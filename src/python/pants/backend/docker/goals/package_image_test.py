@@ -13,8 +13,8 @@ import pytest
 
 from pants.backend.docker.goals.package_image import (
     DockerBuildTargetStageError,
-    DockerFieldSet,
     DockerImageTagValueError,
+    DockerPackageFieldSet,
     DockerRepositoryNameError,
     build_docker_image,
     parse_image_id_from_docker_build_output,
@@ -150,7 +150,7 @@ def assert_build(
     result = run_rule_with_mocks(
         build_docker_image,
         rule_args=[
-            DockerFieldSet.create(tgt),
+            DockerPackageFieldSet.create(tgt),
             docker_options,
             global_options,
             DockerBinary("/dummy/docker"),
@@ -389,7 +389,7 @@ def test_dynamic_image_version(rule_runner: RuleRunner) -> None:
 
     def assert_tags(name: str, *expect_tags: str) -> None:
         tgt = rule_runner.get_target(Address("docker/test", target_name=name))
-        fs = DockerFieldSet.create(tgt)
+        fs = DockerPackageFieldSet.create(tgt)
         tags = fs.image_refs(
             "image",
             DockerRegistries.from_dict({}),
@@ -1029,7 +1029,7 @@ def test_get_context_root(
         )
         address = Address("src/docker", target_name="image")
         tgt = DockerImageTarget({"context_root": context_root}, address)
-        fs = DockerFieldSet.create(tgt)
+        fs = DockerPackageFieldSet.create(tgt)
         actual_context_root = fs.get_context_root(docker_options.default_context_root)
         assert actual_context_root == expected_context_root
 
@@ -1129,12 +1129,28 @@ ImageRefTest = namedtuple(
                 ),
             ),
         ),
+        ImageRefTest(
+            # Test registry `use_local_alias` (#16354)
+            docker_image=dict(registries=["docker.io", "@private"], repository="our-the/pkg"),
+            registries=dict(
+                private={
+                    "address": "our.registry",
+                    "repository": "the/pkg",
+                    "use_local_alias": True,
+                }
+            ),
+            expect_refs=(
+                "docker.io/our-the/pkg:latest",
+                "private/the/pkg:latest",
+                "our.registry/the/pkg:latest",
+            ),
+        ),
     ],
 )
 def test_image_ref_formatting(test: ImageRefTest) -> None:
     address = Address("src/test/docker", target_name=test.docker_image.pop("name", "image"))
     tgt = DockerImageTarget(test.docker_image, address)
-    field_set = DockerFieldSet.create(tgt)
+    field_set = DockerPackageFieldSet.create(tgt)
     registries = DockerRegistries.from_dict(test.registries)
     interpolation_context = InterpolationContext.from_dict({})
     with test.expect_error or no_exception():
