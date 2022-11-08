@@ -2,9 +2,10 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import collections.abc
+import copy
+import json
 from typing import Any, Dict, List, Union
 
-from pants.util.frozendict import FrozenDict
 from pants.util.strutil import softwrap
 
 
@@ -53,16 +54,6 @@ def _normalize_entry_points(
     }
 
 
-def immutable(obj: Any) -> Any:
-    if isinstance(obj, Dict):
-        return FrozenDict(**{str(k): immutable(v) for (k, v) in obj.items()})
-    if isinstance(obj, (list, tuple)):
-        return tuple(immutable(x) for x in obj)
-    if isinstance(obj, (str, int, float, bool)):
-        return obj
-    raise ValueError(f"Invalid type in python_artifact: {type(obj)}, value={obj}")
-
-
 class PythonArtifact:
     """Represents a Python setup.py-based project."""
 
@@ -88,7 +79,14 @@ class PythonArtifact:
             # coerce entry points from Dict[str, List[str]] to Dict[str, Dict[str, str]]
             kwargs["entry_points"] = _normalize_entry_points(kwargs["entry_points"])
 
-        self._kw: FrozenDict[str, Any] = immutable(kwargs)
+        self._kw: Dict[str, Any] = copy.deepcopy(kwargs)
+        # The kwargs come from a BUILD file, and can contain somewhat arbitrary nested structures,
+        # so we don't have a principled way to make them into a hashable data structure.
+        # E.g., we can't naively turn all lists into tuples because distutils checks that some
+        # fields (such as ext_modules) are lists, and doesn't accept tuples.
+        # Instead we stringify and precompute a hash to use in our own __hash__, since we know
+        # that this object is immutable.
+        self._hash: int = hash(json.dumps(kwargs, sort_keys=True))
         self._name: str = name
 
     @property
@@ -96,7 +94,7 @@ class PythonArtifact:
         return self._name
 
     @property
-    def kwargs(self) -> FrozenDict[str, Any]:
+    def kwargs(self) -> Dict[str, Any]:
         return self._kw
 
     def __eq__(self, other: Any) -> bool:
@@ -105,7 +103,7 @@ class PythonArtifact:
         return self._kw == other._kw
 
     def __hash__(self) -> int:
-        return hash(self._kw)
+        return self._hash
 
     def __str__(self) -> str:
         return self.name

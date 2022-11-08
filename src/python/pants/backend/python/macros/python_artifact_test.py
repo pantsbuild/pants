@@ -5,9 +5,8 @@ import re
 
 import pytest
 
-from pants.backend.python.macros.python_artifact import _normalize_entry_points, immutable
+from pants.backend.python.macros.python_artifact import _normalize_entry_points
 from pants.testutil.pytest_util import no_exception
-from pants.util.frozendict import FrozenDict
 
 
 @pytest.mark.parametrize(
@@ -72,30 +71,3 @@ from pants.util.frozendict import FrozenDict
 def test_normalize_entry_points(entry_points, normalized, expect) -> None:
     with expect:
         assert _normalize_entry_points(entry_points) == normalized
-
-
-def test_immutable() -> None:
-    assert immutable(
-        {
-            "a": "aa",
-            "b": ["bb", "bbb", 22, False, [{"b4": "b5"}], {"b6": ["b7", "b8"]}],
-            "c": True,
-            "d": {"e": ("ee",), "f": [1, 2.3, "g", {"gg": ""}]},
-            12: "12",
-        }
-    ) == FrozenDict(
-        {
-            "a": "aa",
-            "b": (
-                "bb",
-                "bbb",
-                22,
-                False,
-                (FrozenDict({"b4": "b5"}),),
-                FrozenDict({"b6": ("b7", "b8")}),
-            ),
-            "c": True,
-            "d": FrozenDict({"e": ("ee",), "f": (1, 2.3, "g", FrozenDict({"gg": ""}))}),
-            "12": "12",
-        }
-    )
