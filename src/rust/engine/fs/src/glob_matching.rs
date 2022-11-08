@@ -417,6 +417,7 @@ trait GlobMatchingImplementation<E: Display + Send + Sync + 'static>: Vfs<E> {
     symbolic_path: PathBuf,
     wildcard: Pattern,
     exclude: &Arc<GitignoreStyleExcludes>,
+    symlink_behavior: SymlinkBehavior,
     link_depth: LinkDepth,
   ) -> Result<Vec<(PathStat, LinkDepth)>, E> {
     // List the directory.
@@ -458,6 +459,13 @@ trait GlobMatchingImplementation<E: Display + Send + Sync + 'static>: Vfs<E> {
                   if link_depth >= MAX_LINK_DEPTH {
                     return Err(Self::mk_error(&format!(
                       "Maximum link depth exceeded at {l:?} for {stat_symbolic_path:?}"
+                    )));
+                  }
+
+                  if let SymlinkBehavior::Aware = symlink_behavior {
+                    return Ok(Some((
+                      PathStat::link(stat_symbolic_path, l.clone()),
+                      link_depth + 1,
                     )));
                   }
 
@@ -629,6 +637,7 @@ trait GlobMatchingImplementation<E: Display + Send + Sync + 'static>: Vfs<E> {
             canonical_dir,
             symbolic_path,
             wildcard,
+            symlink_behavior,
             link_depth,
           )
           .await
@@ -663,11 +672,12 @@ trait GlobMatchingImplementation<E: Display + Send + Sync + 'static>: Vfs<E> {
     canonical_dir: Dir,
     symbolic_path: PathBuf,
     wildcard: Pattern,
+    symlink_behavior: SymlinkBehavior,
     link_depth: LinkDepth,
   ) -> Result<bool, E> {
     // Filter directory listing to append PathStats, with no continuation.
     let path_stats = self
-      .directory_listing(canonical_dir, symbolic_path, wildcard, &exclude, link_depth)
+      .directory_listing(canonical_dir, symbolic_path, wildcard, &exclude, symlink_behavior, link_depth)
       .await?;
 
     let mut result = result.lock();
@@ -690,7 +700,7 @@ trait GlobMatchingImplementation<E: Display + Send + Sync + 'static>: Vfs<E> {
     // Filter directory listing and recurse for matched Dirs.
     let context = self.clone();
     let path_stats = self
-      .directory_listing(canonical_dir, symbolic_path, wildcard, &exclude, link_depth)
+      .directory_listing(canonical_dir, symbolic_path, wildcard, &exclude, symlink_behavior, link_depth)
       .await?;
 
     let path_globs = path_stats
@@ -700,7 +710,6 @@ trait GlobMatchingImplementation<E: Display + Send + Sync + 'static>: Vfs<E> {
           PathGlob::parse_globs(stat, path, &remainder, link_depth)
             .map_err(|e| Self::mk_error(e.as_str())),
         ),
-        // @TODO not none
         PathStat::Link { .. } => None,
         PathStat::File { .. } => None,
       })

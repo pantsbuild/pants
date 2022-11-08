@@ -125,7 +125,7 @@ impl CommandRunner {
     .parse()?;
 
     let path_stats = posix_fs
-      .expand_globs(output_globs, SymlinkBehavior::Oblivious, None)
+      .expand_globs(output_globs, SymlinkBehavior::Aware, None)
       .map_err(|err| format!("Error expanding output globs: {}", err))
       .await?;
     Snapshot::from_path_stats(
