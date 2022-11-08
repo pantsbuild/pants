@@ -2,6 +2,8 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import collections.abc
+import copy
+import json
 from typing import Any, Dict, List, Union
 
 from pants.util.strutil import softwrap
@@ -77,8 +79,14 @@ class PythonArtifact:
             # coerce entry points from Dict[str, List[str]] to Dict[str, Dict[str, str]]
             kwargs["entry_points"] = _normalize_entry_points(kwargs["entry_points"])
 
-        self._kw: Dict[str, Any] = kwargs
-        self._binaries = {}
+        self._kw: Dict[str, Any] = copy.deepcopy(kwargs)
+        # The kwargs come from a BUILD file, and can contain somewhat arbitrary nested structures,
+        # so we don't have a principled way to make them into a hashable data structure.
+        # E.g., we can't naively turn all lists into tuples because distutils checks that some
+        # fields (such as ext_modules) are lists, and doesn't accept tuples.
+        # Instead we stringify and precompute a hash to use in our own __hash__, since we know
+        # that this object is immutable.
+        self._hash: int = hash(json.dumps(kwargs, sort_keys=True))
         self._name: str = name
 
     @property
@@ -89,9 +97,13 @@ class PythonArtifact:
     def kwargs(self) -> Dict[str, Any]:
         return self._kw
 
-    @property
-    def binaries(self):
-        return self._binaries
+    def __eq__(self, other: Any) -> bool:
+        if not isinstance(other, PythonArtifact):
+            return False
+        return self._kw == other._kw
+
+    def __hash__(self) -> int:
+        return self._hash
 
     def __str__(self) -> str:
         return self.name
