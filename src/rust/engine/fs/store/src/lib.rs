@@ -955,19 +955,26 @@ impl Store {
   /// a side effect, if one is configured.
   pub async fn ensure_local_has_files(
     &self,
-    mut file_digests: Vec<Digest>,
-    directory_digests: Vec<DirectoryDigest>,
+    mut file_digests: HashSet<Digest>,
+    directory_digests: HashSet<DirectoryDigest>,
   ) -> Result<(), StoreError> {
     for dir_digest in directory_digests.into_iter() {
       self
         .load_digest_trie(dir_digest)
         .await?
         .walk(SymlinkBehavior::Aware, &mut |_, entry| match entry {
-          directory::Entry::File(f) => file_digests.push(f.digest()),
+          directory::Entry::File(f) => {
+            file_digests.insert(f.digest());
+          }
           directory::Entry::Symlink(_) | directory::Entry::Directory(_) => (),
         });
     }
-    for file_digest in file_digests {
+    let missing_file_digests = self
+      .local
+      .get_missing_digests(EntryType::File, file_digests)
+      .await?;
+
+    for file_digest in missing_file_digests {
       if let Err(e) = self
         .load_bytes_with(EntryType::File, file_digest, |_| Ok(()), |_| Ok(()))
         .await

@@ -219,7 +219,7 @@ async fn load_recursive_directory() {
     .build();
 
   new_store(dir.path(), &cas.address())
-    .ensure_local_has_files(vec![], vec![recursive_testdir_digest.clone()])
+    .ensure_local_has_files(vec![], vec![recursive_testdir_digest.clone().collect()])
     .await
     .expect("Downloading recursive directory should have succeeded.");
 

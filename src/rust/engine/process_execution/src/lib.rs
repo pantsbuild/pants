@@ -27,7 +27,7 @@
 #[macro_use]
 extern crate derivative;
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::convert::{TryFrom, TryInto};
 use std::fmt::{self, Debug, Display};
 use std::path::PathBuf;
@@ -835,8 +835,8 @@ pub(crate) async fn check_cache_content(
       let response = response.clone();
       let fetch_result = in_workunit!("eager_fetch_action_cache", Level::Trace, |_workunit| store
         .ensure_local_has_files(
-          vec![response.stdout_digest, response.stderr_digest],
-          vec![response.output_directory]
+          HashSet::from([response.stdout_digest, response.stderr_digest]),
+          HashSet::from([response.output_directory])
         ))
       .await;
       match fetch_result {
