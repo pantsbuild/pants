@@ -586,6 +586,9 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
         )
         .await?;
 
+        store
+          .ensure_directory_digest_persisted(snapshot.clone().into())
+          .await?;
         let report = ensure_uploaded_to_remote(&store, store_has_remote, snapshot.digest).await?;
         print_upload_summary(args.value_of("output-mode"), &report);
 
