@@ -218,17 +218,17 @@ def test_dependents_rules(rule_runner: RuleRunner, rules: list[str], kwargs, exp
         },
     )
 
+    rsp = rule_runner.request(
+        DependenciesRuleAction,
+        [
+            DependenciesRuleActionRequest(
+                Address("src/origin"),
+                dependencies=Addresses([Address("src/dependency")]),
+                description_of_origin="test",
+            )
+        ],
+    )
     with expect_error or no_exception():
-        rsp = rule_runner.request(
-            DependenciesRuleAction,
-            [
-                DependenciesRuleActionRequest(
-                    Address("src/origin"),
-                    dependencies=Addresses([Address("src/dependency")]),
-                    description_of_origin="test",
-                )
-            ],
-        )
         rsp.execute_actions()
 
 
@@ -257,16 +257,15 @@ def test_dependencies_rules(
         },
     )
 
+    rsp = rule_runner.request(
+        DependenciesRuleAction,
+        [
+            DependenciesRuleActionRequest(
+                Address("src/origin"),
+                dependencies=Addresses([Address("src/dependency")]),
+                description_of_origin="test",
+            )
+        ],
+    )
     with expect_error or no_exception():
-        rsp = rule_runner.request(
-            DependenciesRuleAction,
-            [
-                DependenciesRuleActionRequest(
-                    Address("src/origin"),
-                    dependencies=Addresses([Address("src/dependency")]),
-                    description_of_origin="test",
-                )
-            ],
-        )
-        print(rsp)
         rsp.execute_actions()
