@@ -70,9 +70,8 @@ jobs:
 
         '
     - name: Bootstrap Pants
-      run: './pants --version
-
-        '
+      run: ./pants version > ${{ runner.temp }}/_pants_version.stdout && [[ -s ${{
+        runner.temp }}/_pants_version.stdout ]]
     - name: Run smoke tests
       run: './pants list ::
 
@@ -184,9 +183,8 @@ jobs:
 
         '
     - name: Bootstrap Pants
-      run: './pants --version
-
-        '
+      run: ./pants version > ${{ runner.temp }}/_pants_version.stdout && [[ -s ${{
+        runner.temp }}/_pants_version.stdout ]]
     - name: Run smoke tests
       run: './pants list ::
 

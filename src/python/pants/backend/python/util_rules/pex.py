@@ -10,7 +10,7 @@ import os
 import shlex
 from dataclasses import dataclass
 from pathlib import PurePath
-from textwrap import dedent
+from textwrap import dedent  # noqa: PNT20
 from typing import Iterable, Iterator, Mapping, TypeVar
 
 import packaging.specifiers
