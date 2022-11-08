@@ -1130,10 +1130,14 @@ ImageRefTest = namedtuple(
             ),
         ),
         ImageRefTest(
-            # Test registry `run_as_alias` (#16354)
+            # Test registry `use_local_alias` (#16354)
             docker_image=dict(registries=["docker.io", "@private"], repository="our-the/pkg"),
             registries=dict(
-                private={"address": "our.registry", "repository": "the/pkg", "run_as_alias": True}
+                private={
+                    "address": "our.registry",
+                    "repository": "the/pkg",
+                    "use_local_alias": True,
+                }
             ),
             expect_refs=(
                 "docker.io/our-the/pkg:latest",

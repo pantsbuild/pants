@@ -37,9 +37,9 @@ async def docker_image_run_request(
     build_request = DockerPackageFieldSet.create(wrapped_target.target)
     registries = options.registries()
     for registry in registries.get(*(build_request.registries.value or [])):
-        if registry.run_as_alias:
+        if registry.use_local_alias:
             # We only need to tag a single image name for run requests if there is a registry with
-            # `run_as_alias` as true.
+            # `use_local_alias` as true.
             build_request = replace(
                 build_request,
                 registries=DockerImageRegistriesField((registry.alias,), field_set.address),

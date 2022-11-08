@@ -87,8 +87,8 @@ async def push_docker_images(
             if registry.skip_push and tag.startswith(f"{registry.address}/"):
                 skip_push_reasons["skip_push"][registry.alias].add(tag)
                 break
-            if registry.run_as_alias and tag.startswith(f"{registry.alias}/"):
-                skip_push_reasons["run_as_alias"][registry.alias].add(tag)
+            if registry.use_local_alias and tag.startswith(f"{registry.alias}/"):
+                skip_push_reasons["use_local_alias"][registry.alias].add(tag)
                 break
         else:
             refs.append(tag)

@@ -179,7 +179,7 @@ class DockerPackageFieldSet(PackageFieldSet):
                 interpolation_context,
             )
             for image_name in image_names:
-                if registry.run_as_alias and registry.alias:
+                if registry.use_local_alias and registry.alias:
                     yield "/".join([registry.alias, image_name])
                 yield "/".join([registry.address, image_name])
 
