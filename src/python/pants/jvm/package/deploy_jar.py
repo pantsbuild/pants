@@ -28,10 +28,12 @@ from pants.jvm.compile import (
     FallibleClasspathEntry,
 )
 from pants.jvm.jar_tool.jar_tool import JarToolRequest
+from pants.jvm.shading.rules import ShadedJar, ShadeJarRequest
 from pants.jvm.strip_jar.strip_jar import StripJarRequest
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import (
     DeployJarDuplicatePolicyField,
+    DeployJarShadingRulesField,
     JvmDependenciesField,
     JvmJdkField,
     JvmMainClassNameField,
@@ -53,6 +55,7 @@ class DeployJarFieldSet(PackageFieldSet, RunFieldSet):
     dependencies: JvmDependenciesField
     jdk_version: JvmJdkField
     duplicate_policy: DeployJarDuplicatePolicyField
+    shading_rules: DeployJarShadingRulesField
 
 
 class DeployJarClasspathEntryRequest(ClasspathEntryRequest):
@@ -100,6 +103,7 @@ async def package_deploy_jar(
     1. Resolving/compiling a Classpath for the `root_address` target,
     2. Creating a deploy jar with a valid ZIP index and deduplicated entries
     3. (optionally) Stripping the jar of all metadata that may cause it to be non-reproducible (https://reproducible-builds.org)
+    4. (optionally) Apply shading rules to the bytecode inside the jar file
     """
 
     if field_set.main_class.value is None:
@@ -135,7 +139,6 @@ async def package_deploy_jar(
     #
     # 3. Strip the JAR from  all non-reproducible metadata if requested so
     #
-
     if jvm.reproducible_jars:
         jar_digest = await Get(
             Digest,
@@ -145,9 +148,24 @@ async def package_deploy_jar(
             ),
         )
 
-    renamed_output_digest = await Get(Digest, AddPrefix(jar_digest, str(output_filename.parent)))
+    #
+    # 4. Apply shading rules
+    #
+    if field_set.shading_rules.value:
+        shaded_jar = await Get(
+            ShadedJar,
+            ShadeJarRequest(
+                path=output_filename,
+                digest=jar_digest,
+                rules=field_set.shading_rules.value,
+                skip_manifest=False,
+            ),
+        )
+        jar_digest = shaded_jar.digest
+
+    prefixed_output_digest = await Get(Digest, AddPrefix(jar_digest, str(output_filename.parent)))
     artifact = BuiltPackageArtifact(relpath=str(output_filename))
-    return BuiltPackage(digest=renamed_output_digest, artifacts=(artifact,))
+    return BuiltPackage(digest=prefixed_output_digest, artifacts=(artifact,))
 
 
 def rules():

@@ -6,7 +6,6 @@ from __future__ import annotations
 import ast
 import itertools
 from dataclasses import dataclass
-from textwrap import dedent
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -26,6 +25,7 @@ from pants.engine.internals.native_engine import (
     PyGeneratorResponseGetMulti,
 )
 from pants.util.meta import frozen_after_init
+from pants.util.strutil import softwrap
 
 _Output = TypeVar("_Output")
 _Input = TypeVar("_Input")
@@ -537,8 +537,8 @@ async def MultiGet(  # noqa: F811
     )
     if any(arg is None for arg in likely_args_exlicitly_passed):
         raise ValueError(
-            dedent(
-                f"""\
+            softwrap(
+                f"""
                 Unexpected MultiGet None arguments: {', '.join(
                     map(str, likely_args_exlicitly_passed)
                 )}
@@ -550,13 +550,13 @@ async def MultiGet(  # noqa: F811
         )
 
     raise TypeError(
-        dedent(
-            f"""\
+        softwrap(
+            f"""
             Unexpected MultiGet argument types: {', '.join(map(str, likely_args_exlicitly_passed))}
 
             A MultiGet can be constructed in two ways:
-            1. MultiGet(Iterable[Get[T]]) -> Tuple[T]
-            2. MultiGet(Get[T1]], ...) -> Tuple[T1, T2, ...]
+              1. MultiGet(Iterable[Get[T]]) -> Tuple[T]
+              2. MultiGet(Get[T1]], ...) -> Tuple[T1, T2, ...]
 
             The 1st form is intended for homogenous collections of Gets and emulates an
             async `for ...` comprehension used to iterate over the collection in parallel and

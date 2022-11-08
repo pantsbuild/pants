@@ -19,6 +19,7 @@ from pants.jvm.goals import lockfile
 from pants.jvm.jar_tool import jar_tool
 from pants.jvm.package import deploy_jar, war
 from pants.jvm.resolve import coursier_fetch, coursier_setup, jvm_tool
+from pants.jvm.shading.rules import rules as shading_rules
 from pants.jvm.strip_jar import strip_jar
 from pants.jvm.target_types import DeployJarTarget, JvmArtifactTarget, JvmWarTarget
 from pants.jvm.target_types import build_file_aliases as jvm_build_file_aliases
@@ -48,6 +49,7 @@ def rules():
         *lockfile.rules(),
         *coursier_fetch.rules(),
         *coursier_setup.rules(),
+        *shading_rules(),
         *dep_inf_rules(),
         *jvm_util_rules.rules(),
         *jdk_rules.rules(),
