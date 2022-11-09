@@ -958,17 +958,23 @@ impl Store {
     mut file_digests: HashSet<Digest>,
     directory_digests: HashSet<DirectoryDigest>,
   ) -> Result<(), StoreError> {
-    for dir_digest in directory_digests.into_iter() {
-      self
-        .load_digest_trie(dir_digest)
-        .await?
-        .walk(SymlinkBehavior::Aware, &mut |_, entry| match entry {
-          directory::Entry::File(f) => {
-            file_digests.insert(f.digest());
-          }
-          directory::Entry::Symlink(_) | directory::Entry::Directory(_) => (),
-        });
-    }
+    let file_digests_from_directories =
+      future::try_join_all(directory_digests.into_iter().map(|dir_digest| async move {
+        let mut maybe_file_digest = None;
+        self
+          .load_digest_trie(dir_digest)
+          .await?
+          .walk(SymlinkBehavior::Aware, &mut |_, entry| match entry {
+            directory::Entry::File(f) => {
+              maybe_file_digest = Some(f.digest());
+            }
+            directory::Entry::Symlink(_) | directory::Entry::Directory(_) => (),
+          });
+        Ok::<_, StoreError>(maybe_file_digest)
+      }))
+      .await?;
+    file_digests.extend(file_digests_from_directories.into_iter().flatten());
+
     let missing_file_digests = self
       .local
       .get_missing_digests(EntryType::File, file_digests)
