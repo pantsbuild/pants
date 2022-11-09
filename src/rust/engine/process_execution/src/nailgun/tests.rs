@@ -1,13 +1,13 @@
 use std::path::PathBuf;
 
-use store::Store;
+use store::{ImmutableInputs, Store};
 use task_executor::Executor;
 use tempfile::TempDir;
 use testutil::owned_string_vec;
 use workunit_store::WorkunitStore;
 
 use crate::nailgun::NailgunPool;
-use crate::{ImmutableInputs, NamedCaches, Process};
+use crate::{NamedCaches, Process};
 
 fn pool(size: usize) -> (NailgunPool, NamedCaches, ImmutableInputs) {
   let _ = WorkunitStore::setup_for_tests();

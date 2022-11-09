@@ -46,7 +46,7 @@ use hashing::{Digest, Fingerprint};
 use parking_lot::Mutex;
 use protos::require_digest;
 use serde_derive::Serialize;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use store::{
   Snapshot, SnapshotOps, Store, StoreError, StoreFileByDigest, SubsetParams, UploadSummary,
 };
@@ -535,7 +535,13 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
           output_digest_opt.ok_or_else(|| ExitError("not found".into(), ExitCode::NotFound))?;
         Ok(
           store
-            .materialize_directory(destination, output_digest, Permissions::Writable)
+            .materialize_directory(
+              destination,
+              output_digest,
+              &BTreeSet::new(),
+              None,
+              Permissions::Writable,
+            )
             .await?,
         )
       }
@@ -553,7 +559,13 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
         let digest = DirectoryDigest::from_persisted_digest(Digest::new(fingerprint, size_bytes));
         Ok(
           store
-            .materialize_directory(destination, digest, Permissions::Writable)
+            .materialize_directory(
+              destination,
+              digest,
+              &BTreeSet::new(),
+              None,
+              Permissions::Writable,
+            )
             .await?,
         )
       }

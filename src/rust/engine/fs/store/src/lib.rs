@@ -26,6 +26,8 @@
 #![allow(clippy::mutex_atomic)]
 #![recursion_limit = "256"]
 
+mod immutable_inputs;
+pub use crate::immutable_inputs::{ImmutableInputs, WorkdirSymlink};
 mod snapshot;
 pub use crate::snapshot::{OneOffStoreFileByDigest, Snapshot, StoreFileByDigest};
 mod snapshot_ops;
@@ -35,7 +37,7 @@ mod snapshot_ops_tests;
 mod snapshot_tests;
 pub use crate::snapshot_ops::{SnapshotOps, SubsetParams};
 
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::fmt::{self, Debug, Display};
 use std::fs::OpenOptions;
 use std::future::Future;
@@ -72,6 +74,9 @@ use crate::remote::ByteStoreError;
 
 const MEGABYTES: usize = 1024 * 1024;
 const GIGABYTES: usize = 1024 * MEGABYTES;
+
+/// How big a file must be to become an immutable input symlink.
+const IMMUTABLE_FILE_SIZE_LIMIT: usize = MEGABYTES;
 
 mod local;
 #[cfg(test)]
@@ -247,6 +252,7 @@ impl RemoteStore {
 pub struct Store {
   local: local::ByteStore,
   remote: Option<RemoteStore>,
+  immutable_inputs_base: Option<PathBuf>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -282,17 +288,20 @@ impl Store {
     Ok(Store {
       local: local::ByteStore::new(executor, path)?,
       remote: None,
+      immutable_inputs_base: None,
     })
   }
 
   pub fn local_only_with_options<P: AsRef<Path>>(
     executor: task_executor::Executor,
     path: P,
+    immutable_inputs_base: &Path,
     options: LocalOptions,
   ) -> Result<Store, String> {
     Ok(Store {
       local: local::ByteStore::new_with_options(executor, path, options)?,
       remote: None,
+      immutable_inputs_base: Some(immutable_inputs_base.to_path_buf()),
     })
   }
 
@@ -306,6 +315,7 @@ impl Store {
     Store {
       local: self.local,
       remote: None,
+      immutable_inputs_base: self.immutable_inputs_base,
     }
   }
 
@@ -340,6 +350,7 @@ impl Store {
         capabilities_cell_opt,
         batch_api_size_limit,
       )?)),
+      immutable_inputs_base: self.immutable_inputs_base,
     })
   }
 
@@ -1205,6 +1216,8 @@ impl Store {
     &self,
     destination: PathBuf,
     digest: DirectoryDigest,
+    mutable_paths: &BTreeSet<RelativePath>,
+    immutable_inputs: Option<&ImmutableInputs>,
     perms: Permissions,
   ) -> Result<(), StoreError> {
     // Load the DigestTrie for the digest, and convert it into a mapping between a fully qualified
@@ -1222,8 +1235,20 @@ impl Store {
         }
       });
 
+    let mutable_paths = mutable_paths
+      .iter()
+      .map(|p| destination.join(p))
+      .collect::<BTreeSet<_>>();
+
     self
-      .materialize_directory_helper(destination, true, &parent_to_child, perms)
+      .materialize_directory_helper(
+        destination,
+        true,
+        &parent_to_child,
+        &mutable_paths,
+        immutable_inputs,
+        perms,
+      )
       .await
   }
 
@@ -1232,6 +1257,8 @@ impl Store {
     destination: PathBuf,
     is_root: bool,
     parent_to_child: &'a HashMap<PathBuf, Vec<directory::Entry>>,
+    mutable_paths: &'a BTreeSet<PathBuf>,
+    immutable_inputs: Option<&'a ImmutableInputs>,
     perms: Permissions,
   ) -> BoxFuture<'a, Result<(), StoreError>> {
     let store = self.clone();
@@ -1270,7 +1297,22 @@ impl Store {
                   Permissions::Writable if f.is_executable() => 0o755,
                   Permissions::Writable => 0o644,
                 };
-                store.materialize_file(path, f.digest(), mode).await
+
+                if immutable_inputs.is_some()
+                  && f.digest().size_bytes > IMMUTABLE_FILE_SIZE_LIMIT
+                  && !mutable_paths.contains(&path)
+                  && !mutable_paths.iter().any(|p| path.starts_with(p))
+                {
+                  let dest_path = immutable_inputs
+                    .unwrap()
+                    .path_for_file(f.digest(), mode)
+                    .await?;
+                  store
+                    .materialize_symlink(path, dest_path.to_str().unwrap().to_string())
+                    .await
+                } else {
+                  store.materialize_file(path, f.digest(), mode).await
+                }
               }
               directory::Entry::Symlink(s) => {
                 store
@@ -1279,7 +1321,14 @@ impl Store {
               }
               directory::Entry::Directory(_) => {
                 store
-                  .materialize_directory_helper(path, false, parent_to_child, perms)
+                  .materialize_directory_helper(
+                    path,
+                    false,
+                    parent_to_child,
+                    mutable_paths,
+                    immutable_inputs,
+                    perms,
+                  )
                   .await
               }
             }
