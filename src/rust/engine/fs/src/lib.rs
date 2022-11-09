@@ -172,7 +172,7 @@ impl Stat {
     match self {
       &Stat::Dir(Dir(ref p)) => p.as_path(),
       &Stat::File(File { path: ref p, .. }) => p.as_path(),
-      &Stat::Link(Link(ref p)) => p.as_path(),
+      &Stat::Link(Link { path: ref p, .. }) => p.as_path(),
     }
   }
 
@@ -187,13 +187,16 @@ impl Stat {
     })
   }
 
-  pub fn link(path: PathBuf) -> Stat {
-    Stat::Link(Link(path))
+  pub fn link(path: PathBuf, target: PathBuf) -> Stat {
+    Stat::Link(Link { path, target })
   }
 }
 
 #[derive(Clone, Debug, DeepSizeOf, Eq, Hash, PartialEq)]
-pub struct Link(pub PathBuf);
+pub struct Link {
+  pub path: PathBuf,
+  pub target: PathBuf,
+}
 
 #[derive(Clone, Debug, DeepSizeOf, Eq, Hash, PartialEq)]
 pub struct Dir(pub PathBuf);
@@ -218,6 +221,12 @@ pub enum PathStat {
     // The canonical Stat that underlies the Path.
     stat: File,
   },
+  Link {
+    // The symbolic name of some filesystem Path, which is context specific.
+    path: PathBuf,
+    // The canonical Stat that underlies the Path.
+    stat: Link,
+  },
 }
 
 impl PathStat {
@@ -229,10 +238,15 @@ impl PathStat {
     PathStat::File { path, stat }
   }
 
+  pub fn link(path: PathBuf, stat: Link) -> PathStat {
+    PathStat::Link { path, stat }
+  }
+
   pub fn path(&self) -> &Path {
     match self {
       &PathStat::Dir { ref path, .. } => path.as_path(),
       &PathStat::File { ref path, .. } => path.as_path(),
+      &PathStat::Link { ref path, .. } => path.as_path(),
     }
   }
 }
@@ -521,8 +535,8 @@ impl PosixFS {
   }
 
   pub async fn read_link(&self, link: &Link) -> Result<PathBuf, io::Error> {
-    let link_parent = link.0.parent().map(Path::to_owned);
-    let link_abs = self.root.0.join(link.0.as_path());
+    let link_parent = link.path.parent().map(Path::to_owned);
+    let link_abs = self.root.0.join(link.path.as_path());
     self
       .executor
       .spawn_blocking(move || {
@@ -592,7 +606,10 @@ impl PosixFS {
       ));
     }
     if file_type.is_symlink() {
-      Ok(Some(Stat::Link(Link(path_for_stat))))
+      Ok(Some(Stat::Link(Link {
+        path: path_for_stat.clone(),
+        target: std::fs::read_link(absolute_path_to_root.join(path_for_stat))?,
+      })))
     } else if file_type.is_file() {
       let is_executable = compute_metadata()?.permissions().mode() & 0o100 == 0o100;
       Ok(Some(Stat::File(File {
@@ -648,20 +665,20 @@ impl Vfs<io::Error> for Arc<PosixFS> {
 impl Vfs<String> for DigestTrie {
   async fn read_link(&self, link: &Link) -> Result<PathBuf, String> {
     let entry = self
-      .entry(&link.0)?
+      .entry(&link.path)?
       .ok_or_else(|| format!("{:?} does not exist within this Snapshot.", link))?;
     let target = match entry {
       directory::Entry::File(_) => {
         return Err(format!(
           "Path `{}` was a file rather than a symlink.",
-          link.0.display()
+          link.path.display()
         ))
       }
       directory::Entry::Symlink(s) => s.target(),
       directory::Entry::Directory(_) => {
         return Err(format!(
           "Path `{}` was a directory rather than a symlink.",
-          link.0.display()
+          link.path.display()
         ))
       }
     };
@@ -705,7 +722,10 @@ impl Vfs<String> for DigestTrie {
             path: dir.0.join(f.name().as_ref()),
             is_executable: f.is_executable(),
           }),
-          directory::Entry::Symlink(s) => Stat::Link(Link(dir.0.join(s.name().as_ref()))),
+          directory::Entry::Symlink(s) => Stat::Link(Link {
+            path: dir.0.join(s.name().as_ref()),
+            target: s.target().to_path_buf(),
+          }),
           directory::Entry::Directory(d) => Stat::Dir(Dir(dir.0.join(d.name().as_ref()))),
         })
         .collect(),
@@ -741,7 +761,7 @@ impl PathStatGetter<io::Error> for Arc<PosixFS> {
                 async move {
                   match maybe_stat {
                     // Note: This will drop PathStats for symlinks which don't point anywhere.
-                    Some(Stat::Link(link)) => fs.canonicalize_link(link.0.clone(), link).await,
+                    Some(Stat::Link(link)) => fs.canonicalize_link(link.path.clone(), link).await,
                     Some(Stat::Dir(dir)) => Ok(Some(PathStat::dir(dir.0.clone(), dir))),
                     Some(Stat::File(file)) => Ok(Some(PathStat::file(file.path.clone(), file))),
                     None => Ok(None),
