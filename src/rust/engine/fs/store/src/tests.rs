@@ -221,7 +221,7 @@ async fn load_recursive_directory() {
   new_store(dir.path(), &cas.address())
     .ensure_downloaded(
       HashSet::new(),
-      HashSet::from([recursive_testdir_digest.clone().collect()]),
+      HashSet::from([recursive_testdir_digest.clone()]),
     )
     .await
     .expect("Downloading recursive directory should have succeeded.");
