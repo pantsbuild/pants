@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from pathlib import PurePath
 
+from pants.backend.go.target_types import GoPackageTarget, GoTestRaceDetectorEnabledField
 from pants.backend.go.util_rules.coverage import GoCoverMode
 from pants.core.util_rules.distdir import DistDir
 from pants.option.option_types import ArgsListOption, BoolOption, EnumOption, SkipOption, StrOption
@@ -67,6 +68,19 @@ class GoTestSubsystem(Subsystem):
     )
 
     skip = SkipOption("test")
+
+    with_race = BoolOption(
+        default=False,
+        help=softwrap(
+            f"""
+            If true, then enable the Go data race detector when running tests. The use of the race detector can also
+            be controlled on a test-by-test basis by setting the `{GoTestRaceDetectorEnabledField.alias}` field to
+            `True` on the relevant `{GoPackageTarget.alias}` target.
+
+            See https://go.dev/doc/articles/race_detector for additional information about the data race detector.
+            """
+        ),
+    )
 
     def coverage_output_dir(self, distdir: DistDir, import_path: str) -> PurePath:
         import_path_escaped = import_path.replace("/", "_")

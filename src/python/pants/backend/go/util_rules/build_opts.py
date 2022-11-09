@@ -5,7 +5,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from pants.backend.go.subsystems.golang import GolangSubsystem
-from pants.backend.go.target_types import GoCgoEnabledField
+from pants.backend.go.subsystems.gotest import GoTestSubsystem
+from pants.backend.go.target_types import (
+    GoCgoEnabledField,
+    GoRaceDetectorEnabledField,
+    GoTestRaceDetectorEnabledField,
+)
 from pants.backend.go.util_rules.go_mod import OwningGoMod, OwningGoModRequest
 from pants.build_graph.address import Address
 from pants.engine.engine_aware import EngineAwareParameter
@@ -20,10 +25,14 @@ class GoBuildOptions:
     # Controls whether cgo support is enabled.
     cgo_enabled: bool = True
 
+    # Enable the Go data race detector is true.
+    with_race_detector: bool = False
+
 
 @dataclass(frozen=True)
 class GoBuildOptionsFromTargetRequest(EngineAwareParameter):
     address: Address
+    for_tests: bool = False
 
     def debug_hint(self) -> str | None:
         return self.address.spec
@@ -34,11 +43,21 @@ class GoBuildOptionsFieldSet(FieldSet):
     required_fields = (GoCgoEnabledField,)
 
     cgo_enabled: GoCgoEnabledField
+    with_race: GoRaceDetectorEnabledField
+
+
+@dataclass(frozen=True)
+class GoTestBuildOptionsFieldSet(FieldSet):
+    required_fields = (GoTestRaceDetectorEnabledField,)
+
+    with_race: GoTestRaceDetectorEnabledField
 
 
 @rule
 async def go_extract_build_options_from_target(
-    request: GoBuildOptionsFromTargetRequest, golang: GolangSubsystem
+    request: GoBuildOptionsFromTargetRequest,
+    golang: GolangSubsystem,
+    go_test_subsystem: GoTestSubsystem,
 ) -> GoBuildOptions:
     wrapped_target = await Get(
         WrappedTarget,
@@ -50,6 +69,10 @@ async def go_extract_build_options_from_target(
     target_fields: GoBuildOptionsFieldSet | None = None
     if GoBuildOptionsFieldSet.is_applicable(target):
         target_fields = GoBuildOptionsFieldSet.create(target)
+
+    test_target_fields: GoTestBuildOptionsFieldSet | None = None
+    if request.for_tests and GoTestBuildOptionsFieldSet.is_applicable(target):
+        test_target_fields = GoTestBuildOptionsFieldSet.create(target)
 
     # Find the owning `go_mod` target so any unspecified fields on a target like `go_binary` will then
     # fallback to the `go_mod`. If the target does not have build option fields, then only the `go_mod`
@@ -76,8 +99,22 @@ async def go_extract_build_options_from_target(
     if cgo_enabled is None:
         cgo_enabled = golang.cgo_enabled
 
+    # Extract the `with_race` value for this target.
+    with_race_detector: bool | None = None
+    if test_target_fields is not None and test_target_fields.with_race.value is not None:
+        with_race_detector = test_target_fields.with_race.value
+    if with_race_detector is None:
+        if target_fields is not None and target_fields.with_race.value is not None:
+            with_race_detector = target_fields.with_race.value
+    if with_race_detector is None:
+        if go_mod_target_fields.with_race is not None:
+            with_race_detector = go_mod_target_fields.with_race.value
+    if with_race_detector is None:
+        with_race_detector = go_test_subsystem.with_race
+
     return GoBuildOptions(
         cgo_enabled=cgo_enabled,
+        with_race_detector=with_race_detector,
     )
 
 

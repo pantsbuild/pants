@@ -53,6 +53,23 @@ class GoCgoEnabledField(TriBoolField):
     )
 
 
+class GoRaceDetectorEnabledField(TriBoolField):
+    """Enables the Go data race detector."""
+
+    alias = "with_race"
+    help = softwrap(
+        """
+        Enable compiling the binary with the Go data race detector.
+
+        See https://go.dev/doc/articles/race_detector for additional information about the data race detector.
+        """
+    )
+
+
+class GoTestRaceDetectorEnabledField(GoRaceDetectorEnabledField):
+    alias = "test_with_race"
+
+
 # -----------------------------------------------------------------------------------------------
 # `go_third_party_package` target
 # -----------------------------------------------------------------------------------------------
@@ -164,6 +181,7 @@ class GoModTarget(TargetGenerator):
         GoModDependenciesField,
         GoModSourcesField,
         GoCgoEnabledField,
+        GoRaceDetectorEnabledField,
     )
     copied_fields = COMMON_TARGET_FIELDS
     moved_fields = ()
@@ -241,6 +259,7 @@ class GoPackageTarget(Target):
         GoPackageSourcesField,
         GoTestExtraEnvVarsField,
         GoTestTimeoutField,
+        GoTestRaceDetectorEnabledField,
         SkipGoTestsField,
     )
     help = softwrap(
