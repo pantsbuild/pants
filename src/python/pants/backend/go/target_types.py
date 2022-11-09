@@ -304,6 +304,7 @@ class GoBinaryTarget(Target):
         GoBinaryMainPackageField,
         GoBinaryDependenciesField,
         GoCgoEnabledField,
+        GoRaceDetectorEnabledField,
         RestartableField,
     )
     help = "A Go binary."
