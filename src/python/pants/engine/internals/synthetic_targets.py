@@ -56,16 +56,38 @@ import os.path
 from dataclasses import dataclass
 from typing import ClassVar, Iterable, Sequence
 
-from pants.base.specs import AdditionalSpecPaths, AdditionalSpecPathsRequest
+from pants.base.specs import GlobSpecsProtocol
 from pants.engine.collection import Collection
 from pants.engine.internals.defaults import BuildFileDefaults
 from pants.engine.internals.mapper import AddressMap
 from pants.engine.internals.target_adaptor import TargetAdaptor
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.rules import Get, MultiGet, Rule, collect_rules, rule
 from pants.engine.target import InvalidTargetException
-from pants.engine.unions import UnionMembership, UnionRule, union
+from pants.engine.unions import UnionMembership, union, UnionRule
 from pants.util.frozendict import FrozenDict
 from pants.util.strutil import softwrap
+
+
+@dataclass(frozen=True)
+class SyntheticTargetsSpecPathsRequest:
+    specs: tuple[GlobSpecsProtocol, ...]
+
+
+class SyntheticTargetsSpecPaths(Collection[str]):
+    @staticmethod
+    def from_paths(paths: Iterable[str]) -> SyntheticTargetsSpecPaths:
+        return SyntheticTargetsSpecPaths(sorted(set(paths)))
+
+    @staticmethod
+    def from_request(
+        request: SyntheticTargetsSpecPathsRequest, paths: Iterable[str]
+    ) -> SyntheticTargetsSpecPaths:
+        return SyntheticTargetsSpecPaths.from_paths(
+            filter(
+                lambda path: any(spec.matches_target_residence_dir(path) for spec in request.specs),
+                paths,
+            )
+        )
 
 
 @union
@@ -89,6 +111,19 @@ class SyntheticTargetsRequest:
     directory, unless `request.path` is `SyntheticTargetsRequest.SINGLE_REQUEST_FOR_ALL_TARGETS` in
     which case _all_ synthetic targets should be returned.
     """
+
+    spec_paths_request: ClassVar[type | None] = None
+    """Request class for providing paths in addition to those where BUILD files are found."""
+
+    @union
+    class SpecPathsRequest:
+        pass
+
+    @classmethod
+    def rules(cls) -> Iterator[Rule]:
+        yield UnionRule(SyntheticTargetsRequest, cls)
+        if cls.spec_paths_request is not None:
+            yield UnionRule(SyntheticTargetsRequest.SpecPathsRequest, cls.spec_paths_request)
 
 
 class SyntheticAddressMap(AddressMap):
@@ -172,12 +207,14 @@ class AllSyntheticAddressMaps:
 
     address_maps: FrozenDict[str, SyntheticAddressMaps]
     path_request_types: FrozenDict[str, Sequence[type[SyntheticTargetsRequest]]]
+    spec_paths: Sequence[str]
 
     @classmethod
     def create(
         cls,
         address_maps: Iterable[SyntheticAddressMap],
         requests: Iterable[SyntheticTargetsRequest],
+        spec_paths: Iterable[str],
     ) -> AllSyntheticAddressMaps:
         def address_map_key(address_map: SyntheticAddressMap) -> str:
             return os.path.dirname(address_map.path)
@@ -203,6 +240,7 @@ class AllSyntheticAddressMaps:
                     if path != SyntheticTargetsRequest.SINGLE_REQUEST_FOR_ALL_TARGETS
                 }
             ),
+            spec_paths=tuple(sorted(spec_paths)),
         )
 
     def targets_request_types(self, path: str) -> Iterable[type[SyntheticTargetsRequest]]:
@@ -237,30 +275,30 @@ async def all_synthetic_targets(union_membership: UnionMembership) -> AllSynthet
         for request in requests
         if request.path == SyntheticTargetsRequest.SINGLE_REQUEST_FOR_ALL_TARGETS
     )
+    all_spec_paths = await MultiGet(
+        Get(
+            SyntheticTargetsSpecPaths,
+            SyntheticTargetsRequest.SpecPathsRequest,
+            spec_paths_request(),
+        )
+        for spec_paths_request in union_membership.get(SyntheticTargetsRequest.SpecPathsRequest)
+    )
     return AllSyntheticAddressMaps.create(
         address_maps=itertools.chain.from_iterable(all_synthetic),
         requests=requests,
+        spec_paths=set(itertools.chain.from_iterable(all_spec_paths)),
     )
-
-
-class AdditionalSyntheticTargetsSpecPathsRequest(AdditionalSpecPathsRequest):
-    pass
 
 
 @rule
-def get_additional_synthetic_targets_spec_paths(
-    request: AdditionalSyntheticTargetsSpecPathsRequest, all_synthetic: AllSyntheticAddressMaps
-) -> AdditionalSpecPaths:
-    """Return all known paths for synthetic targets loaded with SINGLE_REQUEST_FOR_ALL_TARGETS.
-
-    Plugins using REQUEST_TARGETS_PER_DIRECTORY are responsible for providing known paths as
-    required them selves.
-    """
-    return AdditionalSpecPaths.from_request(request, all_synthetic.address_maps)
+def get_synthetic_targets_spec_paths(
+    request: SyntheticTargetsSpecPathsRequest, all_synthetic: AllSyntheticAddressMaps
+) -> SyntheticTargetsSpecPaths:
+    """Return all known paths for synthetic targets."""
+    return SyntheticTargetsSpecPaths.from_request(
+        request, itertools.chain(all_synthetic.address_maps, all_synthetic.spec_paths)
+    )
 
 
 def rules():
-    return (
-        *collect_rules(),
-        UnionRule(AdditionalSpecPathsRequest, AdditionalSyntheticTargetsSpecPathsRequest),
-    )
+    return collect_rules()

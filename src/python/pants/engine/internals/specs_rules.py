@@ -12,7 +12,6 @@ from typing import Iterable
 
 from pants.backend.project_info.filter_targets import FilterSubsystem
 from pants.base.specs import (
-    AdditionalSpecPathsRequest,
     AddressLiteralSpec,
     AncestorGlobSpec,
     DirGlobSpec,
@@ -34,6 +33,10 @@ from pants.engine.internals.parametrize import (
     _TargetParametrizationsRequest,
 )
 from pants.engine.internals.selectors import Get, MultiGet
+from pants.engine.internals.synthetic_targets import (
+    SyntheticTargetsSpecPaths,
+    SyntheticTargetsSpecPathsRequest,
+)
 from pants.engine.rules import collect_rules, rule, rule_helper
 from pants.engine.target import (
     FieldSet,
@@ -158,8 +161,8 @@ async def addresses_from_raw_specs_without_file_owners(
         Get(Paths, PathGlobs, validation_globs),
     )
     dirnames = set(
-        await AdditionalSpecPathsRequest._get_additional_spec_paths(
-            union_membership, specs.glob_specs()
+        await Get(
+            SyntheticTargetsSpecPaths, SyntheticTargetsSpecPathsRequest(tuple(specs.glob_specs()))
         )
     )
     dirnames.update(os.path.dirname(f) for f in build_file_paths.files)
