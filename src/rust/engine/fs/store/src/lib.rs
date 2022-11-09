@@ -997,29 +997,35 @@ impl Store {
       return Ok(());
     }
 
-    let remote = self.remote.clone().ok_or_else(|| {
+    let remote = &self.remote.clone().ok_or_else(|| {
       StoreError::MissingDigest(
         "Was not present in the local store".to_owned(),
         *missing_file_digests.iter().next().unwrap(),
       )
     })?;
-    for file_digest in missing_file_digests {
-      if let Err(e) = remote
-        .download_digest_to_local(self.local.clone(), file_digest, EntryType::File, |_| Ok(()))
-        .await
-      {
-        log::debug!("Missing file digest from remote store: {:?}", file_digest);
-        in_workunit!(
-          "missing_file_counter",
-          Level::Trace,
-          |workunit| async move {
-            workunit.increment_counter(Metric::RemoteStoreMissingDigest, 1);
-          },
-        )
-        .await;
-        return Err(e);
-      }
-    }
+    let _ = future::try_join_all(
+      missing_file_digests
+        .into_iter()
+        .map(|file_digest| async move {
+          if let Err(e) = remote
+            .download_digest_to_local(self.local.clone(), file_digest, EntryType::File, |_| Ok(()))
+            .await
+          {
+            log::debug!("Missing file digest from remote store: {:?}", file_digest);
+            in_workunit!(
+              "missing_file_counter",
+              Level::Trace,
+              |workunit| async move {
+                workunit.increment_counter(Metric::RemoteStoreMissingDigest, 1);
+              },
+            )
+            .await;
+            return Err(e);
+          }
+          Ok(())
+        }),
+    )
+    .await?;
     Ok(())
   }
 
