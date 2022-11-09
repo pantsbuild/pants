@@ -68,6 +68,8 @@ def test_export_venv_old_codepath(
             f"--python-enable-resolves={enable_resolves}",
             # Turn off lockfile validation to make the test simpler.
             "--python-invalid-lockfile-behavior=ignore",
+            # Turn off python synthetic lockfile targets to make the test simpler.
+            "--no-python-enable-lockfile-targets",
             symlink_flag,
         ],
         env_inherit={"PATH", "PYENV_ROOT"},
