@@ -834,7 +834,7 @@ pub(crate) async fn check_cache_content(
     CacheContentBehavior::Fetch => {
       let response = response.clone();
       let fetch_result = in_workunit!("eager_fetch_action_cache", Level::Trace, |_workunit| store
-        .ensure_local_has_files(
+        .ensure_downloaded(
           HashSet::from([response.stdout_digest, response.stderr_digest]),
           HashSet::from([response.output_directory])
         ))

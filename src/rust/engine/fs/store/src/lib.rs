@@ -231,7 +231,7 @@ impl RemoteStore {
   }
 
   /// Download the digest to the local byte store from this remote store. The function `f_remote`
-  /// can be used to validate/transform the bytes.
+  /// can be used to validate the bytes.
   async fn download_digest_to_local<
     FRemote: Fn(Bytes) -> Result<(), String> + Send + Sync + 'static,
   >(
@@ -244,9 +244,9 @@ impl RemoteStore {
     let remote_store = self.store.clone();
     self
       .maybe_download(digest, async move {
-        // TODO: Now that we always copy from the remote store to the local store before executing
-        // the caller's logic against the local store, `remote::ByteStore::load_bytes_with` no
-        // longer needs to accept a function.
+        // TODO(#17065): Now that we always copy from the remote store to the local store before
+        // executing the caller's logic against the local store,
+        // `remote::ByteStore::load_bytes_with` no longer needs to accept a function.
         let bytes = retry_call(
           remote_store,
           |remote_store| async move { remote_store.load_bytes_with(digest, Ok).await },
@@ -967,7 +967,7 @@ impl Store {
 
   /// Ensure that the files are locally loadable. This will download them from the remote store as
   /// a side effect, if one is configured.
-  pub async fn ensure_local_has_files(
+  pub async fn ensure_downloaded(
     &self,
     mut file_digests: HashSet<Digest>,
     directory_digests: HashSet<DirectoryDigest>,
