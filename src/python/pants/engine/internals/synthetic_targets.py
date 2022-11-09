@@ -12,16 +12,37 @@ Example demonstrating how to register synthetic targets:
     from pants.engine.internals.synthetic_targets import (
         SyntheticAddressMaps,
         SyntheticTargetsRequest,
+        SyntheticTargetsSpecPaths,
     )
     from pants.engine.internals.target_adaptor import TargetAdaptor
-    from pants.engine.unions import UnionRule
     from pants.engine.rules import collect_rules, rule
 
 
     @dataclass(frozen=True)
     class SyntheticExampleTargetsRequest(SyntheticTargetsRequest):
-        path: str = SyntheticTargetsRequest.REQUEST_TARGETS_PER_DIRECTORY
         path: str = SyntheticTargetsRequest.SINGLE_REQUEST_FOR_ALL_TARGETS
+
+
+    class SyntheticExampleTargetsPerDirectorySpecPathsRequest:
+        pass
+
+
+    @dataclass(frozen=True)
+    class SyntheticExampleTargetsPerDirectoryRequest(SyntheticTargetsRequest):
+        path: str = SyntheticTargetsRequest.REQUEST_TARGETS_PER_DIRECTORY
+
+        # Optional: (without it, only paths with BUILD files will be consistently considered)
+        spec_paths_request = SyntheticExampleTargetsPerDirectorySpecPathsRequest
+
+
+    @rule
+    def example_synthetic_targets_per_directory_spec_paths(
+        request: SyntheticExampleTargetsPerDirectorySpecPathsRequest,
+    ) -> SyntheticTargetsSpecPaths:
+        # Return all paths we have targets for.
+        # This may involve using GlobPaths etc to discover files in the project source tree.
+        known_paths = ["src/a/dir1", "src/a/dir2", ...]
+        return SyntheticTargetsSpecPaths.from_paths(known_paths)
 
 
     @rule
@@ -45,7 +66,8 @@ Example demonstrating how to register synthetic targets:
     def rules():
         return (
             *collect_rules(),
-            UnionRule(SyntheticTargetsRequest, SyntheticExampleTargetsRequest),
+            SyntheticExampleTargetsRequest.rules(),
+            SyntheticExampleTargetsPerDirectoryRequest.rules(),
             ...
         )
 """
@@ -113,17 +135,20 @@ class SyntheticTargetsRequest:
     """
 
     spec_paths_request: ClassVar[type | None] = None
-    """Request class for providing paths in addition to those where BUILD files are found."""
+    """Request class for providing paths in addition to those where BUILD files are found.
+
+    Implement a rule that takes `spec_paths_request` and returns an `SyntheticTargetsSpecPaths`.
+    """
 
     @union
-    class SpecPathsRequest:
-        pass
+    class _SpecPathsRequest:
+        """Protected union type."""
 
     @classmethod
     def rules(cls) -> Iterator[UnionRule]:
         yield UnionRule(SyntheticTargetsRequest, cls)
         if cls.spec_paths_request is not None:
-            yield UnionRule(SyntheticTargetsRequest.SpecPathsRequest, cls.spec_paths_request)
+            yield UnionRule(SyntheticTargetsRequest._SpecPathsRequest, cls.spec_paths_request)
 
 
 class SyntheticAddressMap(AddressMap):
@@ -278,10 +303,10 @@ async def all_synthetic_targets(union_membership: UnionMembership) -> AllSynthet
     all_spec_paths = await MultiGet(
         Get(
             SyntheticTargetsSpecPaths,
-            SyntheticTargetsRequest.SpecPathsRequest,
+            SyntheticTargetsRequest._SpecPathsRequest,
             spec_paths_request(),
         )
-        for spec_paths_request in union_membership.get(SyntheticTargetsRequest.SpecPathsRequest)
+        for spec_paths_request in union_membership.get(SyntheticTargetsRequest._SpecPathsRequest)
     )
     return AllSyntheticAddressMaps.create(
         address_maps=itertools.chain.from_iterable(all_synthetic),

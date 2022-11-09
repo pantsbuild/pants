@@ -20,6 +20,7 @@ from pants.engine.internals.specs_rules_test import resolve_raw_specs_without_fi
 from pants.engine.internals.synthetic_targets import (
     SyntheticAddressMaps,
     SyntheticTargetsRequest,
+    SyntheticTargetsSpecPaths,
     rules,
 )
 from pants.engine.internals.target_adaptor import TargetAdaptor
@@ -41,11 +42,6 @@ from pants.util.strutil import softwrap
 @dataclass(frozen=True)
 class SyntheticExampleTargetsRequest(SyntheticTargetsRequest):
     path: str = SyntheticTargetsRequest.SINGLE_REQUEST_FOR_ALL_TARGETS
-
-
-@dataclass(frozen=True)
-class SyntheticExampleTargetsPerDirectoryRequest(SyntheticTargetsRequest):
-    path: str = SyntheticTargetsRequest.REQUEST_TARGETS_PER_DIRECTORY
 
 
 @rule
@@ -78,7 +74,68 @@ async def example_synthetic_targets(
     return SyntheticAddressMaps.for_targets_request(request, targets)
 
 
+class SyntheticExampleTargetsPerDirectorySpecPathsRequest:
+    pass
+
+
+@dataclass(frozen=True)
+class SyntheticExampleTargetsPerDirectoryRequest(SyntheticTargetsRequest):
+    path: str = SyntheticTargetsRequest.REQUEST_TARGETS_PER_DIRECTORY
+    spec_paths_request = SyntheticExampleTargetsPerDirectorySpecPathsRequest
+
+
 example_synthetic_targets_per_directory_counts: DefaultDict[str, int] = defaultdict(int)
+example_synthetic_targets_per_directory_targets = {
+    "src/test": [
+        (
+            "BUILD.dir-a",
+            (
+                TargetAdaptor(
+                    "target",
+                    "generic3",
+                    description="Target 3",
+                ),
+            ),
+        ),
+        (
+            "BUILD.dir-b",
+            (
+                TargetAdaptor(
+                    "target",
+                    "generic4",
+                    description="Target 4",
+                    tags=["synthetic", "tags"],
+                ),
+            ),
+        ),
+    ],
+    "src/issues/17343": [
+        (
+            "BUILD.issue",
+            (
+                TargetAdaptor(
+                    "_lockfiles",
+                    "python-default",
+                    sources=["lockfile"],
+                ),
+            ),
+        ),
+    ],
+    "src/bare/tree": [
+        (
+            "BUILD.synthetic-targets",
+            (TargetAdaptor("target", "bare-tree"),),
+        ),
+    ],
+}
+
+
+@rule
+def example_synthetic_targets_per_directory_spec_paths(
+    request: SyntheticExampleTargetsPerDirectorySpecPathsRequest,
+) -> SyntheticTargetsSpecPaths:
+    # Return all paths we have targets for.
+    return SyntheticTargetsSpecPaths.from_paths(example_synthetic_targets_per_directory_targets)
 
 
 @rule
@@ -87,44 +144,8 @@ async def example_synthetic_targets_per_directory(
 ) -> SyntheticAddressMaps:
     assert request.path != SyntheticTargetsRequest.SINGLE_REQUEST_FOR_ALL_TARGETS
     example_synthetic_targets_per_directory_counts[request.path] += 1
-    targets = {
-        "src/test": [
-            (
-                "BUILD.dir-a",
-                (
-                    TargetAdaptor(
-                        "target",
-                        "generic3",
-                        description="Target 3",
-                    ),
-                ),
-            ),
-            (
-                "BUILD.dir-b",
-                (
-                    TargetAdaptor(
-                        "target",
-                        "generic4",
-                        description="Target 4",
-                        tags=["synthetic", "tags"],
-                    ),
-                ),
-            ),
-        ],
-        "src/issues/17343": [
-            (
-                "BUILD.issue",
-                (
-                    TargetAdaptor(
-                        "_lockfiles",
-                        "python-default",
-                        sources=["lockfile"],
-                    ),
-                ),
-            ),
-        ],
-    }
-    return SyntheticAddressMaps.for_targets_request(request, targets.get(request.path, ()))
+    targets = example_synthetic_targets_per_directory_targets.get(request.path, ())
+    return SyntheticAddressMaps.for_targets_request(request, targets)
 
 
 @pytest.fixture
@@ -137,6 +158,7 @@ def rule_runner() -> RuleRunner:
             *SyntheticExampleTargetsPerDirectoryRequest.rules(),
             example_synthetic_targets,
             example_synthetic_targets_per_directory,
+            example_synthetic_targets_per_directory_spec_paths,
             QueryRule(Addresses, [RawSpecsWithoutFileOwners]),
             QueryRule(Addresses, (DependenciesRequest, EnvironmentName)),
         ],
@@ -262,12 +284,14 @@ def test_extend_missing_synthetic_target(rule_runner: RuleRunner) -> None:
 def test_additional_spec_path(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
+            # We need this to avoid:
+            # Exception: Unmatched glob from tests: "src/**"
             "src/BUILD": "",
         }
     )
-    assert Address(
-        "src/synthetic", target_name="generic-synth"
-    ) in resolve_raw_specs_without_file_owners(rule_runner, [RecursiveGlobSpec("src")])
+    addresses = resolve_raw_specs_without_file_owners(rule_runner, [RecursiveGlobSpec("src")])
+    assert Address("src/synthetic", target_name="generic-synth") in addresses
+    assert Address("src/bare/tree", target_name="bare-tree") in addresses
 
 
 def test_target_name_collision_issue_17343(rule_runner: RuleRunner) -> None:
