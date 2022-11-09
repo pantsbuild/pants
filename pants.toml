@@ -221,6 +221,7 @@ java_parser_dev = "src/python/pants/backend/java/dependency_inference/java_parse
 # in `generate_scala_parser_lockfile_request`.
 scala_parser_dev = "src/python/pants/backend/scala/dependency_inference/scala_parser.lock"
 strip_jar_dev = "src/python/pants/jvm/strip_jar/strip_jar.lock"
+jar_tool_dev = "src/python/pants/jvm/jar_tool/jar_tool.lock"
 
 [scala]
 version_for_resolve = { "scala_parser_dev" = "2.13.8" }
