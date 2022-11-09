@@ -5,7 +5,7 @@ import string
 from collections import namedtuple
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, Iterable, List, Optional, Set, Tuple, cast
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Set, Tuple, cast
 
 import pytest
 
@@ -15,6 +15,7 @@ from pants.engine.target import (
     AsyncFieldMixin,
     BoolField,
     CoarsenedTarget,
+    CoarsenedTargets,
     DictStringToStringField,
     DictStringToStringSequenceField,
     ExplicitlyProvidedDependencies,
@@ -496,6 +497,27 @@ def test_coarsened_target_equality() -> None:
 
     assert id(nested()) != id(nested())
     assert nested() == nested()
+
+
+def test_coarsened_target_closure() -> None:
+    all_targets = [FortranTarget({}, Address(name)) for name in string.ascii_lowercase[:5]]
+    a, b, c, d, e = all_targets
+
+    def ct(members: List[Target], dependencies: List[CoarsenedTarget] = []) -> CoarsenedTarget:
+        return CoarsenedTarget(members, dependencies)
+
+    def assert_closure(cts: Sequence[CoarsenedTarget], expected: Sequence[Target]) -> None:
+        assert sorted(t.address for t in CoarsenedTargets(cts).closure()) == sorted(
+            t.address for t in expected
+        )
+
+    ct1 = ct([a], [])
+    ct2 = ct([b, c], [ct1])
+    ct3 = ct([d, e], [ct1, ct2])
+
+    assert_closure([ct1], [a])
+    assert_closure([ct1, ct2], [a, b, c])
+    assert_closure([ct1, ct2, ct3], all_targets)
 
 
 # -----------------------------------------------------------------------------------------------
