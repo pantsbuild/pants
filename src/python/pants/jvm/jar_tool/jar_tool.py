@@ -10,15 +10,18 @@ from typing import Iterable, Mapping
 
 import pkg_resources
 
+from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.core.goals.generate_lockfiles import DEFAULT_TOOL_LOCKFILE, GenerateToolLockfileSentinel
 from pants.engine.fs import (
     CreateDigest,
     Digest,
     DigestEntries,
+    DigestSubset,
     Directory,
     FileContent,
     FileEntry,
     MergeDigests,
+    PathGlobs,
     RemovePrefix,
 )
 from pants.engine.process import ProcessResult
@@ -222,8 +225,19 @@ async def build_jar_tool(jdk: InternalJdk) -> JarToolCompiledClassfiles:
     )
 
     dest_dir = "classfiles"
-    materialized_classpath, empty_dest_dir = await MultiGet(
+    materialized_classpath, java_subset_digest, empty_dest_dir = await MultiGet(
         Get(ToolClasspath, ToolClasspathRequest(prefix="__toolcp", lockfile=lockfile_request)),
+        Get(
+            Digest,
+            DigestSubset(
+                source_digest,
+                PathGlobs(
+                    ["**/*.java"],
+                    glob_match_error_behavior=GlobMatchErrorBehavior.error,
+                    description_of_origin="jar tool sources",
+                ),
+            ),
+        ),
         Get(Digest, CreateDigest([Directory(path=dest_dir)])),
     )
 
@@ -232,7 +246,7 @@ async def build_jar_tool(jdk: InternalJdk) -> JarToolCompiledClassfiles:
             Digest,
             MergeDigests([materialized_classpath.digest, source_digest, empty_dest_dir]),
         ),
-        Get(DigestEntries, Digest, source_digest),
+        Get(DigestEntries, Digest, java_subset_digest),
     )
 
     compile_result = await Get(
@@ -246,11 +260,7 @@ async def build_jar_tool(jdk: InternalJdk) -> JarToolCompiledClassfiles:
                 ":".join(materialized_classpath.classpath_entries()),
                 "-d",
                 dest_dir,
-                *[
-                    entry.path
-                    for entry in src_entries
-                    if isinstance(entry, FileEntry) and entry.path.endswith(".java")
-                ],
+                *[entry.path for entry in src_entries if isinstance(entry, FileEntry)],
             ],
             input_digest=merged_digest,
             output_directories=(dest_dir,),
