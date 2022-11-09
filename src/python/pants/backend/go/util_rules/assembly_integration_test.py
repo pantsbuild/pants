@@ -26,6 +26,7 @@ from pants.backend.go.util_rules import (
     sdk,
     third_party_pkg,
 )
+from pants.backend.go.util_rules.build_opts import GoBuildOptions
 from pants.backend.go.util_rules.build_pkg import BuildGoPackageRequest, FallibleBuiltGoPackage
 from pants.core.goals.package import BuiltPackage
 from pants.engine.addresses import Address
@@ -138,6 +139,7 @@ def test_build_invalid_package(rule_runner: RuleRunner) -> None:
         import_path="example.com/assembly",
         pkg_name="main",
         dir_path="",
+        build_opts=GoBuildOptions(),
         go_files=("add_amd64.go", "add_arm64.go"),
         digest=rule_runner.make_snapshot(
             {

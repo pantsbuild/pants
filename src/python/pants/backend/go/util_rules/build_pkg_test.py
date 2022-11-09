@@ -20,6 +20,7 @@ from pants.backend.go.util_rules import (
     sdk,
     third_party_pkg,
 )
+from pants.backend.go.util_rules.build_opts import GoBuildOptions
 from pants.backend.go.util_rules.build_pkg import (
     BuildGoPackageRequest,
     BuiltGoPackage,
@@ -71,6 +72,7 @@ def test_build_pkg(rule_runner: RuleRunner) -> None:
         import_path="example.com/foo/dep/transitive",
         pkg_name="transitive",
         dir_path="dep/transitive",
+        build_opts=GoBuildOptions(),
         go_files=("f.go",),
         digest=rule_runner.make_snapshot(
             {
@@ -95,6 +97,7 @@ def test_build_pkg(rule_runner: RuleRunner) -> None:
         import_path="example.com/foo/dep",
         pkg_name="dep",
         dir_path="dep",
+        build_opts=GoBuildOptions(),
         go_files=("f.go",),
         digest=rule_runner.make_snapshot(
             {
@@ -119,6 +122,7 @@ def test_build_pkg(rule_runner: RuleRunner) -> None:
         import_path="example.com/foo",
         pkg_name="foo",
         dir_path="",
+        build_opts=GoBuildOptions(),
         go_files=("f.go",),
         digest=rule_runner.make_snapshot(
             {
@@ -165,6 +169,7 @@ def test_build_invalid_pkg(rule_runner: RuleRunner) -> None:
         import_path="example.com/foo/dep",
         pkg_name="dep",
         dir_path="dep",
+        build_opts=GoBuildOptions(),
         go_files=("f.go",),
         digest=rule_runner.make_snapshot({"dep/f.go": "invalid!!!"}).digest,
         s_files=(),
@@ -175,6 +180,7 @@ def test_build_invalid_pkg(rule_runner: RuleRunner) -> None:
         import_path="example.com/foo",
         pkg_name="main",
         dir_path="",
+        build_opts=GoBuildOptions(),
         go_files=("f.go",),
         digest=rule_runner.make_snapshot(
             {

@@ -54,16 +54,16 @@ from __future__ import annotations
 import itertools
 import os.path
 from dataclasses import dataclass
-from typing import ClassVar, Iterable, Sequence
+from typing import ClassVar, Iterable, Iterator, Sequence
 
 from pants.base.specs import GlobSpecsProtocol
 from pants.engine.collection import Collection
 from pants.engine.internals.defaults import BuildFileDefaults
 from pants.engine.internals.mapper import AddressMap
 from pants.engine.internals.target_adaptor import TargetAdaptor
-from pants.engine.rules import Get, MultiGet, Rule, collect_rules, rule
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import InvalidTargetException
-from pants.engine.unions import UnionMembership, union, UnionRule
+from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.util.frozendict import FrozenDict
 from pants.util.strutil import softwrap
 
@@ -120,7 +120,7 @@ class SyntheticTargetsRequest:
         pass
 
     @classmethod
-    def rules(cls) -> Iterator[Rule]:
+    def rules(cls) -> Iterator[UnionRule]:
         yield UnionRule(SyntheticTargetsRequest, cls)
         if cls.spec_paths_request is not None:
             yield UnionRule(SyntheticTargetsRequest.SpecPathsRequest, cls.spec_paths_request)

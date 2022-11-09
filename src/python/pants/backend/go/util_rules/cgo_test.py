@@ -27,6 +27,7 @@ from pants.backend.go.util_rules import (
     tests_analysis,
     third_party_pkg,
 )
+from pants.backend.go.util_rules.build_opts import GoBuildOptions
 from pants.backend.go.util_rules.cgo import CGoCompileRequest, CGoCompileResult
 from pants.backend.go.util_rules.first_party_pkg import (
     FallibleFirstPartyPkgAnalysis,
@@ -137,14 +138,16 @@ def test_cgo_compile(rule_runner: RuleRunner) -> None:
 
     tgt = rule_runner.get_target(Address("", target_name="pkg"))
     maybe_analysis = rule_runner.request(
-        FallibleFirstPartyPkgAnalysis, [FirstPartyPkgAnalysisRequest(tgt.address)]
+        FallibleFirstPartyPkgAnalysis,
+        [FirstPartyPkgAnalysisRequest(tgt.address, build_opts=GoBuildOptions())],
     )
     assert maybe_analysis.analysis is not None
     analysis = maybe_analysis.analysis
     assert analysis.cgo_files == ("printer.go",)
 
     maybe_digest = rule_runner.request(
-        FallibleFirstPartyPkgDigest, [FirstPartyPkgDigestRequest(tgt.address)]
+        FallibleFirstPartyPkgDigest,
+        [FirstPartyPkgDigestRequest(tgt.address, build_opts=GoBuildOptions())],
     )
     assert maybe_digest.pkg_digest is not None
     pkg_digest = maybe_digest.pkg_digest
@@ -239,7 +242,8 @@ def test_cgo_with_cxx_source(rule_runner: RuleRunner) -> None:
 
     tgt = rule_runner.get_target(Address("", target_name="pkg"))
     maybe_analysis = rule_runner.request(
-        FallibleFirstPartyPkgAnalysis, [FirstPartyPkgAnalysisRequest(tgt.address)]
+        FallibleFirstPartyPkgAnalysis,
+        [FirstPartyPkgAnalysisRequest(tgt.address, build_opts=GoBuildOptions())],
     )
     assert maybe_analysis.analysis is not None
     analysis = maybe_analysis.analysis
@@ -247,7 +251,8 @@ def test_cgo_with_cxx_source(rule_runner: RuleRunner) -> None:
     assert analysis.cxx_files == ("print.cxx",)
 
     maybe_digest = rule_runner.request(
-        FallibleFirstPartyPkgDigest, [FirstPartyPkgDigestRequest(tgt.address)]
+        FallibleFirstPartyPkgDigest,
+        [FirstPartyPkgDigestRequest(tgt.address, build_opts=GoBuildOptions())],
     )
     assert maybe_digest.pkg_digest is not None
     pkg_digest = maybe_digest.pkg_digest
@@ -340,7 +345,8 @@ def test_cgo_with_objc_source(rule_runner: RuleRunner) -> None:
 
     tgt = rule_runner.get_target(Address("", target_name="pkg"))
     maybe_analysis = rule_runner.request(
-        FallibleFirstPartyPkgAnalysis, [FirstPartyPkgAnalysisRequest(tgt.address)]
+        FallibleFirstPartyPkgAnalysis,
+        [FirstPartyPkgAnalysisRequest(tgt.address, build_opts=GoBuildOptions())],
     )
     assert maybe_analysis.analysis is not None
     analysis = maybe_analysis.analysis
@@ -348,7 +354,8 @@ def test_cgo_with_objc_source(rule_runner: RuleRunner) -> None:
     assert analysis.m_files == ("print.m",)
 
     maybe_digest = rule_runner.request(
-        FallibleFirstPartyPkgDigest, [FirstPartyPkgDigestRequest(tgt.address)]
+        FallibleFirstPartyPkgDigest,
+        [FirstPartyPkgDigestRequest(tgt.address, build_opts=GoBuildOptions())],
     )
     assert maybe_digest.pkg_digest is not None
     pkg_digest = maybe_digest.pkg_digest
@@ -445,7 +452,8 @@ def test_cgo_with_fortran_source(rule_runner: RuleRunner) -> None:
 
     tgt = rule_runner.get_target(Address("", target_name="pkg"))
     maybe_analysis = rule_runner.request(
-        FallibleFirstPartyPkgAnalysis, [FirstPartyPkgAnalysisRequest(tgt.address)]
+        FallibleFirstPartyPkgAnalysis,
+        [FirstPartyPkgAnalysisRequest(tgt.address, build_opts=GoBuildOptions())],
     )
     assert maybe_analysis.analysis is not None
     analysis = maybe_analysis.analysis
@@ -453,7 +461,8 @@ def test_cgo_with_fortran_source(rule_runner: RuleRunner) -> None:
     assert analysis.f_files == ("answer.f90",)
 
     maybe_digest = rule_runner.request(
-        FallibleFirstPartyPkgDigest, [FirstPartyPkgDigestRequest(tgt.address)]
+        FallibleFirstPartyPkgDigest,
+        [FirstPartyPkgDigestRequest(tgt.address, build_opts=GoBuildOptions())],
     )
     assert maybe_digest.pkg_digest is not None
     pkg_digest = maybe_digest.pkg_digest

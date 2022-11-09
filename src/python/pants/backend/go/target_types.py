@@ -21,10 +21,37 @@ from pants.engine.target import (
     StringField,
     Target,
     TargetGenerator,
+    TriBoolField,
     ValidNumbers,
     generate_multiple_sources_field_help_message,
 )
 from pants.util.strutil import softwrap
+
+# -----------------------------------------------------------------------------------------------
+# Build option fields
+# -----------------------------------------------------------------------------------------------
+
+
+class GoCgoEnabledField(TriBoolField):
+    """Enables Cgo support."""
+
+    alias = "cgo_enabled"
+    help = softwrap(
+        """
+        Enable Cgo support, which allows Go and C code to interact. This option must be enabled for any
+        packages making use of Cgo to actually be compiled with Cgo support.
+
+        This field can be specified on several different target types, including `go_binary` and `go_mod` target
+        types. If this field is specified on a `go_binary` target, then that instance takes precedence over other
+        configuration when building the applicable executable. The applicable `go_mod` target will be checked next
+        as a fallback. Finally, if neither target specifies this field, then the value will be taken from
+        the value of the `[golang].cgo_enabled` option. (Note: That option will be deprecated in a future Pants
+        version.)
+
+        See https://go.dev/blog/cgo and https://pkg.go.dev/cmd/cgo for additional information about Cgo.
+        """
+    )
+
 
 # -----------------------------------------------------------------------------------------------
 # `go_third_party_package` target
@@ -136,6 +163,7 @@ class GoModTarget(TargetGenerator):
         *COMMON_TARGET_FIELDS,
         GoModDependenciesField,
         GoModSourcesField,
+        GoCgoEnabledField,
     )
     copied_fields = COMMON_TARGET_FIELDS
     moved_fields = ()
@@ -256,6 +284,7 @@ class GoBinaryTarget(Target):
         OutputPathField,
         GoBinaryMainPackageField,
         GoBinaryDependenciesField,
+        GoCgoEnabledField,
         RestartableField,
     )
     help = "A Go binary."

@@ -479,6 +479,27 @@ class PythonSetup(Subsystem):
         ),
         advanced=True,
     )
+    enable_lockfile_targets = BoolOption(
+        default=True,
+        help=softwrap(
+            """
+            Create targets for all Python lockfiles defined in `[python].resolves`.
+
+            The lockfile targets will then be used as dependencies to the `python_requirement`
+            targets that use them, invalidating source targets per resolve when the lockfile
+            changes.
+
+            If another targets address is in conflict with the created lockfile target, it will
+            shadow the lockfile target and it will not be available as a dependency for any
+            `python_requirement` targets.
+            """
+        ),
+        advanced=True,
+    )
+
+    @property
+    def enable_synthetic_lockfiles(self) -> bool:
+        return self.enable_resolves and self.enable_lockfile_targets
 
     @memoized_property
     def resolves_to_interpreter_constraints(self) -> dict[str, tuple[str, ...]]:
