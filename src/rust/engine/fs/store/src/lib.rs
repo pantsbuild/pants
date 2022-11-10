@@ -1244,6 +1244,7 @@ impl Store {
       .materialize_directory_helper(
         destination,
         true,
+        false,
         &parent_to_child,
         &mutable_paths,
         immutable_inputs,
@@ -1256,6 +1257,7 @@ impl Store {
     &self,
     destination: PathBuf,
     is_root: bool,
+    force_mutable: bool,
     parent_to_child: &'a HashMap<PathBuf, Vec<directory::Entry>>,
     mutable_paths: &'a BTreeSet<PathBuf>,
     immutable_inputs: Option<&'a ImmutableInputs>,
@@ -1301,7 +1303,7 @@ impl Store {
                 if immutable_inputs.is_some()
                   && f.digest().size_bytes > IMMUTABLE_FILE_SIZE_LIMIT
                   && !mutable_paths.contains(&path)
-                  && !mutable_paths.iter().any(|p| path.starts_with(p))
+                  && !force_mutable
                 {
                   let dest_path = immutable_inputs
                     .unwrap()
@@ -1322,8 +1324,9 @@ impl Store {
               directory::Entry::Directory(_) => {
                 store
                   .materialize_directory_helper(
-                    path,
+                    path.clone(),
                     false,
+                    mutable_paths.contains(&path),
                     parent_to_child,
                     mutable_paths,
                     immutable_inputs,
