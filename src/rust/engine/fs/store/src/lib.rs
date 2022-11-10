@@ -229,6 +229,59 @@ impl RemoteStore {
       .await
       .map(|&()| ())
   }
+
+  /// Download the digest to the local byte store from this remote store. The function `f_remote`
+  /// can be used to validate the bytes.
+  async fn download_digest_to_local<
+    FRemote: Fn(Bytes) -> Result<(), String> + Send + Sync + 'static,
+  >(
+    &self,
+    local_store: local::ByteStore,
+    digest: Digest,
+    entry_type: EntryType,
+    f_remote: FRemote,
+  ) -> Result<(), StoreError> {
+    let remote_store = self.store.clone();
+    self
+      .maybe_download(digest, async move {
+        // TODO(#17065): Now that we always copy from the remote store to the local store before
+        // executing the caller's logic against the local store,
+        // `remote::ByteStore::load_bytes_with` no longer needs to accept a function.
+        let bytes = retry_call(
+          remote_store,
+          |remote_store| async move { remote_store.load_bytes_with(digest, Ok).await },
+          |err| match err {
+            ByteStoreError::Grpc(status) => status_is_retryable(status),
+            _ => false,
+          },
+        )
+        .await
+        .map_err(|err| match err {
+          ByteStoreError::Grpc(status) => status_to_str(status),
+          ByteStoreError::Other(msg) => msg,
+        })?
+        .ok_or_else(|| {
+          StoreError::MissingDigest(
+            "Was not present in either the local or remote store".to_owned(),
+            digest,
+          )
+        })?;
+
+        f_remote(bytes.clone())?;
+        let stored_digest = local_store
+          .store_bytes(entry_type, None, bytes, true)
+          .await?;
+        if digest == stored_digest {
+          Ok(())
+        } else {
+          Err(StoreError::Unclassified(format!(
+            "CAS gave wrong digest: expected {:?}, got {:?}",
+            digest, stored_digest
+          )))
+        }
+      })
+      .await
+  }
 }
 
 ///
@@ -674,9 +727,6 @@ impl Store {
     f_local: FLocal,
     f_remote: FRemote,
   ) -> Result<T, StoreError> {
-    let local = self.local.clone();
-    let maybe_remote = self.remote.clone();
-
     if let Some(bytes_res) = self
       .local
       .load_bytes_with(entry_type, digest, f_local.clone())
@@ -685,47 +735,11 @@ impl Store {
       return Ok(bytes_res?);
     }
 
-    let remote = maybe_remote.ok_or_else(|| {
+    let remote = self.remote.clone().ok_or_else(|| {
       StoreError::MissingDigest("Was not present in the local store".to_owned(), digest)
     })?;
-    let remote_store = remote.store.clone();
-
     remote
-      .maybe_download(digest, async move {
-        // TODO: Now that we always copy from the remote store to the local store before executing
-        // the caller's logic against the local store, `remote::ByteStore::load_bytes_with` no
-        // longer needs to accept a function.
-        let bytes = retry_call(
-          remote_store,
-          |remote_store| async move { remote_store.load_bytes_with(digest, Ok).await },
-          |err| match err {
-            ByteStoreError::Grpc(status) => status_is_retryable(status),
-            _ => false,
-          },
-        )
-        .await
-        .map_err(|err| match err {
-          ByteStoreError::Grpc(status) => status_to_str(status),
-          ByteStoreError::Other(msg) => msg,
-        })?
-        .ok_or_else(|| {
-          StoreError::MissingDigest(
-            "Was not present in either the local or remote store".to_owned(),
-            digest,
-          )
-        })?;
-
-        f_remote(bytes.clone())?;
-        let stored_digest = local.store_bytes(entry_type, None, bytes, true).await?;
-        if digest == stored_digest {
-          Ok(())
-        } else {
-          Err(StoreError::Unclassified(format!(
-            "CAS gave wrong digest: expected {:?}, got {:?}",
-            digest, stored_digest
-          )))
-        }
-      })
+      .download_digest_to_local(self.local.clone(), digest, entry_type, f_remote)
       .await?;
 
     Ok(
@@ -951,53 +965,66 @@ impl Store {
     Ok(missing.is_empty())
   }
 
-  ///
-  /// Ensure that a directory is locally loadable, which will download it from the Remote store as
-  /// a sideeffect (if one is configured).
-  ///
-  pub async fn ensure_local_has_recursive_directory(
+  /// Ensure that the files are locally loadable. This will download them from the remote store as
+  /// a side effect, if one is configured.
+  pub async fn ensure_downloaded(
     &self,
-    dir_digest: DirectoryDigest,
+    mut file_digests: HashSet<Digest>,
+    directory_digests: HashSet<DirectoryDigest>,
   ) -> Result<(), StoreError> {
-    let mut file_digests = Vec::new();
-    self
-      .load_digest_trie(dir_digest)
-      .await?
-      .walk(SymlinkBehavior::Aware, &mut |_, entry| match entry {
-        directory::Entry::File(f) => file_digests.push(f.digest()),
-        directory::Entry::Symlink(_) | directory::Entry::Directory(_) => (),
-      });
+    let file_digests_from_directories =
+      future::try_join_all(directory_digests.into_iter().map(|dir_digest| async move {
+        let mut file_digests_for_dir = Vec::new();
+        let trie = self.load_digest_trie(dir_digest).await?;
+        trie.walk(SymlinkBehavior::Aware, &mut |_, entry| match entry {
+          directory::Entry::File(f) => file_digests_for_dir.push(f.digest()),
+          directory::Entry::Symlink(_) | directory::Entry::Directory(_) => (),
+        });
+        // Also ensure that the directory trie is persisted to disk, not only its file entries.
+        self.record_digest_trie(trie, true).await?;
+        Ok::<_, StoreError>(file_digests_for_dir)
+      }))
+      .await?;
+    file_digests.extend(file_digests_from_directories.into_iter().flatten());
 
+    let missing_file_digests = self
+      .local
+      .get_missing_digests(EntryType::File, file_digests)
+      .await?;
+    if missing_file_digests.is_empty() {
+      return Ok(());
+    }
+
+    let remote = &self.remote.clone().ok_or_else(|| {
+      StoreError::MissingDigest(
+        "Was not present in the local store".to_owned(),
+        *missing_file_digests.iter().next().unwrap(),
+      )
+    })?;
     let _ = future::try_join_all(
-      file_digests
+      missing_file_digests
         .into_iter()
-        .map(|file_digest| self.ensure_local_has_file(file_digest))
-        .collect::<Vec<_>>(),
+        .map(|file_digest| async move {
+          if let Err(e) = remote
+            .download_digest_to_local(self.local.clone(), file_digest, EntryType::File, |_| Ok(()))
+            .await
+          {
+            log::debug!("Missing file digest from remote store: {:?}", file_digest);
+            in_workunit!(
+              "missing_file_counter",
+              Level::Trace,
+              |workunit| async move {
+                workunit.increment_counter(Metric::RemoteStoreMissingDigest, 1);
+              },
+            )
+            .await;
+            return Err(e);
+          }
+          Ok(())
+        }),
     )
     .await?;
     Ok(())
-  }
-
-  /// Ensure that a file is locally loadable, which will download it from the Remote store as
-  /// a side effect (if one is configured). Called only with the Digest of a File.
-  pub async fn ensure_local_has_file(&self, file_digest: Digest) -> Result<(), StoreError> {
-    if let Err(e) = self
-      .load_bytes_with(EntryType::File, file_digest, |_| Ok(()), |_| Ok(()))
-      .await
-    {
-      log::debug!("Missing file digest from remote store: {:?}", file_digest);
-      in_workunit!(
-        "missing_file_counter",
-        Level::Trace,
-        |workunit| async move {
-          workunit.increment_counter(Metric::RemoteStoreMissingDigest, 1);
-        },
-      )
-      .await;
-      Err(e)
-    } else {
-      Ok(())
-    }
   }
 
   /// Load a REv2 Tree from a remote CAS _without_ persisting the embedded Directory protos in
