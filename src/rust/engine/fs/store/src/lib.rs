@@ -975,15 +975,14 @@ impl Store {
     let file_digests_from_directories =
       future::try_join_all(directory_digests.into_iter().map(|dir_digest| async move {
         let mut maybe_file_digest = None;
-        self
-          .load_digest_trie(dir_digest)
-          .await?
-          .walk(SymlinkBehavior::Aware, &mut |_, entry| match entry {
-            directory::Entry::File(f) => {
-              maybe_file_digest = Some(f.digest());
-            }
-            directory::Entry::Symlink(_) | directory::Entry::Directory(_) => (),
-          });
+        let trie = self.load_digest_trie(dir_digest).await?;
+        trie.walk(SymlinkBehavior::Aware, &mut |_, entry| match entry {
+          directory::Entry::File(f) => {
+            maybe_file_digest = Some(f.digest());
+          }
+          directory::Entry::Symlink(_) | directory::Entry::Directory(_) => (),
+        });
+        self.record_digest_trie(trie, true).await?;
         Ok::<_, StoreError>(maybe_file_digest)
       }))
       .await?;
@@ -1026,6 +1025,12 @@ impl Store {
         }),
     )
     .await?;
+    // let _ = future::try_join_all(
+    //   directory_digests
+    //     .into_iter()
+    //     .map(self.ensure_directory_digest_persisted),
+    // )
+    // .await?;
     Ok(())
   }
 
