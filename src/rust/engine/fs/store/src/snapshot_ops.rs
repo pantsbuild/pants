@@ -58,7 +58,6 @@ async fn merge_directories<T: SnapshotOps + 'static>(
 
   Ok(tree.into())
 }
-
 ///
 /// Render a directory::MergeError (or fail with a less specific error if some content cannot be
 /// loaded).
@@ -229,7 +228,7 @@ pub trait SnapshotOps: Clone + Send + Sync + 'static {
   ) -> Result<DirectoryDigest, Self::Error> {
     let input_tree = self.load_digest_trie(directory_digest.clone()).await?;
     let path_stats = input_tree
-      .expand_globs(params.globs, SymlinkBehavior::Oblivious, None)
+      .expand_globs(params.globs, SymlinkBehavior::Aware, None)
       .await
       .map_err(|err| format!("Error matching globs against {directory_digest:?}: {}", err))?;
 
@@ -238,7 +237,7 @@ pub trait SnapshotOps: Clone + Send + Sync + 'static {
       directory::Entry::File(f) => {
         files.insert(path.to_owned(), f.digest());
       }
-      directory::Entry::Symlink(_) => todo!(),
+      directory::Entry::Symlink(_) => (),
       directory::Entry::Directory(_) => (),
     });
 
