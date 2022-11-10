@@ -56,7 +56,10 @@ class GoBinaryFieldSet(PackageFieldSet, RunFieldSet):
 
 @rule(desc="Package Go binary", level=LogLevel.DEBUG)
 async def package_go_binary(field_set: GoBinaryFieldSet) -> BuiltPackage:
-    main_pkg = await Get(GoBinaryMainPackage, GoBinaryMainPackageRequest(field_set.main))
+    main_pkg, build_opts = await MultiGet(
+        Get(GoBinaryMainPackage, GoBinaryMainPackageRequest(field_set.main)),
+        Get(GoBuildOptions, GoBuildOptionsFromTargetRequest(field_set.address)),
+    )
 
     if main_pkg.is_third_party:
         import_path = cast(str, main_pkg.import_path)
@@ -70,15 +73,12 @@ async def package_go_binary(field_set: GoBinaryFieldSet) -> BuiltPackage:
                 import_path,
                 go_mod_info.digest,
                 go_mod_info.mod_path,
+                build_opts,
             ),
         )
 
         package_name = analysis.name
     else:
-        main_pkg, build_opts = await MultiGet(
-            Get(GoBinaryMainPackage, GoBinaryMainPackageRequest(field_set.main)),
-            Get(GoBuildOptions, GoBuildOptionsFromTargetRequest(field_set.address)),
-        )
         main_pkg_analysis = await Get(
             FallibleFirstPartyPkgAnalysis,
             FirstPartyPkgAnalysisRequest(main_pkg.address, build_opts=build_opts),
