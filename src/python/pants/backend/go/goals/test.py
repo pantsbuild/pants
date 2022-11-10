@@ -14,6 +14,7 @@ from pants.backend.go.target_types import (
     GoTestTimeoutField,
     SkipGoTestsField,
 )
+from pants.backend.go.util_rules.build_opts import GoBuildOptions, GoBuildOptionsFromTargetRequest
 from pants.backend.go.util_rules.build_pkg import (
     BuildGoPackageRequest,
     BuiltGoPackage,
@@ -175,9 +176,17 @@ async def run_go_tests(
 ) -> TestResult:
     field_set = batch.single_element
 
+    build_opts = await Get(GoBuildOptions, GoBuildOptionsFromTargetRequest(field_set.address))
+
     maybe_pkg_analysis, maybe_pkg_digest, dependencies = await MultiGet(
-        Get(FallibleFirstPartyPkgAnalysis, FirstPartyPkgAnalysisRequest(field_set.address)),
-        Get(FallibleFirstPartyPkgDigest, FirstPartyPkgDigestRequest(field_set.address)),
+        Get(
+            FallibleFirstPartyPkgAnalysis,
+            FirstPartyPkgAnalysisRequest(field_set.address, build_opts=build_opts),
+        ),
+        Get(
+            FallibleFirstPartyPkgDigest,
+            FirstPartyPkgDigestRequest(field_set.address, build_opts=build_opts),
+        ),
         Get(Targets, DependenciesRequest(field_set.dependencies)),
     )
 
@@ -237,7 +246,10 @@ async def run_go_tests(
     maybe_test_pkg_build_request = await Get(
         FallibleBuildGoPackageRequest,
         BuildGoPackageTargetRequest(
-            field_set.address, for_tests=True, coverage_config=coverage_config
+            field_set.address,
+            for_tests=True,
+            coverage_config=coverage_config,
+            build_opts=build_opts,
         ),
     )
     if maybe_test_pkg_build_request.request is None:
@@ -257,7 +269,10 @@ async def run_go_tests(
         maybe_xtest_pkg_build_request = await Get(
             FallibleBuildGoPackageRequest,
             BuildGoPackageTargetRequest(
-                field_set.address, for_xtests=True, coverage_config=coverage_config
+                field_set.address,
+                for_xtests=True,
+                coverage_config=coverage_config,
+                build_opts=build_opts,
             ),
         )
         if maybe_xtest_pkg_build_request.request is None:
@@ -306,6 +321,7 @@ async def run_go_tests(
             pkg_name="main",
             digest=testmain_input_digest,
             dir_path="",
+            build_opts=build_opts,
             go_files=(GeneratedTestMain.TEST_MAIN_FILE, *coverage_setup_files),
             s_files=(),
             direct_dependencies=tuple(main_direct_deps),

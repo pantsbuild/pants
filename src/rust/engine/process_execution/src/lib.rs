@@ -27,7 +27,7 @@
 #[macro_use]
 extern crate derivative;
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::convert::{TryFrom, TryInto};
 use std::fmt::{self, Debug, Display};
 use std::path::PathBuf;
@@ -833,20 +833,11 @@ pub(crate) async fn check_cache_content(
   match cache_content_behavior {
     CacheContentBehavior::Fetch => {
       let response = response.clone();
-      let fetch_result = in_workunit!(
-        "eager_fetch_action_cache",
-        Level::Trace,
-        |_workunit| async move {
-          try_join_all(vec![
-            store.ensure_local_has_file(response.stdout_digest).boxed(),
-            store.ensure_local_has_file(response.stderr_digest).boxed(),
-            store
-              .ensure_local_has_recursive_directory(response.output_directory)
-              .boxed(),
-          ])
-          .await
-        }
-      )
+      let fetch_result = in_workunit!("eager_fetch_action_cache", Level::Trace, |_workunit| store
+        .ensure_downloaded(
+          HashSet::from([response.stdout_digest, response.stderr_digest]),
+          HashSet::from([response.output_directory])
+        ))
       .await;
       match fetch_result {
         Err(StoreError::MissingDigest { .. }) => Ok(false),

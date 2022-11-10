@@ -15,6 +15,7 @@ from pants.backend.go.target_types import (
 from pants.backend.go.util_rules import (
     assembly,
     binary,
+    build_opts,
     build_pkg,
     build_pkg_target,
     cgo,
@@ -41,6 +42,7 @@ def rules():
     return [
         *assembly.rules(),
         *binary.rules(),
+        *build_opts.rules(),
         *build_pkg.rules(),
         *build_pkg_target.rules(),
         *check.rules(),

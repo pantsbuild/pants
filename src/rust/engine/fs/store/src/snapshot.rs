@@ -166,7 +166,7 @@ impl Snapshot {
       )?);
 
       let path_stats = posix_fs
-        .expand_globs(path_globs, None)
+        .expand_globs(path_globs, SymlinkBehavior::Oblivious, None)
         .await
         .map_err(|err| format!("Error expanding globs: {}", err))?;
       Snapshot::from_path_stats(

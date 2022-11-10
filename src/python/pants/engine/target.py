@@ -817,7 +817,7 @@ class CoarsenedTarget(EngineAwareParameter):
     ) -> Iterator[CoarsenedTarget]:
         """All CoarsenedTargets reachable from this root."""
 
-        visited = visited or set()
+        visited = set() if visited is None else visited
         queue = deque([self])
         while queue:
             ct = queue.popleft()

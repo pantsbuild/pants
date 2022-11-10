@@ -8,6 +8,8 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import ClassVar, Iterable, Iterator, cast
 
+from typing_extensions import Protocol
+
 from pants.base.deprecated import warn_or_error
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.engine.fs import GlobExpansionConjunction, PathGlobs
@@ -21,6 +23,11 @@ class Spec(ABC):
     @abstractmethod
     def __str__(self) -> str:
         """The normalized string representation of this spec."""
+
+
+class GlobSpecsProtocol(Protocol):
+    def matches_target_residence_dir(self, residence_dir: str) -> bool:
+        pass
 
 
 @dataclass(frozen=True)
