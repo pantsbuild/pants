@@ -5,7 +5,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import cast
 
 from pants.backend.go.target_types import (
     GoBinaryMainPackageField,
@@ -62,7 +61,7 @@ async def package_go_binary(field_set: GoBinaryFieldSet) -> BuiltPackage:
     )
 
     if main_pkg.is_third_party:
-        import_path = cast(str, main_pkg.import_path)
+        assert isinstance(main_pkg.import_path, str)
 
         go_mod_address = main_pkg.address.maybe_convert_to_target_generator()
         go_mod_info = await Get(GoModInfo, GoModInfoRequest(go_mod_address))
@@ -70,7 +69,7 @@ async def package_go_binary(field_set: GoBinaryFieldSet) -> BuiltPackage:
         analysis = await Get(
             ThirdPartyPkgAnalysis,
             ThirdPartyPkgAnalysisRequest(
-                import_path,
+                main_pkg.import_path,
                 go_mod_info.digest,
                 go_mod_info.mod_path,
                 build_opts,
