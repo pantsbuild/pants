@@ -27,7 +27,7 @@
 
 use criterion::{criterion_group, criterion_main, Criterion};
 
-use std::collections::HashSet;
+use std::collections::{HashSet, BTreeSet};
 use std::io::{BufRead, BufReader, BufWriter, Write};
 use std::os::unix::ffi::OsStrExt;
 use std::path::PathBuf;
