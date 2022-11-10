@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fs::File;
 use std::io::Read;
 use std::os::unix::fs::PermissionsExt;
@@ -1029,6 +1029,8 @@ async fn materialize_missing_directory() {
     .materialize_directory(
       materialize_dir.path().to_owned(),
       TestDirectory::recursive().directory_digest(),
+      &BTreeSet::new(),
+      None,
       Permissions::Writable,
     )
     .await
@@ -1061,6 +1063,8 @@ async fn materialize_directory(perms: Permissions, executable_file: bool) {
     .materialize_directory(
       materialize_dir.path().to_owned(),
       recursive_testdir.directory_digest(),
+      &BTreeSet::new(),
+      None,
       perms,
     )
     .await
@@ -1531,6 +1535,8 @@ async fn explicitly_overwrites_already_existing_file() {
     .materialize_directory(
       dir_to_write_to.path().to_owned(),
       contents_dir.directory_digest(),
+      &BTreeSet::new(),
+      None,
       Permissions::Writable,
     )
     .await
