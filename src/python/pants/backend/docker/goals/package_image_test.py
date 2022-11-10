@@ -276,7 +276,14 @@ def test_build_docker_image(rule_runner: RuleRunner) -> None:
                 alias=None,
                 address=None,
                 repository="test/test1",
-                tags={"1.2.3": dict(template="1.2.3", tag="1.2.3", name="test/test1:1.2.3")},
+                tags={
+                    "1.2.3": dict(
+                        template="1.2.3",
+                        tag="1.2.3",
+                        uses_local_alias=False,
+                        name="test/test1:1.2.3",
+                    )
+                },
             )
         },
     )
@@ -289,7 +296,11 @@ def test_build_docker_image(rule_runner: RuleRunner) -> None:
                 alias=None,
                 address=None,
                 repository="test2",
-                tags={"1.2.3": dict(template="1.2.3", tag="1.2.3", name="test2:1.2.3")},
+                tags={
+                    "1.2.3": dict(
+                        template="1.2.3", tag="1.2.3", uses_local_alias=False, name="test2:1.2.3"
+                    )
+                },
             )
         },
     )
@@ -319,11 +330,24 @@ def test_build_docker_image(rule_runner: RuleRunner) -> None:
                 address=None,
                 repository="test/test5",
                 tags={
-                    "latest": dict(template="latest", tag="latest", name="test/test5:latest"),
-                    "alpha-1.0": dict(
-                        template="alpha-1.0", tag="alpha-1.0", name="test/test5:alpha-1.0"
+                    "latest": dict(
+                        template="latest",
+                        tag="latest",
+                        uses_local_alias=False,
+                        name="test/test5:latest",
                     ),
-                    "alpha-1": dict(template="alpha-1", tag="alpha-1", name="test/test5:alpha-1"),
+                    "alpha-1.0": dict(
+                        template="alpha-1.0",
+                        tag="alpha-1.0",
+                        uses_local_alias=False,
+                        name="test/test5:alpha-1.0",
+                    ),
+                    "alpha-1": dict(
+                        template="alpha-1",
+                        tag="alpha-1",
+                        uses_local_alias=False,
+                        name="test/test5:alpha-1",
+                    ),
                 },
             )
         },
@@ -384,7 +408,10 @@ def test_build_image_with_registries(rule_runner: RuleRunner) -> None:
                 repository="addr1",
                 tags={
                     "1.2.3": dict(
-                        template="1.2.3", tag="1.2.3", name="myregistry1domain:port/addr1:1.2.3"
+                        template="1.2.3",
+                        tag="1.2.3",
+                        uses_local_alias=False,
+                        name="myregistry1domain:port/addr1:1.2.3",
                     )
                 },
             )
@@ -408,7 +435,10 @@ def test_build_image_with_registries(rule_runner: RuleRunner) -> None:
                 repository="addr3",
                 tags={
                     "1.2.3": dict(
-                        template="1.2.3", tag="1.2.3", name="myregistry3domain:port/addr3:1.2.3"
+                        template="1.2.3",
+                        tag="1.2.3",
+                        uses_local_alias=False,
+                        name="myregistry3domain:port/addr3:1.2.3",
                     )
                 },
             )
@@ -426,7 +456,10 @@ def test_build_image_with_registries(rule_runner: RuleRunner) -> None:
                 repository="alias1",
                 tags={
                     "1.2.3": dict(
-                        template="1.2.3", tag="1.2.3", name="myregistry1domain:port/alias1:1.2.3"
+                        template="1.2.3",
+                        tag="1.2.3",
+                        uses_local_alias=False,
+                        name="myregistry1domain:port/alias1:1.2.3",
                     )
                 },
             )
@@ -454,7 +487,11 @@ def test_build_image_with_registries(rule_runner: RuleRunner) -> None:
                 alias=None,
                 address=None,
                 repository="unreg",
-                tags={"1.2.3": dict(template="1.2.3", tag="1.2.3", name="unreg:1.2.3")},
+                tags={
+                    "1.2.3": dict(
+                        template="1.2.3", tag="1.2.3", uses_local_alias=False, name="unreg:1.2.3"
+                    )
+                },
             )
         },
     )
@@ -470,7 +507,10 @@ def test_build_image_with_registries(rule_runner: RuleRunner) -> None:
                 repository="def",
                 tags={
                     "1.2.3": dict(
-                        template="1.2.3", tag="1.2.3", name="myregistry2domain:port/def:1.2.3"
+                        template="1.2.3",
+                        tag="1.2.3",
+                        uses_local_alias=False,
+                        name="myregistry2domain:port/def:1.2.3",
                     )
                 },
             )
@@ -492,7 +532,10 @@ def test_build_image_with_registries(rule_runner: RuleRunner) -> None:
                 repository="multi",
                 tags={
                     "1.2.3": dict(
-                        template="1.2.3", tag="1.2.3", name="myregistry1domain:port/multi:1.2.3"
+                        template="1.2.3",
+                        tag="1.2.3",
+                        uses_local_alias=False,
+                        name="myregistry1domain:port/multi:1.2.3",
                     )
                 },
             ),
@@ -502,7 +545,10 @@ def test_build_image_with_registries(rule_runner: RuleRunner) -> None:
                 repository="multi",
                 tags={
                     "1.2.3": dict(
-                        template="1.2.3", tag="1.2.3", name="myregistry2domain:port/multi:1.2.3"
+                        template="1.2.3",
+                        tag="1.2.3",
+                        uses_local_alias=False,
+                        name="myregistry2domain:port/multi:1.2.3",
                     )
                 },
             ),
@@ -527,6 +573,7 @@ def test_build_image_with_registries(rule_runner: RuleRunner) -> None:
                     "1.2.3": dict(
                         template="1.2.3",
                         tag="1.2.3",
+                        uses_local_alias=False,
                         name="myregistry1domain:port/extra_tags:1.2.3",
                     )
                 },
@@ -536,8 +583,18 @@ def test_build_image_with_registries(rule_runner: RuleRunner) -> None:
                 address="extra",
                 repository="extra_tags",
                 tags={
-                    "1.2.3": dict(template="1.2.3", tag="1.2.3", name="extra/extra_tags:1.2.3"),
-                    "latest": dict(template="latest", tag="latest", name="extra/extra_tags:latest"),
+                    "1.2.3": dict(
+                        template="1.2.3",
+                        tag="1.2.3",
+                        uses_local_alias=False,
+                        name="extra/extra_tags:1.2.3",
+                    ),
+                    "latest": dict(
+                        template="latest",
+                        tag="latest",
+                        uses_local_alias=False,
+                        name="extra/extra_tags:latest",
+                    ),
                 },
             ),
         },
@@ -777,7 +834,10 @@ def test_docker_image_version_from_build_arg(rule_runner: RuleRunner) -> None:
                 repository="ver1",
                 tags={
                     "{build_args.VERSION}": dict(
-                        template="{build_args.VERSION}", tag="1.2.3", name="ver1:1.2.3"
+                        template="{build_args.VERSION}",
+                        tag="1.2.3",
+                        uses_local_alias=False,
+                        name="ver1:1.2.3",
                     )
                 },
             )
@@ -1134,7 +1194,11 @@ def test_build_target_stage(
                 address=None,
                 alias=None,
                 repository="image",
-                tags={"latest": dict(template="latest", tag="latest", name="image:latest")},
+                tags={
+                    "latest": dict(
+                        template="latest", tag="latest", uses_local_alias=False, name="image:latest"
+                    )
+                },
             )
         },
     )
@@ -1290,7 +1354,10 @@ ImageRefTest = namedtuple(
                     repository="lowercase",
                     tags=(
                         ImageRefTag(
-                            template="latest", formatted="latest", full_name="lowercase:latest"
+                            template="latest",
+                            formatted="latest",
+                            uses_local_alias=False,
+                            full_name="lowercase:latest",
                         ),
                     ),
                 ),
@@ -1304,7 +1371,10 @@ ImageRefTest = namedtuple(
                     repository="camelcase",
                     tags=(
                         ImageRefTag(
-                            template="latest", formatted="latest", full_name="camelcase:latest"
+                            template="latest",
+                            formatted="latest",
+                            uses_local_alias=False,
+                            full_name="camelcase:latest",
                         ),
                     ),
                 ),
@@ -1318,7 +1388,10 @@ ImageRefTest = namedtuple(
                     repository="image",
                     tags=(
                         ImageRefTag(
-                            template="CamelCase", formatted="CamelCase", full_name="image:CamelCase"
+                            template="CamelCase",
+                            formatted="CamelCase",
+                            uses_local_alias=False,
+                            full_name="image:CamelCase",
                         ),
                     ),
                 ),
@@ -1334,11 +1407,13 @@ ImageRefTest = namedtuple(
                         ImageRefTag(
                             template="{val1}",
                             formatted="first-value",
+                            uses_local_alias=False,
                             full_name="image:first-value",
                         ),
                         ImageRefTag(
                             template="prefix-{val2}",
                             formatted="prefix-second-value",
+                            uses_local_alias=False,
                             full_name="image:prefix-second-value",
                         ),
                     ),
@@ -1355,6 +1430,7 @@ ImageRefTest = namedtuple(
                         ImageRefTag(
                             template="latest",
                             formatted="latest",
+                            uses_local_alias=False,
                             full_name="REG1.example.net/image:latest",
                         ),
                     ),
@@ -1372,6 +1448,7 @@ ImageRefTest = namedtuple(
                         ImageRefTag(
                             template="latest",
                             formatted="latest",
+                            uses_local_alias=False,
                             full_name="docker.io/our-the/pkg:latest",
                         ),
                     ),
@@ -1385,6 +1462,7 @@ ImageRefTest = namedtuple(
                         ImageRefTag(
                             template="latest",
                             formatted="latest",
+                            uses_local_alias=False,
                             full_name="our.registry/the/pkg:latest",
                         ),
                     ),
@@ -1407,6 +1485,7 @@ ImageRefTest = namedtuple(
                         ImageRefTag(
                             template="latest",
                             formatted="latest",
+                            uses_local_alias=False,
                             full_name="docker.io/test/image:latest",
                         ),
                     ),
@@ -1422,6 +1501,7 @@ ImageRefTest = namedtuple(
                         ImageRefTag(
                             template="latest",
                             formatted="latest",
+                            uses_local_alias=False,
                             full_name="our.registry/test/image/the/pkg:latest",
                         ),
                     ),
@@ -1445,11 +1525,13 @@ ImageRefTest = namedtuple(
                         ImageRefTag(
                             template="prefix-{val1}",
                             formatted="prefix-first-value",
+                            uses_local_alias=False,
                             full_name="our.registry/image:prefix-first-value",
                         ),
                         ImageRefTag(
                             template="{val2}-suffix",
                             formatted="second-value-suffix",
+                            uses_local_alias=False,
                             full_name="our.registry/image:second-value-suffix",
                         ),
                     ),
@@ -1481,9 +1563,41 @@ ImageRefTest = namedtuple(
                 }
             ),
             expect_refs=(
-                "docker.io/our-the/pkg:latest",
-                "private/the/pkg:latest",
-                "our.registry/the/pkg:latest",
+                ImageRefRegistry(
+                    registry=DockerRegistryOptions(address="docker.io"),
+                    repository="our-the/pkg",
+                    tags=(
+                        ImageRefTag(
+                            template="latest",
+                            formatted="latest",
+                            uses_local_alias=False,
+                            full_name="docker.io/our-the/pkg:latest",
+                        ),
+                    ),
+                ),
+                ImageRefRegistry(
+                    registry=DockerRegistryOptions(
+                        alias="private",
+                        address="our.registry",
+                        repository="the/pkg",
+                        use_local_alias=True,
+                    ),
+                    repository="the/pkg",
+                    tags=(
+                        ImageRefTag(
+                            template="latest",
+                            formatted="latest",
+                            uses_local_alias=False,
+                            full_name="our.registry/the/pkg:latest",
+                        ),
+                        ImageRefTag(
+                            template="latest",
+                            formatted="latest",
+                            uses_local_alias=True,
+                            full_name="private/the/pkg:latest",
+                        ),
+                    ),
+                ),
             ),
         ),
     ],
@@ -1540,11 +1654,13 @@ def test_docker_info_serialize() -> None:
                 ImageRefTag(
                     template="repo tag1 template",
                     formatted="repo tag1 formatted",
+                    uses_local_alias=False,
                     full_name="repo tag1 full name",
                 ),
                 ImageRefTag(
                     template="repo tag2 template",
                     formatted="repo tag2 formatted",
+                    uses_local_alias=False,
                     full_name="repo tag2 full name",
                 ),
             ),
@@ -1556,6 +1672,7 @@ def test_docker_info_serialize() -> None:
                 ImageRefTag(
                     template="address tag template",
                     formatted="address tag formatted",
+                    uses_local_alias=False,
                     full_name="address tag full name",
                 ),
             ),
@@ -1567,9 +1684,16 @@ def test_docker_info_serialize() -> None:
             repository="alias repo",
             tags=(
                 ImageRefTag(
-                    template="alias tag template",
-                    formatted="alias tag formatted",
-                    full_name="alias tag full name",
+                    template="alias tag (address) template",
+                    formatted="alias tag (address) formatted",
+                    uses_local_alias=False,
+                    full_name="alias tag (address) full name",
+                ),
+                ImageRefTag(
+                    template="alias tag (local alias) template",
+                    formatted="alias tag (local alias) formatted",
+                    uses_local_alias=True,
+                    full_name="alias tag (local alias) full name",
                 ),
             ),
         ),
@@ -1587,11 +1711,13 @@ def test_docker_info_serialize() -> None:
                     "repo tag1 template": dict(
                         template="repo tag1 template",
                         tag="repo tag1 formatted",
+                        uses_local_alias=False,
                         name="repo tag1 full name",
                     ),
                     "repo tag2 template": dict(
                         template="repo tag2 template",
                         tag="repo tag2 formatted",
+                        uses_local_alias=False,
                         name="repo tag2 full name",
                     ),
                 },
@@ -1604,6 +1730,7 @@ def test_docker_info_serialize() -> None:
                     "address tag template": dict(
                         template="address tag template",
                         tag="address tag formatted",
+                        uses_local_alias=False,
                         name="address tag full name",
                     )
                 },
@@ -1613,11 +1740,18 @@ def test_docker_info_serialize() -> None:
                 address="alias address",
                 repository="alias repo",
                 tags={
-                    "alias tag template": dict(
-                        template="alias tag template",
-                        tag="alias tag formatted",
-                        name="alias tag full name",
-                    )
+                    "alias tag (address) template": dict(
+                        template="alias tag (address) template",
+                        tag="alias tag (address) formatted",
+                        uses_local_alias=False,
+                        name="alias tag (address) full name",
+                    ),
+                    "alias tag (local alias) template:local alias": dict(
+                        template="alias tag (local alias) template",
+                        tag="alias tag (local alias) formatted",
+                        uses_local_alias=True,
+                        name="alias tag (local alias) full name",
+                    ),
                 },
             ),
         },

@@ -123,6 +123,7 @@ class DockerPackageFieldSet(PackageFieldSet):
         repository: str,
         tags: tuple[str, ...],
         interpolation_context: InterpolationContext,
+        uses_local_alias,
     ) -> Iterator[ImageRefTag]:
         for tag in tags:
             formatted = self.format_tag(tag, interpolation_context)
@@ -130,6 +131,7 @@ class DockerPackageFieldSet(PackageFieldSet):
                 template=tag,
                 formatted=formatted,
                 full_name=":".join(s for s in [repository, formatted] if s),
+                uses_local_alias=uses_local_alias,
             )
 
     def image_refs(
@@ -158,22 +160,6 @@ class DockerPackageFieldSet(PackageFieldSet):
         This method will always return at least one `ImageRefRegistry`, and there will be at least
         one tag.
         """
-        return tuple(
-            self._image_refs_generator(
-                default_repository=default_repository,
-                registries=registries,
-                interpolation_context=interpolation_context,
-                additional_tags=additional_tags,
-            )
-        )
-
-    def _image_refs_generator(
-        self,
-        default_repository: str,
-        registries: DockerRegistries,
-        interpolation_context: InterpolationContext,
-        additional_tags: tuple[str, ...] = (),
-    ) -> Iterator[str]:
         image_tags = (self.tags.value or ()) + additional_tags
         registries_options = tuple(registries.get(*(self.registries.value or [])))
         if not registries_options:
@@ -183,24 +169,41 @@ class DockerPackageFieldSet(PackageFieldSet):
                 registry=None,
                 repository=repository,
                 tags=tuple(
-                    self.format_image_ref_tags(repository, image_tags, interpolation_context)
+                    self.format_image_ref_tags(
+                        repository, image_tags, interpolation_context, uses_local_alias=False
+                    )
                 ),
             )
             return
 
         for registry in registries_options:
             repository = self.format_repository(default_repository, interpolation_context, registry)
-            full_repository = "/".join([registry.address, repository])
+            address_repository = "/".join([registry.address, repository])
+            if registry.use_local_alias and registry.alias:
+                alias_repository = "/".join([registry.alias, repository])
+            else:
+                alias_repository = None
 
             yield ImageRefRegistry(
                 registry=registry,
                 repository=repository,
-                tags=tuple(
-                    self.format_image_ref_tags(
-                        full_repository,
+                tags=(
+                    *self.format_image_ref_tags(
+                        address_repository,
                         image_tags + registry.extra_image_tags,
                         interpolation_context,
-                    )
+                        uses_local_alias=False,
+                    ),
+                    *(
+                        self.format_image_ref_tags(
+                            alias_repository,
+                            image_tags + registry.extra_image_tags,
+                            interpolation_context,
+                            uses_local_alias=True,
+                        )
+                        if alias_repository
+                        else []
+                    ),
                 ),
             )
 
@@ -237,6 +240,7 @@ class ImageRefTag:
     template: str
     formatted: str
     full_name: str
+    uses_local_alias: bool
 
 
 @dataclass(frozen=True)
@@ -261,6 +265,11 @@ class DockerInfoV1:
                 return f"@{reg.alias}"
             return reg.address
 
+        def tag_key(tag: ImageRefTag) -> str:
+            if tag.uses_local_alias:
+                return f"{tag.template}:local alias"
+            return tag.template
+
         info = DockerInfoV1(
             version=1,
             image_id=image_id,
@@ -270,10 +279,15 @@ class DockerInfoV1:
                     address=r.registry.address if r.registry else None,
                     repository=r.repository,
                     tags={
-                        t.template: DockerInfoV1ImageTag(
-                            template=t.template, tag=t.formatted, name=t.full_name
-                        )
-                        for t in r.tags
+                        **{
+                            tag_key(t): DockerInfoV1ImageTag(
+                                template=t.template,
+                                tag=t.formatted,
+                                uses_local_alias=t.uses_local_alias,
+                                name=t.full_name,
+                            )
+                            for t in r.tags
+                        },
                     },
                 )
                 for r in image_refs
@@ -297,6 +311,7 @@ class DockerInfoV1Registry:
 class DockerInfoV1ImageTag:
     template: str
     tag: str
+    uses_local_alias: bool
     # for convenience, include the concatenated registry/repository:tag name (using this tag)
     name: str
 
