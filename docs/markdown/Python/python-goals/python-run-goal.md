@@ -68,7 +68,7 @@ Debugging
 >
 > 1. In your editor, set your breakpoints and any other debug settings (like break-on-exception).
 > 2. Run your code with `./pants run --debug-adapter`.
-> 3. Connect your editor to the server. The server host and port are logged by Pants when executing `run --debug-adaptor`. (They can also be configured using the `[debug-adapter]` subsystem).
+> 3. Connect your editor to the server. The server host and port are logged by Pants when executing `run --debug-adapter`. (They can also be configured using the `[debug-adapter]` subsystem).
 
 > 📘 Tip: Using the IntelliJ/PyCharm remote debugger
 >

@@ -21,7 +21,7 @@ if git diff "${MERGE_BASE}" --name-only | grep '\.rs$' > /dev/null; then
 fi
 
 echo "* Typechecking"
-./pants --changed-since="${MERGE_BASE}" --changed-dependees=transitive check
+./pants --changed-since="${MERGE_BASE}" --changed-dependents=transitive check
 
 echo "* Checking linters, formatters, and headers"
 ./pants --changed-since="${MERGE_BASE}" lint ||

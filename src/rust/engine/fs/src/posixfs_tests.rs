@@ -87,10 +87,13 @@ async fn stat_symlink() {
   make_file(&dir.path().join(&path), &[], 0o600);
 
   let link_path = PathBuf::from("remarkably_similar_marmoset");
-  std::os::unix::fs::symlink(&dir.path().join(path), dir.path().join(&link_path)).unwrap();
+  std::os::unix::fs::symlink(&dir.path().join(path.clone()), dir.path().join(&link_path)).unwrap();
   assert_eq!(
     posix_fs.stat_sync(link_path.clone()).unwrap().unwrap(),
-    super::Stat::Link(Link(link_path))
+    super::Stat::Link(Link {
+      path: link_path,
+      target: dir.path().join(path)
+    })
   )
 }
 
@@ -190,7 +193,10 @@ async fn scandir() {
         is_executable: true,
       }),
       Stat::Dir(Dir(hammock.clone())),
-      Stat::Link(Link(remarkably_similar_marmoset.clone())),
+      Stat::Link(Link {
+        path: remarkably_similar_marmoset.clone(),
+        target: dir.path().join(&a_marmoset)
+      }),
       Stat::File(File {
         path: sneaky_marmoset.clone(),
         is_executable: false,
@@ -351,7 +357,9 @@ async fn memfs_expand_basic() {
   .unwrap();
 
   assert_eq!(
-    fs.expand_globs(globs, None).await.unwrap(),
+    fs.expand_globs(globs, SymlinkBehavior::Oblivious, None)
+      .await
+      .unwrap(),
     vec![
       PathStat::file(
         p1.clone(),
@@ -404,6 +412,7 @@ async fn read_mock_files(input: Vec<PathBuf>, posix_fs: &Arc<PosixFS>) -> Vec<St
       let path_stat: PathStat = item.unwrap();
       match path_stat {
         PathStat::Dir { stat, .. } => Stat::Dir(stat),
+        PathStat::Link { stat, .. } => Stat::Link(stat),
         PathStat::File { stat, .. } => Stat::File(stat),
       }
     })

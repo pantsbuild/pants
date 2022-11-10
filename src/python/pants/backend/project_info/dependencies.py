@@ -34,7 +34,7 @@ class DependenciesSubsystem(LineOriented, GoalSubsystem):
 
 class Dependencies(Goal):
     subsystem_cls = DependenciesSubsystem
-    environment_migrated = True
+    environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY
 
 
 @goal_rule

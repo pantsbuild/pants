@@ -14,9 +14,9 @@ import pytest
 
 from pants.backend.docker.goals.package_image import (
     DockerBuildTargetStageError,
-    DockerFieldSet,
     DockerImageTagValueError,
     DockerInfoV1,
+    DockerPackageFieldSet,
     DockerRepositoryNameError,
     ImageRefRegistry,
     ImageRefTag,
@@ -172,7 +172,7 @@ def assert_build(
     result = run_rule_with_mocks(
         build_docker_image,
         rule_args=[
-            DockerFieldSet.create(tgt),
+            DockerPackageFieldSet.create(tgt),
             docker_options,
             global_options,
             DockerBinary("/dummy/docker"),
@@ -557,7 +557,7 @@ def test_dynamic_image_version(rule_runner: RuleRunner) -> None:
 
     def assert_tags(name: str, *expect_tags: str) -> None:
         tgt = rule_runner.get_target(Address("docker/test", target_name=name))
-        fs = DockerFieldSet.create(tgt)
+        fs = DockerPackageFieldSet.create(tgt)
         image_refs = fs.image_refs(
             "image",
             DockerRegistries.from_dict({}),
@@ -619,7 +619,7 @@ def test_docker_build_process_environment(rule_runner: RuleRunner) -> None:
         assert process.argv == (
             "/dummy/docker",
             "build",
-            "--pull=True",
+            "--pull=False",
             "--tag",
             "env1:1.2.3",
             "--file",
@@ -642,13 +642,13 @@ def test_docker_build_process_environment(rule_runner: RuleRunner) -> None:
 
 
 def test_docker_build_pull(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({"docker/test/BUILD": 'docker_image(name="args1", pull=False)'})
+    rule_runner.write_files({"docker/test/BUILD": 'docker_image(name="args1", pull=True)'})
 
     def check_docker_proc(process: Process):
         assert process.argv == (
             "/dummy/docker",
             "build",
-            "--pull=False",
+            "--pull=True",
             "--tag",
             "args1:latest",
             "--file",
@@ -679,7 +679,7 @@ def test_docker_build_squash(rule_runner: RuleRunner) -> None:
         assert process.argv == (
             "/dummy/docker",
             "build",
-            "--pull=True",
+            "--pull=False",
             "--squash",
             "--tag",
             "args1:latest",
@@ -692,7 +692,7 @@ def test_docker_build_squash(rule_runner: RuleRunner) -> None:
         assert process.argv == (
             "/dummy/docker",
             "build",
-            "--pull=True",
+            "--pull=False",
             "--tag",
             "args2:latest",
             "--file",
@@ -728,7 +728,7 @@ def test_docker_build_args(rule_runner: RuleRunner) -> None:
         assert process.argv == (
             "/dummy/docker",
             "build",
-            "--pull=True",
+            "--pull=False",
             "--tag",
             "args1:1.2.3",
             "--build-arg",
@@ -835,7 +835,7 @@ def test_docker_extra_build_args_field(rule_runner: RuleRunner) -> None:
         assert process.argv == (
             "/dummy/docker",
             "build",
-            "--pull=True",
+            "--pull=False",
             "--tag",
             "img1:latest",
             "--build-arg",
@@ -893,7 +893,7 @@ def test_docker_build_secrets_option(rule_runner: RuleRunner) -> None:
             f"id=project-secret,src={rule_runner.build_root}/secrets/mysecret",
             "--secret",
             f"id=target-secret,src={rule_runner.build_root}/docker/test/mysecret",
-            "--pull=True",
+            "--pull=False",
             "--tag",
             "img1:latest",
             "--file",
@@ -928,7 +928,7 @@ def test_docker_build_ssh_option(rule_runner: RuleRunner) -> None:
             "build",
             "--ssh",
             "default",
-            "--pull=True",
+            "--pull=False",
             "--tag",
             "img1:latest",
             "--file",
@@ -972,7 +972,7 @@ def test_docker_build_labels_option(rule_runner: RuleRunner) -> None:
             "build.host=tbs06",
             "--label",
             "build.job=13934",
-            "--pull=True",
+            "--pull=False",
             "--tag",
             "img1:latest",
             "--build-arg",
@@ -1113,7 +1113,7 @@ def test_build_target_stage(
         assert process.argv == (
             "/dummy/docker",
             "build",
-            "--pull=True",
+            "--pull=False",
             "--target",
             expected_target,
             "--tag",
@@ -1218,7 +1218,7 @@ def test_get_context_root(
         )
         address = Address("src/docker", target_name="image")
         tgt = DockerImageTarget({"context_root": context_root}, address)
-        fs = DockerFieldSet.create(tgt)
+        fs = DockerPackageFieldSet.create(tgt)
         actual_context_root = fs.get_context_root(docker_options.default_context_root)
         assert actual_context_root == expected_context_root
 
@@ -1470,12 +1470,28 @@ ImageRefTest = namedtuple(
                 ),
             ),
         ),
+        ImageRefTest(
+            # Test registry `use_local_alias` (#16354)
+            docker_image=dict(registries=["docker.io", "@private"], repository="our-the/pkg"),
+            registries=dict(
+                private={
+                    "address": "our.registry",
+                    "repository": "the/pkg",
+                    "use_local_alias": True,
+                }
+            ),
+            expect_refs=(
+                "docker.io/our-the/pkg:latest",
+                "private/the/pkg:latest",
+                "our.registry/the/pkg:latest",
+            ),
+        ),
     ],
 )
 def test_image_ref_formatting(test: ImageRefTest) -> None:
     address = Address("src/test/docker", target_name=test.docker_image.pop("name", "image"))
     tgt = DockerImageTarget(test.docker_image, address)
-    field_set = DockerFieldSet.create(tgt)
+    field_set = DockerPackageFieldSet.create(tgt)
     registries = DockerRegistries.from_dict(test.registries)
     interpolation_context = InterpolationContext.from_dict(
         {"val1": "first-value", "val2": "second-value"}
@@ -1494,7 +1510,7 @@ def test_docker_image_tags_from_plugin_hook(rule_runner: RuleRunner) -> None:
         assert process.argv == (
             "/dummy/docker",
             "build",
-            "--pull=True",
+            "--pull=False",
             "--tag",
             "plugin:latest",
             "--tag",

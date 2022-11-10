@@ -89,6 +89,7 @@ class DeploySubsystem(GoalSubsystem):
 @dataclass(frozen=True)
 class Deploy(Goal):
     subsystem_cls = DeploySubsystem
+    environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY  # TODO(#17129) — Migrate this.
 
 
 @dataclass(frozen=True)

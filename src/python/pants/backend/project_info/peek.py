@@ -39,6 +39,7 @@ class PeekSubsystem(Outputting, GoalSubsystem):
 
 class Peek(Goal):
     subsystem_cls = PeekSubsystem
+    environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY
 
 
 def _normalize_value(val: Any) -> Any:

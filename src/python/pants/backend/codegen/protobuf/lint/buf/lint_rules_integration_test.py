@@ -30,7 +30,7 @@ def rule_runner() -> RuleRunner:
             *stripped_source_files.rules(),
             *target_types_rules(),
             QueryRule(Partitions, [BufLintRequest.PartitionRequest]),
-            QueryRule(LintResult, [BufLintRequest.SubPartition]),
+            QueryRule(LintResult, [BufLintRequest.Batch]),
         ],
         target_types=[ProtobufSourcesGeneratorTarget],
     )
@@ -55,15 +55,15 @@ def run_buf(
         ],
         env_inherit={"PATH"},
     )
-    partition = rule_runner.request(
-        Partitions[Any, BufFieldSet],
+    partitions = rule_runner.request(
+        Partitions[BufFieldSet, Any],
         [BufLintRequest.PartitionRequest(tuple(BufFieldSet.create(tgt) for tgt in targets))],
     )
     results = []
-    for key, subpartition in partition.items():
+    for partition in partitions:
         result = rule_runner.request(
             LintResult,
-            [BufLintRequest.SubPartition("", subpartition, key)],
+            [BufLintRequest.Batch("", partition.elements, partition.metadata)],
         )
         results.append(result)
     return tuple(results)

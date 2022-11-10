@@ -303,7 +303,7 @@ from base.models.user import User
 from base.util.math import add_two
 ```
 
-Note that even though the projects live in different top-level folders, you are still able to import from other projects. If you would like to limit this, you can use `./pants dependees` or `./pants dependencies` in CI to track where imports are being used. See [Project introspection](doc:project-introspection).
+Note that even though the projects live in different top-level folders, you are still able to import from other projects. If you would like to limit this, you can use `./pants dependents` or `./pants dependencies` in CI to track where imports are being used. See [Project introspection](doc:project-introspection).
 
 ### Config:
 

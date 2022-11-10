@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import re
 from textwrap import dedent
 
 import pytest
@@ -50,7 +51,7 @@ def rule_runner() -> RuleRunner:
             *build_pkg.rules(),
             *assembly.rules(),
             QueryRule(Partitions, [GoVetRequest.PartitionRequest]),
-            QueryRule(LintResult, [GoVetRequest.SubPartition]),
+            QueryRule(LintResult, [GoVetRequest.Batch]),
             SubsystemRule(GoVetSubsystem),
         ],
     )
@@ -95,15 +96,15 @@ def run_go_vet(
 ) -> tuple[LintResult, ...]:
     args = extra_args or []
     rule_runner.set_options(args, env_inherit={"PATH"})
-    partition = rule_runner.request(
+    partitions = rule_runner.request(
         Partitions,
         [GoVetRequest.PartitionRequest(tuple(GoVetFieldSet.create(tgt) for tgt in targets))],
     )
     results = []
-    for key, subpartition in partition.items():
+    for partition in partitions:
         result = rule_runner.request(
             LintResult,
-            [GoVetRequest.SubPartition("", subpartition, key)],
+            [GoVetRequest.Batch("", partition.elements, partition.metadata)],
         )
         results.append(result)
     return tuple(results)
@@ -129,6 +130,14 @@ def test_passing(rule_runner: RuleRunner) -> None:
     assert lint_results[0].stderr == ""
 
 
+def _check_err_msg(result_stderr: str) -> None:
+    # go vet sometimes emits "fmt.Printf" and sometimes just "Printf", depending on conditions
+    # I'm clear on. We elide this nuance.
+    assert re.search(
+        r"./f.go:4:5: (fmt\.)?Printf format %s reads arg #1, but call has 0 args", result_stderr
+    )
+
+
 def test_failing(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -141,9 +150,7 @@ def test_failing(rule_runner: RuleRunner) -> None:
     lint_results = run_go_vet(rule_runner, [tgt])
     assert len(lint_results) == 1
     assert lint_results[0].exit_code == 2
-    assert (
-        "./f.go:4:5: Printf format %s reads arg #1, but call has 0 args" in lint_results[0].stderr
-    )
+    _check_err_msg(lint_results[0].stderr)
 
 
 def test_multiple_targets(rule_runner: RuleRunner) -> None:
@@ -164,9 +171,7 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
     lint_results = run_go_vet(rule_runner, tgts)
     assert len(lint_results) == 1
     assert lint_results[0].exit_code == 2
-    assert (
-        "bad/f.go:4:5: Printf format %s reads arg #1, but call has 0 args" in lint_results[0].stderr
-    )
+    _check_err_msg(lint_results[0].stderr)
     assert "good/f.go" not in lint_results[0].stdout
 
 

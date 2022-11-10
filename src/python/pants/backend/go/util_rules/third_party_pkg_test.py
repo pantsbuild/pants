@@ -21,6 +21,7 @@ from pants.backend.go.util_rules import (
     sdk,
     third_party_pkg,
 )
+from pants.backend.go.util_rules.build_opts import GoBuildOptions
 from pants.backend.go.util_rules.third_party_pkg import (
     AllThirdPartyPackages,
     AllThirdPartyPackagesRequest,
@@ -91,7 +92,8 @@ def set_up_go_mod(rule_runner: RuleRunner, go_mod: str, go_sum: str) -> Digest:
 def test_download_and_analyze_all_packages(rule_runner: RuleRunner) -> None:
     input_digest = rule_runner.make_snapshot({"go.mod": GO_MOD, "go.sum": GO_SUM}).digest
     all_packages = rule_runner.request(
-        AllThirdPartyPackages, [AllThirdPartyPackagesRequest(input_digest, "go.mod")]
+        AllThirdPartyPackages,
+        [AllThirdPartyPackagesRequest(input_digest, "go.mod", build_opts=GoBuildOptions())],
     )
     assert set(all_packages.import_paths_to_pkg_info.keys()) == {
         "golang.org/x/text/encoding/japanese",
@@ -261,7 +263,10 @@ def test_invalid_go_sum(rule_runner: RuleRunner) -> None:
         ),
     )
     with engine_error(ProcessExecutionFailure, contains="SECURITY ERROR"):
-        rule_runner.request(AllThirdPartyPackages, [AllThirdPartyPackagesRequest(digest, "go.mod")])
+        rule_runner.request(
+            AllThirdPartyPackages,
+            [AllThirdPartyPackagesRequest(digest, "go.mod", build_opts=GoBuildOptions())],
+        )
 
 
 @pytest.mark.skip(reason="TODO(#15824)")
@@ -285,7 +290,10 @@ def test_missing_go_sum(rule_runner: RuleRunner) -> None:
         ),
     )
     with engine_error(contains="github.com/google/uuid@v1.3.0: missing go.sum entry"):
-        rule_runner.request(AllThirdPartyPackages, [AllThirdPartyPackagesRequest(digest, "go.mod")])
+        rule_runner.request(
+            AllThirdPartyPackages,
+            [AllThirdPartyPackagesRequest(digest, "go.mod", build_opts=GoBuildOptions())],
+        )
 
 
 @pytest.mark.skip(reason="TODO(#15824)")
@@ -312,7 +320,10 @@ def test_stale_go_mod(rule_runner: RuleRunner) -> None:
         ),
     )
     with engine_error(ProcessExecutionFailure, contains="updates to go.mod needed"):
-        rule_runner.request(AllThirdPartyPackages, [AllThirdPartyPackagesRequest(digest, "go.mod")])
+        rule_runner.request(
+            AllThirdPartyPackages,
+            [AllThirdPartyPackagesRequest(digest, "go.mod", build_opts=GoBuildOptions())],
+        )
 
 
 def test_pkg_missing(rule_runner: RuleRunner) -> None:
@@ -322,7 +333,11 @@ def test_pkg_missing(rule_runner: RuleRunner) -> None:
     ):
         rule_runner.request(
             ThirdPartyPkgAnalysis,
-            [ThirdPartyPkgAnalysisRequest("another_project.org/foo", digest, "go.mod")],
+            [
+                ThirdPartyPkgAnalysisRequest(
+                    "another_project.org/foo", digest, "go.mod", build_opts=GoBuildOptions()
+                )
+            ],
         )
 
 
@@ -344,7 +359,8 @@ def test_module_with_no_packages(rule_runner) -> None:
         ),
     )
     all_packages = rule_runner.request(
-        AllThirdPartyPackages, [AllThirdPartyPackagesRequest(digest, "go.mod")]
+        AllThirdPartyPackages,
+        [AllThirdPartyPackagesRequest(digest, "go.mod", build_opts=GoBuildOptions())],
     )
     assert not all_packages.import_paths_to_pkg_info
 
@@ -465,7 +481,11 @@ def test_determine_pkg_info_module_with_replace_directive(rule_runner: RuleRunne
     )
     pkg_info = rule_runner.request(
         ThirdPartyPkgAnalysis,
-        [ThirdPartyPkgAnalysisRequest("github.com/hashicorp/consul/api", digest, "go.mod")],
+        [
+            ThirdPartyPkgAnalysisRequest(
+                "github.com/hashicorp/consul/api", digest, "go.mod", build_opts=GoBuildOptions()
+            )
+        ],
     )
     assert pkg_info.dir_path == "gopath/pkg/mod/github.com/hashicorp/consul/api@v1.3.0"
     assert "raw.go" in pkg_info.go_files
@@ -493,7 +513,11 @@ def test_ambiguous_package(rule_runner: RuleRunner) -> None:
     )
     pkg_info = rule_runner.request(
         ThirdPartyPkgAnalysis,
-        [ThirdPartyPkgAnalysisRequest("github.com/ugorji/go/codec", digest, "go.mod")],
+        [
+            ThirdPartyPkgAnalysisRequest(
+                "github.com/ugorji/go/codec", digest, "go.mod", build_opts=GoBuildOptions()
+            )
+        ],
     )
     assert pkg_info.error is None
     assert (

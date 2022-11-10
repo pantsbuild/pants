@@ -27,7 +27,7 @@ def rule_runner() -> RuleRunner:
             *yapf_fmt_rules(),
             *yapf_subsystem_rules(),
             *config_files.rules(),
-            QueryRule(FmtResult, (YapfRequest.SubPartition,)),
+            QueryRule(FmtResult, (YapfRequest.Batch,)),
         ],
         target_types=[PythonSourcesGeneratorTarget],
     )
@@ -42,7 +42,7 @@ def run_yapf(rule_runner: RuleRunner, *, extra_args: list[str] | None = None) ->
     fmt_result = rule_runner.request(
         FmtResult,
         [
-            YapfRequest.SubPartition("", snapshot.files, key=None, snapshot=snapshot),
+            YapfRequest.Batch("", snapshot.files, partition_metadata=None, snapshot=snapshot),
         ],
     )
     return fmt_result

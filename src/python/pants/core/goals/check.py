@@ -17,6 +17,7 @@ from pants.core.goals.multi_tool_goal_helper import (
     write_reports,
 )
 from pants.core.util_rules.distdir import DistDir
+from pants.core.util_rules.environments import EnvironmentNameRequest
 from pants.engine.collection import Collection
 from pants.engine.console import Console
 from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
@@ -175,6 +176,7 @@ class CheckSubsystem(GoalSubsystem):
 
 class Check(Goal):
     subsystem_cls = CheckSubsystem
+    environment_behavior = Goal.EnvironmentBehavior.USES_ENVIRONMENTS
 
 
 @goal_rule
@@ -200,8 +202,29 @@ async def check(
         )
         for request_type in request_types
     )
+
+    request_to_field_set = [
+        (request, field_set) for request in requests for field_set in request.field_sets
+    ]
+
+    environment_names = await MultiGet(
+        Get(
+            EnvironmentName,
+            EnvironmentNameRequest,
+            EnvironmentNameRequest.from_field_set(field_set),
+        )
+        for (_, field_set) in request_to_field_set
+    )
+
+    request_to_env_name = {
+        (request, env_name)
+        for (request, _), env_name in zip(request_to_field_set, environment_names)
+    }
+
+    # Run each check request in each valid environment (potentially multiple runs per tool)
     all_results = await MultiGet(
-        Get(CheckResults, CheckRequest, request) for request in requests if request.field_sets
+        Get(CheckResults, {request: CheckRequest, env_name: EnvironmentName})
+        for (request, env_name) in request_to_env_name
     )
 
     results_by_tool: dict[str, list[CheckResult]] = defaultdict(list)

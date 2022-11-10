@@ -29,11 +29,11 @@ from typing import ClassVar, Generic, Type, TypeVar
 
 from typing_extensions import final
 
-from pants.core.goals.package import BuiltPackage, PackageFieldSet
+from pants.core.goals.package import BuiltPackage, EnvironmentAwarePackageRequest, PackageFieldSet
 from pants.engine.addresses import Address
 from pants.engine.collection import Collection
 from pants.engine.console import Console
-from pants.engine.environment import EnvironmentName
+from pants.engine.environment import ChosenLocalEnvironmentName, EnvironmentName
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import InteractiveProcess, InteractiveProcessResult
 from pants.engine.rules import Effect, Get, MultiGet, collect_rules, goal_rule, rule
@@ -180,10 +180,13 @@ class PublishSubsystem(GoalSubsystem):
 
 class Publish(Goal):
     subsystem_cls = PublishSubsystem
+    environment_behavior = Goal.EnvironmentBehavior.USES_ENVIRONMENTS
 
 
 @goal_rule
-async def run_publish(console: Console, publish: PublishSubsystem) -> Publish:
+async def run_publish(
+    console: Console, publish: PublishSubsystem, local_environment: ChosenLocalEnvironmentName
+) -> Publish:
     target_roots_to_package_field_sets, target_roots_to_publish_field_sets = await MultiGet(
         Get(
             TargetRootsToFieldSets,
@@ -241,7 +244,10 @@ async def run_publish(console: Console, publish: PublishSubsystem) -> Publish:
             continue
 
         logger.debug(f"Execute {pub.process}")
-        res = await Effect(InteractiveProcessResult, InteractiveProcess, pub.process)
+        res = await Effect(
+            InteractiveProcessResult,
+            {pub.process: InteractiveProcess, local_environment.val: EnvironmentName},
+        )
         if res.exit_code == 0:
             sigil = console.sigil_succeeded()
             status = "published"
@@ -304,9 +310,12 @@ class _PublishJsonEncoder(json.JSONEncoder):
 
 
 @rule
-async def package_for_publish(request: PublishProcessesRequest) -> PublishProcesses:
+async def package_for_publish(
+    request: PublishProcessesRequest, local_environment: ChosenLocalEnvironmentName
+) -> PublishProcesses:
     packages = await MultiGet(
-        Get(BuiltPackage, PackageFieldSet, field_set) for field_set in request.package_field_sets
+        Get(BuiltPackage, EnvironmentAwarePackageRequest(field_set))
+        for field_set in request.package_field_sets
     )
 
     for pkg in packages:
@@ -319,8 +328,10 @@ async def package_for_publish(request: PublishProcessesRequest) -> PublishProces
     publish = await MultiGet(
         Get(
             PublishProcesses,
-            PublishRequest,
-            field_set._request(packages),
+            {
+                field_set._request(packages): PublishRequest,
+                local_environment.val: EnvironmentName,
+            },
         )
         for field_set in request.publish_field_sets
     )

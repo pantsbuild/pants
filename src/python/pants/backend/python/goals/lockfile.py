@@ -3,9 +3,11 @@
 
 from __future__ import annotations
 
-import logging
+import itertools
+import os.path
 from collections import defaultdict
 from dataclasses import dataclass
+from operator import itemgetter
 from typing import Iterable
 
 from pants.backend.python.pip_requirement import PipRequirement
@@ -35,6 +37,8 @@ from pants.core.goals.generate_lockfiles import (
 )
 from pants.core.util_rules.lockfile_metadata import calculate_invalidation_digest
 from pants.engine.fs import CreateDigest, Digest, DigestContents, FileContent, MergeDigests
+from pants.engine.internals.synthetic_targets import SyntheticAddressMaps, SyntheticTargetsRequest
+from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.engine.process import ProcessCacheScope, ProcessResult
 from pants.engine.rules import Get, collect_rules, rule, rule_helper
 from pants.engine.target import AllTargets
@@ -42,8 +46,6 @@ from pants.engine.unions import UnionRule
 from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
-
-logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -268,10 +270,50 @@ async def setup_user_lockfile_requests(
     )
 
 
+@dataclass(frozen=True)
+class PythonSyntheticLockfileTargetsRequest(SyntheticTargetsRequest):
+    """Register the type used to create synthetic targets for Python lockfiles.
+
+    As the paths for all lockfiles are known up-front, we set the `path` field to
+    `SyntheticTargetsRequest.SINGLE_REQUEST_FOR_ALL_TARGETS` so that we get a single request for all
+    our synthetic targets rather than one request per directory.
+    """
+
+    path: str = SyntheticTargetsRequest.SINGLE_REQUEST_FOR_ALL_TARGETS
+
+
+@rule
+async def python_lockfile_synthetic_targets(
+    request: PythonSyntheticLockfileTargetsRequest,
+    python_setup: PythonSetup,
+) -> SyntheticAddressMaps:
+    if not python_setup.enable_synthetic_lockfiles:
+        return SyntheticAddressMaps()
+
+    resolves = [
+        (os.path.dirname(lockfile), os.path.basename(lockfile), name)
+        for name, lockfile in python_setup.resolves.items()
+    ]
+    return SyntheticAddressMaps.for_targets_request(
+        request,
+        [
+            (
+                os.path.join(spec_path, "BUILD.python-lockfiles"),
+                tuple(
+                    TargetAdaptor("_lockfiles", name=name, sources=[lockfile])
+                    for _, lockfile, name in lockfiles
+                ),
+            )
+            for spec_path, lockfiles in itertools.groupby(sorted(resolves), key=itemgetter(0))
+        ],
+    )
+
+
 def rules():
     return (
         *collect_rules(),
         UnionRule(GenerateLockfile, GeneratePythonLockfile),
         UnionRule(KnownUserResolveNamesRequest, KnownPythonUserResolveNamesRequest),
         UnionRule(RequestedUserResolveNames, RequestedPythonUserResolveNames),
+        UnionRule(SyntheticTargetsRequest, PythonSyntheticLockfileTargetsRequest),
     )

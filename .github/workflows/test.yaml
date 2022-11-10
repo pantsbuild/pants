@@ -24,7 +24,7 @@ jobs:
       with:
         fetch-depth: 10
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v3
+      uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python-version }}
     - name: Tell Pants to use Python ${{ matrix.python-version }}
@@ -38,7 +38,7 @@ jobs:
       uses: actions/cache@v3
       with:
         key: Linux-x86_64-rustup-${{ hashFiles('rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.64.0-*
+        path: '~/.rustup/toolchains/1.65.0-*
 
           ~/.rustup/update-hashes
 
@@ -53,16 +53,12 @@ jobs:
         workspaces: src/rust/engine
     - id: get-engine-hash
       name: Get native engine hash
-      run: 'echo "::set-output name=hash::$(./build-support/bin/rust/print_engine_hash.sh)"
-
-        '
+      run: echo "hash=$(./build-support/bin/rust/print_engine_hash.sh)" >> $GITHUB_OUTPUT
       shell: bash
     - name: Cache native engine
       uses: actions/cache@v3
       with:
-        key: 'Linux-x86_64-engine-${{ steps.get-engine-hash.outputs.hash }}-v1
-
-          '
+        key: Linux-x86_64-engine-${{ steps.get-engine-hash.outputs.hash }}-v1
         path: '.pants
 
           src/python/pants/engine/internals/native_engine.so
@@ -74,9 +70,8 @@ jobs:
 
         '
     - name: Bootstrap Pants
-      run: './pants --version
-
-        '
+      run: ./pants version > ${{ runner.temp }}/_pants_version.stdout && [[ -s ${{
+        runner.temp }}/_pants_version.stdout ]]
     - name: Run smoke tests
       run: './pants list ::
 
@@ -142,7 +137,7 @@ jobs:
       with:
         fetch-depth: 10
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v3
+      uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python-version }}
     - name: Tell Pants to use Python ${{ matrix.python-version }}
@@ -156,7 +151,7 @@ jobs:
       uses: actions/cache@v3
       with:
         key: macOS11-x86_64-rustup-${{ hashFiles('rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.64.0-*
+        path: '~/.rustup/toolchains/1.65.0-*
 
           ~/.rustup/update-hashes
 
@@ -171,16 +166,12 @@ jobs:
         workspaces: src/rust/engine
     - id: get-engine-hash
       name: Get native engine hash
-      run: 'echo "::set-output name=hash::$(./build-support/bin/rust/print_engine_hash.sh)"
-
-        '
+      run: echo "hash=$(./build-support/bin/rust/print_engine_hash.sh)" >> $GITHUB_OUTPUT
       shell: bash
     - name: Cache native engine
       uses: actions/cache@v3
       with:
-        key: 'macOS11-x86_64-engine-${{ steps.get-engine-hash.outputs.hash }}-v1
-
-          '
+        key: macOS11-x86_64-engine-${{ steps.get-engine-hash.outputs.hash }}-v1
         path: '.pants
 
           src/python/pants/engine/internals/native_engine.so
@@ -192,9 +183,8 @@ jobs:
 
         '
     - name: Bootstrap Pants
-      run: './pants --version
-
-        '
+      run: ./pants version > ${{ runner.temp }}/_pants_version.stdout && [[ -s ${{
+        runner.temp }}/_pants_version.stdout ]]
     - name: Run smoke tests
       run: './pants list ::
 
@@ -315,7 +305,7 @@ jobs:
       uses: actions/cache@v3
       with:
         key: macOS10-15-x86_64-rustup-${{ hashFiles('rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.64.0-*
+        path: '~/.rustup/toolchains/1.65.0-*
 
           ~/.rustup/update-hashes
 
@@ -381,7 +371,7 @@ jobs:
       uses: actions/cache@v3
       with:
         key: macOS11-ARM64-rustup-${{ hashFiles('rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.64.0-*
+        path: '~/.rustup/toolchains/1.65.0-*
 
           ~/.rustup/update-hashes
 
@@ -445,7 +435,7 @@ jobs:
       uses: actions/cache@v3
       with:
         key: macOS11-x86_64-rustup-${{ hashFiles('rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.64.0-*
+        path: '~/.rustup/toolchains/1.65.0-*
 
           ~/.rustup/update-hashes
 
@@ -532,9 +522,9 @@ jobs:
       name: Classify changed files
       run: "affected=$(python build-support/bin/classify_changed_files.py \"${{ steps.files.outputs.all_modified_files\
         \ }}\")\necho \"Affected:\"\nif [[ \"${affected}\" == \"docs\" ]]; then\n\
-        \  echo \"::set-output name=docs_only::true\"\n  echo \"docs_only\"\nfi\n\
-        for i in ${affected}; do\n  echo \"::set-output name=${i}::true\"\n  echo\
-        \ \"${i}\"\ndone\n"
+        \  echo \"docs_only=true\" >> $GITHUB_OUTPUT\n  echo \"docs_only\"\nfi\nfor\
+        \ i in ${affected}; do\n  echo \"${i}=true\" >> $GITHUB_OUTPUT\n  echo \"\
+        ${i}\"\ndone\n"
   lint_python:
     if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only
       != 'true')
@@ -550,7 +540,7 @@ jobs:
       with:
         fetch-depth: 10
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v3
+      uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python-version }}
     - name: Tell Pants to use Python ${{ matrix.python-version }}
@@ -622,7 +612,7 @@ jobs:
     - ubuntu-20.04
     steps:
     - id: set_merge_ok
-      run: echo '::set-output name=merge_ok::true'
+      run: echo 'merge_ok=true' >> ${GITHUB_OUTPUT}
   test_python_linux_x86_64_0:
     if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only
       != 'true')
@@ -659,7 +649,7 @@ jobs:
 
         '
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v3
+      uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python-version }}
     - name: Tell Pants to use Python ${{ matrix.python-version }}
@@ -732,7 +722,7 @@ jobs:
 
         '
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v3
+      uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python-version }}
     - name: Tell Pants to use Python ${{ matrix.python-version }}
@@ -805,7 +795,7 @@ jobs:
 
         '
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v3
+      uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python-version }}
     - name: Tell Pants to use Python ${{ matrix.python-version }}
@@ -864,7 +854,7 @@ jobs:
         distribution: adopt
         java-version: '11'
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v3
+      uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python-version }}
     - name: Tell Pants to use Python ${{ matrix.python-version }}

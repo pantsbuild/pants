@@ -102,6 +102,7 @@ pub struct RemotingOptions {
   pub execution_headers: BTreeMap<String, String>,
   pub execution_overall_deadline: Duration,
   pub execution_rpc_concurrency: usize,
+  pub append_only_caches_base_path: Option<String>,
 }
 
 #[derive(Clone, Debug)]
@@ -265,9 +266,11 @@ impl Core {
         remoting_opts.execution_address.as_ref().unwrap(),
         instance_name,
         process_cache_namespace,
+        remoting_opts.append_only_caches_base_path.clone(),
         root_ca_certs.clone(),
         remoting_opts.execution_headers.clone(),
         full_store.clone(),
+        executor.clone(),
         remoting_opts.execution_overall_deadline,
         Duration::from_millis(100),
         remoting_opts.execution_rpc_concurrency,
@@ -329,6 +332,7 @@ impl Core {
         remoting_opts.cache_content_behavior,
         remoting_opts.cache_rpc_concurrency,
         remoting_opts.cache_read_timeout,
+        remoting_opts.append_only_caches_base_path.clone(),
       )?);
     }
 
@@ -513,6 +517,7 @@ impl Core {
 
     let store = if (exec_strategy_opts.remote_cache_read || exec_strategy_opts.remote_cache_write)
       && remoting_opts.cache_content_behavior == CacheContentBehavior::Fetch
+      && !remoting_opts.execution_enable
     {
       // In remote cache mode with eager fetching, the only interaction with the remote CAS
       // should be through the remote cache code paths. Thus, the store seen by the rest of the
@@ -520,6 +525,9 @@ impl Core {
       full_store.clone().into_local_only()
     } else {
       // Otherwise, the remote CAS should be visible everywhere.
+      //
+      // With remote execution, we do not always write remote results into the local cache, so it's
+      // important to always have access to the remote cache or else we will get missing digests.
       full_store.clone()
     };
 

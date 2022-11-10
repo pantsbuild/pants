@@ -38,7 +38,6 @@ from pants.backend.docker.util_rules.docker_build_context import (
 )
 from pants.backend.docker.utils import format_rename_suggestion
 from pants.core.goals.package import BuiltPackage, OutputPathField, PackageFieldSet
-from pants.core.goals.run import RunFieldSet
 from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, Digest, FileContent
 from pants.engine.process import FallibleProcessResult, Process, ProcessExecutionFailure
@@ -69,7 +68,7 @@ class DockerImageOptionValueError(ValueError):
 
 
 @dataclass(frozen=True)
-class DockerFieldSet(PackageFieldSet, RunFieldSet):
+class DockerPackageFieldSet(PackageFieldSet):
     required_fields = (DockerImageSourceField,)
 
     context_root: DockerImageContextRootField
@@ -159,6 +158,22 @@ class DockerFieldSet(PackageFieldSet, RunFieldSet):
         This method will always return at least one `ImageRefRegistry`, and there will be at least
         one tag.
         """
+        return tuple(
+            self._image_refs_generator(
+                default_repository=default_repository,
+                registries=registries,
+                interpolation_context=interpolation_context,
+                additional_tags=additional_tags,
+            )
+        )
+
+    def _image_refs_generator(
+        self,
+        default_repository: str,
+        registries: DockerRegistries,
+        interpolation_context: InterpolationContext,
+        additional_tags: tuple[str, ...] = (),
+    ) -> Iterator[str]:
         image_tags = (self.tags.value or ()) + additional_tags
         registries_options = tuple(registries.get(*(self.registries.value or [])))
         if not registries_options:
@@ -288,7 +303,7 @@ class DockerInfoV1ImageTag:
 
 def get_build_options(
     context: DockerBuildContext,
-    field_set: DockerFieldSet,
+    field_set: DockerPackageFieldSet,
     global_target_stage_option: str | None,
     target: Target,
 ) -> Iterator[str]:
@@ -333,7 +348,7 @@ def get_build_options(
 
 @rule
 async def build_docker_image(
-    field_set: DockerFieldSet,
+    field_set: DockerPackageFieldSet,
     options: DockerOptions,
     global_options: GlobalOptions,
     docker: DockerBinary,
@@ -554,6 +569,5 @@ def format_docker_build_context_help_message(
 def rules():
     return [
         *collect_rules(),
-        UnionRule(PackageFieldSet, DockerFieldSet),
-        UnionRule(RunFieldSet, DockerFieldSet),
+        UnionRule(PackageFieldSet, DockerPackageFieldSet),
     ]

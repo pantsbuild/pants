@@ -13,7 +13,6 @@ import os.path
 from collections import defaultdict
 from dataclasses import dataclass
 from itertools import chain
-from textwrap import dedent
 from typing import DefaultDict, Dict, Generator, Optional, Tuple, cast
 
 from pants.backend.python.dependency_inference.module_mapper import (
@@ -397,13 +396,13 @@ async def resolve_python_distribution_entry_points(
         if category in ["console_scripts", "gui_scripts"] and not entry_point.function:
             url = "https://python-packaging.readthedocs.io/en/latest/command-line-scripts.html#the-console-scripts-entry-point"
             raise InvalidEntryPoint(
-                dedent(
-                    f"""\
-                Every entry point in `{category}` for {address} must end in the format `:my_func`,
-                but {name} set it to {entry_point.spec!r}. For example, set
-                `entry_points={{"{category}": {{"{name}": "{entry_point.module}:main}} }}`.
-                See {url}.
-                """
+                softwrap(
+                    f"""
+                    Every entry point in `{category}` for {address} must end in the format
+                    `:my_func`, but {name} set it to {entry_point.spec!r}. For example, set
+                    `entry_points={{"{category}": {{"{name}": "{entry_point.module}:main}} }}`. See
+                    {url}.
+                    """
                 )
             )
 

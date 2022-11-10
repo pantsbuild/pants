@@ -271,7 +271,7 @@ async def prepare_jdk_environment(
 
     # TODO: Locate `ln`.
     version_comment = "\n".join(f"# {line}" for line in java_version.splitlines())
-    jdk_preparation_script = textwrap.dedent(
+    jdk_preparation_script = textwrap.dedent(  # noqa: PNT20
         f"""\
         # pants javac script using Coursier {coursier_jdk_option}. `java -version`:"
         {version_comment}

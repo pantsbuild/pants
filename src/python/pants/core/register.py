@@ -28,10 +28,13 @@ from pants.core.target_types import (
     FilesGeneratorTarget,
     FileTarget,
     GenericTarget,
-    HTTPSource,
+    LockfilesGeneratorTarget,
+    LockfileTarget,
     RelocatedFiles,
     ResourcesGeneratorTarget,
     ResourceTarget,
+    http_source,
+    per_platform,
 )
 from pants.core.target_types import rules as target_type_rules
 from pants.core.util_rules import (
@@ -91,22 +94,25 @@ def rules():
 def target_types():
     return [
         ArchiveTarget,
-        FileTarget,
-        FilesGeneratorTarget,
-        GenericTarget,
-        ResourceTarget,
-        ResourcesGeneratorTarget,
-        RelocatedFiles,
-        LocalEnvironmentTarget,
         DockerEnvironmentTarget,
+        FilesGeneratorTarget,
+        FileTarget,
+        GenericTarget,
+        LocalEnvironmentTarget,
+        LockfilesGeneratorTarget,
+        LockfileTarget,
+        RelocatedFiles,
         RemoteEnvironmentTarget,
+        ResourcesGeneratorTarget,
+        ResourceTarget,
     ]
 
 
 def build_file_aliases():
     return BuildFileAliases(
         objects={
-            "http_source": HTTPSource,
+            "http_source": http_source,
+            "per_platform": per_platform,
             "parametrize": Parametrize,
         },
     )

@@ -47,7 +47,7 @@ class KtlintToolLockfileSentinel(GenerateJvmToolLockfileSentinel):
 
 @rule(desc="Format with Ktlint", level=LogLevel.DEBUG)
 async def ktlint_fmt(
-    request: KtlintRequest.SubPartition, tool: KtlintSubsystem, jdk: InternalJdk
+    request: KtlintRequest.Batch, tool: KtlintSubsystem, jdk: InternalJdk
 ) -> FmtResult:
     lockfile_request = await Get(GenerateJvmLockfileFromTool, KtlintToolLockfileSentinel())
     tool_classpath = await Get(ToolClasspath, ToolClasspathRequest(lockfile=lockfile_request))

@@ -7,6 +7,7 @@ from textwrap import dedent
 
 import pytest
 
+from pants.backend.python.goals import lockfile
 from pants.backend.python.macros import python_requirements
 from pants.backend.python.macros.python_requirements import PythonRequirementsTargetGenerator
 from pants.backend.python.target_types import PythonRequirementTarget
@@ -21,6 +22,7 @@ from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error
 def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
+            *lockfile.rules(),
             *python_requirements.rules(),
             QueryRule(_TargetParametrizations, [_TargetParametrizationsRequest]),
         ],
@@ -189,5 +191,28 @@ def test_source_override(rule_runner: RuleRunner) -> None:
                 Address("", target_name="reqs", generated_name="ansicolors"),
             ),
             TargetGeneratorSourcesHelperTarget({"source": "subdir/requirements.txt"}, file_addr),
+        },
+    )
+
+
+def test_lockfile_dependency(rule_runner: RuleRunner) -> None:
+    rule_runner.set_options(["--python-enable-resolves"])
+    reqs_addr = Address("", target_name="reqs", relative_file_path="requirements.txt")
+    lock_addr = Address(
+        "3rdparty/python", target_name="python-default", relative_file_path="default.lock"
+    )
+    assert_python_requirements(
+        rule_runner,
+        "python_requirements(name='reqs')",
+        "ansicolors>=1.18.0",
+        expected_targets={
+            PythonRequirementTarget(
+                {
+                    "requirements": ["ansicolors>=1.18.0"],
+                    "dependencies": [reqs_addr.spec, lock_addr.spec],
+                },
+                Address("", target_name="reqs", generated_name="ansicolors"),
+            ),
+            TargetGeneratorSourcesHelperTarget({"source": reqs_addr.filename}, reqs_addr),
         },
     )

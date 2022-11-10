@@ -1,5 +1,8 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+from __future__ import annotations
+
 import hashlib
 import os
 import pkgutil
@@ -38,6 +41,7 @@ from pants.engine.fs import (
     RemovePrefix,
     Snapshot,
     SnapshotDiff,
+    SymlinkEntry,
     Workspace,
 )
 from pants.engine.goal import Goal, GoalSubsystem
@@ -399,7 +403,7 @@ def test_path_globs_to_digest_contents(rule_runner: RuleRunner) -> None:
 def test_path_globs_to_digest_entries(rule_runner: RuleRunner) -> None:
     setup_fs_test_tar(rule_runner)
 
-    def get_entries(globs: Iterable[str]) -> Set[Union[FileEntry, Directory]]:
+    def get_entries(globs: Iterable[str]) -> Set[Union[FileEntry, Directory, SymlinkEntry]]:
         return set(rule_runner.request(DigestEntries, [PathGlobs(globs)]))
 
     assert get_entries(["4.txt", "a/4.txt.ln"]) == {
@@ -438,6 +442,125 @@ def test_digest_entries_handles_empty_directory(rule_runner: RuleRunner) -> None
             ),
         ]
     )
+
+
+def test_digest_entries_handles_symlinks(rule_runner: RuleRunner) -> None:
+    digest = rule_runner.request(
+        Digest,
+        [
+            CreateDigest(
+                [
+                    SymlinkEntry("a.ln", "a.txt"),
+                    SymlinkEntry("b.ln", "b.txt"),
+                    FileContent("a.txt", b"four\n"),
+                ]
+            )
+        ],
+    )
+    entries = rule_runner.request(DigestEntries, [digest])
+    assert entries == DigestEntries(
+        [
+            SymlinkEntry("a.ln", "a.txt"),
+            FileEntry(
+                "a.txt",
+                FileDigest("ab929fcd5594037960792ea0b98caf5fdaf6b60645e4ef248c28db74260f393e", 5),
+            ),
+            SymlinkEntry("b.ln", "b.txt"),
+        ]
+    )
+
+
+@pytest.mark.parametrize(
+    "create_digest, files, dirs",
+    [
+        pytest.param(
+            CreateDigest(
+                [
+                    FileContent("file.txt", b"four\n"),
+                    SymlinkEntry("symlink", "file.txt"),
+                    SymlinkEntry("relsymlink", "./file.txt"),
+                    SymlinkEntry("a/symlink", "../file.txt"),
+                    SymlinkEntry("a/b/symlink", "../../file.txt"),
+                ]
+            ),
+            ("a/b/symlink", "a/symlink", "file.txt", "relsymlink", "symlink"),
+            ("a", "a/b"),
+            id="simple",
+        ),
+        pytest.param(
+            CreateDigest(
+                [
+                    FileContent("file.txt", b"four\n"),
+                    SymlinkEntry(
+                        "circular1", "./circular1"
+                    ),  # After so many traversals, we give up
+                    SymlinkEntry("circular2", "circular2"),  # After so many traversals, we give up
+                    SymlinkEntry("chain1", "chain2"),
+                    SymlinkEntry("chain2", "chain3"),
+                    SymlinkEntry("chain3", "chain1"),
+                    SymlinkEntry(
+                        "a/symlink", "file.txt"
+                    ),  # looks for a/file.txt, which doesn't exist
+                    SymlinkEntry("a/too-far.ln", "../../file.txt"),  # went too far up
+                    SymlinkEntry("a/parent", ".."),
+                    SymlinkEntry("too-far.ln", "../file.txt"),  # went too far up
+                    SymlinkEntry("absolute1.ln", str(Path(__file__).resolve())),  # absolute path
+                    SymlinkEntry("absolute2.ln", "/file.txt"),
+                ]
+            ),
+            ("file.txt",),
+            ("a",),
+            id="ignored",
+        ),
+        pytest.param(
+            CreateDigest(
+                [
+                    FileContent("file.txt", b"four\n"),
+                    SymlinkEntry("a/b/parent-file.ln", "../../file.txt"),
+                    SymlinkEntry("dirlink", "a"),
+                ]
+            ),
+            ("a/b/parent-file.ln", "dirlink/b/parent-file.ln", "file.txt"),
+            ("a", "a/b", "dirlink", "dirlink/b"),
+            id="parentdir-in-symlink-target",
+        ),
+        pytest.param(
+            CreateDigest(
+                [
+                    FileContent("a/file.txt", b"four\n"),
+                    SymlinkEntry("dirlink", "a"),
+                    SymlinkEntry("double-dirlink", "dirlink"),
+                ]
+            ),
+            ("a/file.txt", "dirlink/file.txt", "double-dirlink/file.txt"),
+            ("a", "dirlink", "double-dirlink"),
+            id="double-dirlink",
+        ),
+        pytest.param(
+            CreateDigest(
+                [
+                    FileContent("a/file.txt", b"four\n"),
+                    SymlinkEntry("a/self", "."),
+                ]
+            ),
+            tuple(f"a/{'self/' * count}file.txt" for count in range(64)),
+            ("a",),
+            id="self-dir",
+        ),
+    ],
+)
+def test_snapshot_and_contents_are_symlink_oblivious(
+    rule_runner: RuleRunner,
+    create_digest: CreateDigest,
+    files: tuple[str, ...],
+    dirs: tuple[str, ...],
+) -> None:
+    digest = rule_runner.request(Digest, [create_digest])
+    snapshot = rule_runner.request(Snapshot, [digest])
+    assert snapshot.files == files
+    assert snapshot.dirs == dirs
+    contents = rule_runner.request(DigestContents, [digest])
+    assert tuple(content.path for content in contents) == files
 
 
 def test_glob_match_error_behavior(rule_runner: RuleRunner, caplog) -> None:
@@ -857,6 +980,40 @@ class StubHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
 
+def stub_erroring_handler(error_count_value: int) -> type[BaseHTTPRequestHandler]:
+    """Return a handler that errors once mid-download before succeeding for the next GET.
+
+    This function returns an anonymous class so that each call can create a new instance with its
+    own error counter.
+    """
+    error_num = 1
+
+    class StubErroringHandler(BaseHTTPRequestHandler):
+        error_count = error_count_value
+        response_text = b"Hello, client!"
+
+        def do_HEAD(self):
+            self.send_headers()
+
+        def do_GET(self):
+            self.send_headers()
+            nonlocal error_num
+            if error_num <= self.error_count:
+                msg = f"Returning error {error_num}"
+                error_num += 1
+                raise Exception(msg)
+            self.wfile.write(self.response_text)
+
+        def send_headers(self):
+            code = 200 if self.path == "/file.txt" else 404
+            self.send_response(code)
+            self.send_header("Content-Type", "text/utf-8")
+            self.send_header("Content-Length", f"{len(self.response_text)}")
+            self.end_headers()
+
+    return StubErroringHandler
+
+
 DOWNLOADS_FILE_DIGEST = FileDigest(
     "8fcbc50cda241aee7238c71e87c27804e7abc60675974eaf6567aa16366bc105", 14
 )
@@ -884,6 +1041,24 @@ def test_download_missing_file(downloads_rule_runner: RuleRunner) -> None:
                 Snapshot, [DownloadFile(f"http://localhost:{port}/notfound", DOWNLOADS_FILE_DIGEST)]
             )
     assert "404" in str(exc.value)
+
+
+def test_download_body_error_retry(downloads_rule_runner: RuleRunner) -> None:
+    with http_server(stub_erroring_handler(1)) as port:
+        snapshot = downloads_rule_runner.request(
+            Snapshot, [DownloadFile(f"http://localhost:{port}/file.txt", DOWNLOADS_FILE_DIGEST)]
+        )
+    assert snapshot.files == ("file.txt",)
+    assert snapshot.digest == DOWNLOADS_EXPECTED_DIRECTORY_DIGEST
+
+
+def test_download_body_error_retry_eventually_fails(downloads_rule_runner: RuleRunner) -> None:
+    # Returns one more error than the retry will allow.
+    with http_server(stub_erroring_handler(5)) as port:
+        with pytest.raises(Exception):
+            _ = downloads_rule_runner.request(
+                Snapshot, [DownloadFile(f"http://localhost:{port}/file.txt", DOWNLOADS_FILE_DIGEST)]
+            )
 
 
 def test_download_wrong_digest(downloads_rule_runner: RuleRunner) -> None:
@@ -1010,17 +1185,21 @@ def test_write_digest_workspace(rule_runner: RuleRunner) -> None:
     assert path2.read_text() == "goodbye"
 
 
+@dataclass(frozen=True)
+class DigestRequest:
+    create_digest: CreateDigest
+
+
+class WorkspaceGoalSubsystem(GoalSubsystem):
+    name = "workspace-goal"
+
+
+class WorkspaceGoal(Goal):
+    subsystem_cls = WorkspaceGoalSubsystem
+    environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY
+
+
 def test_workspace_in_goal_rule() -> None:
-    class WorkspaceGoalSubsystem(GoalSubsystem):
-        name = "workspace-goal"
-
-    class WorkspaceGoal(Goal):
-        subsystem_cls = WorkspaceGoalSubsystem
-
-    @dataclass(frozen=True)
-    class DigestRequest:
-        create_digest: CreateDigest
-
     @rule
     def digest_request_singleton() -> DigestRequest:
         fc = FileContent(path="a.txt", content=b"hello")

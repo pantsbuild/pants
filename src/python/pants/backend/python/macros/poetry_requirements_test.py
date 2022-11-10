@@ -9,6 +9,7 @@ from textwrap import dedent
 import pytest
 from packaging.version import Version
 
+from pants.backend.python.goals import lockfile
 from pants.backend.python.macros import poetry_requirements
 from pants.backend.python.macros.poetry_requirements import (
     PoetryRequirementsTargetGenerator,
@@ -438,6 +439,7 @@ def test_parse_multi_reqs() -> None:
 def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
+            *lockfile.rules(),
             *poetry_requirements.rules(),
             QueryRule(_TargetParametrizations, [_TargetParametrizationsRequest]),
         ],
@@ -551,6 +553,35 @@ def test_source_override(rule_runner: RuleRunner) -> None:
                 address=Address("", target_name="reqs", generated_name="ansicolors"),
             ),
             TargetGeneratorSourcesHelperTarget({"source": "subdir/pyproject.toml"}, file_addr),
+        },
+    )
+
+
+def test_lockfile_dependency(rule_runner: RuleRunner) -> None:
+    rule_runner.set_options(["--python-enable-resolves"])
+    file_addr = Address("", target_name="reqs", relative_file_path="pyproject.toml")
+    lock_addr = Address(
+        "3rdparty/python", target_name="python-default", relative_file_path="default.lock"
+    )
+    assert_poetry_requirements(
+        rule_runner,
+        "poetry_requirements(name='reqs')",
+        dedent(
+            """\
+            [tool.poetry.dependencies]
+            ansicolors = ">=1.18.0"
+            [tool.poetry.dev-dependencies]
+            """
+        ),
+        expected_targets={
+            PythonRequirementTarget(
+                {
+                    "dependencies": [file_addr.spec, lock_addr.spec],
+                    "requirements": ["ansicolors>=1.18.0"],
+                },
+                address=Address("", target_name="reqs", generated_name="ansicolors"),
+            ),
+            TargetGeneratorSourcesHelperTarget({"source": file_addr.filename}, file_addr),
         },
     )
 

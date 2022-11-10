@@ -11,7 +11,7 @@ from enum import Enum
 from typing import Callable, ClassVar, Iterable, Sequence
 
 from pants.engine.collection import Collection
-from pants.engine.environment import EnvironmentName
+from pants.engine.environment import ChosenLocalEnvironmentName, EnvironmentName
 from pants.engine.fs import Digest, MergeDigests, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.selectors import Get, MultiGet
@@ -49,6 +49,14 @@ class GenerateLockfile:
 
     resolve_name: str
     lockfile_dest: str
+
+
+@dataclass(frozen=True)
+class GenerateLockfileWithEnvironments(GenerateLockfile):
+    """Allows a `GenerateLockfile` subclass to specify which environments the request is compatible
+    with, if the relevant backend supports environments."""
+
+    environments: tuple[EnvironmentName, ...]
 
 
 @dataclass(frozen=True)
@@ -329,10 +337,9 @@ class GenerateLockfilesSubsystem(GoalSubsystem):
             Only generate lockfiles for the specified resolve(s).
 
             Resolves are the logical names for the different lockfiles used in your project.
-            For your own code's dependencies, these come from the option
-            `[python].resolves`. For tool lockfiles, resolve
-            names are the options scope for that tool such as `black`, `pytest`, and
-            `mypy-protobuf`.
+            For your own code's dependencies, these come from backend-specific configuration
+            such as `[python].resolves`. For tool lockfiles, resolve names are the options
+            scope for that tool such as `black`, `pytest`, and `mypy-protobuf`.
 
             For example, you can run `{bin_name()} generate-lockfiles --resolve=black
             --resolve=pytest --resolve=data-science` to only generate lockfiles for those
@@ -359,6 +366,7 @@ class GenerateLockfilesSubsystem(GoalSubsystem):
 
 class GenerateLockfilesGoal(Goal):
     subsystem_cls = GenerateLockfilesSubsystem
+    environment_behavior = Goal.EnvironmentBehavior.USES_ENVIRONMENTS
 
 
 @goal_rule
@@ -366,6 +374,7 @@ async def generate_lockfiles_goal(
     workspace: Workspace,
     union_membership: UnionMembership,
     generate_lockfiles_subsystem: GenerateLockfilesSubsystem,
+    local_environment: ChosenLocalEnvironmentName,
 ) -> GenerateLockfilesGoal:
     known_user_resolve_names = await MultiGet(
         Get(KnownUserResolveNames, KnownUserResolveNamesRequest, request())
@@ -377,12 +386,20 @@ async def generate_lockfiles_goal(
         set(generate_lockfiles_subsystem.resolve),
     )
 
+    # This is the "planning" phase of lockfile generation. Currently this is all done in the local
+    # environment, since there's not currently a clear mechanism to prescribe an environment.
     all_specified_user_requests = await MultiGet(
-        Get(UserGenerateLockfiles, RequestedUserResolveNames, resolve_names)
+        Get(
+            UserGenerateLockfiles,
+            {resolve_names: RequestedUserResolveNames, local_environment.val: EnvironmentName},
+        )
         for resolve_names in requested_user_resolve_names
     )
     specified_tool_requests = await MultiGet(
-        Get(WrappedGenerateLockfile, GenerateToolLockfileSentinel, sentinel())
+        Get(
+            WrappedGenerateLockfile,
+            {sentinel(): GenerateToolLockfileSentinel, local_environment.val: EnvironmentName},
+        )
         for sentinel in requested_tool_sentinels
     )
     applicable_tool_requests = filter_tool_lockfile_requests(
@@ -390,20 +407,49 @@ async def generate_lockfiles_goal(
         resolve_specified=bool(generate_lockfiles_subsystem.resolve),
     )
 
+    # Execute the actual lockfile generation in each request's environment.
+    # Currently, since resolves specify a single filename for output, we pick a resonable
+    # environment to execute the request in. Currently we warn if multiple environments are
+    # specified.
+    all_requests = itertools.chain(*all_specified_user_requests, applicable_tool_requests)
     results = await MultiGet(
-        Get(GenerateLockfileResult, GenerateLockfile, req)
-        for req in (
-            *(req for reqs in all_specified_user_requests for req in reqs),
-            *applicable_tool_requests,
+        Get(
+            GenerateLockfileResult,
+            {
+                req: GenerateLockfile,
+                _preferred_environment(req, local_environment.val): EnvironmentName,
+            },
         )
+        for req in all_requests
     )
 
+    # Lockfiles are actually written here. This would be an acceptable place to handle conflict
+    # resolution behaviour if we start executing requests in multiple environments.
     merged_digest = await Get(Digest, MergeDigests(res.digest for res in results))
     workspace.write_digest(merged_digest)
     for result in results:
         logger.info(f"Wrote lockfile for the resolve `{result.resolve_name}` to {result.path}")
 
     return GenerateLockfilesGoal(exit_code=0)
+
+
+def _preferred_environment(request: GenerateLockfile, default: EnvironmentName) -> EnvironmentName:
+
+    if not isinstance(request, GenerateLockfileWithEnvironments):
+        return default  # This request has not been migrated to use environments.
+
+    if len(request.environments) == 1:
+        return request.environments[0]
+
+    ret = default if default in request.environments else request.environments[0]
+
+    logger.warning(
+        f"The `{request.__class__.__name__}` for resolve `{request.resolve_name}` specifies more "
+        "than one environment. Pants will generate the lockfile using only the environment "
+        f"`{ret.val}`, which may have unintended effects when executing in the other environments."
+    )
+
+    return ret
 
 
 # -----------------------------------------------------------------------------------------------

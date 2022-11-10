@@ -7,6 +7,7 @@ import dataclasses
 import logging
 import shlex
 from dataclasses import dataclass
+from itertools import groupby
 from typing import Any, Callable, ClassVar, Iterable, Optional, Sequence, Tuple, Type, Union, cast
 
 from pants.build_graph.address import Address, AddressInput
@@ -42,7 +43,7 @@ from pants.option.subsystem import Subsystem
 from pants.util.enums import match
 from pants.util.frozendict import FrozenDict
 from pants.util.memo import memoized
-from pants.util.strutil import softwrap
+from pants.util.strutil import bullet_list, softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -374,6 +375,69 @@ class RemoteEnvironmentTarget(Target):
 # -------------------------------------------------------------------------------------------
 
 
+@rule_helper
+async def _warn_on_non_local_environments(specified_targets: Iterable[Target], source: str) -> None:
+    """Raise a warning when the user runs a local-only operation against a target that expects a
+    non-local environment.
+
+    The `source` will be used to explain which goal is causing the issue.
+    """
+
+    env_names = [
+        (target[EnvironmentField].value, target)
+        for target in specified_targets
+        if target.has_field(EnvironmentField)
+    ]
+    sorted_env_names = sorted(env_names, key=lambda en: (en[0], en[1].address.spec))
+
+    env_names_and_targets = [
+        (env_name, tuple(target for _, target in group))
+        for env_name, group in groupby(sorted_env_names, lambda x: x[0])
+    ]
+
+    env_tgts = await MultiGet(
+        Get(
+            EnvironmentTarget,
+            EnvironmentNameRequest(
+                name,
+                description_of_origin=(
+                    "the `environment` field of targets including "
+                    ", ".join(tgt.address.spec for tgt in tgts[:3])
+                ),
+            ),
+        )
+        for name, tgts in env_names_and_targets
+    )
+
+    error_cases = [
+        (env_name, tgts, env_tgt.val)
+        for ((env_name, tgts), env_tgt) in zip(env_names_and_targets, env_tgts)
+        if env_tgt.val is not None and not isinstance(env_tgt.val, LocalEnvironmentTarget)
+    ]
+
+    for (env_name, tgts, env_tgt) in error_cases:
+        # "Blah was called with target `//foo` which specifies…"
+        # "Blah was called with targets `//foo`, `//bar` which specify…"
+        # "Blah was called with targets including `//foo`, `//bar`, `//baz` (and others) which specify…"
+        plural = len(tgts) > 1
+        is_long = len(tgts) > 3
+        tgt_specs = [tgt.address.spec for tgt in tgts[:3]]
+
+        tgts_str = (
+            ("s " if plural else " ")
+            + ("including " if is_long else "")
+            + ", ".join(f"`{i}`" for i in tgt_specs)
+            + (" (and others)" if is_long else "")
+        )
+        end_specif = "y" if plural else "ies"
+
+        logger.warning(
+            f"{source.capitalize()} was called with target{tgts_str}, which specif{end_specif} "
+            f"the environment `{env_name}`, which is a `{env_tgt.alias}`. {source.capitalize()} "
+            "only runs in the local environment. You may experience unexpected behavior."
+        )
+
+
 def determine_bootstrap_environment(session: SchedulerSession) -> EnvironmentName:
     local_env = cast(
         ChosenLocalEnvironmentName,
@@ -438,6 +502,18 @@ class EnvironmentTarget:
         )
 
 
+def _compute_env_field(field_set: FieldSet) -> EnvironmentField:
+    for attr in dir(field_set):
+        # Skip what look like dunder methods, which are unlikely to be an
+        # EnvironmentField value on FieldSet class declarations.
+        if attr.startswith("__"):
+            continue
+        val = getattr(field_set, attr)
+        if isinstance(val, EnvironmentField):
+            return val
+    return EnvironmentField(None, address=field_set.address)
+
+
 @dataclass(frozen=True)
 class EnvironmentNameRequest(EngineAwareParameter):
     f"""Normalize the value into a name from `[environments-preview].names`, such as by
@@ -458,18 +534,7 @@ class EnvironmentNameRequest(EngineAwareParameter):
         then pass `{{resulting_environment_name: EnvironmentName}}` into a `Get` to change which
         environment is used for the subgraph.
         """
-        for attr in dir(field_set):
-            # Skip what look like dunder methods, which are unlikely to be an
-            # EnvironmentField value on FieldSet class declarations.
-            if attr.startswith("__"):
-                continue
-            val = getattr(field_set, attr)
-            if isinstance(val, EnvironmentField):
-                env_field = val
-                break
-        else:
-            env_field = EnvironmentField(None, address=field_set.address)
-
+        env_field = _compute_env_field(field_set)
         return EnvironmentNameRequest(
             env_field.value,
             # Note that if the field was not registered, we will have fallen back to the default
@@ -483,6 +548,28 @@ class EnvironmentNameRequest(EngineAwareParameter):
 
     def debug_hint(self) -> str:
         return self.raw_value
+
+
+@dataclass(frozen=True)
+class SingleEnvironmentNameRequest(EngineAwareParameter):
+    """Asserts that all of the given environment strings resolve to the same EnvironmentName."""
+
+    raw_values: tuple[str, ...]
+    description_of_origin: str = dataclasses.field(hash=False, compare=False)
+
+    @classmethod
+    def from_field_sets(
+        cls, field_sets: Sequence[FieldSet], description_of_origin: str
+    ) -> SingleEnvironmentNameRequest:
+        """See `EnvironmentNameRequest.from_field_set`."""
+
+        return SingleEnvironmentNameRequest(
+            tuple(sorted({_compute_env_field(field_set).value for field_set in field_sets})),
+            description_of_origin=description_of_origin,
+        )
+
+    def debug_hint(self) -> str:
+        return ", ".join(self.raw_values)
 
 
 @rule
@@ -551,6 +638,25 @@ async def determine_local_environment(
             """
         )
     )
+
+
+@rule
+async def resolve_single_environment_name(
+    request: SingleEnvironmentNameRequest,
+) -> EnvironmentName:
+    environment_names = await MultiGet(
+        Get(EnvironmentName, EnvironmentNameRequest(name, request.description_of_origin))
+        for name in request.raw_values
+    )
+
+    unique_environments = sorted({name.val or "<None>" for name in environment_names})
+    if len(unique_environments) != 1:
+        raise AssertionError(
+            f"Needed 1 unique environment, but {request.description_of_origin} contained "
+            f"{len(unique_environments)}:\n\n"
+            f"{bullet_list(unique_environments)}"
+        )
+    return environment_names[0]
 
 
 @rule_helper

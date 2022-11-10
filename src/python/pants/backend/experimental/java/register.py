@@ -18,11 +18,14 @@ from pants.jvm import classpath, jdk_rules, resources, run_deploy_jar
 from pants.jvm import util_rules as jvm_util_rules
 from pants.jvm.dependency_inference import symbol_mapper
 from pants.jvm.goals import lockfile
+from pants.jvm.jar_tool import jar_tool
 from pants.jvm.package import deploy_jar
 from pants.jvm.package.war import rules as war_rules
 from pants.jvm.resolve import coursier_fetch, jvm_tool
+from pants.jvm.shading.rules import rules as shading_rules
 from pants.jvm.strip_jar import strip_jar
 from pants.jvm.target_types import DeployJarTarget, JvmArtifactTarget, JvmWarTarget
+from pants.jvm.target_types import build_file_aliases as jvm_build_file_aliases
 from pants.jvm.test import junit
 
 
@@ -45,7 +48,9 @@ def rules():
         *classpath.rules(),
         *junit.rules(),
         *strip_jar.rules(),
+        *shading_rules(),
         *deploy_jar.rules(),
+        *jar_tool.rules(),
         *lockfile.rules(),
         *coursier_fetch.rules(),
         *java_parser.rules(),
@@ -62,3 +67,7 @@ def rules():
         *java_bsp_rules.rules(),
         *archive.rules(),
     ]
+
+
+def build_file_aliases():
+    return jvm_build_file_aliases()

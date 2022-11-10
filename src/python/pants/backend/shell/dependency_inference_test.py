@@ -15,7 +15,10 @@ from pants.backend.shell.dependency_inference import (
     ShellDependenciesInferenceFieldSet,
     ShellMapping,
 )
-from pants.backend.shell.target_types import ShellSourcesGeneratorTarget
+from pants.backend.shell.target_types import (
+    ShellSourcesGeneratorTarget,
+    Shunit2TestsGeneratorTarget,
+)
 from pants.backend.shell.target_types import rules as target_types_rules
 from pants.core.util_rules import external_tool
 from pants.engine.addresses import Address
@@ -35,7 +38,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(ParsedShellImports, [ParseShellImportsRequest]),
             QueryRule(InferredDependencies, [InferShellDependencies]),
         ],
-        target_types=[ShellSourcesGeneratorTarget],
+        target_types=[ShellSourcesGeneratorTarget, Shunit2TestsGeneratorTarget],
     )
 
 
@@ -104,7 +107,8 @@ def test_dependency_inference(rule_runner: RuleRunner, caplog) -> None:
             "a/f2.sh": "source a/f1.sh",
             "a/BUILD": "shell_sources()",
             "b/f.sh": "",
-            "b/BUILD": "shell_sources()",
+            "b/f_test.sh": "source b/f.sh",
+            "b/BUILD": "shell_sources()\nshunit2_tests(name='tests', shell='bash')",
             # Test handling of ambiguous imports. We should warn on the ambiguous dependency, but
             # not warn on the disambiguated one and should infer a dep.
             "ambiguous/dep.sh": "",
@@ -139,6 +143,9 @@ def test_dependency_inference(rule_runner: RuleRunner, caplog) -> None:
     assert run_dep_inference(Address("a", relative_file_path="f1.sh")) == InferredDependencies(
         [Address("b", relative_file_path="f.sh")]
     )
+    assert run_dep_inference(
+        Address("b", target_name="tests", relative_file_path="f_test.sh")
+    ) == InferredDependencies([Address("b", relative_file_path="f.sh")])
 
     caplog.clear()
     assert run_dep_inference(

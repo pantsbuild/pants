@@ -301,9 +301,11 @@ async fn main() {
         &address,
         process_metadata.instance_name.clone(),
         process_metadata.cache_key_gen_version.clone(),
+        None,
         root_ca_certs.clone(),
         headers.clone(),
         store.clone(),
+        executor.clone(),
         Duration::from_secs(args.overall_deadline_secs),
         Duration::from_millis(100),
         args.execution_rpc_concurrency,
@@ -328,6 +330,9 @@ async fn main() {
             CacheContentBehavior::Defer,
             args.cache_rpc_concurrency,
             Duration::from_secs(2),
+            args
+              .named_cache_path
+              .map(|p| p.to_string_lossy().to_string()),
           )
           .expect("Failed to make remote cache command runner"),
         )
@@ -411,10 +416,17 @@ async fn make_request(
         execution_strategy,
         platform,
         args.remote_instance_name.clone(),
+        args.command.cache_key_gen_version.clone(),
       ).await
     }
     (None, None, None, None, Some(buildbarn_url)) => {
-      extract_request_from_buildbarn_url(store, buildbarn_url, execution_strategy, platform).await
+      extract_request_from_buildbarn_url(
+        store,
+        buildbarn_url,
+        execution_strategy,
+        platform,
+        args.command.cache_key_gen_version.clone()
+      ).await
     }
     (None, None, None, None, None) => {
       Err("Must specify either action input digest or action digest or buildbarn URL".to_owned())
@@ -498,6 +510,7 @@ async fn extract_request_from_action_digest(
   execution_strategy: ProcessExecutionStrategy,
   platform: Platform,
   instance_name: Option<String>,
+  cache_key_gen_version: Option<String>,
 ) -> Result<(process_execution::Process, ProcessMetadata), String> {
   let action = store
     .load_file_bytes_with(action_digest, |bytes| Action::decode(bytes))
@@ -551,6 +564,11 @@ async fn extract_request_from_action_digest(
     env: command
       .environment_variables
       .iter()
+      .filter(|env| {
+        // Filter out environment variables which will be (re-)set by ExecutionRequest
+        // construction.
+        env.name != process_execution::remote::CACHE_KEY_TARGET_PLATFORM_ENV_VAR_NAME
+      })
       .map(|env| (env.name.clone(), env.value.clone()))
       .collect(),
     working_directory,
@@ -582,7 +600,7 @@ async fn extract_request_from_action_digest(
 
   let metadata = ProcessMetadata {
     instance_name,
-    cache_key_gen_version: None,
+    cache_key_gen_version,
   };
 
   Ok((process, metadata))
@@ -593,6 +611,7 @@ async fn extract_request_from_buildbarn_url(
   buildbarn_url: &str,
   execution_strategy: ProcessExecutionStrategy,
   platform: Platform,
+  cache_key_gen_version: Option<String>,
 ) -> Result<(process_execution::Process, ProcessMetadata), String> {
   let url_parts: Vec<&str> = buildbarn_url.trim_end_matches('/').split('/').collect();
   if url_parts.len() < 4 {
@@ -645,6 +664,7 @@ async fn extract_request_from_buildbarn_url(
     execution_strategy,
     platform,
     Some(instance.to_owned()),
+    cache_key_gen_version,
   )
   .await
 }

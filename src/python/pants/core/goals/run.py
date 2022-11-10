@@ -12,6 +12,7 @@ from typing import Callable, Iterable, Mapping, NamedTuple, Optional, Tuple, Typ
 
 from pants.base.build_root import BuildRoot
 from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
+from pants.core.util_rules.environments import _warn_on_non_local_environments
 from pants.engine.env_vars import CompleteEnvironmentVars
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import Digest, Workspace
@@ -150,6 +151,7 @@ class RunSubsystem(GoalSubsystem):
 
 class Run(Goal):
     subsystem_cls = RunSubsystem
+    environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY
 
 
 class RankedFieldSets(NamedTuple):
@@ -228,6 +230,8 @@ async def run(
     complete_env: CompleteEnvironmentVars,
 ) -> Run:
     field_set, target = await _find_what_to_run("the `run` goal")
+
+    await _warn_on_non_local_environments((target,), "the `run` goal")
 
     request = await (
         Get(RunRequest, RunFieldSet, field_set)

@@ -7,7 +7,7 @@ from typing import Callable, cast
 
 import pytest
 
-from pants.backend.docker.goals.package_image import BuiltDockerImage, DockerFieldSet
+from pants.backend.docker.goals.package_image import BuiltDockerImage, DockerPackageFieldSet
 from pants.backend.docker.goals.publish import (
     PublishDockerImageFieldSet,
     PublishDockerImageRequest,
@@ -55,7 +55,7 @@ def rule_runner() -> RuleRunner:
 
 
 def build(tgt: DockerImageTarget, options: DockerOptions):
-    fs = DockerFieldSet.create(tgt)
+    fs = DockerPackageFieldSet.create(tgt)
     image_refs = fs.image_refs(
         options.default_repository,
         options.registries(),

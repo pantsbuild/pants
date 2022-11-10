@@ -68,6 +68,6 @@ from pants.testutil.pytest_util import no_exception
         ),
     ],
 )
-def test_normalize_entry_points(entry_points, normalized, expect):
+def test_normalize_entry_points(entry_points, normalized, expect) -> None:
     with expect:
         assert _normalize_entry_points(entry_points) == normalized
