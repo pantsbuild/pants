@@ -255,46 +255,35 @@ class DockerInfoV1:
     # It'd be good to include the digest here (e.g. to allow 'docker run
     # registry/repository@digest'), but that is only known after pushing to a V2 registry
 
-    # registry alias or address -> registry (using a dict rather than just a list[registry] for more
-    # convenient look-ups when multiple values exist)
-    registries: dict[str, DockerInfoV1Registry]
+    registries: list[DockerInfoV1Registry]
 
     @staticmethod
     def serialize(image_refs: tuple[ImageRefRegistry, ...], image_id: str) -> bytes:
-        def registry_key(reg: DockerRegistryOptions | None) -> str:
-            if reg is None:
-                return ""
-            if reg.alias:
-                return f"@{reg.alias}"
-            return reg.address
-
-        def tag_key(tag: ImageRefTag) -> str:
-            if tag.uses_local_alias:
-                return f"{tag.template}:local alias"
-            return tag.template
+        # make sure these are in a consistent order (the exact order doesn't matter
+        # so much), no matter how they were configured
+        sorted_refs = sorted(image_refs, key=lambda r: r.registry.address if r.registry else "")
 
         info = DockerInfoV1(
             version=1,
             image_id=image_id,
-            registries={
-                registry_key(r.registry): DockerInfoV1Registry(
+            registries=[
+                DockerInfoV1Registry(
                     alias=r.registry.alias if r.registry and r.registry.alias else None,
                     address=r.registry.address if r.registry else None,
                     repository=r.repository,
-                    tags={
-                        **{
-                            tag_key(t): DockerInfoV1ImageTag(
-                                template=t.template,
-                                tag=t.formatted,
-                                uses_local_alias=t.uses_local_alias,
-                                name=t.full_name,
-                            )
-                            for t in r.tags
-                        },
-                    },
+                    tags=[
+                        DockerInfoV1ImageTag(
+                            template=t.template,
+                            tag=t.formatted,
+                            uses_local_alias=t.uses_local_alias,
+                            name=t.full_name,
+                        )
+                        # consistent order, as above
+                        for t in sorted(r.tags, key=lambda t: t.full_name)
+                    ],
                 )
-                for r in image_refs
-            },
+                for r in sorted_refs
+            ],
         )
 
         return json.dumps(asdict(info)).encode()
@@ -306,8 +295,7 @@ class DockerInfoV1Registry:
     alias: str | None
     address: str | None
     repository: str
-    # tag template -> Tag
-    tags: dict[str, DockerInfoV1ImageTag]
+    tags: list[DockerInfoV1ImageTag]
 
 
 @dataclass(frozen=True)

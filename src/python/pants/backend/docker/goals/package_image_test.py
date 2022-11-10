@@ -105,7 +105,7 @@ def assert_build(
     build_context_snapshot: Snapshot = EMPTY_SNAPSHOT,
     version_tags: tuple[str, ...] = (),
     plugin_tags: tuple[str, ...] = (),
-    expected_registries_metadata: None | dict = None,
+    expected_registries_metadata: None | list = None,
 ) -> None:
     tgt = rule_runner.get_target(address)
     metadata_file_path: list[str] = []
@@ -219,7 +219,7 @@ def assert_build(
     # basic checks that we can always do
     assert metadata["version"] == 1
     assert metadata["image_id"] == "<unknown>"
-    assert isinstance(metadata["registries"], dict)
+    assert isinstance(metadata["registries"], list)
     # detailed checks, if the test opts in
     if expected_registries_metadata is not None:
         assert metadata["registries"] == expected_registries_metadata
@@ -271,38 +271,36 @@ def test_build_docker_image(rule_runner: RuleRunner) -> None:
         rule_runner,
         Address("docker/test", target_name="test1"),
         "Built docker image: test/test1:1.2.3",
-        expected_registries_metadata={
-            "": dict(
+        expected_registries_metadata=[
+            dict(
                 alias=None,
                 address=None,
                 repository="test/test1",
-                tags={
-                    "1.2.3": dict(
+                tags=[
+                    dict(
                         template="1.2.3",
                         tag="1.2.3",
                         uses_local_alias=False,
                         name="test/test1:1.2.3",
                     )
-                },
+                ],
             )
-        },
+        ],
     )
     assert_build(
         rule_runner,
         Address("docker/test", target_name="test2"),
         "Built docker image: test2:1.2.3",
-        expected_registries_metadata={
-            "": dict(
+        expected_registries_metadata=[
+            dict(
                 alias=None,
                 address=None,
                 repository="test2",
-                tags={
-                    "1.2.3": dict(
-                        template="1.2.3", tag="1.2.3", uses_local_alias=False, name="test2:1.2.3"
-                    )
-                },
+                tags=[
+                    dict(template="1.2.3", tag="1.2.3", uses_local_alias=False, name="test2:1.2.3")
+                ],
             )
-        },
+        ],
     )
     assert_build(
         rule_runner,
@@ -324,33 +322,33 @@ def test_build_docker_image(rule_runner: RuleRunner) -> None:
             "  * test/test5:alpha-1"
         ),
         options=dict(default_repository="{directory}/{name}"),
-        expected_registries_metadata={
-            "": dict(
+        expected_registries_metadata=[
+            dict(
                 alias=None,
                 address=None,
                 repository="test/test5",
-                tags={
-                    "latest": dict(
-                        template="latest",
-                        tag="latest",
-                        uses_local_alias=False,
-                        name="test/test5:latest",
-                    ),
-                    "alpha-1.0": dict(
-                        template="alpha-1.0",
-                        tag="alpha-1.0",
-                        uses_local_alias=False,
-                        name="test/test5:alpha-1.0",
-                    ),
-                    "alpha-1": dict(
+                tags=[
+                    dict(
                         template="alpha-1",
                         tag="alpha-1",
                         uses_local_alias=False,
                         name="test/test5:alpha-1",
                     ),
-                },
+                    dict(
+                        template="alpha-1.0",
+                        tag="alpha-1.0",
+                        uses_local_alias=False,
+                        name="test/test5:alpha-1.0",
+                    ),
+                    dict(
+                        template="latest",
+                        tag="latest",
+                        uses_local_alias=False,
+                        name="test/test5:latest",
+                    ),
+                ],
             )
-        },
+        ],
     )
 
     err1 = (
@@ -401,21 +399,21 @@ def test_build_image_with_registries(rule_runner: RuleRunner) -> None:
         Address("docker/test", target_name="addr1"),
         "Built docker image: myregistry1domain:port/addr1:1.2.3",
         options=options,
-        expected_registries_metadata={
-            "@reg1": dict(
+        expected_registries_metadata=[
+            dict(
                 alias="reg1",
                 address="myregistry1domain:port",
                 repository="addr1",
-                tags={
-                    "1.2.3": dict(
+                tags=[
+                    dict(
                         template="1.2.3",
                         tag="1.2.3",
                         uses_local_alias=False,
                         name="myregistry1domain:port/addr1:1.2.3",
                     )
-                },
+                ],
             )
-        },
+        ],
     )
     assert_build(
         rule_runner,
@@ -428,42 +426,42 @@ def test_build_image_with_registries(rule_runner: RuleRunner) -> None:
         Address("docker/test", target_name="addr3"),
         "Built docker image: myregistry3domain:port/addr3:1.2.3",
         options=options,
-        expected_registries_metadata={
-            "myregistry3domain:port": dict(
+        expected_registries_metadata=[
+            dict(
                 alias=None,
                 address="myregistry3domain:port",
                 repository="addr3",
-                tags={
-                    "1.2.3": dict(
+                tags=[
+                    dict(
                         template="1.2.3",
                         tag="1.2.3",
                         uses_local_alias=False,
                         name="myregistry3domain:port/addr3:1.2.3",
                     )
-                },
+                ],
             )
-        },
+        ],
     )
     assert_build(
         rule_runner,
         Address("docker/test", target_name="alias1"),
         "Built docker image: myregistry1domain:port/alias1:1.2.3",
         options=options,
-        expected_registries_metadata={
-            "@reg1": dict(
+        expected_registries_metadata=[
+            dict(
                 alias="reg1",
                 address="myregistry1domain:port",
                 repository="alias1",
-                tags={
-                    "1.2.3": dict(
+                tags=[
+                    dict(
                         template="1.2.3",
                         tag="1.2.3",
                         uses_local_alias=False,
                         name="myregistry1domain:port/alias1:1.2.3",
                     )
-                },
+                ],
             )
-        },
+        ],
     )
     assert_build(
         rule_runner,
@@ -482,39 +480,37 @@ def test_build_image_with_registries(rule_runner: RuleRunner) -> None:
         Address("docker/test", target_name="unreg"),
         "Built docker image: unreg:1.2.3",
         options=options,
-        expected_registries_metadata={
-            "": dict(
+        expected_registries_metadata=[
+            dict(
                 alias=None,
                 address=None,
                 repository="unreg",
-                tags={
-                    "1.2.3": dict(
-                        template="1.2.3", tag="1.2.3", uses_local_alias=False, name="unreg:1.2.3"
-                    )
-                },
+                tags=[
+                    dict(template="1.2.3", tag="1.2.3", uses_local_alias=False, name="unreg:1.2.3")
+                ],
             )
-        },
+        ],
     )
     assert_build(
         rule_runner,
         Address("docker/test", target_name="def"),
         "Built docker image: myregistry2domain:port/def:1.2.3",
         options=options,
-        expected_registries_metadata={
-            "@reg2": dict(
+        expected_registries_metadata=[
+            dict(
                 alias="reg2",
                 address="myregistry2domain:port",
                 repository="def",
-                tags={
-                    "1.2.3": dict(
+                tags=[
+                    dict(
                         template="1.2.3",
                         tag="1.2.3",
                         uses_local_alias=False,
                         name="myregistry2domain:port/def:1.2.3",
                     )
-                },
+                ],
             )
-        },
+        ],
     )
     assert_build(
         rule_runner,
@@ -525,34 +521,34 @@ def test_build_image_with_registries(rule_runner: RuleRunner) -> None:
             "  * myregistry1domain:port/multi:1.2.3"
         ),
         options=options,
-        expected_registries_metadata={
-            "@reg1": dict(
+        expected_registries_metadata=[
+            dict(
                 alias="reg1",
                 address="myregistry1domain:port",
                 repository="multi",
-                tags={
-                    "1.2.3": dict(
+                tags=[
+                    dict(
                         template="1.2.3",
                         tag="1.2.3",
                         uses_local_alias=False,
                         name="myregistry1domain:port/multi:1.2.3",
                     )
-                },
+                ],
             ),
-            "@reg2": dict(
+            dict(
                 alias="reg2",
                 address="myregistry2domain:port",
                 repository="multi",
-                tags={
-                    "1.2.3": dict(
+                tags=[
+                    dict(
                         template="1.2.3",
                         tag="1.2.3",
                         uses_local_alias=False,
                         name="myregistry2domain:port/multi:1.2.3",
                     )
-                },
+                ],
             ),
-        },
+        ],
     )
     assert_build(
         rule_runner,
@@ -564,40 +560,40 @@ def test_build_image_with_registries(rule_runner: RuleRunner) -> None:
             "  * extra/extra_tags:latest"
         ),
         options=options,
-        expected_registries_metadata={
-            "@reg1": dict(
-                alias="reg1",
-                address="myregistry1domain:port",
-                repository="extra_tags",
-                tags={
-                    "1.2.3": dict(
-                        template="1.2.3",
-                        tag="1.2.3",
-                        uses_local_alias=False,
-                        name="myregistry1domain:port/extra_tags:1.2.3",
-                    )
-                },
-            ),
-            "@extra": dict(
+        expected_registries_metadata=[
+            dict(
                 alias="extra",
                 address="extra",
                 repository="extra_tags",
-                tags={
-                    "1.2.3": dict(
+                tags=[
+                    dict(
                         template="1.2.3",
                         tag="1.2.3",
                         uses_local_alias=False,
                         name="extra/extra_tags:1.2.3",
                     ),
-                    "latest": dict(
+                    dict(
                         template="latest",
                         tag="latest",
                         uses_local_alias=False,
                         name="extra/extra_tags:latest",
                     ),
-                },
+                ],
             ),
-        },
+            dict(
+                alias="reg1",
+                address="myregistry1domain:port",
+                repository="extra_tags",
+                tags=[
+                    dict(
+                        template="1.2.3",
+                        tag="1.2.3",
+                        uses_local_alias=False,
+                        name="myregistry1domain:port/extra_tags:1.2.3",
+                    )
+                ],
+            ),
+        ],
     )
 
 
@@ -827,21 +823,21 @@ def test_docker_image_version_from_build_arg(rule_runner: RuleRunner) -> None:
         rule_runner,
         Address("docker/test", target_name="ver1"),
         "Built docker image: ver1:1.2.3",
-        expected_registries_metadata={
-            "": dict(
+        expected_registries_metadata=[
+            dict(
                 alias=None,
                 address=None,
                 repository="ver1",
-                tags={
-                    "{build_args.VERSION}": dict(
+                tags=[
+                    dict(
                         template="{build_args.VERSION}",
                         tag="1.2.3",
                         uses_local_alias=False,
                         name="ver1:1.2.3",
                     )
-                },
+                ],
             )
-        },
+        ],
     )
 
 
@@ -1189,18 +1185,18 @@ def test_build_target_stage(
         options=options,
         process_assertions=check_docker_proc,
         version_tags=("build latest", "dev latest", "prod latest"),
-        expected_registries_metadata={
-            "": dict(
+        expected_registries_metadata=[
+            dict(
                 address=None,
                 alias=None,
                 repository="image",
-                tags={
-                    "latest": dict(
+                tags=[
+                    dict(
                         template="latest", tag="latest", uses_local_alias=False, name="image:latest"
                     )
-                },
+                ],
             )
-        },
+        ],
     )
 
 
@@ -1702,59 +1698,59 @@ def test_docker_info_serialize() -> None:
     expected = dict(
         version=1,
         image_id=image_id,
-        registries={
-            "": dict(
+        registries=[
+            dict(
                 alias=None,
                 address=None,
                 repository="repo",
-                tags={
-                    "repo tag1 template": dict(
+                tags=[
+                    dict(
                         template="repo tag1 template",
                         tag="repo tag1 formatted",
                         uses_local_alias=False,
                         name="repo tag1 full name",
                     ),
-                    "repo tag2 template": dict(
+                    dict(
                         template="repo tag2 template",
                         tag="repo tag2 formatted",
                         uses_local_alias=False,
                         name="repo tag2 full name",
                     ),
-                },
+                ],
             ),
-            "address": dict(
+            dict(
                 alias=None,
                 address="address",
                 repository="address repo",
-                tags={
-                    "address tag template": dict(
+                tags=[
+                    dict(
                         template="address tag template",
                         tag="address tag formatted",
                         uses_local_alias=False,
                         name="address tag full name",
                     )
-                },
+                ],
             ),
-            "@alias": dict(
+            dict(
                 alias="alias",
                 address="alias address",
                 repository="alias repo",
-                tags={
-                    "alias tag (address) template": dict(
+                tags=[
+                    dict(
                         template="alias tag (address) template",
                         tag="alias tag (address) formatted",
                         uses_local_alias=False,
                         name="alias tag (address) full name",
                     ),
-                    "alias tag (local alias) template:local alias": dict(
+                    dict(
                         template="alias tag (local alias) template",
                         tag="alias tag (local alias) formatted",
                         uses_local_alias=True,
                         name="alias tag (local alias) full name",
                     ),
-                },
+                ],
             ),
-        },
+        ],
     )
 
     result = DockerInfoV1.serialize(image_refs, image_id)
