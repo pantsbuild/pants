@@ -74,7 +74,13 @@ pub fn criterion_benchmark_materialize(c: &mut Criterion) {
               let dest = new_temp.path().to_path_buf();
               std::mem::forget(new_temp);
               let _ = executor
-                .block_on(store.materialize_directory(dest, digest.clone(), None, perms))
+                .block_on(store.materialize_directory(
+                  dest,
+                  digest.clone(),
+                  &BTreeSet::new(),
+                  None,
+                  perms,
+                ))
                 .unwrap();
             })
           },
