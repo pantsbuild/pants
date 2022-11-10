@@ -58,6 +58,7 @@ async fn merge_directories<T: SnapshotOps + 'static>(
 
   Ok(tree.into())
 }
+
 ///
 /// Render a directory::MergeError (or fail with a less specific error if some content cannot be
 /// loaded).
