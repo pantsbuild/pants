@@ -130,6 +130,35 @@ def test_package_third_party_requires_main(rule_runner: RuleRunner) -> None:
         build_package(rule_runner, binary_tgt)
 
 
+def test_package_third_party_can_run(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "go.mod": dedent(
+                """\
+                module foo.example.com
+                go 1.17
+
+                require github.com/tgolsson/example-pants-third-party v0.0.0-20221101220057-1a7167a87ec5 // indirect
+                """
+            ),
+            "BUILD": dedent(
+                """\
+                go_mod(name='mod')
+                go_binary(name="bin", main='//:mod#github.com/tgolsson/example-pants-third-party/cmd/hello')
+                """
+            ),
+        }
+    )
+    binary_tgt = rule_runner.get_target(Address("", target_name="bin"))
+    built_package = build_package(rule_runner, binary_tgt)
+    assert len(built_package.artifacts) == 1
+    assert built_package.artifacts[0].relpath == "bin"
+
+    result = subprocess.run([os.path.join(rule_runner.build_root, "bin")], stdout=subprocess.PIPE)
+    assert result.returncode == 0
+    assert result.stdout == b"Hello world!\n"
+
+
 def test_package_with_dependencies(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
