@@ -141,15 +141,18 @@ class DockerPackageFieldSet(PackageFieldSet):
         interpolation_context: InterpolationContext,
         additional_tags: tuple[str, ...] = (),
     ) -> Iterator[ImageRefRegistry]:
-        """The per-registry image refs: the full image name including any registry and version tag.
+        """The per-registry image refs: each returned element is a collection of the tags applied to
+        the image in a single registry.
 
         In the Docker world, the term `tag` is used both for what we here prefer to call the image
         `ref`, as well as for the image version, or tag, that is at the end of the image name
         separated with a colon. By introducing the image `ref` we can retain the use of `tag` for
         the version part of the image name.
 
-        Returns all image refs to apply to the Docker image, accessible within the `full_name`
-        attribute of each element of the `tags` field:
+        This function returns all image refs to apply to the Docker image, grouped by
+        registry. Within each registry, the `tags` attribute contains a metadata about each tag in
+        the context of that registry, and the `full_name` attribute of each `ImageRefTag` provides
+        the image ref, of the following form:
 
             [<registry>/]<repository-name>[:<tag>]
 
@@ -245,7 +248,7 @@ class ImageRefTag:
 
 @dataclass(frozen=True)
 class DockerInfoV1:
-    """The format of the .docker-info.json file."""
+    """The format of the `$target_name.docker-info.json` file."""
 
     version: Literal[1]
     image_id: str
