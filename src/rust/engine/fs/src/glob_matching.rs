@@ -17,7 +17,7 @@ use parking_lot::Mutex;
 
 use crate::{
   Dir, GitignoreStyleExcludes, GlobExpansionConjunction, Link, LinkDepth, PathStat, Stat,
-  StrictGlobMatching, Vfs, MAX_LINK_DEPTH,
+  StrictGlobMatching, SymlinkBehavior, Vfs, MAX_LINK_DEPTH,
 };
 
 static DOUBLE_STAR: &str = "**";
@@ -390,10 +390,16 @@ pub trait GlobMatching<E: Display + Send + Sync + 'static>: Vfs<E> {
   async fn expand_globs(
     &self,
     path_globs: PreparedPathGlobs,
+    symlink_behavior: SymlinkBehavior,
     unmatched_globs_additional_context: Option<String>,
   ) -> Result<Vec<PathStat>, E> {
-    GlobMatchingImplementation::expand_globs(self, path_globs, unmatched_globs_additional_context)
-      .await
+    GlobMatchingImplementation::expand_globs(
+      self,
+      path_globs,
+      symlink_behavior,
+      unmatched_globs_additional_context,
+    )
+    .await
   }
 }
 
@@ -411,6 +417,7 @@ trait GlobMatchingImplementation<E: Display + Send + Sync + 'static>: Vfs<E> {
     symbolic_path: PathBuf,
     wildcard: Pattern,
     exclude: &Arc<GitignoreStyleExcludes>,
+    symlink_behavior: SymlinkBehavior,
     link_depth: LinkDepth,
   ) -> Result<Vec<(PathStat, LinkDepth)>, E> {
     // List the directory.
@@ -455,6 +462,13 @@ trait GlobMatchingImplementation<E: Display + Send + Sync + 'static>: Vfs<E> {
                     )));
                   }
 
+                  if let SymlinkBehavior::Aware = symlink_behavior {
+                    return Ok(Some((
+                      PathStat::link(stat_symbolic_path, l.clone()),
+                      link_depth + 1,
+                    )));
+                  }
+
                   let dest = context
                     .canonicalize_link(stat_symbolic_path, l.clone())
                     .await?;
@@ -483,6 +497,7 @@ trait GlobMatchingImplementation<E: Display + Send + Sync + 'static>: Vfs<E> {
   async fn expand_globs(
     &self,
     path_globs: PreparedPathGlobs,
+    symlink_behavior: SymlinkBehavior,
     unmatched_globs_additional_context: Option<String>,
   ) -> Result<Vec<PathStat>, E> {
     let PreparedPathGlobs {
@@ -505,7 +520,12 @@ trait GlobMatchingImplementation<E: Display + Send + Sync + 'static>: Vfs<E> {
       let source = Arc::new(pgie.input);
       for path_glob in pgie.globs {
         sources.push(source.clone());
-        roots.push(self.expand_single(result.clone(), exclude.clone(), path_glob));
+        roots.push(self.expand_single(
+          result.clone(),
+          exclude.clone(),
+          path_glob,
+          symlink_behavior,
+        ));
       }
     }
 
@@ -601,6 +621,7 @@ trait GlobMatchingImplementation<E: Display + Send + Sync + 'static>: Vfs<E> {
     result: Arc<Mutex<Vec<PathStat>>>,
     exclude: Arc<GitignoreStyleExcludes>,
     path_glob: PathGlob,
+    symlink_behavior: SymlinkBehavior,
   ) -> Result<bool, E> {
     match path_glob {
       PathGlob::Wildcard {
@@ -616,6 +637,7 @@ trait GlobMatchingImplementation<E: Display + Send + Sync + 'static>: Vfs<E> {
             canonical_dir,
             symbolic_path,
             wildcard,
+            symlink_behavior,
             link_depth,
           )
           .await
@@ -635,6 +657,7 @@ trait GlobMatchingImplementation<E: Display + Send + Sync + 'static>: Vfs<E> {
             symbolic_path,
             wildcard,
             remainder,
+            symlink_behavior,
             link_depth,
           )
           .await
@@ -649,11 +672,19 @@ trait GlobMatchingImplementation<E: Display + Send + Sync + 'static>: Vfs<E> {
     canonical_dir: Dir,
     symbolic_path: PathBuf,
     wildcard: Pattern,
+    symlink_behavior: SymlinkBehavior,
     link_depth: LinkDepth,
   ) -> Result<bool, E> {
     // Filter directory listing to append PathStats, with no continuation.
     let path_stats = self
-      .directory_listing(canonical_dir, symbolic_path, wildcard, &exclude, link_depth)
+      .directory_listing(
+        canonical_dir,
+        symbolic_path,
+        wildcard,
+        &exclude,
+        symlink_behavior,
+        link_depth,
+      )
       .await?;
 
     let mut result = result.lock();
@@ -670,12 +701,20 @@ trait GlobMatchingImplementation<E: Display + Send + Sync + 'static>: Vfs<E> {
     symbolic_path: PathBuf,
     wildcard: Pattern,
     remainder: Vec<Pattern>,
+    symlink_behavior: SymlinkBehavior,
     link_depth: LinkDepth,
   ) -> Result<bool, E> {
     // Filter directory listing and recurse for matched Dirs.
     let context = self.clone();
     let path_stats = self
-      .directory_listing(canonical_dir, symbolic_path, wildcard, &exclude, link_depth)
+      .directory_listing(
+        canonical_dir,
+        symbolic_path,
+        wildcard,
+        &exclude,
+        symlink_behavior,
+        link_depth,
+      )
       .await?;
 
     let path_globs = path_stats
@@ -685,6 +724,7 @@ trait GlobMatchingImplementation<E: Display + Send + Sync + 'static>: Vfs<E> {
           PathGlob::parse_globs(stat, path, &remainder, link_depth)
             .map_err(|e| Self::mk_error(e.as_str())),
         ),
+        PathStat::Link { .. } => None,
         PathStat::File { .. } => None,
       })
       .collect::<Result<Vec<_>, E>>()?;
@@ -692,7 +732,7 @@ trait GlobMatchingImplementation<E: Display + Send + Sync + 'static>: Vfs<E> {
     let child_globs = path_globs
       .into_iter()
       .flat_map(Vec::into_iter)
-      .map(|pg| context.expand_single(result.clone(), exclude.clone(), pg))
+      .map(|pg| context.expand_single(result.clone(), exclude.clone(), pg, symlink_behavior))
       .collect::<Vec<_>>();
 
     let child_matches = future::try_join_all(child_globs).await?;
@@ -720,14 +760,15 @@ trait GlobMatchingImplementation<E: Display + Send + Sync + 'static>: Vfs<E> {
     let path_globs =
       PreparedPathGlobs::from_globs(link_globs).map_err(|e| Self::mk_error(e.as_str()))?;
     let mut path_stats = context
-      .expand_globs(path_globs, None)
-      .map_err(move |e| Self::mk_error(&format!("While expanding link {:?}: {}", link.0, e)))
+      .expand_globs(path_globs, SymlinkBehavior::Oblivious, None)
+      .map_err(move |e| Self::mk_error(&format!("While expanding link {:?}: {}", link.path, e)))
       .await?;
 
     // Since we've escaped any globs in the parsed path, expect either 0 or 1 destination.
     Ok(path_stats.pop().map(|ps| match ps {
       PathStat::Dir { stat, .. } => PathStat::dir(symbolic_path, stat),
       PathStat::File { stat, .. } => PathStat::file(symbolic_path, stat),
+      PathStat::Link { stat, .. } => PathStat::link(symbolic_path, stat),
     }))
   }
 }

@@ -36,7 +36,7 @@ use bytes::Bytes;
 use clap::{Arg, Command};
 use fs::{
   DirectoryDigest, GlobExpansionConjunction, GlobMatching, Permissions, PreparedPathGlobs,
-  RelativePath, StrictGlobMatching,
+  RelativePath, StrictGlobMatching, SymlinkBehavior,
 };
 use futures::future::{self, BoxFuture};
 use futures::FutureExt;
@@ -588,7 +588,7 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
         )
         .parse()?;
         let paths = posix_fs
-          .expand_globs(path_globs, None)
+          .expand_globs(path_globs, SymlinkBehavior::Oblivious, None)
           .await
           .map_err(|e| format!("Error expanding globs: {:?}", e))?;
 

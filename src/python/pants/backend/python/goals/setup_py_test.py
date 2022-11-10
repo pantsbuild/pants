@@ -82,7 +82,7 @@ def create_setup_py_rule_runner(*, rules: Iterable) -> RuleRunner:
             ResourcesGeneratorTarget,
             FileTarget,
         ],
-        objects={"setup_py": PythonArtifact},
+        objects={"python_artifact": PythonArtifact},
     )
     rule_runner.set_options([], env_inherit={"PATH", "PYENV_ROOT", "HOME"})
     return rule_runner
@@ -192,7 +192,7 @@ def test_use_existing_setup_script(chroot_rule_runner) -> None:
                         ':setup',
                     ],
                     generate_setup=False,
-                    provides=setup_py(
+                    provides=python_artifact(
                         name='foo', version='1.2.3',
                     )
                 )
@@ -272,7 +272,7 @@ def test_use_generate_setup_script_package_provenance_agnostic(chroot_rule_runne
                         'src/python/foo',
                     ],
                     generate_setup=True,
-                    provides=setup_py(
+                    provides=python_artifact(
                         name='foo', version='1.2.3',
                     )
                 )
@@ -355,7 +355,7 @@ def test_generate_chroot(chroot_rule_runner: RuleRunner) -> None:
                 python_distribution(
                     name="baz-dist",
                     dependencies=[':baz'],
-                    provides=setup_py(
+                    provides=python_artifact(
                         name='baz',
                         version='1.1.1'
                     )
@@ -387,7 +387,7 @@ def test_generate_chroot(chroot_rule_runner: RuleRunner) -> None:
                     dependencies=[
                         ':foo',
                     ],
-                    provides=setup_py(
+                    provides=python_artifact(
                         name='foo', version='1.2.3'
                     ),
                     entry_points={
@@ -465,8 +465,9 @@ def test_generate_chroot_entry_points(chroot_rule_runner: RuleRunner) -> None:
                             "qux":"foo.qux",
                         },
                     },
-                    provides=setup_py(
-                        name='foo', version='1.2.3',
+                    provides=python_artifact(
+                        name='foo',
+                        version='1.2.3',
                         entry_points={
                             "console_scripts":{
                                 "foo_qux":"foo.baz.qux:main",
@@ -533,7 +534,7 @@ def test_generate_long_description_field_from_file(chroot_rule_runner: RuleRunne
                 python_distribution(
                     name='foo-dist',
                     long_description_path="src/python/foo/readme.md",
-                    provides=setup_py(
+                    provides=python_artifact(
                         name='foo',
                         version='1.2.3',
                     )
@@ -574,7 +575,7 @@ def test_generate_long_description_field_from_file_already_having_it(
                 python_distribution(
                     name='foo-dist',
                     long_description_path="src/python/foo/readme.md",
-                    provides=setup_py(
+                    provides=python_artifact(
                         name='foo',
                         version='1.2.3',
                         long_description="Some long description.",
@@ -602,7 +603,7 @@ def test_generate_long_description_field_from_non_existing_file(
                 python_distribution(
                     name='foo-dist',
                     long_description_path="src/python/foo/readme.md",
-                    provides=setup_py(
+                    provides=python_artifact(
                         name='foo',
                         version='1.2.3',
                     )
@@ -631,7 +632,7 @@ def test_invalid_binary(chroot_rule_runner: RuleRunner) -> None:
                 pex_binary(name='invalid_entrypoint_unowned2', entry_point='invalid_binary.app2')
                 python_distribution(
                     name='invalid_bin1',
-                    provides=setup_py(
+                    provides=python_artifact(
                         name='invalid_bin1', version='1.1.1'
                     ),
                     entry_points={
@@ -642,7 +643,7 @@ def test_invalid_binary(chroot_rule_runner: RuleRunner) -> None:
                 )
                 python_distribution(
                     name='invalid_bin2',
-                    provides=setup_py(
+                    provides=python_artifact(
                         name='invalid_bin2', version='1.1.1'
                     ),
                     entry_points={
@@ -653,7 +654,7 @@ def test_invalid_binary(chroot_rule_runner: RuleRunner) -> None:
                 )
                 python_distribution(
                     name='invalid_bin3',
-                    provides=setup_py(
+                    provides=python_artifact(
                         name='invalid_bin3', version='1.1.1'
                     ),
                     entry_points={
@@ -694,7 +695,7 @@ def test_binary_shorthand(chroot_rule_runner: RuleRunner) -> None:
                 pex_binary(name='bin', entry_point='app.py:func')
                 python_distribution(
                     name='dist',
-                    provides=setup_py(
+                    provides=python_artifact(
                         name='bin', version='1.1.1'
                     ),
                     entry_points={
@@ -768,7 +769,7 @@ def test_get_sources() -> None:
                     python_distribution(
                       name="dist",
                       dependencies=["{'","'.join(addr.spec for addr in addrs)}"],
-                      provides=setup_py(name="foo", version="3.2.1"),
+                      provides=python_artifact(name="foo", version="3.2.1"),
                     )
                     """
                 ),
@@ -887,7 +888,7 @@ def test_get_requirements() -> None:
                 python_distribution(
                     name='bar-dist',
                     dependencies=[':bar'],
-                    provides=setup_py(name='bar', version='9.8.7'),
+                    provides=python_artifact(name='bar', version='9.8.7'),
                 )
 
                 python_sources(dependencies=['src/python/foo/bar/baz', 'src/python/foo/bar/qux'])
@@ -900,7 +901,7 @@ def test_get_requirements() -> None:
                     name='corge-dist',
                     # Tests having a 3rdparty requirement directly on a python_distribution.
                     dependencies=[':corge', '3rdparty:ext3'],
-                    provides=setup_py(name='corge', version='2.2.2'),
+                    provides=python_artifact(name='corge', version='2.2.2'),
                 )
 
                 python_sources(dependencies=['src/python/foo/bar'])
@@ -965,7 +966,7 @@ def test_get_requirements_with_exclude() -> None:
                 python_distribution(
                     name='bar-dist',
                     dependencies=['!!3rdparty:ext2',':bar'],
-                    provides=setup_py(name='bar', version='9.8.7'),
+                    provides=python_artifact(name='bar', version='9.8.7'),
                 )
 
                 python_sources(dependencies=['src/python/foo/bar/baz', 'src/python/foo/bar/qux'])
@@ -1023,7 +1024,7 @@ def test_owned_dependencies() -> None:
                 python_distribution(
                     name='bar1-dist',
                     dependencies=[':bar1'],
-                    provides=setup_py(name='bar1', version='1.1.1'),
+                    provides=python_artifact(name='bar1', version='1.1.1'),
                 )
 
                 python_sources(
@@ -1046,7 +1047,7 @@ def test_owned_dependencies() -> None:
                 python_distribution(
                     name='foo-dist',
                     dependencies=[':foo'],
-                    provides=setup_py(name='foo', version='3.4.5'),
+                    provides=python_artifact(name='foo', version='3.4.5'),
                 )
 
                 python_sources(
@@ -1146,7 +1147,7 @@ def test_get_owner_simple(exporting_owner_rule_runner: RuleRunner) -> None:
                 python_distribution(
                     name='bar1',
                     dependencies=['src/python/foo/bar/baz:baz1'],
-                    provides=setup_py(name='bar1', version='1.1.1'),
+                    provides=python_artifact(name='bar1', version='1.1.1'),
                 )
                 python_sources(
                     name='bar2',
@@ -1161,13 +1162,13 @@ def test_get_owner_simple(exporting_owner_rule_runner: RuleRunner) -> None:
                 python_distribution(
                     name='foo1',
                     dependencies=['src/python/foo/bar/baz:baz2'],
-                    provides=setup_py(name='foo1', version='0.1.2'),
+                    provides=python_artifact(name='foo1', version='0.1.2'),
                 )
                 python_sources(name='foo2')
                 python_distribution(
                     name='foo3',
                     dependencies=['src/python/foo/bar:bar2'],
-                    provides=setup_py(name='foo3', version='3.4.5'),
+                    provides=python_artifact(name='foo3', version='3.4.5'),
                 )
                 """
             ),
@@ -1222,7 +1223,7 @@ def test_get_owner_siblings(exporting_owner_rule_runner: RuleRunner) -> None:
                 python_distribution(
                     name='sibling2',
                     dependencies=['src/python/siblings:sibling1'],
-                    provides=setup_py(name='siblings', version='2.2.2'),
+                    provides=python_artifact(name='siblings', version='2.2.2'),
                 )
                 """
             ),
@@ -1254,7 +1255,7 @@ def test_get_owner_not_an_ancestor(exporting_owner_rule_runner: RuleRunner) -> N
                 python_distribution(
                     name='bbb',
                     dependencies=['src/python/notanancestor/aaa'],
-                    provides=setup_py(name='bbb', version='11.22.33'),
+                    provides=python_artifact(name='bbb', version='11.22.33'),
                 )
                 """
             ),
@@ -1282,7 +1283,7 @@ def test_get_owner_multiple_ancestor_generations(exporting_owner_rule_runner: Ru
                 python_distribution(
                     name='bbb',
                     dependencies=['src/python/aaa/bbb/ccc'],
-                    provides=setup_py(name='bbb', version='1.1.1'),
+                    provides=python_artifact(name='bbb', version='1.1.1'),
                 )
                 """
             ),
@@ -1291,7 +1292,7 @@ def test_get_owner_multiple_ancestor_generations(exporting_owner_rule_runner: Ru
                 python_distribution(
                     name='aaa',
                     dependencies=['src/python/aaa/bbb/ccc'],
-                    provides=setup_py(name='aaa', version='2.2.2'),
+                    provides=python_artifact(name='aaa', version='2.2.2'),
                 )
                 """
             ),
@@ -1367,7 +1368,7 @@ def test_no_dist_type_selected() -> None:
             QueryRule(BuiltPackage, (PythonDistributionFieldSet,)),
         ],
         target_types=[PythonDistribution],
-        objects={"setup_py": PythonArtifact},
+        objects={"python_artifact": PythonArtifact},
     )
     rule_runner.write_files(
         {
@@ -1375,7 +1376,7 @@ def test_no_dist_type_selected() -> None:
                 """
                 python_distribution(
                     name='aaa',
-                    provides=setup_py(name='aaa', version='2.2.2'),
+                    provides=python_artifact(name='aaa', version='2.2.2'),
                     wheel=False,
                     sdist=False
                 )
@@ -1412,7 +1413,7 @@ def test_too_many_interpreter_constraints(chroot_rule_runner: RuleRunner) -> Non
                 """
                 python_distribution(
                     name='foo-dist',
-                    provides=setup_py(
+                    provides=python_artifact(
                         name='foo',
                         version='1.2.3',
                     )

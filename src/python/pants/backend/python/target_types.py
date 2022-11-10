@@ -1325,7 +1325,7 @@ class PythonDistributionDependenciesField(Dependencies):
 class PythonProvidesField(ScalarField, AsyncFieldMixin):
     alias = "provides"
     expected_type = PythonArtifact
-    expected_type_help = "setup_py(name='my-dist', **kwargs)"
+    expected_type_help = "python_artifact(name='my-dist', **kwargs)"
     value: PythonArtifact
     required = True
     help = softwrap(

@@ -18,7 +18,7 @@ use async_trait::async_trait;
 use bytes::{Bytes, BytesMut};
 use fs::{
   self, DirectoryDigest, GlobExpansionConjunction, GlobMatching, PathGlobs, Permissions,
-  RelativePath, StrictGlobMatching, EMPTY_DIRECTORY_DIGEST,
+  RelativePath, StrictGlobMatching, SymlinkBehavior, EMPTY_DIRECTORY_DIGEST,
 };
 use futures::stream::{BoxStream, StreamExt, TryStreamExt};
 use futures::{try_join, FutureExt, TryFutureExt};
@@ -127,7 +127,7 @@ impl CommandRunner {
     .parse()?;
 
     let path_stats = posix_fs
-      .expand_globs(output_globs, None)
+      .expand_globs(output_globs, SymlinkBehavior::Aware, None)
       .map_err(|err| format!("Error expanding output globs: {}", err))
       .await?;
     Snapshot::from_path_stats(
