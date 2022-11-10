@@ -229,16 +229,16 @@ pub trait SnapshotOps: Clone + Send + Sync + 'static {
   ) -> Result<DirectoryDigest, Self::Error> {
     let input_tree = self.load_digest_trie(directory_digest.clone()).await?;
     let path_stats = input_tree
-      .expand_globs(params.globs, SymlinkBehavior::Aware, None)
+      .expand_globs(params.globs, SymlinkBehavior::Oblivious, None)
       .await
       .map_err(|err| format!("Error matching globs against {directory_digest:?}: {}", err))?;
 
     let mut files = HashMap::new();
-    input_tree.walk(SymlinkBehavior::Aware, &mut |path, entry| match entry {
+    input_tree.walk(SymlinkBehavior::Oblivious, &mut |path, entry| match entry {
       directory::Entry::File(f) => {
         files.insert(path.to_owned(), f.digest());
       }
-      directory::Entry::Symlink(_) => (),
+      directory::Entry::Symlink(_) => panic!("Unexpected symlink"),
       directory::Entry::Directory(_) => (),
     });
 
