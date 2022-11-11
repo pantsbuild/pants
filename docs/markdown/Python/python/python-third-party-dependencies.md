@@ -352,12 +352,9 @@ To disable lockfiles entirely for a tool, set `[tool].lockfile = "<none>"` for t
 
 ### Manually generating lockfiles
 
-Rather than using `generate-lockfiles` to generate PEX-style lockfiles, you can manually
-generate lockfiles. This can be helpful, for example, when adopting Pants in a repository already
-using Poetry by running `poetry export --dev`.
+Rather than using `generate-lockfiles` to generate PEX-style lockfiles, you can manually generate lockfiles. This can be helpful, for example, when adopting Pants in a repository already using Poetry by running `poetry export --dev`.
 
-Manually generated lockfiles must either use Pex's JSON format or use pip's 
-`requirements.txt`-style format (ideally with `--hash` entries for better supply chain security).
+Manually generated lockfiles must either use Pex's JSON format or use pip's `requirements.txt`-style format (ideally with `--hash` entries for better supply chain security).
 For example:
 
 ```text 3rdparty/user_lock.txt
@@ -366,17 +363,9 @@ freezegun==1.2.0 \
   --hash=sha256:e19563d0b05...
 ```
 
-For manually-generated user lockfiles, set `[python].resolves` to the path of your lockfile(s).
-Also set `[python].resolves_generate_lockfiles` to `False` so that Pants does not expect its
-metadata header. Warning: it will likely be slower to install manually generated user lockfiles
-than Pex ones because Pants cannot as efficiently extract the subset of requirements used for a
-particular task; see the option [`[python].run_against_entire_lockfile`](doc:reference-python). 
+For manually-generated user lockfiles, set `[python].resolves` to the path of your lockfile(s). Also set `[python].resolves_generate_lockfiles` to `False` so that Pants does not expect its  metadata header. Warning: it will likely be slower to install manually generated user lockfiles than Pex ones because Pants cannot as efficiently extract the subset of requirements used for a particular task; see the option [`[python].run_against_entire_lockfile`](doc:reference-python). 
 
-For manually-generated tool lockfiles, set `[tool].lockfile` to the path of your lockfile, e.g.
-`[black].lockfile`. Also set `[python].invalid_lockfile_behavior = "error"` so that Pants does not
-expect metadata headers. Note that this option will disable the check for all lockfiles, including
-user lockfiles, which may not be desirable. Feel free to open a
-[GitHub issue](https://github.com/pantsbuild/pants/issues/new) if you want more precise control.
+For manually-generated tool lockfiles, set `[tool].lockfile` to the path of your lockfile, e.g. `[black].lockfile`. Also set `[python].invalid_lockfile_behavior = "error"` so that Pants does not expect metadata headers. Note that this option will disable the check for all lockfiles, including user lockfiles, which may not be desirable. Feel free to open a [GitHub issue](https://github.com/pantsbuild/pants/issues/new) if you want more precise control.
 
 Advanced usage
 --------------
@@ -469,22 +458,18 @@ There are two mechanisms for setting up custom Python distribution repositories:
 
 #### PEP-503 compatible indexes
 
-Use `[python-repos].indexes` to add [PEP 503-compatible](https://peps.python.org/pep-0503/)
-indexes, like PyPI.
+Use `[python-repos].indexes` to add [PEP 503-compatible](https://peps.python.org/pep-0503/) indexes, like PyPI.
 
 ```toml pants.toml
 [python-repos]
 indexes.add = ["https://custom-cheeseshop.net/simple"]
 ```
 
-To exclusively use your custom index, i.e. to not use the default of PyPI, use `indexes = [..]`
-instead of `indexes.add = [..]`.
+To exclusively use your custom index, i.e. to not use the default of PyPI, use `indexes = [..]` instead of `indexes.add = [..]`.
 
 #### pip `--find-links`
 
-Use the option `[python-repos].find_links` for flat lists of packages. Same as pip's
-[`--find-links`](https://pip.pypa.io/en/stable/cli/pip_wheel/?highlight=find%20links#cmdoption-f)
-option, you can either use:
+Use the option `[python-repos].find_links` for flat lists of packages. Same as pip's [`--find-links`](https://pip.pypa.io/en/stable/cli/pip_wheel/?highlight=find%20links#cmdoption-f) option, you can either use:
 
 * a URL to an HTML file with links to wheel and/or sdist files, or
 * a `file://` absolute path to an HTML file with links, or to a local directory with wheel and/or
@@ -500,21 +485,16 @@ find_links = [
 
 #### Authenticating to custom repos
 
-To authenticate to custom repos, you may need to provide credentials 
-(such as a username and password) in the URL. 
+To authenticate to custom repos, you may need to provide credentials (such as a username and password) in the URL. 
 
-You can use [config file `%(env.ENV_VAR)s` interpolation](doc:options#config-file-interpolation)
-to load the values via environment variables. This avoids checking in sensitive information to
-version control.
+You can use [config file `%(env.ENV_VAR)s` interpolation](doc:options#config-file-interpolation) to load the values via environment variables. This avoids checking in sensitive information to version control.
 
 ```toml pants.toml
 [python-repos]
 indexes.add = ["http://%(env.INDEX_USERNAME)s:%(INDEX_PASSWORD)s@my.custom.repo/index"]
 ```
 
-Alternatively, you can hardcode the value in a private (not checked-in)
-[.pants.rc file](doc:options#pantsrc-file) in each user's Pants repo, that sets this config for
-the user:
+Alternatively, you can hardcode the value in a private (not checked-in) [.pants.rc file](doc:options#pantsrc-file) in each user's Pants repo, that sets this config for the user:
 
 ```toml .pants.rc
 [python-repos]
@@ -559,44 +539,22 @@ python_requirement(name="django", requirements=["django>=3.1,<3.2"])
 # `python_requirements` target generator
 ```
 
-Unlike PEP 440 direct references, `[python-repos].find_links` allows you to use multiple artifacts
-for the same project name. For example, you can include multiple `.whl` and sdist files for the same
-project in the directory; if `[python-repos].indexes` is still set, then Pex/pip may use
-artifacts both from indexes like PyPI and from your local `--find-links`.
+Unlike PEP 440 direct references, `[python-repos].find_links` allows you to use multiple artifacts for the same project name. For example, you can include multiple `.whl` and sdist files for the same  project in the directory; if `[python-repos].indexes` is still set, then Pex/pip may use artifacts both from indexes like PyPI and from your local `--find-links`.
 
-Both approaches require using absolute paths, and the files must exist on your machine. This is
-usually fine when locally iterating and debugging. This approach also works well if your entire
-team can use the same fixed location. Otherwise, see the below section.
+Both approaches require using absolute paths, and the files must exist on your machine. This is usually fine when locally iterating and debugging. This approach also works well if your entire team can use the same fixed location. Otherwise, see the below section.
 
 #### Working around absolute paths
 
-If you need to share the lockfile on different machines, and you cannot use the same
-absolute path, then you can use the option
-`[python-repos].path_mappings` along with `[python-repos].find_links`. (`path_mappings` is not
-intended for PEP 440 direct requirements.)
+If you need to share the lockfile on different machines, and you cannot use the same absolute path, then you can use the option `[python-repos].path_mappings` along with `[python-repos].find_links`. (`path_mappings` is not intended for PEP 440 direct requirements.)
 
-The `path_mappings` option allows you to substitute a portion of the absolute path with a logical
-name, which can be set to a different value than your
-teammates. For example, the path
-`file:///Users/pantsbuild/prebuilt_wheels/django-3.1.1-py3-none-any.whl` could become
-`file://${WHEELS_DIR}/django-3.1.1-py3-none-any.whl`, where each Pants user defines what
-`WHEELS_DIR` should be on their machine.
+The `path_mappings` option allows you to substitute a portion of the absolute path with a logical name, which can be set to a different value than your teammates. For example, the path
+`file:///Users/pantsbuild/prebuilt_wheels/django-3.1.1-py3-none-any.whl` could become `file://${WHEELS_DIR}/django-3.1.1-py3-none-any.whl`, where each Pants user defines what `WHEELS_DIR` should be on their machine.
 
-This feature only works when using Pex lockfiles via `[python].resolves` and for tool lockfiles
-like Pytest and Black.
+This feature only works when using Pex lockfiles via `[python].resolves` and for tool lockfiles like Pytest and Black.
 
-`[python-repos].path_mappings` expects values in the form `NAME|PATH`, e.g.
-`WHEELS_DIR|/Users/pantsbuild/prebuilt_wheels`. Also, still use an absolute path for
-`[python-repos].find_links`.
+`[python-repos].path_mappings` expects values in the form `NAME|PATH`, e.g. `WHEELS_DIR|/Users/pantsbuild/prebuilt_wheels`. Also, still use an absolute path for `[python-repos].find_links`.
 
-If possible, we recommend using a common file location for your whole team, and leveraging [Pants's
-interpolation](doc:options#config-file-interpolation), so that you avoid each user needing to
-manually configure `[python-repos].path_mappings` and `[python-repos].find_links`.
-For example, in `pants.toml`, you could set `[python-repos].path_mappings` to 
-`WHEELS_DIR|%(buildroot)s/python_wheels` and `[python-repos].find_links` to
-`%(buildroot)s/python_wheels`. Then, as long as every user has the folder `python_wheels` in the
-root of the repository, things will work without additional configuration. Or, you could use a
-value like `%(env.HOME)s/pants_wheels` for the path `~/pants_wheels`.
+If possible, we recommend using a common file location for your whole team, and leveraging [Pants's interpolation](doc:options#config-file-interpolation), so that you avoid each user needing to manually configure `[python-repos].path_mappings` and `[python-repos].find_links`. For example, in `pants.toml`, you could set `[python-repos].path_mappings` to `WHEELS_DIR|%(buildroot)s/python_wheels` and `[python-repos].find_links` to `%(buildroot)s/python_wheels`. Then, as long as every user has the folder `python_wheels` in the root of the repository, things will work without additional configuration. Or, you could use a value like `%(env.HOME)s/pants_wheels` for the path `~/pants_wheels`.
 
 ```toml pants.toml
 [python-repos]
@@ -605,9 +563,7 @@ find_links = ["file://%(buildroot)s/prebuilt_wheels"]
 path_mappings = ["WHEELS_DIR|%(buildroot)s/prebuilt_wheels"]
 ```
 
-If you cannot use a common file location via interpolation, then we recommend setting these options
-in a [`.pants.rc` file](doc:options#pantsrc-file). Every teammate will need to set this up for their
-machine.
+If you cannot use a common file location via interpolation, then we recommend setting these options in a [`.pants.rc` file](doc:options#pantsrc-file). Every teammate will need to set this up for their machine.
 
 ```toml .pants.rc
 [python-repos]
@@ -616,23 +572,14 @@ find_links = ["file:///Users/pantsbuild/prebuilt_wheels"]
 path_mappings = ["WHEELS_DIR|/Users/pantsbuild/prebuilt_wheels"]
 ```
 
-After initially setting up `[python-repos].path_mappings` and `[python-repos].find_links`, run
-`./pants generate-lockfiles` or `./pants generate-lockfiles --resolve=<resolve-name>`. You
-should see the `path_mappings` key set in the lockfile's JSON.
+After initially setting up `[python-repos].path_mappings` and `[python-repos].find_links`, run `./pants generate-lockfiles` or `./pants generate-lockfiles --resolve=<resolve-name>`. You should see the `path_mappings` key set in the lockfile's JSON.
 
 ### Constraints files
 
-Sometimes, transitive dependencies of one of your third-party requirements can cause trouble.
-For example, sometimes requirements do not pin their dependencies well enough, and a newer
-version of its transitive dependency is released that breaks the requirement.
-[Constraints files](https://pip.pypa.io/en/stable/user_guide/?highlight=constraints#constraints-files) 
-allow you to pin transitive dependencies to certain versions, overriding the version that
-pip/Pex would normally choose.
+Sometimes, transitive dependencies of one of your third-party requirements can cause trouble. For example, sometimes requirements do not pin their dependencies well enough, and a newer version of its transitive dependency is released that breaks the requirement.
+[Constraints files](https://pip.pypa.io/en/stable/user_guide/?highlight=constraints#constraints-files) allow you to pin transitive dependencies to certain versions, overriding the version that pip/Pex would normally choose.
 
-Constraints files are configured per-resolve, meaning that the resolves for your user code from
-`[python].resolves` and each Python tool, such as Black and Pytest, can have different
-configuration. Use the option `[python].resolves_to_constraints_file` to map resolve names to
-paths to pip-compatible constraints files. For example:
+Constraints files are configured per-resolve, meaning that the resolves for your user code from `[python].resolves` and each Python tool, such as Black and Pytest, can have different configuration. Use the option `[python].resolves_to_constraints_file` to map resolve names to paths to pip-compatible constraints files. For example:
 
 ```toml pants.toml
 [python.resolves_to_constraints_file]
@@ -644,19 +591,14 @@ requests==22.1.0
 urrllib3==4.2
 ```
 
-You can also set the key `__default__` to apply the same constraints file to every resolve by
-default, although this is not always useful because resolves often need different constraints.
+You can also set the key `__default__` to apply the same constraints file to every resolve by default, although this is not always useful because resolves often need different constraints.
 
 ### `only_binary` and `no_binary`
 
-You can use `[python].resolves_to_only_binary` to avoid using sdists (source distributions) for
-certain requirements, and `[python].resolve_to_no_binary` to avoid using bdists (wheel files) for
-certain requirements.
+You can use `[python].resolves_to_only_binary` to avoid using sdists (source distributions) for certain requirements, and `[python].resolve_to_no_binary` to avoid using bdists (wheel files) for certain requirements.
 
-`only_binary` and `no_binary` are configured per-resolve, meaning that the resolves for your user
-code from `[python].resolves` and each Python tool, such as Black and Pytest, can have different
-configuration. Use the options `[python].resolves_to_only_binary` and 
-`[python].resolves_to_no_binary` to map resolve names to list of Python requirement names.
+`only_binary` and `no_binary` are configured per-resolve, meaning that the resolves for your user code from `[python].resolves` and each Python tool, such as Black and Pytest, can have different configuration. Use the options `[python].resolves_to_only_binary` and `[python].resolves_to_no_binary` to map resolve names to list of Python requirement names.
+
 For example:
 
 ```toml pants.toml
