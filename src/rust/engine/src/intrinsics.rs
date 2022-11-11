@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std::collections::HashMap;
+use std::env::current_dir;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::str::FromStr;
@@ -30,7 +31,9 @@ use tokio::process;
 use fs::{DigestTrie, DirectoryDigest, RelativePath, TypedPath};
 use hashing::{Digest, EMPTY_DIGEST};
 use process_execution::docker::{ImagePullPolicy, ImagePullScope, DOCKER, IMAGE_PULL_CACHE};
-use process_execution::local::{apply_chroot, create_sandbox, prepare_workdir, KeepSandboxes};
+use process_execution::local::{
+  apply_chroot, create_sandbox, prepare_workdir, setup_run_sh_script, KeepSandboxes,
+};
 use process_execution::{ManagedChild, Platform, ProcessExecutionStrategy};
 use rule_graph::DependencyKey;
 use stdio::TryCloneAsFile;
@@ -586,7 +589,7 @@ fn interactive_process(
     }
 
     command.env_clear();
-    command.envs(process.env);
+    command.envs(&process.env);
 
     if !restartable {
         task_side_effected()?;
@@ -641,8 +644,13 @@ fn interactive_process(
       .await?;
 
     let code = exit_status.code().unwrap_or(-1);
-    if keep_sandboxes == KeepSandboxes::OnFailure && code != 0 {
+    if keep_sandboxes == KeepSandboxes::Always
+        || keep_sandboxes == KeepSandboxes::OnFailure && code != 0 {
       tempdir.keep("interactive process");
+      let cwd = current_dir()
+          .map_err(|e| format!("Could not detect current working directory: {err}", err = e))?;
+      let workdir_path = if run_in_workspace { cwd.as_path() } else { tempdir.path() };
+      setup_run_sh_script(tempdir.path(), &process.env, &process.working_directory, &process.argv, workdir_path)?;
     }
 
     let result = {
