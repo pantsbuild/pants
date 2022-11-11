@@ -647,10 +647,16 @@ fn interactive_process(
     if keep_sandboxes == KeepSandboxes::Always
         || keep_sandboxes == KeepSandboxes::OnFailure && code != 0 {
       tempdir.keep("interactive process");
-      let cwd = current_dir()
-          .map_err(|e| format!("Could not detect current working directory: {err}", err = e))?;
-      let workdir_path = if run_in_workspace { cwd.as_path() } else { tempdir.path() };
-      setup_run_sh_script(tempdir.path(), &process.env, &process.working_directory, &process.argv, workdir_path)?;
+      let do_setup_run_sh_script = |workdir_path| -> Result<(), String> {
+        setup_run_sh_script(tempdir.path(), &process.env, &process.working_directory, &process.argv, workdir_path)
+      };
+      if run_in_workspace {
+        let cwd = current_dir()
+            .map_err(|e| format!("Could not detect current working directory: {err}", err = e))?;
+        do_setup_run_sh_script(cwd.as_path())?;
+      } else {
+        do_setup_run_sh_script(tempdir.path())?;
+      }
     }
 
     let result = {
