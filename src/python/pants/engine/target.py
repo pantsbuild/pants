@@ -2699,10 +2699,25 @@ class DependenciesRuleActionRequest:
 
 @dataclass(frozen=True)
 class DependenciesRuleAction:
-    """The `dependencies_rule` may be empty if there is no dependency rule implementation."""
+    """Maps all dependencies to their respective depdendecy rule action of a origin target address.
 
-    address: Address
+    The `dependencies_rule` will be empty and the `address` `None` if there is no dependency rule
+    implementation.
+    """
+
+    address: Address | None = None
     dependencies_rule: FrozenDict[Address, DependencyRuleAction] = FrozenDict()
+
+    def __post_init__(self):
+        if self.dependencies_rule and self.address is None:
+            raise ValueError(
+                "The `address` field must not be None when there are `dependencies_rule`s."
+            )
+
+    @classmethod
+    @memoized_method
+    def allow_all(cls) -> DependenciesRuleAction:
+        return cls()
 
     def execute_actions(self) -> None:
         for dependency, action in self.dependencies_rule.items():
