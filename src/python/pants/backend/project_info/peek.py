@@ -24,6 +24,7 @@ from pants.engine.target import (
     UnexpandedTargets,
 )
 from pants.option.option_types import BoolOption
+from pants.backend.python.macros.python_artifact import PythonArtifact
 
 
 class PeekSubsystem(Outputting, GoalSubsystem):
@@ -106,6 +107,8 @@ class _PeekJsonEncoder(json.JSONEncoder):
             return list(o)
         if isinstance(o, Field):
             return self.default(o.value)
+        if isinstance(o, PythonArtifact):
+            return o.asdict()
         try:
             return super().default(o)
         except TypeError:

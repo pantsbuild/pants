@@ -60,7 +60,7 @@ class PythonArtifact:
     def __init__(self, **kwargs):
         """
         :param kwargs: Passed to `setuptools.setup
-          <https://pythonhosted.org/setuptools/setuptools.html>`_.
+          <https://setuptools.pypa.io/en/latest/setuptools.html>`_.
         """
         if "entry_points" in kwargs:
             # coerce entry points from Dict[str, List[str]] to Dict[str, Dict[str, str]]
@@ -86,3 +86,6 @@ class PythonArtifact:
 
     def __hash__(self) -> int:
         return self._hash
+
+    def asdict(self) -> Dict[str, Any]:
+        return self.kwargs
