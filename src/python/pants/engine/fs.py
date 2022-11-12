@@ -222,6 +222,10 @@ class PathGlobsAndRoot:
 class DigestSubset:
     """A request to get a subset of a digest.
 
+    The digest will be traversed symlink-oblivious to match the provided globs. If you require a
+    symlink-aware subset, you can access the digest's entries `Get(DigestEntries, Digest, digest)`,
+    filter them out, and create a new digest: `Get(Digest, CreateDigest(...))`.
+
     Example:
 
         result = await Get(Digest, DigestSubset(original_digest, PathGlobs(["subdir1", "f.txt"]))

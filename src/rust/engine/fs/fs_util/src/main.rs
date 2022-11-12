@@ -598,7 +598,10 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
         )
         .await?;
 
-        let report = ensure_uploaded_to_remote(&store, store_has_remote, snapshot.digest).await?;
+        let ((), report) = futures::try_join!(
+          store.ensure_directory_digest_persisted(snapshot.clone().into()),
+          ensure_uploaded_to_remote(&store, store_has_remote, snapshot.digest),
+        )?;
         print_upload_summary(args.value_of("output-mode"), &report);
 
         Ok(())

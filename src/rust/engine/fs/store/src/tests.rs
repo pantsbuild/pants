@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSetm HashMap, HashSet};
 use std::fs::File;
 use std::io::Read;
 use std::os::unix::fs::PermissionsExt;
@@ -219,7 +219,10 @@ async fn load_recursive_directory() {
     .build();
 
   new_store(dir.path(), &cas.address())
-    .ensure_local_has_recursive_directory(recursive_testdir_digest.clone())
+    .ensure_downloaded(
+      HashSet::new(),
+      HashSet::from([recursive_testdir_digest.clone()]),
+    )
     .await
     .expect("Downloading recursive directory should have succeeded.");
 
