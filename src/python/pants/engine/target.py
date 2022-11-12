@@ -2699,8 +2699,10 @@ class DependenciesRuleActionRequest:
 
 @dataclass(frozen=True)
 class DependenciesRuleAction:
+    """The `dependencies_rule` may be empty if there is no dependency rule implementation."""
+
     address: Address
-    dependencies_rule: FrozenDict[Address, DependencyRuleAction]
+    dependencies_rule: FrozenDict[Address, DependencyRuleAction] = FrozenDict()
 
     def execute_actions(self) -> None:
         for dependency, action in self.dependencies_rule.items():

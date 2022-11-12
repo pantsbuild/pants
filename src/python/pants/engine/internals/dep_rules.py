@@ -3,16 +3,15 @@
 from __future__ import annotations
 
 import logging
+from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
-from fnmatch import fnmatch
-from typing import ClassVar, Iterable, Mapping, Tuple, Union, cast
+from typing import Iterable, Mapping, Sequence, Tuple, Union
 
 from typing_extensions import Literal
 
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.unions import UnionMembership, union
-from pants.util.frozendict import FrozenDict
 
 logger = logging.getLogger(__name__)
 
@@ -48,77 +47,30 @@ class DependencyRuleAction(Enum):
 SetDefaultDependencyRulesT = Union[Literal["allow"], Literal["deny"], Literal["warn"]]
 
 
-@dataclass(frozen=True)
 class DependencyRule:
-    action: DependencyRuleAction
-    pattern: str
-
-    @classmethod
-    def parse(cls, rule: str) -> DependencyRule:
-        if rule.startswith("!"):
-            action = DependencyRuleAction.DENY
-            pattern = rule[1:]
-        elif rule.startswith("?"):
-            action = DependencyRuleAction.WARN
-            pattern = rule[1:]
-        else:
-            action = DependencyRuleAction.ALLOW
-            pattern = rule
-        return cls(action, pattern)
-
-    def match(self, path: str, relpath: str) -> bool:
-        pattern = relpath if self.pattern == "." else self.pattern
-        if pattern.startswith("./"):
-            pattern = relpath + pattern[1:]
-        return fnmatch(path, pattern)
+    pass
 
 
 DependencyRules = Tuple[DependencyRule, ...]
 
 
-@dataclass(frozen=True)
-class BuildFileDependencyRules:
-    rule_class: ClassVar[type[DependencyRule]] = DependencyRule
-
+class BuildFileDependencyRules(ABC):
     default: DependencyRuleAction
     all: DependencyRules
-    targets: FrozenDict[str, DependencyRules]
+    targets: Mapping[str, DependencyRules]
 
     @classmethod
+    @abstractmethod
     def create(
         cls,
-        default: SetDefaultDependencyRulesT = "allow",
-        all: Iterable[str] = (),
-        targets: Mapping[str, Iterable[str]] = {},
+        default: DependencyRuleAction = DependencyRuleAction.ALLOW,
+        all: Iterable[str | DependencyRule] = (),
+        targets: Mapping[str, Iterable[str | DependencyRule]] = {},
     ) -> BuildFileDependencyRules:
-        return cls(
-            DependencyRuleAction(default),
-            cls.parse_dependency_rules(all),
-            FrozenDict(
-                {
-                    type_alias: cls.parse_dependency_rules(rules)
-                    for type_alias, rules in targets.items()
-                }
-            ),
-        )
-
-    @classmethod
-    def parse_dependency_rules(cls, rules: Iterable[str]) -> DependencyRules:
-        return tuple(map(cls.rule_class.parse, rules))
-
-    def get_rules(self, type_alias: str) -> DependencyRules:
-        if type_alias in self.targets:
-            return self.targets[type_alias]
-        else:
-            return self.all
-
-    def get_action(self, type_alias: str, path: str, relpath: str) -> DependencyRuleAction:
-        for dependency_rule in self.get_rules(type_alias):
-            if dependency_rule.match(path, relpath):
-                return dependency_rule.action
-        return self.default
+        ...
 
     @staticmethod
+    @abstractmethod
     def check_dependency_rules(
         *,
         source_type: str,
@@ -137,39 +89,22 @@ class BuildFileDependencyRules:
         Return dependency rule action ALLOW, DENY or WARN. WARN is effectively the same as ALLOW,
         but with a logged warning.
         """
-        # Check outgoing dependency action
-        outgoing = (
-            dependencies_rules.get_action(source_type, target_path, relpath=source_path)
-            if dependencies_rules is not None
-            else DependencyRuleAction.ALLOW
-        )
-        if outgoing == DependencyRuleAction.DENY:
-            return outgoing
-        # Check incoming dependency action
-        incoming = (
-            dependents_rules.get_action(target_type, source_path, relpath=target_path)
-            if dependents_rules is not None
-            else DependencyRuleAction.ALLOW
-        )
-        return incoming if incoming != DependencyRuleAction.ALLOW else outgoing
 
 
 @dataclass
 class BuildFileDependencyRulesParserState:
     parent: BuildFileDependencyRules | None
     default: DependencyRuleAction = DependencyRuleAction.ALLOW
-    all: DependencyRules = ()
-    targets: dict[str, DependencyRules] = field(default_factory=dict)
-    build_file_dependency_rules_class: type[
-        BuildFileDependencyRules
-    ] | None = BuildFileDependencyRules
+    all: Sequence[str | DependencyRule] = ()
+    targets: dict[str, Sequence[str | DependencyRule]] = field(default_factory=dict)
+    build_file_dependency_rules_class: type[BuildFileDependencyRules] | None = None
 
     def get_frozen_dependency_rules(self) -> BuildFileDependencyRules | None:
         if self.build_file_dependency_rules_class is None:
             return None
         else:
-            return self.build_file_dependency_rules_class(
-                default=self.default, all=self.all, targets=FrozenDict(self.targets)
+            return self.build_file_dependency_rules_class.create(
+                default=self.default, all=self.all, targets=self.targets
             )
 
     def set_dependency_rules(
@@ -185,7 +120,7 @@ class BuildFileDependencyRulesParserState:
             return None
 
         if all is not None:
-            self.all = self._process_dependency(all, build_file)
+            self.all = self._check_rules(all, build_file)
         elif extend and self.parent is not None:
             self.all = self.parent.all
 
@@ -194,7 +129,7 @@ class BuildFileDependencyRulesParserState:
         elif extend and self.parent is not None:
             self.default = self.parent.default
 
-        dependency: dict[str, DependencyRules] = {}
+        dependency: dict[str, Sequence[str | DependencyRule]] = {}
         if extend and self.parent is not None:
             dependency = dict(self.parent.targets)
 
@@ -208,7 +143,7 @@ class BuildFileDependencyRulesParserState:
                 targets: Iterable[str]
                 targets = target if isinstance(target, tuple) else (target,)
                 for type_alias in map(str, targets):
-                    dependency[type_alias] = self._process_dependency(rules, build_file)
+                    dependency[type_alias] = self._check_rules(rules, build_file)
 
         # Update with new dependency, dropping targets without any rules.
         for tgt, rules in dependency.items():
@@ -217,17 +152,14 @@ class BuildFileDependencyRulesParserState:
             else:
                 self.targets[tgt] = rules
 
-    def _process_dependency(self, rules: Iterable[str], build_file: str) -> DependencyRules:
+    def _check_rules(self, rules: Iterable[str], build_file: str) -> tuple[str, ...]:
         """Must only be called after ensuring self.build_file_dependency_rules_class != None."""
         if not isinstance(rules, (list, tuple)):
             raise ValueError(
                 f"Invalid dependency rule values in {build_file}, "
                 f"must be a sequence of strings but was `{type(rules).__name__}`: {rules!r}"
             )
-
-        return cast(
-            "type[BuildFileDependencyRules]", self.build_file_dependency_rules_class
-        ).parse_dependency_rules(rules)
+        return tuple(rules)
 
 
 @union

@@ -318,10 +318,7 @@ async def get_dependencies_rule_action(
         maybe_build_file_rules_implementation.build_file_dependency_rules_class
     )
     if build_file_dependency_rules_class is None:
-        return DependenciesRuleAction(
-            request.address,
-            FrozenDict({dep: DependencyRuleAction.ALLOW for dep in request.dependencies}),
-        )
+        return DependenciesRuleAction(request.address)
 
     spec_paths = {address.spec_path for address in (request.address, *request.dependencies)}
     address_families = await MultiGet(
