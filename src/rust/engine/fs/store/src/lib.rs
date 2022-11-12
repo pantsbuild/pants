@@ -72,11 +72,13 @@ use workunit_store::{in_workunit, Level, Metric};
 
 use crate::remote::ByteStoreError;
 
-const MEGABYTES: usize = 1024 * 1024;
+const KILOBYTES: usize = 1024;
+const MEGABYTES: usize = 1024 * KILOBYTES;
 const GIGABYTES: usize = 1024 * MEGABYTES;
 
-/// How big a file must be to become an immutable input symlink.
-const IMMUTABLE_FILE_SIZE_LIMIT: usize = MEGABYTES;
+/// How big a file/dir must be to become an immutable input symlink.
+const IMMUTABLE_FILE_SIZE_LIMIT: usize = 512 * KILOBYTES;
+const IMMUTABLE_DIR_SIZE_LIMIT: usize = 8 * MEGABYTES;
 
 mod local;
 #[cfg(test)]
@@ -1235,10 +1237,16 @@ impl Store {
         }
       });
 
-    let mutable_paths = mutable_paths
-      .iter()
-      .map(|p| destination.join(p))
-      .collect::<BTreeSet<_>>();
+    let mut all_mutable_paths = BTreeSet::new();
+    for relpath in mutable_paths {
+      all_mutable_paths.append(
+        &mut relpath
+          .ancestors()
+          .map(|p| destination.join(p))
+          .collect::<BTreeSet<_>>(),
+      );
+    }
+    all_mutable_paths.remove(&destination);
 
     self
       .materialize_directory_helper(
@@ -1246,7 +1254,7 @@ impl Store {
         true,
         false,
         &parent_to_child,
-        &mutable_paths,
+        &all_mutable_paths,
         immutable_inputs,
         perms,
       )
@@ -1291,6 +1299,9 @@ impl Store {
           let path = destination.join(child.name().as_ref());
           let store = store.clone();
           child_futures.push(async move {
+            let can_be_immutable =
+              immutable_inputs.is_some() && !mutable_paths.contains(&path) && !force_mutable;
+
             match child {
               directory::Entry::File(f) => {
                 let mode = match perms {
@@ -1300,11 +1311,7 @@ impl Store {
                   Permissions::Writable => 0o644,
                 };
 
-                if immutable_inputs.is_some()
-                  && f.digest().size_bytes > IMMUTABLE_FILE_SIZE_LIMIT
-                  && !mutable_paths.contains(&path)
-                  && !force_mutable
-                {
+                if can_be_immutable && f.digest().size_bytes > IMMUTABLE_FILE_SIZE_LIMIT {
                   let dest_path = immutable_inputs
                     .unwrap()
                     .path_for_file(f.digest(), mode)
@@ -1321,18 +1328,29 @@ impl Store {
                   .materialize_symlink(path, s.target().to_str().unwrap().to_string())
                   .await
               }
-              directory::Entry::Directory(_) => {
-                store
-                  .materialize_directory_helper(
-                    path.clone(),
-                    false,
-                    mutable_paths.contains(&path),
-                    parent_to_child,
-                    mutable_paths,
-                    immutable_inputs,
-                    perms,
-                  )
-                  .await
+              directory::Entry::Directory(d) => {
+                let fullsize: usize = d.tree().digests().iter().map(|d| d.size_bytes).sum();
+                if can_be_immutable && fullsize > IMMUTABLE_DIR_SIZE_LIMIT {
+                  let dest_path = immutable_inputs
+                    .unwrap()
+                    .path_for_dir(DirectoryDigest::from(d.tree().clone()))
+                    .await?;
+                  store
+                    .materialize_symlink(path, dest_path.to_str().unwrap().to_string())
+                    .await
+                } else {
+                  store
+                    .materialize_directory_helper(
+                      path.clone(),
+                      false,
+                      mutable_paths.contains(&path),
+                      parent_to_child,
+                      mutable_paths,
+                      immutable_inputs,
+                      perms,
+                    )
+                    .await
+                }
               }
             }
           });
