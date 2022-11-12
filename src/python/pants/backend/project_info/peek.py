@@ -8,6 +8,7 @@ import json
 from dataclasses import asdict, dataclass, is_dataclass
 from typing import Any, Iterable
 
+from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.engine.collection import Collection
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem, Outputting
@@ -24,7 +25,6 @@ from pants.engine.target import (
     UnexpandedTargets,
 )
 from pants.option.option_types import BoolOption
-from pants.backend.python.macros.python_artifact import PythonArtifact
 
 
 class PeekSubsystem(Outputting, GoalSubsystem):

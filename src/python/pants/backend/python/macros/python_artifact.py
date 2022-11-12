@@ -79,6 +79,9 @@ class PythonArtifact:
     def kwargs(self) -> Dict[str, Any]:
         return self._kw
 
+    def asdict(self) -> Dict[str, Any]:
+        return self.kwargs
+
     def __eq__(self, other: Any) -> bool:
         if not isinstance(other, PythonArtifact):
             return False
@@ -87,5 +90,5 @@ class PythonArtifact:
     def __hash__(self) -> int:
         return self._hash
 
-    def asdict(self) -> Dict[str, Any]:
-        return self.kwargs
+    def __str__(self) -> str:
+        return self.name
