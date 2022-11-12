@@ -1264,24 +1264,28 @@ impl Store {
         }
       });
 
-    let mut all_mutable_paths = BTreeSet::new();
+    let mut mutable_path_ancestors = BTreeSet::new();
     for relpath in mutable_paths {
-      all_mutable_paths.append(
+      mutable_path_ancestors.append(
         &mut relpath
           .ancestors()
           .map(|p| destination.join(p))
           .collect::<BTreeSet<_>>(),
       );
     }
-    all_mutable_paths.remove(&destination);
+    mutable_path_ancestors.remove(&destination);
 
     self
       .materialize_directory_helper(
-        destination,
+        destination.clone(),
         true,
         false,
         &parent_to_child,
-        &all_mutable_paths,
+        &mutable_paths
+          .iter()
+          .map(|p| destination.join(p))
+          .collect::<BTreeSet<_>>(),
+        &mutable_path_ancestors,
         immutable_inputs,
         perms,
       )
@@ -1295,6 +1299,7 @@ impl Store {
     force_mutable: bool,
     parent_to_child: &'a HashMap<PathBuf, Vec<directory::Entry>>,
     mutable_paths: &'a BTreeSet<PathBuf>,
+    mutable_path_ancestors: &'a BTreeSet<PathBuf>,
     immutable_inputs: Option<&'a ImmutableInputs>,
     perms: Permissions,
   ) -> BoxFuture<'a, Result<(), StoreError>> {
@@ -1326,8 +1331,9 @@ impl Store {
           let path = destination.join(child.name().as_ref());
           let store = store.clone();
           child_futures.push(async move {
-            let can_be_immutable =
-              immutable_inputs.is_some() && !mutable_paths.contains(&path) && !force_mutable;
+            let can_be_immutable = immutable_inputs.is_some()
+              && !mutable_path_ancestors.contains(&path)
+              && !force_mutable;
 
             match child {
               directory::Entry::File(f) => {
@@ -1374,6 +1380,7 @@ impl Store {
                       mutable_paths.contains(&path),
                       parent_to_child,
                       mutable_paths,
+                      mutable_path_ancestors,
                       immutable_inputs,
                       perms,
                     )
