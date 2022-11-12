@@ -293,10 +293,7 @@ def _get_target_adaptor(
 
 
 @rule
-async def find_target_adaptor(
-    request: TargetAdaptorRequest,
-    maybe_build_file_rules_implementation: MaybeBuildFileDependencyRulesImplementation,
-) -> TargetAdaptor:
+async def find_target_adaptor(request: TargetAdaptorRequest) -> TargetAdaptor:
     """Hydrate a TargetAdaptor so that it may be converted into the Target API."""
     address = request.address
     if address.is_generated_target:
