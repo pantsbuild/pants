@@ -10,6 +10,7 @@ from io import BytesIO
 from typing import Callable, cast
 
 import pytest
+
 from pants.core.util_rules import archive, system_binaries
 from pants.core.util_rules.archive import (
     CreateArchive,
