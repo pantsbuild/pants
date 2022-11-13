@@ -10,7 +10,6 @@ from io import BytesIO
 from typing import Callable, cast
 
 import pytest
-
 from pants.core.util_rules import archive, system_binaries
 from pants.core.util_rules.archive import (
     CreateArchive,
@@ -146,6 +145,32 @@ def test_create_zip_archive(rule_runner: RuleRunner) -> None:
 )
 def test_create_tar_archive(rule_runner: RuleRunner, format: ArchiveFormat) -> None:
     output_filename = f"demo/a.{format.value}"
+    input_snapshot = rule_runner.make_snapshot(FILES)
+    created_digest = rule_runner.request(
+        Digest,
+        [CreateArchive(input_snapshot, output_filename=output_filename, format=format)],
+    )
+
+    digest_contents = rule_runner.request(DigestContents, [created_digest])
+    assert len(digest_contents) == 1
+    io = BytesIO()
+    io.write(digest_contents[0].content)
+    io.seek(0)
+    compression = "" if format == ArchiveFormat.TAR else f"{format.value[4:]}"  # Strip `tar.`.
+    with tarfile.open(fileobj=io, mode=f"r:{compression}") as tf:
+        assert set(tf.getnames()) == set(FILES.keys())
+
+    # We also use Pants to extract the created archive, which checks for idempotency.
+    extracted_archive = rule_runner.request(ExtractedArchive, [created_digest])
+    digest_contents = rule_runner.request(DigestContents, [extracted_archive.digest])
+    assert digest_contents == EXPECTED_DIGEST_CONTENTS
+
+
+@pytest.mark.parametrize(
+    "format", [ArchiveFormat.TAR, ArchiveFormat.TGZ, ArchiveFormat.TXZ, ArchiveFormat.TBZ2]
+)
+def test_create_tar_archive_raw_filename(rule_runner: RuleRunner, format: ArchiveFormat) -> None:
+    output_filename = f"a.{format.value}"
     input_snapshot = rule_runner.make_snapshot(FILES)
     created_digest = rule_runner.request(
         Digest,
