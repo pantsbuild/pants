@@ -91,11 +91,15 @@ async def create_archive(request: CreateArchive) -> Digest:
         )
         # `tar` expects to find a couple binaries like `gzip` and `xz` by looking on the PATH.
         env = {"PATH": os.pathsep.join(SEARCH_PATHS)}
-        # `tar` requires that the output filename's parent directory exists.
-        output_dir_digest = await Get(
-            Digest, CreateDigest([Directory(os.path.dirname(request.output_filename))])
-        )
-        input_digests = [output_dir_digest]
+
+        input_digests = []
+        # `tar` requires that the output filename's parent directory exists,so if the caller
+        # wants the output in a directory we explicitly create it here.
+        # We have to guard this path as the Rust code will crash if we give it empty paths.
+        output_dir = os.path.dirname(request.output_filename)
+        if output_dir != "":
+            output_dir_digest = await Get(Digest, CreateDigest([Directory(output_dir)]))
+            input_digests.append(output_dir_digest)
 
     input_digest = await Get(Digest, MergeDigests([*files_digests, *input_digests]))
 
