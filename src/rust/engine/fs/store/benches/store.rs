@@ -43,7 +43,7 @@ use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use task_executor::Executor;
 use tempfile::TempDir;
 
-use store::{OneOffStoreFileByDigest, Snapshot, SnapshotOps, Store, SubsetParams};
+use store::{ImmutableInputs, OneOffStoreFileByDigest, Snapshot, SnapshotOps, Store, SubsetParams};
 
 fn executor() -> Executor {
   Executor::global(num_cpus::get(), num_cpus::get() * 4, || ()).unwrap()
@@ -57,34 +57,54 @@ pub fn criterion_benchmark_materialize(c: &mut Criterion) {
 
   let mut cgroup = c.benchmark_group("materialize_directory");
 
-  for perms in vec![Permissions::ReadOnly, Permissions::Writable] {
-    for (count, size) in vec![(100, 100), (20, 10_000_000), (1, 200_000_000), (10000, 100)] {
-      let (store, _tempdir, digest) = snapshot(&executor, count, size);
-      let parent_dest = TempDir::new().unwrap();
-      let parent_dest_path = parent_dest.path();
-      cgroup
-        .sample_size(10)
-        .measurement_time(Duration::from_secs(30))
-        .bench_function(
-          format!("materialize_directory({:?}, {}, {})", perms, count, size),
-          |b| {
-            b.iter(|| {
-              // NB: We forget this child tempdir to avoid deleting things during the run.
-              let new_temp = TempDir::new_in(parent_dest_path).unwrap();
-              let dest = new_temp.path().to_path_buf();
-              std::mem::forget(new_temp);
-              let _ = executor
-                .block_on(store.materialize_directory(
-                  dest,
-                  digest.clone(),
-                  &BTreeSet::new(),
-                  None,
-                  perms,
-                ))
-                .unwrap();
-            })
-          },
-        );
+  for use_immutable_inputs in vec![false] {
+    for perms in vec![Permissions::ReadOnly, Permissions::Writable] {
+      for (count, size) in vec![(100, 100), (20, 10_000_000), (1, 200_000_000), (10000, 100)] {
+        let (store, _tempdir, digest) = snapshot(&executor, count, size);
+        let parent_dest = TempDir::new().unwrap();
+        let parent_dest_path = parent_dest.path();
+        let immutable_inputs_dest = TempDir::new().unwrap();
+        let immutable_inputs_path = immutable_inputs_dest.path();
+        let immutable_inputs = ImmutableInputs::new(store.clone(), immutable_inputs_path).unwrap();
+
+        cgroup
+          .sample_size(10)
+          .measurement_time(Duration::from_secs(30))
+          .bench_function(
+            format!(
+              "materialize_directory({}, {:?}, {}, {})",
+              if use_immutable_inputs {
+                "symlinking-big"
+              } else {
+                "no-symlinks"
+              },
+              perms,
+              count,
+              size
+            ),
+            |b| {
+              b.iter(|| {
+                // NB: We forget this child tempdir to avoid deleting things during the run.
+                let new_temp = TempDir::new_in(parent_dest_path).unwrap();
+                let dest = new_temp.path().to_path_buf();
+                std::mem::forget(new_temp);
+                let _ = executor
+                  .block_on(store.materialize_directory(
+                    dest,
+                    digest.clone(),
+                    &BTreeSet::new(),
+                    if use_immutable_inputs {
+                      Some(&immutable_inputs)
+                    } else {
+                      None
+                    },
+                    perms,
+                  ))
+                  .unwrap();
+              })
+            },
+          );
+      }
     }
   }
 }
