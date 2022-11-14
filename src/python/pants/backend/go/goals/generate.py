@@ -12,6 +12,7 @@ from typing import Mapping
 
 from pants.backend.go.target_types import GoPackageSourcesField
 from pants.backend.go.util_rules import first_party_pkg, goroot, sdk
+from pants.backend.go.util_rules.build_opts import GoBuildOptions, GoBuildOptionsFromTargetRequest
 from pants.backend.go.util_rules.first_party_pkg import (
     FallibleFirstPartyPkgAnalysis,
     FallibleFirstPartyPkgDigest,
@@ -286,10 +287,13 @@ async def run_go_package_generators(
     goroot: GoRoot,
     subsystem: GoGenerateGoalSubsystem.EnvironmentAware,
 ) -> RunPackageGeneratorsResult:
+    build_opts = await Get(GoBuildOptions, GoBuildOptionsFromTargetRequest(request.address))
     fallible_analysis, env = await MultiGet(
         Get(
             FallibleFirstPartyPkgAnalysis,
-            FirstPartyPkgAnalysisRequest(request.address, extra_build_tags=("generate",)),
+            FirstPartyPkgAnalysisRequest(
+                request.address, build_opts=build_opts, extra_build_tags=("generate",)
+            ),
         ),
         Get(EnvironmentVars, EnvironmentVarsRequest(subsystem.env_vars)),
     )
@@ -299,7 +303,8 @@ async def run_go_package_generators(
     dir_path = analysis.dir_path if analysis.dir_path else "."
 
     fallible_pkg_digest = await Get(
-        FallibleFirstPartyPkgDigest, FirstPartyPkgDigestRequest(request.address)
+        FallibleFirstPartyPkgDigest,
+        FirstPartyPkgDigestRequest(request.address, build_opts=build_opts),
     )
     if fallible_pkg_digest.pkg_digest is None:
         raise ValueError(

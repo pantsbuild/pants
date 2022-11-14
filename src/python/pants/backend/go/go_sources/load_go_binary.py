@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from pants.backend.go.util_rules.build_opts import GoBuildOptions
 from pants.backend.go.util_rules.build_pkg import BuildGoPackageRequest, BuiltGoPackage
 from pants.backend.go.util_rules.import_analysis import ImportConfig, ImportConfigRequest
 from pants.backend.go.util_rules.link import LinkedGoBinary, LinkGoBinaryRequest
@@ -55,6 +56,7 @@ async def setup_go_binary(request: LoadedGoBinaryRequest) -> LoadedGoBinary:
             import_path="main",
             pkg_name="main",
             dir_path="",
+            build_opts=GoBuildOptions(),
             digest=source_digest,
             go_files=tuple(fc.path for fc in file_contents),
             s_files=(),

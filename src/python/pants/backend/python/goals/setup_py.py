@@ -292,8 +292,10 @@ class SetupKwargsRequest(ABC):
         """Whether the kwargs implementation should be used for this target or not."""
 
     @property
-    def explicit_kwargs(self) -> dict[str, Any]:
-        return self.target[PythonProvidesField].value.kwargs
+    def explicit_kwargs(self) -> Dict[str, Any]:
+        # We return a dict copy of the underlying FrozenDict, because the caller expects a
+        # dict (and we have documented as much).
+        return dict(self.target[PythonProvidesField].value.kwargs)
 
 
 class FinalizedSetupKwargs(SetupKwargs):
@@ -975,7 +977,7 @@ async def get_exporting_owner(owned_dependency: OwnedDependency) -> ExportedTarg
                     softwrap(
                         f"""
                         Found multiple sibling python_distribution targets that are the closest
-                        ancestor dependees of {target.address} and are therefore candidates to
+                        ancestor dependents of {target.address} and are therefore candidates to
                         own it: {', '.join(o.address.spec for o in all_owners)}. Only a
                         single such owner is allowed, to avoid ambiguity.
                         """

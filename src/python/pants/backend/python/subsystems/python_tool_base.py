@@ -339,6 +339,9 @@ class ExportToolOption(BoolOption):
         return super().__new__(
             cls,
             default=True,
+            removal_version="2.23.0.dev0",
+            removal_hint="Use the export goal's --resolve option to select tools to export, instead "
+            "of using this option to exempt a tool from export-by-default.",
             help=(
                 lambda subsystem_cls: softwrap(
                     f"""

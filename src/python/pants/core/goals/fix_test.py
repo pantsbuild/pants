@@ -26,7 +26,7 @@ from pants.core.goals.fix import (
 from pants.core.goals.fix import rules as fix_rules
 from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
 from pants.core.util_rules import source_files
-from pants.core.util_rules.partitions import Partition, PartitionerType
+from pants.core.util_rules.partitions import PartitionerType
 from pants.engine.fs import (
     EMPTY_DIGEST,
     EMPTY_SNAPSHOT,
@@ -500,17 +500,8 @@ def test_default_single_partition_partitioner(kitchen_field_set_type, field_sets
     rule_runner = RuleRunner(rules=rules)
     print(rule_runner.write_files({"BUILD": "", "knife.utensil": "", "bowl.utensil": ""}))
     partitions = rule_runner.request(Partitions, [FixKitchenRequest.PartitionRequest(field_sets)])
-    assert partitions == Partitions(
-        [
-            Partition(
-                (
-                    "bowl.utensil",
-                    "knife.utensil",
-                ),
-                None,
-            )
-        ]
-    )
+    assert len(partitions) == 1
+    assert partitions[0].elements == ("bowl.utensil", "knife.utensil")
 
     rule_runner.set_options(["--kitchen-skip"])
     partitions = rule_runner.request(Partitions, [FixKitchenRequest.PartitionRequest(field_sets)])

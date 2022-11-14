@@ -74,6 +74,24 @@ class FileEntry:
 
 
 @dataclass(frozen=True)
+class SymlinkEntry:
+    """A symlink pointing to a target path.
+
+    For the symlink target:
+        - uses a a forward slash `/` path separator.
+        - can be relative to the parent directory of the symlink or can be an absolute path starting with `/`.
+        - Allows `..` components anywhere in the path (as logical canonicalization may lead to
+            different behavior in the presence of directory symlinks).
+
+    See also the REAPI for a SymlinkNode:
+    https://github.com/bazelbuild/remote-apis/blob/aa29b91f336b9be2c5370297210b67a6654c0b72/build/bazel/remote/execution/v2/remote_execution.proto#L882
+    """
+
+    path: str
+    target: str
+
+
+@dataclass(frozen=True)
 class Directory:
     """The path to a directory.
 
@@ -96,16 +114,17 @@ class DigestContents(Collection[FileContent]):
     """
 
 
-class DigestEntries(Collection[Union[FileEntry, Directory]]):
+class DigestEntries(Collection[Union[FileEntry, SymlinkEntry, Directory]]):
     """The indirect file contents of a Digest.
 
-    DigestEntries is a collection of FileContent and Directory instances representing, respecively,
-    actual files and empty directories present in the Digest.
+    DigestEntries is a collection of FileEntry/SymlinkEntry/Directory instances representing,
+    respectively, actual files, actual symlinks, and empty directories present in the Digest.
     """
 
 
-class CreateDigest(Collection[Union[FileContent, FileEntry, Directory]]):
-    """A request to create a Digest with the input FileContent and/or Directory values.
+class CreateDigest(Collection[Union[FileContent, FileEntry, SymlinkEntry, Directory]]):
+    """A request to create a Digest with the input FileContent/FileEntry/SymlinkEntry/Directory
+    values.
 
     The engine will create any parent directories necessary, e.g. `FileContent('a/b/c.txt')` will
     result in `a/`, `a/b`, and `a/b/c.txt` being created. You only need to use `Directory` to
@@ -202,6 +221,10 @@ class PathGlobsAndRoot:
 @dataclass(frozen=True)
 class DigestSubset:
     """A request to get a subset of a digest.
+
+    The digest will be traversed symlink-oblivious to match the provided globs. If you require a
+    symlink-aware subset, you can access the digest's entries `Get(DigestEntries, Digest, digest)`,
+    filter them out, and create a new digest: `Get(Digest, CreateDigest(...))`.
 
     Example:
 

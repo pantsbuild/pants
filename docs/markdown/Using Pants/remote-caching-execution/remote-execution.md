@@ -37,22 +37,24 @@ remote_execution_address = "grpc://build.corp.example.com:8980"
 remote_instance_name = "main"
 ```
 
-### Platform Properties
+### Environment-specific settings
 
-The REAPI execution service selects a worker for a process by consulting the "platform properties" that are passed in a remote execution request. These platform properties are key/value pairs that are configured in the server. Generally, you will configure these in the server (or be provided them by your server's administrator), and then configure Pants to use what was configured.
+The REAPI execution service selects a worker for a process by consulting the "platform properties" that are passed in a remote execution request. These platform properties are key/value pairs that are configured for particular workers in the server. Generally, you will configure these in the server (or be provided them by your server's administrator), and then configure Pants to match particular workers using their relevant platform properties.
 
-Assume that the REAPI server is configured with `OSFamily=linux` as the only platform properties. Then building on the first example earlier, add the `remote_execution_extra_platform_properties` to `pants.toml`:
+To define platform properties (as well as to configure any other settings which are specific to running on a remote worker), you should define a remote environment. Building on the first example earlier, you would add [`remote_environment` targets](doc:reference-remote_environment) (see [environment](doc:environments) for more information) corresponding to each set of distinct workers you want to use in the server. Assuming that the REAPI server is configured with a particular worker type labeled `docker-container=busybox:latest`, that might look like a `BUILD` file containing:
 
-```toml
-[GLOBAL]
-remote_execution = true
-remote_store_address = "grpc://build.corp.example.com:8980"
-remote_execution_address = "grpc://build.corp.example.com:8980"
-remote_instance_name = "main"
-remote_execution_extra_platform_properties = [
-  "OSFamily=linux",
-]
+```python
+remote_environment(
+  name="remote_busybox",
+  platform="linux_x86_64",
+  extra_platform_properties = [
+    "docker-container=busybox:latest",
+  ],
+  ..
+)
 ```
+
+Your `remote_environment` will also need to override any [environment-aware options](doc:environments) which configure the relevant tools used in your repository. For example: if building Python code, a Python interpreter must be available and matched via the environment-aware options of `[python-bootstrap]`. If using protobuf support, then you may also need `unzip` available in the remote execution environment in order to unpack the protoc archive. Etc.
 
 ### Concurrency
 
@@ -95,13 +97,6 @@ remote_ca_certs_path = "/etc/ssl/certs/ca-certificates.crt"
 Reference
 =========
 
-Run `./pants help-advanced global` or refer to [Global options](doc:reference-global). Most remote execution and caching options begin with the prefix `--remote`.
+For global options, run `./pants help-advanced global` or refer to [Global options](doc:reference-global). Most remote execution and caching options begin with the prefix `--remote`.
 
-Limitations
-===========
-
-The remote execution support in Pants is still experimental and comes with several limitations:
-
-1. The main limitation is that Pants assumes that the remote execution platform is the same as the local platform. Thus, if the remote execution service is running on Linux, then Pants must also be running on Linux in order to successfully submit remote execution requests. This limitation will eventually be fixed, but as of version 2.0.x, Pants still has the limitation.
-
-2. The remote execution environment will need to contain appropriate tooling expected by the Pants subsystems used in your repository. At a minimum, this means a Python interpreter must be available if building Python code. If using protobuf support, then you may also need `unzip` available in the remote execution environment in order to unpack the protoc archive. This documentation is incomplete with regards to what tooling needs to be available.
+For environment-specific options, see `./pants help-advanced remote_environment` or the [`remote_environment` target](doc:reference-remote_environment).

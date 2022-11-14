@@ -3,9 +3,12 @@
 
 from __future__ import annotations
 
-from abc import ABCMeta
-from typing import Optional
+import dataclasses
+from abc import ABC, ABCMeta, abstractmethod
+from dataclasses import dataclass
+from typing import ClassVar, Iterable, Optional, Tuple, Type
 
+from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.core.goals.generate_lockfiles import UnrecognizedResolveNamesError
 from pants.core.goals.package import OutputPathField
 from pants.core.goals.run import RestartableField
@@ -22,6 +25,7 @@ from pants.engine.target import (
     InvalidFieldException,
     InvalidTargetException,
     OptionalSingleSourceField,
+    SequenceField,
     SingleSourceField,
     SpecialCasedDependencies,
     StringField,
@@ -31,7 +35,7 @@ from pants.engine.target import (
 from pants.engine.unions import UnionRule
 from pants.jvm.subsystems import JvmSubsystem
 from pants.util.docutil import git_url
-from pants.util.strutil import softwrap
+from pants.util.strutil import bullet_list, pluralize, softwrap
 
 # -----------------------------------------------------------------------------------------------
 # Generic resolve support fields
@@ -255,6 +259,7 @@ class JvmArtifactResolveField(JvmResolveField):
     )
 
 
+@dataclass(frozen=True)
 class JvmArtifactFieldSet(FieldSet):
     group: JvmArtifactGroupField
     artifact: JvmArtifactArtifactField
@@ -333,16 +338,310 @@ class JvmMainClassNameField(StringField):
     )
 
 
+class JvmShadingRule(ABC):
+    """Base class for defining JAR shading rules as valid aliases in BUILD files.
+
+    Subclasses need to provide with an `alias` and a `help` message. The `alias` represents
+    the name that will be used in BUILD files to instantiate the given subclass.
+
+    Set the `help` class property with a description, which will be used in `./pants help`. For the
+    best rendering, use soft wrapping (e.g. implicit string concatenation) within paragraphs, but
+    hard wrapping (`\n`) to separate distinct paragraphs and/or lists.
+    """
+
+    alias: ClassVar[str]
+    help: ClassVar[str]
+
+    @abstractmethod
+    def encode(self) -> str:
+        pass
+
+    @abstractmethod
+    def validate(self) -> set[str]:
+        pass
+
+    @staticmethod
+    def _validate_field(value: str, *, name: str, invalid_chars: str) -> set[str]:
+        errors = []
+        for ch in invalid_chars:
+            if ch in value:
+                errors.append(f"`{name}` can not contain the character `{ch}`.")
+        return set(errors)
+
+    def __repr__(self) -> str:
+        fields = [f"{fld.name}={repr(getattr(self, fld.name))}" for fld in dataclasses.fields(self)]
+        return f"{self.alias}({', '.join(fields)})"
+
+
+@dataclass(frozen=True, repr=False)
+class JvmShadingRenameRule(JvmShadingRule):
+    alias = "shading_rename"
+    help = "Renames all occurrences of the given `pattern` by the `replacement`."
+
+    pattern: str
+    replacement: str
+
+    def encode(self) -> str:
+        return f"rule {self.pattern} {self.replacement}"
+
+    def validate(self) -> set[str]:
+        errors: list[str] = []
+        errors.extend(
+            JvmShadingRule._validate_field(self.pattern, name="pattern", invalid_chars="/")
+        )
+        errors.extend(
+            JvmShadingRule._validate_field(self.replacement, name="replacement", invalid_chars="/")
+        )
+        return set(errors)
+
+
+@dataclass(frozen=True, repr=False)
+class JvmShadingRelocateRule(JvmShadingRule):
+    alias = "shading_relocate"
+    help = softwrap(
+        """
+        Relocates the classes under the given `package` into the new package name.
+        The default target package is `__shaded_by_pants__` if none provided in
+        the `into` parameter.
+        """
+    )
+
+    package: str
+    into: str | None = None
+
+    def encode(self) -> str:
+        if not self.into:
+            target_suffix = "__shaded_by_pants__"
+        else:
+            target_suffix = self.into
+        return f"rule {self.package}.** {target_suffix}.@1"
+
+    def validate(self) -> set[str]:
+        errors: list[str] = []
+        errors.extend(
+            JvmShadingRule._validate_field(self.package, name="package", invalid_chars="/*")
+        )
+        if self.into:
+            errors.extend(
+                JvmShadingRule._validate_field(self.into, name="into", invalid_chars="/*")
+            )
+        return set(errors)
+
+
+@dataclass(frozen=True, repr=False)
+class JvmShadingZapRule(JvmShadingRule):
+    alias = "shading_zap"
+    help = "Removes from the final artifact the occurrences of the `pattern`."
+
+    pattern: str
+
+    def encode(self) -> str:
+        return f"zap {self.pattern}"
+
+    def validate(self) -> set[str]:
+        return JvmShadingRule._validate_field(self.pattern, name="pattern", invalid_chars="/")
+
+
+@dataclass(frozen=True, repr=False)
+class JvmShadingKeepRule(JvmShadingRule):
+    alias = "shading_keep"
+    help = softwrap(
+        """
+        Keeps in the final artifact the occurrences of the `pattern`
+        (and removes anything else).
+        """
+    )
+
+    pattern: str
+
+    def encode(self) -> str:
+        return f"keep {self.pattern}"
+
+    def validate(self) -> set[str]:
+        return JvmShadingRule._validate_field(self.pattern, name="pattern", invalid_chars="/")
+
+
+JVM_SHADING_RULE_TYPES: list[Type[JvmShadingRule]] = [
+    JvmShadingRelocateRule,
+    JvmShadingRenameRule,
+    JvmShadingZapRule,
+    JvmShadingKeepRule,
+]
+
+
+def _shading_rules_field_help(intro: str) -> str:
+    return softwrap(
+        f"""
+        {intro}
+
+        There are {pluralize(len(JVM_SHADING_RULE_TYPES), "possible shading rule")} available,
+        which are as follows:
+        {bullet_list([f'`{rule.alias}`: {rule.help}' for rule in JVM_SHADING_RULE_TYPES])}
+
+        When defining shading rules, just add them in this field using the previously listed rule
+        alias and passing along the required parameters.
+        """
+    )
+
+
+def _shading_validate_rules(shading_rules: Iterable[JvmShadingRule]) -> set[str]:
+    validation_errors = []
+    for shading_rule in shading_rules:
+        found_errors = shading_rule.validate()
+        if found_errors:
+            validation_errors.append(
+                "\n".join(
+                    [
+                        f"In rule `{shading_rule.alias}`:",
+                        bullet_list(found_errors),
+                        "",
+                    ]
+                )
+            )
+    return set(validation_errors)
+
+
+class JvmShadingRulesField(SequenceField[JvmShadingRule], metaclass=ABCMeta):
+    alias = "shading_rules"
+    required = False
+    expected_element_type = JvmShadingRule
+    expected_type_description = "an iterable of ShadingRule"
+
+    @classmethod
+    def compute_value(
+        cls, raw_value: Optional[Iterable[JvmShadingRule]], address: Address
+    ) -> Optional[Tuple[JvmShadingRule, ...]]:
+        computed_value = super().compute_value(raw_value, address)
+
+        if computed_value:
+            validation_errors = _shading_validate_rules(computed_value)
+            if validation_errors:
+                raise InvalidFieldException(
+                    "\n".join(
+                        [
+                            f"Invalid shading rules assigned to `{cls.alias}` field in target {address}:\n",
+                            *validation_errors,
+                        ]
+                    )
+                )
+
+        return computed_value
+
+
+# -----------------------------------------------------------------------------------------------
+# `deploy_jar` target
+# -----------------------------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class DeployJarDuplicateRule:
+    alias: ClassVar[str] = "duplicate_rule"
+    valid_actions: ClassVar[tuple[str, ...]] = ("skip", "replace", "concat", "concat_text", "throw")
+
+    pattern: str
+    action: str
+
+    def validate(self) -> str | None:
+        if self.action not in DeployJarDuplicateRule.valid_actions:
+            return softwrap(
+                f"""
+                Value '{self.action}' for `action` associated with pattern
+                '{self.pattern}' is not valid.
+
+                It must be one of {list(DeployJarDuplicateRule.valid_actions)}.
+                """
+            )
+        return None
+
+    def __repr__(self) -> str:
+        return f"{self.alias}(pattern='{self.pattern}', action='{self.action}')"
+
+
+class DeployJarDuplicatePolicyField(SequenceField[DeployJarDuplicateRule]):
+    alias = "duplicate_policy"
+    help = softwrap(
+        f"""
+        A list of the rules to apply when duplicate file entries are found in the final
+        assembled JAR file.
+
+        When defining a duplicate policy, just add `duplicate_rule` directives to this
+        field as follows:
+
+        Example:
+
+        ```
+        duplicate_policy=[
+            duplicate_rule(pattern="^META-INF/services", action="concat_text"),
+            duplicate_rule(pattern="^reference\\.conf", action="concat_text"),
+            duplicate_rule(pattern="^org/apache/commons", action="throw"),
+        ]
+        ```
+
+        Where:
+
+        * The `pattern` field is treated as a regular expression
+        * The `action` field must be one of {list(DeployJarDuplicateRule.valid_actions)}.
+
+        Note that the order in which the rules are listed is relevant.
+        """
+    )
+    required = False
+
+    expected_element_type = DeployJarDuplicateRule
+    expected_type_description = "a list of JAR duplicate rules"
+
+    default = (
+        DeployJarDuplicateRule(pattern="^META-INF/services/", action="concat_text"),
+        DeployJarDuplicateRule(pattern="^META-INF/LICENSE", action="skip"),
+    )
+
+    @classmethod
+    def compute_value(
+        cls, raw_value: Optional[Iterable[DeployJarDuplicateRule]], address: Address
+    ) -> Optional[Tuple[DeployJarDuplicateRule, ...]]:
+        value = super().compute_value(raw_value, address)
+        if value:
+            errors = []
+            for duplicate_rule in value:
+                err = duplicate_rule.validate()
+                if err:
+                    errors.append(err)
+
+            if errors:
+                raise InvalidFieldException(
+                    softwrap(
+                        f"""
+                        Invalid value for `{DeployJarDuplicatePolicyField.alias}` field.
+                        Found following errors:
+
+                        {bullet_list(errors)}
+                        """
+                    )
+                )
+        return value
+
+    def value_or_default(self) -> tuple[DeployJarDuplicateRule, ...]:
+        if self.value is not None:
+            return self.value
+        return self.default
+
+
+class DeployJarShadingRulesField(JvmShadingRulesField):
+    help = _shading_rules_field_help("Shading rules to be applied to the final JAR artifact.")
+
+
 class DeployJarTarget(Target):
     alias = "deploy_jar"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        JvmDependenciesField,
+        RestartableField,
         OutputPathField,
+        JvmDependenciesField,
         JvmMainClassNameField,
         JvmJdkField,
         JvmResolveField,
-        RestartableField,
+        DeployJarDuplicatePolicyField,
+        DeployJarShadingRulesField,
     )
     help = softwrap(
         """
@@ -379,6 +678,12 @@ class JvmWarContentField(SpecialCasedDependencies):
     )
 
 
+class JvmWarShadingRulesField(JvmShadingRulesField):
+    help = _shading_rules_field_help(
+        "Shading rules to be applied to the individual JAR artifacts embedded in the `WEB-INF/lib` folder."
+    )
+
+
 class JvmWarTarget(Target):
     alias = "jvm_war"
     core_fields = (
@@ -387,6 +692,7 @@ class JvmWarTarget(Target):
         JvmWarContentField,
         JvmWarDependenciesField,
         JvmWarDescriptorAddressField,
+        JvmWarShadingRulesField,
         OutputPathField,
     )
     help = softwrap(
@@ -419,3 +725,12 @@ def rules():
         *collect_rules(),
         UnionRule(FieldDefaultFactoryRequest, JvmResolveFieldDefaultFactoryRequest),
     ]
+
+
+def build_file_aliases():
+    return BuildFileAliases(
+        objects={
+            DeployJarDuplicateRule.alias: DeployJarDuplicateRule,
+            **{rule.alias: rule for rule in JVM_SHADING_RULE_TYPES},
+        }
+    )

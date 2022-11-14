@@ -35,7 +35,7 @@ jobs:
       uses: actions/cache@v3
       with:
         key: Linux-x86_64-rustup-${{ hashFiles('rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.64.0-*
+        path: '~/.rustup/toolchains/1.65.0-*
 
           ~/.rustup/update-hashes
 
@@ -67,9 +67,8 @@ jobs:
 
         '
     - name: Bootstrap Pants
-      run: './pants --version
-
-        '
+      run: ./pants version > ${{ runner.temp }}/_pants_version.stdout && [[ -s ${{
+        runner.temp }}/_pants_version.stdout ]]
     - name: Run smoke tests
       run: './pants list ::
 
@@ -147,7 +146,7 @@ jobs:
       uses: actions/cache@v3
       with:
         key: macOS11-x86_64-rustup-${{ hashFiles('rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.64.0-*
+        path: '~/.rustup/toolchains/1.65.0-*
 
           ~/.rustup/update-hashes
 
@@ -179,9 +178,8 @@ jobs:
 
         '
     - name: Bootstrap Pants
-      run: './pants --version
-
-        '
+      run: ./pants version > ${{ runner.temp }}/_pants_version.stdout && [[ -s ${{
+        runner.temp }}/_pants_version.stdout ]]
     - name: Run smoke tests
       run: './pants list ::
 

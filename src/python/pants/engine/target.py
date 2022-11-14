@@ -816,7 +816,7 @@ class CoarsenedTarget(EngineAwareParameter):
     ) -> Iterator[CoarsenedTarget]:
         """All CoarsenedTargets reachable from this root."""
 
-        visited = visited or set()
+        visited = set() if visited is None else visited
         queue = deque([self])
         while queue:
             ct = queue.popleft()
@@ -2697,7 +2697,7 @@ class SpecialCasedDependencies(StringSequenceField, AsyncFieldMixin):
     dedicated field.
 
     This type will ensure that the dependencies show up in project introspection,
-    like `dependencies` and `dependees`, but not show up when you call `Get(TransitiveTargets,
+    like `dependencies` and `dependents`, but not show up when you call `Get(TransitiveTargets,
     TransitiveTargetsRequest)` and `Get(Addresses, DependenciesRequest)`.
 
     To hydrate this field's dependencies, use `await Get(Addresses, UnparsedAddressInputs,
@@ -2890,7 +2890,7 @@ def generate_multiple_sources_field_help_message(files_example: str) -> str:
 def generate_file_based_overrides_field_help_message(
     generated_target_name: str, example: str
 ) -> str:
-    example = textwrap.dedent(example.lstrip("\n"))
+    example = textwrap.dedent(example.lstrip("\n"))  # noqa: PNT20
     example = textwrap.indent(example, " " * 4)
     return "\n".join(
         [

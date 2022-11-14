@@ -18,7 +18,7 @@ use async_trait::async_trait;
 use bytes::{Bytes, BytesMut};
 use fs::{
   self, DirectoryDigest, GlobExpansionConjunction, GlobMatching, PathGlobs, Permissions,
-  RelativePath, StrictGlobMatching, EMPTY_DIRECTORY_DIGEST,
+  RelativePath, StrictGlobMatching, SymlinkBehavior, EMPTY_DIRECTORY_DIGEST,
 };
 use futures::stream::{BoxStream, StreamExt, TryStreamExt};
 use futures::{try_join, FutureExt, TryFutureExt};
@@ -125,7 +125,7 @@ impl CommandRunner {
     .parse()?;
 
     let path_stats = posix_fs
-      .expand_globs(output_globs, None)
+      .expand_globs(output_globs, SymlinkBehavior::Aware, None)
       .map_err(|err| format!("Error expanding output globs: {}", err))
       .await?;
     Snapshot::from_path_stats(
@@ -759,7 +759,7 @@ pub async fn prepare_workdir(
 
       let exe_was_materialized = maybe_executable_path
         .as_ref()
-        .map_or(false, |p| workdir_path2.join(&p).exists());
+        .map_or(false, |p| workdir_path2.join(p).exists());
       if exe_was_materialized {
         debug!(
           "Obtaining exclusive spawn lock for process since \
@@ -846,7 +846,7 @@ pub fn setup_run_sh_script(
 ) -> Result<(), String> {
   let mut env_var_strings: Vec<String> = vec![];
   for (key, value) in env.iter() {
-    let quoted_arg = bash::escape(&value);
+    let quoted_arg = bash::escape(value);
     let arg_str = str::from_utf8(&quoted_arg)
       .map_err(|e| format!("{:?}", e))?
       .to_string();
@@ -858,7 +858,7 @@ pub fn setup_run_sh_script(
   // Shell-quote every command-line argument, as necessary.
   let mut full_command_line: Vec<String> = vec![];
   for arg in argv.iter() {
-    let quoted_arg = bash::escape(&arg);
+    let quoted_arg = bash::escape(arg);
     let arg_str = str::from_utf8(&quoted_arg)
       .map_err(|e| format!("{:?}", e))?
       .to_string();

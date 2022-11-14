@@ -27,7 +27,7 @@
 #[macro_use]
 extern crate derivative;
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::convert::{TryFrom, TryInto};
 use std::fmt::{self, Debug, Display};
 use std::path::PathBuf;
@@ -88,6 +88,8 @@ pub use crate::children::ManagedChild;
 pub use crate::immutable_inputs::ImmutableInputs;
 pub use crate::named_caches::{CacheName, NamedCaches};
 pub use crate::remote_cache::RemoteCacheWarningsBehavior;
+
+use crate::remote::EntireExecuteRequest;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ProcessError {
@@ -831,20 +833,11 @@ pub(crate) async fn check_cache_content(
   match cache_content_behavior {
     CacheContentBehavior::Fetch => {
       let response = response.clone();
-      let fetch_result = in_workunit!(
-        "eager_fetch_action_cache",
-        Level::Trace,
-        |_workunit| async move {
-          try_join_all(vec![
-            store.ensure_local_has_file(response.stdout_digest).boxed(),
-            store.ensure_local_has_file(response.stderr_digest).boxed(),
-            store
-              .ensure_local_has_recursive_directory(response.output_directory)
-              .boxed(),
-          ])
-          .await
-        }
-      )
+      let fetch_result = in_workunit!("eager_fetch_action_cache", Level::Trace, |_workunit| store
+        .ensure_downloaded(
+          HashSet::from([response.stdout_digest, response.stderr_digest]),
+          HashSet::from([response.output_directory])
+        ))
       .await;
       match fetch_result {
         Err(StoreError::MissingDigest { .. }) => Ok(false),
@@ -955,13 +948,24 @@ impl<T: CommandRunner + ?Sized> CommandRunner for Arc<T> {
 }
 
 // TODO(#8513) possibly move to the MEPR struct, or to the hashing crate?
-pub fn digest(
+pub async fn digest(
   process: &Process,
   instance_name: Option<String>,
   process_cache_namespace: Option<String>,
+  store: &Store,
+  append_only_caches_base_path: Option<&str>,
 ) -> Digest {
-  let (_, _, execute_request) =
-    remote::make_execute_request(process, instance_name, process_cache_namespace).unwrap();
+  let EntireExecuteRequest {
+    execute_request, ..
+  } = remote::make_execute_request(
+    process,
+    instance_name,
+    process_cache_namespace,
+    store,
+    append_only_caches_base_path,
+  )
+  .await
+  .unwrap();
   execute_request.action_digest.unwrap().try_into().unwrap()
 }
 

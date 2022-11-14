@@ -13,9 +13,9 @@ java_sources(
 
 jvm_artifact(
     name="reproducible-builds-jvm-stripper",
-    group="net.bzzt",
-    artifact="reproducible-builds-jvm-stripper",
-    version="0.9",
+    group="io.github.zlika",
+    artifact="reproducible-build-maven-plugin",
+    version="0.16",
     resolve="strip_jar_dev",
     packages=["io.github.zlika.reproducible.**"],
 )

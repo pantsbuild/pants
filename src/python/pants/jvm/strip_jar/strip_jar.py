@@ -166,7 +166,7 @@ def generate_strip_jar_lockfile_request(
     return GenerateJvmLockfileFromTool(
         artifact_inputs=FrozenOrderedSet(
             {
-                "net.bzzt:reproducible-builds-jvm-stripper:0.9",
+                "io.github.zlika:reproducible-build-maven-plugin:0.16",
             }
         ),
         artifact_option_name="n/a",

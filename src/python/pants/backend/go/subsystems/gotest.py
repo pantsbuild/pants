@@ -7,7 +7,7 @@ from pathlib import PurePath
 
 from pants.backend.go.util_rules.coverage import GoCoverMode
 from pants.core.util_rules.distdir import DistDir
-from pants.option.option_types import ArgsListOption, BoolOption, EnumOption, StrOption
+from pants.option.option_types import ArgsListOption, BoolOption, EnumOption, SkipOption, StrOption
 from pants.option.subsystem import Subsystem
 from pants.util.strutil import softwrap
 
@@ -65,6 +65,8 @@ class GoTestSubsystem(Subsystem):
             """
         ),
     )
+
+    skip = SkipOption("test")
 
     def coverage_output_dir(self, distdir: DistDir, import_path: str) -> PurePath:
         import_path_escaped = import_path.replace("/", "_")

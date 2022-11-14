@@ -110,10 +110,10 @@ def test_render_constraints(rule_runner: RuleRunner) -> None:
 
 def test_constraints_summary(rule_runner: RuleRunner) -> None:
     write_files(rule_runner)
-    result = run_goal(rule_runner, ["--summary"])
+    result = run_goal(rule_runner, ["--summary", "--summary-use-new-header"])
     assert result.stdout == dedent(
         """\
-        Target,Constraints,Transitive Constraints,# Dependencies,# Dependees\r
+        Target,Constraints,Transitive Constraints,# Dependencies,# Dependents\r
         app/f.py,CPython==3.7.*,"CPython==2.7.*,==3.7.*,>=3.6 OR CPython==3.7.*,>=3.5,>=3.6",2,1\r
         lib1/f.py,CPython==2.7.* OR CPython>=3.5,CPython==2.7.* OR CPython>=3.5,0,3\r
         lib2/f.py,CPython>=3.6,CPython>=3.6,0,3\r

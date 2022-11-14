@@ -11,7 +11,7 @@ from pants.backend.helm.util_rules.tool import (
 from pants.engine.platform import Platform
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
-from pants.option.option_types import BoolOption, EnumOption
+from pants.option.option_types import BoolOption, EnumOption, SkipOption
 
 
 class HelmUnitTestReportFormat(Enum):
@@ -52,6 +52,8 @@ class HelmUnitTestSubsystem(ExternalHelmPlugin):
         default=HelmUnitTestReportFormat.XUNIT,
         help="Output type used for the test report.",
     )
+
+    skip = SkipOption("test")
 
     def generate_exe(self, _: Platform) -> str:
         return "./untt"

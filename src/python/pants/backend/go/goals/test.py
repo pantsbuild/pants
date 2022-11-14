@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from typing import Sequence
+from typing import Any, Sequence
 
 from pants.backend.go.subsystems.gotest import GoTestSubsystem
 from pants.backend.go.target_types import (
@@ -14,6 +14,7 @@ from pants.backend.go.target_types import (
     GoTestTimeoutField,
     SkipGoTestsField,
 )
+from pants.backend.go.util_rules.build_opts import GoBuildOptions, GoBuildOptionsFromTargetRequest
 from pants.backend.go.util_rules.build_pkg import (
     BuildGoPackageRequest,
     BuiltGoPackage,
@@ -42,6 +43,7 @@ from pants.core.goals.test import (
     TestDebugRequest,
     TestExtraEnv,
     TestFieldSet,
+    TestRequest,
     TestResult,
     TestSubsystem,
 )
@@ -104,6 +106,11 @@ class GoTestFieldSet(TestFieldSet):
         return tgt.get(SkipGoTestsField).value
 
 
+class GoTestRequest(TestRequest):
+    tool_subsystem = GoTestSubsystem
+    field_set_type = GoTestFieldSet
+
+
 def transform_test_args(args: Sequence[str], timeout_field_value: int | None) -> tuple[str, ...]:
     result = []
     i = 0
@@ -161,15 +168,25 @@ def transform_test_args(args: Sequence[str], timeout_field_value: int | None) ->
 
 @rule(desc="Test with Go", level=LogLevel.DEBUG)
 async def run_go_tests(
-    field_set: GoTestFieldSet,
+    batch: GoTestRequest.Batch[GoTestFieldSet, Any],
     test_subsystem: TestSubsystem,
     go_test_subsystem: GoTestSubsystem,
     test_extra_env: TestExtraEnv,
     goroot: GoRoot,
 ) -> TestResult:
+    field_set = batch.single_element
+
+    build_opts = await Get(GoBuildOptions, GoBuildOptionsFromTargetRequest(field_set.address))
+
     maybe_pkg_analysis, maybe_pkg_digest, dependencies = await MultiGet(
-        Get(FallibleFirstPartyPkgAnalysis, FirstPartyPkgAnalysisRequest(field_set.address)),
-        Get(FallibleFirstPartyPkgDigest, FirstPartyPkgDigestRequest(field_set.address)),
+        Get(
+            FallibleFirstPartyPkgAnalysis,
+            FirstPartyPkgAnalysisRequest(field_set.address, build_opts=build_opts),
+        ),
+        Get(
+            FallibleFirstPartyPkgDigest,
+            FirstPartyPkgDigestRequest(field_set.address, build_opts=build_opts),
+        ),
         Get(Targets, DependenciesRequest(field_set.dependencies)),
     )
 
@@ -180,7 +197,7 @@ async def run_go_tests(
             stderr=stderr or "",
             stdout_digest=EMPTY_FILE_DIGEST,
             stderr_digest=EMPTY_FILE_DIGEST,
-            address=field_set.address,
+            addresses=(field_set.address,),
             output_setting=test_subsystem.output,
             result_metadata=None,
         )
@@ -229,7 +246,10 @@ async def run_go_tests(
     maybe_test_pkg_build_request = await Get(
         FallibleBuildGoPackageRequest,
         BuildGoPackageTargetRequest(
-            field_set.address, for_tests=True, coverage_config=coverage_config
+            field_set.address,
+            for_tests=True,
+            coverage_config=coverage_config,
+            build_opts=build_opts,
         ),
     )
     if maybe_test_pkg_build_request.request is None:
@@ -249,7 +269,10 @@ async def run_go_tests(
         maybe_xtest_pkg_build_request = await Get(
             FallibleBuildGoPackageRequest,
             BuildGoPackageTargetRequest(
-                field_set.address, for_xtests=True, coverage_config=coverage_config
+                field_set.address,
+                for_xtests=True,
+                coverage_config=coverage_config,
+                build_opts=build_opts,
             ),
         )
         if maybe_xtest_pkg_build_request.request is None:
@@ -298,6 +321,7 @@ async def run_go_tests(
             pkg_name="main",
             digest=testmain_input_digest,
             dir_path="",
+            build_opts=build_opts,
             go_files=(GeneratedTestMain.TEST_MAIN_FILE, *coverage_setup_files),
             s_files=(),
             direct_dependencies=tuple(main_direct_deps),
@@ -418,13 +442,13 @@ async def run_go_tests(
 
 
 @rule
-async def generate_go_tests_debug_request(field_set: GoTestFieldSet) -> TestDebugRequest:
+async def generate_go_tests_debug_request(_: GoTestRequest.Batch) -> TestDebugRequest:
     raise NotImplementedError("This is a stub.")
 
 
 @rule
 async def generate_go_tests_debug_adapter_request(
-    field_set: GoTestFieldSet,
+    _: GoTestRequest.Batch,
 ) -> TestDebugAdapterRequest:
     raise NotImplementedError("This is a stub.")
 
@@ -433,4 +457,5 @@ def rules():
     return [
         *collect_rules(),
         UnionRule(TestFieldSet, GoTestFieldSet),
+        *GoTestRequest.rules(),
     ]

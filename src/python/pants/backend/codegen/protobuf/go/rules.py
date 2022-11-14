@@ -36,6 +36,7 @@ from pants.backend.go.util_rules import (
     sdk,
     third_party_pkg,
 )
+from pants.backend.go.util_rules.build_opts import GoBuildOptions
 from pants.backend.go.util_rules.build_pkg import (
     BuildGoPackageRequest,
     FallibleBuildGoPackageRequest,
@@ -212,6 +213,7 @@ class _SetupGoProtobufPackageBuildRequest:
 
     addresses: tuple[Address, ...]
     import_path: str
+    build_opts: GoBuildOptions
 
 
 @rule
@@ -377,7 +379,7 @@ async def setup_full_package_build_request(
                 dep_build_request_addrs.extend(candidate_addresses.addresses)
 
     dep_build_requests = await MultiGet(
-        Get(BuildGoPackageRequest, BuildGoPackageTargetRequest(addr))
+        Get(BuildGoPackageRequest, BuildGoPackageTargetRequest(addr, build_opts=request.build_opts))
         for addr in dep_build_request_addrs
     )
 
@@ -391,6 +393,7 @@ async def setup_full_package_build_request(
             s_files=analysis.s_files,
             direct_dependencies=dep_build_requests,
             minimum_go_version=analysis.minimum_go_version,
+            build_opts=request.build_opts,
         ),
         import_path=request.import_path,
     )
@@ -439,6 +442,7 @@ async def setup_build_go_package_request_for_protobuf(
         _SetupGoProtobufPackageBuildRequest(
             addresses=protobuf_target_addrs_set_for_import_path.addresses,
             import_path=import_path,
+            build_opts=request.build_opts,
         ),
     )
 
