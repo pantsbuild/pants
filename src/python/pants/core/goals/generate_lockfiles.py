@@ -19,7 +19,7 @@ from pants.engine.process import InteractiveProcess, InteractiveProcessResult
 from pants.engine.rules import collect_rules, goal_rule
 from pants.engine.target import Target
 from pants.engine.unions import UnionMembership, union
-from pants.option.option_types import StrListOption, StrOption
+from pants.option.option_types import StrListOption, StrOption, BoolOption
 from pants.util.docutil import bin_name, doc_url
 from pants.util.strutil import bullet_list, softwrap
 
@@ -375,6 +375,10 @@ class GenerateLockfilesSubsystem(GoalSubsystem):
             rather than running `{bin_name()} generate-lockfiles --resolve=<name>` like normal.
             """
         ),
+    )
+    diff_generated = BoolOption(
+        default=True,
+        help="Print a summary of changed distributions after generating the lockfile.",
     )
 
 
