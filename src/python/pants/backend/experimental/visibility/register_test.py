@@ -15,6 +15,7 @@ from pants.backend.experimental.visibility.register import (
 from pants.core.target_types import GenericTarget
 from pants.engine.addresses import Address, Addresses
 from pants.engine.internals.dep_rules import DependencyRuleAction, DependencyRuleActionDeniedError
+from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.engine.target import DependenciesRuleAction, DependenciesRuleActionRequest
 from pants.testutil.pytest_util import no_exception
 from pants.testutil.rule_runner import QueryRule, RuleRunner
@@ -85,10 +86,10 @@ def test_check_dependency_rules(source_path: str, target_path: str, expected_act
         all=("src/ok/*", "?src/dubious/*", "!src/blocked/*"),
     )
     assert BuildFileVisibilityRules.check_dependency_rules(
-        source_type="dependent_target",
+        source_adaptor=TargetAdaptor("dependent_target", "source"),
         source_path=source_path,
         dependencies_rules=dependencies_rules,
-        target_type="dependency_target",
+        target_adaptor=TargetAdaptor("dependency_target", "target"),
         target_path=target_path,
         dependents_rules=dependents_rules,
     ) == DependencyRuleAction(expected_action)

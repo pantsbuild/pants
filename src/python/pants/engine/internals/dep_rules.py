@@ -10,6 +10,7 @@ from typing import Iterable, Mapping, Sequence, Tuple, Union
 
 from typing_extensions import Literal
 
+from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.unions import UnionMembership, union
 
@@ -73,10 +74,10 @@ class BuildFileDependencyRules(ABC):
     @abstractmethod
     def check_dependency_rules(
         *,
-        source_type: str,
+        source_adaptor: TargetAdaptor,
         source_path: str,
         dependencies_rules: BuildFileDependencyRules | None,
-        target_type: str,
+        target_adaptor: TargetAdaptor,
         target_path: str,
         dependents_rules: BuildFileDependencyRules | None,
     ) -> DependencyRuleAction:

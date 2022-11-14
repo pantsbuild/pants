@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from fnmatch import fnmatch
-from typing import Iterable, Mapping, Tuple, cast
+from typing import Iterable, Iterator, Mapping, Tuple, cast
 
 from pants.engine.internals.dep_rules import (
     BuildFileDependencyRules,
@@ -14,6 +14,7 @@ from pants.engine.internals.dep_rules import (
     DependencyRuleAction,
     DependencyRules,
 )
+from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import (
     Dependencies,
@@ -97,18 +98,18 @@ class BuildFileVisibilityRules(BuildFileDependencyRules):
             VisibilityRule.parse(rule) if isinstance(rule, str) else rule for rule in rules
         )
 
-    def get_rules(self, type_alias: str) -> VisibilityRules:
-        if type_alias in self.targets:
-            return cast(VisibilityRules, self.targets[type_alias])
-        else:
-            return cast(VisibilityRules, self.all)
+    def get_rules(self, target: TargetAdaptor) -> Iterator[VisibilityRule]:
+        if target.type_alias in self.targets:
+            yield from cast(VisibilityRules, self.targets[target.type_alias])
+        # The `all` rules always apply as fall-through from any target specific rules.
+        yield from cast(VisibilityRules, self.all)
 
-    def get_action(self, type_alias: str, path: str, relpath: str) -> DependencyRuleAction:
+    def get_action(self, target: TargetAdaptor, path: str, relpath: str) -> DependencyRuleAction:
         """Get applicable rule for target type from `path`.
 
         The rules are declared in `relpath`.
         """
-        for visibility_rule in self.get_rules(type_alias):
+        for visibility_rule in self.get_rules(target):
             if visibility_rule.match(path, relpath):
                 return visibility_rule.action
         return self.default
@@ -116,10 +117,10 @@ class BuildFileVisibilityRules(BuildFileDependencyRules):
     @staticmethod
     def check_dependency_rules(
         *,
-        source_type: str,
+        source_adaptor: TargetAdaptor,
         source_path: str,
         dependencies_rules: BuildFileDependencyRules | None,
-        target_type: str,
+        target_adaptor: TargetAdaptor,
         target_path: str,
         dependents_rules: BuildFileDependencyRules | None,
     ) -> DependencyRuleAction:
@@ -138,7 +139,7 @@ class BuildFileVisibilityRules(BuildFileDependencyRules):
         # Check outgoing dependency action
         outgoing = (
             cast(BuildFileVisibilityRules, dependencies_rules).get_action(
-                source_type, target_path, relpath=source_path
+                source_adaptor, target_path, relpath=source_path
             )
             if dependencies_rules is not None
             else DependencyRuleAction.ALLOW
@@ -148,7 +149,7 @@ class BuildFileVisibilityRules(BuildFileDependencyRules):
         # Check incoming dependency action
         incoming = (
             cast(BuildFileVisibilityRules, dependents_rules).get_action(
-                target_type, source_path, relpath=target_path
+                target_adaptor, source_path, relpath=target_path
             )
             if dependents_rules is not None
             else DependencyRuleAction.ALLOW

@@ -339,10 +339,10 @@ async def get_dependencies_rule_action(
         dependencies_rule[
             dependency_address
         ] = build_file_dependency_rules_class.check_dependency_rules(
-            source_type=origin_target.type_alias,
+            source_adaptor=origin_target,
             source_path=origin_family.namespace,
             dependencies_rules=origin_family.dependencies_rules,
-            target_type=dependency_target.type_alias,
+            target_adaptor=dependency_target,
             target_path=dependency_family.namespace,
             dependents_rules=dependency_family.dependents_rules,
         )

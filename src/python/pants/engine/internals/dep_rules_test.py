@@ -7,7 +7,7 @@ import logging
 from collections import namedtuple
 from dataclasses import dataclass
 from fnmatch import fnmatch
-from typing import Iterable, Mapping, Tuple, cast
+from typing import Iterable, Iterator, Mapping, Tuple, cast
 
 import pytest
 
@@ -19,6 +19,7 @@ from pants.engine.internals.dep_rules import (
     DependencyRuleActionDeniedError,
     DependencyRules,
 )
+from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.testutil.pytest_util import assert_logged, no_exception
 from pants.util.frozendict import FrozenDict
 
@@ -81,11 +82,12 @@ class DummyBuildFileTestRules(BuildFileDependencyRules):
     def parse_dummy_rules(cls, rules: Iterable[str | DependencyRule]) -> DependencyRules:
         return tuple(DummyTestRule.parse(rule) if isinstance(rule, str) else rule for rule in rules)
 
-    def get_rules(self, type_alias: str) -> DummyTestRules:
+    def get_rules(self, type_alias: str) -> Iterator[DummyTestRule]:
         if type_alias in self.targets:
-            return cast(DummyTestRules, self.targets[type_alias])
-        else:
-            return cast(DummyTestRules, self.all)
+            yield from cast(DummyTestRules, self.targets[type_alias])
+        # The `all` rules always apply as fall-through from any target specific rules (in this
+        # implementation).
+        yield from cast(DummyTestRules, self.all)
 
     def get_action(self, type_alias: str, path: str, relpath: str) -> DependencyRuleAction:
         """Get applicable rule for target type from `path`.
@@ -100,17 +102,17 @@ class DummyBuildFileTestRules(BuildFileDependencyRules):
     @staticmethod
     def check_dependency_rules(
         *,
-        source_type: str,
+        source_adaptor: TargetAdaptor,
         source_path: str,
         dependencies_rules: BuildFileDependencyRules | None,
-        target_type: str,
+        target_adaptor: TargetAdaptor,
         target_path: str,
         dependents_rules: BuildFileDependencyRules | None,
     ) -> DependencyRuleAction:
         # Check outgoing dependency action
         outgoing = (
             cast(DummyBuildFileTestRules, dependencies_rules).get_action(
-                source_type, target_path, relpath=source_path
+                source_adaptor.type_alias, target_path, relpath=source_path
             )
             if dependencies_rules is not None
             else DependencyRuleAction.ALLOW
@@ -120,7 +122,7 @@ class DummyBuildFileTestRules(BuildFileDependencyRules):
         # Check incoming dependency action
         incoming = (
             cast(DummyBuildFileTestRules, dependents_rules).get_action(
-                target_type, source_path, relpath=target_path
+                target_adaptor.type_alias, source_path, relpath=target_path
             )
             if dependents_rules is not None
             else DependencyRuleAction.ALLOW
