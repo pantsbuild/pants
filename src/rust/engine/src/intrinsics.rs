@@ -519,7 +519,7 @@ fn interactive_process(
 ) -> BoxFuture<'static, NodeResult<Value>> {
   in_workunit!(
     "interactive_process",
-    Level::Trace,
+    Level::Debug,
       |_workunit| async move {
       let types = &context.core.types;
       let interactive_process_result = types.interactive_process_result;
