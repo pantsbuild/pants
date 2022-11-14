@@ -57,54 +57,38 @@ pub fn criterion_benchmark_materialize(c: &mut Criterion) {
 
   let mut cgroup = c.benchmark_group("materialize_directory");
 
-  for use_immutable_inputs in vec![false] {
-    for perms in vec![Permissions::ReadOnly, Permissions::Writable] {
-      for (count, size) in vec![(100, 100), (20, 10_000_000), (1, 200_000_000), (10000, 100)] {
-        let (store, _tempdir, digest) = snapshot(&executor, count, size);
-        let parent_dest = TempDir::new().unwrap();
-        let parent_dest_path = parent_dest.path();
-        let immutable_inputs_dest = TempDir::new().unwrap();
-        let immutable_inputs_path = immutable_inputs_dest.path();
-        let immutable_inputs = ImmutableInputs::new(store.clone(), immutable_inputs_path).unwrap();
+  for perms in vec![Permissions::Writable] {
+    for (count, size) in vec![(100, 100), (20, 10_000_000), (1, 200_000_000), (10000, 100)] {
+      let (store, _tempdir, digest) = snapshot(&executor, count, size);
+      let parent_dest = TempDir::new().unwrap();
+      let parent_dest_path = parent_dest.path();
+      let immutable_inputs_dest = TempDir::new().unwrap();
+      let immutable_inputs_path = immutable_inputs_dest.path();
+      let immutable_inputs = ImmutableInputs::new(store.clone(), immutable_inputs_path).unwrap();
 
-        cgroup
-          .sample_size(10)
-          .measurement_time(Duration::from_secs(30))
-          .bench_function(
-            format!(
-              "materialize_directory({}, {:?}, {}, {})",
-              if use_immutable_inputs {
-                "symlinking-big"
-              } else {
-                "no-symlinks"
-              },
-              perms,
-              count,
-              size
-            ),
-            |b| {
-              b.iter(|| {
-                // NB: We forget this child tempdir to avoid deleting things during the run.
-                let new_temp = TempDir::new_in(parent_dest_path).unwrap();
-                let dest = new_temp.path().to_path_buf();
-                std::mem::forget(new_temp);
-                let _ = executor
-                  .block_on(store.materialize_directory(
-                    dest,
-                    digest.clone(),
-                    &BTreeSet::new(),
-                    if use_immutable_inputs {
-                      Some(&immutable_inputs)
-                    } else {
-                      None
-                    },
-                    perms,
-                  ))
-                  .unwrap();
-              })
-            },
-          );
-      }
+      cgroup
+        .sample_size(10)
+        .measurement_time(Duration::from_secs(30))
+        .bench_function(
+          format!("materialize_directory({:?}, {}, {})", perms, count, size),
+          |b| {
+            b.iter(|| {
+              // NB: We forget this child tempdir to avoid deleting things during the run.
+              let new_temp = TempDir::new_in(parent_dest_path).unwrap();
+              let dest = new_temp.path().to_path_buf();
+              std::mem::forget(new_temp);
+              let _ = executor
+                .block_on(store.materialize_directory(
+                  dest,
+                  digest.clone(),
+                  &BTreeSet::new(),
+                  Some(&immutable_inputs),
+                  perms,
+                ))
+                .unwrap();
+            })
+          },
+        );
     }
   }
 }
@@ -270,9 +254,9 @@ pub fn criterion_benchmark_merge(c: &mut Criterion) {
 criterion_group!(
   benches,
   criterion_benchmark_materialize,
-  criterion_benchmark_snapshot_capture,
-  criterion_benchmark_subset_wildcard,
-  criterion_benchmark_merge
+  //criterion_benchmark_snapshot_capture,
+  //criterion_benchmark_subset_wildcard,
+  //criterion_benchmark_merge
 );
 criterion_main!(benches);
 
