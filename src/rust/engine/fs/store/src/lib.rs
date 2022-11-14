@@ -1363,8 +1363,7 @@ impl Store {
               }
               directory::Entry::Directory(d) => {
                 // NB: This overcounts the size of the digest, since it includes the size of directory digests.
-                let totalsize: usize = d.tree().digests().iter().map(|d| d.size_bytes).sum();
-                if can_be_immutable && totalsize > IMMUTABLE_DIR_SIZE_LIMIT {
+                if can_be_immutable && d.tree().digests().iter().map(|d| d.size_bytes).sum() > IMMUTABLE_DIR_SIZE_LIMIT {
                   let dest_path = immutable_inputs
                     .unwrap()
                     .path_for_dir(DirectoryDigest::from(d.tree().clone()))
