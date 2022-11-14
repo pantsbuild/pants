@@ -170,7 +170,16 @@ def test_create_tar_archive(rule_runner: RuleRunner, format: ArchiveFormat) -> N
 @pytest.mark.parametrize(
     "format", [ArchiveFormat.TAR, ArchiveFormat.TGZ, ArchiveFormat.TXZ, ArchiveFormat.TBZ2]
 )
-def test_create_tar_archive_raw_filename(rule_runner: RuleRunner, format: ArchiveFormat) -> None:
+def test_create_tar_archive_in_root_dir(rule_runner: RuleRunner, format: ArchiveFormat) -> None:
+    """Validates that a .tar archive can be created with only a filename.
+
+    The specific requirements of creating a tar led to a situation where the CreateArchive code
+    assumed the output file had a directory component, attempting to create a directory called ""
+    if this assumption didn't hold. In 2.14 creating the "" directory became an error, which meant
+    CreateArchive broke. This guards against that break reoccuring.
+
+    Issue: https://github.com/pantsbuild/pants/issues/17545
+    """
     output_filename = f"a.{format.value}"
     input_snapshot = rule_runner.make_snapshot(FILES)
     created_digest = rule_runner.request(
