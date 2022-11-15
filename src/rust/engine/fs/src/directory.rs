@@ -584,6 +584,26 @@ impl DigestTrie {
     files
   }
 
+  pub fn filecount_exceeds(&self, n: usize) -> bool {
+    let mut count = 0;
+    self.filecount_exceeds_helper(n, &mut count)
+  }
+
+  fn filecount_exceeds_helper(&self, n: usize, count: &mut usize) -> bool {
+    for entry in &*self.0 {
+      match entry {
+        Entry::Directory(d) => {
+          d.tree.filecount_exceeds_helper(n, count);
+        }
+        _ => *count += 1,
+      };
+      if *count > n {
+        return true;
+      }
+    }
+    false
+  }
+
   pub fn directories(&self, symlink_behavior: SymlinkBehavior) -> Vec<PathBuf> {
     let mut directories = Vec::new();
     self.walk(symlink_behavior, &mut |path, entry| {

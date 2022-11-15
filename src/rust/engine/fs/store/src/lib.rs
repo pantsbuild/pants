@@ -77,8 +77,12 @@ const MEGABYTES: usize = 1024 * KILOBYTES;
 const GIGABYTES: usize = 1024 * MEGABYTES;
 
 /// How big a file/dir must be to become an immutable input symlink.
+// NB: These numbers were chosen after micro-benchmarking the code on one machine at the time of
+// writing. They were chosen using a rough equation from the microbenchmarks that are optimized
+// for somewhere between 2 and 3 uses of the corresponding entry to "break even".
 const IMMUTABLE_FILE_SIZE_LIMIT: usize = 512 * KILOBYTES;
-const IMMUTABLE_DIR_SIZE_LIMIT: usize = 8 * MEGABYTES;
+// NB: (The equation says 10 files, however that's kinda low, so lets go with 100 for now).
+const IMMUTABLE_DIR_FILE_COUNT_LIMIT: usize = 100;
 
 mod local;
 #[cfg(test)]
@@ -1332,23 +1336,18 @@ impl Store {
 
             match child {
               directory::Entry::File(f) => {
-                let mode = match perms {
-                  Permissions::ReadOnly if f.is_executable() => 0o555,
-                  Permissions::ReadOnly => 0o444,
-                  Permissions::Writable if f.is_executable() => 0o755,
-                  Permissions::Writable => 0o644,
-                };
-
                 if can_be_immutable && f.digest().size_bytes > IMMUTABLE_FILE_SIZE_LIMIT {
                   let dest_path = immutable_inputs
                     .unwrap()
-                    .path_for_file(f.digest(), mode)
+                    .path_for_file(f.digest(), f.is_executable())
                     .await?;
                   store
                     .materialize_symlink(path, dest_path.to_str().unwrap().to_string())
                     .await
                 } else {
-                  store.materialize_file(path, f.digest(), mode).await
+                  store
+                    .materialize_file(path, f.digest(), perms, f.is_executable())
+                    .await
                 }
               }
               directory::Entry::Symlink(s) => {
@@ -1357,16 +1356,7 @@ impl Store {
                   .await
               }
               directory::Entry::Directory(d) => {
-                // NB: This overcounts the size of the digest, since it includes the size of directory digests.
-                if can_be_immutable
-                  && d
-                    .tree()
-                    .digests()
-                    .iter()
-                    .map(|d| d.size_bytes)
-                    .sum::<usize>()
-                    > IMMUTABLE_DIR_SIZE_LIMIT
-                {
+                if can_be_immutable && d.tree().filecount_exceeds(IMMUTABLE_DIR_FILE_COUNT_LIMIT) {
                   let dest_path = immutable_inputs
                     .unwrap()
                     .path_for_dir(DirectoryDigest::from(d.tree().clone()))
@@ -1415,7 +1405,8 @@ impl Store {
     &self,
     destination: PathBuf,
     digest: Digest,
-    mode: u32,
+    perms: Permissions,
+    is_executable: bool,
   ) -> Result<(), StoreError> {
     self
       .load_file_bytes_with(digest, move |bytes| {
@@ -1423,7 +1414,12 @@ impl Store {
           .create(true)
           .write(true)
           .truncate(true)
-          .mode(mode)
+          .mode(match perms {
+            Permissions::ReadOnly if is_executable => 0o555,
+            Permissions::ReadOnly => 0o444,
+            Permissions::Writable if is_executable => 0o755,
+            Permissions::Writable => 0o644,
+          })
           .open(&destination)
           .map_err(|e| {
             format!(
@@ -1439,7 +1435,7 @@ impl Store {
       .await?
   }
 
-  async fn materialize_symlink(
+  pub async fn materialize_symlink(
     &self,
     destination: PathBuf,
     target: String,

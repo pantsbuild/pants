@@ -58,7 +58,7 @@ impl ImmutableInputs {
   pub(crate) async fn path_for_file(
     &self,
     digest: Digest,
-    mode: u32,
+    is_executable: bool,
   ) -> Result<PathBuf, StoreError> {
     let cell = self.0.contents.lock().entry(digest).or_default().clone();
 
@@ -105,7 +105,7 @@ impl ImmutableInputs {
         self
           .0
           .store
-          .materialize_file(dest.clone(), digest, mode)
+          .materialize_file(dest.clone(), digest, Permissions::ReadOnly, is_executable)
           .await?;
 
         // Now that we've successfully initialized the destination, forget the TempDir so that it
