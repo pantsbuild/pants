@@ -43,14 +43,14 @@ class GoBuildOptionsFieldSet(FieldSet):
     required_fields = (GoCgoEnabledField,)
 
     cgo_enabled: GoCgoEnabledField
-    with_race: GoRaceDetectorEnabledField
+    race: GoRaceDetectorEnabledField
 
 
 @dataclass(frozen=True)
 class GoTestBuildOptionsFieldSet(FieldSet):
     required_fields = (GoTestRaceDetectorEnabledField,)
 
-    with_race: GoTestRaceDetectorEnabledField
+    test_race: GoTestRaceDetectorEnabledField
 
 
 @rule
@@ -101,14 +101,14 @@ async def go_extract_build_options_from_target(
 
     # Extract the `with_race` value for this target.
     with_race_detector: bool | None = None
-    if test_target_fields is not None and test_target_fields.with_race.value is not None:
-        with_race_detector = test_target_fields.with_race.value
+    if test_target_fields is not None and test_target_fields.test_race.value is not None:
+        with_race_detector = test_target_fields.test_race.value
     if with_race_detector is None:
-        if target_fields is not None and target_fields.with_race.value is not None:
-            with_race_detector = target_fields.with_race.value
+        if target_fields is not None and target_fields.race.value is not None:
+            with_race_detector = target_fields.race.value
     if with_race_detector is None:
-        if go_mod_target_fields.with_race is not None:
-            with_race_detector = go_mod_target_fields.with_race.value
+        if go_mod_target_fields.race is not None:
+            with_race_detector = go_mod_target_fields.race.value
     if with_race_detector is None:
         with_race_detector = go_test_subsystem.with_race
 

@@ -56,18 +56,25 @@ class GoCgoEnabledField(TriBoolField):
 class GoRaceDetectorEnabledField(TriBoolField):
     """Enables the Go data race detector."""
 
-    alias = "with_race"
+    alias = "race"
     help = softwrap(
         """
         Enable compiling the binary with the Go data race detector.
 
-        See https://go.dev/doc/articles/race_detector for additional information about the data race detector.
+        See https://go.dev/doc/articles/race_detector for additional information about the Go data race detector.
         """
     )
 
 
 class GoTestRaceDetectorEnabledField(GoRaceDetectorEnabledField):
-    alias = "test_with_race"
+    alias = "test_race"
+    help = softwrap(
+        """
+        Enable compiling this package's test binary with the Go data race detector.
+
+        See https://go.dev/doc/articles/race_detector for additional information about the Go data race detector.
+        """
+    )
 
 
 # -----------------------------------------------------------------------------------------------
