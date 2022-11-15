@@ -16,10 +16,7 @@ from pants.base.exceptions import MappingError
 from pants.base.parse_context import ParseContext
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.internals.defaults import BuildFileDefaultsParserState, SetDefaultsT
-from pants.engine.internals.dep_rules import (
-    BuildFileDependencyRulesParserState,
-    SetDependencyRulesT,
-)
+from pants.engine.internals.dep_rules import BuildFileDependencyRulesParserState
 from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
@@ -45,23 +42,23 @@ class ParseState(threading.local):
         self._dependents_rules: BuildFileDependencyRulesParserState | None = None
         self._dependencies_rules: BuildFileDependencyRulesParserState | None = None
         self._filepath: str | None = None
-        self._target_adapters: list[TargetAdaptor] = []
+        self._target_adaptors: list[TargetAdaptor] = []
 
     def reset(
         self,
         filepath: str,
         defaults: BuildFileDefaultsParserState,
-        dependents_rules: BuildFileDependencyRulesParserState,
-        dependencies_rules: BuildFileDependencyRulesParserState,
+        dependents_rules: BuildFileDependencyRulesParserState | None,
+        dependencies_rules: BuildFileDependencyRulesParserState | None,
     ) -> None:
         self._defaults = defaults
         self._dependents_rules = dependents_rules
         self._dependencies_rules = dependencies_rules
         self._filepath = filepath
-        self._target_adapters.clear()
+        self._target_adaptors.clear()
 
-    def add(self, target_adapter: TargetAdaptor) -> None:
-        self._target_adapters.append(target_adapter)
+    def add(self, target_adaptor: TargetAdaptor) -> None:
+        self._target_adaptors.append(target_adaptor)
 
     def filepath(self) -> str:
         if self._filepath is None:
@@ -73,7 +70,7 @@ class ParseState(threading.local):
         return self._filepath
 
     def parsed_targets(self) -> list[TargetAdaptor]:
-        return list(self._target_adapters)
+        return list(self._target_adaptors)
 
     @property
     def defaults(self) -> BuildFileDefaultsParserState:
@@ -88,31 +85,13 @@ class ParseState(threading.local):
     def set_defaults(self, *args: SetDefaultsT, **kwargs) -> None:
         self.defaults.set_defaults(*args, **kwargs)
 
-    @property
-    def dependents_rules(self) -> BuildFileDependencyRulesParserState:
-        if self._dependents_rules is None:
-            raise AssertionError(
-                "The BUILD file __dependents_rules__ was accessed before being set. This indicates a "
-                "programming error in Pants. Please file a bug report at "
-                "https://github.com/pantsbuild/pants/issues/new."
-            )
-        return self._dependents_rules
+    def set_dependents_rules(self, *args, **kwargs) -> None:
+        if self._dependents_rules is not None:
+            self._dependents_rules.set_dependency_rules(self.filepath(), *args, **kwargs)
 
-    def set_dependents_rules(self, *args: SetDependencyRulesT, **kwargs) -> None:
-        self.dependents_rules.set_dependency_rules(self.filepath(), *args, **kwargs)
-
-    @property
-    def dependencies_rules(self) -> BuildFileDependencyRulesParserState:
-        if self._dependencies_rules is None:
-            raise AssertionError(
-                "The BUILD file __dependencies_rules__ was accessed before being set. This indicates a "
-                "programming error in Pants. Please file a bug report at "
-                "https://github.com/pantsbuild/pants/issues/new."
-            )
-        return self._dependencies_rules
-
-    def set_dependencies_rules(self, *args: SetDependencyRulesT, **kwargs) -> None:
-        self.dependencies_rules.set_dependency_rules(self.filepath(), *args, **kwargs)
+    def set_dependencies_rules(self, *args, **kwargs) -> None:
+        if self._dependencies_rules is not None:
+            self._dependencies_rules.set_dependency_rules(self.filepath(), *args, **kwargs)
 
 
 class Parser:
@@ -195,8 +174,8 @@ class Parser:
         build_file_content: str,
         extra_symbols: BuildFilePreludeSymbols,
         defaults: BuildFileDefaultsParserState,
-        dependents_rules: BuildFileDependencyRulesParserState,
-        dependencies_rules: BuildFileDependencyRulesParserState,
+        dependents_rules: BuildFileDependencyRulesParserState | None,
+        dependencies_rules: BuildFileDependencyRulesParserState | None,
     ) -> list[TargetAdaptor]:
         self._parse_state.reset(
             filepath=filepath,

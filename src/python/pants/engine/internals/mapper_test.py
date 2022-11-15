@@ -12,7 +12,6 @@ from pants.base.exceptions import MappingError
 from pants.build_graph.address import Address
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.internals.defaults import BuildFileDefaults, BuildFileDefaultsParserState
-from pants.engine.internals.dep_rules import BuildFileDependencyRulesParserState
 from pants.engine.internals.mapper import (
     AddressFamily,
     AddressMap,
@@ -44,8 +43,8 @@ def parse_address_map(build_file: str, *, ignore_unrecognized_symbols: bool = Fa
         BuildFileDefaultsParserState.create(
             "", BuildFileDefaults({}), RegisteredTargetTypes({}), UnionMembership({})
         ),
-        dependents_rules=BuildFileDependencyRulesParserState(None),
-        dependencies_rules=BuildFileDependencyRulesParserState(None),
+        dependents_rules=None,
+        dependencies_rules=None,
     )
     assert path == address_map.path
     return address_map

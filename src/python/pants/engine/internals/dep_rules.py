@@ -4,11 +4,8 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
-from typing import Iterable, Mapping, Sequence, Tuple, Union
-
-from typing_extensions import Literal
 
 from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.engine.rules import Get, collect_rules, rule
@@ -17,17 +14,16 @@ from pants.engine.unions import UnionMembership, union
 logger = logging.getLogger(__name__)
 
 
-SetDependencyRulesValueT = Tuple[str, ...]
-SetDependencyRulesKeyT = Union[str, Tuple[str, ...]]
-SetDependencyRulesT = Mapping[SetDependencyRulesKeyT, SetDependencyRulesValueT]
-
-
 class DependencyRulesError(Exception):
     pass
 
 
 class DependencyRuleActionDeniedError(DependencyRulesError):
-    pass
+    def __init__(self, description_of_origin: str):
+        super().__init__(self.violation_msg(description_of_origin))
+
+    def violation_msg(self, description_of_origin: str) -> str:
+        return f"Dependency rule violation for {description_of_origin}"
 
 
 class DependencyRuleAction(Enum):
@@ -38,36 +34,21 @@ class DependencyRuleAction(Enum):
     def execute(self, *, description_of_origin: str) -> None:
         if self is DependencyRuleAction.ALLOW:
             return
-        msg = f"Dependency rule violation for {description_of_origin}"
+        err = DependencyRuleActionDeniedError(description_of_origin)
         if self is DependencyRuleAction.DENY:
-            raise DependencyRuleActionDeniedError(msg)
+            raise err
         if self is DependencyRuleAction.WARN:
-            logger.warning(msg)
-
-
-SetDefaultDependencyRulesT = Union[Literal["allow"], Literal["deny"], Literal["warn"]]
-
-
-class DependencyRule:
-    pass
-
-
-DependencyRules = Tuple[DependencyRule, ...]
+            logger.warning(str(err))
+        else:
+            raise NotImplementedError(f"{type(self).__name__}.execute() not implemented for {self}")
 
 
 class BuildFileDependencyRules(ABC):
-    default: DependencyRuleAction
-    all: DependencyRules
-    targets: Mapping[str, DependencyRules]
-
-    @classmethod
+    @staticmethod
     @abstractmethod
-    def create(
-        cls,
-        default: DependencyRuleAction = DependencyRuleAction.ALLOW,
-        all: Iterable[str | DependencyRule] = (),
-        targets: Mapping[str, Iterable[str | DependencyRule]] = {},
-    ) -> BuildFileDependencyRules:
+    def create_parser_state(
+        path: str, parent: BuildFileDependencyRules | None
+    ) -> BuildFileDependencyRulesParserState:
         ...
 
     @staticmethod
@@ -92,75 +73,19 @@ class BuildFileDependencyRules(ABC):
         """
 
 
-@dataclass
-class BuildFileDependencyRulesParserState:
-    parent: BuildFileDependencyRules | None
-    default: DependencyRuleAction = DependencyRuleAction.ALLOW
-    all: Sequence[str | DependencyRule] = ()
-    targets: dict[str, Sequence[str | DependencyRule]] = field(default_factory=dict)
-    build_file_dependency_rules_class: type[BuildFileDependencyRules] | None = None
-
+class BuildFileDependencyRulesParserState(ABC):
+    @abstractmethod
     def get_frozen_dependency_rules(self) -> BuildFileDependencyRules | None:
-        if self.build_file_dependency_rules_class is None:
-            return None
-        else:
-            return self.build_file_dependency_rules_class.create(
-                default=self.default, all=self.all, targets=self.targets
-            )
+        pass
 
+    @abstractmethod
     def set_dependency_rules(
         self,
         build_file: str,
-        *args: SetDependencyRulesT,
-        all: SetDependencyRulesValueT | None = None,
-        default: SetDefaultDependencyRulesT | None = None,
-        extend: bool = False,
+        *args,
         **kwargs,
     ) -> None:
-        if self.build_file_dependency_rules_class is None:
-            return None
-
-        if all is not None:
-            self.all = self._check_rules(all, build_file)
-        elif extend and self.parent is not None:
-            self.all = self.parent.all
-
-        if default is not None:
-            self.default = DependencyRuleAction(default)
-        elif extend and self.parent is not None:
-            self.default = self.parent.default
-
-        dependency: dict[str, Sequence[str | DependencyRule]] = {}
-        if extend and self.parent is not None:
-            dependency = dict(self.parent.targets)
-
-        for targets_dependency in args:
-            if not isinstance(targets_dependency, dict):
-                raise ValueError(
-                    f"Expected dictionary mapping targets to dependency rules in {build_file} "
-                    f"but got: {type(targets_dependency).__name__}."
-                )
-            for target, rules in targets_dependency.items():
-                targets: Iterable[str]
-                targets = target if isinstance(target, tuple) else (target,)
-                for type_alias in map(str, targets):
-                    dependency[type_alias] = self._check_rules(rules, build_file)
-
-        # Update with new dependency, dropping targets without any rules.
-        for tgt, rules in dependency.items():
-            if not rules:
-                self.targets.pop(tgt, None)
-            else:
-                self.targets[tgt] = rules
-
-    def _check_rules(self, rules: Iterable[str], build_file: str) -> tuple[str, ...]:
-        """Must only be called after ensuring self.build_file_dependency_rules_class != None."""
-        if not isinstance(rules, (list, tuple)):
-            raise ValueError(
-                f"Invalid dependency rule values in {build_file}, "
-                f"must be a sequence of strings but was `{type(rules).__name__}`: {rules!r}"
-            )
-        return tuple(rules)
+        pass
 
 
 @union

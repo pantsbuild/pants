@@ -8,7 +8,7 @@ import itertools
 import os.path
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Any
+from typing import Any, cast
 
 from pants.build_graph.address import (
     Address,
@@ -23,7 +23,6 @@ from pants.engine.fs import DigestContents, GlobMatchErrorBehavior, PathGlobs, P
 from pants.engine.internals.defaults import BuildFileDefaults, BuildFileDefaultsParserState
 from pants.engine.internals.dep_rules import (
     BuildFileDependencyRules,
-    BuildFileDependencyRulesParserState,
     DependencyRuleAction,
     MaybeBuildFileDependencyRulesImplementation,
 )
@@ -211,19 +210,22 @@ async def parse_address_family(
     defaults_parser_state = BuildFileDefaultsParserState.create(
         directory.path, defaults, registered_target_types, union_membership
     )
-    # Without a backend registering a BUILD file dependency implementation, the dependency checks
-    # becomes no-ops.
     build_file_dependency_rules_class = (
         maybe_build_file_dependency_rules_implementation.build_file_dependency_rules_class
     )
-    dependents_rules_parser_state = BuildFileDependencyRulesParserState(
-        dependents_rules,
-        build_file_dependency_rules_class=build_file_dependency_rules_class,
-    )
-    dependencies_rules_parser_state = BuildFileDependencyRulesParserState(
-        dependencies_rules,
-        build_file_dependency_rules_class=build_file_dependency_rules_class,
-    )
+    if build_file_dependency_rules_class is not None:
+        dependents_rules_parser_state = build_file_dependency_rules_class.create_parser_state(
+            directory.path,
+            dependents_rules,
+        )
+        dependencies_rules_parser_state = build_file_dependency_rules_class.create_parser_state(
+            directory.path,
+            dependencies_rules,
+        )
+    else:
+        dependents_rules_parser_state = None
+        dependencies_rules_parser_state = None
+
     address_maps = [
         AddressMap.parse(
             fc.path,
@@ -237,8 +239,18 @@ async def parse_address_family(
         for fc in digest_contents
     ]
 
-    # Freeze defaults.
+    # Freeze defaults and dependency rules
     frozen_defaults = defaults_parser_state.get_frozen_defaults()
+    frozen_dependents_rules = cast(
+        "BuildFileDependencyRules | None",
+        dependents_rules_parser_state
+        and dependents_rules_parser_state.get_frozen_dependency_rules(),
+    )
+    frozen_dependencies_rules = cast(
+        "BuildFileDependencyRules | None",
+        dependencies_rules_parser_state
+        and dependencies_rules_parser_state.get_frozen_dependency_rules(),
+    )
 
     # Process synthetic targets.
     for address_map in address_maps:
@@ -249,11 +261,11 @@ async def parse_address_family(
     return OptionalAddressFamily(
         directory.path,
         AddressFamily.create(
-            directory.path,
-            (*address_maps, *synthetic_address_maps),
-            frozen_defaults,
-            dependents_rules_parser_state.get_frozen_dependency_rules(),
-            dependencies_rules_parser_state.get_frozen_dependency_rules(),
+            spec_path=directory.path,
+            address_maps=(*address_maps, *synthetic_address_maps),
+            defaults=frozen_defaults,
+            dependents_rules=frozen_dependents_rules,
+            dependencies_rules=frozen_dependencies_rules,
         ),
     )
 

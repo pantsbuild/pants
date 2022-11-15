@@ -7,7 +7,6 @@ import pytest
 
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.internals.defaults import BuildFileDefaults, BuildFileDefaultsParserState
-from pants.engine.internals.dep_rules import BuildFileDependencyRulesParserState
 from pants.engine.internals.parser import (
     BuildFilePreludeSymbols,
     ParseError,
@@ -41,8 +40,8 @@ def test_imports_banned(defaults_parser_state: BuildFileDefaultsParserState) -> 
             "\nx = 'hello'\n\nimport os\n",
             BuildFilePreludeSymbols(FrozenDict()),
             defaults_parser_state,
-            dependents_rules=BuildFileDependencyRulesParserState(None),
-            dependencies_rules=BuildFileDependencyRulesParserState(None),
+            dependents_rules=None,
+            dependencies_rules=None,
         )
     assert "Import used in dir/BUILD at line 4" in str(exc.value)
 
@@ -68,8 +67,8 @@ def test_unrecognized_symbol(defaults_parser_state: BuildFileDefaultsParserState
                 "fake",
                 prelude_symbols,
                 defaults_parser_state,
-                dependents_rules=BuildFileDependencyRulesParserState(None),
-                dependencies_rules=BuildFileDependencyRulesParserState(None),
+                dependents_rules=None,
+                dependencies_rules=None,
             )
         assert str(exc.value) == (
             f"Name 'fake' is not defined.\n\n{dym}"
@@ -93,8 +92,8 @@ def test_unrecognized_symbol(defaults_parser_state: BuildFileDefaultsParserState
                 "fake",
                 prelude_symbols,
                 defaults_parser_state,
-                dependents_rules=BuildFileDependencyRulesParserState(None),
-                dependencies_rules=BuildFileDependencyRulesParserState(None),
+                dependents_rules=None,
+                dependencies_rules=None,
             )
 
     test_targs = ["fake1", "fake2", "fake3", "fake4", "fake5"]

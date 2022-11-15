@@ -44,8 +44,8 @@ class AddressMap:
         parser: Parser,
         extra_symbols: BuildFilePreludeSymbols,
         defaults: BuildFileDefaultsParserState,
-        dependents_rules: BuildFileDependencyRulesParserState,
-        dependencies_rules: BuildFileDependencyRulesParserState,
+        dependents_rules: BuildFileDependencyRulesParserState | None,
+        dependencies_rules: BuildFileDependencyRulesParserState | None,
     ) -> AddressMap:
         """Parses a source for targets.
 
