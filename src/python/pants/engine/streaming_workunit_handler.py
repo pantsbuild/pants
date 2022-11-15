@@ -289,7 +289,7 @@ class _InnerHandler(threading.Thread):
         # First, set the thread's thread locals to the parent thread's in order to propagate the
         # console, workunit stores, etc.
         self.thread_locals.set_for_current_thread()
-        while not self.stop_request.isSet():
+        while not self.stop_request.is_set():
             self.poll_workunits(finished=False)
             self.stop_request.wait(timeout=self.report_interval)
         else:
