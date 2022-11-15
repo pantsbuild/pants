@@ -13,6 +13,7 @@ from typing_extensions import final
 
 from pants.backend.docker.registries import ALL_DEFAULT_REGISTRIES
 from pants.base.build_environment import get_buildroot
+from pants.core.goals.package import OutputPathField
 from pants.core.goals.run import RestartableField
 from pants.engine.addresses import Address
 from pants.engine.collection import Collection
@@ -404,6 +405,7 @@ class DockerImageTarget(Target):
         DockerImageTargetStageField,
         DockerImageBuildPullOptionField,
         DockerImageBuildSquashOptionField,
+        OutputPathField,
         RestartableField,
     )
     help = softwrap(

@@ -241,7 +241,7 @@ def test_from_image_build_arg_dependency(rule_runner: RuleRunner) -> None:
     assert_build_context(
         rule_runner,
         Address("src/downstream", target_name="image"),
-        expected_files=["src/downstream/Dockerfile"],
+        expected_files=["src/downstream/Dockerfile", "src.upstream/image.docker-info.json"],
         build_upstream_images=True,
         expected_interpolation_context={
             "tags": {
