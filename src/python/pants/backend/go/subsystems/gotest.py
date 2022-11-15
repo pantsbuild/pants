@@ -69,15 +69,15 @@ class GoTestSubsystem(Subsystem):
 
     skip = SkipOption("test")
 
-    with_race = BoolOption(
+    force_race = BoolOption(
         default=False,
         help=softwrap(
             f"""
-            If true, then enable the Go data race detector when running tests. The use of the race detector can also
-            be controlled on a test-by-test basis by setting the `{GoTestRaceDetectorEnabledField.alias}` field to
-            `True` on the relevant `{GoPackageTarget.alias}` target.
+            If true, then always enable the Go data race detector when running tests regardless of the
+            test-by-test `{GoTestRaceDetectorEnabledField.alias}` field on the relevant `{GoPackageTarget.alias}`
+            target.
 
-            See https://go.dev/doc/articles/race_detector for additional information about the data race detector.
+            See https://go.dev/doc/articles/race_detector for additional information about the Go data race detector.
             """
         ),
     )
