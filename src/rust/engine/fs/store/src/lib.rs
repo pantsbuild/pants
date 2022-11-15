@@ -1266,12 +1266,7 @@ impl Store {
 
     let mut mutable_path_ancestors = BTreeSet::new();
     for relpath in mutable_paths {
-      mutable_path_ancestors.append(
-        &mut relpath
-          .ancestors()
-          .map(|p| destination.join(p))
-          .collect::<BTreeSet<_>>(),
-      );
+      mutable_path_ancestors.extend(relpath.ancestors().map(|p| destination.join(p)));
     }
     mutable_path_ancestors.remove(&destination);
 

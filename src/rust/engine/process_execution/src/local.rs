@@ -707,7 +707,7 @@ pub async fn prepare_workdir(
   let store2 = store.clone();
   let workdir_path_2 = workdir_path.clone();
   let mut mutable_paths = req.output_files.clone();
-  mutable_paths.append(&mut req.output_directories.clone());
+  mutable_paths.extend(req.output_directories.clone());
   in_workunit!("setup_sandbox", Level::Debug, |_workunit| async move {
     store2
       .materialize_directory(
