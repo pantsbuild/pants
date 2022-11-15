@@ -312,3 +312,34 @@ See [Setting a repository name](doc:tagging-docker-images#setting-a-repository-n
 > 📘 The `{pants.hash}` stability guarantee
 > 
 > The calculated hash value _may_ change between stable versions of Pants for the otherwise same input sources.
+
+Retrieving the tags of an packaged image
+----------------------------------------
+
+When a docker image is packaged, metadata about the resulting image is output to a JSON file artefact. This includes the image ID, as well as the full names that the image was tagged with. This file is written in the same manner as outputs of other packageable targets and available for later steps (for example, a test with `runtime_package_dependencies` including the docker image target) or in `dist/` after `./pants package`. By default, this is available at `path.to.target/target_name.docker-info.json`.
+
+The structure of this JSON file is:
+
+``` javascript
+{
+    "version": 1, // always 1, until a breaking change is made to this schema
+    "image_id": "sha256:..." // the local Image ID of the computed image
+    "registries": [ // info about each registry used for this image
+        {
+            "alias": "name", // set if the registry is configured in pants.toml, or null if not
+            "address": "reg.invalid", // the address of the registry itself
+            "repository": "the/repo", // the repository used for the image within the registry
+            "tags": [
+                {
+                    "template": "tag-{...}", // the tag before substituting any placeholders
+                    "tag": "tag-some-value", // the fully-substituted tag, actually used to tag the image
+                    "uses_local_alias": false, // if this tag used the local alias for the registry or not
+                    "name": "reg.invalid/the/repo:tag-some-value", // the full name that the image was tagged with
+                }
+            ]
+        }
+    ]
+}
+```
+
+This JSON file can be used to retrieve the exact name to place into cloud deploy templates or to use for running locally, especially when using tags with placeholders.
