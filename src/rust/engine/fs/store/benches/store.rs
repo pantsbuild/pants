@@ -254,9 +254,9 @@ pub fn criterion_benchmark_merge(c: &mut Criterion) {
 criterion_group!(
   benches,
   criterion_benchmark_materialize,
-  criterion_benchmark_snapshot_capture,
-  criterion_benchmark_subset_wildcard,
-  criterion_benchmark_merge
+  //criterion_benchmark_snapshot_capture,
+  //criterion_benchmark_subset_wildcard,
+  //criterion_benchmark_merge
 );
 criterion_main!(benches);
 
