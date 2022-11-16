@@ -9,7 +9,8 @@ use testutil::data::{TestData, TestDirectory};
 
 use bytes::{Bytes, BytesMut};
 use fs::{
-  DigestEntry, DirectoryDigest, FileEntry, Link, PathStat, Permissions, EMPTY_DIRECTORY_DIGEST,
+  DigestEntry, DirectoryDigest, FileEntry, Link, PathStat, Permissions, RelativePath,
+  EMPTY_DIRECTORY_DIGEST,
 };
 use grpc_util::prost::MessageExt;
 use grpc_util::tls;
@@ -19,7 +20,8 @@ use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use workunit_store::WorkunitStore;
 
 use crate::{
-  EntryType, FileContent, Snapshot, Store, StoreError, StoreFileByDigest, UploadSummary, MEGABYTES,
+  EntryType, FileContent, ImmutableInputs, Snapshot, Store, StoreError, StoreFileByDigest,
+  UploadSummary, MEGABYTES,
 };
 
 pub(crate) const STORE_BATCH_API_SIZE_LIMIT: usize = 4 * 1024 * 1024;
@@ -1046,7 +1048,12 @@ async fn materialize_missing_file() {
   let store_dir = TempDir::new().unwrap();
   let store = new_local_store(store_dir.path());
   store
-    .materialize_file(file.clone(), TestData::roland().digest(), 0o644)
+    .materialize_file(
+      file.clone(),
+      TestData::roland().digest(),
+      Permissions::ReadOnly,
+      false,
+    )
     .await
     .expect_err("Want unknown digest error");
 }
@@ -1065,7 +1072,12 @@ async fn materialize_file() {
     .await
     .expect("Error saving bytes");
   store
-    .materialize_file(file.clone(), testdata.digest(), 0o644)
+    .materialize_file(
+      file.clone(),
+      testdata.digest(),
+      Permissions::ReadOnly,
+      false,
+    )
     .await
     .expect("Error materializing file");
   assert_eq!(file_contents(&file), testdata.bytes());
@@ -1597,4 +1609,210 @@ async fn explicitly_overwrites_already_existing_file() {
 
   let file_contents = std::fs::read(&file_path).unwrap();
   assert_eq!(file_contents, b"abc123".to_vec());
+}
+
+#[tokio::test]
+async fn big_file_immutable_symlink() {
+  let materialize_dir = TempDir::new().unwrap();
+  let input_file = materialize_dir.path().join("input_file");
+  let output_file = materialize_dir.path().join("output_file");
+  let output_dir = materialize_dir.path().join("output_dir");
+  let nested_output_file = output_dir.join("file");
+
+  let file_bytes = extra_big_file_bytes();
+  let file_digest = extra_big_file_digest();
+
+  let nested_directory = remexec::Directory {
+    files: vec![remexec::FileNode {
+      name: "file".to_owned(),
+      digest: Some(file_digest.into()),
+      is_executable: true,
+      ..remexec::FileNode::default()
+    }],
+    ..remexec::Directory::default()
+  };
+  let directory = remexec::Directory {
+    files: vec![
+      remexec::FileNode {
+        name: "input_file".to_owned(),
+        digest: Some(file_digest.into()),
+        is_executable: true,
+        ..remexec::FileNode::default()
+      },
+      remexec::FileNode {
+        name: "output_file".to_owned(),
+        digest: Some(file_digest.into()),
+        is_executable: true,
+        ..remexec::FileNode::default()
+      },
+    ],
+    directories: vec![remexec::DirectoryNode {
+      name: "output_dir".to_string(),
+      digest: Some(hashing::Digest::of_bytes(&nested_directory.to_bytes()).into()),
+    }],
+    ..remexec::Directory::default()
+  };
+  let directory_digest =
+    fs::DirectoryDigest::from_persisted_digest(hashing::Digest::of_bytes(&directory.to_bytes()));
+
+  let store_dir = TempDir::new().unwrap();
+  let store = new_local_store(store_dir.path());
+  let immutable_inputs_dir = TempDir::new().unwrap();
+  let immutable_inputs = ImmutableInputs::new(store.clone(), immutable_inputs_dir.path()).unwrap();
+  store
+    .record_directory(&nested_directory, false)
+    .await
+    .expect("Error saving Directory");
+  store
+    .record_directory(&directory, false)
+    .await
+    .expect("Error saving Directory");
+  store
+    .store_file_bytes(file_bytes.clone(), false)
+    .await
+    .expect("Error saving bytes");
+
+  store
+    .materialize_directory(
+      materialize_dir.path().to_owned(),
+      directory_digest,
+      &BTreeSet::from([
+        RelativePath::new("output_file").unwrap(),
+        RelativePath::new("output_dir").unwrap(),
+      ]),
+      Some(&immutable_inputs),
+      Permissions::Writable,
+    )
+    .await
+    .expect("Error materializing file");
+
+  let assert_is_symlinked = |path: &PathBuf, is_symlink: bool| {
+    assert_eq!(file_contents(&path), file_bytes);
+    assert!(is_executable(&path));
+    assert_eq!(path.is_symlink(), is_symlink);
+    assert_eq!(
+      path.metadata().unwrap().permissions().readonly(),
+      is_symlink
+    );
+  };
+
+  assert_is_symlinked(&input_file, true);
+  assert_is_symlinked(&output_file, false);
+  assert_is_symlinked(&nested_output_file, false);
+}
+
+#[tokio::test]
+async fn big_dir_immutable_symlink() {
+  let materialize_dir = TempDir::new().unwrap();
+  let input_dir = materialize_dir.path().join("input_dir");
+  let output_dir1 = materialize_dir.path().join("output_dir1");
+  let output_dir2 = materialize_dir.path().join("output_dir2");
+  let nested_input_dir = input_dir.join("nested_dir");
+  let nested_output_dir1 = output_dir1.join("nested_dir");
+  let nested_output_dir2 = output_dir2.join("nested_dir");
+  let file_testdata = TestData::new("LEGION");
+  let mut a_lot_of_files = (0..150)
+    .map(|n| remexec::FileNode {
+      name: format!("file{n}",),
+      digest: Some(file_testdata.digest().into()),
+      is_executable: true,
+      ..remexec::FileNode::default()
+    })
+    .collect::<Vec<_>>();
+  a_lot_of_files.sort_by_key(|node| node.name.clone());
+
+  let nested_directory = remexec::Directory {
+    files: a_lot_of_files,
+    ..remexec::Directory::default()
+  };
+
+  let input_output_directory = remexec::Directory {
+    directories: vec![remexec::DirectoryNode {
+      name: "nested_dir".to_string(),
+      digest: Some(hashing::Digest::of_bytes(&nested_directory.to_bytes()).into()),
+    }],
+    ..remexec::Directory::default()
+  };
+  let directory = remexec::Directory {
+    directories: vec![
+      remexec::DirectoryNode {
+        name: "input_dir".to_string(),
+        digest: Some(hashing::Digest::of_bytes(&input_output_directory.to_bytes()).into()),
+      },
+      remexec::DirectoryNode {
+        name: "output_dir1".to_string(),
+        digest: Some(hashing::Digest::of_bytes(&input_output_directory.to_bytes()).into()),
+      },
+      remexec::DirectoryNode {
+        name: "output_dir2".to_string(),
+        digest: Some(hashing::Digest::of_bytes(&input_output_directory.to_bytes()).into()),
+      },
+    ],
+    ..remexec::Directory::default()
+  };
+  let directory_digest =
+    fs::DirectoryDigest::from_persisted_digest(hashing::Digest::of_bytes(&directory.to_bytes()));
+
+  let store_dir = TempDir::new().unwrap();
+  let store = new_local_store(store_dir.path());
+  let immutable_inputs_dir = TempDir::new().unwrap();
+  let immutable_inputs = ImmutableInputs::new(store.clone(), immutable_inputs_dir.path()).unwrap();
+  store
+    .record_directory(&nested_directory, false)
+    .await
+    .expect("Error saving Directory");
+  store
+    .record_directory(&input_output_directory, false)
+    .await
+    .expect("Error saving Directory");
+  store
+    .record_directory(&directory, false)
+    .await
+    .expect("Error saving Directory");
+  store
+    .store_file_bytes(file_testdata.bytes().clone(), false)
+    .await
+    .expect("Error saving bytes");
+
+  store
+    .materialize_directory(
+      materialize_dir.path().to_owned(),
+      directory_digest,
+      &BTreeSet::from([
+        RelativePath::new("output_dir1").unwrap(),
+        RelativePath::new("output_dir2/nested_dir").unwrap(),
+      ]),
+      Some(&immutable_inputs),
+      Permissions::Writable,
+    )
+    .await
+    .expect("Error materializing file");
+
+  let assert_is_symlinked = |path: &PathBuf, is_symlink: bool| {
+    assert!(path.is_dir());
+    assert_eq!(path.is_symlink(), is_symlink);
+    assert_eq!(
+      path.metadata().unwrap().permissions().readonly(),
+      is_symlink
+    );
+    for entry in path.read_dir().unwrap() {
+      assert_eq!(
+        entry
+          .unwrap()
+          .path()
+          .metadata()
+          .unwrap()
+          .permissions()
+          .readonly(),
+        is_symlink
+      );
+    }
+  };
+
+  assert_is_symlinked(&input_dir, true);
+  assert_is_symlinked(&nested_input_dir, true);
+  assert_is_symlinked(&output_dir1, false);
+  assert_is_symlinked(&nested_output_dir1, false);
+  assert_is_symlinked(&output_dir2, false);
+  assert_is_symlinked(&nested_output_dir2, false);
 }

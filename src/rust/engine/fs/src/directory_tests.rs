@@ -370,23 +370,3 @@ fn walk_too_many_links_subdir() {
     vec!["".to_string(), "a".to_string()],
   );
 }
-
-#[test]
-fn filecount_exceeds() {
-  let tree = make_tree(vec![
-    TypedPath::File {
-      path: Path::new("a/file.txt"),
-      is_executable: false,
-    },
-    TypedPath::File {
-      path: Path::new("b/file.txt"),
-      is_executable: false,
-    },
-    TypedPath::File {
-      path: Path::new("c/d/e/f/file.txt"),
-      is_executable: false,
-    },
-  ]);
-  assert!(tree.filecount_exceeds(2));
-  assert!(!tree.filecount_exceeds(3));
-}
