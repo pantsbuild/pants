@@ -2699,7 +2699,7 @@ class DependenciesRuleActionRequest:
 
 @dataclass(frozen=True)
 class DependenciesRuleAction:
-    """Maps all dependencies to their respective depdendecy rule action of a origin target address.
+    """Maps all dependencies to their respective dependency rule action of a origin target address.
 
     The `dependencies_rule` will be empty and the `address` `None` if there is no dependency rule
     implementation.

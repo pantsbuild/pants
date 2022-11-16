@@ -55,7 +55,7 @@ class ParseContext:
 
     @property
     def rel_path(self) -> str:
-        """Relative path from the build root to the BUILD file being parsed.
+        """Relative path from the build root to the directory of the BUILD file being parsed.
 
         :API: public
         """
