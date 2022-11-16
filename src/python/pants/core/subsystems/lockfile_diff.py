@@ -14,7 +14,7 @@ from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.core.goals.generate_lockfiles import (
     GenerateToolLockfileSentinel,
-    LockfileGenerated,
+    GenerateLockfileResult,
     LockfileGeneratedPostProcessing,
 )
 from pants.engine.process import InteractiveProcess, Process
@@ -36,20 +36,16 @@ class LockfileDiffSubsystem(PythonToolBase):
     default_interpreter_constraints = ["CPython>=3.8,<3.10"]
 
     register_lockfile = True
-    default_lockfile_resource = ("pants.backend.project_info.subsystems", "lockfile_diff.lock")
-    default_lockfile_path = "src/python/pants/backend/project_info/subsystems/lockfile_diff.lock"
+    default_lockfile_resource = ("pants.core.subsystems", "lockfile_diff.lock")
+    default_lockfile_path = "src/python/pants/core/subsystems/lockfile_diff.lock"
     default_lockfile_url = git_url(default_lockfile_path)
 
-    skip = SkipOption("generate-lockfiles")
+    skip = SkipOption("generate-lockfiles", default=True)
     args = ArgsListOption(example="--unchanged")
 
 
 class LockfileDiffLockfileSentinel(GeneratePythonToolLockfileSentinel):
     resolve_name = LockfileDiffSubsystem.options_scope
-
-
-class LockfileDiffPostProcessing(LockfileGenerated):
-    pass
 
 
 @rule
@@ -61,7 +57,7 @@ def setup_lockfile_diff_lockfile(
 
 @rule
 async def lockfile_diff_post_processing(
-    generated: LockfileDiffPostProcessing, lockfile_diff: LockfileDiffSubsystem
+    generated: GenerateLockfileResult, lockfile_diff: LockfileDiffSubsystem
 ) -> LockfileGeneratedPostProcessing:
     if lockfile_diff.skip:
         return LockfileGeneratedPostProcessing()
@@ -75,6 +71,7 @@ async def lockfile_diff_post_processing(
                 "--new",
                 generated.result.path,
                 "--compare=HEAD",
+                "--no-fail",
                 *lockfile_diff.args,
             ),
             description=f"{generated.result.resolve_name}: diff {generated.result.path}",
@@ -98,5 +95,4 @@ def rules():
         *lockfile.rules(),
         *pex.rules(),
         UnionRule(GenerateToolLockfileSentinel, LockfileDiffLockfileSentinel),
-        UnionRule(LockfileGenerated, LockfileDiffPostProcessing),
     )

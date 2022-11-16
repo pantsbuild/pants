@@ -125,14 +125,6 @@ class RequestedUserResolveNames(Collection[str]):
     """
 
 
-@union(in_scope_types=[EnvironmentName])
-@dataclass(frozen=True)
-class LockfileGenerated:
-    """Hook for post-processing after lockfile generation."""
-
-    result: GenerateLockfileResult
-
-
 @dataclass(frozen=True)
 class LockfileGeneratedPostProcessing:
     process: InteractiveProcess | None = None
@@ -448,19 +440,15 @@ async def generate_lockfiles_goal(
     for result in results:
         logger.info(f"Wrote lockfile for the resolve `{result.resolve_name}` to {result.path}")
 
-        post_processing = await MultiGet(
-            Get(LockfileGeneratedPostProcessing, LockfileGenerated, request(result))
-            for request in union_membership.get(LockfileGenerated)
-        )
-        for post in post_processing:
-            if post.process is not None:
-                _ = await Effect(
-                    InteractiveProcessResult,
-                    {
-                        post.process: InteractiveProcess,
-                        local_environment.val: EnvironmentName,
-                    },
-                )
+        post_processing = await Get(LockfileGeneratedPostProcessing, GenerateLockfileResult, result)
+        if post_processing.process is not None:
+            _ = await Effect(
+                InteractiveProcessResult,
+                {
+                    post_processing.process: InteractiveProcess,
+                    local_environment.val: EnvironmentName,
+                },
+            )
 
     return GenerateLockfilesGoal(exit_code=0)
 
