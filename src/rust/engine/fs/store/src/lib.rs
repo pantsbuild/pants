@@ -1269,33 +1269,17 @@ impl Store {
     // Load the DigestTrie for the digest, and convert it into a mapping between a fully qualified
     // parent path and its children.
     let mut parent_to_child = HashMap::new();
-    let mut dirsize_cache = HashMap::new();
-    self
-      .load_digest_trie(digest)
-      .await?
-      .walk(SymlinkBehavior::Aware, &mut |path, entry| {
-        if let Some(parent) = path.parent() {
-          parent_to_child
-            .entry(destination.join(parent))
-            .or_insert_with(Vec::new)
-            .push(entry.clone());
-        }
+    let tree = self.load_digest_trie(digest).await?;
+    tree.walk(SymlinkBehavior::Aware, &mut |path, entry| {
+      if let Some(parent) = path.parent() {
+        parent_to_child
+          .entry(destination.join(parent))
+          .or_insert_with(Vec::new)
+          .push(entry.clone());
+      }
+    });
 
-        match entry {
-          directory::Entry::Directory(_) => {}
-          _ => {
-            let mut ancestors = path.ancestors();
-            ancestors.next();
-            for ancestor in ancestors {
-              dirsize_cache
-                .entry(destination.join(ancestor))
-                .and_modify(|count| *count += 1)
-                .or_insert(1);
-            }
-          }
-        }
-      });
-
+    let dirsize_cache = tree.recursive_entry_counts(&destination);
     let mut mutable_path_ancestors = BTreeSet::new();
     for relpath in mutable_paths {
       mutable_path_ancestors.extend(relpath.ancestors().map(|p| destination.join(p)));

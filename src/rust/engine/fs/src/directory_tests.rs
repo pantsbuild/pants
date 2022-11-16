@@ -370,3 +370,29 @@ fn walk_too_many_links_subdir() {
     vec!["".to_string(), "a".to_string()],
   );
 }
+
+#[test]
+fn recursive_entry_counts() {
+  let tree = make_tree(vec![
+    TypedPath::File {
+      path: Path::new("a/file.txt"),
+      is_executable: false,
+    },
+    TypedPath::File {
+      path: Path::new("file.txt"),
+      is_executable: false,
+    },
+    TypedPath::File {
+      path: Path::new("b/file.txt"),
+      is_executable: false,
+    },
+    TypedPath::Link {
+      path: Path::new("a/self"),
+      target: Path::new("."),
+    },
+  ]);
+  let counts = tree.recursive_entry_counts(&PathBuf::new());
+  assert_eq!(*counts.get(&PathBuf::from("")).unwrap(), 4);
+  assert_eq!(*counts.get(&PathBuf::from("a")).unwrap(), 2);
+  assert_eq!(*counts.get(&PathBuf::from("b")).unwrap(), 1);
+}

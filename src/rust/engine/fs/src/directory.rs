@@ -608,6 +608,32 @@ impl DigestTrie {
     symlinks
   }
 
+  pub fn recursive_entry_counts(&self, path_prefix: &PathBuf) -> HashMap<PathBuf, usize> {
+    let mut counts = HashMap::new();
+    let _ = self.recursive_entry_counts_helper(path_prefix, &mut counts);
+    counts
+  }
+
+  fn recursive_entry_counts_helper(
+    &self,
+    path_prefix: &PathBuf,
+    counts: &mut HashMap<PathBuf, usize>,
+  ) -> usize {
+    let mut count = 0;
+    for entry in &*self.0 {
+      count += match entry {
+        Entry::Directory(d) => d
+          .tree
+          .recursive_entry_counts_helper(&path_prefix.join(entry.name().as_ref()), counts),
+        _ => 1,
+      };
+    }
+
+    counts.insert(path_prefix.to_path_buf(), count);
+
+    count
+  }
+
   /// Visit every node in the tree, calling the given function with the path to the Node, and its
   /// entries.
   /// NOTE: if SymlinkBehavior::Oblivious, `f` will never be called with a `SymlinkEntry`.
