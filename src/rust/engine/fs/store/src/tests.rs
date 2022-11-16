@@ -1816,3 +1816,81 @@ async fn big_dir_immutable_symlink() {
   assert_is_symlinked(&output_dir2, false);
   assert_is_symlinked(&nested_output_dir2, false);
 }
+
+#[tokio::test]
+async fn big_dir_with_big_file_immutable_symlinks() {
+  let materialize_dir = TempDir::new().unwrap();
+  let input_dir = materialize_dir.path().join("input_dir");
+
+  let big_file_bytes = extra_big_file_bytes();
+  let big_file_digest = extra_big_file_digest();
+
+  let file_testdata = TestData::new("LEGION");
+  let mut a_lot_of_files = (0..150)
+    .map(|n| remexec::FileNode {
+      name: format!("file{n}",),
+      digest: Some(file_testdata.digest().into()),
+      is_executable: true,
+      ..remexec::FileNode::default()
+    })
+    .collect::<Vec<_>>();
+  a_lot_of_files.push(remexec::FileNode {
+    name: "big_input_file".to_owned(),
+    digest: Some(big_file_digest.into()),
+    is_executable: true,
+    ..remexec::FileNode::default()
+  });
+  a_lot_of_files.sort_by_key(|node| node.name.clone());
+
+  let input_directory = remexec::Directory {
+    files: a_lot_of_files,
+    ..remexec::Directory::default()
+  };
+  let directory = remexec::Directory {
+    directories: vec![remexec::DirectoryNode {
+      name: "input_dir".to_string(),
+      digest: Some(hashing::Digest::of_bytes(&input_directory.to_bytes()).into()),
+    }],
+    ..remexec::Directory::default()
+  };
+  let directory_digest =
+    fs::DirectoryDigest::from_persisted_digest(hashing::Digest::of_bytes(&directory.to_bytes()));
+
+  let store_dir = TempDir::new().unwrap();
+  let store = new_local_store(store_dir.path());
+  let immutable_inputs_dir = TempDir::new().unwrap();
+  let immutable_inputs = ImmutableInputs::new(store.clone(), immutable_inputs_dir.path()).unwrap();
+  store
+    .record_directory(&input_directory, false)
+    .await
+    .expect("Error saving Directory");
+  store
+    .record_directory(&directory, false)
+    .await
+    .expect("Error saving Directory");
+  store
+    .store_file_bytes(big_file_bytes.clone(), false)
+    .await
+    .expect("Error saving bytes");
+  store
+    .store_file_bytes(file_testdata.bytes().clone(), false)
+    .await
+    .expect("Error saving bytes");
+
+  store
+    .materialize_directory(
+      materialize_dir.path().to_owned(),
+      directory_digest,
+      &BTreeSet::new(),
+      Some(&immutable_inputs),
+      Permissions::Writable,
+    )
+    .await
+    .expect("Error materializing file");
+
+  assert!(input_dir.is_symlink());
+  let input_dir_dest = input_dir.read_link().unwrap();
+  let big_file_inside_symlinked_dir = input_dir_dest.join("big_input_file");
+  // NBL Assert that within the directory symlink we also symlinked the big file
+  assert!(big_file_inside_symlinked_dir.is_symlink());
+}
