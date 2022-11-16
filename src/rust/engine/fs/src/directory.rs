@@ -608,7 +608,7 @@ impl DigestTrie {
     symlinks
   }
 
-  pub fn recursive_entry_counts(&self, path_prefix: &PathBuf) -> HashMap<PathBuf, usize> {
+  pub fn recursive_entry_counts(&self, path_prefix: PathBuf) -> HashMap<PathBuf, usize> {
     let mut counts = HashMap::new();
     let _ = self.recursive_entry_counts_helper(path_prefix, &mut counts);
     counts
@@ -616,7 +616,7 @@ impl DigestTrie {
 
   fn recursive_entry_counts_helper(
     &self,
-    path_prefix: &PathBuf,
+    path_prefix: PathBuf,
     counts: &mut HashMap<PathBuf, usize>,
   ) -> usize {
     let mut count = 0;
@@ -624,12 +624,12 @@ impl DigestTrie {
       count += match entry {
         Entry::Directory(d) => d
           .tree
-          .recursive_entry_counts_helper(&path_prefix.join(entry.name().as_ref()), counts),
+          .recursive_entry_counts_helper(path_prefix.join(entry.name().as_ref()), counts),
         _ => 1,
       };
     }
 
-    counts.insert(path_prefix.to_path_buf(), count);
+    counts.insert(path_prefix, count);
 
     count
   }

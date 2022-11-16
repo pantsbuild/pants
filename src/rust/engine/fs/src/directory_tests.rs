@@ -391,7 +391,7 @@ fn recursive_entry_counts() {
       target: Path::new("."),
     },
   ]);
-  let counts = tree.recursive_entry_counts(&PathBuf::new());
+  let counts = tree.recursive_entry_counts(PathBuf::new());
   assert_eq!(*counts.get(&PathBuf::from("")).unwrap(), 4);
   assert_eq!(*counts.get(&PathBuf::from("a")).unwrap(), 2);
   assert_eq!(*counts.get(&PathBuf::from("b")).unwrap(), 1);

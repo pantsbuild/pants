@@ -1279,7 +1279,7 @@ impl Store {
       }
     });
 
-    let dirsize_cache = tree.recursive_entry_counts(&destination);
+    let dirsize_cache = tree.recursive_entry_counts(destination.clone());
     let mut mutable_path_ancestors = BTreeSet::new();
     for relpath in mutable_paths {
       mutable_path_ancestors.extend(relpath.ancestors().map(|p| destination.join(p)));
