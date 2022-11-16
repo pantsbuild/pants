@@ -50,6 +50,7 @@ from pants.engine.fs import (
     Paths,
     Snapshot,
 )
+from pants.engine.internals.dep_rules import DependencyRuleAction
 from pants.engine.unions import UnionMembership, UnionRule, distinct_union_type_per_subclass, union
 from pants.option.global_options import UnmatchedBuildFileGlobs
 from pants.source.filespec import Filespec, FilespecMatcher
@@ -2685,6 +2686,42 @@ class ValidateDependenciesRequest(Generic[FS], ABC):
 @dataclass(frozen=True)
 class ValidatedDependencies:
     pass
+
+
+@dataclass(frozen=True)
+class DependenciesRuleActionRequest:
+    """A request to return the applicable dependency rule action for each dependency of a target."""
+
+    address: Address
+    dependencies: Addresses
+    description_of_origin: str = dataclasses.field(hash=False, compare=False)
+
+
+@dataclass(frozen=True)
+class DependenciesRuleAction:
+    """Maps all dependencies to their respective dependency rule action of a origin target address.
+
+    The `dependencies_rule` will be empty and the `address` `None` if there is no dependency rule
+    implementation.
+    """
+
+    address: Address | None = None
+    dependencies_rule: FrozenDict[Address, DependencyRuleAction] = FrozenDict()
+
+    def __post_init__(self):
+        if self.dependencies_rule and self.address is None:
+            raise ValueError(
+                "The `address` field must not be None when there are `dependencies_rule`s."
+            )
+
+    @classmethod
+    @memoized_method
+    def allow_all(cls) -> DependenciesRuleAction:
+        return cls()
+
+    def execute_actions(self) -> None:
+        for dependency, action in self.dependencies_rule.items():
+            action.execute(description_of_origin=f"{self.address} on {dependency}")
 
 
 class SpecialCasedDependencies(StringSequenceField, AsyncFieldMixin):

@@ -23,6 +23,7 @@ from pants.engine.fs import PathGlobs, Snapshot, Workspace
 from pants.engine.goal import Goal
 from pants.engine.internals import (
     build_files,
+    dep_rules,
     graph,
     options_parsing,
     platform_rules,
@@ -268,6 +269,7 @@ class EngineInitializer:
                 *collect_rules(locals()),
                 *build_files.rules(),
                 *fs.rules(),
+                *dep_rules.rules(),
                 *desktop.rules(),
                 *git_rules(),
                 *graph.rules(),
