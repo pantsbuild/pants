@@ -7,7 +7,6 @@ import pytest
 
 from pants.backend.javascript.subsystems import nodejs
 from pants.backend.javascript.subsystems.npx_tool import NpxToolBase
-from pants.engine.rules import SubsystemRule
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
@@ -24,7 +23,7 @@ def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             *nodejs.rules(),
-            SubsystemRule(CowsayTool),
+            *CowsayTool.rules(),  # type: ignore[call-arg]
             QueryRule(CowsayTool, []),
         ],
     )
