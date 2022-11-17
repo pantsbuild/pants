@@ -50,7 +50,7 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use fs::{
   default_cache_path, directory, DigestEntry, DigestTrie, Dir, DirectoryDigest, File, FileContent,
-  FileEntry, PathStat, Permissions, RelativePath, SymlinkBehavior, SymlinkEntry,
+  FileEntry, Link, PathStat, Permissions, RelativePath, SymlinkBehavior, SymlinkEntry,
   EMPTY_DIRECTORY_DIGEST,
 };
 use futures::future::{self, BoxFuture, Either, FutureExt, TryFutureExt};
@@ -597,11 +597,11 @@ impl Store {
       .walk(digest.as_digest(), |_, path_so_far, _, directory| {
         let mut path_stats = Vec::new();
         path_stats.extend(directory.directories.iter().map(move |dir_node| {
-          let path = path_so_far.join(dir_node.name.clone());
+          let path = path_so_far.join(&dir_node.name);
           (PathStat::dir(path.clone(), Dir(path)), None)
         }));
         path_stats.extend(directory.files.iter().map(move |file_node| {
-          let path = path_so_far.join(file_node.name.clone());
+          let path = path_so_far.join(&file_node.name);
           (
             PathStat::file(
               path.clone(),
@@ -611,6 +611,19 @@ impl Store {
               },
             ),
             Some((path, file_node.digest.as_ref().unwrap().try_into().unwrap())),
+          )
+        }));
+        path_stats.extend(directory.symlinks.iter().map(move |link_node| {
+          let path = path_so_far.join(&link_node.name);
+          (
+            PathStat::link(
+              path.clone(),
+              Link {
+                path,
+                target: link_node.target.clone().into(),
+              },
+            ),
+            None,
           )
         }));
         future::ok(path_stats).boxed()

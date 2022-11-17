@@ -234,11 +234,11 @@ pub trait SnapshotOps: Clone + Send + Sync + 'static {
       .map_err(|err| format!("Error matching globs against {directory_digest:?}: {}", err))?;
 
     let mut files = HashMap::new();
-    input_tree.walk(SymlinkBehavior::Aware, &mut |path, entry| match entry {
+    input_tree.walk(SymlinkBehavior::Oblivious, &mut |path, entry| match entry {
       directory::Entry::File(f) => {
         files.insert(path.to_owned(), f.digest());
       }
-      directory::Entry::Symlink(_) => todo!(),
+      directory::Entry::Symlink(_) => panic!("Unexpected symlink"),
       directory::Entry::Directory(_) => (),
     });
 
