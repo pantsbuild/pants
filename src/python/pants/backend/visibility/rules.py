@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
-from pants.backend.visibility.parser_state import BuildFileVisibilityRules
+from pants.backend.visibility.rule_types import BuildFileVisibilityRules
 from pants.engine.internals.dep_rules import (
     BuildFileDependencyRulesImplementation,
     BuildFileDependencyRulesImplementationRequest,

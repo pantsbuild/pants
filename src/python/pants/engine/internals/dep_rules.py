@@ -42,6 +42,9 @@ class DependencyRuleAction(Enum):
         else:
             raise NotImplementedError(f"{type(self).__name__}.execute() not implemented for {self}")
 
+    def __repr__(self):
+        return str(self)
+
 
 class BuildFileDependencyRules(ABC):
     @staticmethod

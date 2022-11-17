@@ -3,12 +3,30 @@
 
 from __future__ import annotations
 
+import logging
+from textwrap import dedent
 from typing import Any
 
 import pytest
 
-from pants.backend.visibility.rule_types import VisibilityRule, VisibilityRuleSet, flatten
+from pants.backend.visibility.rule_types import (
+    BuildFileVisibilityRules,
+    VisibilityRule,
+    VisibilityRuleSet,
+    flatten,
+)
+from pants.backend.visibility.rules import rules as visibility_rules
+from pants.core.target_types import FilesGeneratorTarget, GenericTarget, ResourcesGeneratorTarget
+from pants.engine.addresses import Address, Addresses, AddressInput
+from pants.engine.internals.dep_rules import DependencyRuleAction, DependencyRuleActionDeniedError
 from pants.engine.internals.target_adaptor import TargetAdaptor
+from pants.engine.target import DependenciesRuleAction, DependenciesRuleActionRequest
+from pants.testutil.pytest_util import assert_logged, no_exception
+from pants.testutil.rule_runner import QueryRule, RuleRunner
+
+# -----------------------------------------------------------------------------------------------
+# Rule type classes tests.
+# -----------------------------------------------------------------------------------------------
 
 
 @pytest.mark.parametrize(
@@ -142,3 +160,332 @@ def test_visibility_rule_set_parse(expected: VisibilityRuleSet, arg: Any) -> Non
 )
 def test_visibility_rule_set_match(expected: bool, target: str, rule_spec: tuple) -> None:
     assert expected == VisibilityRuleSet.parse(rule_spec).match(TargetAdaptor(target, None))
+
+
+@pytest.fixture
+def dependencies_rules() -> BuildFileVisibilityRules:
+    return BuildFileVisibilityRules(
+        "test/BUILD",
+        # Rules for outgoing dependency.
+        (VisibilityRuleSet.parse(("*", ("tgt/ok/*", "?tgt/dubious/*", "!tgt/blocked/*"))),),
+    )
+
+
+@pytest.fixture
+def dependents_rules() -> BuildFileVisibilityRules:
+    return BuildFileVisibilityRules(
+        "test/BUILD",
+        # Rules for outgoing dependency.
+        (VisibilityRuleSet.parse(("*", ("src/ok/*", "?src/dubious/*", "!src/blocked/*"))),),
+    )
+
+
+@pytest.mark.parametrize(
+    "source_path, target_path, expected_action",
+    [
+        ("src/ok/a", "tgt/ok/b", "allow"),
+        ("src/ok/a", "tgt/dubious/b", "warn"),
+        ("src/ok/a", "tgt/blocked/b", "deny"),
+        ("src/dubious/a", "tgt/ok/b", "warn"),
+        ("src/dubious/a", "tgt/dubious/b", "warn"),
+        ("src/dubious/a", "tgt/blocked/b", "deny"),
+        ("src/blocked/a", "tgt/ok/b", "deny"),
+        ("src/blocked/a", "tgt/dubious/b", "deny"),
+        ("src/blocked/a", "tgt/blocked/b", "deny"),
+    ],
+)
+def test_check_dependency_rules(
+    dependencies_rules: BuildFileVisibilityRules,
+    dependents_rules: BuildFileVisibilityRules,
+    source_path: str,
+    target_path: str,
+    expected_action: str,
+) -> None:
+    assert BuildFileVisibilityRules.check_dependency_rules(
+        source_adaptor=TargetAdaptor("dependent_target", "source"),
+        source_path=source_path,
+        dependencies_rules=dependencies_rules,
+        target_adaptor=TargetAdaptor("dependency_target", "target"),
+        target_path=target_path,
+        dependents_rules=dependents_rules,
+    ) == DependencyRuleAction(expected_action)
+
+
+# -----------------------------------------------------------------------------------------------
+# BUILD file level tests.
+# -----------------------------------------------------------------------------------------------
+
+
+@pytest.fixture
+def rule_runner() -> RuleRunner:
+    return RuleRunner(
+        rules=[
+            *visibility_rules(),
+            QueryRule(DependenciesRuleAction, (DependenciesRuleActionRequest,)),
+        ],
+        target_types=[FilesGeneratorTarget, GenericTarget, ResourcesGeneratorTarget],
+    )
+
+
+def denied():
+    return pytest.raises(
+        DependencyRuleActionDeniedError,
+        match="Dependency rule violation for src/origin:origin on src/dependency:dependency",
+    )
+
+
+@pytest.mark.parametrize(
+    "rules, expect_error",
+    [
+        (["*"], None),
+        (["!*"], denied()),
+        (["src/origin", "!*"], None),
+        (["!src/origin", "*"], denied()),
+        (["!src/origin/nested", "*"], None),
+        (["src/origin/nested", "!*"], denied()),
+        (["!src/a", "!src/b", "!src/origin", "!src/c", "*"], denied()),
+        (["!src/a", "!src/b", "!src/c", "*"], None),
+        (["src/a", "src/b", "src/origin", "src/c", "!*"], None),
+        (["src/a", "src/b", "src/c", "!*"], denied()),
+    ],
+)
+def test_dependents_rules(rule_runner: RuleRunner, rules: list[str], expect_error) -> None:
+    rule_runner.write_files(
+        {
+            "src/dependency/BUILD": dedent(
+                f"""\
+                __dependents_rules__((target, {rules}))
+                target()
+                """
+            ),
+            "src/origin/BUILD": dedent(
+                """\
+                target(dependencies=["src/dependency:tgt"])
+                """
+            ),
+        },
+    )
+
+    rsp = rule_runner.request(
+        DependenciesRuleAction,
+        [
+            DependenciesRuleActionRequest(
+                Address("src/origin"),
+                dependencies=Addresses([Address("src/dependency")]),
+                description_of_origin="test",
+            )
+        ],
+    )
+    with expect_error or no_exception():
+        rsp.execute_actions()
+
+
+@pytest.mark.parametrize(
+    "rules, expect_error",
+    [
+        (["*"], None),
+        (["src/dependency", "!*"], None),
+        (["src/dependency/nested", "!*"], denied()),
+        (["src/*", "!*"], None),
+        (["!src/*", "*"], denied()),
+    ],
+)
+def test_dependencies_rules(rule_runner: RuleRunner, rules: list[str], expect_error) -> None:
+    rule_runner.write_files(
+        {
+            "src/dependency/BUILD": "target()",
+            "src/origin/BUILD": dedent(
+                f"""\
+                __dependencies_rules__((target, {rules}))
+                target(dependencies=["src/dependency:tgt"])
+                """
+            ),
+        },
+    )
+
+    rsp = rule_runner.request(
+        DependenciesRuleAction,
+        [
+            DependenciesRuleActionRequest(
+                Address("src/origin"),
+                dependencies=Addresses([Address("src/dependency")]),
+                description_of_origin="test",
+            )
+        ],
+    )
+    with expect_error or no_exception():
+        rsp.execute_actions()
+
+
+def assert_dependency_rules(
+    rule_runner: RuleRunner, origin: str, *dependencies: tuple[str, DependencyRuleAction]
+) -> None:
+    desc = repr("assert_dependency_rules")
+    source = AddressInput.parse(origin, description_of_origin=desc).dir_to_address()
+    addresses = Addresses(
+        [
+            AddressInput.parse(
+                dep, relative_to=source.spec_path, description_of_origin=desc
+            ).dir_to_address()
+            for dep, _ in dependencies
+        ]
+    )
+    rsp = rule_runner.request(
+        DependenciesRuleAction,
+        [
+            DependenciesRuleActionRequest(
+                source,
+                dependencies=addresses,
+                description_of_origin=desc,
+            )
+        ],
+    )
+
+    expected = {address: action for address, (_, action) in zip(addresses, dependencies)}
+    assert expected == dict(rsp.dependencies_rule)
+
+
+def test_dependency_rules(rule_runner: RuleRunner, caplog) -> None:
+    ROOT_BUILD = dedent(
+        """
+        # ROOT RULES
+        #
+        # Parent rules apply to whole subtree unless overridden in a child BUILD file.
+
+        __dependencies_rules__(
+          # Deny internal resources from depending on outside files.
+          (resources, ".", "!*"),
+
+          # Allow files to use anything.
+          (files, "*"),
+
+          # Allow all by default, with a warning
+          ("*", "?*"),
+        )
+
+        __dependents_rules__(
+          # Deny outside access to "private" resources.
+          (resources, ".", "!*"),
+
+          # Anyone may depend on `files` targets.
+          ("files", "*"),
+
+          # Allow all by default, with a warning
+          ("*", "?*"),
+        )
+        """
+    )
+
+    def BUILD(dependencies: tuple = (), dependents: tuple = (), extra: str = "") -> str:
+        return dedent(
+            f"""
+            # `files` are "public"
+            files()
+
+            # `resources` are "private"
+            resources(name="internal")
+
+            {extra}
+
+            __dependencies_rules__(
+              *{dependencies},
+              extend=True,
+            )
+
+            __dependents_rules__(
+              *{dependents},
+              extend=True,
+            )
+            """
+        )
+
+    rule_runner.write_files(
+        {
+            "src/BUILD": ROOT_BUILD,
+            "src/a/BUILD": BUILD(),
+            "src/a/a2/BUILD": BUILD(
+                extra="""target(name="joker")""",
+            ),
+            "src/b/BUILD": BUILD(
+                dependents=(),
+            ),
+            "src/b/b2/BUILD": BUILD(
+                dependents=(
+                    # Override default, any target in `b` may depend on internal targets
+                    ("resources", "src/b", "src/b/*", "!*"),
+                    # Only `b` may depend on our nested modules.
+                    ("*", "src/b/*", "!*"),
+                ),
+            ),
+        },
+    )
+
+    allowed = DependencyRuleAction.ALLOW
+    denied = DependencyRuleAction.DENY
+    warned = DependencyRuleAction.WARN
+    caplog.set_level(logging.DEBUG)
+
+    assert_dependency_rules(
+        rule_runner,
+        "src/a",
+        ("src/a:internal", allowed),
+        ("src/a/a2:internal", denied),
+        ("src/b", allowed),
+        ("src/b:internal", denied),
+        ("src/b/b2", denied),
+        ("src/a/a2:joker", warned),
+    )
+    assert_logged(
+        caplog,
+        expect_logged=[
+            (
+                logging.DEBUG,
+                "WARN: dependency on the `target` target src/a/a2:joker from a target at src/a by "
+                "dependent rule '?*' declared in src/a/a2/BUILD",
+            ),
+        ],
+        exclusively=False,
+    )
+
+    caplog.clear()
+    assert_dependency_rules(
+        rule_runner,
+        "src/b",
+        ("src/b:internal", allowed),
+        ("src/b/b2:internal", allowed),
+        ("src/a", allowed),
+        ("src/a:internal", denied),
+        ("src/a/a2", allowed),
+    )
+    assert_logged(
+        caplog,
+        expect_logged=[
+            (
+                logging.DEBUG,
+                "DENY: dependency on the `resources` target src/a:internal from a target at src/b "
+                "by dependent rule '!*' declared in src/a/BUILD",
+            ),
+        ],
+        exclusively=False,
+    )
+
+    caplog.clear()
+    assert_dependency_rules(
+        rule_runner,
+        "src/a:internal",
+        ("src/a", allowed),
+        ("src/b", denied),
+    )
+    assert_logged(
+        caplog,
+        expect_logged=[
+            (
+                logging.DEBUG,
+                # This message is different, as it fired from a dependency rule, rather than a
+                # dependent rule as in the other cases.
+                "DENY: the `resources` target src/a:internal dependency to a target at src/b by "
+                "dependency rule '!*' declared in src/a/BUILD",
+            ),
+        ],
+        exclusively=False,
+    )
