@@ -138,7 +138,7 @@ async def pyright_typecheck_partition(
     process = await Get(
         Process,
         NpxProcess(
-            npm_package=pyright.default_version,
+            npm_package=pyright.version,
             args=(
                 f"--venv-path={complete_pex_env.pex_root}",  # Used with `venv` in config
                 *pyright.args,  # User-added arguments
