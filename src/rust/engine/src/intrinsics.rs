@@ -31,7 +31,9 @@ use tokio::process;
 use fs::{DigestTrie, DirectoryDigest, RelativePath, TypedPath};
 use hashing::{Digest, EMPTY_DIGEST};
 use process_execution::docker::{ImagePullPolicy, ImagePullScope, DOCKER, IMAGE_PULL_CACHE};
-use process_execution::local::{apply_chroot, create_sandbox, prepare_workdir, setup_run_sh_script, KeepSandboxes};
+use process_execution::local::{
+  apply_chroot, create_sandbox, prepare_workdir, setup_run_sh_script, KeepSandboxes,
+};
 use process_execution::{ManagedChild, Platform, ProcessExecutionStrategy};
 use rule_graph::DependencyKey;
 use stdio::TryCloneAsFile;
