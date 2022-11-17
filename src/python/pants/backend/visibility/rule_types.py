@@ -102,9 +102,6 @@ class VisibilityRuleSet:
     def match(self, target: TargetAdaptor) -> bool:
         return any(fnmatchcase(target.type_alias, pattern) for pattern in self.target_type_patterns)
 
-    def __str__(self) -> str:
-        return f"{self.target_type_patterns}, {', '.join(map(str, self.rules))}"
-
 
 @dataclass(frozen=True)
 class BuildFileVisibilityRules(BuildFileDependencyRules):
