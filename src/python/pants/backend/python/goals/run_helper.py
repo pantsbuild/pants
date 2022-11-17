@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import textwrap
 from typing import Iterable, Optional
 
 from pants.backend.python.subsystems.debugpy import DebugPy
@@ -27,7 +28,7 @@ from pants.backend.python.util_rules.python_sources import (
 from pants.core.goals.run import RunDebugAdapterRequest, RunRequest
 from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
 from pants.engine.addresses import Address
-from pants.engine.fs import Digest, MergeDigests
+from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.rules import Get, MultiGet, rule_helper
 from pants.engine.target import TransitiveTargets, TransitiveTargetsRequest
 
@@ -140,16 +141,63 @@ async def _create_python_source_run_dap_request(
     debug_adapter: DebugAdapterSubsystem,
     console_script: Optional[ConsoleScript] = None,
 ) -> RunDebugAdapterRequest:
-    entry_point, debugpy_pex = await MultiGet(
+    entry_point, debugpy_pex, launcher_digest = await MultiGet(
         Get(
             ResolvedPexEntryPoint,
             ResolvePexEntryPointRequest(entry_point_field),
         ),
         Get(Pex, PexRequest, debugpy.to_pex_request()),
+        Get(
+            Digest,
+            CreateDigest(
+                [
+                    FileContent(
+                        "__debugpy_launcher.py",
+                        textwrap.dedent(
+                            f"""
+                            import os
+                            CHROOT = os.environ["PANTS_CHROOT"]
+
+                            # See https://github.com/pantsbuild/pants/issues/17540
+                            # For `run --debug-adapter`, the client might send a `pathMappings`
+                            # (this is likely as VS Code likes to configure that by default) with
+                            # a `remoteRoot` of ".". For `run`, CWD is set to the build root, so
+                            # breakpoints set in-repo will never be hit. We fix this by monkeypatching
+                            # pydevd (the library powering debugpy) so that a remoteRoot of "."
+                            # means the sandbox root.
+
+                            import debugpy._vendored.force_pydevd
+                            from _pydevd_bundle.pydevd_process_net_command_json import PyDevJsonCommandProcessor
+                            orig_resolve_remote_root = PyDevJsonCommandProcessor._resolve_remote_root
+
+                            def patched_resolve_remote_root(*args, **kwargs):
+                                remote_root = orig_resolve_remote_root(*args, **kwargs)
+                                cwd = os.getcwd()
+                                if remote_root.startswith(cwd):
+                                    remote_root = remote_root.replace(cwd, CHROOT)
+                                return remote_root
+
+                            PyDevJsonCommandProcessor._resolve_remote_root = patched_resolve_remote_root
+
+                            from debugpy.server import cli
+                            cli.main()
+                            """
+                        ).encode("utf-8"),
+                    ),
+                ]
+            ),
+        ),
     )
 
     merged_digest = await Get(
-        Digest, MergeDigests([regular_run_request.digest, debugpy_pex.digest])
+        Digest,
+        MergeDigests(
+            [
+                regular_run_request.digest,
+                debugpy_pex.digest,
+                launcher_digest,
+            ]
+        ),
     )
     extra_env = dict(regular_run_request.extra_env)
     extra_env["PEX_PATH"] = os.pathsep.join(
@@ -161,11 +209,14 @@ async def _create_python_source_run_dap_request(
             _in_chroot(os.path.basename(regular_run_request.args[1])),
         ]
     )
+    extra_env["PEX_INTERPRETER"] = "1"
+    extra_env["PANTS_CHROOT"] = _in_chroot("").rstrip("/")
     main = console_script or entry_point.val
     assert main is not None
     args = [
         regular_run_request.args[0],  # python executable
         _in_chroot(debugpy_pex.name),
+        _in_chroot("__debugpy_launcher.py"),
         *debugpy.get_args(debug_adapter, main),
     ]
 
