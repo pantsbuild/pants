@@ -170,12 +170,10 @@ async def _create_python_source_run_dap_request(
                             from _pydevd_bundle.pydevd_process_net_command_json import PyDevJsonCommandProcessor
                             orig_resolve_remote_root = PyDevJsonCommandProcessor._resolve_remote_root
 
-                            def patched_resolve_remote_root(*args, **kwargs):
-                                remote_root = orig_resolve_remote_root(*args, **kwargs)
-                                cwd = os.getcwd()
-                                if remote_root.startswith(cwd):
-                                    remote_root = remote_root.replace(cwd, CHROOT)
-                                return remote_root
+                            def patched_resolve_remote_root(self, local_root, remote_root):
+                                if remote_root == ".":
+                                    remote_root = CHROOT
+                                return orig_resolve_remote_root(self, local_root, remote_root)
 
                             PyDevJsonCommandProcessor._resolve_remote_root = patched_resolve_remote_root
 
