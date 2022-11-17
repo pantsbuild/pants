@@ -233,8 +233,7 @@ This can be fixed by setting `ulimit -n 10000`. (10,000 should work in all cases
 > We recommend permanently setting this by either:
 > 
 > 1. Adding `ulimit -n 10000` to your `./pants` script.
-> 2. Using a tool like [Direnv](https://direnv.net) to run `ulimit -n 10000` everytime the project is loaded.
-> 3. Adding `ulimit -n 10000` to your global `.bashrc` or equivalent.
+> 2. Adding `ulimit -n 10000` to your global `.bashrc` or equivalent.
 > 
 > The first two approaches have the benefit that they will be checked into version control, so every developer at your organization can use the same setting.
 
