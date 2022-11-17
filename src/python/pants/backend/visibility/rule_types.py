@@ -151,8 +151,12 @@ class BuildFileVisibilityRules(BuildFileDependencyRules):
             else DependencyRuleAction.ALLOW
         )
         if outgoing is None:
+            dep_rules = cast(BuildFileVisibilityRules, dependencies_rules)
             raise BuildFileVisibilityRulesError(
-                f"Missing rule for dependency {source_adaptor} {source_path} -> {target_adaptor} {target_path}"
+                f"There is no matching dependencies rule for the `{source_adaptor.type_alias}` "
+                f"target {source_path}:{source_adaptor.name or os.path.basename(source_path)} "
+                f"for the dependency on the `{target_adaptor.type_alias}` target {target_path}:"
+                f"{target_adaptor.name or os.path.basename(target_path)} in {dep_rules.path}"
             )
         if outgoing == DependencyRuleAction.DENY:
             return outgoing
@@ -169,8 +173,12 @@ class BuildFileVisibilityRules(BuildFileDependencyRules):
             else DependencyRuleAction.ALLOW
         )
         if incoming is None:
+            dep_rules = cast(BuildFileVisibilityRules, dependents_rules)
             raise BuildFileVisibilityRulesError(
-                f"Missing rule for dependent {target_adaptor} {target_path} -> {source_adaptor} {source_path}"
+                f"There is no matching dependents rule for the `{target_adaptor.type_alias}` "
+                f"target {target_path}:{target_adaptor.name or os.path.basename(target_path)} "
+                f"for the dependency from the `{source_adaptor.type_alias}` target {source_path}:"
+                f"{source_adaptor.name or os.path.basename(source_path)} in {dep_rules.path}"
             )
         return incoming if incoming != DependencyRuleAction.ALLOW else outgoing
 

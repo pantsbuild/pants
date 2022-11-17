@@ -11,6 +11,7 @@ import pytest
 
 from pants.backend.visibility.rule_types import (
     BuildFileVisibilityRules,
+    BuildFileVisibilityRulesError,
     VisibilityRule,
     VisibilityRuleSet,
     flatten,
@@ -22,7 +23,7 @@ from pants.engine.internals.dep_rules import DependencyRuleAction, DependencyRul
 from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.engine.target import DependenciesRuleAction, DependenciesRuleActionRequest
 from pants.testutil.pytest_util import assert_logged, no_exception
-from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error
 
 # -----------------------------------------------------------------------------------------------
 # Rule type classes tests.
@@ -489,3 +490,56 @@ def test_dependency_rules(rule_runner: RuleRunner, caplog) -> None:
         ],
         exclusively=False,
     )
+
+
+def test_missing_rule_error_message(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/BUILD": dedent(
+                """
+                __dependencies_rules__(
+                  (target, ".", "!*"),
+                )
+
+                __dependents_rules__(
+                  (resources, "res/*"),
+                )
+
+                resources(name="res")
+                target(name="tgt")
+                """
+            ),
+        },
+    )
+
+    msg = (
+        "There is no matching dependencies rule for the `resources` target src:res for the "
+        "dependency on the `target` target src:tgt in src/BUILD"
+    )
+    with engine_error(BuildFileVisibilityRulesError, contains=msg):
+        rule_runner.request(
+            DependenciesRuleAction,
+            [
+                DependenciesRuleActionRequest(
+                    Address("src", target_name="res"),
+                    dependencies=Addresses([Address("src", target_name="tgt")]),
+                    description_of_origin=repr("test"),
+                )
+            ],
+        )
+
+    msg = (
+        "There is no matching dependents rule for the `resources` target src:res for the "
+        "dependency from the `target` target src:tgt in src/BUILD"
+    )
+    with engine_error(BuildFileVisibilityRulesError, contains=msg):
+        rule_runner.request(
+            DependenciesRuleAction,
+            [
+                DependenciesRuleActionRequest(
+                    Address("src", target_name="tgt"),
+                    dependencies=Addresses([Address("src", target_name="res")]),
+                    description_of_origin=repr("test"),
+                )
+            ],
+        )
