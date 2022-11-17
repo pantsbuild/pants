@@ -384,8 +384,10 @@ async def map_third_party_modules_to_addresses(
 class PythonModuleOwners:
     """The target(s) that own a Python module.
 
-    If >1 targets own the same module, and they're implementations (vs .pyi type stubs), they will
-    be put into `ambiguous` instead of `unambiguous`. `unambiguous` should never be > 2.
+    Up to 2 targets can unambiguously own the same module, if one is an implementation and the other
+    is a .pyi type stub. It is ambiguous for >1 implementation target to own the same module, and
+    those targets will be put into `ambiguous` instead of `unambiguous`. Therefore, `unambiguous`
+    should never be >2; and only 1 of `unambiguous` and `ambiguous` should have targets.
     """
 
     unambiguous: tuple[Address, ...]
