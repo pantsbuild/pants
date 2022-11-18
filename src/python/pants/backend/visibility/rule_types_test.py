@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import logging
+from pathlib import PurePath
 from textwrap import dedent
 from typing import Any
 
@@ -70,6 +71,10 @@ from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error
                     "baz",
                 ),
             ),
+        ),
+        (
+            ["src/test"],
+            PurePath("src/test"),
         ),
     ],
 )
