@@ -31,6 +31,14 @@ from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error
 # -----------------------------------------------------------------------------------------------
 
 
+def parse_rule(rule: str, relpath: str = "test/path") -> VisibilityRule:
+    return VisibilityRule.parse(rule, relpath)
+
+
+def parse_ruleset(rules: Any, relpath: str = "test/path") -> VisibilityRuleSet:
+    return VisibilityRuleSet.parse(rules, relpath)
+
+
 @pytest.mark.parametrize(
     "expected, xs",
     [
@@ -83,6 +91,65 @@ def test_flatten(expected, xs) -> None:
 
 
 @pytest.mark.parametrize(
+    "rule, expected",
+    [
+        ("", (".",)),
+        (".", (".",)),
+        ("./", (".",)),
+        (".foo", (".foo",)),
+        ("./foo", ("./foo",)),
+        ("src/foo", ("src/foo",)),
+        ("src/*", ("src/*",)),
+        (":", ("test/path",)),
+        (":/", ("test/path",)),
+        (":/*", ("test/path/*",)),
+        (":/sub", ("test/path/sub",)),
+        (
+            "src/::",
+            (
+                "src",
+                "src/*",
+            ),
+        ),
+        (
+            "src::",
+            (
+                "src",
+                "src/*",
+            ),
+        ),
+        (
+            ":/::",
+            (
+                "test/path",
+                "test/path/*",
+            ),
+        ),
+        ("src/a/../b", ("src/b",)),
+        ("src/a//b", ("src/a/b",)),
+        # Test oddities..
+        (":foo", (":foo",)),
+        ("::foo", ("::foo",)),
+        ("::/foo", ("::/foo",)),
+        ("src:foo", ("src:foo",)),
+        ("src/foo:", ("src/foo:",)),
+        ("src::foo", ("src::foo",)),
+        ("src/:foo", ("src/:foo",)),
+        ("src/::foo", ("src/::foo",)),
+        (
+            ":/su:b::",
+            (
+                "test/path/su:b",
+                "test/path/su:b/*",
+            ),
+        ),
+    ],
+)
+def test_visibility_rule_patterns(rule: str, expected: tuple[str, ...]) -> None:
+    assert expected == parse_rule(rule).patterns
+
+
+@pytest.mark.parametrize(
     "expected, rule, path, relpath",
     [
         (True, "src/a", "src/a", ""),
@@ -103,7 +170,7 @@ def test_flatten(expected, xs) -> None:
     ],
 )
 def test_visibility_rule_match(expected: bool, rule: str, path: str, relpath: str) -> None:
-    assert VisibilityRule.parse(rule).match(path, relpath) == expected
+    assert parse_rule(rule).match(path, relpath) == expected
 
 
 @pytest.mark.parametrize(
@@ -112,7 +179,7 @@ def test_visibility_rule_match(expected: bool, rule: str, path: str, relpath: st
         (
             VisibilityRuleSet(
                 ("target",),
-                (VisibilityRule.parse("src/*"),),
+                (parse_rule("src/*"),),
             ),
             ("target", "src/*"),
         ),
@@ -120,9 +187,11 @@ def test_visibility_rule_match(expected: bool, rule: str, path: str, relpath: st
             VisibilityRuleSet(
                 ("files", "resources"),
                 (
-                    VisibilityRule.parse("src/*"),
-                    VisibilityRule.parse("res/*"),
-                    VisibilityRule.parse("!*"),
+                    parse_rule(
+                        "src/*",
+                    ),
+                    parse_rule("res/*"),
+                    parse_rule("!*"),
                 ),
             ),
             (("files", "resources"), "src/*", "res/*", "!*"),
@@ -130,7 +199,7 @@ def test_visibility_rule_match(expected: bool, rule: str, path: str, relpath: st
     ],
 )
 def test_visibility_rule_set_parse(expected: VisibilityRuleSet, arg: Any) -> None:
-    rule_set = VisibilityRuleSet.parse(arg)
+    rule_set = parse_ruleset(arg)
     assert expected == rule_set
 
 
@@ -165,7 +234,7 @@ def test_visibility_rule_set_parse(expected: VisibilityRuleSet, arg: Any) -> Non
     ],
 )
 def test_visibility_rule_set_match(expected: bool, target: str, rule_spec: tuple) -> None:
-    assert expected == VisibilityRuleSet.parse(rule_spec).match(TargetAdaptor(target, None))
+    assert expected == parse_ruleset(rule_spec).match(TargetAdaptor(target, None))
 
 
 @pytest.fixture
@@ -173,7 +242,7 @@ def dependencies_rules() -> BuildFileVisibilityRules:
     return BuildFileVisibilityRules(
         "test/BUILD",
         # Rules for outgoing dependency.
-        (VisibilityRuleSet.parse(("*", ("tgt/ok/*", "?tgt/dubious/*", "!tgt/blocked/*"))),),
+        (parse_ruleset(("*", ("tgt/ok/*", "?tgt/dubious/*", "!tgt/blocked/*"))),),
     )
 
 
@@ -182,7 +251,7 @@ def dependents_rules() -> BuildFileVisibilityRules:
     return BuildFileVisibilityRules(
         "test/BUILD",
         # Rules for outgoing dependency.
-        (VisibilityRuleSet.parse(("*", ("src/ok/*", "?src/dubious/*", "!src/blocked/*"))),),
+        (parse_ruleset(("*", ("src/ok/*", "?src/dubious/*", "!src/blocked/*"))),),
     )
 
 

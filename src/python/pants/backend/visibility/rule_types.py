@@ -7,6 +7,7 @@ import logging
 import os.path
 from dataclasses import dataclass, field
 from fnmatch import fnmatch, fnmatchcase
+from operator import attrgetter
 from pathlib import PurePath
 from typing import Any, Iterable, Iterator, Sequence, cast
 
@@ -17,12 +18,16 @@ from pants.engine.internals.dep_rules import (
     DependencyRulesError,
 )
 from pants.engine.internals.target_adaptor import TargetAdaptor
+from pants.util.memo import memoized_property
 
 logger = logging.getLogger(__name__)
 
 
 class BuildFileVisibilityRulesError(DependencyRulesError):
     pass
+
+
+_VISIBILITY_RULE_CWD_PREFIX = ":" + os.path.sep
 
 
 @dataclass(frozen=True)
@@ -33,7 +38,7 @@ class VisibilityRule:
     path_pattern: str
 
     @classmethod
-    def parse(cls, rule: str) -> VisibilityRule:
+    def parse(cls, rule: str, relpath: str) -> VisibilityRule:
         if not isinstance(rule, str):
             raise ValueError(f"expected a path pattern string but got: {rule!r}")
         if rule.startswith("!"):
@@ -45,13 +50,33 @@ class VisibilityRule:
         else:
             action = DependencyRuleAction.ALLOW
             pattern = rule
-        return cls(action, pattern)
+        if pattern == ":" or pattern.startswith(_VISIBILITY_RULE_CWD_PREFIX):
+            pattern = (
+                os.path.join(relpath, pattern[1:].lstrip(os.path.sep))
+                if len(pattern) > 1
+                else relpath
+            )
+        normalized_path = os.path.normpath(pattern)
+        return cls(
+            action,
+            os.path.join(".", normalized_path)
+            if pattern and normalized_path[0] != pattern[0]
+            else normalized_path,
+        )
 
     def match(self, path: str, relpath: str) -> bool:
         pattern = relpath if self.path_pattern == "." else self.path_pattern
         if pattern.startswith("./"):
             pattern = relpath + pattern[1:]
         return fnmatch(path, pattern)
+
+    @memoized_property(key_factory=attrgetter("path_pattern"))  # type: ignore[misc]
+    def patterns(self) -> Sequence[str]:
+        if self.path_pattern.endswith("::"):
+            stem = self.path_pattern[:-2].rstrip(os.path.sep)
+            return stem, os.path.join(stem, "*")
+        else:
+            return (self.path_pattern,)
 
     def __str__(self) -> str:
         prefix = ""
@@ -82,7 +107,7 @@ class VisibilityRuleSet:
     rules: Sequence[VisibilityRule]
 
     @classmethod
-    def parse(cls, arg: Any) -> VisibilityRuleSet:
+    def parse(cls, arg: Any, relpath: str) -> VisibilityRuleSet:
         """Translate input `arg` from BUILD file call.
 
         The arg is a rule spec tuple with two or more elements, where the first is the target type
@@ -96,7 +121,7 @@ class VisibilityRuleSet:
 
         try:
             targets, rules = flatten(arg[0]), flatten(arg[1:])
-            return cls(tuple(targets), tuple(map(VisibilityRule.parse, rules)))
+            return cls(tuple(targets), tuple(VisibilityRule.parse(rule, relpath) for rule in rules))
         except ValueError as e:
             raise ValueError(f"Invalid rule spec, {e}") from e
 
@@ -241,7 +266,9 @@ class BuildFileVisibilityRulesParserState(BuildFileDependencyRulesParserState):
         **kwargs,
     ) -> None:
         try:
-            self.rulesets = [VisibilityRuleSet.parse(arg) for arg in args if arg]
+            self.rulesets = [
+                VisibilityRuleSet.parse(arg, os.path.dirname(build_file)) for arg in args if arg
+            ]
             self.path = build_file
         except ValueError as e:
             raise BuildFileVisibilityRulesError(f"{build_file}: {e}") from e
