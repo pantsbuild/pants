@@ -241,7 +241,7 @@ class BuildFileVisibilityRulesParserState(BuildFileDependencyRulesParserState):
         **kwargs,
     ) -> None:
         try:
-            self.rulesets = [VisibilityRuleSet.parse(arg) for arg in args]
+            self.rulesets = [VisibilityRuleSet.parse(arg) for arg in args if arg]
             self.path = build_file
         except ValueError as e:
             raise BuildFileVisibilityRulesError(f"{build_file}: {e}") from e
