@@ -441,7 +441,7 @@ class _Constants:
             .stdout.decode()
             .strip()
         )
-        self.pants_version_file = Path("src/python/pants/version/VERSION")
+        self.pants_version_file = Path("src/python/pants/VERSION")
         self.pants_stable_version = self.pants_version_file.read_text().strip()
 
     @property
@@ -986,7 +986,7 @@ def reversion_prebuilt_wheels() -> None:
             whl_file=str(whl),
             dest_dir=str(stable_wheel_dir),
             target_version=CONSTANTS.pants_stable_version,
-            extra_globs=["pants/version/VERSION"],
+            extra_globs=["pants/VERSION"],
         )
 
 

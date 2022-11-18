@@ -91,7 +91,7 @@ def determine_pants_version(no_prompt: bool) -> str:
             softwrap(
                 """
                 Please either `git checkout` to the appropriate branch (e.g. 2.1.x), or change
-                src/python/pants/version/VERSION.
+                src/python/pants/VERSION.
                 """
             )
         )
