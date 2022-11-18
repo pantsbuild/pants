@@ -348,7 +348,7 @@ def install_exercising_namespace_packages(
     :return: The PYTHONPATH that can be used along with venv_bin_dir / "python" to test the
         installed packages with.
     """
-    with temporary_dir(cleanup=False) as td:
+    with temporary_dir() as td:
         tempdir = Path(td)
         wheel_dir = tempdir / "wheels"
         pip = venv_bin_dir / "pip"
