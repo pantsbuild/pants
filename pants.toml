@@ -30,6 +30,7 @@ backend_packages.add = [
   "pants.backend.experimental.scala",
   "pants.backend.experimental.scala.lint.scalafmt",
   "pants.backend.experimental.scala.debug_goals",
+  "pants.backend.experimental.visibility",
   "internal_plugins.releases",
   "internal_plugins.test_lockfile_fixtures",
 ]

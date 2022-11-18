@@ -10,7 +10,6 @@ import pytest
 from pants.backend.docker.target_types import DockerImageTarget
 from pants.backend.explorer.graphql.rules import rules
 from pants.backend.explorer.graphql.setup import create_schema
-from pants.backend.explorer.rules import validate_explorer_dependencies
 from pants.backend.project_info import peek
 from pants.engine.environment import EnvironmentName
 from pants.engine.explorer import RequestState
@@ -57,7 +56,6 @@ def all_help_info(rule_runner: RuleRunner) -> AllHelpInfo:
 def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=(
-            validate_explorer_dependencies,
             *peek.rules(),
             *rules(),
         ),
