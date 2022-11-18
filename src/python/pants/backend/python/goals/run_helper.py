@@ -154,7 +154,7 @@ async def _create_python_source_run_dap_request(
                     FileContent(
                         "__debugpy_launcher.py",
                         textwrap.dedent(
-                            f"""
+                            """
                             import os
                             CHROOT = os.environ["PANTS_CHROOT"]
 

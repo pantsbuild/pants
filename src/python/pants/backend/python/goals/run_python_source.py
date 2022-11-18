@@ -15,7 +15,6 @@ from pants.backend.python.target_types import (
     PythonSourceField,
 )
 from pants.backend.python.util_rules.pex_environment import PexEnvironment
-from pants.base.build_root import BuildRoot
 from pants.core.goals.run import RunDebugAdapterRequest, RunFieldSet, RunRequest
 from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
 from pants.engine.internals.selectors import Get
