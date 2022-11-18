@@ -367,6 +367,10 @@ def test_dependency_rules(rule_runner: RuleRunner, caplog) -> None:
 
           # Allow all by default, with a warning
           ("*", "?*"),
+
+          # Ignore (accept) empty values as no-op
+          None,
+          (),
         )
 
         __dependents_rules__(
