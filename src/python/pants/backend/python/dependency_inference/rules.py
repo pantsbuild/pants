@@ -44,6 +44,8 @@ from pants.engine.internals.graph import Owners, OwnersRequest
 from pants.engine.rules import Get, MultiGet, rule, rule_helper
 from pants.engine.target import (
     DependenciesRequest,
+    DependenciesRuleAction,
+    DependenciesRuleActionRequest,
     ExplicitlyProvidedDependencies,
     FieldSet,
     InferDependenciesRequest,
@@ -264,6 +266,48 @@ def _get_inferred_asset_deps(
     return {filepath: _resolve_single_asset(filepath) for filepath in assets}
 
 
+@rule_helper
+async def _filter_owners_per_import(
+    field_set: PythonImportDependenciesInferenceFieldSet,
+    owners_per_import: Iterable[PythonModuleOwners],
+) -> Iterable[PythonModuleOwners]:
+    """Use dependency rules to filter the valid owners based on Address."""
+    ambiguous_owners_per_import = {
+        owners: i for i, owners in enumerate(owners_per_import) if owners.ambiguous
+    }
+    if not ambiguous_owners_per_import:
+        return owners_per_import
+
+    dependencies_rule_actions = await MuliGet(
+        Get(
+            DependenciesRuleAction,
+            DependenciesRuleActionRequest(
+                address=field_set.address,
+                #dependencies=field_set.dependencies,
+                dependencies=owners.ambiguous,
+                description_of_origin=f"get dependency rules for {address}",
+            ),
+        ) for owners in ambiguous_owners_per_import.keys()
+    )
+    if dependencies_rule_actions[0].address is None:
+        return owners_per_import
+
+    allowed_owners_per_import = list(owners_per_import)
+
+    for (owners, i), dependencies_rule_action in zip(ambiguous_owners_per_import.items(), dependencies_rule_actions):
+        allowed = (
+            address for address, rule_action in dependencies_rule_action.dependencies_rule
+            if rule_action == DependencyRuleAction.Allow
+        )
+        if len(allowed) == 1:
+            # no longer ambiguous
+            allowed_owners_per_import[i] = PythonModuleOwners(allowed)
+        else:
+            allowed_owners_per_import[i] = PythonModuleOwners((), ambiguous=allowed)
+
+    return allowed_owners_per_import
+
+
 class ImportOwnerStatus(Enum):
     unambiguous = "unambiguous"
     disambiguated = "disambiguated"
@@ -289,6 +333,8 @@ def _get_imports_info(
         if owners.unambiguous:
             return ImportResolveResult(ImportOwnerStatus.unambiguous, owners.unambiguous)
 
+        # this is probably the right place to disambiguate w/ dep rules
+        # after this is too late
         explicitly_provided_deps.maybe_warn_of_ambiguous_dependency_inference(
             owners.ambiguous,
             address,
@@ -320,6 +366,7 @@ def _collect_imports_info(
     - unowned
     """
 
+    # this is too late to disambiguate w/ dep rules
     return frozenset(
         addr
         for dep in resolve_result.values()
@@ -407,6 +454,7 @@ async def _handle_unowned_imports(
     parsed_imports: ParsedPythonImports,
     resolve: str,
 ) -> None:
+    # this is too late to disambiguate w/ dep rules
     if not unowned_imports or unowned_dependency_behavior is UnownedDependencyUsage.DoNothing:
         return
 
@@ -499,6 +547,7 @@ async def resolve_parsed_dependencies(
     python_infer_subsystem: PythonInferSubsystem,
 ) -> ResolvedParsedPythonDependencies:
     """Find the owning targets for the parsed dependencies."""
+    # this is probably the right place to disambiguate w/ dep rules
 
     parsed_imports = request.parsed_dependencies.imports
     parsed_assets = request.parsed_dependencies.assets
@@ -510,6 +559,8 @@ async def resolve_parsed_dependencies(
     )
 
     if parsed_imports:
+        source_address = request.field_set.address
+        # this is probably the right place to disambiguate w/ dep rules
         owners_per_import = await MultiGet(
             Get(
                 PythonModuleOwners,
@@ -517,9 +568,13 @@ async def resolve_parsed_dependencies(
             )
             for imported_module in parsed_imports
         )
+        filtered_owners_per_import = await _filter_owners_per_import(
+            field_set=request.field_set,
+            owners_per_import=owners_per_import,
+        )
         resolve_results = _get_imports_info(
             address=request.field_set.address,
-            owners_per_import=owners_per_import,
+            owners_per_import=filtered_owners_per_import,
             parsed_imports=parsed_imports,
             explicitly_provided_deps=explicitly_provided_deps,
         )
@@ -565,6 +620,7 @@ async def infer_python_dependencies_via_source(
         ResolvedParsedPythonDependencies,
         ResolvedParsedPythonDependenciesRequest(request.field_set, parsed_dependencies, resolve),
     )
+    # this is too late to disambiguate w/ dep rules
     import_deps, unowned_imports = _collect_imports_info(resolved_dependencies.resolve_results)
 
     asset_deps, unowned_assets = _collect_imports_info(resolved_dependencies.assets)
