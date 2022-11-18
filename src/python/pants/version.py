@@ -5,6 +5,8 @@ import os
 
 from packaging.version import Version
 
+import pants._version
+
 # Generate a inferrable dependency on the `pants._version` package and its associated resources.
 from pants.util.resources import read_resource
 
@@ -21,7 +23,7 @@ VERSION: str = (
     # Furthermore, we can't outright move the file there from its previous home of pants/VERSION, as
     # (as of the time of writing) the Pants shim expects it at pants/VERSION. So we symlink the new
     # home to the old home, knowing that Pants is symlink oblivious when collecting sources.
-    read_resource("pants._version", "VERSION").decode().strip()
+    read_resource(pants._version.__name__, "VERSION").decode().strip()
 )
 
 PANTS_SEMVER = Version(VERSION)
