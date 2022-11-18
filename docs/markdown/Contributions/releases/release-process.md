@@ -154,7 +154,7 @@ git diff release_2.8.0..release_2.9.0 CONTRIBUTORS.md
 
 ### 3. `dev` and `a0` - bump the `VERSION`
 
-Change `src/python/pants/VERSION` to the new release, e.g. `2.12.0.dev0`. If you encounter an `a0` version on `main`, then the next release will be for a new release series (i.e. you'll bump from `2.12.0a0` to `2.13.0.dev0`).
+Change `src/python/pants/version/VERSION` to the new release, e.g. `2.12.0.dev0`. If you encounter an `a0` version on `main`, then the next release will be for a new release series (i.e. you'll bump from `2.12.0a0` to `2.13.0.dev0`).
 
 ### 4. Post the prep to GitHub
 
@@ -183,7 +183,7 @@ $ git push upstream 2.9.x
 
 1. Checkout from `main` into the release branch, e.g. `2.9.x`.
 2. Cherry-pick the release prep using `git cherry-pick <sha>`.
-3. Bump the `VERSION` in `src/python/pants/VERSION`, e.g. to `2.9.0rc1`. Push this as a new commit directly to the release branch - you do not need to open a pull request.
+3. Bump the `VERSION` in `src/python/pants/version/VERSION`, e.g. to `2.9.0rc1`. Push this as a new commit directly to the release branch - you do not need to open a pull request.
 
 Step 2: Update this docs site
 -----------------------------

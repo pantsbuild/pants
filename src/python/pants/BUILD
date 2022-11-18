@@ -40,4 +40,4 @@ python_distribution(
 # `:pants-packaged`. We don't actually need to use any meaningful file here, though, because we
 # use `entry_points` to link to the actual native code, so clang/gcc do not need to build any
 # native code. This is just a dummy file.
-resources(name="resources", sources=["VERSION", "py.typed", "dummy.c"])
+resources(name="resources", sources=["py.typed", "dummy.c"])

@@ -10,7 +10,7 @@ from classify_changed_files import Affected, classify
     (
         [["docs/path/to/some/doc", "docs/path/to/some/other/doc"], {Affected.docs}],
         [["src/rust/engine/path/to/file.rs"], {Affected.rust}],
-        [["src/python/pants/VERSION"], {Affected.release}],
+        [["src/python/pants/version/VERSION"], {Affected.release}],
         [["build-support/bin/generate_github_workflows.py"], {Affected.ci_config}],
         [["src/python/pants/whatever.py"], {Affected.other}],
         [["docs/path/to/some/doc", "rust-toolchain"], {Affected.docs, Affected.rust}],

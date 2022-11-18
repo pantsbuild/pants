@@ -24,7 +24,7 @@ _docs_globs = ["docs/*", "build-support/bin/generate_user_list.py"]
 _rust_globs = ["src/rust/engine/*", "rust-toolchain", "build-support/bin/rust/*"]
 _release_globs = [
     "pants.toml",
-    "src/python/pants/VERSION",
+    "src/python/pants/version/VERSION",
     "src/python/pants/notes/*",
     "src/python/pants/init/BUILD",
     "build-support/bin/release.sh",
