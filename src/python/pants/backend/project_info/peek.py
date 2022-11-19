@@ -28,7 +28,7 @@ from pants.option.option_types import BoolOption
 
 @runtime_checkable
 class Dictable(Protocol):
-    """Makes possible to avoid adding concrete types to serialize objects."""
+    """Make possible to avoid adding concrete types to serialize objects."""
 
     def asdict(self) -> Mapping[str, Any]:
         ...
