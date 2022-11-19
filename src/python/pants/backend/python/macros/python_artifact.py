@@ -89,6 +89,3 @@ class PythonArtifact:
 
     def __hash__(self) -> int:
         return self._hash
-
-    def __str__(self) -> str:
-        return self.name
