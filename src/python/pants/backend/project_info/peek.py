@@ -6,7 +6,9 @@ from __future__ import annotations
 import collections
 import json
 from dataclasses import asdict, dataclass, is_dataclass
-from typing import Any, Iterable, Mapping, Protocol, runtime_checkable
+from typing import Any, Iterable, Mapping
+
+from typing_extensions import Protocol, runtime_checkable
 
 from pants.engine.collection import Collection
 from pants.engine.console import Console
