@@ -6,11 +6,17 @@ import itertools
 import logging
 import os.path
 from dataclasses import dataclass, field
-from fnmatch import fnmatch, fnmatchcase
-from operator import attrgetter
+from fnmatch import fnmatchcase
 from pathlib import PurePath
 from typing import Any, Iterable, Iterator, Sequence, cast
 
+from typing_extensions import Literal
+
+from pants.backend.visibility.pathspec import (
+    VisibilityRuleFnMatchPattern,
+    VisibilityRuleGitIgnorePattern,
+    VisibilityRulePattern,
+)
 from pants.engine.internals.dep_rules import (
     BuildFileDependencyRules,
     BuildFileDependencyRulesParserState,
@@ -18,7 +24,6 @@ from pants.engine.internals.dep_rules import (
     DependencyRulesError,
 )
 from pants.engine.internals.target_adaptor import TargetAdaptor
-from pants.util.memo import memoized_property
 
 logger = logging.getLogger(__name__)
 
@@ -35,10 +40,15 @@ class VisibilityRule:
     """A single rule with an associated action when matched against a given path."""
 
     action: DependencyRuleAction
-    path_pattern: str
+    pathspec: VisibilityRulePattern
 
     @classmethod
-    def parse(cls, rule: str, relpath: str) -> VisibilityRule:
+    def parse(
+        cls,
+        rule: str,
+        relpath: str,
+        pathspec_cls: type[VisibilityRulePattern] = VisibilityRuleFnMatchPattern,
+    ) -> VisibilityRule:
         if not isinstance(rule, str):
             raise ValueError(f"expected a path pattern string but got: {rule!r}")
         if rule.startswith("!"):
@@ -59,24 +69,15 @@ class VisibilityRule:
         normalized_path = os.path.normpath(pattern)
         return cls(
             action,
-            os.path.join(".", normalized_path)
-            if pattern and normalized_path[0] != pattern[0]
-            else normalized_path,
+            pathspec_cls.from_pattern(
+                os.path.join(".", normalized_path)
+                if pattern and normalized_path[0] != pattern[0]
+                else normalized_path
+            ),
         )
 
     def match(self, path: str, relpath: str) -> bool:
-        pattern = relpath if self.path_pattern == "." else self.path_pattern
-        if pattern.startswith("./"):
-            pattern = relpath + pattern[1:]
-        return fnmatch(path, pattern)
-
-    @memoized_property(key_factory=attrgetter("path_pattern"))  # type: ignore[misc]
-    def patterns(self) -> Sequence[str]:
-        if self.path_pattern.endswith("::"):
-            stem = self.path_pattern[:-2].rstrip(os.path.sep)
-            return stem, os.path.join(stem, "*")
-        else:
-            return (self.path_pattern,)
+        return self.pathspec.match(path, relpath)
 
     def __str__(self) -> str:
         prefix = ""
@@ -84,13 +85,13 @@ class VisibilityRule:
             prefix = "!"
         elif self.action is DependencyRuleAction.WARN:
             prefix = "?"
-        return repr(f"{prefix}{self.path_pattern}")
+        return repr(f"{prefix}{self.pathspec}")
 
 
 def flatten(xs) -> Iterator[str]:
     """Return an iterator with values, regardless of the nesting of the input."""
     if isinstance(xs, str):
-        yield xs
+        yield from (x.strip() for x in xs.splitlines())
     elif isinstance(xs, Iterable):
         yield from itertools.chain.from_iterable(flatten(x) for x in xs)
     elif type(xs).__name__ == "Registrar" or isinstance(xs, PurePath):
@@ -107,7 +108,9 @@ class VisibilityRuleSet:
     rules: Sequence[VisibilityRule]
 
     @classmethod
-    def parse(cls, arg: Any, relpath: str) -> VisibilityRuleSet:
+    def parse(
+        cls, arg: Any, relpath: str, pathspec_cls: type[VisibilityRulePattern]
+    ) -> VisibilityRuleSet:
         """Translate input `arg` from BUILD file call.
 
         The arg is a rule spec tuple with two or more elements, where the first is the target type
@@ -121,7 +124,10 @@ class VisibilityRuleSet:
 
         try:
             targets, rules = flatten(arg[0]), flatten(arg[1:])
-            return cls(tuple(targets), tuple(VisibilityRule.parse(rule, relpath) for rule in rules))
+            return cls(
+                tuple(targets),
+                tuple(VisibilityRule.parse(rule, relpath, pathspec_cls) for rule in rules),
+            )
         except ValueError as e:
             raise ValueError(f"Invalid rule spec, {e}") from e
 
@@ -133,6 +139,7 @@ class VisibilityRuleSet:
 class BuildFileVisibilityRules(BuildFileDependencyRules):
     path: str
     rulesets: Sequence[VisibilityRuleSet]
+    pathspec_cls: type[VisibilityRulePattern]
 
     @staticmethod
     def create_parser_state(
@@ -251,12 +258,13 @@ class BuildFileVisibilityRulesParserState(BuildFileDependencyRulesParserState):
     path: str
     parent: BuildFileVisibilityRules | None
     rulesets: list[VisibilityRuleSet] = field(default_factory=list)
+    pathspec_cls: type[VisibilityRulePattern] | None = None
 
     def get_frozen_dependency_rules(self) -> BuildFileDependencyRules | None:
         if not self.rulesets:
             return self.parent
         else:
-            return BuildFileVisibilityRules(self.path, tuple(self.rulesets))
+            return BuildFileVisibilityRules(self.path, tuple(self.rulesets), self.pathspec_cls)
 
     def set_dependency_rules(
         self,
@@ -266,8 +274,11 @@ class BuildFileVisibilityRulesParserState(BuildFileDependencyRulesParserState):
         **kwargs,
     ) -> None:
         try:
+            pathspec_cls = self.get_pathspec_cls(kwargs.get("rule_glob_style"))
             self.rulesets = [
-                VisibilityRuleSet.parse(arg, os.path.dirname(build_file)) for arg in args if arg
+                VisibilityRuleSet.parse(arg, os.path.dirname(build_file), pathspec_cls)
+                for arg in args
+                if arg
             ]
             self.path = build_file
         except ValueError as e:
@@ -275,3 +286,25 @@ class BuildFileVisibilityRulesParserState(BuildFileDependencyRulesParserState):
 
         if extend and self.parent:
             self.rulesets.extend(self.parent.rulesets)
+
+    def get_pathspec_cls(
+        self, rule_glob_style: Literal["gitignore", "fnmatch"] | None
+    ) -> type[VisibilityRulePattern]:
+        pathspec_cls: type[VisibilityRulePattern] = VisibilityRuleGitIgnorePattern
+        if rule_glob_style is None:
+            if self.pathspec_cls is not None:
+                return self.pathspec_cls
+            if self.parent is not None:
+                pathspec_cls = self.parent.pathspec_cls
+        elif rule_glob_style == "gitignore":
+            pathspec_cls = VisibilityRuleGitIgnorePattern
+        elif rule_glob_style == "fnmatch":
+            pathspec_cls = VisibilityRuleFnMatchPattern
+        else:
+            raise ValueError(
+                f"invalid value for optional `rule_glob_style`: {rule_glob_style!r}, expected: "
+                "'gitignore' or 'fnmatch'. Default is 'gitignore', and will be inherited from "
+                "parent rule declarations."
+            )
+        self.pathspec_cls = pathspec_cls
+        return pathspec_cls
