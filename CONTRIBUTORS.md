@@ -35,6 +35,7 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Chris Heisterkamp
 + Chris Livingston
 + Chris Pesto
++ Chris Targett
 + Chris Williams
 + Christopher Livingston
 + Christopher Maier
@@ -94,6 +95,7 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Guy Marom
 + Harley Cooper
 + Henry Fuller
++ Herbert Rusznak
 + Huon Wilson
 + Hwasung Lee
 + Ian Tabolt
@@ -179,6 +181,7 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Maxim Khutornenko
 + Maxim Popenko
 + Michael Doherty
++ Michael Glass
 + Michal Bryc
 + Mike Cripps
 + Mike Lindsey
@@ -254,6 +257,7 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Tom Dimiduk
 + Tom Dyas
 + Tom Howland
++ Tom Solberg
 + Tomasz Godzik
 + Tomasz Pasternak
 + Travis Crawford
