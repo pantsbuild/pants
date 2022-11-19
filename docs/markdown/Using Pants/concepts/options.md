@@ -184,6 +184,8 @@ You can also leave off the `[]` to _append_ elements. So we can rewrite the abov
 ./pants --scope-listopt=foo --scope-listopt=bar
 ```
 
+Appending will add to any values from lower-precedence sources, such as config files (`pants.toml`) and possibly Pants's `default`. Otherwise, using `[]` will override any lower-precedence sources.
+
 ### Environment variables:
 
 ```bash
