@@ -4,12 +4,20 @@
 from __future__ import annotations
 
 from textwrap import dedent
+from typing import Iterable
 
 import pytest
 
 from pants.backend.python import target_types_rules
+from pants.backend.python.dependency_inference.module_mapper import PythonModuleOwners
+from pants.backend.python.dependency_inference.parse_python_dependencies import (
+    ParsedPythonImportInfo,
+    ParsedPythonImports,
+)
 from pants.backend.python.dependency_inference.rules import (
     ConftestDependenciesInferenceFieldSet,
+    ImportOwnerStatus,
+    ImportResolveResult,
     InferConftestDependencies,
     InferInitDependencies,
     InferPythonImportDependencies,
@@ -19,6 +27,10 @@ from pants.backend.python.dependency_inference.rules import (
     PythonInferSubsystem,
     UnownedDependencyError,
     UnownedDependencyUsage,
+    UnownedImportsPossibleOwners,
+    UnownedImportsPossibleOwnersRequest,
+    _find_other_owners_for_unowned_imports,
+    _get_imports_info,
     import_rules,
     infer_python_conftest_dependencies,
     infer_python_init_dependencies,
@@ -37,9 +49,10 @@ from pants.core.target_types import FilesGeneratorTarget, ResourcesGeneratorTarg
 from pants.core.target_types import rules as core_target_types_rules
 from pants.engine.addresses import Address
 from pants.engine.internals.parametrize import Parametrize
-from pants.engine.rules import SubsystemRule
-from pants.engine.target import InferredDependencies
+from pants.engine.rules import SubsystemRule, rule
+from pants.engine.target import ExplicitlyProvidedDependencies, InferredDependencies
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner, engine_error
+from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import softwrap
 
 
@@ -461,8 +474,13 @@ def test_infer_python_conftests() -> None:
 
 @pytest.fixture
 def imports_rule_runner() -> RuleRunner:
+    return mk_imports_rule_runner([])
+
+
+def mk_imports_rule_runner(more_rules: Iterable) -> RuleRunner:
     return RuleRunner(
         rules=[
+            *more_rules,
             *import_rules(),
             *target_types_rules.rules(),
             *core_target_types_rules(),
@@ -627,3 +645,253 @@ def test_infer_python_strict_multiple_resolves(imports_rule_runner: RuleRunner) 
             InferredDependencies,
             [InferPythonImportDependencies(PythonImportDependenciesInferenceFieldSet.create(tgt))],
         )
+
+
+class TestCategoriseImportsInfo:
+    address = Address("sample/path")
+    import_cases = {
+        "unambiguous": (
+            ParsedPythonImportInfo(0, False),
+            PythonModuleOwners((Address("unambiguous.py"),)),
+        ),
+        "unambiguous_with_pyi": (
+            ParsedPythonImportInfo(0, False),
+            PythonModuleOwners(
+                (
+                    Address("unambiguous_with_pyi.py"),
+                    Address("unambiguous_with_pyi.pyi"),
+                )
+            ),
+        ),
+        "ambiguous_disambiguatable": (
+            ParsedPythonImportInfo(0, False),
+            PythonModuleOwners(
+                tuple(),
+                (
+                    Address("ambiguous_disambiguatable", target_name="good"),
+                    Address("ambiguous_disambiguatable", target_name="bad"),
+                ),
+            ),
+        ),
+        "ambiguous_terminal": (
+            ParsedPythonImportInfo(0, False),
+            PythonModuleOwners(
+                tuple(),
+                (
+                    Address("ambiguous_disambiguatable", target_name="bad0"),
+                    Address("ambiguous_disambiguatable", target_name="bad1"),
+                ),
+            ),
+        ),
+        "json": (
+            ParsedPythonImportInfo(0, False),
+            PythonModuleOwners(tuple()),
+        ),  # unownable
+        "os.path": (
+            ParsedPythonImportInfo(0, False),
+            PythonModuleOwners(tuple()),
+        ),  # unownable, not root module
+        "weak_owned": (
+            ParsedPythonImportInfo(0, True),
+            PythonModuleOwners((Address("weak_owned.py"),)),
+        ),
+        "weak_unowned": (
+            ParsedPythonImportInfo(0, True),
+            PythonModuleOwners(tuple()),
+        ),
+        "unowned": (
+            ParsedPythonImportInfo(0, False),
+            PythonModuleOwners(tuple()),
+        ),
+    }
+
+    def filter_case(self, case_name: str, cases=None):
+        cases = cases or self.import_cases
+        return {case_name: cases[case_name]}
+
+    def separate_owners_and_imports(
+        self,
+        imports_to_owners: dict[str, tuple[ParsedPythonImportInfo, PythonModuleOwners]],
+    ) -> tuple[list[PythonModuleOwners], ParsedPythonImports]:
+        owners_per_import = [x[1] for x in imports_to_owners.values()]
+        parsed_imports = ParsedPythonImports({k: v[0] for k, v in imports_to_owners.items()})
+        return owners_per_import, parsed_imports
+
+    def do_test(self, case_name: str, expected_status: ImportOwnerStatus) -> ImportResolveResult:
+        owners_per_import, parsed_imports = self.separate_owners_and_imports(
+            self.filter_case(case_name)
+        )
+        resolve_result = _get_imports_info(
+            self.address,
+            owners_per_import,
+            parsed_imports,
+            ExplicitlyProvidedDependencies(
+                self.address,
+                FrozenOrderedSet(),
+                FrozenOrderedSet((Address("ambiguous_disambiguatable", target_name="bad"),)),
+            ),
+        )
+
+        assert len(resolve_result) == 1 and case_name in resolve_result
+        resolved = resolve_result[case_name]
+        assert resolved.status == expected_status
+        return resolved
+
+    def test_unambiguous_imports(self, imports_rule_runner: RuleRunner) -> None:
+        case_name = "unambiguous"
+        resolved = self.do_test(case_name, ImportOwnerStatus.unambiguous)
+        assert resolved.address == self.import_cases[case_name][1].unambiguous
+
+    def test_unambiguous_with_pyi(self, imports_rule_runner: RuleRunner) -> None:
+        case_name = "unambiguous_with_pyi"
+        resolved = self.do_test(case_name, ImportOwnerStatus.unambiguous)
+        assert resolved.address == self.import_cases[case_name][1].unambiguous
+
+    def test_unownable_root(self, imports_rule_runner: RuleRunner) -> None:
+        case_name = "json"
+        self.do_test(case_name, ImportOwnerStatus.unownable)
+
+    def test_unownable_nonroot(self, imports_rule_runner: RuleRunner) -> None:
+        case_name = "os.path"
+        self.do_test(case_name, ImportOwnerStatus.unownable)
+
+    def test_weak_owned(self, imports_rule_runner: RuleRunner) -> None:
+        case_name = "weak_owned"
+        resolved = self.do_test(case_name, ImportOwnerStatus.unambiguous)
+        assert resolved.address == self.import_cases[case_name][1].unambiguous
+
+    def test_weak_unowned(self, imports_rule_runner: RuleRunner) -> None:
+        case_name = "weak_unowned"
+        resolved = self.do_test(case_name, ImportOwnerStatus.weak_ignore)
+        assert resolved.address == tuple()
+
+    def test_unowned(self, imports_rule_runner: RuleRunner) -> None:
+        case_name = "unowned"
+        resolved = self.do_test(case_name, ImportOwnerStatus.unowned)
+        assert resolved.address == tuple()
+
+    def test_ambiguous_disambiguatable(self):
+        case_name = "ambiguous_disambiguatable"
+        resolved = self.do_test(case_name, ImportOwnerStatus.disambiguated)
+        assert resolved.address == (self.import_cases[case_name][1].ambiguous[0],)
+
+    def test_ambiguous_not_disambiguatable(self):
+        case_name = "ambiguous_terminal"
+        resolved = self.do_test(case_name, ImportOwnerStatus.unowned)
+        assert resolved.address == ()
+
+
+class TestFindOtherOwners:
+    missing_import_name = "missing"
+    other_resolve = "other-resolve"
+    other_other_resolve = "other-other-resolve"
+
+    @staticmethod
+    @rule
+    async def run_rule(
+        req: UnownedImportsPossibleOwnersRequest,
+    ) -> UnownedImportsPossibleOwners:
+        return await _find_other_owners_for_unowned_imports(req)
+
+    @pytest.fixture
+    def _imports_rule_runner(self):
+        return mk_imports_rule_runner(
+            [
+                self.run_rule,
+                QueryRule(UnownedImportsPossibleOwners, [UnownedImportsPossibleOwnersRequest]),
+            ]
+        )
+
+    def do_test(self, imports_rule_runner: RuleRunner):
+        resolves = {"python-default": "", self.other_resolve: "", self.other_other_resolve: ""}
+        imports_rule_runner.set_options(
+            [
+                "--python-enable-resolves",
+                f"--python-resolves={resolves}",
+            ]
+        )
+
+        imports_rule_runner.write_files(
+            {
+                "project/cheesey.py": dedent(
+                    f"""\
+                        import other.{self.missing_import_name}
+                    """
+                ),
+                "project/BUILD": "python_sources()",
+            }
+        )
+
+        return imports_rule_runner.request(
+            UnownedImportsPossibleOwners,
+            [
+                UnownedImportsPossibleOwnersRequest(
+                    frozenset((f"other.{self.missing_import_name}",)), "original_resolve"
+                )
+            ],
+        )
+
+    def test_no_other_owners_found(self, _imports_rule_runner):
+        r = self.do_test(_imports_rule_runner)
+        assert not r.value
+
+    def test_other_owners_found_in_single_resolve(self, _imports_rule_runner: RuleRunner):
+
+        _imports_rule_runner.write_files(
+            {
+                "other/BUILD": dedent(
+                    f"""\
+                    python_source(
+                        name="{self.missing_import_name}",
+                        source="{self.missing_import_name}.py",
+                        resolve="{self.other_resolve}",
+                    )
+                """
+                ),
+                f"other/{self.missing_import_name}.py": "",
+            }
+        )
+
+        r = self.do_test(_imports_rule_runner)
+
+        as_module = f"other.{self.missing_import_name}"
+        assert as_module in r.value
+        assert r.value[as_module] == [
+            (
+                Address("other", target_name=self.missing_import_name),
+                self.other_resolve,
+            )
+        ]
+
+    def test_other_owners_found_in_multiple_resolves(self, _imports_rule_runner: RuleRunner):
+
+        _imports_rule_runner.write_files(
+            {
+                "other/BUILD": dedent(
+                    f"""\
+                    python_source(
+                        name="{self.missing_import_name}",
+                        source="{self.missing_import_name}.py",
+                        resolve=parametrize("{self.other_resolve}", "{self.other_other_resolve}"),
+                    )
+                """
+                ),
+                f"other/{self.missing_import_name}.py": "",
+            }
+        )
+
+        r = self.do_test(_imports_rule_runner)
+
+        as_module = f"other.{self.missing_import_name}"
+        assert as_module in r.value
+        assert r.value[as_module] == [
+            (
+                Address(
+                    "other",
+                    target_name=self.missing_import_name,
+                    parameters={"resolve": resolve},
+                ),
+                resolve,
+            )
+            for resolve in (self.other_other_resolve, self.other_resolve)
+        ]

@@ -15,6 +15,7 @@ from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
 from pants.engine.target import (
     Dependencies,
     DependenciesRequest,
+    Field,
     HydratedSources,
     HydrateSourcesRequest,
     SourcesField,
@@ -89,12 +90,22 @@ class _PeekJsonEncoder(json.JSONEncoder):
 
     def default(self, o):
         """Return a serializable object for o."""
+        if isinstance(o, str):  # early exit prevents strings from being treated as sequences
+            return o
+        if o is None:
+            return o
         if is_dataclass(o):
             return asdict(o)
         if isinstance(o, collections.abc.Mapping):
             return dict(o)
-        if isinstance(o, collections.abc.Sequence):
+        if (
+            isinstance(o, collections.abc.Sequence)
+            or isinstance(o, set)
+            or isinstance(o, collections.abc.Set)
+        ):
             return list(o)
+        if isinstance(o, Field):
+            return self.default(o.value)
         try:
             return super().default(o)
         except TypeError:

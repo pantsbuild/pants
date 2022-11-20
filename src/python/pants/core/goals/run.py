@@ -10,7 +10,6 @@ from dataclasses import dataclass
 from itertools import filterfalse, tee
 from typing import Callable, Iterable, Mapping, NamedTuple, Optional, Tuple, TypeVar
 
-from pants.base.build_root import BuildRoot
 from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
 from pants.core.util_rules.environments import _warn_on_non_local_environments
 from pants.engine.env_vars import CompleteEnvironmentVars
@@ -225,8 +224,7 @@ async def run(
     run_subsystem: RunSubsystem,
     debug_adapter: DebugAdapterSubsystem,
     global_options: GlobalOptions,
-    workspace: Workspace,
-    build_root: BuildRoot,
+    workspace: Workspace,  # Needed to enable sideeffecting.
     complete_env: CompleteEnvironmentVars,
 ) -> Run:
     field_set, target = await _find_what_to_run("the `run` goal")

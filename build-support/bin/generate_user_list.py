@@ -115,6 +115,7 @@ _orgs = (
         "https://vicarasolutions.com/",
         "https://files.readme.io/1748a22-vicara-solutions.png",
     ),
+    Org("Whisper", "https://whisper.ai/", "https://files.readme.io/cd60b22-whisper.png"),
 )
 
 

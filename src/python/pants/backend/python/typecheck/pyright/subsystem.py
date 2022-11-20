@@ -3,13 +3,13 @@
 
 from __future__ import annotations
 
+from pants.backend.javascript.subsystems.npx_tool import NpxToolBase
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.option.option_types import ArgsListOption, SkipOption, StrListOption
-from pants.option.subsystem import Subsystem
 from pants.util.strutil import softwrap
 
 
-class Pyright(Subsystem):
+class Pyright(NpxToolBase):
     options_scope = "pyright"
     name = "Pyright"
     help = softwrap(

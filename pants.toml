@@ -31,6 +31,7 @@ backend_packages.add = [
   "pants.backend.experimental.scala",
   "pants.backend.experimental.scala.lint.scalafmt",
   "pants.backend.experimental.scala.debug_goals",
+  "pants.backend.experimental.visibility",
   "internal_plugins.releases",
   "internal_plugins.test_lockfile_fixtures",
 ]
@@ -286,3 +287,4 @@ master = "src/python/pants/notes/master.rst"
 "2.13.x" = "src/python/pants/notes/2.13.x.md"
 "2.14.x" = "src/python/pants/notes/2.14.x.md"
 "2.15.x" = "src/python/pants/notes/2.15.x.md"
+"2.16.x" = "src/python/pants/notes/2.16.x.md"

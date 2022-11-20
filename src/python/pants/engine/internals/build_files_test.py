@@ -21,6 +21,7 @@ from pants.engine.internals.build_files import (
     parse_address_family,
 )
 from pants.engine.internals.defaults import ParametrizeDefault
+from pants.engine.internals.dep_rules import MaybeBuildFileDependencyRulesImplementation
 from pants.engine.internals.parametrize import Parametrize
 from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser
 from pants.engine.internals.scheduler import ExecutionError
@@ -64,6 +65,7 @@ def test_parse_address_family_empty() -> None:
             AddressFamilyDir("/dev/null"),
             RegisteredTargetTypes({}),
             UnionMembership({}),
+            MaybeBuildFileDependencyRulesImplementation(None),
         ],
         mock_gets=[
             MockGet(

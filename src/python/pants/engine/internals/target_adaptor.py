@@ -15,6 +15,8 @@ from pants.engine.engine_aware import EngineAwareParameter
 
 @dataclass(frozen=True)
 class TargetAdaptorRequest(EngineAwareParameter):
+    """Lookup the TargetAdaptor for an Address."""
+
     address: Address
     description_of_origin: str = dataclasses.field(hash=False, compare=False)
 

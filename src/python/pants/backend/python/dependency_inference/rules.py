@@ -5,11 +5,10 @@ from __future__ import annotations
 
 import itertools
 import logging
-from collections import defaultdict
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import PurePath
-from typing import DefaultDict, Iterable, Iterator
+from typing import Dict, Iterable, Optional
 
 from pants.backend.python.dependency_inference import module_mapper, parse_python_dependencies
 from pants.backend.python.dependency_inference.default_unowned_dependencies import (
@@ -222,8 +221,8 @@ def _get_inferred_asset_deps(
     assets_by_path: AllAssetTargetsByPath,
     assets: ParsedPythonAssetPaths,
     explicitly_provided_deps: ExplicitlyProvidedDependencies,
-) -> Iterator[Address]:
-    for filepath in assets:
+) -> dict[str, ImportResolveResult]:
+    def _resolve_single_asset(filepath) -> ImportResolveResult:
         # NB: Resources in Python's ecosystem are loaded relative to a package, so we only try and
         # query for a resource relative to requesting module's path
         # (I.e. we assume the user is doing something like `pkgutil.get_data(__file__, "foo/bar")`)
@@ -245,6 +244,9 @@ def _get_inferred_asset_deps(
 
         if inferred_tgts:
             possible_addresses = tuple(tgt.address for tgt in inferred_tgts)
+            if len(possible_addresses) == 1:
+                return ImportResolveResult(ImportOwnerStatus.unambiguous, possible_addresses)
+
             explicitly_provided_deps.maybe_warn_of_ambiguous_dependency_inference(
                 possible_addresses,
                 address,
@@ -253,7 +255,28 @@ def _get_inferred_asset_deps(
             )
             maybe_disambiguated = explicitly_provided_deps.disambiguated(possible_addresses)
             if maybe_disambiguated:
-                yield maybe_disambiguated
+                return ImportResolveResult(ImportOwnerStatus.disambiguated, (maybe_disambiguated,))
+            else:
+                return ImportResolveResult(ImportOwnerStatus.ambiguous)
+        else:
+            return ImportResolveResult(ImportOwnerStatus.unowned)
+
+    return {filepath: _resolve_single_asset(filepath) for filepath in assets}
+
+
+class ImportOwnerStatus(Enum):
+    unambiguous = "unambiguous"
+    disambiguated = "disambiguated"
+    ambiguous = "ambiguous"
+    unowned = "unowned"
+    weak_ignore = "weak_ignore"
+    unownable = "unownable"
+
+
+@dataclass(frozen=True)
+class ImportResolveResult:
+    status: ImportOwnerStatus
+    address: tuple[Address, ...] = ()
 
 
 def _get_imports_info(
@@ -261,30 +284,118 @@ def _get_imports_info(
     owners_per_import: Iterable[PythonModuleOwners],
     parsed_imports: ParsedPythonImports,
     explicitly_provided_deps: ExplicitlyProvidedDependencies,
-) -> tuple[set[Address], set[str]]:
-    inferred_deps: set[Address] = set()
-    unowned_imports: set[str] = set()
+) -> dict[str, ImportResolveResult]:
+    def _resolve_single_import(owners, import_name) -> ImportResolveResult:
+        if owners.unambiguous:
+            return ImportResolveResult(ImportOwnerStatus.unambiguous, owners.unambiguous)
 
-    for owners, imp in zip(owners_per_import, parsed_imports):
-        inferred_deps.update(owners.unambiguous)
         explicitly_provided_deps.maybe_warn_of_ambiguous_dependency_inference(
             owners.ambiguous,
             address,
             import_reference="module",
-            context=f"The target {address} imports `{imp}`",
+            context=f"The target {address} imports `{import_name}`",
         )
         maybe_disambiguated = explicitly_provided_deps.disambiguated(owners.ambiguous)
         if maybe_disambiguated:
-            inferred_deps.add(maybe_disambiguated)
+            return ImportResolveResult(ImportOwnerStatus.disambiguated, (maybe_disambiguated,))
+        elif import_name.split(".")[0] in DEFAULT_UNOWNED_DEPENDENCIES:
+            return ImportResolveResult(ImportOwnerStatus.unownable)
+        elif parsed_imports[import_name].weak:
+            return ImportResolveResult(ImportOwnerStatus.weak_ignore)
+        else:
+            return ImportResolveResult(ImportOwnerStatus.unowned)
 
+    return {
+        imp: _resolve_single_import(owners, imp)
+        for owners, (imp, inf) in zip(owners_per_import, parsed_imports.items())
+    }
+
+
+def _collect_imports_info(
+    resolve_result: dict[str, ImportResolveResult]
+) -> tuple[frozenset[Address], frozenset[str]]:
+    """Collect import resolution results into:
+
+    - imports (direct and disambiguated)
+    - unowned
+    """
+
+    return frozenset(
+        addr
+        for dep in resolve_result.values()
+        for addr in dep.address
         if (
-            not owners.unambiguous
-            and imp.split(".")[0] not in DEFAULT_UNOWNED_DEPENDENCIES
-            and not parsed_imports[imp].weak
-        ):
-            unowned_imports.add(imp)
+            dep.status == ImportOwnerStatus.unambiguous
+            or dep.status == ImportOwnerStatus.disambiguated
+        )
+    ), frozenset(
+        imp for imp, dep in resolve_result.items() if dep.status == ImportOwnerStatus.unowned
+    )
 
-    return inferred_deps, unowned_imports
+
+@dataclass(frozen=True)
+class UnownedImportsPossibleOwnersRequest:
+    """A request to find possible owners for several imports originating in a resolve."""
+
+    unowned_imports: frozenset[str]
+    original_resolve: str
+
+
+@dataclass(frozen=True)
+class UnownedImportPossibleOwnerRequest:
+    unowned_import: str
+    original_resolve: str
+
+
+@dataclass(frozen=True)
+class UnownedImportsPossibleOwners:
+    value: Dict[str, list[tuple[Address, ResolveName]]]
+
+
+@dataclass(frozen=True)
+class UnownedImportPossibleOwners:
+    value: list[tuple[Address, ResolveName]]
+
+
+@rule_helper
+async def _find_other_owners_for_unowned_imports(
+    req: UnownedImportsPossibleOwnersRequest,
+) -> UnownedImportsPossibleOwners:
+    individual_possible_owners = await MultiGet(
+        Get(UnownedImportPossibleOwners, UnownedImportPossibleOwnerRequest(r, req.original_resolve))
+        for r in req.unowned_imports
+    )
+
+    return UnownedImportsPossibleOwners(
+        {
+            imported_module: possible_owners.value
+            for imported_module, possible_owners in zip(
+                req.unowned_imports, individual_possible_owners
+            )
+            if possible_owners.value
+        }
+    )
+
+
+@rule
+async def find_other_owners_for_unowned_import(
+    req: UnownedImportPossibleOwnerRequest,
+    python_setup: PythonSetup,
+) -> UnownedImportPossibleOwners:
+    other_owner_from_other_resolves = await Get(
+        PythonModuleOwners, PythonModuleOwnersRequest(req.unowned_import, resolve=None)
+    )
+
+    owners = other_owner_from_other_resolves
+    other_owners_as_targets = await Get(Targets, Addresses(owners.unambiguous + owners.ambiguous))
+
+    other_owners = []
+
+    for t in other_owners_as_targets:
+        other_owner_resolve = t[PythonResolveField].normalized_value(python_setup)
+        if other_owner_resolve != req.original_resolve:
+            other_owners.append((t.address, other_owner_resolve))
+    return UnownedImportPossibleOwners(other_owners)
 
 
 @rule_helper
@@ -292,7 +403,7 @@ async def _handle_unowned_imports(
     address: Address,
     unowned_dependency_behavior: UnownedDependencyUsage,
     python_setup: PythonSetup,
-    unowned_imports: Iterable[str],
+    unowned_imports: frozenset[str],
     parsed_imports: ParsedPythonImports,
     resolve: str,
 ) -> None:
@@ -301,25 +412,11 @@ async def _handle_unowned_imports(
 
     other_resolves_snippet = ""
     if len(python_setup.resolves) > 1:
-        other_owners_from_other_resolves = await MultiGet(
-            Get(PythonModuleOwners, PythonModuleOwnersRequest(imported_module, resolve=None))
-            for imported_module in unowned_imports
-        )
-        other_owners_as_targets = await MultiGet(
-            Get(Targets, Addresses(owners.unambiguous + owners.ambiguous))
-            for owners in other_owners_from_other_resolves
-        )
-
-        imports_to_other_owners: DefaultDict[str, list[tuple[Address, ResolveName]]] = defaultdict(
-            list
-        )
-        for imported_module, targets in zip(unowned_imports, other_owners_as_targets):
-            for t in targets:
-                other_owner_resolve = t[PythonResolveField].normalized_value(python_setup)
-                if other_owner_resolve != resolve:
-                    imports_to_other_owners[imported_module].append(
-                        (t.address, other_owner_resolve)
-                    )
+        imports_to_other_owners = (
+            await _find_other_owners_for_unowned_imports(
+                UnownedImportsPossibleOwnersRequest(unowned_imports, resolve),
+            )
+        ).value
 
         if imports_to_other_owners:
             other_resolves_lines = []
@@ -359,6 +456,96 @@ async def _handle_unowned_imports(
         raise UnownedDependencyError(msg)
 
 
+@rule_helper
+async def _exec_parse_deps(
+    field_set: PythonImportDependenciesInferenceFieldSet,
+    python_infer_subsystem: PythonInferSubsystem,
+    python_setup: PythonSetup,
+) -> ParsedPythonDependencies:
+    interpreter_constraints = InterpreterConstraints.create_from_compatibility_fields(
+        [field_set.interpreter_constraints], python_setup
+    )
+    resp = await Get(
+        ParsedPythonDependencies,
+        ParsePythonDependenciesRequest(
+            field_set.source,
+            interpreter_constraints,
+            string_imports=python_infer_subsystem.string_imports,
+            string_imports_min_dots=python_infer_subsystem.string_imports_min_dots,
+            assets=python_infer_subsystem.assets,
+            assets_min_slashes=python_infer_subsystem.assets_min_slashes,
+        ),
+    )
+    return resp
+
+
+@dataclass(frozen=True)
+class ResolvedParsedPythonDependenciesRequest:
+    field_set: PythonImportDependenciesInferenceFieldSet
+    parsed_dependencies: ParsedPythonDependencies
+    resolve: Optional[str]
+
+
+@dataclass(frozen=True)
+class ResolvedParsedPythonDependencies:
+    resolve_results: dict[str, ImportResolveResult]
+    assets: dict[str, ImportResolveResult]
+    explicit: ExplicitlyProvidedDependencies
+
+
+@rule
+async def resolve_parsed_dependencies(
+    request: ResolvedParsedPythonDependenciesRequest,
+    python_infer_subsystem: PythonInferSubsystem,
+) -> ResolvedParsedPythonDependencies:
+    """Find the owning targets for the parsed dependencies."""
+
+    parsed_imports = request.parsed_dependencies.imports
+    parsed_assets = request.parsed_dependencies.assets
+    if not python_infer_subsystem.imports:
+        parsed_imports = ParsedPythonImports([])
+
+    explicitly_provided_deps = await Get(
+        ExplicitlyProvidedDependencies, DependenciesRequest(request.field_set.dependencies)
+    )
+
+    if parsed_imports:
+        owners_per_import = await MultiGet(
+            Get(
+                PythonModuleOwners,
+                PythonModuleOwnersRequest(imported_module, resolve=request.resolve),
+            )
+            for imported_module in parsed_imports
+        )
+        resolve_results = _get_imports_info(
+            address=request.field_set.address,
+            owners_per_import=owners_per_import,
+            parsed_imports=parsed_imports,
+            explicitly_provided_deps=explicitly_provided_deps,
+        )
+    else:
+        resolve_results = {}
+
+    if parsed_assets:
+        all_asset_targets = await Get(AllAssetTargets, AllAssetTargetsRequest())
+        assets_by_path = await Get(AllAssetTargetsByPath, AllAssetTargets, all_asset_targets)
+        asset_deps = _get_inferred_asset_deps(
+            request.field_set.address,
+            request.field_set.source.file_path,
+            assets_by_path,
+            parsed_assets,
+            explicitly_provided_deps,
+        )
+    else:
+        asset_deps = {}
+
+    return ResolvedParsedPythonDependencies(
+        resolve_results=resolve_results,
+        assets=asset_deps,
+        explicit=explicitly_provided_deps,
+    )
+
+
 @rule(desc="Inferring Python dependencies by analyzing source")
 async def infer_python_dependencies_via_source(
     request: InferPythonImportDependencies,
@@ -368,66 +555,28 @@ async def infer_python_dependencies_via_source(
     if not python_infer_subsystem.imports and not python_infer_subsystem.assets:
         return InferredDependencies([])
 
-    address = request.field_set.address
-    interpreter_constraints = InterpreterConstraints.create_from_compatibility_fields(
-        [request.field_set.interpreter_constraints], python_setup
-    )
-    parsed_dependencies = await Get(
-        ParsedPythonDependencies,
-        ParsePythonDependenciesRequest(
-            request.field_set.source,
-            interpreter_constraints,
-            string_imports=python_infer_subsystem.string_imports,
-            string_imports_min_dots=python_infer_subsystem.string_imports_min_dots,
-            assets=python_infer_subsystem.assets,
-            assets_min_slashes=python_infer_subsystem.assets_min_slashes,
-        ),
-    )
-
-    inferred_deps: set[Address] = set()
-    unowned_imports: set[str] = set()
-    parsed_imports = parsed_dependencies.imports
-    parsed_assets = parsed_dependencies.assets
-    if not python_infer_subsystem.imports:
-        parsed_imports = ParsedPythonImports([])
-
-    explicitly_provided_deps = await Get(
-        ExplicitlyProvidedDependencies, DependenciesRequest(request.field_set.dependencies)
+    parsed_dependencies = await _exec_parse_deps(
+        request.field_set, python_infer_subsystem, python_setup
     )
 
     resolve = request.field_set.resolve.normalized_value(python_setup)
 
-    if parsed_imports:
-        import_deps, unowned_imports = _get_imports_info(
-            address=address,
-            owners_per_import=await MultiGet(
-                Get(PythonModuleOwners, PythonModuleOwnersRequest(imported_module, resolve=resolve))
-                for imported_module in parsed_imports
-            ),
-            parsed_imports=parsed_imports,
-            explicitly_provided_deps=explicitly_provided_deps,
-        )
-        inferred_deps.update(import_deps)
+    resolved_dependencies = await Get(
+        ResolvedParsedPythonDependencies,
+        ResolvedParsedPythonDependenciesRequest(request.field_set, parsed_dependencies, resolve),
+    )
+    import_deps, unowned_imports = _collect_imports_info(resolved_dependencies.resolve_results)
 
-    if parsed_assets:
-        all_asset_targets = await Get(AllAssetTargets, AllAssetTargetsRequest())
-        assets_by_path = await Get(AllAssetTargetsByPath, AllAssetTargets, all_asset_targets)
-        inferred_deps.update(
-            _get_inferred_asset_deps(
-                address,
-                request.field_set.source.file_path,
-                assets_by_path,
-                parsed_assets,
-                explicitly_provided_deps,
-            )
-        )
+    asset_deps, unowned_assets = _collect_imports_info(resolved_dependencies.assets)
+
+    inferred_deps = import_deps | asset_deps
 
     _ = await _handle_unowned_imports(
-        address,
+        request.field_set.address,
         python_infer_subsystem.unowned_dependency_behavior,
         python_setup,
         unowned_imports,
-        parsed_imports,
+        parsed_dependencies.imports,
         resolve=resolve,
     )
 
@@ -531,6 +680,8 @@ async def infer_python_conftest_dependencies(
 # This is a separate function to facilitate tests registering import inference.
 def import_rules():
     return [
+        resolve_parsed_dependencies,
+        find_other_owners_for_unowned_import,
         infer_python_dependencies_via_source,
         *pex.rules(),
         *parse_python_dependencies.rules(),

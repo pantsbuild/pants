@@ -327,7 +327,7 @@ def filter_tool_lockfile_requests(
 
 class GenerateLockfilesSubsystem(GoalSubsystem):
     name = "generate-lockfiles"
-    help = "Generate lockfiles for Python third-party dependencies."
+    help = "Generate lockfiles for third-party dependencies."
 
     @classmethod
     def activated(cls, union_membership: UnionMembership) -> bool:
