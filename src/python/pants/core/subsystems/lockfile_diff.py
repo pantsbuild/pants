@@ -13,8 +13,8 @@ from pants.backend.python.target_types import ConsoleScript
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.core.goals.generate_lockfiles import (
-    GenerateToolLockfileSentinel,
     GenerateLockfileResult,
+    GenerateToolLockfileSentinel,
     LockfileGeneratedPostProcessing,
 )
 from pants.engine.process import InteractiveProcess, Process
@@ -29,7 +29,7 @@ class LockfileDiffSubsystem(PythonToolBase):
     name = "lockfile-diff"
     help = "The utility for diff-ing lockfiles."
 
-    default_version = "lockfile-diff>=0.3.0,<0.4.0"
+    default_version = "lockfile-diff>=0.3.3,<0.4.0"
     default_main = ConsoleScript("lockfile-diff")
 
     register_interpreter_constraints = True
@@ -69,12 +69,12 @@ async def lockfile_diff_post_processing(
             pex,
             argv=(
                 "--new",
-                generated.result.path,
+                generated.path,
                 "--compare=HEAD",
                 "--no-fail",
                 *lockfile_diff.args,
             ),
-            description=f"{generated.result.resolve_name}: diff {generated.result.path}",
+            description=f"{generated.resolve_name}: diff {generated.path}",
         ),
     )
     return LockfileGeneratedPostProcessing(

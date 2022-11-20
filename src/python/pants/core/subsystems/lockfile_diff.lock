@@ -9,7 +9,7 @@
 //     "CPython<3.10,>=3.8"
 //   ],
 //   "generated_with_requirements": [
-//     "lockfile-diff<0.3.0,>=0.2.0"
+//     "lockfile-diff<0.4.0,>=0.3.3"
 //   ],
 //   "manylinux": "manylinux2014",
 //   "requirement_constraints": [],
@@ -52,23 +52,28 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "385a47b9ec25f932847ade9dd8f1b915664862fe9068ffb801889e23af7122d9",
-              "url": "https://files.pythonhosted.org/packages/5b/14/e6959201ece1b5ca3b28699d70f1396629bda29080e2f691ed3fd483e43a/lockfile_diff-0.2.0-py3-none-any.whl"
+              "hash": "63e987df077944f1d2a12c74be48eda252cef9d2a5ee85297bf8df0a91dddbe8",
+              "url": "https://files.pythonhosted.org/packages/73/62/6c4bdf1fe0b28f4e00e2262832646b2d5e35daaf9925c0ec2f56d89b6404/lockfile_diff-0.3.3-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "6da30655d3da2625953919510bece317af09685c7504d910cb88047736a04308",
-              "url": "https://files.pythonhosted.org/packages/6f/85/69e04ec1bd3564f976a5576dfadeab9f1f85cc8042ddfe5019d3cb14a2e6/lockfile-diff-0.2.0.tar.gz"
+              "hash": "edcebc664dbeafb6ee41afe471b0378ae64745a6fb139e542385992736f44d44",
+              "url": "https://files.pythonhosted.org/packages/ed/c0/9b3c3b65701affff2a48aef4ff91c5906edb193c873c420137bd05a0092f/lockfile-diff-0.3.3.tar.gz"
             }
           ],
           "project_name": "lockfile-diff",
           "requires_dists": [
             "click",
             "packaging",
-            "pyyaml"
+            "phx-class-registry",
+            "pyyaml",
+            "setuptools",
+            "toml",
+            "types-pyyaml",
+            "types-toml"
           ],
           "requires_python": "<3.10,>=3.8",
-          "version": "0.2.0"
+          "version": "0.3.3"
         },
         {
           "artifacts": [
@@ -89,6 +94,28 @@
           ],
           "requires_python": ">=3.6",
           "version": "21.3"
+        },
+        {
+          "artifacts": [
+            {
+              "algorithm": "sha256",
+              "hash": "ebb6aa3d232f1a5081a00dab2551693bb39ac78359e01b42a9c157ef9a5f85ef",
+              "url": "https://files.pythonhosted.org/packages/32/70/666e3ccf2e8b49c3cabd807570b3e410d9fbda9dcae15421f656a770d377/phx_class_registry-3.0.5-py3-none-any.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "f11462ac410a8cda38c2b6a83b51a2390c7d9528baef591cb5b551b11aba2a92",
+              "url": "https://files.pythonhosted.org/packages/ea/48/b1acdd934f89377fd047401f02c301b938f4962f5af30b8ad7224487c412/phx-class-registry-3.0.5.tar.gz"
+            }
+          ],
+          "project_name": "phx-class-registry",
+          "requires_dists": [
+            "sphinx-rtd-theme; extra == \"docs-builder\"",
+            "sphinx; extra == \"docs-builder\"",
+            "tox>=3.7; extra == \"test-runner\""
+          ],
+          "requires_python": null,
+          "version": "3.0.5"
         },
         {
           "artifacts": [
@@ -168,17 +195,134 @@
           "requires_dists": [],
           "requires_python": ">=3.6",
           "version": "6.0"
+        },
+        {
+          "artifacts": [
+            {
+              "algorithm": "sha256",
+              "hash": "6211d2f5eddad8757bd0484923ca7c0a6302ebc4ab32ea5e94357176e0ca0840",
+              "url": "https://files.pythonhosted.org/packages/1f/97/c03668380f278f1f8b0486d820c142cf224bba1bd78416e1797b52e0e81c/setuptools-65.6.0-py3-none-any.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "d1eebf881c6114e51df1664bc2c9133d022f78d12d5f4f665b9191f084e2862d",
+              "url": "https://files.pythonhosted.org/packages/09/b6/33512596fb92ba68f7c45e9bbc5e1bb9b24fbd941f9aece250fb420c2f5c/setuptools-65.6.0.tar.gz"
+            }
+          ],
+          "project_name": "setuptools",
+          "requires_dists": [
+            "build[virtualenv]; extra == \"testing\"",
+            "build[virtualenv]; extra == \"testing-integration\"",
+            "filelock>=3.4.0; extra == \"testing\"",
+            "filelock>=3.4.0; extra == \"testing-integration\"",
+            "flake8-2020; extra == \"testing\"",
+            "flake8<5; extra == \"testing\"",
+            "furo; extra == \"docs\"",
+            "ini2toml[lite]>=0.9; extra == \"testing\"",
+            "jaraco.envs>=2.2; extra == \"testing\"",
+            "jaraco.envs>=2.2; extra == \"testing-integration\"",
+            "jaraco.packaging>=9; extra == \"docs\"",
+            "jaraco.path>=3.2.0; extra == \"testing\"",
+            "jaraco.path>=3.2.0; extra == \"testing-integration\"",
+            "jaraco.tidelift>=1.4; extra == \"docs\"",
+            "pip-run>=8.8; extra == \"testing\"",
+            "pip>=19.1; extra == \"testing\"",
+            "pygments-github-lexers==0.0.5; extra == \"docs\"",
+            "pytest-black>=0.3.7; platform_python_implementation != \"PyPy\" and extra == \"testing\"",
+            "pytest-checkdocs>=2.4; extra == \"testing\"",
+            "pytest-cov; platform_python_implementation != \"PyPy\" and extra == \"testing\"",
+            "pytest-enabler; extra == \"testing-integration\"",
+            "pytest-enabler>=1.3; extra == \"testing\"",
+            "pytest-flake8; extra == \"testing\"",
+            "pytest-mypy>=0.9.1; platform_python_implementation != \"PyPy\" and extra == \"testing\"",
+            "pytest-perf; extra == \"testing\"",
+            "pytest-timeout; extra == \"testing\"",
+            "pytest-xdist; extra == \"testing\"",
+            "pytest-xdist; extra == \"testing-integration\"",
+            "pytest; extra == \"testing-integration\"",
+            "pytest>=6; extra == \"testing\"",
+            "rst.linker>=1.9; extra == \"docs\"",
+            "sphinx-favicon; extra == \"docs\"",
+            "sphinx-hoverxref<2; extra == \"docs\"",
+            "sphinx-inline-tabs; extra == \"docs\"",
+            "sphinx-notfound-page==0.8.3; extra == \"docs\"",
+            "sphinx-reredirects; extra == \"docs\"",
+            "sphinx>=3.5; extra == \"docs\"",
+            "sphinxcontrib-towncrier; extra == \"docs\"",
+            "tomli-w>=1.0.0; extra == \"testing\"",
+            "tomli; extra == \"testing-integration\"",
+            "virtualenv>=13.0.0; extra == \"testing\"",
+            "virtualenv>=13.0.0; extra == \"testing-integration\"",
+            "wheel; extra == \"testing\"",
+            "wheel; extra == \"testing-integration\""
+          ],
+          "requires_python": ">=3.7",
+          "version": "65.6.0"
+        },
+        {
+          "artifacts": [
+            {
+              "algorithm": "sha256",
+              "hash": "806143ae5bfb6a3c6e736a764057db0e6a0e05e338b5630894a5f779cabb4f9b",
+              "url": "https://files.pythonhosted.org/packages/44/6f/7120676b6d73228c96e17f1f794d8ab046fc910d781c8d151120c3f1569e/toml-0.10.2-py2.py3-none-any.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "b3bda1d108d5dd99f4a20d24d9c348e91c4db7ab1b749200bded2f839ccbe68f",
+              "url": "https://files.pythonhosted.org/packages/be/ba/1f744cdc819428fc6b5084ec34d9b30660f6f9daaf70eead706e3203ec3c/toml-0.10.2.tar.gz"
+            }
+          ],
+          "project_name": "toml",
+          "requires_dists": [],
+          "requires_python": "!=3.0.*,!=3.1.*,!=3.2.*,>=2.6",
+          "version": "0.10.2"
+        },
+        {
+          "artifacts": [
+            {
+              "algorithm": "sha256",
+              "hash": "1e94e80aafee07a7e798addb2a320e32956a373f376655128ae20637adb2655b",
+              "url": "https://files.pythonhosted.org/packages/13/c2/aff0c123a4a8e4b360a52bb62019949fa691d02ca0fda1ac5010171d9d42/types_PyYAML-6.0.12.2-py3-none-any.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "6840819871c92deebe6a2067fb800c11b8a063632eb4e3e755914e7ab3604e83",
+              "url": "https://files.pythonhosted.org/packages/98/f1/b811af145690f4585e5ef03ce961b9ed3e361ace950416bd577dfa6c4918/types-PyYAML-6.0.12.2.tar.gz"
+            }
+          ],
+          "project_name": "types-pyyaml",
+          "requires_dists": [],
+          "requires_python": null,
+          "version": "6.0.12.2"
+        },
+        {
+          "artifacts": [
+            {
+              "algorithm": "sha256",
+              "hash": "b7b5c4977f96ab7b5ac06d8a6590d17c0bf252a96efc03b109c2711fb3e0eafd",
+              "url": "https://files.pythonhosted.org/packages/84/e9/9569cdc5c54b7d36d36b2bacefeb01a1b2feb90c9fd18ee15797ad4fa67b/types_toml-0.10.8.1-py3-none-any.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "171bdb3163d79a520560f24ba916a9fc9bff81659c5448a9fea89240923722be",
+              "url": "https://files.pythonhosted.org/packages/c6/8b/a8544990966e9b475c1767f21272cbbdc2b470d4e690e04b5510b129b311/types-toml-0.10.8.1.tar.gz"
+            }
+          ],
+          "project_name": "types-toml",
+          "requires_dists": [],
+          "requires_python": null,
+          "version": "0.10.8.1"
         }
       ],
       "platform_tag": null
     }
   ],
   "path_mappings": {},
-  "pex_version": "2.1.111",
+  "pex_version": "2.1.113",
   "pip_version": "20.3.4-patched",
   "prefer_older_binary": false,
   "requirements": [
-    "lockfile-diff<0.3.0,>=0.2.0"
+    "lockfile-diff<0.4.0,>=0.3.3"
   ],
   "requires_python": [
     "<3.10,>=3.8"

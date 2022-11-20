@@ -782,12 +782,12 @@ class DictOption(_OptionBase["dict[str, _ValueT]", "dict[str, _ValueT]"], Generi
 class SkipOption(BoolOption[bool]):
     """A --skip option (for an invocable tool)."""
 
-    def __new__(cls, goal: str, *other_goals: str):
+    def __new__(cls, goal: str, *other_goals: str, default: bool = False):
         goals = (goal,) + other_goals
         invocation_str = " and ".join([f"`{bin_name()} {goal}`" for goal in goals])
         return super().__new__(
             cls,  # type: ignore[arg-type]
-            default=False,  # type: ignore[arg-type]
+            default=default,  # type: ignore[arg-type]
             help=lambda subsystem_cls: (
                 f"If true, don't use {subsystem_cls.name} when running {invocation_str}."
             ),

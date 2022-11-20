@@ -23,6 +23,7 @@ from pants.core.goals import (
     test,
     update_build_files,
 )
+from pants.core.subsystems import lockfile_diff
 from pants.core.target_types import (
     ArchiveTarget,
     FilesGeneratorTarget,
@@ -81,6 +82,7 @@ def rules():
         *config_files.rules(),
         *external_tool.rules(),
         *git.rules(),
+        *lockfile_diff.rules(),
         *source_files.rules(),
         *source_root.rules(),
         *stats_aggregator.rules(),
