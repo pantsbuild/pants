@@ -47,6 +47,10 @@ def test_race_detector_fields_work_as_expected(rule_runner: RuleRunner) -> None:
             func main() {}
             """
             ),
+            f"{dir_path}/pkg_race_false/BUILD": "go_package(test_race=False)\n",
+            f"{dir_path}/pkg_race_false/foo.go": "package pkg_race_false\n",
+            f"{dir_path}/pkg_race_true/BUILD": "go_package(test_race=True)\n",
+            f"{dir_path}/pkg_race_true/foo.go": "package pkg_race_true\n",
         }
 
     rule_runner.write_files(
@@ -87,7 +91,20 @@ def test_race_detector_fields_work_as_expected(rule_runner: RuleRunner) -> None:
     assert_value(
         Address("mod_race_unspecified", target_name="pkg"),
         False,
+        for_tests=True,
         msg="for go_package when unspecified on go_mod",
+    )
+    assert_value(
+        Address("mod_race_unspecified/pkg_race_false"),
+        False,
+        for_tests=True,
+        msg="for go_package(test_race=False) when unspecified on go_mod",
+    )
+    assert_value(
+        Address("mod_race_unspecified/pkg_race_true"),
+        True,
+        for_tests=True,
+        msg="for go_package(test_race=True) when unspecified on go_mod",
     )
     assert_value(
         Address("mod_race_unspecified", target_name="mod"),
@@ -114,7 +131,20 @@ def test_race_detector_fields_work_as_expected(rule_runner: RuleRunner) -> None:
     assert_value(
         Address("mod_race_false", target_name="pkg"),
         False,
+        for_tests=True,
         msg="for go_package when race=False on go_mod",
+    )
+    assert_value(
+        Address("mod_race_false/pkg_race_false"),
+        False,
+        for_tests=True,
+        msg="for go_package(test_race=False) when race=False on go_mod",
+    )
+    assert_value(
+        Address("mod_race_false/pkg_race_true"),
+        True,
+        for_tests=True,
+        msg="for go_package(test_race=True) when race=False on go_mod",
     )
     assert_value(
         Address("mod_race_false", target_name="mod"),
@@ -141,10 +171,38 @@ def test_race_detector_fields_work_as_expected(rule_runner: RuleRunner) -> None:
     assert_value(
         Address("mod_race_true", target_name="pkg"),
         True,
+        for_tests=True,
         msg="for go_package when race=True on go_mod",
+    )
+    assert_value(
+        Address("mod_race_true/pkg_race_false"),
+        False,
+        for_tests=True,
+        msg="for go_package(test_race=False) when race=True on go_mod",
+    )
+    assert_value(
+        Address("mod_race_true/pkg_race_true"),
+        True,
+        for_tests=True,
+        msg="for go_package(test_race=True) when race=True on go_mod",
     )
     assert_value(
         Address("mod_race_true", target_name="mod"),
         True,
         msg="for go_mod when race=True on go_mod",
+    )
+
+    # Test when `--go-test-force-race` is in effect.
+    rule_runner.set_options(["--go-test-force-race"], env_inherit={"PATH"})
+    assert_value(
+        Address("mod_race_unspecified", target_name="pkg"),
+        True,
+        for_tests=True,
+        msg="for go_package when --go-test-force-race and when unspecified on go_mod",
+    )
+    assert_value(
+        Address("mod_race_false", target_name="pkg"),
+        True,
+        for_tests=True,
+        msg="for go_package when --go-test-force-race and when race=False on go_mod",
     )
