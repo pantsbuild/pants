@@ -246,12 +246,6 @@ def memoized_property(
     :returns: A read-only property that memoizes its calculated value and un-caches its value when
               `del`ed.
     """
-    if func is None:
-        # See comment on `memoized` for when func is None.
-        return functools.partial(  # type: ignore[return-value]
-            memoized_property, key_factory=key_factory, cache_factory=cache_factory
-        )
-
     getter = memoized_method(func=func, key_factory=key_factory, cache_factory=cache_factory)
     return property(  # type: ignore[return-value]
         fget=getter,
@@ -262,12 +256,6 @@ def memoized_property(
 def memoized_classmethod(
     func: Optional[F] = None, key_factory=per_instance, cache_factory=dict
 ) -> F:
-    if func is None:
-        # See comment on `memoized` for when func is None.
-        return functools.partial(  # type: ignore[return-value]
-            memoized_classmethod, key_factory=key_factory, cache_factory=cache_factory
-        )
-
     return classmethod(  # type: ignore[return-value]
         memoized_method(func, key_factory=key_factory, cache_factory=cache_factory)
     )
@@ -276,12 +264,6 @@ def memoized_classmethod(
 def memoized_classproperty(
     func: Optional[Callable[..., T]] = None, key_factory=per_instance, cache_factory=dict
 ) -> T:
-    if func is None:
-        # See comment on `memoized` for when func is None.
-        return functools.partial(  # type: ignore[return-value]
-            memoized_classproperty, key_factory=key_factory, cache_factory=cache_factory
-        )
-
     return classproperty(
         memoized_classmethod(func, key_factory=key_factory, cache_factory=cache_factory)
     )
@@ -291,12 +273,6 @@ def testable_memoized_property(
     func: Optional[Callable[..., T]] = None, key_factory=per_instance, cache_factory=dict
 ) -> T:
     """A variant of `memoized_property` that allows for setting of properties (for tests, etc)."""
-    if func is None:
-        # See comment on `memoized` for when func is None.
-        return functools.partial(  # type: ignore[return-value]
-            testable_memoized_property, key_factory=key_factory, cache_factory=cache_factory
-        )
-
     getter = memoized_method(func=func, key_factory=key_factory, cache_factory=cache_factory)
 
     def setter(self, val):
