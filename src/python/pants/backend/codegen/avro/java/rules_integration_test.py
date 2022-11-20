@@ -82,7 +82,7 @@ def rule_runner() -> RuleRunner:
         ],
     )
     rule_runner.set_options(
-        ["--source-roots=['src/jvm','src/avro']", "-ltrace"],
+        ["--no-jvm-enable-lockfile-targets", "--source-roots=['src/jvm','src/avro']", "-ltrace"],
         env_inherit=PYTHON_BOOTSTRAP_ENV,
     )
     return rule_runner

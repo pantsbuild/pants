@@ -67,7 +67,7 @@ def rule_runner() -> RuleRunner:
         ],
         target_types=[JavaSourcesGeneratorTarget, JvmArtifactTarget],
     )
-    rule_runner.set_options([], env_inherit=PYTHON_BOOTSTRAP_ENV)
+    rule_runner.set_options(["--no-jvm-enable-lockfile-targets"], env_inherit=PYTHON_BOOTSTRAP_ENV)
     return rule_runner
 
 
@@ -168,13 +168,19 @@ def test_compile_jdk_versions(rule_runner: RuleRunner) -> None:
         ),
         resolve=make_resolve(rule_runner),
     )
-    rule_runner.set_options(["--jvm-jdk=zulu:8.0.312"], env_inherit=PYTHON_BOOTSTRAP_ENV)
+    rule_runner.set_options(
+        ["--no-jvm-enable-lockfile-targets", "--jvm-jdk=zulu:8.0.312"],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
+    )
     classpath = rule_runner.request(RenderedClasspath, [request])
     assert classpath.content == {
         ".ExampleLib.java.lib.javac.jar": {"org/pantsbuild/example/lib/ExampleLib.class"}
     }
 
-    rule_runner.set_options(["--jvm-jdk=bogusjdk:999"], env_inherit=PYTHON_BOOTSTRAP_ENV)
+    rule_runner.set_options(
+        ["--no-jvm-enable-lockfile-targets", "--jvm-jdk=bogusjdk:999"],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
+    )
     expected_exception_msg = r".*?JVM bogusjdk:999 not found in index.*?"
     with pytest.raises(ExecutionError, match=expected_exception_msg):
         rule_runner.request(ClasspathEntry, [request])

@@ -65,7 +65,9 @@ def rule_runner() -> RuleRunner:
         ],
         target_types=[JvmArtifactTarget, KotlinSourcesGeneratorTarget, KotlincPluginTarget],
     )
-    rule_runner.set_options(args=[], env_inherit=PYTHON_BOOTSTRAP_ENV)
+    rule_runner.set_options(
+        args=["--no-jvm-enable-lockfile-targets"], env_inherit=PYTHON_BOOTSTRAP_ENV
+    )
     return rule_runner
 
 
@@ -447,6 +449,7 @@ def test_compile_with_kotlinc_plugin(
     )
     rule_runner.set_options(
         args=[
+            "--no-jvm-enable-lockfile-targets",
             "--kotlin-version-for-resolve={'jvm-default': '1.6.20'}",
             "--kotlinc-plugins-for-resolve={'jvm-default': 'org.jetbrains.kotlin.allopen'}",
         ],

@@ -271,7 +271,7 @@ def run_scalatest_test(
     extra_args: Iterable[str] | None = None,
     env: Mapping[str, str] | None = None,
 ) -> TestResult:
-    args = extra_args or []
+    args = ["--no-jvm-enable-lockfile-targets", *(extra_args or ())]
     rule_runner.set_options(args, env=env, env_inherit=PYTHON_BOOTSTRAP_ENV)
     tgt = rule_runner.get_target(
         Address(spec_path="", target_name=target_name, relative_file_path=relative_file_path)

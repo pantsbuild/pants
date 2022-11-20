@@ -56,7 +56,12 @@ def rule_runner() -> RuleRunner:
             QueryRule(Addresses, (DependenciesRequest,)),
         ],
     )
-    rule_runner.set_options(args=[], env_inherit=PYTHON_BOOTSTRAP_ENV)
+    rule_runner.set_options(
+        args=[
+            "--no-jvm-enable-lockfile-targets",
+        ],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
+    )
     return rule_runner
 
 
@@ -94,7 +99,7 @@ def _assert_generated_files(
     source_roots: Iterable[str] | None = None,
     extra_args: Iterable[str] = (),
 ) -> None:
-    args = []
+    args = ["--no-jvm-enable-lockfile-targets"]
     if source_roots:
         args.append(f"--source-root-patterns={repr(source_roots)}")
     args.extend(extra_args)

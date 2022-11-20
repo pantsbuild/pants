@@ -93,7 +93,10 @@ def rule_runner() -> RuleRunner:
     )
     rule_runner.set_options(
         # Makes JUnit output predictable and parseable across versions (#12933):
-        args=["--junit-args=['--disable-ansi-colors','--details=flat','--details-theme=ascii']"],
+        args=[
+            "--no-jvm-enable-lockfile-targets",
+            "--junit-args=['--disable-ansi-colors','--details=flat','--details-theme=ascii']",
+        ],
         env_inherit=PYTHON_BOOTSTRAP_ENV,
     )
     return rule_runner

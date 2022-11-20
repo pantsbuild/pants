@@ -66,7 +66,9 @@ def rule_runner() -> RuleRunner:
             QueryRule(ExtractedArchive, (MaybeExtractArchiveRequest,)),
         ],
     )
-    rule_runner.set_options(args=[], env_inherit=PYTHON_BOOTSTRAP_ENV)
+    rule_runner.set_options(
+        args=["--no-jvm-enable-lockfile-targets"], env_inherit=PYTHON_BOOTSTRAP_ENV
+    )
     return rule_runner
 
 

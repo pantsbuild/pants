@@ -633,6 +633,7 @@ def run_junit_test(
     env: Mapping[str, str] | None = None,
 ) -> TestResult:
     args = [
+        "--no-jvm-enable-lockfile-targets",
         "--junit-args=['--disable-ansi-colors','--details=flat','--details-theme=ascii']",
         *(extra_args or ()),
     ]

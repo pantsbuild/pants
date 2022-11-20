@@ -138,7 +138,10 @@ def rule_runner() -> RuleRunner:
         ],
     )
     rule_runner.set_options(
-        args=["--scala-version-for-resolve={'jvm-default': '2.13.8'}"],
+        args=[
+            "--no-jvm-enable-lockfile-targets",
+            "--scala-version-for-resolve={'jvm-default': '2.13.8'}",
+        ],
         env_inherit=PYTHON_BOOTSTRAP_ENV,
     )
     return rule_runner

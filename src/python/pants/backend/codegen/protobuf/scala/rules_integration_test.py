@@ -120,7 +120,7 @@ def rule_runner() -> RuleRunner:
         ],
     )
     rule_runner.set_options(
-        [],
+        ["--no-jvm-enable-lockfile-targets"],
         env_inherit=PYTHON_BOOTSTRAP_ENV,
     )
     return rule_runner
@@ -134,7 +134,11 @@ def assert_files_generated(
     source_roots: list[str],
     extra_args: Iterable[str] = (),
 ) -> None:
-    args = [f"--source-root-patterns={repr(source_roots)}", *extra_args]
+    args = [
+        "--no-jvm-enable-lockfile-targets",
+        f"--source-root-patterns={repr(source_roots)}",
+        *extra_args,
+    ]
     rule_runner.set_options(args, env_inherit=PYTHON_BOOTSTRAP_ENV)
     tgt = rule_runner.get_target(address)
     protocol_sources = rule_runner.request(

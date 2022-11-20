@@ -9,6 +9,7 @@ from typing import cast
 import pytest
 
 from pants.core.goals.generate_lockfiles import GenerateLockfileResult, UserGenerateLockfiles
+from pants.core.target_types import LockfilesGeneratorTarget
 from pants.core.util_rules import source_files
 from pants.core.util_rules.external_tool import rules as external_tool_rules
 from pants.engine.fs import DigestContents, FileDigest
@@ -44,7 +45,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(UserGenerateLockfiles, [RequestedJVMUserResolveNames]),
             QueryRule(GenerateLockfileResult, [GenerateJvmLockfile]),
         ],
-        target_types=[JvmArtifactTarget],
+        target_types=[JvmArtifactTarget, LockfilesGeneratorTarget],
         objects={"parametrize": Parametrize},
     )
     rule_runner.set_options([], env_inherit={"PATH"})

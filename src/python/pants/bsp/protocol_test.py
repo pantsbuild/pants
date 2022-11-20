@@ -116,6 +116,7 @@ def jvm_rule_runner() -> RuleRunner:
     )
     rule_runner.set_options(
         args=[
+            "--no-jvm-enable-lockfile-targets",
             "--experimental-bsp-groups-config-files=bsp-groups.toml",
         ],
         env_inherit=PYTHON_BOOTSTRAP_ENV,
