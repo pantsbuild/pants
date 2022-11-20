@@ -10,10 +10,6 @@ from typing import Any
 
 import pytest
 
-from pants.backend.visibility.pathspec import (
-    VisibilityRuleFnMatchPattern,
-    VisibilityRuleGitIgnorePattern,
-)
 from pants.backend.visibility.rule_types import (
     BuildFileVisibilityRules,
     BuildFileVisibilityRulesError,
@@ -35,12 +31,12 @@ from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error
 # -----------------------------------------------------------------------------------------------
 
 
-def parse_rule(rule: str, relpath: str = "test/path", **kwargs) -> VisibilityRule:
-    return VisibilityRule.parse(rule, relpath, **kwargs)
+def parse_rule(rule: str, relpath: str = "test/path") -> VisibilityRule:
+    return VisibilityRule.parse(rule, relpath)
 
 
 def parse_ruleset(rules: Any, relpath: str = "test/path") -> VisibilityRuleSet:
-    return VisibilityRuleSet.parse(rules, relpath, VisibilityRuleFnMatchPattern)
+    return VisibilityRuleSet.parse(rules, relpath)
 
 
 @pytest.mark.parametrize(
@@ -113,33 +109,11 @@ def test_flatten(expected, xs) -> None:
         (False, "?src/a", "src/b", ""),
         (False, "!src/a", "src/b", ""),
         (True, "src/a/*", "src/a/b", ""),
-        (True, "src/a/*", "src/a/b/c/d", ""),
+        (False, "src/a/*", "src/a/b/c/d", ""),
+        (True, "src/a/**", "src/a/b/c/d", ""),
+        (True, "src/a/**", "src/a", ""),
+        (False, "src/a/*", "src/a", ""),
         (False, "src/a/*/c", "src/a/b/c/d", ""),
-        (True, "src/a/*/c", "src/a/b/d/c", ""),
-        (True, ".", "src/a", "src/a"),
-        (False, ".", "src/a", "src/b"),
-        (False, ".", "src/a/b", "src/a"),
-        (True, "./*", "src/a/b", "src/a"),
-        (False, "./*", "src/a/b", "src/a/b/c"),
-    ],
-)
-def test_visibility_rule_fnmatch(expected: bool, rule: str, path: str, relpath: str) -> None:
-    assert parse_rule(rule).match(path, relpath) == expected
-
-
-@pytest.mark.parametrize(
-    "expected, rule, path, relpath",
-    [
-        (True, "src/a", "src/a", ""),
-        (True, "?src/a", "src/a", ""),
-        (True, "!src/a", "src/a", ""),
-        (False, "src/a", "src/b", ""),
-        (False, "?src/a", "src/b", ""),
-        (False, "!src/a", "src/b", ""),
-        (True, "src/a/*", "src/a/b", ""),
-        (True, "src/a/*", "src/a/b/c/d", ""),
-        (True, "src/a/*/c", "src/a/b/c/d", ""),
-        (False, "src/a/*/c", "src/a/b/d/c", ""),
         (True, "src/a/**/c", "src/a/b/d/c", ""),
         (True, ".", "src/a", "src/a"),
         (False, ".", "src/a", "src/b"),
@@ -148,11 +122,8 @@ def test_visibility_rule_fnmatch(expected: bool, rule: str, path: str, relpath: 
         (False, "./*", "src/a/b", "src/a/b/c"),
     ],
 )
-def test_visibility_rule_gitwild_match(expected: bool, rule: str, path: str, relpath: str) -> None:
-    assert (
-        parse_rule(rule, pathspec_cls=VisibilityRuleGitIgnorePattern).match(path, relpath)
-        == expected
-    )
+def test_visibility_rule(expected: bool, rule: str, path: str, relpath: str) -> None:
+    assert parse_rule(rule).match(path, relpath) == expected
 
 
 @pytest.mark.parametrize(
@@ -225,7 +196,6 @@ def dependencies_rules() -> BuildFileVisibilityRules:
         "test/BUILD",
         # Rules for outgoing dependency.
         (parse_ruleset(("*", ("tgt/ok/*", "?tgt/dubious/*", "!tgt/blocked/*"))),),
-        VisibilityRuleFnMatchPattern,
     )
 
 
@@ -235,7 +205,6 @@ def dependents_rules() -> BuildFileVisibilityRules:
         "test/BUILD",
         # Rules for outgoing dependency.
         (parse_ruleset(("*", ("src/ok/*", "?src/dubious/*", "!src/blocked/*"))),),
-        VisibilityRuleFnMatchPattern,
     )
 
 
@@ -273,10 +242,6 @@ def test_check_dependency_rules(
 # -----------------------------------------------------------------------------------------------
 # BUILD file level tests.
 # -----------------------------------------------------------------------------------------------
-
-allowed = DependencyRuleAction.ALLOW
-denied = DependencyRuleAction.DENY
-warned = DependencyRuleAction.WARN
 
 
 @pytest.fixture
@@ -408,10 +373,9 @@ def assert_dependency_rules(
     assert expected == dict(rsp.dependencies_rule)
 
 
-@pytest.mark.parametrize("rule_glob_style", ["gitignore", "fnmatch"])
-def test_dependency_rules(rule_runner: RuleRunner, caplog, rule_glob_style: str) -> None:
+def test_dependency_rules(rule_runner: RuleRunner, caplog) -> None:
     ROOT_BUILD = dedent(
-        f"""
+        """
         # ROOT RULES
         #
         # Parent rules apply to whole subtree unless overridden in a child BUILD file.
@@ -429,8 +393,6 @@ def test_dependency_rules(rule_runner: RuleRunner, caplog, rule_glob_style: str)
           # Ignore (accept) empty values as no-op
           None,
           (),
-
-          rule_glob_style={rule_glob_style!r},
         )
 
         __dependents_rules__(
@@ -442,8 +404,6 @@ def test_dependency_rules(rule_runner: RuleRunner, caplog, rule_glob_style: str)
 
           # Allow all by default, with a warning
           ("*", "?*"),
-
-          rule_glob_style={rule_glob_style!r},
         )
         """
     )
@@ -492,6 +452,9 @@ def test_dependency_rules(rule_runner: RuleRunner, caplog, rule_glob_style: str)
         },
     )
 
+    allowed = DependencyRuleAction.ALLOW
+    denied = DependencyRuleAction.DENY
+    warned = DependencyRuleAction.WARN
     caplog.set_level(logging.DEBUG)
 
     assert_dependency_rules(
@@ -614,6 +577,10 @@ def test_missing_rule_error_message(rule_runner: RuleRunner) -> None:
 
 
 def test_gitignore_style_syntax(rule_runner: RuleRunner) -> None:
+    allowed = DependencyRuleAction.ALLOW
+    denied = DependencyRuleAction.DENY
+    warned = DependencyRuleAction.WARN
+
     rule_runner.write_files(
         {
             "src/BUILD": dedent(
@@ -626,7 +593,7 @@ def test_gitignore_style_syntax(rule_runner: RuleRunner) -> None:
                     pub/*
 
                     # Everything rooted in `src/inc`
-                    /src/inc/**
+                    /inc/**
 
                     # Nothing from `src/priv/` trees
                     !src/priv/**
@@ -642,6 +609,7 @@ def test_gitignore_style_syntax(rule_runner: RuleRunner) -> None:
             "src/inc/proj/interfaces/BUILD": "files()",
             "src/proj/pub/docs/BUILD": "files()",
             "src/proj/pub/docs/internal/BUILD": "files()",
+            "tests/proj/src/priv/data/BUILD": "files()",
         },
     )
 
@@ -653,5 +621,6 @@ def test_gitignore_style_syntax(rule_runner: RuleRunner) -> None:
         (
             "src/proj/pub/docs/internal",
             warned,
-        ),  # <-- I expected a warn here, but alas, the `pub/*` rule matched it!
+        ),
+        ("tests/proj/src/priv/data", denied),
     )
