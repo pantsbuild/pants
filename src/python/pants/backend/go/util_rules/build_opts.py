@@ -110,13 +110,15 @@ async def go_extract_build_options_from_target(
         cgo_enabled = golang.cgo_enabled
 
     # Extract the `with_race_detector` value for this target.
-    with_race_detector = _first_non_none_value([
-        True if go_test_subsystem.force_race and test_target_fields else None,
-        test_target_fields.test_race.value if test_target_fields else None ,
-        target_fields.race.value if target_fields else None,
-        go_mod_target_fields.race.value if go_mod_target_fields else None,
-        False,
-    ])
+    with_race_detector = _first_non_none_value(
+        [
+            True if go_test_subsystem.force_race and test_target_fields else None,
+            test_target_fields.test_race.value if test_target_fields else None,
+            target_fields.race.value if target_fields else None,
+            go_mod_target_fields.race.value if go_mod_target_fields else None,
+            False,
+        ]
+    )
 
     return GoBuildOptions(
         cgo_enabled=cgo_enabled,
