@@ -12,14 +12,14 @@ python_distribution(
     ),
     entry_points={
         "pantsbuild.plugin": {
-            "rules": "pants.backend.explorer.register:rules",
+            "rules": "pants.explorer.server.register:rules",
         }
     },
 )
 
 python_tests(
     name="tests",
-    dependencies=[":explorer"],
+    dependencies=[":server"],
 )
 
 
