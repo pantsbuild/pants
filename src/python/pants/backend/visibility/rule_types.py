@@ -7,6 +7,7 @@ import logging
 import os.path
 from dataclasses import dataclass, field
 from fnmatch import fnmatch, fnmatchcase
+from pathlib import PurePath
 from typing import Any, Iterable, Iterator, Sequence, cast
 
 from pants.engine.internals.dep_rules import (
@@ -67,7 +68,7 @@ def flatten(xs) -> Iterator[str]:
         yield xs
     elif isinstance(xs, Iterable):
         yield from itertools.chain.from_iterable(flatten(x) for x in xs)
-    elif type(xs).__name__ == "Registrar":
+    elif type(xs).__name__ == "Registrar" or isinstance(xs, PurePath):
         yield str(xs)
     else:
         raise ValueError(f"expected a string but got: {xs!r}")
@@ -240,7 +241,7 @@ class BuildFileVisibilityRulesParserState(BuildFileDependencyRulesParserState):
         **kwargs,
     ) -> None:
         try:
-            self.rulesets = [VisibilityRuleSet.parse(arg) for arg in args]
+            self.rulesets = [VisibilityRuleSet.parse(arg) for arg in args if arg]
             self.path = build_file
         except ValueError as e:
             raise BuildFileVisibilityRulesError(f"{build_file}: {e}") from e
