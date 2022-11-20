@@ -3,8 +3,11 @@
 
 from __future__ import annotations
 
+import itertools
+import os.path
 from collections import defaultdict
 from dataclasses import dataclass
+from operator import itemgetter
 from typing import Mapping
 
 from pants.core.goals.generate_lockfiles import (
@@ -19,6 +22,8 @@ from pants.core.goals.generate_lockfiles import (
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import CreateDigest, Digest, FileContent
 from pants.engine.internals.selectors import MultiGet
+from pants.engine.internals.synthetic_targets import SyntheticAddressMaps, SyntheticTargetsRequest
+from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import AllTargets
 from pants.engine.unions import UnionMembership, UnionRule, union
@@ -159,6 +164,45 @@ async def setup_user_lockfile_requests(
     return UserGenerateLockfiles(jvm_lockfile_requests)
 
 
+@dataclass(frozen=True)
+class JvmSyntheticLockfileTargetsRequest(SyntheticTargetsRequest):
+    """Register the type used to create synthetic targets for JVM lockfiles.
+
+    As the paths for all lockfiles are known up-front, we set the `path` field to
+    `SyntheticTargetsRequest.SINGLE_REQUEST_FOR_ALL_TARGETS` so that we get a single request for all
+    our synthetic targets rather than one request per directory.
+    """
+
+    path: str = SyntheticTargetsRequest.SINGLE_REQUEST_FOR_ALL_TARGETS
+
+
+@rule
+async def jvm_lockfile_synthetic_targets(
+    request: JvmSyntheticLockfileTargetsRequest,
+    jvm_subsystem: JvmSubsystem,
+) -> SyntheticAddressMaps:
+    if not jvm_subsystem.enable_lockfile_targets:
+        return SyntheticAddressMaps()
+
+    resolves = [
+        (os.path.dirname(lockfile), os.path.basename(lockfile), name)
+        for name, lockfile in jvm_subsystem.resolves.items()
+    ]
+    return SyntheticAddressMaps.for_targets_request(
+        request,
+        [
+            (
+                os.path.join(spec_path, "BUILD.jvm-lockfiles"),
+                tuple(
+                    TargetAdaptor("_lockfiles", name=name, sources=[lockfile])
+                    for _, lockfile, name in lockfiles
+                ),
+            )
+            for spec_path, lockfiles in itertools.groupby(sorted(resolves), key=itemgetter(0))
+        ],
+    )
+
+
 def rules():
     return (
         *collect_rules(),
@@ -166,4 +210,5 @@ def rules():
         UnionRule(GenerateLockfile, GenerateJvmLockfile),
         UnionRule(KnownUserResolveNamesRequest, KnownJVMUserResolveNamesRequest),
         UnionRule(RequestedUserResolveNames, RequestedJVMUserResolveNames),
+        UnionRule(SyntheticTargetsRequest, JvmSyntheticLockfileTargetsRequest),
     )

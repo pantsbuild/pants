@@ -78,6 +78,21 @@ class JvmSubsystem(Subsystem):
             """
         ),
     )
+    enable_lockfile_targets = BoolOption(
+        default=True,
+        help=softwrap(
+            """
+            Create targets for all JVM lockfiles defined in `[jvm].resolves`.
+
+            The lockfile targets will then be used as dependencies to the targets that use them,
+            invalidating source targets per resolve when the lockfile changes.
+
+            If another targets address is in conflict with the created lockfile target, it will
+            shadow the lockfile target and it will not be available as a dependency.
+            """
+        ),
+        advanced=True,
+    )
     debug_args = StrListOption(
         help=softwrap(
             """
