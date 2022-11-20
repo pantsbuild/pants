@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Iterable
 
 from pants.backend.go.subsystems.golang import GolangSubsystem
 from pants.backend.go.subsystems.gotest import GoTestSubsystem
@@ -11,6 +12,7 @@ from pants.backend.go.target_types import (
     GoRaceDetectorEnabledField,
     GoTestRaceDetectorEnabledField,
 )
+from pants.backend.go.util_rules import go_mod
 from pants.backend.go.util_rules.go_mod import OwningGoMod, OwningGoModRequest
 from pants.build_graph.address import Address
 from pants.engine.engine_aware import EngineAwareParameter
@@ -51,6 +53,14 @@ class GoTestBuildOptionsFieldSet(FieldSet):
     required_fields = (GoTestRaceDetectorEnabledField,)
 
     test_race: GoTestRaceDetectorEnabledField
+
+
+def _first_non_none_value(items: Iterable[bool | None]) -> bool:
+    """Return the first non-None value from the iterator."""
+    for item in items:
+        if item is not None:
+            return item
+    return False
 
 
 @rule
@@ -100,19 +110,13 @@ async def go_extract_build_options_from_target(
         cgo_enabled = golang.cgo_enabled
 
     # Extract the `with_race_detector` value for this target.
-    with_race_detector: bool | None = None
-    if go_test_subsystem.force_race:
-        with_race_detector = True
-    if test_target_fields is not None and test_target_fields.test_race.value is not None:
-        with_race_detector = test_target_fields.test_race.value
-    if with_race_detector is None:
-        if target_fields is not None and target_fields.race.value is not None:
-            with_race_detector = target_fields.race.value
-    if with_race_detector is None:
-        if go_mod_target_fields.race is not None:
-            with_race_detector = go_mod_target_fields.race.value
-    if with_race_detector is None:
-        with_race_detector = False
+    with_race_detector = _first_non_none_value([
+        True if go_test_subsystem.force_race and test_target_fields else None,
+        test_target_fields.test_race.value if test_target_fields else None ,
+        target_fields.race.value if target_fields else None,
+        go_mod_target_fields.race.value if go_mod_target_fields else None,
+        False,
+    ])
 
     return GoBuildOptions(
         cgo_enabled=cgo_enabled,
@@ -123,5 +127,6 @@ async def go_extract_build_options_from_target(
 def rules():
     return (
         *collect_rules(),
+        *go_mod.rules(),
         *graph.rules(),
     )
