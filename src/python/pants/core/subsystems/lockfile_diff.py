@@ -40,7 +40,7 @@ class LockfileDiffSubsystem(PythonToolBase):
     default_lockfile_path = "src/python/pants/core/subsystems/lockfile_diff.lock"
     default_lockfile_url = git_url(default_lockfile_path)
 
-    skip = SkipOption("generate-lockfiles", default=True)
+    skip = SkipOption("generate-lockfiles")
     args = ArgsListOption(example="--unchanged")
 
 

@@ -369,8 +369,14 @@ class GenerateLockfilesSubsystem(GoalSubsystem):
         ),
     )
     diff_generated = BoolOption(
-        default=True,
-        help="Print a summary of changed distributions after generating the lockfile.",
+        default=False,
+        help=softwrap(
+            """
+            Print a summary of changed distributions after generating the lockfile.
+
+            Refer to the `lockfile-diff` subsystem help for more details.
+            """
+        ),
     )
 
 
@@ -439,6 +445,9 @@ async def generate_lockfiles_goal(
     workspace.write_digest(merged_digest)
     for result in results:
         logger.info(f"Wrote lockfile for the resolve `{result.resolve_name}` to {result.path}")
+
+        if not generate_lockfiles_subsystem.diff_generated:
+            continue
 
         post_processing = await Get(
             LockfileGeneratedPostProcessing,
