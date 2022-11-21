@@ -129,7 +129,8 @@ async def check_compiler_supports_flag(
             env={
                 "LC_ALL": "C",
             },
-            description=f"Check whether CC supports flag: {request.flag}",
+            description=f"Check whether compiler `{request.cc}` for Cgo supports flag `{request.flag}`",
+            level=LogLevel.DEBUG,
         ),
     )
 
