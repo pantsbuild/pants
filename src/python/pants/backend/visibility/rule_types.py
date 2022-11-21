@@ -6,10 +6,11 @@ import itertools
 import logging
 import os.path
 from dataclasses import dataclass, field
-from fnmatch import fnmatch, fnmatchcase
+from fnmatch import fnmatchcase
 from pathlib import PurePath
 from typing import Any, Iterable, Iterator, Sequence, cast
 
+from pants.backend.visibility.glob import PathGlob
 from pants.engine.internals.dep_rules import (
     BuildFileDependencyRules,
     BuildFileDependencyRulesParserState,
@@ -30,10 +31,14 @@ class VisibilityRule:
     """A single rule with an associated action when matched against a given path."""
 
     action: DependencyRuleAction
-    path_pattern: str
+    glob: PathGlob
 
     @classmethod
-    def parse(cls, rule: str) -> VisibilityRule:
+    def parse(
+        cls,
+        rule: str,
+        relpath: str,
+    ) -> VisibilityRule:
         if not isinstance(rule, str):
             raise ValueError(f"expected a path pattern string but got: {rule!r}")
         if rule.startswith("!"):
@@ -45,13 +50,10 @@ class VisibilityRule:
         else:
             action = DependencyRuleAction.ALLOW
             pattern = rule
-        return cls(action, pattern)
+        return cls(action, PathGlob.parse(pattern, relpath))
 
     def match(self, path: str, relpath: str) -> bool:
-        pattern = relpath if self.path_pattern == "." else self.path_pattern
-        if pattern.startswith("./"):
-            pattern = relpath + pattern[1:]
-        return fnmatch(path, pattern)
+        return self.glob.match(path, relpath)
 
     def __str__(self) -> str:
         prefix = ""
@@ -59,13 +61,13 @@ class VisibilityRule:
             prefix = "!"
         elif self.action is DependencyRuleAction.WARN:
             prefix = "?"
-        return repr(f"{prefix}{self.path_pattern}")
+        return repr(f"{prefix}{self.glob.raw}")
 
 
 def flatten(xs) -> Iterator[str]:
     """Return an iterator with values, regardless of the nesting of the input."""
     if isinstance(xs, str):
-        yield xs
+        yield from (x.strip() for x in xs.splitlines())
     elif isinstance(xs, Iterable):
         yield from itertools.chain.from_iterable(flatten(x) for x in xs)
     elif type(xs).__name__ == "Registrar" or isinstance(xs, PurePath):
@@ -82,7 +84,7 @@ class VisibilityRuleSet:
     rules: Sequence[VisibilityRule]
 
     @classmethod
-    def parse(cls, arg: Any) -> VisibilityRuleSet:
+    def parse(cls, arg: Any, relpath: str) -> VisibilityRuleSet:
         """Translate input `arg` from BUILD file call.
 
         The arg is a rule spec tuple with two or more elements, where the first is the target type
@@ -96,9 +98,20 @@ class VisibilityRuleSet:
 
         try:
             targets, rules = flatten(arg[0]), flatten(arg[1:])
-            return cls(tuple(targets), tuple(map(VisibilityRule.parse, rules)))
+            return cls(
+                tuple(targets),
+                tuple(
+                    VisibilityRule.parse(rule, relpath)
+                    for rule in rules
+                    if not cls._noop_rule(rule)
+                ),
+            )
         except ValueError as e:
             raise ValueError(f"Invalid rule spec, {e}") from e
+
+    @staticmethod
+    def _noop_rule(rule: str) -> bool:
+        return not rule or rule.startswith("#")
 
     def match(self, target: TargetAdaptor) -> bool:
         return any(fnmatchcase(target.type_alias, pattern) for pattern in self.target_type_patterns)
@@ -241,7 +254,9 @@ class BuildFileVisibilityRulesParserState(BuildFileDependencyRulesParserState):
         **kwargs,
     ) -> None:
         try:
-            self.rulesets = [VisibilityRuleSet.parse(arg) for arg in args if arg]
+            self.rulesets = [
+                VisibilityRuleSet.parse(arg, os.path.dirname(build_file)) for arg in args if arg
+            ]
             self.path = build_file
         except ValueError as e:
             raise BuildFileVisibilityRulesError(f"{build_file}: {e}") from e
