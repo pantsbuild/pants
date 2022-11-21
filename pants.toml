@@ -67,6 +67,24 @@ build_ignore.add = [
   "testprojects/src/go/**",
 ]
 
+#            ___________    ____
+#     ______/   \__//   \__/____\
+#   _/   \_/  :           //____\\
+#  /|      :  :  ..      /        \
+# | |     ::     ::      \        /
+# | |     :|     ||     \ \______/
+# | |     ||     ||      |\  /  |
+#  \|     ||     ||      |   / | \
+#   |     ||     ||      |  / /_\ \
+#   | ___ || ___ ||      | /  /    \
+#    \_-_/  \_-_/ | ____ |/__/      \
+#                 _\_--_/    \      /
+#                /____             /
+#               /     \           /
+#               \______\_________/
+#
+
+
 unmatched_build_file_globs = "error"
 
 # TODO: May cause tests which experience missing digests to hang. If you experience an
