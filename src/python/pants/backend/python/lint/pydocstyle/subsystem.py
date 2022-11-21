@@ -25,7 +25,7 @@ from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import FieldSet, Target
 from pants.engine.unions import UnionRule
-from pants.option.option_types import ArgsListOption, FileOption, SkipOption
+from pants.option.option_types import ArgsListOption, BoolOption, FileOption, SkipOption
 from pants.util.docutil import git_url
 from pants.util.logging import LogLevel
 from pants.util.strutil import softwrap
@@ -48,7 +48,7 @@ class Pydocstyle(PythonToolBase):
     name = "Pydocstyle"
     help = "A tool for checking compliance with Python docstring conventions (http://www.pydocstyle.org/en/stable/)."
 
-    default_version = "pydocstyle>=6.1.1,<7.0"
+    default_version = "pydocstyle[toml]>=6.1.1,<7.0"
     default_main = ConsoleScript("pydocstyle")
 
     register_lockfile = True
@@ -64,13 +64,40 @@ class Pydocstyle(PythonToolBase):
         advanced=True,
         help="Path to a Pydocstyle config file (http://www.pydocstyle.org/en/stable/usage.html#configuration-files).",
     )
+    config_discovery = BoolOption(
+        default=True,
+        advanced=True,
+        help=lambda cls: softwrap(
+            f"""
+            If true, Pants will include any relevant config files during runs
+            (`setup.cfg`, `tox.ini`, `.pydocstyle`, `.pydocstyle.ini`, `.pydocstylerc`, `.pydocstylerc.ini`,
+            and `pyproject.toml`) searching for the configuration file in this particular order.
+
+            Use `[{cls.options_scope}].config` instead if your config is in a
+            non-standard location.
+            """
+        ),
+    )
 
     @property
     def config_request(self) -> ConfigFilesRequest:
         # Refer to http://www.pydocstyle.org/en/stable/usage.html#configuration-files. Pydocstyle will search
         # configuration files in a particular order.
         return ConfigFilesRequest(
-            specified=self.config, specified_option_name=f"{self.options_scope}.config"
+            specified=self.config,
+            specified_option_name=f"{self.options_scope}.config",
+            discovery=self.config_discovery,
+            check_existence=[
+                ".pydocstyle",
+                ".pydocstyle.ini",
+                ".pydocstylerc",
+                ".pydocstylerc.ini",
+            ],
+            check_content={
+                "setup.cfg": b"[pydocstyle]",
+                "tox.ini": b"[pydocstyle]",
+                "pyproject.toml": b"[tool.pydocstyle]",
+            },
         )
 
 
