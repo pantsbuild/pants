@@ -319,7 +319,13 @@ impl super::CommandRunner for CommandRunner {
             && res.as_ref().map(|r| r.exit_code).unwrap_or(1) != 0
         {
           workdir.keep(&req.description);
-          setup_run_sh_script(&req.env, &req.working_directory, &req.argv, workdir.path())?;
+          setup_run_sh_script(
+            workdir.path(),
+            &req.env,
+            &req.working_directory,
+            &req.argv,
+            workdir.path(),
+          )?;
         }
 
         res
@@ -845,6 +851,7 @@ impl Drop for AsyncDropSandbox {
 
 /// Create a file called __run.sh with the env, cwd and argv used by Pants to facilitate debugging.
 pub fn setup_run_sh_script(
+  sandbox_path: &Path,
   env: &BTreeMap<String, String>,
   working_directory: &Option<RelativePath>,
   argv: &[String],
@@ -894,7 +901,7 @@ cd {}
     stringified_env_vars, stringified_cwd, stringified_command_line,
   );
 
-  let full_file_path = workdir_path.join("__run.sh");
+  let full_file_path = sandbox_path.join("__run.sh");
 
   std::fs::OpenOptions::new()
     .create_new(true)

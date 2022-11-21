@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import os.path
 import re
 import threading
 import tokenize
@@ -17,6 +16,7 @@ from pants.base.exceptions import MappingError
 from pants.base.parse_context import ParseContext
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.internals.defaults import BuildFileDefaultsParserState, SetDefaultsT
+from pants.engine.internals.dep_rules import BuildFileDependencyRulesParserState
 from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
@@ -39,28 +39,38 @@ class UnaddressableObjectError(MappingError):
 class ParseState(threading.local):
     def __init__(self):
         self._defaults: BuildFileDefaultsParserState | None = None
-        self._rel_path: str | None = None
-        self._target_adapters: list[TargetAdaptor] = []
+        self._dependents_rules: BuildFileDependencyRulesParserState | None = None
+        self._dependencies_rules: BuildFileDependencyRulesParserState | None = None
+        self._filepath: str | None = None
+        self._target_adaptors: list[TargetAdaptor] = []
 
-    def reset(self, rel_path: str, defaults: BuildFileDefaultsParserState) -> None:
+    def reset(
+        self,
+        filepath: str,
+        defaults: BuildFileDefaultsParserState,
+        dependents_rules: BuildFileDependencyRulesParserState | None,
+        dependencies_rules: BuildFileDependencyRulesParserState | None,
+    ) -> None:
         self._defaults = defaults
-        self._rel_path = rel_path
-        self._target_adapters.clear()
+        self._dependents_rules = dependents_rules
+        self._dependencies_rules = dependencies_rules
+        self._filepath = filepath
+        self._target_adaptors.clear()
 
-    def add(self, target_adapter: TargetAdaptor) -> None:
-        self._target_adapters.append(target_adapter)
+    def add(self, target_adaptor: TargetAdaptor) -> None:
+        self._target_adaptors.append(target_adaptor)
 
-    def rel_path(self) -> str:
-        if self._rel_path is None:
+    def filepath(self) -> str:
+        if self._filepath is None:
             raise AssertionError(
-                "The BUILD file rel_path was accessed before being set. This indicates a "
+                "The BUILD file filepath was accessed before being set. This indicates a "
                 "programming error in Pants. Please file a bug report at "
                 "https://github.com/pantsbuild/pants/issues/new."
             )
-        return self._rel_path
+        return self._filepath
 
     def parsed_targets(self) -> list[TargetAdaptor]:
-        return list(self._target_adapters)
+        return list(self._target_adaptors)
 
     @property
     def defaults(self) -> BuildFileDefaultsParserState:
@@ -74,6 +84,14 @@ class ParseState(threading.local):
 
     def set_defaults(self, *args: SetDefaultsT, **kwargs) -> None:
         self.defaults.set_defaults(*args, **kwargs)
+
+    def set_dependents_rules(self, *args, **kwargs) -> None:
+        if self._dependents_rules is not None:
+            self._dependents_rules.set_dependency_rules(self.filepath(), *args, **kwargs)
+
+    def set_dependencies_rules(self, *args, **kwargs) -> None:
+        if self._dependencies_rules is not None:
+            self._dependencies_rules.set_dependency_rules(self.filepath(), *args, **kwargs)
 
 
 class Parser:
@@ -117,7 +135,7 @@ class Parser:
                 # Target names default to the name of the directory their BUILD file is in
                 # (as long as it's not the root directory).
                 if "name" not in kwargs:
-                    if not parse_state.rel_path():
+                    if not parse_state.filepath():
                         raise UnaddressableObjectError(
                             "Targets in root-level BUILD files must be named explicitly."
                         )
@@ -131,13 +149,15 @@ class Parser:
 
         symbols: dict[str, Any] = {
             **object_aliases.objects,
-            "build_file_dir": lambda: PurePath(parse_state.rel_path()),
+            "build_file_dir": lambda: PurePath(parse_state.filepath()).parent,
             "__defaults__": parse_state.set_defaults,
+            "__dependents_rules__": parse_state.set_dependents_rules,
+            "__dependencies_rules__": parse_state.set_dependencies_rules,
         }
         symbols.update((alias, Registrar(alias)) for alias in target_type_aliases)
 
         parse_context = ParseContext(
-            build_root=build_root, type_aliases=symbols, rel_path_oracle=parse_state
+            build_root=build_root, type_aliases=symbols, filepath_oracle=parse_state
         )
         for alias, object_factory in object_aliases.context_aware_object_factories.items():
             symbols[alias] = object_factory(parse_context)
@@ -154,8 +174,15 @@ class Parser:
         build_file_content: str,
         extra_symbols: BuildFilePreludeSymbols,
         defaults: BuildFileDefaultsParserState,
+        dependents_rules: BuildFileDependencyRulesParserState | None,
+        dependencies_rules: BuildFileDependencyRulesParserState | None,
     ) -> list[TargetAdaptor]:
-        self._parse_state.reset(rel_path=os.path.dirname(filepath), defaults=defaults)
+        self._parse_state.reset(
+            filepath=filepath,
+            defaults=defaults,
+            dependents_rules=dependents_rules,
+            dependencies_rules=dependencies_rules,
+        )
 
         global_symbols = {**self._symbols, **extra_symbols.symbols}
 
@@ -166,7 +193,12 @@ class Parser:
                 except NameError as e:
                     bad_symbol = _extract_symbol_from_name_error(e)
                     global_symbols[bad_symbol] = _unrecognized_symbol_func
-                    self._parse_state.reset(rel_path=os.path.dirname(filepath), defaults=defaults)
+                    self._parse_state.reset(
+                        filepath=filepath,
+                        defaults=defaults,
+                        dependents_rules=dependents_rules,
+                        dependencies_rules=dependencies_rules,
+                    )
                     continue
                 break
 

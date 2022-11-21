@@ -425,7 +425,13 @@ impl<'a> super::CommandRunner for CommandRunner<'a> {
             && res.as_ref().map(|r| r.exit_code).unwrap_or(1) != 0
         {
           workdir.keep(&req.description);
-          setup_run_sh_script(&req.env, &req.working_directory, &req.argv, workdir.path())?;
+          setup_run_sh_script(
+            workdir.path(),
+            &req.env,
+            &req.working_directory,
+            &req.argv,
+            workdir.path(),
+          )?;
         }
 
         res

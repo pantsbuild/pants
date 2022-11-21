@@ -27,6 +27,13 @@ logger = logging.getLogger(__name__)
 
 
 @enum.unique
+class PipVersion(enum.Enum):
+    V20_3_4 = "20.3.4-patched"
+    V22_2_2 = "22.2.2"
+    V22_3 = "22.3"
+
+
+@enum.unique
 class InvalidLockfileBehavior(enum.Enum):
     error = "error"
     ignore = "ignore"
@@ -179,6 +186,11 @@ class PythonSetup(Subsystem):
             relevant field for more details.
             """
         ),
+    )
+    pip_version = EnumOption(
+        default=PipVersion.V20_3_4,
+        help="Use this version of Pip for resolving requirements and generating lockfiles.",
+        advanced=True,
     )
     _resolves_to_interpreter_constraints = DictOption["list[str]"](
         help=softwrap(

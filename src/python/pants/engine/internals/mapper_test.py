@@ -43,6 +43,8 @@ def parse_address_map(build_file: str, *, ignore_unrecognized_symbols: bool = Fa
         BuildFileDefaultsParserState.create(
             "", BuildFileDefaults({}), RegisteredTargetTypes({}), UnionMembership({})
         ),
+        dependents_rules=None,
+        dependencies_rules=None,
     )
     assert path == address_map.path
     return address_map
