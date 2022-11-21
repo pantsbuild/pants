@@ -10,7 +10,6 @@ from typing import ClassVar, Iterable, Iterator, cast
 
 from typing_extensions import Protocol
 
-from pants.base.deprecated import warn_or_error
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.engine.fs import GlobExpansionConjunction, PathGlobs
 from pants.util.dirutil import fast_relpath_optional, recursive_dirname
@@ -257,7 +256,6 @@ class RawSpecs:
         specs: Iterable[Spec],
         *,
         description_of_origin: str,
-        convert_dir_literal_to_address_literal: bool | None = None,
         unmatched_glob_behavior: GlobMatchErrorBehavior = GlobMatchErrorBehavior.error,
         filter_by_global_options: bool = False,
         from_change_detection: bool = False,
@@ -267,12 +265,6 @@ class RawSpecs:
         If the `Spec` objects are already separated by type, prefer using the class's constructor
         directly.
         """
-        if convert_dir_literal_to_address_literal is not None:
-            warn_or_error(
-                "2.16.0.dev0",
-                "the convert_dir_literal_to_address_literal kwarg for `RawSpecs.parse_specs",
-                "Directories are now never converted to AddressLiteral. So, remove the kwarg.",
-            )
 
         address_literals = []
         file_literals = []

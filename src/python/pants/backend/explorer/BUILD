@@ -21,3 +21,14 @@ python_tests(
     name="tests",
     dependencies=[":explorer"],
 )
+
+
+__dependents_rules__(
+    # Block any outside sources from pulling in code from this backend, as it is self contained and
+    # have 3rd party dependencies that we don't want to leak to the core Pants distribution.
+    (
+        "*",
+        build_file_dir() / "**",
+        "!*",
+    ),
+)

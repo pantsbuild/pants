@@ -236,7 +236,7 @@ async def export_virtualenv_for_resolve(
         )
 
         pex_request = PexRequest(
-            description="chosen_resolve.name",
+            description=f"Build pex for resolve `{resolve}`",
             output_filename=f"{path_safe(resolve)}.pex",
             internal_only=True,
             requirements=EntireLockfile(lockfile),

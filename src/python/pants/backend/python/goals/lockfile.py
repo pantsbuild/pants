@@ -134,7 +134,9 @@ async def _setup_pip_args_and_constraints_file(resolve_name: str) -> _PipArgsAnd
 
 @rule(desc="Generate Python lockfile", level=LogLevel.DEBUG)
 async def generate_lockfile(
-    req: GeneratePythonLockfile, generate_lockfiles_subsystem: GenerateLockfilesSubsystem
+    req: GeneratePythonLockfile,
+    generate_lockfiles_subsystem: GenerateLockfilesSubsystem,
+    python_setup: PythonSetup,
 ) -> GenerateLockfileResult:
     pip_args_setup = await _setup_pip_args_and_constraints_file(req.resolve_name)
 
@@ -150,6 +152,8 @@ async def generate_lockfile(
                 # generate universal locks because they have the best compatibility. We may
                 # want to let users change this, as `style=strict` is safer.
                 "--style=universal",
+                "--pip-version",
+                python_setup.pip_version.value,
                 "--resolver-version",
                 "pip-2020-resolver",
                 # PEX files currently only run on Linux and Mac machines; so we hard code this

@@ -523,6 +523,16 @@ class EnvironmentNameRequest(EngineAwareParameter):
     description_of_origin: str = dataclasses.field(hash=False, compare=False)
 
     @classmethod
+    def from_target(cls, target: Target) -> EnvironmentNameRequest:
+        f"""Return a `EnvironmentNameRequest` with the environment this target should use when built.
+
+        If the Target includes `EnvironmentField` in its class definition, then this method will
+        use the value of that field. Otherwise, it will fall back to `{LOCAL_ENVIRONMENT_MATCHER}`.
+        """
+        env_field = target.get(EnvironmentField)
+        return cls._from_field(env_field, target.address)
+
+    @classmethod
     def from_field_set(cls, field_set: FieldSet) -> EnvironmentNameRequest:
         f"""Return a `EnvironmentNameRequest` with the environment this target should use when built.
 
@@ -535,15 +545,17 @@ class EnvironmentNameRequest(EngineAwareParameter):
         environment is used for the subgraph.
         """
         env_field = _compute_env_field(field_set)
+        return cls._from_field(env_field, field_set.address)
+
+    @classmethod
+    def _from_field(cls, env_field: EnvironmentField, address: Address) -> EnvironmentNameRequest:
         return EnvironmentNameRequest(
             env_field.value,
             # Note that if the field was not registered, we will have fallen back to the default
             # LOCAL_ENVIRONMENT_MATCHER, which we expect to be infallible when normalized. That
             # implies that the error message using description_of_origin should not trigger, so
             # it's okay that the field is not actually registered on the target.
-            description_of_origin=(
-                f"the `{env_field.alias}` field from the target {field_set.address}"
-            ),
+            description_of_origin=(f"the `{env_field.alias}` field from the target {address}"),
         )
 
     def debug_hint(self) -> str:

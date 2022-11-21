@@ -8,7 +8,7 @@ import itertools
 import os.path
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Any
+from typing import Any, cast
 
 from pants.build_graph.address import (
     Address,
@@ -21,6 +21,11 @@ from pants.build_graph.address import (
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import DigestContents, GlobMatchErrorBehavior, PathGlobs, Paths
 from pants.engine.internals.defaults import BuildFileDefaults, BuildFileDefaultsParserState
+from pants.engine.internals.dep_rules import (
+    BuildFileDependencyRules,
+    DependencyRuleAction,
+    MaybeBuildFileDependencyRulesImplementation,
+)
 from pants.engine.internals.mapper import AddressFamily, AddressMap
 from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser, error_on_imports
 from pants.engine.internals.synthetic_targets import (
@@ -29,7 +34,11 @@ from pants.engine.internals.synthetic_targets import (
 )
 from pants.engine.internals.target_adaptor import TargetAdaptor, TargetAdaptorRequest
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import RegisteredTargetTypes
+from pants.engine.target import (
+    DependenciesRuleAction,
+    DependenciesRuleActionRequest,
+    RegisteredTargetTypes,
+)
 from pants.engine.unions import UnionMembership
 from pants.option.global_options import GlobalOptions
 from pants.util.frozendict import FrozenDict
@@ -159,6 +168,7 @@ async def parse_address_family(
     directory: AddressFamilyDir,
     registered_target_types: RegisteredTargetTypes,
     union_membership: UnionMembership,
+    maybe_build_file_dependency_rules_implementation: MaybeBuildFileDependencyRulesImplementation,
 ) -> OptionalAddressFamily:
     """Given an AddressMapper and a directory, return an AddressFamily.
 
@@ -181,6 +191,8 @@ async def parse_address_family(
         return OptionalAddressFamily(directory.path)
 
     defaults = BuildFileDefaults({})
+    dependents_rules: BuildFileDependencyRules | None = None
+    dependencies_rules: BuildFileDependencyRules | None = None
     parent_dirs = tuple(PurePath(directory.path).parents)
     if parent_dirs:
         maybe_parents = await MultiGet(
@@ -189,21 +201,56 @@ async def parse_address_family(
         )
         for maybe_parent in maybe_parents:
             if maybe_parent.address_family is not None:
-                defaults = maybe_parent.address_family.defaults
+                family = maybe_parent.address_family
+                defaults = family.defaults
+                dependents_rules = family.dependents_rules
+                dependencies_rules = family.dependencies_rules
                 break
 
     defaults_parser_state = BuildFileDefaultsParserState.create(
         directory.path, defaults, registered_target_types, union_membership
     )
+    build_file_dependency_rules_class = (
+        maybe_build_file_dependency_rules_implementation.build_file_dependency_rules_class
+    )
+    if build_file_dependency_rules_class is not None:
+        dependents_rules_parser_state = build_file_dependency_rules_class.create_parser_state(
+            directory.path,
+            dependents_rules,
+        )
+        dependencies_rules_parser_state = build_file_dependency_rules_class.create_parser_state(
+            directory.path,
+            dependencies_rules,
+        )
+    else:
+        dependents_rules_parser_state = None
+        dependencies_rules_parser_state = None
+
     address_maps = [
         AddressMap.parse(
-            fc.path, fc.content.decode(), parser, prelude_symbols, defaults_parser_state
+            fc.path,
+            fc.content.decode(),
+            parser,
+            prelude_symbols,
+            defaults_parser_state,
+            dependents_rules_parser_state,
+            dependencies_rules_parser_state,
         )
         for fc in digest_contents
     ]
 
-    # Freeze defaults.
+    # Freeze defaults and dependency rules
     frozen_defaults = defaults_parser_state.get_frozen_defaults()
+    frozen_dependents_rules = cast(
+        "BuildFileDependencyRules | None",
+        dependents_rules_parser_state
+        and dependents_rules_parser_state.get_frozen_dependency_rules(),
+    )
+    frozen_dependencies_rules = cast(
+        "BuildFileDependencyRules | None",
+        dependencies_rules_parser_state
+        and dependencies_rules_parser_state.get_frozen_dependency_rules(),
+    )
 
     # Process synthetic targets.
     for address_map in address_maps:
@@ -214,7 +261,11 @@ async def parse_address_family(
     return OptionalAddressFamily(
         directory.path,
         AddressFamily.create(
-            directory.path, (*address_maps, *synthetic_address_maps), frozen_defaults
+            spec_path=directory.path,
+            address_maps=(*address_maps, *synthetic_address_maps),
+            defaults=frozen_defaults,
+            dependents_rules=frozen_dependents_rules,
+            dependencies_rules=frozen_dependencies_rules,
         ),
     )
 
@@ -239,6 +290,20 @@ async def find_build_file(request: BuildFileAddressRequest) -> BuildFileAddress:
     return BuildFileAddress(address, bfa.rel_path) if address.is_generated_target else bfa
 
 
+def _get_target_adaptor(
+    address: Address, address_family: AddressFamily, description_of_origin: str
+) -> TargetAdaptor:
+    target_adaptor = address_family.get_target_adaptor(address)
+    if target_adaptor is None:
+        raise ResolveError.did_you_mean(
+            address,
+            description_of_origin=description_of_origin,
+            known_names=address_family.target_names,
+            namespace=address_family.namespace,
+        )
+    return target_adaptor
+
+
 @rule
 async def find_target_adaptor(request: TargetAdaptorRequest) -> TargetAdaptor:
     """Hydrate a TargetAdaptor so that it may be converted into the Target API."""
@@ -249,15 +314,51 @@ async def find_target_adaptor(request: TargetAdaptorRequest) -> TargetAdaptor:
             f"TargetAdaptors: {request}"
         )
     address_family = await Get(AddressFamily, AddressFamilyDir(address.spec_path))
-    target_adaptor = address_family.get_target_adaptor(address)
-    if target_adaptor is None:
-        raise ResolveError.did_you_mean(
-            address,
-            description_of_origin=request.description_of_origin,
-            known_names=address_family.target_names,
-            namespace=address_family.namespace,
-        )
+    target_adaptor = _get_target_adaptor(address, address_family, request.description_of_origin)
     return target_adaptor
+
+
+@rule
+async def get_dependencies_rule_action(
+    request: DependenciesRuleActionRequest,
+    maybe_build_file_rules_implementation: MaybeBuildFileDependencyRulesImplementation,
+) -> DependenciesRuleAction:
+    build_file_dependency_rules_class = (
+        maybe_build_file_rules_implementation.build_file_dependency_rules_class
+    )
+    if build_file_dependency_rules_class is None:
+        return DependenciesRuleAction.allow_all()
+
+    spec_paths = {address.spec_path for address in (request.address, *request.dependencies)}
+    address_families = await MultiGet(
+        Get(AddressFamily, AddressFamilyDir(spec_path)) for spec_path in spec_paths
+    )
+    families = {address_family.namespace: address_family for address_family in address_families}
+    origin_family = families[request.address.spec_path]
+    origin_target = _get_target_adaptor(
+        request.address.maybe_convert_to_target_generator(),
+        origin_family,
+        request.description_of_origin,
+    )
+    dependencies_rule: dict[Address, DependencyRuleAction] = {}
+    for dependency_address in request.dependencies:
+        dependency_family = families[dependency_address.spec_path]
+        dependency_target = _get_target_adaptor(
+            dependency_address.maybe_convert_to_target_generator(),
+            dependency_family,
+            f"{request.description_of_origin} on {dependency_address}",
+        )
+        dependencies_rule[
+            dependency_address
+        ] = build_file_dependency_rules_class.check_dependency_rules(
+            source_adaptor=origin_target,
+            source_path=origin_family.namespace,
+            dependencies_rules=origin_family.dependencies_rules,
+            target_adaptor=dependency_target,
+            target_path=dependency_family.namespace,
+            dependents_rules=dependency_family.dependents_rules,
+        )
+    return DependenciesRuleAction(request.address, FrozenDict(dependencies_rule))
 
 
 def rules():

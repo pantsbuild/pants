@@ -50,6 +50,7 @@ from pants.engine.fs import (
     Paths,
     Snapshot,
 )
+from pants.engine.internals.dep_rules import DependencyRuleAction
 from pants.engine.unions import UnionMembership, UnionRule, distinct_union_type_per_subclass, union
 from pants.option.global_options import UnmatchedBuildFileGlobs
 from pants.source.filespec import Filespec, FilespecMatcher
@@ -71,6 +72,18 @@ logger = logging.getLogger(__name__)
 # Type alias to express the intent that the type should be immutable and hashable. There's nothing
 # to actually enforce this, outside of convention. Maybe we could develop a MyPy plugin?
 ImmutableValue = Any
+
+
+class _NoValue:
+    def __bool__(self) -> bool:
+        return False
+
+    def __repr__(self) -> str:
+        return "<NO_VALUE>"
+
+
+# Marker for unspecified field values that should use the default value if applicable.
+NO_VALUE = _NoValue()
 
 
 @frozen_after_init
@@ -118,6 +131,13 @@ class Field:
                 return value_or_default
     """
 
+    # Opt-in per field class to use a "no value" marker for the `raw_value` in `compute_value()` in
+    # case the field was not represented in the BUILD file.
+    #
+    # This will allow users to provide `None` as the field value (when applicable) without getting
+    # the fields default value.
+    none_is_valid_value: ClassVar[bool] = False
+
     # Subclasses must define these.
     alias: ClassVar[str]
     help: ClassVar[str]
@@ -135,6 +155,8 @@ class Field:
 
     @final
     def __init__(self, raw_value: Optional[Any], address: Address) -> None:
+        if raw_value is NO_VALUE and not self.none_is_valid_value:
+            raw_value = None
         self._check_deprecated(raw_value, address)
         self.value: Optional[ImmutableValue] = self.compute_value(raw_value, address)
 
@@ -147,7 +169,7 @@ class Field:
 
         The resulting value must be hashable (and should be immutable).
         """
-        if raw_value is None:
+        if raw_value is (NO_VALUE if cls.none_is_valid_value else None):
             if cls.required:
                 raise RequiredFieldMissingException(address, cls.alias)
             return cls.default
@@ -155,7 +177,7 @@ class Field:
 
     @classmethod
     def _check_deprecated(cls, raw_value: Optional[Any], address: Address) -> None:
-        if not cls.removal_version or address.is_generated_target or raw_value is None:
+        if not cls.removal_version or address.is_generated_target or raw_value in (NO_VALUE, None):
             return
         if not cls.removal_hint:
             raise ValueError(
@@ -448,9 +470,9 @@ class Target:
             field_type = aliases_to_field_types[alias]
             field_values[field_type] = field_type(value, address)
 
-        # For undefined fields, mark the raw value as None.
+        # For undefined fields, mark the raw value as missing.
         for field_type in set(self.field_types) - set(field_values.keys()):
-            field_values[field_type] = field_type(None, address)
+            field_values[field_type] = field_type(NO_VALUE, address)
         return FrozenDict(
             sorted(
                 field_values.items(),
@@ -2685,6 +2707,42 @@ class ValidateDependenciesRequest(Generic[FS], ABC):
 @dataclass(frozen=True)
 class ValidatedDependencies:
     pass
+
+
+@dataclass(frozen=True)
+class DependenciesRuleActionRequest:
+    """A request to return the applicable dependency rule action for each dependency of a target."""
+
+    address: Address
+    dependencies: Addresses
+    description_of_origin: str = dataclasses.field(hash=False, compare=False)
+
+
+@dataclass(frozen=True)
+class DependenciesRuleAction:
+    """Maps all dependencies to their respective dependency rule action of a origin target address.
+
+    The `dependencies_rule` will be empty and the `address` `None` if there is no dependency rule
+    implementation.
+    """
+
+    address: Address | None = None
+    dependencies_rule: FrozenDict[Address, DependencyRuleAction] = FrozenDict()
+
+    def __post_init__(self):
+        if self.dependencies_rule and self.address is None:
+            raise ValueError(
+                "The `address` field must not be None when there are `dependencies_rule`s."
+            )
+
+    @classmethod
+    @memoized_method
+    def allow_all(cls) -> DependenciesRuleAction:
+        return cls()
+
+    def execute_actions(self) -> None:
+        for dependency, action in self.dependencies_rule.items():
+            action.execute(description_of_origin=f"{self.address} on {dependency}")
 
 
 class SpecialCasedDependencies(StringSequenceField, AsyncFieldMixin):
