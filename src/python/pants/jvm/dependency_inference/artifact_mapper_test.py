@@ -96,7 +96,8 @@ def test_trie_node_merge_basic() -> None:
 def test_third_party_mapping_parsing(rule_runner: RuleRunner) -> None:
     rule_runner.set_options(
         [
-            "--java-infer-third-party-import-mapping={'io.github.frenchtoast.savory.**': 'github-frenchtoast:savory'}"
+            "--no-jvm-enable-lockfile-targets",
+            "--java-infer-third-party-import-mapping={'io.github.frenchtoast.savory.**': 'github-frenchtoast:savory'}",
         ],
         env_inherit=PYTHON_BOOTSTRAP_ENV,
     )
@@ -179,6 +180,7 @@ def test_third_party_dep_inference_resolve(rule_runner: RuleRunner) -> None:
     """Dependencies are only resolved on artifacts in the relevant resolves."""
     rule_runner.set_options(
         [
+            "--no-jvm-enable-lockfile-targets",
             "--java-infer-third-party-import-mapping={'org.joda.time.**': 'joda-time:joda-time'}",
             "--jvm-resolves={'a': '', 'b': '', 'c': ''}",
         ],
@@ -227,7 +229,10 @@ def test_third_party_dep_inference_resolve(rule_runner: RuleRunner) -> None:
 @maybe_skip_jdk_test
 def test_third_party_dep_inference_fqtn(rule_runner: RuleRunner) -> None:
     rule_runner.set_options(
-        ["--java-infer-third-party-import-mapping={'org.joda.time.**': 'joda-time:joda-time'}"],
+        [
+            "--no-jvm-enable-lockfile-targets",
+            "--java-infer-third-party-import-mapping={'org.joda.time.**': 'joda-time:joda-time'}",
+        ],
         env_inherit=PYTHON_BOOTSTRAP_ENV,
     )
     rule_runner.write_files(
@@ -271,6 +276,7 @@ def test_third_party_dep_inference_fqtn(rule_runner: RuleRunner) -> None:
 def test_third_party_dep_inference_nonrecursive(rule_runner: RuleRunner) -> None:
     rule_runner.set_options(
         [
+            "--no-jvm-enable-lockfile-targets",
             "--java-infer-third-party-import-mapping={'org.joda.time.**':'joda-time:joda-time', 'org.joda.time.DateTime':'joda-time:joda-time-2'}",
         ],
         env_inherit=PYTHON_BOOTSTRAP_ENV,
@@ -350,6 +356,7 @@ def test_third_party_dep_inference_nonrecursive(rule_runner: RuleRunner) -> None
 def test_third_party_dep_inference_with_provides(rule_runner: RuleRunner) -> None:
     rule_runner.set_options(
         [
+            "--no-jvm-enable-lockfile-targets",
             "--java-infer-third-party-import-mapping={'org.joda.time.**':'joda-time:joda-time', 'org.joda.time.DateTime':'joda-time:joda-time-2'}",
         ],
         env_inherit=PYTHON_BOOTSTRAP_ENV,
@@ -417,6 +424,7 @@ def test_third_party_dep_inference_with_provides(rule_runner: RuleRunner) -> Non
 def test_third_party_dep_inference_with_incorrect_provides(rule_runner: RuleRunner) -> None:
     rule_runner.set_options(
         [
+            "--no-jvm-enable-lockfile-targets",
             "--java-infer-third-party-import-mapping={'org.joda.time.**':'joda-time:joda-time', 'org.joda.time.DateTime':'joda-time:joda-time-2'}",
         ],
         env_inherit=PYTHON_BOOTSTRAP_ENV,

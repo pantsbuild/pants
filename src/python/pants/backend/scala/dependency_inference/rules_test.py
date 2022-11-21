@@ -341,7 +341,8 @@ def test_multi_resolve_dependency_inference(rule_runner: RuleRunner) -> None:
     )
     rule_runner.set_options(
         [
-            '--jvm-resolves={"scala-2.13":"3rdparty/jvm/scala-2.13.lock", "scala-2.12":"3rdparty/jvm/scala-2.12.lock"}'
+            "--no-jvm-enable-lockfile-targets",
+            '--jvm-resolves={"scala-2.13":"3rdparty/jvm/scala-2.13.lock", "scala-2.12":"3rdparty/jvm/scala-2.12.lock"}',
         ],
         env_inherit=PYTHON_BOOTSTRAP_ENV,
     )

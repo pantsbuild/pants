@@ -427,7 +427,10 @@ def test_deploy_jar_shaded(rule_runner: RuleRunner) -> None:
 
 @maybe_skip_jdk_test
 def test_deploy_jar_reproducible(rule_runner: RuleRunner) -> None:
-    rule_runner.set_options(args=["--jvm-reproducible-jars"], env_inherit=PYTHON_BOOTSTRAP_ENV)
+    rule_runner.set_options(
+        args=["--no-jvm-enable-lockfile-targets", "--jvm-reproducible-jars"],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
+    )
     rule_runner.write_files(
         {
             "BUILD": dedent(
@@ -482,7 +485,9 @@ def test_deploy_jar_reproducible(rule_runner: RuleRunner) -> None:
 def _deploy_jar_test(
     rule_runner: RuleRunner, target_name: str, args: Iterable[str] | None = None
 ) -> None:
-    rule_runner.set_options(args=(args or ()), env_inherit=PYTHON_BOOTSTRAP_ENV)
+    rule_runner.set_options(
+        args=["--no-jvm-enable-lockfile-targets", *(args or ())], env_inherit=PYTHON_BOOTSTRAP_ENV
+    )
 
     tgt = rule_runner.get_target(Address("", target_name=target_name))
     jdk = rule_runner.request(InternalJdk, [])

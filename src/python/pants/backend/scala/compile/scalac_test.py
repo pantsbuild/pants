@@ -541,6 +541,7 @@ def test_compile_with_scalac_plugin(
     )
     rule_runner.set_options(
         args=[
+            "--no-jvm-enable-lockfile-targets",
             "--scala-version-for-resolve={'jvm-default': '2.13.8'}",
             "--scalac-plugins-for-resolve={'jvm-default': 'acyclic'}",
         ],
@@ -601,6 +602,7 @@ def test_compile_with_local_scalac_plugin(
     )
     rule_runner.set_options(
         args=[
+            "--no-jvm-enable-lockfile-targets",
             "--scala-version-for-resolve={'jvm-default': '2.13.8'}",
         ],
         env_inherit=PYTHON_BOOTSTRAP_ENV,
@@ -701,6 +703,7 @@ def test_compile_with_multiple_scalac_plugins(
     )
     rule_runner.set_options(
         args=[
+            "--no-jvm-enable-lockfile-targets",
             "--scala-version-for-resolve={'jvm-default': '2.13.8'}",
             "--scalac-plugins-for-resolve={'jvm-default': 'bm4,kind-projector'}",
         ],
@@ -761,6 +764,7 @@ def test_compile_with_multiple_scala_versions(
     )
     rule_runner.set_options(
         [
+            "--no-jvm-enable-lockfile-targets",
             '--scala-version-for-resolve={"scala2.12":"2.12.15","scala2.13":"2.13.8"}',
             '--jvm-resolves={"scala2.12":"3rdparty/jvm/scala2.12.lock","scala2.13":"3rdparty/jvm/scala2.13.lock"}',
         ],
