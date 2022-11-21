@@ -523,6 +523,9 @@ async def build_go_package(
     if embedcfg.digest != EMPTY_DIGEST:
         compile_args.extend(["-embedcfg", RenderedEmbedConfig.PATH])
 
+    if request.build_opts.with_race_detector:
+        compile_args.append("-race")
+
     # If there are no loose object files to add to the package archive later, then pass -complete flag which
     # tells the compiler that the provided Go files constitute the entire package.
     if not objects:
