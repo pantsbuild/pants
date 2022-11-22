@@ -50,7 +50,10 @@ from pants.engine.fs import (
     Paths,
     Snapshot,
 )
-from pants.engine.internals.dep_rules import DependencyRuleAction
+from pants.engine.internals.dep_rules import (
+    DependencyRuleActionDeniedError,
+    DependencyRuleApplication,
+)
 from pants.engine.unions import UnionMembership, UnionRule, distinct_union_type_per_subclass, union
 from pants.option.global_options import UnmatchedBuildFileGlobs
 from pants.source.filespec import Filespec, FilespecMatcher
@@ -2710,7 +2713,7 @@ class ValidatedDependencies:
 
 
 @dataclass(frozen=True)
-class DependenciesRuleActionRequest:
+class DependenciesRuleApplicationRequest:
     """A request to return the applicable dependency rule action for each dependency of a target."""
 
     address: Address
@@ -2719,15 +2722,16 @@ class DependenciesRuleActionRequest:
 
 
 @dataclass(frozen=True)
-class DependenciesRuleAction:
-    """Maps all dependencies to their respective dependency rule action of a origin target address.
+class DependenciesRuleApplication:
+    """Maps all dependencies to their respective dependency rule application of a origin target
+    address.
 
-    The `dependencies_rule` will be empty and the `address` `None` if there is no dependency rule
+    The `applications` will be empty and the `address` `None` if there is no dependency rule
     implementation.
     """
 
     address: Address | None = None
-    dependencies_rule: FrozenDict[Address, DependencyRuleAction] = FrozenDict()
+    dependencies_rule: FrozenDict[Address, DependencyRuleApplication] = FrozenDict()
 
     def __post_init__(self):
         if self.dependencies_rule and self.address is None:
@@ -2737,12 +2741,26 @@ class DependenciesRuleAction:
 
     @classmethod
     @memoized_method
-    def allow_all(cls) -> DependenciesRuleAction:
+    def allow_all(cls) -> DependenciesRuleApplication:
         return cls()
 
     def execute_actions(self) -> None:
-        for dependency, action in self.dependencies_rule.items():
-            action.execute(description_of_origin=f"{self.address} on {dependency}")
+        errors = [
+            action_error.replace("\n", "\n    ")
+            for action_error in (rule.execute() for rule in self.dependencies_rule.values())
+            if action_error is not None
+        ]
+        if errors:
+            err_count = len(errors)
+            raise DependencyRuleActionDeniedError(
+                softwrap(
+                    f"""
+                    {self.address} has {pluralize(err_count, 'dependency violation')}:
+
+                    {bullet_list(errors)}
+                    """
+                )
+            )
 
 
 class SpecialCasedDependencies(StringSequenceField, AsyncFieldMixin):

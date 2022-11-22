@@ -7,6 +7,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
 
+from pants.engine.addresses import Address
 from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.unions import UnionMembership, union
@@ -19,11 +20,9 @@ class DependencyRulesError(Exception):
 
 
 class DependencyRuleActionDeniedError(DependencyRulesError):
-    def __init__(self, description_of_origin: str):
-        super().__init__(self.violation_msg(description_of_origin))
-
-    def violation_msg(self, description_of_origin: str) -> str:
-        return f"Dependency rule violation for {description_of_origin}"
+    @classmethod
+    def create(cls, description_of_origin: str) -> DependencyRuleActionDeniedError:
+        return cls(f"Dependency rule violation for {description_of_origin}")
 
 
 class DependencyRuleAction(Enum):
@@ -31,16 +30,47 @@ class DependencyRuleAction(Enum):
     DENY = "deny"
     WARN = "warn"
 
-    def execute(self, *, description_of_origin: str) -> None:
+    def execute(
+        self, *, description_of_origin: str, return_exc: bool = False
+    ) -> DependencyRuleActionDeniedError | None:
         if self is DependencyRuleAction.ALLOW:
-            return
-        err = DependencyRuleActionDeniedError(description_of_origin)
+            return None
+        err = DependencyRuleActionDeniedError.create(description_of_origin)
         if self is DependencyRuleAction.DENY:
-            raise err
+            if return_exc:
+                return err
+            else:
+                raise err
         if self is DependencyRuleAction.WARN:
             logger.warning(str(err))
         else:
             raise NotImplementedError(f"{type(self).__name__}.execute() not implemented for {self}")
+        return None
+
+
+@dataclass(frozen=True)
+class DependencyRuleApplication:
+    action: DependencyRuleAction
+    rule_description: str
+    origin_address: Address
+    origin_type: str
+    dependency_address: Address
+    dependency_type: str
+
+    def execute(self) -> str | None:
+        err = self.action.execute(
+            description_of_origin=(
+                f"{self.origin_address}'s dependency on {self.dependency_address}"
+            ),
+            return_exc=True,
+        )
+        if err is None:
+            return None
+        else:
+            return (
+                f"{self.rule_description} : {self.action.name}\n{self.origin_type} "
+                f"{self.origin_address} -> {self.dependency_type} {self.dependency_address}"
+            )
 
 
 class BuildFileDependencyRules(ABC):
@@ -55,21 +85,20 @@ class BuildFileDependencyRules(ABC):
     @abstractmethod
     def check_dependency_rules(
         *,
-        source_adaptor: TargetAdaptor,
-        source_path: str,
+        origin_address: Address,
+        origin_adaptor: TargetAdaptor,
         dependencies_rules: BuildFileDependencyRules | None,
-        target_adaptor: TargetAdaptor,
-        target_path: str,
+        dependency_address: Address,
+        dependency_adaptor: TargetAdaptor,
         dependents_rules: BuildFileDependencyRules | None,
-    ) -> DependencyRuleAction:
-        """The source of the dependency has the dependencies field, the target of the dependency is
-        the one listed as a value in the dependencies field.
+    ) -> DependencyRuleApplication:
+        """Check all rules for any that apply to the relation between the two targets.
 
-        The `__dependencies_rules__` are the rules applicable for the source path.
-        The `__dependents_rules__` are the rules applicable for the target path.
+        The `__dependencies_rules__` are the rules applicable for the origin target.
+        The `__dependents_rules__` are the rules applicable for the dependency target.
 
-        Return dependency rule action ALLOW, DENY or WARN. WARN is effectively the same as ALLOW,
-        but with a logged warning.
+        Return dependency rule application describing the resulting action to take: ALLOW, DENY or
+        WARN. WARN is effectively the same as ALLOW, but with a logged warning.
         """
 
 
