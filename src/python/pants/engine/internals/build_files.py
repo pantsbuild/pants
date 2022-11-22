@@ -23,7 +23,7 @@ from pants.engine.fs import DigestContents, GlobMatchErrorBehavior, PathGlobs, P
 from pants.engine.internals.defaults import BuildFileDefaults, BuildFileDefaultsParserState
 from pants.engine.internals.dep_rules import (
     BuildFileDependencyRules,
-    DependencyRuleAction,
+    DependencyRuleApplication,
     MaybeBuildFileDependencyRulesImplementation,
 )
 from pants.engine.internals.mapper import AddressFamily, AddressMap
@@ -35,8 +35,8 @@ from pants.engine.internals.synthetic_targets import (
 from pants.engine.internals.target_adaptor import TargetAdaptor, TargetAdaptorRequest
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
-    DependenciesRuleAction,
-    DependenciesRuleActionRequest,
+    DependenciesRuleApplication,
+    DependenciesRuleApplicationRequest,
     RegisteredTargetTypes,
 )
 from pants.engine.unions import UnionMembership
@@ -319,15 +319,15 @@ async def find_target_adaptor(request: TargetAdaptorRequest) -> TargetAdaptor:
 
 
 @rule
-async def get_dependencies_rule_action(
-    request: DependenciesRuleActionRequest,
+async def get_dependencies_rule_application(
+    request: DependenciesRuleApplicationRequest,
     maybe_build_file_rules_implementation: MaybeBuildFileDependencyRulesImplementation,
-) -> DependenciesRuleAction:
+) -> DependenciesRuleApplication:
     build_file_dependency_rules_class = (
         maybe_build_file_rules_implementation.build_file_dependency_rules_class
     )
     if build_file_dependency_rules_class is None:
-        return DependenciesRuleAction.allow_all()
+        return DependenciesRuleApplication.allow_all()
 
     spec_paths = {address.spec_path for address in (request.address, *request.dependencies)}
     address_families = await MultiGet(
@@ -340,7 +340,7 @@ async def get_dependencies_rule_action(
         origin_family,
         request.description_of_origin,
     )
-    dependencies_rule: dict[Address, DependencyRuleAction] = {}
+    dependencies_rule: dict[Address, DependencyRuleApplication] = {}
     for dependency_address in request.dependencies:
         dependency_family = families[dependency_address.spec_path]
         dependency_target = _get_target_adaptor(
@@ -351,14 +351,14 @@ async def get_dependencies_rule_action(
         dependencies_rule[
             dependency_address
         ] = build_file_dependency_rules_class.check_dependency_rules(
-            source_adaptor=origin_target,
-            source_path=origin_family.namespace,
+            origin_address=request.address,
+            origin_adaptor=origin_target,
             dependencies_rules=origin_family.dependencies_rules,
-            target_adaptor=dependency_target,
-            target_path=dependency_family.namespace,
+            dependency_address=dependency_address,
+            dependency_adaptor=dependency_target,
             dependents_rules=dependency_family.dependents_rules,
         )
-    return DependenciesRuleAction(request.address, FrozenDict(dependencies_rule))
+    return DependenciesRuleApplication(request.address, FrozenDict(dependencies_rule))
 
 
 def rules():
