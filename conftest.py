@@ -1,6 +1,9 @@
 # Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import os
+import shutil
+
 import pytest
 
 
@@ -31,3 +34,20 @@ def pytest_addoption(parser):
     parser.addoption(
         "--noskip", action="store_true", default=False, help="Treat skipped tests as errors"
     )
+
+
+def pytest_runtestloop():
+    # These files are so big they exceed our "immutable symlink" hueristic. However, our integration
+    # tests run Pants in the sandbox, and Pants doesn't allow globbing absolute symlinks.
+    # Therefore we re-materialize them from their symlink.
+    for filepath in [
+        "local_dists.pex/.bootstrap",
+        "pytest.pex/.bootstrap",
+        "requirements.pex/.bootstrap",
+        "pytest_runner.pex/.bootstrap",
+        "src/python/pants/engine/internals/native_engine.so",
+    ]:
+        if os.path.exists(filepath):
+            actual = os.path.realpath(filepath)
+            os.unlink(filepath)
+            shutil.copyfile(actual, filepath)
