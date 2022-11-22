@@ -76,13 +76,11 @@ const KILOBYTES: usize = 1024;
 const MEGABYTES: usize = 1024 * KILOBYTES;
 const GIGABYTES: usize = 1024 * MEGABYTES;
 
-/// How big a file/dir must be to become an immutable input symlink.
+/// How big a file must be to become an immutable input symlink.
 // NB: These numbers were chosen after micro-benchmarking the code on one machine at the time of
 // writing. They were chosen using a rough equation from the microbenchmarks that are optimized
 // for somewhere between 2 and 3 uses of the corresponding entry to "break even".
 const IMMUTABLE_FILE_SIZE_LIMIT: usize = 512 * KILOBYTES;
-// NB: (The equation says 10 files, however that's kinda low, so lets go with 100 for now).
-const IMMUTABLE_DIR_FILE_COUNT_LIMIT: usize = 100;
 
 mod local;
 #[cfg(test)]
@@ -1279,7 +1277,6 @@ impl Store {
       }
     });
 
-    let dirsize_cache = tree.recursive_entry_counts(destination.clone());
     let mut mutable_path_ancestors = BTreeSet::new();
     for relpath in mutable_paths {
       mutable_path_ancestors.extend(relpath.ancestors().map(|p| destination.join(p)));
@@ -1298,7 +1295,6 @@ impl Store {
           .collect::<BTreeSet<_>>(),
         &mutable_path_ancestors,
         immutable_inputs,
-        &dirsize_cache,
         perms,
       )
       .await
@@ -1313,7 +1309,6 @@ impl Store {
     mutable_paths: &'a BTreeSet<PathBuf>,
     mutable_path_ancestors: &'a BTreeSet<PathBuf>,
     immutable_inputs: Option<&'a ImmutableInputs>,
-    dirsize_cache: &'a HashMap<PathBuf, usize>,
     perms: Permissions,
   ) -> BoxFuture<'a, Result<(), StoreError>> {
     let store = self.clone();
@@ -1366,18 +1361,16 @@ impl Store {
                   .materialize_symlink(path, s.target().to_str().unwrap().to_string())
                   .await
               }
-              directory::Entry::Directory(d) => {
+              directory::Entry::Directory(_) => {
                 store
-                  .materialize_directory_maybe_symlink(
-                    path,
-                    d.tree(),
-                    &d.digest(),
+                  .materialize_directory_children(
+                    path.clone(),
+                    false,
+                    mutable_paths.contains(&path),
                     parent_to_child,
                     mutable_paths,
                     mutable_path_ancestors,
-                    can_be_immutable,
                     immutable_inputs,
-                    dirsize_cache,
                     perms,
                   )
                   .await
@@ -1402,46 +1395,6 @@ impl Store {
       Ok(())
     }
     .boxed()
-  }
-
-  async fn materialize_directory_maybe_symlink(
-    &self,
-    destination: PathBuf,
-    tree: &DigestTrie,
-    digest: &Digest,
-    parent_to_child: &HashMap<PathBuf, Vec<directory::Entry>>,
-    mutable_paths: &BTreeSet<PathBuf>,
-    mutable_path_ancestors: &BTreeSet<PathBuf>,
-    can_be_immutable: bool,
-    immutable_inputs: Option<&ImmutableInputs>,
-    dirsize_cache: &HashMap<PathBuf, usize>,
-    perms: Permissions,
-  ) -> Result<(), StoreError> {
-    if can_be_immutable
-      && dirsize_cache.get(&destination).unwrap() > &IMMUTABLE_DIR_FILE_COUNT_LIMIT
-    {
-      let dest_path = immutable_inputs
-        .unwrap()
-        .path_for_dir(DirectoryDigest::new(*digest, tree.clone()))
-        .await?;
-      self
-        .materialize_symlink(destination, dest_path.to_str().unwrap().to_string())
-        .await
-    } else {
-      self
-        .materialize_directory_children(
-          destination.clone(),
-          false,
-          mutable_paths.contains(&destination),
-          parent_to_child,
-          mutable_paths,
-          mutable_path_ancestors,
-          immutable_inputs,
-          dirsize_cache,
-          perms,
-        )
-        .await
-    }
   }
 
   async fn materialize_file_maybe_symlink(
