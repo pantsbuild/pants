@@ -156,10 +156,7 @@ def test_build_invalid_package(rule_runner: RuleRunner) -> None:
     result = rule_runner.request(FallibleBuiltGoPackage, [request])
     assert result.output is None
     assert result.exit_code == 1
-    assert (
-        result.stdout
-        == ".//add_amd64.s:1: unexpected EOF\nasm: assembly of .//add_amd64.s failed\n"
-    )
+    assert result.stdout == "add_amd64.s:1: unexpected EOF\nasm: assembly of add_amd64.s failed\n"
 
 
 def test_build_package_with_prebuilt_object_files(rule_runner: RuleRunner) -> None:
