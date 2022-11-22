@@ -278,7 +278,6 @@ def test_build_package_using_api_metdata(rule_runner: RuleRunner) -> None:
             ),
             "add_amd64.go": "package main\nfunc add_magic(x int64) int64",
             "add_arm64.go": "package main\nfunc add_magic(x int64) int64",
-            # Based on https://davidwong.fr/goasm/add.
             "add_amd64.s": dedent(
                 """\
                 #include "textflag.h"  // for NOSPLIT
@@ -292,8 +291,6 @@ def test_build_package_using_api_metdata(rule_runner: RuleRunner) -> None:
                     RET
                 """
             ),
-            # Based on combining https://davidwong.fr/goasm/add and `go tool compile -S` to get
-            # ARM instructions.
             "add_arm64.s": dedent(
                 """\
                 #include "textflag.h"  // for NOSPLIT
