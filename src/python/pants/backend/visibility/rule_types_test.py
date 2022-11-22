@@ -37,6 +37,11 @@ from pants.util.strutil import softwrap
 # -----------------------------------------------------------------------------------------------
 
 
+def parse_address(raw: str, description_of_origin: str = repr("test"), **kwargs) -> Address:
+    parsed = AddressInput.parse(raw, description_of_origin=description_of_origin, **kwargs)
+    return parsed.dir_to_address() if "." not in raw else parsed.file_to_address()
+
+
 def parse_rule(rule: str, relpath: str = "test/path") -> VisibilityRule:
     return VisibilityRule.parse(rule, relpath)
 
@@ -203,7 +208,10 @@ def dependencies_rules() -> BuildFileVisibilityRules:
     return BuildFileVisibilityRules(
         "src/BUILD",
         # Rules for outgoing dependency.
-        (parse_ruleset(("*", ("tgt/ok/*", "?tgt/dubious/*", "!tgt/blocked/*")), "src/BUILD"),),
+        (
+            parse_ruleset(("requirement", "!//3rdparty/req#restrict*", "//3rdparty/**"), "BUILD"),
+            parse_ruleset(("*", ("tgt/ok/*", "?tgt/dubious/*", "!tgt/blocked/*")), "src/BUILD"),
+        ),
     )
 
 
@@ -212,67 +220,113 @@ def dependents_rules() -> BuildFileVisibilityRules:
     return BuildFileVisibilityRules(
         "tgt/BUILD",
         # Rules for incoming dependency.
-        (parse_ruleset(("*", ("src/ok/*", "?src/dubious/*", "!src/blocked/*")), "tgt/BUILD"),),
+        (
+            parse_ruleset(("requirement", "*"), "BUILD"),
+            parse_ruleset(("*", ("src/ok/*", "?src/dubious/*", "!src/blocked/*")), "tgt/BUILD"),
+        ),
     )
 
 
 @pytest.mark.parametrize(
-    "source_path, target_path, expected_action, expected_rule",
+    "target_type, source_path, target_path, expected_action, expected_rule",
     [
-        ("src/ok/a", "tgt/ok/b", "allow", "src/BUILD[tgt/ok/*] -> tgt/BUILD[src/ok/*]"),
-        ("src/ok/a", "tgt/dubious/b", "warn", "src/BUILD[?tgt/dubious/*] -> tgt/BUILD[src/ok/*]"),
-        ("src/ok/a", "tgt/blocked/b", "deny", "src/BUILD[!tgt/blocked/*] -> tgt/BUILD[src/ok/*]"),
-        ("src/dubious/a", "tgt/ok/b", "warn", "src/BUILD[tgt/ok/*] -> tgt/BUILD[?src/dubious/*]"),
+        ("test", "src/ok/a", "tgt/ok/b", "allow", "src/BUILD[tgt/ok/*] -> tgt/BUILD[src/ok/*]"),
         (
+            "test",
+            "src/ok/a",
+            "tgt/dubious/b",
+            "warn",
+            "src/BUILD[?tgt/dubious/*] -> tgt/BUILD[src/ok/*]",
+        ),
+        (
+            "test",
+            "src/ok/a",
+            "tgt/blocked/b",
+            "deny",
+            "src/BUILD[!tgt/blocked/*] -> tgt/BUILD[src/ok/*]",
+        ),
+        (
+            "test",
+            "src/dubious/a",
+            "tgt/ok/b",
+            "warn",
+            "src/BUILD[tgt/ok/*] -> tgt/BUILD[?src/dubious/*]",
+        ),
+        (
+            "test",
             "src/dubious/a",
             "tgt/dubious/b",
             "warn",
             "src/BUILD[?tgt/dubious/*] -> tgt/BUILD[?src/dubious/*]",
         ),
         (
+            "test",
             "src/dubious/a",
             "tgt/blocked/b",
             "deny",
             "src/BUILD[!tgt/blocked/*] -> tgt/BUILD[?src/dubious/*]",
         ),
-        ("src/blocked/a", "tgt/ok/b", "deny", "src/BUILD[tgt/ok/*] -> tgt/BUILD[!src/blocked/*]"),
         (
+            "test",
+            "src/blocked/a",
+            "tgt/ok/b",
+            "deny",
+            "src/BUILD[tgt/ok/*] -> tgt/BUILD[!src/blocked/*]",
+        ),
+        (
+            "test",
             "src/blocked/a",
             "tgt/dubious/b",
             "deny",
             "src/BUILD[?tgt/dubious/*] -> tgt/BUILD[!src/blocked/*]",
         ),
         (
+            "test",
             "src/blocked/a",
             "tgt/blocked/b",
             "deny",
             "src/BUILD[!tgt/blocked/*] -> tgt/BUILD[!src/blocked/*]",
+        ),
+        (
+            "requirement",
+            "src/proj/code.ext",
+            "3rdparty/req#lib",
+            "allow",
+            "BUILD[//3rdparty/**] -> BUILD[*]",
+        ),
+        (
+            "requirement",
+            "src/proj/code.ext",
+            "3rdparty/req#restricted",
+            "deny",
+            "BUILD[!//3rdparty/req#restrict*] -> BUILD[*]",
         ),
     ],
 )
 def test_check_dependency_rules(
     dependencies_rules: BuildFileVisibilityRules,
     dependents_rules: BuildFileVisibilityRules,
+    target_type: str,
     source_path: str,
     target_path: str,
     expected_action: str,
     expected_rule: str,
 ) -> None:
-    origin_address = Address(source_path, target_name="source")
-    dependency_address = Address(target_path, target_name="target")
+    origin_address = parse_address(source_path)
+    dependency_address = parse_address(target_path)
     assert DependencyRuleApplication(
         action=DependencyRuleAction(expected_action),
         rule_description=expected_rule,
         origin_address=origin_address,
-        origin_type="origin_target",
+        origin_type=target_type,
         dependency_address=dependency_address,
-        dependency_type="dependency_target",
+        dependency_type=target_type,
     ) == BuildFileVisibilityRules.check_dependency_rules(
         origin_address=origin_address,
-        origin_adaptor=TargetAdaptor("origin_target", "source"),
+        origin_adaptor=TargetAdaptor(target_type, "source"),
         dependencies_rules=dependencies_rules,
         dependency_address=dependency_address,
-        dependency_adaptor=TargetAdaptor("dependency_target", "target"),
+        dependency_adaptor=TargetAdaptor(target_type, "target"),
         dependents_rules=dependents_rules,
     )
 
@@ -397,19 +451,14 @@ def test_dependencies_rules(rule_runner: RuleRunner, rules: list[str], expect_er
         rsp.execute_actions()
 
 
-def _parse_address(raw: str, **kwargs) -> Address:
-    parsed = AddressInput.parse(raw, **kwargs)
-    return parsed.dir_to_address() if "." not in raw else parsed.file_to_address()
-
-
 def assert_dependency_rules(
     rule_runner: RuleRunner, origin: str, *dependencies: tuple[str, DependencyRuleAction]
 ) -> None:
     desc = repr("assert_dependency_rules")
-    source = _parse_address(origin, description_of_origin=desc)
+    source = parse_address(origin, description_of_origin=desc)
     addresses = Addresses(
         [
-            _parse_address(dep, relative_to=source.spec_path, description_of_origin=desc)
+            parse_address(dep, relative_to=source.spec_path, description_of_origin=desc)
             for dep, _ in dependencies
         ]
     )
