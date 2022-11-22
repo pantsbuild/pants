@@ -5,13 +5,14 @@ import string
 from collections import namedtuple
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Set, Tuple, cast
+from typing import Any, ClassVar, Dict, Iterable, List, Optional, Sequence, Set, Tuple, cast
 
 import pytest
 
 from pants.engine.addresses import Address
 from pants.engine.fs import GlobExpansionConjunction, GlobMatchErrorBehavior, PathGlobs, Paths
 from pants.engine.target import (
+    NO_VALUE,
     AsyncFieldMixin,
     BoolField,
     CoarsenedTarget,
@@ -1118,7 +1119,18 @@ def test_single_source_file_path() -> None:
         pass
 
     assert TestSingleSourceField(None, Address("project")).file_path is None
+    assert TestSingleSourceField(NO_VALUE, Address("project")).file_path is None
     assert TestSingleSourceField("f.ext", Address("project")).file_path == "project/f.ext"
+
+
+def test_optional_source_value() -> None:
+    class TestSingleSourceField(OptionalSingleSourceField):
+        none_is_valid_value: ClassVar[bool] = True
+        default: ClassVar[str] = "default"
+
+    assert TestSingleSourceField(None, Address("project")).value is None
+    assert TestSingleSourceField(NO_VALUE, Address("project")).value == "default"
+    assert TestSingleSourceField("f.ext", Address("project")).value == "f.ext"
 
 
 def test_sources_fields_ban_parent_dir_pattern() -> None:

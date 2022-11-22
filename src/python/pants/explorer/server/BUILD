@@ -28,8 +28,7 @@ __dependents_rules__(
     # have 3rd party dependencies that we don't want to leak to the core Pants distribution.
     (
         "*",
-        build_file_dir(),
-        build_file_dir() / "*",
+        build_file_dir() / "**",
         "!*",
     ),
 )

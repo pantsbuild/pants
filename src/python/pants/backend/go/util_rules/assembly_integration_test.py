@@ -156,10 +156,7 @@ def test_build_invalid_package(rule_runner: RuleRunner) -> None:
     result = rule_runner.request(FallibleBuiltGoPackage, [request])
     assert result.output is None
     assert result.exit_code == 1
-    assert (
-        result.stdout
-        == ".//add_amd64.s:1: unexpected EOF\nasm: assembly of .//add_amd64.s failed\n"
-    )
+    assert result.stdout == "add_amd64.s:1: unexpected EOF\nasm: assembly of add_amd64.s failed\n"
 
 
 def test_build_package_with_prebuilt_object_files(rule_runner: RuleRunner) -> None:
@@ -255,3 +252,73 @@ def test_build_package_with_prebuilt_object_files(rule_runner: RuleRunner) -> No
     result = subprocess.run([os.path.join(rule_runner.build_root, "bin")], stdout=subprocess.PIPE)
     assert result.returncode == 0
     assert result.stdout == b"42\n"
+
+
+def test_build_package_using_api_metdata(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "go.mod": dedent(
+                """\
+                module example.com/assembly
+                go 1.17
+                """
+            ),
+            "main.go": dedent(
+                """\
+                package main
+
+                import "fmt"
+
+                const MagicValueToBeUsedByAssembly int = 42
+
+                func main() {
+                    fmt.Println(add_magic(10))
+                }
+                """
+            ),
+            "add_amd64.go": "package main\nfunc add_magic(x int64) int64",
+            "add_arm64.go": "package main\nfunc add_magic(x int64) int64",
+            "add_amd64.s": dedent(
+                """\
+                #include "textflag.h"  // for NOSPLIT
+                #include "go_asm.h"  // for const_MagicValueToBeUsedByAssembly
+                TEXT ·add_magic(SB),NOSPLIT,$0
+                    MOVQ  x+0(FP), BX
+                    MOVQ  $const_MagicValueToBeUsedByAssembly, BP
+
+                    ADDQ  BP, BX
+                    MOVQ  BX, ret+8(FP)
+                    RET
+                """
+            ),
+            "add_arm64.s": dedent(
+                """\
+                #include "textflag.h"  // for NOSPLIT
+                #include "go_asm.h"  // for const_MagicValueToBeUsedByAssembly
+                TEXT ·add_magic(SB),NOSPLIT,$0
+                    MOVD  x+0(FP), R0
+                    MOVD  $const_MagicValueToBeUsedByAssembly, R1
+
+                    ADD   R1, R0, R0
+                    MOVD  R0, ret+8(FP)
+                    RET
+                """
+            ),
+            "BUILD": dedent(
+                """\
+                go_mod(name="mod")
+                go_package(name="pkg", sources=["*.go", "*.s"])
+                go_binary(name="bin")
+                """
+            ),
+        }
+    )
+
+    binary_tgt = rule_runner.get_target(Address("", target_name="bin"))
+    built_package = build_package(rule_runner, binary_tgt)
+    assert len(built_package.artifacts) == 1
+    assert built_package.artifacts[0].relpath == "bin"
+
+    result = subprocess.run([os.path.join(rule_runner.build_root, "bin")], stdout=subprocess.PIPE)
+    assert result.returncode == 0
+    assert result.stdout == b"52\n"  # should be 10 + the 42 "magic" value
