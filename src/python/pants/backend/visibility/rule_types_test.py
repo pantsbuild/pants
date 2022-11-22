@@ -201,52 +201,52 @@ def test_visibility_rule_set_match(expected: bool, target: str, rule_spec: tuple
 @pytest.fixture
 def dependencies_rules() -> BuildFileVisibilityRules:
     return BuildFileVisibilityRules(
-        "a/BUILD",
+        "src/BUILD",
         # Rules for outgoing dependency.
-        (parse_ruleset(("*", ("tgt/ok/*", "?tgt/dubious/*", "!tgt/blocked/*")), "a/BUILD"),),
+        (parse_ruleset(("*", ("tgt/ok/*", "?tgt/dubious/*", "!tgt/blocked/*")), "src/BUILD"),),
     )
 
 
 @pytest.fixture
 def dependents_rules() -> BuildFileVisibilityRules:
     return BuildFileVisibilityRules(
-        "b/BUILD",
-        # Rules for outgoing dependency.
-        (parse_ruleset(("*", ("src/ok/*", "?src/dubious/*", "!src/blocked/*")), "b/BUILD"),),
+        "tgt/BUILD",
+        # Rules for incoming dependency.
+        (parse_ruleset(("*", ("src/ok/*", "?src/dubious/*", "!src/blocked/*")), "tgt/BUILD"),),
     )
 
 
 @pytest.mark.parametrize(
     "source_path, target_path, expected_action, expected_rule",
     [
-        ("src/ok/a", "tgt/ok/b", "allow", "a/BUILD[tgt/ok/*] -> b/BUILD[src/ok/*]"),
-        ("src/ok/a", "tgt/dubious/b", "warn", "a/BUILD[?tgt/dubious/*] -> b/BUILD[src/ok/*]"),
-        ("src/ok/a", "tgt/blocked/b", "deny", "a/BUILD[!tgt/blocked/*] -> b/BUILD[src/ok/*]"),
-        ("src/dubious/a", "tgt/ok/b", "warn", "a/BUILD[tgt/ok/*] -> b/BUILD[?src/dubious/*]"),
+        ("src/ok/a", "tgt/ok/b", "allow", "src/BUILD[tgt/ok/*] -> tgt/BUILD[src/ok/*]"),
+        ("src/ok/a", "tgt/dubious/b", "warn", "src/BUILD[?tgt/dubious/*] -> tgt/BUILD[src/ok/*]"),
+        ("src/ok/a", "tgt/blocked/b", "deny", "src/BUILD[!tgt/blocked/*] -> tgt/BUILD[src/ok/*]"),
+        ("src/dubious/a", "tgt/ok/b", "warn", "src/BUILD[tgt/ok/*] -> tgt/BUILD[?src/dubious/*]"),
         (
             "src/dubious/a",
             "tgt/dubious/b",
             "warn",
-            "a/BUILD[?tgt/dubious/*] -> b/BUILD[?src/dubious/*]",
+            "src/BUILD[?tgt/dubious/*] -> tgt/BUILD[?src/dubious/*]",
         ),
         (
             "src/dubious/a",
             "tgt/blocked/b",
             "deny",
-            "a/BUILD[!tgt/blocked/*] -> b/BUILD[?src/dubious/*]",
+            "src/BUILD[!tgt/blocked/*] -> tgt/BUILD[?src/dubious/*]",
         ),
-        ("src/blocked/a", "tgt/ok/b", "deny", "a/BUILD[tgt/ok/*] -> b/BUILD[!src/blocked/*]"),
+        ("src/blocked/a", "tgt/ok/b", "deny", "src/BUILD[tgt/ok/*] -> tgt/BUILD[!src/blocked/*]"),
         (
             "src/blocked/a",
             "tgt/dubious/b",
             "deny",
-            "a/BUILD[?tgt/dubious/*] -> b/BUILD[!src/blocked/*]",
+            "src/BUILD[?tgt/dubious/*] -> tgt/BUILD[!src/blocked/*]",
         ),
         (
             "src/blocked/a",
             "tgt/blocked/b",
             "deny",
-            "a/BUILD[!tgt/blocked/*] -> b/BUILD[!src/blocked/*]",
+            "src/BUILD[!tgt/blocked/*] -> tgt/BUILD[!src/blocked/*]",
         ),
     ],
 )
@@ -397,16 +397,19 @@ def test_dependencies_rules(rule_runner: RuleRunner, rules: list[str], expect_er
         rsp.execute_actions()
 
 
+def _parse_address(raw: str, **kwargs) -> Address:
+    parsed = AddressInput.parse(raw, **kwargs)
+    return parsed.dir_to_address() if "." not in raw else parsed.file_to_address()
+
+
 def assert_dependency_rules(
     rule_runner: RuleRunner, origin: str, *dependencies: tuple[str, DependencyRuleAction]
 ) -> None:
     desc = repr("assert_dependency_rules")
-    source = AddressInput.parse(origin, description_of_origin=desc).dir_to_address()
+    source = _parse_address(origin, description_of_origin=desc)
     addresses = Addresses(
         [
-            AddressInput.parse(
-                dep, relative_to=source.spec_path, description_of_origin=desc
-            ).dir_to_address()
+            _parse_address(dep, relative_to=source.spec_path, description_of_origin=desc)
             for dep, _ in dependencies
         ]
     )
@@ -690,4 +693,84 @@ def test_gitignore_style_syntax(rule_runner: RuleRunner) -> None:
             warned,
         ),
         ("tests/proj/src/priv/data", denied),
+    )
+
+
+def test_file_specific_rules(rule_runner: RuleRunner) -> None:
+    files = (
+        "src/lib/root.txt",
+        "src/lib/pub/ok.txt",
+        "src/lib/pub/exception.txt",
+        "src/lib/priv/secret.txt",
+        "src/app/root.txt",
+        "src/app/sub/nested/impl.txt",
+    )
+    rule_runner.write_files(
+        {
+            "src/lib/BUILD": dedent(
+                """
+                __dependencies_rules__(
+                  # Limit lib dependencies to only files from the lib/ tree.
+                  ("*", "/**", "!*"),
+                )
+
+                __dependents_rules__(
+
+                  # Limit dependencies upon lib to only come from within the lib/ tree, except this
+                  # one particular impl file when it comes from a nested/ folder, we warn about it
+                  # though.
+                  ("*", "/**", "?nested/impl.txt", "!*"),
+                )
+
+                files(sources=["**/*.txt"])
+                """
+            ),
+            "src/lib/pub/BUILD": dedent(
+                """
+                __dependents_rules__(
+                  # Allow all to depend on files from lib/pub/
+                  # TODO: support to except one file. work around now is to have the rule in
+                  # src/app/BUILD
+                  ("*", "*"),
+                )
+                """
+            ),
+            "src/app/BUILD": dedent(
+                """
+                __dependencies_rules__(
+                  # TODO: this exception should live in src/lib/pub/BUILD
+                  ("*", "!//src/lib/pub/exception.txt", "*"),
+                )
+
+                files(sources=["**/*.txt"])
+                """
+            ),
+            **{path: "" for path in files},
+        },
+    )
+
+    assert_dependency_rules(
+        rule_runner,
+        "src/lib/root.txt",
+        ("src/lib/pub/ok.txt:../lib", DependencyRuleAction.ALLOW),
+        ("src/lib/priv/secret.txt:../lib", DependencyRuleAction.ALLOW),
+        ("src/app/root.txt", DependencyRuleAction.DENY),
+    )
+
+    assert_dependency_rules(
+        rule_runner,
+        "src/app/root.txt",
+        ("src/lib/root.txt", DependencyRuleAction.DENY),
+        ("src/lib/pub/ok.txt:../lib", DependencyRuleAction.ALLOW),
+        ("src/lib/pub/exception.txt:../lib", DependencyRuleAction.DENY),
+        ("src/lib/priv/secret.txt:../lib", DependencyRuleAction.DENY),
+    )
+
+    assert_dependency_rules(
+        rule_runner,
+        "src/app/sub/nested/impl.txt:../../app",
+        ("src/lib/root.txt", DependencyRuleAction.WARN),
+        ("src/lib/pub/ok.txt:../lib", DependencyRuleAction.ALLOW),
+        ("src/lib/pub/exception.txt:../lib", DependencyRuleAction.DENY),
+        ("src/lib/priv/secret.txt:../lib", DependencyRuleAction.WARN),
     )

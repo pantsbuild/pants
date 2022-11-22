@@ -260,7 +260,7 @@ class BuildFileVisibilityRules(BuildFileDependencyRules):
         ruleset = self.get_ruleset(target)
         if ruleset is None:
             return None, None, None
-        path = str(address) if address.is_file_target else address.spec_path
+        path = address.filename if address.is_file_target else address.spec_path
         for visibility_rule in ruleset.rules:
             if visibility_rule.match(path, relpath):
                 if visibility_rule.action != DependencyRuleAction.ALLOW:
