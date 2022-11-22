@@ -580,7 +580,15 @@ async def build_go_package(
         # Extract the `go_asm.h` header from the compilation output and merge into the original compilation input.
         assert asm_header_path is not None
         asm_header_digest = await Get(
-            Digest, DigestSubset(compilation_digest, PathGlobs([asm_header_path]))
+            Digest,
+            DigestSubset(
+                compilation_digest,
+                PathGlobs(
+                    [asm_header_path],
+                    glob_match_error_behavior=GlobMatchErrorBehavior.error,
+                    description_of_origin="the `build_go_package` rule",
+                ),
+            ),
         )
         assembly_input_digest = await Get(Digest, MergeDigests([input_digest, asm_header_digest]))
         assembly_fallible_result = await Get(
