@@ -133,10 +133,10 @@ async def assemble_go_assembly_files(
         ["-p", request.import_path] if goroot.is_compatible_version("1.19") else []
     )
 
-    obj_dir_path = str(PurePath(".", request.dir_path, "__obj__"))
+    obj_dir_path = PurePath(".", request.dir_path, "__obj__")
     asm_tool_id, obj_dir_digest = await MultiGet(
         Get(GoSdkToolIDResult, GoSdkToolIDRequest("asm")),
-        Get(Digest, CreateDigest([Directory(obj_dir_path)])),
+        Get(Digest, CreateDigest([Directory(str(obj_dir_path))])),
     )
 
     input_digest = await Get(Digest, MergeDigests([request.input_digest, obj_dir_digest]))
@@ -146,7 +146,7 @@ async def assemble_go_assembly_files(
     )
 
     def obj_output_path(s_file: str) -> str:
-        return str(PurePath(".", request.dir_path, PurePath(s_file).with_suffix(".o")))
+        return str(obj_dir_path / PurePath(s_file).with_suffix(".o"))
 
     assembly_results = await MultiGet(
         Get(
