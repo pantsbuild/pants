@@ -10,7 +10,7 @@ from typing import Iterable, Iterator, List, Optional, cast
 import strawberry
 from strawberry.types import Info
 
-from pants.backend.explorer.graphql.context import GraphQLContext
+from pants.explorer.server.graphql.context import GraphQLContext
 from pants.help import help_info_extracter
 
 
