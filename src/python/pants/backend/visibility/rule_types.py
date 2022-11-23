@@ -167,8 +167,9 @@ class BuildFileVisibilityRules(BuildFileDependencyRules):
     ) -> BuildFileDependencyRulesParserState:
         return BuildFileVisibilityRulesParserState(path, cast(BuildFileVisibilityRules, parent))
 
-    @staticmethod
+    @classmethod
     def check_dependency_rules(
+        cls,
         *,
         origin_address: Address,
         origin_adaptor: TargetAdaptor,
@@ -193,8 +194,7 @@ class BuildFileVisibilityRules(BuildFileDependencyRules):
             cast(BuildFileVisibilityRules, dependencies_rules).get_action(
                 target=origin_adaptor,
                 address=dependency_address,
-                relpath=origin_address.spec_path,
-                outgoing_dependency=True,
+                relpath=cls._get_address_relpath(origin_address),
             )
             if dependencies_rules is not None
             else (None, DependencyRuleAction.ALLOW, None)
@@ -215,8 +215,7 @@ class BuildFileVisibilityRules(BuildFileDependencyRules):
             cast(BuildFileVisibilityRules, dependents_rules).get_action(
                 target=dependency_adaptor,
                 address=origin_address,
-                relpath=dependency_address.spec_path,
-                outgoing_dependency=False,
+                relpath=cls._get_address_relpath(dependency_address),
             )
             if dependents_rules is not None
             else (None, DependencyRuleAction.ALLOW, None)
@@ -247,6 +246,12 @@ class BuildFileVisibilityRules(BuildFileDependencyRules):
         )
 
     @staticmethod
+    def _get_address_relpath(address: Address) -> str:
+        if address.is_file_target:
+            return os.path.dirname(address.filename)
+        return address.spec_path
+
+    @staticmethod
     def _get_address_path(address: Address) -> str:
         if address.is_file_target:
             return address.filename
@@ -259,7 +264,6 @@ class BuildFileVisibilityRules(BuildFileDependencyRules):
         target: TargetAdaptor,
         address: Address,
         relpath: str,
-        outgoing_dependency: bool,
     ) -> tuple[VisibilityRuleSet | None, DependencyRuleAction | None, str | None]:
         """Get applicable rule for target type from `path`.
 
@@ -272,20 +276,16 @@ class BuildFileVisibilityRules(BuildFileDependencyRules):
         for visibility_rule in ruleset.rules:
             if visibility_rule.match(path, relpath):
                 if visibility_rule.action != DependencyRuleAction.ALLOW:
-                    target_addr = f"{relpath}:{target.name or os.path.basename(relpath)}"
-                    target_type = target.type_alias
-                    if outgoing_dependency:
-                        logger.debug(
-                            f"{visibility_rule.action.name}: the `{target_type}` target "
-                            f"{target_addr} dependency to a target at {path} by dependency rule "
-                            f"{str(visibility_rule)!r} declared in {self.path}"
+                    logger.debug(
+                        softwrap(
+                            f"""
+                            {visibility_rule.action.name}: type:{target.type_alias}
+                            name:{target.name} path:{path!r} relpath:{relpath!r} address:{address}
+                            rule:{str(visibility_rule)!r} {self.path}:
+                            {', '.join(map(str, ruleset.rules))}
+                            """
                         )
-                    else:
-                        logger.debug(
-                            f"{visibility_rule.action.name}: dependency on the `{target_type}` "
-                            f"target {target_addr} from a target at {path} by dependent rule "
-                            f"{str(visibility_rule)!r} declared in {self.path}"
-                        )
+                    )
                 return ruleset, visibility_rule.action, str(visibility_rule)
         return ruleset, None, None
 

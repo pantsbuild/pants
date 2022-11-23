@@ -28,17 +28,21 @@ class PathGlob:
     raw: str
     anchor_mode: PathGlobAnchorMode = field(compare=False)
     glob: Pattern = field(compare=False)
+    uplvl: int
 
     @classmethod
     def parse(cls, pattern: str, base: str) -> PathGlob:
         anchor_mode = PathGlobAnchorMode.parse(pattern)
-        glob = os.path.normpath(pattern).lstrip("./")
+        glob = os.path.normpath(pattern)
+        uplvl = glob.count("../")
+        glob = glob.lstrip("./")
         if anchor_mode is PathGlobAnchorMode.DECLARED_PATH:
             glob = os.path.join(base, glob)
         return cls(
             raw=pattern,
             anchor_mode=anchor_mode,
             glob=cls._parse_pattern(glob),
+            uplvl=uplvl,
         )
 
     @staticmethod
@@ -57,7 +61,7 @@ class PathGlob:
 
     def _match_path(self, path: str, base: str) -> str | None:
         if self.anchor_mode is PathGlobAnchorMode.INVOKED_PATH:
-            path = os.path.relpath(path, base)
+            path = os.path.relpath(path, base + "/.." * self.uplvl)
             if path.startswith(".."):
                 # The `path` is not in the sub tree of `base`.
                 return None

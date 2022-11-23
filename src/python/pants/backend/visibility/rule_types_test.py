@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import itertools
 import logging
 import re
 from pathlib import PurePath
@@ -473,8 +474,17 @@ def assert_dependency_rules(
         ],
     )
 
-    expected = {address: action for address, (_, action) in zip(addresses, dependencies)}
-    assert expected == {addr: rule.action for addr, rule in rsp.dependencies_rule.items()}
+    for address, (_, action) in zip(addresses, dependencies):
+        application = rsp.dependencies_rule[address]
+        print(
+            "-",
+            application.rule_description,
+            "\n ",
+            application.origin_address.spec,
+            application.action.name,
+            application.dependency_address.spec,
+        )
+        assert action == application.action
 
 
 def test_dependency_rules(rule_runner: RuleRunner, caplog) -> None:
@@ -822,4 +832,121 @@ def test_file_specific_rules(rule_runner: RuleRunner) -> None:
         ("src/lib/pub/ok.txt:../lib", DependencyRuleAction.ALLOW),
         ("src/lib/pub/exception.txt:../lib", DependencyRuleAction.DENY),
         ("src/lib/priv/secret.txt:../lib", DependencyRuleAction.WARN),
+    )
+
+
+@pytest.fixture
+def setup_testbed(rule_runner: RuleRunner) -> bool:
+    """Comprehensive tree layout to test various rule selection paths."""
+    files = tuple(
+        itertools.chain.from_iterable(
+            (
+                f"{dir}file1{ext}",
+                f"{dir}file2{ext}",
+                f"{dir}origin/file1{ext}",
+                f"{dir}origin/file2{ext}",
+                f"{dir}dependency/file1{ext}",
+                f"{dir}dependency/file2{ext}",
+            )
+            for cwd, ext in (
+                ("", ".txt"),
+                ("a/", ".txt"),
+                ("a/b/", ".txt"),
+                ("anchor-mode/", ".top"),
+                ("anchor-mode/proj-root/", ".root"),
+                ("anchor-mode/declared/", ".dec"),
+                ("anchor-mode/invoked/", ".inv"),
+                ("anchor-mode/floating/", ".float"),
+                ("anchor-mode/proj-root/a/", ".root"),
+                ("anchor-mode/declared/a/", ".dec"),
+                ("anchor-mode/invoked/a/", ".inv"),
+                ("anchor-mode/floating/a/", ".float"),
+                ("anchor-mode/proj-root/a/b/", ".root"),
+                ("anchor-mode/declared/a/b/", ".dec"),
+                ("anchor-mode/invoked/a/b/", ".inv"),
+                ("anchor-mode/floating/a/b/", ".float"),
+            )
+        )
+    )
+    rule_runner.write_files(
+        {
+            "BUILD": "files(name='txt', sources=['**/*.txt'])",
+            "a/b/origin/BUILD": "files(name='txt', sources=['**/*.txt-b'])",
+            "a/b/dependency/BUILD": "files(name='txt', sources=['**/*.txt-b'])",
+            "anchor-mode/BUILD": "files(name='top', sources=['**/*.top'])",
+            "anchor-mode/proj-root/a/b/dependency/BUILD": "files(name='txt', sources=['**/*.root-b'])",
+            "anchor-mode/proj-root/a/b/origin/BUILD": "files(name='txt', sources=['**/*.root-b'])",
+            "anchor-mode/declared/a/b/dependency/BUILD": "files(name='txt', sources=['**/*.dec-b'])",
+            "anchor-mode/declared/a/b/origin/BUILD": "files(name='txt', sources=['**/*.dec-b'])",
+            "anchor-mode/invoked/a/b/dependency/BUILD": "files(name='txt', sources=['**/*.inv-b'])",
+            "anchor-mode/invoked/a/b/origin/BUILD": "files(name='txt', sources=['**/*.inv-b'])",
+            "anchor-mode/floating/a/b/dependency/BUILD": "files(name='txt', sources=['**/*.float-b'])",
+            "anchor-mode/floating/a/b/origin/BUILD": "files(name='txt', sources=['**/*.float-b'])",
+            "anchor-mode/proj-root/BUILD": dedent(
+                """
+                files(name="root", sources=["**/*.root"])
+
+                __dependencies_rules__(
+                  ("*", "//dependency/*", "!*"),
+                )
+
+                __dependents_rules__(
+                  ("*", "//origin/*", "!*"),
+                )
+                """
+            ),
+            "anchor-mode/declared/BUILD": dedent(
+                """
+                files(name="dec", sources=["**/*.dec"])
+
+                __dependencies_rules__(
+                  ("*", "/dependency/*", "!*"),
+                )
+
+                __dependents_rules__(
+                  ("*", "/origin/*", "!*"),
+                )
+                """
+            ),
+            "anchor-mode/invoked/BUILD": dedent(
+                """
+                files(name="inv", sources=["**/*.inv"])
+
+                __dependencies_rules__(
+                  ("*", "../dependency/*", "!*"),
+                )
+
+                __dependents_rules__(
+                  ("*", "../origin/*", "!*"),
+                )
+                """
+            ),
+            "anchor-mode/floating/BUILD": dedent(
+                """
+                files(name="float", sources=["**/*.float"])
+
+                __dependencies_rules__(
+                  ("*", "dependency/*", "!*"),
+                )
+
+                __dependents_rules__(
+                  ("*", "origin/*", "!*"),
+                )
+                """
+            ),
+            **{path: "" for path in files},
+        },
+    )
+    return True
+
+
+def test_relpath_for_file_targets(rule_runner: RuleRunner, setup_testbed: bool) -> None:
+    # Testing purpose:
+    #
+    # When a file is owned by a target declared in a parent directory, make sure the correct BUILD
+    # file is consulted for the rules set to apply, and with the correct relpath for the matching.
+    assert_dependency_rules(
+        rule_runner,
+        "anchor-mode/invoked/origin/file1.inv:../inv",
+        ("anchor-mode/invoked/dependency/file2.inv:../inv", DependencyRuleAction.ALLOW),
     )
