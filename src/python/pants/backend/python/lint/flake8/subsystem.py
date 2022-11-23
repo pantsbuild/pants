@@ -70,6 +70,8 @@ class Flake8(PythonToolBase):
     default_main = ConsoleScript("flake8")
 
     register_lockfile = True
+    register_interpreter_constraints = True
+    default_interpreter_constraints = ["CPython>=3.7,<4"]
     default_lockfile_resource = ("pants.backend.python.lint.flake8", "flake8.lock")
     default_lockfile_path = "src/python/pants/backend/python/lint/flake8/flake8.lock"
     default_lockfile_url = git_url(default_lockfile_path)
