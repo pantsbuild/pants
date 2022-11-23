@@ -43,7 +43,8 @@ def pytest_runtestloop():
     # Therefore we re-materialize them from their symlink.
     for fileglob in [
         "*.pex/.bootstrap",
-        "pantsbuild.pants*.whl" "src/python/pants/engine/internals/native_engine.so",
+        "pantsbuild.pants*.whl",
+        "src/python/pants/engine/internals/native_engine.so",
     ]:
         for filepath in glob.iglob(fileglob):
             if os.path.exists(filepath):
