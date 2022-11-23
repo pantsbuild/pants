@@ -8,20 +8,22 @@ from pants.backend.visibility.glob import PathGlob
 
 
 @pytest.mark.parametrize(
-    "pattern, base, anchor_mode, glob",
+    "pattern, base, anchor_mode, glob, uplvl",
     [
-        ("foo", "base", "", "foo$"),
-        (".", "base", ".", "$"),
-        ("./foo", "base", ".", "foo$"),
-        ("/foo", "base", "/", "base/foo$"),
-        ("//foo", "base", "//", "foo$"),
+        ("foo", "base", "", "foo$", 0),
+        (".", "base", ".", "$", 0),
+        ("./foo", "base", ".", "foo$", 0),
+        ("../foo/../bar", "base", ".", "bar$", 1),
+        ("/foo/../baz", "base", "/", "base/baz$", 0),
+        ("//foo", "base", "//", "foo$", 0),
     ],
 )
-def test_parse_pattern(pattern: str, base: str, anchor_mode: str, glob: str) -> None:
+def test_parse_pattern(pattern: str, base: str, anchor_mode: str, glob: str, uplvl: int) -> None:
     parsed = PathGlob.parse(pattern, base)
     assert pattern == parsed.raw
     assert anchor_mode == parsed.anchor_mode.value
     assert glob == parsed.glob.pattern
+    assert uplvl == parsed.uplvl
 
 
 @pytest.mark.parametrize(
@@ -30,9 +32,17 @@ def test_parse_pattern(pattern: str, base: str, anchor_mode: str, glob: str) -> 
         (
             PathGlob.parse("./foo/bar", "base"),
             (
+                # path, base, expected
                 ("tests/foo", "src", None),
                 ("src/foo", "src", "foo"),
                 ("src/foo", "src/a", None),
+            ),
+        ),
+        (
+            PathGlob.parse("../foo/bar", "base"),
+            (
+                # path, base, expected
+                ("src/foo/bar", "src/qux", "foo/bar"),
             ),
         ),
     ],

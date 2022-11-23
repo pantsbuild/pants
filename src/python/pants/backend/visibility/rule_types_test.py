@@ -473,8 +473,17 @@ def assert_dependency_rules(
         ],
     )
 
-    expected = {address: action for address, (_, action) in zip(addresses, dependencies)}
-    assert expected == {addr: rule.action for addr, rule in rsp.dependencies_rule.items()}
+    for address, (_, action) in zip(addresses, dependencies):
+        application = rsp.dependencies_rule[address]
+        print(
+            "-",
+            application.rule_description,
+            "\n ",
+            application.origin_address.spec,
+            application.action.name,
+            application.dependency_address.spec,
+        )
+        assert action == application.action
 
 
 def test_dependency_rules(rule_runner: RuleRunner, caplog) -> None:
@@ -576,8 +585,8 @@ def test_dependency_rules(rule_runner: RuleRunner, caplog) -> None:
         expect_logged=[
             (
                 logging.DEBUG,
-                "WARN: dependency on the `target` target src/a/a2:joker from a target at src/a by "
-                "dependent rule '?*' declared in src/a/a2/BUILD",
+                "WARN: type:target name:joker path:'src/a' relpath:'src/a/a2' address:src/a:a "
+                "rule:'?*' src/a/a2/BUILD: ?*",
             ),
         ],
         exclusively=False,
@@ -598,8 +607,8 @@ def test_dependency_rules(rule_runner: RuleRunner, caplog) -> None:
         expect_logged=[
             (
                 logging.DEBUG,
-                "DENY: dependency on the `resources` target src/a:internal from a target at src/b "
-                "by dependent rule '!*' declared in src/a/BUILD",
+                "DENY: type:resources name:internal path:'src/b' relpath:'src/a' "
+                "address:src/b:b rule:'!*' src/a/BUILD: ., !*",
             ),
         ],
         exclusively=False,
@@ -617,10 +626,8 @@ def test_dependency_rules(rule_runner: RuleRunner, caplog) -> None:
         expect_logged=[
             (
                 logging.DEBUG,
-                # This message is different, as it fired from a dependency rule, rather than a
-                # dependent rule as in the other cases.
-                "DENY: the `resources` target src/a:internal dependency to a target at src/b by "
-                "dependency rule '!*' declared in src/a/BUILD",
+                "DENY: type:resources name:internal path:'src/b' relpath:'src/a' address:src/b:b "
+                "rule:'!*' src/a/BUILD: ., !*",
             ),
         ],
         exclusively=False,
@@ -822,4 +829,36 @@ def test_file_specific_rules(rule_runner: RuleRunner) -> None:
         ("src/lib/pub/ok.txt:../lib", DependencyRuleAction.ALLOW),
         ("src/lib/pub/exception.txt:../lib", DependencyRuleAction.DENY),
         ("src/lib/priv/secret.txt:../lib", DependencyRuleAction.WARN),
+    )
+
+
+def test_relpath_for_file_targets(rule_runner: RuleRunner) -> None:
+    # Testing purpose:
+    #
+    # When a file is owned by a target declared in a parent directory, make sure the correct BUILD
+    # file is consulted for the rules set to apply, and with the correct relpath for the matching.
+    rule_runner.write_files(
+        {
+            "anchor-mode/invoked/BUILD": dedent(
+                """
+                files(name="inv", sources=["**/*.inv"])
+
+                __dependencies_rules__(
+                  ("*", "../dependency/*", "!*"),
+                )
+
+                __dependents_rules__(
+                  ("*", "../origin/*", "!*"),
+                )
+                """
+            ),
+            "anchor-mode/invoked/origin/file1.inv:../inv": "",
+            "anchor-mode/invoked/dependency/file2.inv:../inv": "",
+        },
+    )
+
+    assert_dependency_rules(
+        rule_runner,
+        "anchor-mode/invoked/origin/file1.inv:../inv",
+        ("anchor-mode/invoked/dependency/file2.inv:../inv", DependencyRuleAction.ALLOW),
     )
