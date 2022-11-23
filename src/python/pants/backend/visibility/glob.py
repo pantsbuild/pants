@@ -7,8 +7,11 @@ import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from enum import Enum
+from fnmatch import fnmatchcase
 from typing import Any, Pattern
 
+from pants.engine.addresses import Address
+from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.util.strutil import softwrap
 
 
@@ -117,12 +120,9 @@ class TargetGlob:
         return f"{self.type_ or ''}{tags}{path}" or "*"
 
     @classmethod
-    def parse(cls, spec: str | Mapping[str, Any], relpath: str) -> TargetGlob:
+    def parse(cls, spec: str | Mapping[str, Any], base: str) -> TargetGlob:
         if isinstance(spec, str):
             spec_dict = cls._parse_string(spec)
-            from pprint import pprint
-
-            pprint(spec_dict)
         elif isinstance(spec, Mapping):
             spec_dict = spec
         else:
@@ -130,7 +130,7 @@ class TargetGlob:
 
         return cls(
             type_=spec_dict.get("type"),
-            path=PathGlob.parse(spec_dict["path"], relpath)
+            path=PathGlob.parse(spec_dict["path"], base)
             if spec_dict.get("path") is not None
             else None,
             tags=cls._parse_tags(spec_dict.get("tags")),
@@ -161,7 +161,6 @@ class TargetGlob:
                 f"invalid target spec string with optional parts of 'target-glob(tag-value, ...)[path-glob]' "
                 f"but got: {spec!r}"
             )
-        print(match, match.groups())
         return match.groupdict()
 
     @staticmethod
@@ -188,3 +187,33 @@ class TargetGlob:
             )
         tags = tuple(str(tag).strip() for tag in tags)
         return tags
+
+    @staticmethod
+    def address_path(address: Address) -> str:
+        if address.is_file_target:
+            return address.filename
+        elif address.is_generated_target:
+            return address.spec
+        else:
+            return address.spec_path
+
+    def match(self, address: Address, adaptor: TargetAdaptor, base: str) -> bool:
+        # type
+        if self.type_ and not fnmatchcase(adaptor.type_alias, self.type_):
+            return False
+        # path
+        if self.path and not self.path.match(self.address_path(address), base):
+            return False
+        # tags
+        if self.tags:
+            # Use adaptor.kwargs with caution, unvalidated input data from BUILD file.
+            target_tags = adaptor.kwargs.get("tags")
+            if not isinstance(target_tags, Sequence) or isinstance(target_tags, str):
+                # Bad tags value
+                return False
+            if not all(
+                any(fnmatchcase(str(tag), pattern) for tag in target_tags) for pattern in self.tags
+            ):
+                return False
+        # Nothing rules this target out
+        return True

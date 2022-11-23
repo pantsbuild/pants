@@ -2,11 +2,14 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
+import os
 from typing import Any, Mapping
 
 import pytest
 
 from pants.backend.visibility.glob import PathGlob, TargetGlob
+from pants.engine.addresses import Address
+from pants.engine.internals.target_adaptor import TargetAdaptor
 
 
 @pytest.mark.parametrize(
@@ -21,7 +24,7 @@ from pants.backend.visibility.glob import PathGlob, TargetGlob
         ("foo/../bar", "base", "", "bar", "bar$", "bar"),
     ],
 )
-def test_parse_pattern(
+def test_pathglob_parse(
     pattern: str, base: str, anchor_mode: str, raw: str, glob: str, text: str
 ) -> None:
     parsed = PathGlob.parse(pattern, base)
@@ -44,7 +47,9 @@ def test_parse_pattern(
         ),
     ],
 )
-def test_match_path(glob: PathGlob, tests: tuple[tuple[str, str, str | None], ...]) -> None:
+def test_pathglob_match_path(
+    glob: PathGlob, tests: tuple[tuple[str, str, str | None], ...]
+) -> None:
     for path, base, expected in tests:
         assert expected == glob._match_path(path, base)
 
@@ -106,7 +111,7 @@ def test_match_path(glob: PathGlob, tests: tuple[tuple[str, str, str | None], ..
         ),
     ],
 )
-def test_match(glob: PathGlob, tests: tuple[tuple[str, str, bool], ...]) -> None:
+def test_pathglob_match(glob: PathGlob, tests: tuple[tuple[str, str, bool], ...]) -> None:
     for path, base, expected in tests:
         print(path, base)
         assert expected == glob.match(path, base)
@@ -133,3 +138,31 @@ def test_match(glob: PathGlob, tests: tuple[tuple[str, str, bool], ...]) -> None
 )
 def test_target_glob_parse_spec(target_spec: str | Mapping[str, Any], expected: str) -> None:
     assert expected == str(TargetGlob.parse(target_spec, "base"))
+
+
+def tagged(type_alias: str, name: str | None = None, *tags: str, **kwargs) -> TargetAdaptor:
+    kwargs["tags"] = tags
+    return TargetAdaptor(type_alias, name, **kwargs)
+
+
+@pytest.mark.parametrize(
+    "expected, target_spec",
+    [
+        (True, "*"),
+        (True, "file"),
+        (True, "(tag-c)"),
+        (True, "(tag-*)"),
+        (False, "(tag-b)"),
+        (True, "[file.ext]"),
+        (False, "[files.ext]"),
+        (True, "[//src/*]"),
+        (True, "file(tag-a, tag-c)[src/file.ext]"),
+        (False, "file(tag-a, tag-b)[src/file.ext]"),
+        (False, "resource"),
+    ],
+)
+def test_targetglob_match(expected: bool, target_spec: str) -> None:
+    path = "src/file.ext"
+    adaptor = TargetAdaptor("file", None, tags=["tag-a", "tag-c"])
+    address = Address(os.path.dirname(path), relative_file_path=os.path.basename(path))
+    assert expected == TargetGlob.parse(target_spec, "src").match(address, adaptor, "src")
