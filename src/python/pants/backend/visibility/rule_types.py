@@ -246,6 +246,14 @@ class BuildFileVisibilityRules(BuildFileDependencyRules):
             dependency_type=dependency_adaptor.type_alias,
         )
 
+    @staticmethod
+    def _get_address_path(address: Address) -> str:
+        if address.is_file_target:
+            return address.filename
+        if address.is_generated_target:
+            return address.spec
+        return address.spec_path
+
     def get_action(
         self,
         target: TargetAdaptor,
@@ -260,7 +268,7 @@ class BuildFileVisibilityRules(BuildFileDependencyRules):
         ruleset = self.get_ruleset(target)
         if ruleset is None:
             return None, None, None
-        path = address.filename if address.is_file_target else address.spec_path
+        path = self._get_address_path(address)
         for visibility_rule in ruleset.rules:
             if visibility_rule.match(path, relpath):
                 if visibility_rule.action != DependencyRuleAction.ALLOW:
