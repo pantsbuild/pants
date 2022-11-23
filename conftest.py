@@ -47,7 +47,7 @@ def pytest_runtestloop():
         "src/python/pants/engine/internals/native_engine.so",
     ]:
         for filepath in glob.iglob(fileglob):
-            if os.path.exists(filepath):
+            if os.path.islink(filepath):
                 actual = os.path.realpath(filepath)
                 os.unlink(filepath)
                 shutil.copyfile(actual, filepath)
