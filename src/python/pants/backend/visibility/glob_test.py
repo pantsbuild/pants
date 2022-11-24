@@ -13,25 +13,29 @@ from pants.engine.internals.target_adaptor import TargetAdaptor
 
 
 @pytest.mark.parametrize(
-    "pattern, base, anchor_mode, raw, glob, text",
+    "pattern, base, anchor_mode, raw, glob, text, uplvl",
     [
-        ("foo", "base", "", "foo", "foo$", "foo"),
-        (".", "base", ".", "", "$", "."),
-        ("./foo", "base", ".", "foo", "foo$", "./foo"),
-        ("/foo", "base", "/", "base/foo", "base/foo$", "base/foo"),
-        ("//foo", "base", "//", "foo", "foo$", "//foo"),
-        ("foo/**/bar", "base", "", "foo/**/bar", "foo(/.*)?/bar$", "foo/**/bar"),
-        ("foo/../bar", "base", "", "bar", "bar$", "bar"),
+        ("foo", "base", "", "foo", "foo$", "foo", 0),
+        (".", "base", ".", "", "$", ".", 0),
+        ("./foo", "base", ".", "foo", "foo$", "./foo", 0),
+        ("../foo/../bar", "base", ".", "bar", "bar$", "../bar", 1),
+        ("/foo", "base", "/", "base/foo", "base/foo$", "base/foo", 0),
+        ("/../bar", "base/sub", "/", "base/bar", "base/bar$", "base/bar", 0),
+        ("/foo/../baz", "base", "/", "base/baz", "base/baz$", "base/baz", 0),
+        ("//foo", "base", "//", "foo", "foo$", "//foo", 0),
+        ("foo/**/bar", "base", "", "foo/**/bar", "foo(/.*)?/bar$", "foo/**/bar", 0),
+        ("foo/../bar", "base", "", "bar", "bar$", "bar", 0),
     ],
 )
 def test_pathglob_parse(
-    pattern: str, base: str, anchor_mode: str, raw: str, glob: str, text: str
+    pattern: str, base: str, anchor_mode: str, raw: str, glob: str, text: str, uplvl: int
 ) -> None:
     parsed = PathGlob.parse(pattern, base)
     assert raw == parsed.raw
     assert anchor_mode == parsed.anchor_mode.value
     assert glob == parsed.glob.pattern
     assert text == str(parsed)
+    assert uplvl == parsed.uplvl
 
 
 @pytest.mark.parametrize(
@@ -40,9 +44,17 @@ def test_pathglob_parse(
         (
             PathGlob.parse("./foo/bar", "base"),
             (
+                # path, base, expected
                 ("tests/foo", "src", None),
                 ("src/foo", "src", "foo"),
                 ("src/foo", "src/a", None),
+            ),
+        ),
+        (
+            PathGlob.parse("../foo/bar", "base"),
+            (
+                # path, base, expected
+                ("src/foo/bar", "src/qux", "foo/bar"),
             ),
         ),
     ],

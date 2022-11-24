@@ -34,10 +34,11 @@ class PathGlob:
     raw: str
     anchor_mode: PathGlobAnchorMode = field(compare=False)
     glob: Pattern = field(compare=False)
+    uplvl: int
 
     def __str__(self) -> str:
         if self.anchor_mode is PathGlobAnchorMode.INVOKED_PATH and self.raw:
-            return f"./{self.raw}"
+            return f"./{self.raw}" if not self.uplvl else "../" * self.uplvl + self.raw
         elif self.anchor_mode is PathGlobAnchorMode.DECLARED_PATH:
             return self.raw
         else:
@@ -48,13 +49,16 @@ class PathGlob:
         if not isinstance(pattern, str):
             raise ValueError(f"invalid path glob, expected string but got: {pattern!r}")
         anchor_mode = PathGlobAnchorMode.parse(pattern)
-        glob = os.path.normpath(pattern).lstrip("./")
         if anchor_mode is PathGlobAnchorMode.DECLARED_PATH:
-            glob = os.path.join(base, glob)
+            pattern = os.path.join(base, pattern.lstrip("/"))
+        pattern = os.path.normpath(pattern)
+        uplvl = pattern.count("../")
+        pattern = pattern.lstrip("./")
         return cls(
-            raw=glob,
+            raw=pattern,
             anchor_mode=anchor_mode,
-            glob=cls._parse_pattern(glob),
+            glob=cls._parse_pattern(pattern),
+            uplvl=uplvl,
         )
 
     @staticmethod
@@ -73,7 +77,7 @@ class PathGlob:
 
     def _match_path(self, path: str, base: str) -> str | None:
         if self.anchor_mode is PathGlobAnchorMode.INVOKED_PATH:
-            path = os.path.relpath(path, base)
+            path = os.path.relpath(path, base + "/.." * self.uplvl)
             if path.startswith(".."):
                 # The `path` is not in the sub tree of `base`.
                 return None
