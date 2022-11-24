@@ -11,6 +11,7 @@ from typing import Any
 
 import pytest
 
+from pants.backend.visibility.glob import TargetGlob
 from pants.backend.visibility.rule_types import (
     BuildFileVisibilityRules,
     BuildFileVisibilityRulesError,
@@ -107,7 +108,7 @@ def parse_ruleset(rules: Any, build_file: str = "test/path/BUILD") -> Visibility
     ],
 )
 def test_flatten(expected, xs) -> None:
-    assert expected == list(flatten(xs))
+    assert expected == list(flatten(xs, str))
 
 
 @pytest.mark.parametrize(
@@ -143,7 +144,7 @@ def test_visibility_rule(expected: bool, rule: str, path: str, relpath: str) -> 
         (
             VisibilityRuleSet(
                 "test/path/BUILD",
-                ("target",),
+                (TargetGlob.parse("target", ""),),
                 (parse_rule("src/*"),),
             ),
             ("target", "src/*"),
@@ -151,7 +152,7 @@ def test_visibility_rule(expected: bool, rule: str, path: str, relpath: str) -> 
         (
             VisibilityRuleSet(
                 "test/path/BUILD",
-                ("files", "resources"),
+                (TargetGlob.parse("files", ""), TargetGlob.parse("resources", "")),
                 (
                     parse_rule(
                         "src/*",
@@ -200,7 +201,9 @@ def test_visibility_rule_set_parse(expected: VisibilityRuleSet, arg: Any) -> Non
     ],
 )
 def test_visibility_rule_set_match(expected: bool, target: str, rule_spec: tuple) -> None:
-    assert expected == parse_ruleset(rule_spec).match(TargetAdaptor(target, None))
+    assert expected == parse_ruleset(rule_spec, "").match(
+        Address(""), TargetAdaptor(target, None), ""
+    )
 
 
 @pytest.fixture
