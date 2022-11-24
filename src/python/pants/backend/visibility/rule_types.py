@@ -195,9 +195,9 @@ class BuildFileVisibilityRules(BuildFileDependencyRules):
         # Check outgoing dependency action
         out_ruleset, out_action, out_pattern = (
             cast(BuildFileVisibilityRules, dependencies_rules).get_action(
-                target=origin_adaptor,
-                address=dependency_address,
-                relpath=cls._get_address_relpath(origin_address),
+                address=origin_address,
+                adaptor=origin_adaptor,
+                other_address=dependency_address,
             )
             if dependencies_rules is not None
             else (None, DependencyRuleAction.ALLOW, None)
@@ -216,9 +216,9 @@ class BuildFileVisibilityRules(BuildFileDependencyRules):
         # Check incoming dependency action
         in_ruleset, in_action, in_pattern = (
             cast(BuildFileVisibilityRules, dependents_rules).get_action(
-                target=dependency_adaptor,
-                address=origin_address,
-                relpath=cls._get_address_relpath(dependency_address),
+                address=dependency_address,
+                adaptor=dependency_adaptor,
+                other_address=origin_address,
             )
             if dependents_rules is not None
             else (None, DependencyRuleAction.ALLOW, None)
@@ -264,27 +264,28 @@ class BuildFileVisibilityRules(BuildFileDependencyRules):
 
     def get_action(
         self,
-        target: TargetAdaptor,
         address: Address,
-        relpath: str,
+        adaptor: TargetAdaptor,
+        other_address: Address,
     ) -> tuple[VisibilityRuleSet | None, DependencyRuleAction | None, str | None]:
         """Get applicable rule for target type from `path`.
 
         The rules are declared in `relpath`.
         """
-        ruleset = self.get_ruleset(address, target, relpath)
+        relpath = self._get_address_relpath(address)
+        ruleset = self.get_ruleset(address, adaptor, relpath)
         if ruleset is None:
             return None, None, None
-        path = self._get_address_path(address)
+        path = self._get_address_path(other_address)
         for visibility_rule in ruleset.rules:
             if visibility_rule.match(path, relpath):
                 if visibility_rule.action != DependencyRuleAction.ALLOW:
                     logger.debug(
                         softwrap(
                             f"""
-                            {visibility_rule.action.name}: type:{target.type_alias}
-                            name:{target.name} path:{path!r} relpath:{relpath!r} address:{address}
-                            rule:{str(visibility_rule)!r} {self.path}:
+                            {visibility_rule.action.name}: type={adaptor.type_alias}
+                            address={address} other={other_address}
+                            rule={str(visibility_rule)!r} {self.path}:
                             {', '.join(map(str, ruleset.rules))}
                             """
                         )
