@@ -388,3 +388,25 @@ shunit2_tests(
     },
 )
 ```
+
+Visibility
+==========
+
+Visibility rules are the mechanism by which to control who may depend on whom. It is an implementation of Pants's dependency rules API. Using file globs this may be set from entire directory trees down to single files. Targets may be selected not only by its file path but also by target type and tags.
+
+The visibility rules operates on the dependency link between two targets. Dependencies are directional, so if target `A` depends on another target `B` the dependency goes from the "origin" target `A` -> `B`, we say that `B` is the __dependency__ of `A`, while `A` is the __dependent__ of `B`. 
+
+> 📘 The Direction of Dependency, `A` -> `B`.
+> 
+> Target `A` may have zero or more dependencies. For each of those dependencies `A` is their dependent.
+>
+> Target `B` may be the dependency of zero or more dependents. For each of those dependents `B` is their dependency.
+
+Dependency rules are configured in the BUILD files along with targets and any other BUILD file configuration. Rules may be provided on either end of a dependency link between two targets. There are two different keywords to use for each side of this link. As discussed above, any target may have both dependencies and dependents and these keywords map onto that:
+
+* `__dependencies_rules__` declares the rules that applies to a targets dependencies.
+* `__dependents_rules__` declares the rules that applies to a targets dependents.
+
+
+    `A` `__dependencies_rules__` -> `__dependents_rules__` `B` `__dependencies_rules__` -> ...
+
