@@ -13,7 +13,7 @@ from pants.backend.go.target_types import (
     GoRaceDetectorEnabledField,
     GoTestRaceDetectorEnabledField,
 )
-from pants.backend.go.util_rules import go_mod
+from pants.backend.go.util_rules import go_mod, goroot
 from pants.backend.go.util_rules.go_mod import OwningGoMod, OwningGoModRequest
 from pants.backend.go.util_rules.goroot import GoRoot
 from pants.build_graph.address import Address
@@ -154,5 +154,6 @@ def rules():
     return (
         *collect_rules(),
         *go_mod.rules(),
+        *goroot.rules(),
         *graph.rules(),
     )
