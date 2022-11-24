@@ -10,7 +10,9 @@ from pants.backend.go.subsystems.golang import GolangSubsystem
 from pants.backend.go.subsystems.gotest import GoTestSubsystem
 from pants.backend.go.target_types import (
     GoCgoEnabledField,
+    GoMemorySanitizerEnabledField,
     GoRaceDetectorEnabledField,
+    GoTestMemorySanitizerEnabledField,
     GoTestRaceDetectorEnabledField,
 )
 from pants.backend.go.util_rules import go_mod, goroot
@@ -34,6 +36,9 @@ class GoBuildOptions:
     # Enable the Go data race detector is true.
     with_race_detector: bool = False
 
+    # Enable interoperation with the LLVM memory sanitizer.
+    with_msan: bool = False
+
 
 @dataclass(frozen=True)
 class GoBuildOptionsFromTargetRequest(EngineAwareParameter):
@@ -46,17 +51,19 @@ class GoBuildOptionsFromTargetRequest(EngineAwareParameter):
 
 @dataclass(frozen=True)
 class GoBuildOptionsFieldSet(FieldSet):
-    required_fields = (GoCgoEnabledField,)
+    required_fields = (GoCgoEnabledField, GoRaceDetectorEnabledField, GoMemorySanitizerEnabledField)
 
     cgo_enabled: GoCgoEnabledField
     race: GoRaceDetectorEnabledField
+    msan: GoMemorySanitizerEnabledField
 
 
 @dataclass(frozen=True)
 class GoTestBuildOptionsFieldSet(FieldSet):
-    required_fields = (GoTestRaceDetectorEnabledField,)
+    required_fields = (GoTestRaceDetectorEnabledField, GoTestMemorySanitizerEnabledField)
 
     test_race: GoTestRaceDetectorEnabledField
+    test_msan: GoTestMemorySanitizerEnabledField
 
 
 def _first_non_none_value(items: Iterable[bool | None]) -> bool:
@@ -68,13 +75,24 @@ def _first_non_none_value(items: Iterable[bool | None]) -> bool:
 
 
 # Adapted from https://github.com/golang/go/blob/920f87adda5412a41036a862cf2139bed24aa533/src/internal/platform/supported.go#L7-L23.
-def _race_detector_supported(goroot: GoRoot) -> bool:
+def race_detector_supported(goroot: GoRoot) -> bool:
     """Returns True if the Go data race detector is supported for the `goroot`'s platform."""
     if goroot.goos == "linux":
         return goroot.goarch in ("amd64", "ppc64le", "arm64", "s390x")
     elif goroot.goos == "darwin":
         return goroot.goarch in ("amd64", "arm64")
     elif goroot.goos in ("freebsd", "netbsd", "openbsd", "windows"):
+        return goroot.goarch == "amd64"
+    else:
+        return False
+
+
+# Adapted from https://github.com/golang/go/blob/920f87adda5412a41036a862cf2139bed24aa533/src/internal/platform/supported.go#L25-L37
+def msan_supported(goroot: GoRoot) -> bool:
+    """Returns True if this platform supports interoperation with the LLVM memory sanitizer."""
+    if goroot.goos == "linux":
+        return goroot.goarch in ("amd64", "arm64")
+    elif goroot.goos == "freebsd":
         return goroot.goarch == "amd64"
     else:
         return False
@@ -137,16 +155,34 @@ async def go_extract_build_options_from_target(
             False,
         ]
     )
-    if with_race_detector and not _race_detector_supported(goroot):
+    if with_race_detector and not race_detector_supported(goroot):
         logger.warning(
             f"The Go data race detector would have been enabled for target `{request.address}, "
             f"but the race detector is not supported on platform {goroot.goos}/{goroot.goarch}."
         )
         with_race_detector = False
 
+    # Extract the `with_msan` value for this target.
+    with_msan = _first_non_none_value(
+        [
+            True if go_test_subsystem.force_msan and test_target_fields else None,
+            test_target_fields.test_msan.value if test_target_fields else None,
+            target_fields.msan.value if target_fields else None,
+            go_mod_target_fields.msan.value if go_mod_target_fields else None,
+            False,
+        ]
+    )
+    if with_msan and not msan_supported(goroot):
+        logger.warning(
+            f"Interoperation with the LLVM memory sanitizer would have been enabled for target `{request.address}, "
+            f"but the memory sanitizer is not supported on platform {goroot.goos}/{goroot.goarch}."
+        )
+        with_msan = False
+
     return GoBuildOptions(
         cgo_enabled=cgo_enabled,
         with_race_detector=with_race_detector,
+        with_msan=with_msan,
     )
 
 
