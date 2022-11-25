@@ -132,6 +132,12 @@ def test_flatten(expected, xs) -> None:
         (False, ".", "src/a/b", "src/a"),
         (True, "./*", "src/a/b", "src/a"),
         (False, "./*", "src/a/b", "src/a/b/c"),
+        (True, ".ext", "my_file.ext", ""),
+        (True, ".ext", "path/my_file.ext", ""),
+        (True, "my_file.ext", "my_file.ext", ""),
+        (True, "my_file.ext", "path/my_file.ext", ""),
+        (False, "my_file.ext", "not_my_file.ext", ""),
+        (True, "*my_file.ext", "path/some_of_my_file.ext", ""),
     ],
 )
 def test_visibility_rule(expected: bool, rule: str, path: str, relpath: str) -> None:

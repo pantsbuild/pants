@@ -14,19 +14,20 @@ from pants.engine.internals.target_adaptor import TargetAdaptor
 
 
 @pytest.mark.parametrize(
-    "base, pattern, text, expected",
+    "base, pattern_text, expected",
     [
         (
             "base",
             "foo",
-            "foo",
             PathGlob(
-                raw="foo", anchor_mode=PathGlobAnchorMode.FLOATING, glob=re.compile("foo$"), uplvl=0
+                raw="foo",
+                anchor_mode=PathGlobAnchorMode.FLOATING,
+                glob=re.compile(r"/?\bfoo$"),
+                uplvl=0,
             ),
         ),
         (
             "base",
-            ".",
             ".",
             PathGlob(
                 raw="", anchor_mode=PathGlobAnchorMode.INVOKED_PATH, glob=re.compile("$"), uplvl=0
@@ -34,7 +35,6 @@ from pants.engine.internals.target_adaptor import TargetAdaptor
         ),
         (
             "base",
-            "./foo",
             "./foo",
             PathGlob(
                 raw="foo",
@@ -45,8 +45,7 @@ from pants.engine.internals.target_adaptor import TargetAdaptor
         ),
         (
             "base",
-            "../foo/../bar",
-            "../bar",
+            ("../foo/../bar", "../bar"),
             PathGlob(
                 raw="bar",
                 anchor_mode=PathGlobAnchorMode.INVOKED_PATH,
@@ -56,8 +55,7 @@ from pants.engine.internals.target_adaptor import TargetAdaptor
         ),
         (
             "base",
-            "/foo",
-            "base/foo",
+            ("/foo", "base/foo"),
             PathGlob(
                 raw="base/foo",
                 anchor_mode=PathGlobAnchorMode.DECLARED_PATH,
@@ -67,8 +65,7 @@ from pants.engine.internals.target_adaptor import TargetAdaptor
         ),
         (
             "base/sub",
-            "/../bar",
-            "base/bar",
+            ("/../bar", "base/bar"),
             PathGlob(
                 raw="base/bar",
                 anchor_mode=PathGlobAnchorMode.DECLARED_PATH,
@@ -78,8 +75,7 @@ from pants.engine.internals.target_adaptor import TargetAdaptor
         ),
         (
             "base",
-            "/foo/../baz",
-            "base/baz",
+            ("/foo/../baz", "base/baz"),
             PathGlob(
                 raw="base/baz",
                 anchor_mode=PathGlobAnchorMode.DECLARED_PATH,
@@ -90,39 +86,75 @@ from pants.engine.internals.target_adaptor import TargetAdaptor
         (
             "base",
             "//foo",
-            "//foo",
             PathGlob(
                 raw="foo",
                 anchor_mode=PathGlobAnchorMode.PROJECT_ROOT,
-                glob=re.compile("foo$"),
+                glob=re.compile(r"foo$"),
                 uplvl=0,
             ),
         ),
         (
             "base",
-            "foo/**/bar",
             "foo/**/bar",
             PathGlob(
                 raw="foo/**/bar",
                 anchor_mode=PathGlobAnchorMode.FLOATING,
-                glob=re.compile("foo(/.*)?/bar$"),
+                glob=re.compile(r"/?\bfoo(/.*)?/bar$"),
                 uplvl=0,
             ),
         ),
         (
             "base",
-            "foo/../bar",
-            "bar",
+            ("foo/../bar", "bar"),
             PathGlob(
-                raw="bar", anchor_mode=PathGlobAnchorMode.FLOATING, glob=re.compile("bar$"), uplvl=0
+                raw="bar",
+                anchor_mode=PathGlobAnchorMode.FLOATING,
+                glob=re.compile(r"/?\bbar$"),
+                uplvl=0,
+            ),
+        ),
+        (
+            "base",
+            "my_file.ext",
+            PathGlob(
+                raw="my_file.ext",
+                anchor_mode=PathGlobAnchorMode.FLOATING,
+                glob=re.compile(r"/?\bmy_file\.ext$"),
+                uplvl=0,
+            ),
+        ),
+        (
+            "base",
+            "*my_file.ext",
+            PathGlob(
+                raw="*my_file.ext",
+                anchor_mode=PathGlobAnchorMode.FLOATING,
+                glob=re.compile(r"[^/]*my_file\.ext$"),
+                uplvl=0,
+            ),
+        ),
+        (
+            "base",
+            ".ext",
+            PathGlob(
+                raw=".ext",
+                anchor_mode=PathGlobAnchorMode.FLOATING,
+                glob=re.compile(r"\.ext$"),
+                uplvl=0,
             ),
         ),
     ],
 )
-def test_pathglob_parse(base: str, pattern: str, text: str, expected: PathGlob) -> None:
+def test_pathglob_parse(base: str, pattern_text: str | tuple[str, str], expected: PathGlob) -> None:
+    if isinstance(pattern_text, tuple):
+        pattern, text = pattern_text
+    else:
+        pattern, text = (pattern_text,) * 2
     actual = PathGlob.parse(pattern, base)
-    assert expected == actual
+    assert expected.anchor_mode == actual.anchor_mode
+    assert expected.glob.pattern == actual.glob.pattern
     assert text == str(actual)
+    assert expected == actual
 
 
 @pytest.mark.parametrize(
@@ -212,7 +244,6 @@ def test_pathglob_match_path(
 )
 def test_pathglob_match(glob: PathGlob, tests: tuple[tuple[str, str, bool], ...]) -> None:
     for path, base, expected in tests:
-        print(path, base)
         assert expected == glob.match(path, base)
 
 

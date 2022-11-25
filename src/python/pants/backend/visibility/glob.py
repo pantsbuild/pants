@@ -12,6 +12,7 @@ from typing import Any, Pattern
 
 from pants.engine.addresses import Address
 from pants.engine.internals.target_adaptor import TargetAdaptor
+from pants.util.memo import memoized_classmethod
 from pants.util.strutil import softwrap
 
 
@@ -25,6 +26,11 @@ class PathGlobAnchorMode(Enum):
     def parse(cls, pattern: str) -> PathGlobAnchorMode:
         for mode in cls.__members__.values():
             if pattern.startswith(mode.value):
+                if mode is PathGlobAnchorMode.INVOKED_PATH:
+                    # Special case invoked path, to not select ".text"; only "." "../" or "./" are valid
+                    # for `invoked path` mode. (we're not picky on the number of leading dots)
+                    if pattern.lstrip(".")[:1] not in "./":
+                        return PathGlobAnchorMode.FLOATING
                 return mode
         raise TypeError("Internal Error: should not get here, please file a bug report!")
 
@@ -44,25 +50,46 @@ class PathGlob:
         else:
             return f"{self.anchor_mode.value}{self.raw}"
 
+    @memoized_classmethod
+    def create(  # type: ignore[misc]
+        cls: type[PathGlob], raw: str, anchor_mode: PathGlobAnchorMode, glob: str, uplvl: int
+    ) -> PathGlob:
+        return cls(raw=raw, anchor_mode=anchor_mode, glob=re.compile(glob), uplvl=uplvl)
+
     @classmethod
     def parse(cls, pattern: str, base: str) -> PathGlob:
+        org_pattern = pattern
         if not isinstance(pattern, str):
             raise ValueError(f"invalid path glob, expected string but got: {pattern!r}")
         anchor_mode = PathGlobAnchorMode.parse(pattern)
         if anchor_mode is PathGlobAnchorMode.DECLARED_PATH:
             pattern = os.path.join(base, pattern.lstrip("/"))
+
+        if anchor_mode is PathGlobAnchorMode.FLOATING:
+            snap_to_path = not pattern.startswith(".")
+        else:
+            snap_to_path = False
+
         pattern = os.path.normpath(pattern)
         uplvl = pattern.count("../")
-        pattern = pattern.lstrip("./")
-        return cls(
+        if anchor_mode is not PathGlobAnchorMode.FLOATING:
+            pattern = pattern.lstrip("./")
+
+        if uplvl > 0 and anchor_mode is not PathGlobAnchorMode.INVOKED_PATH:
+            raise ValueError(
+                f"Internal Error: unexpected `uplvl` {uplvl} for pattern={org_pattern!r}, "
+                f"{anchor_mode}, base={base!r}. Please file a bug report!"
+            )
+
+        return cls.create(  # type: ignore[call-arg]
             raw=pattern,
             anchor_mode=anchor_mode,
-            glob=cls._parse_pattern(pattern),
+            glob=cls._translate_pattern_to_regexp(pattern, snap_to_path=snap_to_path),
             uplvl=uplvl,
         )
 
     @staticmethod
-    def _parse_pattern(pattern: str) -> Pattern:
+    def _translate_pattern_to_regexp(pattern: str, snap_to_path: bool) -> str:
         # Escape regexp characters, then restore any `*`s.
         glob = re.escape(pattern).replace(r"\*", "*")
         # Translate recursive `**` globs to regexp, a `/` prefix is optional.
@@ -72,8 +99,11 @@ class PathGlob:
         glob = glob.replace("*", "[^/]<<$>>")
         # Restore `*`s that was "escaped" during translation.
         glob = glob.replace("<<$>>", "*")
-        # Return regexp for translated glob pattern.
-        return re.compile(glob + "$")
+        # Snap to closest `/`
+        if snap_to_path and glob and glob[0].isalnum():
+            glob = r"/?\b" + glob
+
+        return glob + "$"
 
     def _match_path(self, path: str, base: str) -> str | None:
         if self.anchor_mode is PathGlobAnchorMode.INVOKED_PATH:
@@ -123,6 +153,15 @@ class TargetGlob:
         path = f"[{self.path}]" if self.path is not None else ""
         return f"{self.type_ or ''}{tags}{path}" or "*"
 
+    @memoized_classmethod
+    def create(  # type: ignore[misc]
+        cls: type[TargetGlob],
+        type_: str | None,
+        path: PathGlob | None,
+        tags: tuple[str, ...] | None,
+    ) -> TargetGlob:
+        return cls(type_=type_, path=path, tags=tags)
+
     @classmethod
     def parse(cls, spec: str | Mapping[str, Any], base: str) -> TargetGlob:
         if isinstance(spec, str):
@@ -132,7 +171,7 @@ class TargetGlob:
         else:
             raise ValueError(f"invalid target spec, expected string or dict but got: {spec!r}")
 
-        return cls(
+        return cls.create(  # type: ignore[call-arg]
             type_=spec_dict.get("type"),
             path=PathGlob.parse(spec_dict["path"], base)
             if spec_dict.get("path") is not None
