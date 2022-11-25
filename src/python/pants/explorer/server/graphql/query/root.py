@@ -5,8 +5,8 @@ from __future__ import annotations
 
 import strawberry
 
-from pants.backend.explorer.graphql.query.rules import QueryRulesMixin
-from pants.backend.explorer.graphql.query.targets import QueryTargetsMixin
+from pants.explorer.server.graphql.query.rules import QueryRulesMixin
+from pants.explorer.server.graphql.query.targets import QueryTargetsMixin
 
 
 @strawberry.type

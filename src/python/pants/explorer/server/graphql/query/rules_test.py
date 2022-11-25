@@ -13,8 +13,7 @@ import pytest
             {"name": r"\.explorer\."},
             {
                 "rules": [
-                    {"name": "pants.backend.explorer.rules.validate_explorer_dependencies"},
-                    {"name": "pants.backend.explorer.graphql.rules.get_graphql_uvicorn_setup"},
+                    {"name": "pants.explorer.server.graphql.rules.get_graphql_uvicorn_setup"},
                 ]
             },
         ),
@@ -22,17 +21,13 @@ import pytest
             {"name": r"\.graphql\."},
             {
                 "rules": [
-                    {"name": "pants.backend.explorer.graphql.rules.get_graphql_uvicorn_setup"},
+                    {"name": "pants.explorer.server.graphql.rules.get_graphql_uvicorn_setup"},
                 ]
             },
         ),
         (
-            {"limit": 1},
-            {
-                "rules": [
-                    {"name": "pants.backend.explorer.rules.validate_explorer_dependencies"},
-                ]
-            },
+            {"limit": 0},
+            {"rules": []},
         ),
         (
             {"limit": 0},

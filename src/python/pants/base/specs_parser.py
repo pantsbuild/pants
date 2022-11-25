@@ -8,7 +8,6 @@ from pathlib import Path, PurePath
 from typing import Iterable
 
 from pants.base.build_environment import get_buildroot
-from pants.base.deprecated import warn_or_error
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.base.specs import (
     AddressLiteralSpec,
@@ -117,15 +116,8 @@ class SpecsParser:
         specs: Iterable[str],
         *,
         description_of_origin: str,
-        convert_dir_literal_to_address_literal: bool | None = None,
         unmatched_glob_behavior: GlobMatchErrorBehavior = GlobMatchErrorBehavior.error,
     ) -> Specs:
-        if convert_dir_literal_to_address_literal is not None:
-            warn_or_error(
-                "2.16.0.dev0",
-                "the convert_dir_literal_to_address_literal kwarg for `SpecsParser.parse_specs",
-                "Directories are now never converted to AddressLiteral. So, remove the kwarg.",
-            )
         include_specs = []
         ignore_specs = []
         for spec_str in specs:

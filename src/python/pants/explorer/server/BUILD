@@ -12,12 +12,23 @@ python_distribution(
     ),
     entry_points={
         "pantsbuild.plugin": {
-            "rules": "pants.backend.explorer.register:rules",
+            "rules": "pants.explorer.server.register:rules",
         }
     },
 )
 
 python_tests(
     name="tests",
-    dependencies=[":explorer"],
+    dependencies=[":server"],
+)
+
+
+__dependents_rules__(
+    # Block any outside sources from pulling in code from this backend, as it is self contained and
+    # have 3rd party dependencies that we don't want to leak to the core Pants distribution.
+    (
+        "*",
+        build_file_dir() / "**",
+        "!*",
+    ),
 )

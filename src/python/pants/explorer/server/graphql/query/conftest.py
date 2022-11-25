@@ -8,14 +8,13 @@ from textwrap import dedent  # noqa: PNT20
 import pytest
 
 from pants.backend.docker.target_types import DockerImageTarget
-from pants.backend.explorer.graphql.rules import rules
-from pants.backend.explorer.graphql.setup import create_schema
-from pants.backend.explorer.rules import validate_explorer_dependencies
 from pants.backend.project_info import peek
 from pants.engine.environment import EnvironmentName
 from pants.engine.explorer import RequestState
 from pants.engine.target import RegisteredTargetTypes
 from pants.engine.unions import UnionMembership
+from pants.explorer.server.graphql.rules import rules
+from pants.explorer.server.graphql.setup import create_schema
 from pants.help.help_info_extracter import AllHelpInfo, HelpInfoExtracter
 from pants.testutil.rule_runner import RuleRunner
 
@@ -57,7 +56,6 @@ def all_help_info(rule_runner: RuleRunner) -> AllHelpInfo:
 def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=(
-            validate_explorer_dependencies,
             *peek.rules(),
             *rules(),
         ),

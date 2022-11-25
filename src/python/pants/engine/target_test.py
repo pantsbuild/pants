@@ -1125,7 +1125,7 @@ def test_single_source_file_path() -> None:
 
 def test_optional_source_value() -> None:
     class TestSingleSourceField(OptionalSingleSourceField):
-        use_no_value: ClassVar[bool] = True
+        none_is_valid_value: ClassVar[bool] = True
         default: ClassVar[str] = "default"
 
     assert TestSingleSourceField(None, Address("project")).value is None
