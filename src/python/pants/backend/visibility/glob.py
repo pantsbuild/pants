@@ -27,10 +27,9 @@ class PathGlobAnchorMode(Enum):
         for mode in cls.__members__.values():
             if pattern.startswith(mode.value):
                 if mode is PathGlobAnchorMode.INVOKED_PATH:
-                    # Special case invoked path, to not select ".text"; only "." "../" or "./" are
-                    # valid for `invoked path` mode. (we're not picky on the number of leading dots)
-                    # Using `not in "/"` here rather than `!= "/"` as it also works for `""`.
-                    if pattern.lstrip(".")[:1] not in "/":
+                    # Special case "invoked path", to not select ".text"; only "." "../" or "./" are
+                    # valid for "invoked path" mode. (we're not picky on the number of leading dots)
+                    if pattern.lstrip(".")[:1] not in ("", "/"):
                         return PathGlobAnchorMode.FLOATING
                 return mode
         raise TypeError("Internal Error: should not get here, please file a bug report!")
