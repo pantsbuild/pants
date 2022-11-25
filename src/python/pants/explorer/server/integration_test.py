@@ -28,7 +28,7 @@ from pants.testutil.pants_integration_test import (
             },
             {
                 "data": {
-                    "rules": [{"name": "pants.backend.explorer.server.uvicorn.create_server"}],
+                    "rules": [{"name": "pants.explorer.server.uvicorn.create_server"}],
                 },
             },
         ),
@@ -38,7 +38,7 @@ def test_explorer_graphql_query(query: dict, expected_result: dict) -> None:
     with temporary_workdir() as workdir:
         handle = run_pants_with_workdir_without_waiting(
             [
-                "--backend-packages=['pants.backend.explorer']",
+                "--backend-packages=['pants.explorer.server']",
                 "--no-watch-filesystem",
                 "--no-dynamic-ui",
                 "experimental-explorer",

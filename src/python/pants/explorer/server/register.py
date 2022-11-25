@@ -3,9 +3,8 @@
 
 from __future__ import annotations
 
-from pants.backend.explorer import browser
-from pants.backend.explorer.graphql import rules as graphql
-from pants.backend.explorer.server import uvicorn
+from pants.explorer.server import browser, uvicorn
+from pants.explorer.server.graphql import rules as graphql
 
 
 def rules():
