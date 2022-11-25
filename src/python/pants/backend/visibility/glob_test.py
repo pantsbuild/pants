@@ -3,39 +3,126 @@
 from __future__ import annotations
 
 import os
+import re
 from typing import Any, Mapping
 
 import pytest
 
-from pants.backend.visibility.glob import PathGlob, TargetGlob
+from pants.backend.visibility.glob import PathGlob, PathGlobAnchorMode, TargetGlob
 from pants.engine.addresses import Address
 from pants.engine.internals.target_adaptor import TargetAdaptor
 
 
 @pytest.mark.parametrize(
-    "pattern, base, anchor_mode, raw, glob, text, uplvl",
+    "base, pattern, text, expected",
     [
-        ("foo", "base", "", "foo", "foo$", "foo", 0),
-        (".", "base", ".", "", "$", ".", 0),
-        ("./foo", "base", ".", "foo", "foo$", "./foo", 0),
-        ("../foo/../bar", "base", ".", "bar", "bar$", "../bar", 1),
-        ("/foo", "base", "/", "base/foo", "base/foo$", "base/foo", 0),
-        ("/../bar", "base/sub", "/", "base/bar", "base/bar$", "base/bar", 0),
-        ("/foo/../baz", "base", "/", "base/baz", "base/baz$", "base/baz", 0),
-        ("//foo", "base", "//", "foo", "foo$", "//foo", 0),
-        ("foo/**/bar", "base", "", "foo/**/bar", "foo(/.*)?/bar$", "foo/**/bar", 0),
-        ("foo/../bar", "base", "", "bar", "bar$", "bar", 0),
+        (
+            "base",
+            "foo",
+            "foo",
+            PathGlob(
+                raw="foo", anchor_mode=PathGlobAnchorMode.FLOATING, glob=re.compile("foo$"), uplvl=0
+            ),
+        ),
+        (
+            "base",
+            ".",
+            ".",
+            PathGlob(
+                raw="", anchor_mode=PathGlobAnchorMode.INVOKED_PATH, glob=re.compile("$"), uplvl=0
+            ),
+        ),
+        (
+            "base",
+            "./foo",
+            "./foo",
+            PathGlob(
+                raw="foo",
+                anchor_mode=PathGlobAnchorMode.INVOKED_PATH,
+                glob=re.compile("foo$"),
+                uplvl=0,
+            ),
+        ),
+        (
+            "base",
+            "../foo/../bar",
+            "../bar",
+            PathGlob(
+                raw="bar",
+                anchor_mode=PathGlobAnchorMode.INVOKED_PATH,
+                glob=re.compile("bar$"),
+                uplvl=1,
+            ),
+        ),
+        (
+            "base",
+            "/foo",
+            "base/foo",
+            PathGlob(
+                raw="base/foo",
+                anchor_mode=PathGlobAnchorMode.DECLARED_PATH,
+                glob=re.compile("base/foo$"),
+                uplvl=0,
+            ),
+        ),
+        (
+            "base/sub",
+            "/../bar",
+            "base/bar",
+            PathGlob(
+                raw="base/bar",
+                anchor_mode=PathGlobAnchorMode.DECLARED_PATH,
+                glob=re.compile("base/bar$"),
+                uplvl=0,
+            ),
+        ),
+        (
+            "base",
+            "/foo/../baz",
+            "base/baz",
+            PathGlob(
+                raw="base/baz",
+                anchor_mode=PathGlobAnchorMode.DECLARED_PATH,
+                glob=re.compile("base/baz$"),
+                uplvl=0,
+            ),
+        ),
+        (
+            "base",
+            "//foo",
+            "//foo",
+            PathGlob(
+                raw="foo",
+                anchor_mode=PathGlobAnchorMode.PROJECT_ROOT,
+                glob=re.compile("foo$"),
+                uplvl=0,
+            ),
+        ),
+        (
+            "base",
+            "foo/**/bar",
+            "foo/**/bar",
+            PathGlob(
+                raw="foo/**/bar",
+                anchor_mode=PathGlobAnchorMode.FLOATING,
+                glob=re.compile("foo(/.*)?/bar$"),
+                uplvl=0,
+            ),
+        ),
+        (
+            "base",
+            "foo/../bar",
+            "bar",
+            PathGlob(
+                raw="bar", anchor_mode=PathGlobAnchorMode.FLOATING, glob=re.compile("bar$"), uplvl=0
+            ),
+        ),
     ],
 )
-def test_pathglob_parse(
-    pattern: str, base: str, anchor_mode: str, raw: str, glob: str, text: str, uplvl: int
-) -> None:
-    parsed = PathGlob.parse(pattern, base)
-    assert raw == parsed.raw
-    assert anchor_mode == parsed.anchor_mode.value
-    assert glob == parsed.glob.pattern
-    assert text == str(parsed)
-    assert uplvl == parsed.uplvl
+def test_pathglob_parse(base: str, pattern: str, text: str, expected: PathGlob) -> None:
+    actual = PathGlob.parse(pattern, base)
+    assert expected == actual
+    assert text == str(actual)
 
 
 @pytest.mark.parametrize(
