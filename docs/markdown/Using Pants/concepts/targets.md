@@ -421,7 +421,7 @@ The visibility rules operates on the dependency link between two targets. Depend
 >
 > Target `B` may be the dependency of zero or more dependents. For each of those dependents `B` is their dependency.
 
-Dependency rules are configured in the BUILD files along with targets and any other BUILD file configuration. Rules may be provided on either end of a dependency link between two targets. There are two different keywords to use for each side of this link. As discussed above, any target may have both dependencies and dependents and these keywords map onto that:
+Dependency rules are configured in the BUILD files along with targets and any other BUILD file configuration. Rules may be provided on either end of a dependency link between two targets. There are two different keywords to use, one for each side of this link. As discussed above, any target may have both dependencies and dependents and these keywords map onto that:
 
 * `__dependencies_rules__` declares the rules that applies to a targets dependencies.
 * `__dependents_rules__` declares the rules that applies to a targets dependents.
@@ -430,7 +430,7 @@ Dependency rules are configured in the BUILD files along with targets and any ot
     `A` `__dependencies_rules__` -> `__dependents_rules__` `B` `__dependencies_rules__` -> ...
 
 
-For each dependency there may be up to 2 sets of rules consulted to determine if it should be `allowed` or `denied` (or just `warn`), one for each end of the dependency link. The rules themselves are merely [path globs](doc:targets#glob-syntax) applied in order until a matching rule is found. It is an error for there to not be any matching rule, if any rules are defined. That is, you may have a dependency without any rules and that will be allowed, but as soon as there are rules in play there must exist at least one that is a match for the dependency link that dictates the outcome.
+For each dependency there may be up to 2 sets of rules consulted to determine if it should be `allowed` or `denied` (or just `warn`, see [Rule Actions](doc:targets#rule-actions)), one for each end of the dependency link. The rules themselves are merely [path globs](doc:targets#glob-syntax) applied in order until a matching rule is found. It is an error for there to not be any matching rule, if any rules are defined. That is, you may have a dependency without any rules and that will be allowed, but as soon as there are rules in play there must exist at least one that is a match for the dependency link that dictates the outcome.
 
 > 🚧 There are no default rules
 >
@@ -501,7 +501,7 @@ __dependencies_rules__(
 )
 ```
 
-The rules are just string values using a [glob syntax](doc:targets#glob-syntax) for pattern matching and may be grouped together for readability (how rules are grouped does not affect how they are applied). The selector is a dictionary value with properties describing what targets its associated rules apply to and together this pair of selector(s) and rules is called a __Rule Set__. A rule set may have multiple selectors wrapped in a list/tuple.
+The rules are just string values using a [glob syntax](doc:targets#glob-syntax) for pattern matching and may be grouped together for readability (how rules are grouped does not affect how they are applied). The selector is a dictionary value with properties describing what targets its associated rules apply to and together this pair of selector(s) and rules is called a __rule set__. A rule set may have multiple selectors wrapped in a list/tuple.
 
 The selector has three properties: `type`, `tags` and `path`. From the above example, when determining which rule set to apply for the dependencies of `src/a/main.py` Pants will look for the first selector for `src/a/BUILD` that satisifies the properties `type=python_sources`, `tags=["apps"]` and `path=src/a/main.py`. The selection is based on exclusion so only when there is a property value and it doesn't match the targets property it will move on to the next selector, so the lack of a property will be considered to match anything. Consequently an empty selector matches all targets.
 
