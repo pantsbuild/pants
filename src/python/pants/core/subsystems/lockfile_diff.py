@@ -29,7 +29,7 @@ class LockfileDiffSubsystem(PythonToolBase):
     name = "lockfile-diff"
     help = "The utility for diff-ing lockfiles."
 
-    default_version = "lockfile-diff>=0.3.3,<0.4.0"
+    default_version = "lockfile-diff>=0.3.4,<0.4.0"
     default_main = ConsoleScript("lockfile-diff")
 
     register_interpreter_constraints = True

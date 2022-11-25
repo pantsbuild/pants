@@ -9,7 +9,7 @@
 //     "CPython<3.10,>=3.8"
 //   ],
 //   "generated_with_requirements": [
-//     "lockfile-diff<0.4.0,>=0.3.3"
+//     "lockfile-diff<0.4.0,>=0.3.4"
 //   ],
 //   "manylinux": "manylinux2014",
 //   "requirement_constraints": [],
@@ -52,13 +52,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "63e987df077944f1d2a12c74be48eda252cef9d2a5ee85297bf8df0a91dddbe8",
-              "url": "https://files.pythonhosted.org/packages/73/62/6c4bdf1fe0b28f4e00e2262832646b2d5e35daaf9925c0ec2f56d89b6404/lockfile_diff-0.3.3-py3-none-any.whl"
+              "hash": "5e559d9ba70ff3e88917c6ea007c27c18c8af8d1adb6d687f5e63130f1c63c85",
+              "url": "https://files.pythonhosted.org/packages/00/39/aa6d091d20f5bed932cb24df99988606d097f21dd702c59d8c7bee5a7f34/lockfile_diff-0.3.4-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "edcebc664dbeafb6ee41afe471b0378ae64745a6fb139e542385992736f44d44",
-              "url": "https://files.pythonhosted.org/packages/ed/c0/9b3c3b65701affff2a48aef4ff91c5906edb193c873c420137bd05a0092f/lockfile-diff-0.3.3.tar.gz"
+              "hash": "78be25336fa93bed7f8b8221e68dfbaedd5783675fe20cb9f4a0c49d16ffa44e",
+              "url": "https://files.pythonhosted.org/packages/f7/1b/093c446ed950a9d2cbd352a0aca94c91894bb52680442252c87d2122fcfa/lockfile-diff-0.3.4.tar.gz"
             }
           ],
           "project_name": "lockfile-diff",
@@ -73,7 +73,7 @@
             "types-toml"
           ],
           "requires_python": "<3.10,>=3.8",
-          "version": "0.3.3"
+          "version": "0.3.4"
         },
         {
           "artifacts": [
@@ -200,13 +200,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "6211d2f5eddad8757bd0484923ca7c0a6302ebc4ab32ea5e94357176e0ca0840",
-              "url": "https://files.pythonhosted.org/packages/1f/97/c03668380f278f1f8b0486d820c142cf224bba1bd78416e1797b52e0e81c/setuptools-65.6.0-py3-none-any.whl"
+              "hash": "57f6f22bde4e042978bcd50176fdb381d7c21a9efa4041202288d3737a0c6a54",
+              "url": "https://files.pythonhosted.org/packages/ef/e3/29d6e1a07e8d90ace4a522d9689d03e833b67b50d1588e693eec15f26251/setuptools-65.6.3-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "d1eebf881c6114e51df1664bc2c9133d022f78d12d5f4f665b9191f084e2862d",
-              "url": "https://files.pythonhosted.org/packages/09/b6/33512596fb92ba68f7c45e9bbc5e1bb9b24fbd941f9aece250fb420c2f5c/setuptools-65.6.0.tar.gz"
+              "hash": "a7620757bf984b58deaf32fc8a4577a9bbc0850cf92c20e1ce41c38c19e5fb75",
+              "url": "https://files.pythonhosted.org/packages/b6/21/cb9a8d0b2c8597c83fce8e9c02884bce3d4951e41e807fc35791c6b23d9a/setuptools-65.6.3.tar.gz"
             }
           ],
           "project_name": "setuptools",
@@ -257,7 +257,7 @@
             "wheel; extra == \"testing-integration\""
           ],
           "requires_python": ">=3.7",
-          "version": "65.6.0"
+          "version": "65.6.3"
         },
         {
           "artifacts": [
@@ -322,7 +322,7 @@
   "pip_version": "20.3.4-patched",
   "prefer_older_binary": false,
   "requirements": [
-    "lockfile-diff<0.4.0,>=0.3.3"
+    "lockfile-diff<0.4.0,>=0.3.4"
   ],
   "requires_python": [
     "<3.10,>=3.8"
