@@ -381,7 +381,12 @@ async def build_go_package(
 
     merged_deps_digest, import_config, embedcfg, action_id_result = await MultiGet(
         Get(Digest, MergeDigests(dep_digests)),
-        Get(ImportConfig, ImportConfigRequest(FrozenDict(import_paths_to_pkg_a_files))),
+        Get(
+            ImportConfig,
+            ImportConfigRequest(
+                FrozenDict(import_paths_to_pkg_a_files), build_opts=request.build_opts
+            ),
+        ),
         Get(RenderedEmbedConfig, RenderEmbedConfigRequest(request.embed_config)),
         Get(GoCompileActionIdResult, GoCompileActionIdRequest(request)),
     )

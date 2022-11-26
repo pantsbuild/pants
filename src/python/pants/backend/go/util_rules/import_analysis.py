@@ -9,6 +9,7 @@ from typing import ClassVar
 
 import ijson
 
+from pants.backend.go.util_rules.build_opts import GoBuildOptions
 from pants.backend.go.util_rules.sdk import GoSdkProcess
 from pants.engine.fs import CreateDigest, Digest, FileContent
 from pants.engine.internals.selectors import Get
@@ -28,13 +29,19 @@ class GoStdLibImports(FrozenDict[str, str]):
     """
 
 
+@dataclass(frozen=True)
+class GoStdLibImportsRequest:
+    with_race_detector: bool
+
+
 @rule(desc="Determine Go std lib's imports", level=LogLevel.DEBUG)
-async def determine_go_std_lib_imports() -> GoStdLibImports:
+async def determine_go_std_lib_imports(request: GoStdLibImportsRequest) -> GoStdLibImports:
+    maybe_race_arg = ["-race"] if request.with_race_detector else []
     list_result = await Get(
         ProcessResult,
         GoSdkProcess(
             # "-find" skips determining dependencies and imports for each package.
-            command=("list", "-find", "-json", "std"),
+            command=("list", "-find", *maybe_race_arg, "-json", "std"),
             description="Ask Go for its available import paths",
         ),
     )
@@ -62,17 +69,16 @@ class ImportConfigRequest:
     """Create an `importcfg` file associating import paths to their `__pkg__.a` files."""
 
     import_paths_to_pkg_a_files: FrozenDict[str, str]
+    build_opts: GoBuildOptions
     include_stdlib: bool = True
 
     @classmethod
-    def stdlib_only(cls) -> ImportConfigRequest:
-        return cls(FrozenDict(), include_stdlib=True)
+    def stdlib_only(cls, build_opts: GoBuildOptions) -> ImportConfigRequest:
+        return cls(FrozenDict(), build_opts=build_opts, include_stdlib=True)
 
 
 @rule
-async def generate_import_config(
-    request: ImportConfigRequest, stdlib_imports: GoStdLibImports
-) -> ImportConfig:
+async def generate_import_config(request: ImportConfigRequest) -> ImportConfig:
     lines = [
         "# import config",
         *(
@@ -81,9 +87,13 @@ async def generate_import_config(
         ),
     ]
     if request.include_stdlib:
+        std_lib_imports = await Get(
+            GoStdLibImports,
+            GoStdLibImportsRequest(with_race_detector=request.build_opts.with_race_detector),
+        )
         lines.extend(
             f"packagefile {import_path}={static_file_path}"
-            for import_path, static_file_path in stdlib_imports.items()
+            for import_path, static_file_path in std_lib_imports.items()
         )
     content = "\n".join(lines).encode("utf-8")
     result = await Get(Digest, CreateDigest([FileContent(ImportConfig.CONFIG_PATH, content)]))
