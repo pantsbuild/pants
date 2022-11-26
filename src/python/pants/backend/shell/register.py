@@ -1,14 +1,8 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants.backend.shell import (
-    dependency_inference,
-    shell_command,
-    shunit2,
-    shunit2_test_runner,
-    tailor,
-)
-from pants.backend.shell.goals.test import rules as test_goal_rules
+from pants.backend.shell import dependency_inference, shell_command, shunit2, shunit2_test_runner
+from pants.backend.shell.goals import tailor, test
 from pants.backend.shell.target_types import (
     ShellCommandRunTarget,
     ShellCommandTarget,
@@ -41,5 +35,5 @@ def rules():
         *shunit2_test_runner.rules(),
         *tailor.rules(),
         *target_types_rules(),
-        *test_goal_rules(),
+        *test.rules(),
     ]
