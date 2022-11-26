@@ -8,6 +8,7 @@ from pants.backend.shell import (
     shunit2_test_runner,
     tailor,
 )
+from pants.backend.shell.goals.test import rules as test_goal_rules
 from pants.backend.shell.target_types import (
     ShellCommandRunTarget,
     ShellCommandTarget,
@@ -38,4 +39,5 @@ def rules():
         *shunit2_test_runner.rules(),
         *tailor.rules(),
         *target_types_rules(),
+        *test_goal_rules(),
     ]
