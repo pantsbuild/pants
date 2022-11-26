@@ -528,6 +528,7 @@ def test_get_all_help_info():
                 "used_in_rules": ("construct_scope_foo",),
             },
         },
+        "name_to_backend_help_info": {},
     }
 
     # Break down this colossal structure into pieces so it is easier to spot where the issue is.
