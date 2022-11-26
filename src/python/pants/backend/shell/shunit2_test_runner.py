@@ -164,9 +164,10 @@ async def setup_shunit2_for_target(
     test_extra_env: TestExtraEnv,
     global_options: GlobalOptions,
     shunit2: Shunit2,
+    platform: Platform,
 ) -> TestSetup:
     shunit2_script, transitive_targets, built_package_dependencies = await MultiGet(
-        Get(DownloadedExternalTool, ExternalToolRequest, shunit2.get_request(Platform.current)),
+        Get(DownloadedExternalTool, ExternalToolRequest, shunit2.get_request(platform)),
         Get(TransitiveTargets, TransitiveTargetsRequest([request.field_set.address])),
         Get(
             BuiltPackageDependencies,
