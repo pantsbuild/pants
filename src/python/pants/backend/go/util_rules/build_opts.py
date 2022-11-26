@@ -39,6 +39,9 @@ class GoBuildOptions:
     # Enable interoperation with the C/C++ memory sanitizer.
     with_msan: bool = False
 
+    def __post_init__(self):
+        assert not (self.with_race_detector and self.with_msan)
+
 
 @dataclass(frozen=True)
 class GoBuildOptionsFromTargetRequest(EngineAwareParameter):
