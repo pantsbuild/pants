@@ -180,7 +180,8 @@ async def go_extract_build_options_from_target(
     )
     if with_race_detector and not race_detector_supported(goroot):
         logger.warning(
-            f"The Go data race detector would have been enabled for target `{request.address}, "
+            f"The Go data race detector would have been enabled for target `{request.address} "
+            f"because {race_detector_reason}, "
             f"but the race detector is not supported on platform {goroot.goos}/{goroot.goarch}."
         )
         with_race_detector = False
@@ -215,7 +216,8 @@ async def go_extract_build_options_from_target(
     )
     if with_msan and not msan_supported(goroot):
         logger.warning(
-            f"Interoperation with the C/C++ memory sanitizer would have been enabled for target `{request.address}`, "
+            f"Interoperation with the C/C++ memory sanitizer would have been enabled for target `{request.address}` "
+            f"because {msan_reason}, "
             f"but the memory sanitizer is not supported on platform {goroot.goos}/{goroot.goarch}."
         )
         with_msan = False
