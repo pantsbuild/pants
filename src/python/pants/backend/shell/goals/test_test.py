@@ -16,8 +16,8 @@ from pants.backend.shell.target_types import (
     ShellSourcesGeneratorTarget,
 )
 from pants.build_graph.address import Address
-from pants.core.goals.test import TestResult
-from pants.core.util_rules import source_files
+from pants.core.goals.test import TestResult, get_filtered_environment
+from pants.core.util_rules import archive, source_files
 from pants.engine.rules import QueryRule
 from pants.engine.target import Target
 from pants.testutil.rule_runner import RuleRunner
@@ -29,6 +29,8 @@ def rule_runner() -> RuleRunner:
         rules=[
             *test.rules(),
             *source_files.rules(),
+            *archive.rules(),
+            get_filtered_environment,
             QueryRule(TestResult, (ShellTestRequest.Batch,)),
         ],
         target_types=[
