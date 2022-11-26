@@ -83,10 +83,10 @@ class GoMemorySanitizerEnabledField(TriBoolField):
     alias = "msan"
     help = softwrap(
         """
-        Enable interoperation between Go code and the LLVM "memory sanitizer." 
+        Enable interoperation between Go code and the C/C++ "memory sanitizer."
 
         See https://github.com/google/sanitizers/wiki/MemorySanitizer for additional information about
-        the LLVM memory sanitizer.
+        the C/C++ memory sanitizer.
         """
     )
 
@@ -95,11 +95,11 @@ class GoTestMemorySanitizerEnabledField(GoRaceDetectorEnabledField):
     alias = "test_msan"
     help = softwrap(
         """
-        Enable interoperation between Go code and the LLVM "memory sanitizer" when building this package's
-        test binary. 
+        Enable interoperation between Go code and the C/C++ "memory sanitizer" when building this package's
+        test binary.
 
         See https://github.com/google/sanitizers/wiki/MemorySanitizer for additional information about
-        the LLVM memory sanitizer.
+        the C/C++ memory sanitizer.
         """
     )
 

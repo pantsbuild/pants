@@ -36,7 +36,7 @@ class GoBuildOptions:
     # Enable the Go data race detector is true.
     with_race_detector: bool = False
 
-    # Enable interoperation with the LLVM memory sanitizer.
+    # Enable interoperation with the C/C++ memory sanitizer.
     with_msan: bool = False
 
 
@@ -91,7 +91,7 @@ def race_detector_supported(goroot: GoRoot) -> bool:
 
 # Adapted from https://github.com/golang/go/blob/920f87adda5412a41036a862cf2139bed24aa533/src/internal/platform/supported.go#L25-L37
 def msan_supported(goroot: GoRoot) -> bool:
-    """Returns True if this platform supports interoperation with the LLVM memory sanitizer."""
+    """Returns True if this platform supports interoperation with the C/C++ memory sanitizer."""
     if goroot.goos == "linux":
         return goroot.goarch in ("amd64", "arm64")
     elif goroot.goos == "freebsd":
@@ -212,16 +212,16 @@ async def go_extract_build_options_from_target(
     )
     if with_msan and not msan_supported(goroot):
         logger.warning(
-            f"Interoperation with the LLVM memory sanitizer would have been enabled for target `{request.address}, "
+            f"Interoperation with the C/C++ memory sanitizer would have been enabled for target `{request.address}`, "
             f"but the memory sanitizer is not supported on platform {goroot.goos}/{goroot.goarch}."
         )
         with_msan = False
 
     if with_race_detector and with_msan:
         raise ValueError(
-            "The Go race detector and msan support cannot be enabled at the same time. "
-            f"The race detector is enabled because {race_detector_reason} "
-            f"and msan support is enabled because {msan_reason}."
+            "The Go data race detector and C/C++ memory sanitizer support cannot be enabled at the same time. "
+            f"The Go data race detector is enabled because {race_detector_reason}. "
+            f"The C/C++ memory sanitizer support is enabled because {msan_reason}."
         )
 
     return GoBuildOptions(

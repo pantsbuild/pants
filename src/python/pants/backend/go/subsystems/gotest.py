@@ -86,12 +86,12 @@ class GoTestSubsystem(Subsystem):
         default=False,
         help=softwrap(
             f"""
-            If true, then always enable interoperation between Go and the LLVM memory sanitizer when running tests
+            If true, then always enable interoperation between Go and the C/C++ "memory sanitizer" when running tests
             regardless of the test-by-test `{GoTestRaceDetectorEnabledField.alias}` field on the relevant
             `{GoPackageTarget.alias}` target.
 
             See https://github.com/google/sanitizers/wiki/MemorySanitizer for additional information about
-            the LLVM memory sanitizer.
+            the C/C++ memory sanitizer.
             """
         ),
     )
