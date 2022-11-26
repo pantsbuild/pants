@@ -23,7 +23,7 @@ from pants.engine.fs import DigestContents, GlobMatchErrorBehavior, PathGlobs, P
 from pants.engine.internals.defaults import BuildFileDefaults, BuildFileDefaultsParserState
 from pants.engine.internals.dep_rules import (
     BuildFileDependencyRules,
-    DependencyRuleAction,
+    DependencyRuleApplication,
     MaybeBuildFileDependencyRulesImplementation,
 )
 from pants.engine.internals.mapper import AddressFamily, AddressMap
@@ -35,8 +35,8 @@ from pants.engine.internals.synthetic_targets import (
 from pants.engine.internals.target_adaptor import TargetAdaptor, TargetAdaptorRequest
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
-    DependenciesRuleAction,
-    DependenciesRuleActionRequest,
+    DependenciesRuleApplication,
+    DependenciesRuleApplicationRequest,
     RegisteredTargetTypes,
 )
 from pants.engine.unions import UnionMembership
@@ -152,12 +152,15 @@ class OptionalAddressFamily:
     path: str
     address_family: AddressFamily | None = None
 
+    def ensure(self) -> AddressFamily:
+        if self.address_family is not None:
+            return self.address_family
+        raise ResolveError(f"Directory '{self.path}' does not contain any BUILD files.")
+
 
 @rule
 async def ensure_address_family(request: OptionalAddressFamily) -> AddressFamily:
-    if request.address_family is None:
-        raise ResolveError(f"Directory '{request.path}' does not contain any BUILD files.")
-    return request.address_family
+    return request.ensure()
 
 
 @rule(desc="Search for addresses in BUILD files")
@@ -318,47 +321,71 @@ async def find_target_adaptor(request: TargetAdaptorRequest) -> TargetAdaptor:
     return target_adaptor
 
 
+def _rules_path(address: Address) -> str:
+    if address.is_file_target and os.path.sep in address._relative_file_path:  # type: ignore[operator]
+        # The file is in a subdirectory of spec_path
+        return os.path.dirname(address.filename)
+    else:
+        return address.spec_path
+
+
 @rule
-async def get_dependencies_rule_action(
-    request: DependenciesRuleActionRequest,
+async def get_dependencies_rule_application(
+    request: DependenciesRuleApplicationRequest,
     maybe_build_file_rules_implementation: MaybeBuildFileDependencyRulesImplementation,
-) -> DependenciesRuleAction:
+) -> DependenciesRuleApplication:
     build_file_dependency_rules_class = (
         maybe_build_file_rules_implementation.build_file_dependency_rules_class
     )
     if build_file_dependency_rules_class is None:
-        return DependenciesRuleAction.allow_all()
+        return DependenciesRuleApplication.allow_all()
 
-    spec_paths = {address.spec_path for address in (request.address, *request.dependencies)}
-    address_families = await MultiGet(
-        Get(AddressFamily, AddressFamilyDir(spec_path)) for spec_path in spec_paths
+    # Fetch up to 4 sets of address families, one each for the target adaptors, and then one each
+    # for the dep rules (as we want the rules from the directory the file is in rather than the
+    # directory where the target generator was declared, if not the same)
+    rules_paths = set(
+        itertools.chain.from_iterable(
+            {address.spec_path, _rules_path(address)}
+            for address in (request.address, *request.dependencies)
+        )
     )
-    families = {address_family.namespace: address_family for address_family in address_families}
-    origin_family = families[request.address.spec_path]
+    maybe_address_families = await MultiGet(
+        Get(OptionalAddressFamily, AddressFamilyDir(rules_path)) for rules_path in rules_paths
+    )
+    maybe_families = {maybe.path: maybe for maybe in maybe_address_families}
+    origin_tgt_address = request.address.maybe_convert_to_target_generator()
     origin_target = _get_target_adaptor(
-        request.address.maybe_convert_to_target_generator(),
-        origin_family,
+        origin_tgt_address,
+        maybe_families[origin_tgt_address.spec_path].ensure(),
         request.description_of_origin,
     )
-    dependencies_rule: dict[Address, DependencyRuleAction] = {}
+    origin_rules_family = (
+        maybe_families[_rules_path(request.address)].address_family
+        or maybe_families[request.address.spec_path].ensure()
+    )
+    dependencies_rule: dict[Address, DependencyRuleApplication] = {}
     for dependency_address in request.dependencies:
-        dependency_family = families[dependency_address.spec_path]
+        dependency_tgt_address = dependency_address.maybe_convert_to_target_generator()
         dependency_target = _get_target_adaptor(
-            dependency_address.maybe_convert_to_target_generator(),
-            dependency_family,
+            dependency_tgt_address,
+            maybe_families[dependency_tgt_address.spec_path].ensure(),
             f"{request.description_of_origin} on {dependency_address}",
+        )
+        dependency_rules_family = (
+            maybe_families[_rules_path(dependency_address)].address_family
+            or maybe_families[dependency_address.spec_path].ensure()
         )
         dependencies_rule[
             dependency_address
         ] = build_file_dependency_rules_class.check_dependency_rules(
-            source_adaptor=origin_target,
-            source_path=origin_family.namespace,
-            dependencies_rules=origin_family.dependencies_rules,
-            target_adaptor=dependency_target,
-            target_path=dependency_family.namespace,
-            dependents_rules=dependency_family.dependents_rules,
+            origin_address=request.address,
+            origin_adaptor=origin_target,
+            dependencies_rules=origin_rules_family.dependencies_rules,
+            dependency_address=dependency_address,
+            dependency_adaptor=dependency_target,
+            dependents_rules=dependency_rules_family.dependents_rules,
         )
-    return DependenciesRuleAction(request.address, FrozenDict(dependencies_rule))
+    return DependenciesRuleApplication(request.address, FrozenDict(dependencies_rule))
 
 
 def rules():
