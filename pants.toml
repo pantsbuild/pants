@@ -58,6 +58,8 @@ pants_ignore.add = [
   "!/pants.pex",
   # Ignore node modules for docs processing tools
   "/docs/node_modules",
+  # Remove or comment this line to see the bug
+  "/ignored_dir",
 ]
 
 build_ignore.add = [

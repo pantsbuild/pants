@@ -60,3 +60,5 @@ GTAGS
 /.pants.rc
 /.venv
 .tool-versions
+
+/ignored_dir/
