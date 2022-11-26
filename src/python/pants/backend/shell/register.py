@@ -12,6 +12,7 @@ from pants.backend.shell.goals.test import rules as test_goal_rules
 from pants.backend.shell.target_types import (
     ShellCommandRunTarget,
     ShellCommandTarget,
+    ShellCommandTestTarget,
     ShellSourcesGeneratorTarget,
     ShellSourceTarget,
     Shunit2TestsGeneratorTarget,
@@ -24,6 +25,7 @@ def target_types():
     return [
         ShellCommandTarget,
         ShellCommandRunTarget,
+        ShellCommandTestTarget,
         ShellSourcesGeneratorTarget,
         Shunit2TestsGeneratorTarget,
         ShellSourceTarget,

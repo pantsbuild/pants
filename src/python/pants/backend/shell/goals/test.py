@@ -27,6 +27,7 @@ from pants.engine.internals.selectors import Get
 from pants.engine.process import FallibleProcessResult, Process, ProcessCacheScope
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import Target, WrappedTarget, WrappedTargetRequest
+from pants.engine.unions import UnionRule
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 
@@ -99,4 +100,5 @@ def rules():
         *collect_rules(),
         *shell_command.rules(),
         *ShellTestRequest.rules(),
+        UnionRule(TestFieldSet, TestShellCommandFieldSet),
     )

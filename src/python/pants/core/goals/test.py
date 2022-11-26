@@ -70,7 +70,7 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
-class   TestResult(EngineAwareReturnType):
+class TestResult(EngineAwareReturnType):
     exit_code: int | None
     stdout: str
     stdout_digest: FileDigest
