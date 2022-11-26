@@ -66,12 +66,14 @@ class GoTestBuildOptionsFieldSet(FieldSet):
     test_msan: GoTestMemorySanitizerEnabledField
 
 
-def _first_non_none_value(items: Iterable[bool | None]) -> bool:
+def _first_non_none_value(items: Iterable[tuple[bool | None, str] | None]) -> tuple[bool, str]:
     """Return the first non-None value from the iterator."""
-    for item in items:
-        if item is not None:
-            return item
-    return False
+    for item_opt in items:
+        if item_opt is not None:
+            item, reason = item_opt
+            if item is not None:
+                return item, reason
+    return False, "default"
 
 
 # Adapted from https://github.com/golang/go/blob/920f87adda5412a41036a862cf2139bed24aa533/src/internal/platform/supported.go#L7-L23.
@@ -146,13 +148,31 @@ async def go_extract_build_options_from_target(
         cgo_enabled = golang.cgo_enabled
 
     # Extract the `with_race_detector` value for this target.
-    with_race_detector = _first_non_none_value(
+    with_race_detector, race_detector_reason = _first_non_none_value(
         [
-            True if go_test_subsystem.force_race and test_target_fields else None,
-            test_target_fields.test_race.value if test_target_fields else None,
-            target_fields.race.value if target_fields else None,
-            go_mod_target_fields.race.value if go_mod_target_fields else None,
-            False,
+            (
+                True if go_test_subsystem.force_race and test_target_fields else None,
+                "the `[go-test].force_race` option is in effect",
+            ),
+            (
+                test_target_fields.test_race.value,
+                f"{GoTestRaceDetectorEnabledField.alias}={test_target_fields.test_race.value} on target `{request.address}`",
+            )
+            if test_target_fields
+            else None,
+            (
+                target_fields.race.value,
+                f"{GoRaceDetectorEnabledField.alias}={target_fields.race.value} on target `{request.address}`",
+            )
+            if target_fields
+            else None,
+            (
+                go_mod_target_fields.race.value,
+                f"{GoRaceDetectorEnabledField.alias}={go_mod_target_fields.race.value} on target `{request.address}`",
+            )
+            if go_mod_target_fields
+            else None,
+            (False, "default"),
         ]
     )
     if with_race_detector and not race_detector_supported(goroot):
@@ -163,13 +183,31 @@ async def go_extract_build_options_from_target(
         with_race_detector = False
 
     # Extract the `with_msan` value for this target.
-    with_msan = _first_non_none_value(
+    with_msan, msan_reason = _first_non_none_value(
         [
-            True if go_test_subsystem.force_msan and test_target_fields else None,
-            test_target_fields.test_msan.value if test_target_fields else None,
-            target_fields.msan.value if target_fields else None,
-            go_mod_target_fields.msan.value if go_mod_target_fields else None,
-            False,
+            (
+                True if go_test_subsystem.force_msan and test_target_fields else None,
+                "the `[go-test].force_msan` option is in effect",
+            ),
+            (
+                test_target_fields.test_msan.value,
+                f"{GoTestMemorySanitizerEnabledField.alias}={test_target_fields.test_msan.value} on target `{request.address}`",
+            )
+            if test_target_fields
+            else None,
+            (
+                target_fields.msan.value,
+                f"{GoMemorySanitizerEnabledField.alias}={target_fields.msan.value} on target `{request.address}`",
+            )
+            if target_fields
+            else None,
+            (
+                go_mod_target_fields.msan.value,
+                f"{GoMemorySanitizerEnabledField.alias}={go_mod_target_fields.msan.value} on target `{request.address}`",
+            )
+            if go_mod_target_fields
+            else None,
+            (False, "default"),
         ]
     )
     if with_msan and not msan_supported(goroot):
@@ -178,6 +216,13 @@ async def go_extract_build_options_from_target(
             f"but the memory sanitizer is not supported on platform {goroot.goos}/{goroot.goarch}."
         )
         with_msan = False
+
+    if with_race_detector and with_msan:
+        raise ValueError(
+            "The Go race detector and msan support cannot be enabled at the same time. "
+            f"The race detector is enabled because {race_detector_reason} "
+            f"and msan support is enabled because {msan_reason}."
+        )
 
     return GoBuildOptions(
         cgo_enabled=cgo_enabled,
