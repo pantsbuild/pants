@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from typing import Iterable
 
@@ -12,14 +13,17 @@ from pants.backend.go.target_types import (
     GoRaceDetectorEnabledField,
     GoTestRaceDetectorEnabledField,
 )
-from pants.backend.go.util_rules import go_mod
+from pants.backend.go.util_rules import go_mod, goroot
 from pants.backend.go.util_rules.go_mod import OwningGoMod, OwningGoModRequest
+from pants.backend.go.util_rules.goroot import GoRoot
 from pants.build_graph.address import Address
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.internals import graph
 from pants.engine.internals.selectors import Get
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import FieldSet, WrappedTarget, WrappedTargetRequest
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -63,9 +67,23 @@ def _first_non_none_value(items: Iterable[bool | None]) -> bool:
     return False
 
 
+# Adapted from https://github.com/golang/go/blob/920f87adda5412a41036a862cf2139bed24aa533/src/internal/platform/supported.go#L7-L23.
+def _race_detector_supported(goroot: GoRoot) -> bool:
+    """Returns True if the Go data race detector is supported for the `goroot`'s platform."""
+    if goroot.goos == "linux":
+        return goroot.goarch in ("amd64", "ppc64le", "arm64", "s390x")
+    elif goroot.goos == "darwin":
+        return goroot.goarch in ("amd64", "arm64")
+    elif goroot.goos in ("freebsd", "netbsd", "openbsd", "windows"):
+        return goroot.goarch == "amd64"
+    else:
+        return False
+
+
 @rule
 async def go_extract_build_options_from_target(
     request: GoBuildOptionsFromTargetRequest,
+    goroot: GoRoot,
     golang: GolangSubsystem,
     go_test_subsystem: GoTestSubsystem,
 ) -> GoBuildOptions:
@@ -119,6 +137,12 @@ async def go_extract_build_options_from_target(
             False,
         ]
     )
+    if with_race_detector and not _race_detector_supported(goroot):
+        logger.warning(
+            f"The Go data race detector would have been enabled for target `{request.address}, "
+            f"but the race detector is not supported on platform {goroot.goos}/{goroot.goarch}."
+        )
+        with_race_detector = False
 
     return GoBuildOptions(
         cgo_enabled=cgo_enabled,
@@ -130,5 +154,6 @@ def rules():
     return (
         *collect_rules(),
         *go_mod.rules(),
+        *goroot.rules(),
         *graph.rules(),
     )
