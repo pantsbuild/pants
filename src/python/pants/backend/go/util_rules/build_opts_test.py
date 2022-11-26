@@ -2,15 +2,34 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
+import os
+import subprocess
 from textwrap import dedent
 
 import pytest
 
+from pants.backend.go import target_type_rules
+from pants.backend.go.goals import package_binary
+from pants.backend.go.goals.package_binary import GoBinaryFieldSet
 from pants.backend.go.target_types import GoBinaryTarget, GoModTarget, GoPackageTarget
-from pants.backend.go.util_rules import build_opts
+from pants.backend.go.util_rules import (
+    assembly,
+    build_opts,
+    build_pkg,
+    build_pkg_target,
+    first_party_pkg,
+    go_mod,
+    goroot,
+    import_analysis,
+    link,
+    sdk,
+    third_party_pkg,
+)
 from pants.backend.go.util_rules.build_opts import GoBuildOptions, GoBuildOptionsFromTargetRequest
 from pants.build_graph.address import Address
+from pants.core.goals.package import BuiltPackage
 from pants.engine.rules import QueryRule
+from pants.engine.target import Target
 from pants.testutil.rule_runner import RuleRunner
 
 
@@ -19,7 +38,21 @@ def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
         rules=[
             *build_opts.rules(),
+            # for building binaries:
+            *import_analysis.rules(),
+            *package_binary.rules(),
+            *assembly.rules(),
+            *build_pkg.rules(),
+            *build_pkg_target.rules(),
+            *first_party_pkg.rules(),
+            *go_mod.rules(),
+            *goroot.rules(),
+            *link.rules(),
+            *target_type_rules.rules(),
+            *third_party_pkg.rules(),
+            *sdk.rules(),
             QueryRule(GoBuildOptions, (GoBuildOptionsFromTargetRequest,)),
+            QueryRule(BuiltPackage, (GoBinaryFieldSet,)),
         ],
         target_types=[GoModTarget, GoPackageTarget, GoBinaryTarget],
     )
@@ -206,3 +239,54 @@ def test_race_detector_fields_work_as_expected(rule_runner: RuleRunner) -> None:
         for_tests=True,
         msg="for go_package when --go-test-force-race and when race=False on go_mod",
     )
+
+
+def build_package(rule_runner: RuleRunner, binary_target: Target) -> BuiltPackage:
+    field_set = GoBinaryFieldSet.create(binary_target)
+    result = rule_runner.request(BuiltPackage, [field_set])
+    rule_runner.write_digest(result.digest)
+    return result
+
+
+def test_race_detector_actually_works(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+            go_mod(name="mod")
+            go_package()
+            go_binary(name="bin", race=True)
+            """
+            ),
+            "go.mod": "module example.pantsbuild.org/racy\n",
+            "racy.go": dedent(
+                """\
+            // From example in https://go.dev/blog/race-detector
+            package main
+
+            import "fmt"
+
+            func main() {
+                done := make(chan bool)
+                m := make(map[string]string)
+                m["name"] = "world"
+                go func() {
+                    m["name"] = "data race"
+                    done <- true
+                }()
+                fmt.Println("Hello,", m["name"])
+                <-done
+            }
+            """
+            ),
+        }
+    )
+
+    binary_tgt = rule_runner.get_target(Address("", target_name="bin"))
+    built_package = build_package(rule_runner, binary_tgt)
+    assert len(built_package.artifacts) == 1
+    assert built_package.artifacts[0].relpath == "bin"
+
+    result = subprocess.run([os.path.join(rule_runner.build_root, "bin")], capture_output=True)
+    assert result.returncode == 66  # standard exit code if race detector finds a race
+    assert b"WARNING: DATA RACE" in result.stderr
