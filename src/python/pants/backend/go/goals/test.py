@@ -337,7 +337,8 @@ async def run_go_tests(
 
     main_pkg_a_file_path = built_main_pkg.import_paths_to_pkg_a_files["main"]
     import_config = await Get(
-        ImportConfig, ImportConfigRequest(built_main_pkg.import_paths_to_pkg_a_files)
+        ImportConfig,
+        ImportConfigRequest(built_main_pkg.import_paths_to_pkg_a_files, build_opts=build_opts),
     )
     linker_input_digest = await Get(
         Digest, MergeDigests([built_main_pkg.digest, import_config.digest])
