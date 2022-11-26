@@ -73,8 +73,8 @@ class ImportConfigRequest:
     include_stdlib: bool = True
 
     @classmethod
-    def stdlib_only(cls) -> ImportConfigRequest:
-        return cls(FrozenDict(), build_opts=GoBuildOptions(), include_stdlib=True)
+    def stdlib_only(cls, build_opts: GoBuildOptions) -> ImportConfigRequest:
+        return cls(FrozenDict(), build_opts=build_opts, include_stdlib=True)
 
 
 @rule

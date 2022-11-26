@@ -44,10 +44,11 @@ def setup_files(dir_name: str, file_names: tuple[str, ...]) -> tuple[FileContent
 @rule
 async def setup_go_binary(request: LoadedGoBinaryRequest) -> LoadedGoBinary:
     file_contents = setup_files(request.dir_name, request.file_names)
+    build_opts = GoBuildOptions()
 
     source_digest, import_config = await MultiGet(
         Get(Digest, CreateDigest(file_contents)),
-        Get(ImportConfig, ImportConfigRequest, ImportConfigRequest.stdlib_only()),
+        Get(ImportConfig, ImportConfigRequest, ImportConfigRequest.stdlib_only(build_opts)),
     )
 
     built_pkg = await Get(
@@ -56,7 +57,7 @@ async def setup_go_binary(request: LoadedGoBinaryRequest) -> LoadedGoBinary:
             import_path="main",
             pkg_name="main",
             dir_path="",
-            build_opts=GoBuildOptions(),
+            build_opts=build_opts,
             digest=source_digest,
             go_files=tuple(fc.path for fc in file_contents),
             s_files=(),
@@ -72,6 +73,7 @@ async def setup_go_binary(request: LoadedGoBinaryRequest) -> LoadedGoBinary:
         LinkGoBinaryRequest(
             input_digest=input_digest,
             archives=(main_pkg_a_file_path,),
+            build_opts=build_opts,
             import_config_path=import_config.CONFIG_PATH,
             output_filename=request.output_name,
             description="Link Go package analyzer",
