@@ -77,6 +77,33 @@ class GoTestRaceDetectorEnabledField(GoRaceDetectorEnabledField):
     )
 
 
+class GoMemorySanitizerEnabledField(TriBoolField):
+    """Enables the Go data race detector."""
+
+    alias = "msan"
+    help = softwrap(
+        """
+        Enable interoperation between Go code and the C/C++ "memory sanitizer."
+
+        See https://github.com/google/sanitizers/wiki/MemorySanitizer for additional information about
+        the C/C++ memory sanitizer.
+        """
+    )
+
+
+class GoTestMemorySanitizerEnabledField(GoRaceDetectorEnabledField):
+    alias = "test_msan"
+    help = softwrap(
+        """
+        Enable interoperation between Go code and the C/C++ "memory sanitizer" when building this package's
+        test binary.
+
+        See https://github.com/google/sanitizers/wiki/MemorySanitizer for additional information about
+        the C/C++ memory sanitizer.
+        """
+    )
+
+
 # -----------------------------------------------------------------------------------------------
 # `go_third_party_package` target
 # -----------------------------------------------------------------------------------------------
@@ -189,6 +216,7 @@ class GoModTarget(TargetGenerator):
         GoModSourcesField,
         GoCgoEnabledField,
         GoRaceDetectorEnabledField,
+        GoMemorySanitizerEnabledField,
     )
     copied_fields = COMMON_TARGET_FIELDS
     moved_fields = ()
@@ -267,6 +295,7 @@ class GoPackageTarget(Target):
         GoTestExtraEnvVarsField,
         GoTestTimeoutField,
         GoTestRaceDetectorEnabledField,
+        GoTestMemorySanitizerEnabledField,
         SkipGoTestsField,
     )
     help = softwrap(
@@ -312,6 +341,7 @@ class GoBinaryTarget(Target):
         GoBinaryDependenciesField,
         GoCgoEnabledField,
         GoRaceDetectorEnabledField,
+        GoMemorySanitizerEnabledField,
         RestartableField,
     )
     help = "A Go binary."
