@@ -681,7 +681,12 @@ async def cgo_compile_request(
             ldflags=flags.ldflags + ("-fsanitize=memory",),
         )
 
-    # TODO(#16837): Add ASan (address sanitizer) option.
+    if request.build_opts.with_asan:
+        flags = dataclasses.replace(
+            flags,
+            cflags=flags.cflags + ("-fsanitize=address",),
+            ldflags=flags.ldflags + ("-fsanitize=address",),
+        )
 
     # Allows including _cgo_export.h, as well as the user's .h files,
     # from .[ch] files in the package.

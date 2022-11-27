@@ -30,6 +30,7 @@ from pants.backend.go.util_rules import (
 from pants.backend.go.util_rules.build_opts import (
     GoBuildOptions,
     GoBuildOptionsFromTargetRequest,
+    asan_supported,
     msan_supported,
     race_detector_supported,
 )
@@ -74,6 +75,7 @@ def rule_runner() -> RuleRunner:
     (
         ("race", lambda opts: opts.with_race_detector, race_detector_supported),
         ("msan", lambda opts: opts.with_msan, msan_supported),
+        ("asan", lambda opts: opts.with_asan, asan_supported),
     ),
 )
 def test_race_detector_fields_work_as_expected(

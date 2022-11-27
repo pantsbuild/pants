@@ -552,6 +552,9 @@ async def build_go_package(
     if request.build_opts.with_msan:
         compile_args.append("-msan")
 
+    if request.build_opts.with_asan:
+        compile_args.append("-asan")
+
     # If there are no loose object files to add to the package archive later or assembly files to assemble,
     # then pass -complete flag which tells the compiler that the provided Go files constitute the entire package.
     if not objects and not s_files:
