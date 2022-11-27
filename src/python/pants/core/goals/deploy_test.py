@@ -6,6 +6,7 @@ from textwrap import dedent
 
 import pytest
 
+from pants.core import register as register_core
 from pants.core.goals.deploy import Deploy, DeployFieldSet, DeployProcess
 from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact, PackageFieldSet
 from pants.core.goals.publish import (
@@ -14,7 +15,6 @@ from pants.core.goals.publish import (
     PublishProcesses,
     PublishRequest,
 )
-from pants.core.register import rules as core_rules
 from pants.engine import process
 from pants.engine.fs import EMPTY_DIGEST
 from pants.engine.internals.scheduler import ExecutionError
@@ -144,7 +144,7 @@ async def mock_deploy(field_set: MockDeployFieldSet) -> DeployProcess:
 def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
-            *core_rules(),
+            *register_core.rules(),
             *process.rules(),
             mock_publish,
             mock_deploy,
@@ -153,7 +153,7 @@ def rule_runner() -> RuleRunner:
             UnionRule(PackageFieldSet, MockPackageFieldSet),
             UnionRule(DeployFieldSet, MockDeployFieldSet),
         ],
-        target_types=[MockDeployTarget, MockPackageTarget],
+        target_types=[MockDeployTarget, MockPackageTarget, *register_core.target_types()],
     )
 
 
