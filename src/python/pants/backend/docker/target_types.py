@@ -96,6 +96,7 @@ class DockerImageContextRootField(StringField):
 
 
 class DockerImageSourceField(OptionalSingleSourceField):
+    none_is_valid_value = True
     default = "Dockerfile"
 
     # When the default glob value is in effect, we don't want the normal glob match error behavior
