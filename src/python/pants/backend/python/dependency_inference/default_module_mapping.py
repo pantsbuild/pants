@@ -135,7 +135,7 @@ DEFAULT_MODULE_MAPPING = {
     "pyopenssl": ("OpenSSL",),
     "pypdf2": ("PyPDF2",),
     "pypi-kenlm": ("kenlm",),
-    "PySocks": ("socks",),
+    "pysocks": ("socks",),
     "pytest": ("pytest", "_pytest"),
     "python-dateutil": ("dateutil",),
     "python-docx": ("docx",),
