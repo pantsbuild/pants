@@ -893,6 +893,28 @@ class LockfilesGeneratorTarget(TargetFilesGenerator):
     help = "Generate a `_lockfile` target for each file in the `sources` field."
 
 
+# -----------------------------------------------------------------------------------------------
+# `_subsystem` target
+# -----------------------------------------------------------------------------------------------
+
+
+class SubsystemDependenciesField(Dependencies):
+    pass
+
+
+class SubsystemTarget(Target):
+    alias = "_subsystem"
+    core_fields = (*COMMON_TARGET_FIELDS, SubsystemDependenciesField)
+    help = softwrap(
+        """
+        A target for subsystems in order to include them in the dependency graph of other targets.
+
+        This tracks them so that `--changed-since --changed-dependents` works properly for targets
+        relying on a particular subsystem.
+        """
+    )
+
+
 def rules():
     return (
         *collect_rules(),
