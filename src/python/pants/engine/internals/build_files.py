@@ -3,12 +3,13 @@
 
 from __future__ import annotations
 
+import ast
 import builtins
 import itertools
 import os.path
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Any, cast
+from typing import Any, Sequence, cast
 
 from pants.build_graph.address import (
     Address,
@@ -19,7 +20,8 @@ from pants.build_graph.address import (
     ResolveError,
 )
 from pants.engine.engine_aware import EngineAwareParameter
-from pants.engine.fs import DigestContents, GlobMatchErrorBehavior, PathGlobs, Paths
+from pants.engine.env_vars import CompleteEnvironmentVars, EnvironmentVars, EnvironmentVarsRequest
+from pants.engine.fs import DigestContents, FileContent, GlobMatchErrorBehavior, PathGlobs, Paths
 from pants.engine.internals.defaults import BuildFileDefaults, BuildFileDefaultsParserState
 from pants.engine.internals.dep_rules import (
     BuildFileDependencyRules,
@@ -28,6 +30,7 @@ from pants.engine.internals.dep_rules import (
 )
 from pants.engine.internals.mapper import AddressFamily, AddressMap
 from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser, error_on_imports
+from pants.engine.internals.session import SessionValues
 from pants.engine.internals.synthetic_targets import (
     SyntheticAddressMaps,
     SyntheticAddressMapsRequest,
@@ -169,6 +172,52 @@ async def ensure_address_family(request: OptionalAddressFamily) -> AddressFamily
     return request.ensure()
 
 
+@dataclass(frozen=True)
+class BUILDFileEnvironmentVariablesRequest:
+    file_content: FileContent
+
+
+class BUILDFileEnvVarExtractor(ast.NodeVisitor):
+    def __init__(self):
+        super().__init__()
+        self.env_vars: set[str] = set()
+
+    @classmethod
+    def get_env_vars(cls, file_content: FileContent) -> Sequence[str]:
+        obj = cls()
+        obj.visit(ast.parse(file_content.content, file_content.path))
+        return tuple(obj.env_vars)
+
+    def visit_Call(self, node: ast.Call):
+        is_env = isinstance(node.func, ast.Name) and node.func.id == "env"
+        for arg in node.args:
+            if is_env and isinstance(arg, ast.Constant):
+                self.env_vars.add(arg.value)
+                return
+            else:
+                is_env = False
+            self.visit(arg)
+        for kwarg in node.keywords:
+            self.visit(kwarg)
+
+
+@rule
+async def extract_env_vars(
+    request: BUILDFileEnvironmentVariablesRequest,
+    session_values: SessionValues,
+) -> EnvironmentVars:
+    """For BUILD file env vars, we only ever consult the local systems env."""
+    return await Get(
+        EnvironmentVars,
+        {
+            EnvironmentVarsRequest(
+                BUILDFileEnvVarExtractor.get_env_vars(request.file_content)
+            ): EnvironmentVarsRequest,
+            session_values[CompleteEnvironmentVars]: CompleteEnvironmentVars,
+        },
+    )
+
+
 @rule(desc="Search for addresses in BUILD files")
 async def parse_address_family(
     parser: Parser,
@@ -235,17 +284,22 @@ async def parse_address_family(
         dependents_rules_parser_state = None
         dependencies_rules_parser_state = None
 
+    all_env_vars = await MultiGet(
+        Get(EnvironmentVars, BUILDFileEnvironmentVariablesRequest(fc)) for fc in digest_contents
+    )
+
     address_maps = [
         AddressMap.parse(
             fc.path,
             fc.content.decode(),
             parser,
             prelude_symbols,
+            env_vars,
             defaults_parser_state,
             dependents_rules_parser_state,
             dependencies_rules_parser_state,
         )
-        for fc in digest_contents
+        for fc, env_vars in zip(digest_contents, all_env_vars)
     ]
 
     # Freeze defaults and dependency rules

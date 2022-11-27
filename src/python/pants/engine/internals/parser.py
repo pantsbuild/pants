@@ -16,6 +16,7 @@ from pants.base.deprecated import warn_or_error
 from pants.base.exceptions import MappingError
 from pants.base.parse_context import ParseContext
 from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.engine.env_vars import EnvironmentVars
 from pants.engine.internals.defaults import BuildFileDefaultsParserState, SetDefaultsT
 from pants.engine.internals.dep_rules import BuildFileDependencyRulesParserState
 from pants.engine.internals.target_adaptor import TargetAdaptor
@@ -213,6 +214,7 @@ class Parser:
         filepath: str,
         build_file_content: str,
         extra_symbols: BuildFilePreludeSymbols,
+        env_vars: EnvironmentVars,
         defaults: BuildFileDefaultsParserState,
         dependents_rules: BuildFileDependencyRulesParserState | None,
         dependencies_rules: BuildFileDependencyRulesParserState | None,
@@ -224,7 +226,11 @@ class Parser:
             dependencies_rules=dependencies_rules,
         )
 
-        global_symbols = {**self._symbols, **extra_symbols.symbols}
+        global_symbols: dict[str, Any] = {
+            "env": env_vars.get,
+            **self._symbols,
+            **extra_symbols.symbols,
+        }
 
         if self.ignore_unrecognized_symbols:
             defined_symbols = set()

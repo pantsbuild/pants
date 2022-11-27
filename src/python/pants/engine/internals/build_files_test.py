@@ -13,9 +13,11 @@ from pants.build_graph.address import BuildFileAddressRequest, MaybeAddress, Res
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.core.target_types import GenericTarget
 from pants.engine.addresses import Address, AddressInput, BuildFileAddress
+from pants.engine.env_vars import EnvironmentVars
 from pants.engine.fs import DigestContents, FileContent, PathGlobs
 from pants.engine.internals.build_files import (
     AddressFamilyDir,
+    BUILDFileEnvironmentVariablesRequest,
     BuildFileOptions,
     OptionalAddressFamily,
     evaluate_preludes,
@@ -85,6 +87,11 @@ def test_parse_address_family_empty() -> None:
                 output_type=SyntheticAddressMaps,
                 input_types=(SyntheticAddressMapsRequest,),
                 mock=lambda _: SyntheticAddressMaps(),
+            ),
+            MockGet(
+                output_type=EnvironmentVars,
+                input_types=(BUILDFileEnvironmentVariablesRequest,),
+                mock=lambda _: EnvironmentVars({}),
             ),
         ],
     )
@@ -521,3 +528,28 @@ def test_macro_undefined_symbol_bootstrap() -> None:
     # Parse the root BUILD file.
     address_family = rule_runner.request(AddressFamily, [AddressFamilyDir("")])
     assert not address_family.name_to_target_adaptors
+
+
+def test_build_file_env_vars(target_adaptor_rule_runner: RuleRunner) -> None:
+    target_adaptor_rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """
+                mock_tgt(
+                  description=env("MOCK_DESC"),
+                  tags=[
+                    env("DEF", "default"),
+                    env("TAG", "default"),
+                  ]
+                )
+                """
+            ),
+        },
+    )
+    target_adaptor_rule_runner.set_options([], env={"MOCK_DESC": "from env", "TAG": "tag"})
+    target_adaptor = target_adaptor_rule_runner.request(
+        TargetAdaptor,
+        [TargetAdaptorRequest(Address(""), description_of_origin="tests")],
+    )
+    assert target_adaptor.kwargs["description"] == "from env"
+    assert target_adaptor.kwargs["tags"] == ["default", "tag"]
