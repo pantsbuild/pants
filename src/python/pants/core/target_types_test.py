@@ -330,7 +330,7 @@ def test_url_assets(use_per_platform: bool) -> None:
 
     def source_field_value(http_source_value: str) -> str:
         if use_per_platform:
-            return f"per_platform({Platform.current.value}={http_source_value})"
+            return f"per_platform({Platform.create_for_localhost().value}={http_source_value})"
         return http_source_value
 
     rule_runner.write_files(
