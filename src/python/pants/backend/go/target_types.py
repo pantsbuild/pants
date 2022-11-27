@@ -78,7 +78,7 @@ class GoTestRaceDetectorEnabledField(GoRaceDetectorEnabledField):
 
 
 class GoMemorySanitizerEnabledField(TriBoolField):
-    """Enables the Go data race detector."""
+    """Enables the C/C++ memory sanitizer."""
 
     alias = "msan"
     help = softwrap(
@@ -100,6 +100,33 @@ class GoTestMemorySanitizerEnabledField(GoRaceDetectorEnabledField):
 
         See https://github.com/google/sanitizers/wiki/MemorySanitizer for additional information about
         the C/C++ memory sanitizer.
+        """
+    )
+
+
+class GoAddressSanitizerEnabledField(TriBoolField):
+    """Enables the C/C++ address sanitizer."""
+
+    alias = "asan"
+    help = softwrap(
+        """
+        Enable interoperation between Go code and the C/C++ "address sanitizer."
+
+        See https://github.com/google/sanitizers/wiki/AddressSanitizer for additional information about
+        the C/C++ address sanitizer.
+        """
+    )
+
+
+class GoTestAddressSanitizerEnabledField(GoRaceDetectorEnabledField):
+    alias = "test_asan"
+    help = softwrap(
+        """
+        Enable interoperation between Go code and the C/C++ "address sanitizer" when building this package's
+        test binary.
+
+        See https://github.com/google/sanitizers/wiki/AddressSanitizer for additional information about
+        the C/C++ address sanitizer.
         """
     )
 
@@ -217,6 +244,7 @@ class GoModTarget(TargetGenerator):
         GoCgoEnabledField,
         GoRaceDetectorEnabledField,
         GoMemorySanitizerEnabledField,
+        GoAddressSanitizerEnabledField,
     )
     copied_fields = COMMON_TARGET_FIELDS
     moved_fields = ()
@@ -296,6 +324,7 @@ class GoPackageTarget(Target):
         GoTestTimeoutField,
         GoTestRaceDetectorEnabledField,
         GoTestMemorySanitizerEnabledField,
+        GoTestAddressSanitizerEnabledField,
         SkipGoTestsField,
     )
     help = softwrap(
@@ -342,6 +371,7 @@ class GoBinaryTarget(Target):
         GoCgoEnabledField,
         GoRaceDetectorEnabledField,
         GoMemorySanitizerEnabledField,
+        GoAddressSanitizerEnabledField,
         RestartableField,
     )
     help = "A Go binary."

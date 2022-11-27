@@ -35,6 +35,7 @@ async def link_go_binary(request: LinkGoBinaryRequest) -> LinkedGoBinary:
     link_tool_id = await Get(GoSdkToolIDResult, GoSdkToolIDRequest("link"))
     maybe_race_arg = ["-race"] if request.build_opts.with_race_detector else []
     maybe_msan_arg = ["-msan"] if request.build_opts.with_msan else []
+    maybe_asan_arg = ["-asan"] if request.build_opts.with_asan else []
     result = await Get(
         ProcessResult,
         GoSdkProcess(
@@ -44,6 +45,7 @@ async def link_go_binary(request: LinkGoBinaryRequest) -> LinkedGoBinary:
                 "link",
                 *maybe_race_arg,
                 *maybe_msan_arg,
+                *maybe_asan_arg,
                 "-importcfg",
                 request.import_config_path,
                 "-o",
