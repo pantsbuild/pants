@@ -19,6 +19,7 @@ DIRS_TO_CHECK = (
 def main() -> None:
     exclude_check = {
         "src/python/pants/__init__.py",
+        "src/python/pants/testutil/__init__.py",
     }
     files = itertools.chain.from_iterable(
         [Path().glob(f"{d}/**/__init__.py") for d in DIRS_TO_CHECK]
