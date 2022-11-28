@@ -114,25 +114,20 @@ def twine_env_suffix(repo: str) -> str:
 
 def twine_env_request(repo: str) -> EnvironmentRequest:
     suffix = twine_env_suffix(repo)
-    req = EnvironmentRequest(
-        [
-            f"{var}{suffix}"
-            for var in [
-                "TWINE_USERNAME",
-                "TWINE_PASSWORD",
-                "TWINE_REPOSITORY_URL",
-            ]
-        ]
-    )
+    env_vars = [
+        "TWINE_USERNAME",
+        "TWINE_PASSWORD",
+        "TWINE_REPOSITORY_URL",
+    ]
+    req = EnvironmentRequest(env_vars + [f"{var}{suffix}" for var in env_vars])
     return req
 
 
 def twine_env(env: Environment, repo: str) -> Environment:
     suffix = twine_env_suffix(repo)
-    if not suffix:
-        return env
-
-    return Environment({key.rsplit(suffix, maxsplit=1)[0]: value for key, value in env.items()})
+    return Environment(
+        {key.rsplit(suffix, maxsplit=1)[0] if suffix else key: value for key, value in env.items()}
+    )
 
 
 @rule
