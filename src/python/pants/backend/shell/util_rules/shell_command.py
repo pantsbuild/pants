@@ -9,6 +9,7 @@ import re
 import shlex
 from dataclasses import dataclass
 from textwrap import dedent  # noqa: PNT20
+from typing import Dict, Tuple  # noqa: PNT20
 
 from pants.backend.shell.subsystems.shell_setup import ShellSetup
 from pants.backend.shell.target_types import (
@@ -59,6 +60,7 @@ from pants.engine.target import (
     WrappedTargetRequest,
 )
 from pants.engine.unions import UnionRule
+from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
@@ -113,9 +115,51 @@ def _shell_tool_safe_env_name(tool_name: str) -> str:
     return re.sub(r"\W", "_", tool_name)
 
 
+class ShellCommandTools(FrozenDict[str, str]):
+    pass
+
+
+@dataclass(frozen=True)
+class ToolsRequest:
+    tools: Tuple[str, ...]
+    rationale: str
+
+
+@rule
+async def shell_command_tools(
+    shell_setup: ShellSetup.EnvironmentAware, request: ToolsRequest
+) -> ShellCommandTools:
+
+    search_path = shell_setup.executable_search_path
+    tool_requests = [
+        BinaryPathRequest(
+            binary_name=tool,
+            search_path=search_path,
+        )
+        for tool in sorted({*request.tools, *["mkdir", "ln"]})
+        if tool not in BASH_BUILTIN_COMMANDS
+    ]
+    tool_paths = await MultiGet(
+        Get(BinaryPaths, BinaryPathRequest, request) for request in tool_requests
+    )
+
+    paths: Dict[str, str] = {}
+
+    for binary, tool_request in zip(tool_paths, tool_requests):
+        if binary.first_path:
+            paths[_shell_tool_safe_env_name(tool_request.binary_name)] = binary.first_path.path
+        else:
+            raise BinaryNotFoundError.from_request(
+                tool_request,
+                rationale=request.rationale,
+            )
+
+    return ShellCommandTools(paths)
+
+
 @rule
 async def prepare_shell_command_process(
-    request: ShellCommandProcessRequest, shell_setup: ShellSetup.EnvironmentAware, bash: BashBinary
+    request: ShellCommandProcessRequest, bash: BashBinary
 ) -> Process:
     shell_command = request.target
     interactive = shell_command.has_field(ShellCommandRunWorkdirField)
@@ -144,35 +188,13 @@ async def prepare_shell_command_process(
                 f"Must provide any `tools` used by the `{shell_command.alias}` {shell_command.address}."
             )
 
-        search_path = shell_setup.executable_search_path
-        tool_requests = [
-            BinaryPathRequest(
-                binary_name=tool,
-                search_path=search_path,
-            )
-            for tool in sorted({*tools, *["mkdir", "ln"]})
-            if tool not in BASH_BUILTIN_COMMANDS
-        ]
-        tool_paths = await MultiGet(
-            Get(BinaryPaths, BinaryPathRequest, request) for request in tool_requests
+        resolved_tools = await Get(
+            ShellCommandTools,
+            ToolsRequest(tools, f"execute `{shell_command.alias}` {shell_command.address}"),
         )
+        tools = tuple(tool for tool in sorted(resolved_tools))
 
-        command_env = {
-            "TOOLS": " ".join(
-                _shell_tool_safe_env_name(tool.binary_name) for tool in tool_requests
-            ),
-        }
-
-        for binary, tool_request in zip(tool_paths, tool_requests):
-            if binary.first_path:
-                command_env[
-                    _shell_tool_safe_env_name(tool_request.binary_name)
-                ] = binary.first_path.path
-            else:
-                raise BinaryNotFoundError.from_request(
-                    tool_request,
-                    rationale=f"execute `{shell_command.alias}` {shell_command.address}",
-                )
+        command_env = {"TOOLS": " ".join(tools), **resolved_tools}
 
     extra_env = await Get(EnvironmentVars, EnvironmentVarsRequest(extra_env_vars))
     command_env.update(extra_env)
