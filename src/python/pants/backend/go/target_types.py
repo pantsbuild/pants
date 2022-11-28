@@ -53,6 +53,84 @@ class GoCgoEnabledField(TriBoolField):
     )
 
 
+class GoRaceDetectorEnabledField(TriBoolField):
+    """Enables the Go data race detector."""
+
+    alias = "race"
+    help = softwrap(
+        """
+        Enable compiling the binary with the Go data race detector.
+
+        See https://go.dev/doc/articles/race_detector for additional information about the Go data race detector.
+        """
+    )
+
+
+class GoTestRaceDetectorEnabledField(GoRaceDetectorEnabledField):
+    alias = "test_race"
+    help = softwrap(
+        """
+        Enable compiling this package's test binary with the Go data race detector.
+
+        See https://go.dev/doc/articles/race_detector for additional information about the Go data race detector.
+        """
+    )
+
+
+class GoMemorySanitizerEnabledField(TriBoolField):
+    """Enables the C/C++ memory sanitizer."""
+
+    alias = "msan"
+    help = softwrap(
+        """
+        Enable interoperation between Go code and the C/C++ "memory sanitizer."
+
+        See https://github.com/google/sanitizers/wiki/MemorySanitizer for additional information about
+        the C/C++ memory sanitizer.
+        """
+    )
+
+
+class GoTestMemorySanitizerEnabledField(GoRaceDetectorEnabledField):
+    alias = "test_msan"
+    help = softwrap(
+        """
+        Enable interoperation between Go code and the C/C++ "memory sanitizer" when building this package's
+        test binary.
+
+        See https://github.com/google/sanitizers/wiki/MemorySanitizer for additional information about
+        the C/C++ memory sanitizer.
+        """
+    )
+
+
+class GoAddressSanitizerEnabledField(TriBoolField):
+    """Enables the C/C++ address sanitizer."""
+
+    alias = "asan"
+    help = softwrap(
+        """
+        Enable interoperation between Go code and the C/C++ "address sanitizer."
+
+        See https://github.com/google/sanitizers/wiki/AddressSanitizer for additional information about
+        the C/C++ address sanitizer.
+        """
+    )
+
+
+class GoTestAddressSanitizerEnabledField(GoRaceDetectorEnabledField):
+    alias = "test_asan"
+    help = softwrap(
+        """
+        Enable interoperation between Go code and the C/C++ "address sanitizer" when building this package's
+        test binary.
+
+        See https://github.com/google/sanitizers/wiki/AddressSanitizer for additional information about
+        the C/C++ address sanitizer.
+        """
+    )
+
+
 # -----------------------------------------------------------------------------------------------
 # `go_third_party_package` target
 # -----------------------------------------------------------------------------------------------
@@ -164,6 +242,9 @@ class GoModTarget(TargetGenerator):
         GoModDependenciesField,
         GoModSourcesField,
         GoCgoEnabledField,
+        GoRaceDetectorEnabledField,
+        GoMemorySanitizerEnabledField,
+        GoAddressSanitizerEnabledField,
     )
     copied_fields = COMMON_TARGET_FIELDS
     moved_fields = ()
@@ -241,6 +322,9 @@ class GoPackageTarget(Target):
         GoPackageSourcesField,
         GoTestExtraEnvVarsField,
         GoTestTimeoutField,
+        GoTestRaceDetectorEnabledField,
+        GoTestMemorySanitizerEnabledField,
+        GoTestAddressSanitizerEnabledField,
         SkipGoTestsField,
     )
     help = softwrap(
@@ -285,6 +369,9 @@ class GoBinaryTarget(Target):
         GoBinaryMainPackageField,
         GoBinaryDependenciesField,
         GoCgoEnabledField,
+        GoRaceDetectorEnabledField,
+        GoMemorySanitizerEnabledField,
+        GoAddressSanitizerEnabledField,
         RestartableField,
     )
     help = "A Go binary."

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from pants.backend.go.util_rules.build_opts import GoBuildOptions
 from pants.backend.go.util_rules.sdk import GoSdkProcess, GoSdkToolIDRequest, GoSdkToolIDResult
 from pants.engine.fs import Digest
 from pants.engine.process import ProcessResult
@@ -16,6 +17,7 @@ class LinkGoBinaryRequest:
 
     input_digest: Digest
     archives: tuple[str, ...]
+    build_opts: GoBuildOptions
     import_config_path: str
     output_filename: str
     description: str
@@ -31,6 +33,9 @@ class LinkedGoBinary:
 @rule
 async def link_go_binary(request: LinkGoBinaryRequest) -> LinkedGoBinary:
     link_tool_id = await Get(GoSdkToolIDResult, GoSdkToolIDRequest("link"))
+    maybe_race_arg = ["-race"] if request.build_opts.with_race_detector else []
+    maybe_msan_arg = ["-msan"] if request.build_opts.with_msan else []
+    maybe_asan_arg = ["-asan"] if request.build_opts.with_asan else []
     result = await Get(
         ProcessResult,
         GoSdkProcess(
@@ -38,6 +43,9 @@ async def link_go_binary(request: LinkGoBinaryRequest) -> LinkedGoBinary:
             command=(
                 "tool",
                 "link",
+                *maybe_race_arg,
+                *maybe_msan_arg,
+                *maybe_asan_arg,
                 "-importcfg",
                 request.import_config_path,
                 "-o",

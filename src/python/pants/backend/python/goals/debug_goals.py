@@ -65,6 +65,7 @@ class DumpPythonSourceAnalysisSubsystem(GoalSubsystem):
 
 class DumpPythonSourceAnalysis(Goal):
     subsystem_cls = DumpPythonSourceAnalysisSubsystem
+    environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY  # TODO(#17129) — Migrate this.
 
 
 @dataclass(frozen=True)

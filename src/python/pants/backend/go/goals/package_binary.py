@@ -65,7 +65,8 @@ async def package_go_binary(field_set: GoBinaryFieldSet) -> BuiltPackage:
     )
     main_pkg_a_file_path = built_package.import_paths_to_pkg_a_files["main"]
     import_config = await Get(
-        ImportConfig, ImportConfigRequest(built_package.import_paths_to_pkg_a_files)
+        ImportConfig,
+        ImportConfigRequest(built_package.import_paths_to_pkg_a_files, build_opts=build_opts),
     )
     input_digest = await Get(Digest, MergeDigests([built_package.digest, import_config.digest]))
 
@@ -75,6 +76,7 @@ async def package_go_binary(field_set: GoBinaryFieldSet) -> BuiltPackage:
         LinkGoBinaryRequest(
             input_digest=input_digest,
             archives=(main_pkg_a_file_path,),
+            build_opts=build_opts,
             import_config_path=import_config.CONFIG_PATH,
             output_filename=f"./{output_filename.name}",
             description=f"Link Go binary for {field_set.address}",

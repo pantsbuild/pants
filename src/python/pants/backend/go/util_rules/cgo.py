@@ -13,6 +13,7 @@ from typing import Iterable
 
 from pants.backend.go.subsystems.golang import GolangSubsystem
 from pants.backend.go.util_rules import cgo_binaries, cgo_pkgconfig
+from pants.backend.go.util_rules.build_opts import GoBuildOptions
 from pants.backend.go.util_rules.cgo_binaries import CGoBinaryPathRequest
 from pants.backend.go.util_rules.cgo_pkgconfig import (
     CGoPkgConfigFlagsRequest,
@@ -61,6 +62,7 @@ class CGoCompileRequest(EngineAwareParameter):
     import_path: str
     pkg_name: str
     digest: Digest
+    build_opts: GoBuildOptions
     dir_path: str
     cgo_files: tuple[str, ...]
     cgo_flags: CGoCompilerFlags
@@ -129,7 +131,8 @@ async def check_compiler_supports_flag(
             env={
                 "LC_ALL": "C",
             },
-            description=f"Check whether CC supports flag: {request.flag}",
+            description=f"Check whether compiler `{request.cc}` for Cgo supports flag `{request.flag}`",
+            level=LogLevel.DEBUG,
         ),
     )
 
@@ -671,8 +674,19 @@ async def cgo_compile_request(
     if request.fortran_files and "gfortran" in golang_env_aware.cgo_fortran_binary_name:
         flags = dataclasses.replace(flags, ldflags=flags.ldflags + ("-lgfortran",))
 
-    # TODO(#16838): Add MSan (memory sanitizer) option.
-    # TODO(#16837): Add ASan (address sanitizer) option.
+    if request.build_opts.with_msan:
+        flags = dataclasses.replace(
+            flags,
+            cflags=flags.cflags + ("-fsanitize=memory",),
+            ldflags=flags.ldflags + ("-fsanitize=memory",),
+        )
+
+    if request.build_opts.with_asan:
+        flags = dataclasses.replace(
+            flags,
+            cflags=flags.cflags + ("-fsanitize=address",),
+            ldflags=flags.ldflags + ("-fsanitize=address",),
+        )
 
     # Allows including _cgo_export.h, as well as the user's .h files,
     # from .[ch] files in the package.
