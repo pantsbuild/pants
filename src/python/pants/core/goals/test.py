@@ -71,6 +71,8 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class TestResult(EngineAwareReturnType):
+    # A None exit_code indicates a backend that performs its own test discovery/selection
+    # (rather than delegating that to the underlying test tool), and discovered no tests.
     exit_code: int | None
     stdout: str
     stdout_digest: FileDigest
@@ -78,6 +80,9 @@ class TestResult(EngineAwareReturnType):
     stderr_digest: FileDigest
     addresses: tuple[Address, ...]
     output_setting: ShowOutput
+    # A None result_metadata indicates a backend that performs its own test discovery/selection
+    # and either discovered no tests, or encounted an error, such as a compilation error, in
+    # the attempt.
     result_metadata: ProcessResultMetadata | None
     partition_description: str | None = None
 
@@ -92,7 +97,8 @@ class TestResult(EngineAwareReturnType):
     __test__ = False
 
     @staticmethod
-    def skip(address: Address, output_setting: ShowOutput) -> TestResult:
+    def no_tests_found(address: Address, output_setting: ShowOutput) -> TestResult:
+        """Used when we do test discovery ourselves, and we didn't find any."""
         return TestResult(
             exit_code=None,
             stdout="",
@@ -105,9 +111,10 @@ class TestResult(EngineAwareReturnType):
         )
 
     @staticmethod
-    def skip_batch(
+    def no_tests_found_in_batch(
         batch: TestRequest.Batch[_TestFieldSetT, Any], output_setting: ShowOutput
     ) -> TestResult:
+        """Used when we do test discovery ourselves, and we didn't find any."""
         return TestResult(
             exit_code=None,
             stdout="",
@@ -170,10 +177,6 @@ class TestResult(EngineAwareReturnType):
         )
 
     @property
-    def skipped(self) -> bool:
-        return self.exit_code is None or self.result_metadata is None
-
-    @property
     def description(self) -> str:
         if len(self.addresses) == 1:
             return self.addresses[0].spec
@@ -188,15 +191,14 @@ class TestResult(EngineAwareReturnType):
         return f"{self.addresses[0].path_safe_spec}+{len(self.addresses)-1}"
 
     def __lt__(self, other: Any) -> bool:
-        """We sort first by status (skipped vs failed vs succeeded), then alphanumerically within
-        each group."""
+        """We sort first by exit code, then alphanumerically within each group."""
         if not isinstance(other, TestResult):
             return NotImplemented
         if self.exit_code == other.exit_code:
             return self.description < other.description
-        if self.skipped or self.exit_code is None:
+        if self.exit_code is None:
             return True
-        if other.skipped or other.exit_code is None:
+        if other.exit_code is None:
             return False
         return abs(self.exit_code) < abs(other.exit_code)
 
@@ -210,13 +212,13 @@ class TestResult(EngineAwareReturnType):
         return output
 
     def level(self) -> LogLevel:
-        if self.skipped:
+        if self.exit_code is None:
             return LogLevel.DEBUG
         return LogLevel.INFO if self.exit_code == 0 else LogLevel.ERROR
 
     def message(self) -> str:
-        if self.skipped:
-            return "skipped."
+        if self.exit_code is None:
+            return "no tests found."
         status = "succeeded" if self.exit_code == 0 else f"failed (exit code {self.exit_code})"
         message = f"{status}."
         if self.partition_description:
@@ -824,10 +826,14 @@ async def run_tests(
     if results:
         console.print_stderr("")
     for result in sorted(results):
-        if result.skipped:
+        if result.exit_code is None:
+            # We end up here, e.g., if we implemented test discovery and found no tests.
             continue
         if result.exit_code != 0:
-            exit_code = cast(int, result.exit_code)
+            exit_code = result.exit_code
+        if result.result_metadata is None:
+            # We end up here, e.g., if compilation failed during self-implemented test discovery.
+            continue
 
         console.print_stderr(_format_test_summary(result, run_id, console))
 

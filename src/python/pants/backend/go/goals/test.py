@@ -236,7 +236,7 @@ async def run_go_tests(
         return compilation_failure(_exit_code, None, _stderr)
 
     if not testmain.has_tests and not testmain.has_xtests:
-        return TestResult.skip(field_set.address, output_setting=test_subsystem.output)
+        return TestResult.no_tests_found(field_set.address, output_setting=test_subsystem.output)
 
     coverage_config: GoCoverageConfig | None = None
     if test_subsystem.use_coverage:
