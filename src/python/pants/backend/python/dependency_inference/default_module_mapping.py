@@ -7,6 +7,7 @@ DEFAULT_MODULE_MAPPING = {
     "absl-py": ("absl",),
     "ansicolors": ("colors",),
     "apache-airflow": ("airflow",),
+    "atlassian-python-api": ("atlassian",),
     "attrs": ("attr",),
     # Azure
     "azure-common": ("azure.common",),
@@ -112,6 +113,7 @@ DEFAULT_MODULE_MAPPING = {
     "pyopenssl": ("OpenSSL",),
     "pypdf2": ("PyPDF2",),
     "pypi-kenlm": ("kenlm",),
+    "pysocks": ("socks",),
     "pytest": ("pytest", "_pytest"),
     "python-dateutil": ("dateutil",),
     "python-docx": ("docx",),
