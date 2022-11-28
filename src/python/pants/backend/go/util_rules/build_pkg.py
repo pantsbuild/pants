@@ -381,7 +381,12 @@ async def build_go_package(
 
     merged_deps_digest, import_config, embedcfg, action_id_result = await MultiGet(
         Get(Digest, MergeDigests(dep_digests)),
-        Get(ImportConfig, ImportConfigRequest(FrozenDict(import_paths_to_pkg_a_files))),
+        Get(
+            ImportConfig,
+            ImportConfigRequest(
+                FrozenDict(import_paths_to_pkg_a_files), build_opts=request.build_opts
+            ),
+        ),
         Get(RenderedEmbedConfig, RenderEmbedConfigRequest(request.embed_config)),
         Get(GoCompileActionIdResult, GoCompileActionIdRequest(request)),
     )
@@ -448,6 +453,7 @@ async def build_go_package(
                 import_path=request.import_path,
                 pkg_name=request.pkg_name,
                 digest=go_files_digest,
+                build_opts=request.build_opts,
                 dir_path=request.dir_path,
                 cgo_files=cgo_files,
                 cgo_flags=request.cgo_flags,
@@ -542,6 +548,12 @@ async def build_go_package(
 
     if request.build_opts.with_race_detector:
         compile_args.append("-race")
+
+    if request.build_opts.with_msan:
+        compile_args.append("-msan")
+
+    if request.build_opts.with_asan:
+        compile_args.append("-asan")
 
     # If there are no loose object files to add to the package archive later or assembly files to assemble,
     # then pass -complete flag which tells the compiler that the provided Go files constitute the entire package.

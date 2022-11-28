@@ -673,3 +673,34 @@ def test_pex_custom_output_path_issue14031(rule_runner: RuleRunner) -> None:
         Address("project/test", target_name="test-image"),
         expected_files=["project/test/Dockerfile", "project/test.pex"],
     )
+
+
+def test_dockerfile_instructions_issue_17571(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/docker/Dockerfile": "do not use this file",
+            "src/docker/BUILD": dedent(
+                """\
+                docker_image(
+                  source=None,
+                  instructions=[
+                    "FROM python:3.8",
+                  ]
+                )
+                """
+            ),
+        }
+    )
+
+    assert_build_context(
+        rule_runner,
+        Address("src/docker"),
+        expected_files=["src/docker/Dockerfile.docker"],
+        expected_interpolation_context={
+            "tags": {
+                "baseimage": "3.8",
+                "stage0": "3.8",
+            },
+            "build_args": {},
+        },
+    )

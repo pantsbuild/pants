@@ -6,12 +6,11 @@ import itertools
 import logging
 import os.path
 from dataclasses import dataclass, field
-from fnmatch import fnmatchcase
 from pathlib import PurePath
 from pprint import pformat
 from typing import Any, Iterable, Iterator, Sequence, cast
 
-from pants.backend.visibility.glob import PathGlob
+from pants.backend.visibility.glob import PathGlob, TargetGlob
 from pants.engine.addresses import Address
 from pants.engine.internals.dep_rules import (
     BuildFileDependencyRules,
@@ -39,7 +38,7 @@ class BuildFileVisibilityRulesError(DependencyRulesError):
         dependency_adaptor: TargetAdaptor,
     ) -> BuildFileVisibilityRulesError:
         example = (
-            pformat((ruleset.target_type_patterns, *map(str, ruleset.rules), "!*"))
+            pformat((tuple(map(str, ruleset.selectors)), *map(str, ruleset.rules), "!*"))
             if ruleset is not None
             else '(<target patterns>, <existing rules...>, "!*"),'
         )
@@ -94,19 +93,22 @@ class VisibilityRule:
             prefix = "!"
         elif self.action is DependencyRuleAction.WARN:
             prefix = "?"
-        return f"{prefix}{self.glob.raw}"
+        return f"{prefix}{self.glob}"
 
 
-def flatten(xs) -> Iterator[str]:
+def flatten(xs, *types: type) -> Iterator:
     """Return an iterator with values, regardless of the nesting of the input."""
-    if isinstance(xs, str):
+    assert types
+    if str in types and isinstance(xs, str):
         yield from (x.strip() for x in xs.splitlines())
+    elif isinstance(xs, types):
+        yield xs
     elif isinstance(xs, Iterable):
-        yield from itertools.chain.from_iterable(flatten(x) for x in xs)
+        yield from itertools.chain.from_iterable(flatten(x, *types) for x in xs)
     elif type(xs).__name__ == "Registrar" or isinstance(xs, PurePath):
         yield str(xs)
     else:
-        raise ValueError(f"expected a string but got: {xs!r}")
+        raise ValueError(f"expected {' or '.join(typ.__name__ for typ in types)} but got: {xs!r}")
 
 
 @dataclass(frozen=True)
@@ -114,8 +116,8 @@ class VisibilityRuleSet:
     """An ordered set of rules that applies to some set of target types."""
 
     build_file: str
-    target_type_patterns: Sequence[str]
-    rules: Sequence[VisibilityRule]
+    selectors: tuple[TargetGlob, ...]
+    rules: tuple[VisibilityRule, ...]
 
     @classmethod
     def parse(cls, build_file: str, arg: Any) -> VisibilityRuleSet:
@@ -132,10 +134,11 @@ class VisibilityRuleSet:
 
         relpath = os.path.dirname(build_file)
         try:
-            targets, rules = flatten(arg[0]), flatten(arg[1:])
+            selectors = cast("Iterator[str | dict]", flatten(arg[0], str, dict))
+            rules = cast("Iterator[str]", flatten(arg[1:], str))
             return cls(
                 build_file,
-                tuple(targets),
+                tuple(TargetGlob.parse(selector, relpath) for selector in selectors),
                 tuple(
                     VisibilityRule.parse(rule, relpath)
                     for rule in rules
@@ -152,14 +155,14 @@ class VisibilityRuleSet:
     def _noop_rule(rule: str) -> bool:
         return not rule or rule.startswith("#")
 
-    def match(self, target: TargetAdaptor) -> bool:
-        return any(fnmatchcase(target.type_alias, pattern) for pattern in self.target_type_patterns)
+    def match(self, address: Address, adaptor: TargetAdaptor, relpath: str) -> bool:
+        return any(selector.match(address, adaptor, relpath) for selector in self.selectors)
 
 
 @dataclass(frozen=True)
 class BuildFileVisibilityRules(BuildFileDependencyRules):
     path: str
-    rulesets: Sequence[VisibilityRuleSet]
+    rulesets: tuple[VisibilityRuleSet, ...]
 
     @staticmethod
     def create_parser_state(
@@ -167,8 +170,9 @@ class BuildFileVisibilityRules(BuildFileDependencyRules):
     ) -> BuildFileDependencyRulesParserState:
         return BuildFileVisibilityRulesParserState(path, cast(BuildFileVisibilityRules, parent))
 
-    @staticmethod
+    @classmethod
     def check_dependency_rules(
+        cls,
         *,
         origin_address: Address,
         origin_adaptor: TargetAdaptor,
@@ -191,10 +195,9 @@ class BuildFileVisibilityRules(BuildFileDependencyRules):
         # Check outgoing dependency action
         out_ruleset, out_action, out_pattern = (
             cast(BuildFileVisibilityRules, dependencies_rules).get_action(
-                target=origin_adaptor,
-                address=dependency_address,
-                relpath=origin_address.spec_path,
-                outgoing_dependency=True,
+                address=origin_address,
+                adaptor=origin_adaptor,
+                other_address=dependency_address,
             )
             if dependencies_rules is not None
             else (None, DependencyRuleAction.ALLOW, None)
@@ -213,10 +216,9 @@ class BuildFileVisibilityRules(BuildFileDependencyRules):
         # Check incoming dependency action
         in_ruleset, in_action, in_pattern = (
             cast(BuildFileVisibilityRules, dependents_rules).get_action(
-                target=dependency_adaptor,
-                address=origin_address,
-                relpath=dependency_address.spec_path,
-                outgoing_dependency=False,
+                address=dependency_address,
+                adaptor=dependency_adaptor,
+                other_address=origin_address,
             )
             if dependents_rules is not None
             else (None, DependencyRuleAction.ALLOW, None)
@@ -247,6 +249,12 @@ class BuildFileVisibilityRules(BuildFileDependencyRules):
         )
 
     @staticmethod
+    def _get_address_relpath(address: Address) -> str:
+        if address.is_file_target:
+            return os.path.dirname(address.filename)
+        return address.spec_path
+
+    @staticmethod
     def _get_address_path(address: Address) -> str:
         if address.is_file_target:
             return address.filename
@@ -256,42 +264,40 @@ class BuildFileVisibilityRules(BuildFileDependencyRules):
 
     def get_action(
         self,
-        target: TargetAdaptor,
         address: Address,
-        relpath: str,
-        outgoing_dependency: bool,
+        adaptor: TargetAdaptor,
+        other_address: Address,
     ) -> tuple[VisibilityRuleSet | None, DependencyRuleAction | None, str | None]:
         """Get applicable rule for target type from `path`.
 
         The rules are declared in `relpath`.
         """
-        ruleset = self.get_ruleset(target)
+        relpath = self._get_address_relpath(address)
+        ruleset = self.get_ruleset(address, adaptor, relpath)
         if ruleset is None:
             return None, None, None
-        path = self._get_address_path(address)
+        path = self._get_address_path(other_address)
         for visibility_rule in ruleset.rules:
             if visibility_rule.match(path, relpath):
                 if visibility_rule.action != DependencyRuleAction.ALLOW:
-                    target_addr = f"{relpath}:{target.name or os.path.basename(relpath)}"
-                    target_type = target.type_alias
-                    if outgoing_dependency:
-                        logger.debug(
-                            f"{visibility_rule.action.name}: the `{target_type}` target "
-                            f"{target_addr} dependency to a target at {path} by dependency rule "
-                            f"{str(visibility_rule)!r} declared in {self.path}"
+                    logger.debug(
+                        softwrap(
+                            f"""
+                            {visibility_rule.action.name}: type={adaptor.type_alias}
+                            address={address} other={other_address}
+                            rule={str(visibility_rule)!r} {self.path}:
+                            {', '.join(map(str, ruleset.rules))}
+                            """
                         )
-                    else:
-                        logger.debug(
-                            f"{visibility_rule.action.name}: dependency on the `{target_type}` "
-                            f"target {target_addr} from a target at {path} by dependent rule "
-                            f"{str(visibility_rule)!r} declared in {self.path}"
-                        )
+                    )
                 return ruleset, visibility_rule.action, str(visibility_rule)
         return ruleset, None, None
 
-    def get_ruleset(self, target: TargetAdaptor) -> VisibilityRuleSet | None:
+    def get_ruleset(
+        self, address: Address, target: TargetAdaptor, relpath: str
+    ) -> VisibilityRuleSet | None:
         for ruleset in self.rulesets:
-            if ruleset.match(target):
+            if ruleset.match(address, target, relpath):
                 return ruleset
         return None
 
