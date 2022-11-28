@@ -125,7 +125,6 @@ def twine_env_request(repo: str) -> EnvironmentVarsRequest:
 
 def twine_env(env: EnvironmentVars, repo: str) -> EnvironmentVars:
     suffix = twine_env_suffix(repo)
-    print(env)
     return EnvironmentVars(
         {key.rsplit(suffix, maxsplit=1)[0] if suffix else key: value for key, value in env.items()}
     )
