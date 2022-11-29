@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pants.backend.visibility.rule_types import BuildFileVisibilityRules
+from pants.backend.visibility.subsystem import VisibilitySubsystem
 from pants.engine.internals.dep_rules import (
     BuildFileDependencyRulesImplementation,
     BuildFileDependencyRulesImplementationRequest,
@@ -41,7 +42,11 @@ def build_file_visibility_implementation(
 @rule
 async def visibility_validate_dependencies(
     request: VisibilityValidateDependenciesRequest,
+    visibility: VisibilitySubsystem,
 ) -> ValidatedDependencies:
+    if not visibility.enforce:  # TODO: support for `or current_goal == "lint"`
+        return ValidatedDependencies()
+
     address = request.field_set.address
     dependencies_rule_action = await Get(
         DependenciesRuleApplication,
