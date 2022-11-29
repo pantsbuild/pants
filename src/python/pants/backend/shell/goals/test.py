@@ -13,7 +13,7 @@ from pants.backend.shell.target_types import (
     SkipShellCommandTestsField,
 )
 from pants.backend.shell.util_rules import shell_command
-from pants.backend.shell.util_rules.shell_command import ShellCommandProcessRequest
+from pants.backend.shell.util_rules.shell_command import ShellCommandProcessFromTargetRequest
 from pants.core.goals.test import (
     TestDebugAdapterRequest,
     TestDebugRequest,
@@ -62,8 +62,7 @@ async def test_shell_command(
 
     shell_process = await Get(
         Process,
-        ShellCommandProcessRequest,
-        ShellCommandProcessRequest.from_target(wrapped_tgt.target),
+        ShellCommandProcessFromTargetRequest(wrapped_tgt.target),
     )
 
     shell_process = dataclasses.replace(

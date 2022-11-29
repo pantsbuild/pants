@@ -83,36 +83,50 @@ class ShellCommandProcessRequest:
     output_directories: tuple[str, ...]
     extra_env_vars: tuple[str, ...]
 
-    @staticmethod
-    def from_target(shell_command: Target) -> ShellCommandProcessRequest:
-        interactive = shell_command.has_field(ShellCommandRunWorkdirField)
-        if interactive:
-            working_directory = shell_command[ShellCommandRunWorkdirField].value or ""
-        else:
-            working_directory = shell_command.address.spec_path
 
-        command = shell_command[ShellCommandCommandField].value
-        if not command:
-            raise ValueError(
-                f"Missing `command` line in `{shell_command.alias}` target {shell_command.address}."
-            )
+@dataclass(frozen=True)
+class ShellCommandProcessFromTargetRequest:
+    target: Target
 
-        outputs = shell_command.get(ShellCommandOutputsField).value or ()
-        output_files = tuple(f for f in outputs if not f.endswith("/"))
-        output_directories = tuple(d for d in outputs if d.endswith("/"))
 
-        return ShellCommandProcessRequest(
-            alias=shell_command.alias,
-            address=shell_command.address,
-            interactive=interactive,
-            working_directory=working_directory,
-            command=command,
-            timeout=shell_command.get(ShellCommandTimeoutField).value,
-            tools=shell_command.get(ShellCommandToolsField, default_raw_value=()).value or (),
-            output_files=output_files,
-            output_directories=output_directories,
-            extra_env_vars=shell_command.get(ShellCommandExtraEnvVarsField).value or (),
+@rule
+async def prepare_process_request_from_target(
+    request: ShellCommandProcessFromTargetRequest,
+) -> Process:
+    scpr = await _prepare_process_request_from_target(request.target)
+    return await Get(Process, ShellCommandProcessRequest, scpr)
+
+
+@rule_helper
+async def _prepare_process_request_from_target(shell_command: Target) -> ShellCommandProcessRequest:
+    interactive = shell_command.has_field(ShellCommandRunWorkdirField)
+    if interactive:
+        working_directory = shell_command[ShellCommandRunWorkdirField].value or ""
+    else:
+        working_directory = shell_command.address.spec_path
+
+    command = shell_command[ShellCommandCommandField].value
+    if not command:
+        raise ValueError(
+            f"Missing `command` line in `{shell_command.alias}` target {shell_command.address}."
         )
+
+    outputs = shell_command.get(ShellCommandOutputsField).value or ()
+    output_files = tuple(f for f in outputs if not f.endswith("/"))
+    output_directories = tuple(d for d in outputs if d.endswith("/"))
+
+    return ShellCommandProcessRequest(
+        alias=shell_command.alias,
+        address=shell_command.address,
+        interactive=interactive,
+        working_directory=working_directory,
+        command=command,
+        timeout=shell_command.get(ShellCommandTimeoutField).value,
+        tools=shell_command.get(ShellCommandToolsField, default_raw_value=()).value or (),
+        output_files=output_files,
+        output_directories=output_directories,
+        extra_env_vars=shell_command.get(ShellCommandExtraEnvVarsField).value or (),
+    )
 
 
 class RunShellCommand(RunFieldSet):
@@ -134,7 +148,9 @@ async def run_shell_command(
         ProcessResult,
         {
             environment_name: EnvironmentName,
-            ShellCommandProcessRequest.from_target(shell_command): ShellCommandProcessRequest,
+            ShellCommandProcessFromTargetRequest(
+                shell_command
+            ): ShellCommandProcessFromTargetRequest,
         },
     )
 
@@ -297,8 +313,7 @@ async def run_shell_command_request(shell_command: RunShellCommand) -> RunReques
     )
     process = await Get(
         Process,
-        ShellCommandProcessRequest,
-        ShellCommandProcessRequest.from_target(wrapped_tgt.target),
+        ShellCommandProcessFromTargetRequest(wrapped_tgt.target),
     )
     return RunRequest(
         digest=process.input_digest,
