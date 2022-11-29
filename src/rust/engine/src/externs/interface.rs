@@ -25,6 +25,7 @@ use fs::DirectoryDigest;
 use futures::future::{self, FutureExt};
 use futures::Future;
 use hashing::Digest;
+use ignore::gitignore;
 use log::{self, debug, error, warn, Log};
 use logging::logger::PANTS_LOGGER;
 use logging::{Logger, PythonLogLevel};
@@ -149,6 +150,8 @@ fn native_engine(py: Python, m: &PyModule) -> PyO3Result<()> {
 
   m.add_function(wrap_pyfunction!(strongly_connected_components, m)?)?;
   m.add_function(wrap_pyfunction!(hash_prefix_zero_bits, m)?)?;
+
+  m.add_function(wrap_pyfunction!(matches_gitignore_style_globs, m)?)?;
 
   Ok(())
 }
@@ -648,6 +651,33 @@ fn hash_prefix_zero_bits(item: &str) -> u32 {
   let mut hasher = FnvHasher::default();
   hasher.write(item.as_bytes());
   hasher.finish().leading_zeros()
+}
+
+/// Return the paths that match the gitignore-style globs.
+///
+/// Implemented in Rust so we can just call into the `ignore` crate.
+#[pyfunction]
+pub(crate) fn matches_gitignore_style_globs(
+  globs: Vec<String>,
+  paths: Vec<String>,
+) -> PyO3Result<Vec<String>> {
+  let mut builder = gitignore::GitignoreBuilder::new("");
+  for glob in globs {
+    builder
+      .add_line(None, &glob)
+      .map_err(|_| PyException::new_err(format!("Error parsing glob '{glob:?}'.")))?;
+  }
+  let gitignore = builder
+    .build()
+    .map_err(|_| PyException::new_err("Error building ignore::gitignore::GitIgnore."))?;
+
+  let result = paths
+    .iter()
+    .filter(|path| gitignore.matched(path, false).is_ignore())
+    .cloned()
+    .collect::<Vec<_>>();
+
+  Ok(result)
 }
 
 ///
