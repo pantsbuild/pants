@@ -78,9 +78,9 @@ class ShellCommandProcessRequest:
     address: Address
     interactive: bool
     working_directory: str
-    command: str | None
+    command: str
     timeout: int | None
-    tools: tuple[str, ...] | None
+    tools: tuple[str, ...]
     outputs: tuple[str, ...]
     extra_env_vars: tuple[str, ...]
 
@@ -92,14 +92,20 @@ class ShellCommandProcessRequest:
         else:
             working_directory = shell_command.address.spec_path
 
+        command = shell_command[ShellCommandCommandField].value
+        if not command:
+            raise ValueError(
+                f"Missing `command` line in `{shell_command.alias}` target {shell_command.address}."
+            )
+
         return ShellCommandProcessRequest(
             alias=shell_command.alias,
             address=shell_command.address,
             interactive=interactive,
             working_directory=working_directory,
-            command=shell_command[ShellCommandCommandField].value,
+            command=command,
             timeout=shell_command.get(ShellCommandTimeoutField).value,
-            tools=shell_command.get(ShellCommandToolsField, default_raw_value=()).value,
+            tools=shell_command.get(ShellCommandToolsField, default_raw_value=()).value or (),
             outputs=shell_command.get(ShellCommandOutputsField).value or (),
             extra_env_vars=shell_command.get(ShellCommandExtraEnvVarsField).value or (),
         )
@@ -191,18 +197,15 @@ async def prepare_shell_command_process(
     shell_command: ShellCommandProcessRequest, bash: BashBinary
 ) -> Process:
 
-    alias: str = shell_command.alias
-    address: Address = shell_command.address
-    interactive: bool = shell_command.interactive
-    working_directory: str = shell_command.working_directory
-    command: str | None = shell_command.command
+    alias = shell_command.alias
+    address = shell_command.address
+    interactive = shell_command.interactive
+    working_directory = shell_command.working_directory
+    command = shell_command.command
     timeout: int | None = shell_command.timeout
-    tools: tuple[str, ...] | None = shell_command.tools
-    outputs: tuple[str, ...] = shell_command.outputs
-    extra_env_vars: tuple[str, ...] = shell_command.extra_env_vars
-
-    if not command:
-        raise ValueError(f"Missing `command` line in `{alias}` target {address}.")
+    tools = shell_command.tools
+    outputs = shell_command.outputs
+    extra_env_vars = shell_command.extra_env_vars
 
     if interactive:
         command_env = {
