@@ -95,6 +95,8 @@ ARG BASE_IMAGE=:base
 FROM $BASE_IMAGE
 ```
 
+In the example, `:base` is the base image target address specified using a relative path. Pants will provide the built Docker image name for that target as the `BASE_IMAGE` build arg to the Docker build command.
+
 Building a Docker image
 -----------------------
 
@@ -187,8 +189,8 @@ This example copies both a `file` and `pex_binary`. The file is specified as an 
 file(name="msg", source="msg.txt")
 
 docker_image(
-    name="docker",
-    dependencies=[":msg", "src/python/hw:bin"],
+    name="helloworld",
+    dependencies=[":msg"],
 )
 ```
 ```dockerfile src/docker/hw/Dockerfile
@@ -200,7 +202,7 @@ COPY src.python.hw/bin.pex /bin/helloworld
 ```text src/docker/hw/msg.txt
 Hello, Docker!
 ```
-```python src/py/hw/BUILD
+```python src/python/hw/BUILD
 python_sources(name="lib")
 
 pex_binary(name="bin", entry_point="main.py")
@@ -218,10 +220,11 @@ print(msg)
 
 ```
 ❯ ./pants package src/docker/hw/Dockerfile
-[...]
-18:07:29.66 [INFO] Completed: Building src.python.hw/bin.pex
-18:07:31.83 [INFO] Completed: Building docker image helloworld:latest
-18:07:31.83 [INFO] Built docker image: helloworld:latest
+08:09:22.86 [INFO] Completed: Building local_dists.pex
+08:09:23.80 [INFO] Completed: Building src.python.hw/bin.pex
+08:10:42.51 [INFO] Completed: Building docker image helloworld:latest
+08:10:42.51 [INFO] Built docker image: helloworld:latest
+Docker image ID: 1fe744d52222
 ```
 
 Running a Docker image
