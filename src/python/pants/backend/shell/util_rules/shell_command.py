@@ -10,7 +10,6 @@ import shlex
 from dataclasses import dataclass
 from textwrap import dedent  # noqa: PNT20
 
-from pants.backend.shell.builtin import BASH_BUILTIN_COMMANDS
 from pants.backend.shell.shell_setup import ShellSetup
 from pants.backend.shell.target_types import (
     ShellCommandCommandField,
@@ -22,6 +21,7 @@ from pants.backend.shell.target_types import (
     ShellCommandTimeoutField,
     ShellCommandToolsField,
 )
+from pants.backend.shell.util_rules.builtin import BASH_BUILTIN_COMMANDS
 from pants.core.goals.package import BuiltPackage, PackageFieldSet
 from pants.core.goals.run import RunDebugAdapterRequest, RunFieldSet, RunRequest
 from pants.core.target_types import FileSourceField
