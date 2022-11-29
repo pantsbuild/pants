@@ -23,6 +23,7 @@ from pants.backend.shell.target_types import (
     ShellCommandToolsField,
 )
 from pants.backend.shell.util_rules.builtin import BASH_BUILTIN_COMMANDS
+from pants.build_graph.address import Address
 from pants.core.goals.package import BuiltPackage, PackageFieldSet
 from pants.core.goals.run import RunDebugAdapterRequest, RunFieldSet, RunRequest
 from pants.core.target_types import FileSourceField
@@ -73,7 +74,35 @@ class GenerateFilesFromShellCommandRequest(GenerateSourcesRequest):
 
 @dataclass(frozen=True)
 class ShellCommandProcessRequest:
-    target: Target
+    alias: str
+    address: Address
+    interactive: bool
+    working_directory: str
+    command: str | None
+    timeout: int | None
+    tools: tuple[str, ...] | None
+    outputs: tuple[str, ...]
+    extra_env_vars: tuple[str, ...]
+
+    @staticmethod
+    def from_target(shell_command: Target) -> ShellCommandProcessRequest:
+        interactive = shell_command.has_field(ShellCommandRunWorkdirField)
+        if interactive:
+            working_directory = shell_command[ShellCommandRunWorkdirField].value or ""
+        else:
+            working_directory = shell_command.address.spec_path
+
+        return ShellCommandProcessRequest(
+            alias=shell_command.alias,
+            address=shell_command.address,
+            interactive=interactive,
+            working_directory=working_directory,
+            command=shell_command[ShellCommandCommandField].value,
+            timeout=shell_command.get(ShellCommandTimeoutField).value,
+            tools=shell_command.get(ShellCommandToolsField, default_raw_value=()).value,
+            outputs=shell_command.get(ShellCommandOutputsField).value or (),
+            extra_env_vars=shell_command.get(ShellCommandExtraEnvVarsField).value or (),
+        )
 
 
 class RunShellCommand(RunFieldSet):
@@ -95,7 +124,7 @@ async def run_shell_command(
         ProcessResult,
         {
             environment_name: EnvironmentName,
-            ShellCommandProcessRequest(shell_command): ShellCommandProcessRequest,
+            ShellCommandProcessRequest.from_target(shell_command): ShellCommandProcessRequest,
         },
     )
 
@@ -159,24 +188,21 @@ async def shell_command_tools(
 
 @rule
 async def prepare_shell_command_process(
-    request: ShellCommandProcessRequest, bash: BashBinary
+    shell_command: ShellCommandProcessRequest, bash: BashBinary
 ) -> Process:
-    shell_command = request.target
-    interactive = shell_command.has_field(ShellCommandRunWorkdirField)
-    if interactive:
-        working_directory = shell_command[ShellCommandRunWorkdirField].value or ""
-    else:
-        working_directory = shell_command.address.spec_path
-    command = shell_command[ShellCommandCommandField].value
-    timeout = shell_command.get(ShellCommandTimeoutField).value
-    tools = shell_command.get(ShellCommandToolsField, default_raw_value=()).value
-    outputs = shell_command.get(ShellCommandOutputsField).value or ()
-    extra_env_vars = shell_command.get(ShellCommandExtraEnvVarsField).value or ()
+
+    alias: str = shell_command.alias
+    address: Address = shell_command.address
+    interactive: bool = shell_command.interactive
+    working_directory: str = shell_command.working_directory
+    command: str | None = shell_command.command
+    timeout: int | None = shell_command.timeout
+    tools: tuple[str, ...] | None = shell_command.tools
+    outputs: tuple[str, ...] = shell_command.outputs
+    extra_env_vars: tuple[str, ...] = shell_command.extra_env_vars
 
     if not command:
-        raise ValueError(
-            f"Missing `command` line in `{shell_command.alias}` target {shell_command.address}."
-        )
+        raise ValueError(f"Missing `command` line in `{alias}` target {address}.")
 
     if interactive:
         command_env = {
@@ -184,13 +210,11 @@ async def prepare_shell_command_process(
         }
     else:
         if not tools:
-            raise ValueError(
-                f"Must provide any `tools` used by the `{shell_command.alias}` {shell_command.address}."
-            )
+            raise ValueError(f"Must provide any `tools` used by the `{alias}` {address}.")
 
         resolved_tools = await Get(
             ShellCommandTools,
-            ToolsRequest(tools, f"execute `{shell_command.alias}` {shell_command.address}"),
+            ToolsRequest(tools, f"execute `{alias}` {address}"),
         )
         tools = tuple(tool for tool in sorted(resolved_tools))
 
@@ -201,7 +225,7 @@ async def prepare_shell_command_process(
 
     transitive_targets = await Get(
         TransitiveTargets,
-        TransitiveTargetsRequest([shell_command.address]),
+        TransitiveTargetsRequest([address]),
     )
 
     sources, pkgs_per_target = await MultiGet(
@@ -256,7 +280,7 @@ async def prepare_shell_command_process(
 
     return Process(
         argv=(bash.path, "-c", boot_script + command),
-        description=f"Running {shell_command.alias} {shell_command.address}",
+        description=f"Running {alias} {address}",
         env=command_env,
         input_digest=input_digest,
         output_directories=output_directories,
@@ -272,7 +296,11 @@ async def run_shell_command_request(shell_command: RunShellCommand) -> RunReques
         WrappedTarget,
         WrappedTargetRequest(shell_command.address, description_of_origin="<infallible>"),
     )
-    process = await Get(Process, ShellCommandProcessRequest(wrapped_tgt.target))
+    process = await Get(
+        Process,
+        ShellCommandProcessRequest,
+        ShellCommandProcessRequest.from_target(wrapped_tgt.target),
+    )
     return RunRequest(
         digest=process.input_digest,
         args=process.argv,

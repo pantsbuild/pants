@@ -390,7 +390,7 @@ def test_shell_command_boot_script(rule_runner: RuleRunner) -> None:
     )
 
     tgt = rule_runner.get_target(Address("src", target_name="boot-script-test"))
-    res = rule_runner.request(Process, [ShellCommandProcessRequest(tgt)])
+    res = rule_runner.request(Process, [ShellCommandProcessRequest.from_target(tgt)])
     assert "bash" in res.argv[0]
     assert res.argv[1:] == (
         "-c",

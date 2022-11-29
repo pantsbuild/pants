@@ -60,7 +60,11 @@ async def test_shell_command(
         WrappedTargetRequest(field_set.address, description_of_origin="<infallible>"),
     )
 
-    shell_process = await Get(Process, ShellCommandProcessRequest(wrapped_tgt.target))
+    shell_process = await Get(
+        Process,
+        ShellCommandProcessRequest,
+        ShellCommandProcessRequest.from_target(wrapped_tgt.target),
+    )
 
     shell_process = dataclasses.replace(
         shell_process,
