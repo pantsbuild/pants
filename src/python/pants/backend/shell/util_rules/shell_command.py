@@ -9,7 +9,6 @@ import re
 import shlex
 from dataclasses import dataclass
 from textwrap import dedent  # noqa: PNT20
-from typing import Dict, Tuple  # noqa: PNT20
 
 from pants.backend.shell.subsystems.shell_setup import ShellSetup
 from pants.backend.shell.target_types import (
@@ -47,7 +46,7 @@ from pants.engine.fs import (
     Snapshot,
 )
 from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.rules import Get, MultiGet, collect_rules, rule, rule_helper
 from pants.engine.target import (
     FieldSetsPerTarget,
     FieldSetsPerTargetRequest,
@@ -61,7 +60,6 @@ from pants.engine.target import (
     WrappedTargetRequest,
 )
 from pants.engine.unions import UnionRule
-from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
@@ -150,20 +148,10 @@ def _shell_tool_safe_env_name(tool_name: str) -> str:
     return re.sub(r"\W", "_", tool_name)
 
 
-class ShellCommandTools(FrozenDict[str, str]):
-    pass
-
-
-@dataclass(frozen=True)
-class ToolsRequest:
-    tools: Tuple[str, ...]
-    rationale: str
-
-
-@rule
-async def shell_command_tools(
-    shell_setup: ShellSetup.EnvironmentAware, request: ToolsRequest
-) -> ShellCommandTools:
+@rule_helper
+async def _shell_command_tools(
+    shell_setup: ShellSetup.EnvironmentAware, tools: tuple[str, ...], rationale: str
+) -> dict[str, str]:
 
     search_path = shell_setup.executable_search_path
     tool_requests = [
@@ -171,14 +159,14 @@ async def shell_command_tools(
             binary_name=tool,
             search_path=search_path,
         )
-        for tool in sorted({*request.tools, *["mkdir", "ln"]})
+        for tool in sorted({*tools, *["mkdir", "ln"]})
         if tool not in BASH_BUILTIN_COMMANDS
     ]
     tool_paths = await MultiGet(
         Get(BinaryPaths, BinaryPathRequest, request) for request in tool_requests
     )
 
-    paths: Dict[str, str] = {}
+    paths: dict[str, str] = {}
 
     for binary, tool_request in zip(tool_paths, tool_requests):
         if binary.first_path:
@@ -186,15 +174,17 @@ async def shell_command_tools(
         else:
             raise BinaryNotFoundError.from_request(
                 tool_request,
-                rationale=request.rationale,
+                rationale=rationale,
             )
 
-    return ShellCommandTools(paths)
+    return paths
 
 
 @rule
 async def prepare_shell_command_process(
-    shell_command: ShellCommandProcessRequest, bash: BashBinary
+    shell_setup: ShellSetup.EnvironmentAware,
+    shell_command: ShellCommandProcessRequest,
+    bash: BashBinary,
 ) -> Process:
 
     alias = shell_command.alias
@@ -215,9 +205,8 @@ async def prepare_shell_command_process(
         if not tools:
             raise ValueError(f"Must provide any `tools` used by the `{alias}` {address}.")
 
-        resolved_tools = await Get(
-            ShellCommandTools,
-            ToolsRequest(tools, f"execute `{alias}` {address}"),
+        resolved_tools = await _shell_command_tools(
+            shell_setup, tools, f"execute `{alias}` {address}"
         )
         tools = tuple(tool for tool in sorted(resolved_tools))
 
