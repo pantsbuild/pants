@@ -8,11 +8,9 @@ from pants.backend.visibility.subsystem import VisibilitySubsystem
 from pants.core.goals.lint import LintResult, LintTargetsRequest
 from pants.core.util_rules.partitions import PartitionerType
 from pants.engine.addresses import Addresses
-from pants.engine.fs import EMPTY_DIGEST, EMPTY_FILE_DIGEST
 from pants.engine.internals.dep_rules import DependencyRuleActionDeniedError
 from pants.engine.internals.session import RunId
 from pants.engine.platform import Platform
-from pants.engine.process import FallibleProcessResult, ProcessResultMetadata
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     Dependencies,
@@ -63,18 +61,13 @@ async def enforce_visibility_rules(
     except DependencyRuleActionDeniedError as e:
         violations.append(str(e))
 
-    # Mimic a process result to pass as lint result.
-    result = FallibleProcessResult(
-        stdout="\n\n".join(violations).encode(),
-        stdout_digest=EMPTY_FILE_DIGEST,
-        stderr=b"",
-        stderr_digest=EMPTY_FILE_DIGEST,
+    return LintResult(
         exit_code=0 if not violations else 1,
-        output_digest=EMPTY_DIGEST,
-        platform=platform,
-        metadata=ProcessResultMetadata(None, "ran_locally", run_id),
+        stdout="\n\n".join(violations),
+        stderr="",
+        linter_name=request.tool_name,
+        partition_description=request.partition_metadata.description,
     )
-    return LintResult.create(request, process_result=result)
 
 
 def rules():
