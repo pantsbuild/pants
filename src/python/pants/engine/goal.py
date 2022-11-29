@@ -1,5 +1,6 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+from __future__ import annotations
 
 from abc import abstractmethod
 from contextlib import contextmanager
@@ -10,6 +11,7 @@ from typing import TYPE_CHECKING, Callable, ClassVar, Iterator, Type, cast
 from typing_extensions import final
 
 from pants.base.deprecated import deprecated_conditional
+from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.unions import UnionMembership
 from pants.option.option_types import StrOption
 from pants.option.scope import ScopeInfo
@@ -131,6 +133,27 @@ class Goal:
     @classproperty
     def name(cls) -> str:
         return cast(str, cls.subsystem_cls.name)
+
+
+@dataclass(frozen=True)
+class CurrentExecutingGoal(EngineAwareReturnType):
+    goal: type[Goal] | None = None
+
+    @property
+    def name(self) -> str | None:
+        return None if self.goal is None else self.goal.name
+
+    @contextmanager
+    def _executing(self, goal: type[Goal]) -> Iterator[None]:
+        # Mutate current goal; we're only frozen to avoid inadvertent tampering with `self.goal`.
+        object.__setattr__(self, "goal", goal)
+        try:
+            yield
+        finally:
+            object.__setattr__(self, "goal", None)
+
+    def cacheable(self) -> bool:
+        return False
 
 
 class Outputting:
