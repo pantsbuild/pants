@@ -246,14 +246,17 @@ async def prepare_shell_command_process(
         Get(BuiltPackage, PackageFieldSet, field_set) for field_set in pkgs_per_target.field_sets
     )
 
+    dependencies_digest = await Get(
+        Digest, MergeDigests([sources.snapshot.digest, *(pkg.digest for pkg in packages)])
+    )
+
     if interactive or not working_directory or working_directory in sources.snapshot.dirs:
+        # Needed to ensure that underlying filesystem does not change during run
         work_dir = EMPTY_DIGEST
     else:
         work_dir = await Get(Digest, CreateDigest([Directory(working_directory)]))
 
-    input_digest = await Get(
-        Digest, MergeDigests([sources.snapshot.digest, work_dir, *(pkg.digest for pkg in packages)])
-    )
+    input_digest = await Get(Digest, MergeDigests([dependencies_digest, work_dir]))
 
     if interactive:
         relpath = os.path.relpath(
