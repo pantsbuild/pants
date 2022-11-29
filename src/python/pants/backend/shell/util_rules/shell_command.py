@@ -22,7 +22,6 @@ from pants.backend.shell.target_types import (
     ShellCommandToolsField,
 )
 from pants.backend.shell.util_rules.builtin import BASH_BUILTIN_COMMANDS
-from pants.build_graph.address import Address
 from pants.core.goals.package import BuiltPackage, PackageFieldSet
 from pants.core.goals.run import RunDebugAdapterRequest, RunFieldSet, RunRequest
 from pants.core.target_types import FileSourceField
@@ -72,13 +71,13 @@ class GenerateFilesFromShellCommandRequest(GenerateSourcesRequest):
 
 @dataclass(frozen=True)
 class ShellCommandProcessRequest:
-    alias: str
-    address: Address
+    description: str
     interactive: bool
     working_directory: str
     command: str
     timeout: int | None
     tools: tuple[str, ...]
+    input_digest: Digest
     output_files: tuple[str, ...]
     output_directories: tuple[str, ...]
     extra_env_vars: tuple[str, ...]
@@ -87,14 +86,6 @@ class ShellCommandProcessRequest:
 @dataclass(frozen=True)
 class ShellCommandProcessFromTargetRequest:
     target: Target
-
-
-@rule
-async def prepare_process_request_from_target(
-    request: ShellCommandProcessFromTargetRequest,
-) -> Process:
-    scpr = await _prepare_process_request_from_target(request.target)
-    return await Get(Process, ShellCommandProcessRequest, scpr)
 
 
 @rule_helper
@@ -111,22 +102,60 @@ async def _prepare_process_request_from_target(shell_command: Target) -> ShellCo
             f"Missing `command` line in `{shell_command.alias}` target {shell_command.address}."
         )
 
+    # Prepare `input_digest`: Currently uses transitive targets per old behaviour, but
+    # this will probably change soon, per #17345.
+    transitive_targets = await Get(
+        TransitiveTargets,
+        TransitiveTargetsRequest([shell_command.address]),
+    )
+
+    sources, pkgs_per_target = await MultiGet(
+        Get(
+            SourceFiles,
+            SourceFilesRequest(
+                sources_fields=[tgt.get(SourcesField) for tgt in transitive_targets.dependencies],
+                for_sources_types=(SourcesField, FileSourceField),
+                enable_codegen=True,
+            ),
+        ),
+        Get(
+            FieldSetsPerTarget,
+            FieldSetsPerTargetRequest(PackageFieldSet, transitive_targets.dependencies),
+        ),
+    )
+
+    packages = await MultiGet(
+        Get(BuiltPackage, PackageFieldSet, field_set) for field_set in pkgs_per_target.field_sets
+    )
+
+    dependencies_digest = await Get(
+        Digest, MergeDigests([sources.snapshot.digest, *(pkg.digest for pkg in packages)])
+    )
+
     outputs = shell_command.get(ShellCommandOutputsField).value or ()
     output_files = tuple(f for f in outputs if not f.endswith("/"))
     output_directories = tuple(d for d in outputs if d.endswith("/"))
 
     return ShellCommandProcessRequest(
-        alias=shell_command.alias,
-        address=shell_command.address,
+        description="the `{alias}` at {address}",
         interactive=interactive,
         working_directory=working_directory,
         command=command,
         timeout=shell_command.get(ShellCommandTimeoutField).value,
         tools=shell_command.get(ShellCommandToolsField, default_raw_value=()).value or (),
+        input_digest=dependencies_digest,
         output_files=output_files,
         output_directories=output_directories,
         extra_env_vars=shell_command.get(ShellCommandExtraEnvVarsField).value or (),
     )
+
+
+@rule
+async def prepare_process_request_from_target(
+    request: ShellCommandProcessFromTargetRequest,
+) -> Process:
+    scpr = await _prepare_process_request_from_target(request.target)
+    return await Get(Process, ShellCommandProcessRequest, scpr)
 
 
 class RunShellCommand(RunFieldSet):
@@ -209,8 +238,7 @@ async def prepare_shell_command_process(
     bash: BashBinary,
 ) -> Process:
 
-    alias = shell_command.alias
-    address = shell_command.address
+    description = shell_command.description
     interactive = shell_command.interactive
     working_directory = shell_command.working_directory
     command = shell_command.command
@@ -226,11 +254,9 @@ async def prepare_shell_command_process(
         }
     else:
         if not tools:
-            raise ValueError(f"Must provide any `tools` used by the `{alias}` {address}.")
+            raise ValueError(f"Must provide any `tools` used by the {description}.")
 
-        resolved_tools = await _shell_command_tools(
-            shell_setup, tools, f"execute `{alias}` {address}"
-        )
+        resolved_tools = await _shell_command_tools(shell_setup, tools, f"execute {description}")
         tools = tuple(tool for tool in sorted(resolved_tools))
 
         command_env = {"TOOLS": " ".join(tools), **resolved_tools}
@@ -238,41 +264,15 @@ async def prepare_shell_command_process(
     extra_env = await Get(EnvironmentVars, EnvironmentVarsRequest(extra_env_vars))
     command_env.update(extra_env)
 
-    transitive_targets = await Get(
-        TransitiveTargets,
-        TransitiveTargetsRequest([address]),
-    )
+    input_snapshot = await Get(Snapshot, Digest, shell_command.input_digest)
 
-    sources, pkgs_per_target = await MultiGet(
-        Get(
-            SourceFiles,
-            SourceFilesRequest(
-                sources_fields=[tgt.get(SourcesField) for tgt in transitive_targets.dependencies],
-                for_sources_types=(SourcesField, FileSourceField),
-                enable_codegen=True,
-            ),
-        ),
-        Get(
-            FieldSetsPerTarget,
-            FieldSetsPerTargetRequest(PackageFieldSet, transitive_targets.dependencies),
-        ),
-    )
-
-    packages = await MultiGet(
-        Get(BuiltPackage, PackageFieldSet, field_set) for field_set in pkgs_per_target.field_sets
-    )
-
-    dependencies_digest = await Get(
-        Digest, MergeDigests([sources.snapshot.digest, *(pkg.digest for pkg in packages)])
-    )
-
-    if interactive or not working_directory or working_directory in sources.snapshot.dirs:
+    if interactive or not working_directory or working_directory in input_snapshot.dirs:
         # Needed to ensure that underlying filesystem does not change during run
         work_dir = EMPTY_DIGEST
     else:
         work_dir = await Get(Digest, CreateDigest([Directory(working_directory)]))
 
-    input_digest = await Get(Digest, MergeDigests([dependencies_digest, work_dir]))
+    input_digest = await Get(Digest, MergeDigests([shell_command.input_digest, work_dir]))
 
     if interactive:
         relpath = os.path.relpath(
@@ -295,7 +295,7 @@ async def prepare_shell_command_process(
 
     return Process(
         argv=(bash.path, "-c", boot_script + command),
-        description=f"Running {alias} {address}",
+        description=f"Running {description}",
         env=command_env,
         input_digest=input_digest,
         output_directories=output_directories,
