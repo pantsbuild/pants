@@ -5,8 +5,8 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
-from pants.backend.shell.shell_setup import ShellSetup
 from pants.backend.shell.shunit2 import Shunit2
+from pants.backend.shell.subsystems.shell_setup import ShellSetup
 from pants.backend.shell.target_types import (
     ShellSourceField,
     Shunit2Shell,

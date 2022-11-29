@@ -6,7 +6,7 @@ from __future__ import annotations
 import re
 from enum import Enum
 
-from pants.backend.shell.shell_setup import ShellSetup
+from pants.backend.shell.subsystems.shell_setup import ShellSetup
 from pants.core.goals.test import RuntimePackageDependenciesField, TestTimeoutField
 from pants.core.util_rules.environments import EnvironmentField
 from pants.core.util_rules.system_binaries import BinaryPathTest
