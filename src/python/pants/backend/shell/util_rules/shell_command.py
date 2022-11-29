@@ -79,7 +79,8 @@ class ShellCommandProcessRequest:
     command: str
     timeout: int | None
     tools: tuple[str, ...]
-    outputs: tuple[str, ...]
+    output_files: tuple[str, ...]
+    output_directories: tuple[str, ...]
     extra_env_vars: tuple[str, ...]
 
     @staticmethod
@@ -96,6 +97,10 @@ class ShellCommandProcessRequest:
                 f"Missing `command` line in `{shell_command.alias}` target {shell_command.address}."
             )
 
+        outputs = shell_command.get(ShellCommandOutputsField).value or ()
+        output_files = tuple(f for f in outputs if not f.endswith("/"))
+        output_directories = tuple(d for d in outputs if d.endswith("/"))
+
         return ShellCommandProcessRequest(
             alias=shell_command.alias,
             address=shell_command.address,
@@ -104,7 +109,8 @@ class ShellCommandProcessRequest:
             command=command,
             timeout=shell_command.get(ShellCommandTimeoutField).value,
             tools=shell_command.get(ShellCommandToolsField, default_raw_value=()).value or (),
-            outputs=shell_command.get(ShellCommandOutputsField).value or (),
+            output_files=output_files,
+            output_directories=output_directories,
             extra_env_vars=shell_command.get(ShellCommandExtraEnvVarsField).value or (),
         )
 
@@ -194,7 +200,8 @@ async def prepare_shell_command_process(
     command = shell_command.command
     timeout: int | None = shell_command.timeout
     tools = shell_command.tools
-    outputs = shell_command.outputs
+    output_files = shell_command.output_files
+    output_directories = shell_command.output_directories
     extra_env_vars = shell_command.extra_env_vars
 
     if interactive:
@@ -247,9 +254,6 @@ async def prepare_shell_command_process(
     input_digest = await Get(
         Digest, MergeDigests([sources.snapshot.digest, work_dir, *(pkg.digest for pkg in packages)])
     )
-
-    output_files = [f for f in outputs if not f.endswith("/")]
-    output_directories = [d for d in outputs if d.endswith("/")]
 
     if interactive:
         relpath = os.path.relpath(
