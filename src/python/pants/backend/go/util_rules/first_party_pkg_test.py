@@ -325,8 +325,8 @@ def test_embeds_supported(rule_runner: RuleRunner) -> None:
                 go 1.17
                 """
             ),
-            **resources,  # type: ignore[arg-type]
-            **go_sources,  # type: ignore[arg-type]
+            **resources,
+            **go_sources,
         }
     )
     maybe_analysis = rule_runner.request(
