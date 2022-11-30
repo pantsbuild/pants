@@ -153,11 +153,14 @@ def run_pytest(
         ):
             debug_adapter_request = rule_runner.request(TestDebugAdapterRequest, [batch])
             if debug_adapter_request.process is not None:
-                with mock_console(rule_runner.options_bootstrapper):
+                with mock_console(rule_runner.options_bootstrapper) as mocked_console:
+                    _, stdioreader = mocked_console
                     debug_adapter_result = rule_runner.run_interactive_process(
                         debug_adapter_request.process
                     )
-                    assert test_result.exit_code == debug_adapter_result.exit_code
+                    assert (
+                        test_result.exit_code == debug_adapter_result.exit_code
+                    ), f"{stdioreader.get_stdout()}\n{stdioreader.get_stderr()}"
 
     return test_result
 
