@@ -3,9 +3,9 @@
 
 from __future__ import annotations
 
-import itertools
 import os
-from typing import Any, Iterable, Iterator, MutableMapping
+from functools import partial
+from typing import Any, Callable, Iterator, MutableMapping
 
 import toml
 from packaging.utils import NormalizedName
@@ -130,8 +130,13 @@ async def generate_from_python_requirement(
 ) -> GeneratedTargets:
     generator = request.generator
     requirements_rel_path = generator[PythonRequirementsSourceField].value
+    callback: Callable[[bytes, str], Iterator[PipRequirement]]
     if os.path.basename(requirements_rel_path) == "pyproject.toml":
-        callback = parse_pyproject_callback
+        overrides = {
+            canonicalize_project_name(k): v
+            for k, v in request.require_unparametrized_overrides().items()
+        }
+        callback = partial(parse_pyproject_callback, overrides=overrides)
     else:
         callback = parse_requirements_callback
     result = await _generate_requirements(
@@ -146,7 +151,10 @@ async def generate_from_python_requirement(
 def parse_requirements_callback(file_contents: bytes, file_path: str) -> Iterator[PipRequirement]:
     return parse_requirements_file(file_contents.decode(), rel_path=file_path)
 
-def parse_pyproject_callback(file_contents: bytes, file_path: str, overrides) -> Iterator[PipRequirement]:
+
+def parse_pyproject_callback(
+    file_contents: bytes, file_path: str, overrides: MutableMapping[NormalizedName, dict[str, Any]]
+) -> Iterator[PipRequirement]:
     return parse_pyproject_toml(file_contents.decode(), rel_path=file_path, overrides=overrides)
 
 
