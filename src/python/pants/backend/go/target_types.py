@@ -19,6 +19,7 @@ from pants.engine.target import (
     InvalidTargetException,
     MultipleSourcesField,
     StringField,
+    StringSequenceField,
     Target,
     TargetGenerator,
     TriBoolField,
@@ -127,6 +128,26 @@ class GoTestAddressSanitizerEnabledField(GoRaceDetectorEnabledField):
 
         See https://github.com/google/sanitizers/wiki/AddressSanitizer for additional information about
         the C/C++ address sanitizer.
+        """
+    )
+
+
+class GoCompilerFlagsField(StringSequenceField):
+    alias = "compiler_flags"
+    help = softwrap(
+        """
+        Extra flags to pass to the Go compiler (i.e., `go tool compile`) when compiling Go code.
+
+        This field can be specified on several different target types:
+        - On `go_mod` targets, the specified compiler flags are used when compiling any package involving the module
+        including both first-party (i.e., `go_package` targets) and third-party dependencies.
+        - On `go_binary` targets, the compiler flags are used when compiling for all packages comprising that
+        the binary including third-party dependencies. These compiler flags will be added after any compiler flags
+        added by any `compile_flags` field on the applicable `go_mod` target.
+        - On `go_package` targets, the compiler flags are used only for compiling that specific package and not
+        for any other package. These compiler flags will be added after any compiler flags
+        added by any `compile_flags` field set on the applicable `go_mod` target or any applicable `go_binary`
+        target.
         """
     )
 
@@ -245,6 +266,7 @@ class GoModTarget(TargetGenerator):
         GoRaceDetectorEnabledField,
         GoMemorySanitizerEnabledField,
         GoAddressSanitizerEnabledField,
+        GoCompilerFlagsField,
     )
     copied_fields = COMMON_TARGET_FIELDS
     moved_fields = ()
@@ -325,6 +347,7 @@ class GoPackageTarget(Target):
         GoTestRaceDetectorEnabledField,
         GoTestMemorySanitizerEnabledField,
         GoTestAddressSanitizerEnabledField,
+        GoCompilerFlagsField,
         SkipGoTestsField,
     )
     help = softwrap(
@@ -372,6 +395,7 @@ class GoBinaryTarget(Target):
         GoRaceDetectorEnabledField,
         GoMemorySanitizerEnabledField,
         GoAddressSanitizerEnabledField,
+        GoCompilerFlagsField,
         RestartableField,
     )
     help = "A Go binary."

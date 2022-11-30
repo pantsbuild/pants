@@ -73,6 +73,7 @@ class BuildGoPackageRequest(EngineAwareParameter):
         objc_files: tuple[str, ...] = (),
         fortran_files: tuple[str, ...] = (),
         prebuilt_object_files: tuple[str, ...] = (),
+        pkg_specific_compiler_flags: tuple[str, ...] = (),
     ) -> None:
         """Build a package and its dependencies as `__pkg__.a` files.
 
@@ -99,6 +100,7 @@ class BuildGoPackageRequest(EngineAwareParameter):
         self.objc_files = objc_files
         self.fortran_files = fortran_files
         self.prebuilt_object_files = prebuilt_object_files
+        self.pkg_specific_compiler_flags = pkg_specific_compiler_flags
         self._hashcode = hash(
             (
                 self.import_path,
@@ -120,6 +122,7 @@ class BuildGoPackageRequest(EngineAwareParameter):
                 self.objc_files,
                 self.fortran_files,
                 self.prebuilt_object_files,
+                self.pkg_specific_compiler_flags,
             )
         )
 
@@ -146,7 +149,8 @@ class BuildGoPackageRequest(EngineAwareParameter):
             f"cxx_files={self.cxx_files}, "
             f"objc_files={self.objc_files}, "
             f"fortran_files={self.fortran_files}, "
-            f"prebuilt_object_files={self.prebuilt_object_files}"
+            f"prebuilt_object_files={self.prebuilt_object_files}, "
+            f"pkg_specific_compiler_flags={self.pkg_specific_compiler_flags}"
             ")"
         )
 
@@ -176,6 +180,7 @@ class BuildGoPackageRequest(EngineAwareParameter):
             and self.objc_files == other.objc_files
             and self.fortran_files == other.fortran_files
             and self.prebuilt_object_files == other.prebuilt_object_files
+            and self.pkg_specific_compiler_flags == other.pkg_specific_compiler_flags
             # TODO: Use a recursive memoized __eq__ if this ever shows up in profiles.
             and self.direct_dependencies == other.direct_dependencies
         )
@@ -559,6 +564,12 @@ async def build_go_package(
     # then pass -complete flag which tells the compiler that the provided Go files constitute the entire package.
     if not objects and not s_files:
         compile_args.append("-complete")
+
+    # Add any extra compiler flags after the ones added automatically by this rule.
+    if request.build_opts.compiler_flags:
+        compile_args.extend(request.build_opts.compiler_flags)
+    if request.pkg_specific_compiler_flags:
+        compile_args.extend(request.pkg_specific_compiler_flags)
 
     relativized_sources = (
         f"./{request.dir_path}/{name}" if request.dir_path else f"./{name}" for name in go_files
