@@ -802,16 +802,18 @@ def test_lockfile_requirements_selection(
         ),
     }
     if mode == ResolveMode.resolve_all_constraints:
-        mode_files = {"constraints.txt": "setuptools==54.1.2"}
+        mode_files.update({"constraints.txt": "setuptools==54.1.2"})
     elif mode == ResolveMode.poetry_or_manual:
-        mode_files = {"3rdparty/python/default.lock": setuptools_poetry_lockfile}
+        mode_files.update({"3rdparty/python/default.lock": setuptools_poetry_lockfile})
     else:
         assert mode == ResolveMode.pex
 
         requirements = rule_runner.request(Setuptools, []).pex_requirements()
         assert isinstance(requirements, EntireLockfile)
         assert isinstance(requirements.lockfile, LockfileContent)
-        mode_files = {"3rdparty/python/default.lock": requirements.lockfile.file_content.content}
+        mode_files.update(
+            {"3rdparty/python/default.lock": requirements.lockfile.file_content.content}
+        )
 
     rule_runner.write_files(mode_files)
 
