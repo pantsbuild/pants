@@ -8,18 +8,18 @@ from textwrap import dedent
 
 import pytest
 
-from pants.backend.shell.shell_command import (
-    GenerateFilesFromShellCommandRequest,
-    RunShellCommand,
-    ShellCommandProcessRequest,
-)
-from pants.backend.shell.shell_command import rules as shell_command_rules
 from pants.backend.shell.target_types import (
     ShellCommandRunTarget,
     ShellCommandTarget,
     ShellCommandTestTarget,
     ShellSourcesGeneratorTarget,
 )
+from pants.backend.shell.util_rules.shell_command import (
+    GenerateFilesFromShellCommandRequest,
+    RunShellCommand,
+    ShellCommandProcessRequest,
+)
+from pants.backend.shell.util_rules.shell_command import rules as shell_command_rules
 from pants.core.goals.run import RunRequest
 from pants.core.target_types import ArchiveTarget, FilesGeneratorTarget, FileSourceField
 from pants.core.target_types import rules as core_target_type_rules

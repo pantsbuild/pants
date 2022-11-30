@@ -158,14 +158,22 @@ def test_docker_complete_env_vars() -> None:
         target_types=[DockerEnvironmentTarget],
         inherent_environment=EnvironmentName("docker"),
     )
+    localhost_platform = Platform.create_for_localhost()
+    if localhost_platform == Platform.linux_arm64:
+        image_sha = "65a4aad1156d8a0679537cb78519a17eb7142e05a968b26a5361153006224fdc"
+        platform = Platform.linux_arm64.value
+    else:
+        image_sha = "a1801b843b1bfaf77c501e7a6d3f709401a1e0c83863037fa3aab063a7fdb9dc"
+        platform = Platform.linux_x86_64.value
+
     rule_runner.write_files(
         {
             "BUILD": dedent(
-                """\
+                f"""\
                 docker_environment(
                     name='docker',
-                    image='centos@sha256:a1801b843b1bfaf77c501e7a6d3f709401a1e0c83863037fa3aab063a7fdb9dc',
-                    platform='linux_x86_64',
+                    image='centos@sha256:{image_sha}',
+                    platform='{platform}',
                 )
                 """
             )

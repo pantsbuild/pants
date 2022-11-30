@@ -3,4 +3,4 @@
 
 java_sources(resolve="jar_tool_dev")
 
-files(name="src", sources=["*.java"])
+resources(name="src", sources=["*.java"])
