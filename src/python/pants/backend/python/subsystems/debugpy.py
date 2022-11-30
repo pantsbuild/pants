@@ -27,7 +27,7 @@ class DebugPy(PythonToolBase):
     default_main = EntryPoint("debugpy")
 
     register_interpreter_constraints = True
-    default_interpreter_constraints = ["CPython>=3.7,<3.11"]
+    default_interpreter_constraints = ["CPython>=3.7"]
 
     register_lockfile = True
     default_lockfile_resource = ("pants.backend.python.subsystems", "debugpy.lock")
@@ -64,9 +64,10 @@ class DebugPy(PythonToolBase):
             "-c",
             (
                 "import importlib_metadata;"
+                + "import sys;"
                 + "eps = importlib_metadata.entry_points()['console_scripts'];"
                 + f"ep = next(ep for ep in eps if ep.name == '{main.name}');"
-                + "ep.load()()"
+                + "sys.exit(ep.load()())"
             ),
         )
 

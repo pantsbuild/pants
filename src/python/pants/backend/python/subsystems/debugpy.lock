@@ -4,14 +4,18 @@
 //
 // --- BEGIN PANTS LOCKFILE METADATA: DO NOT EDIT OR REMOVE ---
 // {
-//   "version": 2,
+//   "version": 3,
 //   "valid_for_interpreter_constraints": [
-//     "CPython<3.11,>=3.7"
+//     "CPython>=3.7"
 //   ],
 //   "generated_with_requirements": [
 //     "debugpy==1.6.0",
 //     "importlib_metadata==1.4.0"
-//   ]
+//   ],
+//   "manylinux": "manylinux2014",
+//   "requirement_constraints": [],
+//   "only_binary": [],
+//   "no_binary": []
 // }
 // --- END PANTS LOCKFILE METADATA ---
 
@@ -80,7 +84,7 @@
           "project_name": "debugpy",
           "requires_dists": [],
           "requires_python": ">=3.7",
-          "version": "1.6"
+          "version": "1.6.0"
         },
         {
           "artifacts": [
@@ -107,53 +111,58 @@
             "zipp>=0.5"
           ],
           "requires_python": "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,>=2.7",
-          "version": "1.4"
+          "version": "1.4.0"
         },
         {
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "47c40d7fe183a6f21403a199b3e4192cca5774656965b0a4988ad2f8feb5f009",
-              "url": "https://files.pythonhosted.org/packages/f0/36/639d6742bcc3ffdce8b85c31d79fcfae7bb04b95f0e5c4c6f8b206a038cc/zipp-3.8.1-py3-none-any.whl"
+              "hash": "83a28fcb75844b5c0cdaf5aa4003c2d728c77e05f5aeabe8e95e56727005fbaa",
+              "url": "https://files.pythonhosted.org/packages/d8/20/256eb3f3f437c575fb1a2efdce5e801a5ce3162ea8117da96c43e6ee97d8/zipp-3.11.0-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "05b45f1ee8f807d0cc928485ca40a07cb491cf092ff587c0df9cb1fd154848d2",
-              "url": "https://files.pythonhosted.org/packages/3b/e3/fb79a1ea5f3a7e9745f688855d3c673f2ef7921639a380ec76f7d4d83a85/zipp-3.8.1.tar.gz"
+              "hash": "a7a22e05929290a67401440b39690ae6563279bced5f314609d9d03798f56766",
+              "url": "https://files.pythonhosted.org/packages/8e/b3/8b16a007184714f71157b1a71bbe632c5d66dd43bc8152b3c799b13881e1/zipp-3.11.0.tar.gz"
             }
           ],
           "project_name": "zipp",
           "requires_dists": [
+            "flake8<5; extra == \"testing\"",
             "func-timeout; extra == \"testing\"",
+            "furo; extra == \"docs\"",
+            "jaraco.functools; extra == \"testing\"",
             "jaraco.itertools; extra == \"testing\"",
             "jaraco.packaging>=9; extra == \"docs\"",
             "jaraco.tidelift>=1.4; extra == \"docs\"",
+            "more-itertools; extra == \"testing\"",
             "pytest-black>=0.3.7; platform_python_implementation != \"PyPy\" and extra == \"testing\"",
             "pytest-checkdocs>=2.4; extra == \"testing\"",
             "pytest-cov; extra == \"testing\"",
             "pytest-enabler>=1.3; extra == \"testing\"",
-            "pytest-flake8; extra == \"testing\"",
+            "pytest-flake8; python_version < \"3.12\" and extra == \"testing\"",
             "pytest-mypy>=0.9.1; platform_python_implementation != \"PyPy\" and extra == \"testing\"",
             "pytest>=6; extra == \"testing\"",
             "rst.linker>=1.9; extra == \"docs\"",
-            "sphinx; extra == \"docs\""
+            "sphinx>=3.5; extra == \"docs\""
           ],
           "requires_python": ">=3.7",
-          "version": "3.8.1"
+          "version": "3.11.0"
         }
       ],
       "platform_tag": null
     }
   ],
   "path_mappings": {},
-  "pex_version": "2.1.99",
+  "pex_version": "2.1.116",
+  "pip_version": "20.3.4-patched",
   "prefer_older_binary": false,
   "requirements": [
     "debugpy==1.6.0",
     "importlib_metadata==1.4.0"
   ],
   "requires_python": [
-    "<3.11,>=3.7"
+    ">=3.7"
   ],
   "resolver_version": "pip-2020-resolver",
   "style": "universal",

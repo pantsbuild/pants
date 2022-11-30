@@ -401,10 +401,10 @@ async def setup_pytest_for_target(
         VenvPexProcess(
             pytest_runner_pex,
             argv=(
-                *(("-c", pytest.config) if pytest.config else ()),
-                *(("-n", "{pants_concurrency}") if xdist_concurrency else ()),
                 *request.prepend_argv,
                 *pytest.args,
+                *(("-c", pytest.config) if pytest.config else ()),
+                *(("-n", "{pants_concurrency}") if xdist_concurrency else ()),
                 # N.B.: Now that we're using command-line options instead of the PYTEST_ADDOPTS
                 # environment variable, it's critical that `pytest_args` comes after `pytest.args`.
                 *pytest_args,
@@ -539,8 +539,17 @@ async def debugpy_python_test(
     debugpy: DebugPy,
     debug_adapter: DebugAdapterSubsystem,
     pytest: PyTest,
+    python_setup: PythonSetup,
 ) -> TestDebugAdapterRequest:
-    debugpy_pex = await Get(Pex, PexRequest, debugpy.to_pex_request())
+    debugpy_pex = await Get(
+        Pex,
+        PexRequest,
+        debugpy.to_pex_request(
+            interpreter_constraints=InterpreterConstraints.create_from_compatibility_fields(
+                [field_set.interpreter_constraints for field_set in batch.elements], python_setup
+            )
+        ),
+    )
 
     setup = await Get(
         TestSetup,

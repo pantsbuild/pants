@@ -10,10 +10,12 @@ from pants.backend.python.goals.run_helper import (
 from pants.backend.python.subsystems.debugpy import DebugPy
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
+    InterpreterConstraintsField,
     PexEntryPointField,
     PythonRunGoalUseSandboxField,
     PythonSourceField,
 )
+from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex_environment import PexEnvironment
 from pants.core.goals.run import RunDebugAdapterRequest, RunFieldSet, RunRequest
 from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
@@ -28,6 +30,7 @@ class PythonSourceFieldSet(RunFieldSet):
     required_fields = (PythonSourceField, PythonRunGoalUseSandboxField)
 
     source: PythonSourceField
+    interpreter_constraints: InterpreterConstraintsField
     run_goal_use_sandbox: PythonRunGoalUseSandboxField
 
 
@@ -54,10 +57,14 @@ async def create_python_source_debug_adapter_request(
     field_set: PythonSourceFieldSet,
     debugpy: DebugPy,
     debug_adapter: DebugAdapterSubsystem,
+    python_setup: PythonSetup,
 ) -> RunDebugAdapterRequest:
     run_request = await Get(RunRequest, PythonSourceFieldSet, field_set)
     return await _create_python_source_run_dap_request(
         run_request,
+        interpreter_constraints=InterpreterConstraints.create_from_compatibility_fields(
+            [field_set.interpreter_constraints], python_setup
+        ),
         entry_point_field=PexEntryPointField(field_set.source.value, field_set.address),
         debugpy=debugpy,
         debug_adapter=debug_adapter,

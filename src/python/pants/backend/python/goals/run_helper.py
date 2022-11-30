@@ -136,6 +136,7 @@ async def _create_python_source_run_request(
 async def _create_python_source_run_dap_request(
     regular_run_request: RunRequest,
     *,
+    interpreter_constraints: InterpreterConstraints,
     entry_point_field: PexEntryPointField,
     debugpy: DebugPy,
     debug_adapter: DebugAdapterSubsystem,
@@ -146,7 +147,11 @@ async def _create_python_source_run_dap_request(
             ResolvedPexEntryPoint,
             ResolvePexEntryPointRequest(entry_point_field),
         ),
-        Get(Pex, PexRequest, debugpy.to_pex_request()),
+        Get(
+            Pex,
+            PexRequest,
+            debugpy.to_pex_request(interpreter_constraints=interpreter_constraints),
+        ),
         Get(
             Digest,
             CreateDigest(

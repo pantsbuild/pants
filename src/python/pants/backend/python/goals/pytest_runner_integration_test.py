@@ -22,6 +22,7 @@ from pants.backend.python.goals.pytest_runner import (
     TestMetadata,
 )
 from pants.backend.python.macros.python_artifact import PythonArtifact
+from pants.backend.python.subsystems.debugpy import DebugPy
 from pants.backend.python.subsystems.pytest import PythonTestFieldSet
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
@@ -128,6 +129,7 @@ def run_pytest(
     *,
     extra_args: list[str] | None = None,
     env: dict[str, str] | None = None,
+    test_debug_adapter: bool = True,
 ) -> TestResult:
     _configure_pytest_runner(rule_runner, extra_args=extra_args, env=env)
     batch = _get_pytest_batch(rule_runner, test_targets)
@@ -137,6 +139,26 @@ def run_pytest(
         with mock_console(rule_runner.options_bootstrapper):
             debug_result = rule_runner.run_interactive_process(debug_request.process)
             assert test_result.exit_code == debug_result.exit_code
+
+    if test_debug_adapter:
+        old_debugpy_get_args = DebugPy.get_args
+
+        def get_debugpy_args_but_dont_wait_for_client(*args, **kwargs):
+            result = list(old_debugpy_get_args(*args, **kwargs))
+            result.remove("--wait-for-client")
+            return tuple(result)
+
+        with unittest.mock.patch.object(
+            DebugPy, "get_args", new=get_debugpy_args_but_dont_wait_for_client
+        ):
+            debug_adapter_request = rule_runner.request(TestDebugAdapterRequest, [batch])
+            if debug_adapter_request.process is not None:
+                with mock_console(rule_runner.options_bootstrapper):
+                    debug_adapter_result = rule_runner.run_interactive_process(
+                        debug_adapter_request.process
+                    )
+                    assert test_result.exit_code == debug_adapter_result.exit_code
+
     return test_result
 
 
@@ -289,14 +311,14 @@ def test_uses_correct_python_version(rule_runner: RuleRunner) -> None:
     py2_tgt = rule_runner.get_target(
         Address(PACKAGE, target_name="py2", relative_file_path="tests.py")
     )
-    result = run_pytest(rule_runner, [py2_tgt], extra_args=extra_args)
+    result = run_pytest(rule_runner, [py2_tgt], extra_args=extra_args, test_debug_adapter=False)
     assert result.exit_code == 2
     assert "SyntaxError: invalid syntax" in result.stdout
 
     py3_tgt = rule_runner.get_target(
         Address(PACKAGE, target_name="py3", relative_file_path="tests.py")
     )
-    result = run_pytest(rule_runner, [py3_tgt], extra_args=extra_args)
+    result = run_pytest(rule_runner, [py3_tgt], extra_args=extra_args, test_debug_adapter=False)
     assert result.exit_code == 0
     assert f"{PACKAGE}/tests.py ." in result.stdout
 
