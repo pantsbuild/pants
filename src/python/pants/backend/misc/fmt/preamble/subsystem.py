@@ -46,7 +46,7 @@ class PreambleSubsystem(Subsystem):
     )
 
     @property
-    def template_by_globs(self) -> dict[list[str], str]:
+    def template_by_globs(self) -> dict[tuple[str, ...], str]:
         return {tuple(key.split(":")): value for key, value in self._template_by_globs.items()}
 
     def get_template_by_path(self, filepaths: Sequence[str]) -> dict[str, str]:

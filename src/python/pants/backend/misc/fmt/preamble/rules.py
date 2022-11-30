@@ -36,7 +36,7 @@ def _substituted_template(template: str) -> str:
 @rule
 async def partition_inputs(
     request: PreambleRequest.PartitionRequest, preamble_subsystem: PreambleSubsystem
-) -> Partitions[str, Any]:
+) -> Partitions[Any]:
     if preamble_subsystem.skip:
         return Partitions()
 

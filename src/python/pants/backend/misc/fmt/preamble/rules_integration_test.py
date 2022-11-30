@@ -42,7 +42,9 @@ def run_preamble(rule_runner: RuleRunner, template_by_globs: dict[str, str]) -> 
     fmt_result = rule_runner.request(
         FmtResult,
         [
-            PreambleRequest.Batch("", snapshot.files, partition_metadata=None, snapshot=snapshot),
+            PreambleRequest.Batch(
+                "", snapshot.files, partition_metadata=None, snapshot=snapshot
+            ),
         ],
     )
     return fmt_result
@@ -120,7 +122,6 @@ def test_ignores_shebang(rule_runner: RuleRunner) -> None:
     )
     assert fmt_result.did_change is False
 
-
 def test_preamble_includes_shebang(rule_runner: RuleRunner) -> None:
     files_before = {"foo.py": "#!/usr/bin/env python3\n# Copyright"}
 
@@ -132,7 +133,6 @@ def test_preamble_includes_shebang(rule_runner: RuleRunner) -> None:
         },
     )
     assert fmt_result.did_change is False
-
 
 def test_multi_glob(rule_runner: RuleRunner) -> None:
     files_before = {"foo.py": ""}
