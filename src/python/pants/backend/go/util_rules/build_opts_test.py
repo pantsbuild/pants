@@ -78,7 +78,7 @@ def rule_runner() -> RuleRunner:
         ("asan", lambda opts: opts.with_asan, asan_supported),
     ),
 )
-def test_race_detector_fields_work_as_expected(
+def test_runtime_check_enable_fields_work_as_expected(
     rule_runner: RuleRunner,
     field_name: str,
     getter: Callable[[GoBuildOptions], bool],
