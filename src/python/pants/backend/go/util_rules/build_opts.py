@@ -79,7 +79,7 @@ class GoBuildOptionsFieldSet(FieldSet):
     race: GoRaceDetectorEnabledField
     msan: GoMemorySanitizerEnabledField
     asan: GoAddressSanitizerEnabledField
-    compile_flags: GoCompilerFlagsField
+    compiler_flags: GoCompilerFlagsField
 
 
 @dataclass(frozen=True)
@@ -315,15 +315,15 @@ async def go_extract_build_options_from_target(
         )
 
     # Extract any extra compiler flags specified on `go_mod` or `go_binary` targets.
-    # Note: A `compile_flags` field specified on a `go_package` target is extracted elsewhere.from
+    # Note: A `compiler_flags` field specified on a `go_package` target is extracted elsewhere.
     compiler_flags: list[str] = []
     if go_mod_target_fields is not None:
         # To avoid duplication of options, only add the module-specific compiler flags if the target for this request
         # is not a `go_mod` target (i.e., because it does not conform to the field set or has a different address).
         if target_fields is None or go_mod_target_fields.address != target_fields.address:
-            compiler_flags.extend(go_mod_target_fields.compile_flags.value or [])
+            compiler_flags.extend(go_mod_target_fields.compiler_flags.value or [])
     if target_fields is not None:
-        compiler_flags.extend(target_fields.compile_flags.value or [])
+        compiler_flags.extend(target_fields.compiler_flags.value or [])
 
     return GoBuildOptions(
         cgo_enabled=cgo_enabled,
