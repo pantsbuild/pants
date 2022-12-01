@@ -44,8 +44,6 @@ async def create_python_source_run_request(
         entry_point_field=PexEntryPointField(field_set.source.value, field_set.address),
         pex_env=pex_env,
         run_in_sandbox=run_goal_use_sandbox,
-        # Setting --venv is kosher because the PEX we create is just for the thirdparty deps.
-        additional_pex_args=["--venv"],
     )
 
 
