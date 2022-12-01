@@ -12,6 +12,7 @@ from pants.backend.go.target_types import (
     GoAddressSanitizerEnabledField,
     GoCgoEnabledField,
     GoCompilerFlagsField,
+    GoLinkerFlagsField,
     GoMemorySanitizerEnabledField,
     GoRaceDetectorEnabledField,
     GoTestAddressSanitizerEnabledField,
@@ -50,6 +51,10 @@ class GoBuildOptions:
     # may still come from `go_package` targets.
     compiler_flags: tuple[str, ...] = ()
 
+    # Extra flags to pass to the Go linker (i.e., `go tool link`).
+    # Note: These flags come from `go_mod` and `go_binary` targets.
+    linker_flags: tuple[str, ...] = ()
+
     def __post_init__(self):
         assert not (self.with_race_detector and self.with_msan)
         assert not (self.with_race_detector and self.with_asan)
@@ -73,6 +78,7 @@ class GoBuildOptionsFieldSet(FieldSet):
         GoMemorySanitizerEnabledField,
         GoAddressSanitizerEnabledField,
         GoCompilerFlagsField,
+        GoLinkerFlagsField,
     )
 
     cgo_enabled: GoCgoEnabledField
@@ -80,6 +86,7 @@ class GoBuildOptionsFieldSet(FieldSet):
     msan: GoMemorySanitizerEnabledField
     asan: GoAddressSanitizerEnabledField
     compiler_flags: GoCompilerFlagsField
+    linker_flags: GoLinkerFlagsField
 
 
 @dataclass(frozen=True)
@@ -325,12 +332,24 @@ async def go_extract_build_options_from_target(
     if target_fields is not None:
         compiler_flags.extend(target_fields.compiler_flags.value or [])
 
+    # Extract any extra linker flags specified on `go_mod` or `go_binary` targets.
+    # Note: A `compiler_flags` field specified on a `go_package` target is extracted elsewhere.
+    linker_flags: list[str] = []
+    if go_mod_target_fields is not None:
+        # To avoid duplication of options, only add the module-specific compiler flags if the target for this request
+        # is not a `go_mod` target (i.e., because it does not conform to the field set or has a different address).
+        if target_fields is None or go_mod_target_fields.address != target_fields.address:
+            linker_flags.extend(go_mod_target_fields.linker_flags.value or [])
+    if target_fields is not None:
+        linker_flags.extend(target_fields.linker_flags.value or [])
+
     return GoBuildOptions(
         cgo_enabled=cgo_enabled,
         with_race_detector=with_race_detector,
         with_msan=with_msan,
         with_asan=with_asan,
         compiler_flags=tuple(compiler_flags),
+        linker_flags=tuple(linker_flags),
     )
 
 

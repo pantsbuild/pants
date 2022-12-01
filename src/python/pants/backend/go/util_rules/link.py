@@ -51,6 +51,7 @@ async def link_go_binary(request: LinkGoBinaryRequest) -> LinkedGoBinary:
                 "-o",
                 request.output_filename,
                 "-buildmode=exe",  # seen in `go build -x` output
+                *request.build_opts.linker_flags,
                 *request.archives,
             ),
             env={

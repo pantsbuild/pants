@@ -392,3 +392,53 @@ def test_compiler_flags_fields(rule_runner: RuleRunner) -> None:
         ],
     )
     assert build_request.pkg_specific_compiler_flags == ("-xyzzy",)
+
+
+def test_linker_flags_fields(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "mod_with_field/BUILD": dedent(
+                """\
+            go_mod(
+              name="mod",
+              linker_flags=["-foo"],
+            )
+
+            go_package(name="pkg")
+
+            go_binary(
+              name="bin_without_field",
+            )
+
+            go_binary(
+              name="bin_with_field",
+              linker_flags=["-bar"],
+            )
+            """
+            ),
+            "mod_with_field/go.mod": "module example.pantsbuild.org/mod_with_field\n",
+            "mod_with_field/main.go": dedent(
+                """\
+            package main
+            func main() {}
+            """
+            ),
+        }
+    )
+
+    def assert_flags(address: Address, expected_value: Iterable[str]) -> None:
+        opts = rule_runner.request(
+            GoBuildOptions,
+            (
+                GoBuildOptionsFromTargetRequest(
+                    address=address,
+                ),
+            ),
+        )
+        assert opts.linker_flags == tuple(
+            expected_value
+        ), f"{address}: expected `linker_flags` to be {expected_value}"
+
+    assert_flags(Address("mod_with_field", target_name="mod"), ["-foo"])
+    assert_flags(Address("mod_with_field", target_name="bin_without_field"), ["-foo"])
+    assert_flags(Address("mod_with_field", target_name="bin_with_field"), ["-foo", "-bar"])
