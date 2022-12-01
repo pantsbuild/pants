@@ -559,13 +559,13 @@ def assert_streaming_output(
     assert result.message() == expected_message
 
 
-def test_streaming_output_skip() -> None:
+def test_streaming_output_no_tests() -> None:
     assert_streaming_output(
         exit_code=None,
         stdout="",
         stderr="",
         expected_level=LogLevel.DEBUG,
-        expected_message="skipped.",
+        expected_message="no tests found.",
     )
 
 
