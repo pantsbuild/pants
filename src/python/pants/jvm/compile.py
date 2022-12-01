@@ -11,7 +11,11 @@ from dataclasses import dataclass
 from enum import Enum, auto
 from typing import ClassVar, Iterable, Iterator, Sequence
 
-from pants.core.target_types import FilesGeneratingSourcesField, FileSourceField
+from pants.core.target_types import (
+    FilesGeneratingSourcesField,
+    FileSourceField,
+    RelocatedFilesOriginalTargetsField,
+)
 from pants.engine.collection import Collection
 from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.environment import EnvironmentName
@@ -425,7 +429,9 @@ def classpath_dependency_requests(
         return sum(
             1
             for t in coarsened_dep.members
-            if t.has_field(FileSourceField) or t.has_field(FilesGeneratingSourcesField)
+            if t.has_field(FileSourceField)
+            or t.has_field(FilesGeneratingSourcesField)
+            or t.has_field(RelocatedFilesOriginalTargetsField)
         ) == len(coarsened_dep.members)
 
     return ClasspathEntryRequests(
