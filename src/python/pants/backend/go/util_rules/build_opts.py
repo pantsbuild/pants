@@ -11,6 +11,7 @@ from pants.backend.go.subsystems.gotest import GoTestSubsystem
 from pants.backend.go.target_types import (
     GoAddressSanitizerEnabledField,
     GoCgoEnabledField,
+    GoCompilerFlagsField,
     GoMemorySanitizerEnabledField,
     GoRaceDetectorEnabledField,
     GoTestAddressSanitizerEnabledField,
@@ -44,6 +45,11 @@ class GoBuildOptions:
     # Enable interoperation with the C/C++ address sanitizer.
     with_asan: bool = False
 
+    # Extra flags to pass to the Go compiler (i.e., `go tool compile`).
+    # Note: These flags come from `go_mod` and `go_binary` targets. Package-specific compiler flags
+    # may still come from `go_package` targets.
+    compiler_flags: tuple[str, ...] = ()
+
     def __post_init__(self):
         assert not (self.with_race_detector and self.with_msan)
         assert not (self.with_race_detector and self.with_asan)
@@ -61,17 +67,28 @@ class GoBuildOptionsFromTargetRequest(EngineAwareParameter):
 
 @dataclass(frozen=True)
 class GoBuildOptionsFieldSet(FieldSet):
-    required_fields = (GoCgoEnabledField, GoRaceDetectorEnabledField, GoMemorySanitizerEnabledField)
+    required_fields = (
+        GoCgoEnabledField,
+        GoRaceDetectorEnabledField,
+        GoMemorySanitizerEnabledField,
+        GoAddressSanitizerEnabledField,
+        GoCompilerFlagsField,
+    )
 
     cgo_enabled: GoCgoEnabledField
     race: GoRaceDetectorEnabledField
     msan: GoMemorySanitizerEnabledField
     asan: GoAddressSanitizerEnabledField
+    compiler_flags: GoCompilerFlagsField
 
 
 @dataclass(frozen=True)
 class GoTestBuildOptionsFieldSet(FieldSet):
-    required_fields = (GoTestRaceDetectorEnabledField, GoTestMemorySanitizerEnabledField)
+    required_fields = (
+        GoTestRaceDetectorEnabledField,
+        GoTestMemorySanitizerEnabledField,
+        GoTestAddressSanitizerEnabledField,
+    )
 
     test_race: GoTestRaceDetectorEnabledField
     test_msan: GoTestMemorySanitizerEnabledField
@@ -297,11 +314,23 @@ async def go_extract_build_options_from_target(
             f"The C/C++ address sanitizer is enabled because {asan_reason}."
         )
 
+    # Extract any extra compiler flags specified on `go_mod` or `go_binary` targets.
+    # Note: A `compiler_flags` field specified on a `go_package` target is extracted elsewhere.
+    compiler_flags: list[str] = []
+    if go_mod_target_fields is not None:
+        # To avoid duplication of options, only add the module-specific compiler flags if the target for this request
+        # is not a `go_mod` target (i.e., because it does not conform to the field set or has a different address).
+        if target_fields is None or go_mod_target_fields.address != target_fields.address:
+            compiler_flags.extend(go_mod_target_fields.compiler_flags.value or [])
+    if target_fields is not None:
+        compiler_flags.extend(target_fields.compiler_flags.value or [])
+
     return GoBuildOptions(
         cgo_enabled=cgo_enabled,
         with_race_detector=with_race_detector,
         with_msan=with_msan,
         with_asan=with_asan,
+        compiler_flags=tuple(compiler_flags),
     )
 
 
