@@ -137,7 +137,7 @@ async def _prepare_process_request_from_target(shell_command: Target) -> ShellCo
     output_directories = tuple(d for d in outputs if d.endswith("/"))
 
     return ShellCommandProcessRequest(
-        description="the `{alias}` at {address}",
+        description=f"the `{shell_command.alias}` at `{shell_command.address}`",
         interactive=interactive,
         working_directory=working_directory,
         command=command,
