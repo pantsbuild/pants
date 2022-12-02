@@ -20,6 +20,7 @@ from pants.backend.go.target_types import (
     GoTestRaceDetectorEnabledField,
 )
 from pants.backend.go.util_rules import go_mod, goroot
+from pants.backend.go.util_rules.coverage import GoCoverageConfig
 from pants.backend.go.util_rules.go_mod import OwningGoMod, OwningGoModRequest
 from pants.backend.go.util_rules.goroot import GoRoot
 from pants.build_graph.address import Address
@@ -34,6 +35,12 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class GoBuildOptions:
+    # Coverage configuration.
+    # If this is set and a package's import path matches `import_path_include_patterns`, then the package
+    # will be instrumented for code coverage. (A caller can also force code coverage instrumentation by setting
+    # `with_coverage` to `True` on `BuildGoPackageTargetRequest`.)
+    coverage_config: GoCoverageConfig | None = None
+
     # Controls whether cgo support is enabled.
     cgo_enabled: bool = True
 

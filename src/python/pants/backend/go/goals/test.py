@@ -3,9 +3,11 @@
 
 from __future__ import annotations
 
+import dataclasses
 import os
+from collections import deque
 from dataclasses import dataclass
-from typing import Any, Sequence
+from typing import Any, Iterable, Sequence
 
 from pants.backend.go.subsystems.gotest import GoTestSubsystem
 from pants.backend.go.target_types import (
@@ -166,6 +168,23 @@ def transform_test_args(args: Sequence[str], timeout_field_value: int | None) ->
     return tuple(result)
 
 
+def _lift_build_requests_with_coverage(
+    roots: Iterable[BuildGoPackageRequest],
+) -> list[BuildGoPackageRequest]:
+    result: list[BuildGoPackageRequest] = []
+
+    queue: deque[BuildGoPackageRequest] = deque()
+    queue.extend(roots)
+
+    while queue:
+        build_request = queue.popleft()
+        if build_request.with_coverage:
+            result.append(build_request)
+        queue.extend(build_request.direct_dependencies)
+
+    return result
+
+
 @rule(desc="Test with Go", level=LogLevel.DEBUG)
 async def run_go_tests(
     batch: GoTestRequest.Batch[GoTestFieldSet, Any],
@@ -238,9 +257,16 @@ async def run_go_tests(
     if not testmain.has_tests and not testmain.has_xtests:
         return TestResult.no_tests_found(field_set.address, output_setting=test_subsystem.output)
 
-    coverage_config: GoCoverageConfig | None = None
+    with_coverage = False
     if test_subsystem.use_coverage:
-        coverage_config = GoCoverageConfig(cover_mode=go_test_subsystem.coverage_mode)
+        with_coverage = True
+        build_opts = dataclasses.replace(
+            build_opts,
+            coverage_config=GoCoverageConfig(
+                cover_mode=go_test_subsystem.coverage_mode,
+                import_path_include_patterns=go_test_subsystem.coverage_include_patterns,
+            ),
+        )
 
     # Construct the build request for the package under test.
     maybe_test_pkg_build_request = await Get(
@@ -248,7 +274,7 @@ async def run_go_tests(
         BuildGoPackageTargetRequest(
             field_set.address,
             for_tests=True,
-            coverage_config=coverage_config,
+            with_coverage=with_coverage,
             build_opts=build_opts,
         ),
     )
@@ -259,10 +285,9 @@ async def run_go_tests(
         )
     test_pkg_build_request = maybe_test_pkg_build_request.request
 
-    # TODO: Eventually support adding coverage to non-test packages. Those other packages will need to be
-    # added to `main_direct_deps` and to the coverage setup in the testmain.
+    # Determine the direct dependencies of the generated main package. The test package itself is always a
+    # dependency. Add the xtests package as well if any xtests exist.
     main_direct_deps = [test_pkg_build_request]
-
     if testmain.has_xtests:
         # Build a synthetic package for xtests where the import path is the same as the package under test
         # but with "_test" appended.
@@ -271,7 +296,7 @@ async def run_go_tests(
             BuildGoPackageTargetRequest(
                 field_set.address,
                 for_xtests=True,
-                coverage_config=coverage_config,
+                with_coverage=with_coverage,
                 build_opts=build_opts,
             ),
         )
@@ -291,7 +316,14 @@ async def run_go_tests(
     # register them with the coverage runtime.
     coverage_setup_digest = EMPTY_DIGEST
     coverage_setup_files = []
-    if coverage_config is not None:
+    if with_coverage:
+        # Scan the tree of BuildGoPackageRequest's and lift any packages with coverage enabled to be direct
+        # dependencies of the generated main package. This facilitates registration of the code coverage
+        # setup functions.
+        coverage_transitive_deps = _lift_build_requests_with_coverage(main_direct_deps)
+        coverage_transitive_deps.sort(key=lambda build_req: build_req.import_path)
+        main_direct_deps.extend(coverage_transitive_deps)
+
         # Build the `main_direct_deps` when in coverage mode to obtain the "coverage variables" for those packages.
         built_main_direct_deps = await MultiGet(
             Get(BuiltGoPackage, BuildGoPackageRequest, build_req) for build_req in main_direct_deps
