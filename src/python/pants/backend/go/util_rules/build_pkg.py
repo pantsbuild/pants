@@ -667,6 +667,14 @@ async def build_go_package(
     output_digest = await Get(Digest, AddPrefix(compilation_digest, path_prefix))
     merged_result_digest = await Get(Digest, MergeDigests([*dep_digests, output_digest]))
 
+    # Include the modules sources in the output `Digest` alongside the package archive if the Cgo rules
+    # detected a potential attempt to link against a static archive (or other reference to `${SRCDIR}` in
+    # options) which necessitates the linker needing access to module sources.
+    if cgo_compile_result and cgo_compile_result.include_module_sources_with_output:
+        merged_result_digest = await Get(
+            Digest, MergeDigests([merged_result_digest, request.digest])
+        )
+
     coverage_metadata = (
         BuiltGoPackageCodeCoverageMetadata(
             import_path=request.import_path,

@@ -90,6 +90,12 @@ class GolangSubsystem(Subsystem):
             help="Name of the tool to use to compile fortran code included via CGo in a Go package.",
         )
 
+        external_linker_binary_name = StrOption(
+            default="gcc",
+            advanced=True,
+            help='Name of the tool to use as the "external linker" when invoking `go tool link`.',
+        )
+
         cgo_c_flags = StrListOption(
             default=lambda _: list(_DEFAULT_COMPILER_FLAGS),
             advanced=True,
