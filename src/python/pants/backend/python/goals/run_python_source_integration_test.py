@@ -222,4 +222,34 @@ def test_local_dist() -> None:
             f"{tmpdir}/foo/main.py",
         ]
         result = run_pants(args)
-        assert result.stdout == "LOCAL DIST\n"
+        assert result.stdout == "LOCAL DIST\n", result.stderr
+
+
+def test_runs_in_venv() -> None:
+    # NB: We aren't just testing an implementation detail, users can and should expect their code to
+    # be run just as if they ran their code in a virtualenv (as is common in the Python ecosystem).
+    sources = {
+        "src/app.py": dedent(
+            """\
+            import os
+            import sys
+
+            if __name__ == "__main__":
+                sys.exit(0 if "VIRTUAL_ENV" in os.environ else 1)
+            """
+        ),
+        "src/BUILD": dedent(
+            """\
+            python_sources(name="lib")
+            """
+        ),
+    }
+    with setup_tmpdir(sources) as tmpdir:
+        args = [
+            "--backend-packages=pants.backend.python",
+            f"--source-root-patterns=['/{tmpdir}/src']",
+            "run",
+            f"{tmpdir}/src/app.py",
+        ]
+        result = run_pants(args)
+        assert result.exit_code == 0
