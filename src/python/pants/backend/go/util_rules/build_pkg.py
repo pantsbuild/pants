@@ -23,7 +23,6 @@ from pants.backend.go.util_rules.coverage import (
     ApplyCodeCoverageResult,
     BuiltGoPackageCodeCoverageMetadata,
     FileCodeCoverageMetadata,
-    GoCoverageConfig,
 )
 from pants.backend.go.util_rules.embedcfg import EmbedConfig
 from pants.backend.go.util_rules.goroot import GoRoot
@@ -65,7 +64,7 @@ class BuildGoPackageRequest(EngineAwareParameter):
         minimum_go_version: str | None,
         for_tests: bool = False,
         embed_config: EmbedConfig | None = None,
-        coverage_config: GoCoverageConfig | None = None,
+        with_coverage: bool = False,
         cgo_files: tuple[str, ...] = (),
         cgo_flags: CGoCompilerFlags | None = None,
         c_files: tuple[str, ...] = (),
@@ -81,6 +80,11 @@ class BuildGoPackageRequest(EngineAwareParameter):
         the recursive portion.
         """
 
+        if with_coverage and build_opts.coverage_config is None:
+            raise ValueError(
+                "BuildGoPackageRequest.with_coverage is set but BuildGoPackageRequest.build_opts.coverage_config is None!"
+            )
+
         self.import_path = import_path
         self.pkg_name = pkg_name
         self.digest = digest
@@ -92,7 +96,7 @@ class BuildGoPackageRequest(EngineAwareParameter):
         self.minimum_go_version = minimum_go_version
         self.for_tests = for_tests
         self.embed_config = embed_config
-        self.coverage_config = coverage_config
+        self.with_coverage = with_coverage
         self.cgo_files = cgo_files
         self.cgo_flags = cgo_flags
         self.c_files = c_files
@@ -114,7 +118,7 @@ class BuildGoPackageRequest(EngineAwareParameter):
                 self.minimum_go_version,
                 self.for_tests,
                 self.embed_config,
-                self.coverage_config,
+                self.with_coverage,
                 self.cgo_files,
                 self.cgo_flags,
                 self.c_files,
@@ -142,7 +146,7 @@ class BuildGoPackageRequest(EngineAwareParameter):
             f"minimum_go_version={self.minimum_go_version}, "
             f"for_tests={self.for_tests}, "
             f"embed_config={self.embed_config}, "
-            f"coverage_config={self.coverage_config}, "
+            f"with_coverage={self.with_coverage}, "
             f"cgo_files={self.cgo_files}, "
             f"cgo_flags={self.cgo_flags}, "
             f"c_files={self.c_files}, "
@@ -172,7 +176,7 @@ class BuildGoPackageRequest(EngineAwareParameter):
             and self.minimum_go_version == other.minimum_go_version
             and self.for_tests == other.for_tests
             and self.embed_config == other.embed_config
-            and self.coverage_config == other.coverage_config
+            and self.with_coverage == other.with_coverage
             and self.cgo_files == other.cgo_files
             and self.cgo_flags == other.cgo_flags
             and self.c_files == other.c_files
@@ -410,7 +414,9 @@ async def build_go_package(
     s_files = list(request.s_files)
     go_files_digest = request.digest
     cover_file_metadatas: tuple[FileCodeCoverageMetadata, ...] | None = None
-    if request.coverage_config:
+    if request.with_coverage:
+        coverage_config = request.build_opts.coverage_config
+        assert coverage_config is not None, "with_coverage=True but coverage_config is None!"
         coverage_result = await Get(
             ApplyCodeCoverageResult,
             ApplyCodeCoverageRequest(
@@ -418,7 +424,7 @@ async def build_go_package(
                 dir_path=request.dir_path,
                 go_files=go_files,
                 cgo_files=cgo_files,
-                cover_mode=request.coverage_config.cover_mode,
+                cover_mode=coverage_config.cover_mode,
                 import_path=request.import_path,
             ),
         )
