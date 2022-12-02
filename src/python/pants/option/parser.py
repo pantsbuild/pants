@@ -565,7 +565,7 @@ class Parser:
                     fromfile = val_or_str[1:]
                     try:
                         with open(fromfile) as fp:
-                            s = fp.read().strip()
+                            s = fp.read()
                             if fromfile.endswith(".json"):
                                 return json.loads(s)
                             elif fromfile.endswith(".yml") or fromfile.endswith(".yaml"):
