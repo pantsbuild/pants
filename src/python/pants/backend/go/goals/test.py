@@ -236,7 +236,7 @@ async def run_go_tests(
         return compilation_failure(_exit_code, None, _stderr)
 
     if not testmain.has_tests and not testmain.has_xtests:
-        return TestResult.skip(field_set.address, output_setting=test_subsystem.output)
+        return TestResult.no_tests_found(field_set.address, output_setting=test_subsystem.output)
 
     coverage_config: GoCoverageConfig | None = None
     if test_subsystem.use_coverage:
@@ -337,7 +337,8 @@ async def run_go_tests(
 
     main_pkg_a_file_path = built_main_pkg.import_paths_to_pkg_a_files["main"]
     import_config = await Get(
-        ImportConfig, ImportConfigRequest(built_main_pkg.import_paths_to_pkg_a_files)
+        ImportConfig,
+        ImportConfigRequest(built_main_pkg.import_paths_to_pkg_a_files, build_opts=build_opts),
     )
     linker_input_digest = await Get(
         Digest, MergeDigests([built_main_pkg.digest, import_config.digest])
@@ -347,6 +348,7 @@ async def run_go_tests(
         LinkGoBinaryRequest(
             input_digest=linker_input_digest,
             archives=(main_pkg_a_file_path,),
+            build_opts=build_opts,
             import_config_path=import_config.CONFIG_PATH,
             output_filename="./test_runner",  # TODO: Name test binary the way that `go` does?
             description=f"Link Go test binary for {field_set.address}",

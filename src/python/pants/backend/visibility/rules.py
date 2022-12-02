@@ -10,8 +10,8 @@ from pants.engine.internals.dep_rules import (
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import (
     Dependencies,
-    DependenciesRuleAction,
-    DependenciesRuleActionRequest,
+    DependenciesRuleApplication,
+    DependenciesRuleApplicationRequest,
     FieldSet,
     ValidatedDependencies,
     ValidateDependenciesRequest,
@@ -44,8 +44,8 @@ async def visibility_validate_dependencies(
 ) -> ValidatedDependencies:
     address = request.field_set.address
     dependencies_rule_action = await Get(
-        DependenciesRuleAction,
-        DependenciesRuleActionRequest(
+        DependenciesRuleApplication,
+        DependenciesRuleApplicationRequest(
             address=address,
             dependencies=request.dependencies,
             description_of_origin=f"get dependency rules for {address}",

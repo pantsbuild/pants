@@ -8,7 +8,6 @@ backend_packages.add = [
   "pants.backend.build_files.fmt.black",
   "pants.backend.python",
   "pants.backend.experimental.python.packaging.pyoxidizer",
-  "pants.backend.explorer",
   "pants.backend.python.lint.autoflake",
   "pants.backend.python.lint.black",
   "pants.backend.python.lint.docformatter",
@@ -31,6 +30,7 @@ backend_packages.add = [
   "pants.backend.experimental.scala.lint.scalafmt",
   "pants.backend.experimental.scala.debug_goals",
   "pants.backend.experimental.visibility",
+  "pants.explorer.server",
   "internal_plugins.releases",
   "internal_plugins.test_lockfile_fixtures",
 ]
@@ -286,3 +286,4 @@ master = "src/python/pants/notes/master.rst"
 "2.13.x" = "src/python/pants/notes/2.13.x.md"
 "2.14.x" = "src/python/pants/notes/2.14.x.md"
 "2.15.x" = "src/python/pants/notes/2.15.x.md"
+"2.16.x" = "src/python/pants/notes/2.16.x.md"

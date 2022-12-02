@@ -188,6 +188,7 @@ async def export_cgo_package(request: ExportCgoPackageRequest) -> ExportCgoPacka
             import_path=analysis.import_path,
             pkg_name=analysis.name,
             digest=fallible_digest_info.pkg_digest.digest,
+            build_opts=request.build_opts,
             dir_path=analysis.dir_path,
             cgo_files=analysis.cgo_files,
             cgo_flags=analysis.cgo_flags,
