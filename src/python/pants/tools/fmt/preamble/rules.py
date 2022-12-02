@@ -9,7 +9,7 @@ import re
 import string
 from typing import Any
 
-from pants.backend.misc.fmt.preamble.subsystem import PreambleSubsystem
+from pants.tools.fmt.preamble.subsystem import PreambleSubsystem
 from pants.core.goals.fmt import FmtFilesRequest, FmtResult, Partitions
 from pants.engine.fs import CreateDigest, Digest, DigestContents, Snapshot
 from pants.engine.rules import Get, collect_rules, rule

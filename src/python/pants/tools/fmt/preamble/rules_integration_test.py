@@ -8,8 +8,8 @@ import datetime
 import pytest
 from freezegun import freeze_time
 
-from pants.backend.misc.fmt.preamble.rules import PreambleRequest, _substituted_template
-from pants.backend.misc.fmt.preamble.rules import rules as preamble_rules
+from pants.tools.fmt.preamble.rules import PreambleRequest, _substituted_template
+from pants.tools.fmt.preamble.rules import rules as preamble_rules
 from pants.core.goals.fmt import FmtResult
 from pants.engine.fs import PathGlobs
 from pants.engine.internals.native_engine import Snapshot
@@ -34,7 +34,7 @@ def handle_memos():
 def run_preamble(rule_runner: RuleRunner, template_by_globs: dict[str, str]) -> FmtResult:
     rule_runner.set_options(
         [
-            "--backend-packages=pants.backend.misc.fmt.preamble",
+            "--backend-packages=pants.tools.fmt.preamble",
             f"--preamble-template-by-globs={template_by_globs!r}",
         ],
     )
