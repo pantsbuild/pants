@@ -13,6 +13,9 @@ from textwrap import dedent  # noqa: PNT20
 
 from pants.backend.shell.subsystems.shell_setup import ShellSetup
 from pants.backend.shell.target_types import (
+    RunInSandboxArgumentsField,
+    RunInSandboxRunnableField,
+    RunInSandboxSourcesField,
     ShellCommandCommandField,
     ShellCommandExecutionDependenciesField,
     ShellCommandExtraEnvVarsField,
@@ -27,6 +30,7 @@ from pants.backend.shell.target_types import (
 )
 from pants.backend.shell.util_rules.builtin import BASH_BUILTIN_COMMANDS
 from pants.base.deprecated import warn_or_error
+from pants.build_graph.address import Address, AddressInput
 from pants.core.goals.package import BuiltPackage, PackageFieldSet
 from pants.core.goals.run import RunDebugAdapterRequest, RunFieldSet, RunRequest
 from pants.core.target_types import FileSourceField
@@ -59,12 +63,14 @@ from pants.engine.target import (
     GenerateSourcesRequest,
     SourcesField,
     Target,
+    Targets,
     TransitiveTargets,
     TransitiveTargetsRequest,
     WrappedTarget,
     WrappedTargetRequest,
 )
 from pants.engine.unions import UnionRule
+from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
@@ -72,6 +78,11 @@ logger = logging.getLogger(__name__)
 
 class GenerateFilesFromShellCommandRequest(GenerateSourcesRequest):
     input = ShellCommandSourcesField
+    output = FileSourceField
+
+
+class GenerateFilesFromRunInSandboxRequest(GenerateSourcesRequest):
+    input = RunInSandboxSourcesField
     output = FileSourceField
 
 
@@ -84,9 +95,12 @@ class ShellCommandProcessRequest:
     timeout: int | None
     tools: tuple[str, ...]
     input_digest: Digest
+    immutable_input_digests: FrozenDict[str, Digest] | None
+    append_only_caches: FrozenDict[str, str] | None
     output_files: tuple[str, ...]
     output_directories: tuple[str, ...]
     extra_env_vars: tuple[str, ...]
+    extra_env_vars_2: FrozenDict[str, str] | None
 
 
 @dataclass(frozen=True)
@@ -123,6 +137,9 @@ async def _prepare_process_request_from_target(shell_command: Target) -> ShellCo
         output_files=output_files,
         output_directories=output_directories,
         extra_env_vars=shell_command.get(ShellCommandExtraEnvVarsField).value or (),
+        immutable_input_digests=None,
+        append_only_caches=None,
+        extra_env_vars_2=None,
     )
 
 
@@ -276,6 +293,89 @@ async def run_shell_command(
     return GeneratedSources(output)
 
 
+@rule(desc="Running run_in_sandbox target", level=LogLevel.DEBUG)
+async def run_in_sandbox_request(
+    request: GenerateFilesFromRunInSandboxRequest,
+) -> GeneratedSources:
+    shell_command = request.protocol_target
+    description = f"the `{shell_command.alias}` at {shell_command.address}"
+    environment_name = await Get(
+        EnvironmentName, EnvironmentNameRequest, EnvironmentNameRequest.from_target(shell_command)
+    )
+
+    runnable_address_str = shell_command[RunInSandboxRunnableField].value
+    if not runnable_address_str:
+        raise Exception(f"Must supply a `runnable` for {description}.")
+
+    runnable_address = await Get(
+        Address,
+        AddressInput,
+        AddressInput.parse(
+            runnable_address_str,
+            relative_to=shell_command.address.spec_path,
+            description_of_origin=f"The `{RunInSandboxRunnableField.alias}` field of {description}",
+        ),
+    )
+
+    addresses = Addresses((runnable_address,))
+    addresses.expect_single()
+
+    runnable_targets = await Get(Targets, Addresses, addresses)
+    field_sets = await Get(
+        FieldSetsPerTarget, FieldSetsPerTargetRequest(RunFieldSet, runnable_targets)
+    )
+    run_field_set = field_sets.field_sets[0]
+
+    # Must be run in target environment so that the binaries/envvars match the execution
+    # environment when we actually run the process.
+    run_request = await Get(
+        RunRequest, {environment_name: EnvironmentName, run_field_set: RunFieldSet}
+    )
+
+    dependencies_digest = await _execution_environment_from_dependencies(shell_command)
+
+    input_digest = await Get(Digest, MergeDigests((dependencies_digest, run_request.digest)))
+
+    working_directory = shell_command.address.spec_path
+    output_files, output_directories = _parse_outputs_from_command(shell_command, description)
+
+    extra_args = shell_command.get(RunInSandboxArgumentsField).value or ()
+
+    process_request = ShellCommandProcessRequest(
+        description=description,
+        interactive=False,
+        working_directory=working_directory,
+        command=" ".join(shlex.quote(arg) for arg in (run_request.args + extra_args)),
+        timeout=None,
+        tools=(),
+        input_digest=input_digest,
+        immutable_input_digests=FrozenDict(run_request.immutable_input_digests or {}),
+        append_only_caches=FrozenDict(run_request.append_only_caches or {}),
+        output_files=output_files,
+        output_directories=output_directories,
+        extra_env_vars=(),
+        extra_env_vars_2=FrozenDict(**run_request.extra_env),
+    )
+
+    result = await Get(
+        ProcessResult,
+        {
+            environment_name: EnvironmentName,
+            process_request: ShellCommandProcessRequest,
+        },
+    )
+
+    if shell_command[ShellCommandLogOutputField].value:
+        if result.stdout:
+            logger.info(result.stdout.decode())
+        if result.stderr:
+            logger.warning(result.stderr.decode())
+
+    working_directory = shell_command.address.spec_path
+    output = await Get(Snapshot, AddPrefix(result.output_digest, working_directory))
+    return GeneratedSources(output)
+
+
 def _shell_tool_safe_env_name(tool_name: str) -> str:
     """Replace any characters not suitable in an environment variable name with `_`."""
     return re.sub(r"\W", "_", tool_name)
@@ -329,6 +429,9 @@ async def prepare_shell_command_process(
     output_files = shell_command.output_files
     output_directories = shell_command.output_directories
     extra_env_vars = shell_command.extra_env_vars
+    extra_env_vars_2 = shell_command.extra_env_vars_2 or FrozenDict()
+    immutable_input_digests = shell_command.immutable_input_digests or FrozenDict()
+    append_only_caches = shell_command.append_only_caches or FrozenDict()
 
     if interactive:
         command_env = {
@@ -342,6 +445,9 @@ async def prepare_shell_command_process(
 
     extra_env = await Get(EnvironmentVars, EnvironmentVarsRequest(extra_env_vars))
     command_env.update(extra_env)
+
+    if extra_env_vars_2:
+        command_env.update(extra_env_vars_2)
 
     input_snapshot = await Get(Snapshot, Digest, shell_command.input_digest)
 
@@ -381,6 +487,8 @@ async def prepare_shell_command_process(
         output_files=output_files,
         timeout_seconds=timeout,
         working_directory=working_directory,
+        append_only_caches=append_only_caches,
+        immutable_input_digests=immutable_input_digests,
     )
 
 
@@ -414,5 +522,6 @@ def rules():
     return [
         *collect_rules(),
         UnionRule(GenerateSourcesRequest, GenerateFilesFromShellCommandRequest),
+        UnionRule(GenerateSourcesRequest, GenerateFilesFromRunInSandboxRequest),
         UnionRule(RunFieldSet, RunShellCommand),
     ]
