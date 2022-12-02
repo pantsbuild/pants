@@ -254,7 +254,10 @@ async def prepare_shell_command_process(
         }
     else:
         if not tools:
-            raise ValueError(f"Must provide any `tools` used by the {description}.")
+            raise ValueError(
+                f"Must provide any `tools` used by the {description}. If your command relies only "
+                'on the shell and its internal commands, set `tools=["bash"]`.'
+            )
 
         resolved_tools = await _shell_command_tools(shell_setup, tools, f"execute {description}")
         tools = tuple(tool for tool in sorted(resolved_tools))
