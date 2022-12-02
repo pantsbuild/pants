@@ -44,7 +44,7 @@ from pants.engine.fs import (
     MergeDigests,
     Snapshot,
 )
-from pants.engine.process import Process, ProcessResult
+from pants.engine.process import FallibleProcessResult, Process, ProcessResult, ProductDescription
 from pants.engine.rules import Get, MultiGet, collect_rules, rule, rule_helper
 from pants.engine.target import (
     FieldSetsPerTarget,
@@ -173,13 +173,31 @@ async def run_shell_command(
     environment_name = await Get(
         EnvironmentName, EnvironmentNameRequest, EnvironmentNameRequest.from_target(shell_command)
     )
-    result = await Get(
-        ProcessResult,
+
+    fallible_result = await Get(
+        FallibleProcessResult,
         {
             environment_name: EnvironmentName,
             ShellCommandProcessFromTargetRequest(
                 shell_command
             ): ShellCommandProcessFromTargetRequest,
+        },
+    )
+
+    if fallible_result.exit_code == 127:
+        logger.error(
+            f"`{shell_command.alias}` requires the names of any external commands used by this "
+            "shell command to be specified in the `{ShellCommandToolsField.alias}` field. If "
+            "`bash` cannot find a tool, add it to the `{ShellCommandToolsField.alias}` field."
+        )
+
+    result = await Get(
+        ProcessResult,
+        {
+            fallible_result: FallibleProcessResult,
+            ProductDescription(
+                f"the `{shell_command.alias}` at `{shell_command.address}`"
+            ): ProductDescription,
         },
     )
 
@@ -253,12 +271,6 @@ async def prepare_shell_command_process(
             "CHROOT": "{chroot}",
         }
     else:
-        if not tools:
-            raise ValueError(
-                f"Must provide any `tools` used by the {description}. If your command relies only "
-                'on the shell and its internal commands, set `tools=["bash"]`.'
-            )
-
         resolved_tools = await _shell_command_tools(shell_setup, tools, f"execute {description}")
         tools = tuple(tool for tool in sorted(resolved_tools))
 
