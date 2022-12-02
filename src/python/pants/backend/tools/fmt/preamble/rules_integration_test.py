@@ -59,10 +59,30 @@ def test_passing(rule_runner: RuleRunner) -> None:
     fmt_result = run_preamble(
         rule_runner,
         {
-            "*.py": "# Copyright $year\n",
-            "*.rs": "// Copyright $year\n",
+            "**/*.py": "# Copyright $year\n",
+            "**/*.rs": "// Copyright $year\n",
         },
     )
+    assert fmt_result.output == rule_runner.make_snapshot(files)
+    assert fmt_result.did_change is False
+
+
+@pytest.mark.parametrize(
+    "preamble, content",
+    [
+        ("# Copyright (c) $year", "# Copyright (c) 1853"),
+        ("# Copyright (c) $$year", "# Copyright (c) $year"),
+        ("# Copyright (c) ${year}", "# Copyright (c) 1853"),
+        ("# Copyright (c) YEAR${year}", "# Copyright (c) YEAR1853"),
+        ("# Copyright (c) $${year}", "# Copyright (c) ${year}"),
+    ],
+)
+def test_substitution_fun(rule_runner: RuleRunner, preamble: str, content: str) -> None:
+    files = {
+        "foo.py": content,
+    }
+    rule_runner.write_files(files)
+    fmt_result = run_preamble(rule_runner, {"*": preamble})
     assert fmt_result.output == rule_runner.make_snapshot(files)
     assert fmt_result.did_change is False
 

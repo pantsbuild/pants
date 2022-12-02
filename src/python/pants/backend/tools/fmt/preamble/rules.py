@@ -24,7 +24,8 @@ class PreambleRequest(FmtFilesRequest):
 @memoized
 def _template_checker_regex(template: str) -> re.Pattern:
     maybe_shebang = r"(#!.*\n)?"
-    raw_regex = string.Template(template).safe_substitute(year=r"\d{4}")
+    subbed = string.Template(template).safe_substitute(year=r"====YEAR====")
+    raw_regex = re.escape(subbed).replace("====YEAR====", r"\d{4}")
     return re.compile(maybe_shebang + raw_regex)
 
 
