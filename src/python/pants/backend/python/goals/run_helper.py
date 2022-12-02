@@ -158,6 +158,8 @@ async def _create_python_source_run_dap_request(
                             import os
                             CHROOT = os.environ["PANTS_CHROOT"]
 
+                            del os.environ["PEX_INTERPRETER"]
+
                             # See https://github.com/pantsbuild/pants/issues/17540
                             # For `run --debug-adapter`, the client might send a `pathMappings`
                             # (this is likely as VS Code likes to configure that by default) with
@@ -202,9 +204,8 @@ async def _create_python_source_run_dap_request(
         [
             extra_env["PEX_PATH"],
             # For debugpy to work properly, we need to have just one "environment" for our
-            # command to run in. Therefore, we cobble one together by exeucting debugpy's PEX, and
-            # shoehorning in the original PEX through PEX_PATH.
-            _in_chroot(os.path.basename(regular_run_request.args[1])),
+            # command to run in. Therefore, we cobble one together with PEX_PATH.
+            _in_chroot(debugpy_pex.name),
         ]
     )
     extra_env["PEX_INTERPRETER"] = "1"
@@ -212,8 +213,7 @@ async def _create_python_source_run_dap_request(
     main = console_script or entry_point.val
     assert main is not None
     args = [
-        regular_run_request.args[0],  # python executable
-        _in_chroot(debugpy_pex.name),
+        *regular_run_request.args,
         _in_chroot("__debugpy_launcher.py"),
         *debugpy.get_args(debug_adapter, main),
     ]
