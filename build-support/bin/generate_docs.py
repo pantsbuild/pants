@@ -276,7 +276,7 @@ def run_pants_help_all() -> dict[str, Any]:
         "pants.backend.shell",
         "pants.backend.shell.lint.shellcheck",
         "pants.backend.shell.lint.shfmt",
-        "pants.tools.fmt.preamble",
+        "pants.backend.tools.fmt.preamble",
     ]
     argv = [
         "./pants",
