@@ -187,8 +187,8 @@ async def run_shell_command(
     if fallible_result.exit_code == 127:
         logger.error(
             f"`{shell_command.alias}` requires the names of any external commands used by this "
-            "shell command to be specified in the `{ShellCommandToolsField.alias}` field. If "
-            "`bash` cannot find a tool, add it to the `{ShellCommandToolsField.alias}` field."
+            f"shell command to be specified in the `{ShellCommandToolsField.alias}` field. If "
+            f"`bash` cannot find a tool, add it to the `{ShellCommandToolsField.alias}` field."
         )
 
     result = await Get(
