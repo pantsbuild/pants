@@ -320,9 +320,7 @@ async def run_go_tests(
         # Scan the tree of BuildGoPackageRequest's and lift any packages with coverage enabled to be direct
         # dependencies of the generated main package. This facilitates registration of the code coverage
         # setup functions.
-        print(f"main_direct_deps={main_direct_deps}")
         coverage_transitive_deps = _lift_build_requests_with_coverage(main_direct_deps)
-        print(f"coverage_transitive_deps={coverage_transitive_deps}")
         coverage_transitive_deps.sort(key=lambda build_req: build_req.import_path)
         main_direct_deps.extend(coverage_transitive_deps)
 
