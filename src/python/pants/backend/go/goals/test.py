@@ -285,7 +285,7 @@ async def run_go_tests(
         )
     test_pkg_build_request = maybe_test_pkg_build_request.request
 
-    # Determine the direct dependencies of the generated main package. The test package itself it always a
+    # Determine the direct dependencies of the generated main package. The test package itself is always a
     # dependency. Add the xtests package as well if any xtests exist.
     main_direct_deps = [test_pkg_build_request]
     if testmain.has_xtests:
