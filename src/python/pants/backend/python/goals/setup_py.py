@@ -866,7 +866,7 @@ async def get_requirements(
     # If a python_requirement T has an undeclared requirement R, we recommend fixing that by adding
     # an explicit dependency from T to a python_requirement target for R. In that case we want to
     # represent these explicit deps in T's distribution metadata. See issue #17593.
-    transitive_3rd_party_tgts = await MultiGet(
+    transitive_explicit_reqs = await MultiGet(
         Get(TransitiveTargets, TransitiveTargetsRequest([tgt.address]))
         for tgt in direct_deps_chained
         if tgt.has_field(PythonRequirementsField)
@@ -885,7 +885,7 @@ async def get_requirements(
         )
 
     direct_deps_chained.update(
-        itertools.chain.from_iterable(t.dependencies for t in transitive_3rd_party_tgts)
+        itertools.chain.from_iterable(t.dependencies for t in transitive_explicit_reqs)
     )
     direct_deps_with_excl = direct_deps_chained.difference(transitive_excludes)
 
