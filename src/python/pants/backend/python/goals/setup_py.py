@@ -863,11 +863,11 @@ async def get_requirements(
         Get(Targets, DependenciesRequest(tgt.get(Dependencies))) for tgt in owned_by_us
     )
     direct_deps_chained = OrderedSet(itertools.chain.from_iterable(direct_deps_tgts))
-    # Issue #17593: If ET has an undeclared requirement on R which has been resolved with an
-    # explicit override dependency, we must preserve the explicit dependency on R in favour of the
-    # broken ET.
-    transient_3rd_party_tgts = await MultiGet(
-        Get(Targets, DependenciesRequest(tgt.get(Dependencies)))
+    # If a python_requirement T has an undeclared requirement R, we recommend fixing that by adding
+    # an explicit dependency from T to a python_requirement target for R. In that case we want to
+    # represent these explicit deps in T's distribution metadata. See issue #17593.
+    transitive_3rd_party_tgts = await MultiGet(
+        Get(TransitiveTargets, TransitiveTargetsRequest([tgt.address]))
         for tgt in direct_deps_chained
         if tgt.has_field(PythonRequirementsField)
     )
@@ -884,7 +884,9 @@ async def get_requirements(
             itertools.chain.from_iterable(excludes for excludes in nested_trans_excl)
         )
 
-    direct_deps_chained.update(itertools.chain.from_iterable(transient_3rd_party_tgts))
+    direct_deps_chained.update(
+        itertools.chain.from_iterable(t.dependencies for t in transitive_3rd_party_tgts)
+    )
     direct_deps_with_excl = direct_deps_chained.difference(transitive_excludes)
 
     req_strs = list(
