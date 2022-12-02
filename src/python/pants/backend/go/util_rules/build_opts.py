@@ -38,7 +38,7 @@ class GoBuildOptions:
     # Coverage configuration.
     # If this is set and a package's import path matches `import_path_include_patterns`, then the package
     # will be instrumented for code coverage. (A caller can also force code coverage instrumentation by setting
-    # `with_coverage` to True on `BuildGoPackageTargetRequest`.
+    # `with_coverage` to `True` on `BuildGoPackageTargetRequest`.)
     coverage_config: GoCoverageConfig | None = None
 
     # Controls whether cgo support is enabled.
