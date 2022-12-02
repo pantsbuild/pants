@@ -290,7 +290,7 @@ class ShellCommandTimeoutField(IntField):
 
 class ShellCommandToolsField(StringSequenceField):
     alias = "tools"
-    required = True
+    default = ()
     help = softwrap(
         """
         Specify required executable tools that might be used.
