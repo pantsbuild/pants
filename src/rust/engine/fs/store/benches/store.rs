@@ -57,7 +57,7 @@ pub fn criterion_benchmark_materialize(c: &mut Criterion) {
 
   let mut cgroup = c.benchmark_group("materialize_directory");
 
-  for perms in vec![Permissions::Writable] {
+  for perms in vec![Permissions::ReadOnly, Permissions::Writable] {
     for (count, size) in vec![(100, 100), (20, 10_000_000), (1, 200_000_000), (10000, 100)] {
       let (store, _tempdir, digest) = snapshot(&executor, count, size);
       let parent_dest = TempDir::new().unwrap();
