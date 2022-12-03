@@ -155,6 +155,19 @@ nav.pagetoc ul li.toc-h4 {
   padding-left: 3.0em;
 }
 
+.deprecated {
+  padding: 0.3rem 0;
+  margin: 0;
+  font-size: larger;
+  background-color: lightcoral;
+  text-align: center;
+}
+
+.deprecated a:hover {
+  background-color: lightcoral;
+  color: blue;
+}
+
 div.ci-status {
   position: absolute;
   top: 0;
