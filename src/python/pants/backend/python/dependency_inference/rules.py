@@ -333,14 +333,6 @@ def _get_imports_info(
         if owners.unambiguous:
             return ImportResolveResult(ImportOwnerStatus.unambiguous, owners.unambiguous)
 
-        # this is probably the right place to disambiguate w/ dep rules
-        # after this is too late
-        explicitly_provided_deps.maybe_warn_of_ambiguous_dependency_inference(
-            owners.ambiguous,
-            address,
-            import_reference="module",
-            context=f"The target {address} imports `{import_name}`",
-        )
         maybe_disambiguated = explicitly_provided_deps.disambiguated(owners.ambiguous)
         if maybe_disambiguated:
             return ImportResolveResult(ImportOwnerStatus.disambiguated, (maybe_disambiguated,))
@@ -559,7 +551,7 @@ async def resolve_parsed_dependencies(
     )
 
     if parsed_imports:
-        source_address = request.field_set.address
+        req_address = request.field_set.address
         # this is probably the right place to disambiguate w/ dep rules
         owners_per_import = await MultiGet(
             Get(
@@ -568,16 +560,27 @@ async def resolve_parsed_dependencies(
             )
             for imported_module in parsed_imports
         )
-        filtered_owners_per_import = await _filter_owners_per_import(
-            field_set=request.field_set,
-            owners_per_import=owners_per_import,
-        )
+        #filtered_owners_per_import = await _filter_owners_per_import(
+        #    field_set=request.field_set,
+        #    owners_per_import=owners_per_import,
+        #)
         resolve_results = _get_imports_info(
-            address=request.field_set.address,
-            owners_per_import=filtered_owners_per_import,
+            address=req_address,
+            #owners_per_import=filtered_owners_per_import,
+            owners_per_import=owners_per_import,
             parsed_imports=parsed_imports,
             explicitly_provided_deps=explicitly_provided_deps,
         )
+        # call _filter_owners_per_import here 
+        #   (using the ambiguous signal from _get_imports_info)
+        # then call maybe_warn_of_ambiguous_dependency_inference
+        for owners, import_name in zip(owners_per_import, parsed_imports.keys()):
+            explicitly_provided_deps.maybe_warn_of_ambiguous_dependency_inference(
+                owners.ambiguous,
+                req_address,
+                import_reference="module",
+                context=f"The target {req_address} imports `{import_name}`",
+            )
     else:
         resolve_results = {}
 
