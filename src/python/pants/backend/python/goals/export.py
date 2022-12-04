@@ -161,11 +161,14 @@ async def do_export(
 ) -> ExportResult:
     if not req.pex_request.internal_only:
         raise ExportError(f"The PEX to be exported for {req.resolve_name} must be internal_only.")
-    dest = (
+    dest_prefix = (
         os.path.join(req.dest_prefix, path_safe(req.resolve_name))
         if req.resolve_name
         else req.dest_prefix
     )
+    # digest_root is the absolute path to build_root/dest_prefix/py_version
+    # (py_version may be left off in some cases)
+    output_path = "{digest_root}"
 
     complete_pex_env = pex_env.in_workspace()
 
@@ -179,7 +182,7 @@ async def do_export(
         py_version = await _get_full_python_version(requirements_venv_pex)
         # Note that for symlinking we ignore qualify_path_with_python_version and always qualify, since
         # we need some name for the symlink anyway.
-        output_path = f"{{digest_root}}/{py_version}"
+        dest = f"{dest_prefix}/{py_version}"
         description = (
             f"symlink to immutable virtualenv for {req.resolve_name or 'requirements'} "
             f"(using Python {py_version})"
@@ -188,7 +191,10 @@ async def do_export(
         return ExportResult(
             description,
             dest,
-            post_processing_cmds=[PostProcessingCommand(["ln", "-s", venv_abspath, output_path])],
+            post_processing_cmds=[
+                PostProcessingCommand(["rmdir", output_path]),
+                PostProcessingCommand(["ln", "-s", venv_abspath, output_path]),
+            ],
             resolve=req.resolve_name or None,
         )
     elif export_format == PythonResolveExportFormat.mutable_virtualenv:
@@ -197,9 +203,10 @@ async def do_export(
         requirements_pex = await Get(Pex, PexRequest, req.pex_request)
         assert requirements_pex.python is not None
         py_version = await _get_full_python_version(requirements_pex)
-        output_path = (
-            f"{{digest_root}}/{py_version if req.qualify_path_with_python_version else ''}"
-        )
+        if req.qualify_path_with_python_version:
+            dest = f"{dest_prefix}/{py_version}"
+        else:
+            dest = dest_prefix
         description = (
             f"mutable virtualenv for {req.resolve_name or 'requirements'} "
             f"(using Python {py_version})"
