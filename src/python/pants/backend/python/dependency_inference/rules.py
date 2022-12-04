@@ -291,6 +291,7 @@ async def _disambiguate_or_mark_unowned(
         ) for import_name, result in ambiguous_results.items()
     )
     if dependencies_rule_actions[0].address is None:
+        # There is no dependency rules backend enabled.
         return resolve_results
 
     disambiguated_results = {import_name: result for import_name, result in resolve_results.items()}
