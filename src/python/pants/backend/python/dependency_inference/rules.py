@@ -270,6 +270,7 @@ def _get_inferred_asset_deps(
 async def _disambiguate_or_mark_unowned(
     address: Address,
     resolve_results: dict[str, ImportResolveResult],
+    explicitly_provided_deps: ExplicitlyProvidedDependencies,
 ) -> dict[str, ImportResolveResult]:
     """Use dependency rules to disambiguate imports based on Address."""
     ambiguous_results = {
@@ -290,19 +291,28 @@ async def _disambiguate_or_mark_unowned(
             ),
         ) for import_name, result in ambiguous_results.items()
     )
-    if dependencies_rule_actions[0].address is None:
-        # There is no dependency rules backend enabled.
-        return resolve_results
+    dep_rules_enabled = dependencies_rule_actions[0].address is not None
 
     disambiguated_results = {import_name: result for import_name, result in resolve_results.items()}
 
     for (import_name, result), dependencies_rule_action in zip(ambiguous_results.items(), dependencies_rule_actions):
-        allowed = (
-            address for address, rule_action in dependencies_rule_action.dependencies_rule
-            if rule_action == DependencyRuleAction.Allow
-        )
-        status = ImportOwnerStatus.disambiguated if len(allowed) == 1 else ImportOwnerStatus.unowned
-        disambiguated_results[import_name] = ImportResolveResult(status, allowed)
+        ambiguous = result.address
+
+        if dep_rules_enabled:
+            ambiguous = (
+                address for address, rule_action in dependencies_rule_action.dependencies_rule
+                if rule_action == DependencyRuleAction.Allow
+            )
+            if len(ambiguous) == 1:
+                disambiguated_results[import_name] = ImportResolveResult(ImportOwnerStatus.disambiguated, ambiguous)
+                continue
+
+        maybe_disambiguated = explicitly_provided_deps.disambiguated(ambiguous )
+        if maybe_disambiguated:
+            disambiguated_results[import_name] = ImportResolveResult(ImportOwnerStatus.disambiguated, (maybe_disambiguated,))
+            continue
+
+        disambiguated_results[import_name] = ImportResolveResult(ImportOwnerStatus.unowned, ambiguous)
 
     return disambiguated_results
 
@@ -326,17 +336,13 @@ def _get_imports_info(
     address: Address,
     owners_per_import: Iterable[PythonModuleOwners],
     parsed_imports: ParsedPythonImports,
-    explicitly_provided_deps: ExplicitlyProvidedDependencies,
 ) -> dict[str, ImportResolveResult]:
     def _resolve_single_import(owners, import_name) -> ImportResolveResult:
         if owners.unambiguous:
             return ImportResolveResult(ImportOwnerStatus.unambiguous, owners.unambiguous)
 
-        maybe_disambiguated = explicitly_provided_deps.disambiguated(owners.ambiguous)
-        if maybe_disambiguated:
-            return ImportResolveResult(ImportOwnerStatus.disambiguated, (maybe_disambiguated,))
-        elif import_name.split(".")[0] in DEFAULT_UNOWNED_DEPENDENCIES:
-            return ImportResolveResult(ImportOwnerStatus.unownable, owners.ambiguous)
+        if import_name.split(".")[0] in DEFAULT_UNOWNED_DEPENDENCIES:
+            return ImportResolveResult(ImportOwnerStatus.unownable)
         elif parsed_imports[import_name].weak:
             # what is weak_ignore? should we try to disambiguate these?
             return ImportResolveResult(ImportOwnerStatus.weak_ignore, owners.ambiguous)
@@ -565,11 +571,11 @@ async def resolve_parsed_dependencies(
             address=req_address,
             owners_per_import=owners_per_import,
             parsed_imports=parsed_imports,
-            explicitly_provided_deps=explicitly_provided_deps,
         )
         resolve_results = await _disambiguate_or_mark_unowned(
             address=req_address,
             resolve_results=resolve_results,
+            explicitly_provided_deps=explicitly_provided_deps,
         )
         for import_name, resolve_result in resolve_results.items():
             if resolve_result.status in [
