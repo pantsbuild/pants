@@ -267,45 +267,43 @@ def _get_inferred_asset_deps(
 
 
 @rule_helper
-async def _filter_owners_per_import(
-    field_set: PythonImportDependenciesInferenceFieldSet,
-    owners_per_import: Iterable[PythonModuleOwners],
-) -> Iterable[PythonModuleOwners]:
-    """Use dependency rules to filter the valid owners based on Address."""
-    ambiguous_owners_per_import = {
-        owners: i for i, owners in enumerate(owners_per_import) if owners.ambiguous
+async def _disambiguate_or_mark_unowned(
+    address: Address,
+    resolve_results: dict[str, ImportResolveResult],
+) -> dict[str, ImportResolveResult]:
+    """Use dependency rules to disambiguate imports based on Address."""
+    ambiguous_results = {
+        import_name: result
+        for import_name, result in resolve_results
+        if result.status == ImportOwnerStatus.ambiguous
     }
-    if not ambiguous_owners_per_import:
-        return owners_per_import
+    if not ambiguous_results:
+        return resolve_results
 
     dependencies_rule_actions = await MuliGet(
         Get(
             DependenciesRuleAction,
             DependenciesRuleActionRequest(
-                address=field_set.address,
-                #dependencies=field_set.dependencies,
-                dependencies=owners.ambiguous,
-                description_of_origin=f"get dependency rules for {address}",
+                address=address,
+                dependencies=result.address,
+                description_of_origin=f"get dependency rules for {address} to import {import_name}",
             ),
-        ) for owners in ambiguous_owners_per_import.keys()
+        ) for import_name, result in ambiguous_results.items()
     )
     if dependencies_rule_actions[0].address is None:
-        return owners_per_import
+        return resolve_results
 
-    allowed_owners_per_import = list(owners_per_import)
+    disambiguated_results = {import_name: result for import_name, result in resolve_results.items()}
 
-    for (owners, i), dependencies_rule_action in zip(ambiguous_owners_per_import.items(), dependencies_rule_actions):
+    for (import_name, result), dependencies_rule_action in zip(ambiguous_results.items(), dependencies_rule_actions):
         allowed = (
             address for address, rule_action in dependencies_rule_action.dependencies_rule
             if rule_action == DependencyRuleAction.Allow
         )
-        if len(allowed) == 1:
-            # no longer ambiguous
-            allowed_owners_per_import[i] = PythonModuleOwners(allowed)
-        else:
-            allowed_owners_per_import[i] = PythonModuleOwners((), ambiguous=allowed)
+        status = ImportOwnerStatus.disambiguated if len(allowed) == 1 else ImportOwnerStatus.unowned
+        disambiguated_results[import_name] = ImportResolveResult(status, allowed)
 
-    return allowed_owners_per_import
+    return disambiguated_results
 
 
 class ImportOwnerStatus(Enum):
@@ -337,11 +335,13 @@ def _get_imports_info(
         if maybe_disambiguated:
             return ImportResolveResult(ImportOwnerStatus.disambiguated, (maybe_disambiguated,))
         elif import_name.split(".")[0] in DEFAULT_UNOWNED_DEPENDENCIES:
-            return ImportResolveResult(ImportOwnerStatus.unownable)
+            return ImportResolveResult(ImportOwnerStatus.unownable, owners.ambiguous)
         elif parsed_imports[import_name].weak:
-            return ImportResolveResult(ImportOwnerStatus.weak_ignore)
+            # what is weak_ignore? should we try to disambiguate these?
+            return ImportResolveResult(ImportOwnerStatus.weak_ignore, owners.ambiguous)
         else:
-            return ImportResolveResult(ImportOwnerStatus.unowned)
+            # return ImportResolveResult(ImportOwnerStatus.unowned)
+            return ImportResolveResult(ImportOwnerStatus.ambiguous, owners.ambiguous)
 
     return {
         imp: _resolve_single_import(owners, imp)
@@ -560,23 +560,23 @@ async def resolve_parsed_dependencies(
             )
             for imported_module in parsed_imports
         )
-        #filtered_owners_per_import = await _filter_owners_per_import(
-        #    field_set=request.field_set,
-        #    owners_per_import=owners_per_import,
-        #)
         resolve_results = _get_imports_info(
             address=req_address,
-            #owners_per_import=filtered_owners_per_import,
             owners_per_import=owners_per_import,
             parsed_imports=parsed_imports,
             explicitly_provided_deps=explicitly_provided_deps,
         )
-        # call _filter_owners_per_import here 
-        #   (using the ambiguous signal from _get_imports_info)
-        # then call maybe_warn_of_ambiguous_dependency_inference
-        for owners, import_name in zip(owners_per_import, parsed_imports.keys()):
+        resolve_results = await _disambiguate_or_mark_unowned(
+            address=req_address,
+            resolve_results=resolve_results,
+        )
+        for import_name, resolve_result in resolve_results.items():
+            if resolve_result.status in [
+                ImportOwnerResult.unambiguous, ImportOwnerResult.disambiguated,
+            ]:
+                continue
             explicitly_provided_deps.maybe_warn_of_ambiguous_dependency_inference(
-                owners.ambiguous,
+                resolve_result.address,
                 req_address,
                 import_reference="module",
                 context=f"The target {req_address} imports `{import_name}`",
