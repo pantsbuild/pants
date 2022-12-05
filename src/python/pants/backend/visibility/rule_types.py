@@ -321,11 +321,40 @@ class BuildFileVisibilityRulesParserState(BuildFileDependencyRulesParserState):
         extend: bool = False,
         **kwargs,
     ) -> None:
+        if self.rulesets:
+            raise BuildFileVisibilityRulesError(
+                softwrap(
+                    """
+                    There must be at most one each of the `__dependencies_rules__()` /
+                    `__dependents_rules__()` declarations per BUILD file.
+
+                    To declare multiple rule sets, simply provide them in a single call.
+
+                    Example:
+
+                      __dependencies_rules__(
+                        (
+                           (files, resources),
+                           "//resources/**",
+                           "//files/**",
+                           "!*",
+                        ),
+                        (
+                          python_sources,
+                          "//src/**",
+                          "!*",
+                        ),
+                        ("*", "*"),
+                      )
+                    """
+                )
+            )
+
         try:
             self.rulesets = [VisibilityRuleSet.parse(build_file, arg) for arg in args if arg]
             self.path = build_file
         except ValueError as e:
-            raise BuildFileVisibilityRulesError(f"{build_file}: {e}") from e
+            raise BuildFileVisibilityRulesError(str(e)) from e
 
         if extend and self.parent:
             self.rulesets.extend(self.parent.rulesets)

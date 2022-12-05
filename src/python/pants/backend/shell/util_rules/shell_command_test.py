@@ -17,6 +17,7 @@ from pants.backend.shell.target_types import (
 from pants.backend.shell.util_rules.shell_command import (
     GenerateFilesFromShellCommandRequest,
     RunShellCommand,
+    ShellCommandProcessFromTargetRequest,
     ShellCommandProcessRequest,
 )
 from pants.backend.shell.util_rules.shell_command import rules as shell_command_rules
@@ -26,6 +27,7 @@ from pants.core.target_types import rules as core_target_type_rules
 from pants.core.util_rules import archive, source_files
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
+from pants.engine.environment import EnvironmentName
 from pants.engine.fs import EMPTY_SNAPSHOT, DigestContents
 from pants.engine.process import Process
 from pants.engine.target import (
@@ -47,6 +49,7 @@ def rule_runner() -> RuleRunner:
             *core_target_type_rules(),
             QueryRule(GeneratedSources, [GenerateFilesFromShellCommandRequest]),
             QueryRule(Process, [ShellCommandProcessRequest]),
+            QueryRule(Process, [EnvironmentName, ShellCommandProcessFromTargetRequest]),
             QueryRule(RunRequest, [RunShellCommand]),
             QueryRule(SourceFiles, [SourceFilesRequest]),
             QueryRule(TransitiveTargets, [TransitiveTargetsRequest]),
@@ -390,7 +393,7 @@ def test_shell_command_boot_script(rule_runner: RuleRunner) -> None:
     )
 
     tgt = rule_runner.get_target(Address("src", target_name="boot-script-test"))
-    res = rule_runner.request(Process, [ShellCommandProcessRequest(tgt)])
+    res = rule_runner.request(Process, [ShellCommandProcessFromTargetRequest(tgt)])
     assert "bash" in res.argv[0]
     assert res.argv[1:] == (
         "-c",

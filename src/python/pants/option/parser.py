@@ -565,13 +565,13 @@ class Parser:
                     fromfile = val_or_str[1:]
                     try:
                         with open(fromfile) as fp:
-                            s = fp.read().strip()
+                            s = fp.read()
                             if fromfile.endswith(".json"):
                                 return json.loads(s)
                             elif fromfile.endswith(".yml") or fromfile.endswith(".yaml"):
                                 return yaml.safe_load(s)
                             else:
-                                return s
+                                return s.strip()
                     except (OSError, ValueError, yaml.YAMLError) as e:
                         raise FromfileError(
                             f"Failed to read {dest} in {self._scope_str()} from file {fromfile}: {e!r}"

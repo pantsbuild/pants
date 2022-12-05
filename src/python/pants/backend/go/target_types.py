@@ -19,6 +19,7 @@ from pants.engine.target import (
     InvalidTargetException,
     MultipleSourcesField,
     StringField,
+    StringSequenceField,
     Target,
     TargetGenerator,
     TriBoolField,
@@ -127,6 +128,50 @@ class GoTestAddressSanitizerEnabledField(GoRaceDetectorEnabledField):
 
         See https://github.com/google/sanitizers/wiki/AddressSanitizer for additional information about
         the C/C++ address sanitizer.
+        """
+    )
+
+
+class GoCompilerFlagsField(StringSequenceField):
+    alias = "compiler_flags"
+    help = softwrap(
+        """
+        Extra flags to pass to the Go compiler (i.e., `go tool compile`) when compiling Go code.
+
+        This field can be specified on several different target types:
+
+        - On `go_mod` targets, the compiler flags are used when compiling any package involving the module
+        including both first-party (i.e., `go_package` targets) and third-party dependencies.
+
+        - On `go_binary` targets, the compiler flags are used when compiling any packages comprising that binary
+        including third-party dependencies. These compiler flags will be added after any compiler flags
+        added by any `compiler_flags` field set on the applicable `go_mod` target.
+
+        - On `go_package` targets, the compiler flags are used only for compiling that specific package and not
+        for any other package. These compiler flags will be added after any compiler flags added by any
+        `compiler_flags` field set on the applicable `go_mod` target or applicable `go_binary` target.
+
+        Run `go doc cmd/compile` to see the flags supported by `go tool compile`.
+        """
+    )
+
+
+class GoLinkerFlagsField(StringSequenceField):
+    alias = "linker_flags"
+    help = softwrap(
+        """
+        Extra flags to pass to the Go linker (i.e., `go tool link`) when linking Go binaries.
+
+        This field can be specified on several different target types:
+
+        - On `go_mod` targets, the linker flags are used when linking any binary involving the module
+        including both `go_binary` targets and test binaries for `go_package` targets within the module.
+
+        - On `go_binary` targets, the linker flags are used when linking that binary. These linker flags
+        will be added after any linker flags added by any `linker_flags` field set on the applicable
+        `go_mod` target.
+
+        Run `go doc cmd/link` to see the flags supported by `go tool link`.
         """
     )
 
@@ -245,6 +290,8 @@ class GoModTarget(TargetGenerator):
         GoRaceDetectorEnabledField,
         GoMemorySanitizerEnabledField,
         GoAddressSanitizerEnabledField,
+        GoCompilerFlagsField,
+        GoLinkerFlagsField,
     )
     copied_fields = COMMON_TARGET_FIELDS
     moved_fields = ()
@@ -325,6 +372,7 @@ class GoPackageTarget(Target):
         GoTestRaceDetectorEnabledField,
         GoTestMemorySanitizerEnabledField,
         GoTestAddressSanitizerEnabledField,
+        GoCompilerFlagsField,
         SkipGoTestsField,
     )
     help = softwrap(
@@ -372,6 +420,8 @@ class GoBinaryTarget(Target):
         GoRaceDetectorEnabledField,
         GoMemorySanitizerEnabledField,
         GoAddressSanitizerEnabledField,
+        GoCompilerFlagsField,
+        GoLinkerFlagsField,
         RestartableField,
     )
     help = "A Go binary."

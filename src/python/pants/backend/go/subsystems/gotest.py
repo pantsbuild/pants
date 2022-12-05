@@ -13,7 +13,14 @@ from pants.backend.go.target_types import (
 )
 from pants.backend.go.util_rules.coverage import GoCoverMode
 from pants.core.util_rules.distdir import DistDir
-from pants.option.option_types import ArgsListOption, BoolOption, EnumOption, SkipOption, StrOption
+from pants.option.option_types import (
+    ArgsListOption,
+    BoolOption,
+    EnumOption,
+    SkipOption,
+    StrListOption,
+    StrOption,
+)
 from pants.option.subsystem import Subsystem
 from pants.util.strutil import softwrap
 
@@ -68,6 +75,36 @@ class GoTestSubsystem(Subsystem):
             """
             If true, then convert coverage reports to HTML format and write a `coverage.html` file next to the
             raw coverage data.
+            """
+        ),
+    )
+
+    coverage_include_patterns = StrListOption(
+        default=[],
+        help=softwrap(
+            """
+            A list of import path patterns for determining which import paths will be instrumented for code
+            coverage.
+
+            From `go help packages`:
+
+            An import path is a pattern if it includes one or more "..." wildcards,
+            each of which can match any string, including the empty string and
+            strings containing slashes. Such a pattern expands to all package
+            directories found in the GOPATH trees with names matching the
+            patterns.
+
+            To make common patterns more convenient, there are two special cases.
+            First, /... at the end of the pattern can match an empty string,
+            so that net/... matches both net and packages in its subdirectories, like net/http.
+            Second, any slash-separated pattern element containing a wildcard never
+            participates in a match of the "vendor" element in the path of a vendored
+            package, so that ./... does not match packages in subdirectories of
+            ./vendor or ./mycode/vendor, but ./vendor/... and ./mycode/vendor/... do.
+            Note, however, that a directory named vendor that itself contains code
+            is not a vendored package: cmd/vendor would be a command named vendor,
+            and the pattern cmd/... matches it.
+            See golang.org/s/go15vendor for more about vendoring.
             """
         ),
     )

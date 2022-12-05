@@ -37,7 +37,11 @@ class GoCoverMode(enum.Enum):
 
 @dataclass(frozen=True)
 class GoCoverageConfig:
+    # How to count the code usage.
     cover_mode: GoCoverMode
+
+    # Import path patterns for packages which should be instrumented for code coverage.
+    import_path_include_patterns: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)

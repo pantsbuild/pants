@@ -416,7 +416,7 @@ class DockerImageTarget(Target):
         Any dependencies, as inferred or explicitly specified, will be included in the Docker
         build context, after being packaged if applicable.
 
-        By default, will use a Dockerfile from the same directory as the BUILD file this target
+        By default, it will use a Dockerfile from the same directory as the BUILD file this target
         is defined in. Point at another file with the `source` field, or use the `instructions`
         field to have the Dockerfile contents verbatim directly in the BUILD file.
 
