@@ -336,18 +336,59 @@ impl CommandRunner {
       &context.build_id
     );
 
-    loop {
-      let item = Self::wait_on_operation_stream_item(
-        &mut stream,
-        context,
-        running_operation,
-        &mut start_time_opt,
-      )
-      .await;
+    // If the server returns an `ExecutionStage` other than `Unknown`, then we assume that it
+    // implements reporting when the operation actually begins `Executing` (as opposed to being
+    // `Queued`, etc), and will wait to create a workunit until we see the `Executing` stage.
+    'entire_operation: loop {
+      // Consume the prefix of the stream before we receive an `Executing` or `Unknown` stage.
+      loop {
+        match Self::wait_on_operation_stream_item(
+          &mut stream,
+          context,
+          running_operation,
+          &mut start_time_opt,
+        )
+        .await
+        {
+          OperationStreamItem::Running(
+            ExecutionStageValue::Unknown | ExecutionStageValue::Executing,
+          ) => {
+            // Either the server doesn't know how to report the stage, or the operation has
+            // actually begun executing serverside: proceed to the suffix.
+            break;
+          }
+          OperationStreamItem::Running(_) => {
+            // The operation has not reached an ExecutionStage that we recognize as
+            // "executing" (likely: it is queued, doing a cache lookup, etc): keep waiting.
+            continue;
+          }
+          OperationStreamItem::Outcome(outcome) => return outcome,
+        }
+      }
 
-      match item {
-        OperationStreamItem::Running(_) => continue,
-        OperationStreamItem::Outcome(outcome) => return outcome,
+      // Start a workunit to represent the execution of the work, and consume the rest of the stream.
+      loop {
+        match Self::wait_on_operation_stream_item(
+          &mut stream,
+          context,
+          running_operation,
+          &mut start_time_opt,
+        )
+        .await
+        {
+          OperationStreamItem::Running(
+            ExecutionStageValue::Queued | ExecutionStageValue::CacheCheck,
+          ) => {
+            // The server must have cancelled and requeued the work: this isn't an error, so we restart
+            // waiting as if on a fresh stream.
+            continue 'entire_operation;
+          }
+          OperationStreamItem::Running(_) => {
+            // The operation is still running.
+            continue;
+          }
+          OperationStreamItem::Outcome(outcome) => return outcome,
+        }
       }
     }
   }
