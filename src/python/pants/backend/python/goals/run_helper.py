@@ -120,7 +120,7 @@ async def _create_python_source_run_request(
         *chrooted_source_roots,
     ]
     extra_env = {
-        **complete_pex_environment.environment_dict(python_configured=True),
+        **complete_pex_environment.environment_dict(python_configured=venv_pex.python is not None),
         "PEX_EXTRA_SYS_PATH": os.pathsep.join(source_roots),
     }
 
