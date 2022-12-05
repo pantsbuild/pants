@@ -42,6 +42,7 @@ use std::fmt::{self, Debug, Display};
 use std::fs::OpenOptions;
 use std::future::Future;
 use std::io::{self, Read, Write};
+use std::fs::{hard_link};
 use std::os::unix::fs::{symlink, OpenOptionsExt, PermissionsExt};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Weak};
@@ -1281,12 +1282,12 @@ impl Store {
     for relpath in mutable_paths {
       mutable_path_ancestors.extend(relpath.ancestors().map(|p| destination.join(p)));
     }
-    mutable_path_ancestors.remove(&destination);
 
     self
       .materialize_directory_children(
         destination.clone(),
         true,
+        false,
         &parent_to_child,
         &mutable_path_ancestors,
         immutable_inputs,
@@ -1299,8 +1300,9 @@ impl Store {
     &self,
     destination: PathBuf,
     is_root: bool,
+    force_mutable: bool,
     parent_to_child: &'a HashMap<PathBuf, Vec<directory::Entry>>,
-    mutable_path_ancestors: &'a BTreeSet<PathBuf>,
+    mutable_paths: &'a BTreeSet<PathBuf>,
     immutable_inputs: Option<&'a ImmutableInputs>,
     perms: Permissions,
   ) -> BoxFuture<'a, Result<(), StoreError>> {
@@ -1333,12 +1335,12 @@ impl Store {
           let store = store.clone();
           child_futures.push(async move {
             let can_be_immutable =
-              immutable_inputs.is_some() && !mutable_path_ancestors.contains(&path);
+              immutable_inputs.is_some() && !mutable_paths.contains(&path) && !force_mutable;
 
             match child {
               directory::Entry::File(f) => {
                 store
-                  .materialize_file_maybe_symlink(
+                  .materialize_file_maybe_hardlink(
                     path,
                     f.digest(),
                     perms,
@@ -1358,8 +1360,9 @@ impl Store {
                   .materialize_directory_children(
                     path.clone(),
                     false,
+                    mutable_paths.contains(&path),
                     parent_to_child,
-                    mutable_path_ancestors,
+                    mutable_paths,
                     immutable_inputs,
                     perms,
                   )
@@ -1387,7 +1390,7 @@ impl Store {
     .boxed()
   }
 
-  async fn materialize_file_maybe_symlink(
+  async fn materialize_file_maybe_hardlink(
     &self,
     destination: PathBuf,
     digest: Digest,
@@ -1402,7 +1405,7 @@ impl Store {
         .path_for_file(digest, is_executable)
         .await?;
       self
-        .materialize_symlink(destination, dest_path.to_str().unwrap().to_string())
+        .materialize_hardlink(destination, dest_path.to_str().unwrap().to_string())
         .await
     } else {
       self
@@ -1451,6 +1454,15 @@ impl Store {
     target: String,
   ) -> Result<(), StoreError> {
     symlink(target, destination)?;
+    Ok(())
+  }
+
+  pub async fn materialize_hardlink(
+    &self,
+    destination: PathBuf,
+    target: String,
+  ) -> Result<(), StoreError> {
+    hard_link(target, destination)?;
     Ok(())
   }
 

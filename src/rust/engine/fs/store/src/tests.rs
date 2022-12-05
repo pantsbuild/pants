@@ -1612,7 +1612,7 @@ async fn explicitly_overwrites_already_existing_file() {
 }
 
 #[tokio::test]
-async fn big_file_immutable_symlink() {
+async fn big_file_immutable_link() {
   let materialize_dir = TempDir::new().unwrap();
   let input_file = materialize_dir.path().join("input_file");
   let output_file = materialize_dir.path().join("output_file");
@@ -1686,17 +1686,16 @@ async fn big_file_immutable_symlink() {
     .await
     .expect("Error materializing file");
 
-  let assert_is_symlinked = |path: &PathBuf, is_symlink: bool| {
+  let assert_is_linked = |path: &PathBuf, is_linked: bool| {
     assert_eq!(file_contents(&path), file_bytes);
     assert!(is_executable(&path));
-    assert_eq!(path.is_symlink(), is_symlink);
     assert_eq!(
       path.metadata().unwrap().permissions().readonly(),
-      is_symlink
+      is_linked
     );
   };
 
-  assert_is_symlinked(&input_file, true);
-  assert_is_symlinked(&output_file, false);
-  assert_is_symlinked(&nested_output_file, false);
+  assert_is_linked(&input_file, true);
+  assert_is_linked(&output_file, false);
+  assert_is_linked(&nested_output_file, false);
 }
