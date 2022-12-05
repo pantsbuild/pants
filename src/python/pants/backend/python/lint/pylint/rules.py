@@ -27,6 +27,7 @@ from pants.backend.python.util_rules.pex import (
     VenvPexProcess,
     VenvPexRequest,
 )
+from pants.backend.python.util_rules.pex_environment import PexEnvironment
 from pants.backend.python.util_rules.pex_from_targets import RequirementsPexRequest
 from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
@@ -118,6 +119,7 @@ async def run_pylint(
     request: PylintRequest.Batch[PylintFieldSet, PartitionMetadata],
     pylint: Pylint,
     first_party_plugins: PylintFirstPartyPlugins,
+    pex_environment: PexEnvironment,
 ) -> LintResult:
     assert request.partition_metadata is not None
 
@@ -181,6 +183,7 @@ async def run_pylint(
                     internal_only=True,
                     pex_path=[pylint_pex, requirements_pex],
                 ),
+                pex_environment.in_sandbox(working_directory=None),
                 # Astroid < 2.9.1 had a regression that prevented the use of symlinks:
                 # https://github.com/PyCQA/pylint/issues/1470
                 site_packages_copies=(astroid_info.version < packaging.version.Version("2.9.1")),
