@@ -1689,10 +1689,7 @@ async fn big_file_immutable_link() {
   let assert_is_linked = |path: &PathBuf, is_linked: bool| {
     assert_eq!(file_contents(&path), file_bytes);
     assert!(is_executable(&path));
-    assert_eq!(
-      path.metadata().unwrap().permissions().readonly(),
-      is_linked
-    );
+    assert_eq!(path.metadata().unwrap().permissions().readonly(), is_linked);
   };
 
   assert_is_linked(&input_file, true);
