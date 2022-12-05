@@ -36,12 +36,12 @@ async def run_shellcheck(target: Target, shellcheck: Shellcheck) -> LintResult:
 
 You do not call a rule like you would a normal function. In the above examples, you would not say `int_to_str(26)` or `run_shellcheck(tgt, shellcheck)`. Instead, the Pants engine determines when rules are used and calls the rules for you.
 
-Each rule should be pure; you should not use side-effects like `subprocess.run()`, `print()`, or the `requests` library. Instead, the Rules API has its own alternatives that are understood by the Pants engine and which work properly with its caching and parallelism.
+Each rule should be pure; you should not use side effects like `subprocess.run()`, `print()`, or the `requests` library. Instead, the Rules API has its own alternatives that are understood by the Pants engine and which work properly with its caching and parallelism.
 
 The rule graph
 --------------
 
-All of the registered rules create a rule graph, with each type as a node and the edges being dependencies used to compute those types.
+All the registered rules create a rule graph, with each type as a node and the edges being dependencies used to compute those types.
 
 For example, the `list` goal uses this rule definition and results in the below graph:
 
@@ -140,7 +140,7 @@ async def call_fibonacci(...) -> Foo:
 > 
 > Currently, you can only give a single input. It is not possible to do something like `Get(OutputType, InputType1(...), InputType2(...))`.
 > 
-> Instead, it's common for rules to create a "Request" data class, such as `PexRequest` or `SourceFilesRequest`. This request centralizes all of the data it needs to operate into one data structure, which allows for call sites to say `await Get(SourceFiles, SourceFilesRequest, my_request)`, for example.
+> Instead, it's common for rules to create a "Request" data class, such as `PexRequest` or `SourceFilesRequest`. This request centralizes all the data it needs to operate into one data structure, which allows for call sites to say `await Get(SourceFiles, SourceFilesRequest, my_request)`, for example.
 > 
 > See <https://github.com/pantsbuild/pants/issues/7490> for the tracking issue.
 

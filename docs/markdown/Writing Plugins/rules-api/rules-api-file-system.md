@@ -90,11 +90,11 @@ from pants.engine.rules import Get, rule
 @rule
 async def demo(...) -> Foo:
     ...
-    digest = await Get(Digest, PathGlobs(["**/*.txt", "!ignore_me.txt"])
+    digest = await Get(Digest, PathGlobs(["**/*.txt", "!ignore_me.txt"]))
 ```
 
 - All globs must be relative paths, relative to the build root.
-- `PathGlobs` uses the same syntax as the `sources` field, which is roughly Git's syntax. Use `*` for globs over just the current working directory, `**` for recursive globs over everything below (at any level the current working directory, and prefix with `!` for ignores.
+- `PathGlobs` uses the same syntax as the `sources` field, which is roughly Git's syntax. Use `*` for globs over just the current working directory, `**` for recursive globs over everything below (at any level the current working directory), and prefix with `!` for ignores.
 - `PathGlobs` will ignore all values from the global option `pants_ignore`.
 
 By default, the engine will no-op for any globs that are unmatched. If you want to instead warn or error, set `glob_match_error_behavior=GlobMatchErrorBehavior.warn` or `GlobMatchErrorBehavior.error`. This will require that you also set `description_of_origin`, which is a human-friendly description of where the `PathGlobs` is coming from so that the error message is helpful. For example:
@@ -131,7 +131,7 @@ from pants.engine.rules import Get, rule
 @rule
 async def demo(...) -> Foo:
     ...
-    paths = await Get(Paths, PathGlobs(["**/*.txt", "!ignore_me.txt"])
+    paths = await Get(Paths, PathGlobs(["**/*.txt", "!ignore_me.txt"]))
     logger.info(paths.files)
 ```
 
@@ -211,7 +211,7 @@ async def demo(...) -> Foo:
 
 - It is okay if multiple digests include the same file, so long as they have identical content.
 - If any digests have different content for the same file, the engine will error. Unlike Git, the engine does not attempt to resolve merge conflicts.
-- It is okay if some of the digests are empty, i.e. `EMPTY_DIGEST`.
+- It is okay if some digests are empty, i.e. `EMPTY_DIGEST`.
 
 `DigestSubset`: extract certain files from a `Digest`
 -----------------------------------------------------
