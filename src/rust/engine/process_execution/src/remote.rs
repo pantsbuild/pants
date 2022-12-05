@@ -133,14 +133,23 @@ struct RunningOperation {
   name: Option<String>,
   operations_client: Arc<OperationsClient<LayeredService>>,
   executor: Executor,
+  process_level: Level,
+  process_description: String,
 }
 
 impl RunningOperation {
-  fn new(operations_client: Arc<OperationsClient<LayeredService>>, executor: Executor) -> Self {
+  fn new(
+    operations_client: Arc<OperationsClient<LayeredService>>,
+    executor: Executor,
+    process_level: Level,
+    process_description: String,
+  ) -> Self {
     Self {
       name: None,
       operations_client,
       executor,
+      process_level,
+      process_description,
     }
   }
 
@@ -327,7 +336,7 @@ impl CommandRunner {
     running_operation: &mut RunningOperation,
   ) -> StreamOutcome
   where
-    S: Stream<Item = Result<Operation, Status>> + Unpin,
+    S: Stream<Item = Result<Operation, Status>> + Unpin + Send,
   {
     let mut start_time_opt = Some(Instant::now());
 
@@ -339,58 +348,70 @@ impl CommandRunner {
     // If the server returns an `ExecutionStage` other than `Unknown`, then we assume that it
     // implements reporting when the operation actually begins `Executing` (as opposed to being
     // `Queued`, etc), and will wait to create a workunit until we see the `Executing` stage.
-    'entire_operation: loop {
-      // Consume the prefix of the stream before we receive an `Executing` or `Unknown` stage.
-      loop {
-        match Self::wait_on_operation_stream_item(
-          &mut stream,
-          context,
-          running_operation,
-          &mut start_time_opt,
-        )
-        .await
-        {
-          OperationStreamItem::Running(
-            ExecutionStageValue::Unknown | ExecutionStageValue::Executing,
-          ) => {
-            // Either the server doesn't know how to report the stage, or the operation has
-            // actually begun executing serverside: proceed to the suffix.
-            break;
-          }
-          OperationStreamItem::Running(_) => {
-            // The operation has not reached an ExecutionStage that we recognize as
-            // "executing" (likely: it is queued, doing a cache lookup, etc): keep waiting.
-            continue;
-          }
-          OperationStreamItem::Outcome(outcome) => return outcome,
+    //
+    // We start by consuming the prefix of the stream before we receive an `Executing` or `Unknown` stage.
+    loop {
+      match Self::wait_on_operation_stream_item(
+        &mut stream,
+        context,
+        running_operation,
+        &mut start_time_opt,
+      )
+      .await
+      {
+        OperationStreamItem::Running(
+          ExecutionStageValue::Unknown | ExecutionStageValue::Executing,
+        ) => {
+          // Either the server doesn't know how to report the stage, or the operation has
+          // actually begun executing serverside: proceed to the suffix.
+          break;
         }
-      }
-
-      // Start a workunit to represent the execution of the work, and consume the rest of the stream.
-      loop {
-        match Self::wait_on_operation_stream_item(
-          &mut stream,
-          context,
-          running_operation,
-          &mut start_time_opt,
-        )
-        .await
-        {
-          OperationStreamItem::Running(
-            ExecutionStageValue::Queued | ExecutionStageValue::CacheCheck,
-          ) => {
-            // The server must have cancelled and requeued the work: this isn't an error, so we restart
-            // waiting as if on a fresh stream.
-            continue 'entire_operation;
-          }
-          OperationStreamItem::Running(_) => {
-            // The operation is still running.
-            continue;
-          }
-          OperationStreamItem::Outcome(outcome) => return outcome,
+        OperationStreamItem::Running(_) => {
+          // The operation has not reached an ExecutionStage that we recognize as
+          // "executing" (likely: it is queued, doing a cache lookup, etc): keep waiting.
+          continue;
         }
+        OperationStreamItem::Outcome(outcome) => return outcome,
       }
     }
+
+    // Start a workunit to represent the execution of the work, and consume the rest of the stream.
+    in_workunit!(
+      "run_remote_process",
+      // NB: See engine::nodes::NodeKey::workunit_level for more information on why this workunit
+      // renders at the Process's level.
+      running_operation.process_level,
+      desc = Some(running_operation.process_description.clone()),
+      |_workunit| async move {
+        loop {
+          match Self::wait_on_operation_stream_item(
+            &mut stream,
+            context,
+            running_operation,
+            &mut start_time_opt,
+          )
+          .await
+          {
+            OperationStreamItem::Running(
+              ExecutionStageValue::Queued | ExecutionStageValue::CacheCheck,
+            ) => {
+              // The server must have cancelled and requeued the work: although this isn't an error
+              // per-se, it is much easier for us to re-open the stream than to treat this as a
+              // nested loop. In particular:
+              // 1. we can't break/continue out of a workunit
+              // 2. the stream needs to move into the workunit, and can't move back out
+              break StreamOutcome::StreamClosed;
+            }
+            OperationStreamItem::Running(_) => {
+              // The operation is still running.
+              continue;
+            }
+            OperationStreamItem::Outcome(outcome) => break outcome,
+          }
+        }
+      }
+    )
+    .await
   }
 
   // Store the remote timings into the workunit store.
@@ -715,8 +736,13 @@ impl CommandRunner {
     const MAX_BACKOFF_DURATION: Duration = Duration::from_secs(10);
 
     let start_time = Instant::now();
-    let mut running_operation =
-      RunningOperation::new(self.operations_client.clone(), self.executor.clone());
+
+    let mut running_operation = RunningOperation::new(
+      self.operations_client.clone(),
+      self.executor.clone(),
+      process.level,
+      process.description.clone(),
+    );
     let mut num_retries = 0;
 
     loop {
@@ -943,10 +969,9 @@ impl crate::CommandRunner for CommandRunner {
     let context2 = context.clone();
     in_workunit!(
       "run_execute_request",
-      // NB: See engine::nodes::NodeKey::workunit_level for more information on why this workunit
-      // renders at the Process's level.
-      request.level,
-      desc = Some(request.description.clone()),
+      // NB: The process has not actually started running until the server has notified us that it
+      // has: see `wait_on_operation_stream`.
+      Level::Debug,
       user_metadata = vec![(
         "action_digest".to_owned(),
         UserMetadataItem::String(format!("{action_digest:?}")),
