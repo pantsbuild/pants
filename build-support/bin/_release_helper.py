@@ -79,7 +79,7 @@ _expected_maintainers = {"EricArellano", "illicitonion", "wisechengyi"}
 # Disable the explorer backend, as that is packaged into a dedicated Python distribution and thus
 # not included in the pex either.
 DISABLED_BACKENDS_CONFIG = {
-    "PANTS_BACKEND_PACKAGES": '-["internal_plugins.test_lockfile_fixtures", "pants.backend.explorer"]',
+    "PANTS_BACKEND_PACKAGES": '-["internal_plugins.test_lockfile_fixtures", "pants.explorer.server"]',
 }
 
 
@@ -986,7 +986,7 @@ def reversion_prebuilt_wheels() -> None:
             whl_file=str(whl),
             dest_dir=str(stable_wheel_dir),
             target_version=CONSTANTS.pants_stable_version,
-            extra_globs=["pants/VERSION"],
+            extra_globs=["pants/_version/VERSION"],
         )
 
 

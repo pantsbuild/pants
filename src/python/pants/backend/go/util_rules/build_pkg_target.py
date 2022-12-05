@@ -10,6 +10,7 @@ from typing import ClassVar, Type, cast
 from pants.backend.go.dependency_inference import GoModuleImportPathsMapping
 from pants.backend.go.target_type_rules import GoImportPathMappingRequest
 from pants.backend.go.target_types import (
+    GoCompilerFlagsField,
     GoImportPathField,
     GoPackageSourcesField,
     GoThirdPartyPackageDependenciesField,
@@ -278,6 +279,12 @@ async def setup_build_go_package_target_request(
             "message!"
         )
 
+    pkg_specific_compiler_flags: tuple[str, ...] = ()
+    if target.has_field(GoCompilerFlagsField):
+        compiler_flags_field = target.get(GoCompilerFlagsField)
+        if compiler_flags_field and compiler_flags_field.value:
+            pkg_specific_compiler_flags = compiler_flags_field.value
+
     all_direct_dependencies = await Get(Targets, DependenciesRequest(target[Dependencies]))
 
     first_party_dep_import_path_targets = []
@@ -382,6 +389,7 @@ async def setup_build_go_package_target_request(
         for_tests=request.for_tests,
         embed_config=embed_config,
         coverage_config=request.coverage_config,
+        pkg_specific_compiler_flags=tuple(pkg_specific_compiler_flags),
     )
     return FallibleBuildGoPackageRequest(result, import_path)
 
