@@ -12,6 +12,7 @@ import chevron
 
 from pants.backend.go.util_rules.sdk import GoSdkProcess, GoSdkToolIDRequest, GoSdkToolIDResult
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
+from pants.build_graph.address import Address
 from pants.core.goals.test import CoverageData
 from pants.engine.fs import CreateDigest, DigestSubset, FileContent, PathGlobs
 from pants.engine.internals.native_engine import Digest, MergeDigests
@@ -27,6 +28,7 @@ class GoCoverageData(CoverageData):
     import_path: str
     sources_digest: Digest
     sources_dir_path: str
+    pkg_target_address: Address
 
 
 class GoCoverMode(enum.Enum):

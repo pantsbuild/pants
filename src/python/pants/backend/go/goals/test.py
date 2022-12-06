@@ -465,6 +465,7 @@ async def run_go_tests(
             import_path=import_path,
             sources_digest=pkg_digest.digest,
             sources_dir_path=pkg_analysis.dir_path,
+            pkg_target_address=field_set.address,
         )
 
     return TestResult.from_fallible_process_result(
