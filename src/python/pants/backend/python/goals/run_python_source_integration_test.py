@@ -7,31 +7,39 @@ import json
 import os
 from textwrap import dedent
 from typing import Tuple
-from pants.backend.codegen.protobuf.target_types import ProtobufSourcesGeneratorTarget, rules as protobuf_target_types_rules
-from pants.backend.python import target_types_rules
-from pants.backend.codegen.protobuf.python import additional_fields as protobuf_additional_fields
-from pants.backend.codegen.protobuf.python.python_protobuf_module_mapper import rules as protobuf_module_mapper_rules
-from pants.backend.python.goals import setup_py
-from pants.backend.codegen.protobuf.python.python_protobuf_subsystem import (
-    rules as protobuf_subsystem_rules,
-)
-from pants.backend.python.dependency_inference import rules as dependency_inference_rules
-from pants.backend.python.goals.run_python_source import PythonSourceFieldSet
-from pants.backend.python.macros.python_artifact import PythonArtifact
-from pants.backend.codegen.protobuf.python.rules import rules as protobuf_python_rules
-from pants.backend.python.target_types import PythonDistribution, PythonRequirementTarget, PythonSourcesGeneratorTarget
-from pants.backend.python.util_rules import local_dists, pex_from_targets
-from pants.build_graph.address import Address
-from pants.core.goals.run import RunDebugAdapterRequest, RunRequest
-from pants.engine.process import InteractiveProcess, InteractiveProcessResult, Process
-from pants.engine.rules import QueryRule
-from pants.engine.target import Target
-from pants.testutil.rule_runner import RuleRunner, mock_console
-from pants.backend.python.goals.run_python_source import rules as run_rules
 
 import pytest
 
-from pants.testutil.pants_integration_test import PantsResult, run_pants, setup_tmpdir
+from pants.backend.codegen.protobuf.python import additional_fields as protobuf_additional_fields
+from pants.backend.codegen.protobuf.python.python_protobuf_module_mapper import (
+    rules as protobuf_module_mapper_rules,
+)
+from pants.backend.codegen.protobuf.python.python_protobuf_subsystem import (
+    rules as protobuf_subsystem_rules,
+)
+from pants.backend.codegen.protobuf.python.rules import rules as protobuf_python_rules
+from pants.backend.codegen.protobuf.target_types import ProtobufSourcesGeneratorTarget
+from pants.backend.codegen.protobuf.target_types import rules as protobuf_target_types_rules
+from pants.backend.python import target_types_rules
+from pants.backend.python.dependency_inference import rules as dependency_inference_rules
+from pants.backend.python.goals import setup_py
+from pants.backend.python.goals.run_python_source import PythonSourceFieldSet
+from pants.backend.python.goals.run_python_source import rules as run_rules
+from pants.backend.python.macros.python_artifact import PythonArtifact
+from pants.backend.python.target_types import (
+    PythonDistribution,
+    PythonRequirementTarget,
+    PythonSourcesGeneratorTarget,
+)
+from pants.backend.python.util_rules import local_dists, pex_from_targets
+from pants.build_graph.address import Address
+from pants.core.goals.run import RunDebugAdapterRequest, RunRequest
+from pants.engine.process import InteractiveProcess
+from pants.engine.rules import QueryRule
+from pants.engine.target import Target
+from pants.testutil.pants_integration_test import run_pants
+from pants.testutil.rule_runner import RuleRunner, mock_console
+
 
 @pytest.fixture
 def rule_runner() -> RuleRunner:
@@ -60,22 +68,24 @@ def rule_runner() -> RuleRunner:
         objects={"python_artifact": PythonArtifact},
     )
 
-def run_run_request(rule_runner:RuleRunner, target: Target) -> Tuple[int, str, str]:
+
+def run_run_request(rule_runner: RuleRunner, target: Target) -> Tuple[int, str, str]:
     run_request = rule_runner.request(RunRequest, [PythonSourceFieldSet.create(target)])
     run_process = InteractiveProcess(
-            argv=run_request.args,
-            env=run_request.extra_env,
-            input_digest=run_request.digest,
-            run_in_workspace=True,
-            immutable_input_digests=run_request.immutable_input_digests,
-            append_only_caches=run_request.append_only_caches,
-        )
+        argv=run_request.args,
+        env=run_request.extra_env,
+        input_digest=run_request.digest,
+        run_in_workspace=True,
+        immutable_input_digests=run_request.immutable_input_digests,
+        append_only_caches=run_request.append_only_caches,
+    )
     with mock_console(rule_runner.options_bootstrapper) as mocked_console:
         result = rule_runner.run_interactive_process(run_process)
         stdout = mocked_console[1].get_stdout()
         stderr = mocked_console[1].get_stderr()
 
     return result.exit_code, stdout, stderr
+
 
 @pytest.mark.parametrize(
     "global_default_value, field_value, run_uses_sandbox",
@@ -200,8 +210,8 @@ def test_no_strip_pex_env_issues_12057(rule_runner: RuleRunner) -> None:
     }
     rule_runner.write_files(sources)
     args = [
-            "--backend-packages=pants.backend.python",
-            f"--source-root-patterns=['src']",
+        "--backend-packages=pants.backend.python",
+        "--source-root-patterns=['src']",
     ]
     rule_runner.set_options(args, env_inherit={"PATH", "PYENV_ROOT", "HOME"})
     target = rule_runner.get_target(Address("src", relative_file_path="app.py"))
@@ -231,8 +241,8 @@ def test_no_leak_pex_root_issues_12055() -> None:
     }
     rule_runner.write_files(sources)
     args = [
-            "--backend-packages=pants.backend.python",
-            f"--source-root-patterns=['src']",
+        "--backend-packages=pants.backend.python",
+        "--source-root-patterns=['src']",
     ]
     rule_runner.set_options(args, env_inherit={"PATH", "PYENV_ROOT", "HOME"})
     target = rule_runner.get_target(Address("src", relative_file_path="app.py"))
@@ -275,8 +285,8 @@ def test_local_dist() -> None:
     }
     rule_runner.write_files(sources)
     args = [
-            "--backend-packages=pants.backend.python",
-            f"--source-root-patterns=['/']",
+        "--backend-packages=pants.backend.python",
+        "--source-root-patterns=['/']",
     ]
     rule_runner.set_options(args, env_inherit={"PATH", "PYENV_ROOT", "HOME"})
     target = rule_runner.get_target(Address("foo", relative_file_path="main.py"))
@@ -306,8 +316,8 @@ def test_runs_in_venv() -> None:
     }
     rule_runner.write_files(sources)
     args = [
-            "--backend-packages=pants.backend.python",
-            f"--source-root-patterns=['src']",
+        "--backend-packages=pants.backend.python",
+        "--source-root-patterns=['src']",
     ]
     rule_runner.set_options(args, env_inherit={"PATH", "PYENV_ROOT", "HOME"})
     target = rule_runner.get_target(Address("src", relative_file_path="app.py"))
