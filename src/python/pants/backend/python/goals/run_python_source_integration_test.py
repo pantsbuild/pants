@@ -219,7 +219,7 @@ def test_no_strip_pex_env_issues_12057(rule_runner: RuleRunner) -> None:
     assert exit_code == 42, stderr
 
 
-def test_no_leak_pex_root_issues_12055() -> None:
+def test_no_leak_pex_root_issues_12055(rule_runner: RuleRunner) -> None:
     read_config_result = run_pants(["help-all"])
     read_config_result.assert_success()
     config_data = json.loads(read_config_result.stdout)
@@ -251,7 +251,7 @@ def test_no_leak_pex_root_issues_12055() -> None:
     assert os.path.join(named_caches_dir, "pex_root") == stdout.strip()
 
 
-def test_local_dist() -> None:
+def test_local_dist(rule_runner: RuleRunner) -> None:
     sources = {
         "foo/bar.py": "BAR = 'LOCAL DIST'",
         "foo/setup.py": dedent(
@@ -295,7 +295,7 @@ def test_local_dist() -> None:
     assert stdout == "LOCAL DIST\n", stderr
 
 
-def test_runs_in_venv() -> None:
+def test_runs_in_venv(rule_runner: RuleRunner) -> None:
     # NB: We aren't just testing an implementation detail, users can and should expect their code to
     # be run just as if they ran their code in a virtualenv (as is common in the Python ecosystem).
     sources = {
