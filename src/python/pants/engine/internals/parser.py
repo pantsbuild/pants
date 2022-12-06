@@ -21,7 +21,7 @@ from pants.engine.internals.dep_rules import BuildFileDependencyRulesParserState
 from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.engine.target import Field, ImmutableValue, RegisteredTargetTypes
 from pants.engine.unions import UnionMembership
-from pants.util.docutil import bin_name, doc_url
+from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
 from pants.util.strutil import softwrap
 
@@ -149,12 +149,14 @@ class Parser:
                     if field_type.deprecated_alias:
 
                         def deprecated_field(self):
+                            # TODO(17720) Support fixing automatically with `build-file` deprecation
+                            # fixer.
                             warn_or_error(
                                 removal_version=field_type.deprecated_alias_removal_version,
                                 entity=f"the field name {field_type.deprecated_alias}",
                                 hint=(
-                                    f"Instead, use `{field_type.alias}`, which behaves the same. Run `{bin_name()} "
-                                    "update-build-files` to automatically fix your BUILD files."
+                                    f"Instead, use `{type_alias}.{field_type.alias}`, which "
+                                    "behaves the same."
                                 ),
                             )
                             return registrar_field
