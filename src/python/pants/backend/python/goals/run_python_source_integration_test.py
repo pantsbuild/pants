@@ -204,7 +204,7 @@ def test_no_strip_pex_env_issues_12057(rule_runner: RuleRunner) -> None:
         ),
         "src/BUILD": dedent(
             """\
-            python_sources(name="lib")
+            python_sources()
             """
         ),
     }
@@ -235,7 +235,7 @@ def test_no_leak_pex_root_issues_12055(rule_runner: RuleRunner) -> None:
         "src/app.py": "import os; print(os.environ['PEX_ROOT'])",
         "src/BUILD": dedent(
             """\
-            python_sources(name="lib")
+            python_sources()
             """
         ),
     }
@@ -258,8 +258,7 @@ def test_local_dist(rule_runner: RuleRunner) -> None:
             """\
             from setuptools import setup
 
-            # Double-brace the package_dir to avoid setup_tmpdir treating it as a format.
-            setup(name="foo", version="9.8.7", packages=["foo"], package_dir={{"foo": "."}},)
+            setup(name="foo", version="9.8.7", packages=["foo"], package_dir={"foo": "."},)
             """
         ),
         "foo/main.py": "from foo.bar import BAR; print(BAR)",
@@ -275,7 +274,7 @@ def test_local_dist(rule_runner: RuleRunner) -> None:
                 generate_setup=False,
             )
 
-            python_sources(name="main_lib",
+            python_sources(
                 sources=["main.py"],
                 # Force-exclude any dep on bar.py, so the only way to consume it is via the dist.
                 dependencies=[":dist", "!:lib"],
@@ -310,7 +309,7 @@ def test_runs_in_venv(rule_runner: RuleRunner) -> None:
         ),
         "src/BUILD": dedent(
             """\
-            python_sources(name="lib")
+            python_sources()
             """
         ),
     }
