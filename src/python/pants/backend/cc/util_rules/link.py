@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class LinkCCObjectsRequest:
-    """Link CC objects into a library or executable."""
+    """A request to link C/C++ objects into an executable or library."""
 
     input_digest: Digest
     output_name: str
@@ -31,13 +31,14 @@ class LinkCCObjectsRequest:
 
 @dataclass(frozen=True)
 class LinkedCCObjects:
-    """A linked CC library/binary stored in a `Digest`."""
+    """The result of linking C/C++ objects into an executable or library, stored in a `Digest`."""
 
     digest: Digest
 
 
 @rule(desc="Create a library or executable from object files")
 async def link_cc_objects(request: LinkCCObjectsRequest) -> LinkedCCObjects:
+    """Link C/C++ objects into an executable or library."""
 
     # Get object files stored in digest
     snapshot = await Get(Snapshot, Digest, request.input_digest)

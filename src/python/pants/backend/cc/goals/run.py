@@ -17,6 +17,10 @@ from pants.util.logging import LogLevel
 
 @rule(level=LogLevel.DEBUG)
 async def run_cc_binary(field_set: CCBinaryFieldSet) -> RunRequest:
+    """Run a C/C++ binary.
+
+    This will first run the `package` goal to create a binary, then run it.
+    """
     binary = await Get(BuiltPackage, PackageFieldSet, field_set)
     artifact_relpath = binary.artifacts[0].relpath
     assert artifact_relpath is not None

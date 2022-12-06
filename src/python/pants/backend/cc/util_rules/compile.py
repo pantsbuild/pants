@@ -32,16 +32,22 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class CompileCCSourceRequest:
+    """A request to compile a single C/C++ source file."""
+
     field_set: CCFieldSet
 
 
 @dataclass(frozen=True)
 class CompiledCCObject:
+    """A compiled C/C++ object file."""
+
     digest: Digest
 
 
 @dataclass(frozen=True)
 class FallibleCompiledCCObject:
+    """A compiled C/C++ object file, which may have failed to compile."""
+
     name: str
     process_result: FallibleProcessResult
 
@@ -79,6 +85,8 @@ async def _infer_source_files(field_set: CCFieldSet) -> SourceFiles:
 
 
 def _extract_include_directories(inferred_source_files: SourceFiles) -> list[str]:
+    """Extract the include directories from the inferred source files."""
+
     # Add header include directories to compilation args prefixed with "-I"
     inferred_header_files = [
         file
@@ -91,6 +99,8 @@ def _extract_include_directories(inferred_source_files: SourceFiles) -> list[str
 
 @rule(desc="Compile CC source with the current toolchain")
 async def compile_cc_source(request: CompileCCSourceRequest) -> FallibleCompiledCCObject:
+    """Compile a single C/C++ source file."""
+
     field_set = request.field_set
 
     # Gather all required source files and dependencies

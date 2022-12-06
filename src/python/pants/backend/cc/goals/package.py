@@ -100,6 +100,8 @@ def _determine_link_language(cc_field_sets: Iterable[CCFieldSet]) -> CCLanguage:
 
 @dataclass(frozen=True)
 class CCLibraryFieldSet(PackageFieldSet):
+    """A `cc_library` target's field set."""
+
     required_fields = (CCDependenciesField, CCLinkTypeField)
 
     dependencies: CCDependenciesField
@@ -112,6 +114,8 @@ class CCLibraryFieldSet(PackageFieldSet):
 async def package_cc_library(
     field_set: CCLibraryFieldSet,
 ) -> BuiltPackage:
+    """Package a `cc_library` target."""
+
     cc_field_sets = await _transitive_field_sets(field_set.address)
     digest = await _compile_sources(cc_field_sets)
     link_language = _determine_link_language(cc_field_sets)
@@ -157,6 +161,8 @@ async def package_cc_library(
 
 @dataclass(frozen=True)
 class CCBinaryFieldSet(PackageFieldSet):
+    """A `cc_binary` target's field set."""
+
     required_fields = (
         CCContrivedField,
         CCDependenciesField,
@@ -170,6 +176,7 @@ class CCBinaryFieldSet(PackageFieldSet):
 async def package_cc_binary(
     field_set: CCBinaryFieldSet,
 ) -> BuiltPackage:
+    """Package a `cc_binary` target."""
     cc_field_sets = await _transitive_field_sets(field_set.address)
     digest = await _compile_sources(cc_field_sets)
     link_language = _determine_link_language(cc_field_sets)

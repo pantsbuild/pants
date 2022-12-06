@@ -33,12 +33,14 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class CCToolchainRequest:
+    """A request for a C/C++ toolchain."""
+
     language: CCLanguage
 
 
 @dataclass(frozen=True)
 class CCToolchain:
-    """A configured C/C++ toolchain for the current platform."""
+    """A C/C++ toolchain."""
 
     compiler: str
     compile_flags: tuple[str, ...] = ()
@@ -55,17 +57,21 @@ class CCToolchain:
 
     @property
     def compile_command(self) -> tuple[str, ...]:
+        """The command to compile a C/C++ source file."""
         command = [self.compiler, *self.compile_defines, *self.compile_flags]
         return tuple(filter(None, command))
 
     @property
     def link_command(self) -> tuple[str, ...]:
+        """The command to link a C/C++ binary."""
         command = [self.compiler, *self.link_flags]
         return tuple(filter(None, command))
 
 
 @rule_helper
 async def _executable_path(binary_names: Iterable[str], search_paths: Iterable[str]) -> str:
+    """Find the path to an executable by checking whether the executable supports a version
+    option."""
     for name in binary_names:
         binary_paths = await Get(
             BinaryPaths,
@@ -85,9 +91,13 @@ async def _executable_path(binary_names: Iterable[str], search_paths: Iterable[s
 
 @rule_helper
 async def _setup_downloadable_toolchain(
-    request: CCToolchainRequest, subsystem: ExternalCCSubsystem
+    request: CCToolchainRequest,
+    subsystem: ExternalCCSubsystem,
+    platform: Platform,
 ) -> CCToolchain:
-    download_file_request = subsystem.get_request(Platform.current).download_file_request
+    """Set up a toolchain from a downloadable archive."""
+
+    download_file_request = subsystem.get_request(platform).download_file_request
     maybe_archive_digest = await Get(Digest, DownloadFile, download_file_request)
     extracted_archive = await Get(ExtractedArchive, Digest, maybe_archive_digest)
 
@@ -112,6 +122,8 @@ async def _setup_downloadable_toolchain(
 async def _setup_system_toolchain(
     request: CCToolchainRequest, subsystem: CCSubsystem
 ) -> CCToolchain:
+    """Set up a toolchain from the user's host system."""
+
     # Sanitize the search paths in case the "<PATH>" is specified
     raw_search_paths = list(subsystem.search_paths)
     if "<PATH>" in raw_search_paths:
@@ -141,10 +153,14 @@ async def _setup_system_toolchain(
 
 @rule(desc="Setup the CC Toolchain", level=LogLevel.DEBUG)
 async def setup_cc_toolchain(
-    request: CCToolchainRequest, subsystem: CCSubsystem, external_subsystem: ExternalCCSubsystem
+    request: CCToolchainRequest,
+    subsystem: CCSubsystem,
+    external_subsystem: ExternalCCSubsystem,
+    platform: Platform,
 ) -> CCToolchain:
+    """Set up the C/C++ toolchain."""
     if external_subsystem.url_template:
-        return await _setup_downloadable_toolchain(request, external_subsystem)
+        return await _setup_downloadable_toolchain(request, external_subsystem, platform)
     else:
         return await _setup_system_toolchain(request, subsystem)
 
@@ -161,6 +177,11 @@ class CCProcess:
 
 @rule(desc="Setup a CC Process loaded with the CCToolchain", level=LogLevel.DEBUG)
 async def setup_cc_process(request: CCProcess) -> Process:
+    """Set up a C/C++ process.
+
+    This rule will load the C/C++ toolchain based on the requested language. It will then return a
+    Process that can be run to compile or link a C/C++ source file.
+    """
     toolchain = await Get(CCToolchain, CCToolchainRequest(request.language))
 
     # TODO: What if this is for linking instead of compiling?

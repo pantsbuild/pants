@@ -18,17 +18,24 @@ logger = logging.getLogger(__name__)
 
 
 class CCCheckRequest(CheckRequest):
+    """A request to check a single C/C++ target."""
+
     field_set_type = CCFieldSet
-    name = "cc-compile"
+    tool_name = "cc-compile"
 
 
 def _source_file_extension(field_set: CCFieldSet) -> str:
+    """Get the source file extension for the given field set."""
     path = PurePath(field_set.sources.value)
     return path.suffix
 
 
 @rule(desc="Check CC compilation", level=LogLevel.DEBUG)
 async def check_cc(request: CCCheckRequest) -> CheckResults:
+    """Check that a C/C++ target compiles.
+
+    Returns a `CheckResults` with a single `CheckResult` for each source target.
+    """
     logger.debug(request.field_sets)
 
     # Filter out header files from Check processes
@@ -52,7 +59,7 @@ async def check_cc(request: CCCheckRequest) -> CheckResults:
             )
             for result in compile_results
         ],
-        checker_name=request.name,
+        checker_name=request.tool_name,
     )
 
 
