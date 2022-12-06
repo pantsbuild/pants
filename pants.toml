@@ -30,6 +30,7 @@ backend_packages.add = [
   "pants.backend.experimental.scala.lint.scalafmt",
   "pants.backend.experimental.scala.debug_goals",
   "pants.backend.experimental.visibility",
+  "pants.backend.tools.preamble",
   "pants.explorer.server",
   "internal_plugins.releases",
   "internal_plugins.test_lockfile_fixtures",
@@ -199,8 +200,8 @@ lockfile = "3rdparty/python/mypy.lock"
 [coverage-py]
 interpreter_constraints = [">=3.7,<3.10"]
 
-[regex-lint]
-config = "@build-support/regexes/config.yaml"
+[preamble]
+template_by_globs = "@build-support/preambles/config.yaml"
 
 [generate-lockfiles]
 custom_command = "build-support/bin/generate_all_lockfiles.sh"
