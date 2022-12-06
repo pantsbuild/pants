@@ -37,18 +37,16 @@ class DebugPy(PythonToolBase):
     args = ArgsListOption(example="--log-to-stderr")
 
     # NB: The debugpy arguments assume that:
-    #   1. debugpy is being invoked in a venv (i.e. we're in a VenvPex)
+    #   1. debugpy is being invoked in a venv (likely we're in a VenvPex)
     #   2. debugpy is in the same venv as the user code
-    def get_args(
-        self, debug_adapter: DebugAdapterSubsystem
-    ) -> tuple[str, ...]:
+    def get_args(self, debug_adapter: DebugAdapterSubsystem) -> tuple[str, ...]:
         return (
             "--listen",
             f"{debug_adapter.host}:{debug_adapter.port}",
             "--wait-for-client",
             *self.args,
             "-c",
-            "__import__('runpy').run_path(__import__('os').environ['VIRTUAL_ENV'] + '/pex', run_name='__main__')"
+            "__import__('runpy').run_path(__import__('os').environ['VIRTUAL_ENV'] + '/pex', run_name='__main__')",
         )
 
 

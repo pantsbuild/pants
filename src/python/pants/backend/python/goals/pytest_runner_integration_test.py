@@ -141,26 +141,16 @@ def run_pytest(
             assert test_result.exit_code == debug_result.exit_code
 
     if test_debug_adapter:
-        old_debugpy_get_args = DebugPy.get_args
-
-        def get_debugpy_args_but_dont_wait_for_client(*args, **kwargs):
-            result = list(old_debugpy_get_args(*args, **kwargs))
-            result.remove("--wait-for-client")
-            return tuple(result)
-
-        with unittest.mock.patch.object(
-            DebugPy, "get_args", new=get_debugpy_args_but_dont_wait_for_client
-        ):
-            debug_adapter_request = rule_runner.request(TestDebugAdapterRequest, [batch])
-            if debug_adapter_request.process is not None:
-                with mock_console(rule_runner.options_bootstrapper) as mocked_console:
-                    _, stdioreader = mocked_console
-                    debug_adapter_result = rule_runner.run_interactive_process(
-                        debug_adapter_request.process
-                    )
-                    assert (
-                        test_result.exit_code == debug_adapter_result.exit_code
-                    ), f"{stdioreader.get_stdout()}\n{stdioreader.get_stderr()}"
+        debug_adapter_request = rule_runner.request(TestDebugAdapterRequest, [batch])
+        if debug_adapter_request.process is not None:
+            with mock_console(rule_runner.options_bootstrapper) as mocked_console:
+                _, stdioreader = mocked_console
+                debug_adapter_result = rule_runner.run_interactive_process(
+                    debug_adapter_request.process
+                )
+                assert (
+                    test_result.exit_code == debug_adapter_result.exit_code
+                ), f"{stdioreader.get_stdout()}\n{stdioreader.get_stderr()}"
 
     return test_result
 
@@ -827,7 +817,6 @@ def test_debug_adaptor_request_argv(rule_runner: RuleRunner) -> None:
         "./pytest_runner.pex_pex_shim.sh",
         "--listen",
         "127.0.0.1:5678",
-        "--wait-for-client",
         "-c",
         unittest.mock.ANY,
         "--color=no",

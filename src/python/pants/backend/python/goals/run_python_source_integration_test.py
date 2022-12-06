@@ -6,11 +6,46 @@ from __future__ import annotations
 import json
 import os
 from textwrap import dedent
-from typing import Tuple
+from typing import Iterable, Tuple
 
 import pytest
 
 from pants.testutil.pants_integration_test import PantsResult, run_pants, setup_tmpdir
+
+
+def run_pants_run(
+    sources: dict[str, str],
+    *,
+    source_roots: Iterable[str],
+    file: str,
+    pants_args: Iterable[str] = (),
+    extra_args: Iterable[str] = (),
+    extra_env: dict[str, str] = {},
+) -> Tuple[PantsResult, str]:
+    with setup_tmpdir(sources) as tmpdir:
+        source_roots_flag_value = ", ".join(
+            f"'/{tmpdir}/{source_root}'" for source_root in source_roots
+        )
+        args = [
+            "--backend-packages=pants.backend.python",
+            "--backend-packages=pants.backend.codegen.protobuf.python",
+            f"--source-root-patterns=[{source_roots_flag_value}]",
+            "--pants-ignore=__pycache__",
+            "--pants-ignore=/src/python",
+            *pants_args,
+            "run",
+            f"{tmpdir}/{file}",
+            *extra_args,
+        ]
+        result =  run_pants(args, extra_env=extra_env)
+
+        # Now test using the debug adapter
+        args.insert(args.index("run")+1, "--debug-adapter")
+        debug_adapter_result = run_pants(args, extra_env=extra_env)
+        assert result.exit_code == debug_adapter_result.exit_code, result.stderr
+
+        return result, tmpdir
+
 
 
 @pytest.mark.parametrize(
@@ -83,30 +118,20 @@ def test_run_sample_script(
         ),
     }
 
-    def run(*extra_args: str, **extra_env: str) -> Tuple[PantsResult, str]:
-        with setup_tmpdir(sources) as tmpdir:
-            args = [
-                "--backend-packages=pants.backend.python",
-                "--backend-packages=pants.backend.codegen.protobuf.python",
-                f"--source-root-patterns=['/{tmpdir}/src_root1', '/{tmpdir}/src_root2']",
-                "--pants-ignore=__pycache__",
-                "--pants-ignore=/src/python",
-                *(
-                    (
-                        "--python-default-run-goal-use-sandbox"
-                        if global_default_value
-                        else "--no-python-default-run-goal-use-sandbox",
-                    )
-                    if global_default_value is not None
-                    else ()
-                ),
-                "run",
-                f"{tmpdir}/src_root1/project/app.py",
-                *extra_args,
-            ]
-            return run_pants(args, extra_env=extra_env), tmpdir
-
-    result, test_repo_root = run()
+    result, test_repo_root = run_pants_run(
+        sources,
+        source_roots=["src_root1", "src_root2"],
+        file="src_root1/project/app.py",
+        pants_args=(
+            (
+                "--python-default-run-goal-use-sandbox"
+                if global_default_value
+                else "--no-python-default-run-goal-use-sandbox",
+            )
+            if global_default_value is not None
+            else ()
+        ),
+    )
     assert "Hola, mundo.\n" in result.stderr
     file = result.stdout.strip()
     if run_uses_sandbox:
@@ -139,15 +164,12 @@ def test_no_strip_pex_env_issues_12057() -> None:
             """
         ),
     }
-    with setup_tmpdir(sources) as tmpdir:
-        args = [
-            "--backend-packages=pants.backend.python",
-            f"--source-root-patterns=['/{tmpdir}/src']",
-            "run",
-            f"{tmpdir}/src/app.py",
-        ]
-        result = run_pants(args)
-        assert result.exit_code == 42, result.stderr
+    result, _ = run_pants_run(
+        sources,
+        source_roots=["src"],
+        file="src/app.py",
+    )
+    assert result.exit_code == 42, result.stderr
 
 
 def test_no_leak_pex_root_issues_12055() -> None:
@@ -166,20 +188,14 @@ def test_no_leak_pex_root_issues_12055() -> None:
         "src/app.py": "import os; print(os.environ['PEX_ROOT'])",
         "src/BUILD": dedent(
             """\
-            python_sources(name="lib")
-            """
+        python_sources(name="lib")
+        """
         ),
     }
-    with setup_tmpdir(sources) as tmpdir:
-        args = [
-            "--backend-packages=pants.backend.python",
-            f"--source-root-patterns=['/{tmpdir}/src']",
-            "run",
-            f"{tmpdir}/src/app.py",
-        ]
-        result = run_pants(args)
-        result.assert_success()
-        assert os.path.join(named_caches_dir, "pex_root") == result.stdout.strip()
+    result, _ = run_pants_run(sources, source_roots=["src"], file="src/app.py")
+
+    result.assert_success()
+    assert os.path.join(named_caches_dir, "pex_root") == result.stdout.strip()
 
 
 def test_local_dist() -> None:
@@ -214,15 +230,9 @@ def test_local_dist() -> None:
             """
         ),
     }
-    with setup_tmpdir(sources) as tmpdir:
-        args = [
-            "--backend-packages=pants.backend.python",
-            f"--source-root-patterns=['/{tmpdir}']",
-            "run",
-            f"{tmpdir}/foo/main.py",
-        ]
-        result = run_pants(args)
-        assert result.stdout == "LOCAL DIST\n", result.stderr
+    result, _ = run_pants_run(sources, source_roots=[""], file="foo/main.py")
+
+    assert result.stdout == "LOCAL DIST\n", result.stderr
 
 
 def test_runs_in_venv() -> None:
@@ -244,12 +254,5 @@ def test_runs_in_venv() -> None:
             """
         ),
     }
-    with setup_tmpdir(sources) as tmpdir:
-        args = [
-            "--backend-packages=pants.backend.python",
-            f"--source-root-patterns=['/{tmpdir}/src']",
-            "run",
-            f"{tmpdir}/src/app.py",
-        ]
-        result = run_pants(args)
-        assert result.exit_code == 0
+    result, _ = run_pants_run(sources, source_roots=["src"], file="src/app.py")
+    assert result.exit_code == 0

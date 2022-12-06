@@ -16,6 +16,7 @@ from pants.backend.python.target_types import (
     PythonSourceField,
 )
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
+from pants.backend.python.util_rules.pex import Pex, PexRequest
 from pants.backend.python.util_rules.pex_environment import PexEnvironment
 from pants.core.goals.run import RunDebugAdapterRequest, RunFieldSet, RunRequest
 from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
@@ -31,22 +32,23 @@ class PythonSourceFieldSet(RunFieldSet):
 
     source: PythonSourceField
     interpreter_constraints: InterpreterConstraintsField
-    run_goal_use_sandbox: PythonRunGoalUseSandboxField
+    _run_goal_use_sandbox: PythonRunGoalUseSandboxField
+
+    def get_run_goal_use_sandbox(self, python_setup: PythonSetup) -> bool:
+        if self._run_goal_use_sandbox is None:
+            return python_setup.default_run_goal_use_sandbox
+        return self._run_goal_use_sandbox
 
 
 @rule(level=LogLevel.DEBUG)
 async def create_python_source_run_request(
-    field_set: PythonSourceFieldSet, pex_env: PexEnvironment, python: PythonSetup
+    field_set: PythonSourceFieldSet, pex_env: PexEnvironment, python_setup: PythonSetup
 ) -> RunRequest:
-    run_goal_use_sandbox = field_set.run_goal_use_sandbox.value
-    if run_goal_use_sandbox is None:
-        run_goal_use_sandbox = python.default_run_goal_use_sandbox
-
     return await _create_python_source_run_request(
         field_set.address,
         entry_point_field=PexEntryPointField(field_set.source.value, field_set.address),
         pex_env=pex_env,
-        run_in_sandbox=run_goal_use_sandbox,
+        run_in_sandbox=field_set.get_run_goal_use_sandbox(python_setup),
     )
 
 
@@ -55,15 +57,29 @@ async def create_python_source_debug_adapter_request(
     field_set: PythonSourceFieldSet,
     debugpy: DebugPy,
     debug_adapter: DebugAdapterSubsystem,
+    pex_env: PexEnvironment,
     python_setup: PythonSetup,
 ) -> RunDebugAdapterRequest:
-    run_request = await Get(RunRequest, PythonSourceFieldSet, field_set)
+    debugpy_pex = await Get(
+        Pex,
+        PexRequest,
+        debugpy.to_pex_request(
+            interpreter_constraints=InterpreterConstraints.create_from_compatibility_fields(
+                [field_set.interpreter_constraints], python_setup
+            )
+        ),
+    )
+
+    run_request = await _create_python_source_run_request(
+        field_set.address,
+        entry_point_field=PexEntryPointField(field_set.source.value, field_set.address),
+        pex_env=pex_env,
+        pex_path=[debugpy_pex],
+        run_in_sandbox=field_set.get_run_goal_use_sandbox(python_setup),
+    )
+
     return await _create_python_source_run_dap_request(
         run_request,
-        interpreter_constraints=InterpreterConstraints.create_from_compatibility_fields(
-            [field_set.interpreter_constraints], python_setup
-        ),
-        entry_point_field=PexEntryPointField(field_set.source.value, field_set.address),
         debugpy=debugpy,
         debug_adapter=debug_adapter,
     )
