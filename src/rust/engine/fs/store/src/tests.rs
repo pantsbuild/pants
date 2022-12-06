@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fs::File;
 use std::io::Read;
 use std::os::unix::fs::PermissionsExt;
@@ -8,7 +8,9 @@ use tempfile::TempDir;
 use testutil::data::{TestData, TestDirectory};
 
 use bytes::{Bytes, BytesMut};
-use fs::{DigestEntry, FileEntry, Permissions, EMPTY_DIRECTORY_DIGEST};
+use fs::{
+  DigestEntry, DirectoryDigest, FileEntry, Link, PathStat, Permissions, EMPTY_DIRECTORY_DIGEST,
+};
 use grpc_util::prost::MessageExt;
 use grpc_util::tls;
 use hashing::{Digest, Fingerprint};
@@ -16,7 +18,9 @@ use mock::StubCAS;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use workunit_store::WorkunitStore;
 
-use crate::{EntryType, FileContent, Store, StoreError, UploadSummary, MEGABYTES};
+use crate::{
+  EntryType, FileContent, Snapshot, Store, StoreError, StoreFileByDigest, UploadSummary, MEGABYTES,
+};
 
 pub(crate) const STORE_BATCH_API_SIZE_LIMIT: usize = 4 * 1024 * 1024;
 
@@ -219,7 +223,10 @@ async fn load_recursive_directory() {
     .build();
 
   new_store(dir.path(), &cas.address())
-    .ensure_local_has_recursive_directory(recursive_testdir_digest.clone())
+    .ensure_downloaded(
+      HashSet::new(),
+      HashSet::from([recursive_testdir_digest.clone()]),
+    )
     .await
     .expect("Downloading recursive directory should have succeeded.");
 
@@ -319,6 +326,52 @@ async fn load_directory_remote_error_is_error() {
       .contains("StubCAS is configured to always fail"),
     "Bad error message"
   );
+}
+
+#[tokio::test]
+async fn roundtrip_symlink() {
+  let _ = WorkunitStore::setup_for_tests();
+  let dir = TempDir::new().unwrap();
+
+  #[derive(Clone)]
+  struct NoopDigester;
+
+  impl StoreFileByDigest<String> for NoopDigester {
+    fn store_by_digest(
+      &self,
+      _: fs::File,
+    ) -> futures::future::BoxFuture<'static, Result<hashing::Digest, String>> {
+      unimplemented!();
+    }
+  }
+
+  let input_digest: DirectoryDigest = Snapshot::from_path_stats(
+    NoopDigester,
+    vec![PathStat::link(
+      "x".into(),
+      Link {
+        path: "x".into(),
+        target: "y".into(),
+      },
+    )],
+  )
+  .await
+  .unwrap()
+  .into();
+
+  let store = new_local_store(dir.path());
+
+  store
+    .ensure_directory_digest_persisted(input_digest.clone())
+    .await
+    .unwrap();
+
+  // Discard the DigestTrie to force it to be reloaded from disk.
+  let digest = DirectoryDigest::from_persisted_digest(input_digest.as_digest());
+  assert!(digest.tree.is_none());
+
+  let output_digest: DirectoryDigest = store.load_digest_trie(digest).await.unwrap().into();
+  assert_eq!(input_digest.as_digest(), output_digest.as_digest());
 }
 
 #[tokio::test]

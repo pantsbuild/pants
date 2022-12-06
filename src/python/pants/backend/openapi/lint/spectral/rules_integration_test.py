@@ -9,6 +9,7 @@ from typing import Any
 import pytest
 
 from pants.backend.experimental.openapi.register import rules as target_types_rules
+from pants.backend.javascript.subsystems import nodejs
 from pants.backend.openapi.lint.spectral.rules import SpectralFieldSet, SpectralRequest
 from pants.backend.openapi.lint.spectral.rules import rules as spectral_rules
 from pants.backend.openapi.sample.resources import PETSTORE_SAMPLE_SPEC
@@ -17,7 +18,7 @@ from pants.backend.openapi.target_types import (
     OpenApiSourceGeneratorTarget,
 )
 from pants.core.goals.lint import LintResult, Partitions
-from pants.core.util_rules import config_files, external_tool, stripped_source_files
+from pants.core.util_rules import config_files, stripped_source_files
 from pants.engine.addresses import Address
 from pants.engine.target import Target
 from pants.testutil.rule_runner import QueryRule, RuleRunner
@@ -29,7 +30,7 @@ def rule_runner() -> RuleRunner:
         rules=[
             *spectral_rules(),
             *config_files.rules(),
-            *external_tool.rules(),
+            *nodejs.rules(),
             *stripped_source_files.rules(),
             *target_types_rules(),
             QueryRule(Partitions, [SpectralRequest.PartitionRequest]),
@@ -87,7 +88,6 @@ def assert_success(
     assert len(result) == 1
     assert result[0].exit_code == 0
     assert result[0].stdout == "No results with a severity of 'error' found!\n"
-    assert not result[0].stderr
 
 
 def test_passing(rule_runner: RuleRunner) -> None:

@@ -256,7 +256,7 @@ If you use multiple files with `test --debug`, they will run sequentially rather
 >
 > 1. In your editor, set your breakpoints and any other debug settings (like break-on-exception).
 > 2. Run your test with `./pants test --debug-adapter`.
-> 3. Connect your editor to the server. The server host and port are logged by Pants when executing `test --debug-adaptor`. (They can also be configured using the `[debug-adapter]` subsystem).
+> 3. Connect your editor to the server. The server host and port are logged by Pants when executing `test --debug-adapter`. (They can also be configured using the `[debug-adapter]` subsystem).
 
 > Run your test with `./pants test --debug` as usual.
 
@@ -499,3 +499,21 @@ report = true
 ```
 
 This will default to writing test reports to `dist/test/reports`. You may also want to set the option `[pytest].junit_family` to change the format. Run `./pants help-advanced pytest` for more information.
+
+Customizing Pytest command line options per target
+--------------------------------------------------
+
+You can set `PYTEST_ADDOPTS` environment variable to add your own command line options, like this:
+
+```python BUILD
+python_tests(
+    name="tests",
+    ...
+    extra_env_vars=[
+        "PYTEST_ADDOPTS=-p myplugin --reuse-db",
+    ],
+    ...
+)
+```
+
+Take note that Pants uses some CLI args for its internal mechanism of controlling Pytest (`--color`, `--junit-xml`, `junit_family`, `--cov`, `--cov-report` and `--cov-config`). If these options are overridden, Pants Pytest handling may not work correctly. Set these at your own peril!

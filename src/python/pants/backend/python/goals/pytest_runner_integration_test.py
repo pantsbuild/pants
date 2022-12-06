@@ -539,14 +539,14 @@ def test_extra_env_vars(rule_runner: RuleRunner) -> None:
             ),
             f"{PACKAGE}/BUILD": dedent(
                 """\
-            python_tests(
-                extra_env_vars=(
-                    "PYTHON_TESTS_VAR_WITHOUT_VALUE",
-                    "PYTHON_TESTS_VAR_WITH_VALUE=python_tests_var_with_value",
-                    "PYTHON_TESTS_OVERRIDE_WITH_VALUE_VAR=python_tests_override_with_value_var_override",
+                python_tests(
+                    extra_env_vars=(
+                        "PYTHON_TESTS_VAR_WITHOUT_VALUE",
+                        "PYTHON_TESTS_VAR_WITH_VALUE=python_tests_var_with_value",
+                        "PYTHON_TESTS_OVERRIDE_WITH_VALUE_VAR=python_tests_override_with_value_var_override",
+                    )
                 )
-            )
-            """
+                """
             ),
         }
     )
@@ -555,13 +555,83 @@ def test_extra_env_vars(rule_runner: RuleRunner) -> None:
         rule_runner,
         [tgt],
         extra_args=[
-            '--test-extra-env-vars=["ARG_WITH_VALUE_VAR=arg_with_value_var", "ARG_WITHOUT_VALUE_VAR", "PYTHON_TESTS_OVERRIDE_ARG_WITH_VALUE_VAR"]'
+            "--test-extra-env-vars=['ARG_WITH_VALUE_VAR=arg_with_value_var', 'ARG_WITHOUT_VALUE_VAR', 'PYTHON_TESTS_OVERRIDE_ARG_WITH_VALUE_VAR']"
         ],
         env={
             "ARG_WITHOUT_VALUE_VAR": "arg_without_value_value",
             "PYTHON_TESTS_VAR_WITHOUT_VALUE": "python_tests_var_without_value",
             "PYTHON_TESTS_OVERRIDE_WITH_VALUE_VAR": "python_tests_override_with_value_var",
         },
+    )
+    assert result.exit_code == 0
+
+
+def test_pytest_addopts_test_extra_env(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            f"{PACKAGE}/test_pytest_addopts_test_extra_env.py": dedent(
+                """\
+                import os
+
+                def test_addopts():
+                    assert "-vv" in os.getenv("PYTEST_ADDOPTS")
+                    assert "--maxfail=2" in os.getenv("PYTEST_ADDOPTS")
+                """
+            ),
+            f"{PACKAGE}/BUILD": dedent(
+                """\
+                python_tests()
+                """
+            ),
+        }
+    )
+    tgt = rule_runner.get_target(
+        Address(PACKAGE, relative_file_path="test_pytest_addopts_test_extra_env.py")
+    )
+    result = run_pytest(
+        rule_runner,
+        [tgt],
+        extra_args=[
+            "--test-extra-env-vars=['PYTEST_ADDOPTS=-vv --maxfail=2']",
+        ],
+    )
+    assert result.exit_code == 0
+
+
+def test_pytest_addopts_field_set_extra_env(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            f"{PACKAGE}/test_pytest_addopts_field_set_extra_env.py": dedent(
+                """\
+                import os
+
+                def test_addopts():
+                    assert "-vv" not in os.getenv("PYTEST_ADDOPTS")
+                    assert "--maxfail=2" not in os.getenv("PYTEST_ADDOPTS")
+                    assert "-ra" in os.getenv("PYTEST_ADDOPTS")
+                    assert "-q" in os.getenv("PYTEST_ADDOPTS")
+                """
+            ),
+            f"{PACKAGE}/BUILD": dedent(
+                """\
+                python_tests(
+                    extra_env_vars=(
+                        "PYTEST_ADDOPTS=-ra -q",
+                    )
+                )
+                """
+            ),
+        }
+    )
+    tgt = rule_runner.get_target(
+        Address(PACKAGE, relative_file_path="test_pytest_addopts_field_set_extra_env.py")
+    )
+    result = run_pytest(
+        rule_runner,
+        [tgt],
+        extra_args=[
+            "--test-extra-env-vars=['PYTEST_ADDOPTS=-vv --maxfail=2']",  # should be overridden by `python_tests`
+        ],
     )
     assert result.exit_code == 0
 
@@ -735,6 +805,7 @@ def test_debug_adaptor_request_argv(rule_runner: RuleRunner) -> None:
         "--wait-for-client",
         "-c",
         unittest.mock.ANY,
+        "--color=no",
         "tests/python/pants_test/test_foo.py",
     )
 

@@ -321,7 +321,7 @@ def filter_tool_lockfile_requests(
 
 class GenerateLockfilesSubsystem(GoalSubsystem):
     name = "generate-lockfiles"
-    help = "Generate lockfiles for Python third-party dependencies."
+    help = "Generate lockfiles for third-party dependencies."
 
     @classmethod
     def activated(cls, union_membership: UnionMembership) -> bool:
@@ -337,10 +337,9 @@ class GenerateLockfilesSubsystem(GoalSubsystem):
             Only generate lockfiles for the specified resolve(s).
 
             Resolves are the logical names for the different lockfiles used in your project.
-            For your own code's dependencies, these come from the option
-            `[python].resolves`. For tool lockfiles, resolve
-            names are the options scope for that tool such as `black`, `pytest`, and
-            `mypy-protobuf`.
+            For your own code's dependencies, these come from backend-specific configuration
+            such as `[python].resolves`. For tool lockfiles, resolve names are the options
+            scope for that tool such as `black`, `pytest`, and `mypy-protobuf`.
 
             For example, you can run `{bin_name()} generate-lockfiles --resolve=black
             --resolve=pytest --resolve=data-science` to only generate lockfiles for those

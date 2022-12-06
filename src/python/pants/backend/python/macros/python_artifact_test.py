@@ -41,7 +41,7 @@ from pants.testutil.pytest_util import no_exception
             pytest.raises(
                 ValueError,
                 match=re.escape(
-                    r"The `entry_points` in `setup_py()` must be a dictionary, but was ['not=ok'] with type list."
+                    r"The `entry_points` in `python_artifact()` must be a dictionary, but was ['not=ok'] with type list."
                 ),
             ),
         ),
@@ -61,13 +61,13 @@ from pants.testutil.pytest_util import no_exception
             pytest.raises(
                 ValueError,
                 match=re.escape(
-                    r"The values of the `entry_points` dictionary in `setup_py()` must be a list of strings "
+                    r"The values of the `entry_points` dictionary in `python_artifact()` must be a list of strings "
                     r"or a dictionary of string to string, but got 'whops = this.is.a:mistake' of type str."
                 ),
             ),
         ),
     ],
 )
-def test_normalize_entry_points(entry_points, normalized, expect):
+def test_normalize_entry_points(entry_points, normalized, expect) -> None:
     with expect:
         assert _normalize_entry_points(entry_points) == normalized

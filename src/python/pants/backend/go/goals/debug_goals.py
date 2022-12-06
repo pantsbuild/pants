@@ -7,7 +7,6 @@ import logging
 from dataclasses import dataclass
 
 from pants.backend.go.dependency_inference import GoModuleImportPathsMapping
-from pants.backend.go.subsystems.golang import GolangSubsystem
 from pants.backend.go.target_type_rules import GoImportPathMappingRequest
 from pants.backend.go.target_types import (
     GoImportPathField,
@@ -16,6 +15,7 @@ from pants.backend.go.target_types import (
     GoThirdPartyPackageDependenciesField,
 )
 from pants.backend.go.util_rules import first_party_pkg, third_party_pkg
+from pants.backend.go.util_rules.build_opts import GoBuildOptions, GoBuildOptionsFromTargetRequest
 from pants.backend.go.util_rules.cgo import CGoCompileRequest, CGoCompileResult
 from pants.backend.go.util_rules.first_party_pkg import (
     FallibleFirstPartyPkgAnalysis,
@@ -56,10 +56,17 @@ async def go_show_package_analysis(targets: Targets, console: Console) -> ShowGo
     first_party_analysis_gets = []
     third_party_analysis_gets = []
 
-    for target in targets:
+    build_opts_by_target = await MultiGet(
+        Get(GoBuildOptions, GoBuildOptionsFromTargetRequest(tgt.address)) for tgt in targets
+    )
+
+    for target, build_opts in zip(targets, build_opts_by_target):
         if target.has_field(GoPackageSourcesField):
             first_party_analysis_gets.append(
-                Get(FallibleFirstPartyPkgAnalysis, FirstPartyPkgAnalysisRequest(target.address))
+                Get(
+                    FallibleFirstPartyPkgAnalysis,
+                    FirstPartyPkgAnalysisRequest(target.address, build_opts=build_opts),
+                )
             )
         elif target.has_field(GoThirdPartyPackageDependenciesField):
             import_path = target[GoImportPathField].value
@@ -69,7 +76,7 @@ async def go_show_package_analysis(targets: Targets, console: Console) -> ShowGo
                 Get(
                     ThirdPartyPkgAnalysis,
                     ThirdPartyPkgAnalysisRequest(
-                        import_path, go_mod_info.digest, go_mod_info.mod_path
+                        import_path, go_mod_info.digest, go_mod_info.mod_path, build_opts=build_opts
                     ),
                 )
             )
@@ -141,6 +148,7 @@ class GoExportCgoCodegen(Goal):
 @dataclass(frozen=True)
 class ExportCgoPackageRequest:
     address: Address
+    build_opts: GoBuildOptions
 
 
 @dataclass(frozen=True)
@@ -154,7 +162,8 @@ class ExportCgoPackageResult:
 async def export_cgo_package(request: ExportCgoPackageRequest) -> ExportCgoPackageResult:
     # Analyze the package and ensure it is actually contains cgo code.
     analysis_wrapper = await Get(
-        FallibleFirstPartyPkgAnalysis, FirstPartyPkgAnalysisRequest(request.address)
+        FallibleFirstPartyPkgAnalysis,
+        FirstPartyPkgAnalysisRequest(request.address, build_opts=request.build_opts),
     )
     if not analysis_wrapper.analysis:
         return ExportCgoPackageResult(error=f"Failed to analyze target: {analysis_wrapper.stderr}")
@@ -164,7 +173,8 @@ async def export_cgo_package(request: ExportCgoPackageRequest) -> ExportCgoPacka
         return ExportCgoPackageResult(skip=True)
 
     fallible_digest_info = await Get(
-        FallibleFirstPartyPkgDigest, FirstPartyPkgDigestRequest(request.address)
+        FallibleFirstPartyPkgDigest,
+        FirstPartyPkgDigestRequest(request.address, build_opts=request.build_opts),
     )
     if not fallible_digest_info.pkg_digest:
         return ExportCgoPackageResult(
@@ -178,6 +188,7 @@ async def export_cgo_package(request: ExportCgoPackageRequest) -> ExportCgoPacka
             import_path=analysis.import_path,
             pkg_name=analysis.name,
             digest=fallible_digest_info.pkg_digest.digest,
+            build_opts=request.build_opts,
             dir_path=analysis.dir_path,
             cgo_files=analysis.cgo_files,
             cgo_flags=analysis.cgo_flags,
@@ -193,20 +204,26 @@ async def go_export_cgo_codegen(
     targets: Targets,
     distdir_path: DistDir,
     workspace: Workspace,
-    golang_subsystem: GolangSubsystem,
 ) -> GoExportCgoCodegen:
-    if not golang_subsystem.cgo_enabled:
-        raise ValueError(
-            "Nothing to export since cgo is disabled, which is set by the option [golang].cgo_enabled"
-        )
-
     go_package_targets = [tgt for tgt in targets if tgt.has_field(GoPackageSourcesField)]
-    cgo_results = await MultiGet(
-        Get(ExportCgoPackageResult, ExportCgoPackageRequest(tgt.address))
-        for tgt in go_package_targets
+
+    build_opts_by_target = await MultiGet(
+        Get(GoBuildOptions, GoBuildOptionsFromTargetRequest(tgt.address)) for tgt in targets
     )
 
-    for tgt, cgo_result in zip(go_package_targets, cgo_results):
+    targets_to_process = []
+    for tgt, build_opts in zip(go_package_targets, build_opts_by_target):
+        if not build_opts.cgo_enabled:
+            logger.warning(f"Skipping target {tgt.address} because Cgo is not enabled for it.")
+            continue
+        targets_to_process.append((tgt, build_opts))
+
+    cgo_results = await MultiGet(
+        Get(ExportCgoPackageResult, ExportCgoPackageRequest(tgt.address, build_opts=build_opts))
+        for tgt, build_opts in targets_to_process
+    )
+
+    for (tgt, build_opts), cgo_result in zip(targets_to_process, cgo_results):
         if cgo_result.skip:
             continue
         if cgo_result.error:
@@ -215,7 +232,7 @@ async def go_export_cgo_codegen(
 
         export_dir = distdir_path.relpath / "cgo" / tgt.address.path_safe_spec
         workspace.write_digest(cgo_result.digest, path_prefix=str(export_dir))
-        logger.info(f"{tgt.address}: Exported cgo files to `{export_dir}`\n")
+        logger.info(f"{tgt.address}: Exported Cgo files to `{export_dir}`\n")
 
     return GoExportCgoCodegen(exit_code=0)
 

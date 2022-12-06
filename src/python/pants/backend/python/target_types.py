@@ -625,6 +625,7 @@ class PexVenvSitePackagesCopies(BoolField):
 
 
 _PEX_BINARY_COMMON_FIELDS = (
+    EnvironmentField,
     InterpreterConstraintsField,
     PythonResolveField,
     PexBinaryDependenciesField,
@@ -1027,6 +1028,7 @@ class PythonSourceTarget(Target):
         PythonResolveField,
         PythonRunGoalUseSandboxField,
         PythonSourceField,
+        RestartableField,
     )
     help = "A single Python source file."
 
@@ -1108,6 +1110,7 @@ class PythonSourcesGeneratorTarget(TargetFilesGenerator):
         PythonRunGoalUseSandboxField,
         PythonDependenciesField,
         InterpreterConstraintsField,
+        RestartableField,
     )
     settings_request_cls = PythonFilesGeneratorSettingsRequest
     help = softwrap(
@@ -1322,7 +1325,7 @@ class PythonDistributionDependenciesField(Dependencies):
 class PythonProvidesField(ScalarField, AsyncFieldMixin):
     alias = "provides"
     expected_type = PythonArtifact
-    expected_type_help = "setup_py(name='my-dist', **kwargs)"
+    expected_type_help = "python_artifact(name='my-dist', **kwargs)"
     value: PythonArtifact
     required = True
     help = softwrap(

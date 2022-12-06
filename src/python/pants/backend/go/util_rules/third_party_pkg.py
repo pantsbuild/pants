@@ -13,8 +13,8 @@ from typing import Any
 import ijson
 
 from pants.backend.go.go_sources.load_go_binary import LoadedGoBinary, LoadedGoBinaryRequest
-from pants.backend.go.subsystems.golang import GolangSubsystem
 from pants.backend.go.util_rules import pkg_analyzer
+from pants.backend.go.util_rules.build_opts import GoBuildOptions
 from pants.backend.go.util_rules.cgo import CGoCompilerFlags
 from pants.backend.go.util_rules.embedcfg import EmbedConfig
 from pants.backend.go.util_rules.pkg_analyzer import PackageAnalyzerSetup
@@ -73,6 +73,8 @@ class ThirdPartyPkgAnalysis:
     f_files: tuple[str, ...]
     s_files: tuple[str, ...]
 
+    syso_files: tuple[str, ...]
+
     minimum_go_version: str | None
 
     embed_patterns: tuple[str, ...]
@@ -96,6 +98,7 @@ class ThirdPartyPkgAnalysisRequest(EngineAwareParameter):
     import_path: str
     go_mod_digest: Digest
     go_mod_path: str
+    build_opts: GoBuildOptions
 
     def debug_hint(self) -> str:
         return f"{self.import_path} from {self.go_mod_path}"
@@ -118,6 +121,7 @@ class AllThirdPartyPackages(FrozenDict[str, ThirdPartyPkgAnalysis]):
 class AllThirdPartyPackagesRequest:
     go_mod_digest: Digest
     go_mod_path: str
+    build_opts: GoBuildOptions
 
 
 @dataclass(frozen=True)
@@ -149,6 +153,7 @@ class AnalyzeThirdPartyModuleRequest:
     name: str
     version: str
     minimum_go_version: str | None
+    build_opts: GoBuildOptions
 
 
 @dataclass(frozen=True)
@@ -277,7 +282,6 @@ def _freeze_json_dict(d: dict[Any, Any]) -> FrozenDict[str, Any]:
 async def analyze_go_third_party_module(
     request: AnalyzeThirdPartyModuleRequest,
     analyzer: PackageAnalyzerSetup,
-    golang_subsystem: GolangSubsystem,
 ) -> AnalyzedThirdPartyModule:
     # Download the module.
     download_result = await Get(
@@ -344,7 +348,7 @@ async def analyze_go_third_party_module(
             },
             description=f"Analyze metadata for Go third-party module: {request.name}@{request.version}",
             level=LogLevel.DEBUG,
-            env={"CGO_ENABLED": "1" if golang_subsystem.cgo_enabled else "0"},
+            env={"CGO_ENABLED": "1" if request.build_opts.cgo_enabled else "0"},
         ),
     )
 
@@ -416,7 +420,6 @@ async def analyze_go_third_party_package(
         "CompiledGoFiles",
         "SwigFiles",
         "SwigCXXFiles",
-        "SysoFiles",
     ):
         if key in request.pkg_json:
             maybe_error = GoThirdPartyPkgError(
@@ -452,6 +455,7 @@ async def analyze_go_third_party_package(
         h_files=tuple(request.pkg_json.get("HFiles", ())),
         f_files=tuple(request.pkg_json.get("FFiles", ())),
         s_files=tuple(request.pkg_json.get("SFiles", ())),
+        syso_files=tuple(request.pkg_json.get("SysoFiles", ())),
         cgo_files=tuple(request.pkg_json.get("CgoFiles", ())),
         minimum_go_version=request.minimum_go_version,
         embed_patterns=tuple(request.pkg_json.get("EmbedPatterns", [])),
@@ -544,6 +548,7 @@ async def download_and_analyze_third_party_packages(
                 name=mod.name,
                 version=mod.version,
                 minimum_go_version=mod.minimum_go_version,
+                build_opts=request.build_opts,
             ),
         )
         for mod in module_analysis.modules
@@ -562,7 +567,9 @@ async def download_and_analyze_third_party_packages(
 async def extract_package_info(request: ThirdPartyPkgAnalysisRequest) -> ThirdPartyPkgAnalysis:
     all_packages = await Get(
         AllThirdPartyPackages,
-        AllThirdPartyPackagesRequest(request.go_mod_digest, request.go_mod_path),
+        AllThirdPartyPackagesRequest(
+            request.go_mod_digest, request.go_mod_path, build_opts=request.build_opts
+        ),
     )
     pkg_info = all_packages.import_paths_to_pkg_info.get(request.import_path)
     if pkg_info:
@@ -618,6 +625,7 @@ def maybe_raise_or_create_error_or_create_failed_pkg_info(
             m_files=(),
             f_files=(),
             s_files=(),
+            syso_files=(),
             minimum_go_version=None,
             embed_patterns=(),
             test_embed_patterns=(),

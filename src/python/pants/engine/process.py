@@ -9,7 +9,6 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Iterable, Mapping
 
-from pants.base.deprecated import warn_or_error
 from pants.engine.engine_aware import SideEffecting
 from pants.engine.fs import EMPTY_DIGEST, Digest, FileDigest
 from pants.engine.internals.native_engine import (  # noqa: F401
@@ -22,7 +21,6 @@ from pants.option.global_options import KeepSandboxes
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
-from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -88,7 +86,6 @@ class Process:
         execution_slot_variable: str | None = None,
         concurrency_available: int = 0,
         cache_scope: ProcessCacheScope = ProcessCacheScope.SUCCESSFUL,
-        platform: Platform | None = None,
         remote_cache_speculation_delay_millis: int = 0,
     ) -> None:
         """Request to run a subprocess, similar to subprocess.Popen.
@@ -137,18 +134,6 @@ class Process:
         self.concurrency_available = concurrency_available
         self.cache_scope = cache_scope
         self.remote_cache_speculation_delay_millis = remote_cache_speculation_delay_millis
-
-        if platform is not None:
-            warn_or_error(
-                "2.16.0.dev0",
-                "the `platform` kwarg for `Process`",
-                softwrap(
-                    """
-                    The `platform` kwarg no longer does anything because the `platform` is always
-                    automatically set. To fix this deprecation, delete the kwarg.
-                    """
-                ),
-            )
 
 
 @dataclass(frozen=True)

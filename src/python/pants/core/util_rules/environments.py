@@ -43,7 +43,7 @@ from pants.option.subsystem import Subsystem
 from pants.util.enums import match
 from pants.util.frozendict import FrozenDict
 from pants.util.memo import memoized
-from pants.util.strutil import softwrap
+from pants.util.strutil import bullet_list, softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -502,6 +502,18 @@ class EnvironmentTarget:
         )
 
 
+def _compute_env_field(field_set: FieldSet) -> EnvironmentField:
+    for attr in dir(field_set):
+        # Skip what look like dunder methods, which are unlikely to be an
+        # EnvironmentField value on FieldSet class declarations.
+        if attr.startswith("__"):
+            continue
+        val = getattr(field_set, attr)
+        if isinstance(val, EnvironmentField):
+            return val
+    return EnvironmentField(None, address=field_set.address)
+
+
 @dataclass(frozen=True)
 class EnvironmentNameRequest(EngineAwareParameter):
     f"""Normalize the value into a name from `[environments-preview].names`, such as by
@@ -509,6 +521,16 @@ class EnvironmentNameRequest(EngineAwareParameter):
 
     raw_value: str
     description_of_origin: str = dataclasses.field(hash=False, compare=False)
+
+    @classmethod
+    def from_target(cls, target: Target) -> EnvironmentNameRequest:
+        f"""Return a `EnvironmentNameRequest` with the environment this target should use when built.
+
+        If the Target includes `EnvironmentField` in its class definition, then this method will
+        use the value of that field. Otherwise, it will fall back to `{LOCAL_ENVIRONMENT_MATCHER}`.
+        """
+        env_field = target.get(EnvironmentField)
+        return cls._from_field(env_field, target.address)
 
     @classmethod
     def from_field_set(cls, field_set: FieldSet) -> EnvironmentNameRequest:
@@ -522,31 +544,44 @@ class EnvironmentNameRequest(EngineAwareParameter):
         then pass `{{resulting_environment_name: EnvironmentName}}` into a `Get` to change which
         environment is used for the subgraph.
         """
-        for attr in dir(field_set):
-            # Skip what look like dunder methods, which are unlikely to be an
-            # EnvironmentField value on FieldSet class declarations.
-            if attr.startswith("__"):
-                continue
-            val = getattr(field_set, attr)
-            if isinstance(val, EnvironmentField):
-                env_field = val
-                break
-        else:
-            env_field = EnvironmentField(None, address=field_set.address)
+        env_field = _compute_env_field(field_set)
+        return cls._from_field(env_field, field_set.address)
 
+    @classmethod
+    def _from_field(cls, env_field: EnvironmentField, address: Address) -> EnvironmentNameRequest:
         return EnvironmentNameRequest(
             env_field.value,
             # Note that if the field was not registered, we will have fallen back to the default
             # LOCAL_ENVIRONMENT_MATCHER, which we expect to be infallible when normalized. That
             # implies that the error message using description_of_origin should not trigger, so
             # it's okay that the field is not actually registered on the target.
-            description_of_origin=(
-                f"the `{env_field.alias}` field from the target {field_set.address}"
-            ),
+            description_of_origin=(f"the `{env_field.alias}` field from the target {address}"),
         )
 
     def debug_hint(self) -> str:
         return self.raw_value
+
+
+@dataclass(frozen=True)
+class SingleEnvironmentNameRequest(EngineAwareParameter):
+    """Asserts that all of the given environment strings resolve to the same EnvironmentName."""
+
+    raw_values: tuple[str, ...]
+    description_of_origin: str = dataclasses.field(hash=False, compare=False)
+
+    @classmethod
+    def from_field_sets(
+        cls, field_sets: Sequence[FieldSet], description_of_origin: str
+    ) -> SingleEnvironmentNameRequest:
+        """See `EnvironmentNameRequest.from_field_set`."""
+
+        return SingleEnvironmentNameRequest(
+            tuple(sorted({_compute_env_field(field_set).value for field_set in field_sets})),
+            description_of_origin=description_of_origin,
+        )
+
+    def debug_hint(self) -> str:
+        return ", ".join(self.raw_values)
 
 
 @rule
@@ -615,6 +650,25 @@ async def determine_local_environment(
             """
         )
     )
+
+
+@rule
+async def resolve_single_environment_name(
+    request: SingleEnvironmentNameRequest,
+) -> EnvironmentName:
+    environment_names = await MultiGet(
+        Get(EnvironmentName, EnvironmentNameRequest(name, request.description_of_origin))
+        for name in request.raw_values
+    )
+
+    unique_environments = sorted({name.val or "<None>" for name in environment_names})
+    if len(unique_environments) != 1:
+        raise AssertionError(
+            f"Needed 1 unique environment, but {request.description_of_origin} contained "
+            f"{len(unique_environments)}:\n\n"
+            f"{bullet_list(unique_environments)}"
+        )
+    return environment_names[0]
 
 
 @rule_helper

@@ -32,8 +32,8 @@ from pants.backend.helm.util_rules.renderer import (
 )
 from pants.backend.helm.util_rules.renderer_test import _read_file_from_digest
 from pants.backend.helm.util_rules.tool import HelmProcess
-from pants.backend.shell import shell_command
 from pants.backend.shell.target_types import ShellCommandRunTarget, ShellSourcesGeneratorTarget
+from pants.backend.shell.util_rules import shell_command
 from pants.core.goals.run import rules as run_rules
 from pants.core.util_rules import source_files
 from pants.engine.addresses import Address

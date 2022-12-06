@@ -11,6 +11,10 @@ from pants.backend.project_info.filter_targets import FilterSubsystem
 from pants.base.exceptions import MappingError
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.engine.internals.defaults import BuildFileDefaults, BuildFileDefaultsParserState
+from pants.engine.internals.dep_rules import (
+    BuildFileDependencyRules,
+    BuildFileDependencyRulesParserState,
+)
 from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser
 from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.engine.target import RegisteredTargetTypes, Tags, Target
@@ -40,6 +44,8 @@ class AddressMap:
         parser: Parser,
         extra_symbols: BuildFilePreludeSymbols,
         defaults: BuildFileDefaultsParserState,
+        dependents_rules: BuildFileDependencyRulesParserState | None,
+        dependencies_rules: BuildFileDependencyRulesParserState | None,
     ) -> AddressMap:
         """Parses a source for targets.
 
@@ -47,9 +53,16 @@ class AddressMap:
         the same namespace but from a separate source are left as unresolved pointers.
         """
         try:
-            target_adaptors = parser.parse(filepath, build_file_content, extra_symbols, defaults)
+            target_adaptors = parser.parse(
+                filepath,
+                build_file_content,
+                extra_symbols,
+                defaults,
+                dependents_rules,
+                dependencies_rules,
+            )
         except Exception as e:
-            raise MappingError(f"Failed to parse ./{filepath}:\n{e}")
+            raise MappingError(f"Failed to parse ./{filepath}:\n{type(e).__name__}: {e}")
         return cls.create(filepath, target_adaptors)
 
     @classmethod
@@ -87,12 +100,16 @@ class AddressFamily:
     :param namespace: The namespace path of this address family.
     :param name_to_target_adaptors: A dict mapping from name to the target adaptor.
     :param defaults: The default target field values, per target type, applicable for this address family.
+    :param dependents_rules: The rules to apply on incoming dependencies to targets in this family.
+    :param dependencies_rules: The rules to apply on the outgoing dependencies from targets in this family.
     """
 
     # The directory from which the adaptors were parsed.
     namespace: str
     name_to_target_adaptors: dict[str, tuple[str, TargetAdaptor]]
     defaults: BuildFileDefaults
+    dependents_rules: BuildFileDependencyRules | None
+    dependencies_rules: BuildFileDependencyRules | None
 
     @classmethod
     def create(
@@ -100,6 +117,8 @@ class AddressFamily:
         spec_path: str,
         address_maps: Iterable[AddressMap],
         defaults: BuildFileDefaults = BuildFileDefaults({}),
+        dependents_rules: BuildFileDependencyRules | None = None,
+        dependencies_rules: BuildFileDependencyRules | None = None,
     ) -> AddressFamily:
         """Creates an address family from the given set of address maps.
 
@@ -131,6 +150,8 @@ class AddressFamily:
             namespace=spec_path,
             name_to_target_adaptors=dict(sorted(name_to_target_adaptors.items())),
             defaults=defaults,
+            dependents_rules=dependents_rules,
+            dependencies_rules=dependencies_rules,
         )
 
     @memoized_property

@@ -11,12 +11,14 @@ from dataclasses import dataclass
 from typing import Any, DefaultDict, Iterable, cast
 
 from pants.backend.python.subsystems.setup import PythonSetup
-from pants.backend.python.target_types import PythonResolveField
+from pants.backend.python.target_types import PexLayout, PythonResolveField
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import Pex, PexProcess, PexRequest, VenvPex, VenvPexProcess
 from pants.backend.python.util_rules.pex_cli import PexPEX
 from pants.backend.python.util_rules.pex_environment import PexEnvironment
 from pants.backend.python.util_rules.pex_from_targets import RequirementsPexRequest
+from pants.backend.python.util_rules.pex_requirements import EntireLockfile, Lockfile
+from pants.base.deprecated import warn_or_error
 from pants.core.goals.export import (
     Export,
     ExportError,
@@ -54,6 +56,11 @@ class _ExportVenvRequest(EngineAwareParameter):
 
     def debug_hint(self) -> str | None:
         return self.resolve
+
+
+@dataclass(frozen=True)
+class _ExportVenvForResolveRequest(EngineAwareParameter):
+    resolve: str
 
 
 @union(in_scope_types=[EnvironmentName])
@@ -151,6 +158,7 @@ async def do_export(
             description,
             dest,
             post_processing_cmds=[PostProcessingCommand(["ln", "-s", venv_abspath, output_path])],
+            resolve=req.resolve_name or None,
         )
     else:
         # Note that an internal-only pex will always have the `python` field set.
@@ -196,7 +204,90 @@ async def do_export(
                 # Remove the requirements and pex pexes, to avoid confusion.
                 PostProcessingCommand(["rm", "-rf", tmpdir_under_digest_root]),
             ],
+            resolve=req.resolve_name or None,
         )
+
+
+@dataclass(frozen=True)
+class MaybeExportResult:
+    result: ExportResult | None
+
+
+@rule
+async def export_virtualenv_for_resolve(
+    request: _ExportVenvForResolveRequest,
+    python_setup: PythonSetup,
+    union_membership: UnionMembership,
+) -> MaybeExportResult:
+    resolve = request.resolve
+    lockfile_path = python_setup.resolves.get(resolve)
+    if lockfile_path:
+        # It's a user resolve.
+        lockfile = Lockfile(
+            file_path=lockfile_path,
+            file_path_description_of_origin=f"the resolve `{resolve}`",
+            resolve_name=resolve,
+        )
+
+        interpreter_constraints = InterpreterConstraints(
+            python_setup.resolves_to_interpreter_constraints.get(
+                request.resolve, python_setup.interpreter_constraints
+            )
+        )
+
+        pex_request = PexRequest(
+            description=f"Build pex for resolve `{resolve}`",
+            output_filename=f"{path_safe(resolve)}.pex",
+            internal_only=True,
+            requirements=EntireLockfile(lockfile),
+            interpreter_constraints=interpreter_constraints,
+            # Packed layout should lead to the best performance in this use case.
+            layout=PexLayout.PACKED,
+        )
+    else:
+        # It's a tool resolve.
+        # TODO: Can we simplify tool lockfiles to be more uniform with user lockfiles?
+        #  It's unclear if we will need the ExportPythonToolSentinel runaround once we
+        #  remove the older export codepath below. It would be nice to be able to go from
+        #  resolve name -> EntireLockfile, regardless of whether the resolve happened to be
+        #  a user lockfile or a tool lockfile. Currently we have to get all the ExportPythonTools
+        #  and then check for the resolve name.  But this is OK for now, as it lets us
+        #  move towards deprecating that other codepath.
+        tool_export_types = cast(
+            "Iterable[type[ExportPythonToolSentinel]]",
+            union_membership.get(ExportPythonToolSentinel),
+        )
+        all_export_tool_requests = await MultiGet(
+            Get(ExportPythonTool, ExportPythonToolSentinel, tool_export_type())
+            for tool_export_type in tool_export_types
+        )
+        export_tool_request = next(
+            (etr for etr in all_export_tool_requests if etr.resolve_name == resolve), None
+        )
+        if not export_tool_request:
+            # No such Python resolve or tool, but it may be a resolve for a different language/backend,
+            # so we let the core export goal sort out whether it's an error or not.
+            return MaybeExportResult(None)
+        if not export_tool_request.pex_request:
+            raise ExportError(
+                f"Requested an export of `{resolve}` but that tool's exports were disabled with "
+                f"the `export=false` option. The per-tool `export=false` options will soon be "
+                f"deprecated anyway, so we recommend removing `export=false` from your config file "
+                f"and switching to using `--resolve`."
+            )
+        pex_request = export_tool_request.pex_request
+
+    dest_prefix = os.path.join("python", "virtualenvs")
+    export_result = await Get(
+        ExportResult,
+        VenvExportRequest(
+            pex_request,
+            dest_prefix,
+            resolve,
+            qualify_path_with_python_version=True,
+        ),
+    )
+    return MaybeExportResult(export_result)
 
 
 @rule
@@ -269,7 +360,31 @@ async def export_virtualenvs(
     python_setup: PythonSetup,
     dist_dir: DistDir,
     union_membership: UnionMembership,
+    export_subsys: ExportSubsystem,
 ) -> ExportResults:
+    if export_subsys.options.resolve:
+        if request.targets:
+            raise ExportError("If using the `--resolve` option, do not also provide target specs.")
+        maybe_venvs = await MultiGet(
+            Get(MaybeExportResult, _ExportVenvForResolveRequest(resolve))
+            for resolve in export_subsys.options.resolve
+        )
+        return ExportResults(mv.result for mv in maybe_venvs if mv.result is not None)
+
+    # TODO: After the deprecation exipres, everything in this function below this comment
+    #  can be deleted.
+    warn_or_error(
+        "2.23.0.dev0",
+        "exporting resolves without using the --resolve option",
+        softwrap(
+            f"""
+            Use the --resolve flag one or more times to name the resolves you want to export,
+            and don't provide any target specs. E.g.,
+
+              {bin_name()} export --resolve=python-default --resolve=pytest
+            """
+        ),
+    )
     resolve_to_root_targets: DefaultDict[str, list[Target]] = defaultdict(list)
     for tgt in request.targets:
         if not tgt.has_field(PythonResolveField):

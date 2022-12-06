@@ -8,7 +8,7 @@ import logging
 import os
 from dataclasses import dataclass
 from pathlib import PurePath
-from textwrap import dedent
+from textwrap import dedent  # noqa: PNT20
 
 from pants.backend.python.packaging.pyoxidizer.config import PyOxidizerConfig
 from pants.backend.python.packaging.pyoxidizer.subsystem import PyOxidizer
@@ -36,6 +36,7 @@ from pants.engine.fs import (
     RemovePrefix,
     Snapshot,
 )
+from pants.engine.platform import Platform, PlatformError
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
@@ -99,7 +100,10 @@ async def package_pyoxidizer_binary(
     field_set: PyOxidizerFieldSet,
     runner_script: PyoxidizerRunnerScript,
     bash: BashBinary,
+    platform: Platform,
 ) -> BuiltPackage:
+    if platform == Platform.linux_arm64:
+        raise PlatformError(f"PyOxidizer is not supported on {platform.value}")
     direct_deps = await Get(Targets, DependenciesRequest(field_set.dependencies))
     deps_field_sets = await Get(
         FieldSetsPerTarget, FieldSetsPerTargetRequest(PackageFieldSet, direct_deps)

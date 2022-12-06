@@ -6,7 +6,9 @@ from __future__ import annotations
 import collections
 import json
 from dataclasses import asdict, dataclass, is_dataclass
-from typing import Any, Iterable
+from typing import Any, Iterable, Mapping
+
+from typing_extensions import Protocol, runtime_checkable
 
 from pants.engine.collection import Collection
 from pants.engine.console import Console
@@ -15,6 +17,7 @@ from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
 from pants.engine.target import (
     Dependencies,
     DependenciesRequest,
+    Field,
     HydratedSources,
     HydrateSourcesRequest,
     SourcesField,
@@ -23,6 +26,14 @@ from pants.engine.target import (
     UnexpandedTargets,
 )
 from pants.option.option_types import BoolOption
+
+
+@runtime_checkable
+class Dictable(Protocol):
+    """Make possible to avoid adding concrete types to serialize objects."""
+
+    def asdict(self) -> Mapping[str, Any]:
+        ...
 
 
 class PeekSubsystem(Outputting, GoalSubsystem):
@@ -89,12 +100,24 @@ class _PeekJsonEncoder(json.JSONEncoder):
 
     def default(self, o):
         """Return a serializable object for o."""
+        if isinstance(o, str):  # early exit prevents strings from being treated as sequences
+            return o
+        if o is None:
+            return o
         if is_dataclass(o):
             return asdict(o)
         if isinstance(o, collections.abc.Mapping):
             return dict(o)
-        if isinstance(o, collections.abc.Sequence):
+        if (
+            isinstance(o, collections.abc.Sequence)
+            or isinstance(o, set)
+            or isinstance(o, collections.abc.Set)
+        ):
             return list(o)
+        if isinstance(o, Field):
+            return self.default(o.value)
+        if isinstance(o, Dictable):
+            return o.asdict()
         try:
             return super().default(o)
         except TypeError:

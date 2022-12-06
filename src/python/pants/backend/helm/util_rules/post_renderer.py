@@ -7,7 +7,7 @@ import logging
 from dataclasses import dataclass
 from itertools import chain
 
-from pants.backend.docker.goals.package_image import DockerFieldSet
+from pants.backend.docker.goals.package_image import DockerPackageFieldSet
 from pants.backend.docker.subsystems import dockerfile_parser
 from pants.backend.docker.subsystems.docker_options import DockerOptions
 from pants.backend.docker.target_types import DockerImageTags, DockerImageTagsRequest
@@ -99,7 +99,7 @@ async def prepare_post_renderer_for_helm_deployment(
     )
 
     docker_targets = await Get(Targets, Addresses(docker_addresses))
-    field_sets = [DockerFieldSet.create(tgt) for tgt in docker_targets]
+    field_sets = [DockerPackageFieldSet.create(tgt) for tgt in docker_targets]
 
     async def resolve_docker_image_ref(address: Address, context: DockerBuildContext) -> str | None:
         docker_field_sets = [fs for fs in field_sets if fs.address == address]
@@ -119,12 +119,14 @@ async def prepare_post_renderer_for_helm_deployment(
         # Choose first non-latest image reference found, or fallback to 'latest'.
         found_ref: str | None = None
         fallback_ref: str | None = None
-        for ref in image_refs:
-            if ref.endswith(":latest"):
-                fallback_ref = ref
-            else:
-                found_ref = ref
-                break
+        for registry in image_refs:
+            for tag in registry.tags:
+                ref = tag.full_name
+                if ref.endswith(":latest"):
+                    fallback_ref = ref
+                else:
+                    found_ref = ref
+                    break
 
         resolved_ref = found_ref or fallback_ref
         if resolved_ref:

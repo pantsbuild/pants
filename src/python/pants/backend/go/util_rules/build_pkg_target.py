@@ -10,16 +10,18 @@ from typing import ClassVar, Type, cast
 from pants.backend.go.dependency_inference import GoModuleImportPathsMapping
 from pants.backend.go.target_type_rules import GoImportPathMappingRequest
 from pants.backend.go.target_types import (
+    GoCompilerFlagsField,
     GoImportPathField,
     GoPackageSourcesField,
     GoThirdPartyPackageDependenciesField,
 )
+from pants.backend.go.util_rules import build_opts
+from pants.backend.go.util_rules.build_opts import GoBuildOptions
 from pants.backend.go.util_rules.build_pkg import (
     BuildGoPackageRequest,
     FallibleBuildGoPackageRequest,
 )
 from pants.backend.go.util_rules.cgo import CGoCompilerFlags
-from pants.backend.go.util_rules.coverage import GoCoverageConfig
 from pants.backend.go.util_rules.embedcfg import EmbedConfig
 from pants.backend.go.util_rules.first_party_pkg import (
     FallibleFirstPartyPkgAnalysis,
@@ -35,6 +37,7 @@ from pants.backend.go.util_rules.go_mod import (
     OwningGoMod,
     OwningGoModRequest,
 )
+from pants.backend.go.util_rules.pkg_pattern import match_simple_pattern
 from pants.backend.go.util_rules.third_party_pkg import (
     ThirdPartyPkgAnalysis,
     ThirdPartyPkgAnalysisRequest,
@@ -66,10 +69,13 @@ class BuildGoPackageTargetRequest(EngineAwareParameter):
     `__pkg__.a` files."""
 
     address: Address
+    build_opts: GoBuildOptions
     is_main: bool = False
     for_tests: bool = False
     for_xtests: bool = False
-    coverage_config: GoCoverageConfig | None = None
+
+    # If True, then force coverage instead of applying import path patterns from `build_opts.coverage_config`.
+    with_coverage: bool = False
 
     def debug_hint(self) -> str:
         return str(self.address)
@@ -100,12 +106,13 @@ class GoCodegenBuildRequest:
     """
 
     target: Target
+    build_opts: GoBuildOptions
 
     generate_from: ClassVar[type[SourcesField]]
 
 
 def maybe_get_codegen_request_type(
-    tgt: Target, union_membership: UnionMembership
+    tgt: Target, build_opts: GoBuildOptions, union_membership: UnionMembership
 ) -> GoCodegenBuildRequest | None:
     if not tgt.has_field(SourcesField):
         return None
@@ -125,14 +132,15 @@ def maybe_get_codegen_request_type(
             f"Possible implementations:\n\n"
             f"{bullet_list(sorted(generator.__name__ for generator in relevant_requests))}"
         )
-    return relevant_requests[0](tgt) if relevant_requests else None
+    return relevant_requests[0](tgt, build_opts) if relevant_requests else None
 
 
 # NB: We must have a description for the streaming of this rule to work properly
 # (triggered by `FallibleBuildGoPackageRequest` subclassing `EngineAwareReturnType`).
 @rule(desc="Set up Go compilation request", level=LogLevel.DEBUG)
 async def setup_build_go_package_target_request(
-    request: BuildGoPackageTargetRequest, union_membership: UnionMembership
+    request: BuildGoPackageTargetRequest,
+    union_membership: UnionMembership,
 ) -> FallibleBuildGoPackageRequest:
     wrapped_target = await Get(
         WrappedTarget,
@@ -140,7 +148,7 @@ async def setup_build_go_package_target_request(
     )
     target = wrapped_target.target
 
-    codegen_request = maybe_get_codegen_request_type(target, union_membership)
+    codegen_request = maybe_get_codegen_request_type(target, request.build_opts, union_membership)
     if codegen_request:
         codegen_result = await Get(
             FallibleBuildGoPackageRequest, GoCodegenBuildRequest, codegen_request
@@ -150,8 +158,14 @@ async def setup_build_go_package_target_request(
     embed_config: EmbedConfig | None = None
     if target.has_field(GoPackageSourcesField):
         _maybe_first_party_pkg_analysis, _maybe_first_party_pkg_digest = await MultiGet(
-            Get(FallibleFirstPartyPkgAnalysis, FirstPartyPkgAnalysisRequest(target.address)),
-            Get(FallibleFirstPartyPkgDigest, FirstPartyPkgDigestRequest(target.address)),
+            Get(
+                FallibleFirstPartyPkgAnalysis,
+                FirstPartyPkgAnalysisRequest(target.address, build_opts=request.build_opts),
+            ),
+            Get(
+                FallibleFirstPartyPkgDigest,
+                FirstPartyPkgDigestRequest(target.address, build_opts=request.build_opts),
+            ),
         )
         if _maybe_first_party_pkg_analysis.analysis is None:
             return FallibleBuildGoPackageRequest(
@@ -200,6 +214,7 @@ async def setup_build_go_package_target_request(
         cxx_files = _first_party_pkg_analysis.cxx_files
         objc_files = _first_party_pkg_analysis.m_files
         fortran_files = _first_party_pkg_analysis.f_files
+        prebuilt_object_files = _first_party_pkg_analysis.syso_files
 
         # If the xtest package was requested, then replace analysis with the xtest values.
         if request.for_xtests:
@@ -231,7 +246,12 @@ async def setup_build_go_package_target_request(
         _go_mod_info = await Get(GoModInfo, GoModInfoRequest(_go_mod_address))
         _third_party_pkg_info = await Get(
             ThirdPartyPkgAnalysis,
-            ThirdPartyPkgAnalysisRequest(import_path, _go_mod_info.digest, _go_mod_info.mod_path),
+            ThirdPartyPkgAnalysisRequest(
+                import_path,
+                _go_mod_info.digest,
+                _go_mod_info.mod_path,
+                build_opts=request.build_opts,
+            ),
         )
 
         # We error if trying to _build_ a package with issues (vs. only generating the target and
@@ -253,12 +273,19 @@ async def setup_build_go_package_target_request(
         cxx_files = _third_party_pkg_info.cxx_files
         objc_files = _third_party_pkg_info.m_files
         fortran_files = _third_party_pkg_info.f_files
+        prebuilt_object_files = _third_party_pkg_info.syso_files
     else:
         raise AssertionError(
             f"Unknown how to build `{target.alias}` target at address {request.address} with Go. "
             "Please open a bug at https://github.com/pantsbuild/pants/issues/new/choose with this "
             "message!"
         )
+
+    pkg_specific_compiler_flags: tuple[str, ...] = ()
+    if target.has_field(GoCompilerFlagsField):
+        compiler_flags_field = target.get(GoCompilerFlagsField)
+        if compiler_flags_field and compiler_flags_field.value:
+            pkg_specific_compiler_flags = compiler_flags_field.value
 
     all_direct_dependencies = await Get(Targets, DependenciesRequest(target[Dependencies]))
 
@@ -270,7 +297,7 @@ async def setup_build_go_package_target_request(
             first_party_dep_import_path_targets.append(dep)
         elif dep.has_field(GoThirdPartyPackageDependenciesField):
             third_party_dep_import_path_targets.append(dep)
-        elif bool(maybe_get_codegen_request_type(dep, union_membership)):
+        elif bool(maybe_get_codegen_request_type(dep, request.build_opts, union_membership)):
             codegen_dep_import_path_targets.append(dep)
 
     first_party_dep_import_path_results = await MultiGet(
@@ -311,7 +338,10 @@ async def setup_build_go_package_target_request(
 
     pkg_dependency_addresses = sorted(pkg_dependency_addresses_set)
     maybe_pkg_direct_dependencies = await MultiGet(
-        Get(FallibleBuildGoPackageRequest, BuildGoPackageTargetRequest(address))
+        Get(
+            FallibleBuildGoPackageRequest,
+            BuildGoPackageTargetRequest(address, build_opts=request.build_opts),
+        )
         for address in pkg_dependency_addresses
     )
 
@@ -330,7 +360,9 @@ async def setup_build_go_package_target_request(
     ):
         maybe_base_pkg_dep = await Get(
             FallibleBuildGoPackageRequest,
-            BuildGoPackageTargetRequest(request.address, for_tests=True),
+            BuildGoPackageTargetRequest(
+                request.address, for_tests=True, build_opts=request.build_opts
+            ),
         )
         if maybe_base_pkg_dep.request is None:
             return dataclasses.replace(
@@ -339,11 +371,18 @@ async def setup_build_go_package_target_request(
             )
         pkg_direct_dependencies.append(maybe_base_pkg_dep.request)
 
+    with_coverage = request.with_coverage
+    coverage_config = request.build_opts.coverage_config
+    if coverage_config:
+        for pattern in coverage_config.import_path_include_patterns:
+            with_coverage = with_coverage or match_simple_pattern(pattern)(import_path)
+
     result = BuildGoPackageRequest(
         digest=digest,
         import_path="main" if request.is_main else import_path,
         pkg_name=pkg_name,
         dir_path=dir_path,
+        build_opts=request.build_opts,
         go_files=go_file_names,
         s_files=s_files,
         cgo_files=cgo_files,
@@ -352,11 +391,13 @@ async def setup_build_go_package_target_request(
         cxx_files=cxx_files,
         objc_files=objc_files,
         fortran_files=fortran_files,
+        prebuilt_object_files=prebuilt_object_files,
         minimum_go_version=minimum_go_version,
         direct_dependencies=tuple(pkg_direct_dependencies),
         for_tests=request.for_tests,
         embed_config=embed_config,
-        coverage_config=request.coverage_config,
+        with_coverage=with_coverage,
+        pkg_specific_compiler_flags=tuple(pkg_specific_compiler_flags),
     )
     return FallibleBuildGoPackageRequest(result, import_path)
 
@@ -374,4 +415,7 @@ def required_build_go_package_request(
 
 
 def rules():
-    return collect_rules()
+    return (
+        *collect_rules(),
+        *build_opts.rules(),
+    )

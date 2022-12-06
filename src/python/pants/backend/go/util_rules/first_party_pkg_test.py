@@ -19,6 +19,7 @@ from pants.backend.go.util_rules import (
     sdk,
     third_party_pkg,
 )
+from pants.backend.go.util_rules.build_opts import GoBuildOptions
 from pants.backend.go.util_rules.embedcfg import EmbedConfig
 from pants.backend.go.util_rules.first_party_pkg import (
     FallibleFirstPartyPkgAnalysis,
@@ -158,7 +159,8 @@ def test_package_analysis(rule_runner: RuleRunner) -> None:
     ) -> None:
         addr = Address(os.path.join("foo", dir_path))
         maybe_analysis = rule_runner.request(
-            FallibleFirstPartyPkgAnalysis, [FirstPartyPkgAnalysisRequest(addr)]
+            FallibleFirstPartyPkgAnalysis,
+            [FirstPartyPkgAnalysisRequest(addr, build_opts=GoBuildOptions())],
         )
         assert maybe_analysis.analysis is not None
         analysis = maybe_analysis.analysis
@@ -178,7 +180,8 @@ def test_package_analysis(rule_runner: RuleRunner) -> None:
         assert analysis.xtest_embed_patterns == ()
 
         maybe_digest = rule_runner.request(
-            FallibleFirstPartyPkgDigest, [FirstPartyPkgDigestRequest(addr)]
+            FallibleFirstPartyPkgDigest,
+            [FirstPartyPkgDigestRequest(addr, build_opts=GoBuildOptions())],
         )
         assert maybe_digest.pkg_digest is not None
         pkg_digest = maybe_digest.pkg_digest
@@ -224,7 +227,7 @@ def test_invalid_package(rule_runner) -> None:
     )
     maybe_analysis = rule_runner.request(
         FallibleFirstPartyPkgAnalysis,
-        [FirstPartyPkgAnalysisRequest(Address("", target_name="pkg"))],
+        [FirstPartyPkgAnalysisRequest(Address("", target_name="pkg"), build_opts=GoBuildOptions())],
     )
     assert maybe_analysis.analysis is None
     assert maybe_analysis.exit_code == 1
@@ -264,7 +267,11 @@ def test_cgo_not_supported(rule_runner: RuleRunner) -> None:
     with engine_error(NotImplementedError):
         rule_runner.request(
             FallibleFirstPartyPkgAnalysis,
-            [FirstPartyPkgAnalysisRequest(Address("", target_name="pkg"))],
+            [
+                FirstPartyPkgAnalysisRequest(
+                    Address("", target_name="pkg"), build_opts=GoBuildOptions()
+                )
+            ],
         )
 
 
@@ -318,13 +325,13 @@ def test_embeds_supported(rule_runner: RuleRunner) -> None:
                 go 1.17
                 """
             ),
-            **resources,  # type: ignore[arg-type]
-            **go_sources,  # type: ignore[arg-type]
+            **resources,
+            **go_sources,
         }
     )
     maybe_analysis = rule_runner.request(
         FallibleFirstPartyPkgAnalysis,
-        [FirstPartyPkgAnalysisRequest(Address("", target_name="pkg"))],
+        [FirstPartyPkgAnalysisRequest(Address("", target_name="pkg"), build_opts=GoBuildOptions())],
     )
     assert maybe_analysis.analysis is not None
     analysis = maybe_analysis.analysis
@@ -334,7 +341,7 @@ def test_embeds_supported(rule_runner: RuleRunner) -> None:
 
     maybe_digest = rule_runner.request(
         FallibleFirstPartyPkgDigest,
-        [FirstPartyPkgDigestRequest(Address("", target_name="pkg"))],
+        [FirstPartyPkgDigestRequest(Address("", target_name="pkg"), build_opts=GoBuildOptions())],
     )
     assert maybe_digest.pkg_digest is not None
     pkg_digest = maybe_digest.pkg_digest
@@ -387,7 +394,7 @@ def test_missing_embeds(rule_runner: RuleRunner) -> None:
     )
     maybe_digest = rule_runner.request(
         FallibleFirstPartyPkgDigest,
-        [FirstPartyPkgDigestRequest(Address("", target_name="pkg"))],
+        [FirstPartyPkgDigestRequest(Address("", target_name="pkg"), build_opts=GoBuildOptions())],
     )
     assert maybe_digest.pkg_digest is None
     assert maybe_digest.exit_code != 0

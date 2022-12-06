@@ -1503,6 +1503,20 @@ class OptionsTest(unittest.TestCase):
             options = self._parse(flags=f"fromfile --{'dictvalue'}=@{fp.name}")
             assert val == options.for_scope("fromfile")["dictvalue"]
 
+    def test_fromfile_yaml_trailing_newlines_matter(self) -> None:
+        with temporary_file(suffix=".yaml", binary_mode=False) as fp:
+            fp.write(
+                dedent(
+                    """\
+                        a: |+
+                          multiline
+                    """
+                )
+            )
+            fp.close()
+            options = self._parse(flags=f"fromfile --{'dictvalue'}=@{fp.name}")
+            assert {"a": "multiline\n"} == options.for_scope("fromfile")["dictvalue"]
+
     def test_fromfile_error(self) -> None:
         options = self._parse(flags="fromfile --string=@/does/not/exist")
         with pytest.raises(FromfileError):

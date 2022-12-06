@@ -9,28 +9,15 @@ from pathlib import PurePath
 
 from pants.backend.go.util_rules.goroot import GoRoot
 from pants.backend.go.util_rules.sdk import GoSdkProcess, GoSdkToolIDRequest, GoSdkToolIDResult
-from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests
+from pants.engine.fs import CreateDigest, Digest, Directory, FileContent, MergeDigests
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 
 
 @dataclass(frozen=True)
-class FallibleAssemblyPreCompilation:
-    result: AssemblyPreCompilation | None
-    exit_code: int = 0
-    stdout: str | None = None
-    stderr: str | None = None
-
-
-@dataclass(frozen=True)
-class AssemblyPreCompilation:
-    merged_compilation_input_digest: Digest
-    assembly_digests: tuple[Digest, ...]
-
-
-@dataclass(frozen=True)
-class AssemblyPreCompilationRequest:
-    """Add a `symabis` file for consumption by Go compiler and assemble all `.s` files.
+class GenerateAssemblySymabisRequest:
+    """Generate a `symabis` file with metadata about the assemnbly files for consumption by Go
+    compiler.
 
     See https://github.com/bazelbuild/rules_go/issues/1893.
     """
@@ -38,42 +25,66 @@ class AssemblyPreCompilationRequest:
     compilation_input: Digest
     s_files: tuple[str, ...]
     dir_path: str
+
+
+@dataclass(frozen=True)
+class GenerateAssemblySymabisResult:
+    symabis_digest: Digest
+    symabis_path: str
+
+
+@dataclass(frozen=True)
+class FallibleGenerateAssemblySymabisResult:
+    result: GenerateAssemblySymabisResult | None
+    exit_code: int = 0
+    stdout: str | None = None
+    stderr: str | None = None
+
+
+@dataclass(frozen=True)
+class AssembleGoAssemblyFilesRequest:
+    """Assemble Go assembly files to object files."""
+
+    input_digest: Digest
+    s_files: tuple[str, ...]
+    dir_path: str
+    asm_header_path: str | None
     import_path: str
 
 
 @dataclass(frozen=True)
-class AssemblyPostCompilation:
-    result: FallibleProcessResult
-    merged_output_digest: Digest | None
+class AssembleGoAssemblyFilesResult:
+    assembly_outputs: tuple[tuple[str, Digest], ...]
 
 
 @dataclass(frozen=True)
-class AssemblyPostCompilationRequest:
-    """Link the assembly_digests into the compilation_result."""
-
-    compilation_result: Digest
-    assembly_digests: tuple[Digest, ...]
-    s_files: tuple[str, ...]
-    dir_path: str
+class FallibleAssembleGoAssemblyFilesResult:
+    result: AssembleGoAssemblyFilesResult | None
+    exit_code: int = 0
+    stdout: str | None = None
+    stderr: str | None = None
 
 
 @rule
-async def setup_assembly_pre_compilation(
-    request: AssemblyPreCompilationRequest,
+async def generate_go_assembly_symabisfile(
+    request: GenerateAssemblySymabisRequest,
     goroot: GoRoot,
-) -> FallibleAssemblyPreCompilation:
+) -> FallibleGenerateAssemblySymabisResult:
     # From Go tooling comments:
     #
     #   Supply an empty go_asm.h as if the compiler had been run. -symabis parsing is lax enough
     #   that we don't need the actual definitions that would appear in go_asm.h.
     #
     # See https://go-review.googlesource.com/c/go/+/146999/8/src/cmd/go/internal/work/gc.go
-    go_asm_h_digest, asm_tool_id = await MultiGet(
+    obj_dir_path = PurePath(".", request.dir_path, "__obj__")
+    symabis_path = str(obj_dir_path / "symabis")
+    go_asm_h_digest, asm_tool_id, obj_dir_digest = await MultiGet(
         Get(Digest, CreateDigest([FileContent("go_asm.h", b"")])),
         Get(GoSdkToolIDResult, GoSdkToolIDRequest("asm")),
+        Get(Digest, CreateDigest([Directory(str(obj_dir_path))])),
     )
     symabis_input_digest = await Get(
-        Digest, MergeDigests([request.compilation_input, go_asm_h_digest])
+        Digest, MergeDigests([request.compilation_input, go_asm_h_digest, obj_dir_digest])
     )
     symabis_result = await Get(
         FallibleProcessResult,
@@ -86,54 +97,78 @@ async def setup_assembly_pre_compilation(
                 os.path.join(goroot.path, "pkg", "include"),
                 "-gensymabis",
                 "-o",
-                "symabis",
+                symabis_path,
                 "--",
-                *(f"./{request.dir_path}/{name}" for name in request.s_files),
+                *(str(PurePath(".", request.dir_path, s_file)) for s_file in request.s_files),
             ),
             env={
                 "__PANTS_GO_ASM_TOOL_ID": asm_tool_id.tool_id,
             },
             description=f"Generate symabis metadata for assembly files for {request.dir_path}",
-            output_files=("symabis",),
+            output_files=(symabis_path,),
         ),
     )
     if symabis_result.exit_code != 0:
-        return FallibleAssemblyPreCompilation(
+        return FallibleGenerateAssemblySymabisResult(
             None, symabis_result.exit_code, symabis_result.stderr.decode("utf-8")
         )
 
-    merged = await Get(
-        Digest,
-        MergeDigests([request.compilation_input, symabis_result.output_digest]),
+    return FallibleGenerateAssemblySymabisResult(
+        result=GenerateAssemblySymabisResult(
+            symabis_digest=symabis_result.output_digest,
+            symabis_path=symabis_path,
+        ),
     )
 
+
+@rule
+async def assemble_go_assembly_files(
+    request: AssembleGoAssemblyFilesRequest,
+    goroot: GoRoot,
+) -> FallibleAssembleGoAssemblyFilesResult:
     # On Go 1.19+, the import path must be supplied via the `-p` option to `go tool asm`.
     # See https://go.dev/doc/go1.19#assembler and
     # https://github.com/bazelbuild/rules_go/commit/cde7d7bc27a34547c014369790ddaa95b932d08d (Bazel rules_go).
-    maybe_package_path_args = (
+    maybe_package_import_path_args = (
         ["-p", request.import_path] if goroot.is_compatible_version("1.19") else []
     )
+
+    obj_dir_path = PurePath(".", request.dir_path, "__obj__")
+    asm_tool_id, obj_dir_digest = await MultiGet(
+        Get(GoSdkToolIDResult, GoSdkToolIDRequest("asm")),
+        Get(Digest, CreateDigest([Directory(str(obj_dir_path))])),
+    )
+
+    input_digest = await Get(Digest, MergeDigests([request.input_digest, obj_dir_digest]))
+
+    maybe_asm_header_path_args = (
+        ["-I", str(PurePath(request.asm_header_path).parent)] if request.asm_header_path else []
+    )
+
+    def obj_output_path(s_file: str) -> str:
+        return str(obj_dir_path / PurePath(s_file).with_suffix(".o"))
 
     assembly_results = await MultiGet(
         Get(
             FallibleProcessResult,
             GoSdkProcess(
-                input_digest=request.compilation_input,
+                input_digest=input_digest,
                 command=(
                     "tool",
                     "asm",
                     "-I",
                     os.path.join(goroot.path, "pkg", "include"),
-                    *maybe_package_path_args,
+                    *maybe_asm_header_path_args,
+                    *maybe_package_import_path_args,
                     "-o",
-                    f"./{request.dir_path}/{PurePath(s_file).with_suffix('.o')}",
-                    f"./{request.dir_path}/{s_file}",
+                    obj_output_path(s_file),
+                    str(os.path.normpath(PurePath(".", request.dir_path, s_file))),
                 ),
                 env={
                     "__PANTS_GO_ASM_TOOL_ID": asm_tool_id.tool_id,
                 },
                 description=f"Assemble {s_file} with Go",
-                output_files=(f"./{request.dir_path}/{PurePath(s_file).with_suffix('.o')}",),
+                output_files=(obj_output_path(s_file),),
             ),
         )
         for s_file in request.s_files
@@ -146,49 +181,17 @@ async def setup_assembly_pre_compilation(
         stderr = "\n\n".join(
             result.stderr.decode("utf-8") for result in assembly_results if result.stderr
         )
-        return FallibleAssemblyPreCompilation(None, exit_code, stdout, stderr)
+        return FallibleAssembleGoAssemblyFilesResult(None, exit_code, stdout, stderr)
 
-    return FallibleAssemblyPreCompilation(
-        AssemblyPreCompilation(merged, tuple(result.output_digest for result in assembly_results))
+    assembly_outputs = tuple(
+        (obj_output_path(s_file), result.output_digest)
+        for s_file, result in zip(request.s_files, assembly_results)
     )
 
-
-# TODO(#16831): Refactor this to share logic with similar cgo logic.
-@rule
-async def link_assembly_post_compilation(
-    request: AssemblyPostCompilationRequest,
-) -> AssemblyPostCompilation:
-    merged_digest, asm_tool_id = await MultiGet(
-        Get(
-            Digest,
-            MergeDigests([request.compilation_result, *request.assembly_digests]),
-        ),
-        # Use `go tool asm` tool ID since `go tool pack` does not have a version argument.
-        Get(GoSdkToolIDResult, GoSdkToolIDRequest("asm")),
-    )
-    pack_result = await Get(
-        FallibleProcessResult,
-        GoSdkProcess(
-            input_digest=merged_digest,
-            command=(
-                "tool",
-                "pack",
-                "r",
-                "__pkg__.a",
-                *(
-                    f"./{request.dir_path}/{PurePath(name).with_suffix('.o')}"
-                    for name in request.s_files
-                ),
-            ),
-            env={
-                "__PANTS_GO_ASM_TOOL_ID": asm_tool_id.tool_id,
-            },
-            description=f"Link assembly objects to Go package archive for {request.dir_path}",
-            output_files=("__pkg__.a",),
-        ),
-    )
-    return AssemblyPostCompilation(
-        pack_result, pack_result.output_digest if pack_result.exit_code == 0 else None
+    return FallibleAssembleGoAssemblyFilesResult(
+        AssembleGoAssemblyFilesResult(
+            assembly_outputs=assembly_outputs,
+        )
     )
 
 

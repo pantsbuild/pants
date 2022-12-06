@@ -513,6 +513,8 @@ class ExecutionOptions:
     remote_execution_overall_deadline_secs: int
     remote_execution_rpc_concurrency: int
 
+    remote_execution_append_only_caches_base_path: str | None
+
     @classmethod
     def from_options(
         cls,
@@ -555,6 +557,7 @@ class ExecutionOptions:
             remote_execution_headers=dynamic_remote_options.execution_headers,
             remote_execution_overall_deadline_secs=bootstrap_options.remote_execution_overall_deadline_secs,
             remote_execution_rpc_concurrency=dynamic_remote_options.execution_rpc_concurrency,
+            remote_execution_append_only_caches_base_path=bootstrap_options.remote_execution_append_only_caches_base_path,
         )
 
 
@@ -642,6 +645,7 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     },
     remote_execution_overall_deadline_secs=60 * 60,  # one hour
     remote_execution_rpc_concurrency=128,
+    remote_execution_append_only_caches_base_path=None,
 )
 
 DEFAULT_LOCAL_STORE_OPTIONS = LocalStoreOptions()
@@ -1393,7 +1397,7 @@ class BootstrapOptions:
         default=None,
         advanced=True,
         deprecation_start_version="2.15.0.dev2",
-        removal_version="2.16.0.dev1",
+        removal_version="2.16.0.dev2",
         removal_hint=softwrap(
             """
             Remote auth plugins should now provide the function by implementing an entry point called remote_auth.
@@ -1548,6 +1552,18 @@ class BootstrapOptions:
         advanced=True,
         default=DEFAULT_EXECUTION_OPTIONS.remote_execution_rpc_concurrency,
         help="The number of concurrent requests allowed to the remote execution service.",
+    )
+    remote_execution_append_only_caches_base_path = StrOption(
+        default=None,
+        advanced=True,
+        help=softwrap(
+            """
+            Sets the base path to use when setting up an append-only cache for a process running remotely.
+            If this option is not set, then append-only caches will not be used with remote execution.
+            The option should be set to the absolute path of a writable directory in the remote execution
+            environment where Pants can create append-only caches for use with remotely executing processes.
+            """
+        ),
     )
     watch_filesystem = BoolOption(
         default=True,

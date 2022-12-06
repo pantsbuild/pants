@@ -10,7 +10,7 @@ use async_trait::async_trait;
 use bytes::BytesMut;
 use fs::{
   directory, DigestTrie, DirectoryDigest, GlobMatching, PreparedPathGlobs, RelativePath,
-  EMPTY_DIRECTORY_DIGEST,
+  SymlinkBehavior, EMPTY_DIRECTORY_DIGEST,
 };
 use futures::future::{self, FutureExt};
 use hashing::Digest;
@@ -71,6 +71,7 @@ async fn render_merge_error<T: SnapshotOps + 'static>(
     parent_path,
     files,
     directories,
+    symlinks,
   } = err;
   let file_details_by_name = files
     .iter()
@@ -105,6 +106,15 @@ async fn render_merge_error<T: SnapshotOps + 'static>(
       res
     })
     .map(|f| f.boxed());
+  let symlink_details_by_name = symlinks
+    .iter()
+    .map(|symlink| async move {
+      let target = symlink.target();
+      let detail = format!("symlink target={}:\n\n", target.to_str().unwrap());
+      let res: Result<_, String> = Ok((symlink.name(), detail));
+      res
+    })
+    .map(|f| f.boxed());
   let dir_details_by_name = directories
     .iter()
     .map(|dir| async move {
@@ -118,6 +128,7 @@ async fn render_merge_error<T: SnapshotOps + 'static>(
   let duplicate_details = async move {
     let details_by_name = future::try_join_all(
       file_details_by_name
+        .chain(symlink_details_by_name)
         .chain(dir_details_by_name)
         .collect::<Vec<_>>(),
     )
@@ -163,7 +174,7 @@ async fn render_merge_error<T: SnapshotOps + 'static>(
 ///
 #[async_trait]
 pub trait SnapshotOps: Clone + Send + Sync + 'static {
-  type Error: Debug + Display + From<String> + Send;
+  type Error: Debug + Display + From<String>;
 
   async fn load_file_bytes_with<
     T: Send + 'static,
@@ -218,15 +229,16 @@ pub trait SnapshotOps: Clone + Send + Sync + 'static {
   ) -> Result<DirectoryDigest, Self::Error> {
     let input_tree = self.load_digest_trie(directory_digest.clone()).await?;
     let path_stats = input_tree
-      .expand_globs(params.globs, None)
+      .expand_globs(params.globs, SymlinkBehavior::Oblivious, None)
       .await
       .map_err(|err| format!("Error matching globs against {directory_digest:?}: {}", err))?;
 
     let mut files = HashMap::new();
-    input_tree.walk(&mut |path, entry| match entry {
+    input_tree.walk(SymlinkBehavior::Oblivious, &mut |path, entry| match entry {
       directory::Entry::File(f) => {
         files.insert(path.to_owned(), f.digest());
       }
+      directory::Entry::Symlink(_) => panic!("Unexpected symlink"),
       directory::Entry::Directory(_) => (),
     });
 

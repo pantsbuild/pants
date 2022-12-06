@@ -8,7 +8,6 @@ backend_packages.add = [
   "pants.backend.build_files.fmt.black",
   "pants.backend.python",
   "pants.backend.experimental.python.packaging.pyoxidizer",
-  "pants.backend.explorer",
   "pants.backend.python.lint.autoflake",
   "pants.backend.python.lint.black",
   "pants.backend.python.lint.docformatter",
@@ -30,12 +29,14 @@ backend_packages.add = [
   "pants.backend.experimental.scala",
   "pants.backend.experimental.scala.lint.scalafmt",
   "pants.backend.experimental.scala.debug_goals",
+  "pants.backend.experimental.visibility",
+  "pants.explorer.server",
   "internal_plugins.releases",
   "internal_plugins.test_lockfile_fixtures",
 ]
 plugins = [
   "hdrhistogram",  # For use with `--stats-log`.
-  "toolchain.pants.plugin==0.24.0",
+  "toolchain.pants.plugin==0.25.0",
 ]
 
 # The invalidation globs cover the PYTHONPATH by default, but we exclude some files that are on the
@@ -221,6 +222,7 @@ java_parser_dev = "src/python/pants/backend/java/dependency_inference/java_parse
 # in `generate_scala_parser_lockfile_request`.
 scala_parser_dev = "src/python/pants/backend/scala/dependency_inference/scala_parser.lock"
 strip_jar_dev = "src/python/pants/jvm/strip_jar/strip_jar.lock"
+jar_tool_dev = "src/python/pants/jvm/jar_tool/jar_tool.lock"
 
 [scala]
 version_for_resolve = { "scala_parser_dev" = "2.13.8" }
@@ -284,3 +286,4 @@ master = "src/python/pants/notes/master.rst"
 "2.13.x" = "src/python/pants/notes/2.13.x.md"
 "2.14.x" = "src/python/pants/notes/2.14.x.md"
 "2.15.x" = "src/python/pants/notes/2.15.x.md"
+"2.16.x" = "src/python/pants/notes/2.16.x.md"

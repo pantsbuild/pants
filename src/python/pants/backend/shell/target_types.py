@@ -6,8 +6,9 @@ from __future__ import annotations
 import re
 from enum import Enum
 
-from pants.backend.shell.shell_setup import ShellSetup
+from pants.backend.shell.subsystems.shell_setup import ShellSetup
 from pants.core.goals.test import RuntimePackageDependenciesField, TestTimeoutField
+from pants.core.util_rules.environments import EnvironmentField
 from pants.core.util_rules.system_binaries import BinaryPathTest
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
@@ -108,7 +109,7 @@ class Shunit2Shell(Enum):
         return BinaryPathTest((arg,))
 
 
-class Shunit2TestDependenciesField(Dependencies):
+class Shunit2TestDependenciesField(ShellDependenciesField):
     supports_transitive_excludes = True
 
 
@@ -269,8 +270,8 @@ class ShellCommandOutputsField(StringSequenceField):
     )
 
 
-class ShellCommandDependenciesField(Dependencies):
-    pass
+class ShellCommandDependenciesField(ShellDependenciesField):
+    supports_transitive_excludes = True
 
 
 class ShellCommandSourcesField(MultipleSourcesField):
@@ -289,7 +290,7 @@ class ShellCommandTimeoutField(IntField):
 
 class ShellCommandToolsField(StringSequenceField):
     alias = "tools"
-    required = True
+    default = ()
     help = softwrap(
         """
         Specify required executable tools that might be used.
@@ -324,6 +325,16 @@ class ShellCommandRunWorkdirField(StringField):
     help = "Sets the current working directory of the command, relative to the project root."
 
 
+class ShellCommandTestDependenciesField(ShellCommandDependenciesField):
+    pass
+
+
+class SkipShellCommandTestsField(BoolField):
+    alias = "skip_tests"
+    default = False
+    help = "If true, don't run this tests for target."
+
+
 class ShellCommandTarget(Target):
     alias = "experimental_shell_command"
     core_fields = (
@@ -336,6 +347,7 @@ class ShellCommandTarget(Target):
         ShellCommandTimeoutField,
         ShellCommandToolsField,
         ShellCommandExtraEnvVarsField,
+        EnvironmentField,
     )
     help = softwrap(
         """
@@ -387,6 +399,42 @@ class ShellCommandRunTarget(Target):
         the `command` and `dependencies` fields as the `tools` you are going to use are already
         on the PATH which is inherited from the Pants environment. Also, the `outputs` does not
         apply, as any output files produced will end up directly in your project tree.
+        """
+    )
+
+
+class ShellCommandTestTarget(Target):
+    alias = "experimental_test_shell_command"
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        ShellCommandTestDependenciesField,
+        ShellCommandCommandField,
+        ShellCommandLogOutputField,
+        ShellCommandSourcesField,
+        ShellCommandTimeoutField,
+        ShellCommandToolsField,
+        ShellCommandExtraEnvVarsField,
+        EnvironmentField,
+        SkipShellCommandTestsField,
+    )
+    help = softwrap(
+        """
+        Run a script as a test via the `test` goal, with all dependencies packaged/copied available in the chroot.
+
+        Example BUILD file:
+
+            experimental_test_shell_command(
+                name="test",
+                tools=["test"],
+                command="test -r $CHROOT/some-data-file.txt",
+                dependencies=["src/project/files:data"],
+            )
+
+        The `command` may use either `{chroot}` on the command line, or the `$CHROOT`
+        environment variable to get the root directory for where any dependencies are located.
+
+        In contrast to the `experimental_run_shell_command`, this target is intended to run shell commands as tests
+        and will only run them via the `test` goal.
         """
     )
 

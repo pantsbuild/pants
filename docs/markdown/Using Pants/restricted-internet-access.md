@@ -43,7 +43,7 @@ You may need to set standard proxy-related environment variables, such as `http_
 env_vars.add = ["http_proxy=http://myproxy", "https_proxy"]
 ```
 
-You can use lowercase or all-caps env var names.
+You may need to use lowercase or uppercase env var names, or both.
 
 Note that if you leave of the env var's value, as for `https_proxy` above, Pants will use the value of the same variable in the environment in which it is invoked.
 

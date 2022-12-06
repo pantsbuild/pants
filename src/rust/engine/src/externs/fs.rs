@@ -179,7 +179,6 @@ impl PySnapshot {
       self.0.digest.size_bytes,
       self
         .0
-        .tree
         .directories()
         .into_iter()
         .map(|d| d.display().to_string())
@@ -187,7 +186,6 @@ impl PySnapshot {
         .join(","),
       self
         .0
-        .tree
         .files()
         .into_iter()
         .map(|d| d.display().to_string())
@@ -211,7 +209,7 @@ impl PySnapshot {
 
   #[getter]
   fn files<'py>(&self, py: Python<'py>) -> &'py PyTuple {
-    let files = self.0.tree.files();
+    let files = self.0.files();
     PyTuple::new(
       py,
       files
@@ -223,7 +221,7 @@ impl PySnapshot {
 
   #[getter]
   fn dirs<'py>(&self, py: Python<'py>) -> &'py PyTuple {
-    let dirs = self.0.tree.directories();
+    let dirs = self.0.directories();
     PyTuple::new(
       py,
       dirs

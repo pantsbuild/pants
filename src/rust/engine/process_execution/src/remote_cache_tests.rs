@@ -149,6 +149,7 @@ fn create_cached_runner(
       cache_content_behavior,
       256,
       CACHE_READ_TIMEOUT,
+      None,
     )
     .expect("caching command runner"),
   )
@@ -162,7 +163,7 @@ async fn create_process(store_setup: &StoreSetup) -> (Process, Digest) {
   ]);
   let EntireExecuteRequest {
     action, command, ..
-  } = make_execute_request(&process, None, None, &store_setup.store)
+  } = make_execute_request(&process, None, None, &store_setup.store, None)
     .await
     .unwrap();
   let (_command_digest, action_digest) =
@@ -733,6 +734,7 @@ async fn make_action_result_basic() {
     CacheContentBehavior::Defer,
     256,
     CACHE_READ_TIMEOUT,
+    None,
   )
   .expect("caching command runner");
 

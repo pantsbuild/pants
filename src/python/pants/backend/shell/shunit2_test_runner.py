@@ -5,8 +5,8 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
-from pants.backend.shell.shell_setup import ShellSetup
-from pants.backend.shell.shunit2 import Shunit2
+from pants.backend.shell.subsystems.shell_setup import ShellSetup
+from pants.backend.shell.subsystems.shunit2 import Shunit2
 from pants.backend.shell.target_types import (
     ShellSourceField,
     Shunit2Shell,
@@ -164,9 +164,10 @@ async def setup_shunit2_for_target(
     test_extra_env: TestExtraEnv,
     global_options: GlobalOptions,
     shunit2: Shunit2,
+    platform: Platform,
 ) -> TestSetup:
     shunit2_script, transitive_targets, built_package_dependencies = await MultiGet(
-        Get(DownloadedExternalTool, ExternalToolRequest, shunit2.get_request(Platform.current)),
+        Get(DownloadedExternalTool, ExternalToolRequest, shunit2.get_request(platform)),
         Get(TransitiveTargets, TransitiveTargetsRequest([request.field_set.address])),
         Get(
             BuiltPackageDependencies,

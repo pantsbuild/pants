@@ -26,6 +26,7 @@ from typing import (
     Type,
     TypeVar,
     cast,
+    overload,
 )
 
 from pants.base.build_root import BuildRoot
@@ -462,7 +463,17 @@ class RuleRunner:
         self._invalidate_for(str(relpath))
         return path
 
-    def write_files(self, files: Mapping[str | PurePath, str | bytes]) -> tuple[str, ...]:
+    @overload
+    def write_files(self, files: Mapping[str, str | bytes]) -> tuple[str, ...]:
+        ...
+
+    @overload
+    def write_files(self, files: Mapping[PurePath, str | bytes]) -> tuple[str, ...]:
+        ...
+
+    def write_files(
+        self, files: Mapping[PurePath, str | bytes] | Mapping[str, str | bytes]
+    ) -> tuple[str, ...]:
         """Write the files to the build root.
 
         :API: public

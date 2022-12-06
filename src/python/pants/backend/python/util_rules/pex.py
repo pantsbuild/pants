@@ -10,7 +10,7 @@ import os
 import shlex
 from dataclasses import dataclass
 from pathlib import PurePath
-from textwrap import dedent
+from textwrap import dedent  # noqa: PNT20
 from typing import Iterable, Iterator, Mapping, TypeVar
 
 import packaging.specifiers
@@ -667,13 +667,12 @@ class VenvScriptWriter:
 
     @classmethod
     def create(
-        cls, pex_environment: PexEnvironment, pex: Pex, venv_rel_dir: PurePath
+        cls, complete_pex_env: CompletePexEnvironment, pex: Pex, venv_rel_dir: PurePath
     ) -> VenvScriptWriter:
         # N.B.: We don't know the working directory that will be used in any given
         # invocation of the venv scripts; so we deal with working_directory once in an
         # `adjust_relative_paths` function inside the script to save rule authors from having to do
         # CWD offset math in every rule for all the relative paths their process depends on.
-        complete_pex_env = pex_environment.in_sandbox(working_directory=None)
         venv_dir = complete_pex_env.pex_root / venv_rel_dir
         return cls(complete_pex_env=complete_pex_env, pex=pex, venv_dir=venv_dir)
 
@@ -795,18 +794,21 @@ class VenvPex:
 @dataclass(unsafe_hash=True)
 class VenvPexRequest:
     pex_request: PexRequest
+    complete_pex_env: CompletePexEnvironment
     bin_names: tuple[str, ...] = ()
     site_packages_copies: bool = False
 
     def __init__(
         self,
         pex_request: PexRequest,
+        complete_pex_env: CompletePexEnvironment,
         bin_names: Iterable[str] = (),
         site_packages_copies: bool = False,
     ) -> None:
         """A request for a PEX that runs in a venv and optionally exposes select venv `bin` scripts.
 
         :param pex_request: The details of the desired PEX.
+        :param complete_pex_env: The complete PEX environment the pex will be run in.
         :param bin_names: The names of venv `bin` scripts to expose for execution.
         :param site_packages_copies: `True` to use copies (hardlinks when possible) of PEX
             dependencies when installing them in the venv site-packages directory. By default this
@@ -814,14 +816,17 @@ class VenvPexRequest:
             but results in a non-standard venv structure that does trip up some libraries.
         """
         self.pex_request = pex_request
+        self.complete_pex_env = complete_pex_env
         self.bin_names = tuple(bin_names)
         self.site_packages_copies = site_packages_copies
 
 
 @rule
-def wrap_venv_prex_request(pex_request: PexRequest) -> VenvPexRequest:
+def wrap_venv_prex_request(
+    pex_request: PexRequest, pex_environment: PexEnvironment
+) -> VenvPexRequest:
     # Allow creating a VenvPex from a plain PexRequest when no extra bin scripts need to be exposed.
-    return VenvPexRequest(pex_request)
+    return VenvPexRequest(pex_request, pex_environment.in_sandbox(working_directory=None))
 
 
 @rule
@@ -877,7 +882,9 @@ async def create_venv_pex(
     venv_rel_dir = abs_pex_path.relative_to(abs_pex_root).parent
 
     venv_script_writer = VenvScriptWriter.create(
-        pex_environment=pex_environment, pex=venv_pex_result.create_pex(), venv_rel_dir=venv_rel_dir
+        complete_pex_env=request.complete_pex_env,
+        pex=venv_pex_result.create_pex(),
+        venv_rel_dir=venv_rel_dir,
     )
     pex = venv_script_writer.exe(bash)
     python = venv_script_writer.python(bash)
