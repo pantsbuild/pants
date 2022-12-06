@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import os
+import pprint
 import subprocess
 from textwrap import dedent
+from typing import Callable, Iterable
 
 import pytest
 
@@ -25,7 +27,16 @@ from pants.backend.go.util_rules import (
     sdk,
     third_party_pkg,
 )
-from pants.backend.go.util_rules.build_opts import GoBuildOptions, GoBuildOptionsFromTargetRequest
+from pants.backend.go.util_rules.build_opts import (
+    GoBuildOptions,
+    GoBuildOptionsFromTargetRequest,
+    asan_supported,
+    msan_supported,
+    race_detector_supported,
+)
+from pants.backend.go.util_rules.build_pkg import BuildGoPackageRequest
+from pants.backend.go.util_rules.build_pkg_target import BuildGoPackageTargetRequest
+from pants.backend.go.util_rules.goroot import GoRoot
 from pants.build_graph.address import Address
 from pants.core.goals.package import BuiltPackage
 from pants.engine.rules import QueryRule
@@ -53,6 +64,8 @@ def rule_runner() -> RuleRunner:
             *sdk.rules(),
             QueryRule(GoBuildOptions, (GoBuildOptionsFromTargetRequest,)),
             QueryRule(BuiltPackage, (GoBinaryFieldSet,)),
+            QueryRule(GoRoot, ()),
+            QueryRule(BuildGoPackageRequest, [BuildGoPackageTargetRequest]),
         ],
         target_types=[GoModTarget, GoPackageTarget, GoBinaryTarget],
     )
@@ -60,17 +73,30 @@ def rule_runner() -> RuleRunner:
     return rule_runner
 
 
-def test_race_detector_fields_work_as_expected(rule_runner: RuleRunner) -> None:
+@pytest.mark.parametrize(
+    "field_name,getter,enabled_for_platform",
+    (
+        ("race", lambda opts: opts.with_race_detector, race_detector_supported),
+        ("msan", lambda opts: opts.with_msan, msan_supported),
+        ("asan", lambda opts: opts.with_asan, asan_supported),
+    ),
+)
+def test_runtime_check_enable_fields_work_as_expected(
+    rule_runner: RuleRunner,
+    field_name: str,
+    getter: Callable[[GoBuildOptions], bool],
+    enabled_for_platform: Callable[[GoRoot], bool],
+) -> None:
     def module_files(dir_path: str, value: bool | None) -> dict:
-        race_field = f", race={value}" if value is not None else ""
+        field = f", {field_name}={value}" if value is not None else ""
         return {
             f"{dir_path}/BUILD": dedent(
                 f"""\
-            go_mod(name="mod"{race_field})
+            go_mod(name="mod"{field})
             go_package(name="pkg")
-            go_binary(name="bin_with_race_unspecified")
-            go_binary(name="bin_with_race_false", race=False)
-            go_binary(name="bin_with_race_true", race=True)
+            go_binary(name="bin_with_field_unspecified")
+            go_binary(name="bin_with_field_false", {field_name}=False)
+            go_binary(name="bin_with_field_true", {field_name}=True)
             """
             ),
             f"{dir_path}/go.mod": f"module test.pantsbuild.org/{dir_path}\n",
@@ -80,19 +106,23 @@ def test_race_detector_fields_work_as_expected(rule_runner: RuleRunner) -> None:
             func main() {}
             """
             ),
-            f"{dir_path}/pkg_race_false/BUILD": "go_package(test_race=False)\n",
-            f"{dir_path}/pkg_race_false/foo.go": "package pkg_race_false\n",
-            f"{dir_path}/pkg_race_true/BUILD": "go_package(test_race=True)\n",
-            f"{dir_path}/pkg_race_true/foo.go": "package pkg_race_true\n",
+            f"{dir_path}/pkg_false/BUILD": f"go_package(test_{field_name}=False)\n",
+            f"{dir_path}/pkg_false/foo.go": "package pkg_false\n",
+            f"{dir_path}/pkg_true/BUILD": f"go_package(test_{field_name}=True)\n",
+            f"{dir_path}/pkg_true/foo.go": "package pkg_true\n",
         }
 
-    rule_runner.write_files(
-        {
-            **module_files("mod_race_unspecified", None),
-            **module_files("mod_race_false", False),
-            **module_files("mod_race_true", True),
-        }
-    )
+    files = {
+        **module_files("mod_unspecified", None),
+        **module_files("mod_false", False),
+        **module_files("mod_true", True),
+    }
+    pprint.pprint(files)
+    rule_runner.write_files(files)
+
+    goroot = rule_runner.request(GoRoot, [])
+    if not enabled_for_platform(goroot):
+        pytest.skip(f"Skipping test because `{field_name}` is not supported on this platform.")
 
     def assert_value(
         address: Address, expected_value: bool, *, for_tests: bool = False, msg: str
@@ -101,143 +131,141 @@ def test_race_detector_fields_work_as_expected(rule_runner: RuleRunner) -> None:
             GoBuildOptions,
             (GoBuildOptionsFromTargetRequest(address=address, for_tests=for_tests),),
         )
-        assert (
-            opts.with_race_detector is expected_value
-        ), f"{address}: expected {expected_value} {msg}"
+        assert getter(opts) is expected_value, f"{address}: expected {expected_value} {msg}"
 
     # go_mod does not specify a value for `race`
     assert_value(
-        Address("mod_race_unspecified", target_name="bin_with_race_unspecified"),
+        Address("mod_unspecified", target_name="bin_with_field_unspecified"),
         False,
         msg="when unspecified on go_binary and when unspecified on go_mod",
     )
     assert_value(
-        Address("mod_race_unspecified", target_name="bin_with_race_false"),
+        Address("mod_unspecified", target_name="bin_with_field_false"),
         False,
-        msg="when race=False on go_binary and when unspecified on go_mod",
+        msg=f"when {field_name}=False on go_binary and when unspecified on go_mod",
     )
     assert_value(
-        Address("mod_race_unspecified", target_name="bin_with_race_true"),
+        Address("mod_unspecified", target_name="bin_with_field_true"),
         True,
-        msg="when race=True on go_binary and when unspecified on go_mod",
+        msg=f"when {field_name}=True on go_binary and when unspecified on go_mod",
     )
     assert_value(
-        Address("mod_race_unspecified", target_name="pkg"),
+        Address("mod_unspecified", target_name="pkg"),
         False,
         for_tests=True,
         msg="for go_package when unspecified on go_mod",
     )
     assert_value(
-        Address("mod_race_unspecified/pkg_race_false"),
+        Address("mod_unspecified/pkg_false"),
         False,
         for_tests=True,
-        msg="for go_package(test_race=False) when unspecified on go_mod",
+        msg=f"for go_package(test_{field_name}=False) when unspecified on go_mod",
     )
     assert_value(
-        Address("mod_race_unspecified/pkg_race_true"),
+        Address("mod_unspecified/pkg_true"),
         True,
         for_tests=True,
-        msg="for go_package(test_race=True) when unspecified on go_mod",
+        msg=f"for go_package(test_{field_name}=True) when unspecified on go_mod",
     )
     assert_value(
-        Address("mod_race_unspecified", target_name="mod"),
+        Address("mod_unspecified", target_name="mod"),
         False,
         msg="for go_mod when unspecified on go_mod",
     )
 
     # go_mod specifies False for `race`
     assert_value(
-        Address("mod_race_false", target_name="bin_with_race_unspecified"),
+        Address("mod_false", target_name="bin_with_field_unspecified"),
         False,
-        msg="when unspecified on go_binary and when race=False on go_mod",
+        msg=f"when unspecified on go_binary and when {field_name}=False on go_mod",
     )
     assert_value(
-        Address("mod_race_false", target_name="bin_with_race_false"),
+        Address("mod_false", target_name="bin_with_field_false"),
         False,
-        msg="when race=False on go_binary and when race=False on go_mod",
+        msg=f"when {field_name}=False on go_binary and when {field_name}=False on go_mod",
     )
     assert_value(
-        Address("mod_race_false", target_name="bin_with_race_true"),
+        Address("mod_false", target_name="bin_with_field_true"),
         True,
-        msg="when race=True on go_binary and when race=False on go_mod",
+        msg=f"when {field_name}=True on go_binary and when {field_name}=False on go_mod",
     )
     assert_value(
-        Address("mod_race_false", target_name="pkg"),
+        Address("mod_false", target_name="pkg"),
         False,
         for_tests=True,
-        msg="for go_package when race=False on go_mod",
+        msg=f"for go_package when {field_name}=False on go_mod",
     )
     assert_value(
-        Address("mod_race_false/pkg_race_false"),
+        Address("mod_false/pkg_false"),
         False,
         for_tests=True,
-        msg="for go_package(test_race=False) when race=False on go_mod",
+        msg=f"for go_package(test_{field_name}=False) when {field_name}=False on go_mod",
     )
     assert_value(
-        Address("mod_race_false/pkg_race_true"),
+        Address("mod_false/pkg_true"),
         True,
         for_tests=True,
-        msg="for go_package(test_race=True) when race=False on go_mod",
+        msg=f"for go_package(test_{field_name}=True) when {field_name}=False on go_mod",
     )
     assert_value(
-        Address("mod_race_false", target_name="mod"),
+        Address("mod_false", target_name="mod"),
         False,
-        msg="for go_mod when race=False on go_mod",
+        msg=f"for go_mod when {field_name}=False on go_mod",
     )
 
     # go_mod specifies True for `race`
     assert_value(
-        Address("mod_race_true", target_name="bin_with_race_unspecified"),
+        Address("mod_true", target_name="bin_with_field_unspecified"),
         True,
-        msg="when unspecified on go_binary and when race=True on go_mod",
+        msg=f"when unspecified on go_binary and when {field_name}=True on go_mod",
     )
     assert_value(
-        Address("mod_race_true", target_name="bin_with_race_false"),
+        Address("mod_true", target_name="bin_with_field_false"),
         False,
-        msg="when race=False on go_binary and when race=True on go_mod",
+        msg=f"when {field_name}=False on go_binary and when {field_name}=True on go_mod",
     )
     assert_value(
-        Address("mod_race_true", target_name="bin_with_race_true"),
+        Address("mod_true", target_name="bin_with_field_true"),
         True,
-        msg="when race=True on go_binary and when race=True on go_mod",
+        msg=f"when {field_name}=True on go_binary and when {field_name}=True on go_mod",
     )
     assert_value(
-        Address("mod_race_true", target_name="pkg"),
+        Address("mod_true", target_name="pkg"),
         True,
         for_tests=True,
-        msg="for go_package when race=True on go_mod",
+        msg=f"for go_package when {field_name}=True on go_mod",
     )
     assert_value(
-        Address("mod_race_true/pkg_race_false"),
+        Address("mod_true/pkg_false"),
         False,
         for_tests=True,
-        msg="for go_package(test_race=False) when race=True on go_mod",
+        msg=f"for go_package(test_{field_name}=False) when {field_name}=True on go_mod",
     )
     assert_value(
-        Address("mod_race_true/pkg_race_true"),
+        Address("mod_true/pkg_true"),
         True,
         for_tests=True,
-        msg="for go_package(test_race=True) when race=True on go_mod",
+        msg=f"for go_package(test_{field_name}=True) when {field_name}=True on go_mod",
     )
     assert_value(
-        Address("mod_race_true", target_name="mod"),
+        Address("mod_true", target_name="mod"),
         True,
-        msg="for go_mod when race=True on go_mod",
+        msg=f"for go_mod when {field_name}=True on go_mod",
     )
 
-    # Test when `--go-test-force-race` is in effect.
-    rule_runner.set_options(["--go-test-force-race"], env_inherit={"PATH"})
+    # Test when `--go-test-force-{race,msan}` is in effect.
+    rule_runner.set_options([f"--go-test-force-{field_name}"], env_inherit={"PATH"})
     assert_value(
-        Address("mod_race_unspecified", target_name="pkg"),
+        Address("mod_unspecified", target_name="pkg"),
         True,
         for_tests=True,
-        msg="for go_package when --go-test-force-race and when unspecified on go_mod",
+        msg=f"for go_package when --go-test-force-{field_name} and when unspecified on go_mod",
     )
     assert_value(
-        Address("mod_race_false", target_name="pkg"),
+        Address("mod_false", target_name="pkg"),
         True,
         for_tests=True,
-        msg="for go_package when --go-test-force-race and when race=False on go_mod",
+        msg=f"for go_package when --go-test-force-{field_name }and when {field_name}=False on go_mod",
     )
 
 
@@ -290,3 +318,127 @@ def test_race_detector_actually_works(rule_runner: RuleRunner) -> None:
     result = subprocess.run([os.path.join(rule_runner.build_root, "bin")], capture_output=True)
     assert result.returncode == 66  # standard exit code if race detector finds a race
     assert b"WARNING: DATA RACE" in result.stderr
+
+
+def test_compiler_flags_fields(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "mod_with_field/BUILD": dedent(
+                """\
+            go_mod(
+              name="mod",
+              compiler_flags=["-foo"],
+            )
+
+            go_package(name="pkg")
+
+            go_binary(
+              name="bin_without_field",
+            )
+
+            go_binary(
+              name="bin_with_field",
+              compiler_flags=["-bar"],
+            )
+            """
+            ),
+            "mod_with_field/go.mod": "module example.pantsbuild.org/mod_with_field\n",
+            "mod_with_field/main.go": dedent(
+                """\
+            package main
+            func main() {}
+            """
+            ),
+            "mod_with_field/pkg_with_field/BUILD": dedent(
+                """
+                go_package(
+                  compiler_flags=["-xyzzy"],
+                )
+                """
+            ),
+            "mod_with_field/pkg_with_field/foo.go": dedent(
+                """\
+            package pkg_with_field
+            """
+            ),
+        }
+    )
+
+    def assert_flags(address: Address, expected_value: Iterable[str]) -> None:
+        opts = rule_runner.request(
+            GoBuildOptions,
+            (
+                GoBuildOptionsFromTargetRequest(
+                    address=address,
+                ),
+            ),
+        )
+        assert opts.compiler_flags == tuple(
+            expected_value
+        ), f"{address}: expected `compiler_flags` to be {expected_value}"
+
+    assert_flags(Address("mod_with_field", target_name="mod"), ["-foo"])
+    assert_flags(Address("mod_with_field", target_name="bin_without_field"), ["-foo"])
+    assert_flags(Address("mod_with_field", target_name="bin_with_field"), ["-foo", "-bar"])
+    assert_flags(Address("mod_with_field", target_name="pkg"), ["-foo"])
+    assert_flags(Address("mod_with_field/pkg_with_field"), ["-foo"])
+
+    build_request = rule_runner.request(
+        BuildGoPackageRequest,
+        [
+            BuildGoPackageTargetRequest(
+                Address("mod_with_field/pkg_with_field"), build_opts=GoBuildOptions()
+            )
+        ],
+    )
+    assert build_request.pkg_specific_compiler_flags == ("-xyzzy",)
+
+
+def test_linker_flags_fields(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "mod_with_field/BUILD": dedent(
+                """\
+            go_mod(
+              name="mod",
+              linker_flags=["-foo"],
+            )
+
+            go_package(name="pkg")
+
+            go_binary(
+              name="bin_without_field",
+            )
+
+            go_binary(
+              name="bin_with_field",
+              linker_flags=["-bar"],
+            )
+            """
+            ),
+            "mod_with_field/go.mod": "module example.pantsbuild.org/mod_with_field\n",
+            "mod_with_field/main.go": dedent(
+                """\
+            package main
+            func main() {}
+            """
+            ),
+        }
+    )
+
+    def assert_flags(address: Address, expected_value: Iterable[str]) -> None:
+        opts = rule_runner.request(
+            GoBuildOptions,
+            (
+                GoBuildOptionsFromTargetRequest(
+                    address=address,
+                ),
+            ),
+        )
+        assert opts.linker_flags == tuple(
+            expected_value
+        ), f"{address}: expected `linker_flags` to be {expected_value}"
+
+    assert_flags(Address("mod_with_field", target_name="mod"), ["-foo"])
+    assert_flags(Address("mod_with_field", target_name="bin_without_field"), ["-foo"])
+    assert_flags(Address("mod_with_field", target_name="bin_with_field"), ["-foo", "-bar"])

@@ -20,6 +20,7 @@ from pants.backend.visibility.rule_types import (
     flatten,
 )
 from pants.backend.visibility.rules import rules as visibility_rules
+from pants.base.exceptions import MappingError
 from pants.core.target_types import FilesGeneratorTarget, GenericTarget, ResourcesGeneratorTarget
 from pants.engine.addresses import Address, Addresses, AddressInput
 from pants.engine.internals.dep_rules import (
@@ -594,8 +595,8 @@ def test_dependency_rules(rule_runner: RuleRunner, caplog) -> None:
         expect_logged=[
             (
                 logging.DEBUG,
-                "WARN: type:target name:joker path:'src/a' relpath:'src/a/a2' address:src/a:a "
-                "rule:'?*' src/a/a2/BUILD: ?*",
+                "WARN: type=target address=src/a/a2:joker other=src/a:a rule='?*' "
+                "src/a/a2/BUILD: ?*",
             ),
         ],
         exclusively=False,
@@ -616,8 +617,8 @@ def test_dependency_rules(rule_runner: RuleRunner, caplog) -> None:
         expect_logged=[
             (
                 logging.DEBUG,
-                "DENY: type:resources name:internal path:'src/b' relpath:'src/a' "
-                "address:src/b:b rule:'!*' src/a/BUILD: ., !*",
+                "DENY: type=resources address=src/a:internal other=src/b:b rule='!*' "
+                "src/a/BUILD: ., !*",
             ),
         ],
         exclusively=False,
@@ -635,8 +636,8 @@ def test_dependency_rules(rule_runner: RuleRunner, caplog) -> None:
         expect_logged=[
             (
                 logging.DEBUG,
-                "DENY: type:resources name:internal path:'src/b' relpath:'src/a' address:src/b:b "
-                "rule:'!*' src/a/BUILD: ., !*",
+                "DENY: type=resources address=src/a:internal other=src/b:b rule='!*' "
+                "src/a/BUILD: ., !*",
             ),
         ],
         exclusively=False,
@@ -793,20 +794,14 @@ def test_file_specific_rules(rule_runner: RuleRunner) -> None:
             "src/lib/pub/BUILD": dedent(
                 """
                 __dependents_rules__(
-                  # Allow all to depend on files from lib/pub/
-                  # TODO: support to except one file. work around now is to have the rule in
-                  # src/app/BUILD
+                  # Allow all to depend on files from lib/pub/ except for one file in particular.
+                  ("[/exception.txt]", "//src/lib/**", "!*"),
                   ("*", "*"),
                 )
                 """
             ),
             "src/app/BUILD": dedent(
                 """
-                __dependencies_rules__(
-                  # TODO: this exception should live in src/lib/pub/BUILD
-                  ("*", "!//src/lib/pub/exception.txt", "*"),
-                )
-
                 files(sources=["**/*.txt"])
                 """
             ),
@@ -842,10 +837,6 @@ def test_file_specific_rules(rule_runner: RuleRunner) -> None:
 
 
 def test_relpath_for_file_targets(rule_runner: RuleRunner) -> None:
-    # Testing purpose:
-    #
-    # When a file is owned by a target declared in a parent directory, make sure the correct BUILD
-    # file is consulted for the rules set to apply, and with the correct relpath for the matching.
     rule_runner.write_files(
         {
             "anchor-mode/invoked/BUILD": dedent(
@@ -871,3 +862,28 @@ def test_relpath_for_file_targets(rule_runner: RuleRunner) -> None:
         "anchor-mode/invoked/origin/file1.inv:../inv",
         ("anchor-mode/invoked/dependency/file2.inv:../inv", DependencyRuleAction.ALLOW),
     )
+
+
+def test_single_rules_declaration_per_build_file(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "test/BUILD": dedent(
+                """
+                __dependencies_rules__(
+                  ("*", "!*"),
+                )
+
+                __dependencies_rules__(
+                  ("*", "*"),
+                )
+                """
+            ),
+        },
+    )
+
+    msg = "BuildFileVisibilityRulesError: There must be at most one each"
+    with engine_error(MappingError, contains=msg):
+        assert_dependency_rules(
+            rule_runner,
+            "test",
+        )

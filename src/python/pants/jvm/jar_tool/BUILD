@@ -7,14 +7,8 @@ python_tests(
     name="tests",
 )
 
-relocated_files(
-    name="java_files",
-    files_targets=[
-        "//src/java/org/pantsbuild/args4j:src",
-        "//src/java/org/pantsbuild/tools/jar:src",
-    ],
-    src="src/java",
-    dest="src/python/pants/jvm/jar_tool/src",
+resources(
+    name="jar_tool_src",
+    sources=["jar_tool.lock"],
+    dependencies=["./args4j:src", "./jar_tool_source:src"],
 )
-
-resources(name="jar_tool_src", sources=["jar_tool.lock"], dependencies=[":java_files"])

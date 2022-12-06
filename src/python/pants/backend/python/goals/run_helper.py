@@ -2,9 +2,10 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
+import dataclasses
 import os
 import textwrap
-from typing import Iterable, Optional
+from typing import Optional
 
 from pants.backend.python.subsystems.debugpy import DebugPy
 from pants.backend.python.target_types import (
@@ -15,7 +16,7 @@ from pants.backend.python.target_types import (
 )
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.local_dists import LocalDistsPex, LocalDistsPexRequest
-from pants.backend.python.util_rules.pex import Pex, PexRequest
+from pants.backend.python.util_rules.pex import Pex, PexRequest, VenvPex, VenvPexRequest
 from pants.backend.python.util_rules.pex_environment import PexEnvironment
 from pants.backend.python.util_rules.pex_from_targets import (
     InterpreterConstraintsRequest,
@@ -45,10 +46,10 @@ async def _create_python_source_run_request(
     pex_env: PexEnvironment,
     run_in_sandbox: bool,
     console_script: Optional[ConsoleScript] = None,
-    additional_pex_args: Iterable[str] = (),
 ) -> RunRequest:
     addresses = [address]
-    entry_point, transitive_targets = await MultiGet(
+    interpreter_constraints, entry_point, transitive_targets = await MultiGet(
+        Get(InterpreterConstraints, InterpreterConstraintsRequest(addresses)),
         Get(
             ResolvedPexEntryPoint,
             ResolvePexEntryPointRequest(entry_point_field),
@@ -56,35 +57,33 @@ async def _create_python_source_run_request(
         Get(TransitiveTargets, TransitiveTargetsRequest(addresses)),
     )
 
-    interpreter_constraints = await Get(
-        InterpreterConstraints, InterpreterConstraintsRequest(addresses)
-    )
-
     pex_filename = (
         address.generated_name.replace(".", "_") if address.generated_name else address.target_name
     )
-    pex_get = Get(
-        Pex,
-        PexFromTargetsRequest(
-            addresses,
-            output_filename=f"{pex_filename}.pex",
-            internal_only=True,
-            include_source_files=False,
-            # `PEX_EXTRA_SYS_PATH` should contain this entry_point's module.
-            main=console_script or entry_point.val,
-            additional_args=(
-                *additional_pex_args,
-                # N.B.: Since we cobble together the runtime environment via PEX_EXTRA_SYS_PATH
-                # below, it's important for any app that re-executes itself that these environment
-                # variables are not stripped.
-                "--no-strip-pex-env",
+
+    pex_request, sources = await MultiGet(
+        Get(
+            PexRequest,
+            PexFromTargetsRequest(
+                addresses,
+                output_filename=f"{pex_filename}.pex",
+                internal_only=True,
+                include_source_files=False,
+                # `PEX_EXTRA_SYS_PATH` should contain this entry_point's module.
+                main=console_script or entry_point.val,
+                additional_args=(
+                    # N.B.: Since we cobble together the runtime environment via PEX_EXTRA_SYS_PATH
+                    # below, it's important for any app that re-executes itself that these environment
+                    # variables are not stripped.
+                    "--no-strip-pex-env",
+                ),
             ),
         ),
+        Get(
+            PythonSourceFiles,
+            PythonSourceFilesRequest(transitive_targets.closure, include_files=True),
+        ),
     )
-    sources_get = Get(
-        PythonSourceFiles, PythonSourceFilesRequest(transitive_targets.closure, include_files=True)
-    )
-    pex, sources = await MultiGet(pex_get, sources_get)
 
     local_dists = await Get(
         LocalDistsPex,
@@ -95,10 +94,14 @@ async def _create_python_source_run_request(
             sources=sources,
         ),
     )
+    pex_request = dataclasses.replace(
+        pex_request, pex_path=(*pex_request.pex_path, local_dists.pex)
+    )
 
+    complete_pex_environment = pex_env.in_workspace()
+    venv_pex = await Get(VenvPex, VenvPexRequest(pex_request, complete_pex_environment))
     input_digests = [
-        pex.digest,
-        local_dists.pex.digest,
+        venv_pex.digest,
         # Note regarding not-in-sandbox mode: You might think that the sources don't need to be copied
         # into the chroot when using inline sources. But they do, because some of them might be
         # codegenned, and those won't exist in the inline source tree. Rather than incurring the
@@ -109,9 +112,6 @@ async def _create_python_source_run_request(
     ]
     merged_digest = await Get(Digest, MergeDigests(input_digests))
 
-    complete_pex_env = pex_env.in_workspace()
-    args = complete_pex_env.create_argv(_in_chroot(pex.name), python=pex.python)
-
     chrooted_source_roots = [_in_chroot(sr) for sr in sources.source_roots]
     # The order here is important: we want the in-repo sources to take precedence over their
     # copies in the sandbox (see above for why those copies exist even in non-sandboxed mode).
@@ -120,14 +120,13 @@ async def _create_python_source_run_request(
         *chrooted_source_roots,
     ]
     extra_env = {
-        **pex_env.in_workspace().environment_dict(python_configured=pex.python is not None),
-        "PEX_PATH": _in_chroot(local_dists.pex.name),
+        **complete_pex_environment.environment_dict(python_configured=venv_pex.python is not None),
         "PEX_EXTRA_SYS_PATH": os.pathsep.join(source_roots),
     }
 
     return RunRequest(
         digest=merged_digest,
-        args=args,
+        args=[_in_chroot(venv_pex.pex.argv0)],
         extra_env=extra_env,
     )
 
@@ -157,6 +156,8 @@ async def _create_python_source_run_dap_request(
                             """
                             import os
                             CHROOT = os.environ["PANTS_CHROOT"]
+
+                            del os.environ["PEX_INTERPRETER"]
 
                             # See https://github.com/pantsbuild/pants/issues/17540
                             # For `run --debug-adapter`, the client might send a `pathMappings`
@@ -202,9 +203,8 @@ async def _create_python_source_run_dap_request(
         [
             extra_env["PEX_PATH"],
             # For debugpy to work properly, we need to have just one "environment" for our
-            # command to run in. Therefore, we cobble one together by exeucting debugpy's PEX, and
-            # shoehorning in the original PEX through PEX_PATH.
-            _in_chroot(os.path.basename(regular_run_request.args[1])),
+            # command to run in. Therefore, we cobble one together with PEX_PATH.
+            _in_chroot(debugpy_pex.name),
         ]
     )
     extra_env["PEX_INTERPRETER"] = "1"
@@ -212,8 +212,7 @@ async def _create_python_source_run_dap_request(
     main = console_script or entry_point.val
     assert main is not None
     args = [
-        regular_run_request.args[0],  # python executable
-        _in_chroot(debugpy_pex.name),
+        *regular_run_request.args,
         _in_chroot("__debugpy_launcher.py"),
         *debugpy.get_args(debug_adapter, main),
     ]

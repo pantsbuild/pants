@@ -23,7 +23,6 @@ from pants.backend.go.util_rules.coverage import (
     ApplyCodeCoverageResult,
     BuiltGoPackageCodeCoverageMetadata,
     FileCodeCoverageMetadata,
-    GoCoverageConfig,
 )
 from pants.backend.go.util_rules.embedcfg import EmbedConfig
 from pants.backend.go.util_rules.goroot import GoRoot
@@ -65,7 +64,7 @@ class BuildGoPackageRequest(EngineAwareParameter):
         minimum_go_version: str | None,
         for_tests: bool = False,
         embed_config: EmbedConfig | None = None,
-        coverage_config: GoCoverageConfig | None = None,
+        with_coverage: bool = False,
         cgo_files: tuple[str, ...] = (),
         cgo_flags: CGoCompilerFlags | None = None,
         c_files: tuple[str, ...] = (),
@@ -73,12 +72,18 @@ class BuildGoPackageRequest(EngineAwareParameter):
         objc_files: tuple[str, ...] = (),
         fortran_files: tuple[str, ...] = (),
         prebuilt_object_files: tuple[str, ...] = (),
+        pkg_specific_compiler_flags: tuple[str, ...] = (),
     ) -> None:
         """Build a package and its dependencies as `__pkg__.a` files.
 
         Instances of this class form a structure-shared DAG, and so a hashcode is pre-computed for
         the recursive portion.
         """
+
+        if with_coverage and build_opts.coverage_config is None:
+            raise ValueError(
+                "BuildGoPackageRequest.with_coverage is set but BuildGoPackageRequest.build_opts.coverage_config is None!"
+            )
 
         self.import_path = import_path
         self.pkg_name = pkg_name
@@ -91,7 +96,7 @@ class BuildGoPackageRequest(EngineAwareParameter):
         self.minimum_go_version = minimum_go_version
         self.for_tests = for_tests
         self.embed_config = embed_config
-        self.coverage_config = coverage_config
+        self.with_coverage = with_coverage
         self.cgo_files = cgo_files
         self.cgo_flags = cgo_flags
         self.c_files = c_files
@@ -99,6 +104,7 @@ class BuildGoPackageRequest(EngineAwareParameter):
         self.objc_files = objc_files
         self.fortran_files = fortran_files
         self.prebuilt_object_files = prebuilt_object_files
+        self.pkg_specific_compiler_flags = pkg_specific_compiler_flags
         self._hashcode = hash(
             (
                 self.import_path,
@@ -112,7 +118,7 @@ class BuildGoPackageRequest(EngineAwareParameter):
                 self.minimum_go_version,
                 self.for_tests,
                 self.embed_config,
-                self.coverage_config,
+                self.with_coverage,
                 self.cgo_files,
                 self.cgo_flags,
                 self.c_files,
@@ -120,6 +126,7 @@ class BuildGoPackageRequest(EngineAwareParameter):
                 self.objc_files,
                 self.fortran_files,
                 self.prebuilt_object_files,
+                self.pkg_specific_compiler_flags,
             )
         )
 
@@ -139,14 +146,15 @@ class BuildGoPackageRequest(EngineAwareParameter):
             f"minimum_go_version={self.minimum_go_version}, "
             f"for_tests={self.for_tests}, "
             f"embed_config={self.embed_config}, "
-            f"coverage_config={self.coverage_config}, "
+            f"with_coverage={self.with_coverage}, "
             f"cgo_files={self.cgo_files}, "
             f"cgo_flags={self.cgo_flags}, "
             f"c_files={self.c_files}, "
             f"cxx_files={self.cxx_files}, "
             f"objc_files={self.objc_files}, "
             f"fortran_files={self.fortran_files}, "
-            f"prebuilt_object_files={self.prebuilt_object_files}"
+            f"prebuilt_object_files={self.prebuilt_object_files}, "
+            f"pkg_specific_compiler_flags={self.pkg_specific_compiler_flags}"
             ")"
         )
 
@@ -168,7 +176,7 @@ class BuildGoPackageRequest(EngineAwareParameter):
             and self.minimum_go_version == other.minimum_go_version
             and self.for_tests == other.for_tests
             and self.embed_config == other.embed_config
-            and self.coverage_config == other.coverage_config
+            and self.with_coverage == other.with_coverage
             and self.cgo_files == other.cgo_files
             and self.cgo_flags == other.cgo_flags
             and self.c_files == other.c_files
@@ -176,6 +184,7 @@ class BuildGoPackageRequest(EngineAwareParameter):
             and self.objc_files == other.objc_files
             and self.fortran_files == other.fortran_files
             and self.prebuilt_object_files == other.prebuilt_object_files
+            and self.pkg_specific_compiler_flags == other.pkg_specific_compiler_flags
             # TODO: Use a recursive memoized __eq__ if this ever shows up in profiles.
             and self.direct_dependencies == other.direct_dependencies
         )
@@ -405,7 +414,9 @@ async def build_go_package(
     s_files = list(request.s_files)
     go_files_digest = request.digest
     cover_file_metadatas: tuple[FileCodeCoverageMetadata, ...] | None = None
-    if request.coverage_config:
+    if request.with_coverage:
+        coverage_config = request.build_opts.coverage_config
+        assert coverage_config is not None, "with_coverage=True but coverage_config is None!"
         coverage_result = await Get(
             ApplyCodeCoverageResult,
             ApplyCodeCoverageRequest(
@@ -413,7 +424,7 @@ async def build_go_package(
                 dir_path=request.dir_path,
                 go_files=go_files,
                 cgo_files=cgo_files,
-                cover_mode=request.coverage_config.cover_mode,
+                cover_mode=coverage_config.cover_mode,
                 import_path=request.import_path,
             ),
         )
@@ -453,6 +464,7 @@ async def build_go_package(
                 import_path=request.import_path,
                 pkg_name=request.pkg_name,
                 digest=go_files_digest,
+                build_opts=request.build_opts,
                 dir_path=request.dir_path,
                 cgo_files=cgo_files,
                 cgo_flags=request.cgo_flags,
@@ -548,10 +560,22 @@ async def build_go_package(
     if request.build_opts.with_race_detector:
         compile_args.append("-race")
 
+    if request.build_opts.with_msan:
+        compile_args.append("-msan")
+
+    if request.build_opts.with_asan:
+        compile_args.append("-asan")
+
     # If there are no loose object files to add to the package archive later or assembly files to assemble,
     # then pass -complete flag which tells the compiler that the provided Go files constitute the entire package.
     if not objects and not s_files:
         compile_args.append("-complete")
+
+    # Add any extra compiler flags after the ones added automatically by this rule.
+    if request.build_opts.compiler_flags:
+        compile_args.extend(request.build_opts.compiler_flags)
+    if request.pkg_specific_compiler_flags:
+        compile_args.extend(request.pkg_specific_compiler_flags)
 
     relativized_sources = (
         f"./{request.dir_path}/{name}" if request.dir_path else f"./{name}" for name in go_files

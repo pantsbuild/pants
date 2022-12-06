@@ -91,7 +91,7 @@ from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_property
 from pants.util.meta import frozen_after_init
-from pants.util.ordered_set import FrozenOrderedSet
+from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
@@ -862,6 +862,15 @@ async def get_requirements(
     direct_deps_tgts = await MultiGet(
         Get(Targets, DependenciesRequest(tgt.get(Dependencies))) for tgt in owned_by_us
     )
+    direct_deps_chained = OrderedSet(itertools.chain.from_iterable(direct_deps_tgts))
+    # If a python_requirement T has an undeclared requirement R, we recommend fixing that by adding
+    # an explicit dependency from T to a python_requirement target for R. In that case we want to
+    # represent these explicit deps in T's distribution metadata. See issue #17593.
+    transitive_explicit_reqs = await MultiGet(
+        Get(TransitiveTargets, TransitiveTargetsRequest([tgt.address]))
+        for tgt in direct_deps_chained
+        if tgt.has_field(PythonRequirementsField)
+    )
 
     transitive_excludes: FrozenOrderedSet[Target] = FrozenOrderedSet()
     uneval_trans_excl = [
@@ -875,7 +884,9 @@ async def get_requirements(
             itertools.chain.from_iterable(excludes for excludes in nested_trans_excl)
         )
 
-    direct_deps_chained = FrozenOrderedSet(itertools.chain.from_iterable(direct_deps_tgts))
+    direct_deps_chained.update(
+        itertools.chain.from_iterable(t.dependencies for t in transitive_explicit_reqs)
+    )
     direct_deps_with_excl = direct_deps_chained.difference(transitive_excludes)
 
     req_strs = list(

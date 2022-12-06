@@ -986,7 +986,7 @@ def reversion_prebuilt_wheels() -> None:
             whl_file=str(whl),
             dest_dir=str(stable_wheel_dir),
             target_version=CONSTANTS.pants_stable_version,
-            extra_globs=["pants/VERSION"],
+            extra_globs=["pants/_version/VERSION"],
         )
 
 
