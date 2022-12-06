@@ -10,41 +10,81 @@ from typing import Iterable, Tuple
 
 import pytest
 
-from pants.testutil.pants_integration_test import PantsResult, run_pants, setup_tmpdir
+from pants.backend.codegen.protobuf.python import additional_fields as protobuf_additional_fields
+from pants.backend.codegen.protobuf.python.python_protobuf_module_mapper import (
+    rules as protobuf_module_mapper_rules,
+)
+from pants.backend.codegen.protobuf.python.python_protobuf_subsystem import (
+    rules as protobuf_subsystem_rules,
+)
+from pants.backend.codegen.protobuf.python.rules import rules as protobuf_python_rules
+from pants.backend.codegen.protobuf.target_types import ProtobufSourcesGeneratorTarget
+from pants.backend.codegen.protobuf.target_types import rules as protobuf_target_types_rules
+from pants.backend.python import target_types_rules
+from pants.backend.python.dependency_inference import rules as dependency_inference_rules
+from pants.backend.python.goals import setup_py
+from pants.backend.python.goals.run_python_source import PythonSourceFieldSet
+from pants.backend.python.goals.run_python_source import rules as run_rules
+from pants.backend.python.macros.python_artifact import PythonArtifact
+from pants.backend.python.target_types import (
+    PythonDistribution,
+    PythonRequirementTarget,
+    PythonSourcesGeneratorTarget,
+)
+from pants.backend.python.util_rules import local_dists, pex_from_targets
+from pants.build_graph.address import Address
+from pants.core.goals.run import RunDebugAdapterRequest, RunRequest
+from pants.engine.process import InteractiveProcess
+from pants.engine.rules import QueryRule
+from pants.engine.target import Target
+from pants.testutil.pants_integration_test import run_pants
+from pants.testutil.rule_runner import RuleRunner, mock_console
 
 
-def run_pants_run(
-    sources: dict[str, str],
-    *,
-    source_roots: Iterable[str],
-    file: str,
-    pants_args: Iterable[str] = (),
-    extra_args: Iterable[str] = (),
-    extra_env: dict[str, str] = {},
-) -> Tuple[PantsResult, str]:
-    with setup_tmpdir(sources) as tmpdir:
-        source_roots_flag_value = ", ".join(
-            f"'/{tmpdir}/{source_root}'" for source_root in source_roots
-        )
-        args = [
-            "--backend-packages=pants.backend.python",
-            "--backend-packages=pants.backend.codegen.protobuf.python",
-            f"--source-root-patterns=[{source_roots_flag_value}]",
-            "--pants-ignore=__pycache__",
-            "--pants-ignore=/src/python",
-            *pants_args,
-            "run",
-            f"{tmpdir}/{file}",
-            *extra_args,
-        ]
-        result =  run_pants(args, extra_env=extra_env)
+@pytest.fixture
+def rule_runner() -> RuleRunner:
+    return RuleRunner(
+        rules=[
+            *run_rules(),
+            *dependency_inference_rules.rules(),
+            *target_types_rules.rules(),
+            *local_dists.rules(),
+            *pex_from_targets.rules(),
+            *setup_py.rules(),
+            *protobuf_subsystem_rules(),
+            *protobuf_target_types_rules(),
+            *protobuf_python_rules(),
+            *protobuf_additional_fields.rules(),
+            *protobuf_module_mapper_rules(),
+            QueryRule(RunRequest, (PythonSourceFieldSet,)),
+            QueryRule(RunDebugAdapterRequest, (RunDebugAdapterRequest,)),
+        ],
+        target_types=[
+            ProtobufSourcesGeneratorTarget,
+            PythonSourcesGeneratorTarget,
+            PythonRequirementTarget,
+            PythonDistribution,
+        ],
+        objects={"python_artifact": PythonArtifact},
+    )
 
-        # Now test using the debug adapter
-        args.insert(args.index("run")+1, "--debug-adapter")
-        debug_adapter_result = run_pants(args, extra_env=extra_env)
-        assert result.exit_code == debug_adapter_result.exit_code, result.stderr
 
-        return result, tmpdir
+def run_run_request(rule_runner: RuleRunner, target: Target) -> Tuple[int, str, str]:
+    run_request = rule_runner.request(RunRequest, [PythonSourceFieldSet.create(target)])
+    run_process = InteractiveProcess(
+        argv=run_request.args,
+        env=run_request.extra_env,
+        input_digest=run_request.digest,
+        run_in_workspace=True,
+        immutable_input_digests=run_request.immutable_input_digests,
+        append_only_caches=run_request.append_only_caches,
+    )
+    with mock_console(rule_runner.options_bootstrapper) as mocked_console:
+        result = rule_runner.run_interactive_process(run_process)
+        stdout = mocked_console[1].get_stdout()
+        stderr = mocked_console[1].get_stderr()
+
+    return result.exit_code, stdout, stderr
 
 
 
@@ -70,6 +110,7 @@ def test_run_sample_script(
     global_default_value: bool | None,
     field_value: bool | None,
     run_uses_sandbox: bool,
+    rule_runner: RuleRunner,
 ) -> None:
     """Test that we properly run a `python_source` target.
 
@@ -97,19 +138,20 @@ def test_run_sample_script(
         "src_root1/project/BUILD": dedent(
             f"""\
             python_sources(
-                name='lib',
                 {("run_goal_use_sandbox=" + str(field_value)) if field_value is not None else ""}
             )
             """
         ),
         "src_root2/utils/strutil.py": dedent(
             """\
+            import os.path
+
             def my_file():
-                return __file__
+                return os.path.abspath(__file__)
             """
         ),
         "src_root2/utils/BUILD": "python_sources()",
-        "src_root2/codegen/hello.proto": 'syntax = "proto3";\nmessage Hi {{}}',
+        "src_root2/codegen/hello.proto": 'syntax = "proto3";\nmessage Hi {string name = 1;}',
         "src_root2/codegen/BUILD": dedent(
             """\
             protobuf_sources()
@@ -118,11 +160,12 @@ def test_run_sample_script(
         ),
     }
 
-    result, test_repo_root = run_pants_run(
-        sources,
-        source_roots=["src_root1", "src_root2"],
-        file="src_root1/project/app.py",
-        pants_args=(
+    rule_runner.write_files(sources)
+    args = [
+        "--backend-packages=pants.backend.python",
+        "--backend-packages=pants.backend.codegen.protobuf.python",
+        "--source-root-patterns=['src_root1', 'src_root2']",
+        *(
             (
                 "--python-default-run-goal-use-sandbox"
                 if global_default_value
@@ -131,18 +174,22 @@ def test_run_sample_script(
             if global_default_value is not None
             else ()
         ),
-    )
-    assert "Hola, mundo.\n" in result.stderr
-    file = result.stdout.strip()
+    ]
+    rule_runner.set_options(args, env_inherit={"PATH", "PYENV_ROOT", "HOME"})
+    target = rule_runner.get_target(Address("src_root1/project", relative_file_path="app.py"))
+    exit_code, stdout, stderr = run_run_request(rule_runner, target)
+
+    assert "Hola, mundo.\n" in stderr
+    file = stdout.strip()
     if run_uses_sandbox:
         assert file.endswith("src_root2/utils/strutil.py")
         assert "pants-sandbox-" in file
     else:
-        assert file.endswith(os.path.join(test_repo_root, "src_root2/utils/strutil.py"))
-    assert result.exit_code == 23
+        assert file == os.path.join(rule_runner.build_root, "src_root2/utils/strutil.py")
+    assert exit_code == 23
 
 
-def test_no_strip_pex_env_issues_12057() -> None:
+def test_no_strip_pex_env_issues_12057(rule_runner: RuleRunner) -> None:
     sources = {
         "src/app.py": dedent(
             """\
@@ -160,19 +207,22 @@ def test_no_strip_pex_env_issues_12057() -> None:
         ),
         "src/BUILD": dedent(
             """\
-            python_sources(name="lib")
+            python_sources()
             """
         ),
     }
-    result, _ = run_pants_run(
-        sources,
-        source_roots=["src"],
-        file="src/app.py",
-    )
-    assert result.exit_code == 42, result.stderr
+    rule_runner.write_files(sources)
+    args = [
+        "--backend-packages=pants.backend.python",
+        "--source-root-patterns=['src']",
+    ]
+    rule_runner.set_options(args, env_inherit={"PATH", "PYENV_ROOT", "HOME"})
+    target = rule_runner.get_target(Address("src", relative_file_path="app.py"))
+    exit_code, _, stderr = run_run_request(rule_runner, target)
+    assert exit_code == 42, stderr
 
 
-def test_no_leak_pex_root_issues_12055() -> None:
+def test_no_leak_pex_root_issues_12055(rule_runner: RuleRunner) -> None:
     read_config_result = run_pants(["help-all"])
     read_config_result.assert_success()
     config_data = json.loads(read_config_result.stdout)
@@ -188,25 +238,30 @@ def test_no_leak_pex_root_issues_12055() -> None:
         "src/app.py": "import os; print(os.environ['PEX_ROOT'])",
         "src/BUILD": dedent(
             """\
-        python_sources(name="lib")
-        """
+            python_sources()
+            """
         ),
     }
-    result, _ = run_pants_run(sources, source_roots=["src"], file="src/app.py")
+    rule_runner.write_files(sources)
+    args = [
+        "--backend-packages=pants.backend.python",
+        "--source-root-patterns=['src']",
+    ]
+    rule_runner.set_options(args, env_inherit={"PATH", "PYENV_ROOT", "HOME"})
+    target = rule_runner.get_target(Address("src", relative_file_path="app.py"))
+    exit_code, stdout, _ = run_run_request(rule_runner, target)
+    assert exit_code == 0
+    assert os.path.join(named_caches_dir, "pex_root") == stdout.strip()
 
-    result.assert_success()
-    assert os.path.join(named_caches_dir, "pex_root") == result.stdout.strip()
 
-
-def test_local_dist() -> None:
+def test_local_dist(rule_runner: RuleRunner) -> None:
     sources = {
         "foo/bar.py": "BAR = 'LOCAL DIST'",
         "foo/setup.py": dedent(
             """\
             from setuptools import setup
 
-            # Double-brace the package_dir to avoid setup_tmpdir treating it as a format.
-            setup(name="foo", version="9.8.7", packages=["foo"], package_dir={{"foo": "."}},)
+            setup(name="foo", version="9.8.7", packages=["foo"], package_dir={"foo": "."},)
             """
         ),
         "foo/main.py": "from foo.bar import BAR; print(BAR)",
@@ -222,7 +277,7 @@ def test_local_dist() -> None:
                 generate_setup=False,
             )
 
-            python_sources(name="main_lib",
+            python_sources(
                 sources=["main.py"],
                 # Force-exclude any dep on bar.py, so the only way to consume it is via the dist.
                 dependencies=[":dist", "!:lib"],
@@ -230,12 +285,19 @@ def test_local_dist() -> None:
             """
         ),
     }
-    result, _ = run_pants_run(sources, source_roots=[""], file="foo/main.py")
+    rule_runner.write_files(sources)
+    args = [
+        "--backend-packages=pants.backend.python",
+        "--source-root-patterns=['/']",
+    ]
+    rule_runner.set_options(args, env_inherit={"PATH", "PYENV_ROOT", "HOME"})
+    target = rule_runner.get_target(Address("foo", relative_file_path="main.py"))
+    exit_code, stdout, stderr = run_run_request(rule_runner, target)
+    assert exit_code == 0
+    assert stdout == "LOCAL DIST\n", stderr
 
-    assert result.stdout == "LOCAL DIST\n", result.stderr
 
-
-def test_runs_in_venv() -> None:
+def test_runs_in_venv(rule_runner: RuleRunner) -> None:
     # NB: We aren't just testing an implementation detail, users can and should expect their code to
     # be run just as if they ran their code in a virtualenv (as is common in the Python ecosystem).
     sources = {
@@ -250,9 +312,16 @@ def test_runs_in_venv() -> None:
         ),
         "src/BUILD": dedent(
             """\
-            python_sources(name="lib")
+            python_sources()
             """
         ),
     }
-    result, _ = run_pants_run(sources, source_roots=["src"], file="src/app.py")
-    assert result.exit_code == 0
+    rule_runner.write_files(sources)
+    args = [
+        "--backend-packages=pants.backend.python",
+        "--source-root-patterns=['src']",
+    ]
+    rule_runner.set_options(args, env_inherit={"PATH", "PYENV_ROOT", "HOME"})
+    target = rule_runner.get_target(Address("src", relative_file_path="app.py"))
+    exit_code, stdout, _ = run_run_request(rule_runner, target)
+    assert exit_code == 0, stdout

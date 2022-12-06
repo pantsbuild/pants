@@ -64,8 +64,6 @@ pub mod docker;
 #[cfg(test)]
 mod docker_tests;
 
-pub mod immutable_inputs;
-
 pub mod local;
 #[cfg(test)]
 mod local_tests;
@@ -85,7 +83,6 @@ mod remote_cache_tests;
 extern crate uname;
 
 pub use crate::children::ManagedChild;
-pub use crate::immutable_inputs::ImmutableInputs;
 pub use crate::named_caches::{CacheName, NamedCaches};
 pub use crate::remote_cache::RemoteCacheWarningsBehavior;
 
@@ -252,13 +249,6 @@ impl TryFrom<String> for ProcessCacheScope {
 
 fn serialize_level<S: serde::Serializer>(level: &log::Level, s: S) -> Result<S::Ok, S::Error> {
   s.serialize_str(&level.to_string())
-}
-
-/// A symlink from a relative src to an absolute dst (outside of the workdir).
-#[derive(Debug)]
-pub struct WorkdirSymlink {
-  pub src: RelativePath,
-  pub dst: PathBuf,
 }
 
 /// Input Digests for a process execution.

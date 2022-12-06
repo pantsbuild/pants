@@ -6,6 +6,7 @@ from __future__ import annotations
 import pytest
 
 from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.core.target_types import GenericTarget
 from pants.engine.internals.defaults import BuildFileDefaults, BuildFileDefaultsParserState
 from pants.engine.internals.parser import (
     BuildFilePreludeSymbols,
@@ -30,7 +31,8 @@ def defaults_parser_state() -> BuildFileDefaultsParserState:
 def test_imports_banned(defaults_parser_state: BuildFileDefaultsParserState) -> None:
     parser = Parser(
         build_root="",
-        target_type_aliases=[],
+        registered_target_types=RegisteredTargetTypes({}),
+        union_membership=UnionMembership({}),
         object_aliases=BuildFileAliases(),
         ignore_unrecognized_symbols=False,
     )
@@ -55,7 +57,10 @@ def test_unrecognized_symbol(defaults_parser_state: BuildFileDefaultsParserState
     def perform_test(extra_targets: list[str], dym: str) -> None:
         parser = Parser(
             build_root="",
-            target_type_aliases=["tgt", *extra_targets],
+            registered_target_types=RegisteredTargetTypes(
+                {alias: GenericTarget for alias in ("tgt", *extra_targets)}
+            ),
+            union_membership=UnionMembership({}),
             object_aliases=build_file_aliases,
             ignore_unrecognized_symbols=False,
         )
@@ -83,7 +88,10 @@ def test_unrecognized_symbol(defaults_parser_state: BuildFileDefaultsParserState
         with no_exception():
             parser = Parser(
                 build_root="",
-                target_type_aliases=["tgt", *extra_targets],
+                registered_target_types=RegisteredTargetTypes(
+                    {alias: GenericTarget for alias in ("tgt", *extra_targets)}
+                ),
+                union_membership=UnionMembership({}),
                 object_aliases=build_file_aliases,
                 ignore_unrecognized_symbols=True,
             )

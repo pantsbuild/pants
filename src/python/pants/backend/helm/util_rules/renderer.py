@@ -140,12 +140,16 @@ class _HelmDeploymentProcessWrapper(EngineAwareParameter, EngineAwareReturnType)
         return msg
 
     def metadata(self) -> dict[str, Any] | None:
-        return {
-            "address": self.address,
+        meta = {
+            "address": self.address.spec,
             "chart": self.chart,
             "process": self.process,
-            "output_directory": self.output_directory,
         }
+
+        if self.output_directory:
+            meta["output_directory"] = self.output_directory
+
+        return meta
 
 
 @dataclass(frozen=True)
@@ -170,7 +174,11 @@ class RenderedHelmFiles(EngineAwareReturnType):
         return {"content": self.snapshot}
 
     def metadata(self) -> dict[str, Any] | None:
-        return {"address": self.address, "chart": self.chart, "post_processed": self.post_processed}
+        return {
+            "address": self.address.spec,
+            "chart": self.chart,
+            "post_processed": self.post_processed,
+        }
 
     def cacheable(self) -> bool:
         # When using post-renderers it may not be safe to cache the generated files as the final result
@@ -363,6 +371,7 @@ async def setup_render_helm_deployment_process(
         extra_immutable_input_digests=immutable_input_digests,
         extra_append_only_caches=append_only_caches,
         description=request.description,
+        level=LogLevel.DEBUG if request.cmd == HelmDeploymentCmd.RENDER else LogLevel.INFO,
         input_digest=merged_digests,
         output_directories=output_directories,
         cache_scope=process_cache,
