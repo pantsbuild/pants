@@ -160,7 +160,12 @@ class HelmPostRenderer(EngineAwareReturnType):
         return f"runnable {self.exe} for {self.description_of_origin} is ready."
 
     def metadata(self) -> dict[str, Any] | None:
-        return {"exe": self.exe, "env": self.env, "append_only_caches": self.append_only_caches}
+        return {
+            "exe": self.exe,
+            "env": self.env,
+            "append_only_caches": self.append_only_caches,
+            "description_of_origin": self.description_of_origin,
+        }
 
 
 @rule_helper
