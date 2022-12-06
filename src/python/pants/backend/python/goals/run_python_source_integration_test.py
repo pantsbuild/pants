@@ -162,7 +162,7 @@ def test_run_sample_script(
             else ()
         ),
     ]
-    rule_runner.set_options(args, env={}, env_inherit={"PATH", "PYENV_ROOT", "HOME"})
+    rule_runner.set_options(args, env_inherit={"PATH", "PYENV_ROOT", "HOME"})
     target = rule_runner.get_target(Address("src_root1/project", relative_file_path="app.py"))
     exit_code, stdout, stderr = run_run_request(rule_runner, target)
 
@@ -172,11 +172,11 @@ def test_run_sample_script(
         assert file.endswith("src_root2/utils/strutil.py")
         assert "pants-sandbox-" in file
     else:
-        assert file.endswith(os.path.join(rule_runner.build_root, "src_root2/utils/strutil.py"))
+        assert file == os.path.join(rule_runner.build_root, "src_root2/utils/strutil.py")
     assert exit_code == 23
 
 
-def test_no_strip_pex_env_issues_12057() -> None:
+def test_no_strip_pex_env_issues_12057(rule_runner: RuleRunner) -> None:
     sources = {
         "src/app.py": dedent(
             """\
@@ -198,15 +198,15 @@ def test_no_strip_pex_env_issues_12057() -> None:
             """
         ),
     }
-    with setup_tmpdir(sources) as tmpdir:
-        args = [
+    rule_runner.write_files(sources)
+    args = [
             "--backend-packages=pants.backend.python",
-            f"--source-root-patterns=['/{tmpdir}/src']",
-            "run",
-            f"{tmpdir}/src/app.py",
-        ]
-        result = run_pants(args)
-        assert result.exit_code == 42, result.stderr
+            f"--source-root-patterns=['src']",
+    ]
+    rule_runner.set_options(args, env_inherit={"PATH", "PYENV_ROOT", "HOME"})
+    target = rule_runner.get_target(Address("src", relative_file_path="app.py"))
+    exit_code, _, stderr = run_run_request(rule_runner, target)
+    assert exit_code == 42, stderr
 
 
 def test_no_leak_pex_root_issues_12055() -> None:
@@ -229,16 +229,16 @@ def test_no_leak_pex_root_issues_12055() -> None:
             """
         ),
     }
-    with setup_tmpdir(sources) as tmpdir:
-        args = [
+    rule_runner.write_files(sources)
+    args = [
             "--backend-packages=pants.backend.python",
-            f"--source-root-patterns=['/{tmpdir}/src']",
-            "run",
-            f"{tmpdir}/src/app.py",
-        ]
-        result = run_pants(args)
-        result.assert_success()
-        assert os.path.join(named_caches_dir, "pex_root") == result.stdout.strip()
+            f"--source-root-patterns=['src']",
+    ]
+    rule_runner.set_options(args, env_inherit={"PATH", "PYENV_ROOT", "HOME"})
+    target = rule_runner.get_target(Address("src", relative_file_path="app.py"))
+    exit_code, stdout, _ = run_run_request(rule_runner, target)
+    assert exit_code == 0
+    assert os.path.join(named_caches_dir, "pex_root") == stdout.strip()
 
 
 def test_local_dist() -> None:
@@ -273,15 +273,16 @@ def test_local_dist() -> None:
             """
         ),
     }
-    with setup_tmpdir(sources) as tmpdir:
-        args = [
+    rule_runner.write_files(sources)
+    args = [
             "--backend-packages=pants.backend.python",
-            f"--source-root-patterns=['/{tmpdir}']",
-            "run",
-            f"{tmpdir}/foo/main.py",
-        ]
-        result = run_pants(args)
-        assert result.stdout == "LOCAL DIST\n", result.stderr
+            f"--source-root-patterns=['/']",
+    ]
+    rule_runner.set_options(args, env_inherit={"PATH", "PYENV_ROOT", "HOME"})
+    target = rule_runner.get_target(Address("foo", relative_file_path="main.py"))
+    exit_code, stdout, stderr = run_run_request(rule_runner, target)
+    assert exit_code == 0
+    assert stdout == "LOCAL DIST\n", stderr
 
 
 def test_runs_in_venv() -> None:
@@ -303,12 +304,12 @@ def test_runs_in_venv() -> None:
             """
         ),
     }
-    with setup_tmpdir(sources) as tmpdir:
-        args = [
+    rule_runner.write_files(sources)
+    args = [
             "--backend-packages=pants.backend.python",
-            f"--source-root-patterns=['/{tmpdir}/src']",
-            "run",
-            f"{tmpdir}/src/app.py",
-        ]
-        result = run_pants(args)
-        assert result.exit_code == 0
+            f"--source-root-patterns=['src']",
+    ]
+    rule_runner.set_options(args, env_inherit={"PATH", "PYENV_ROOT", "HOME"})
+    target = rule_runner.get_target(Address("src", relative_file_path="app.py"))
+    exit_code, stdout, _ = run_run_request(rule_runner, target)
+    assert exit_code == 0, stdout
