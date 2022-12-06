@@ -6,7 +6,7 @@ from __future__ import annotations
 import dataclasses
 import logging
 from dataclasses import dataclass
-from typing import Iterable, Any
+from typing import Any, Iterable
 
 from pants.backend.helm.dependency_inference import chart as chart_inference
 from pants.backend.helm.resolve import fetch
@@ -155,7 +155,7 @@ async def get_helm_chart(request: HelmChartRequest, subsystem: HelmSubsystem) ->
     )
 
     subcharts_digest = EMPTY_DIGEST
-    find_subcharts: Iterable[Get[HelmChart, Any]] = [
+    find_subcharts: Iterable[Get[HelmChart]] = [
         *(
             Get(HelmChart, HelmChartRequest, HelmChartRequest.from_target(target))
             for target in dependencies
@@ -295,7 +295,7 @@ async def find_chart_for_deployment(request: FindHelmDeploymentChart) -> HelmCha
         ),
     )
 
-    find_charts: Iterable[Get[HelmChart, Any]] = [
+    find_charts: Iterable[Get[HelmChart]] = [
         *(
             Get(HelmChart, HelmChartRequest, HelmChartRequest.from_target(tgt))
             for tgt in explicit_targets
