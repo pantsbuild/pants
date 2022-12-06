@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import contextlib
 import dataclasses
 import functools
 import os
@@ -62,7 +61,7 @@ from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.source import source_root
 from pants.testutil.option_util import create_options_bootstrapper
 from pants.util.collections import assert_single_element
-from pants.util.contextutil import temporary_dir, temporary_file
+from pants.util.contextutil import pushd, temporary_dir, temporary_file
 from pants.util.dirutil import (
     recursive_dirname,
     safe_file_dump,
@@ -72,14 +71,6 @@ from pants.util.dirutil import (
 )
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import OrderedSet
-
-
-@contextlib.contextmanager
-def _chdir(path: int | str | bytes | os.PathLike[str] | os.PathLike[bytes]):
-    old_cwd = os.getcwd()
-    os.chdir(path)
-    yield
-    os.chdir(old_cwd)
 
 
 def logging(original_function=None, *, level: LogLevel = LogLevel.INFO):
@@ -542,7 +533,7 @@ class RuleRunner:
         )
 
     def run_interactive_process(self, request: InteractiveProcess) -> InteractiveProcessResult:
-        with _chdir(self.build_root):
+        with pushd(self.build_root):
             return native_engine.session_run_interactive_process(
                 self.scheduler.py_session,
                 request,
