@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import itertools
 import logging
 import os
@@ -11,6 +12,7 @@ import shlex
 from dataclasses import dataclass
 from textwrap import dedent  # noqa: PNT20
 
+from pants.backend.python.target_types import PythonRunGoalUseSandboxField  # noqa: PNT20
 from pants.backend.shell.subsystems.shell_setup import ShellSetup
 from pants.backend.shell.target_types import (
     RunInSandboxArgumentsField,
@@ -324,7 +326,15 @@ async def run_in_sandbox_request(
     field_sets = await Get(
         FieldSetsPerTarget, FieldSetsPerTargetRequest(RunFieldSet, runnable_targets)
     )
-    run_field_set = field_sets.field_sets[0]
+    run_field_set: RunFieldSet = field_sets.field_sets[0]
+
+    if hasattr(run_field_set, "run_goal_use_sandbox"):
+        run_field_set = dataclasses.replace(
+            run_field_set,
+            run_goal_use_sandbox=PythonRunGoalUseSandboxField(True, addresses[0]),
+        )
+
+    working_directory = shell_command.address.spec_path
 
     # Must be run in target environment so that the binaries/envvars match the execution
     # environment when we actually run the process.
@@ -336,7 +346,6 @@ async def run_in_sandbox_request(
 
     input_digest = await Get(Digest, MergeDigests((dependencies_digest, run_request.digest)))
 
-    working_directory = shell_command.address.spec_path
     output_files, output_directories = _parse_outputs_from_command(shell_command, description)
 
     extra_args = shell_command.get(RunInSandboxArgumentsField).value or ()
