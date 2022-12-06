@@ -242,7 +242,8 @@ class EngineInitializer:
         def parser_singleton() -> Parser:
             return Parser(
                 build_root=build_root_path,
-                target_type_aliases=registered_target_types.aliases,
+                registered_target_types=registered_target_types,
+                union_membership=union_membership,
                 object_aliases=build_configuration.registered_aliases,
                 ignore_unrecognized_symbols=ignore_unrecognized_build_file_symbols,
             )
