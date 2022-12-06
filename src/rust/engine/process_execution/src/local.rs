@@ -27,7 +27,9 @@ use futures::{try_join, FutureExt, TryFutureExt};
 use log::{debug, info};
 use nails::execution::ExitCode;
 use shell_quote::bash;
-use store::{OneOffStoreFileByDigest, Snapshot, Store, StoreError};
+use store::{
+  ImmutableInputs, OneOffStoreFileByDigest, Snapshot, Store, StoreError, WorkdirSymlink,
+};
 use task_executor::Executor;
 use tempfile::TempDir;
 use tokio::process::{Child, Command};
@@ -37,8 +39,8 @@ use tokio_util::codec::{BytesCodec, FramedRead};
 use workunit_store::{in_workunit, Level, Metric, RunningWorkunit};
 
 use crate::{
-  Context, FallibleProcessResultWithPlatform, ImmutableInputs, NamedCaches, Platform, Process,
-  ProcessError, ProcessResultMetadata, ProcessResultSource, WorkdirSymlink,
+  Context, FallibleProcessResultWithPlatform, NamedCaches, Platform, Process, ProcessError,
+  ProcessResultMetadata, ProcessResultSource,
 };
 
 pub const USER_EXECUTABLE_MODE: u32 = 0o100755;
@@ -712,11 +714,15 @@ pub async fn prepare_workdir(
   // non-determinism when paths overlap: see the method doc.
   let store2 = store.clone();
   let workdir_path_2 = workdir_path.clone();
+  let mut mutable_paths = req.output_files.clone();
+  mutable_paths.extend(req.output_directories.clone());
   in_workunit!("setup_sandbox", Level::Debug, |_workunit| async move {
     store2
       .materialize_directory(
         workdir_path_2,
         materialized_input_digest,
+        &mutable_paths,
+        Some(immutable_inputs),
         Permissions::Writable,
       )
       .await

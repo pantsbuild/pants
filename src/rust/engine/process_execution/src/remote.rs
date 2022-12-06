@@ -24,9 +24,9 @@ use protos::gen::google::rpc::{PreconditionFailure, Status as StatusProto};
 use protos::require_digest;
 use rand::{thread_rng, Rng};
 use remexec::{
-  capabilities_client::CapabilitiesClient, execution_client::ExecutionClient, Action, Command,
-  ExecuteRequest, ExecuteResponse, ExecutedActionMetadata, ServerCapabilities,
-  WaitExecutionRequest,
+  capabilities_client::CapabilitiesClient, execution_client::ExecutionClient,
+  execution_stage::Value as ExecutionStageValue, Action, Command, ExecuteRequest, ExecuteResponse,
+  ExecutedActionMetadata, ServerCapabilities, WaitExecutionRequest,
 };
 use tonic::metadata::BinaryMetadataValue;
 use tonic::{Code, Request, Status};
@@ -124,20 +124,34 @@ enum StreamOutcome {
   StreamClosed,
 }
 
+enum OperationStreamItem {
+  Running(ExecutionStageValue),
+  Outcome(StreamOutcome),
+}
+
 /// A single remote Operation, with a `Drop` implementation to cancel the work if our client goes
 /// away.
 struct RunningOperation {
   name: Option<String>,
   operations_client: Arc<OperationsClient<LayeredService>>,
   executor: Executor,
+  process_level: Level,
+  process_description: String,
 }
 
 impl RunningOperation {
-  fn new(operations_client: Arc<OperationsClient<LayeredService>>, executor: Executor) -> Self {
+  fn new(
+    operations_client: Arc<OperationsClient<LayeredService>>,
+    executor: Executor,
+    process_level: Level,
+    process_description: String,
+  ) -> Self {
     Self {
       name: None,
       operations_client,
       executor,
+      process_level,
+      process_description,
     }
   }
 
@@ -244,18 +258,87 @@ impl CommandRunner {
       .await
   }
 
-  // Monitors the operation stream returned by the REv2 Execute and WaitExecution methods.
-  // Outputs progress reported by the server and returns the next actionable operation
-  // or gRPC status back to the main loop (plus the operation name so the main loop can
-  // reconnect).
+  async fn wait_on_operation_stream_item<S>(
+    stream: &mut S,
+    context: &Context,
+    running_operation: &mut RunningOperation,
+    start_time_opt: &mut Option<Instant>,
+  ) -> OperationStreamItem
+  where
+    S: Stream<Item = Result<Operation, Status>> + Unpin,
+  {
+    let item = stream.next().await;
+
+    if let Some(start_time) = start_time_opt.take() {
+      let timing: Result<u64, _> = Instant::now()
+        .duration_since(start_time)
+        .as_micros()
+        .try_into();
+      if let Ok(obs) = timing {
+        context.workunit_store.record_observation(
+          ObservationMetric::RemoteExecutionRPCFirstResponseTimeMicros,
+          obs,
+        );
+      }
+    }
+
+    match item {
+      Some(Ok(operation)) => {
+        trace!(
+          "wait_on_operation_stream (build_id={}): got operation: {:?}",
+          &context.build_id,
+          &operation
+        );
+
+        // Extract the operation name.
+        // Note: protobuf can return empty string for an empty field so convert empty strings
+        // to None.
+        running_operation.name = Some(operation.name.clone()).filter(|s| !s.trim().is_empty());
+
+        if operation.done {
+          // Continue monitoring if the operation is not complete.
+          OperationStreamItem::Outcome(StreamOutcome::Complete(OperationOrStatus::Operation(
+            operation,
+          )))
+        } else {
+          // Otherwise, return to the main loop with the operation as the result.
+          OperationStreamItem::Running(
+            Self::maybe_extract_execution_stage(&operation).unwrap_or(ExecutionStageValue::Unknown),
+          )
+        }
+      }
+
+      Some(Err(err)) => {
+        debug!("wait_on_operation_stream: got error: {:?}", err);
+        let status_proto = StatusProto {
+          code: err.code() as i32,
+          message: err.message().to_string(),
+          ..StatusProto::default()
+        };
+        OperationStreamItem::Outcome(StreamOutcome::Complete(OperationOrStatus::Status(
+          status_proto,
+        )))
+      }
+
+      None => {
+        // Stream disconnected unexpectedly.
+        debug!("wait_on_operation_stream: unexpected disconnect from RE server");
+        OperationStreamItem::Outcome(StreamOutcome::StreamClosed)
+      }
+    }
+  }
+
+  /// Monitors the operation stream returned by the REv2 Execute and WaitExecution methods.
+  /// Outputs progress reported by the server and returns the next actionable operation
+  /// or gRPC status back to the main loop (plus the operation name so the main loop can
+  /// reconnect).
   async fn wait_on_operation_stream<S>(
-    &self,
     mut stream: S,
     context: &Context,
     running_operation: &mut RunningOperation,
   ) -> StreamOutcome
   where
-    S: Stream<Item = Result<Operation, Status>> + Unpin,
+    S: Stream<Item = Result<Operation, Status>> + Unpin + Send,
   {
     let mut start_time_opt = Some(Instant::now());
 
@@ -264,61 +347,73 @@ impl CommandRunner {
       &context.build_id
     );
 
+    // If the server returns an `ExecutionStage` other than `Unknown`, then we assume that it
+    // implements reporting when the operation actually begins `Executing` (as opposed to being
+    // `Queued`, etc), and will wait to create a workunit until we see the `Executing` stage.
+    //
+    // We start by consuming the prefix of the stream before we receive an `Executing` or `Unknown` stage.
     loop {
-      let item = stream.next().await;
-
-      if let Some(start_time) = start_time_opt.take() {
-        let timing: Result<u64, _> = Instant::now()
-          .duration_since(start_time)
-          .as_micros()
-          .try_into();
-        if let Ok(obs) = timing {
-          context.workunit_store.record_observation(
-            ObservationMetric::RemoteExecutionRPCFirstResponseTimeMicros,
-            obs,
-          );
+      match Self::wait_on_operation_stream_item(
+        &mut stream,
+        context,
+        running_operation,
+        &mut start_time_opt,
+      )
+      .await
+      {
+        OperationStreamItem::Running(
+          ExecutionStageValue::Unknown | ExecutionStageValue::Executing,
+        ) => {
+          // Either the server doesn't know how to report the stage, or the operation has
+          // actually begun executing serverside: proceed to the suffix.
+          break;
         }
-      }
-
-      match item {
-        Some(Ok(operation)) => {
-          trace!(
-            "wait_on_operation_stream (build_id={}): got operation: {:?}",
-            &context.build_id,
-            &operation
-          );
-
-          // Extract the operation name.
-          // Note: protobuf can return empty string for an empty field so convert empty strings
-          // to None.
-          running_operation.name = Some(operation.name.clone()).filter(|s| !s.trim().is_empty());
-
-          // Continue monitoring if the operation is not complete.
-          if !operation.done {
-            continue;
-          }
-
-          // Otherwise, return to the main loop with the operation as the result.
-          return StreamOutcome::Complete(OperationOrStatus::Operation(operation));
+        OperationStreamItem::Running(_) => {
+          // The operation has not reached an ExecutionStage that we recognize as
+          // "executing" (likely: it is queued, doing a cache lookup, etc): keep waiting.
+          continue;
         }
-
-        Some(Err(err)) => {
-          debug!("wait_on_operation_stream: got error: {:?}", err);
-          let status_proto = StatusProto {
-            code: err.code() as i32,
-            message: err.message().to_string(),
-            ..StatusProto::default()
-          };
-          return StreamOutcome::Complete(OperationOrStatus::Status(status_proto));
-        }
-
-        None => {
-          // Stream disconnected unexpectedly.
-          debug!("wait_on_operation_stream: unexpected disconnect from RE server");
-          return StreamOutcome::StreamClosed;
-        }
+        OperationStreamItem::Outcome(outcome) => return outcome,
       }
     }
+
+    // Start a workunit to represent the execution of the work, and consume the rest of the stream.
+    in_workunit!(
+      "run_remote_process",
+      // NB: See engine::nodes::NodeKey::workunit_level for more information on why this workunit
+      // renders at the Process's level.
+      running_operation.process_level,
+      desc = Some(running_operation.process_description.clone()),
+      |_workunit| async move {
+        loop {
+          match Self::wait_on_operation_stream_item(
+            &mut stream,
+            context,
+            running_operation,
+            &mut start_time_opt,
+          )
+          .await
+          {
+            OperationStreamItem::Running(
+              ExecutionStageValue::Queued | ExecutionStageValue::CacheCheck,
+            ) => {
+              // The server must have cancelled and requeued the work: although this isn't an error
+              // per-se, it is much easier for us to re-open the stream than to treat this as a
+              // nested loop. In particular:
+              // 1. we can't break/continue out of a workunit
+              // 2. the stream needs to move into the workunit, and can't move back out
+              break StreamOutcome::StreamClosed;
+            }
+            OperationStreamItem::Running(_) => {
+              // The operation is still running.
+              continue;
+            }
+            OperationStreamItem::Outcome(outcome) => break outcome,
+          }
+        }
+      }
+    )
+    .await
   }
 
   // Store the remote timings into the workunit store.
@@ -475,6 +570,20 @@ impl CommandRunner {
     ExecutionError::MissingRemoteDigests(missing_digests)
   }
 
+  /// If set, extract `ExecuteOperationMetadata` from the `Operation`.
+  fn maybe_extract_execution_stage(operation: &Operation) -> Option<ExecutionStageValue> {
+    let metadata = operation.metadata.as_ref()?;
+
+    let eom = remexec::ExecuteOperationMetadata::decode(&metadata.value[..])
+      .map(Some)
+      .unwrap_or_else(|e| {
+        log::warn!("Invalid ExecuteOperationMetadata from server: {e:?}");
+        None
+      })?;
+
+    ExecutionStageValue::from_i32(eom.stage)
+  }
+
   // pub(crate) for testing
   pub(crate) async fn extract_execute_response(
     &self,
@@ -629,8 +738,13 @@ impl CommandRunner {
     const MAX_BACKOFF_DURATION: Duration = Duration::from_secs(10);
 
     let start_time = Instant::now();
-    let mut running_operation =
-      RunningOperation::new(self.operations_client.clone(), self.executor.clone());
+
+    let mut running_operation = RunningOperation::new(
+      self.operations_client.clone(),
+      self.executor.clone(),
+      process.level,
+      process.description.clone(),
+    );
     let mut num_retries = 0;
 
     loop {
@@ -683,9 +797,8 @@ impl CommandRunner {
           // Monitor the operation stream until there is an actionable operation
           // or status to interpret.
           let operation_stream = operation_stream_response.into_inner();
-          let stream_outcome = self
-            .wait_on_operation_stream(operation_stream, context, &mut running_operation)
-            .await;
+          let stream_outcome =
+            Self::wait_on_operation_stream(operation_stream, context, &mut running_operation).await;
 
           match stream_outcome {
             StreamOutcome::Complete(status) => {
@@ -858,10 +971,9 @@ impl crate::CommandRunner for CommandRunner {
     let context2 = context.clone();
     in_workunit!(
       "run_execute_request",
-      // NB: See engine::nodes::NodeKey::workunit_level for more information on why this workunit
-      // renders at the Process's level.
-      request.level,
-      desc = Some(request.description.clone()),
+      // NB: The process has not actually started running until the server has notified us that it
+      // has: see `wait_on_operation_stream`.
+      Level::Debug,
       user_metadata = vec![(
         "action_digest".to_owned(),
         UserMetadataItem::String(format!("{action_digest:?}")),

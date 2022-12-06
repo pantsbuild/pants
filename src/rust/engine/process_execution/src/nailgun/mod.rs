@@ -10,15 +10,15 @@ use futures::future::{FutureExt, TryFutureExt};
 use futures::stream::{BoxStream, StreamExt};
 use log::{debug, trace};
 use nails::execution::{self, child_channel, ChildInput, Command};
-use store::Store;
+use store::{ImmutableInputs, Store};
 use task_executor::Executor;
 use tokio::net::TcpStream;
 use workunit_store::{in_workunit, Metric, RunningWorkunit};
 
 use crate::local::{prepare_workdir, CapturedWorkdir, ChildOutput};
 use crate::{
-  Context, FallibleProcessResultWithPlatform, ImmutableInputs, InputDigests, NamedCaches, Platform,
-  Process, ProcessError,
+  Context, FallibleProcessResultWithPlatform, InputDigests, NamedCaches, Platform, Process,
+  ProcessError,
 };
 
 #[cfg(test)]

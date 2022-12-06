@@ -6,8 +6,8 @@ use std::path::{Path, PathBuf};
 use deepsize::DeepSizeOf;
 use serde::Serialize;
 
-use crate::WorkdirSymlink;
 use fs::{default_cache_path, safe_create_dir_all_ioerror, RelativePath};
+use store::WorkdirSymlink;
 
 #[derive(Clone, Debug, DeepSizeOf, Eq, PartialEq, Hash, PartialOrd, Ord, Serialize)]
 pub struct CacheName(String);

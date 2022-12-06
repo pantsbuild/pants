@@ -11,6 +11,7 @@ from pants.backend.project_info.filter_targets import FilterSubsystem, TargetGra
 from pants.base.exceptions import MappingError
 from pants.build_graph.address import Address
 from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.core.target_types import GenericTarget
 from pants.engine.internals.defaults import BuildFileDefaults, BuildFileDefaultsParserState
 from pants.engine.internals.mapper import (
     AddressFamily,
@@ -31,7 +32,8 @@ def parse_address_map(build_file: str, *, ignore_unrecognized_symbols: bool = Fa
     path = "/dev/null"
     parser = Parser(
         build_root="",
-        target_type_aliases=["thing"],
+        registered_target_types=RegisteredTargetTypes({"thing": GenericTarget}),
+        union_membership=UnionMembership({}),
         object_aliases=BuildFileAliases(),
         ignore_unrecognized_symbols=ignore_unrecognized_symbols,
     )
