@@ -10,6 +10,7 @@ from pants.backend.go.subsystems.golang import GolangSubsystem
 from pants.backend.go.subsystems.gotest import GoTestSubsystem
 from pants.backend.go.target_types import (
     GoAddressSanitizerEnabledField,
+    GoAssemblerFlagsField,
     GoCgoEnabledField,
     GoCompilerFlagsField,
     GoLinkerFlagsField,
@@ -62,6 +63,11 @@ class GoBuildOptions:
     # Note: These flags come from `go_mod` and `go_binary` targets.
     linker_flags: tuple[str, ...] = ()
 
+    # Extra flags to pass to the Go assembler (i.e., `go tool asm`).
+    # Note: These flags come from `go_mod` and `go_binary` targets. Package-specific assembler flags
+    # may still come from `go_package` targets.
+    assembler_flags: tuple[str, ...] = ()
+
     def __post_init__(self):
         assert not (self.with_race_detector and self.with_msan)
         assert not (self.with_race_detector and self.with_asan)
@@ -94,6 +100,7 @@ class GoBuildOptionsFieldSet(FieldSet):
     asan: GoAddressSanitizerEnabledField
     compiler_flags: GoCompilerFlagsField
     linker_flags: GoLinkerFlagsField
+    assembler_flags: GoAssemblerFlagsField
 
 
 @dataclass(frozen=True)
@@ -350,6 +357,17 @@ async def go_extract_build_options_from_target(
     if target_fields is not None:
         linker_flags.extend(target_fields.linker_flags.value or [])
 
+    # Extract any extra assembler flags specified on `go_mod` or `go_binary` targets.
+    # Note: An `assembler_flags` field specified on a `go_package` target is extracted elsewhere.
+    assembler_flags: list[str] = []
+    if go_mod_target_fields is not None:
+        # To avoid duplication of options, only add the module-specific assembler flags if the target for this request
+        # is not a `go_mod` target (i.e., because it does not conform to the field set or has a different address).
+        if target_fields is None or go_mod_target_fields.address != target_fields.address:
+            assembler_flags.extend(go_mod_target_fields.assembler_flags.value or [])
+    if target_fields is not None:
+        assembler_flags.extend(target_fields.assembler_flags.value or [])
+
     return GoBuildOptions(
         cgo_enabled=cgo_enabled,
         with_race_detector=with_race_detector,
@@ -357,6 +375,7 @@ async def go_extract_build_options_from_target(
         with_asan=with_asan,
         compiler_flags=tuple(compiler_flags),
         linker_flags=tuple(linker_flags),
+        assembler_flags=tuple(assembler_flags),
     )
 
 

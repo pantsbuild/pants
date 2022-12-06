@@ -73,6 +73,7 @@ class BuildGoPackageRequest(EngineAwareParameter):
         fortran_files: tuple[str, ...] = (),
         prebuilt_object_files: tuple[str, ...] = (),
         pkg_specific_compiler_flags: tuple[str, ...] = (),
+        pkg_specific_assembler_flags: tuple[str, ...] = (),
     ) -> None:
         """Build a package and its dependencies as `__pkg__.a` files.
 
@@ -105,6 +106,7 @@ class BuildGoPackageRequest(EngineAwareParameter):
         self.fortran_files = fortran_files
         self.prebuilt_object_files = prebuilt_object_files
         self.pkg_specific_compiler_flags = pkg_specific_compiler_flags
+        self.pkg_specific_assembler_flags = pkg_specific_assembler_flags
         self._hashcode = hash(
             (
                 self.import_path,
@@ -127,6 +129,7 @@ class BuildGoPackageRequest(EngineAwareParameter):
                 self.fortran_files,
                 self.prebuilt_object_files,
                 self.pkg_specific_compiler_flags,
+                self.pkg_specific_assembler_flags,
             )
         )
 
@@ -154,7 +157,8 @@ class BuildGoPackageRequest(EngineAwareParameter):
             f"objc_files={self.objc_files}, "
             f"fortran_files={self.fortran_files}, "
             f"prebuilt_object_files={self.prebuilt_object_files}, "
-            f"pkg_specific_compiler_flags={self.pkg_specific_compiler_flags}"
+            f"pkg_specific_compiler_flags={self.pkg_specific_compiler_flags}, "
+            f"pkg_specific_assembler_flags={self.pkg_specific_assembler_flags}"
             ")"
         )
 
@@ -185,6 +189,7 @@ class BuildGoPackageRequest(EngineAwareParameter):
             and self.fortran_files == other.fortran_files
             and self.prebuilt_object_files == other.prebuilt_object_files
             and self.pkg_specific_compiler_flags == other.pkg_specific_compiler_flags
+            and self.pkg_specific_assembler_flags == other.pkg_specific_assembler_flags
             # TODO: Use a recursive memoized __eq__ if this ever shows up in profiles.
             and self.direct_dependencies == other.direct_dependencies
         )
@@ -628,6 +633,9 @@ async def build_go_package(
                 dir_path=request.dir_path,
                 asm_header_path=asm_header_path,
                 import_path=request.import_path,
+                extra_assembler_flags=tuple(
+                    *request.build_opts.assembler_flags, *request.pkg_specific_assembler_flags
+                ),
             ),
         )
         assembly_result = assembly_fallible_result.result
