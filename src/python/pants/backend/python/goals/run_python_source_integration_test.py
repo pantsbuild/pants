@@ -143,8 +143,10 @@ def test_run_sample_script(
         ),
         "src_root2/utils/strutil.py": dedent(
             """\
+            import os.path
+
             def my_file():
-                return __file__
+                return os.path.abspath(__file__)
             """
         ),
         "src_root2/utils/BUILD": "python_sources()",
