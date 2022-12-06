@@ -780,12 +780,8 @@ impl DigestTrie {
     let mut prefix_iter = prefix.iter();
     let mut tree = self;
     while let Some(parent) = prefix_iter.next_back() {
-      let directory = Directory {
-        name: first_path_component_to_name(parent.as_ref())?,
-        digest: tree.compute_root_digest(),
-        tree,
-      };
-
+      let directory =
+        Directory::from_digest_tree(first_path_component_to_name(parent.as_ref())?, tree);
       tree = DigestTrie(vec![Entry::Directory(directory)].into());
     }
 

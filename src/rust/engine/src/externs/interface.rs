@@ -8,7 +8,7 @@
 use std::any::Any;
 use std::cell::RefCell;
 use std::collections::hash_map::HashMap;
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::convert::TryInto;
 use std::fs::File;
 use std::hash::Hasher;
@@ -1644,6 +1644,8 @@ fn write_digest(
         .materialize_directory(
           destination.clone(),
           lifted_digest,
+          &BTreeSet::new(),
+          None,
           fs::Permissions::Writable,
         )
         .await
