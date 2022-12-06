@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import dataclasses
 import functools
 import os
@@ -71,6 +72,14 @@ from pants.util.dirutil import (
 )
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import OrderedSet
+
+
+@contextlib.contextmanager
+def _chdir(path: int | str | bytes | os.PathLike[str] | os.PathLike[bytes]):
+    old_cwd = os.getcwd()
+    os.chdir(path)
+    yield
+    os.chdir(old_cwd)
 
 
 def logging(original_function=None, *, level: LogLevel = LogLevel.INFO):
@@ -533,16 +542,17 @@ class RuleRunner:
         )
 
     def run_interactive_process(self, request: InteractiveProcess) -> InteractiveProcessResult:
-        return native_engine.session_run_interactive_process(
-            self.scheduler.py_session,
-            request,
-            ProcessConfigFromEnvironment(
-                platform=Platform.create_for_localhost().value,
-                docker_image=None,
-                remote_execution=False,
-                remote_execution_extra_platform_properties=[],
-            ),
-        )
+        with _chdir(self.build_root):
+            return native_engine.session_run_interactive_process(
+                self.scheduler.py_session,
+                request,
+                ProcessConfigFromEnvironment(
+                    platform=Platform.create_for_localhost().value,
+                    docker_image=None,
+                    remote_execution=False,
+                    remote_execution_extra_platform_properties=[],
+                ),
+            )
 
     def do_not_use_mock(self, output_type: Type, input_types: Iterable[type]) -> MockGet:
         """Returns a `MockGet` whose behavior is to run the actual rule using this `RuleRunner`"""
