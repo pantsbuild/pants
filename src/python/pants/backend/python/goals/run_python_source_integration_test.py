@@ -84,6 +84,19 @@ def run_run_request(rule_runner: RuleRunner, target: Target) -> Tuple[int, str, 
         stdout = mocked_console[1].get_stdout()
         stderr = mocked_console[1].get_stderr()
 
+    # Also check DebugAdapterRequest
+    with mock_console(rule_runner.options_bootstrapper) as mocked_console:
+        debug_adapter_request = rule_runner.request(RunDebugAdapterRequest, [PythonSourceFieldSet.create(target)])
+        debug_adapter_result = rule_runner.run_interactive_process(InteractiveProcess(
+            argv=debug_adapter_request.args,
+            env=debug_adapter_request.extra_env,
+            input_digest=debug_adapter_request.digest,
+            run_in_workspace=True,
+            immutable_input_digests=debug_adapter_request.immutable_input_digests,
+            append_only_caches=debug_adapter_request.append_only_caches,
+        ))
+        assert debug_adapter_result.exit_code == result.exit_code
+
     return result.exit_code, stdout, stderr
 
 
