@@ -22,9 +22,9 @@ from pants.backend.shell.target_types import (
     ShellCommandSourcesField,
     ShellCommandTimeoutField,
     ShellCommandToolsField,
-    ShellCommandUseOutputDependenciesWhenExecutingField,
 )
 from pants.backend.shell.util_rules.builtin import BASH_BUILTIN_COMMANDS
+from pants.base.deprecated import warn_or_error
 from pants.core.goals.package import BuiltPackage, PackageFieldSet
 from pants.core.goals.run import RunDebugAdapterRequest, RunFieldSet, RunRequest
 from pants.core.target_types import FileSourceField
@@ -129,20 +129,36 @@ async def _prepare_process_request_from_target(shell_command: Target) -> ShellCo
 @rule_helper
 async def _execution_environment_from_dependencies(shell_command: Target) -> Digest:
 
-    # If we're specifying the `dependencies` as relevant to the runtime, then include
-    # this command as a root for the transitive dependency search for runtime dependencies.
-    maybe_this_target = (
-        (shell_command.address,)
-        if shell_command.get(ShellCommandUseOutputDependenciesWhenExecutingField).value
-        else ()
+    runtime_dependencies_defined = (
+        shell_command.get(ShellCommandExecutionDependenciesField).value is not None
     )
 
-    # Always include the runtime dependencies that were specified
-    runtime_dependencies = await Get(
-        Addresses,
-        UnparsedAddressInputs,
-        shell_command.get(ShellCommandExecutionDependenciesField).to_unparsed_address_inputs(),
-    )
+    # If we're specifying the `dependencies` as relevant to the execution environment, then include
+    # this command as a root for the transitive dependency search for execution dependencies.
+    maybe_this_target = (shell_command.address,) if not runtime_dependencies_defined else ()
+
+    # Always include the execution dependencies that were specified
+    if runtime_dependencies_defined:
+        runtime_dependencies = await Get(
+            Addresses,
+            UnparsedAddressInputs,
+            shell_command.get(ShellCommandExecutionDependenciesField).to_unparsed_address_inputs(),
+        )
+    else:
+        runtime_dependencies = Addresses()
+        warn_or_error(
+            "2.17.0.dev0",
+            (
+                "Using `dependencies` to specify execution-time dependencies for "
+                "`experimental_shell_command` "
+            ),
+            (
+                "To clear this warning, use the `output_dependencies` and `execution_dependencies`"
+                "fields. Set `execution_dependencies=()` if you have no execution-time "
+                "dependencies."
+            ),
+            print_warning=True,
+        )
 
     transitive = await Get(
         TransitiveTargets,

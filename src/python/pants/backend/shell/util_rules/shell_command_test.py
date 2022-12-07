@@ -376,13 +376,12 @@ def test_execution_dependencies(caplog, rule_runner: RuleRunner) -> None:
                 )
 
                 # Fails because `output_dependencies` are not available at runtime
-                # when you ask for that
                 experimental_shell_command(
                     name="expect_fail_2",
                     tools=["cat"],
                     command="cat msg.txt",
+                    execution_dependencies=(),
                     output_dependencies=[":a1"],
-                    use_dependencies_when_executing=False,
                 )
 
                 # Fails because runtime dependencies are not fetched transitively
@@ -437,6 +436,47 @@ def test_execution_dependencies(caplog, rule_runner: RuleRunner) -> None:
     assert_shell_command_result(
         rule_runner,
         Address("src", target_name="expect_success_2"),
+        expected_contents={"src/output.txt": "message\nmessage\n"},
+    )
+
+
+def test_old_style_dependencies(caplog, rule_runner: RuleRunner) -> None:
+    caplog.set_level(logging.INFO)
+    caplog.clear()
+
+    rule_runner.write_files(
+        {
+            "src/BUILD": dedent(
+                """\
+                experimental_shell_command(
+                  name="a1",
+                  command="echo message > msg.txt",
+                  outputs=["msg.txt"],
+                )
+
+                experimental_shell_command(
+                    name="a2",
+                    tools=["cat"],
+                    command="cat msg.txt > msg2.txt",
+                    dependencies=[":a1",],
+                    outputs=["msg2.txt",],
+                )
+
+                experimental_shell_command(
+                    name="expect_success",
+                    tools=["cat"],
+                    command="cat msg.txt msg2.txt > output.txt",
+                    dependencies=[":a1", ":a2",],
+                    outputs=["output.txt"],
+                )
+                """
+            ),
+        }
+    )
+
+    assert_shell_command_result(
+        rule_runner,
+        Address("src", target_name="expect_success"),
         expected_contents={"src/output.txt": "message\nmessage\n"},
     )
 
