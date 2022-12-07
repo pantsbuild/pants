@@ -9,6 +9,7 @@ import re
 import shlex
 from dataclasses import dataclass
 from textwrap import dedent  # noqa: PNT20
+from typing import Iterable
 
 from pants.backend.shell.subsystems.shell_setup import ShellSetup
 from pants.backend.shell.target_types import (
@@ -111,27 +112,8 @@ async def _prepare_process_request_from_target(shell_command: Target) -> ShellCo
         TransitiveTargetsRequest([shell_command.address]),
     )
 
-    sources, pkgs_per_target = await MultiGet(
-        Get(
-            SourceFiles,
-            SourceFilesRequest(
-                sources_fields=[tgt.get(SourcesField) for tgt in transitive_targets.dependencies],
-                for_sources_types=(SourcesField, FileSourceField),
-                enable_codegen=True,
-            ),
-        ),
-        Get(
-            FieldSetsPerTarget,
-            FieldSetsPerTargetRequest(PackageFieldSet, transitive_targets.dependencies),
-        ),
-    )
-
-    packages = await MultiGet(
-        Get(BuiltPackage, PackageFieldSet, field_set) for field_set in pkgs_per_target.field_sets
-    )
-
-    dependencies_digest = await Get(
-        Digest, MergeDigests([sources.snapshot.digest, *(pkg.digest for pkg in packages)])
+    dependencies_digest = await _execution_environment_from_dependencies(
+        transitive_targets.dependencies
     )
 
     output_files, output_directories = _parse_outputs_from_command(shell_command, description)
@@ -148,6 +130,34 @@ async def _prepare_process_request_from_target(shell_command: Target) -> ShellCo
         output_directories=output_directories,
         extra_env_vars=shell_command.get(ShellCommandExtraEnvVarsField).value or (),
     )
+
+
+@rule_helper
+async def _execution_environment_from_dependencies(dependencies: Iterable[Target]) -> Digest:
+    sources, pkgs_per_target = await MultiGet(
+        Get(
+            SourceFiles,
+            SourceFilesRequest(
+                sources_fields=[tgt.get(SourcesField) for tgt in dependencies],
+                for_sources_types=(SourcesField, FileSourceField),
+                enable_codegen=True,
+            ),
+        ),
+        Get(
+            FieldSetsPerTarget,
+            FieldSetsPerTargetRequest(PackageFieldSet, dependencies),
+        ),
+    )
+
+    packages = await MultiGet(
+        Get(BuiltPackage, PackageFieldSet, field_set) for field_set in pkgs_per_target.field_sets
+    )
+
+    dependencies_digest = await Get(
+        Digest, MergeDigests([sources.snapshot.digest, *(pkg.digest for pkg in packages)])
+    )
+
+    return dependencies_digest
 
 
 def _parse_outputs_from_command(shell_command, description):
