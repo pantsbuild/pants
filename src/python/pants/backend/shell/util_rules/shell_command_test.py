@@ -29,14 +29,14 @@ from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import EMPTY_SNAPSHOT, DigestContents
-from pants.engine.process import Process
+from pants.engine.process import Process, ProcessExecutionFailure
 from pants.engine.target import (
     GeneratedSources,
     MultipleSourcesField,
     TransitiveTargets,
     TransitiveTargetsRequest,
 )
-from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error
 
 
 @pytest.fixture
@@ -312,7 +312,7 @@ def test_package_dependencies(caplog, rule_runner: RuleRunner) -> None:
                   name="msg-gen",
                   command="echo message > msg.txt",
                   tools=["echo"],
-                  outputs=["msg.txt"],
+                  output_files=["msg.txt"],
                 )
 
                 archive(
@@ -341,6 +341,103 @@ def test_package_dependencies(caplog, rule_runner: RuleRunner) -> None:
         [
             (logging.INFO, "msg-archive.zip\n"),
         ],
+    )
+
+
+def test_runtime_dependencies(caplog, rule_runner: RuleRunner) -> None:
+    caplog.set_level(logging.INFO)
+    caplog.clear()
+
+    rule_runner.write_files(
+        {
+            "src/BUILD": dedent(
+                """\
+                experimental_shell_command(
+                  name="a1",
+                  command="echo message > msg.txt",
+                  output_files=["msg.txt"],
+                )
+
+                experimental_shell_command(
+                    name="a2",
+                    tools=["cat"],
+                    command="cat msg.txt > msg2.txt",
+                    runtime_dependencies=[":a1",],
+                    output_files=["msg2.txt",],
+                )
+
+                # Fails because runtime dependencies are not exported
+                # transitively
+                experimental_shell_command(
+                    name="expect_fail_1",
+                    tools=["cat"],
+                    command="cat msg.txt",
+                    runtime_dependencies=[":a2",],
+                )
+
+                # Fails because `dependencies` are not available at runtime
+                # when you ask for that
+                experimental_shell_command(
+                    name="expect_fail_2",
+                    tools=["cat"],
+                    command="cat msg.txt",
+                    dependencies=[":a1"],
+                    use_dependencies_at_runtime=False,
+                )
+
+                # Fails because runtime dependencies are not fetched transitively
+                # even if the root is requested through `dependencies`
+                experimental_shell_command(
+                    name="expect_fail_3",
+                    tools=["cat"],
+                    command="cat msg.txt",
+                    dependencies=[":a2"],
+                )
+
+                # Succeeds because `a1` and `a2` are requested directly
+                experimental_shell_command(
+                    name="expect_success_1",
+                    tools=["cat"],
+                    command="cat msg.txt msg2.txt > output.txt",
+                    runtime_dependencies=[":a1", ":a2",],
+                    output_files=["output.txt"],
+                )
+
+                # Succeeds becuase `a1` and `a2` are requested directly and `dependencies`
+                # are made available at runtime
+                experimental_shell_command(
+                    name="expect_success_2",
+                    tools=["cat"],
+                    command="cat msg.txt msg2.txt > output.txt",
+                    dependencies=[":a1", ":a2",],
+                    output_files=["output.txt"],
+                )
+                """
+            ),
+        }
+    )
+
+    with engine_error(ProcessExecutionFailure):
+        assert_shell_command_result(
+            rule_runner, Address("src", target_name="expect_fail_1"), expected_contents={}
+        )
+    with engine_error(ProcessExecutionFailure):
+        assert_shell_command_result(
+            rule_runner, Address("src", target_name="expect_fail_2"), expected_contents={}
+        )
+    with engine_error(ProcessExecutionFailure):
+        assert_shell_command_result(
+            rule_runner, Address("src", target_name="expect_fail_3"), expected_contents={}
+        )
+    assert_shell_command_result(
+        rule_runner,
+        Address("src", target_name="expect_success_1"),
+        expected_contents={"src/output.txt": "message\nmessage\n"},
+    )
+    assert_shell_command_result(
+        rule_runner,
+        Address("src", target_name="expect_success_2"),
+        expected_contents={"src/output.txt": "message\nmessage\n"},
     )
 
 
