@@ -19,6 +19,7 @@ from pants.engine.target import (
     MultipleSourcesField,
     OverridesField,
     SingleSourceField,
+    SpecialCasedDependencies,
     StringField,
     StringSequenceField,
     Target,
@@ -302,6 +303,43 @@ class ShellCommandDependenciesField(ShellDependenciesField):
     supports_transitive_excludes = True
 
 
+class ShellCommandUseOutputDependenciesInRuntimeField(BoolField):
+    alias = "use_dependencies_at_runtime"
+    default = True
+    help = softwrap(
+        """
+        Allows you to separate dependencies between those required to run the shell command and
+        those required to successfully use the output artifacts.
+
+        If `True`, the dependencies specified in the `dependencies` field will be materialized
+        into the runtime sandbox (with any package dependencies built), and also included in any
+        transitive dependency resolution involving this target. Dependencies specified in
+        `runtime_dependencies` will also be materialized into the sandbox.
+
+        If `False`, the dependencies in the `dependencies` field will only be used for transitive
+        dependency resolution, and only the `runtime_dependencies` field will be materialized into
+        the sandbox.
+        """
+    )
+
+
+class ShellCommandRuntimeDependenciesField(SpecialCasedDependencies):
+    alias = "runtime_dependencies"
+    help = softwrap(
+        """
+        The runtime dependencies for this shell command.
+
+        Dependencies specified here are those required to make the command complete successfully
+        (e.g. file inputs, binaries compiled from other targets, etc), but NOT required to make
+        the output side-effects useful. Dependencies that are required to use the side-effects
+        produced by this command should be specified using the `dependencies` field.
+
+        If you have fully separated your dependencies between runtime and output dependencies,
+        you can set `use_dependencies_at_runtime = False`.
+        """
+    )
+
+
 class ShellCommandSourcesField(MultipleSourcesField):
     # We solely register this field for codegen to work.
     alias = "_sources"
@@ -368,6 +406,7 @@ class ShellCommandTarget(Target):
     core_fields = (
         *COMMON_TARGET_FIELDS,
         ShellCommandDependenciesField,
+        ShellCommandRuntimeDependenciesField,
         ShellCommandCommandField,
         ShellCommandLogOutputField,
         ShellCommandOutputsField,

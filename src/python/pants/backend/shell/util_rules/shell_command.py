@@ -211,7 +211,7 @@ async def run_shell_command(
             f"shell command to be specified in the `{ShellCommandToolsField.alias}` field. If "
             f"`bash` cannot find a tool, add it to the `{ShellCommandToolsField.alias}` field."
         )
-        
+
     result = await Get(
         ProcessResult,
         {
