@@ -99,7 +99,7 @@ def test_sources_and_files(rule_runner: RuleRunner) -> None:
                 """\
                 experimental_shell_command(
                   name="hello",
-                  dependencies=[":build-utils", ":files"],
+                  execution_dependencies=[":build-utils", ":files"],
                   tools=[
                     "bash",
                     "cat",
@@ -185,7 +185,7 @@ def test_chained_shell_commands(rule_runner: RuleRunner) -> None:
                   tools=["cp", "echo"],
                   outputs=["msg"],
                   command="cp ../a/msg . ; echo 'shell_command:b' >> msg",
-                  dependencies=["src/a:msg"],
+                  execution_dependencies=["src/a:msg"],
                 )
                 """
             ),
@@ -326,7 +326,7 @@ def test_package_dependencies(caplog, rule_runner: RuleRunner) -> None:
                   command="ls .",
                   tools=["ls"],
                   log_output=True,
-                  dependencies=[":msg-archive"],
+                  execution_dependencies=[":msg-archive"],
                 )
                 """
             ),
@@ -344,7 +344,7 @@ def test_package_dependencies(caplog, rule_runner: RuleRunner) -> None:
     )
 
 
-def test_runtime_dependencies(caplog, rule_runner: RuleRunner) -> None:
+def test_execution_dependencies(caplog, rule_runner: RuleRunner) -> None:
     caplog.set_level(logging.INFO)
     caplog.clear()
 
@@ -362,7 +362,7 @@ def test_runtime_dependencies(caplog, rule_runner: RuleRunner) -> None:
                     name="a2",
                     tools=["cat"],
                     command="cat msg.txt > msg2.txt",
-                    runtime_dependencies=[":a1",],
+                    execution_dependencies=[":a1",],
                     output_files=["msg2.txt",],
                 )
 
@@ -372,26 +372,26 @@ def test_runtime_dependencies(caplog, rule_runner: RuleRunner) -> None:
                     name="expect_fail_1",
                     tools=["cat"],
                     command="cat msg.txt",
-                    runtime_dependencies=[":a2",],
+                    execution_dependencies=[":a2",],
                 )
 
-                # Fails because `dependencies` are not available at runtime
+                # Fails because `output_dependencies` are not available at runtime
                 # when you ask for that
                 experimental_shell_command(
                     name="expect_fail_2",
                     tools=["cat"],
                     command="cat msg.txt",
-                    dependencies=[":a1"],
-                    use_dependencies_at_runtime=False,
+                    output_dependencies=[":a1"],
+                    use_dependencies_when_executing=False,
                 )
 
                 # Fails because runtime dependencies are not fetched transitively
-                # even if the root is requested through `dependencies`
+                # even if the root is requested through `output_dependencies`
                 experimental_shell_command(
                     name="expect_fail_3",
                     tools=["cat"],
                     command="cat msg.txt",
-                    dependencies=[":a2"],
+                    output_dependencies=[":a2"],
                 )
 
                 # Succeeds because `a1` and `a2` are requested directly
@@ -399,17 +399,17 @@ def test_runtime_dependencies(caplog, rule_runner: RuleRunner) -> None:
                     name="expect_success_1",
                     tools=["cat"],
                     command="cat msg.txt msg2.txt > output.txt",
-                    runtime_dependencies=[":a1", ":a2",],
+                    execution_dependencies=[":a1", ":a2",],
                     output_files=["output.txt"],
                 )
 
-                # Succeeds becuase `a1` and `a2` are requested directly and `dependencies`
+                # Succeeds becuase `a1` and `a2` are requested directly and `output_dependencies`
                 # are made available at runtime
                 experimental_shell_command(
                     name="expect_success_2",
                     tools=["cat"],
                     command="cat msg.txt msg2.txt > output.txt",
-                    dependencies=[":a1", ":a2",],
+                    output_dependencies=[":a1", ":a2",],
                     output_files=["output.txt"],
                 )
                 """

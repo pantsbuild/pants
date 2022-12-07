@@ -14,17 +14,17 @@ from textwrap import dedent  # noqa: PNT20
 from pants.backend.shell.subsystems.shell_setup import ShellSetup
 from pants.backend.shell.target_types import (
     ShellCommandCommandField,
+    ShellCommandExecutionDependenciesField,
     ShellCommandExtraEnvVarsField,
     ShellCommandLogOutputField,
     ShellCommandOutputDirectoriesField,
     ShellCommandOutputFilesField,
     ShellCommandOutputsField,
-    ShellCommandRuntimeDependenciesField,
     ShellCommandRunWorkdirField,
     ShellCommandSourcesField,
     ShellCommandTimeoutField,
     ShellCommandToolsField,
-    ShellCommandUseOutputDependenciesInRuntimeField,
+    ShellCommandUseOutputDependenciesWhenExecutingField,
 )
 from pants.backend.shell.util_rules.builtin import BASH_BUILTIN_COMMANDS
 from pants.core.goals.package import BuiltPackage, PackageFieldSet
@@ -133,7 +133,7 @@ async def _execution_environment_from_dependencies(shell_command: Target) -> Dig
     # this command as a root for the transitive dependency search for runtime dependencies.
     maybe_this_target = (
         (shell_command.address,)
-        if shell_command.get(ShellCommandUseOutputDependenciesInRuntimeField).value
+        if shell_command.get(ShellCommandUseOutputDependenciesWhenExecutingField).value
         else ()
     )
 
@@ -141,7 +141,7 @@ async def _execution_environment_from_dependencies(shell_command: Target) -> Dig
     runtime_dependencies = await Get(
         Addresses,
         UnparsedAddressInputs,
-        shell_command.get(ShellCommandRuntimeDependenciesField).to_unparsed_address_inputs(),
+        shell_command.get(ShellCommandExecutionDependenciesField).to_unparsed_address_inputs(),
     )
 
     transitive = await Get(

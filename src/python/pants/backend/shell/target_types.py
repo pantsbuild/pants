@@ -301,10 +301,13 @@ class ShellCommandOutputDirectoriesField(StringSequenceField):
 
 class ShellCommandDependenciesField(ShellDependenciesField):
     supports_transitive_excludes = True
+    alias = "output_dependencies"
+    deprecated_alias = "dependencies"
+    deprecated_alias_removal_version = "2.17.0.dev0"
 
 
-class ShellCommandUseOutputDependenciesInRuntimeField(BoolField):
-    alias = "use_dependencies_at_runtime"
+class ShellCommandUseOutputDependenciesWhenExecutingField(BoolField):
+    alias = "use_dependencies_when_executing"
     default = True
     help = softwrap(
         """
@@ -312,30 +315,30 @@ class ShellCommandUseOutputDependenciesInRuntimeField(BoolField):
         those required to successfully use the output artifacts.
 
         If `True`, the dependencies specified in the `dependencies` field will be materialized
-        into the runtime sandbox (with any package dependencies built), and also included in any
+        into the command's sandbox (with any package dependencies built), and also included in any
         transitive dependency resolution involving this target. Dependencies specified in
-        `runtime_dependencies` will also be materialized into the sandbox.
+        `execution_dependencies` will also be materialized into the sandbox.
 
         If `False`, the dependencies in the `dependencies` field will only be used for transitive
-        dependency resolution, and only the `runtime_dependencies` field will be materialized into
+        dependency resolution, and only the `execution_dependencies` field will be materialized into
         the sandbox.
         """
     )
 
 
-class ShellCommandRuntimeDependenciesField(SpecialCasedDependencies):
-    alias = "runtime_dependencies"
+class ShellCommandExecutionDependenciesField(SpecialCasedDependencies):
+    alias = "execution_dependencies"
     help = softwrap(
         """
-        The runtime dependencies for this shell command.
+        The execution dependencies for this shell command.
 
         Dependencies specified here are those required to make the command complete successfully
         (e.g. file inputs, binaries compiled from other targets, etc), but NOT required to make
         the output side-effects useful. Dependencies that are required to use the side-effects
-        produced by this command should be specified using the `dependencies` field.
+        produced by this command should be specified using the `output_dependencies` field.
 
         If you have fully separated your dependencies between runtime and output dependencies,
-        you can set `use_dependencies_at_runtime = False`.
+        you can set `use_dependencies_when_executing = False`.
         """
     )
 
@@ -406,8 +409,8 @@ class ShellCommandTarget(Target):
     core_fields = (
         *COMMON_TARGET_FIELDS,
         ShellCommandDependenciesField,
-        ShellCommandRuntimeDependenciesField,
-        ShellCommandUseOutputDependenciesInRuntimeField,
+        ShellCommandExecutionDependenciesField,
+        ShellCommandUseOutputDependenciesWhenExecutingField,
         ShellCommandCommandField,
         ShellCommandLogOutputField,
         ShellCommandOutputsField,
@@ -449,6 +452,8 @@ class ShellCommandRunTarget(Target):
     core_fields = (
         *COMMON_TARGET_FIELDS,
         ShellCommandDependenciesField,
+        ShellCommandExecutionDependenciesField,
+        ShellCommandUseOutputDependenciesWhenExecutingField,
         ShellCommandCommandField,
         ShellCommandRunWorkdirField,
     )
