@@ -6,7 +6,7 @@ from __future__ import annotations
 import json
 import os
 from textwrap import dedent
-from typing import Iterable, Tuple
+from typing import Tuple
 
 import pytest
 
@@ -69,7 +69,11 @@ def rule_runner() -> RuleRunner:
     )
 
 
-def run_run_request(rule_runner: RuleRunner, target: Target, test_debug_adapter: bool = True,) -> Tuple[int, str, str]:
+def run_run_request(
+    rule_runner: RuleRunner,
+    target: Target,
+    test_debug_adapter: bool = True,
+) -> Tuple[int, str, str]:
     run_request = rule_runner.request(RunRequest, [PythonSourceFieldSet.create(target)])
     run_process = InteractiveProcess(
         argv=run_request.args,
@@ -85,21 +89,24 @@ def run_run_request(rule_runner: RuleRunner, target: Target, test_debug_adapter:
         stderr = mocked_console[1].get_stderr()
 
     if test_debug_adapter:
-        debug_adapter_request = rule_runner.request(RunDebugAdapterRequest, [PythonSourceFieldSet.create(target)])
+        debug_adapter_request = rule_runner.request(
+            RunDebugAdapterRequest, [PythonSourceFieldSet.create(target)]
+        )
         debug_adapter_process = InteractiveProcess(
-                argv=debug_adapter_request.args,
-                env=debug_adapter_request.extra_env,
-                input_digest=debug_adapter_request.digest,
-                run_in_workspace=True,
-                immutable_input_digests=debug_adapter_request.immutable_input_digests,
-                append_only_caches=debug_adapter_request.append_only_caches,
-            )
+            argv=debug_adapter_request.args,
+            env=debug_adapter_request.extra_env,
+            input_digest=debug_adapter_request.digest,
+            run_in_workspace=True,
+            immutable_input_digests=debug_adapter_request.immutable_input_digests,
+            append_only_caches=debug_adapter_request.append_only_caches,
+        )
         with mock_console(rule_runner.options_bootstrapper) as mocked_console:
             debug_adapter_result = rule_runner.run_interactive_process(debug_adapter_process)
-            assert debug_adapter_result.exit_code == result.exit_code, mocked_console[1].get_stderr()
+            assert debug_adapter_result.exit_code == result.exit_code, mocked_console[
+                1
+            ].get_stderr()
 
     return result.exit_code, stdout, stderr
-
 
 
 @pytest.mark.parametrize(

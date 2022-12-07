@@ -22,7 +22,6 @@ from pants.backend.python.goals.pytest_runner import (
     TestMetadata,
 )
 from pants.backend.python.macros.python_artifact import PythonArtifact
-from pants.backend.python.subsystems.debugpy import DebugPy
 from pants.backend.python.subsystems.pytest import PythonTestFieldSet
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
