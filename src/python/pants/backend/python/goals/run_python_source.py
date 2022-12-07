@@ -61,6 +61,9 @@ async def create_python_source_debug_adapter_request(
     python_setup: PythonSetup,
 ) -> RunDebugAdapterRequest:
     debugpy_pex = await Get(
+        # NB: We fold the debugpy PEX into the normally constructed VenvPex so that debugpy is in the
+        # venv, but isn't the main entrypoint. Then we use PEX_* env vars to dynamically have debugpy
+        # be invoked in that VenvPex. Hence, a vanilla Pex.
         Pex,
         PexRequest,
         debugpy.to_pex_request(
