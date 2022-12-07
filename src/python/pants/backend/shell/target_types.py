@@ -407,6 +407,7 @@ class ShellCommandTarget(Target):
         *COMMON_TARGET_FIELDS,
         ShellCommandDependenciesField,
         ShellCommandRuntimeDependenciesField,
+        ShellCommandUseOutputDependenciesInRuntimeField,
         ShellCommandCommandField,
         ShellCommandLogOutputField,
         ShellCommandOutputsField,
