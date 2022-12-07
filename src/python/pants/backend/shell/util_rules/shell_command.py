@@ -15,6 +15,8 @@ from pants.backend.shell.target_types import (
     ShellCommandCommandField,
     ShellCommandExtraEnvVarsField,
     ShellCommandLogOutputField,
+    ShellCommandOutputDirectoriesField,
+    ShellCommandOutputFilesField,
     ShellCommandOutputsField,
     ShellCommandRunWorkdirField,
     ShellCommandSourcesField,
@@ -90,6 +92,8 @@ class ShellCommandProcessFromTargetRequest:
 
 @rule_helper
 async def _prepare_process_request_from_target(shell_command: Target) -> ShellCommandProcessRequest:
+    description = f"the `{shell_command.alias}` at `{shell_command.address}`"
+
     interactive = shell_command.has_field(ShellCommandRunWorkdirField)
     if interactive:
         working_directory = shell_command[ShellCommandRunWorkdirField].value or ""
@@ -98,9 +102,7 @@ async def _prepare_process_request_from_target(shell_command: Target) -> ShellCo
 
     command = shell_command[ShellCommandCommandField].value
     if not command:
-        raise ValueError(
-            f"Missing `command` line in `{shell_command.alias}` target {shell_command.address}."
-        )
+        raise ValueError(f"Missing `command` line in `{description}.")
 
     # Prepare `input_digest`: Currently uses transitive targets per old behaviour, but
     # this will probably change soon, per #17345.
@@ -132,12 +134,10 @@ async def _prepare_process_request_from_target(shell_command: Target) -> ShellCo
         Digest, MergeDigests([sources.snapshot.digest, *(pkg.digest for pkg in packages)])
     )
 
-    outputs = shell_command.get(ShellCommandOutputsField).value or ()
-    output_files = tuple(f for f in outputs if not f.endswith("/"))
-    output_directories = tuple(d for d in outputs if d.endswith("/"))
+    output_files, output_directories = _parse_outputs_from_command(shell_command, description)
 
     return ShellCommandProcessRequest(
-        description=f"the `{shell_command.alias}` at `{shell_command.address}`",
+        description=description,
         interactive=interactive,
         working_directory=working_directory,
         command=command,
@@ -148,6 +148,27 @@ async def _prepare_process_request_from_target(shell_command: Target) -> ShellCo
         output_directories=output_directories,
         extra_env_vars=shell_command.get(ShellCommandExtraEnvVarsField).value or (),
     )
+
+
+def _parse_outputs_from_command(shell_command, description):
+    outputs = shell_command.get(ShellCommandOutputsField).value or ()
+    output_files = shell_command.get(ShellCommandOutputFilesField).value or ()
+    output_directories = shell_command.get(ShellCommandOutputDirectoriesField).value or ()
+    if outputs and (output_files or output_directories):
+        raise ValueError(
+            "Both new-style `output_files` or `output_directories` and old-style `outputs` were "
+            f"specified in {description}. To fix, move all values from `outputs` to "
+            "`output_files` or `output_directories`."
+        )
+    elif outputs:
+        output_files = tuple(f for f in outputs if not f.endswith("/"))
+        output_directories = tuple(d for d in outputs if d.endswith("/"))
+    elif not (output_files or output_directories):
+        raise ValueError(
+            f"Neither `ouput_files` nor `output_directories` were specified in {description}. "
+            "To fix, specify at least one of these fields."
+        )
+    return output_files, output_directories
 
 
 @rule
@@ -190,7 +211,7 @@ async def run_shell_command(
             f"shell command to be specified in the `{ShellCommandToolsField.alias}` field. If "
             f"`bash` cannot find a tool, add it to the `{ShellCommandToolsField.alias}` field."
         )
-
+        
     result = await Get(
         ProcessResult,
         {
