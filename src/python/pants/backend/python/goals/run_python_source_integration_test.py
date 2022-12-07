@@ -57,7 +57,7 @@ def rule_runner() -> RuleRunner:
             *protobuf_additional_fields.rules(),
             *protobuf_module_mapper_rules(),
             QueryRule(RunRequest, (PythonSourceFieldSet,)),
-            QueryRule(RunDebugAdapterRequest, (RunDebugAdapterRequest,)),
+            QueryRule(RunDebugAdapterRequest, (PythonSourceFieldSet,)),
         ],
         target_types=[
             ProtobufSourcesGeneratorTarget,
@@ -69,7 +69,7 @@ def rule_runner() -> RuleRunner:
     )
 
 
-def run_run_request(rule_runner: RuleRunner, target: Target) -> Tuple[int, str, str]:
+def run_run_request(rule_runner: RuleRunner, target: Target, test_debug_adapter: bool = True,) -> Tuple[int, str, str]:
     run_request = rule_runner.request(RunRequest, [PythonSourceFieldSet.create(target)])
     run_process = InteractiveProcess(
         argv=run_request.args,
@@ -84,18 +84,19 @@ def run_run_request(rule_runner: RuleRunner, target: Target) -> Tuple[int, str, 
         stdout = mocked_console[1].get_stdout()
         stderr = mocked_console[1].get_stderr()
 
-    # Also check DebugAdapterRequest
-    with mock_console(rule_runner.options_bootstrapper) as mocked_console:
+    if test_debug_adapter:
         debug_adapter_request = rule_runner.request(RunDebugAdapterRequest, [PythonSourceFieldSet.create(target)])
-        debug_adapter_result = rule_runner.run_interactive_process(InteractiveProcess(
-            argv=debug_adapter_request.args,
-            env=debug_adapter_request.extra_env,
-            input_digest=debug_adapter_request.digest,
-            run_in_workspace=True,
-            immutable_input_digests=debug_adapter_request.immutable_input_digests,
-            append_only_caches=debug_adapter_request.append_only_caches,
-        ))
-        assert debug_adapter_result.exit_code == result.exit_code
+        debug_adapter_process = InteractiveProcess(
+                argv=debug_adapter_request.args,
+                env=debug_adapter_request.extra_env,
+                input_digest=debug_adapter_request.digest,
+                run_in_workspace=True,
+                immutable_input_digests=debug_adapter_request.immutable_input_digests,
+                append_only_caches=debug_adapter_request.append_only_caches,
+            )
+        with mock_console(rule_runner.options_bootstrapper) as mocked_console:
+            debug_adapter_result = rule_runner.run_interactive_process(debug_adapter_process)
+            assert debug_adapter_result.exit_code == result.exit_code, mocked_console[1].get_stderr()
 
     return result.exit_code, stdout, stderr
 
@@ -231,7 +232,7 @@ def test_no_strip_pex_env_issues_12057(rule_runner: RuleRunner) -> None:
     ]
     rule_runner.set_options(args, env_inherit={"PATH", "PYENV_ROOT", "HOME"})
     target = rule_runner.get_target(Address("src", relative_file_path="app.py"))
-    exit_code, _, stderr = run_run_request(rule_runner, target)
+    exit_code, _, stderr = run_run_request(rule_runner, target, test_debug_adapter=False)
     assert exit_code == 42, stderr
 
 
@@ -262,7 +263,7 @@ def test_no_leak_pex_root_issues_12055(rule_runner: RuleRunner) -> None:
     ]
     rule_runner.set_options(args, env_inherit={"PATH", "PYENV_ROOT", "HOME"})
     target = rule_runner.get_target(Address("src", relative_file_path="app.py"))
-    exit_code, stdout, _ = run_run_request(rule_runner, target)
+    exit_code, stdout, _ = run_run_request(rule_runner, target, test_debug_adapter=False)
     assert exit_code == 0
     assert os.path.join(named_caches_dir, "pex_root") == stdout.strip()
 

@@ -34,10 +34,10 @@ class PythonSourceFieldSet(RunFieldSet):
     interpreter_constraints: InterpreterConstraintsField
     _run_goal_use_sandbox: PythonRunGoalUseSandboxField
 
-    def get_run_goal_use_sandbox(self, python_setup: PythonSetup) -> bool:
-        if self._run_goal_use_sandbox is None:
+    def should_use_sandbox(self, python_setup: PythonSetup) -> bool:
+        if self._run_goal_use_sandbox.value is None:
             return python_setup.default_run_goal_use_sandbox
-        return self._run_goal_use_sandbox
+        return self._run_goal_use_sandbox.value
 
 
 @rule(level=LogLevel.DEBUG)
@@ -48,7 +48,7 @@ async def create_python_source_run_request(
         field_set.address,
         entry_point_field=PexEntryPointField(field_set.source.value, field_set.address),
         pex_env=pex_env,
-        run_in_sandbox=field_set.get_run_goal_use_sandbox(python_setup),
+        run_in_sandbox=field_set.should_use_sandbox(python_setup),
     )
 
 
@@ -75,7 +75,7 @@ async def create_python_source_debug_adapter_request(
         entry_point_field=PexEntryPointField(field_set.source.value, field_set.address),
         pex_env=pex_env,
         pex_path=[debugpy_pex],
-        run_in_sandbox=field_set.get_run_goal_use_sandbox(python_setup),
+        run_in_sandbox=field_set.should_use_sandbox(python_setup),
     )
 
     return await _create_python_source_run_dap_request(
