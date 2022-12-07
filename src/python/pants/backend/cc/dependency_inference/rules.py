@@ -6,7 +6,7 @@ import re
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import DefaultDict
+from typing import DefaultDict, Iterable
 
 from pants.backend.cc.subsystems.cc_infer import CCInferSubsystem
 from pants.backend.cc.target_types import CCDependenciesField, CCSourceField
@@ -16,7 +16,7 @@ from pants.core.util_rules.stripped_source_files import StrippedFileName, Stripp
 from pants.engine.fs import DigestContents
 from pants.engine.internals.native_engine import Digest
 from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.rules import collect_rules, rule
+from pants.engine.rules import Rule, collect_rules, rule
 from pants.engine.target import (
     AllTargets,
     DependenciesRequest,
@@ -65,10 +65,44 @@ class CCFilesMapping:
     mapping: FrozenDict[str, Address]
     ambiguous_files: FrozenDict[str, tuple[Address, ...]]
     mapping_not_stripped: FrozenDict[str, Address]
+    mapping_relative_to_include_dirs: FrozenDict[str, Address]
+
+
+def _map_relative_to_include_directories(
+    cc_file_mapping: dict[str, Address], include_directories: Iterable[str]
+) -> dict[str, Address]:
+    """Returns a mapping of CC files (made relative to a potential set of include_directories) to
+    their owning file address.
+
+    This is used to infer dependencies when an #include statement is relative to an include_directory, but does
+    not explicitly state that relative include_directory.
+
+    For example, a project with a file at `root/include/mylib/foo.h` may be referenced via `#include "mylib/foo.h"`,
+    with pre-defined build settings to reference the `root/include` automatically.
+
+    This is a common pattern in C/C++ libraries, where the public headers are all in a single directory (e.g. `include/`)
+    and the library is compiled with `-Iinclude` to automatically reference the public headers. Private headers are
+    typically in a separate directory alongside source files (e.g. `src/`).
+
+    TODO: Would a more "correct" implementation be to grab SourceRoots and use those to determine the relative path? Currently,
+    this implementation progresses up the file's parent chain until it finds a directory that matches an include_directory, and then
+    uses that as the relative path.
+    """
+
+    mapping: dict[str, Address] = {}
+    for not_stripped_file in cc_file_mapping.keys():
+        path = PurePath(not_stripped_file)
+        path_parents = list(path.parents)
+        for parent in path_parents:
+            if parent.name in include_directories:
+                relative_path = path.relative_to(parent)
+                mapping[str(relative_path)] = cc_file_mapping[not_stripped_file]
+
+    return mapping
 
 
 @rule(desc="Creating map of CC file names to CC targets", level=LogLevel.DEBUG)
-async def map_cc_files(cc_targets: AllCCTargets) -> CCFilesMapping:
+async def map_cc_files(cc_targets: AllCCTargets, cc_infer: CCInferSubsystem) -> CCFilesMapping:
     stripped_file_per_target = await MultiGet(
         Get(StrippedFileName, StrippedFileNameRequest(tgt[CCSourceField].file_path))
         for tgt in cc_targets
@@ -90,13 +124,21 @@ async def map_cc_files(cc_targets: AllCCTargets) -> CCFilesMapping:
 
     mapping_not_stripped = {tgt[CCSourceField].file_path: tgt.address for tgt in cc_targets}
 
-    return CCFilesMapping(
+    mapping_relative_to_include_dirs = _map_relative_to_include_directories(
+        mapping_not_stripped, tuple(cc_infer.include_directories)
+    )
+
+    m = CCFilesMapping(
         mapping=FrozenDict(sorted(stripped_files_to_addresses.items())),
         ambiguous_files=FrozenDict(
             (k, tuple(sorted(v))) for k, v in sorted(stripped_files_with_multiple_owners.items())
         ),
         mapping_not_stripped=FrozenDict(mapping_not_stripped),
+        mapping_relative_to_include_dirs=FrozenDict(mapping_relative_to_include_dirs),
     )
+
+    print(m)
+    return m
 
 
 @dataclass(frozen=True)
@@ -158,8 +200,10 @@ async def infer_cc_source_dependencies(
         if cc_infer.include_from_source_roots:
             unambiguous = cc_files_mapping.mapping.get(include.path)
             ambiguous = cc_files_mapping.ambiguous_files.get(include.path)
+
             if unambiguous:
                 result.add(unambiguous)
+
             elif ambiguous:
                 explicitly_provided_deps.maybe_warn_of_ambiguous_dependency_inference(
                     ambiguous,
@@ -176,10 +220,18 @@ async def infer_cc_source_dependencies(
                 if maybe_disambiguated:
                     result.add(maybe_disambiguated)
 
+            else:
+                # Finally, try searching relative to provided include_directories (from the source root).
+                maybe_relative_to_include_dir = (
+                    cc_files_mapping.mapping_relative_to_include_dirs.get(include.path)
+                )
+                if maybe_relative_to_include_dir:
+                    result.add(maybe_relative_to_include_dir)
+
     return InferredDependencies(sorted(result))
 
 
-def rules():
+def rules() -> Iterable[Rule | UnionRule]:
     return (
         *collect_rules(),
         *stripped_source_files.rules(),

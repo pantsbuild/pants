@@ -1,8 +1,9 @@
 # Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants.option.option_types import BoolOption
+from pants.option.option_types import BoolOption, StrListOption
 from pants.option.subsystem import Subsystem
+from pants.util.strutil import softwrap
 
 
 class CCInferSubsystem(Subsystem):
@@ -19,4 +20,24 @@ class CCInferSubsystem(Subsystem):
     include_from_source_roots = BoolOption(
         default=True,
         help="Infer a target's dependencies by trying to include relative to source roots.",
+    )
+
+    # TODO: Should this be more generalized?
+    include_directories = StrListOption(
+        default=["include", "includes", "inc"],
+        help=softwrap(
+            """
+            Infer a target's dependencies by searching relative to an include_directory.
+
+            An example where this may be useful is if you have a a file at `root/include/mylib/foo.h`
+            which may be referenced via `#include "mylib/foo.h"`. This option will allow you to
+            correctly infer dependencies by searching for `mylib/foo.h` relative to the `root/{include}`
+            directory.
+
+            The inferred files take part in compilation, and the inferred directory is added to compilation
+            arguments prefixed by the '-I' flag.
+
+            This option is only used if `--include-from-source-roots` is set to True.
+            """
+        ),
     )
