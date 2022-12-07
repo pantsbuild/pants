@@ -312,7 +312,7 @@ def test_package_dependencies(caplog, rule_runner: RuleRunner) -> None:
                   name="msg-gen",
                   command="echo message > msg.txt",
                   tools=["echo"],
-                  output_files=["msg.txt"],
+                  outputs=["msg.txt"],
                 )
 
                 archive(
@@ -355,7 +355,7 @@ def test_execution_dependencies(caplog, rule_runner: RuleRunner) -> None:
                 experimental_shell_command(
                   name="a1",
                   command="echo message > msg.txt",
-                  output_files=["msg.txt"],
+                  outputs=["msg.txt"],
                 )
 
                 experimental_shell_command(
@@ -363,7 +363,7 @@ def test_execution_dependencies(caplog, rule_runner: RuleRunner) -> None:
                     tools=["cat"],
                     command="cat msg.txt > msg2.txt",
                     execution_dependencies=[":a1",],
-                    output_files=["msg2.txt",],
+                    outputs=["msg2.txt",],
                 )
 
                 # Fails because runtime dependencies are not exported
@@ -400,7 +400,7 @@ def test_execution_dependencies(caplog, rule_runner: RuleRunner) -> None:
                     tools=["cat"],
                     command="cat msg.txt msg2.txt > output.txt",
                     execution_dependencies=[":a1", ":a2",],
-                    output_files=["output.txt"],
+                    outputs=["output.txt"],
                 )
 
                 # Succeeds becuase `a1` and `a2` are requested directly and `output_dependencies`
@@ -410,7 +410,7 @@ def test_execution_dependencies(caplog, rule_runner: RuleRunner) -> None:
                     tools=["cat"],
                     command="cat msg.txt msg2.txt > output.txt",
                     output_dependencies=[":a1", ":a2",],
-                    output_files=["output.txt"],
+                    outputs=["output.txt"],
                 )
                 """
             ),
