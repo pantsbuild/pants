@@ -128,7 +128,7 @@ async def map_cc_files(cc_targets: AllCCTargets, cc_infer: CCInferSubsystem) -> 
         mapping_not_stripped, tuple(cc_infer.include_directories)
     )
 
-    m = CCFilesMapping(
+    return CCFilesMapping(
         mapping=FrozenDict(sorted(stripped_files_to_addresses.items())),
         ambiguous_files=FrozenDict(
             (k, tuple(sorted(v))) for k, v in sorted(stripped_files_with_multiple_owners.items())
@@ -136,9 +136,6 @@ async def map_cc_files(cc_targets: AllCCTargets, cc_infer: CCInferSubsystem) -> 
         mapping_not_stripped=FrozenDict(mapping_not_stripped),
         mapping_relative_to_include_dirs=FrozenDict(mapping_relative_to_include_dirs),
     )
-
-    print(m)
-    return m
 
 
 @dataclass(frozen=True)
