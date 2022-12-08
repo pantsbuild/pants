@@ -391,21 +391,28 @@ class PyGeneratorResponseGet(Generic[_Output]):
     output_type: type[_Output]
     input_types: Sequence[type]
     inputs: Sequence[Any]
+    _safe: bool
 
     @overload
     def __init__(
         self,
         output_type: type[_Output],
         input_arg0: dict[Any, type],
+        *,
+        _safe: bool = False,
     ) -> None: ...
     @overload
-    def __init__(self, output_type: type[_Output], input_arg0: _Input) -> None: ...
+    def __init__(
+        self, output_type: type[_Output], input_arg0: _Input, *, _safe: bool = False
+    ) -> None: ...
     @overload
     def __init__(
         self,
         output_type: type[_Output],
         input_arg0: type[_Input],
         input_arg1: _Input,
+        *,
+        _safe: bool = False,
     ) -> None: ...
     @overload
     def __init__(
@@ -413,6 +420,8 @@ class PyGeneratorResponseGet(Generic[_Output]):
         output_type: type[_Output],
         input_arg0: type[_Input] | _Input,
         input_arg1: _Input | None = None,
+        *,
+        _safe: bool = False,
     ) -> None: ...
 
 class PyGeneratorResponseGetMulti:

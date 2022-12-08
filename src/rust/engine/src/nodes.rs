@@ -1119,8 +1119,11 @@ impl Task {
               }
             })?;
           let res = select.run_node(context).await;
-          if get.safe && let Err(Failure::Throw { val, .. }) = res {
-            val
+          if get.safe {
+            match res {
+              Err(Failure::Throw { val, .. }) => Ok(val),
+              _ => res,
+            }
           } else {
             res
           }

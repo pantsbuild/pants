@@ -339,8 +339,9 @@ def test_unhashable_types_failure() -> None:
 
 @rule(desc="Safe get in this rule")
 async def safe_rule() -> C:
-    res = await Get(A, {}, safe=True)
-    print(f"\n\n==>> SAFE RULE res: {res} <<==\n\n")
+    res = await Get(A, {}, _safe=True)
+    assert isinstance(res, Exception)
+    assert str(res) == "An exception!"
     return C()
 
 

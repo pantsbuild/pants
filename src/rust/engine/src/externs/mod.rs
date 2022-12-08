@@ -327,7 +327,7 @@ impl PyGeneratorResponseGet {
     product: &PyAny,
     input_arg0: &PyAny,
     input_arg1: Option<&PyAny>,
-    safe: Option<&PyBool>,
+    _safe: Option<&PyBool>,
   ) -> PyResult<Self> {
     let product = product.cast_as::<PyType>().map_err(|_| {
       let actual_type = product.get_type();
@@ -397,7 +397,7 @@ impl PyGeneratorResponseGet {
       )
     };
 
-    let safe_arg = match safe {
+    let safe = match _safe {
       Some(value) => value.is_true(),
       None => false,
     };
@@ -406,7 +406,7 @@ impl PyGeneratorResponseGet {
       output,
       input_types,
       inputs,
-      safe: safe_arg,
+      safe,
     }))))
   }
 
@@ -513,14 +513,14 @@ pub struct Get {
   pub output: TypeId,
   pub input_types: SmallVec<[TypeId; 2]>,
   pub inputs: SmallVec<[Key; 2]>,
-  pub safe: bool,  
+  pub safe: bool,
 }
 
 impl fmt::Display for Get {
   fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
     write!(f, "Get({}", self.output)?;
     if self.safe {
-      write!(f, " [SAFE]")?;
+      write!(f, " <SAFE>")?;
     }
     match self.input_types.len() {
       0 => write!(f, ")"),
@@ -540,7 +540,6 @@ impl fmt::Display for Get {
   }
 }
 
-#[derive(Debug)]
 pub enum GeneratorResponse {
   Break(Value, TypeId),
   Get(Get),
