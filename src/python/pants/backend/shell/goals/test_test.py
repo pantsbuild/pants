@@ -59,7 +59,7 @@ def test_shell_command_as_test(rule_runner: RuleRunner) -> None:
 
                 experimental_test_shell_command(
                   name="pass",
-                  dependencies=[":msg-gen", ":src"],
+                  execution_dependencies=[":msg-gen", ":src"],
                   tools=["echo"],
                   command="./test.sh msg.txt message",
                 )
