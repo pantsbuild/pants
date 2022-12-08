@@ -13,7 +13,7 @@ python_tests(
             "tags": ["platform_specific_behavior"],
             "timeout": 480,
         },
-        "export_integration_test.py": {"timeout": 300},
+        "export_integration_test.py": {"timeout": 600},
         "lockfile_test.py": {"timeout": 120},
         "package_pex_binary_integration_test.py": {
             "dependencies": [":platforms"],
