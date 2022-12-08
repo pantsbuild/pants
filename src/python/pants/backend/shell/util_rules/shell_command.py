@@ -102,7 +102,7 @@ async def _prepare_process_request_from_target(shell_command: Target) -> ShellCo
 
     command = shell_command[ShellCommandCommandField].value
     if not command:
-        raise ValueError(f"Missing `command` line in `{description}.")
+        raise ValueError(f"Missing `command` line in {description}.")
 
     # Prepare `input_digest`: Currently uses transitive targets per old behaviour, but
     # this will probably change soon, per #17345.
