@@ -11,7 +11,7 @@ use spectral::{assert_that, string::StrAssertions};
 use tempfile::TempDir;
 
 use fs::EMPTY_DIRECTORY_DIGEST;
-use store::{ImmutableInputs, Store};
+use store::Store;
 use testutil::data::{TestData, TestDirectory};
 use testutil::path::{find_bash, which};
 use testutil::{owned_string_vec, relative_paths};
@@ -19,8 +19,8 @@ use workunit_store::{RunningWorkunit, WorkunitStore};
 
 use crate::{
   local, local::KeepSandboxes, CacheName, CommandRunner as CommandRunnerTrait, Context,
-  FallibleProcessResultWithPlatform, InputDigests, NamedCaches, Platform, Process, ProcessError,
-  RelativePath,
+  FallibleProcessResultWithPlatform, ImmutableInputs, InputDigests, NamedCaches, Platform, Process,
+  ProcessError, RelativePath,
 };
 
 #[derive(PartialEq, Debug)]

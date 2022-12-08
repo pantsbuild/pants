@@ -2,14 +2,14 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 use std::path::PathBuf;
 
-use store::{ImmutableInputs, Store};
+use store::Store;
 use task_executor::Executor;
 use tempfile::TempDir;
 use testutil::owned_string_vec;
 use workunit_store::WorkunitStore;
 
 use crate::nailgun::NailgunPool;
-use crate::{NamedCaches, Process};
+use crate::{ImmutableInputs, NamedCaches, Process};
 
 fn pool(size: usize) -> (NailgunPool, NamedCaches, ImmutableInputs) {
   let _ = WorkunitStore::setup_for_tests();

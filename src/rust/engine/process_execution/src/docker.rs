@@ -18,7 +18,7 @@ use log::Level;
 use nails::execution::ExitCode;
 use once_cell::sync::Lazy;
 use parking_lot::Mutex;
-use store::{ImmutableInputs, Store};
+use store::Store;
 use task_executor::Executor;
 use workunit_store::{in_workunit, Metric, RunningWorkunit};
 
@@ -27,8 +27,8 @@ use crate::local::{
   KeepSandboxes,
 };
 use crate::{
-  Context, FallibleProcessResultWithPlatform, NamedCaches, Platform, Process, ProcessError,
-  ProcessExecutionStrategy,
+  Context, FallibleProcessResultWithPlatform, ImmutableInputs, NamedCaches, Platform, Process,
+  ProcessError, ProcessExecutionStrategy,
 };
 
 pub(crate) const SANDBOX_BASE_PATH_IN_CONTAINER: &str = "/pants-sandbox";

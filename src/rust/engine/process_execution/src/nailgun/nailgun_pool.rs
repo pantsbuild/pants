@@ -20,12 +20,12 @@ use tempfile::TempDir;
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 
 use hashing::Fingerprint;
-use store::{ImmutableInputs, Store};
+use store::Store;
 use task_executor::Executor;
 use workunit_store::{in_workunit, Level};
 
 use crate::local::prepare_workdir;
-use crate::{NamedCaches, Process, ProcessError};
+use crate::{ImmutableInputs, NamedCaches, Process, ProcessError};
 
 lazy_static! {
   static ref NAILGUN_PORT_REGEX: Regex = Regex::new(r".*\s+port\s+(\d+)\.$").unwrap();

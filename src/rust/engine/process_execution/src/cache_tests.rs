@@ -6,7 +6,7 @@ use std::path::PathBuf;
 
 use cache::PersistentCache;
 use sharded_lmdb::DEFAULT_LEASE_TIME;
-use store::{ImmutableInputs, Store};
+use store::Store;
 use tempfile::TempDir;
 use testutil::data::TestData;
 use testutil::relative_paths;
@@ -14,7 +14,7 @@ use workunit_store::{RunningWorkunit, WorkunitStore};
 
 use crate::{
   local::KeepSandboxes, CacheContentBehavior, CommandRunner as CommandRunnerTrait, Context,
-  FallibleProcessResultWithPlatform, NamedCaches, Process, ProcessError,
+  FallibleProcessResultWithPlatform, ImmutableInputs, NamedCaches, Process, ProcessError,
 };
 
 struct RoundtripResults {

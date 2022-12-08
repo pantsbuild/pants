@@ -26,8 +26,6 @@
 #![allow(clippy::mutex_atomic)]
 #![recursion_limit = "256"]
 
-mod immutable_inputs;
-pub use crate::immutable_inputs::{ImmutableInputs, WorkdirSymlink};
 mod snapshot;
 pub use crate::snapshot::{OneOffStoreFileByDigest, Snapshot, StoreFileByDigest};
 mod snapshot_ops;
@@ -37,9 +35,8 @@ mod snapshot_ops_tests;
 mod snapshot_tests;
 pub use crate::snapshot_ops::{SnapshotOps, SubsetParams};
 
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt::{self, Debug, Display};
-use std::fs::hard_link;
 use std::fs::OpenOptions;
 use std::future::Future;
 use std::io::{self, Read, Write};
@@ -73,15 +70,8 @@ use workunit_store::{in_workunit, Level, Metric};
 
 use crate::remote::ByteStoreError;
 
-const KILOBYTES: usize = 1024;
-const MEGABYTES: usize = 1024 * KILOBYTES;
+const MEGABYTES: usize = 1024 * 1024;
 const GIGABYTES: usize = 1024 * MEGABYTES;
-
-/// How big a file must be to become an immutable input symlink.
-// NB: These numbers were chosen after micro-benchmarking the code on one machine at the time of
-// writing. They were chosen using a rough equation from the microbenchmarks that are optimized
-// for somewhere between 2 and 3 uses of the corresponding entry to "break even".
-const IMMUTABLE_FILE_SIZE_LIMIT: usize = 512 * KILOBYTES;
 
 mod local;
 #[cfg(test)]
@@ -310,7 +300,6 @@ impl RemoteStore {
 pub struct Store {
   local: local::ByteStore,
   remote: Option<RemoteStore>,
-  immutable_inputs_base: Option<PathBuf>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -346,20 +335,17 @@ impl Store {
     Ok(Store {
       local: local::ByteStore::new(executor, path)?,
       remote: None,
-      immutable_inputs_base: None,
     })
   }
 
   pub fn local_only_with_options<P: AsRef<Path>>(
     executor: task_executor::Executor,
     path: P,
-    immutable_inputs_base: &Path,
     options: LocalOptions,
   ) -> Result<Store, String> {
     Ok(Store {
       local: local::ByteStore::new_with_options(executor, path, options)?,
       remote: None,
-      immutable_inputs_base: Some(immutable_inputs_base.to_path_buf()),
     })
   }
 
@@ -373,7 +359,6 @@ impl Store {
     Store {
       local: self.local,
       remote: None,
-      immutable_inputs_base: self.immutable_inputs_base,
     }
   }
 
@@ -408,7 +393,6 @@ impl Store {
         capabilities_cell_opt,
         batch_api_size_limit,
       )?)),
-      immutable_inputs_base: self.immutable_inputs_base,
     })
   }
 
@@ -1261,49 +1245,33 @@ impl Store {
     &self,
     destination: PathBuf,
     digest: DirectoryDigest,
-    mutable_paths: &BTreeSet<RelativePath>,
-    immutable_inputs: Option<&ImmutableInputs>,
     perms: Permissions,
   ) -> Result<(), StoreError> {
     // Load the DigestTrie for the digest, and convert it into a mapping between a fully qualified
     // parent path and its children.
     let mut parent_to_child = HashMap::new();
-    let tree = self.load_digest_trie(digest).await?;
-    tree.walk(SymlinkBehavior::Aware, &mut |path, entry| {
-      if let Some(parent) = path.parent() {
-        parent_to_child
-          .entry(destination.join(parent))
-          .or_insert_with(Vec::new)
-          .push(entry.clone());
-      }
-    });
-
-    let mut mutable_path_ancestors = BTreeSet::new();
-    for relpath in mutable_paths {
-      mutable_path_ancestors.extend(relpath.ancestors().map(|p| destination.join(p)));
-    }
+    self
+      .load_digest_trie(digest)
+      .await?
+      .walk(SymlinkBehavior::Aware, &mut |path, entry| {
+        if let Some(parent) = path.parent() {
+          parent_to_child
+            .entry(destination.join(parent))
+            .or_insert_with(Vec::new)
+            .push(entry.clone());
+        }
+      });
 
     self
-      .materialize_directory_children(
-        destination.clone(),
-        true,
-        false,
-        &parent_to_child,
-        &mutable_path_ancestors,
-        immutable_inputs,
-        perms,
-      )
+      .materialize_directory_helper(destination, true, &parent_to_child, perms)
       .await
   }
 
-  fn materialize_directory_children<'a>(
+  fn materialize_directory_helper<'a>(
     &self,
     destination: PathBuf,
     is_root: bool,
-    force_mutable: bool,
     parent_to_child: &'a HashMap<PathBuf, Vec<directory::Entry>>,
-    mutable_paths: &'a BTreeSet<PathBuf>,
-    immutable_inputs: Option<&'a ImmutableInputs>,
     perms: Permissions,
   ) -> BoxFuture<'a, Result<(), StoreError>> {
     let store = self.clone();
@@ -1334,21 +1302,15 @@ impl Store {
           let path = destination.join(child.name().as_ref());
           let store = store.clone();
           child_futures.push(async move {
-            let can_be_immutable =
-              immutable_inputs.is_some() && !mutable_paths.contains(&path) && !force_mutable;
-
             match child {
               directory::Entry::File(f) => {
-                store
-                  .materialize_file_maybe_hardlink(
-                    path,
-                    f.digest(),
-                    perms,
-                    f.is_executable(),
-                    can_be_immutable,
-                    immutable_inputs,
-                  )
-                  .await
+                let mode = match perms {
+                  Permissions::ReadOnly if f.is_executable() => 0o555,
+                  Permissions::ReadOnly => 0o444,
+                  Permissions::Writable if f.is_executable() => 0o755,
+                  Permissions::Writable => 0o644,
+                };
+                store.materialize_file(path, f.digest(), mode).await
               }
               directory::Entry::Symlink(s) => {
                 store
@@ -1357,15 +1319,7 @@ impl Store {
               }
               directory::Entry::Directory(_) => {
                 store
-                  .materialize_directory_children(
-                    path.clone(),
-                    false,
-                    mutable_paths.contains(&path),
-                    parent_to_child,
-                    mutable_paths,
-                    immutable_inputs,
-                    perms,
-                  )
+                  .materialize_directory_helper(path, false, parent_to_child, perms)
                   .await
               }
             }
@@ -1390,36 +1344,11 @@ impl Store {
     .boxed()
   }
 
-  async fn materialize_file_maybe_hardlink(
-    &self,
-    destination: PathBuf,
-    digest: Digest,
-    perms: Permissions,
-    is_executable: bool,
-    can_be_immutable: bool,
-    immutable_inputs: Option<&ImmutableInputs>,
-  ) -> Result<(), StoreError> {
-    if can_be_immutable && digest.size_bytes > IMMUTABLE_FILE_SIZE_LIMIT {
-      let dest_path = immutable_inputs
-        .unwrap()
-        .path_for_file(digest, is_executable)
-        .await?;
-      self
-        .materialize_hardlink(destination, dest_path.to_str().unwrap().to_string())
-        .await
-    } else {
-      self
-        .materialize_file(destination, digest, perms, is_executable)
-        .await
-    }
-  }
-
   async fn materialize_file(
     &self,
     destination: PathBuf,
     digest: Digest,
-    perms: Permissions,
-    is_executable: bool,
+    mode: u32,
   ) -> Result<(), StoreError> {
     self
       .load_file_bytes_with(digest, move |bytes| {
@@ -1427,12 +1356,7 @@ impl Store {
           .create(true)
           .write(true)
           .truncate(true)
-          .mode(match perms {
-            Permissions::ReadOnly if is_executable => 0o555,
-            Permissions::ReadOnly => 0o444,
-            Permissions::Writable if is_executable => 0o755,
-            Permissions::Writable => 0o644,
-          })
+          .mode(mode)
           .open(&destination)
           .map_err(|e| {
             format!(
@@ -1448,21 +1372,12 @@ impl Store {
       .await?
   }
 
-  pub async fn materialize_symlink(
+  async fn materialize_symlink(
     &self,
     destination: PathBuf,
     target: String,
   ) -> Result<(), StoreError> {
     symlink(target, destination)?;
-    Ok(())
-  }
-
-  pub async fn materialize_hardlink(
-    &self,
-    destination: PathBuf,
-    target: String,
-  ) -> Result<(), StoreError> {
-    hard_link(target, destination)?;
     Ok(())
   }
 

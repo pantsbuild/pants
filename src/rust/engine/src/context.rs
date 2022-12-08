@@ -30,12 +30,12 @@ use process_execution::docker::{DOCKER, IMAGE_PULL_CACHE};
 use process_execution::switched::SwitchedCommandRunner;
 use process_execution::{
   self, bounded, docker, local, nailgun, remote, remote_cache, CacheContentBehavior, CommandRunner,
-  NamedCaches, ProcessExecutionStrategy, RemoteCacheWarningsBehavior,
+  ImmutableInputs, NamedCaches, ProcessExecutionStrategy, RemoteCacheWarningsBehavior,
 };
 use protos::gen::build::bazel::remote::execution::v2::ServerCapabilities;
 use regex::Regex;
 use rule_graph::RuleGraph;
-use store::{self, ImmutableInputs, Store};
+use store::{self, Store};
 use task_executor::Executor;
 use watch::{Invalidatable, InvalidationWatcher};
 use workunit_store::{Metric, RunId, RunningWorkunit};
@@ -144,7 +144,6 @@ impl Core {
   fn make_store(
     executor: &Executor,
     local_store_options: &LocalStoreOptions,
-    local_execution_root_dir: &Path,
     enable_remote: bool,
     remoting_opts: &RemotingOptions,
     remote_store_address: &Option<String>,
@@ -154,7 +153,6 @@ impl Core {
     let local_only = Store::local_only_with_options(
       executor.clone(),
       local_store_options.store_dir.clone(),
-      local_execution_root_dir,
       local_store_options.into(),
     )?;
     if enable_remote {
@@ -500,7 +498,6 @@ impl Core {
     let full_store = Self::make_store(
       &executor,
       &local_store_options,
-      &local_execution_root_dir,
       need_remote_store,
       &remoting_opts,
       &remoting_opts.store_address,
