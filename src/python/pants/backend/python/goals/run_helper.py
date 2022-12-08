@@ -81,9 +81,7 @@ async def _create_python_source_run_request(
         ),
     )
 
-    pex_request = dataclasses.replace(
-        pex_request, pex_path=(*pex_request.pex_path, *pex_path)
-    )
+    pex_request = dataclasses.replace(pex_request, pex_path=(*pex_request.pex_path, *pex_path))
 
     complete_pex_environment = pex_env.in_workspace()
     venv_pex = await Get(VenvPex, VenvPexRequest(pex_request, complete_pex_environment))
