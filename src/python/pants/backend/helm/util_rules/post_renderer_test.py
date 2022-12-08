@@ -285,7 +285,7 @@ def test_use_simple_extra_post_renderer(rule_runner: RuleRunner) -> None:
                 """\
               helm_deployment(
                 name="test",
-                execution_dependencies=["//src/mychart"],
+                dependencies=["//src/mychart"],
                 post_renderers=["//src/shell:custom_post_renderer"]
               )
               """
