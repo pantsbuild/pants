@@ -37,10 +37,13 @@ We could [add a custom field](https://www.pantsbuild.org/docs/target-api-new-fie
 You only need to register the target to start using it: 
 
 ```python pants-plugins/project_version/register.py
-from project_version.targets import ProjectVersionTarget
+from typing import Iterable
+
+from pants.engine.target import Target
+from project_version.target_types import ProjectVersionTarget
 
 
-def target_types():
+def target_types() -> Iterable[type[Target]]:
     return [ProjectVersionTarget]
 ```
 
@@ -99,11 +102,14 @@ def rules():
     return collect_rules()
 ```
 ```python pants-plugins/project_version/rules.py
-from project_version.targets import ProjectVersionTarget
+from typing import Iterable
+
 import project_version.rules as project_version_rules
+from pants.engine.target import Target
+from project_version.target_types import ProjectVersionTarget
 
 
-def target_types():
+def target_types() -> Iterable[type[Target]]:
     return [ProjectVersionTarget]
 
 
@@ -255,7 +261,7 @@ from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import collect_rules, goal_rule, rule
 from pants.engine.target import (HydratedSources, HydrateSourcesRequest,
                                  SourcesField, Targets)
-from project_version.targets import ProjectVersionTarget
+from project_version.target_types import ProjectVersionTarget
 
 
 @dataclass(frozen=True)
@@ -313,11 +319,14 @@ class ProjectVersionTarget(Target):
     help = "A project version target representing the VERSION file."
 ```
 ```python pants-plugins/project_version/register.py
+from typing import Iterable
+
 import project_version.rules as project_version_rules
-from project_version.targets import ProjectVersionTarget
+from pants.engine.target import Target
+from project_version.target_types import ProjectVersionTarget
 
 
-def target_types():
+def target_types() -> Iterable[type[Target]]:
     return [ProjectVersionTarget]
 
 
