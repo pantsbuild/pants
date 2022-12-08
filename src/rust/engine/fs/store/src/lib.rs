@@ -82,7 +82,7 @@ const GIGABYTES: usize = 1024 * MEGABYTES;
 // writing. They were chosen using a rough equation from the microbenchmarks that are optimized
 // for somewhere between 2 and 3 uses of the corresponding entry to "break even".
 // Number set impossibly high to disable the linking feature -- see #17754 for tracking.
-const IMMUTABLE_FILE_SIZE_LIMIT: usize = usize::MAX; // was: 512 * KILOBYTES;
+const IMMUTABLE_FILE_SIZE_LIMIT: usize = usize::MAX - 1; // was: 512 * KILOBYTES;
 
 mod local;
 #[cfg(test)]
