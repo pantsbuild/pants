@@ -7,6 +7,7 @@ In this tutorial, you'll learn the basics needed to get started writing a plugin
 We'll be writing an [in-repo plugin](https://www.pantsbuild.org/docs/plugins-overview#in-repo-plugins), and expect you to have the `pants-plugins/project_version` directory with the `pants.toml` configuration file extended:
 
 ```toml pants.toml
+# Specifying the path to our plugin's top-level folder using the `pythonpath` option:
 pythonpath = ["%(buildroot)s/pants-plugins"]
 
 backend_packages = [
