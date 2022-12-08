@@ -25,7 +25,7 @@ from pants.engine.internals.native_engine import (
     PyGeneratorResponseGetMulti,
 )
 from pants.util.meta import frozen_after_init
-from pants.util.strutil import softwrap
+from pants.util.strutil import pluralize, softwrap
 
 _Output = TypeVar("_Output")
 _Input = TypeVar("_Input")
@@ -114,7 +114,14 @@ class Awaitable(Generic[_Output], _BasePyGeneratorResponseGet[_Output]):
         See more information about implementing this method at
         https://www.python.org/dev/peps/pep-0492/#await-expression.
         """
+        error_boundary = self._error_boundary
+
         result = yield self
+
+        if error_boundary and isinstance(result, Exception):
+            # This is an error from a `Get(_error_boundary=True)` (or `Effect`) request.
+            raise result
+
         return cast(_Output, result)
 
 
@@ -152,13 +159,40 @@ class Get(Generic[_Output], Awaitable[_Output]):
     """
 
 
+class MultiGetError(Generic[_Output], Exception):
+    errors: tuple[Exception, ...]
+    results: tuple[_Output | Exception, ...]
+
+    def __init__(self, errors: tuple[Exception, ...], results: tuple[_Output | Exception, ...]):
+        self.errors = errors
+        self.results = results
+        super().__init__(
+            f"MultiGet with {pluralize(len(self.errors), 'error')}:\n"
+            + "\n\n".join(f"  {nr+1}. {err}" for nr, err in enumerate(self.errors))
+            + "\n"
+        )
+
+
 @dataclass(frozen=True)
 class _MultiGet:
     gets: tuple[Get, ...]
 
     def __await__(self) -> Generator[tuple[Get, ...], None, tuple]:
-        result = yield self.gets
-        return cast(Tuple, result)
+        # Save which `Get`s are error boundaries (if any).
+        error_boundaries = [get._error_boundary for get in self.gets]
+
+        results = cast(Tuple, (yield self.gets))
+
+        # Check if there are any errors for the boundary `Get`s.
+        errors = tuple(
+            err
+            for err, boundary in zip(results, error_boundaries)
+            if boundary and isinstance(err, Exception)
+        )
+        if errors:
+            raise MultiGetError(errors, results)
+
+        return results
 
 
 # These type variables are used to parametrize from 1 to 10 Gets when used in a tuple-style

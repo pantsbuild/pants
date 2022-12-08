@@ -11,7 +11,8 @@ import pytest
 
 from pants.engine.internals.engine_testutil import remove_locations_from_traceback
 from pants.engine.internals.scheduler import ExecutionError
-from pants.engine.rules import Get, rule
+from pants.engine.internals.selectors import MultiGetError
+from pants.engine.rules import Get, MultiGet, rule
 from pants.engine.unions import UnionRule, union
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
@@ -333,19 +334,56 @@ def test_unhashable_types_failure() -> None:
 
 
 # -----------------------------------------------------------------------------------------------
-# Test safe Get
+# Test error boundaries.
 # -----------------------------------------------------------------------------------------------
 
 
 @rule(desc="Safe get in this rule")
-async def safe_rule() -> C:
-    res = await Get(A, {}, _safe=True)
-    assert isinstance(res, Exception)
-    assert str(res) == "An exception!"
+async def safe_get_rule() -> C:
+    try:
+        _ = await Get(A, {}, _error_boundary=True)
+        assert False, "should not get here"
+    except Exception as e:
+        assert str(e) == "An exception!"
     return C()
 
 
 def test_safe_get() -> None:
-    rule_runner = RuleRunner(rules=[safe_rule, nested_raise, QueryRule(C, [])])
+    rule_runner = RuleRunner(rules=[safe_get_rule, nested_raise, QueryRule(C, [])])
     res = rule_runner.request(C, [])
     assert isinstance(res, C)
+
+
+@rule(desc="Safe multi get in this rule")
+async def safe_multi_get_rule() -> D:
+    try:
+        b, a, c = await MultiGet(
+            Get(B, {}),
+            Get(A, {}, _error_boundary=True),
+            Get(C, {}),
+        )
+    except MultiGetError as e:
+        assert len(e.errors) == 1
+        assert len(e.results) == 3
+        assert isinstance(e.results[0], B)
+        assert isinstance(e.results[1], Exception)
+        assert isinstance(e.results[2], C)
+        assert e.results[1] is e.errors[0]
+        assert str(e) == dedent(
+            """\
+            MultiGet with 1 error:
+              1. An exception!
+            """
+        )
+        b = e.results[0]
+
+    return D(b)
+
+
+def test_safe_multi_get() -> None:
+    rule_runner = RuleRunner(
+        rules=[safe_get_rule, safe_multi_get_rule, nested_raise, transitive_b_c, QueryRule(D, [])]
+    )
+    res = rule_runner.request(D, [])
+    assert isinstance(res, D)
+    assert isinstance(res.b, B)

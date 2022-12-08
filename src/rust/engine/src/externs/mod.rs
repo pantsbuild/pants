@@ -327,7 +327,7 @@ impl PyGeneratorResponseGet {
     product: &PyAny,
     input_arg0: &PyAny,
     input_arg1: Option<&PyAny>,
-    _safe: Option<&PyBool>,
+    _error_boundary: Option<&PyBool>,
   ) -> PyResult<Self> {
     let product = product.cast_as::<PyType>().map_err(|_| {
       let actual_type = product.get_type();
@@ -397,7 +397,7 @@ impl PyGeneratorResponseGet {
       )
     };
 
-    let safe = match _safe {
+    let safe = match _error_boundary {
       Some(value) => value.is_true(),
       None => false,
     };
@@ -469,7 +469,7 @@ impl PyGeneratorResponseGet {
   }
 
   #[getter]
-  fn safe<'p>(&'p self, py: Python<'p>) -> PyResult<&'p PyBool> {
+  fn _error_boundary<'p>(&'p self, py: Python<'p>) -> PyResult<&'p PyBool> {
     Ok(PyBool::new(
       py,
       self
