@@ -442,3 +442,77 @@ def test_linker_flags_fields(rule_runner: RuleRunner) -> None:
     assert_flags(Address("mod_with_field", target_name="mod"), ["-foo"])
     assert_flags(Address("mod_with_field", target_name="bin_without_field"), ["-foo"])
     assert_flags(Address("mod_with_field", target_name="bin_with_field"), ["-foo", "-bar"])
+
+
+def test_assembler_flags_fields(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "mod_with_field/BUILD": dedent(
+                """\
+            go_mod(
+              name="mod",
+              assembler_flags=["-foo"],
+            )
+
+            go_package(name="pkg")
+
+            go_binary(
+              name="bin_without_field",
+            )
+
+            go_binary(
+              name="bin_with_field",
+              assembler_flags=["-bar"],
+            )
+            """
+            ),
+            "mod_with_field/go.mod": "module example.pantsbuild.org/mod_with_field\n",
+            "mod_with_field/main.go": dedent(
+                """\
+            package main
+            func main() {}
+            """
+            ),
+            "mod_with_field/pkg_with_field/BUILD": dedent(
+                """
+                go_package(
+                  assembler_flags=["-xyzzy"],
+                )
+                """
+            ),
+            "mod_with_field/pkg_with_field/foo.go": dedent(
+                """\
+            package pkg_with_field
+            """
+            ),
+        }
+    )
+
+    def assert_flags(address: Address, expected_value: Iterable[str]) -> None:
+        opts = rule_runner.request(
+            GoBuildOptions,
+            (
+                GoBuildOptionsFromTargetRequest(
+                    address=address,
+                ),
+            ),
+        )
+        assert opts.assembler_flags == tuple(
+            expected_value
+        ), f"{address}: expected `assembler_flags` to be {expected_value}"
+
+    assert_flags(Address("mod_with_field", target_name="mod"), ["-foo"])
+    assert_flags(Address("mod_with_field", target_name="bin_without_field"), ["-foo"])
+    assert_flags(Address("mod_with_field", target_name="bin_with_field"), ["-foo", "-bar"])
+    assert_flags(Address("mod_with_field", target_name="pkg"), ["-foo"])
+    assert_flags(Address("mod_with_field/pkg_with_field"), ["-foo"])
+
+    build_request = rule_runner.request(
+        BuildGoPackageRequest,
+        [
+            BuildGoPackageTargetRequest(
+                Address("mod_with_field/pkg_with_field"), build_opts=GoBuildOptions()
+            )
+        ],
+    )
+    assert build_request.pkg_specific_assembler_flags == ("-xyzzy",)

@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import PurePath
 
 from pants.backend.go.target_types import (
@@ -12,6 +13,7 @@ from pants.backend.go.target_types import (
     GoTestRaceDetectorEnabledField,
 )
 from pants.backend.go.util_rules.coverage import GoCoverMode
+from pants.build_graph.address import Address
 from pants.core.util_rules.distdir import DistDir
 from pants.option.option_types import (
     ArgsListOption,
@@ -57,14 +59,25 @@ class GoTestSubsystem(Subsystem):
     )
 
     _coverage_output_dir = StrOption(
-        default=str(PurePath("{distdir}", "coverage", "go", "{import_path_escaped}")),
+        default=str(PurePath("{distdir}", "coverage", "go", "{target_spec}")),
         advanced=True,
         help=softwrap(
             """
             Path to write the Go coverage reports to. Must be relative to the build root.
-            `{distdir}` is replaced with the Pants `distdir`, and `{import_path_escaped}` is
-            replaced with the applicable package's import path but with slashes converted to
-            underscores.
+
+            Replacements:
+
+            - `{distdir}` is replaced with the Pants `distdir`.
+
+            - `{target_spec}` is replaced with the address of the applicable `go_package` target with `/`
+            characters replaced with dots (`.`).
+
+            - `{import_path}` is replaced with the applicable package's import path. Subdirectories will be made
+            for any path components separated by `/` characters.
+
+            - `{import_path_escaped}` is replaced with the applicable package's import path but with
+            slashes converted to underscores. This is deprecated and only exists to support behavior from
+            earlier versions.
             """
         ),
     )
@@ -152,10 +165,14 @@ class GoTestSubsystem(Subsystem):
         ),
     )
 
-    def coverage_output_dir(self, distdir: DistDir, import_path: str) -> PurePath:
+    def coverage_output_dir(self, distdir: DistDir, address: Address, import_path: str) -> PurePath:
+        target_spec = address.spec_path.replace(os.sep, ".")
         import_path_escaped = import_path.replace("/", "_")
         return PurePath(
             self._coverage_output_dir.format(
-                distdir=distdir.relpath, import_path_escaped=import_path_escaped
+                distdir=distdir.relpath,
+                target_spec=target_spec,
+                import_path=import_path,
+                import_path_escaped=import_path_escaped,
             )
         )

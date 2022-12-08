@@ -132,6 +132,32 @@ class GoTestAddressSanitizerEnabledField(GoRaceDetectorEnabledField):
     )
 
 
+class GoAssemblerFlagsField(StringSequenceField):
+    alias = "assembler_flags"
+    help = softwrap(
+        """
+        Extra flags to pass to the Go assembler (i.e., `go tool asm`) when assembling Go-format assembly code.
+
+        Note: These flags will not be added to gcc/clang-format assembly that is assembled in packages using Cgo.
+
+        This field can be specified on several different target types:
+
+        - On `go_mod` targets, the assembler flags are used when building any package involving the module
+        including both first-party (i.e., `go_package` targets) and third-party dependencies.
+
+        - On `go_binary` targets, the assembler flags are used when building any packages comprising that binary
+        including third-party dependencies. These assembler flags will be added after any assembler flags
+        added by any `assembler_flags` field set on the applicable `go_mod` target.
+
+        - On `go_package` targets, the assembler flags are used only for building that specific package and not
+        for any other package. These assembler flags will be added after any assembler flags added by any
+        `assembler_flags` field set on the applicable `go_mod` target or applicable `go_binary` target.
+
+        Run `go doc cmd/asm` to see the flags supported by `go tool asm`.
+        """
+    )
+
+
 class GoCompilerFlagsField(StringSequenceField):
     alias = "compiler_flags"
     help = softwrap(
@@ -290,6 +316,7 @@ class GoModTarget(TargetGenerator):
         GoRaceDetectorEnabledField,
         GoMemorySanitizerEnabledField,
         GoAddressSanitizerEnabledField,
+        GoAssemblerFlagsField,
         GoCompilerFlagsField,
         GoLinkerFlagsField,
     )
@@ -372,6 +399,7 @@ class GoPackageTarget(Target):
         GoTestRaceDetectorEnabledField,
         GoTestMemorySanitizerEnabledField,
         GoTestAddressSanitizerEnabledField,
+        GoAssemblerFlagsField,
         GoCompilerFlagsField,
         SkipGoTestsField,
     )
@@ -420,6 +448,7 @@ class GoBinaryTarget(Target):
         GoRaceDetectorEnabledField,
         GoMemorySanitizerEnabledField,
         GoAddressSanitizerEnabledField,
+        GoAssemblerFlagsField,
         GoCompilerFlagsField,
         GoLinkerFlagsField,
         RestartableField,
