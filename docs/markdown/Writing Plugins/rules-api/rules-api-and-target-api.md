@@ -136,8 +136,8 @@ await Get(
         file_globs=(FileGlobSpec("my_dir/*.ext"),),  # `my_dir/*.ext`
         dir_literals=(DirLiteralSpec("my_dir"),),  # `my_dir/`
         dir_globs=(DirGlobSpec("my_dir"),),  # `my_dir:`
-        recursive_globs=(RecursiveGlobs("my_dir"),),  # `my_dir::`
-        ancestor_globs=(AncestorGlobs("my_dir"),),  # i.e. `my_dir` and all ancestors
+        recursive_globs=(RecursiveGlobSpec("my_dir"),),  # `my_dir::`
+        ancestor_globs=(AncestorGlobSpec("my_dir"),),  # i.e. `my_dir` and all ancestors
     )
 )
 ```

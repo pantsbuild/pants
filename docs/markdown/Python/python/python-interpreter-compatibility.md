@@ -79,6 +79,8 @@ constraints.
 > )
 > ```
 
+When you `parametrize` constraints, Pants will generate multiple targets, one for each constraint, allowing you to test multiple python versions with a single command. This is somewhat similar to "matrix testing". See [Target Generation](doc:targets#parametrizing-targets) for more details.
+
 ### Tip: activate `pants.backend.python.mixed_interpreter_constraints`
 
 We recommend adding `pants.backend.python.mixed_interpreter_constraints` to `backend_packages` in the `[GLOBAL]` scope, which will add the new goal `py-constraints`.
