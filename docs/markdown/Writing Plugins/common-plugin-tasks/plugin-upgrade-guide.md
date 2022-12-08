@@ -11,18 +11,15 @@ updatedAt: "2022-07-25T20:02:17.695Z"
 
 ### `lint` and `fmt` schema changes
 
-In order to accomplish several goals (namely targetless formatters and unifying the implementation of `lint`)
-`lint` and `fmt` have undergone a drastic change of their plugin API.
+In order to accomplish several goals (namely targetless formatters and unifying the implementation of `lint`) `lint` and `fmt` have undergone a drastic change of their plugin API.
 
 #### 1. `Lint<Targets|Files>Request` and `FmtTargetsRequest` now require a `tool_subsystem` class attribute.
 
-Instead of the `name` class attribute, `Lint<Targets|Files>Request` and `FmtTargetsRequest` require
-subclasses to provide a `tool_subsystem` class attribute with a value of your tool's `Subsystem` subclass.
+Instead of the `name` class attribute, `Lint<Targets|Files>Request` and `FmtTargetsRequest` require subclasses to provide a `tool_subsystem` class attribute with a value of your tool's `Subsystem` subclass.
 
 #### 2. Your tool subsystem should have a `skip` option.
 
-Although not explictly not required by the engine to function correctly, `mypy` will complain if the
-subsystem type provided to `tool_subsystem` doesn't have a `skip: SkipOption` option registered.
+Although not explictly not required by the engine to function correctly, `mypy` will complain if the subsystem type provided to `tool_subsystem` doesn't have a `skip: SkipOption` option registered.
 
 Otherwise, you can `# type: ignore[assignment]` on your `tool_subsystem` declaration.
 
@@ -30,33 +27,20 @@ Otherwise, you can `# type: ignore[assignment]` on your `tool_subsystem` declara
 
 Fmt:
 
-In order to support targetless formatters, `fmt` needs to know which _files_ you'll be operating on.
-Therefore the plugin API for `fmt` has forked into 2 rules:
+In order to support targetless formatters, `fmt` needs to know which _files_ you'll be operating on. Therefore the plugin API for `fmt` has forked into 2 rules:
 
 1. A rule taking `<RequestType>.PartitionRequest` and returning a `Partitions` object. This is sometimes referred to as the "partitioner" rule.
 2. A rule taking `<RequestType>.Batch` and returning a `FmtResult`. This is sometimes referred to as the "runner" rule.
 
-This way `fmt` can serialize tool runs that operate on the same file(s) while parallelizing tool runs
-that don't overlap.
+This way `fmt` can serialize tool runs that operate on the same file(s) while parallelizing tool runs that don't overlap.
 
-(Why are targetless formatters something we want to support? This allows us to have `BUILD` file formatters,
-formatters like `Prettier` running on your codebase *without* boilerplate targets, as well as Pants
-doing interesting deprecation fixers on its own files)
+(Why are targetless formatters something we want to support? This allows us to have `BUILD` file formatters, formatters like `Prettier` running on your codebase *without* boilerplate targets, as well as Pants doing interesting deprecation fixers on its own files)
 
-The partitioner rule gives you all the matching files (or `FieldSet`s depending on which class you
-subclassed) and you'll return a mapping from `<key>` to files (called a Partition).
-The `<key>` can be anything passable at the rule boundary and is given back to you in your runner rule.
-The partitioner rule gives you an opportunity to perform expensive `Get`s once for the entire run,
-to partition the inputs based on metadata to simplify your runner, and to have a place for easily
-skipping your tool if requested.
+The partitioner rule gives you all the matching files (or `FieldSet`s depending on which class you subclassed) and you'll return a mapping from `<key>` to files (called a Partition). The `<key>` can be anything passable at the rule boundary and is given back to you in your runner rule. The partitioner rule gives you an opportunity to perform expensive `Get`s once for the entire run, to partition the inputs based on metadata to simplify your runner, and to have a place for easily skipping your tool if requested.
 
-The runner rule will mostly remain unchanged, aside from the request type (`<RequestType>.Batch`),
-which now has a `.files` property.
+The runner rule will mostly remain unchanged, aside from the request type (`<RequestType>.Batch`), which now has a `.files` property.
 
-If you don't require any `Get`s or metadata for your tool in your partitioner rule,
-Pants has a way to provide a "default" implementation. In your `FmtRequest` subclass,
-set the `partitioner_type` class variable to `PartitionerType.DEFAULT_SINGLE_PARTITION` and only
-provide a runner rule.
+If you don't require any `Get`s or metadata for your tool in your partitioner rule, Pants has a way to provide a "default" implementation. In your `FmtRequest` subclass, set the `partitioner_type` class variable to `PartitionerType.DEFAULT_SINGLE_PARTITION` and only provide a runner rule.
 
 -----
 
@@ -77,8 +61,7 @@ To enable running tests in batches, the plugin API for `test` has significantly 
 
 #### 1. Test plugins must now define a `skip`-able `Subsystem`.
 
-To hook into the new API, a test runner must declare a subclass of `Subsystem` with a `skip: SkipOption` option.
-Add `skip = SkipOption("test")` to your existing (or new) subsystems.
+To hook into the new API, a test runner must declare a subclass of `Subsystem` with a `skip: SkipOption` option. Add `skip = SkipOption("test")` to your existing (or new) subsystems.
 
 #### 2. Test plugins must define a subclass of `TestRequest`.
 
@@ -190,23 +173,17 @@ To reduce the number of changes necessary in tests, the `RuleRunner.inherent_env
 
 ### `platform` kwarg for `Process` deprecated
 
-Previously, we assumed processes were platform-agnostic, i.e. they had identical output on all
-platforms (OS x CPU architecture). You had to opt into platform awareness by setting the kwarg
-`platform` on the `Process`; otherwise, remote caching could incorrectly use results from a
-different platform.
+Previously, we assumed processes were platform-agnostic, i.e. they had identical output on all platforms (OS x CPU architecture). You had to opt into platform awareness by setting the kwarg`platform` on the `Process`; otherwise, remote caching could incorrectly use results from a different platform.
 
-This was not a safe default, and this behavior also breaks the new Docker support. So, now all
-processes automatically are marked as platform-specific.
+This was not a safe default, and this behavior also breaks the new Docker support. So, now all processes automatically are marked as platform-specific.
 
-https://github.com/pantsbuild/pants/issues/16873 proposes how you will eventually be able to mark
-a `Process` as platform-agnostic.
+https://github.com/pantsbuild/pants/issues/16873 proposes how you will eventually be able to mark a `Process` as platform-agnostic.
 
 To fix this deprecation, simply delete the `platform` kwarg.
 
 ### `Environment`, `EnvironmentRequest`, and `CompleteEnvironment` renamed and moved
 
-The types were moved from `pants.engine.environment` to `pants.engine.env_vars`, and now have
-`Vars` in their names:
+The types were moved from `pants.engine.environment` to `pants.engine.env_vars`, and now have `Vars` in their names:
 
 Before: `pants.engine.environment.{Environment,EnvironmentRequest,CompleteEnvironment}`
 After: `pants.engine.env_vars.{EnvironmentVars,EnvironmentVarsRequest,CompleteEnvironmentVars}`
@@ -241,13 +218,11 @@ MockGet(
 
 ### Deprecated `Platform.current`
 
-The `Platform` to use will soon become dependent on a `@rule`'s position in the `@rule` graph. To
-get the correct `Platform`, a `@rule` should request a `Platform` as a positional argument.
+The `Platform` to use will soon become dependent on a `@rule`'s position in the `@rule` graph. To get the correct `Platform`, a `@rule` should request a `Platform` as a positional argument.
 
 ### Deprecated `convert_dir_literal_to_address_literal` kwarg
 
-The `convert_dir_literal_to_address_literal` keyword argument for `RawSpecs.create()` and
-`SpecsParser.parse_specs()` no longer does anything. It should be deleted.
+The `convert_dir_literal_to_address_literal` keyword argument for `RawSpecs.create()` and `SpecsParser.parse_specs()` no longer does anything. It should be deleted.
 
 2.14
 ----
@@ -256,20 +231,17 @@ See <https://github.com/pantsbuild/pants/blob/main/src/python/pants/notes/2.14.x
 
 ### Removed second type parameter from `Get`
 
-`Get` now takes only a single type parameter for the output type: `Get[_Output]`. The input type
-parameter was unused.
+`Get` now takes only a single type parameter for the output type: `Get[_Output]`. The input type parameter was unused.
 
 ### `FmtRequest` -> `FmtTargetsRequest`
 
-In order to support non-target formatting (like `BUILD` files) we'll be introducing additional `fmt`
-request types. Therefore `FmtRequest` has been renamed to `FmtTargetsRequest` to reflect the behavior.
+In order to support non-target formatting (like `BUILD` files) we'll be introducing additional `fmt` request types. Therefore `FmtRequest` has been renamed to `FmtTargetsRequest` to reflect the behavior.
 
 This change also matches `lint`, which uses `LintTargetsRequest`.
 
 ### Optional Option flag name
 
-Pants 2.14 adds support for deducing the flag name from the attribute name when declaring `XOption`s.
-You can still provide the flag name in case the generated one shouldn't match the attribute name.
+Pants 2.14 adds support for deducing the flag name from the attribute name when declaring `XOption`s. You can still provide the flag name in case the generated one shouldn't match the attribute name.
 
 Before:
 
@@ -287,40 +259,27 @@ _run = BoolOption(...)  # Still uses --run
 
 ### `InjectDependencies` -> `InferDependencies`, with `InferDependencies` using a `FieldSet`
 
-`InjectDependenciesRequest` has been folded into `InferDependenciesRequest`, which has also been changed
-to receive a `FieldSet`.
+`InjectDependenciesRequest` has been folded into `InferDependenciesRequest`, which has also been changed to receive a `FieldSet`.
 
 If you have an `InjectDependenciesRequest` type/rule, those should be renamed to `Infer...`.
 
-Then for each `InferDependenciesRequest`, the `infer_from` class variable should now point to a
-relevant `FieldSet` subclass type. If you had an `Inject...` request, the `required_fields` will
-likely include the relevant `Dependencies` subclass. Likewise for pre-2.14 `Infer...` request, the
-`required_fields` will include the relevant `SourcesField` subclass.
+Then for each `InferDependenciesRequest`, the `infer_from` class variable should now point to a relevant `FieldSet` subclass type. If you had an `Inject...` request, the `required_fields` will likely include the relevant `Dependencies` subclass. Likewise for pre-2.14 `Infer...` request, the`required_fields` will include the relevant `SourcesField` subclass.
 
-Note that in most cases, you no longer need to request the target in your rule code, and should rely
-on `FieldSet`'s mechanisms for matching targets and getting field values.
+Note that in most cases, you no longer need to request the target in your rule code, and should rely on `FieldSet`'s mechanisms for matching targets and getting field values.
 
 ### `GenerateToolLockfileSentinel` encouraged to use language-specific subclasses
 
-Rather than directly subclassing `GenerateToolLockfileSentinel`, we encourage you to subclass
-`GeneratePythonToolLockfileSentinel` and `GenerateJvmToolLockfileSentinel`. This is so that we can
-distinguish what language a tool belongs to, which is used for options like
-`[python].resolves_to_constraints_file` to validate which resolve names are recognized.
+Rather than directly subclassing `GenerateToolLockfileSentinel`, we encourage you to subclass `GeneratePythonToolLockfileSentinel` and `GenerateJvmToolLockfileSentinel`. This is so that we can distinguish what language a tool belongs to, which is used for options like `[python].resolves_to_constraints_file` to validate which resolve names are recognized.
 
-Things will still work if you do not make this change, other than the new options not recognizing
-your tool.
+Things will still work if you do not make this change, other than the new options not recognizing your tool.
 
-However, keep the `UnionRule` the same, i.e. with the first argument still
-`GenerateToolLockfileSentinel`.
+However, keep the `UnionRule` the same, i.e. with the first argument still `GenerateToolLockfileSentinel`.
 
 ### `matches_filespec()` replaced by `FilespecMatcher`
 
-Instead, use `FilespecMatcher(includes=[], excludes=[]).matches(paths: Sequence[str])` from
-`pants.source.filespec`.
+Instead, use `FilespecMatcher(includes=[], excludes=[]).matches(paths: Sequence[str])` from `pants.source.filespec`.
 
-The functionality is the same, but can have better performance because we don't need to parse the
-same globs each time `.matches()` is called. When possible, reuse the same `FilespecMatcher` object
-to get these performance benefits.
+The functionality is the same, but can have better performance because we don't need to parse the same globs each time `.matches()` is called. When possible, reuse the same `FilespecMatcher` object to get these performance benefits.
 
 2.13
 ----

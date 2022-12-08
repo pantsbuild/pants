@@ -50,6 +50,7 @@ class AssembleGoAssemblyFilesRequest:
     dir_path: str
     asm_header_path: str | None
     import_path: str
+    extra_assembler_flags: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -160,6 +161,7 @@ async def assemble_go_assembly_files(
                     os.path.join(goroot.path, "pkg", "include"),
                     *maybe_asm_header_path_args,
                     *maybe_package_import_path_args,
+                    *request.extra_assembler_flags,
                     "-o",
                     obj_output_path(s_file),
                     str(os.path.normpath(PurePath(".", request.dir_path, s_file))),
