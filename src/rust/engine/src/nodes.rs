@@ -1118,7 +1118,12 @@ impl Task {
                 ))
               }
             })?;
-          select.run_node(context).await
+          let res = select.run_node(context).await;
+          if get.safe && let Err(Failure::Throw { val, .. }) = res {
+            val
+          } else {
+            res
+          }
         }
       })
       .collect::<Vec<_>>();

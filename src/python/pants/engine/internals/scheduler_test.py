@@ -330,3 +330,21 @@ def test_unhashable_types_failure() -> None:
     # Fail if the `input` in a `Get` is not hashable.
     with pytest.raises(ExecutionError, match="unhashable type: 'list'"):
         rule_runner.request(C, [])
+
+
+# -----------------------------------------------------------------------------------------------
+# Test safe Get
+# -----------------------------------------------------------------------------------------------
+
+
+@rule(desc="Safe get in this rule")
+async def safe_rule() -> C:
+    res = await Get(A, {}, safe=True)
+    print(f"\n\n==>> SAFE RULE res: {res} <<==\n\n")
+    return C()
+
+
+def test_safe_get() -> None:
+    rule_runner = RuleRunner(rules=[safe_rule, nested_raise, QueryRule(C, [])])
+    res = rule_runner.request(C, [])
+    assert isinstance(res, C)

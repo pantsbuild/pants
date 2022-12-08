@@ -12,7 +12,7 @@ use std::fmt;
 use lazy_static::lazy_static;
 use pyo3::exceptions::{PyException, PyTypeError};
 use pyo3::prelude::*;
-use pyo3::types::{PyBytes, PyDict, PyTuple, PyType};
+use pyo3::types::{PyBool, PyBytes, PyDict, PyTuple, PyType};
 use pyo3::{import_exception, intern};
 use pyo3::{FromPyObject, ToPyObject};
 use smallvec::{smallvec, SmallVec};
@@ -327,6 +327,7 @@ impl PyGeneratorResponseGet {
     product: &PyAny,
     input_arg0: &PyAny,
     input_arg1: Option<&PyAny>,
+    safe: Option<&PyBool>,
   ) -> PyResult<Self> {
     let product = product.cast_as::<PyType>().map_err(|_| {
       let actual_type = product.get_type();
@@ -396,10 +397,16 @@ impl PyGeneratorResponseGet {
       )
     };
 
+    let safe_arg = match safe {
+      Some(value) => value.is_true(),
+      None => false,
+    };
+
     Ok(Self(RefCell::new(Some(Get {
       output,
       input_types,
       inputs,
+      safe: safe_arg,
     }))))
   }
 
@@ -461,6 +468,23 @@ impl PyGeneratorResponseGet {
     )
   }
 
+  #[getter]
+  fn safe<'p>(&'p self, py: Python<'p>) -> PyResult<&'p PyBool> {
+    Ok(PyBool::new(
+      py,
+      self
+        .0
+        .borrow()
+        .as_ref()
+        .ok_or_else(|| {
+          PyException::new_err(
+            "A `Get` may not be consumed after being provided to the @rule engine.",
+          )
+        })?
+        .safe,
+    ))
+  }
+
   fn __repr__(&self) -> PyResult<String> {
     Ok(format!(
       "{}",
@@ -489,11 +513,15 @@ pub struct Get {
   pub output: TypeId,
   pub input_types: SmallVec<[TypeId; 2]>,
   pub inputs: SmallVec<[Key; 2]>,
+  pub safe: bool,  
 }
 
 impl fmt::Display for Get {
   fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
     write!(f, "Get({}", self.output)?;
+    if self.safe {
+      write!(f, " [SAFE]")?;
+    }
     match self.input_types.len() {
       0 => write!(f, ")"),
       1 => write!(f, ", {}, {})", self.input_types[0], self.inputs[0]),
@@ -512,6 +540,7 @@ impl fmt::Display for Get {
   }
 }
 
+#[derive(Debug)]
 pub enum GeneratorResponse {
   Break(Value, TypeId),
   Get(Get),
