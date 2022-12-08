@@ -109,9 +109,9 @@ def test_extract_zstd(extract_from_file_info: ExtractorFixtureT):
         b"ntP6biQQTAJghx0OBuQSEzQBh3TGgaiDjAHkMBaaUD1QiATq8BdBg4DdIBoDkQAQwaIBj5TI9ASI="
     )
 
-    digest_contents = extract_from_file_info(".tar.zstd", archive_content)
+    digest_contents = extract_from_file_info(".tar.zst", archive_content)
     assert digest_contents == EXPECTED_DIGEST_CONTENTS
-    digest_contents = extract_from_file_info(".zstd", archive_content)
+    digest_contents = extract_from_file_info(".zst", archive_content)
     assert digest_contents == EXPECTED_DIGEST_CONTENTS
 
 
