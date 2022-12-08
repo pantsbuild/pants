@@ -1613,6 +1613,7 @@ async fn explicitly_overwrites_already_existing_file() {
   assert_eq!(file_contents, b"abc123".to_vec());
 }
 
+#[ignore]  // see #17754
 #[tokio::test]
 async fn big_file_immutable_link() {
   let materialize_dir = TempDir::new().unwrap();
