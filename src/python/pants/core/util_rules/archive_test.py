@@ -114,6 +114,7 @@ def test_extract_zstd(extract_from_file_info: ExtractorFixtureT):
     digest_contents = extract_from_file_info(".zstd", archive_content)
     assert digest_contents == EXPECTED_DIGEST_CONTENTS
 
+
 def test_extract_gz(extract_from_file_info: ExtractorFixtureT, rule_runner: RuleRunner) -> None:
     # NB: `gz` files are only compressed, and are not archives: they represent a single file.
     name = "test"

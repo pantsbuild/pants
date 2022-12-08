@@ -162,7 +162,18 @@ async def maybe_extract_archive(request: MaybeExtractArchiveRequest) -> Extracte
     archive_suffix = request.use_suffix or "".join(PurePath(archive_path).suffixes)
     is_zip = archive_suffix.endswith(".zip")
     is_tar = archive_suffix.endswith(
-        (".tar", ".tar.gz", ".tgz", ".tar.bz2", ".tbz2", ".tar.xz", ".txz", ".tar.lz4", ".zstd", ".tar.zstd")
+        (
+            ".tar",
+            ".tar.gz",
+            ".tgz",
+            ".tar.bz2",
+            ".tbz2",
+            ".tar.xz",
+            ".txz",
+            ".tar.lz4",
+            ".zstd",
+            ".tar.zstd",
+        )
     )
     is_gz = not is_tar and archive_suffix.endswith(".gz")
     if not is_zip and not is_tar and not is_gz:
