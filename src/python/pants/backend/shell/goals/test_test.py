@@ -103,3 +103,4 @@ def test_shell_command_as_test(rule_runner: RuleRunner) -> None:
     fail_result = run_test(fail_target)
     assert fail_result.exit_code == 1
     assert fail_result.stdout == "does not contain 'xyzzy'\n"
+
