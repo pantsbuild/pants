@@ -108,7 +108,7 @@ def test_sources_and_files(rule_runner: RuleRunner) -> None:
                     "tee",
                   ],
                   output_files=["message.txt"],
-                  output_directories=["res/"],
+                  output_directories=["res"],
                   command="./script.sh",
                 )
 

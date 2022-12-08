@@ -150,7 +150,9 @@ async def _prepare_process_request_from_target(shell_command: Target) -> ShellCo
     )
 
 
-def _parse_outputs_from_command(shell_command, description):
+def _parse_outputs_from_command(
+    shell_command: Target, description: str
+) -> tuple[tuple[str, ...], tuple[str, ...]]:
     outputs = shell_command.get(ShellCommandOutputsField).value or ()
     output_files = shell_command.get(ShellCommandOutputFilesField).value or ()
     output_directories = shell_command.get(ShellCommandOutputDirectoriesField).value or ()

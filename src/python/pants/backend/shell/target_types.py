@@ -288,9 +288,12 @@ class ShellCommandOutputFilesField(StringSequenceField):
 
 class ShellCommandOutputDirectoriesField(StringSequenceField):
     alias = "output_directories"
+    required = False
+    default = ()
     help = softwrap(
         """
-        Specify full directories of output from the shell command to capture.
+        Specify full directories (including recursive descendants) of output to capture from the
+        shell command.
 
         For files, use `output_files`. At least one of `output_files` and
         `output_directories` must be specified.
