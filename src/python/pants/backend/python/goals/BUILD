@@ -3,6 +3,8 @@
 
 python_sources()
 
+python_test_utils(name="test_utils")
+
 python_tests(
     name="tests",
     overrides={
@@ -19,7 +21,7 @@ python_tests(
         },
         "pytest_runner_integration_test.py": {
             "tags": ["platform_specific_behavior"],
-            "timeout": 480,
+            "timeout": 600,
         },
         "repl_integration_test.py": {
             "tags": ["platform_specific_behavior"],

@@ -2,9 +2,10 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
+import dataclasses
 import os
 import textwrap
-from typing import Optional
+from typing import Iterable, Optional
 
 from pants.backend.python.subsystems.debugpy import DebugPy
 from pants.backend.python.target_types import (
@@ -39,6 +40,7 @@ async def _create_python_source_run_request(
     entry_point_field: PexEntryPointField,
     pex_env: PexEnvironment,
     run_in_sandbox: bool,
+    pex_path: Iterable[Pex] = (),
     console_script: Optional[ConsoleScript] = None,
 ) -> RunRequest:
     addresses = [address]
@@ -79,6 +81,8 @@ async def _create_python_source_run_request(
         ),
     )
 
+    pex_request = dataclasses.replace(pex_request, pex_path=(*pex_request.pex_path, *pex_path))
+
     complete_pex_environment = pex_env.in_workspace()
     venv_pex = await Get(VenvPex, VenvPexRequest(pex_request, complete_pex_environment))
     input_digests = [
@@ -116,25 +120,17 @@ async def _create_python_source_run_request(
 async def _create_python_source_run_dap_request(
     regular_run_request: RunRequest,
     *,
-    entry_point_field: PexEntryPointField,
     debugpy: DebugPy,
     debug_adapter: DebugAdapterSubsystem,
-    console_script: Optional[ConsoleScript] = None,
 ) -> RunDebugAdapterRequest:
-    entry_point, debugpy_pex, launcher_digest = await MultiGet(
-        Get(
-            ResolvedPexEntryPoint,
-            ResolvePexEntryPointRequest(entry_point_field),
-        ),
-        Get(Pex, PexRequest, debugpy.to_pex_request()),
-        Get(
-            Digest,
-            CreateDigest(
-                [
-                    FileContent(
-                        "__debugpy_launcher.py",
-                        textwrap.dedent(
-                            """
+    launcher_digest = await Get(
+        Digest,
+        CreateDigest(
+            [
+                FileContent(
+                    "__debugpy_launcher.py",
+                    textwrap.dedent(
+                        """
                             import os
                             CHROOT = os.environ["PANTS_CHROOT"]
 
@@ -162,10 +158,9 @@ async def _create_python_source_run_dap_request(
                             from debugpy.server import cli
                             cli.main()
                             """
-                        ).encode("utf-8"),
-                    ),
-                ]
-            ),
+                    ).encode("utf-8"),
+                ),
+            ]
         ),
     )
 
@@ -174,28 +169,17 @@ async def _create_python_source_run_dap_request(
         MergeDigests(
             [
                 regular_run_request.digest,
-                debugpy_pex.digest,
                 launcher_digest,
             ]
         ),
     )
     extra_env = dict(regular_run_request.extra_env)
-    extra_env["PEX_PATH"] = os.pathsep.join(
-        [
-            extra_env["PEX_PATH"],
-            # For debugpy to work properly, we need to have just one "environment" for our
-            # command to run in. Therefore, we cobble one together with PEX_PATH.
-            _in_chroot(debugpy_pex.name),
-        ]
-    )
     extra_env["PEX_INTERPRETER"] = "1"
     extra_env["PANTS_CHROOT"] = _in_chroot("").rstrip("/")
-    main = console_script or entry_point.val
-    assert main is not None
     args = [
         *regular_run_request.args,
         _in_chroot("__debugpy_launcher.py"),
-        *debugpy.get_args(debug_adapter, main),
+        *debugpy.get_args(debug_adapter),
     ]
 
     return RunDebugAdapterRequest(digest=merged_digest, args=args, extra_env=extra_env)
