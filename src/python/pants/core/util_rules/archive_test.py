@@ -100,6 +100,20 @@ def test_extract_tarlz4(extract_from_file_info: ExtractorFixtureT):
     assert digest_contents == DigestContents([FileContent("tmp/msg/txt.txt", b"pants")])
 
 
+def test_extract_zstd(extract_from_file_info: ExtractorFixtureT):
+    if subprocess.run(["zstd", "--help"], check=False).returncode != 0:
+        pytest.skip(reason="zstd not on PATH")
+
+    archive_content = base64.b64decode(
+        b"KLUv/WAAJ4UDACKEDhaQOR2AVV4APzTz5XpORATuPV27FyoDAHGCYSmEqLCGe9kI6dyR9LWi97VFYfppmrFv0f+"
+        b"ntP6biQQTAJghx0OBuQSEzQBh3TGgaiDjAHkMBaaUD1QiATq8BdBg4DdIBoDkQAQwaIBj5TI9ASI="
+    )
+
+    digest_contents = extract_from_file_info(".tar.zstd", archive_content)
+    assert digest_contents == EXPECTED_DIGEST_CONTENTS
+    digest_contents = extract_from_file_info(".zstd", archive_content)
+    assert digest_contents == EXPECTED_DIGEST_CONTENTS
+
 def test_extract_gz(extract_from_file_info: ExtractorFixtureT, rule_runner: RuleRunner) -> None:
     # NB: `gz` files are only compressed, and are not archives: they represent a single file.
     name = "test"
