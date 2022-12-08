@@ -171,8 +171,8 @@ async def maybe_extract_archive(request: MaybeExtractArchiveRequest) -> Extracte
             ".tar.xz",
             ".txz",
             ".tar.lz4",
-            ".zstd",
-            ".tar.zstd",
+            ".zst",
+            ".tar.zst",
         )
     )
     is_gz = not is_tar and archive_suffix.endswith(".gz")
