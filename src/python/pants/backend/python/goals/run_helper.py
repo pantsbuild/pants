@@ -188,4 +188,9 @@ async def _create_python_source_run_dap_request(
         *debugpy.get_args(debug_adapter),
     ]
 
-    return RunDebugAdapterRequest(digest=merged_digest, args=args, extra_env=extra_env)
+    return RunDebugAdapterRequest(
+        digest=merged_digest,
+        args=args,
+        extra_env=extra_env,
+        append_only_caches=regular_run_request.append_only_caches,
+    )
