@@ -8,15 +8,15 @@ from typing import Any
 
 import pytest
 
+from pants.backend.python.util_rules.pex import rules as pex_rules
 from pants.backend.tools.yamllint.rules import YamllintFieldSet, YamllintRequest
 from pants.backend.tools.yamllint.rules import rules as yamllint_rules
 from pants.backend.tools.yamllint.target_types import YamlSourcesGeneratorTarget, YamlSourceTarget
 from pants.core.goals.lint import LintResult, Partitions
+from pants.core.util_rules import config_files, external_tool, source_files
 from pants.engine.addresses import Address
 from pants.engine.target import Target
 from pants.testutil.rule_runner import QueryRule, RuleRunner
-from pants.core.util_rules import config_files, external_tool, source_files
-from pants.backend.python.util_rules.pex import rules as pex_rules
 
 
 @pytest.fixture
@@ -49,7 +49,7 @@ def run_yamllint(
 ) -> tuple[LintResult, ...]:
     rule_runner.set_options(
         ["--backend-packages=pants.backend.tools.yamllint", *(extra_args or ())],
-        env_inherit={"PATH", "PYENV_ROOT"}
+        env_inherit={"PATH", "PYENV_ROOT"},
     )
     partitions = rule_runner.request(
         Partitions[YamllintFieldSet, Any],

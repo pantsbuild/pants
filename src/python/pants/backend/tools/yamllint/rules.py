@@ -3,23 +3,18 @@
 from dataclasses import dataclass
 from typing import Any
 
+from pants.backend.python.util_rules.pex import Pex, PexProcess, PexRequest
 from pants.backend.tools.yamllint.subsystem import Yamllint
 from pants.backend.tools.yamllint.target_types import YamlSourceField
 from pants.core.goals.lint import LintResult, LintTargetsRequest
+from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.partitions import PartitionerType
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import Dependencies, FieldSet
-from pants.util.logging import LogLevel
-from pants.core.util_rules.config_files import ConfigFilesRequest, ConfigFiles
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.backend.python.util_rules.pex import (
-    Pex,
-    PexProcess,
-    PexRequest,
-    PexRequirements,
-)
 from pants.engine.fs import Digest, MergeDigests
-from pants.engine.process import FallibleProcessResult, Process
+from pants.engine.process import FallibleProcessResult
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.target import FieldSet
+from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 
 
@@ -34,8 +29,11 @@ class YamllintRequest(LintTargetsRequest):
     tool_subsystem = Yamllint
     partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
+
 @rule(desc="Lint using yamllint", level=LogLevel.DEBUG)
-async def run_yamllint(request: YamllintRequest.Batch[YamllintFieldSet, Any], yamllint: Yamllint) -> LintResult:
+async def run_yamllint(
+    request: YamllintRequest.Batch[YamllintFieldSet, Any], yamllint: Yamllint
+) -> LintResult:
     sources_get = Get(
         SourceFiles,
         SourceFilesRequest(
