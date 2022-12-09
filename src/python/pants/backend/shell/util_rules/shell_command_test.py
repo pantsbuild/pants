@@ -107,7 +107,8 @@ def test_sources_and_files(rule_runner: RuleRunner) -> None:
                     "mkdir",
                     "tee",
                   ],
-                  outputs=["message.txt", "res/"],
+                  output_files=["message.txt"],
+                  output_directories=["res"],
                   command="./script.sh",
                 )
 
@@ -151,7 +152,7 @@ def test_quotes_command(rule_runner: RuleRunner) -> None:
                   name="quotes",
                   tools=["echo", "tee"],
                   command='echo "foo bar" | tee out.log',
-                  outputs=["out.log"],
+                  output_files=["out.log"],
                 )
                 """
             ),
@@ -173,7 +174,7 @@ def test_chained_shell_commands(rule_runner: RuleRunner) -> None:
                 experimental_shell_command(
                   name="msg",
                   tools=["echo"],
-                  outputs=["msg"],
+                  output_files=["msg"],
                   command="echo 'shell_command:a' > msg",
                 )
                 """
@@ -183,7 +184,7 @@ def test_chained_shell_commands(rule_runner: RuleRunner) -> None:
                 experimental_shell_command(
                   name="msg",
                   tools=["cp", "echo"],
-                  outputs=["msg"],
+                  output_files=["msg"],
                   command="cp ../a/msg . ; echo 'shell_command:b' >> msg",
                   dependencies=["src/a:msg"],
                 )
@@ -270,7 +271,7 @@ def test_shell_command_masquerade_as_a_files_target(rule_runner: RuleRunner) -> 
                   name="content-gen",
                   command="echo contents > contents.txt",
                   tools=["echo"],
-                  outputs=["contents.txt"]
+                  output_files=["contents.txt"]
                 )
                 """
             ),
@@ -312,7 +313,7 @@ def test_package_dependencies(caplog, rule_runner: RuleRunner) -> None:
                   name="msg-gen",
                   command="echo message > msg.txt",
                   tools=["echo"],
-                  outputs=["msg.txt"],
+                  output_files=["msg.txt"],
                 )
 
                 archive(
