@@ -96,6 +96,7 @@ impl ByteStore {
       tonic::transport::Channel::balance_list(vec![endpoint].into_iter()),
       rpc_concurrency_limit,
       http_headers,
+      None,
     );
 
     let byte_stream_client = Arc::new(ByteStreamClient::new(channel.clone()));
