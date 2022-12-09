@@ -236,18 +236,18 @@ class TargetGlob:
         if address.is_file_target:
             return address.filename
         elif address.is_generated_target:
-            return address.spec
+            return address.spec.replace(":", "/").lstrip("/")
         else:
             return address.spec_path
 
     def match(self, address: Address, adaptor: TargetAdaptor, base: str) -> bool:
-        # type
+        # target type
         if self.type_ and not fnmatchcase(adaptor.type_alias, self.type_):
             return False
-        # path
+        # target path (includes filename for source targets)
         if self.path and not self.path.match(self.address_path(address), base):
             return False
-        # tags
+        # target tags
         if self.tags:
             # Use adaptor.kwargs with caution, unvalidated input data from BUILD file.
             target_tags = adaptor.kwargs.get("tags")

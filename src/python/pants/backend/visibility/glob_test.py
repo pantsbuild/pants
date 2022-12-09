@@ -296,3 +296,18 @@ def test_targetglob_match(expected: bool, target_spec: str) -> None:
     adaptor = TargetAdaptor("file", None, tags=["tag-a", "tag-c"])
     address = Address(os.path.dirname(path), relative_file_path=os.path.basename(path))
     assert expected == TargetGlob.parse(target_spec, "src").match(address, adaptor, "src")
+
+
+@pytest.mark.parametrize(
+    "address, path",
+    [
+        (Address("src", relative_file_path="file"), "src/file"),
+        (Address("src", target_name="name"), "src"),
+        (Address("src", target_name="gen", generated_name="name"), "src/gen#name"),
+        (Address("", relative_file_path="file"), "file"),
+        (Address("", target_name="name"), ""),
+        (Address("", target_name="gen", generated_name="name"), "gen#name"),
+    ],
+)
+def test_address_path(address: Address, path: str) -> None:
+    assert TargetGlob.address_path(address) == path

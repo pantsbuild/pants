@@ -595,7 +595,7 @@ def test_dependency_rules(rule_runner: RuleRunner, caplog) -> None:
         expect_logged=[
             (
                 logging.DEBUG,
-                "WARN: type=target address=src/a/a2:joker other=src/a:a rule='?*' "
+                "WARN: type=target address=src/a/a2:joker [src/a/a2] other=src/a:a [src/a] rule='?*' "
                 "src/a/a2/BUILD: ?*",
             ),
         ],
@@ -617,7 +617,7 @@ def test_dependency_rules(rule_runner: RuleRunner, caplog) -> None:
         expect_logged=[
             (
                 logging.DEBUG,
-                "DENY: type=resources address=src/a:internal other=src/b:b rule='!*' "
+                "DENY: type=resources address=src/a:internal [src/a] other=src/b:b [src/b] rule='!*' "
                 "src/a/BUILD: ., !*",
             ),
         ],
@@ -636,7 +636,7 @@ def test_dependency_rules(rule_runner: RuleRunner, caplog) -> None:
         expect_logged=[
             (
                 logging.DEBUG,
-                "DENY: type=resources address=src/a:internal other=src/b:b rule='!*' "
+                "DENY: type=resources address=src/a:internal [src/a] other=src/b:b [src/b] rule='!*' "
                 "src/a/BUILD: ., !*",
             ),
         ],
