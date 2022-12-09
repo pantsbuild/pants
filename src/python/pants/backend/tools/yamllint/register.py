@@ -5,7 +5,7 @@ from pants.backend.tools.yamllint.target_types import YamlSourcesGeneratorTarget
 
 
 def rules():
-    return [*yamllint_rules.rules()]
+    return [*yamllint_rules()]
 
 
 def target_types():
