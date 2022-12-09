@@ -243,7 +243,9 @@ def test_no_strip_pex_env_issues_12057(rule_runner: RuleRunner) -> None:
     assert exit_code == 42, stderr
 
 
-def test_no_leak_pex_root_issues_12055(rule_runner: RuleRunner) -> None:
+@pytest.mark.parametrize("run_in_sandbox", [False, True])
+def test_pex_root_location(rule_runner: RuleRunner, run_in_sandbox: bool) -> None:
+    # See issues #12055 and #17750.
     read_config_result = run_pants(["help-all"])
     read_config_result.assert_success()
     config_data = json.loads(read_config_result.stdout)
@@ -256,10 +258,10 @@ def test_no_leak_pex_root_issues_12055(rule_runner: RuleRunner) -> None:
     named_caches_dir = global_advanced_options["named_caches_dir"]
 
     sources = {
-        "src/app.py": "import os; print(os.environ['PEX_ROOT'])",
+        "src/app.py": "import os; print(__file__ + '\\n' + os.environ['PEX_ROOT'])",
         "src/BUILD": dedent(
-            """\
-            python_sources()
+            f"""\
+            python_sources(run_goal_use_sandbox={run_in_sandbox})
             """
         ),
     }
@@ -272,7 +274,14 @@ def test_no_leak_pex_root_issues_12055(rule_runner: RuleRunner) -> None:
     target = rule_runner.get_target(Address("src", relative_file_path="app.py"))
     exit_code, stdout, _ = run_run_request(rule_runner, target, test_debug_adapter=False)
     assert exit_code == 0
-    assert os.path.join(named_caches_dir, "pex_root") == stdout.strip()
+    app_file, pex_root = stdout.splitlines(keepends=False)
+    sandbox = os.path.dirname(os.path.dirname(app_file))
+    expected_pex_root = (
+        os.path.join(sandbox, ".", ".cache", "pex_root")
+        if run_in_sandbox
+        else os.path.join(named_caches_dir, "pex_root")
+    )
+    assert expected_pex_root == pex_root
 
 
 def test_local_dist(rule_runner: RuleRunner) -> None:
