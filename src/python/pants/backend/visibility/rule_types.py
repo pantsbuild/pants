@@ -256,11 +256,7 @@ class BuildFileVisibilityRules(BuildFileDependencyRules):
 
     @staticmethod
     def _get_address_path(address: Address) -> str:
-        if address.is_file_target:
-            return address.filename
-        if address.is_generated_target:
-            return address.spec
-        return address.spec_path
+        return TargetGlob.address_path(address)
 
     def get_action(
         self,
@@ -284,7 +280,7 @@ class BuildFileVisibilityRules(BuildFileDependencyRules):
                         softwrap(
                             f"""
                             {visibility_rule.action.name}: type={adaptor.type_alias}
-                            address={address} other={other_address}
+                            address={address} [{relpath}] other={other_address} [{path}]
                             rule={str(visibility_rule)!r} {self.path}:
                             {', '.join(map(str, ruleset.rules))}
                             """
