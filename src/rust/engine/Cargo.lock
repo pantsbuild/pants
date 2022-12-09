@@ -1259,6 +1259,7 @@ dependencies = [
  "lazy_static",
  "parking_lot 0.11.2",
  "pin-project 1.0.12",
+ "pin-project-lite",
  "prost",
  "prost-build",
  "prost-types",

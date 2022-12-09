@@ -17,6 +17,8 @@ from pants.backend.shell.target_types import (
     ShellCommandExecutionDependenciesField,
     ShellCommandExtraEnvVarsField,
     ShellCommandLogOutputField,
+    ShellCommandOutputDirectoriesField,
+    ShellCommandOutputFilesField,
     ShellCommandOutputsField,
     ShellCommandRunWorkdirField,
     ShellCommandSourcesField,
@@ -108,9 +110,7 @@ async def _prepare_process_request_from_target(shell_command: Target) -> ShellCo
 
     dependencies_digest = await _execution_environment_from_dependencies(shell_command)
 
-    outputs = shell_command.get(ShellCommandOutputsField).value or ()
-    output_files = tuple(f for f in outputs if not f.endswith("/"))
-    output_directories = tuple(d for d in outputs if d.endswith("/"))
+    output_files, output_directories = _parse_outputs_from_command(shell_command, description)
 
     return ShellCommandProcessRequest(
         description=description,
@@ -194,6 +194,24 @@ async def _execution_environment_from_dependencies(shell_command: Target) -> Dig
     )
 
     return dependencies_digest
+
+
+def _parse_outputs_from_command(
+    shell_command: Target, description: str
+) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    outputs = shell_command.get(ShellCommandOutputsField).value or ()
+    output_files = shell_command.get(ShellCommandOutputFilesField).value or ()
+    output_directories = shell_command.get(ShellCommandOutputDirectoriesField).value or ()
+    if outputs and (output_files or output_directories):
+        raise ValueError(
+            "Both new-style `output_files` or `output_directories` and old-style `outputs` were "
+            f"specified in {description}. To fix, move all values from `outputs` to "
+            "`output_files` or `output_directories`."
+        )
+    elif outputs:
+        output_files = tuple(f for f in outputs if not f.endswith("/"))
+        output_directories = tuple(d for d in outputs if d.endswith("/"))
+    return output_files, output_directories
 
 
 @rule

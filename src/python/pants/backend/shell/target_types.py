@@ -269,6 +269,37 @@ class ShellCommandOutputsField(StringSequenceField):
         Use a trailing slash on directory names, i.e. `my_dir/`.
         """
     )
+    removal_hint = "To fix, use `output_files` and `output_directories` instead."
+    removal_version = "2.17.0.dev0"
+
+
+class ShellCommandOutputFilesField(StringSequenceField):
+    alias = "output_files"
+    required = False
+    default = ()
+    help = softwrap(
+        """
+        Specify the shell command's output files to capture.
+
+        For directories, use `output_directories`. At least one of `output_files` and
+        `output_directories` must be specified.
+        """
+    )
+
+
+class ShellCommandOutputDirectoriesField(StringSequenceField):
+    alias = "output_directories"
+    required = False
+    default = ()
+    help = softwrap(
+        """
+        Specify full directories (including recursive descendants) of output to capture from the
+        shell command.
+
+        For files, use `output_files`. At least one of `output_files` and
+        `output_directories` must be specified.
+        """
+    )
 
 
 class ShellCommandOutputDependenciesField(ShellDependenciesField):
@@ -378,6 +409,8 @@ class ShellCommandTarget(Target):
         ShellCommandCommandField,
         ShellCommandLogOutputField,
         ShellCommandOutputsField,
+        ShellCommandOutputFilesField,
+        ShellCommandOutputDirectoriesField,
         ShellCommandSourcesField,
         ShellCommandTimeoutField,
         ShellCommandToolsField,
@@ -394,7 +427,8 @@ class ShellCommandTarget(Target):
                 command="./my-script.sh --flag",
                 tools=["tar", "curl", "cat", "bash", "env"],
                 execution_dependencies=[":scripts"],
-                outputs=["results/", "logs/my-script.log"],
+                output_files=["logs/my-script.log"],
+                output_directories=["results"],
             )
 
             shell_sources(name="scripts")
