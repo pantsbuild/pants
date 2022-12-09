@@ -19,6 +19,7 @@ from pants.engine.target import (
     MultipleSourcesField,
     OverridesField,
     SingleSourceField,
+    SpecialCasedDependencies,
     StringField,
     StringSequenceField,
     Target,
@@ -301,8 +302,41 @@ class ShellCommandOutputDirectoriesField(StringSequenceField):
     )
 
 
-class ShellCommandDependenciesField(ShellDependenciesField):
+class ShellCommandOutputDependenciesField(ShellDependenciesField):
     supports_transitive_excludes = True
+    alias = "output_dependencies"
+    deprecated_alias = "dependencies"
+    deprecated_alias_removal_version = "2.17.0.dev0"
+
+    help = softwrap(
+        """
+        Any dependencies that the output artifacts require in order to be effectively consumed.
+
+        To enable legacy use cases, if `execution_dependencies` is `None`, these dependencies will
+        be materialized in the command execution sandbox. This behavior is deprecated, and will be
+        removed in version 2.17.0.dev0.
+        """
+    )
+
+
+class ShellCommandExecutionDependenciesField(SpecialCasedDependencies):
+    alias = "execution_dependencies"
+    required = False
+    default = None
+
+    help = softwrap(
+        """
+        The execution dependencies for this shell command.
+
+        Dependencies specified here are those required to make the command complete successfully
+        (e.g. file inputs, binaries compiled from other targets, etc), but NOT required to make
+        the output side-effects useful. Dependencies that are required to use the side-effects
+        produced by this command should be specified using the `output_dependencies` field.
+
+        If this field is specified, dependencies from `output_dependencies` will not be added to
+        the execution sandbox.
+        """
+    )
 
 
 class ShellCommandSourcesField(MultipleSourcesField):
@@ -356,7 +390,7 @@ class ShellCommandRunWorkdirField(StringField):
     help = "Sets the current working directory of the command, relative to the project root."
 
 
-class ShellCommandTestDependenciesField(ShellCommandDependenciesField):
+class ShellCommandTestDependenciesField(ShellCommandExecutionDependenciesField):
     pass
 
 
@@ -370,7 +404,8 @@ class ShellCommandTarget(Target):
     alias = "experimental_shell_command"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        ShellCommandDependenciesField,
+        ShellCommandOutputDependenciesField,
+        ShellCommandExecutionDependenciesField,
         ShellCommandCommandField,
         ShellCommandLogOutputField,
         ShellCommandOutputsField,
@@ -391,7 +426,7 @@ class ShellCommandTarget(Target):
             experimental_shell_command(
                 command="./my-script.sh --flag",
                 tools=["tar", "curl", "cat", "bash", "env"],
-                dependencies=[":scripts"],
+                execution_dependencies=[":scripts"],
                 output_files=["logs/my-script.log"],
                 output_directories=["results"],
             )
@@ -411,7 +446,7 @@ class ShellCommandRunTarget(Target):
     alias = "experimental_run_shell_command"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        ShellCommandDependenciesField,
+        ShellCommandExecutionDependenciesField,
         ShellCommandCommandField,
         ShellCommandRunWorkdirField,
     )
@@ -423,16 +458,16 @@ class ShellCommandRunTarget(Target):
 
             experimental_run_shell_command(
                 command="./scripts/my-script.sh --data-files-dir={chroot}",
-                dependencies=["src/project/files:data"],
+                execution_dependencies=["src/project/files:data"],
             )
 
         The `command` may use either `{chroot}` on the command line, or the `$CHROOT`
         environment variable to get the root directory for where any dependencies are located.
 
         In contrast to the `experimental_shell_command`, in addition to `workdir` you only have
-        the `command` and `dependencies` fields as the `tools` you are going to use are already
-        on the PATH which is inherited from the Pants environment. Also, the `outputs` does not
-        apply, as any output files produced will end up directly in your project tree.
+        the `command` and `execution_dependencies` fields as the `tools` you are going to use are
+        already on the PATH which is inherited from the Pants environment. Also, the `outputs` does
+        not apply, as any output files produced will end up directly in your project tree.
         """
     )
 
@@ -461,7 +496,7 @@ class ShellCommandTestTarget(Target):
                 name="test",
                 tools=["test"],
                 command="test -r $CHROOT/some-data-file.txt",
-                dependencies=["src/project/files:data"],
+                execution_dependencies=["src/project/files:data"],
             )
 
         The `command` may use either `{chroot}` on the command line, or the `$CHROOT`
