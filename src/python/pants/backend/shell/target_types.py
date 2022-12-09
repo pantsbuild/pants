@@ -362,6 +362,7 @@ class RunInSandboxSourcesField(MultipleSourcesField):
 class RunInSandboxArgumentsField(StringSequenceField):
     alias = "argv"
     default = ()
+    help = f"""Extra arguments to pass into the `{RunInSandboxRunnableField.alias}` field. """
 
 
 class ShellCommandTimeoutField(IntField):
