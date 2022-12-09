@@ -192,7 +192,6 @@ async def _create_python_source_run_dap_request(
     extra_env["PANTS_CHROOT"] = _in_chroot("").rstrip("/")
     args = [
         regular_run_request.args[0],  # python executable
-        _in_chroot(debugpy_pex.name),
         _in_chroot("__debugpy_launcher.py"),
         *debugpy.get_args(debug_adapter),
     ]
