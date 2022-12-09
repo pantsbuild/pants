@@ -170,9 +170,10 @@ def test_download_and_analyze_all_packages(rule_runner: RuleRunner) -> None:
         assert pkg_info.go_files == go_files
         assert not pkg_info.s_files
         snapshot = rule_runner.request(Snapshot, [pkg_info.digest])
-        assert set(snapshot.files) == {
+        expected_files = {
             os.path.join(dir_path, file_name) for file_name in (*go_files, *extra_files)
         }
+        assert expected_files.issubset(snapshot.files)
         assert pkg_info.minimum_go_version == minimum_go_version
 
     assert_pkg_info(
