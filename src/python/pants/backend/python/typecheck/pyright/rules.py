@@ -31,6 +31,7 @@ from pants.backend.python.util_rules.python_sources import (
     PythonSourceFilesRequest,
 )
 from pants.core.goals.check import CheckRequest, CheckResult, CheckResults
+from pants.core.util_rules import config_files
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.collection import Collection
@@ -293,6 +294,7 @@ async def pyright_typecheck(
 def rules() -> Iterable[Rule | UnionRule]:
     return (
         *collect_rules(),
+        *config_files.rules(),
         *pex_from_targets.rules(),
         UnionRule(CheckRequest, PyrightRequest),
     )
