@@ -28,7 +28,7 @@ from pants.backend.shell.target_types import (
 from pants.backend.shell.util_rules.builtin import BASH_BUILTIN_COMMANDS
 from pants.base.deprecated import warn_or_error
 from pants.core.goals.package import BuiltPackage, PackageFieldSet
-from pants.core.goals.run import RunDebugAdapterRequest, RunFieldSet, RunRequest
+from pants.core.goals.run import RunFieldSet, RunRequest
 from pants.core.target_types import FileSourceField
 from pants.core.util_rules.environments import EnvironmentNameRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
@@ -401,18 +401,9 @@ async def run_shell_command_request(shell_command: RunShellCommand) -> RunReques
     )
 
 
-@rule
-async def run_shell_debug_adapter_binary(
-    field_set: RunShellCommand,
-) -> RunDebugAdapterRequest:
-    raise NotImplementedError(
-        "Debugging a shell command using a debug adapter has not yet been implemented."
-    )
-
-
 def rules():
     return [
         *collect_rules(),
         UnionRule(GenerateSourcesRequest, GenerateFilesFromShellCommandRequest),
-        UnionRule(RunFieldSet, RunShellCommand),
+        *RunShellCommand.rules(),
     ]
