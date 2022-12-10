@@ -92,6 +92,17 @@ class CGoCompilerFlags:
     ldflags: tuple[str, ...]
     pkg_config: tuple[str, ...]
 
+    @classmethod
+    def empty(cls) -> CGoCompilerFlags:
+        return cls(
+            cflags=(),
+            cppflags=(),
+            cxxflags=(),
+            fflags=(),
+            ldflags=(),
+            pkg_config=(),
+        )
+
 
 @dataclass(frozen=True)
 class CheckCompilerSupportsFlagRequest:
