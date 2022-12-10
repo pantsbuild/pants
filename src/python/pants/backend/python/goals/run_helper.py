@@ -150,6 +150,8 @@ async def _create_python_source_run_dap_request(
                             import os
                             CHROOT = os.environ["PANTS_CHROOT"]
 
+                            del os.environ["PEX_INTERPRETER"]
+
                             # See https://github.com/pantsbuild/pants/issues/17540
                             # For `run --debug-adapter`, the client might send a `pathMappings`
                             # (this is likely as VS Code likes to configure that by default) with
