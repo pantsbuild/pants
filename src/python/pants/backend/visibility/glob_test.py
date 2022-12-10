@@ -143,6 +143,16 @@ from pants.engine.internals.target_adaptor import TargetAdaptor
                 uplvl=0,
             ),
         ),
+        (
+            "base",
+            "**/path",
+            PathGlob(
+                raw="**/path",
+                anchor_mode=PathGlobAnchorMode.FLOATING,
+                glob=re.compile(r"/?\bpath$"),
+                uplvl=0,
+            ),
+        ),
     ],
 )
 def test_pathglob_parse(base: str, pattern_text: str | tuple[str, str], expected: PathGlob) -> None:
