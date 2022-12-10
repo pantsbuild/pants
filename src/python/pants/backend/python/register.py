@@ -80,7 +80,6 @@ def rules():
         *local_dists.rules(),
         *export.rules(),
         *lockfile.rules(),
-        *export_codegen_goal.rules(),
         # Macros.
         *pipenv_requirements.rules(),
         *poetry_requirements.rules(),
