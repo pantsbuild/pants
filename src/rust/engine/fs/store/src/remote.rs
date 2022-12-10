@@ -118,139 +118,6 @@ impl ByteStore {
     })
   }
 
-  pub(crate) fn chunk_size_bytes(&self) -> usize {
-    self.chunk_size_bytes
-  }
-
-  pub async fn store_buffered<WriteToBuffer, WriteResult>(
-    &self,
-    digest: Digest,
-    mut write_to_buffer: WriteToBuffer,
-  ) -> Result<(), StoreError>
-  where
-    WriteToBuffer: FnMut(std::fs::File) -> WriteResult,
-    WriteResult: Future<Output = Result<(), StoreError>>,
-  {
-    let write_buffer = tempfile::tempfile().map_err(|e| {
-      format!(
-        "Failed to create a temporary blob upload buffer for {digest:?}: {err}",
-        digest = digest,
-        err = e
-      )
-    })?;
-    let read_buffer = write_buffer.try_clone().map_err(|e| {
-      format!(
-        "Failed to create a read handle for the temporary upload buffer for {digest:?}: {err}",
-        digest = digest,
-        err = e
-      )
-    })?;
-    write_to_buffer(write_buffer).await?;
-
-    // Unsafety: Mmap presents an immutable slice of bytes, but the underlying file that is mapped
-    // could be mutated by another process. We guard against this by creating an anonymous
-    // temporary file and ensuring it is written to and closed via the only other handle to it in
-    // the code just above.
-    let mmap = Arc::new(unsafe {
-      let mapping = memmap::Mmap::map(&read_buffer).map_err(|e| {
-        format!(
-          "Failed to memory map the temporary file buffer for {digest:?}: {err}",
-          digest = digest,
-          err = e
-        )
-      })?;
-      if let Err(err) = madvise::madvise(
-        mapping.as_ptr(),
-        mapping.len(),
-        madvise::AccessPattern::Sequential,
-      ) {
-        log::warn!(
-          "Failed to madvise(MADV_SEQUENTIAL) for the memory map of the temporary file buffer for \
-          {digest:?}. Continuing with possible reduced performance: {err}",
-          digest = digest,
-          err = err
-        )
-      }
-      Ok(mapping) as Result<memmap::Mmap, String>
-    }?);
-
-    retry_call(
-      mmap,
-      |mmap| self.store_bytes_source(digest, move |range| Bytes::copy_from_slice(&mmap[range])),
-      |err| match err {
-        ByteStoreError::Grpc(status) => status_is_retryable(status),
-        _ => false,
-      },
-    )
-    .await
-    .map_err(|err| match err {
-      ByteStoreError::Grpc(status) => status_to_str(status).into(),
-      ByteStoreError::Other(msg) => msg.into(),
-    })
-  }
-
-  pub async fn store_bytes(&self, bytes: Bytes) -> Result<(), String> {
-    let digest = Digest::of_bytes(&bytes);
-    retry_call(
-      bytes,
-      |bytes| self.store_bytes_source(digest, move |range| bytes.slice(range)),
-      |err| match err {
-        ByteStoreError::Grpc(status) => status_is_retryable(status),
-        _ => false,
-      },
-    )
-    .await
-    .map_err(|err| match err {
-      ByteStoreError::Grpc(status) => status_to_str(status),
-      ByteStoreError::Other(msg) => msg,
-    })
-  }
-
-  async fn store_bytes_source<ByteSource>(
-    &self,
-    digest: Digest,
-    bytes: ByteSource,
-  ) -> Result<(), ByteStoreError>
-  where
-    ByteSource: Fn(Range<usize>) -> Bytes + Send + Sync + 'static,
-  {
-    let len = digest.size_bytes;
-
-    let max_batch_total_size_bytes = {
-      let capabilities = self.get_capabilities().await?;
-
-      capabilities
-        .cache_capabilities
-        .as_ref()
-        .map(|c| c.max_batch_total_size_bytes as usize)
-        .unwrap_or_default()
-    };
-
-    let batch_api_allowed_by_local_config = len <= self.batch_api_size_limit;
-    let batch_api_allowed_by_server_config =
-      max_batch_total_size_bytes == 0 || len < max_batch_total_size_bytes;
-
-    in_workunit!(
-      "store_bytes",
-      Level::Trace,
-      desc = Some(format!("Storing {digest:?}")),
-      |workunit| async move {
-        let result = if batch_api_allowed_by_local_config && batch_api_allowed_by_server_config {
-          self.store_bytes_source_batch(digest, bytes).await
-        } else {
-          self.store_bytes_source_stream(digest, bytes).await
-        };
-
-        if result.is_ok() {
-          workunit.record_observation(ObservationMetric::RemoteStoreBlobBytesUploaded, len as u64);
-        }
-
-        result
-      }
-    )
-    .await
-  }
-
   async fn store_bytes_source_batch<ByteSource>(
     &self,
     digest: Digest,
@@ -336,14 +203,72 @@ impl ByteStore {
     .await
   }
 
-  pub async fn load_bytes_with<
-    T: Send + 'static,
-    F: Fn(Bytes) -> Result<T, String> + Send + Sync + Clone + 'static,
-  >(
-    &self,
-    digest: Digest,
-    f: F,
-  ) -> Result<Option<T>, ByteStoreError> {
+  async fn get_capabilities(&self) -> Result<&remexec::ServerCapabilities, ByteStoreError> {
+    let capabilities_fut = async {
+      let mut request = remexec::GetCapabilitiesRequest::default();
+      if let Some(s) = self.instance_name.as_ref() {
+        request.instance_name = s.clone();
+      }
+
+      let mut client = self.capabilities_client.as_ref().clone();
+      client
+        .get_capabilities(request)
+        .await
+        .map(|r| r.into_inner())
+        .map_err(ByteStoreError::Grpc)
+    };
+
+    self
+      .capabilities_cell
+      .get_or_try_init(capabilities_fut)
+      .await
+  }
+}
+
+impl RemoteCacheConnection for ByteStore {
+  fn chunk_size_bytes(&self) -> usize {
+    self.chunk_size_bytes
+  }
+
+  async fn store_bytes(&self, digest: Digest, bytes: ByteSource) -> Result<(), RemoteCacheError> {
+    let len = digest.size_bytes;
+
+    let max_batch_total_size_bytes = {
+      let capabilities = self.get_capabilities().await?;
+
+      capabilities
+        .cache_capabilities
+        .as_ref()
+        .map(|c| c.max_batch_total_size_bytes as usize)
+        .unwrap_or_default()
+    };
+
+    let batch_api_allowed_by_local_config = len <= self.batch_api_size_limit;
+    let batch_api_allowed_by_server_config =
+      max_batch_total_size_bytes == 0 || len < max_batch_total_size_bytes;
+
+    in_workunit!(
+      "store_bytes",
+      Level::Trace,
+      desc = Some(format!("Storing {digest:?}")),
+      |workunit| async move {
+        let result = if batch_api_allowed_by_local_config && batch_api_allowed_by_server_config {
+          self.store_bytes_source_batch(digest, bytes).await
+        } else {
+          self.store_bytes_source_stream(digest, bytes).await
+        };
+
+        if result.is_ok() {
+          workunit.record_observation(ObservationMetric::RemoteStoreBlobBytesUploaded, len as u64);
+        }
+
+        result
+      }
+    )
+    .await
+  }
+
+  async fn load_bytes(&self, digest: Digest) -> Result<Option<Bytes>, String> {
     let start = Instant::now();
     let store = self.clone();
     let instance_name = store.instance_name.clone().unwrap_or_default();
@@ -359,7 +284,6 @@ impl ByteStore {
 
     let mut client = self.byte_stream_client.as_ref().clone();
 
-    let result_future = async move {
       let mut start_opt = Some(Instant::now());
 
       let stream_result = client
@@ -406,54 +330,31 @@ impl ByteStore {
 
       let read_result: Result<Bytes, tonic::Status> = read_result_closure.await;
 
-      let maybe_bytes = match read_result {
-        Ok(bytes) => Some(bytes),
+      match read_result {
+        Ok(bytes) => Ok(Some(bytes)),
         Err(status) => {
           if status.code() == tonic::Code::NotFound {
-            None
+            Ok(None)
           } else {
-            return Err(ByteStoreError::Grpc(status));
+            Err(ByteStoreError::Grpc(status));
           }
         }
-      };
-
-      match maybe_bytes {
-        Some(b) => f(b).map(Some).map_err(ByteStoreError::Other),
-        None => Ok(None),
       }
-    };
-
-    in_workunit!(
-      "load_bytes_with",
-      Level::Trace,
-      desc = Some(workunit_desc),
-      |workunit| async move {
-        let result = result_future.await;
-        workunit.record_observation(
-          ObservationMetric::RemoteStoreReadBlobTimeMicros,
-          start.elapsed().as_micros() as u64,
-        );
-        if result.is_ok() {
-          workunit.record_observation(
-            ObservationMetric::RemoteStoreBlobBytesDownloaded,
-            digest.size_bytes as u64,
-          );
-        }
-        result
-      },
-    )
-    .await
   }
 
   ///
   /// Given a collection of Digests (digests),
   /// returns the set of digests from that collection not present in the CAS.
   ///
-  pub fn list_missing_digests(
+  async fn list_missing_digests(
     &self,
-    request: remexec::FindMissingBlobsRequest,
-  ) -> impl Future<Output = Result<HashSet<Digest>, String>> {
+    request: &mut dyn Iterator<Item=Digest>,
+  ) -> Result<Option<HashSet<Digest>>, String> {
     let store = self.clone();
+    request = remexec::FindMissingBlobsRequest {
+      instance_name: self.instance_name.as_ref().cloned().unwrap_or_default(),
+      blob_digests: digests.into_iter().map(|d| d.into()).collect::<Vec<_>>(),
+    }
     async {
       in_workunit!(
         "list_missing_digests",
@@ -484,34 +385,4 @@ impl ByteStore {
     }
   }
 
-  pub fn find_missing_blobs_request(
-    &self,
-    digests: impl IntoIterator<Item = Digest>,
-  ) -> remexec::FindMissingBlobsRequest {
-    remexec::FindMissingBlobsRequest {
-      instance_name: self.instance_name.as_ref().cloned().unwrap_or_default(),
-      blob_digests: digests.into_iter().map(|d| d.into()).collect::<Vec<_>>(),
-    }
-  }
-
-  async fn get_capabilities(&self) -> Result<&remexec::ServerCapabilities, ByteStoreError> {
-    let capabilities_fut = async {
-      let mut request = remexec::GetCapabilitiesRequest::default();
-      if let Some(s) = self.instance_name.as_ref() {
-        request.instance_name = s.clone();
-      }
-
-      let mut client = self.capabilities_client.as_ref().clone();
-      client
-        .get_capabilities(request)
-        .await
-        .map(|r| r.into_inner())
-        .map_err(ByteStoreError::Grpc)
-    };
-
-    self
-      .capabilities_cell
-      .get_or_try_init(capabilities_fut)
-      .await
-  }
 }
