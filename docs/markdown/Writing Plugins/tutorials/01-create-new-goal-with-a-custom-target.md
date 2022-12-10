@@ -1,10 +1,11 @@
 # Introduction
 
-In this tutorial, you'll learn the basics needed to get started writing a plugin. You will create a new goal, `project-version`, which will tell you the version (retrieved from the `VERSION` text file) of a particular project in your monorepository. You will learn how to create a new custom target to refer to the `VERSION` file, how to author a new goal, and, most importantly, how to connect rules and targets. You can follow along this tutorial in your own repository; you only need to be on a recent version of Pants and have a `VERSION` file containing a version string e.g. `1.2.3`.
+In this tutorial, you'll learn the basics needed to get started writing a plugin. You will create a new goal, `project-version`, which will tell you the version (retrieved from the `VERSION` text file) of a particular project in your monorepository. You will learn how to create a new custom target to refer to the `VERSION` file, how to author a new goal, and, most importantly, how to connect rules and targets. You can follow along this tutorial in your own repository; you only need to be on a recent version of Pants and have a `VERSION` file containing a version string e.g. `1.2.3`. If you do not have a repository with Pants enabled yet, you can use [this example Python repository](https://github.com/pantsbuild/example-python/) to work on the plugin.
 
 ## Registering a plugin
 
-We'll be writing an [in-repo plugin](https://www.pantsbuild.org/docs/plugins-overview#in-repo-plugins), and expect you to have the `pants-plugins/project_version` directory with the `pants.toml` configuration file extended:
+We'll be writing an [in-repo plugin](https://www.pantsbuild.org/docs/plugins-overview#in-repo-plugins), and expect 
+you to have the `pants-plugins/project_version` directory as well as the `pants.toml` file with this configuration:
 
 ```toml pants.toml
 # Specifying the path to our plugin's top-level folder using the `pythonpath` option:
@@ -33,9 +34,9 @@ class ProjectVersionTarget(Target):
 
 Our target has some common target fields such as `tags` and `description` available via the `COMMON_TARGET_FIELDS`; including those fields in your targets may be convenient if you decide to use tags and provide a description later. In addition, it also has the [`source` field](https://www.pantsbuild.org/docs/rules-api-and-target-api#sourcesfield) which will be used to provide path to the project's `VERSION` file. 
 
-We could [add a custom field](https://www.pantsbuild.org/docs/target-api-new-fields) to provide a file path, however, when using the `source` field, you get a few features for free such as setting the `default` value and `expected_file_extensions`. Furthermore, with the `source` field, thanks to the [`unmatched_build_file_globs`](https://www.pantsbuild.org/docs/reference-global#unmatched_build_file_globs) option, you won't need to provide custom logic to handle errors when a path glob doesn't expand to any files in your repository.
+We could [add a custom field](https://www.pantsbuild.org/docs/target-api-new-fields) to provide a file path, however, there are multiple advantages to  using the `source` field. You will learn more about them in the following tutorials. 
 
-You only need to register the target to start using it: 
+In order to start using a target, you only need to register it: 
 
 ```python pants-plugins/project_version/register.py
 from typing import Iterable
@@ -102,7 +103,7 @@ async def goal_show_project_version() -> ProjectVersionGoal:
 def rules():
     return collect_rules()
 ```
-```python pants-plugins/project_version/rules.py
+```python pants-plugins/project_version/register.py
 from typing import Iterable
 
 import project_version.rules as project_version_rules
@@ -148,7 +149,6 @@ we are ready to inspect our new target:
 ```text
 $ ./pants project-version myapp
 {'address': 'myapp:main-project-version'}
-{'includes': ['myapp/VERSION']}
 ```
 
 ## Writing a rule
@@ -207,12 +207,33 @@ Get(ProjectVersionFileView, ProjectVersionTarget, target)
 async def get_project_version_file_view(target: ProjectVersionTarget) -> ProjectVersionFileView: ...
 ```
 
+> 📘 Understanding the requests and rules signatures
+> In our basic usage, there's a 1:1 match between the `Get(output: B, input: A, obj)` request and the `@rule(input: A) -> B` function signature. This doesn't have to be the case! When you make a request (providing an input type and asking for an output type), Pants looks at all the [rules in the graph](https://www.pantsbuild.org/docs/rules-api-concepts#the-rule-graph) to find a way from the input to the output using all the available rules. 
+
+> Let's consider a following scenario where you have a few `@rule`s and a `Get()` request:
+
+> ```python
+> @rule
+> async def rule1(A) -> B: ...
+> 
+> @rule
+> async def rule2(B) -> C: ...
+> 
+> @goal_rule
+> async def main(...):
+>     result = await Get(C, A, obj)
+> ```
+
+> With the following suite of rules, Pants will "figure out" that in order to return `C`, it's necessary to call `rule1` first to get `B` and then once there's `B`, call `rule2` to get C. This means you can focus on writing individual rules and leave the hard work of finding out the right order of calls that will need happen to Pants!   
+
 The `project-version` Pants goal now shows some useful information -- the target path along with a dummy version. This means our `@rule` was run!
 
 ```
 $ ./pants project-version myapp
 ProjectVersionFileView(path='myapp:main-project-version', version='1.2.3')
 ```
+
+You would normally expect for a project to have only a single `version_file` target declared, so as an improvement, we could raise an exception if there are multiple targets of this type found within a single project. This is something we'll do in the following tutorials.
 
 ## Reading the `VERSION` file
 
@@ -225,15 +246,13 @@ async def get_project_version_file_view(
 ) -> ProjectVersionFileView:
     sources = await Get(HydratedSources, HydrateSourcesRequest(target[SourcesField]))
     digest_contents = await Get(DigestContents, Digest, sources.snapshot.digest)
-    if len(digest_contents) > 1:
-        raise ValueError("There should be only one source file.")
     file_content = digest_contents[0]    
     return ProjectVersionFileView(
         path=file_content.path, version=file_content.content.decode("utf-8").strip()
     )
 ```
 
-You would normally expect for a project to have only a single `version_file` target declared, so you could raise an exception if there are multiple targets of this type found within a single project. We could also replace our `Get()` calls in the `for` loop with a [`MultiGet()` call](https://www.pantsbuild.org/docs/rules-api-tips#tip-use-multiget-for-increased-concurrency):
+If the `@goal_rule` would receive multiple `version_file` targets (which may happen if user would run the goal for multiple projects or provide a recursive glob pattern such as `::`), it would be required to iterate over the list of targets. For efficiency, it is generally encouraged to replace the `Get()` calls in the `for` loop with a [`MultiGet()` call](https://www.pantsbuild.org/docs/rules-api-tips#tip-use-multiget-for-increased-concurrency):
 
 ```python
 @goal_rule
@@ -277,8 +296,6 @@ async def get_project_version_file_view(
 ) -> ProjectVersionFileView:
     sources = await Get(HydratedSources, HydrateSourcesRequest(target[SourcesField]))
     digest_contents = await Get(DigestContents, Digest, sources.snapshot.digest)
-    if len(digest_contents) > 1:
-        raise ValueError("There should be only one source file.")
     file_content = digest_contents[0]
     return ProjectVersionFileView(
         path=file_content.path, version=file_content.content.decode("utf-8").strip()
@@ -342,4 +359,6 @@ $ /pants project-version myapp
 ProjectVersionFileView(path='myapp/VERSION', version='0.0.1')
 ```
 
-The `VERSION` file was read and its contents is shown in the console. You have now finished writing your plugin!
+The `VERSION` file was read and its contents is shown in the console. Congratulations, you have now finished writing your first plugin! 
+
+There are a few things that we could do to improve it, though. We may want to check that the version string follows a semver convention, let user see the version in the console as a JSON object if desired, or show the version number string when exploring the `target` via the `peek` Pants goal. This is something we'll do in the following tutorials! 
