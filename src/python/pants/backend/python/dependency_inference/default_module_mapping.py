@@ -148,6 +148,7 @@ DEFAULT_MODULE_MAPPING = {
     "python-pptx": ("pptx",),
     "python-socketio": ("socketio",),
     "python-statsd": ("statsd",),
+    "pytorch-lightning": ("pytorch_lightning"),
     "pyyaml": ("yaml",),
     "pymongo": ("bson", "gridfs", "pymongo"),
     "pymupdf": ("fitz",),
