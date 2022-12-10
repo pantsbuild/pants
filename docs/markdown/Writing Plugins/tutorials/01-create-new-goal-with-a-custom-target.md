@@ -49,7 +49,32 @@ def target_types() -> Iterable[type[Target]]:
     return [ProjectVersionTarget]
 ```
 
-You can now run `./pants help version_file` to learn more about the target. You can now also add a target to a `myapp/BUILD` file:
+You can now run `./pants help version_file` to learn more about the target:
+
+```
+❯ ./pants help version_file  
+
+`version_file` target
+---------------------
+
+A project version target representing the VERSION file.
+
+
+Activated by project_version
+Valid fields:
+
+source
+    type: str
+    required
+
+    A single file that belongs to this target.
+    
+    Path is relative to the BUILD file's directory, e.g. `source='example.ext'`.
+
+...
+```
+
+You can now also add a target to a `myapp/BUILD` file:
 
 ```python
 version_file(
@@ -79,7 +104,9 @@ $ ./pants peek myapp:main-project-version
 
 ## Creating a goal
 
-[Goals](https://www.pantsbuild.org/docs/goals) are the commands that Pants runs such as `fmt` or `lint`. To be able to get a project version number (using a target we've just created), we need to [create a new goal](https://www.pantsbuild.org/docs/rules-api-goal-rules). The code below is the boilerplate necessary to create a goal, so it's not really necessary to understand how, for instance, subsystems work right now. The function decorated with the `@goal_rule` can be named anything, but it's helpful for the name to represent the functionality your goal provides. To make your goal part of the plugin's interface, add it to the `rules` function in the `register.py` module.
+[Goals](https://www.pantsbuild.org/docs/goals) are the commands that Pants runs such as `fmt` or `lint`. Writing a plugin doesn't necessarily mean adding a new goal. Most users would likely only want to enrich their build metadata with new kinds of targets or extend behavior of existing Pants goals. See [Common plugin tasks](https://www.pantsbuild.org/docs/common-plugin-tasks) to learn more.
+
+For the purposes of our tutorial, to be able to get a project version number (using a target we've just created), we need to [create a new goal](https://www.pantsbuild.org/docs/rules-api-goal-rules). The code below is the boilerplate necessary to create a goal, so it's not really necessary to understand how, for instance, subsystems work right now. The function decorated with the `@goal_rule` can be named anything, but it's helpful for the name to represent the functionality your goal provides. To make your goal part of the plugin's interface, add it to the `rules` function in the `register.py` module.
 
 ```python pants-plugins/project_version/rules.py
 from pants.engine.goal import Goal, GoalSubsystem
