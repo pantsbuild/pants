@@ -1,6 +1,7 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from pants.backend.codegen import export_codegen_goal
 from pants.backend.codegen.thrift.apache.python import (
     additional_fields,
     python_thrift_module_mapper,
@@ -29,4 +30,5 @@ def rules():
         *python_thrift_module_mapper.rules(),
         *module_mapper.rules(),
         *stripped_source_files.rules(),
+        *export_codegen_goal.rules(),
     ]
