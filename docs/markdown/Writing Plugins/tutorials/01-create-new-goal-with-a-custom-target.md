@@ -361,4 +361,4 @@ ProjectVersionFileView(path='myapp/VERSION', version='0.0.1')
 
 The `VERSION` file was read and its contents is shown in the console. Congratulations, you have now finished writing your first plugin! 
 
-There are a few things that we could do to improve it, though. We may want to check that the version string follows a semver convention, let user see the version in the console as a JSON object if desired, or show the version number string when exploring the `target` via the `peek` Pants goal. This is something we'll do in the following tutorials! 
+There are a few things that we could do to improve it, though. We may want to check that the version string follows a semver convention, let user see the version in the console as a JSON object if desired, or show the version number string when exploring the `version_file` target via the `peek` Pants goal. This is something we'll do in the following tutorials! 
