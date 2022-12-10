@@ -68,7 +68,7 @@ def rule_runner() -> RuleRunner:
 
 
 def test_dependency_inference(rule_runner: RuleRunner, caplog) -> None:
-    rule_runner.set_options(["--source-root-patterns=['src/native', 'mylib']"])
+    rule_runner.set_options(["--source-root-patterns=['src/native', '/mylib', 'mylib/include']"])
     rule_runner.write_files(
         {
             "src/native/BUILD": "cc_sources()",
