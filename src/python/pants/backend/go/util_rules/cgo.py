@@ -31,14 +31,7 @@ from pants.core.util_rules.system_binaries import (
 )
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
-from pants.engine.fs import (
-    CreateDigest,
-    DigestContents,
-    DigestSubset,
-    Directory,
-    FileContent,
-    PathGlobs,
-)
+from pants.engine.fs import CreateDigest, DigestContents, DigestSubset, FileContent, PathGlobs
 from pants.engine.internals.native_engine import EMPTY_DIGEST, Digest, MergeDigests
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import FallibleProcessResult, Process, ProcessResult
@@ -306,8 +299,11 @@ async def make_cgo_compile_wrapper_script(
                     path="wrapper",
                     content=textwrap.dedent(
                         """\
-                sandbox_root="$(/bin/pwd)"
-                args=("${@//__PANTS_SANDBOX_ROOT__/$sandbox_root}")
+                export sandbox_root="$(/bin/pwd)"
+                ln -s "${sandbox_root}" __pants_sandbox_root__
+                declare -a args
+                args=("$@")
+                args=("${args[@]//__PANTS_SANDBOX_ROOT__/${sandbox_root}}")
                 exec "${args[@]}"
                 """
                     ).encode(),
@@ -323,7 +319,7 @@ async def make_cgo_compile_wrapper_script(
 async def _cc(
     binary_name: str,
     input_digest: Digest,
-    work_dir: str,
+    dir_path: str,
     src_file: str,
     flags: Iterable[str],
     obj_file: str,
@@ -340,14 +336,14 @@ async def _cc(
     bash = await Get(BashBinary, BashBinaryRequest())
     wrapper_script = await Get(CGoCompilerWrapperScript, CGoCompilerWrapperScriptRequest())
     compiler_args_result, env, input_digest = await MultiGet(
-        Get(SetupCompilerCmdResult, SetupCompilerCmdRequest((compiler_path.path,), work_dir)),
+        Get(SetupCompilerCmdResult, SetupCompilerCmdRequest((compiler_path.path,), dir_path)),
         Get(
             EnvironmentVars,
             EnvironmentVarsRequest(golang_env_aware.env_vars_to_pass_to_subprocesses),
         ),
         Get(Digest, MergeDigests([input_digest, wrapper_script.digest])),
     )
-    replaced_flags = _replace_srcdir_in_flags(flags, work_dir)
+    replaced_flags = _replace_srcdir_in_flags(flags, dir_path)
     args = [
         bash.path,
         "./wrapper",
@@ -372,7 +368,7 @@ async def _cc(
 async def _gccld(
     binary_name: str,
     input_digest: Digest,
-    obj_dir_path: str,
+    dir_path: str,
     outfile: str,
     flags: Iterable[str],
     objs: Iterable[str],
@@ -386,12 +382,30 @@ async def _gccld(
         ),
     )
 
-    compiler_args_result, env = await MultiGet(
-        Get(SetupCompilerCmdResult, SetupCompilerCmdRequest((compiler_path.path,), obj_dir_path)),
-        Get(EnvironmentVars, EnvironmentVarsRequest(["PATH"])),
+    bash, wrapper_script = await MultiGet(
+        Get(BashBinary, BashBinaryRequest()),
+        Get(CGoCompilerWrapperScript, CGoCompilerWrapperScriptRequest()),
     )
 
-    args = [*compiler_args_result.args, "-o", outfile, *objs, *flags]
+    compiler_args_result, env, input_digest = await MultiGet(
+        Get(SetupCompilerCmdResult, SetupCompilerCmdRequest((compiler_path.path,), dir_path)),
+        Get(EnvironmentVars, EnvironmentVarsRequest(["PATH"])),
+        Get(Digest, MergeDigests([input_digest, wrapper_script.digest])),
+    )
+
+    replaced_flags_in_compiler_args = _replace_srcdir_in_flags(compiler_args_result.args, dir_path)
+    replaced_other_flags = _replace_srcdir_in_flags(flags, dir_path)
+
+    args = [
+        bash.path,
+        "./wrapper",
+        *replaced_flags_in_compiler_args,
+        "-o",
+        outfile,
+        *objs,
+        *replaced_other_flags,
+    ]
+
     result = await Get(
         FallibleProcessResult,
         Process(
@@ -431,7 +445,7 @@ async def _dynimport(
     import_path: str,
     input_digest: Digest,
     obj_files: Iterable[str],
-    obj_dir_path: str,
+    dir_path: str,
     cflags: Iterable[str],
     ldflags: Iterable[str],
     pkg_name: str,
@@ -443,10 +457,10 @@ async def _dynimport(
     cgo_main_compile_process = await _cc(
         binary_name=golang_env_aware.cgo_gcc_binary_name,
         input_digest=input_digest,
-        work_dir=obj_dir_path,
-        src_file=os.path.join(obj_dir_path, "_cgo_main.c"),
+        dir_path=dir_path,
+        src_file=os.path.join(dir_path, "_cgo_main.c"),
         flags=cflags,
-        obj_file=os.path.join(obj_dir_path, "_cgo_main.o"),
+        obj_file=os.path.join(dir_path, "_cgo_main.o"),
         description=f"Compile _cgo_main.c ({import_path})",
         golang_env_aware=golang_env_aware,
     )
@@ -458,7 +472,7 @@ async def _dynimport(
     # TODO(#16827): Gather .syso files from this package and all (transitive) dependencies. Cgo support requires
     # linking all object files with `.syso` extension into the package archive.
 
-    dynobj = os.path.join(obj_dir_path, "_cgo_.o")
+    dynobj = os.path.join(dir_path, "_cgo_.o")
     ldflags = list(ldflags)
     if (goroot.goarch == "arm" and goroot.goos == "linux") or goroot.goos == "android":
         if "-no-pie" not in ldflags:
@@ -479,10 +493,10 @@ async def _dynimport(
     cgo_binary_link_result = await _gccld(
         binary_name=linker_binary_name,
         input_digest=obj_digest,
-        obj_dir_path=obj_dir_path,
+        dir_path=dir_path,
         outfile=dynobj,
         flags=ldflags,
-        objs=[*obj_files, os.path.join(obj_dir_path, "_cgo_main.o")],
+        objs=[*obj_files, os.path.join(dir_path, "_cgo_main.o")],
         description=f"Link _cgo_.o ({import_path})",
     )
     if cgo_binary_link_result.exit_code != 0:
@@ -520,7 +534,7 @@ async def _dynimport(
         cgo_binary_link_result = await _gccld(
             binary_name=linker_binary_name,
             input_digest=obj_digest,
-            obj_dir_path=obj_dir_path,
+            dir_path=dir_path,
             outfile=dynobj,
             flags=[*ldflags, allow_unresolved_symbols_ldflag],
             objs=obj_files,
@@ -641,8 +655,6 @@ async def cgo_compile_request(
     request: CGoCompileRequest, goroot: GoRoot, golang_env_aware: GolangSubsystem.EnvironmentAware
 ) -> CGoCompileResult:
     dir_path = request.dir_path if request.dir_path else "."
-    obj_dir_path = f"{dir_path}/__obj__" if dir_path else "__obj__"
-    obj_dir_path_digest = await Get(Digest, CreateDigest([Directory(obj_dir_path)]))
 
     # Extract the cgo flags instance from the request so it can be updated as necessary.
     flags = request.cgo_flags
@@ -701,7 +713,7 @@ async def cgo_compile_request(
 
     # Allows including _cgo_export.h, as well as the user's .h files,
     # from .[ch] files in the package.
-    flags = dataclasses.replace(flags, cflags=flags.cflags + ("-I", dir_path, "-I", obj_dir_path))
+    flags = dataclasses.replace(flags, cflags=flags.cflags + ("-I", dir_path))
 
     # Replace `${SRCDIR}` in LDFLAGS with the path to the source directory within the sandbox.
     # From Go docs:
@@ -718,17 +730,17 @@ async def cgo_compile_request(
         pkg_config=flags.pkg_config,
     )
 
-    go_files: list[str] = [os.path.join(obj_dir_path, "_cgo_gotypes.go")]
+    go_files: list[str] = [os.path.join(dir_path, "_cgo_gotypes.go")]
     gcc_files: list[str] = [
-        os.path.join(obj_dir_path, "_cgo_export.c"),
+        os.path.join(dir_path, "_cgo_export.c"),
         *(os.path.join(dir_path, c_file) for c_file in request.c_files),
         *(os.path.join(dir_path, s_file) for s_file in request.s_files),
     ]
     for cgo_file in request.cgo_files:
         cgo_file_path = PurePath(cgo_file)
         stem = cgo_file_path.stem
-        go_files.append(os.path.join(obj_dir_path, f"{stem}.cgo1.go"))
-        gcc_files.append(os.path.join(obj_dir_path, f"{stem}.cgo2.c"))
+        go_files.append(os.path.join(dir_path, f"{stem}.cgo1.go"))
+        gcc_files.append(os.path.join(dir_path, f"{stem}.cgo2.c"))
 
     # Note: If Pants ever supports building the Go stdlib, then certain options would need to be inserted here
     # for building certain `runtime` modules.
@@ -747,8 +759,6 @@ async def cgo_compile_request(
     # Note: If Pants supported building C static or shared archives, then we would need to direct cgo here to
     # produce a header file via the `-exportheader` option. Not necessary since Pants does not support that.
 
-    input_digest = await Get(Digest, MergeDigests([request.digest, obj_dir_path_digest]))
-
     # Invoke cgo.
     cgo_result = await Get(
         ProcessResult,
@@ -757,7 +767,7 @@ async def cgo_compile_request(
                 "tool",
                 "cgo",
                 "-objdir",
-                obj_dir_path,
+                dir_path,
                 "-importpath",
                 request.import_path,
                 # TODO(#16835): Add -trimpath option to remove sandbox paths from source paths embedded in files.
@@ -769,8 +779,8 @@ async def cgo_compile_request(
             ],
             env=cgo_env,
             description="Generate Go and C files from CGo files.",
-            input_digest=input_digest,
-            output_directories=(dir_path, obj_dir_path),
+            input_digest=request.digest,
+            output_directories=(dir_path,),
             replace_sandbox_root_in_args=True,
         ),
     )
@@ -782,14 +792,14 @@ async def cgo_compile_request(
     # C files
     cflags = [*flags.cppflags, *flags.cflags]
     for gcc_file in gcc_files:
-        ofile = os.path.join(obj_dir_path, "_x{:03}.o".format(oseq))
+        ofile = os.path.join(dir_path, "_x{:03}.o".format(oseq))
         oseq = oseq + 1
         out_obj_files.append(ofile)
 
         compile_process = await _cc(
             binary_name=golang_env_aware.cgo_gcc_binary_name,
             input_digest=cgo_result.output_digest,
-            work_dir=obj_dir_path,
+            dir_path=dir_path,
             src_file=gcc_file,
             flags=cflags,
             obj_file=ofile,
@@ -801,14 +811,14 @@ async def cgo_compile_request(
     # C++ files
     cxxflags = [*flags.cppflags, *flags.cxxflags]
     for cxx_file in (os.path.join(dir_path, cxx_file) for cxx_file in request.cxx_files):
-        ofile = os.path.join(obj_dir_path, "_x{:03}.o".format(oseq))
+        ofile = os.path.join(dir_path, "_x{:03}.o".format(oseq))
         oseq = oseq + 1
         out_obj_files.append(ofile)
 
         compile_process = await _cc(
             binary_name=golang_env_aware.cgo_gxx_binary_name,
             input_digest=cgo_result.output_digest,
-            work_dir=obj_dir_path,
+            dir_path=dir_path,
             src_file=cxx_file,
             flags=cxxflags,
             obj_file=ofile,
@@ -819,14 +829,14 @@ async def cgo_compile_request(
 
     # Objective-C files
     for objc_file in (os.path.join(dir_path, objc_file) for objc_file in request.objc_files):
-        ofile = os.path.join(obj_dir_path, "_x{:03}.o".format(oseq))
+        ofile = os.path.join(dir_path, "_x{:03}.o".format(oseq))
         oseq = oseq + 1
         out_obj_files.append(ofile)
 
         compile_process = await _cc(
             binary_name=golang_env_aware.cgo_gcc_binary_name,
             input_digest=cgo_result.output_digest,
-            work_dir=obj_dir_path,
+            dir_path=dir_path,
             src_file=objc_file,
             flags=cflags,
             obj_file=ofile,
@@ -839,14 +849,14 @@ async def cgo_compile_request(
     for fortran_file in (
         os.path.join(dir_path, fortran_file) for fortran_file in request.fortran_files
     ):
-        ofile = os.path.join(obj_dir_path, "_x{:03}.o".format(oseq))
+        ofile = os.path.join(dir_path, "_x{:03}.o".format(oseq))
         oseq = oseq + 1
         out_obj_files.append(ofile)
 
         compile_process = await _cc(
             binary_name=golang_env_aware.cgo_fortran_binary_name,
             input_digest=cgo_result.output_digest,
-            work_dir=obj_dir_path,
+            dir_path=dir_path,
             src_file=fortran_file,
             flags=fflags,
             obj_file=ofile,
@@ -876,13 +886,13 @@ async def cgo_compile_request(
     dynimport_result = await _dynimport(
         import_path=request.import_path,
         input_digest=dynimport_input_digest,
+        dir_path=dir_path,
         obj_files=out_obj_files,
-        obj_dir_path=obj_dir_path,
         cflags=cflags,
         ldflags=request.cgo_flags.ldflags,
         pkg_name=request.pkg_name,
         goroot=goroot,
-        import_go_path=os.path.join(obj_dir_path, "_cgo_import.go"),
+        import_go_path=os.path.join(dir_path, "_cgo_import.go"),
         golang_env_aware=golang_env_aware,
         use_cxx_linker=bool(request.cxx_files),
     )
