@@ -27,6 +27,9 @@ impl ByteStore {
   }
 }
 
+// GHA doesn't support storing empty caches, so we swap in
+const EMPTY_BYTES: &[u8] = &[0xFF];
+
 #[async_trait]
 impl RemoteCacheConnection for ByteStore {
   fn chunk_size_bytes(&self) -> usize {
@@ -40,7 +43,12 @@ impl RemoteCacheConnection for ByteStore {
       digest.size_bytes,
       self.client.base_url()
     );
-    let slice = bytes(0..digest.size_bytes);
+    let slice = if digest.size_bytes == 0 {
+      Bytes::from(EMPTY_BYTES)
+    } else {
+      bytes(0..digest.size_bytes)
+    };
+
     self
       .client
       .put(
@@ -82,7 +90,11 @@ impl RemoteCacheConnection for ByteStore {
           retryable: false,
           msg: err.to_string(),
         })?;
-      Ok(Some(Bytes::from(data)))
+      Ok(Some(if digest.size_bytes == 0 && data == EMPTY_BYTES {
+        Bytes::new()
+      } else {
+        Bytes::from(data)
+      }))
     } else {
       Ok(None)
     }
