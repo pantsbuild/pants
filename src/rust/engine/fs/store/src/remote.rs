@@ -9,8 +9,8 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use async_oncecell::OnceCell;
+use async_trait::async_trait;
 use bytes::{Bytes, BytesMut};
-use futures::Future;
 use futures::StreamExt;
 use grpc_util::retry::{retry_call, status_is_retryable};
 use grpc_util::{headers_to_http_header_map, layered_service, status_to_str, LayeredService};
@@ -26,7 +26,7 @@ use remexec::{
 use tonic::{Code, Request, Status};
 use workunit_store::{in_workunit, ObservationMetric};
 
-use crate::StoreError;
+use crate::remote_trait::{ByteSource, RemoteCacheConnection, RemoteCacheError};
 
 #[derive(Clone)]
 pub struct ByteStore {
@@ -67,6 +67,21 @@ impl fmt::Display for ByteStoreError {
 }
 
 impl std::error::Error for ByteStoreError {}
+
+impl From<ByteStoreError> for RemoteCacheError {
+  fn from(err: ByteStoreError) -> RemoteCacheError {
+    match err {
+      ByteStoreError::Grpc(status) => RemoteCacheError {
+        retryable: status_is_retryable(&status),
+        msg: status_to_str(status),
+      },
+      ByteStoreError::Other(msg) => RemoteCacheError {
+        retryable: false,
+        msg,
+      },
+    }
+  }
+}
 
 impl ByteStore {
   // TODO: Consider extracting these options to a struct with `impl Default`, similar to
@@ -162,7 +177,8 @@ impl ByteStore {
     );
     let store = self.clone();
 
-    let mut client = self.byte_stream_client.as_ref().clone();
+    struct C(ByteStreamClient<LayeredService>);
+    let mut client = C(self.byte_stream_client.as_ref().clone());
 
     let chunk_size_bytes = store.chunk_size_bytes;
 
@@ -184,23 +200,26 @@ impl ByteStore {
     });
 
     // NB: We must box the future to avoid a stack overflow.
-    Box::pin(async move {
-      let response = client
-        .write(Request::new(stream))
-        .await
-        .map_err(ByteStoreError::Grpc)?;
+    // Explicit type annotation is a workaround for https://github.com/rust-lang/rust/issues/64552
+    let x: std::pin::Pin<Box<dyn futures::Future<Output = Result<(), ByteStoreError>> + Send>> =
+      Box::pin(async move {
+        let response = client
+          .0
+          .write(Request::new(stream))
+          .await
+          .map_err(ByteStoreError::Grpc)?;
 
-      let response = response.into_inner();
-      if response.committed_size == len as i64 {
-        Ok(())
-      } else {
-        Err(ByteStoreError::Other(format!(
-          "Uploading file with digest {:?}: want committed size {} but got {}",
-          digest, len, response.committed_size
-        )))
-      }
-    })
-    .await
+        let response = response.into_inner();
+        if response.committed_size == len as i64 {
+          Ok(())
+        } else {
+          Err(ByteStoreError::Other(format!(
+            "Uploading file with digest {:?}: want committed size {} but got {}",
+            digest, len, response.committed_size
+          )))
+        }
+      });
+    x.await
   }
 
   async fn get_capabilities(&self) -> Result<&remexec::ServerCapabilities, ByteStoreError> {
@@ -225,16 +244,18 @@ impl ByteStore {
   }
 }
 
+#[async_trait]
 impl RemoteCacheConnection for ByteStore {
   fn chunk_size_bytes(&self) -> usize {
     self.chunk_size_bytes
   }
 
   async fn store_bytes(&self, digest: Digest, bytes: ByteSource) -> Result<(), RemoteCacheError> {
+    let store = self.clone();
     let len = digest.size_bytes;
 
     let max_batch_total_size_bytes = {
-      let capabilities = self.get_capabilities().await?;
+      let capabilities = store.get_capabilities().await?;
 
       capabilities
         .cache_capabilities
@@ -243,33 +264,19 @@ impl RemoteCacheConnection for ByteStore {
         .unwrap_or_default()
     };
 
-    let batch_api_allowed_by_local_config = len <= self.batch_api_size_limit;
+    let batch_api_allowed_by_local_config = len <= store.batch_api_size_limit;
     let batch_api_allowed_by_server_config =
       max_batch_total_size_bytes == 0 || len < max_batch_total_size_bytes;
 
-    in_workunit!(
-      "store_bytes",
-      Level::Trace,
-      desc = Some(format!("Storing {digest:?}")),
-      |workunit| async move {
-        let result = if batch_api_allowed_by_local_config && batch_api_allowed_by_server_config {
-          self.store_bytes_source_batch(digest, bytes).await
-        } else {
-          self.store_bytes_source_stream(digest, bytes).await
-        };
-
-        if result.is_ok() {
-          workunit.record_observation(ObservationMetric::RemoteStoreBlobBytesUploaded, len as u64);
-        }
-
-        result
-      }
-    )
-    .await
+    if batch_api_allowed_by_local_config && batch_api_allowed_by_server_config {
+      store.store_bytes_source_batch(digest, bytes).await?
+    } else {
+      store.store_bytes_source_stream(digest, bytes).await?
+    }
+    Ok(())
   }
 
-  async fn load_bytes(&self, digest: Digest) -> Result<Option<Bytes>, String> {
-    let start = Instant::now();
+  async fn load_bytes(&self, digest: Digest) -> Result<Option<Bytes>, RemoteCacheError> {
     let store = self.clone();
     let instance_name = store.instance_name.clone().unwrap_or_default();
     let resource_name = format!(
@@ -279,67 +286,65 @@ impl RemoteCacheConnection for ByteStore {
       digest.hash,
       digest.size_bytes
     );
-    let workunit_desc = format!("Loading bytes at: {resource_name}");
-    let f = f.clone();
 
     let mut client = self.byte_stream_client.as_ref().clone();
 
-      let mut start_opt = Some(Instant::now());
+    let mut start_opt = Some(Instant::now());
 
-      let stream_result = client
-        .read({
-          protos::gen::google::bytestream::ReadRequest {
-            resource_name,
-            read_offset: 0,
-            // 0 means no limit.
-            read_limit: 0,
-          }
-        })
-        .await;
-
-      let mut stream = match stream_result {
-        Ok(response) => response.into_inner(),
-        Err(status) => {
-          return match status.code() {
-            Code::NotFound => Ok(None),
-            _ => Err(ByteStoreError::Grpc(status)),
-          }
+    let stream_result = client
+      .read({
+        protos::gen::google::bytestream::ReadRequest {
+          resource_name,
+          read_offset: 0,
+          // 0 means no limit.
+          read_limit: 0,
         }
-      };
+      })
+      .await;
 
-      let read_result_closure = async {
-        let mut buf = BytesMut::with_capacity(digest.size_bytes);
-        while let Some(response) = stream.next().await {
-          // Record the observed time to receive the first response for this read.
-          if let Some(start) = start_opt.take() {
-            if let Some(workunit_store_handle) = workunit_store::get_workunit_store_handle() {
-              let timing: Result<u64, _> =
-                Instant::now().duration_since(start).as_micros().try_into();
-              if let Ok(obs) = timing {
-                workunit_store_handle
-                  .store
-                  .record_observation(ObservationMetric::RemoteStoreTimeToFirstByteMicros, obs);
-              }
-            }
-          }
-
-          buf.extend_from_slice(&(response?).data);
-        }
-        Ok(buf.freeze())
-      };
-
-      let read_result: Result<Bytes, tonic::Status> = read_result_closure.await;
-
-      match read_result {
-        Ok(bytes) => Ok(Some(bytes)),
-        Err(status) => {
-          if status.code() == tonic::Code::NotFound {
-            Ok(None)
-          } else {
-            Err(ByteStoreError::Grpc(status));
-          }
+    let mut stream = match stream_result {
+      Ok(response) => response.into_inner(),
+      Err(status) => {
+        return match status.code() {
+          Code::NotFound => Ok(None),
+          _ => Err(From::from(ByteStoreError::Grpc(status))),
         }
       }
+    };
+
+    let read_result_closure = async {
+      let mut buf = BytesMut::with_capacity(digest.size_bytes);
+      while let Some(response) = stream.next().await {
+        // Record the observed time to receive the first response for this read.
+        if let Some(start) = start_opt.take() {
+          if let Some(workunit_store_handle) = workunit_store::get_workunit_store_handle() {
+            let timing: Result<u64, _> =
+              Instant::now().duration_since(start).as_micros().try_into();
+            if let Ok(obs) = timing {
+              workunit_store_handle
+                .store
+                .record_observation(ObservationMetric::RemoteStoreTimeToFirstByteMicros, obs);
+            }
+          }
+        }
+
+        buf.extend_from_slice(&(response?).data);
+      }
+      Ok(buf.freeze())
+    };
+
+    let read_result: Result<Bytes, tonic::Status> = read_result_closure.await;
+
+    match read_result {
+      Ok(bytes) => Ok(Some(bytes)),
+      Err(status) => {
+        if status.code() == tonic::Code::NotFound {
+          Ok(None)
+        } else {
+          Err(From::from(ByteStoreError::Grpc(status)))
+        }
+      }
+    }
   }
 
   ///
@@ -348,41 +353,39 @@ impl RemoteCacheConnection for ByteStore {
   ///
   async fn list_missing_digests(
     &self,
-    request: &mut dyn Iterator<Item=Digest>,
+    digests: &mut (dyn Iterator<Item = Digest> + Send),
   ) -> Result<Option<HashSet<Digest>>, String> {
     let store = self.clone();
-    request = remexec::FindMissingBlobsRequest {
+    let request = remexec::FindMissingBlobsRequest {
       instance_name: self.instance_name.as_ref().cloned().unwrap_or_default(),
       blob_digests: digests.into_iter().map(|d| d.into()).collect::<Vec<_>>(),
-    }
-    async {
-      in_workunit!(
-        "list_missing_digests",
-        Level::Trace,
-        |_workunit| async move {
-          let store2 = store.clone();
-          let client = store2.cas_client.as_ref().clone();
-          let response = retry_call(
-            client,
-            move |mut client| {
-              let request = request.clone();
-              async move { client.find_missing_blobs(request).await }
-            },
-            status_is_retryable,
-          )
-          .await
-          .map_err(status_to_str)?;
+    };
+    in_workunit!(
+      "list_missing_digests",
+      Level::Trace,
+      |_workunit| async move {
+        let store2 = store.clone();
+        let client = store2.cas_client.as_ref().clone();
+        let response = retry_call(
+          client,
+          move |mut client| {
+            let request = request.clone();
+            async move { client.find_missing_blobs(request).await }
+          },
+          status_is_retryable,
+        )
+        .await
+        .map_err(status_to_str)?;
 
-          response
-            .into_inner()
-            .missing_blob_digests
-            .iter()
-            .map(|digest| digest.try_into())
-            .collect::<Result<HashSet<_>, _>>()
-        }
-      )
-      .await
-    }
+        response
+          .into_inner()
+          .missing_blob_digests
+          .iter()
+          .map(|digest| digest.try_into())
+          .collect::<Result<HashSet<_>, _>>()
+          .map(Some)
+      }
+    )
+    .await
   }
-
 }

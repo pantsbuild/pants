@@ -58,8 +58,6 @@ use fs::{
 };
 use futures::future::{self, BoxFuture, Either, FutureExt, TryFutureExt};
 use grpc_util::prost::MessageExt;
-use grpc_util::retry::{retry_call, status_is_retryable};
-use grpc_util::status_to_str;
 use hashing::Digest;
 use parking_lot::Mutex;
 use prost::Message;
@@ -70,8 +68,6 @@ use serde_derive::Serialize;
 use sharded_lmdb::DEFAULT_LEASE_TIME;
 use tryfuture::try_future;
 use workunit_store::{in_workunit, Level, Metric};
-
-use crate::remote::ByteStoreError;
 
 const KILOBYTES: usize = 1024;
 const MEGABYTES: usize = 1024 * KILOBYTES;
@@ -91,6 +87,8 @@ pub mod local_tests;
 mod remote;
 #[cfg(test)]
 mod remote_tests;
+
+mod remote_trait;
 
 pub struct LocalOptions {
   pub files_max_size_bytes: usize,
@@ -178,13 +176,13 @@ pub struct UploadSummary {
 ///
 #[derive(Clone, Debug)]
 struct RemoteStore {
-  store: remote::ByteStore,
+  store: remote_trait::ByteStore,
   in_flight_uploads: Arc<Mutex<HashMap<Digest, Weak<OnceCell<()>>>>>,
   in_flight_downloads: Arc<Mutex<HashMap<Digest, Weak<OnceCell<()>>>>>,
 }
 
 impl RemoteStore {
-  fn new(store: remote::ByteStore) -> Self {
+  fn new(store: remote_trait::ByteStore) -> Self {
     Self {
       store,
       in_flight_uploads: Arc::default(),
@@ -258,25 +256,15 @@ impl RemoteStore {
         // TODO(#17065): Now that we always copy from the remote store to the local store before
         // executing the caller's logic against the local store,
         // `remote::ByteStore::load_bytes_with` no longer needs to accept a function.
-        let bytes = retry_call(
-          remote_store,
-          |remote_store| async move { remote_store.load_bytes_with(digest, Ok).await },
-          |err| match err {
-            ByteStoreError::Grpc(status) => status_is_retryable(status),
-            _ => false,
-          },
-        )
-        .await
-        .map_err(|err| match err {
-          ByteStoreError::Grpc(status) => status_to_str(status),
-          ByteStoreError::Other(msg) => msg,
-        })?
-        .ok_or_else(|| {
-          StoreError::MissingDigest(
-            "Was not present in either the local or remote store".to_owned(),
-            digest,
-          )
-        })?;
+        let bytes = remote_store
+          .load_bytes_with(digest, Ok)
+          .await?
+          .ok_or_else(|| {
+            StoreError::MissingDigest(
+              "Was not present in either the local or remote store".to_owned(),
+              digest,
+            )
+          })?;
 
         f_remote(bytes.clone())?;
         let stored_digest = local_store
@@ -397,18 +385,20 @@ impl Store {
   ) -> Result<Store, String> {
     Ok(Store {
       local: self.local,
-      remote: Some(RemoteStore::new(remote::ByteStore::new(
-        cas_address,
-        instance_name,
-        tls_config,
-        headers,
-        chunk_size_bytes,
-        upload_timeout,
-        rpc_retries,
-        rpc_concurrency_limit,
-        capabilities_cell_opt,
-        batch_api_size_limit,
-      )?)),
+      remote: Some(RemoteStore::new(remote_trait::ByteStore::new(
+        remote::ByteStore::new(
+          cas_address,
+          instance_name,
+          tls_config,
+          headers,
+          chunk_size_bytes,
+          upload_timeout,
+          rpc_retries,
+          rpc_concurrency_limit,
+          capabilities_cell_opt,
+          batch_api_size_limit,
+        )?,
+      ))),
       immutable_inputs_base: self.immutable_inputs_base,
     })
   }
@@ -818,11 +808,11 @@ impl Store {
         if Store::upload_is_faster_than_checking_whether_to_upload(ingested_digests.iter()) {
           ingested_digests.keys().cloned().collect()
         } else {
+          // default to all digests if we cannot tell which need to upload
           remote
-            .list_missing_digests(
-              remote.find_missing_blobs_request(ingested_digests.keys().cloned()),
-            )
+            .list_missing_digests(ingested_digests.keys().cloned())
             .await?
+            .unwrap_or_else(|| ingested_digests.keys().cloned().collect())
         };
 
       future::try_join_all(
@@ -879,7 +869,7 @@ impl Store {
 
   async fn store_small_blob_remote(
     local: local::ByteStore,
-    remote: remote::ByteStore,
+    remote: remote_trait::ByteStore,
     entry_type: EntryType,
     digest: Digest,
   ) -> Result<(), StoreError> {
@@ -908,7 +898,7 @@ impl Store {
 
   async fn store_large_blob_remote(
     local: local::ByteStore,
-    remote: remote::ByteStore,
+    remote: remote_trait::ByteStore,
     entry_type: EntryType,
     digest: Digest,
   ) -> Result<(), StoreError> {
@@ -987,12 +977,10 @@ impl Store {
     } else {
       return Ok(false);
     };
-    let missing = remote
-      .store
-      .list_missing_digests(remote.store.find_missing_blobs_request(missing_locally))
-      .await?;
+    let missing = remote.store.list_missing_digests(missing_locally).await?;
 
-    Ok(missing.is_empty())
+    // FIXME: if we can't check, just assume they exist... similar to CacheContentBehaviour::Defer
+    Ok(missing.map_or(true, |m| m.is_empty()))
   }
 
   /// Ensure that the files are locally loadable. This will download them from the remote store as
@@ -1077,27 +1065,13 @@ impl Store {
       return Err("Cannot load Trees from a remote without a remote".to_owned());
     };
 
-    let tree_opt = retry_call(
-      remote,
-      |remote| async move {
-        remote
-          .store
-          .load_bytes_with(tree_digest, |b| {
-            let tree = Tree::decode(b).map_err(|e| format!("protobuf decode error: {:?}", e))?;
-            Ok(tree)
-          })
-          .await
-      },
-      |err| match err {
-        ByteStoreError::Grpc(status) => status_is_retryable(status),
-        _ => false,
-      },
-    )
-    .await
-    .map_err(|err| match err {
-      ByteStoreError::Grpc(status) => status_to_str(status),
-      ByteStoreError::Other(msg) => msg,
-    })?;
+    let tree_opt = remote
+      .store
+      .load_bytes_with(tree_digest, |b| {
+        let tree = Tree::decode(b).map_err(|e| format!("protobuf decode error: {:?}", e))?;
+        Ok(tree)
+      })
+      .await?;
 
     let tree = match tree_opt {
       Some(t) => t,

@@ -11,6 +11,7 @@ use testutil::data::{TestData, TestDirectory};
 use workunit_store::WorkunitStore;
 
 use crate::remote::ByteStore;
+use crate::remote_trait::RemoteCacheConnection;
 use crate::tests::{big_file_bytes, big_file_fingerprint, new_cas};
 use crate::MEGABYTES;
 
@@ -145,10 +146,11 @@ async fn fetch_multiple_chunks_nonfactor() {
 async fn write_file_one_chunk() {
   let _ = WorkunitStore::setup_for_tests();
   let testdata = TestData::roland();
+  let bytes = testdata.bytes();
   let cas = StubCAS::empty();
 
   let store = new_byte_store(&cas);
-  assert_eq!(store.store_bytes(testdata.bytes()).await, Ok(()));
+  assert_eq!(store_bytes(&store, bytes).await, Ok(()));
 
   let blobs = cas.blobs.lock();
   assert_eq!(blobs.get(&testdata.fingerprint()), Some(&testdata.bytes()));
@@ -177,7 +179,7 @@ async fn write_file_multiple_chunks() {
 
   let fingerprint = big_file_fingerprint();
 
-  assert_eq!(store.store_bytes(all_the_henries.clone()).await, Ok(()));
+  assert_eq!(store_bytes(&store, all_the_henries.clone()).await, Ok(()));
 
   let blobs = cas.blobs.lock();
   assert_eq!(blobs.get(&fingerprint), Some(&all_the_henries));
@@ -205,7 +207,7 @@ async fn write_empty_file() {
   let cas = StubCAS::empty();
 
   let store = new_byte_store(&cas);
-  assert_eq!(store.store_bytes(empty_file.bytes()).await, Ok(()));
+  assert_eq!(store_bytes(&store, empty_file.bytes()).await, Ok(()));
 
   let blobs = cas.blobs.lock();
   assert_eq!(
@@ -220,8 +222,7 @@ async fn write_file_errors() {
   let cas = StubCAS::cas_always_errors();
 
   let store = new_byte_store(&cas);
-  let error = store
-    .store_bytes(TestData::roland().bytes())
+  let error = store_bytes(&store, TestData::roland().bytes())
     .await
     .expect_err("Want error");
   assert!(
@@ -246,8 +247,7 @@ async fn write_connection_error() {
     super::tests::STORE_BATCH_API_SIZE_LIMIT,
   )
   .unwrap();
-  let error = store
-    .store_bytes(TestData::roland().bytes())
+  let error = store_bytes(&store, TestData::roland().bytes())
     .await
     .expect_err("Want error");
   assert!(
@@ -264,9 +264,9 @@ async fn list_missing_digests_none_missing() {
   let store = new_byte_store(&cas);
   assert_eq!(
     store
-      .list_missing_digests(store.find_missing_blobs_request(vec![TestData::roland().digest()]),)
+      .list_missing_digests(&mut vec![TestData::roland().digest()].into_iter())
       .await,
-    Ok(HashSet::new())
+    Ok(Some(HashSet::new()))
   );
 }
 
@@ -284,9 +284,9 @@ async fn list_missing_digests_some_missing() {
 
   assert_eq!(
     store
-      .list_missing_digests(store.find_missing_blobs_request(vec![digest]))
+      .list_missing_digests(&mut vec![digest].into_iter())
       .await,
-    Ok(digest_set)
+    Ok(Some(digest_set))
   );
 }
 
@@ -298,7 +298,7 @@ async fn list_missing_digests_error() {
   let store = new_byte_store(&cas);
 
   let error = store
-    .list_missing_digests(store.find_missing_blobs_request(vec![TestData::roland().digest()]))
+    .list_missing_digests(&mut vec![TestData::roland().digest()].into_iter())
     .await
     .expect_err("Want error");
   assert!(
@@ -336,8 +336,12 @@ pub async fn load_directory_proto_bytes(
 }
 
 async fn load_bytes(store: &ByteStore, digest: Digest) -> Result<Option<Bytes>, String> {
+  store.load_bytes(digest).await.map_err(|err| err.msg)
+}
+
+async fn store_bytes(store: &ByteStore, bytes: Bytes) -> Result<(), String> {
   store
-    .load_bytes_with(digest, |b| Ok(b))
+    .store_bytes(Digest::of_bytes(&bytes), Box::new(move |r| bytes.slice(r)))
     .await
-    .map_err(|err| format!("{}", err))
+    .map_err(|err| err.msg)
 }
