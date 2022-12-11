@@ -34,6 +34,12 @@ impl RemoteCacheConnection for ByteStore {
   }
 
   async fn store_bytes(&self, digest: Digest, bytes: ByteSource) -> Result<(), RemoteCacheError> {
+    log::debug!(
+      "storing {} ({} bytes) via {}",
+      digest.hash,
+      digest.size_bytes,
+      self.client.base_url()
+    );
     let slice = bytes(0..digest.size_bytes);
     self
       .client
@@ -49,6 +55,12 @@ impl RemoteCacheConnection for ByteStore {
     Ok(())
   }
   async fn load_bytes(&self, digest: Digest) -> Result<Option<Bytes>, RemoteCacheError> {
+    log::debug!(
+      "loading {} ({} bytes) via {}",
+      digest.hash,
+      digest.size_bytes,
+      self.client.base_url()
+    );
     let entry = self
       .client
       .entry(&self.version_for_digest(&digest))
