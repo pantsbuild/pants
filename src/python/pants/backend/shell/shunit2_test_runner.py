@@ -20,7 +20,6 @@ from pants.core.goals.test import (
     BuildPackageDependenciesRequest,
     BuiltPackageDependencies,
     RuntimePackageDependenciesField,
-    TestDebugAdapterRequest,
     TestDebugRequest,
     TestExtraEnv,
     TestFieldSet,
@@ -48,7 +47,6 @@ from pants.engine.process import (
 )
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import SourcesField, Target, TransitiveTargets, TransitiveTargetsRequest
-from pants.engine.unions import UnionRule
 from pants.option.global_options import GlobalOptions
 from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
@@ -72,6 +70,7 @@ class Shunit2FieldSet(TestFieldSet):
 class Shunit2TestRequest(TestRequest):
     tool_subsystem = Shunit2
     field_set_type = Shunit2FieldSet
+    supports_debug = True
 
 
 @dataclass(frozen=True)
@@ -268,16 +267,8 @@ async def setup_shunit2_debug_test(
     )
 
 
-@rule
-async def setup_shunit2_debug_adapter_test(
-    _: Shunit2TestRequest.Batch[Shunit2FieldSet, Any]
-) -> TestDebugAdapterRequest:
-    raise NotImplementedError("Debugging Shell using a debug adapter has not yet been implemented.")
-
-
 def rules():
     return [
         *collect_rules(),
-        UnionRule(TestFieldSet, Shunit2FieldSet),
         *Shunit2TestRequest.rules(),
     ]
