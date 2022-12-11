@@ -181,6 +181,7 @@ impl ByteStore {
     digest: Digest,
     f: F,
   ) -> Result<Option<T>, String> {
+    log::trace!("ByteStore:::load_bytes_with({:?})", digest);
     let start = Instant::now();
     let workunit_desc = format!("Loading {} bytes for {}", digest.size_bytes, digest.hash);
     let result_future = async move {

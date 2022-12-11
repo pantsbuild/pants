@@ -251,6 +251,11 @@ impl RemoteStore {
     entry_type: EntryType,
     f_remote: FRemote,
   ) -> Result<(), StoreError> {
+    log::trace!(
+      "RemoteStore:::download_digest_to_local({:?}, {:?})",
+      digest,
+      entry_type
+    );
     let remote_store = self.store.clone();
     self
       .maybe_download(digest, async move {
@@ -742,6 +747,7 @@ impl Store {
     f_local: FLocal,
     f_remote: FRemote,
   ) -> Result<T, StoreError> {
+    log::trace!("Store:::load_bytes_with({:?}, {:?})", entry_type, digest);
     if let Some(bytes_res) = self
       .local
       .load_bytes_with(entry_type, digest, f_local.clone())
@@ -750,6 +756,7 @@ impl Store {
       return Ok(bytes_res?);
     }
 
+    log::trace!("Store.remote = {:?}", self.remote);
     let remote = self.remote.clone().ok_or_else(|| {
       StoreError::MissingDigest("Was not present in the local store".to_owned(), digest)
     })?;
