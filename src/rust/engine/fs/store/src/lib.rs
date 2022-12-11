@@ -88,6 +88,7 @@ mod remote;
 #[cfg(test)]
 mod remote_tests;
 
+mod remote_gha;
 mod remote_trait;
 
 pub struct LocalOptions {
@@ -370,6 +371,7 @@ impl Store {
   /// Add remote storage to a Store. If it is missing a value which it tries to load, it will
   /// attempt to back-fill its local storage from the remote storage.
   ///
+  #[allow(unused_variables)]
   pub fn into_with_remote(
     self,
     cas_address: &str,
@@ -386,17 +388,10 @@ impl Store {
     Ok(Store {
       local: self.local,
       remote: Some(RemoteStore::new(remote_trait::ByteStore::new(
-        remote::ByteStore::new(
-          cas_address,
-          instance_name,
-          tls_config,
-          headers,
-          chunk_size_bytes,
-          upload_timeout,
-          rpc_retries,
-          rpc_concurrency_limit,
-          capabilities_cell_opt,
-          batch_api_size_limit,
+        remote_gha::ByteStore::new(
+          &std::env::var("PANTS_REMOTE_GHA_CACHE_URL").expect("url env var not set"),
+          &std::env::var("PANTS_REMOTE_GHA_RUNTIME_TOKEN").expect("token env var not set"),
+          "pants-remote-cache",
         )?,
       ))),
       immutable_inputs_base: self.immutable_inputs_base,

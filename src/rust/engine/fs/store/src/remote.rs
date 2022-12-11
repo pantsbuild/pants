@@ -86,6 +86,7 @@ impl From<ByteStoreError> for RemoteCacheError {
 impl ByteStore {
   // TODO: Consider extracting these options to a struct with `impl Default`, similar to
   // `super::LocalOptions`.
+  #[allow(dead_code)]
   pub fn new(
     cas_address: &str,
     instance_name: Option<String>,
