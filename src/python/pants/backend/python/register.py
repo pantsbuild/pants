@@ -6,7 +6,6 @@
 See https://www.pantsbuild.org/docs/python-backend.
 """
 
-from pants.backend.codegen import export_codegen_goal
 from pants.backend.python import target_types_rules
 from pants.backend.python.dependency_inference import rules as dependency_inference_rules
 from pants.backend.python.goals import (
