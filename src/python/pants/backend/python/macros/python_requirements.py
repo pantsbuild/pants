@@ -4,12 +4,10 @@
 from __future__ import annotations
 
 import os
-from functools import partial
-from typing import Any, Callable, Iterator, MutableMapping
+from itertools import chain
+from typing import Any, Callable, Iterator
 
 import toml
-from packaging.utils import NormalizedName
-from packaging.utils import canonicalize_name as canonicalize_project_name
 
 from pants.backend.python.macros.common_fields import (
     ModuleMappingField,
@@ -37,15 +35,12 @@ from pants.util.logging import LogLevel
 from pants.util.strutil import softwrap
 
 
-def parse_pyproject_toml(
-    pyproject_toml: str,
-    *,
-    rel_path: str,
-    overrides: MutableMapping[NormalizedName, dict[str, Any]],
-) -> Iterator[PipRequirement]:
-    parsed = toml.loads(pyproject_toml)
+def parse_pyproject_toml(pyproject_toml: str, *, rel_path: str) -> Iterator[PipRequirement]:
+    parsed: dict[str, Any] = toml.loads(pyproject_toml)
     deps_vals: list[str] = parsed.get("project", {}).get("dependencies", [])
-    optional_dependencies = parsed.get("project", {}).get("optional-dependencies", {})
+    optional_dependencies: dict[str, list[str]] = parsed.get("project", {}).get(
+        "optional-dependencies", {}
+    )
     if not deps_vals and not optional_dependencies:
         raise KeyError(
             softwrap(
@@ -59,16 +54,13 @@ def parse_pyproject_toml(
         if not dep or dep.startswith(("#", "-")):
             continue
         yield PipRequirement.parse(dep, description_of_origin=rel_path)
-    for tag, opt_dep in optional_dependencies.items():
-        for dep in opt_dep:
-            req = PipRequirement.parse(dep, description_of_origin=rel_path)
-            canonical_project_name = canonicalize_project_name(req.project_name)
-            override = overrides.get(canonical_project_name, {})
-            tags: list[str] = override.get("tags", [])
-            tags.append(tag)
-            override["tags"] = tags
-            overrides[canonical_project_name] = override
-            yield req
+    for dep in chain.from_iterable(optional_dependencies.values()):
+        dep, _, _ = dep.partition("--")
+        dep = dep.strip().rstrip("\\")
+        if not dep or dep.startswith(("#", "-")):
+            continue
+        req = PipRequirement.parse(dep, description_of_origin=rel_path)
+        yield req
 
 
 class PythonRequirementsSourceField(SingleSourceField):
@@ -132,11 +124,7 @@ async def generate_from_python_requirement(
     requirements_rel_path = generator[PythonRequirementsSourceField].value
     callback: Callable[[bytes, str], Iterator[PipRequirement]]
     if os.path.basename(requirements_rel_path) == "pyproject.toml":
-        overrides = {
-            canonicalize_project_name(k): v
-            for k, v in request.require_unparametrized_overrides().items()
-        }
-        callback = partial(parse_pyproject_callback, overrides=overrides)
+        callback = parse_pyproject_callback
     else:
         callback = parse_requirements_callback
     result = await _generate_requirements(
@@ -152,10 +140,8 @@ def parse_requirements_callback(file_contents: bytes, file_path: str) -> Iterato
     return parse_requirements_file(file_contents.decode(), rel_path=file_path)
 
 
-def parse_pyproject_callback(
-    file_contents: bytes, file_path: str, overrides: MutableMapping[NormalizedName, dict[str, Any]]
-) -> Iterator[PipRequirement]:
-    return parse_pyproject_toml(file_contents.decode(), rel_path=file_path, overrides=overrides)
+def parse_pyproject_callback(file_contents: bytes, file_path: str) -> Iterator[PipRequirement]:
+    return parse_pyproject_toml(file_contents.decode(), rel_path=file_path)
 
 
 def rules():

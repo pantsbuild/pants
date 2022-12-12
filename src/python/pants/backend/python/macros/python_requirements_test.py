@@ -227,7 +227,6 @@ def test_pyproject_toml(rule_runner: RuleRunner) -> None:
     * module_mapping works regardless of capitalization.
     * Projects get normalized thanks to Requirement.parse().
     * Overrides works, including for dependencies and optional-dependencies
-    * Optional dependencies are captured as tags
     """
     file_addr = Address("", target_name="reqs", relative_file_path="pyproject.toml")
     assert_python_requirements(
@@ -293,10 +292,7 @@ def test_pyproject_toml(rule_runner: RuleRunner) -> None:
                 Address("", target_name="reqs", generated_name="Django-types"),
             ),
             PythonRequirementTarget(
-                {
-                    "requirements": ["Un_Normalized_PROJECT"],
-                    "dependencies": [file_addr.spec],
-                },
+                {"requirements": ["Un_Normalized_PROJECT"], "dependencies": [file_addr.spec]},
                 Address("", target_name="reqs", generated_name="Un-Normalized-PROJECT"),
             ),
             PythonRequirementTarget(
@@ -310,7 +306,6 @@ def test_pyproject_toml(rule_runner: RuleRunner) -> None:
                 {
                     "requirements": ["pytest>=5.7.0"],
                     "dependencies": [file_addr.spec],
-                    "tags": ["test"],
                 },
                 Address("", target_name="reqs", generated_name="pytest"),
             ),
@@ -318,7 +313,7 @@ def test_pyproject_toml(rule_runner: RuleRunner) -> None:
                 {
                     "requirements": ["notebook>=6.1.0"],
                     "dependencies": [file_addr.spec],
-                    "tags": ["another-tag", "jupyter"],
+                    "tags": ["another-tag"],
                 },
                 Address("", target_name="reqs", generated_name="notebook"),
             ),
