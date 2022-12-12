@@ -9,7 +9,7 @@ from pathlib import PurePath
 
 from pants.backend.go.util_rules.goroot import GoRoot
 from pants.backend.go.util_rules.sdk import GoSdkProcess, GoSdkToolIDRequest, GoSdkToolIDResult
-from pants.engine.fs import CreateDigest, Digest, Directory, FileContent, MergeDigests
+from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 
@@ -77,15 +77,13 @@ async def generate_go_assembly_symabisfile(
     #   that we don't need the actual definitions that would appear in go_asm.h.
     #
     # See https://go-review.googlesource.com/c/go/+/146999/8/src/cmd/go/internal/work/gc.go
-    obj_dir_path = PurePath(".", request.dir_path, "__obj__")
-    symabis_path = str(obj_dir_path / "symabis")
-    go_asm_h_digest, asm_tool_id, obj_dir_digest = await MultiGet(
+    symabis_path = os.path.join(request.dir_path, "symabis")
+    go_asm_h_digest, asm_tool_id = await MultiGet(
         Get(Digest, CreateDigest([FileContent("go_asm.h", b"")])),
         Get(GoSdkToolIDResult, GoSdkToolIDRequest("asm")),
-        Get(Digest, CreateDigest([Directory(str(obj_dir_path))])),
     )
     symabis_input_digest = await Get(
-        Digest, MergeDigests([request.compilation_input, go_asm_h_digest, obj_dir_digest])
+        Digest, MergeDigests([request.compilation_input, go_asm_h_digest])
     )
     symabis_result = await Get(
         FallibleProcessResult,
@@ -134,26 +132,20 @@ async def assemble_go_assembly_files(
         ["-p", request.import_path] if goroot.is_compatible_version("1.19") else []
     )
 
-    obj_dir_path = PurePath(".", request.dir_path, "__obj__")
-    asm_tool_id, obj_dir_digest = await MultiGet(
-        Get(GoSdkToolIDResult, GoSdkToolIDRequest("asm")),
-        Get(Digest, CreateDigest([Directory(str(obj_dir_path))])),
-    )
-
-    input_digest = await Get(Digest, MergeDigests([request.input_digest, obj_dir_digest]))
+    asm_tool_id = await Get(GoSdkToolIDResult, GoSdkToolIDRequest("asm"))
 
     maybe_asm_header_path_args = (
         ["-I", str(PurePath(request.asm_header_path).parent)] if request.asm_header_path else []
     )
 
     def obj_output_path(s_file: str) -> str:
-        return str(obj_dir_path / PurePath(s_file).with_suffix(".o"))
+        return str(request.dir_path / PurePath(s_file).with_suffix(".o"))
 
     assembly_results = await MultiGet(
         Get(
             FallibleProcessResult,
             GoSdkProcess(
-                input_digest=input_digest,
+                input_digest=request.input_digest,
                 command=(
                     "tool",
                     "asm",

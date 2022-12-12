@@ -22,12 +22,12 @@ from pants.core.goals.run import RunDebugAdapterRequest, RunFieldSet, RunRequest
 from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
 from pants.engine.internals.selectors import Get
 from pants.engine.rules import collect_rules, rule
-from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 
 
 @dataclass(frozen=True)
 class PythonSourceFieldSet(RunFieldSet):
+    supports_debug_adapter = True
     required_fields = (PythonSourceField, PythonRunGoalUseSandboxField)
 
     source: PythonSourceField
@@ -91,5 +91,5 @@ async def create_python_source_debug_adapter_request(
 def rules():
     return [
         *collect_rules(),
-        UnionRule(RunFieldSet, PythonSourceFieldSet),
+        *PythonSourceFieldSet.rules(),
     ]

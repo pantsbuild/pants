@@ -76,18 +76,6 @@ class ExampleTestFieldSet(TestFieldSet):
         return tgt.get(SkipExampleTestsField).value
 ```
 
-Register your new subclass as a valid `TestFieldSet` using a `UnionRule`:
-
-```python
-from pants.engine.unions import UnionRule
-
-def rules():
-    return [
-        # Add to any other existing rules here:
-        UnionRule(TestFieldSet, ExampleTestFieldSet),
-    ]
-```
-
 3. Set up a `Subsystem` for your test runner
 --------------------------------------------
 
@@ -231,10 +219,17 @@ If you didn't override the `partitioner_type` in your `TestRequest` subclass, `e
 7. Define `@rule`s for debug testing
 ------------------------------------
 
-`./pants test` exposes `--debug` and `--debug-adapter` options for interactive execution of tests. To hook into these execution modes, define two additional rules:
+`./pants test` exposes `--debug` and `--debug-adapter` options for interactive execution of tests. To hook into these execution modes, opt-in in your `TestRequest` subclass and define one/both additional rules:
 
 ```python
 from pants.core.goals.test import TestDebugAdapterRequest, TestDebugRequest
+from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
+
+@dataclass(frozen=True)
+class ExampleTestRequest(TestRequest):
+    ...  # Fields from earlier
+    supports_debug = True  # Supports --debug
+    supports_debug_adapter = True  # Supports --debug-adapter
 
 @rule
 async def setup_example_debug_test(
@@ -245,8 +240,7 @@ async def setup_example_debug_test(
 @rule
 async def setup_example_debug_adapter_test(
     batch: ExampleTestRequest.Batch[ExampleTestFieldSet, ExampleTestMetadata],
+    debug_adapter: DebugAdapterSubsystem,
 ) -> TestDebugAdapterRequest:
     ...
 ```
-
-You _must_ define these rules to avoid rule-graph errors. If your test runner is not compatible with the Debug Adapter, or if it doesn't benefit from running in `--debug` mode, you can simply `raise` a `NotImplementedError` saying so in one/both of these rules.
