@@ -365,7 +365,7 @@ class RunInSandboxSourcesField(MultipleSourcesField):
 
 
 class RunInSandboxArgumentsField(StringSequenceField):
-    alias = "argv"
+    alias = "args"
     default = ()
     help = f"""Extra arguments to pass into the `{RunInSandboxRunnableField.alias}` field. """
 
