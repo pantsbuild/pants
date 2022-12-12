@@ -1,7 +1,6 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants.backend.codegen import export_codegen_goal
 from pants.backend.shell import dependency_inference, shunit2_test_runner
 from pants.backend.shell.goals import tailor, test
 from pants.backend.shell.subsystems import shunit2
@@ -39,5 +38,4 @@ def rules():
         *tailor.rules(),
         *target_types_rules(),
         *test.rules(),
-        *export_codegen_goal.rules(),
     ]
