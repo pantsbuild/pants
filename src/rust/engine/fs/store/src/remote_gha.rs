@@ -13,10 +13,11 @@ pub struct ByteStore {
 }
 
 impl ByteStore {
-  pub fn new(base_url: &str, token: &str, cache_prefix: &str) -> Result<ByteStore, String> {
+  pub fn new(base_url: &str, token: &str, cache_key: &str) -> Result<ByteStore, String> {
     Ok(ByteStore {
       client: CacheClient::builder(base_url, token)
-        .cache_to(cache_prefix)
+        .cache_to(cache_key)
+        .cache_from([cache_key].iter().copied())
         .build()
         .map_err(|err| err.to_string())?,
     })
