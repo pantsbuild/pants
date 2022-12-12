@@ -299,11 +299,8 @@ async def make_cgo_compile_wrapper_script(
                     path="wrapper",
                     content=textwrap.dedent(
                         """\
-                export sandbox_root="$(/bin/pwd)"
-                ln -s "${sandbox_root}" __pants_sandbox_root__
-                declare -a args
-                args=("$@")
-                args=("${args[@]//__PANTS_SANDBOX_ROOT__/${sandbox_root}}")
+                sandbox_root="$(/bin/pwd)"
+                args=("${@//__PANTS_SANDBOX_ROOT__/$sandbox_root}")
                 exec "${args[@]}"
                 """
                     ).encode(),
