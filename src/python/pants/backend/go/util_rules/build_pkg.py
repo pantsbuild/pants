@@ -6,7 +6,6 @@ import dataclasses
 import hashlib
 import os.path
 from dataclasses import dataclass
-from pathlib import PurePath
 from typing import Iterable
 
 from pants.backend.go.util_rules import cgo, coverage
@@ -37,7 +36,6 @@ from pants.engine.fs import (
     Digest,
     DigestContents,
     DigestSubset,
-    Directory,
     FileContent,
     MergeDigests,
     PathGlobs,
@@ -553,10 +551,7 @@ async def build_go_package(
     # about the Go code that can be used by assembly files.
     asm_header_path: str | None = None
     if s_files:
-        obj_dir_path = PurePath(".", request.dir_path, "__obj__")
-        asm_header_path = str(obj_dir_path / "go_asm.h")
-        obj_dir_digest = await Get(Digest, CreateDigest([Directory(str(obj_dir_path))]))
-        input_digest = await Get(Digest, MergeDigests([input_digest, obj_dir_digest]))
+        asm_header_path = os.path.join(request.dir_path, "go_asm.h")
         compile_args.extend(["-asmhdr", asm_header_path])
 
     if embedcfg.digest != EMPTY_DIGEST:
