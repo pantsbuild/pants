@@ -390,6 +390,7 @@ impl Store {
     capabilities_cell_opt: Option<Arc<OnceCell<ServerCapabilities>>>,
     batch_api_size_limit: usize,
   ) -> Result<Store, String> {
+    log::trace!("Store::into_with_remote - starting");
     Ok(Store {
       local: self.local,
       remote: Some(RemoteStore::new(remote_trait::ByteStore::new(
@@ -412,6 +413,7 @@ impl Store {
   /// Remove a file locally, returning true if it existed, or false otherwise.
   ///
   pub async fn remove_file(&self, digest: Digest) -> Result<bool, String> {
+    log::trace!("Store::remove_file({:?}) - starting", digest);
     self.local.remove(EntryType::File, digest).await
   }
 
@@ -426,6 +428,7 @@ impl Store {
     bytes: Bytes,
     initial_lease: bool,
   ) -> Result<Digest, String> {
+    log::trace!("Store::store_file_bytes({:?}) - starting", bytes.len());
     self
       .local
       .store_bytes(EntryType::File, None, bytes, initial_lease)
@@ -443,6 +446,10 @@ impl Store {
     items: Vec<(Option<Digest>, Bytes)>,
     initial_lease: bool,
   ) -> Result<Vec<Digest>, String> {
+    log::trace!(
+      "Store::store_file_bytes_batch({:?}) - starting",
+      items.len()
+    );
     self
       .local
       .store_bytes_batch(EntryType::File, items, initial_lease)
@@ -462,6 +469,7 @@ impl Store {
     R: Read + Debug,
     F: Fn() -> Result<R, io::Error> + Send + 'static,
   {
+    log::trace!("Store::store_file - starting");
     self
       .local
       .store(
@@ -480,6 +488,7 @@ impl Store {
     digest: hashing::Digest,
     is_executable: bool,
   ) -> Result<Snapshot, String> {
+    log::trace!("Store::snapshot_of_one_file({:?}) - starting", digest);
     #[derive(Clone)]
     struct Digester {
       digest: hashing::Digest,
@@ -520,6 +529,7 @@ impl Store {
     digest: Digest,
     f: F,
   ) -> Result<T, StoreError> {
+    log::trace!("Store::load_file_bytes_with({:?}) - starting", digest);
     // No transformation or verification is needed for files.
     self
       .load_bytes_with(
@@ -539,6 +549,7 @@ impl Store {
     tree: DigestTrie,
     initial_lease: bool,
   ) -> Result<DirectoryDigest, String> {
+    log::trace!("Store::load_file_bytes_with - starting");
     // Collect all Directory structs in the trie.
     let mut directories = Vec::new();
     tree.walk(SymlinkBehavior::Aware, &mut |_, entry| match entry {
@@ -572,6 +583,7 @@ impl Store {
     directory: &remexec::Directory,
     initial_lease: bool,
   ) -> Result<Digest, String> {
+    log::trace!("Store::record_directory - starting");
     let local = self.local.clone();
     let digest = local
       .store_bytes(
@@ -594,6 +606,7 @@ impl Store {
   /// a DigestTrie.
   ///
   pub async fn load_digest_trie(&self, digest: DirectoryDigest) -> Result<DigestTrie, StoreError> {
+    log::trace!("Store::load_digest_tree({:?}) - starting", digest);
     if let Some(tree) = digest.tree {
       // The DigestTrie is already loaded.
       return Ok(tree);
@@ -666,6 +679,7 @@ impl Store {
   /// store unnecessarily, so this method is primarily useful for tests and benchmarks.
   ///
   pub async fn load_directory_digest(&self, digest: Digest) -> Result<DirectoryDigest, StoreError> {
+    log::trace!("Store::load_digest_digest({:?}) - starting", digest);
     Ok(DirectoryDigest::new(
       digest,
       self
@@ -682,6 +696,7 @@ impl Store {
   /// Directory.
   ///
   pub async fn load_directory(&self, digest: Digest) -> Result<remexec::Directory, StoreError> {
+    log::trace!("Store::load_directory({:?}) - starting", digest);
     self
       .load_bytes_with(
         EntryType::Directory,
@@ -726,6 +741,10 @@ impl Store {
     &self,
     digest: DirectoryDigest,
   ) -> Result<(), StoreError> {
+    log::trace!(
+      "Store::ensure_directory_digest_persisted({:?}) - starting",
+      digest
+    );
     let tree = self.load_digest_trie(digest).await?;
     let _ = self.record_digest_trie(tree, true).await?;
     Ok(())
@@ -803,6 +822,10 @@ impl Store {
     &self,
     digests: Vec<Digest>,
   ) -> BoxFuture<'static, Result<UploadSummary, StoreError>> {
+    log::trace!(
+      "Store::ensure_remote_has_recursive({}) - starting",
+      digests.len()
+    );
     let start_time = Instant::now();
 
     let remote_store = if let Some(ref remote) = self.remote {
@@ -822,13 +845,18 @@ impl Store {
       let ingested_digests = store.expand_local_digests(digests.iter()).await?;
       let digests_to_upload =
         if Store::upload_is_faster_than_checking_whether_to_upload(ingested_digests.iter()) {
+          log::trace!("Store::ensure_remote_has_recursive - falling back to uploading all digests due to performance estimate");
           ingested_digests.keys().cloned().collect()
         } else {
+          log::trace!("Store::ensure_remote_has_recursive - checking remote digests");
           // default to all digests if we cannot tell which need to upload
           remote
             .list_missing_digests(ingested_digests.keys().cloned())
             .await?
-            .unwrap_or_else(|| ingested_digests.keys().cloned().collect())
+            .unwrap_or_else(|| {
+              log::trace!("Store::ensure_remote_has_recursive - falling back to uploading all digests due to lack of support");
+              ingested_digests.keys().cloned().collect()
+            })
         };
 
       future::try_join_all(
@@ -958,7 +986,8 @@ impl Store {
     &self,
     directory_digests: impl IntoIterator<Item = DirectoryDigest>,
     file_digests: impl IntoIterator<Item = Digest>,
-  ) -> Result<bool, StoreError> {
+  ) -> Result<Option<bool>, StoreError> {
+    log::trace!("Store::exists_recursive - starting");
     // Load directories, which implicitly validates that they exist.
     let digest_tries = future::try_join_all(
       directory_digests
@@ -986,17 +1015,16 @@ impl Store {
 
     // If there are any digests which don't exist locally, check remotely.
     if missing_locally.is_empty() {
-      return Ok(true);
+      return Ok(Some(true));
     }
     let remote = if let Some(remote) = self.remote.clone() {
       remote
     } else {
-      return Ok(false);
+      return Ok(Some(false));
     };
     let missing = remote.store.list_missing_digests(missing_locally).await?;
 
-    // FIXME: if we can't check, just assume they exist... similar to CacheContentBehaviour::Defer
-    Ok(missing.map_or(true, |m| m.is_empty()))
+    Ok(missing.map(|m| m.is_empty()))
   }
 
   /// Ensure that the files are locally loadable. This will download them from the remote store as
@@ -1555,6 +1583,7 @@ impl Store {
     digest: Digest,
     f: F,
   ) -> BoxFuture<'static, Result<Vec<T>, StoreError>> {
+    log::trace!("Store::walk({:?}) - starting", digest);
     let f = Arc::new(f);
     let accumulator = Arc::new(Mutex::new(Vec::new()));
     self
@@ -1617,6 +1646,7 @@ impl Store {
   }
 
   pub fn all_local_digests(&self, entry_type: EntryType) -> Result<Vec<Digest>, String> {
+    log::trace!("Store::all_local_digests({:?}) - starting", entry_type);
     self.local.all_digests(entry_type)
   }
 }

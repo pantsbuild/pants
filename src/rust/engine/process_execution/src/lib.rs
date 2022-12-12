@@ -845,6 +845,7 @@ pub(crate) async fn check_cache_content(
           store
             .exists_recursive(directory_digests, file_digests)
             .await
+            .map(|opt| opt.expect("FIXME: validate isn't supported"))
         }
       )
       .await
