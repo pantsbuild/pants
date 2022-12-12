@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from pants.backend.codegen import export_codegen_goal
 from pants.backend.experimental.java.register import rules as java_rules
 from pants.backend.openapi.codegen.java.rules import rules as java_codegen_rules
 
@@ -12,4 +13,4 @@ def target_types():
 
 
 def rules():
-    return [*java_rules(), *java_codegen_rules()]
+    return [*java_rules(), *java_codegen_rules(), *export_codegen_goal.rules()]
