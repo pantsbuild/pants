@@ -401,10 +401,11 @@ impl ByteStore {
     }
 
     log::trace!(
-      "local::ByteStore:::load_bytes_with({:?}, {:?}) - inner {:?}",
+      "local::ByteStore:::load_bytes_with({:?}, {:?}) - directory_dbs {} , file_dbs {}",
       entry_type,
       digest,
-      self.inner
+      self.inner.directory_dbs.is_ok(),
+      self.inner.file_dbs.is_ok(),
     );
     let dbs = match entry_type {
       EntryType::Directory => self.inner.directory_dbs.clone(),
@@ -413,6 +414,11 @@ impl ByteStore {
     let res = dbs
       .load_bytes_with(digest.hash, move |bytes| {
         if bytes.len() == digest.size_bytes {
+          log::trace!(
+            "local::ByteStore:::load_bytes_with({:?}, {:?}) - found",
+            entry_type,
+            digest,
+          );
           Ok(f(bytes))
         } else {
           Err(format!(

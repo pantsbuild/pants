@@ -154,6 +154,7 @@ impl ByteStore {
     digest: Digest,
     bytes: ByteSource,
   ) -> Result<(), RemoteCacheError> {
+    log::trace!("remote_trait::ByteStore::store_bytes_source({:?})", digest);
     let len = digest.size_bytes;
 
     in_workunit!(
@@ -181,7 +182,7 @@ impl ByteStore {
     digest: Digest,
     f: F,
   ) -> Result<Option<T>, String> {
-    log::trace!("ByteStore:::load_bytes_with({:?})", digest);
+    log::trace!("remote_trait::ByteStore::load_bytes_with({:?})", digest);
     let start = Instant::now();
     let workunit_desc = format!("Loading {} bytes for {}", digest.size_bytes, digest.hash);
     let result_future = async move {
@@ -225,6 +226,7 @@ impl ByteStore {
     D: IntoIterator<Item = Digest> + Send,
     D::IntoIter: Send,
   {
+    log::trace!("remote_trait::ByteStore::list_missing_digests running...");
     in_workunit!(
       "list_missing_digests",
       Level::Trace,
