@@ -88,8 +88,8 @@ mod remote;
 #[cfg(test)]
 mod remote_tests;
 
-mod remote_gha;
-mod remote_trait;
+pub mod remote_gha;
+pub mod remote_trait;
 
 pub struct LocalOptions {
   pub files_max_size_bytes: usize,

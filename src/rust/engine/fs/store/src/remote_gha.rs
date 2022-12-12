@@ -101,3 +101,5 @@ impl RemoteCacheConnection for ByteStore {
     }
   }
 }
+
+// FIXME: I think this is only used for digest caches, not process executions, see src/rust/engine/process_execution/src/remote.rs and src/rust/engine/process_execution/src/remote_cache.rs

@@ -17,7 +17,7 @@ use workunit_store::{in_workunit, ObservationMetric};
 use crate::StoreError;
 
 #[derive(Debug, Clone)]
-pub(crate) struct RemoteCacheError {
+pub struct RemoteCacheError {
   pub retryable: bool,
   pub msg: String,
 }
@@ -33,7 +33,7 @@ impl std::error::Error for RemoteCacheError {}
 pub type ByteSource = Box<(dyn Fn(Range<usize>) -> Bytes + Send + Sync + 'static)>;
 
 #[async_trait]
-pub(crate) trait RemoteCacheConnection: Sync {
+pub trait RemoteCacheConnection: Sync {
   async fn store_bytes(&self, digest: Digest, bytes: ByteSource) -> Result<(), RemoteCacheError>;
   async fn load_bytes(&self, digest: Digest) -> Result<Option<Bytes>, RemoteCacheError>;
 

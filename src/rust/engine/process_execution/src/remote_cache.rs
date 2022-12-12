@@ -1,3 +1,4 @@
+#![allow(warnings)]
 // Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 use std::collections::{BTreeMap, HashSet};
@@ -10,15 +11,17 @@ use async_trait::async_trait;
 use fs::{directory, DigestTrie, RelativePath, SymlinkBehavior};
 use futures::future::{BoxFuture, TryFutureExt};
 use futures::FutureExt;
+use grpc_util::prost::MessageExt;
 use grpc_util::retry::{retry_call, status_is_retryable};
 use grpc_util::{headers_to_http_header_map, layered_service, status_to_str, LayeredService};
 use hashing::Digest;
 use parking_lot::Mutex;
+use prost::Message;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use protos::require_digest;
 use remexec::action_cache_client::ActionCacheClient;
 use remexec::{ActionResult, Command, Tree};
-use store::{Store, StoreError};
+use store::{remote_gha, remote_trait::RemoteCacheConnection, Store, StoreError};
 use workunit_store::{
   in_workunit, Level, Metric, ObservationMetric, RunningWorkunit, WorkunitMetadata,
 };
@@ -63,6 +66,7 @@ pub struct CommandRunner {
   warnings_behavior: RemoteCacheWarningsBehavior,
   read_errors_counter: Arc<Mutex<BTreeMap<String, usize>>>,
   write_errors_counter: Arc<Mutex<BTreeMap<String, usize>>>,
+  gha_store: Arc<remote_gha::ByteStore>,
 }
 
 impl CommandRunner {
@@ -102,6 +106,11 @@ impl CommandRunner {
       Some((read_timeout, Metric::RemoteCacheRequestTimeouts)),
     );
     let action_cache_client = Arc::new(ActionCacheClient::new(channel));
+    let gha_store = Arc::new(remote_gha::ByteStore::new(
+      &std::env::var("PANTS_REMOTE_GHA_CACHE_URL").expect("url env var not set"),
+      &std::env::var("PANTS_REMOTE_GHA_RUNTIME_TOKEN").expect("token env var not set"),
+      "pants-remote-action",
+    )?);
 
     Ok(CommandRunner {
       inner,
@@ -117,6 +126,7 @@ impl CommandRunner {
       warnings_behavior,
       read_errors_counter: Arc::new(Mutex::new(BTreeMap::new())),
       write_errors_counter: Arc::new(Mutex::new(BTreeMap::new())),
+      gha_store,
     })
   }
 
@@ -285,6 +295,7 @@ impl CommandRunner {
         self.action_cache_client.clone(),
         self.store.clone(),
         self.cache_content_behavior,
+        self.gha_store.clone(),
       )
       .await;
       match response {
@@ -405,27 +416,39 @@ impl CommandRunner {
       .ensure_remote_has_recursive(digests_for_action_result)
       .await?;
 
-    let client = self.action_cache_client.as_ref().clone();
-    retry_call(
-      client,
-      move |mut client| {
-        let update_action_cache_request = remexec::UpdateActionResultRequest {
-          instance_name: instance_name.clone().unwrap_or_else(|| "".to_owned()),
-          action_digest: Some(action_digest.into()),
-          action_result: Some(action_result.clone()),
-          ..remexec::UpdateActionResultRequest::default()
-        };
+    //let client = self.action_cache_client.as_ref().clone();
+    //let client = self.gha_store.as_ref().clone();
+    // retry_call(
+    //   client,
+    //   move |mut client| {
+    let update_action_cache_request = remexec::UpdateActionResultRequest {
+      instance_name: instance_name.clone().unwrap_or_else(|| "".to_owned()),
+      action_digest: Some(action_digest.into()),
+      action_result: Some(action_result.clone()),
+      ..remexec::UpdateActionResultRequest::default()
+    };
 
-        async move {
-          client
-            .update_action_result(update_action_cache_request)
-            .await
-        }
-      },
-      status_is_retryable,
-    )
-    .await
-    .map_err(status_to_str)?;
+    // async move {
+    //   client
+    //     .update_action_result(update_action_cache_request)
+    //     .await
+    // }
+    let bytes = update_action_cache_request.to_bytes();
+    self
+      .gha_store
+      .store_bytes(
+        Digest {
+          size_bytes: bytes.len(),
+          ..action_digest
+        },
+        Box::new(move |r| bytes.slice(r)),
+      )
+      //   },
+      //   status_is_retryable,
+      // )
+      .await
+      .map_err(|e| e.msg)?;
+    //.map_err(status_to_str)?;
 
     Ok(())
   }
@@ -582,6 +605,7 @@ async fn check_action_cache(
   action_cache_client: Arc<ActionCacheClient<LayeredService>>,
   store: Store,
   cache_content_behavior: CacheContentBehavior,
+  gha_store: Arc<remote_gha::ByteStore>,
 ) -> Result<Option<FallibleProcessResultWithPlatform>, ProcessError> {
   in_workunit!(
     "check_action_cache",
@@ -592,45 +616,58 @@ async fn check_action_cache(
 
       let start = Instant::now();
       let client = action_cache_client.as_ref().clone();
-      let response = retry_call(
-        client,
-        move |mut client| {
-          let request = remexec::GetActionResultRequest {
-            action_digest: Some(action_digest.into()),
-            instance_name: instance_name.clone().unwrap_or_default(),
-            ..remexec::GetActionResultRequest::default()
-          };
-          let request = apply_headers(Request::new(request), &context.build_id);
-          async move { client.get_action_result(request).await }
-        },
-        status_is_retryable,
-      )
-      .and_then(|action_result| async move {
-        let action_result = action_result.into_inner();
-        let response = populate_fallible_execution_result(
-          store.clone(),
-          context.run_id,
-          &action_result,
-          platform,
-          false,
-          ProcessResultSource::HitRemotely,
-        )
-        .await
-        .map_err(|e| Status::unavailable(format!("Output roots could not be loaded: {e}")))?;
-
-        let cache_content_valid = check_cache_content(&response, &store, cache_content_behavior)
+      let response = gha_store
+        .load_bytes(action_digest)
+        .map(|r| {
+          r.map_err(|e| Status::unknown(e.msg))
+            .and_then(|b| b.ok_or_else(|| Status::not_found("")))
+        })
+        .map(|r| {
+          r.and_then(|b| {
+            remexec::UpdateActionResultRequest::decode(b)
+              .map_err(|e| Status::unknown("decoding error"))
+          })
+        })
+        // retry_call(
+        //   client,
+        //   move |mut client| {
+        //     let request = remexec::GetActionResultRequest {
+        //       action_digest: Some(action_digest.into()),
+        //       instance_name: instance_name.clone().unwrap_or_default(),
+        //       ..remexec::GetActionResultRequest::default()
+        //     };
+        //     let request = apply_headers(Request::new(request), &context.build_id);
+        //     async move { client.get_action_result(request).await }
+        //   },
+        //   status_is_retryable,
+        // )
+        .and_then(|action_result| async move {
+          let action_result = action_result.action_result.expect("no result?");
+          //let action_result = action_result.into_inner();
+          let response = populate_fallible_execution_result(
+            store.clone(),
+            context.run_id,
+            &action_result,
+            platform,
+            false,
+            ProcessResultSource::HitRemotely,
+          )
           .await
-          .map_err(|e| {
-            Status::unavailable(format!("Output content could not be validated: {e}"))
-          })?;
+          .map_err(|e| Status::unavailable(format!("Output roots could not be loaded: {e}")))?;
 
-        if cache_content_valid {
-          Ok(response)
-        } else {
-          Err(Status::not_found(""))
-        }
-      })
-      .await;
+          let cache_content_valid = check_cache_content(&response, &store, cache_content_behavior)
+            .await
+            .map_err(|e| {
+              Status::unavailable(format!("Output content could not be validated: {e}"))
+            })?;
+
+          if cache_content_valid {
+            Ok(response)
+          } else {
+            Err(Status::not_found(""))
+          }
+        })
+        .await;
 
       workunit.record_observation(
         ObservationMetric::RemoteCacheGetActionResultTimeMicros,
