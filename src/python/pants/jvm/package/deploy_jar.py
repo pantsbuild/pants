@@ -11,7 +11,7 @@ from pants.core.goals.package import (
     OutputPathField,
     PackageFieldSet,
 )
-from pants.core.goals.run import RunFieldSet
+from pants.core.goals.run import RunFieldSet, RunInSandboxBehavior
 from pants.engine.addresses import Addresses
 from pants.engine.fs import EMPTY_DIGEST, AddPrefix, Digest, MergeDigests
 from pants.engine.rules import Get, collect_rules, rule
@@ -49,6 +49,7 @@ class DeployJarFieldSet(PackageFieldSet, RunFieldSet):
         JvmJdkField,
         Dependencies,
     )
+    run_in_sandbox_behavior = RunInSandboxBehavior.RUN_REQUEST_HERMETIC
 
     main_class: JvmMainClassNameField
     output_path: OutputPathField

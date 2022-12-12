@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import dataclasses
 import itertools
 import logging
 import os
@@ -12,7 +11,6 @@ import shlex
 from dataclasses import dataclass
 from textwrap import dedent  # noqa: PNT20
 
-from pants.backend.python.target_types import PythonRunGoalUseSandboxField  # noqa: PNT20
 from pants.backend.shell.subsystems.shell_setup import ShellSetup
 from pants.backend.shell.target_types import (
     RunInSandboxArgumentsField,
@@ -34,7 +32,7 @@ from pants.backend.shell.util_rules.builtin import BASH_BUILTIN_COMMANDS
 from pants.base.deprecated import warn_or_error
 from pants.build_graph.address import Address, AddressInput
 from pants.core.goals.package import BuiltPackage, PackageFieldSet
-from pants.core.goals.run import RunFieldSet, RunRequest
+from pants.core.goals.run import RunFieldSet, RunInSandboxBehavior, RunInSandboxRequest, RunRequest
 from pants.core.target_types import FileSourceField
 from pants.core.util_rules.environments import EnvironmentNameRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
@@ -246,6 +244,7 @@ class RunShellCommand(RunFieldSet):
         ShellCommandCommandField,
         ShellCommandRunWorkdirField,
     )
+    run_in_sandbox_behavior = RunInSandboxBehavior.NOT_SUPPORTED
 
 
 @rule(desc="Running shell command", level=LogLevel.DEBUG)
@@ -328,18 +327,12 @@ async def run_in_sandbox_request(
     )
     run_field_set: RunFieldSet = field_sets.field_sets[0]
 
-    if hasattr(run_field_set, "run_goal_use_sandbox"):
-        run_field_set = dataclasses.replace(
-            run_field_set,
-            run_goal_use_sandbox=PythonRunGoalUseSandboxField(True, addresses[0]),
-        )
-
     working_directory = shell_command.address.spec_path
 
     # Must be run in target environment so that the binaries/envvars match the execution
     # environment when we actually run the process.
     run_request = await Get(
-        RunRequest, {environment_name: EnvironmentName, run_field_set: RunFieldSet}
+        RunInSandboxRequest, {environment_name: EnvironmentName, run_field_set: RunFieldSet}
     )
 
     dependencies_digest = await _execution_environment_from_dependencies(shell_command)
