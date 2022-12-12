@@ -747,16 +747,30 @@ impl Store {
     f_local: FLocal,
     f_remote: FRemote,
   ) -> Result<T, StoreError> {
-    log::trace!("Store:::load_bytes_with({:?}, {:?})", entry_type, digest);
+    log::trace!(
+      "Store:::load_bytes_with({:?}, {:?}) - start",
+      entry_type,
+      digest
+    );
     if let Some(bytes_res) = self
       .local
       .load_bytes_with(entry_type, digest, f_local.clone())
       .await?
     {
+      log::trace!(
+        "Store:::load_bytes_with({:?}, {:?}) - loaded locally",
+        entry_type,
+        digest
+      );
       return Ok(bytes_res?);
     }
 
-    log::trace!("Store.remote = {:?}", self.remote);
+    log::trace!(
+      "Store:::load_bytes_with({:?}, {:?}) - remote = {:?}",
+      entry_type,
+      digest,
+      self.remote
+    );
     let remote = self.remote.clone().ok_or_else(|| {
       StoreError::MissingDigest("Was not present in the local store".to_owned(), digest)
     })?;

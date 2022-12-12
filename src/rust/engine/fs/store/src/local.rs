@@ -388,6 +388,11 @@ impl ByteStore {
     digest: Digest,
     mut f: F,
   ) -> Result<Option<T>, String> {
+    log::trace!(
+      "local::ByteStore:::load_bytes_with({:?}, {:?}) - start",
+      entry_type,
+      digest
+    );
     let start = Instant::now();
     if digest == EMPTY_DIGEST {
       // Avoid I/O for this case. This allows some client-provided operations (like merging
@@ -395,6 +400,12 @@ impl ByteStore {
       return Ok(Some(f(&[])));
     }
 
+    log::trace!(
+      "local::ByteStore:::load_bytes_with({:?}, {:?}) - inner {:?}",
+      entry_type,
+      digest,
+      self.inner
+    );
     let dbs = match entry_type {
       EntryType::Directory => self.inner.directory_dbs.clone(),
       EntryType::File => self.inner.file_dbs.clone(),
