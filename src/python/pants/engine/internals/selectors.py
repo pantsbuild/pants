@@ -144,8 +144,8 @@ class Get(Generic[_Output], Awaitable[_Output]):
 
     The long form supports providing type information to the rule engine that it could not otherwise
     infer from the input variable [1]. Likewise, the short form must use inline construction of the
-    input in order to convey the input type to the engine. The dict form supports providing more than
-    one input to the engine for the Get request.
+    input in order to convey the input type to the engine. The dict form supports providing zero or
+    more inputs to the engine for the Get request.
 
     [1] The engine needs to determine all rule and Get input and output types statically before
     executing any rules. Since Gets are declared inside function bodies, the only way to extract this
