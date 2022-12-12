@@ -302,8 +302,8 @@ class ResolvePexConfig:
     find_links: tuple[str, ...]
     manylinux: str | None
     constraints_file: ResolvePexConstraintsFile | None
-    only_binary: FrozenOrderedSet[PipRequirement]
-    no_binary: FrozenOrderedSet[PipRequirement]
+    only_binary: FrozenOrderedSet[str]
+    no_binary: FrozenOrderedSet[str]
     path_mappings: tuple[str, ...]
 
     def pex_args(self) -> Iterator[str]:
