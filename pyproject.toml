@@ -63,7 +63,7 @@ module = [
     "gnupg",
     "hdrh",
     "hdrh.histogram",
-    "ijson",
+    "ijson.*",
     "pex.*",
     "psutil",
     "setproctitle",
