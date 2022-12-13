@@ -786,6 +786,7 @@ async fn make_action_result_basic() {
     remexec::OutputDirectory {
       path: "pets/cats".to_owned(),
       tree_digest: Some(TestTree::roland_at_root().digest().into()),
+      is_topologically_sorted: false,
     }
   );
 

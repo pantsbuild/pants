@@ -2400,6 +2400,7 @@ async fn extract_output_files_from_response_just_directory() {
       output_directories: vec![remexec::OutputDirectory {
         path: "cats".into(),
         tree_digest: Some(test_tree.digest().into()),
+        is_topologically_sorted: false,
       }],
       ..Default::default()
     }),
@@ -2431,10 +2432,12 @@ async fn extract_output_files_from_response_directories_and_files() {
         remexec::OutputDirectory {
           path: "pets/cats".into(),
           tree_digest: Some((&TestTree::roland_at_root().digest()).into()),
+          is_topologically_sorted: false,
         },
         remexec::OutputDirectory {
           path: "pets/dogs".into(),
           tree_digest: Some((&TestTree::robin_at_root().digest()).into()),
+          is_topologically_sorted: false,
         },
       ],
       ..Default::default()
@@ -2463,6 +2466,7 @@ async fn extract_output_files_from_response_no_prefix() {
       output_directories: vec![remexec::OutputDirectory {
         path: String::new(),
         tree_digest: Some((&TestTree::roland_at_root().digest()).into()),
+        is_topologically_sorted: false,
       }],
       ..Default::default()
     }),

@@ -240,6 +240,7 @@ impl CommandRunner {
         .push(remexec::OutputDirectory {
           path: output_directory.to_owned(),
           tree_digest: Some(tree_digest.into()),
+          is_topologically_sorted: false,
         });
     }
 
