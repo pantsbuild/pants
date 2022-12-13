@@ -6,6 +6,25 @@ hidden: false
 createdAt: "2020-10-12T16:19:01.543Z"
 updatedAt: "2022-07-25T20:02:17.695Z"
 ---
+
+2.16
+----
+
+### `RunFieldSet` and `TestRequest` now have a `.rules()` method
+
+These methods should be used to register your run/test plugins:
+
+```python
+
+def rules():
+    return [
+        *MyRunFieldSetSubclass.rules(),
+        *MyTestRequestSubclass.rules(),
+    ]
+```
+
+Additionally, these types now by-default register the implementations for the rules used for `--debug`/`--debug-adapter`. If your plugin doesn't support these flags, simply remove the rules you've declared and let the default ones handle erroring. If your plugin does support these, set the class property(s) `supports_debug = True`/`supports_debug_adapter = True`, respectively.
+
 2.15
 ----
 

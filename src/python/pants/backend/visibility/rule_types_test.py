@@ -52,6 +52,20 @@ def parse_ruleset(rules: Any, build_file: str = "test/path/BUILD") -> Visibility
     return VisibilityRuleSet.parse(build_file, rules)
 
 
+def test_dead_ruleset() -> None:
+    err = softwrap(
+        """\
+        The rule set will never apply to anything, for the rules: \\('src/\\*', '!\\*'\\)
+        """
+    )
+    with pytest.raises(BuildFileVisibilityRulesError, match=err):
+        # These rules will never apply.
+        parse_ruleset(("", "src/*", "!*"))
+
+    # Ignore match-none selectors if there are others that do match on something.
+    parse_ruleset((("", "foo"), "src/*", "!*"))
+
+
 @pytest.mark.parametrize(
     "expected, xs",
     [
@@ -595,7 +609,7 @@ def test_dependency_rules(rule_runner: RuleRunner, caplog) -> None:
         expect_logged=[
             (
                 logging.DEBUG,
-                "WARN: type=target address=src/a/a2:joker other=src/a:a rule='?*' "
+                "WARN: type=target address=src/a/a2:joker [src/a/a2] other=src/a:a [src/a] rule='?*' "
                 "src/a/a2/BUILD: ?*",
             ),
         ],
@@ -617,7 +631,7 @@ def test_dependency_rules(rule_runner: RuleRunner, caplog) -> None:
         expect_logged=[
             (
                 logging.DEBUG,
-                "DENY: type=resources address=src/a:internal other=src/b:b rule='!*' "
+                "DENY: type=resources address=src/a:internal [src/a] other=src/b:b [src/b] rule='!*' "
                 "src/a/BUILD: ., !*",
             ),
         ],
@@ -636,7 +650,7 @@ def test_dependency_rules(rule_runner: RuleRunner, caplog) -> None:
         expect_logged=[
             (
                 logging.DEBUG,
-                "DENY: type=resources address=src/a:internal other=src/b:b rule='!*' "
+                "DENY: type=resources address=src/a:internal [src/a] other=src/b:b [src/b] rule='!*' "
                 "src/a/BUILD: ., !*",
             ),
         ],

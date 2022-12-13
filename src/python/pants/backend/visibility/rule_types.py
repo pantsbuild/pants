@@ -119,6 +119,22 @@ class VisibilityRuleSet:
     selectors: tuple[TargetGlob, ...]
     rules: tuple[VisibilityRule, ...]
 
+    def __post_init__(self) -> None:
+        if all("!*" == str(selector) for selector in self.selectors):
+            rules = tuple(map(str, self.rules))
+            raise BuildFileVisibilityRulesError(
+                softwrap(
+                    f"""
+                    The rule set will never apply to anything, for the rules: {rules}
+
+                    At least one target selector must have a filtering rule that can match
+                    something, for example:
+
+                        ("python_*", {rules})
+                    """
+                )
+            )
+
     @classmethod
     def parse(cls, build_file: str, arg: Any) -> VisibilityRuleSet:
         """Translate input `arg` from BUILD file call.
@@ -256,11 +272,7 @@ class BuildFileVisibilityRules(BuildFileDependencyRules):
 
     @staticmethod
     def _get_address_path(address: Address) -> str:
-        if address.is_file_target:
-            return address.filename
-        if address.is_generated_target:
-            return address.spec
-        return address.spec_path
+        return TargetGlob.address_path(address)
 
     def get_action(
         self,
@@ -284,7 +296,7 @@ class BuildFileVisibilityRules(BuildFileDependencyRules):
                         softwrap(
                             f"""
                             {visibility_rule.action.name}: type={adaptor.type_alias}
-                            address={address} other={other_address}
+                            address={address} [{relpath}] other={other_address} [{path}]
                             rule={str(visibility_rule)!r} {self.path}:
                             {', '.join(map(str, ruleset.rules))}
                             """
