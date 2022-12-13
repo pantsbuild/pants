@@ -21,7 +21,7 @@ use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use protos::require_digest;
 use remexec::action_cache_client::ActionCacheClient;
 use remexec::{ActionResult, Command, Tree};
-use store::{remote_gha, remote_trait::RemoteCacheConnection, Store, StoreError};
+use store::{remote, remote::ByteStoreProvider, Store, StoreError};
 use workunit_store::{
   in_workunit, Level, Metric, ObservationMetric, RunningWorkunit, WorkunitMetadata,
 };
@@ -66,7 +66,7 @@ pub struct CommandRunner {
   warnings_behavior: RemoteCacheWarningsBehavior,
   read_errors_counter: Arc<Mutex<BTreeMap<String, usize>>>,
   write_errors_counter: Arc<Mutex<BTreeMap<String, usize>>>,
-  gha_store: Arc<remote_gha::ByteStore>,
+  gha_store: Arc<remote::gha::ByteStore>,
 }
 
 impl CommandRunner {
@@ -106,7 +106,7 @@ impl CommandRunner {
       Some((read_timeout, Metric::RemoteCacheRequestTimeouts)),
     );
     let action_cache_client = Arc::new(ActionCacheClient::new(channel));
-    let gha_store = Arc::new(remote_gha::ByteStore::new(
+    let gha_store = Arc::new(remote::gha::ByteStore::new(
       &std::env::var("PANTS_REMOTE_GHA_CACHE_URL").expect("url env var not set"),
       &std::env::var("PANTS_REMOTE_GHA_RUNTIME_TOKEN").expect("token env var not set"),
       "pants-remote-action",
@@ -446,8 +446,7 @@ impl CommandRunner {
       //   },
       //   status_is_retryable,
       // )
-      .await
-      .map_err(|e| e.msg)?;
+      .await?;
     //.map_err(status_to_str)?;
 
     Ok(())
@@ -605,7 +604,7 @@ async fn check_action_cache(
   action_cache_client: Arc<ActionCacheClient<LayeredService>>,
   store: Store,
   cache_content_behavior: CacheContentBehavior,
-  gha_store: Arc<remote_gha::ByteStore>,
+  gha_store: Arc<remote::gha::ByteStore>,
 ) -> Result<Option<FallibleProcessResultWithPlatform>, ProcessError> {
   in_workunit!(
     "check_action_cache",
@@ -619,7 +618,7 @@ async fn check_action_cache(
       let response = gha_store
         .load_bytes(action_digest)
         .map(|r| {
-          r.map_err(|e| Status::unknown(e.msg))
+          r.map_err(Status::unknown)
             .and_then(|b| b.ok_or_else(|| Status::not_found("")))
         })
         .map(|r| {
@@ -687,7 +686,7 @@ async fn check_action_cache(
           _ => {
             workunit.increment_counter(Metric::RemoteCacheReadErrors, 1);
             // TODO: Ensure that we're catching missing digests.
-            Err(status_to_str(status).into())
+            Err(status_to_str(&status).into())
           }
         },
       }

@@ -9,33 +9,21 @@ use std::time::Instant;
 use async_trait::async_trait;
 use bytes::Bytes;
 use futures::Future;
-use grpc_util::retry::retry_call;
 use hashing::Digest;
 use log::Level;
 use workunit_store::{in_workunit, ObservationMetric};
 
 use crate::StoreError;
 
-#[derive(Debug, Clone)]
-pub struct RemoteCacheError {
-  pub retryable: bool,
-  pub msg: String,
-}
-
-impl fmt::Display for RemoteCacheError {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    fmt::Display::fmt(&self.msg, f)
-  }
-}
-
-impl std::error::Error for RemoteCacheError {}
+pub mod gha;
+pub mod reapi;
 
 pub type ByteSource = Box<(dyn Fn(Range<usize>) -> Bytes + Send + Sync + 'static)>;
 
 #[async_trait]
-pub trait RemoteCacheConnection: Sync {
-  async fn store_bytes(&self, digest: Digest, bytes: ByteSource) -> Result<(), RemoteCacheError>;
-  async fn load_bytes(&self, digest: Digest) -> Result<Option<Bytes>, RemoteCacheError>;
+pub trait ByteStoreProvider: Sync {
+  async fn store_bytes(&self, digest: Digest, bytes: ByteSource) -> Result<(), String>;
+  async fn load_bytes(&self, digest: Digest) -> Result<Option<Bytes>, String>;
 
   /// List any missing digests.
   ///
@@ -52,7 +40,7 @@ pub trait RemoteCacheConnection: Sync {
 
 #[derive(Clone)]
 pub(crate) struct ByteStore {
-  connection: Arc<dyn RemoteCacheConnection + Sync + Send + 'static>,
+  connection: Arc<dyn ByteStoreProvider + Sync + Send + 'static>,
 }
 
 impl fmt::Debug for ByteStore {
@@ -62,7 +50,7 @@ impl fmt::Debug for ByteStore {
 }
 
 impl ByteStore {
-  pub fn new(connection: impl RemoteCacheConnection + Sync + Send + 'static) -> ByteStore {
+  pub fn new(connection: impl ByteStoreProvider + Sync + Send + 'static) -> ByteStore {
     ByteStore {
       connection: Arc::new(connection),
     }
@@ -124,36 +112,24 @@ impl ByteStore {
       Ok(mapping) as Result<memmap::Mmap, String>
     }?);
 
-    retry_call(
-      mmap,
-      |mmap| {
-        self.store_bytes_source(
-          digest,
-          Box::new(move |range| Bytes::copy_from_slice(&mmap[range])),
-        )
-      },
-      |err| err.retryable,
-    )
-    .await
-    .map_err(|err| err.msg.into())
+    self
+      .store_bytes_source(
+        digest,
+        Box::new(move |range| Bytes::copy_from_slice(&mmap[range])),
+      )
+      .await?;
+
+    Ok(())
   }
 
   pub async fn store_bytes(&self, bytes: Bytes) -> Result<(), String> {
     let digest = Digest::of_bytes(&bytes);
-    retry_call(
-      bytes,
-      |bytes| self.store_bytes_source(digest, Box::new(move |range| bytes.slice(range))),
-      |err| err.retryable,
-    )
-    .await
-    .map_err(|err| err.msg)
+    self
+      .store_bytes_source(digest, Box::new(move |range| bytes.slice(range)))
+      .await
   }
 
-  async fn store_bytes_source(
-    &self,
-    digest: Digest,
-    bytes: ByteSource,
-  ) -> Result<(), RemoteCacheError> {
+  async fn store_bytes_source(&self, digest: Digest, bytes: ByteSource) -> Result<(), String> {
     log::trace!("remote_trait::ByteStore::store_bytes_source({:?})", digest);
     let len = digest.size_bytes;
 
@@ -186,16 +162,10 @@ impl ByteStore {
     let start = Instant::now();
     let workunit_desc = format!("Loading {} bytes for {}", digest.size_bytes, digest.hash);
     let result_future = async move {
-      match retry_call(
-        digest,
-        |digest| self.connection.load_bytes(digest),
-        |err| err.retryable,
-      )
-      .await
-      {
+      match self.connection.load_bytes(digest).await {
         Ok(Some(bytes)) => Ok(Some(f(bytes)?)),
         Ok(None) => Ok(None),
-        Err(err) => Err(err.msg),
+        Err(err) => Err(err),
       }
     };
 

@@ -84,12 +84,9 @@ mod local;
 #[cfg(test)]
 pub mod local_tests;
 
-mod remote;
+pub mod remote;
 #[cfg(test)]
 mod remote_tests;
-
-pub mod remote_gha;
-pub mod remote_trait;
 
 pub struct LocalOptions {
   pub files_max_size_bytes: usize,
@@ -177,13 +174,13 @@ pub struct UploadSummary {
 ///
 #[derive(Clone, Debug)]
 struct RemoteStore {
-  store: remote_trait::ByteStore,
+  store: remote::ByteStore,
   in_flight_uploads: Arc<Mutex<HashMap<Digest, Weak<OnceCell<()>>>>>,
   in_flight_downloads: Arc<Mutex<HashMap<Digest, Weak<OnceCell<()>>>>>,
 }
 
 impl RemoteStore {
-  fn new(store: remote_trait::ByteStore) -> Self {
+  fn new(store: remote::ByteStore) -> Self {
     Self {
       store,
       in_flight_uploads: Arc::default(),
@@ -393,8 +390,8 @@ impl Store {
     log::trace!("Store::into_with_remote - starting");
     Ok(Store {
       local: self.local,
-      remote: Some(RemoteStore::new(remote_trait::ByteStore::new(
-        remote_gha::ByteStore::new(
+      remote: Some(RemoteStore::new(remote::ByteStore::new(
+        remote::gha::ByteStore::new(
           &std::env::var("PANTS_REMOTE_GHA_CACHE_URL").expect("url env var not set"),
           &std::env::var("PANTS_REMOTE_GHA_RUNTIME_TOKEN").expect("token env var not set"),
           "pants-remote-cache",
@@ -913,7 +910,7 @@ impl Store {
 
   async fn store_small_blob_remote(
     local: local::ByteStore,
-    remote: remote_trait::ByteStore,
+    remote: remote::ByteStore,
     entry_type: EntryType,
     digest: Digest,
   ) -> Result<(), StoreError> {
@@ -942,7 +939,7 @@ impl Store {
 
   async fn store_large_blob_remote(
     local: local::ByteStore,
-    remote: remote_trait::ByteStore,
+    remote: remote::ByteStore,
     entry_type: EntryType,
     digest: Digest,
   ) -> Result<(), StoreError> {

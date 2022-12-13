@@ -26,7 +26,7 @@ use remexec::{
 use tonic::{Code, Request, Status};
 use workunit_store::{in_workunit, ObservationMetric};
 
-use crate::remote_trait::{ByteSource, RemoteCacheConnection, RemoteCacheError};
+use crate::remote::{ByteSource, ByteStoreProvider};
 
 #[derive(Clone)]
 pub struct ByteStore {
@@ -60,7 +60,7 @@ pub enum ByteStoreError {
 impl fmt::Display for ByteStoreError {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     match self {
-      ByteStoreError::Grpc(status) => fmt::Display::fmt(status, f),
+      ByteStoreError::Grpc(status) => fmt::Display::fmt(&status_to_str(status), f),
       ByteStoreError::Other(msg) => fmt::Display::fmt(msg, f),
     }
   }
@@ -68,17 +68,11 @@ impl fmt::Display for ByteStoreError {
 
 impl std::error::Error for ByteStoreError {}
 
-impl From<ByteStoreError> for RemoteCacheError {
-  fn from(err: ByteStoreError) -> RemoteCacheError {
-    match err {
-      ByteStoreError::Grpc(status) => RemoteCacheError {
-        retryable: status_is_retryable(&status),
-        msg: status_to_str(status),
-      },
-      ByteStoreError::Other(msg) => RemoteCacheError {
-        retryable: false,
-        msg,
-      },
+impl ByteStoreError {
+  fn retryable(&self) -> bool {
+    match self {
+      ByteStoreError::Grpc(status) => status_is_retryable(status),
+      ByteStoreError::Other(_) => false,
     }
   }
 }
@@ -178,8 +172,7 @@ impl ByteStore {
     );
     let store = self.clone();
 
-    struct C(ByteStreamClient<LayeredService>);
-    let mut client = C(self.byte_stream_client.as_ref().clone());
+    let mut client = self.byte_stream_client.as_ref().clone();
 
     let chunk_size_bytes = store.chunk_size_bytes;
 
@@ -205,7 +198,6 @@ impl ByteStore {
     let x: std::pin::Pin<Box<dyn futures::Future<Output = Result<(), ByteStoreError>> + Send>> =
       Box::pin(async move {
         let response = client
-          .0
           .write(Request::new(stream))
           .await
           .map_err(ByteStoreError::Grpc)?;
@@ -246,38 +238,52 @@ impl ByteStore {
 }
 
 #[async_trait]
-impl RemoteCacheConnection for ByteStore {
+impl ByteStoreProvider for ByteStore {
   fn chunk_size_bytes(&self) -> usize {
     self.chunk_size_bytes
   }
 
-  async fn store_bytes(&self, digest: Digest, bytes: ByteSource) -> Result<(), RemoteCacheError> {
+  async fn store_bytes(&self, digest: Digest, bytes: ByteSource) -> Result<(), String> {
     let store = self.clone();
     let len = digest.size_bytes;
+    // FIXME: this is nonsense
+    let all_bytes = bytes(0..len);
 
-    let max_batch_total_size_bytes = {
-      let capabilities = store.get_capabilities().await?;
+    retry_call(
+      all_bytes,
+      |all_bytes| async {
+        let max_batch_total_size_bytes = {
+          let capabilities = store.get_capabilities().await?;
 
-      capabilities
-        .cache_capabilities
-        .as_ref()
-        .map(|c| c.max_batch_total_size_bytes as usize)
-        .unwrap_or_default()
-    };
+          capabilities
+            .cache_capabilities
+            .as_ref()
+            .map(|c| c.max_batch_total_size_bytes as usize)
+            .unwrap_or_default()
+        };
 
-    let batch_api_allowed_by_local_config = len <= store.batch_api_size_limit;
-    let batch_api_allowed_by_server_config =
-      max_batch_total_size_bytes == 0 || len < max_batch_total_size_bytes;
+        let batch_api_allowed_by_local_config = len <= store.batch_api_size_limit;
+        let batch_api_allowed_by_server_config =
+          max_batch_total_size_bytes == 0 || len < max_batch_total_size_bytes;
 
-    if batch_api_allowed_by_local_config && batch_api_allowed_by_server_config {
-      store.store_bytes_source_batch(digest, bytes).await?
-    } else {
-      store.store_bytes_source_stream(digest, bytes).await?
-    }
-    Ok(())
+        if batch_api_allowed_by_local_config && batch_api_allowed_by_server_config {
+          store
+            .store_bytes_source_batch(digest, Box::new(move |r| all_bytes.slice(r)))
+            .await?
+        } else {
+          store
+            .store_bytes_source_stream(digest, Box::new(move |r| all_bytes.slice(r)))
+            .await?
+        }
+        Ok(())
+      },
+      |err: &ByteStoreError| err.retryable(),
+    )
+    .await
+    .map_err(|err| err.to_string())
   }
 
-  async fn load_bytes(&self, digest: Digest) -> Result<Option<Bytes>, RemoteCacheError> {
+  async fn load_bytes(&self, digest: Digest) -> Result<Option<Bytes>, String> {
     let store = self.clone();
     let instance_name = store.instance_name.clone().unwrap_or_default();
     let resource_name = format!(
@@ -288,64 +294,72 @@ impl RemoteCacheConnection for ByteStore {
       digest.size_bytes
     );
 
-    let mut client = self.byte_stream_client.as_ref().clone();
+    retry_call(
+      (),
+      |_| async {
+        let mut client = self.byte_stream_client.as_ref().clone();
 
-    let mut start_opt = Some(Instant::now());
+        let mut start_opt = Some(Instant::now());
 
-    let stream_result = client
-      .read({
-        protos::gen::google::bytestream::ReadRequest {
-          resource_name,
-          read_offset: 0,
-          // 0 means no limit.
-          read_limit: 0,
-        }
-      })
-      .await;
+        let stream_result = client
+          .read({
+            protos::gen::google::bytestream::ReadRequest {
+              resource_name: resource_name.clone(),
+              read_offset: 0,
+              // 0 means no limit.
+              read_limit: 0,
+            }
+          })
+          .await;
 
-    let mut stream = match stream_result {
-      Ok(response) => response.into_inner(),
-      Err(status) => {
-        return match status.code() {
-          Code::NotFound => Ok(None),
-          _ => Err(From::from(ByteStoreError::Grpc(status))),
-        }
-      }
-    };
+        let mut stream = match stream_result {
+          Ok(response) => response.into_inner(),
+          Err(status) => {
+            return match status.code() {
+              Code::NotFound => Ok(None),
+              _ => Err(ByteStoreError::Grpc(status)),
+            }
+          }
+        };
 
-    let read_result_closure = async {
-      let mut buf = BytesMut::with_capacity(digest.size_bytes);
-      while let Some(response) = stream.next().await {
-        // Record the observed time to receive the first response for this read.
-        if let Some(start) = start_opt.take() {
-          if let Some(workunit_store_handle) = workunit_store::get_workunit_store_handle() {
-            let timing: Result<u64, _> =
-              Instant::now().duration_since(start).as_micros().try_into();
-            if let Ok(obs) = timing {
-              workunit_store_handle
-                .store
-                .record_observation(ObservationMetric::RemoteStoreTimeToFirstByteMicros, obs);
+        let read_result_closure = async {
+          let mut buf = BytesMut::with_capacity(digest.size_bytes);
+          while let Some(response) = stream.next().await {
+            // Record the observed time to receive the first response for this read.
+            if let Some(start) = start_opt.take() {
+              if let Some(workunit_store_handle) = workunit_store::get_workunit_store_handle() {
+                let timing: Result<u64, _> =
+                  Instant::now().duration_since(start).as_micros().try_into();
+                if let Ok(obs) = timing {
+                  workunit_store_handle
+                    .store
+                    .record_observation(ObservationMetric::RemoteStoreTimeToFirstByteMicros, obs);
+                }
+              }
+            }
+
+            buf.extend_from_slice(&(response?).data);
+          }
+          Ok(buf.freeze())
+        };
+
+        let read_result: Result<Bytes, tonic::Status> = read_result_closure.await;
+
+        match read_result {
+          Ok(bytes) => Ok(Some(bytes)),
+          Err(status) => {
+            if status.code() == tonic::Code::NotFound {
+              Ok(None)
+            } else {
+              Err(ByteStoreError::Grpc(status))
             }
           }
         }
-
-        buf.extend_from_slice(&(response?).data);
-      }
-      Ok(buf.freeze())
-    };
-
-    let read_result: Result<Bytes, tonic::Status> = read_result_closure.await;
-
-    match read_result {
-      Ok(bytes) => Ok(Some(bytes)),
-      Err(status) => {
-        if status.code() == tonic::Code::NotFound {
-          Ok(None)
-        } else {
-          Err(From::from(ByteStoreError::Grpc(status)))
-        }
-      }
-    }
+      },
+      |err: &ByteStoreError| err.retryable(),
+    )
+    .await
+    .map_err(|err| err.to_string())
   }
 
   ///
@@ -376,7 +390,7 @@ impl RemoteCacheConnection for ByteStore {
           status_is_retryable,
         )
         .await
-        .map_err(status_to_str)?;
+        .map_err(|x| status_to_str(&x))?;
 
         response
           .into_inner()

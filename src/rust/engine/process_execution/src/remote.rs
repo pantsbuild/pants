@@ -250,7 +250,7 @@ impl CommandRunner {
         .get_capabilities(request)
         .await
         .map(|r| r.into_inner())
-        .map_err(status_to_str)
+        .map_err(|err| status_to_str(&err))
     };
 
     self

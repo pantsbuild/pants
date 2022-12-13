@@ -6,7 +6,7 @@ use bytes::Bytes;
 use gha_toolkit::cache::{ArtifactCacheEntry, CacheClient};
 use hashing::Digest;
 
-use crate::remote_trait::{ByteSource, RemoteCacheConnection, RemoteCacheError};
+use crate::remote::{ByteSource, ByteStoreProvider};
 
 pub struct ByteStore {
   client: CacheClient,
@@ -32,12 +32,12 @@ impl ByteStore {
 const EMPTY_BYTES: &[u8] = &[0xFF];
 
 #[async_trait]
-impl RemoteCacheConnection for ByteStore {
+impl ByteStoreProvider for ByteStore {
   fn chunk_size_bytes(&self) -> usize {
     usize::MAX
   }
 
-  async fn store_bytes(&self, digest: Digest, bytes: ByteSource) -> Result<(), RemoteCacheError> {
+  async fn store_bytes(&self, digest: Digest, bytes: ByteSource) -> Result<(), String> {
     log::debug!(
       "storing {} ({} bytes) via {}",
       digest.hash,
@@ -57,13 +57,10 @@ impl RemoteCacheConnection for ByteStore {
         std::io::Cursor::new(slice),
       )
       .await
-      .map_err(|err| RemoteCacheError {
-        retryable: false,
-        msg: err.to_string(),
-      })?;
+      .map_err(|err| err.to_string())?;
     Ok(())
   }
-  async fn load_bytes(&self, digest: Digest) -> Result<Option<Bytes>, RemoteCacheError> {
+  async fn load_bytes(&self, digest: Digest) -> Result<Option<Bytes>, String> {
     log::debug!(
       "loading {} ({} bytes) via {}",
       digest.hash,
@@ -74,23 +71,13 @@ impl RemoteCacheConnection for ByteStore {
       .client
       .entry(&self.version_for_digest(&digest))
       .await
-      .map_err(|err| RemoteCacheError {
-        retryable: false,
-        msg: err.to_string(),
-      })?;
+      .map_err(|err| err.to_string())?;
     if let Some(ArtifactCacheEntry {
       archive_location: Some(url),
       ..
     }) = entry
     {
-      let data = self
-        .client
-        .get(&url)
-        .await
-        .map_err(|err| RemoteCacheError {
-          retryable: false,
-          msg: err.to_string(),
-        })?;
+      let data = self.client.get(&url).await.map_err(|err| err.to_string())?;
       Ok(Some(if digest.size_bytes == 0 && data == EMPTY_BYTES {
         Bytes::new()
       } else {
