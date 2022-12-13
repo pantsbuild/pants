@@ -51,6 +51,11 @@ _orgs = (
         "https://files.readme.io/a213f0f-coinbase-small.png",
     ),
     Org(
+        "Doctrine",
+        "https://www.doctrine.fr/",
+        "https://files.readme.io/8497e9c-doctrine-small.png",
+    ),
+    Org(
         "ESL Gaming",
         "https://about.eslgaming.com/",
         "https://files.readme.io/b63d33d-esl-small.png",
