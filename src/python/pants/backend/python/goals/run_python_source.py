@@ -15,9 +15,11 @@ from pants.backend.python.target_types import (
     PythonRunGoalUseSandboxField,
     PythonSourceField,
 )
+from pants.backend.python.target_types_rules import rules as python_target_types_rules
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import Pex, PexRequest
 from pants.backend.python.util_rules.pex_environment import PexEnvironment
+from pants.backend.python.util_rules.pex_from_targets import rules as pex_from_targets_rules
 from pants.core.goals.run import (
     RunDebugAdapterRequest,
     RunFieldSet,
@@ -114,4 +116,6 @@ def rules():
     return [
         *collect_rules(),
         *PythonSourceFieldSet.rules(),
+        *pex_from_targets_rules(),
+        *python_target_types_rules(),
     ]
