@@ -57,7 +57,7 @@ def rule_runner() -> RuleRunner:
             *protobuf_additional_fields.rules(),
             *protobuf_module_mapper_rules(),
             QueryRule(RunRequest, (PythonSourceFieldSet,)),
-            QueryRule(RunDebugAdapterRequest, (RunDebugAdapterRequest,)),
+            QueryRule(RunDebugAdapterRequest, (PythonSourceFieldSet,)),
         ],
         target_types=[
             ProtobufSourcesGeneratorTarget,
@@ -69,7 +69,11 @@ def rule_runner() -> RuleRunner:
     )
 
 
-def run_run_request(rule_runner: RuleRunner, target: Target) -> Tuple[int, str, str]:
+def run_run_request(
+    rule_runner: RuleRunner,
+    target: Target,
+    test_debug_adapter: bool = True,
+) -> Tuple[int, str, str]:
     run_request = rule_runner.request(RunRequest, [PythonSourceFieldSet.create(target)])
     run_process = InteractiveProcess(
         argv=run_request.args,
@@ -83,6 +87,24 @@ def run_run_request(rule_runner: RuleRunner, target: Target) -> Tuple[int, str, 
         result = rule_runner.run_interactive_process(run_process)
         stdout = mocked_console[1].get_stdout()
         stderr = mocked_console[1].get_stderr()
+
+    if test_debug_adapter:
+        debug_adapter_request = rule_runner.request(
+            RunDebugAdapterRequest, [PythonSourceFieldSet.create(target)]
+        )
+        debug_adapter_process = InteractiveProcess(
+            argv=debug_adapter_request.args,
+            env=debug_adapter_request.extra_env,
+            input_digest=debug_adapter_request.digest,
+            run_in_workspace=True,
+            immutable_input_digests=debug_adapter_request.immutable_input_digests,
+            append_only_caches=debug_adapter_request.append_only_caches,
+        )
+        with mock_console(rule_runner.options_bootstrapper) as mocked_console:
+            debug_adapter_result = rule_runner.run_interactive_process(debug_adapter_process)
+            assert debug_adapter_result.exit_code == result.exit_code, mocked_console[
+                1
+            ].get_stderr()
 
     return result.exit_code, stdout, stderr
 
@@ -217,11 +239,13 @@ def test_no_strip_pex_env_issues_12057(rule_runner: RuleRunner) -> None:
     ]
     rule_runner.set_options(args, env_inherit={"PATH", "PYENV_ROOT", "HOME"})
     target = rule_runner.get_target(Address("src", relative_file_path="app.py"))
-    exit_code, _, stderr = run_run_request(rule_runner, target)
+    exit_code, _, stderr = run_run_request(rule_runner, target, test_debug_adapter=False)
     assert exit_code == 42, stderr
 
 
-def test_no_leak_pex_root_issues_12055(rule_runner: RuleRunner) -> None:
+@pytest.mark.parametrize("run_in_sandbox", [False, True])
+def test_pex_root_location(rule_runner: RuleRunner, run_in_sandbox: bool) -> None:
+    # See issues #12055 and #17750.
     read_config_result = run_pants(["help-all"])
     read_config_result.assert_success()
     config_data = json.loads(read_config_result.stdout)
@@ -234,10 +258,10 @@ def test_no_leak_pex_root_issues_12055(rule_runner: RuleRunner) -> None:
     named_caches_dir = global_advanced_options["named_caches_dir"]
 
     sources = {
-        "src/app.py": "import os; print(os.environ['PEX_ROOT'])",
+        "src/app.py": "import os; print(__file__ + '\\n' + os.environ['PEX_ROOT'])",
         "src/BUILD": dedent(
-            """\
-            python_sources()
+            f"""\
+            python_sources(run_goal_use_sandbox={run_in_sandbox})
             """
         ),
     }
@@ -248,9 +272,16 @@ def test_no_leak_pex_root_issues_12055(rule_runner: RuleRunner) -> None:
     ]
     rule_runner.set_options(args, env_inherit={"PATH", "PYENV_ROOT", "HOME"})
     target = rule_runner.get_target(Address("src", relative_file_path="app.py"))
-    exit_code, stdout, _ = run_run_request(rule_runner, target)
+    exit_code, stdout, _ = run_run_request(rule_runner, target, test_debug_adapter=False)
     assert exit_code == 0
-    assert os.path.join(named_caches_dir, "pex_root") == stdout.strip()
+    app_file, pex_root = stdout.splitlines(keepends=False)
+    sandbox = os.path.dirname(os.path.dirname(app_file))
+    expected_pex_root = (
+        os.path.join(sandbox, ".", ".cache", "pex_root")
+        if run_in_sandbox
+        else os.path.join(named_caches_dir, "pex_root")
+    )
+    assert expected_pex_root == pex_root
 
 
 def test_local_dist(rule_runner: RuleRunner) -> None:

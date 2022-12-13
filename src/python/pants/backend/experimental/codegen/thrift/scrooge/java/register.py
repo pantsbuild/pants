@@ -1,6 +1,5 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-from pants.backend.codegen import export_codegen_goal
 from pants.backend.codegen.thrift.rules import rules as thrift_rules
 from pants.backend.codegen.thrift.scrooge.java.rules import rules as scrooge_java_rules
 from pants.backend.codegen.thrift.scrooge.rules import rules as scrooge_rules
@@ -29,7 +28,6 @@ def rules():
         *thrift_rules(),
         *scrooge_rules(),
         *scrooge_java_rules(),
-        *export_codegen_goal.rules(),
         # Re-export rules necessary to avoid rule graph errors.
         *config_files.rules(),
         *classpath.rules(),

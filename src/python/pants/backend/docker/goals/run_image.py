@@ -11,11 +11,10 @@ from pants.backend.docker.subsystems.docker_options import DockerOptions
 from pants.backend.docker.target_types import DockerImageRegistriesField, DockerImageSourceField
 from pants.backend.docker.util_rules.docker_binary import DockerBinary
 from pants.core.goals.package import BuiltPackage, PackageFieldSet
-from pants.core.goals.run import RunDebugAdapterRequest, RunFieldSet, RunRequest
+from pants.core.goals.run import RunFieldSet, RunRequest
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import WrappedTarget, WrappedTargetRequest
-from pants.engine.unions import UnionRule
 
 
 @dataclass(frozen=True)
@@ -60,17 +59,8 @@ async def docker_image_run_request(
     )
 
 
-@rule
-async def docker_image_run_debug_adapter_request(
-    field_set: DockerRunFieldSet,
-) -> RunDebugAdapterRequest:
-    raise NotImplementedError(
-        "Debugging a Docker image using a debug adapter has not yet been implemented."
-    )
-
-
 def rules():
     return [
         *collect_rules(),
-        UnionRule(RunFieldSet, DockerRunFieldSet),
+        *DockerRunFieldSet.rules(),
     ]

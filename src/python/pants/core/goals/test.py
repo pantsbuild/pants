@@ -63,6 +63,7 @@ from pants.option.option_types import BoolOption, EnumOption, IntOption, StrList
 from pants.util.collections import partition_sequentially
 from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
+from pants.util.memo import memoized
 from pants.util.meta import classproperty
 from pants.util.strutil import softwrap
 
@@ -267,7 +268,7 @@ class TestDebugAdapterRequest(TestDebugRequest):
     """
 
 
-@union(in_scope_types=[EnvironmentName])
+@union
 @dataclass(frozen=True)
 class TestFieldSet(FieldSet, metaclass=ABCMeta):
     """The fields necessary to run tests on a target."""
@@ -303,6 +304,9 @@ class TestRequest:
     tool_subsystem: ClassVar[type[SkippableSubsystem]]
     field_set_type: ClassVar[type[TestFieldSet]]
     partitioner_type: ClassVar[PartitionerType] = PartitionerType.DEFAULT_ONE_PARTITION_PER_INPUT
+
+    supports_debug: ClassVar[bool] = False
+    supports_debug_adapter: ClassVar[bool] = False
 
     __test__ = False
 
@@ -358,9 +362,16 @@ class TestRequest:
     def rules(cls) -> Iterable:
         yield from cls.partitioner_type.default_rules(cls, by_file=False)
 
+        yield UnionRule(TestFieldSet, cls.field_set_type)
         yield UnionRule(TestRequest, cls)
         yield UnionRule(TestRequest.PartitionRequest, cls.PartitionRequest)
         yield UnionRule(TestRequest.Batch, cls.Batch)
+
+        if not cls.supports_debug:
+            yield from _unsupported_debug_rules(cls)
+
+        if not cls.supports_debug_adapter:
+            yield from _unsupported_debug_adapter_rules(cls)
 
 
 class CoverageData(ABC):
@@ -470,7 +481,7 @@ class TestSubsystem(GoalSubsystem):
 
     @classmethod
     def activated(cls, union_membership: UnionMembership) -> bool:
-        return TestFieldSet in union_membership
+        return TestRequest in union_membership
 
     class EnvironmentAware:
         extra_env_vars = StrListOption(
@@ -955,6 +966,30 @@ async def get_filtered_environment(test_env_aware: TestSubsystem.EnvironmentAwar
     return TestExtraEnv(
         await Get(EnvironmentVars, EnvironmentVarsRequest(test_env_aware.extra_env_vars))
     )
+
+
+@memoized
+def _unsupported_debug_rules(cls: type[TestRequest]) -> Iterable:
+    """Returns a rule that implements TestDebugRequest by raising an error."""
+
+    @rule(_param_type_overrides={"request": cls.Batch})
+    async def get_test_debug_request(request: TestRequest.Batch) -> TestDebugRequest:
+        raise NotImplementedError("Testing this target with --debug is not yet supported.")
+
+    return collect_rules(locals())
+
+
+@memoized
+def _unsupported_debug_adapter_rules(cls: type[TestRequest]) -> Iterable:
+    """Returns a rule that implements TestDebugAdapterRequest by raising an error."""
+
+    @rule(_param_type_overrides={"request": cls.Batch})
+    async def get_test_debug_adapter_request(request: TestRequest.Batch) -> TestDebugAdapterRequest:
+        raise NotImplementedError(
+            "Testing this target type with a debug adapter is not yet supported."
+        )
+
+    return collect_rules(locals())
 
 
 # -------------------------------------------------------------------------------------------

@@ -40,15 +40,7 @@ from pants.backend.go.util_rules.goroot import GoRoot
 from pants.backend.go.util_rules.import_analysis import ImportConfig, ImportConfigRequest
 from pants.backend.go.util_rules.link import LinkedGoBinary, LinkGoBinaryRequest
 from pants.backend.go.util_rules.tests_analysis import GeneratedTestMain, GenerateTestMainRequest
-from pants.core.goals.test import (
-    TestDebugAdapterRequest,
-    TestDebugRequest,
-    TestExtraEnv,
-    TestFieldSet,
-    TestRequest,
-    TestResult,
-    TestSubsystem,
-)
+from pants.core.goals.test import TestExtraEnv, TestFieldSet, TestRequest, TestResult, TestSubsystem
 from pants.core.target_types import FileSourceField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
@@ -57,7 +49,6 @@ from pants.engine.internals.native_engine import EMPTY_DIGEST
 from pants.engine.process import FallibleProcessResult, Process, ProcessCacheScope
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import Dependencies, DependenciesRequest, SourcesField, Target, Targets
-from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
 
@@ -465,6 +456,7 @@ async def run_go_tests(
             import_path=import_path,
             sources_digest=pkg_digest.digest,
             sources_dir_path=pkg_analysis.dir_path,
+            pkg_target_address=field_set.address,
         )
 
     return TestResult.from_fallible_process_result(
@@ -475,21 +467,8 @@ async def run_go_tests(
     )
 
 
-@rule
-async def generate_go_tests_debug_request(_: GoTestRequest.Batch) -> TestDebugRequest:
-    raise NotImplementedError("This is a stub.")
-
-
-@rule
-async def generate_go_tests_debug_adapter_request(
-    _: GoTestRequest.Batch,
-) -> TestDebugAdapterRequest:
-    raise NotImplementedError("This is a stub.")
-
-
 def rules():
     return [
         *collect_rules(),
-        UnionRule(TestFieldSet, GoTestFieldSet),
         *GoTestRequest.rules(),
     ]

@@ -213,6 +213,7 @@ impl CommandRunner {
       tonic::transport::Channel::balance_list(vec![execution_endpoint].into_iter()),
       execution_concurrency_limit,
       execution_http_headers,
+      None,
     );
     let execution_client = Arc::new(ExecutionClient::new(execution_channel.clone()));
     let operations_client = Arc::new(OperationsClient::new(execution_channel.clone()));

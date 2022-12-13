@@ -34,8 +34,8 @@ def test_metadata_header_round_trip() -> None:
         requirements=reqset("ansicolors==0.1.0"),
         manylinux="manylinux2014",
         requirement_constraints={PipRequirement.parse("constraint")},
-        only_binary={PipRequirement.parse("bdist")},
-        no_binary={PipRequirement.parse("sdist")},
+        only_binary={"bdist"},
+        no_binary={"sdist"},
     )
     serialized_lockfile = input_metadata.add_header_to_lockfile(
         b"req1==1.0", regenerate_command="./pants lock", delimeter="#"
@@ -89,8 +89,8 @@ dave==3.1.4 \\
         requirements=reqset("ansicolors==0.1.0"),
         manylinux=None,
         requirement_constraints={PipRequirement.parse("constraint")},
-        only_binary={PipRequirement.parse("bdist")},
-        no_binary={PipRequirement.parse("sdist")},
+        only_binary={"bdist"},
+        no_binary={"sdist"},
     )
     result = metadata.add_header_to_lockfile(
         input_lockfile, regenerate_command="./pants lock", delimeter="#"
@@ -280,8 +280,8 @@ def test_is_valid_for_v3_metadata(is_tool: bool) -> None:
         # Everything below is new to v3+.
         manylinux=None,
         requirement_constraints={PipRequirement.parse("c1")},
-        only_binary={PipRequirement.parse("bdist")},
-        no_binary={PipRequirement.parse("sdist")},
+        only_binary={"bdist"},
+        no_binary={"sdist"},
     ).is_valid_for(
         is_tool=is_tool,
         expected_invalidation_digest="",
@@ -290,8 +290,8 @@ def test_is_valid_for_v3_metadata(is_tool: bool) -> None:
         user_requirements=reqset(),
         manylinux="manylinux2014",
         requirement_constraints={PipRequirement.parse("c2")},
-        only_binary={PipRequirement.parse("not-bdist")},
-        no_binary={PipRequirement.parse("not-sdist")},
+        only_binary={"not-bdist"},
+        no_binary={"not-sdist"},
     )
     assert result.failure_reasons == {
         InvalidPythonLockfileReason.CONSTRAINTS_FILE_MISMATCH,
