@@ -212,7 +212,7 @@ def test_coverage_of_multiple_packages(rule_runner: RuleRunner) -> None:
         [
             "--go-test-args=-v -bench=.",
             "--test-use-coverage",
-            "--go-test-coverage-include-patterns=foo/adder",
+            "--go-test-coverage-packages=foo/adder",
         ],
         env_inherit={"PATH"},
     )
