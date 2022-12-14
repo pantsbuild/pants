@@ -35,12 +35,29 @@ use crate::{
 };
 use tonic::{Code, Request, Status};
 
+mod byte_store;
+mod reapi;
+
 #[derive(Clone, Copy, Debug, strum_macros::EnumString)]
 #[strum(serialize_all = "snake_case")]
 pub enum RemoteCacheWarningsBehavior {
   Ignore,
   FirstOnly,
   Backoff,
+}
+
+#[async_trait]
+pub trait RemoteCacheProvider: Sync {
+  async fn update_action_result(
+    &self,
+    action_digest: Digest,
+    action_result: ActionResult,
+  ) -> Result<(), String>;
+  async fn get_action_result(
+    &self,
+    action_digest: Digest,
+    context: &Context,
+  ) -> Result<Option<ActionResult>, String>;
 }
 
 /// This `CommandRunner` implementation caches results remotely using the Action Cache service

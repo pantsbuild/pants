@@ -21,7 +21,7 @@ pub mod reapi;
 pub type ByteSource = Box<(dyn Fn(Range<usize>) -> Bytes + Send + Sync + 'static)>;
 
 #[async_trait]
-pub trait ByteStoreProvider: Sync {
+pub trait ByteStoreProvider: Sync + Send + 'static {
   async fn store_bytes(&self, digest: Digest, bytes: ByteSource) -> Result<(), String>;
   async fn load_bytes(&self, digest: Digest) -> Result<Option<Bytes>, String>;
 
@@ -40,7 +40,7 @@ pub trait ByteStoreProvider: Sync {
 
 #[derive(Clone)]
 pub(crate) struct ByteStore {
-  connection: Arc<dyn ByteStoreProvider + Sync + Send + 'static>,
+  connection: Arc<dyn ByteStoreProvider>,
 }
 
 impl fmt::Debug for ByteStore {
