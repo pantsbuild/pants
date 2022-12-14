@@ -41,13 +41,13 @@ Assuming you are using the ["resolves" feature for Python lockfiles](doc:python-
 To use the `export` goal to create a virtualenv:
 
 ```
-❯ ./pants export --symlink-python-virtualenv --resolve=python-default
+❯ ./pants export --py-resolve-format=symlinked_immutable_virtualenv --resolve=python-default
 Wrote symlink to immutable virtualenv for python-default (using Python 3.9.13) to dist/export/python/virtualenvs/python-default
 ```
 
 You can specify the `--resolve` flag [multiple times](doc:options#list-values) to export multiple virtualenvs at once.
 
-The `--symlink-python-virtualenv` option symlinks to an immutable, internal virtualenv that does not have `pip` installed in it. This method is faster, but you must be careful not to attempt to modify the virtualenv. If you omit this flag, Pants will create a standalone, mutable virtualenv that includes `pip`, and that you can modify, but this method is slower.
+The `--py-resolve-format=symlinked_immutable_virtualenv` option symlinks to an immutable, internal virtualenv that does not have `pip` installed in it. This method is faster, but you must be careful not to attempt to modify the virtualenv. If you omit this flag, Pants will create a standalone, mutable virtualenv that includes `pip`, and that you can modify, but this method is slower.
 
 ### Tool virtualenvs
 

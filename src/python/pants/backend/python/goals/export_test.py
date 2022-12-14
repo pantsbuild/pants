@@ -9,7 +9,7 @@ import pytest
 
 from pants.backend.python import target_types_rules
 from pants.backend.python.goals import export
-from pants.backend.python.goals.export import ExportVenvsRequest
+from pants.backend.python.goals.export import ExportVenvsRequest, PythonResolveExportFormat
 from pants.backend.python.lint.flake8 import subsystem as flake8_subsystem
 from pants.backend.python.target_types import PythonRequirementTarget
 from pants.backend.python.util_rules import pex_from_targets
@@ -39,11 +39,17 @@ def rule_runner() -> RuleRunner:
 
 
 @pytest.mark.parametrize("enable_resolves", [False, True])
-@pytest.mark.parametrize("symlink", [False, True])
+@pytest.mark.parametrize(
+    "py_resolve_format",
+    [
+        PythonResolveExportFormat.symlinked_immutable_virtualenv,
+        PythonResolveExportFormat.mutable_virtualenv,
+    ],
+)
 def test_export_venv_old_codepath(
     rule_runner: RuleRunner,
     enable_resolves: bool,
-    symlink: bool,
+    py_resolve_format: PythonResolveExportFormat,
 ) -> None:
     # We know that the current interpreter exists on the system.
     vinfo = sys.version_info
@@ -60,7 +66,7 @@ def test_export_venv_old_codepath(
         }
     )
 
-    symlink_flag = f"--{'' if symlink else 'no-'}export-symlink-python-virtualenv"
+    format_flag = f"--export-py-resolve-format={py_resolve_format.value}"
     rule_runner.set_options(
         [
             f"--python-interpreter-constraints=['=={current_interpreter}']",
@@ -70,7 +76,7 @@ def test_export_venv_old_codepath(
             "--python-invalid-lockfile-behavior=ignore",
             # Turn off python synthetic lockfile targets to make the test simpler.
             "--no-python-enable-lockfile-targets",
-            symlink_flag,
+            format_flag,
         ],
         env_inherit={"PATH", "PYENV_ROOT"},
     )
@@ -81,7 +87,7 @@ def test_export_venv_old_codepath(
     all_results = rule_runner.request(ExportResults, [ExportVenvsRequest(targets)])
 
     for result, resolve in zip(all_results, ["a", "b"] if enable_resolves else [""]):
-        if symlink:
+        if py_resolve_format == PythonResolveExportFormat.symlinked_immutable_virtualenv:
             assert len(result.post_processing_cmds) == 1
             ppc0 = result.post_processing_cmds[0]
             assert ppc0.argv[0:2] == ("ln", "-s")
@@ -130,10 +136,16 @@ def test_export_venv_old_codepath(
         assert reldirs == ["python/virtualenv", "python/virtualenvs/tools/flake8"]
 
 
-@pytest.mark.parametrize("symlink", [False, True])
+@pytest.mark.parametrize(
+    "py_resolve_format",
+    [
+        PythonResolveExportFormat.symlinked_immutable_virtualenv,
+        PythonResolveExportFormat.mutable_virtualenv,
+    ],
+)
 def test_export_venv_new_codepath(
     rule_runner: RuleRunner,
-    symlink: bool,
+    py_resolve_format: PythonResolveExportFormat,
 ) -> None:
     # We know that the current interpreter exists on the system.
     vinfo = sys.version_info
@@ -150,7 +162,7 @@ def test_export_venv_new_codepath(
         }
     )
 
-    symlink_flag = f"--{'' if symlink else 'no-'}export-symlink-python-virtualenv"
+    format_flag = f"--export-py-resolve-format={py_resolve_format.value}"
     rule_runner.set_options(
         [
             f"--python-interpreter-constraints=['=={current_interpreter}']",
@@ -160,14 +172,14 @@ def test_export_venv_new_codepath(
             "--export-resolve=flake8",
             # Turn off lockfile validation to make the test simpler.
             "--python-invalid-lockfile-behavior=ignore",
-            symlink_flag,
+            format_flag,
         ],
         env_inherit={"PATH", "PYENV_ROOT"},
     )
     all_results = rule_runner.request(ExportResults, [ExportVenvsRequest(targets=())])
 
     for result, resolve in zip(all_results, ["a", "b", "flake8"]):
-        if symlink:
+        if py_resolve_format == PythonResolveExportFormat.symlinked_immutable_virtualenv:
             assert len(result.post_processing_cmds) == 1
             ppc0 = result.post_processing_cmds[0]
             assert ppc0.argv[0:2] == ("ln", "-s")
