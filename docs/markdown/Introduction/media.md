@@ -8,6 +8,14 @@ updatedAt: "2022-09-08T22:02:38.457Z"
 ---
 ## Posts & Articles
 
+### Doctrine.fr Engineering blog
+
+Nov 25, 2022  
+[**Tutorial**] "Industrialized Python code with Pylint plugins in Pants"  
+<https://medium.com/doctrine/industrialized-python-code-with-pylint-plugins-in-pants-321d9cbad07a>
+
+> What if you needed to put strict code convention rules through a linter and apply them with the help of Pants?
+
 ### Coinbase Blog
 
 September 1, 2022  
@@ -26,9 +34,10 @@ August 24, 2022
 
 ### Astranis Space Technologies
 
-August 12, 2022 
+August 12, 2022  
 [**Case Study**] "Astranis Case Study: Wrangling Python In a Monorepo"
 <https://blog.pantsbuild.org/astranis-case-study-wrangling-python-in-a-monorepo/>
+
 > <i>"...We found it incredibly easy to hook in our existing remote caching systems to Pants, and added other nice features like running tailor in a check-only mode to highlight any inconsistencies in our repo. As a side benefit, Pants has helped us gain better insight into our repository by being able to easily scan for and report the transitive dependencies of modules. Having that insight has helped us plan out how to minimize the coupling of our modules..."</i>
 
 ### Dev.to
@@ -246,6 +255,11 @@ Pants Build 2 Tour: <https://www.youtube.com/playlist?list=PLwPRXwjURiOzXjgqydxZ
 
 "A running example of the Pants Build system and Python packaging with PEX."  
 <https://github.com/StephanErb/pexample>
+
+### Example: Pylint custom linter rules for a Python project using Pants
+
+"A ready-to-use example of a repository that contains a Python project and Pylint custom linter rules"  
+<https://github.com/DoctrineLegal/demo-pants-pylint>
 
 > 📘 Suggest a Resource
 > 
