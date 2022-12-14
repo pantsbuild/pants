@@ -10,8 +10,8 @@ use mock::StubCAS;
 use testutil::data::{TestData, TestDirectory};
 use workunit_store::WorkunitStore;
 
-use crate::remote::ByteStore;
-use crate::remote_trait::RemoteCacheConnection;
+use crate::remote::reapi::ByteStore;
+use crate::remote::ByteStoreProvider;
 use crate::tests::{big_file_bytes, big_file_fingerprint, new_cas};
 use crate::MEGABYTES;
 
@@ -336,12 +336,11 @@ pub async fn load_directory_proto_bytes(
 }
 
 async fn load_bytes(store: &ByteStore, digest: Digest) -> Result<Option<Bytes>, String> {
-  store.load_bytes(digest).await.map_err(|err| err.msg)
+  store.load_bytes(digest).await
 }
 
 async fn store_bytes(store: &ByteStore, bytes: Bytes) -> Result<(), String> {
   store
     .store_bytes(Digest::of_bytes(&bytes), Box::new(move |r| bytes.slice(r)))
     .await
-    .map_err(|err| err.msg)
 }
