@@ -6,6 +6,7 @@ import dataclasses
 import hashlib
 import os.path
 from dataclasses import dataclass
+from pathlib import PurePath
 from typing import Iterable
 
 from pants.backend.go.util_rules import cgo, coverage
@@ -35,8 +36,10 @@ from pants.engine.fs import (
     CreateDigest,
     Digest,
     DigestContents,
+    DigestEntries,
     DigestSubset,
     FileContent,
+    FileEntry,
     MergeDigests,
     PathGlobs,
 )
@@ -66,6 +69,7 @@ class BuildGoPackageRequest(EngineAwareParameter):
         cgo_files: tuple[str, ...] = (),
         cgo_flags: CGoCompilerFlags | None = None,
         c_files: tuple[str, ...] = (),
+        header_files: tuple[str, ...] = (),
         cxx_files: tuple[str, ...] = (),
         objc_files: tuple[str, ...] = (),
         fortran_files: tuple[str, ...] = (),
@@ -99,6 +103,7 @@ class BuildGoPackageRequest(EngineAwareParameter):
         self.cgo_files = cgo_files
         self.cgo_flags = cgo_flags
         self.c_files = c_files
+        self.header_files = header_files
         self.cxx_files = cxx_files
         self.objc_files = objc_files
         self.fortran_files = fortran_files
@@ -122,6 +127,7 @@ class BuildGoPackageRequest(EngineAwareParameter):
                 self.cgo_files,
                 self.cgo_flags,
                 self.c_files,
+                self.header_files,
                 self.cxx_files,
                 self.objc_files,
                 self.fortran_files,
@@ -151,6 +157,7 @@ class BuildGoPackageRequest(EngineAwareParameter):
             f"cgo_files={self.cgo_files}, "
             f"cgo_flags={self.cgo_flags}, "
             f"c_files={self.c_files}, "
+            f"header_files={self.header_files}, "
             f"cxx_files={self.cxx_files}, "
             f"objc_files={self.objc_files}, "
             f"fortran_files={self.fortran_files}, "
@@ -182,6 +189,7 @@ class BuildGoPackageRequest(EngineAwareParameter):
             and self.cgo_files == other.cgo_files
             and self.cgo_flags == other.cgo_flags
             and self.c_files == other.c_files
+            and self.header_files == other.header_files
             and self.cxx_files == other.cxx_files
             and self.objc_files == other.objc_files
             and self.fortran_files == other.fortran_files
@@ -369,6 +377,55 @@ async def _any_file_is_golang_assembly(
     return False
 
 
+# Copy header files to names which use platform independent names. For example, defs_linux_amd64.h
+# becomes defs_GOOS_GOARCH.h.
+#
+# See https://github.com/golang/go/blob/1c05968c9a5d6432fc6f30196528f8f37287dd3d/src/cmd/go/internal/work/exec.go#L867-L892
+# for particulars.
+@rule_helper
+async def _maybe_copy_headers_to_platform_independent_names(
+    input_digest: Digest,
+    dir_path: str,
+    header_files: tuple[str, ...],
+    goroot: GoRoot,
+) -> Digest | None:
+    goos_goarch = f"_{goroot.goos}_{goroot.goarch}"
+    goos = f"_{goroot.goos}"
+    goarch = f"_{goroot.goarch}"
+
+    digest_entries = await Get(DigestEntries, Digest, input_digest)
+    digest_entries_by_path: dict[str, FileEntry] = {
+        entry.path: entry for entry in digest_entries if isinstance(entry, FileEntry)
+    }
+
+    new_digest_entries: list[FileEntry] = []
+    for header_file in header_files:
+        header_file_path = PurePath(dir_path, header_file)
+
+        entry = digest_entries_by_path.get(str(header_file))
+        if not entry:
+            continue
+
+        stem = header_file_path.stem
+        new_stem: str | None = None
+        if stem.endswith(goos_goarch):
+            new_stem = stem[0 : -len(goos_goarch)] + "_GOOS_GOARCH"
+        elif stem.endswith(goos):
+            new_stem = stem[0 : -len(goos)] + "_GOOS"
+        elif stem.endswith(goarch):
+            new_stem = stem[0 : -len(goarch)] + "_GOARCH"
+
+        if new_stem:
+            new_header_file_path = PurePath(dir_path, f"{new_stem}{header_file_path.suffix}")
+            new_digest_entries.append(dataclasses.replace(entry, path=str(new_header_file_path)))
+
+    if new_digest_entries:
+        digest = await Get(Digest, CreateDigest(new_digest_entries))
+        return digest
+    else:
+        return None
+
+
 # NB: We must have a description for the streaming of this rule to work properly
 # (triggered by `FallibleBuiltGoPackage` subclassing `EngineAwareReturnType`).
 @rule(desc="Compile with Go", level=LogLevel.DEBUG)
@@ -488,6 +545,18 @@ async def build_go_package(
         )
         s_files = []  # Clear s_files since assembly has already been handled in cgo rules.
 
+    # Copy header files with platform-specific values in their name to platform independent names.
+    # For example, defs_linux_amd64.h becomes defs_GOOS_GOARCH.h.
+    copied_headers_digest = await _maybe_copy_headers_to_platform_independent_names(
+        input_digest=request.digest,
+        dir_path=request.dir_path,
+        header_files=request.header_files,
+        goroot=go_root,
+    )
+    if copied_headers_digest:
+        unmerged_input_digests.append(copied_headers_digest)
+
+    # Merge all of the input digests together.
     input_digest = await Get(
         Digest,
         MergeDigests(unmerged_input_digests),
@@ -500,13 +569,18 @@ async def build_go_package(
     # Note: The assembly files cannot be assembled at this point because a similar process happens from Go to
     # assembly: The Go compiler generates a `go_asm.h` header file with metadata about the Go code in the package.
     symabis_path: str | None = None
+    extra_assembler_flags = tuple(
+        *request.build_opts.assembler_flags, *request.pkg_specific_assembler_flags
+    )
     if s_files:
         symabis_fallible_result = await Get(
             FallibleGenerateAssemblySymabisResult,
             GenerateAssemblySymabisRequest(
                 compilation_input=input_digest,
                 s_files=tuple(s_files),
+                import_path=request.import_path,
                 dir_path=request.dir_path,
+                extra_assembler_flags=extra_assembler_flags,
             ),
         )
         symabis_result = symabis_fallible_result.result
@@ -603,6 +677,8 @@ async def build_go_package(
 
     compilation_digest = compile_result.output_digest
 
+    # TODO: Compile any C files if this package does not use Cgo.
+
     # If any assembly files are present, then assemble them. The `compilation_digest` will contain the
     # assembly header `go_asm.h` in the object directory.
     if s_files:
@@ -626,11 +702,8 @@ async def build_go_package(
                 input_digest=assembly_input_digest,
                 s_files=tuple(sorted(s_files)),
                 dir_path=request.dir_path,
-                asm_header_path=asm_header_path,
                 import_path=request.import_path,
-                extra_assembler_flags=tuple(
-                    *request.build_opts.assembler_flags, *request.pkg_specific_assembler_flags
-                ),
+                extra_assembler_flags=extra_assembler_flags,
             ),
         )
         assembly_result = assembly_fallible_result.result
