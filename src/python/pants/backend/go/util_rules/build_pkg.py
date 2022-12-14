@@ -402,7 +402,7 @@ async def _maybe_copy_headers_to_platform_independent_names(
     for header_file in header_files:
         header_file_path = PurePath(dir_path, header_file)
 
-        entry = digest_entries_by_path.get(str(header_file))
+        entry = digest_entries_by_path.get(str(header_file_path))
         if not entry:
             continue
 
