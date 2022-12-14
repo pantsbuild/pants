@@ -38,7 +38,7 @@ jobs:
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
       name: Deploy to S3
-      run: ./build-support/bin/deploy_to_s3.py
+      run: ./build-support/bin/deploy_to_s3.py --scope tags/pantsbuild.pants
 name: Record Release Commit
 'on':
   push:
