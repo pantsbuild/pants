@@ -834,16 +834,14 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
                 },
                 {
                     "name": "Create Release -> Commit Mapping",
-                    # N.B.: The "literal suffix" mentioned below will only be the actual correct
-                    # literal syntax on rendering of the yaml document - confusing. That literal
-                    # suffix syntax is `^{commit}`.
+                    # The `git rev-parse` subshell below is used to obtain the tagged commit sha.
+                    # The syntax it uses is tricky, but correct. The literal suffix `^{commit}` gets
+                    # the sha of the commit object that is the tag's target (as opposed to the sha
+                    # of the tag object itself). Due to Python f-strings, the nearness of shell
+                    # ${VAR} syntax to it and the ${{ github }} syntax ... this is a confusing read.
                     "run": dedent(
                         f"""\
                         tag="{gha_expr("steps.determine-tag.outputs.release-tag")}"
-
-                        # Tricky syntax, but correct. The literal suffix `^{{commit}}` gets
-                        # the sha of the commit object that is the tag's target (as opposed
-                        # to the sha of the tag object itself).
                         commit="$(git rev-parse ${{tag}}^{{commit}})"
 
                         echo "Recording tag ${{tag}} is of commit ${{commit}}"

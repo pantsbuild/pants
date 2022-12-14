@@ -23,13 +23,6 @@ jobs:
     - name: Create Release -> Commit Mapping
       run: 'tag="${{ steps.determine-tag.outputs.release-tag }}"
 
-
-        # Tricky syntax, but correct. The literal suffix `^{commit}` gets
-
-        # the sha of the commit object that is the tag''s target (as opposed
-
-        # to the sha of the tag object itself).
-
         commit="$(git rev-parse ${tag}^{commit})"
 
 
