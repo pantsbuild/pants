@@ -66,6 +66,5 @@ module = [
     "ijson.*",
     "pex.*",
     "psutil",
-    "setproctitle",
 ]
 ignore_missing_imports = true
