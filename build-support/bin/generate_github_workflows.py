@@ -240,11 +240,11 @@ def install_go() -> Step:
     }
 
 
-def deploy_to_s3() -> Step:
+def deploy_to_s3(when: str = "github.event_name == 'push'") -> Step:
     return {
         "name": "Deploy to S3",
         "run": "./build-support/bin/deploy_to_s3.py",
-        "if": "github.event_name == 'push'",
+        "if": when,
         "env": {
             "AWS_SECRET_ACCESS_KEY": f"{gha_expr('secrets.AWS_SECRET_ACCESS_KEY')}",
             "AWS_ACCESS_KEY_ID": f"{gha_expr('secrets.AWS_ACCESS_KEY_ID')}",
@@ -799,6 +799,67 @@ def cache_comparison_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
     return jobs, cc_inputs
 
 
+def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
+    inputs, env = workflow_dispatch_inputs([WorkflowInput("TAG", "string")])
+
+    jobs = {
+        "publish-tag-to-commit-mapping": {
+            "runs-on": "ubuntu-latest",
+            "if": IS_PANTS_OWNER,
+            "steps": [
+                {
+                    "name": "Determine Release Tag",
+                    "id": "determine-tag",
+                    "env": env,
+                    "run": dedent(
+                        """\
+                        if [[ -n "$TAG" ]]; then
+                            tag="$TAG"
+                        else
+                            tag="${GITHUB_REF#refs/tags/}"
+                        fi
+                        if [[ "${tag}" =~ ^release_.+$ ]]; then
+                            echo "release-tag=${tag}" >> $GITHUB_OUTPUT
+                        else
+                            echo "::error::Release tag '${tag}' must match 'release_.+'."
+                            exit 1
+                        fi
+                        """
+                    ),
+                },
+                {
+                    "name": "Checkout Pants at Release Tag",
+                    "uses": "actions/checkout@v3",
+                    "with": {"ref": f"{gha_expr('steps.determine-tag.outputs.release-tag')}"},
+                },
+                {
+                    "name": "Create Release -> Commit Mapping",
+                    # The `git rev-parse` subshell below is used to obtain the tagged commit sha.
+                    # The syntax it uses is tricky, but correct. The literal suffix `^{commit}` gets
+                    # the sha of the commit object that is the tag's target (as opposed to the sha
+                    # of the tag object itself). Due to Python f-strings, the nearness of shell
+                    # ${VAR} syntax to it and the ${{ github }} syntax ... this is a confusing read.
+                    "run": dedent(
+                        f"""\
+                        tag="{gha_expr("steps.determine-tag.outputs.release-tag")}"
+                        commit="$(git rev-parse ${{tag}}^{{commit}})"
+
+                        echo "Recording tag ${{tag}} is of commit ${{commit}}"
+                        mkdir -p dist/deploy/tags/pantsbuild.pants
+                        echo "${{commit}}" > "dist/deploy/tags/pantsbuild.pants/${{tag}}"
+                        """
+                    ),
+                },
+                deploy_to_s3(
+                    when="github.event_name == 'push' || github.event_name == 'workflow_dispatch'"
+                ),
+            ],
+        }
+    }
+
+    return jobs, inputs
+
+
 # ----------------------------------------------------------------------
 # Main file
 # ----------------------------------------------------------------------
@@ -975,12 +1036,26 @@ def generate() -> dict[Path, str]:
         Dumper=NoAliasDumper,
     )
 
+    release_jobs, release_inputs = release_jobs_and_inputs()
+    release_yaml = yaml.dump(
+        {
+            "name": "Record Release Commit",
+            "on": {
+                "push": {"tags": ["release_*"]},
+                "workflow_dispatch": {"inputs": release_inputs},
+            },
+            "jobs": release_jobs,
+        },
+        Dumper=NoAliasDumper,
+    )
+
     return {
         Path(".github/workflows/audit.yaml"): f"{HEADER}\n\n{audit_yaml}",
         Path(".github/workflows/cache_comparison.yaml"): f"{HEADER}\n\n{cache_comparison_yaml}",
         Path(".github/workflows/cancel.yaml"): f"{HEADER}\n\n{cancel_yaml}",
         Path(".github/workflows/test.yaml"): f"{HEADER}\n\n{test_yaml}",
         Path(".github/workflows/test-cron.yaml"): f"{HEADER}\n\n{test_cron_yaml}",
+        Path(".github/workflows/release.yaml"): f"{HEADER}\n\n{release_yaml}",
     }
 
 
