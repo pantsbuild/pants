@@ -142,6 +142,7 @@ async def generate_go_assembly_symabisfile(
             },
             description=f"Generate symabis metadata for assembly files for {request.dir_path}",
             output_files=(symabis_path,),
+            replace_sandbox_root_in_args=True,
         ),
     )
     if symabis_result.exit_code != 0:
@@ -190,6 +191,7 @@ async def assemble_go_assembly_files(
                 },
                 description=f"Assemble {s_file} with Go",
                 output_files=(obj_output_path(s_file),),
+                replace_sandbox_root_in_args=True,
             ),
         )
         for s_file in request.s_files
