@@ -107,7 +107,7 @@ impl ImmutableInputs {
         self
           .0
           .store
-          .materialize_file(dest.clone(), digest, Permissions::ReadOnly, is_executable)
+          .materialize_file(dest.clone(), digest, Permissions::Writable, is_executable)
           .await?;
 
         // Now that we've successfully initialized the destination, forget the TempDir so that it
