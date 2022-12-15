@@ -36,14 +36,14 @@ use std::time::Duration;
 use fs::{DirectoryDigest, Permissions, RelativePath};
 use hashing::{Digest, Fingerprint};
 use process_execution::{
-  local::KeepSandboxes, CacheContentBehavior, Context, ImmutableInputs, InputDigests, NamedCaches,
-  Platform, ProcessCacheScope, ProcessExecutionStrategy,
+  local::KeepSandboxes, CacheContentBehavior, Context, InputDigests, NamedCaches, Platform,
+  ProcessCacheScope, ProcessExecutionStrategy,
 };
 use prost::Message;
 use protos::gen::build::bazel::remote::execution::v2::{Action, Command};
 use protos::gen::buildbarn::cas::UncachedActionResult;
 use protos::require_digest;
-use store::Store;
+use store::{ImmutableInputs, Store};
 use structopt::StructOpt;
 use workunit_store::{in_workunit, Level, WorkunitStore};
 
@@ -362,7 +362,13 @@ async fn main() {
 
   if let Some(output) = args.materialize_output_to {
     store
-      .materialize_directory(output, result.output_directory, Permissions::Writable)
+      .materialize_directory(
+        output,
+        result.output_directory,
+        &BTreeSet::new(),
+        None,
+        Permissions::Writable,
+      )
       .await
       .unwrap();
   }

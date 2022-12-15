@@ -17,6 +17,7 @@ from pants.backend.shell.target_types import (
 from pants.backend.shell.util_rules.shell_command import (
     GenerateFilesFromShellCommandRequest,
     RunShellCommand,
+    ShellCommandProcessFromTargetRequest,
     ShellCommandProcessRequest,
 )
 from pants.backend.shell.util_rules.shell_command import rules as shell_command_rules
@@ -26,15 +27,16 @@ from pants.core.target_types import rules as core_target_type_rules
 from pants.core.util_rules import archive, source_files
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
+from pants.engine.environment import EnvironmentName
 from pants.engine.fs import EMPTY_SNAPSHOT, DigestContents
-from pants.engine.process import Process
+from pants.engine.process import Process, ProcessExecutionFailure
 from pants.engine.target import (
     GeneratedSources,
     MultipleSourcesField,
     TransitiveTargets,
     TransitiveTargetsRequest,
 )
-from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error
 
 
 @pytest.fixture
@@ -47,6 +49,7 @@ def rule_runner() -> RuleRunner:
             *core_target_type_rules(),
             QueryRule(GeneratedSources, [GenerateFilesFromShellCommandRequest]),
             QueryRule(Process, [ShellCommandProcessRequest]),
+            QueryRule(Process, [EnvironmentName, ShellCommandProcessFromTargetRequest]),
             QueryRule(RunRequest, [RunShellCommand]),
             QueryRule(SourceFiles, [SourceFilesRequest]),
             QueryRule(TransitiveTargets, [TransitiveTargetsRequest]),
@@ -96,7 +99,7 @@ def test_sources_and_files(rule_runner: RuleRunner) -> None:
                 """\
                 experimental_shell_command(
                   name="hello",
-                  dependencies=[":build-utils", ":files"],
+                  execution_dependencies=[":build-utils", ":files"],
                   tools=[
                     "bash",
                     "cat",
@@ -104,7 +107,8 @@ def test_sources_and_files(rule_runner: RuleRunner) -> None:
                     "mkdir",
                     "tee",
                   ],
-                  outputs=["message.txt", "res/"],
+                  output_files=["message.txt"],
+                  output_directories=["res"],
                   command="./script.sh",
                 )
 
@@ -148,7 +152,7 @@ def test_quotes_command(rule_runner: RuleRunner) -> None:
                   name="quotes",
                   tools=["echo", "tee"],
                   command='echo "foo bar" | tee out.log',
-                  outputs=["out.log"],
+                  output_files=["out.log"],
                 )
                 """
             ),
@@ -170,7 +174,7 @@ def test_chained_shell_commands(rule_runner: RuleRunner) -> None:
                 experimental_shell_command(
                   name="msg",
                   tools=["echo"],
-                  outputs=["msg"],
+                  output_files=["msg"],
                   command="echo 'shell_command:a' > msg",
                 )
                 """
@@ -180,9 +184,9 @@ def test_chained_shell_commands(rule_runner: RuleRunner) -> None:
                 experimental_shell_command(
                   name="msg",
                   tools=["cp", "echo"],
-                  outputs=["msg"],
+                  output_files=["msg"],
                   command="cp ../a/msg . ; echo 'shell_command:b' >> msg",
-                  dependencies=["src/a:msg"],
+                  execution_dependencies=["src/a:msg"],
                 )
                 """
             ),
@@ -267,7 +271,7 @@ def test_shell_command_masquerade_as_a_files_target(rule_runner: RuleRunner) -> 
                   name="content-gen",
                   command="echo contents > contents.txt",
                   tools=["echo"],
-                  outputs=["contents.txt"]
+                  output_files=["contents.txt"]
                 )
                 """
             ),
@@ -309,7 +313,7 @@ def test_package_dependencies(caplog, rule_runner: RuleRunner) -> None:
                   name="msg-gen",
                   command="echo message > msg.txt",
                   tools=["echo"],
-                  outputs=["msg.txt"],
+                  output_files=["msg.txt"],
                 )
 
                 archive(
@@ -323,7 +327,7 @@ def test_package_dependencies(caplog, rule_runner: RuleRunner) -> None:
                   command="ls .",
                   tools=["ls"],
                   log_output=True,
-                  dependencies=[":msg-archive"],
+                  execution_dependencies=[":msg-archive"],
                 )
                 """
             ),
@@ -338,6 +342,143 @@ def test_package_dependencies(caplog, rule_runner: RuleRunner) -> None:
         [
             (logging.INFO, "msg-archive.zip\n"),
         ],
+    )
+
+
+def test_execution_dependencies(caplog, rule_runner: RuleRunner) -> None:
+    caplog.set_level(logging.INFO)
+    caplog.clear()
+
+    rule_runner.write_files(
+        {
+            "src/BUILD": dedent(
+                """\
+                experimental_shell_command(
+                  name="a1",
+                  command="echo message > msg.txt",
+                  outputs=["msg.txt"],
+                )
+
+                experimental_shell_command(
+                    name="a2",
+                    tools=["cat"],
+                    command="cat msg.txt > msg2.txt",
+                    execution_dependencies=[":a1",],
+                    outputs=["msg2.txt",],
+                )
+
+                # Fails because runtime dependencies are not exported
+                # transitively
+                experimental_shell_command(
+                    name="expect_fail_1",
+                    tools=["cat"],
+                    command="cat msg.txt",
+                    execution_dependencies=[":a2",],
+                )
+
+                # Fails because `output_dependencies` are not available at runtime
+                experimental_shell_command(
+                    name="expect_fail_2",
+                    tools=["cat"],
+                    command="cat msg.txt",
+                    execution_dependencies=(),
+                    output_dependencies=[":a1"],
+                )
+
+                # Fails because runtime dependencies are not fetched transitively
+                # even if the root is requested through `output_dependencies`
+                experimental_shell_command(
+                    name="expect_fail_3",
+                    tools=["cat"],
+                    command="cat msg.txt",
+                    output_dependencies=[":a2"],
+                )
+
+                # Succeeds because `a1` and `a2` are requested directly
+                experimental_shell_command(
+                    name="expect_success_1",
+                    tools=["cat"],
+                    command="cat msg.txt msg2.txt > output.txt",
+                    execution_dependencies=[":a1", ":a2",],
+                    outputs=["output.txt"],
+                )
+
+                # Succeeds becuase `a1` and `a2` are requested directly and `output_dependencies`
+                # are made available at runtime
+                experimental_shell_command(
+                    name="expect_success_2",
+                    tools=["cat"],
+                    command="cat msg.txt msg2.txt > output.txt",
+                    output_dependencies=[":a1", ":a2",],
+                    outputs=["output.txt"],
+                )
+                """
+            ),
+        }
+    )
+
+    with engine_error(ProcessExecutionFailure):
+        assert_shell_command_result(
+            rule_runner, Address("src", target_name="expect_fail_1"), expected_contents={}
+        )
+    with engine_error(ProcessExecutionFailure):
+        assert_shell_command_result(
+            rule_runner, Address("src", target_name="expect_fail_2"), expected_contents={}
+        )
+    with engine_error(ProcessExecutionFailure):
+        assert_shell_command_result(
+            rule_runner, Address("src", target_name="expect_fail_3"), expected_contents={}
+        )
+    assert_shell_command_result(
+        rule_runner,
+        Address("src", target_name="expect_success_1"),
+        expected_contents={"src/output.txt": "message\nmessage\n"},
+    )
+    assert_shell_command_result(
+        rule_runner,
+        Address("src", target_name="expect_success_2"),
+        expected_contents={"src/output.txt": "message\nmessage\n"},
+    )
+
+
+def test_old_style_dependencies(caplog, rule_runner: RuleRunner) -> None:
+    caplog.set_level(logging.INFO)
+    caplog.clear()
+
+    rule_runner.write_files(
+        {
+            "src/BUILD": dedent(
+                """\
+                experimental_shell_command(
+                  name="a1",
+                  command="echo message > msg.txt",
+                  outputs=["msg.txt"],
+                )
+
+                experimental_shell_command(
+                    name="a2",
+                    tools=["cat"],
+                    command="cat msg.txt > msg2.txt",
+                    dependencies=[":a1",],
+                    outputs=["msg2.txt",],
+                )
+
+                experimental_shell_command(
+                    name="expect_success",
+                    tools=["cat"],
+                    command="cat msg.txt msg2.txt > output.txt",
+                    dependencies=[":a1", ":a2",],
+                    outputs=["output.txt"],
+                )
+                """
+            ),
+        }
+    )
+
+    assert_shell_command_result(
+        rule_runner,
+        Address("src", target_name="expect_success"),
+        expected_contents={"src/output.txt": "message\nmessage\n"},
     )
 
 
@@ -390,7 +531,7 @@ def test_shell_command_boot_script(rule_runner: RuleRunner) -> None:
     )
 
     tgt = rule_runner.get_target(Address("src", target_name="boot-script-test"))
-    res = rule_runner.request(Process, [ShellCommandProcessRequest(tgt)])
+    res = rule_runner.request(Process, [ShellCommandProcessFromTargetRequest(tgt)])
     assert "bash" in res.argv[0]
     assert res.argv[1:] == (
         "-c",

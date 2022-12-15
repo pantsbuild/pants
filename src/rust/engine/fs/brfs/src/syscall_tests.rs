@@ -1,3 +1,5 @@
+// Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
+// Licensed under the Apache License, Version 2.0 (see LICENSE).
 // TODO: Write a bunch more syscall-y tests to test that each syscall for each file/directory type
 // acts as we expect.
 

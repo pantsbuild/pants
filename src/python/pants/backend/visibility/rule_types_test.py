@@ -20,6 +20,7 @@ from pants.backend.visibility.rule_types import (
     flatten,
 )
 from pants.backend.visibility.rules import rules as visibility_rules
+from pants.base.exceptions import MappingError
 from pants.core.target_types import FilesGeneratorTarget, GenericTarget, ResourcesGeneratorTarget
 from pants.engine.addresses import Address, Addresses, AddressInput
 from pants.engine.internals.dep_rules import (
@@ -49,6 +50,20 @@ def parse_rule(rule: str, relpath: str = "test/path") -> VisibilityRule:
 
 def parse_ruleset(rules: Any, build_file: str = "test/path/BUILD") -> VisibilityRuleSet:
     return VisibilityRuleSet.parse(build_file, rules)
+
+
+def test_dead_ruleset() -> None:
+    err = softwrap(
+        """\
+        The rule set will never apply to anything, for the rules: \\('src/\\*', '!\\*'\\)
+        """
+    )
+    with pytest.raises(BuildFileVisibilityRulesError, match=err):
+        # These rules will never apply.
+        parse_ruleset(("", "src/*", "!*"))
+
+    # Ignore match-none selectors if there are others that do match on something.
+    parse_ruleset((("", "foo"), "src/*", "!*"))
 
 
 @pytest.mark.parametrize(
@@ -594,7 +609,7 @@ def test_dependency_rules(rule_runner: RuleRunner, caplog) -> None:
         expect_logged=[
             (
                 logging.DEBUG,
-                "WARN: type=target address=src/a/a2:joker other=src/a:a rule='?*' "
+                "WARN: type=target address=src/a/a2:joker [src/a/a2] other=src/a:a [src/a] rule='?*' "
                 "src/a/a2/BUILD: ?*",
             ),
         ],
@@ -616,7 +631,7 @@ def test_dependency_rules(rule_runner: RuleRunner, caplog) -> None:
         expect_logged=[
             (
                 logging.DEBUG,
-                "DENY: type=resources address=src/a:internal other=src/b:b rule='!*' "
+                "DENY: type=resources address=src/a:internal [src/a] other=src/b:b [src/b] rule='!*' "
                 "src/a/BUILD: ., !*",
             ),
         ],
@@ -635,7 +650,7 @@ def test_dependency_rules(rule_runner: RuleRunner, caplog) -> None:
         expect_logged=[
             (
                 logging.DEBUG,
-                "DENY: type=resources address=src/a:internal other=src/b:b rule='!*' "
+                "DENY: type=resources address=src/a:internal [src/a] other=src/b:b [src/b] rule='!*' "
                 "src/a/BUILD: ., !*",
             ),
         ],
@@ -861,3 +876,28 @@ def test_relpath_for_file_targets(rule_runner: RuleRunner) -> None:
         "anchor-mode/invoked/origin/file1.inv:../inv",
         ("anchor-mode/invoked/dependency/file2.inv:../inv", DependencyRuleAction.ALLOW),
     )
+
+
+def test_single_rules_declaration_per_build_file(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "test/BUILD": dedent(
+                """
+                __dependencies_rules__(
+                  ("*", "!*"),
+                )
+
+                __dependencies_rules__(
+                  ("*", "*"),
+                )
+                """
+            ),
+        },
+    )
+
+    msg = "BuildFileVisibilityRulesError: There must be at most one each"
+    with engine_error(MappingError, contains=msg):
+        assert_dependency_rules(
+            rule_runner,
+            "test",
+        )

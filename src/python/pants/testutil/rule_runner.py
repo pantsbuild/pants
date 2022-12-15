@@ -26,6 +26,7 @@ from typing import (
     Type,
     TypeVar,
     cast,
+    overload,
 )
 
 from pants.base.build_root import BuildRoot
@@ -60,7 +61,7 @@ from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.source import source_root
 from pants.testutil.option_util import create_options_bootstrapper
 from pants.util.collections import assert_single_element
-from pants.util.contextutil import temporary_dir, temporary_file
+from pants.util.contextutil import pushd, temporary_dir, temporary_file
 from pants.util.dirutil import (
     recursive_dirname,
     safe_file_dump,
@@ -463,7 +464,17 @@ class RuleRunner:
         self._invalidate_for(str(relpath))
         return path
 
-    def write_files(self, files: Mapping[str | PurePath, str | bytes]) -> tuple[str, ...]:
+    @overload
+    def write_files(self, files: Mapping[str, str | bytes]) -> tuple[str, ...]:
+        ...
+
+    @overload
+    def write_files(self, files: Mapping[PurePath, str | bytes]) -> tuple[str, ...]:
+        ...
+
+    def write_files(
+        self, files: Mapping[PurePath, str | bytes] | Mapping[str, str | bytes]
+    ) -> tuple[str, ...]:
         """Write the files to the build root.
 
         :API: public
@@ -523,16 +534,17 @@ class RuleRunner:
         )
 
     def run_interactive_process(self, request: InteractiveProcess) -> InteractiveProcessResult:
-        return native_engine.session_run_interactive_process(
-            self.scheduler.py_session,
-            request,
-            ProcessConfigFromEnvironment(
-                platform=Platform.create_for_localhost().value,
-                docker_image=None,
-                remote_execution=False,
-                remote_execution_extra_platform_properties=[],
-            ),
-        )
+        with pushd(self.build_root):
+            return native_engine.session_run_interactive_process(
+                self.scheduler.py_session,
+                request,
+                ProcessConfigFromEnvironment(
+                    platform=Platform.create_for_localhost().value,
+                    docker_image=None,
+                    remote_execution=False,
+                    remote_execution_extra_platform_properties=[],
+                ),
+            )
 
     def do_not_use_mock(self, output_type: Type, input_types: Iterable[type]) -> MockGet:
         """Returns a `MockGet` whose behavior is to run the actual rule using this `RuleRunner`"""

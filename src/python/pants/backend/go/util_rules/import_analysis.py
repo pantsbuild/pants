@@ -7,7 +7,7 @@ import logging
 from dataclasses import dataclass
 from typing import ClassVar
 
-import ijson
+import ijson.backends.python as ijson
 
 from pants.backend.go.util_rules.build_opts import GoBuildOptions
 from pants.backend.go.util_rules.sdk import GoSdkProcess

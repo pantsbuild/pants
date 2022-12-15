@@ -10,14 +10,17 @@ from dataclasses import dataclass
 from difflib import get_close_matches
 from io import StringIO
 from pathlib import PurePath
-from typing import Any, Iterable
+from typing import Any
 
+from pants.base.deprecated import warn_or_error
 from pants.base.exceptions import MappingError
 from pants.base.parse_context import ParseContext
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.internals.defaults import BuildFileDefaultsParserState, SetDefaultsT
 from pants.engine.internals.dep_rules import BuildFileDependencyRulesParserState
 from pants.engine.internals.target_adaptor import TargetAdaptor
+from pants.engine.target import Field, ImmutableValue, RegisteredTargetTypes
+from pants.engine.unions import UnionMembership
 from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
 from pants.util.strutil import softwrap
@@ -94,25 +97,41 @@ class ParseState(threading.local):
             self._dependencies_rules.set_dependency_rules(self.filepath(), *args, **kwargs)
 
 
+class RegistrarField:
+    __slots__ = ("_field_type",)
+
+    def __init__(self, field_type: type[Field]) -> None:
+        self._field_type = field_type
+
+    @property
+    def default(self) -> ImmutableValue:
+        return self._field_type.default
+
+
 class Parser:
     def __init__(
         self,
         *,
         build_root: str,
-        target_type_aliases: Iterable[str],
+        registered_target_types: RegisteredTargetTypes,
+        union_membership: UnionMembership,
         object_aliases: BuildFileAliases,
         ignore_unrecognized_symbols: bool,
     ) -> None:
         self._symbols, self._parse_state = self._generate_symbols(
-            build_root, target_type_aliases, object_aliases
+            build_root,
+            object_aliases,
+            registered_target_types,
+            union_membership,
         )
         self.ignore_unrecognized_symbols = ignore_unrecognized_symbols
 
     @staticmethod
     def _generate_symbols(
         build_root: str,
-        target_type_aliases: Iterable[str],
         object_aliases: BuildFileAliases,
+        registered_target_types: RegisteredTargetTypes,
+        union_membership: UnionMembership,
     ) -> tuple[FrozenDict[str, Any], ParseState]:
         # N.B.: We re-use the thread local ParseState across symbols for performance reasons.
         # This allows a single construction of all symbols here that can be re-used for each BUILD
@@ -122,6 +141,27 @@ class Parser:
         class Registrar:
             def __init__(self, type_alias: str) -> None:
                 self._type_alias = type_alias
+                for field_type in registered_target_types.aliases_to_types[
+                    type_alias
+                ].class_field_types(union_membership):
+                    registrar_field = RegistrarField(field_type)
+                    setattr(self, field_type.alias, registrar_field)
+                    if field_type.deprecated_alias:
+
+                        def deprecated_field(self):
+                            # TODO(17720) Support fixing automatically with `build-file` deprecation
+                            # fixer.
+                            warn_or_error(
+                                removal_version=field_type.deprecated_alias_removal_version,
+                                entity=f"the field name {field_type.deprecated_alias}",
+                                hint=(
+                                    f"Instead, use `{type_alias}.{field_type.alias}`, which "
+                                    "behaves the same."
+                                ),
+                            )
+                            return registrar_field
+
+                        setattr(self, field_type.deprecated_alias, property(deprecated_field))
 
             def __str__(self) -> str:
                 """The BuildFileDefaultsParserState.set_defaults() rely on string inputs.
@@ -154,7 +194,7 @@ class Parser:
             "__dependents_rules__": parse_state.set_dependents_rules,
             "__dependencies_rules__": parse_state.set_dependencies_rules,
         }
-        symbols.update((alias, Registrar(alias)) for alias in target_type_aliases)
+        symbols.update((alias, Registrar(alias)) for alias in registered_target_types.aliases)
 
         parse_context = ParseContext(
             build_root=build_root, type_aliases=symbols, filepath_oracle=parse_state

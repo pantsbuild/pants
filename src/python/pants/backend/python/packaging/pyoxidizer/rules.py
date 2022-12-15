@@ -24,7 +24,7 @@ from pants.backend.python.packaging.pyoxidizer.target_types import (
 from pants.backend.python.target_types import GenerateSetupField, WheelField
 from pants.backend.python.util_rules.pex import Pex, PexProcess, PexRequest
 from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact, PackageFieldSet
-from pants.core.goals.run import RunDebugAdapterRequest, RunFieldSet, RunRequest
+from pants.core.goals.run import RunFieldSet, RunRequest
 from pants.core.util_rules.system_binaries import BashBinary
 from pants.engine.fs import (
     AddPrefix,
@@ -36,6 +36,7 @@ from pants.engine.fs import (
     RemovePrefix,
     Snapshot,
 )
+from pants.engine.platform import Platform, PlatformError
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
@@ -56,7 +57,7 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
-class PyOxidizerFieldSet(PackageFieldSet):
+class PyOxidizerFieldSet(PackageFieldSet, RunFieldSet):
     required_fields = (PyOxidizerDependenciesField,)
 
     binary_name: PyOxidizerBinaryNameField
@@ -99,7 +100,10 @@ async def package_pyoxidizer_binary(
     field_set: PyOxidizerFieldSet,
     runner_script: PyoxidizerRunnerScript,
     bash: BashBinary,
+    platform: Platform,
 ) -> BuiltPackage:
+    if platform == Platform.linux_arm64:
+        raise PlatformError(f"PyOxidizer is not supported on {platform.value}")
     direct_deps = await Get(Targets, DependenciesRequest(field_set.dependencies))
     deps_field_sets = await Get(
         FieldSetsPerTarget, FieldSetsPerTargetRequest(PackageFieldSet, direct_deps)
@@ -234,18 +238,9 @@ async def run_pyoxidizer_binary(field_set: PyOxidizerFieldSet) -> RunRequest:
     return RunRequest(digest=binary.digest, args=(os.path.join("{chroot}", artifact.relpath),))
 
 
-@rule
-async def run_pyoxidizer_debug_adapter_binary(
-    field_set: PyOxidizerFieldSet,
-) -> RunDebugAdapterRequest:
-    raise NotImplementedError(
-        "Debugging a PyOxidizer binary using a debug adapter has not yet been implemented."
-    )
-
-
 def rules():
     return (
         *collect_rules(),
         UnionRule(PackageFieldSet, PyOxidizerFieldSet),
-        UnionRule(RunFieldSet, PyOxidizerFieldSet),
+        *PyOxidizerFieldSet.rules(),
     )

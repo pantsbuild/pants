@@ -3,9 +3,11 @@
 
 from __future__ import annotations
 
+import dataclasses
 import os
+from collections import deque
 from dataclasses import dataclass
-from typing import Any, Sequence
+from typing import Any, Iterable, Sequence
 
 from pants.backend.go.subsystems.gotest import GoTestSubsystem
 from pants.backend.go.target_types import (
@@ -38,15 +40,7 @@ from pants.backend.go.util_rules.goroot import GoRoot
 from pants.backend.go.util_rules.import_analysis import ImportConfig, ImportConfigRequest
 from pants.backend.go.util_rules.link import LinkedGoBinary, LinkGoBinaryRequest
 from pants.backend.go.util_rules.tests_analysis import GeneratedTestMain, GenerateTestMainRequest
-from pants.core.goals.test import (
-    TestDebugAdapterRequest,
-    TestDebugRequest,
-    TestExtraEnv,
-    TestFieldSet,
-    TestRequest,
-    TestResult,
-    TestSubsystem,
-)
+from pants.core.goals.test import TestExtraEnv, TestFieldSet, TestRequest, TestResult, TestSubsystem
 from pants.core.target_types import FileSourceField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
@@ -55,7 +49,6 @@ from pants.engine.internals.native_engine import EMPTY_DIGEST
 from pants.engine.process import FallibleProcessResult, Process, ProcessCacheScope
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import Dependencies, DependenciesRequest, SourcesField, Target, Targets
-from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
 
@@ -166,6 +159,23 @@ def transform_test_args(args: Sequence[str], timeout_field_value: int | None) ->
     return tuple(result)
 
 
+def _lift_build_requests_with_coverage(
+    roots: Iterable[BuildGoPackageRequest],
+) -> list[BuildGoPackageRequest]:
+    result: list[BuildGoPackageRequest] = []
+
+    queue: deque[BuildGoPackageRequest] = deque()
+    queue.extend(roots)
+
+    while queue:
+        build_request = queue.popleft()
+        if build_request.with_coverage:
+            result.append(build_request)
+        queue.extend(build_request.direct_dependencies)
+
+    return result
+
+
 @rule(desc="Test with Go", level=LogLevel.DEBUG)
 async def run_go_tests(
     batch: GoTestRequest.Batch[GoTestFieldSet, Any],
@@ -236,11 +246,18 @@ async def run_go_tests(
         return compilation_failure(_exit_code, None, _stderr)
 
     if not testmain.has_tests and not testmain.has_xtests:
-        return TestResult.skip(field_set.address, output_setting=test_subsystem.output)
+        return TestResult.no_tests_found(field_set.address, output_setting=test_subsystem.output)
 
-    coverage_config: GoCoverageConfig | None = None
+    with_coverage = False
     if test_subsystem.use_coverage:
-        coverage_config = GoCoverageConfig(cover_mode=go_test_subsystem.coverage_mode)
+        with_coverage = True
+        build_opts = dataclasses.replace(
+            build_opts,
+            coverage_config=GoCoverageConfig(
+                cover_mode=go_test_subsystem.coverage_mode,
+                import_path_include_patterns=go_test_subsystem.coverage_packages,
+            ),
+        )
 
     # Construct the build request for the package under test.
     maybe_test_pkg_build_request = await Get(
@@ -248,7 +265,7 @@ async def run_go_tests(
         BuildGoPackageTargetRequest(
             field_set.address,
             for_tests=True,
-            coverage_config=coverage_config,
+            with_coverage=with_coverage,
             build_opts=build_opts,
         ),
     )
@@ -259,10 +276,9 @@ async def run_go_tests(
         )
     test_pkg_build_request = maybe_test_pkg_build_request.request
 
-    # TODO: Eventually support adding coverage to non-test packages. Those other packages will need to be
-    # added to `main_direct_deps` and to the coverage setup in the testmain.
+    # Determine the direct dependencies of the generated main package. The test package itself is always a
+    # dependency. Add the xtests package as well if any xtests exist.
     main_direct_deps = [test_pkg_build_request]
-
     if testmain.has_xtests:
         # Build a synthetic package for xtests where the import path is the same as the package under test
         # but with "_test" appended.
@@ -271,7 +287,7 @@ async def run_go_tests(
             BuildGoPackageTargetRequest(
                 field_set.address,
                 for_xtests=True,
-                coverage_config=coverage_config,
+                with_coverage=with_coverage,
                 build_opts=build_opts,
             ),
         )
@@ -291,7 +307,14 @@ async def run_go_tests(
     # register them with the coverage runtime.
     coverage_setup_digest = EMPTY_DIGEST
     coverage_setup_files = []
-    if coverage_config is not None:
+    if with_coverage:
+        # Scan the tree of BuildGoPackageRequest's and lift any packages with coverage enabled to be direct
+        # dependencies of the generated main package. This facilitates registration of the code coverage
+        # setup functions.
+        coverage_transitive_deps = _lift_build_requests_with_coverage(main_direct_deps)
+        coverage_transitive_deps.sort(key=lambda build_req: build_req.import_path)
+        main_direct_deps.extend(coverage_transitive_deps)
+
         # Build the `main_direct_deps` when in coverage mode to obtain the "coverage variables" for those packages.
         built_main_direct_deps = await MultiGet(
             Get(BuiltGoPackage, BuildGoPackageRequest, build_req) for build_req in main_direct_deps
@@ -433,6 +456,7 @@ async def run_go_tests(
             import_path=import_path,
             sources_digest=pkg_digest.digest,
             sources_dir_path=pkg_analysis.dir_path,
+            pkg_target_address=field_set.address,
         )
 
     return TestResult.from_fallible_process_result(
@@ -443,21 +467,8 @@ async def run_go_tests(
     )
 
 
-@rule
-async def generate_go_tests_debug_request(_: GoTestRequest.Batch) -> TestDebugRequest:
-    raise NotImplementedError("This is a stub.")
-
-
-@rule
-async def generate_go_tests_debug_adapter_request(
-    _: GoTestRequest.Batch,
-) -> TestDebugAdapterRequest:
-    raise NotImplementedError("This is a stub.")
-
-
 def rules():
     return [
         *collect_rules(),
-        UnionRule(TestFieldSet, GoTestFieldSet),
         *GoTestRequest.rules(),
     ]

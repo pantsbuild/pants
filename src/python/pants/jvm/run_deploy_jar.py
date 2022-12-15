@@ -5,10 +5,9 @@ import logging
 from typing import Iterable
 
 from pants.core.goals.package import BuiltPackage
-from pants.core.goals.run import RunDebugAdapterRequest, RunFieldSet, RunRequest
+from pants.core.goals.run import RunRequest
 from pants.engine.process import Process
 from pants.engine.rules import Get, collect_rules, rule
-from pants.engine.unions import UnionRule
 from pants.jvm.jdk_rules import JdkEnvironment, JdkRequest, JvmProcess
 from pants.jvm.package.deploy_jar import DeployJarFieldSet
 from pants.util.logging import LogLevel
@@ -73,14 +72,8 @@ async def create_deploy_jar_run_request(
     )
 
 
-@rule
-async def run_deploy_jar_debug_adapter_binary(
-    field_set: DeployJarFieldSet,
-) -> RunDebugAdapterRequest:
-    raise NotImplementedError(
-        "Debugging a deploy JAR using a debug adapter has not yet been implemented."
-    )
-
-
 def rules():
-    return [*collect_rules(), UnionRule(RunFieldSet, DeployJarFieldSet)]
+    return [
+        *collect_rules(),
+        *DeployJarFieldSet.rules(),
+    ]

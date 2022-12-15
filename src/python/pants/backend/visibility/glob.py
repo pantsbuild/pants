@@ -92,18 +92,19 @@ class PathGlob:
     def _translate_pattern_to_regexp(pattern: str, snap_to_path: bool) -> str:
         # Escape regexp characters, then restore any `*`s.
         glob = re.escape(pattern).replace(r"\*", "*")
-        # Translate recursive `**` globs to regexp, a `/` prefix is optional.
-        glob = glob.replace("/**", "(/.<<$>>)?")
-        glob = glob.replace("**", ".<<$>>")
+        # Translate recursive `**` globs to regexp, any adjacent `/` is optional.
+        glob = glob.replace("/**", r"(/.<<$>>)?")
+        glob = glob.replace("**/", r"/?\b")
+        glob = glob.replace("**", r".<<$>>")
         # Translate `*` to match any path segment.
-        glob = glob.replace("*", "[^/]<<$>>")
+        glob = glob.replace("*", r"[^/]<<$>>")
         # Restore `*`s that was "escaped" during translation.
-        glob = glob.replace("<<$>>", "*")
+        glob = glob.replace("<<$>>", r"*")
         # Snap to closest `/`
         if snap_to_path and glob and glob[0].isalnum():
             glob = r"/?\b" + glob
 
-        return glob + "$"
+        return glob + r"$"
 
     def _match_path(self, path: str, base: str) -> str | None:
         if self.anchor_mode is PathGlobAnchorMode.INVOKED_PATH:
@@ -151,7 +152,7 @@ class TargetGlob:
             else ""
         )
         path = f"[{self.path}]" if self.path is not None else ""
-        return f"{self.type_ or ''}{tags}{path}" or "*"
+        return f"{self.type_ or ''}{tags}{path}" or "!*"
 
     @memoized_classmethod
     def create(  # type: ignore[misc]
@@ -236,18 +237,22 @@ class TargetGlob:
         if address.is_file_target:
             return address.filename
         elif address.is_generated_target:
-            return address.spec
+            return address.spec.replace(":", "/").lstrip("/")
         else:
             return address.spec_path
 
     def match(self, address: Address, adaptor: TargetAdaptor, base: str) -> bool:
-        # type
+        if not (self.type_ or self.path or self.tags):
+            # Nothing rules this target in.
+            return False
+
+        # target type
         if self.type_ and not fnmatchcase(adaptor.type_alias, self.type_):
             return False
-        # path
+        # target path (includes filename for source targets)
         if self.path and not self.path.match(self.address_path(address), base):
             return False
-        # tags
+        # target tags
         if self.tags:
             # Use adaptor.kwargs with caution, unvalidated input data from BUILD file.
             target_tags = adaptor.kwargs.get("tags")
@@ -258,5 +263,6 @@ class TargetGlob:
                 any(fnmatchcase(str(tag), pattern) for tag in target_tags) for pattern in self.tags
             ):
                 return False
-        # Nothing rules this target out
+
+        # Nothing rules this target out.
         return True

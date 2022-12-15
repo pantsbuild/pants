@@ -980,6 +980,50 @@ def test_get_requirements_with_exclude() -> None:
     )
 
 
+def test_get_requirements_with_override_dependency_issue_17593() -> None:
+    rule_runner = create_setup_py_rule_runner(
+        rules=[
+            determine_explicitly_provided_setup_kwargs,
+            get_requirements,
+            get_owned_dependencies,
+            get_exporting_owner,
+            *target_types_rules.rules(),
+            SubsystemRule(SetupPyGeneration),
+            QueryRule(ExportedTargetRequirements, (DependencyOwner,)),
+        ]
+    )
+    rule_runner.write_files(
+        {
+            "3rdparty/BUILD": textwrap.dedent(
+                """
+                python_requirement(name='ext1', requirements=['ext1==1.22.333'], dependencies=[':ext2'])
+                python_requirement(name='ext2', requirements=['ext2==4.5.6'])
+                """
+            ),
+            "src/python/foo/bar/baz/a.py": "",
+            "src/python/foo/bar/baz/BUILD": "python_sources(dependencies=['3rdparty:ext1'])",
+            "src/python/foo/bar/a.py": "",
+            "src/python/foo/bar/BUILD": textwrap.dedent(
+                """
+                python_distribution(
+                    name='bar-dist',
+                    dependencies=[':bar'],
+                    provides=python_artifact(name='bar', version='9.8.7'),
+                )
+
+                python_sources(dependencies=['src/python/foo/bar/baz'])
+              """
+            ),
+        }
+    )
+
+    assert_requirements(
+        rule_runner,
+        ["ext1==1.22.333", "ext2==4.5.6"],
+        Address("src/python/foo/bar", target_name="bar-dist"),
+    )
+
+
 def assert_requirements(
     rule_runner,
     expected_req_strs,

@@ -682,7 +682,7 @@ def test_no_tests(rule_runner: RuleRunner) -> None:
     result = rule_runner.request(
         TestResult, [GoTestRequest.Batch("", (GoTestFieldSet.create(tgt),), None)]
     )
-    assert result.skipped
+    assert result.exit_code is None
 
 
 def test_compilation_error(rule_runner: RuleRunner) -> None:

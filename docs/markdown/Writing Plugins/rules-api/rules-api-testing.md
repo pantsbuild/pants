@@ -126,7 +126,7 @@ async def find_needle_in_haystack(find_needle: FindNeedle) -> TargetsWithNeedle:
 We can write this test:
 
 ```python
-from pants.engine.addresses import address
+from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_DIGEST, Snapshot
 from pants.engine.target import HydratedSources, HydrateSourcesRequest, Target, Sources
 from pants.testutil.rule_runner import MockGet, run_rule_with_mocks
@@ -206,7 +206,7 @@ After setting up your isolated environment, you can run `rule_runner.request(Out
 
 ### Setting up the `RuleRunner`
 
-First, you must set up a `RuleRunner` instance and activate the rules and target types you'll use in your tests. Set the argument `target_types` with a list of the `Target` types used in in your tests, and set `rules` with a list of all the rules used transitively. 
+First, you must set up a `RuleRunner` instance and activate the rules and target types you'll use in your tests. Set the argument `target_types` with a list of the `Target` types used in your tests, and set `rules` with a list of all the rules used transitively. 
 
 This means that you must register the rules you directly wrote, and also any rules that they depend on. Pants will automatically register some core rules for you, but leaves off most of them for better isolation of tests. If you're missing some rules, the rule graph will fail to be built.
 
@@ -289,7 +289,7 @@ def second_rule_runner() -> RuleRunner:
 
 
 def test_example3(second_rule_runner: RuleRunner) -> None:
-    second_rule_runner.write_files(..)
+    second_rule_runner.write_files(...)
     ...
 ```
 
@@ -492,7 +492,7 @@ def test_one_target_one_source(rule_runner: RuleRunner) -> None:
        }
     )
     result = rule_runner.run_goal_rule(Filedeps, args=["project/example.ext"])
-    assert result.stdout.splitlines() = ["project/BUILD", "project/example.ext"]
+    assert result.stdout.splitlines() == ["project/BUILD", "project/example.ext"]
 ```
 
 Unlike when testing normal `@rules`, you do not need to define a `QueryRule` when using `rule_runner.run_goal_rule()`. This is already set up for you. However, you do need to make sure that your `@goal_rule` and all the rules it depends on are registered with the `RuleRunner` instance.
@@ -543,7 +543,7 @@ To read any files that were created, use `get_buildroot()` as the first part of 
 ```python
 from pathlib import Path
 
-from pants.base.build_environment import get_buildroot()
+from pants.base.build_environment import get_buildroot
 from pants.testutil.pants_integration_test import run_pants, setup_tmpdir
 
 def test_junit_report() -> None:

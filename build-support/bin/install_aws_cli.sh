@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-# Install the AWS CLI in CI jobs.
+# Install the AWS CLI.
 
 # This is the fastest, most reliable way to install the AWS CLI on Linux and, particularly, MacOS.
 # Using pip is broken on some systems, and package managers (e.g., brew) must be updated prior
@@ -22,17 +22,17 @@ if [[ ! -x "${AWS_CLI_BIN}" ]]; then
 
   curl --fail "https://s3.amazonaws.com/aws-cli/awscli-bundle.zip" -o "awscli-bundle.zip"
   unzip awscli-bundle.zip
-  # NB: We must run this with python3 because it defaults to `python`, which refers to Python 2 in Linux GitHub
-  # Actions CI job and is no longer supported.
+  # NB: We must run this with python3 because it defaults to `python`, which refers to Python 2 in
+  # Linux GitHub Actions CI job and is no longer supported.
   python3 ./awscli-bundle/install --install-dir "${AWS_CLI_ROOT}"
 
   popd
 
 fi
 
-# We symlink so that `aws` is discoverable on the $PATH. Our Docker image does not have `sudo`, whereas
-# we need it for macOS to symlink into /usr/local/bin.
-symlink="/usr/local/bin/aws"
+# We symlink so that `aws` is discoverable on the $PATH. Our Docker image does not have `sudo`,
+# whereas we need it for macOS to symlink into /usr/local/bin.
+symlink="${AWS_CLI_SYMLINK_PATH:-/usr/local/bin/}"
 if [[ ! -L "${symlink}" ]]; then
   case "$(uname)" in
     "Darwin")
