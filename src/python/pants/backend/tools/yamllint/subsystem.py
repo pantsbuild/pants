@@ -43,7 +43,7 @@ class Yamllint(PythonToolBase):
         ]
         return ConfigFilesRequest(
             specified=self.config,
-            specified_option_name="[{self.options_scope}].config",
+            specified_option_name=f"[{self.options_scope}].config",
             discovery=True,
             check_existence=candidates,
         )
