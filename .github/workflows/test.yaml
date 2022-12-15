@@ -512,7 +512,8 @@ jobs:
     - name: Check out code
       uses: actions/checkout@v3
       with:
-        fetch-depth: 10
+        # Must be 2, apparently?
+        fetch-depth: 2
     - id: files
       name: Get changed files
       uses: tj-actions/changed-files@v32
