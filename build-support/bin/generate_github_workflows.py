@@ -105,7 +105,8 @@ def classify_changes() -> Jobs:
                 "other": gha_expr("steps.classify.outputs.other"),
             },
             "steps": [
-                *checkout(),
+                # fetch_depth must be 2.
+                *checkout(fetch_depth=2),
                 {
                     "id": "files",
                     "name": "Get changed files",
@@ -158,7 +159,7 @@ def ensure_category_label() -> Sequence[Step]:
     ]
 
 
-def checkout(*, containerized: bool = False) -> Sequence[Step]:
+def checkout(*, fetch_depth: int = 10, containerized: bool = False) -> Sequence[Step]:
     """Get prior commits and the commit message."""
     steps = [
         # See https://github.community/t/accessing-commit-message-in-pull-request-event/17158/8
@@ -167,7 +168,7 @@ def checkout(*, containerized: bool = False) -> Sequence[Step]:
         {
             "name": "Check out code",
             "uses": "actions/checkout@v3",
-            "with": {"fetch-depth": 10},
+            "with": {"fetch-depth": fetch_depth},
         },
     ]
     if containerized:

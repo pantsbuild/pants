@@ -24,7 +24,7 @@ from pants.backend.python.packaging.pyoxidizer.target_types import (
 from pants.backend.python.target_types import GenerateSetupField, WheelField
 from pants.backend.python.util_rules.pex import Pex, PexProcess, PexRequest
 from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact, PackageFieldSet
-from pants.core.goals.run import RunFieldSet, RunRequest
+from pants.core.goals.run import RunFieldSet, RunInSandboxBehavior, RunRequest
 from pants.core.util_rules.system_binaries import BashBinary
 from pants.engine.fs import (
     AddPrefix,
@@ -59,6 +59,7 @@ logger = logging.getLogger(__name__)
 @dataclass(frozen=True)
 class PyOxidizerFieldSet(PackageFieldSet, RunFieldSet):
     required_fields = (PyOxidizerDependenciesField,)
+    run_in_sandbox_behavior = RunInSandboxBehavior.RUN_REQUEST_HERMETIC
 
     binary_name: PyOxidizerBinaryNameField
     entry_point: PyOxidizerEntryPointField
