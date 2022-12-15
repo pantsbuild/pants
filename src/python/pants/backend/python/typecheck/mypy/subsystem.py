@@ -105,7 +105,6 @@ class MyPy(PythonToolBase):
     default_lockfile_resource = ("pants.backend.python.typecheck.mypy", "mypy.lock")
     default_lockfile_path = "src/python/pants/backend/python/typecheck/mypy/mypy.lock"
     default_lockfile_url = git_url(default_lockfile_path)
-    uses_requirements_from_source_plugins = True
 
     skip = SkipOption("check")
     args = ArgsListOption(example="--python-version 3.7 --disallow-any-expr")
@@ -224,8 +223,6 @@ class MyPy(PythonToolBase):
                 ),
                 lockfile_hex_digest=calculate_invalidation_digest(self.extra_type_stubs),
                 resolve_name=MyPyExtraTypeStubsLockfileSentinel.resolve_name,
-                uses_project_interpreter_constraints=True,
-                uses_source_plugins=False,
             )
             requirements = EntireLockfile(tool_lockfile, complete_req_strings=self.extra_type_stubs)
         return PexRequest(
