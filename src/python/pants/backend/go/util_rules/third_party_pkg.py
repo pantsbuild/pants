@@ -322,7 +322,7 @@ async def _check_go_sum_has_not_changed(
             raise ValueError(
                 f"For `{GoModTarget.alias}` target `{go_mod_address}`, the go.sum file is incomplete "
                 f"because it was updated while processing third-party dependency `{import_path}`. "
-                "Please re-generate the go.sum file by running `go mod download` in the module directory. "
+                "Please re-generate the go.sum file by running `go mod download all` in the module directory. "
                 "(Pants does not currently have support for updating the go.sum checksum database itself.)\n\n"
                 f"Diff:\n{go_sum_diff_rendered}"
             )
