@@ -92,11 +92,11 @@ class GoTestSubsystem(Subsystem):
         ),
     )
 
-    coverage_include_patterns = StrListOption(
+    coverage_packages = StrListOption(
         default=[],
         help=softwrap(
             """
-            A list of import path patterns for determining which import paths will be instrumented for code
+            A list of "import path patterns" for determining which import paths will be instrumented for code
             coverage.
 
             From `go help packages`:
@@ -118,6 +118,9 @@ class GoTestSubsystem(Subsystem):
             is not a vendored package: cmd/vendor would be a command named vendor,
             and the pattern cmd/... matches it.
             See golang.org/s/go15vendor for more about vendoring.
+
+            This option is similar to the `go test -coverpkg` option, but without support currently
+            for reserved import path patterns like `std` and `all`.
             """
         ),
     )

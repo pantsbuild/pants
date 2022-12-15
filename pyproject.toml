@@ -63,9 +63,8 @@ module = [
     "gnupg",
     "hdrh",
     "hdrh.histogram",
-    "ijson",
+    "ijson.*",
     "pex.*",
     "psutil",
-    "setproctitle",
 ]
 ignore_missing_imports = true

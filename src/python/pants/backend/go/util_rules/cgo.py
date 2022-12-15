@@ -75,6 +75,11 @@ class CGoCompileResult:
     output_go_files: tuple[str, ...]
     output_obj_files: tuple[str, ...]
 
+    # If True, then include the module sources in the same Digest as the package archive. This supports
+    # cgo usages where the package wants to link with a static archive embedded in the module, for example,
+    # https://github.com/confluentinc/confluent-kafka-go.
+    include_module_sources_with_output: bool
+
 
 @dataclass(frozen=True)
 class CGoCompilerFlags:
@@ -742,15 +747,27 @@ async def cgo_compile_request(
     # Note: If Pants ever supports building the Go stdlib, then certain options would need to be inserted here
     # for building certain `runtime` modules.
 
-    # Update $CGO_LDFLAGS with p.CgoLDFLAGS.
-    # These flags are recorded in the generated _cgo_gotypes.go file
-    # using //go:cgo_ldflag directives, the compiler records them in the
-    # object file for the package, and then the Go linker passes them
-    # along to the host linker. At this point in the code, cgoLDFLAGS
-    # consists of the original $CGO_LDFLAGS (unchecked) and all the
-    # flags put together from source code (checked).
+    # Update CGO_LDFLAGS with the configured linker flags.
+    #
+    # From Go sources:
+    #   These flags are recorded in the generated _cgo_gotypes.go file
+    #   using //go:cgo_ldflag directives, the compiler records them in the
+    #   object file for the package, and then the Go linker passes them
+    #   along to the host linker. At this point in the code, cgoLDFLAGS
+    #   consists of the original $CGO_LDFLAGS (unchecked) and all the
+    #   flags put together from source code (checked).
+    #
+    # Note: Some packages, e.g. https://github.com/confluentinc/confluent-kafka-go, try to link a static archive
+    # emedded in the module into the package archive. If so, mark this package so that the module sources are
+    # included in the output digest for the build of this package. We assume that this is needed if an earlier
+    # replacement of `${SRCDIR}` resulted in `__PANTS_SANDBOX_ROOT__` appearing in the flags. The
+    # `__PANTS_SANDBOX_ROOT__` will be replaced by the external linker wrapper configured in `link.py`.
     cgo_env = {"CGO_ENABLED": "1", "TERM": "dumb"}
+    include_module_sources_with_output = False
     if flags.ldflags:
+        for arg in flags.ldflags:
+            if "__PANTS_SANDBOX_ROOT__" in arg:
+                include_module_sources_with_output = True
         cgo_env["CGO_LDFLAGS"] = " ".join([shlex.quote(arg) for arg in flags.ldflags])
 
     # Note: If Pants supported building C static or shared archives, then we would need to direct cgo here to
@@ -775,7 +792,7 @@ async def cgo_compile_request(
                 *(os.path.join(dir_path, f) for f in request.cgo_files),
             ],
             env=cgo_env,
-            description="Generate Go and C files from CGo files.",
+            description=f"Generate Go and C files from CGo files ({request.import_path})",
             input_digest=request.digest,
             output_directories=(dir_path,),
             replace_sandbox_root_in_args=True,
@@ -919,6 +936,7 @@ async def cgo_compile_request(
         digest=output_digest,
         output_go_files=tuple(go_files),
         output_obj_files=tuple(out_obj_files),
+        include_module_sources_with_output=include_module_sources_with_output,
     )
 
 

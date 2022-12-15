@@ -255,7 +255,7 @@ async def run_go_tests(
             build_opts,
             coverage_config=GoCoverageConfig(
                 cover_mode=go_test_subsystem.coverage_mode,
-                import_path_include_patterns=go_test_subsystem.coverage_include_patterns,
+                import_path_include_patterns=go_test_subsystem.coverage_packages,
             ),
         )
 

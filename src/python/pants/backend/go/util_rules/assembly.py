@@ -6,6 +6,7 @@ from __future__ import annotations
 import os.path
 from dataclasses import dataclass
 from pathlib import PurePath
+from typing import Iterable
 
 from pants.backend.go.util_rules.goroot import GoRoot
 from pants.backend.go.util_rules.sdk import GoSdkProcess, GoSdkToolIDRequest, GoSdkToolIDResult
@@ -24,7 +25,9 @@ class GenerateAssemblySymabisRequest:
 
     compilation_input: Digest
     s_files: tuple[str, ...]
+    import_path: str
     dir_path: str
+    extra_assembler_flags: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -48,7 +51,6 @@ class AssembleGoAssemblyFilesRequest:
     input_digest: Digest
     s_files: tuple[str, ...]
     dir_path: str
-    asm_header_path: str | None
     import_path: str
     extra_assembler_flags: tuple[str, ...]
 
@@ -64,6 +66,37 @@ class FallibleAssembleGoAssemblyFilesResult:
     exit_code: int = 0
     stdout: str | None = None
     stderr: str | None = None
+
+
+# Adapted from https://github.com/golang/go/blob/cb07765045aed5104a3df31507564ac99e6ddce8/src/cmd/go/internal/work/gc.go#L358-L410
+#
+# Note: Architecture-specific flags have not been adapted nor the flags added when compiling Go SDK packages
+# themselves.
+def _asm_args(
+    import_path: str, dir_path: str, goroot: GoRoot, extra_flags: Iterable[str]
+) -> tuple[str, ...]:
+    # On Go 1.19+, the import path must be supplied via the `-p` option to `go tool asm`.
+    # See https://go.dev/doc/go1.19#assembler and
+    # https://github.com/bazelbuild/rules_go/commit/cde7d7bc27a34547c014369790ddaa95b932d08d (Bazel rules_go).
+    maybe_package_import_path_args = (
+        ["-p", import_path] if goroot.is_compatible_version("1.19") else []
+    )
+
+    return (
+        *maybe_package_import_path_args,
+        "-trimpath",
+        "__PANTS_SANDBOX_ROOT__",
+        "-I",
+        f"__PANTS_SANDBOX_ROOT__/{dir_path}",
+        # Add -I pkg/GOOS_GOARCH so #include "textflag.h" works in .s files.
+        "-I",
+        os.path.join(goroot.path, "pkg", "include"),
+        "-D",
+        f"GOOS_{goroot.goos}",
+        "-D",
+        f"GOARCH_{goroot.goarch}",
+        *extra_flags,
+    )
 
 
 @rule
@@ -92,8 +125,12 @@ async def generate_go_assembly_symabisfile(
             command=(
                 "tool",
                 "asm",
-                "-I",
-                os.path.join(goroot.path, "pkg", "include"),
+                *_asm_args(
+                    import_path=request.import_path,
+                    dir_path=request.dir_path,
+                    goroot=goroot,
+                    extra_flags=request.extra_assembler_flags,
+                ),
                 "-gensymabis",
                 "-o",
                 symabis_path,
@@ -105,6 +142,7 @@ async def generate_go_assembly_symabisfile(
             },
             description=f"Generate symabis metadata for assembly files for {request.dir_path}",
             output_files=(symabis_path,),
+            replace_sandbox_root_in_args=True,
         ),
     )
     if symabis_result.exit_code != 0:
@@ -125,18 +163,7 @@ async def assemble_go_assembly_files(
     request: AssembleGoAssemblyFilesRequest,
     goroot: GoRoot,
 ) -> FallibleAssembleGoAssemblyFilesResult:
-    # On Go 1.19+, the import path must be supplied via the `-p` option to `go tool asm`.
-    # See https://go.dev/doc/go1.19#assembler and
-    # https://github.com/bazelbuild/rules_go/commit/cde7d7bc27a34547c014369790ddaa95b932d08d (Bazel rules_go).
-    maybe_package_import_path_args = (
-        ["-p", request.import_path] if goroot.is_compatible_version("1.19") else []
-    )
-
     asm_tool_id = await Get(GoSdkToolIDResult, GoSdkToolIDRequest("asm"))
-
-    maybe_asm_header_path_args = (
-        ["-I", str(PurePath(request.asm_header_path).parent)] if request.asm_header_path else []
-    )
 
     def obj_output_path(s_file: str) -> str:
         return str(request.dir_path / PurePath(s_file).with_suffix(".o"))
@@ -149,11 +176,12 @@ async def assemble_go_assembly_files(
                 command=(
                     "tool",
                     "asm",
-                    "-I",
-                    os.path.join(goroot.path, "pkg", "include"),
-                    *maybe_asm_header_path_args,
-                    *maybe_package_import_path_args,
-                    *request.extra_assembler_flags,
+                    *_asm_args(
+                        import_path=request.import_path,
+                        dir_path=request.dir_path,
+                        goroot=goroot,
+                        extra_flags=request.extra_assembler_flags,
+                    ),
                     "-o",
                     obj_output_path(s_file),
                     str(os.path.normpath(PurePath(".", request.dir_path, s_file))),
@@ -163,6 +191,7 @@ async def assemble_go_assembly_files(
                 },
                 description=f"Assemble {s_file} with Go",
                 output_files=(obj_output_path(s_file),),
+                replace_sandbox_root_in_args=True,
             ),
         )
         for s_file in request.s_files
