@@ -484,7 +484,7 @@ def validate_metadata(
     msg = "".join(msg_iter).strip()
     if python_setup.invalid_lockfile_behavior == InvalidLockfileBehavior.error:
         raise InvalidLockfileError(msg)
-    logger.warning("%s", msg)
+    logger.warning(msg)
 
 
 def _common_failure_reasons(
@@ -560,6 +560,7 @@ def _invalid_tool_lockfile_error(
             You can fix this by updating `[{tool_name}].version`,
             `[{tool_name}].extra_requirements`, and/or
             `[{tool_name}].source_plugins` (if applicable), or by using a new custom lockfile.
+            See {doc_url('python-third-party-dependencies')} for details.
             """
         ) + "\n"
         if isinstance(metadata, PythonLockfileMetadataV2):
@@ -588,7 +589,7 @@ def _invalid_tool_lockfile_error(
             are not compatible with those used to generate the lockfile
             (`{metadata.valid_for_interpreter_constraints}`). You can fix this by adjusting
             `[{tool_name}].interpreter_constraints` (if applicable), or by generating a new
-            custom lockfile.
+            custom lockfile. See {doc_url('python-third-party-dependencies')} for details.
             """
         )
         yield "\n\n"
