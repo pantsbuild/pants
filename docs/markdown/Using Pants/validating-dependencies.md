@@ -333,7 +333,27 @@ __dependents_rules__(
     "src/cli/**",
     "src/net/**",
     "!*",
-  )
+  ),
+  ("*", "*"),
+)
+```
+
+From the other end, to limit which libraries may be used for some sources:
+```python
+# example/BUILD
+
+# Limit which libraries may be depended upon
+__dependencies_rules__(
+  (
+    "*",  # These rules applies to all targets
+    # May only import setuptools and ansicolors, but no other libraries from the example/reqs target
+    "//example/reqs#setuptools",
+    "reqs#ansicolors",
+    "!//example/reqs#*",
+
+    # Any other dependency allowed
+    "*",
+  ),
 )
 ```
 
