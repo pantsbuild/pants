@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import dataclasses
+import difflib
 import json
 import logging
 import os
@@ -311,11 +312,14 @@ async def _check_go_sum_has_not_changed(
 
     if input_go_sum_entry is not None or output_go_sum_entry is not None:
         if input_go_sum_entry != output_go_sum_entry:
+            go_sum_diff = list(difflib.unified_diff(input_go_sum_entry.decode().splitlines(), output_go_sum_entry.decode().splitlines()))
+            go_sum_diff_rendered = "\n".join(line.rstrip() for line in go_sum_diff)
             raise ValueError(
                 f"For `{GoModTarget.alias}` target `{go_mod_address}`, the go.sum file is incomplete "
                 f"because it was updated while processing third-party dependency `{import_path}`. "
                 "Please re-generate the go.sum file by running `go mod download` in the module directory. "
-                "(Pants does not currently have support for updating the go.sum checksum database itself.)"
+                "(Pants does not currently have support for updating the go.sum checksum database itself.)\n\n"
+                f"Diff:\n{go_sum_diff_rendered}"
             )
 
 
