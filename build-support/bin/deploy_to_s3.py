@@ -22,10 +22,10 @@ def main() -> None:
         ),
     )
     options = parser.parse_args()
-    perform_deploy(aws_cli_symlink_path=options.aws_cli_symlink_path, scope=options.scope)
+    perform_deploy(scope=options.scope)
 
 
-def perform_deploy(*, aws_cli_symlink_path: str | None = None, scope: str | None = None):
+def perform_deploy(*, aws_cli_symlink_path: str | None = None, scope: str | None = None) -> None:
     """Deploy the contents of dist/deploy to S3.
 
     The `aws` CLI app will be installed if needed and will be symlinked into the system standard
