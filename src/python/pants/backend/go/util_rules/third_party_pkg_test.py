@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import os.path
+import re
 from textwrap import dedent
 
 import pytest
@@ -30,6 +31,7 @@ from pants.backend.go.util_rules.third_party_pkg import (
 )
 from pants.build_graph.address import Address
 from pants.engine.fs import Digest, Snapshot
+from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.process import ProcessExecutionFailure
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner, engine_error
@@ -574,3 +576,34 @@ def test_ambiguous_package(rule_runner: RuleRunner) -> None:
         == "gopath/pkg/mod/github.com/ugorji/go/codec@v0.0.0-20181204163529-d75b2dcb6bc8"
     )
     assert "encode.go" in pkg_info.go_files
+
+
+def test_go_sum_with_missing_entries_triggers_error(rule_runner: RuleRunner) -> None:
+    digest = set_up_go_mod(
+        rule_runner,
+        dedent(
+            """\
+            module example.com/third-party-module
+            go 1.16
+            require github.com/google/uuid v1.3.0
+            """
+        ),
+        "",
+    )
+    msg = (
+        "For `go_mod` target `fake_addr_for_test:mod`, the go.sum file is incomplete because "
+        "it was updated while processing third-party dependency `github.com/google/uuid`."
+    )
+    with pytest.raises(ExecutionError, match=re.escape(msg)):
+        _ = rule_runner.request(
+            ThirdPartyPkgAnalysis,
+            [
+                ThirdPartyPkgAnalysisRequest(
+                    "github.com/ugorji/go/codec",
+                    Address("fake_addr_for_test", target_name="mod"),
+                    digest,
+                    "go.mod",
+                    build_opts=GoBuildOptions(),
+                )
+            ],
+        )

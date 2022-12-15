@@ -312,7 +312,12 @@ async def _check_go_sum_has_not_changed(
 
     if input_go_sum_entry is not None or output_go_sum_entry is not None:
         if input_go_sum_entry != output_go_sum_entry:
-            go_sum_diff = list(difflib.unified_diff(input_go_sum_entry.decode().splitlines(), output_go_sum_entry.decode().splitlines()))
+            go_sum_diff = list(
+                difflib.unified_diff(
+                    (input_go_sum_entry or b"").decode().splitlines(),
+                    (output_go_sum_entry or b"").decode().splitlines(),
+                )
+            )
             go_sum_diff_rendered = "\n".join(line.rstrip() for line in go_sum_diff)
             raise ValueError(
                 f"For `{GoModTarget.alias}` target `{go_mod_address}`, the go.sum file is incomplete "
