@@ -306,7 +306,7 @@ async def run_in_sandbox_request(
 
     runnable_address_str = shell_command[RunInSandboxRunnableField].value
     if not runnable_address_str:
-        raise Exception(f"Must supply a `runnable` for {description}.")
+        raise Exception(f"Must supply a value for `runnable` for {description}.")
 
     runnable_address = await Get(
         Address,
