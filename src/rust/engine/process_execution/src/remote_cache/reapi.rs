@@ -18,6 +18,32 @@ pub struct RemoteCache {
   action_cache_client: Arc<ActionCacheClient<LayeredService>>,
 }
 
+impl RemoteCache {
+  pub fn new() -> Result<RemoteCache, ()> {
+    let tls_client_config = if action_cache_address.starts_with("https://") {
+      Some(grpc_util::tls::Config::new_without_mtls(root_ca_certs).try_into()?)
+    } else {
+      None
+    };
+
+    let endpoint = grpc_util::create_endpoint(
+      action_cache_address,
+      tls_client_config.as_ref(),
+      &mut headers,
+    )?;
+    let http_headers = headers_to_http_header_map(&headers)?;
+    let channel = layered_service(
+      tonic::transport::Channel::balance_list(vec![endpoint].into_iter()),
+      concurrency_limit,
+      http_headers,
+      Some((read_timeout, Metric::RemoteCacheRequestTimeouts)),
+    );
+    let action_cache_client = Arc::new(ActionCacheClient::new(channel));
+
+    Ok(RemoteCache { instance_name, action_cache_client })
+  }
+}
+
 #[async_trait]
 impl RemoteCacheProvider for RemoteCache {
   async fn update_action_result(

@@ -47,7 +47,7 @@ pub enum RemoteCacheWarningsBehavior {
 }
 
 #[async_trait]
-pub trait RemoteCacheProvider: Sync {
+pub trait RemoteCacheProvider: Sync + Send + 'static {
   async fn update_action_result(
     &self,
     action_digest: Digest,
@@ -76,14 +76,13 @@ pub struct CommandRunner {
   append_only_caches_base_path: Option<String>,
   executor: task_executor::Executor,
   store: Store,
-  action_cache_client: Arc<ActionCacheClient<LayeredService>>,
   cache_read: bool,
   cache_write: bool,
   cache_content_behavior: CacheContentBehavior,
   warnings_behavior: RemoteCacheWarningsBehavior,
   read_errors_counter: Arc<Mutex<BTreeMap<String, usize>>>,
   write_errors_counter: Arc<Mutex<BTreeMap<String, usize>>>,
-  gha_store: Arc<remote::gha::ByteStore>,
+  provider: Arc<dyn RemoteCacheProvider>
 }
 
 impl CommandRunner {
@@ -104,25 +103,6 @@ impl CommandRunner {
     read_timeout: Duration,
     append_only_caches_base_path: Option<String>,
   ) -> Result<Self, String> {
-    let tls_client_config = if action_cache_address.starts_with("https://") {
-      Some(grpc_util::tls::Config::new_without_mtls(root_ca_certs).try_into()?)
-    } else {
-      None
-    };
-
-    let endpoint = grpc_util::create_endpoint(
-      action_cache_address,
-      tls_client_config.as_ref(),
-      &mut headers,
-    )?;
-    let http_headers = headers_to_http_header_map(&headers)?;
-    let channel = layered_service(
-      tonic::transport::Channel::balance_list(vec![endpoint].into_iter()),
-      concurrency_limit,
-      http_headers,
-      Some((read_timeout, Metric::RemoteCacheRequestTimeouts)),
-    );
-    let action_cache_client = Arc::new(ActionCacheClient::new(channel));
     let gha_store = Arc::new(remote::gha::ByteStore::new(
       &std::env::var("PANTS_REMOTE_GHA_CACHE_URL").expect("url env var not set"),
       &std::env::var("PANTS_REMOTE_GHA_RUNTIME_TOKEN").expect("token env var not set"),
@@ -136,7 +116,6 @@ impl CommandRunner {
       append_only_caches_base_path,
       executor,
       store,
-      action_cache_client,
       cache_read,
       cache_write,
       cache_content_behavior,
@@ -309,10 +288,9 @@ impl CommandRunner {
         self.instance_name.clone(),
         request.platform,
         &context,
-        self.action_cache_client.clone(),
+        self.provider.clone(),
         self.store.clone(),
         self.cache_content_behavior,
-        self.gha_store.clone(),
       )
       .await;
       match response {
@@ -433,38 +411,9 @@ impl CommandRunner {
       .ensure_remote_has_recursive(digests_for_action_result)
       .await?;
 
-    //let client = self.action_cache_client.as_ref().clone();
-    //let client = self.gha_store.as_ref().clone();
-    // retry_call(
-    //   client,
-    //   move |mut client| {
-    let update_action_cache_request = remexec::UpdateActionResultRequest {
-      instance_name: instance_name.clone().unwrap_or_else(|| "".to_owned()),
-      action_digest: Some(action_digest.into()),
-      action_result: Some(action_result.clone()),
-      ..remexec::UpdateActionResultRequest::default()
-    };
-
-    // async move {
-    //   client
-    //     .update_action_result(update_action_cache_request)
-    //     .await
-    // }
-    let bytes = update_action_cache_request.to_bytes();
     self
-      .gha_store
-      .store_bytes(
-        Digest {
-          size_bytes: bytes.len(),
-          ..action_digest
-        },
-        Box::new(move |r| bytes.slice(r)),
-      )
-      //   },
-      //   status_is_retryable,
-      // )
+      .provider.update_action_result(action_digest, action_result)
       .await?;
-    //.map_err(status_to_str)?;
 
     Ok(())
   }
