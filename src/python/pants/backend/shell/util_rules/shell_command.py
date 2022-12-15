@@ -99,8 +99,8 @@ class ShellCommandProcessRequest:
     append_only_caches: FrozenDict[str, str] | None
     output_files: tuple[str, ...]
     output_directories: tuple[str, ...]
-    extra_env_vars: tuple[str, ...]
-    extra_env_vars_2: FrozenDict[str, str] | None
+    fetch_env_vars: tuple[str, ...]
+    supplied_env_var_values: FrozenDict[str, str] | None
 
 
 @dataclass(frozen=True)
@@ -136,10 +136,10 @@ async def _prepare_process_request_from_target(shell_command: Target) -> ShellCo
         input_digest=dependencies_digest,
         output_files=output_files,
         output_directories=output_directories,
-        extra_env_vars=shell_command.get(ShellCommandExtraEnvVarsField).value or (),
+        fetch_env_vars=shell_command.get(ShellCommandExtraEnvVarsField).value or (),
         immutable_input_digests=None,
         append_only_caches=None,
-        extra_env_vars_2=None,
+        supplied_env_var_values=None,
     )
 
 
@@ -355,8 +355,8 @@ async def run_in_sandbox_request(
         append_only_caches=FrozenDict(run_request.append_only_caches or {}),
         output_files=output_files,
         output_directories=output_directories,
-        extra_env_vars=(),
-        extra_env_vars_2=FrozenDict(**run_request.extra_env),
+        fetch_env_vars=(),
+        supplied_env_var_values=FrozenDict(**run_request.extra_env),
     )
 
     result = await Get(
@@ -430,8 +430,8 @@ async def prepare_shell_command_process(
     tools = shell_command.tools
     output_files = shell_command.output_files
     output_directories = shell_command.output_directories
-    extra_env_vars = shell_command.extra_env_vars
-    extra_env_vars_2 = shell_command.extra_env_vars_2 or FrozenDict()
+    fetch_env_vars = shell_command.fetch_env_vars
+    supplied_env_vars = shell_command.supplied_env_var_values or FrozenDict()
     immutable_input_digests = shell_command.immutable_input_digests or FrozenDict()
     append_only_caches = shell_command.append_only_caches or FrozenDict()
 
@@ -445,11 +445,11 @@ async def prepare_shell_command_process(
 
         command_env = {"TOOLS": " ".join(tools), **resolved_tools}
 
-    extra_env = await Get(EnvironmentVars, EnvironmentVarsRequest(extra_env_vars))
+    extra_env = await Get(EnvironmentVars, EnvironmentVarsRequest(fetch_env_vars))
     command_env.update(extra_env)
 
-    if extra_env_vars_2:
-        command_env.update(extra_env_vars_2)
+    if supplied_env_vars:
+        command_env.update(supplied_env_vars)
 
     input_snapshot = await Get(Snapshot, Digest, shell_command.input_digest)
 

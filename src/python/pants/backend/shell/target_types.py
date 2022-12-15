@@ -263,7 +263,7 @@ class ShellCommandCommandField(StringField):
 class RunInSandboxRunnableField(StringField):
     alias = "runnable"
     required = True
-    help = (
+    help = softwrap(
         "Address to a target that can be invoked by the `run` goal (and does not set "
         "`run_in_sandbox_behavior=NOT_SUPPORTED`). This will be executed along with any arguments "
         "specified by `argv`, in a sandbox with that target's transitive dependencies, along with "
@@ -367,7 +367,7 @@ class RunInSandboxSourcesField(MultipleSourcesField):
 class RunInSandboxArgumentsField(StringSequenceField):
     alias = "args"
     default = ()
-    help = f"""Extra arguments to pass into the `{RunInSandboxRunnableField.alias}` field. """
+    help = f"Extra arguments to pass into the `{RunInSandboxRunnableField.alias}` field."
 
 
 class ShellCommandTimeoutField(IntField):

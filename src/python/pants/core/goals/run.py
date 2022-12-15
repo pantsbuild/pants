@@ -61,6 +61,19 @@ class RunInSandboxBehavior(Enum):
 
     This is used to automatically generate rules used to fulfill `experimental_run_in_sandbox`
     targets.
+
+    The behaviors are as follows:
+
+    * `RUN_REQUEST_HERMETIC`: Use the existing `RunRequest`-generating rule, and enable cacheing.
+       Use this if you are confident the behaviour of the rule relies only on state that is
+       captured by pants (e.g. binary paths are found using `EnvironmentVarsRequest`), and that
+       the rule only refers to files in the sandbox.
+    * `RUN_REQUEST_NOT_HERMETIC`: Use the existing `RunRequest`-generating rule, and do not
+       enable cacheing. Use this if your existing rule is mostly suitable for use in the sandbox,
+       but you cannot guarantee reproducible behavior.
+    * `CUSTOM`: Opt to write your own rule that returns `RunInSandboxRequest`.
+    * `NOT_SUPPORTED`: Opt out of being usable in `experimental_run_in_sandbox`. Attempting to use
+       such a target will result in a runtime exception.
     """
 
     RUN_REQUEST_HERMETIC = 1
@@ -143,8 +156,13 @@ class RunInSandboxRequest(RunRequest):
     """A run request that launches the process in the sandbox for use as part of a build rule.
 
     The arguments and environment should only use values relative to the build root (or prefixed
-    with `{chroot}`), or refer to binaries that were fetched with `BinaryPathRequest`. Implementors
-    can mark a rule as not guaranteeing hermeticity, which will
+    with `{chroot}`), or refer to binaries that were fetched with `BinaryPathRequest`.
+
+    Presently, implementors can opt to use the existing as not guaranteeing hermeticity, which will
+    internally mark the rule as uncacheable. In such a case, non-safe APIs can be used, however,
+    this behavior can result in poorer performance, and only exists as a stop-gap while
+    implementors work to make sure their `RunRequest`-generating rules can be used in a hermetic
+    context, or writing new custom rules. (See the Plugin Upgrade Guide for details).
     """
 
 
