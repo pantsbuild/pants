@@ -264,10 +264,12 @@ class RunInSandboxRunnableField(StringField):
     alias = "runnable"
     required = True
     help = softwrap(
-        "Address to a target that can be invoked by the `run` goal (and does not set "
-        "`run_in_sandbox_behavior=NOT_SUPPORTED`). This will be executed along with any arguments "
-        "specified by `argv`, in a sandbox with that target's transitive dependencies, along with "
-        "the transitive dependencies specified by `execution_dependencies`."
+        """
+        Address to a target that can be invoked by the `run` goal (and does not set
+        `run_in_sandbox_behavior=NOT_SUPPORTED`). This will be executed along with any arguments
+        specified by `argv`, in a sandbox with that target's transitive dependencies, along with
+        the transitive dependencies specified by `execution_dependencies`.
+        """
     )
 
 
