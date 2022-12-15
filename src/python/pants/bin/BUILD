@@ -73,6 +73,7 @@ target(
         "src/python/pants/backend/shell",
         "src/python/pants/backend/shell/lint/shellcheck",
         "src/python/pants/backend/shell/lint/shfmt",
+        "src/python/pants/backend/tools/preamble",
         "src/python/pants/core",
     ],
 )

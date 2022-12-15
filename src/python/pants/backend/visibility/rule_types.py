@@ -119,6 +119,22 @@ class VisibilityRuleSet:
     selectors: tuple[TargetGlob, ...]
     rules: tuple[VisibilityRule, ...]
 
+    def __post_init__(self) -> None:
+        if all("!*" == str(selector) for selector in self.selectors):
+            rules = tuple(map(str, self.rules))
+            raise BuildFileVisibilityRulesError(
+                softwrap(
+                    f"""
+                    The rule set will never apply to anything, for the rules: {rules}
+
+                    At least one target selector must have a filtering rule that can match
+                    something, for example:
+
+                        ("python_*", {rules})
+                    """
+                )
+            )
+
     @classmethod
     def parse(cls, build_file: str, arg: Any) -> VisibilityRuleSet:
         """Translate input `arg` from BUILD file call.
@@ -195,9 +211,9 @@ class BuildFileVisibilityRules(BuildFileDependencyRules):
         # Check outgoing dependency action
         out_ruleset, out_action, out_pattern = (
             cast(BuildFileVisibilityRules, dependencies_rules).get_action(
-                target=origin_adaptor,
-                address=dependency_address,
-                relpath=cls._get_address_relpath(origin_address),
+                address=origin_address,
+                adaptor=origin_adaptor,
+                other_address=dependency_address,
             )
             if dependencies_rules is not None
             else (None, DependencyRuleAction.ALLOW, None)
@@ -216,9 +232,9 @@ class BuildFileVisibilityRules(BuildFileDependencyRules):
         # Check incoming dependency action
         in_ruleset, in_action, in_pattern = (
             cast(BuildFileVisibilityRules, dependents_rules).get_action(
-                target=dependency_adaptor,
-                address=origin_address,
-                relpath=cls._get_address_relpath(dependency_address),
+                address=dependency_address,
+                adaptor=dependency_adaptor,
+                other_address=origin_address,
             )
             if dependents_rules is not None
             else (None, DependencyRuleAction.ALLOW, None)
@@ -256,35 +272,32 @@ class BuildFileVisibilityRules(BuildFileDependencyRules):
 
     @staticmethod
     def _get_address_path(address: Address) -> str:
-        if address.is_file_target:
-            return address.filename
-        if address.is_generated_target:
-            return address.spec
-        return address.spec_path
+        return TargetGlob.address_path(address)
 
     def get_action(
         self,
-        target: TargetAdaptor,
         address: Address,
-        relpath: str,
+        adaptor: TargetAdaptor,
+        other_address: Address,
     ) -> tuple[VisibilityRuleSet | None, DependencyRuleAction | None, str | None]:
         """Get applicable rule for target type from `path`.
 
         The rules are declared in `relpath`.
         """
-        ruleset = self.get_ruleset(address, target, relpath)
+        relpath = self._get_address_relpath(address)
+        ruleset = self.get_ruleset(address, adaptor, relpath)
         if ruleset is None:
             return None, None, None
-        path = self._get_address_path(address)
+        path = self._get_address_path(other_address)
         for visibility_rule in ruleset.rules:
             if visibility_rule.match(path, relpath):
                 if visibility_rule.action != DependencyRuleAction.ALLOW:
                     logger.debug(
                         softwrap(
                             f"""
-                            {visibility_rule.action.name}: type:{target.type_alias}
-                            name:{target.name} path:{path!r} relpath:{relpath!r} address:{address}
-                            rule:{str(visibility_rule)!r} {self.path}:
+                            {visibility_rule.action.name}: type={adaptor.type_alias}
+                            address={address} [{relpath}] other={other_address} [{path}]
+                            rule={str(visibility_rule)!r} {self.path}:
                             {', '.join(map(str, ruleset.rules))}
                             """
                         )
@@ -320,11 +333,40 @@ class BuildFileVisibilityRulesParserState(BuildFileDependencyRulesParserState):
         extend: bool = False,
         **kwargs,
     ) -> None:
+        if self.rulesets:
+            raise BuildFileVisibilityRulesError(
+                softwrap(
+                    """
+                    There must be at most one each of the `__dependencies_rules__()` /
+                    `__dependents_rules__()` declarations per BUILD file.
+
+                    To declare multiple rule sets, simply provide them in a single call.
+
+                    Example:
+
+                      __dependencies_rules__(
+                        (
+                           (files, resources),
+                           "//resources/**",
+                           "//files/**",
+                           "!*",
+                        ),
+                        (
+                          python_sources,
+                          "//src/**",
+                          "!*",
+                        ),
+                        ("*", "*"),
+                      )
+                    """
+                )
+            )
+
         try:
             self.rulesets = [VisibilityRuleSet.parse(build_file, arg) for arg in args if arg]
             self.path = build_file
         except ValueError as e:
-            raise BuildFileVisibilityRulesError(f"{build_file}: {e}") from e
+            raise BuildFileVisibilityRulesError(str(e)) from e
 
         if extend and self.parent:
             self.rulesets.extend(self.parent.rulesets)

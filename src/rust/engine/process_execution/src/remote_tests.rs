@@ -1,3 +1,5 @@
+// Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
+// Licensed under the Apache License, Version 2.0 (see LICENSE).
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::convert::TryInto;
 use std::path::{Path, PathBuf};
@@ -12,7 +14,7 @@ use mock::execution_server::{ExpectedAPICall, MockOperation};
 use prost::Message;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use protos::gen::google::longrunning::Operation;
-use remexec::ExecutedActionMetadata;
+use remexec::{execution_stage::Value as ExecutionStageValue, ExecutedActionMetadata};
 use spectral::prelude::*;
 use spectral::{assert_that, string::StrAssertions};
 use store::{SnapshotOps, Store, StoreError};
@@ -20,7 +22,7 @@ use tempfile::TempDir;
 use testutil::data::{TestData, TestDirectory, TestTree};
 use testutil::{owned_string_vec, relative_paths};
 use tokio::time::{sleep, timeout};
-use workunit_store::{RunId, WorkunitStore};
+use workunit_store::{Level, RunId, RunningWorkunit, WorkunitStore};
 
 use crate::remote::{CommandRunner, EntireExecuteRequest, ExecutionError, OperationOrStatus};
 use crate::{
@@ -1052,6 +1054,95 @@ async fn successful_after_reconnect_from_retryable_error() {
   assert_eq!(result.original.exit_code, 0);
   assert_eq!(result.original.output_directory, *EMPTY_DIRECTORY_DIGEST);
   assert_cancellation_requests(&mock_server, vec![]);
+}
+
+#[tokio::test]
+async fn creates_executing_workunit() {
+  let (workunit_store, mut workunit) = WorkunitStore::setup_for_tests();
+  let executor = task_executor::Executor::new();
+  let store_dir = TempDir::new().unwrap();
+  let store = Store::local_only(executor, store_dir).unwrap();
+
+  let execute_request = echo_foo_request();
+  let op_name = "gimme-foo".to_string();
+
+  let queue_time = Duration::from_millis(100);
+  let executing_time = Duration::from_millis(100);
+
+  let mock_server = {
+    let EntireExecuteRequest {
+      execute_request, ..
+    } = crate::remote::make_execute_request(
+      &execute_request.clone().try_into().unwrap(),
+      None,
+      None,
+      &store,
+      None,
+    )
+    .await
+    .unwrap();
+
+    mock::execution_server::TestServer::new(
+      mock::execution_server::MockExecution::new(vec![ExpectedAPICall::Execute {
+        execute_request,
+        stream_responses: Ok(vec![
+          make_delayed_incomplete_operation_with_stage(
+            &op_name,
+            queue_time,
+            ExecutionStageValue::Queued,
+          ),
+          make_delayed_incomplete_operation_with_stage(
+            &op_name,
+            Duration::from_millis(0),
+            ExecutionStageValue::Executing,
+          ),
+          make_delayed_incomplete_operation_with_stage(
+            &op_name,
+            executing_time,
+            ExecutionStageValue::Completed,
+          ),
+          make_successful_operation(
+            &op_name,
+            StdoutType::Raw("foo".to_owned()),
+            StderrType::Raw("".to_owned()),
+            0,
+          ),
+        ]),
+      }]),
+      None,
+    )
+  };
+
+  let result =
+    run_command_remote_in_workunit(mock_server.address(), execute_request, &mut workunit)
+      .await
+      .unwrap();
+
+  assert_eq!(result.original.exit_code, 0);
+
+  // Confirm that a workunit was created, and that it took:
+  // 1. at least the queue_time less than its parent
+  // 2. more than the executing_time
+  let (_, completed_workunits) = workunit_store.latest_workunits(Level::Trace);
+  let parent_duration: Duration = completed_workunits
+    .iter()
+    .find(|wu| wu.name == "run_execute_request")
+    .unwrap()
+    .time_span()
+    .unwrap()
+    .duration
+    .into();
+  let child_duration: Duration = completed_workunits
+    .iter()
+    .find(|wu| wu.name == "run_remote_process")
+    .unwrap()
+    .time_span()
+    .unwrap()
+    .duration
+    .into();
+
+  assert!(parent_duration - queue_time >= child_duration);
+  assert!(child_duration >= executing_time);
 }
 
 #[tokio::test]
@@ -2309,6 +2400,7 @@ async fn extract_output_files_from_response_just_directory() {
       output_directories: vec![remexec::OutputDirectory {
         path: "cats".into(),
         tree_digest: Some(test_tree.digest().into()),
+        is_topologically_sorted: false,
       }],
       ..Default::default()
     }),
@@ -2340,10 +2432,12 @@ async fn extract_output_files_from_response_directories_and_files() {
         remexec::OutputDirectory {
           path: "pets/cats".into(),
           tree_digest: Some((&TestTree::roland_at_root().digest()).into()),
+          is_topologically_sorted: false,
         },
         remexec::OutputDirectory {
           path: "pets/dogs".into(),
           tree_digest: Some((&TestTree::robin_at_root().digest()).into()),
+          is_topologically_sorted: false,
         },
       ],
       ..Default::default()
@@ -2372,6 +2466,7 @@ async fn extract_output_files_from_response_no_prefix() {
       output_directories: vec![remexec::OutputDirectory {
         path: String::new(),
         tree_digest: Some((&TestTree::roland_at_root().digest()).into()),
+        is_topologically_sorted: false,
       }],
       ..Default::default()
     }),
@@ -2392,17 +2487,37 @@ pub fn echo_foo_request() -> Process {
 }
 
 fn make_incomplete_operation(operation_name: &str) -> MockOperation {
-  let op = Operation {
+  MockOperation::new(Operation {
     name: operation_name.to_string(),
     done: false,
     ..Default::default()
-  };
-  MockOperation::new(op)
+  })
 }
 
 fn make_delayed_incomplete_operation(operation_name: &str, delay: Duration) -> MockOperation {
   let mut op = make_incomplete_operation(operation_name);
   op.duration = Some(delay);
+  op
+}
+
+fn make_delayed_incomplete_operation_with_stage(
+  operation_name: &str,
+  delay: Duration,
+  stage: ExecutionStageValue,
+) -> MockOperation {
+  let mut op = make_delayed_incomplete_operation(operation_name, delay);
+  match &mut op.op {
+    Ok(Some(op)) => {
+      op.metadata = Some(make_any_proto(
+        &remexec::ExecuteOperationMetadata {
+          stage: stage as i32,
+          ..Default::default()
+        },
+        "protos::gen::",
+      ));
+    }
+    x => panic!("Unexpected MockOperation content: {x:?}"),
+  }
   op
 }
 
@@ -2618,6 +2733,14 @@ async fn run_command_remote(
   request: Process,
 ) -> Result<RemoteTestResult, ProcessError> {
   let (_, mut workunit) = WorkunitStore::setup_for_tests();
+  run_command_remote_in_workunit(execution_address, request, &mut workunit).await
+}
+
+async fn run_command_remote_in_workunit(
+  execution_address: String,
+  request: Process,
+  workunit: &mut RunningWorkunit,
+) -> Result<RemoteTestResult, ProcessError> {
   let cas = mock::StubCAS::builder()
     .file(&TestData::roland())
     .directory(&TestDirectory::containing_roland())
@@ -2625,7 +2748,7 @@ async fn run_command_remote(
     .build();
   let (command_runner, store) = create_command_runner(execution_address, &cas);
   let original = command_runner
-    .run(Context::default(), &mut workunit, request)
+    .run(Context::default(), workunit, request)
     .await?;
 
   let stdout_bytes = store

@@ -8,6 +8,7 @@ import os
 import uuid
 from collections import defaultdict
 from dataclasses import dataclass
+from enum import Enum
 from typing import Any, DefaultDict, Iterable, cast
 
 from pants.backend.python.subsystems.setup import PythonSetup
@@ -37,7 +38,7 @@ from pants.engine.process import ProcessResult
 from pants.engine.rules import collect_rules, rule, rule_helper
 from pants.engine.target import Target
 from pants.engine.unions import UnionMembership, UnionRule, union
-from pants.option.option_types import BoolOption
+from pants.option.option_types import BoolOption, EnumOption
 from pants.util.docutil import bin_name
 from pants.util.strutil import path_safe, softwrap
 
@@ -89,12 +90,36 @@ class ExportPythonTool(EngineAwareParameter):
         return self.resolve_name
 
 
+class PythonResolveExportFormat(Enum):
+    """How to export Python resolves."""
+
+    mutable_virtualenv = "mutable_virtualenv"
+    symlinked_immutable_virtualenv = "symlinked_immutable_virtualenv"
+
+
 class ExportPluginOptions:
+    py_resolve_format = EnumOption(
+        default=PythonResolveExportFormat.mutable_virtualenv,
+        help=softwrap(
+            """\
+            Export Python resolves using this format. Options are:
+              - mutable_virtualenv: Export a standalone mutable virtualenv that you can
+                further modify.
+              - symlinked_immutable_virtualenv: Export a symlink into a cached Python virtualenv.
+                This virtualenv will have no pip binary, and will be immutable. Any attempt to
+                modify it will corrupt the cache!  It may, however, take significantly less time
+                to export than a standalone, mutable virtualenv.
+            """
+        ),
+    )
+
     symlink_python_virtualenv = BoolOption(
         default=False,
         help="Export a symlink into a cached Python virtualenv.  This virtualenv will have no pip binary, "
         "and will be immutable. Any attempt to modify it will corrupt the cache!  It may, however, "
         "take significantly less time to export than a standalone, mutable virtualenv will.",
+        removal_version="2.20.0.dev0",
+        removal_hint="Set the `[export].py_resolve_format` option to 'symlinked_immutable_virtualenv'",
     )
 
 
@@ -143,7 +168,13 @@ async def do_export(
     )
 
     complete_pex_env = pex_env.in_workspace()
+
     if export_subsys.options.symlink_python_virtualenv:
+        export_format = PythonResolveExportFormat.symlinked_immutable_virtualenv
+    else:
+        export_format = export_subsys.options.py_resolve_format
+
+    if export_format == PythonResolveExportFormat.symlinked_immutable_virtualenv:
         requirements_venv_pex = await Get(VenvPex, PexRequest, req.pex_request)
         py_version = await _get_full_python_version(requirements_venv_pex)
         # Note that for symlinking we ignore qualify_path_with_python_version and always qualify, since
@@ -160,7 +191,7 @@ async def do_export(
             post_processing_cmds=[PostProcessingCommand(["ln", "-s", venv_abspath, output_path])],
             resolve=req.resolve_name or None,
         )
-    else:
+    elif export_format == PythonResolveExportFormat.mutable_virtualenv:
         # Note that an internal-only pex will always have the `python` field set.
         # See the build_pex() rule and _determine_pex_python_and_platforms() helper in pex.py.
         requirements_pex = await Get(Pex, PexRequest, req.pex_request)
@@ -206,6 +237,8 @@ async def do_export(
             ],
             resolve=req.resolve_name or None,
         )
+    else:
+        raise ExportError("Unsupported value for [export].py_resolve_format")
 
 
 @dataclass(frozen=True)

@@ -1,3 +1,5 @@
+// Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
+// Licensed under the Apache License, Version 2.0 (see LICENSE).
 use std::cmp::min;
 use std::collections::{BTreeMap, HashSet};
 use std::convert::TryInto;
@@ -94,6 +96,7 @@ impl ByteStore {
       tonic::transport::Channel::balance_list(vec![endpoint].into_iter()),
       rpc_concurrency_limit,
       http_headers,
+      None,
     );
 
     let byte_stream_client = Arc::new(ByteStreamClient::new(channel.clone()));
@@ -261,6 +264,7 @@ impl ByteStore {
       requests: vec![remexec::batch_update_blobs_request::Request {
         digest: Some(digest.into()),
         data: bytes(0..digest.size_bytes),
+        compressor: remexec::compressor::Value::Identity as i32,
       }],
     };
 

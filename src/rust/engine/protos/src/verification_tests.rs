@@ -1,3 +1,5 @@
+// Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
+// Licensed under the Apache License, Version 2.0 (see LICENSE).
 use hashing::EMPTY_DIGEST;
 
 use crate::gen::build::bazel::remote::execution::v2::{Digest, Directory, DirectoryNode, FileNode};

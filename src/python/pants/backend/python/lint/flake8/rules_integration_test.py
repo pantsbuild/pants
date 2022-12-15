@@ -132,7 +132,13 @@ def test_uses_correct_python_version(rule_runner: RuleRunner) -> None:
             ),
         }
     )
-    extra_args = ["--flake8-lockfile=<none>", "--flake8-version=flake8<4.0,>=3.9.2"]
+    extra_args = [
+        "--flake8-lockfile=<none>",
+        "--flake8-version=flake8<4.0,>=3.9.2",
+        # Necessary due to https://github.com/PyCQA/flake8/issues/1701, which the flake8 maintainers
+        # have closed without, as far as I can tell, actually fixing.
+        "--flake8-extra-requirements=importlib-metadata>=1.1.0,<4.3",
+    ]
 
     py2_tgt = rule_runner.get_target(Address("", target_name="py2", relative_file_path="f.py"))
     py2_result = run_flake8(rule_runner, [py2_tgt], extra_args=extra_args)

@@ -10,7 +10,7 @@ import os
 from dataclasses import dataclass
 from typing import Any
 
-import ijson
+import ijson.backends.python as ijson
 
 from pants.backend.go.go_sources.load_go_binary import LoadedGoBinary, LoadedGoBinaryRequest
 from pants.backend.go.util_rules import pkg_analyzer
@@ -430,20 +430,8 @@ async def analyze_go_third_party_package(
                 "the third-party module."
             )
 
-    package_digest = await Get(
-        Digest,
-        DigestSubset(
-            request.module_sources_digest,
-            PathGlobs(
-                [os.path.join(request.package_path, "*")],
-                glob_match_error_behavior=GlobMatchErrorBehavior.error,
-                description_of_origin=f"the analysis of Go package {import_path}",
-            ),
-        ),
-    )
-
     analysis = ThirdPartyPkgAnalysis(
-        digest=package_digest,
+        digest=request.module_sources_digest,
         import_path=import_path,
         name=request.pkg_json["Name"],
         dir_path=request.package_path,
@@ -485,7 +473,8 @@ async def analyze_go_third_party_package(
             Get(Digest, CreateDigest([FileContent("patterns.json", patterns_json)])),
         )
         input_digest = await Get(
-            Digest, MergeDigests((package_digest, patterns_json_digest, embedder.digest))
+            Digest,
+            MergeDigests((request.module_sources_digest, patterns_json_digest, embedder.digest)),
         )
         embed_result = await Get(
             FallibleProcessResult,

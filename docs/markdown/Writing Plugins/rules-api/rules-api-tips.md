@@ -19,9 +19,9 @@ Every time your rule has `await`, Python will yield execution to the engine and 
 Okay:
 
 ```python
-from pants.core.util_rules.determine_source_files import SourceFilesRequest, SourceFiles
+from pants.core.util_rules.source_files import SourceFilesRequest, SourceFiles
 from pants.engine.fs import AddPrefix, Digest
-from pants.engine.selectors import Get, MultiGet
+from pants.engine.internals.selectors import Get
 
 @rule
 async def demo(...) -> Foo:
@@ -32,9 +32,9 @@ async def demo(...) -> Foo:
 Better:
 
 ```python
-from pants.core.util_rules.determine_source_files import SourceFilesRequest, SourceFiles
+from pants.core.util_rules.source_files import SourceFilesRequest, SourceFiles
 from pants.engine.fs import AddPrefix, Digest
-from pants.engine.selectors import Get, MultiGet
+from pants.engine.internals.selectors import Get, MultiGet
 
 @rule
 async def demo(...) -> Foo:
@@ -136,7 +136,7 @@ if __name__ == "__main__":
     main()
 ```
 
-Once you've identified the smallest combination of backends that fail and you have updated `pants.toml`, you can try isolating which rules are problematic by commenting out `Get`s and the parameters to `@rule`s.
+Once you've identified the smallest combination of backends that fail, and you have updated `pants.toml`, you can try isolating which rules are problematic by commenting out `Get`s and the parameters to `@rule`s.
 
 Some common sources of rule graph failures:
 

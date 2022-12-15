@@ -1,11 +1,13 @@
+// Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
+// Licensed under the Apache License, Version 2.0 (see LICENSE).
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use deepsize::DeepSizeOf;
 use serde::Serialize;
 
-use crate::WorkdirSymlink;
 use fs::{default_cache_path, safe_create_dir_all_ioerror, RelativePath};
+use store::WorkdirSymlink;
 
 #[derive(Clone, Debug, DeepSizeOf, Eq, PartialEq, Hash, PartialOrd, Ord, Serialize)]
 pub struct CacheName(String);

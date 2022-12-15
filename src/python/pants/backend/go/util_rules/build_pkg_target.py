@@ -10,6 +10,8 @@ from typing import ClassVar, Type, cast
 from pants.backend.go.dependency_inference import GoModuleImportPathsMapping
 from pants.backend.go.target_type_rules import GoImportPathMappingRequest
 from pants.backend.go.target_types import (
+    GoAssemblerFlagsField,
+    GoCompilerFlagsField,
     GoImportPathField,
     GoPackageSourcesField,
     GoThirdPartyPackageDependenciesField,
@@ -21,7 +23,6 @@ from pants.backend.go.util_rules.build_pkg import (
     FallibleBuildGoPackageRequest,
 )
 from pants.backend.go.util_rules.cgo import CGoCompilerFlags
-from pants.backend.go.util_rules.coverage import GoCoverageConfig
 from pants.backend.go.util_rules.embedcfg import EmbedConfig
 from pants.backend.go.util_rules.first_party_pkg import (
     FallibleFirstPartyPkgAnalysis,
@@ -37,6 +38,7 @@ from pants.backend.go.util_rules.go_mod import (
     OwningGoMod,
     OwningGoModRequest,
 )
+from pants.backend.go.util_rules.pkg_pattern import match_simple_pattern
 from pants.backend.go.util_rules.third_party_pkg import (
     ThirdPartyPkgAnalysis,
     ThirdPartyPkgAnalysisRequest,
@@ -72,7 +74,9 @@ class BuildGoPackageTargetRequest(EngineAwareParameter):
     is_main: bool = False
     for_tests: bool = False
     for_xtests: bool = False
-    coverage_config: GoCoverageConfig | None = None
+
+    # If True, then force coverage instead of applying import path patterns from `build_opts.coverage_config`.
+    with_coverage: bool = False
 
     def debug_hint(self) -> str:
         return str(self.address)
@@ -208,6 +212,7 @@ async def setup_build_go_package_target_request(
         cgo_files = _first_party_pkg_analysis.cgo_files
         cgo_flags = _first_party_pkg_analysis.cgo_flags
         c_files = _first_party_pkg_analysis.c_files
+        h_files = _first_party_pkg_analysis.h_files
         cxx_files = _first_party_pkg_analysis.cxx_files
         objc_files = _first_party_pkg_analysis.m_files
         fortran_files = _first_party_pkg_analysis.f_files
@@ -230,6 +235,7 @@ async def setup_build_go_package_target_request(
                 pkg_config=(),
             )
             c_files = ()
+            h_files = ()
             cxx_files = ()
             objc_files = ()
             fortran_files = ()
@@ -267,6 +273,7 @@ async def setup_build_go_package_target_request(
         cgo_files = _third_party_pkg_info.cgo_files
         cgo_flags = _third_party_pkg_info.cgo_flags
         c_files = _third_party_pkg_info.c_files
+        h_files = _third_party_pkg_info.h_files
         cxx_files = _third_party_pkg_info.cxx_files
         objc_files = _third_party_pkg_info.m_files
         fortran_files = _third_party_pkg_info.f_files
@@ -277,6 +284,18 @@ async def setup_build_go_package_target_request(
             "Please open a bug at https://github.com/pantsbuild/pants/issues/new/choose with this "
             "message!"
         )
+
+    pkg_specific_compiler_flags: tuple[str, ...] = ()
+    if target.has_field(GoCompilerFlagsField):
+        compiler_flags_field = target.get(GoCompilerFlagsField)
+        if compiler_flags_field and compiler_flags_field.value:
+            pkg_specific_compiler_flags = compiler_flags_field.value
+
+    pkg_specific_assembler_flags: tuple[str, ...] = ()
+    if target.has_field(GoAssemblerFlagsField):
+        assembler_flags_field = target.get(GoAssemblerFlagsField)
+        if assembler_flags_field and assembler_flags_field.value:
+            pkg_specific_assembler_flags = assembler_flags_field.value
 
     all_direct_dependencies = await Get(Targets, DependenciesRequest(target[Dependencies]))
 
@@ -362,6 +381,12 @@ async def setup_build_go_package_target_request(
             )
         pkg_direct_dependencies.append(maybe_base_pkg_dep.request)
 
+    with_coverage = request.with_coverage
+    coverage_config = request.build_opts.coverage_config
+    if coverage_config:
+        for pattern in coverage_config.import_path_include_patterns:
+            with_coverage = with_coverage or match_simple_pattern(pattern)(import_path)
+
     result = BuildGoPackageRequest(
         digest=digest,
         import_path="main" if request.is_main else import_path,
@@ -373,6 +398,7 @@ async def setup_build_go_package_target_request(
         cgo_files=cgo_files,
         cgo_flags=cgo_flags,
         c_files=c_files,
+        header_files=h_files,
         cxx_files=cxx_files,
         objc_files=objc_files,
         fortran_files=fortran_files,
@@ -381,7 +407,9 @@ async def setup_build_go_package_target_request(
         direct_dependencies=tuple(pkg_direct_dependencies),
         for_tests=request.for_tests,
         embed_config=embed_config,
-        coverage_config=request.coverage_config,
+        with_coverage=with_coverage,
+        pkg_specific_compiler_flags=tuple(pkg_specific_compiler_flags),
+        pkg_specific_assembler_flags=tuple(pkg_specific_assembler_flags),
     )
     return FallibleBuildGoPackageRequest(result, import_path)
 

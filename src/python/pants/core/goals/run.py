@@ -8,7 +8,9 @@ import logging
 from abc import ABCMeta
 from dataclasses import dataclass
 from itertools import filterfalse, tee
-from typing import Callable, Iterable, Mapping, NamedTuple, Optional, Tuple, TypeVar
+from typing import Callable, ClassVar, Iterable, Mapping, NamedTuple, Optional, Tuple, TypeVar
+
+from typing_extensions import final
 
 from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
 from pants.core.util_rules.environments import _warn_on_non_local_environments
@@ -21,7 +23,7 @@ from pants.engine.internals.specs_rules import (
     TooManyTargetsException,
 )
 from pants.engine.process import InteractiveProcess, InteractiveProcessResult
-from pants.engine.rules import Effect, Get, collect_rules, goal_rule, rule_helper
+from pants.engine.rules import Effect, Get, collect_rules, goal_rule, rule, rule_helper
 from pants.engine.target import (
     BoolField,
     FieldSet,
@@ -31,10 +33,11 @@ from pants.engine.target import (
     TargetRootsToFieldSets,
     TargetRootsToFieldSetsRequest,
 )
-from pants.engine.unions import UnionMembership, union
-from pants.option.global_options import GlobalOptions, KeepSandboxes
+from pants.engine.unions import UnionMembership, UnionRule, union
+from pants.option.global_options import GlobalOptions
 from pants.option.option_types import ArgsListOption, BoolOption
 from pants.util.frozendict import FrozenDict
+from pants.util.memo import memoized
 from pants.util.meta import frozen_after_init
 from pants.util.strutil import softwrap
 
@@ -46,6 +49,15 @@ _T = TypeVar("_T")
 @union(in_scope_types=[EnvironmentName])
 class RunFieldSet(FieldSet, metaclass=ABCMeta):
     """The fields necessary from a target to run a program/script."""
+
+    supports_debug_adapter: ClassVar[bool] = False
+
+    @final
+    @classmethod
+    def rules(cls) -> Iterable:
+        yield UnionRule(RunFieldSet, cls)
+        if not cls.supports_debug_adapter:
+            yield from _unsupported_debug_adapter_rules(cls)
 
 
 class RestartableField(BoolField):
@@ -116,22 +128,6 @@ class RunSubsystem(GoalSubsystem):
         example="val1 val2 --debug",
         tool_name="the executed target",
         passthrough=True,
-    )
-    cleanup = BoolOption(
-        default=True,
-        deprecation_start_version="2.15.0.dev1",
-        removal_version="2.16.0.dev1",
-        removal_hint="Use the global `keep_sandboxes` option instead.",
-        help=softwrap(
-            """
-            Whether to clean up the temporary directory in which the binary is chrooted.
-            Set this to false to retain the directory, e.g., for debugging.
-
-            Note that setting the global --keep-sandboxes option may also conserve this directory,
-            along with those of all other processes that Pants executes. This option is more
-            selective and controls just the target binary's directory.
-            """
-        ),
     )
     # See also `test.py`'s same option
     debug_adapter = BoolOption(
@@ -237,12 +233,6 @@ async def run(
         else Get(RunDebugAdapterRequest, RunFieldSet, field_set)
     )
     restartable = target.get(RestartableField).value
-    keep_sandboxes = (
-        global_options.keep_sandboxes
-        if run_subsystem.options.is_default("cleanup")
-        else (KeepSandboxes.never if run_subsystem.cleanup else KeepSandboxes.always)
-    )
-
     if run_subsystem.debug_adapter:
         logger.info(
             softwrap(
@@ -261,13 +251,26 @@ async def run(
             input_digest=request.digest,
             run_in_workspace=True,
             restartable=restartable,
-            keep_sandboxes=keep_sandboxes,
+            keep_sandboxes=global_options.keep_sandboxes,
             immutable_input_digests=request.immutable_input_digests,
             append_only_caches=request.append_only_caches,
         ),
     )
 
     return Run(result.exit_code)
+
+
+@memoized
+def _unsupported_debug_adapter_rules(cls: type[RunFieldSet]) -> Iterable:
+    """Returns a rule that implements DebugAdapterRequest by raising an error."""
+
+    @rule(_param_type_overrides={"request": cls})
+    async def get_run_debug_adapter_request(request: RunFieldSet) -> RunDebugAdapterRequest:
+        raise NotImplementedError(
+            "Running this target type with a debug adapter is not yet supported."
+        )
+
+    return collect_rules(locals())
 
 
 def rules():
