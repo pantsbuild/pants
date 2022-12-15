@@ -11,7 +11,7 @@ from pants.engine.target import (
 
 
 class YamlSourceField(SingleSourceField):
-    expected_file_extensions = (".yaml",)
+    expected_file_extensions = (".yaml", ".yml")
     uses_source_roots = False
 
 
