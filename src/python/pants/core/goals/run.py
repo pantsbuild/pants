@@ -351,7 +351,7 @@ def _run_in_sandbox_behavior_rule(cls: type[RunFieldSet]) -> Iterable:
     @rule(_param_type_overrides={"request": cls})
     async def not_supported(request: RunFieldSet) -> RunInSandboxRequest:
         raise NotImplementedError(
-            "Running this target type with in the sandbox is not yet supported."
+            "Running this target type within the sandbox is not yet supported."
         )
 
     @rule(_param_type_overrides={"request": cls})
