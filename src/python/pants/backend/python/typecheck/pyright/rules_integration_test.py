@@ -161,6 +161,35 @@ def test_config_file(
     assert result[0].exit_code == exit_code
 
 
+def test_additional_source_roots(rule_runner: RuleRunner) -> None:
+    LIB_1_PACKAGE = f"{PACKAGE}/lib1"
+    LIB_2_PACKAGE = f"{PACKAGE}/lib2"
+    rule_runner.write_files(
+        {
+            f"{LIB_1_PACKAGE}/core/a.py": GOOD_FILE,
+            f"{LIB_1_PACKAGE}/core/BUILD": "python_sources()",
+            f"{LIB_2_PACKAGE}/core/b.py": "from core.a import add",
+            f"{LIB_2_PACKAGE}/core/BUILD": "python_sources()",
+        }
+    )
+    tgts = [
+        rule_runner.get_target(Address(f"{LIB_1_PACKAGE}/core", relative_file_path="a.py")),
+        rule_runner.get_target(Address(f"{LIB_2_PACKAGE}/core", relative_file_path="b.py")),
+    ]
+    result = run_pyright(rule_runner, tgts)
+    assert len(result) == 1
+    assert result[0].exit_code == 1
+    assert "reportMissingImports" in result[0].stdout
+
+    result = run_pyright(
+        rule_runner,
+        tgts,
+        extra_args=[f"--source-root-patterns=['{LIB_1_PACKAGE}', '{LIB_2_PACKAGE}']"],
+    )
+    assert len(result) == 1
+    assert result[0].exit_code == 0
+
+
 def test_skip(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({f"{PACKAGE}/f.py": BAD_FILE, f"{PACKAGE}/BUILD": "python_sources()"})
     tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))

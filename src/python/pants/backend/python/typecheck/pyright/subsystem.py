@@ -46,6 +46,10 @@ class Pyright(NpxToolBase):
         `pyrightconfig.json` takes precedence if both are present.
         Pyright's configuration content is specified here:
         https://github.com/microsoft/pyright/blob/main/docs/configuration.md.
+
+        In order for Pants to work with Pyright, we modify the config file before
+        putting it in the Pyright digest. Specifically, we append source roots
+        to `extraPaths` and we overwrite `venv` to point to a pex venv.
         """
 
         return ConfigFilesRequest(

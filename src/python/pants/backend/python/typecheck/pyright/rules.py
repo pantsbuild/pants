@@ -93,15 +93,17 @@ async def _patch_config_file(
     Additionally, add source roots to the `extraPaths` key in the config file.
     """
 
+    source_roots_list = list(source_roots)
     if not config_files.snapshot.files:
         # venv workaround as per: https://github.com/microsoft/pyright/issues/4051
+        generated_config = {"venv": venv_dir, "extraPaths": source_roots_list}
         return await Get(
             Digest,
             CreateDigest(
                 [
                     FileContent(
                         "pyrightconfig.json",
-                        f'{{ "venv": "{venv_dir}" }}'.encode(),
+                        json.dumps(generated_config).encode(),
                     )
                 ]
             ),
@@ -110,23 +112,25 @@ async def _patch_config_file(
     config_contents = await Get(DigestContents, Digest, config_files.snapshot.digest)
     new_files: list[FileContent] = []
     for file in config_contents:
+        # This only supports a single json config file in the root of the project
+        # https://github.com/pantsbuild/pants/issues/17816 tracks supporting multiple config files and workspaces
         if file.path == "pyrightconfig.json":
-            config = json.loads(file.content)
-            config["venv"] = venv_dir
-            if "extraPaths" not in config:
-                config["extraPaths"] = []
-            config["extraPaths"] += source_roots
-            new_content = json.dumps(config).encode()
+            json_config = json.loads(file.content)
+            json_config["venv"] = venv_dir
+            json_extra_paths: list[str] = json_config.get("extraPaths", [])
+            json_config["extraPaths"] = list(OrderedSet(json_extra_paths + source_roots_list))
+            new_content = json.dumps(json_config).encode()
             new_files.append(replace(file, content=new_content))
 
-        if file.path == "pyproject.toml":
-            config = toml.loads(file.content.decode())
-            pyright_config = config["tool"]["pyright"]
+        # This only supports a single pyproject.toml file in the root of the project
+        # https://github.com/pantsbuild/pants/issues/17816 tracks supporting multiple config files and workspaces
+        elif file.path == "pyproject.toml":
+            toml_config = toml.loads(file.content.decode())
+            pyright_config = toml_config["tool"]["pyright"]
             pyright_config["venv"] = venv_dir
-            if "extraPaths" not in pyright_config:
-                pyright_config["extraPaths"] = []
-            pyright_config["extraPaths"] += source_roots
-            new_content = toml.dumps(config).encode()
+            toml_extra_paths: list[str] = pyright_config.get("extraPaths", [])
+            pyright_config["extraPaths"] = list(OrderedSet(toml_extra_paths + source_roots_list))
+            new_content = toml.dumps(toml_config).encode()
             new_files.append(replace(file, content=new_content))
 
     return await Get(Digest, CreateDigest(new_files))
@@ -161,7 +165,7 @@ async def pyright_typecheck_partition(
         ),
     )
 
-    # Look for any/all of the Pyright configuration files (will be modified shortly for `venv` workaround)
+    # Look for any/all of the Pyright configuration files (the config is modified below for the `venv` workaround)
     config_files_get = Get(
         ConfigFiles,
         ConfigFilesRequest,
@@ -198,7 +202,9 @@ async def pyright_typecheck_partition(
 
     # Patch the config file to use the venv directory from the requirements pex,
     # and add source roots to the `extraPaths` key in the config file.
-    unique_source_roots = {root.path for root in source_roots.path_to_root.values()}
+    unique_source_roots = FrozenOrderedSet(
+        [root.path for root in source_roots.path_to_root.values()]
+    )
     patched_config_digest = await _patch_config_file(
         config_files, requirements_venv_pex.venv_rel_dir, unique_source_roots
     )
