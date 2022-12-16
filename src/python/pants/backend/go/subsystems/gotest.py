@@ -168,6 +168,78 @@ class GoTestSubsystem(Subsystem):
         ),
     )
 
+    _profile_output_dir = StrOption(
+        default=str(PurePath("{distdir}", "go", "profiles", "{target_spec}")),
+        advanced=True,
+        help=softwrap(
+            """
+            Path to write the Go test profiling reports to. Must be relative to the build root.
+
+            Replacements:
+
+            - `{distdir}` is replaced with the Pants `distdir`.
+
+            - `{target_spec}` is replaced with the address of the applicable `go_package` target with `/`
+            characters replaced with dots (`.`).
+
+            - `{import_path}` is replaced with the applicable package's import path. Subdirectories will be made
+            for any path components separated by `/` characters.
+            """
+        ),
+    )
+
+    block_profile = BoolOption(
+        default=False,
+        help=softwrap(
+            """
+            Capture a goroutine blocking profile from the execution of the test runner. Writes the profile to
+            the file `block.out` in the directory set by the `[go-test].profile_output_dir` option.
+            """
+        ),
+    )
+
+    cpu_profile = BoolOption(
+        default=False,
+        help=softwrap(
+            """
+            Capture a CPU profile from the execution of the test runner. Writes the profile to the file `cpu.out`
+            in the directory set by the `[go-test].profile_output_dir` option.
+            """
+        ),
+    )
+
+    mem_profile = BoolOption(
+        default=False,
+        help=softwrap(
+            """
+            Capture an allocation profile from the execution of the test runner after tests have passed.
+            Writes the profile to the file `mem.out` in the directory set by the `[go-test].profile_output_dir`
+            option.
+            """
+        ),
+    )
+
+    mutex_profile = BoolOption(
+        default=False,
+        help=softwrap(
+            """
+            Capture a mutex contention profile from the execution of the test runner when all tests are
+            complete. Writes the profile to the file `mem.out` in the directory set by the
+            `[go-test].profile_output_dir` option.
+            """
+        ),
+    )
+
+    trace = BoolOption(
+        default=False,
+        help=softwrap(
+            """
+            Capture an execution trace from the execution of the test runner. Writes the trace to the file
+            `trace.out` in the directory set by the `[go-test].profile_output_dir` option.
+            """
+        ),
+    )
+
     def coverage_output_dir(self, distdir: DistDir, address: Address, import_path: str) -> PurePath:
         target_spec = address.spec_path.replace(os.sep, ".")
         import_path_escaped = import_path.replace("/", "_")
@@ -177,5 +249,14 @@ class GoTestSubsystem(Subsystem):
                 target_spec=target_spec,
                 import_path=import_path,
                 import_path_escaped=import_path_escaped,
+            )
+        )
+
+    def profile_output_dir(self, distdir: DistDir, address: Address, import_path: str) -> PurePath:
+        return PurePath(
+            self._coverage_output_dir.format(
+                distdir=distdir.relpath,
+                target_spec=address.spec_path.replace(os.sep, "."),
+                import_path=import_path,
             )
         )

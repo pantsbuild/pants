@@ -761,3 +761,46 @@ def test_file_dependencies(rule_runner: RuleRunner) -> None:
         TestResult, [GoTestRequest.Batch("", (GoTestFieldSet.create(tgt),), None)]
     )
     assert result.exit_code == 0
+
+
+def test_profile_options_write_results(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "foo/BUILD": "go_mod(name='mod')\ngo_package()",
+            "foo/go.mod": "module foo",
+            "foo/add.go": textwrap.dedent(
+                """
+                package foo
+                func add(x, y int) int {
+                  return x + y
+                }
+                """
+            ),
+            "foo/add_test.go": textwrap.dedent(
+                """
+                package foo
+                import "testing"
+                func TestAdd(t *testing.T) {
+                  if add(2, 3) != 5 {
+                    t.Fail()
+                  }
+                }
+                """
+            ),
+        }
+    )
+    rule_runner.set_options([
+        "--go-test-args=-v -bench=.",
+        "--go-test-block-profile",
+        "--go-test-cpu-profile",
+        "--go-test-mem-profile",
+        "--go-test-mutex-profile",
+        "--go-test-trace",
+
+    ], env_inherit={"PATH"})
+    tgt = rule_runner.get_target(Address("foo"))
+    result = rule_runner.request(
+        TestResult, [GoTestRequest.Batch("", (GoTestFieldSet.create(tgt),), None)]
+    )
+    assert result.exit_code == 0
+    assert "PASS: TestAdd" in result.stdout
