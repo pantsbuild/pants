@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import sys
 from typing import Any
 
 import pytest
@@ -38,9 +37,29 @@ def rule_runner() -> RuleRunner:
     )
 
 
-GOOD_FILE = """
+GOOD_FILE = """\
 this: is
 valid: YAML
+"""
+
+DOCUMENT_START_CONFIG = """\
+extends: default
+
+rules:
+  document-start: disable
+"""
+
+GOOD_FILE_WITH_START = """\
+---
+this: is
+valid: YAML
+"""
+
+REPEATED_KEY = """\
+---
+this: key
+is: repeated
+this: here
 """
 
 
@@ -65,9 +84,107 @@ def run_yamllint(
     return tuple(results)
 
 
+def assert_success(
+    rule_runner: RuleRunner, tgts: list[Target], *, extra_args: list[str] | None = None
+) -> None:
+    result = run_yamllint(rule_runner, tgts, extra_args=extra_args)
+    assert len(result) == 1
+    assert result[0].exit_code == 0
+    assert not result[0].stdout
+    assert not result[0].stderr
+
+
+def assert_failure_with(
+    snippet: str,
+    rule_runner: RuleRunner,
+    tgts: list[Target],
+    *,
+    extra_args: list[str] | None = None,
+) -> None:
+    result = run_yamllint(rule_runner, tgts, extra_args=extra_args)
+    assert len(result) == 1
+    assert result[0].exit_code == 1
+    assert snippet in result[0].stdout
+
+
+def assert_warnings_with(
+    snippet: str,
+    rule_runner: RuleRunner,
+    tgts: list[Target],
+    *,
+    extra_args: list[str] | None = None,
+) -> None:
+    result = run_yamllint(rule_runner, tgts, extra_args=extra_args)
+    assert len(result) == 1
+    assert result[0].exit_code == 2
+    assert snippet in result[0].stdout
+
+
 def test_passing(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({"test.yaml": GOOD_FILE, "BUILD": "yaml_sources(name='t')"})
+    rule_runner.write_files({"test.yaml": GOOD_FILE_WITH_START, "BUILD": "yaml_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="test.yaml"))
-    result = run_yamllint(rule_runner, [tgt])
-    print(f"run_yamllint result: {result}", file=sys.stderr)
-    assert False
+    assert_success(rule_runner, [tgt])
+
+
+def test_failure(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files({"test.yaml": REPEATED_KEY, "BUILD": "yaml_sources(name='t')"})
+    tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="test.yaml"))
+    assert_failure_with('duplication of key "this"', rule_runner, [tgt])
+
+
+def test_config_autodiscovery(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "test.yaml": GOOD_FILE,
+            ".yamllint.yaml": DOCUMENT_START_CONFIG,
+            "BUILD": "yaml_sources(name='t')",
+        }
+    )
+    tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="test.yaml"))
+    assert_success(rule_runner, [tgt])
+
+
+def test_config_autodiscovery_yml(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "test.yaml": GOOD_FILE,
+            ".yamllint.yml": DOCUMENT_START_CONFIG,
+            "BUILD": "yaml_sources(name='t')",
+        }
+    )
+    tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="test.yaml"))
+    assert_success(rule_runner, [tgt])
+
+
+def test_explicit_config(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "test.yaml": GOOD_FILE,
+            "yamllint.yaml": DOCUMENT_START_CONFIG,
+            "BUILD": "yaml_sources(name='t')",
+        }
+    )
+    tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="test.yaml"))
+    assert_success(
+        rule_runner, [tgt], extra_args=["--yamllint-config=yamllint.yaml", '--yamllint-args="-s"']
+    )
+    assert_warnings_with(
+        "missing document start", rule_runner, [tgt], extra_args=['--yamllint-args="-s"']
+    )
+
+
+def test_multiple_targets(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "good.yaml": GOOD_FILE_WITH_START,
+            "bad.yaml": REPEATED_KEY,
+            "BUILD": "yaml_sources(name='t')",
+        }
+    )
+    tgts = [
+        rule_runner.get_target(Address("", target_name="t", relative_file_path="good.yaml")),
+        rule_runner.get_target(Address("", target_name="t", relative_file_path="bad.yaml")),
+    ]
+    assert_failure_with(
+        'bad.yaml\n  4:1       error    duplication of key "this" in mapping', rule_runner, tgts
+    )

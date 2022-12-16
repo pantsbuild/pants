@@ -17,7 +17,10 @@ class YamlSourceField(SingleSourceField):
 
 class YamlSourcesGeneratingSourcesField(MultipleSourcesField):
     uses_source_roots = False
-    default = ("*.yaml", "*.yml",)
+    default = (
+        "*.yaml",
+        "*.yml",
+    )
     help = generate_multiple_sources_field_help_message(
         "Example: `sources=['example.yaml', 'example.yml', 'examples_*.yaml', '!ignore_me.yaml']`"
     )
