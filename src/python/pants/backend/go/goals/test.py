@@ -205,8 +205,6 @@ async def prepare_go_test_binary(
     request: PrepareGoTestBinaryRequest,
     test_subsystem: TestSubsystem,
     go_test_subsystem: GoTestSubsystem,
-    test_extra_env: TestExtraEnv,
-    goroot: GoRoot,
 ) -> FalliblePrepareGoTestBinaryResult:
     build_opts = await Get(
         GoBuildOptions, GoBuildOptionsFromTargetRequest(request.field_set.address)
