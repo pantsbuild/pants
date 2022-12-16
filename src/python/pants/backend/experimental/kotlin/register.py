@@ -13,7 +13,7 @@ from pants.backend.kotlin.target_types import (
 from pants.backend.kotlin.target_types import rules as target_types_rules
 from pants.backend.kotlin.test.junit import rules as kotlin_junit_rules
 from pants.core.util_rules import source_files, system_binaries
-from pants.jvm import classpath, jdk_rules, resources, run_deploy_jar
+from pants.jvm import classpath, jdk_rules, resources, run
 from pants.jvm import util_rules as jvm_util_rules
 from pants.jvm.goals import lockfile
 from pants.jvm.jar_tool import jar_tool
@@ -61,7 +61,7 @@ def rules():
         *strip_jar.rules(),
         *deploy_jar.rules(),
         *jar_tool.rules(),
-        *run_deploy_jar.rules(),
+        *run.rules(),
         *war.rules(),
         *jvm_junit_rules(),
         *kotlin_junit_rules(),
