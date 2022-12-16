@@ -13,7 +13,7 @@ from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import CoarsenedTargets
 from pants.jvm.classpath import Classpath
-from pants.jvm.jdk_rules import DefaultJdk, JdkEnvironment, JdkRequest, JvmProcess
+from pants.jvm.jdk_rules import JdkEnvironment, JdkRequest, JvmProcess
 from pants.jvm.package.deploy_jar import DeployJarFieldSet
 from pants.jvm.target_types import JvmArtifactFieldSet
 from pants.util.logging import LogLevel
@@ -84,7 +84,7 @@ async def create_jvm_artifact_run_request(
     unzip: UnzipBinary,
 ) -> RunRequest:
 
-    jdk = await Get(JdkEnvironment, JdkRequest, JdkRequest(DefaultJdk.SOURCE_DEFAULT))
+    jdk = await Get(JdkEnvironment, JdkRequest, JdkRequest.from_field(field_set.jdk_version))
 
     artifacts = await Get(CoarsenedTargets, Addresses([field_set.address]))
     classpath = await Get(Classpath, CoarsenedTargets, artifacts)

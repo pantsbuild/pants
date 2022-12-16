@@ -267,6 +267,7 @@ class JvmArtifactFieldSet(RunFieldSet):
     version: JvmArtifactVersionField
     packages: JvmArtifactPackagesField
     url: JvmArtifactUrlField
+    jdk_version: JvmJdkField
 
     required_fields = (
         JvmArtifactGroupField,
@@ -285,6 +286,7 @@ class JvmArtifactTarget(Target):
         JvmArtifactJarSourceField,
         JvmArtifactResolveField,
         JvmArtifactExcludeDependenciesField,
+        JvmJdkField,
     )
     help = softwrap(
         """
