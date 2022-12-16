@@ -350,7 +350,7 @@ def _run_in_sandbox_behavior_rule(register: RuleRegistry, cls: type[RunFieldSet]
 
     @register(
         rule(_param_type_overrides={"request": cls}),
-        predicate=behavior == RunInSandboxBehavior.NOT_SUPPORTED,
+        only_if=behavior == RunInSandboxBehavior.NOT_SUPPORTED,
     )
     async def not_supported(request: RunFieldSet) -> RunInSandboxRequest:
         raise NotImplementedError(
@@ -359,14 +359,14 @@ def _run_in_sandbox_behavior_rule(register: RuleRegistry, cls: type[RunFieldSet]
 
     @register(
         rule(_param_type_overrides={"request": cls}),
-        predicate=behavior == RunInSandboxBehavior.RUN_REQUEST_HERMETIC,
+        only_if=behavior == RunInSandboxBehavior.RUN_REQUEST_HERMETIC,
     )
     async def run_request_hermetic(request: RunFieldSet) -> RunInSandboxRequest:
         return await _run_request(request)
 
     @register(
         _uncacheable_rule(_param_type_overrides={"request": cls}),
-        predicate=behavior == RunInSandboxBehavior.RUN_REQUEST_NOT_HERMETIC,
+        only_if=behavior == RunInSandboxBehavior.RUN_REQUEST_NOT_HERMETIC,
     )
     async def run_request_not_hermetic(request: RunFieldSet) -> RunInSandboxRequest:
         return await _run_request(request)

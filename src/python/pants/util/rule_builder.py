@@ -26,18 +26,18 @@ class RuleRegistry:
         return collect_rules({_rule.__name__: _rule for _rule in self._rules})
 
     def __call__(
-        self, rule_spec: Callable[[Callable[P, T]], Callable[P, T]], *, predicate: bool = True
+        self, rule_spec: Callable[[Callable[P, T]], Callable[P, T]], *, only_if: bool = True
     ) -> Callable[[Callable[P, T]], Callable[P, T]]:
         """Register the decorated function as a rule. The rule is not provided to the engine until
         `build` is called.
 
         * `rule_spec` should be a decorator from `pants.engine.rules`
-        *`predicate` is an optional boolean that allows selective registration of rules. If
-         `predicate` is falsey, the rule is not registered.
+        *`only_if` is an optional boolean that allows selective registration of rules. If
+         `only_if` is falsey, the rule is not registered.
         """
 
         def decorated(f: Callable[P, T]) -> Callable[P, T]:
-            if predicate:
+            if only_if:
                 rule_spec(f)
                 self._rules.append(f)
             return f
@@ -63,14 +63,14 @@ def rule_builder(f: Callable[Concatenate[RuleRegistry, P], None]) -> Callable[P,
         async def a_rule(request: RequestType) -> ReturnType:
             return await Get(ReturnType, ReturnTypeRequest(request.data))
 
-        # Rules can be selectively discarded, using the `predicate` parameter
-        @register(rule(), predicate=(param == 57))
+        # Rules can be selectively discarded, using the `only_if` parameter
+        @register(rule(), only_if=(param == 57))
         async def rule_that_is_discarded(request: RequestType) -> ReturnType:
             return await Get(ReturnType, ReturnTypeRequest(request.data))
 
     def rules():
         return [
-            *some_rules(57),
+            *some_rules(56),  # will not register the second rule
         ]
     ```
     """
