@@ -22,14 +22,11 @@ class RuleRegistry:
     def __init__(self):
         self._rules = []
 
-    def build(self) -> Iterable[Rule]:
-        return collect_rules({_rule.__name__: _rule for _rule in self._rules})
-
     def __call__(
         self, rule_spec: Callable[[Callable[P, T]], Callable[P, T]], *, only_if: bool = True
     ) -> Callable[[Callable[P, T]], Callable[P, T]]:
-        """Register the decorated function as a rule. The rule is not provided to the engine until
-        `build` is called.
+        """Register the decorated function as a rule. All rules registered here will be collected by
+        `collect_rules`, unless they are skipped.
 
         * `rule_spec` should be a decorator from `pants.engine.rules`
         *`only_if` is an optional boolean that allows selective registration of rules. If
@@ -79,7 +76,7 @@ def rule_builder(f: Callable[Concatenate[RuleRegistry, P], None]) -> Callable[P,
     def new_function(*a: P.args, **k: P.kwargs) -> Iterable[Rule]:
         builder = RuleRegistry()
         f(builder, *a, **k)
-        return builder.build()
+        return collect_rules({_rule.__name__: _rule for _rule in builder._rules})
 
     new_function.__name__ = f.__name__
     return new_function
