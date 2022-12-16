@@ -41,6 +41,11 @@ class Org:
 # to keep this list in that order too.
 _orgs = (
     Org("Aiven", "https://aiven.io/", "https://files.readme.io/20085f3-aiven-small.png"),
+    Org(
+        "Astranis",
+        "https://www.astranis.com/",
+        "https://files.readme.io/e4989d4-astranis-small.png",
+    ),
     Org("Brand24", "https://brand24.com/", "https://files.readme.io/e3203d1-brand24-small.png"),
     Org(
         "Chartbeat", "https://chartbeat.com/", "https://files.readme.io/861ace7-chartbeat-small.png"
@@ -49,6 +54,11 @@ _orgs = (
         "Coinbase",
         "https://www.coinbase.com/",
         "https://files.readme.io/a213f0f-coinbase-small.png",
+    ),
+    Org(
+        "Doctrine",
+        "https://www.doctrine.fr/",
+        "https://files.readme.io/8497e9c-doctrine-small.png",
     ),
     Org(
         "ESL Gaming",

@@ -1,3 +1,5 @@
+// Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
+// Licensed under the Apache License, Version 2.0 (see LICENSE).
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::{self, Debug};
 use std::net::SocketAddr;
@@ -8,15 +10,15 @@ use futures::future::{FutureExt, TryFutureExt};
 use futures::stream::{BoxStream, StreamExt};
 use log::{debug, trace};
 use nails::execution::{self, child_channel, ChildInput, Command};
-use store::Store;
+use store::{ImmutableInputs, Store};
 use task_executor::Executor;
 use tokio::net::TcpStream;
 use workunit_store::{in_workunit, Metric, RunningWorkunit};
 
 use crate::local::{prepare_workdir, CapturedWorkdir, ChildOutput};
 use crate::{
-  Context, FallibleProcessResultWithPlatform, ImmutableInputs, InputDigests, NamedCaches, Platform,
-  Process, ProcessError,
+  Context, FallibleProcessResultWithPlatform, InputDigests, NamedCaches, Platform, Process,
+  ProcessError,
 };
 
 #[cfg(test)]

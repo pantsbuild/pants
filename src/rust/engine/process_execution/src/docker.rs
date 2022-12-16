@@ -1,3 +1,5 @@
+// Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
+// Licensed under the Apache License, Version 2.0 (see LICENSE).
 use std::collections::BTreeMap;
 use std::fmt;
 use std::path::{Path, PathBuf};
@@ -16,7 +18,7 @@ use log::Level;
 use nails::execution::ExitCode;
 use once_cell::sync::Lazy;
 use parking_lot::Mutex;
-use store::Store;
+use store::{ImmutableInputs, Store};
 use task_executor::Executor;
 use workunit_store::{in_workunit, Metric, RunningWorkunit};
 
@@ -25,8 +27,8 @@ use crate::local::{
   KeepSandboxes,
 };
 use crate::{
-  Context, FallibleProcessResultWithPlatform, ImmutableInputs, NamedCaches, Platform, Process,
-  ProcessError, ProcessExecutionStrategy,
+  Context, FallibleProcessResultWithPlatform, NamedCaches, Platform, Process, ProcessError,
+  ProcessExecutionStrategy,
 };
 
 pub(crate) const SANDBOX_BASE_PATH_IN_CONTAINER: &str = "/pants-sandbox";

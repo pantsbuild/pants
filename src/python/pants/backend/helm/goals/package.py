@@ -57,7 +57,7 @@ async def run_helm_package(field_set: HelmPackageFieldSet) -> BuiltPackage:
             input_digest=result_digest,
             extra_immutable_input_digests=chart.immutable_input_digests,
             output_files=(process_output_file,),
-            description=f"Packaging Helm chart: {field_set.address.spec_path}",
+            description=f"Packaging Helm chart: {field_set.address}",
         ),
     )
 

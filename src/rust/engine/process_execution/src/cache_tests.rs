@@ -1,10 +1,12 @@
+// Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
+// Licensed under the Apache License, Version 2.0 (see LICENSE).
 use std::convert::TryInto;
 use std::io::Write;
 use std::path::PathBuf;
 
 use cache::PersistentCache;
 use sharded_lmdb::DEFAULT_LEASE_TIME;
-use store::Store;
+use store::{ImmutableInputs, Store};
 use tempfile::TempDir;
 use testutil::data::TestData;
 use testutil::relative_paths;
@@ -12,7 +14,7 @@ use workunit_store::{RunningWorkunit, WorkunitStore};
 
 use crate::{
   local::KeepSandboxes, CacheContentBehavior, CommandRunner as CommandRunnerTrait, Context,
-  FallibleProcessResultWithPlatform, ImmutableInputs, NamedCaches, Process, ProcessError,
+  FallibleProcessResultWithPlatform, NamedCaches, Process, ProcessError,
 };
 
 struct RoundtripResults {

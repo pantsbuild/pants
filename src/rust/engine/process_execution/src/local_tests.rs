@@ -1,3 +1,5 @@
+// Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
+// Licensed under the Apache License, Version 2.0 (see LICENSE).
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::path::PathBuf;
 use std::str;
@@ -9,7 +11,7 @@ use spectral::{assert_that, string::StrAssertions};
 use tempfile::TempDir;
 
 use fs::EMPTY_DIRECTORY_DIGEST;
-use store::Store;
+use store::{ImmutableInputs, Store};
 use testutil::data::{TestData, TestDirectory};
 use testutil::path::{find_bash, which};
 use testutil::{owned_string_vec, relative_paths};
@@ -17,8 +19,8 @@ use workunit_store::{RunningWorkunit, WorkunitStore};
 
 use crate::{
   local, local::KeepSandboxes, CacheName, CommandRunner as CommandRunnerTrait, Context,
-  FallibleProcessResultWithPlatform, ImmutableInputs, InputDigests, NamedCaches, Platform, Process,
-  ProcessError, RelativePath,
+  FallibleProcessResultWithPlatform, InputDigests, NamedCaches, Platform, Process, ProcessError,
+  RelativePath,
 };
 
 #[derive(PartialEq, Debug)]

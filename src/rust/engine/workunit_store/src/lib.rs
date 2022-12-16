@@ -262,6 +262,14 @@ pub struct Workunit {
 }
 
 impl Workunit {
+  // If the workunit has completed, its TimeSpan.
+  pub fn time_span(&self) -> Option<TimeSpan> {
+    match self.state {
+      WorkunitState::Started { .. } => None,
+      WorkunitState::Completed { time_span } => Some(time_span),
+    }
+  }
+
   fn log_workunit_state(&self, canceled: bool) {
     let metadata = match self.metadata.as_ref() {
       Some(metadata) if log::log_enabled!(self.level) => metadata,

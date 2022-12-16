@@ -55,8 +55,7 @@ function bootstrap_native_code() {
     engine_version_in_metadata="$(sed -n 's/^engine_version: //p' "${NATIVE_ENGINE_RESOURCE_METADATA}")"
   fi
 
-  if [[ -f "${NATIVE_ENGINE_RESOURCE}" && -f \
-    "${NATIVE_CLIENT_PATH}" && \
+  if [[ -f "${NATIVE_ENGINE_RESOURCE}" && -f "${NATIVE_CLIENT_PATH}" &&
     "${engine_version_calculated}" == "${engine_version_in_metadata}" ]]; then
     return 0
   fi

@@ -23,7 +23,6 @@ from pants.backend.go.util_rules.coverage import (
     ApplyCodeCoverageResult,
     BuiltGoPackageCodeCoverageMetadata,
     FileCodeCoverageMetadata,
-    GoCoverageConfig,
 )
 from pants.backend.go.util_rules.embedcfg import EmbedConfig
 from pants.backend.go.util_rules.goroot import GoRoot
@@ -37,9 +36,10 @@ from pants.engine.fs import (
     CreateDigest,
     Digest,
     DigestContents,
+    DigestEntries,
     DigestSubset,
-    Directory,
     FileContent,
+    FileEntry,
     MergeDigests,
     PathGlobs,
 )
@@ -65,20 +65,28 @@ class BuildGoPackageRequest(EngineAwareParameter):
         minimum_go_version: str | None,
         for_tests: bool = False,
         embed_config: EmbedConfig | None = None,
-        coverage_config: GoCoverageConfig | None = None,
+        with_coverage: bool = False,
         cgo_files: tuple[str, ...] = (),
         cgo_flags: CGoCompilerFlags | None = None,
         c_files: tuple[str, ...] = (),
+        header_files: tuple[str, ...] = (),
         cxx_files: tuple[str, ...] = (),
         objc_files: tuple[str, ...] = (),
         fortran_files: tuple[str, ...] = (),
         prebuilt_object_files: tuple[str, ...] = (),
+        pkg_specific_compiler_flags: tuple[str, ...] = (),
+        pkg_specific_assembler_flags: tuple[str, ...] = (),
     ) -> None:
         """Build a package and its dependencies as `__pkg__.a` files.
 
         Instances of this class form a structure-shared DAG, and so a hashcode is pre-computed for
         the recursive portion.
         """
+
+        if with_coverage and build_opts.coverage_config is None:
+            raise ValueError(
+                "BuildGoPackageRequest.with_coverage is set but BuildGoPackageRequest.build_opts.coverage_config is None!"
+            )
 
         self.import_path = import_path
         self.pkg_name = pkg_name
@@ -91,14 +99,17 @@ class BuildGoPackageRequest(EngineAwareParameter):
         self.minimum_go_version = minimum_go_version
         self.for_tests = for_tests
         self.embed_config = embed_config
-        self.coverage_config = coverage_config
+        self.with_coverage = with_coverage
         self.cgo_files = cgo_files
         self.cgo_flags = cgo_flags
         self.c_files = c_files
+        self.header_files = header_files
         self.cxx_files = cxx_files
         self.objc_files = objc_files
         self.fortran_files = fortran_files
         self.prebuilt_object_files = prebuilt_object_files
+        self.pkg_specific_compiler_flags = pkg_specific_compiler_flags
+        self.pkg_specific_assembler_flags = pkg_specific_assembler_flags
         self._hashcode = hash(
             (
                 self.import_path,
@@ -112,14 +123,17 @@ class BuildGoPackageRequest(EngineAwareParameter):
                 self.minimum_go_version,
                 self.for_tests,
                 self.embed_config,
-                self.coverage_config,
+                self.with_coverage,
                 self.cgo_files,
                 self.cgo_flags,
                 self.c_files,
+                self.header_files,
                 self.cxx_files,
                 self.objc_files,
                 self.fortran_files,
                 self.prebuilt_object_files,
+                self.pkg_specific_compiler_flags,
+                self.pkg_specific_assembler_flags,
             )
         )
 
@@ -139,14 +153,17 @@ class BuildGoPackageRequest(EngineAwareParameter):
             f"minimum_go_version={self.minimum_go_version}, "
             f"for_tests={self.for_tests}, "
             f"embed_config={self.embed_config}, "
-            f"coverage_config={self.coverage_config}, "
+            f"with_coverage={self.with_coverage}, "
             f"cgo_files={self.cgo_files}, "
             f"cgo_flags={self.cgo_flags}, "
             f"c_files={self.c_files}, "
+            f"header_files={self.header_files}, "
             f"cxx_files={self.cxx_files}, "
             f"objc_files={self.objc_files}, "
             f"fortran_files={self.fortran_files}, "
-            f"prebuilt_object_files={self.prebuilt_object_files}"
+            f"prebuilt_object_files={self.prebuilt_object_files}, "
+            f"pkg_specific_compiler_flags={self.pkg_specific_compiler_flags}, "
+            f"pkg_specific_assembler_flags={self.pkg_specific_assembler_flags}"
             ")"
         )
 
@@ -168,14 +185,17 @@ class BuildGoPackageRequest(EngineAwareParameter):
             and self.minimum_go_version == other.minimum_go_version
             and self.for_tests == other.for_tests
             and self.embed_config == other.embed_config
-            and self.coverage_config == other.coverage_config
+            and self.with_coverage == other.with_coverage
             and self.cgo_files == other.cgo_files
             and self.cgo_flags == other.cgo_flags
             and self.c_files == other.c_files
+            and self.header_files == other.header_files
             and self.cxx_files == other.cxx_files
             and self.objc_files == other.objc_files
             and self.fortran_files == other.fortran_files
             and self.prebuilt_object_files == other.prebuilt_object_files
+            and self.pkg_specific_compiler_flags == other.pkg_specific_compiler_flags
+            and self.pkg_specific_assembler_flags == other.pkg_specific_assembler_flags
             # TODO: Use a recursive memoized __eq__ if this ever shows up in profiles.
             and self.direct_dependencies == other.direct_dependencies
         )
@@ -357,6 +377,55 @@ async def _any_file_is_golang_assembly(
     return False
 
 
+# Copy header files to names which use platform independent names. For example, defs_linux_amd64.h
+# becomes defs_GOOS_GOARCH.h.
+#
+# See https://github.com/golang/go/blob/1c05968c9a5d6432fc6f30196528f8f37287dd3d/src/cmd/go/internal/work/exec.go#L867-L892
+# for particulars.
+@rule_helper
+async def _maybe_copy_headers_to_platform_independent_names(
+    input_digest: Digest,
+    dir_path: str,
+    header_files: tuple[str, ...],
+    goroot: GoRoot,
+) -> Digest | None:
+    goos_goarch = f"_{goroot.goos}_{goroot.goarch}"
+    goos = f"_{goroot.goos}"
+    goarch = f"_{goroot.goarch}"
+
+    digest_entries = await Get(DigestEntries, Digest, input_digest)
+    digest_entries_by_path: dict[str, FileEntry] = {
+        entry.path: entry for entry in digest_entries if isinstance(entry, FileEntry)
+    }
+
+    new_digest_entries: list[FileEntry] = []
+    for header_file in header_files:
+        header_file_path = PurePath(dir_path, header_file)
+
+        entry = digest_entries_by_path.get(str(header_file_path))
+        if not entry:
+            continue
+
+        stem = header_file_path.stem
+        new_stem: str | None = None
+        if stem.endswith(goos_goarch):
+            new_stem = stem[0 : -len(goos_goarch)] + "_GOOS_GOARCH"
+        elif stem.endswith(goos):
+            new_stem = stem[0 : -len(goos)] + "_GOOS"
+        elif stem.endswith(goarch):
+            new_stem = stem[0 : -len(goarch)] + "_GOARCH"
+
+        if new_stem:
+            new_header_file_path = PurePath(dir_path, f"{new_stem}{header_file_path.suffix}")
+            new_digest_entries.append(dataclasses.replace(entry, path=str(new_header_file_path)))
+
+    if new_digest_entries:
+        digest = await Get(Digest, CreateDigest(new_digest_entries))
+        return digest
+    else:
+        return None
+
+
 # NB: We must have a description for the streaming of this rule to work properly
 # (triggered by `FallibleBuiltGoPackage` subclassing `EngineAwareReturnType`).
 @rule(desc="Compile with Go", level=LogLevel.DEBUG)
@@ -381,7 +450,12 @@ async def build_go_package(
 
     merged_deps_digest, import_config, embedcfg, action_id_result = await MultiGet(
         Get(Digest, MergeDigests(dep_digests)),
-        Get(ImportConfig, ImportConfigRequest(FrozenDict(import_paths_to_pkg_a_files))),
+        Get(
+            ImportConfig,
+            ImportConfigRequest(
+                FrozenDict(import_paths_to_pkg_a_files), build_opts=request.build_opts
+            ),
+        ),
         Get(RenderedEmbedConfig, RenderEmbedConfigRequest(request.embed_config)),
         Get(GoCompileActionIdResult, GoCompileActionIdRequest(request)),
     )
@@ -400,7 +474,9 @@ async def build_go_package(
     s_files = list(request.s_files)
     go_files_digest = request.digest
     cover_file_metadatas: tuple[FileCodeCoverageMetadata, ...] | None = None
-    if request.coverage_config:
+    if request.with_coverage:
+        coverage_config = request.build_opts.coverage_config
+        assert coverage_config is not None, "with_coverage=True but coverage_config is None!"
         coverage_result = await Get(
             ApplyCodeCoverageResult,
             ApplyCodeCoverageRequest(
@@ -408,7 +484,7 @@ async def build_go_package(
                 dir_path=request.dir_path,
                 go_files=go_files,
                 cgo_files=cgo_files,
-                cover_mode=request.coverage_config.cover_mode,
+                cover_mode=coverage_config.cover_mode,
                 import_path=request.import_path,
             ),
         )
@@ -448,6 +524,7 @@ async def build_go_package(
                 import_path=request.import_path,
                 pkg_name=request.pkg_name,
                 digest=go_files_digest,
+                build_opts=request.build_opts,
                 dir_path=request.dir_path,
                 cgo_files=cgo_files,
                 cgo_flags=request.cgo_flags,
@@ -468,6 +545,18 @@ async def build_go_package(
         )
         s_files = []  # Clear s_files since assembly has already been handled in cgo rules.
 
+    # Copy header files with platform-specific values in their name to platform independent names.
+    # For example, defs_linux_amd64.h becomes defs_GOOS_GOARCH.h.
+    copied_headers_digest = await _maybe_copy_headers_to_platform_independent_names(
+        input_digest=request.digest,
+        dir_path=request.dir_path,
+        header_files=request.header_files,
+        goroot=go_root,
+    )
+    if copied_headers_digest:
+        unmerged_input_digests.append(copied_headers_digest)
+
+    # Merge all of the input digests together.
     input_digest = await Get(
         Digest,
         MergeDigests(unmerged_input_digests),
@@ -480,13 +569,18 @@ async def build_go_package(
     # Note: The assembly files cannot be assembled at this point because a similar process happens from Go to
     # assembly: The Go compiler generates a `go_asm.h` header file with metadata about the Go code in the package.
     symabis_path: str | None = None
+    extra_assembler_flags = tuple(
+        *request.build_opts.assembler_flags, *request.pkg_specific_assembler_flags
+    )
     if s_files:
         symabis_fallible_result = await Get(
             FallibleGenerateAssemblySymabisResult,
             GenerateAssemblySymabisRequest(
                 compilation_input=input_digest,
                 s_files=tuple(s_files),
+                import_path=request.import_path,
                 dir_path=request.dir_path,
+                extra_assembler_flags=extra_assembler_flags,
             ),
         )
         symabis_result = symabis_fallible_result.result
@@ -531,10 +625,7 @@ async def build_go_package(
     # about the Go code that can be used by assembly files.
     asm_header_path: str | None = None
     if s_files:
-        obj_dir_path = PurePath(".", request.dir_path, "__obj__")
-        asm_header_path = str(obj_dir_path / "go_asm.h")
-        obj_dir_digest = await Get(Digest, CreateDigest([Directory(str(obj_dir_path))]))
-        input_digest = await Get(Digest, MergeDigests([input_digest, obj_dir_digest]))
+        asm_header_path = os.path.join(request.dir_path, "go_asm.h")
         compile_args.extend(["-asmhdr", asm_header_path])
 
     if embedcfg.digest != EMPTY_DIGEST:
@@ -543,10 +634,22 @@ async def build_go_package(
     if request.build_opts.with_race_detector:
         compile_args.append("-race")
 
+    if request.build_opts.with_msan:
+        compile_args.append("-msan")
+
+    if request.build_opts.with_asan:
+        compile_args.append("-asan")
+
     # If there are no loose object files to add to the package archive later or assembly files to assemble,
     # then pass -complete flag which tells the compiler that the provided Go files constitute the entire package.
     if not objects and not s_files:
         compile_args.append("-complete")
+
+    # Add any extra compiler flags after the ones added automatically by this rule.
+    if request.build_opts.compiler_flags:
+        compile_args.extend(request.build_opts.compiler_flags)
+    if request.pkg_specific_compiler_flags:
+        compile_args.extend(request.pkg_specific_compiler_flags)
 
     relativized_sources = (
         f"./{request.dir_path}/{name}" if request.dir_path else f"./{name}" for name in go_files
@@ -574,6 +677,8 @@ async def build_go_package(
 
     compilation_digest = compile_result.output_digest
 
+    # TODO: Compile any C files if this package does not use Cgo.
+
     # If any assembly files are present, then assemble them. The `compilation_digest` will contain the
     # assembly header `go_asm.h` in the object directory.
     if s_files:
@@ -597,8 +702,8 @@ async def build_go_package(
                 input_digest=assembly_input_digest,
                 s_files=tuple(sorted(s_files)),
                 dir_path=request.dir_path,
-                asm_header_path=asm_header_path,
                 import_path=request.import_path,
+                extra_assembler_flags=extra_assembler_flags,
             ),
         )
         assembly_result = assembly_fallible_result.result
@@ -634,6 +739,14 @@ async def build_go_package(
     import_paths_to_pkg_a_files[request.import_path] = os.path.join(path_prefix, "__pkg__.a")
     output_digest = await Get(Digest, AddPrefix(compilation_digest, path_prefix))
     merged_result_digest = await Get(Digest, MergeDigests([*dep_digests, output_digest]))
+
+    # Include the modules sources in the output `Digest` alongside the package archive if the Cgo rules
+    # detected a potential attempt to link against a static archive (or other reference to `${SRCDIR}` in
+    # options) which necessitates the linker needing access to module sources.
+    if cgo_compile_result and cgo_compile_result.include_module_sources_with_output:
+        merged_result_digest = await Get(
+            Digest, MergeDigests([merged_result_digest, request.digest])
+        )
 
     coverage_metadata = (
         BuiltGoPackageCodeCoverageMetadata(

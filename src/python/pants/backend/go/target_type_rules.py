@@ -36,7 +36,7 @@ from pants.backend.go.util_rules.go_mod import (
     OwningGoMod,
     OwningGoModRequest,
 )
-from pants.backend.go.util_rules.import_analysis import GoStdLibImports
+from pants.backend.go.util_rules.import_analysis import GoStdLibImports, GoStdLibImportsRequest
 from pants.backend.go.util_rules.third_party_pkg import (
     AllThirdPartyPackages,
     AllThirdPartyPackagesRequest,
@@ -217,7 +217,6 @@ class InferGoPackageDependenciesRequest(InferDependenciesRequest):
 @rule(desc="Infer dependencies for first-party Go packages", level=LogLevel.DEBUG)
 async def infer_go_dependencies(
     request: InferGoPackageDependenciesRequest,
-    std_lib_imports: GoStdLibImports,
 ) -> InferredDependencies:
     go_mod_addr = await Get(OwningGoMod, OwningGoModRequest(request.field_set.address))
     package_mapping, build_opts = await MultiGet(
@@ -226,9 +225,16 @@ async def infer_go_dependencies(
     )
 
     addr = request.field_set.address
-    maybe_pkg_analysis = await Get(
-        FallibleFirstPartyPkgAnalysis, FirstPartyPkgAnalysisRequest(addr, build_opts=build_opts)
+    maybe_pkg_analysis, std_lib_imports = await MultiGet(
+        Get(
+            FallibleFirstPartyPkgAnalysis, FirstPartyPkgAnalysisRequest(addr, build_opts=build_opts)
+        ),
+        Get(
+            GoStdLibImports,
+            GoStdLibImportsRequest(with_race_detector=build_opts.with_race_detector),
+        ),
     )
+
     if maybe_pkg_analysis.analysis is None:
         logger.error(
             f"Failed to analyze {maybe_pkg_analysis.import_path} for dependency inference:\n"
@@ -289,7 +295,6 @@ class InferGoThirdPartyPackageDependenciesRequest(InferDependenciesRequest):
 @rule(desc="Infer dependencies for third-party Go packages", level=LogLevel.DEBUG)
 async def infer_go_third_party_package_dependencies(
     request: InferGoThirdPartyPackageDependenciesRequest,
-    std_lib_imports: GoStdLibImports,
 ) -> InferredDependencies:
     addr = request.field_set.address
     go_mod_address = addr.maybe_convert_to_target_generator()
@@ -300,13 +305,20 @@ async def infer_go_third_party_package_dependencies(
         Get(GoBuildOptions, GoBuildOptionsFromTargetRequest(go_mod_address)),
     )
 
-    pkg_info = await Get(
-        ThirdPartyPkgAnalysis,
-        ThirdPartyPkgAnalysisRequest(
-            request.field_set.import_path.value,
-            go_mod_info.digest,
-            go_mod_info.mod_path,
-            build_opts=build_opts,
+    pkg_info, std_lib_imports = await MultiGet(
+        Get(
+            ThirdPartyPkgAnalysis,
+            ThirdPartyPkgAnalysisRequest(
+                request.field_set.import_path.value,
+                go_mod_address,
+                go_mod_info.digest,
+                go_mod_info.mod_path,
+                build_opts=build_opts,
+            ),
+        ),
+        Get(
+            GoStdLibImports,
+            GoStdLibImportsRequest(with_race_detector=build_opts.with_race_detector),
         ),
     )
 
@@ -362,6 +374,7 @@ async def generate_targets_from_go_mod(
     all_packages = await Get(
         AllThirdPartyPackages,
         AllThirdPartyPackagesRequest(
+            generator_addr,
             go_mod_info.digest,
             go_mod_info.mod_path,
             # TODO: There is a rule graph cycle in this rule if this rule tries to use GoBuildOptionsFromTargetRequest.

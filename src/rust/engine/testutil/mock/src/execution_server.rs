@@ -1,3 +1,5 @@
+// Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
+// Licensed under the Apache License, Version 2.0 (see LICENSE).
 use std::any::type_name;
 use std::collections::VecDeque;
 use std::fmt::Debug;
@@ -495,7 +497,7 @@ impl Capabilities for MockResponder {
   ) -> Result<Response<ServerCapabilities>, Status> {
     let response = ServerCapabilities {
       cache_capabilities: Some(CacheCapabilities {
-        digest_function: vec![remexec::digest_function::Value::Sha256 as i32],
+        digest_functions: vec![remexec::digest_function::Value::Sha256 as i32],
         max_batch_total_size_bytes: 0,
         ..CacheCapabilities::default()
       }),

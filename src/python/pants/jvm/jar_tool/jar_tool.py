@@ -193,20 +193,20 @@ async def run_jar_tool(
     return await Get(Digest, RemovePrefix(result.output_digest, output_prefix))
 
 
-_JAR_TOOL_SRC_PACKAGES = ["org.pantsbuild.args4j", "org.pantsbuild.tools.jar"]
+_JAR_TOOL_SRC_PACKAGES = ["args4j", "jar_tool_source"]
 
 
 def _load_jar_tool_sources() -> list[FileContent]:
     result = []
     for package in _JAR_TOOL_SRC_PACKAGES:
-        pkg_path = package.replace(".", os.path.sep)
-        relative_folder = os.path.join("src", pkg_path)
-        for basename in pkg_resources.resource_listdir(__name__, relative_folder):
+        # pkg_path = package.replace(".", os.path.sep)
+        # relative_folder = os.path.join("src", pkg_path)
+        for basename in pkg_resources.resource_listdir(__name__, package):
             result.append(
                 FileContent(
-                    path=os.path.join(pkg_path, basename),
+                    path=os.path.join(package, basename),
                     content=pkg_resources.resource_string(
-                        __name__, os.path.join(relative_folder, basename)
+                        __name__, os.path.join(package, basename)
                     ),
                 )
             )

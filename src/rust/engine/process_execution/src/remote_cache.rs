@@ -1,3 +1,5 @@
+// Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
+// Licensed under the Apache License, Version 2.0 (see LICENSE).
 use std::collections::{BTreeMap, HashSet};
 use std::convert::TryInto;
 use std::fmt::{self, Debug};
@@ -61,7 +63,6 @@ pub struct CommandRunner {
   warnings_behavior: RemoteCacheWarningsBehavior,
   read_errors_counter: Arc<Mutex<BTreeMap<String, usize>>>,
   write_errors_counter: Arc<Mutex<BTreeMap<String, usize>>>,
-  read_timeout: Duration,
 }
 
 impl CommandRunner {
@@ -98,6 +99,7 @@ impl CommandRunner {
       tonic::transport::Channel::balance_list(vec![endpoint].into_iter()),
       concurrency_limit,
       http_headers,
+      Some((read_timeout, Metric::RemoteCacheRequestTimeouts)),
     );
     let action_cache_client = Arc::new(ActionCacheClient::new(channel));
 
@@ -115,7 +117,6 @@ impl CommandRunner {
       warnings_behavior,
       read_errors_counter: Arc::new(Mutex::new(BTreeMap::new())),
       write_errors_counter: Arc::new(Mutex::new(BTreeMap::new())),
-      read_timeout,
     })
   }
 
@@ -239,6 +240,7 @@ impl CommandRunner {
         .push(remexec::OutputDirectory {
           path: output_directory.to_owned(),
           tree_digest: Some(tree_digest.into()),
+          is_topologically_sorted: false,
         });
     }
 
@@ -284,7 +286,6 @@ impl CommandRunner {
         self.action_cache_client.clone(),
         self.store.clone(),
         self.cache_content_behavior,
-        self.read_timeout,
       )
       .await;
       match response {
@@ -582,7 +583,6 @@ async fn check_action_cache(
   action_cache_client: Arc<ActionCacheClient<LayeredService>>,
   store: Store,
   cache_content_behavior: CacheContentBehavior,
-  timeout_duration: Duration,
 ) -> Result<Option<FallibleProcessResultWithPlatform>, ProcessError> {
   in_workunit!(
     "check_action_cache",
@@ -602,13 +602,7 @@ async fn check_action_cache(
             ..remexec::GetActionResultRequest::default()
           };
           let request = apply_headers(Request::new(request), &context.build_id);
-          async move {
-            let lookup_fut = client.get_action_result(request);
-            let timeout_fut = tokio::time::timeout(timeout_duration, lookup_fut);
-            timeout_fut
-              .await
-              .unwrap_or_else(|_| Err(Status::unavailable("Pants client timeout")))
-          }
+          async move { client.get_action_result(request).await }
         },
         status_is_retryable,
       )

@@ -3,8 +3,8 @@
 
 import pytest
 
-from pants.backend.shell import tailor
-from pants.backend.shell.tailor import PutativeShellTargetsRequest, classify_source_files
+from pants.backend.shell.goals import tailor
+from pants.backend.shell.goals.tailor import PutativeShellTargetsRequest, classify_source_files
 from pants.backend.shell.target_types import (
     ShellSourcesGeneratorTarget,
     Shunit2TestsGeneratorTarget,

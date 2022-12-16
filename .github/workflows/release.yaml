@@ -1,0 +1,51 @@
+# GENERATED, DO NOT EDIT!
+# To change, edit `build-support/bin/generate_github_workflows.py` and run:
+#   ./pants run build-support/bin/generate_github_workflows.py
+
+
+jobs:
+  publish-tag-to-commit-mapping:
+    if: github.repository_owner == 'pantsbuild'
+    runs-on: ubuntu-latest
+    steps:
+    - env:
+        TAG: ${{ github.event.inputs.tag }}
+      id: determine-tag
+      name: Determine Release Tag
+      run: "if [[ -n \"$TAG\" ]]; then\n    tag=\"$TAG\"\nelse\n    tag=\"${GITHUB_REF#refs/tags/}\"\
+        \nfi\nif [[ \"${tag}\" =~ ^release_.+$ ]]; then\n    echo \"release-tag=${tag}\"\
+        \ >> $GITHUB_OUTPUT\nelse\n    echo \"::error::Release tag '${tag}' must match\
+        \ 'release_.+'.\"\n    exit 1\nfi\n"
+    - name: Checkout Pants at Release Tag
+      uses: actions/checkout@v3
+      with:
+        ref: ${{ steps.determine-tag.outputs.release-tag }}
+    - name: Create Release -> Commit Mapping
+      run: 'tag="${{ steps.determine-tag.outputs.release-tag }}"
+
+        commit="$(git rev-parse ${tag}^{commit})"
+
+
+        echo "Recording tag ${tag} is of commit ${commit}"
+
+        mkdir -p dist/deploy/tags/pantsbuild.pants
+
+        echo "${commit}" > "dist/deploy/tags/pantsbuild.pants/${tag}"
+
+        '
+    - env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+      name: Deploy to S3
+      run: ./build-support/bin/deploy_to_s3.py --scope tags/pantsbuild.pants
+name: Record Release Commit
+'on':
+  push:
+    tags:
+    - release_*
+  workflow_dispatch:
+    inputs:
+      tag:
+        required: true
+        type: string

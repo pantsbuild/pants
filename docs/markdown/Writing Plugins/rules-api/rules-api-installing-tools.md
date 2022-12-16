@@ -35,7 +35,7 @@ async def demo(...) -> Foo:
     docker_bin = docker_paths.first_path
     if docker_bin is None:
         raise OSError("Could not find 'docker'.")
-    result = await Get(ProcessResult, Process(argv=[docker_bin.path, ...], ...)
+    result = await Get(ProcessResult, Process(argv=[docker_bin.path, ...], ...))
 ```
 
 `BinaryPaths` has a field called `paths: tuple[BinaryPath, ...]`, which stores all the discovered absolute paths to the specified binary. Each `BinaryPath` object has the fields `path: str`, such as `/usr/bin/docker`, and `fingerprint: str`, which is used to invalidate the cache if the binary changes. The results will be ordered by the order of `search_path`, meaning that earlier entries in `search_path` will show up earlier in the result.
