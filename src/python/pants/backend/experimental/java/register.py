@@ -14,7 +14,7 @@ from pants.backend.java.target_types import (
 )
 from pants.backend.java.target_types import rules as target_types_rules
 from pants.core.util_rules import archive
-from pants.jvm import classpath, jdk_rules, resources, run_deploy_jar
+from pants.jvm import classpath, jdk_rules, resources, run
 from pants.jvm import util_rules as jvm_util_rules
 from pants.jvm.dependency_inference import symbol_mapper
 from pants.jvm.goals import lockfile
@@ -62,7 +62,7 @@ def rules():
         *jdk_rules.rules(),
         *target_types_rules(),
         *jvm_tool.rules(),
-        *run_deploy_jar.rules(),
+        *run.rules(),
         *war_rules(),
         *java_bsp_rules.rules(),
         *archive.rules(),
