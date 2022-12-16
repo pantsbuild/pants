@@ -48,34 +48,7 @@ async def create_deploy_jar_run_request(
         ),
     )
 
-    # TODO(#16104) This argument re-writing code should use the native {chroot} support.
-    # See also `jdk_rules.py` for other argument re-writing code.
-    def prefixed(arg: str, prefixes: Iterable[str]) -> str:
-        if any(arg.startswith(prefix) for prefix in prefixes):
-            return f"{{chroot}}/{arg}"
-        else:
-            return arg
-
-    prefixes = (jdk.bin_dir, jdk.jdk_preparation_script, jdk.java_home)
-    args = [prefixed(arg, prefixes) for arg in proc.argv]
-
-    env = {
-        **proc.env,
-        "PANTS_INTERNAL_ABSOLUTE_PREFIX": "{chroot}/",
-    }
-
-    # absolutify coursier cache envvars
-    for key in env:
-        if key.startswith("COURSIER"):
-            env[key] = prefixed(env[key], (jdk.coursier.cache_dir,))
-
-    return RunRequest(
-        digest=proc.input_digest,
-        args=args,
-        extra_env=env,
-        immutable_input_digests=proc.immutable_input_digests,
-        append_only_caches=proc.append_only_caches,
-    )
+    return _post_process_jvm_process(proc, jdk)
 
 
 @rule(level=LogLevel.DEBUG)
@@ -129,6 +102,10 @@ async def create_jvm_artifact_run_request(
         ),
     )
 
+    return _post_process_jvm_process(proc, jdk)
+
+
+def _post_process_jvm_process(proc: Process, jdk: JdkEnvironment) -> RunRequest:
     # TODO(#16104) This argument re-writing code should use the native {chroot} support.
     # See also `jdk_rules.py` for other argument re-writing code.
     def prefixed(arg: str, prefixes: Iterable[str]) -> str:
