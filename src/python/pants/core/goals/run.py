@@ -46,8 +46,8 @@ from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.option.global_options import GlobalOptions
 from pants.option.option_types import ArgsListOption, BoolOption
 from pants.util.frozendict import FrozenDict
-from pants.util.memo import memoized
 from pants.util.meta import frozen_after_init
+from pants.util.rule_builder import RuleRegistry, rule_builder
 from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
@@ -321,17 +321,15 @@ async def run(
     return Run(result.exit_code)
 
 
-@memoized
-def _unsupported_debug_adapter_rules(cls: type[RunFieldSet]) -> Iterable:
+@rule_builder
+def _unsupported_debug_adapter_rules(r: RuleRegistry, cls: type[RunFieldSet]) -> None:
     """Returns a rule that implements DebugAdapterRequest by raising an error."""
 
-    @rule(_param_type_overrides={"request": cls})
+    @r.register(rule(_param_type_overrides={"request": cls}))
     async def get_run_debug_adapter_request(request: RunFieldSet) -> RunDebugAdapterRequest:
         raise NotImplementedError(
             "Running this target type with a debug adapter is not yet supported."
         )
-
-    return collect_rules(locals())
 
 
 @rule_helper
@@ -340,38 +338,38 @@ async def _run_request(request: RunFieldSet) -> RunInSandboxRequest:
     return run_request.to_run_in_sandbox_request()
 
 
-@memoized
-def _run_in_sandbox_behavior_rule(cls: type[RunFieldSet]) -> Iterable:
+@rule_builder
+def _run_in_sandbox_behavior_rule(r: RuleRegistry, cls: type[RunFieldSet]) -> None:
     """Returns a default rule that helps fulfil `experimental_run_in_sandbox` targets.
 
     If `RunInSandboxBehavior.CUSTOM` is specified, rule implementors must write a rule that returns
     a `RunInSandboxRequest`.
     """
 
-    @rule(_param_type_overrides={"request": cls})
+    behavior = cls.run_in_sandbox_behavior
+
+    @r.register(
+        rule(_param_type_overrides={"request": cls}),
+        predicate=behavior == RunInSandboxBehavior.NOT_SUPPORTED,
+    )
     async def not_supported(request: RunFieldSet) -> RunInSandboxRequest:
         raise NotImplementedError(
             "Running this target type within the sandbox is not yet supported."
         )
 
-    @rule(_param_type_overrides={"request": cls})
+    @r.register(
+        rule(_param_type_overrides={"request": cls}),
+        predicate=behavior == RunInSandboxBehavior.RUN_REQUEST_HERMETIC,
+    )
     async def run_request_hermetic(request: RunFieldSet) -> RunInSandboxRequest:
         return await _run_request(request)
 
-    @_uncacheable_rule(_param_type_overrides={"request": cls})
+    @r.register(
+        _uncacheable_rule(_param_type_overrides={"request": cls}),
+        predicate=behavior == RunInSandboxBehavior.RUN_REQUEST_NOT_HERMETIC,
+    )
     async def run_request_not_hermetic(request: RunFieldSet) -> RunInSandboxRequest:
         return await _run_request(request)
-
-    default_rules = {
-        RunInSandboxBehavior.NOT_SUPPORTED: [not_supported],
-        RunInSandboxBehavior.RUN_REQUEST_HERMETIC: [run_request_hermetic],
-        RunInSandboxBehavior.RUN_REQUEST_NOT_HERMETIC: [run_request_not_hermetic],
-        RunInSandboxBehavior.CUSTOM: [],
-    }
-
-    return collect_rules(
-        {_rule.__name__: _rule for _rule in default_rules[cls.run_in_sandbox_behavior]}
-    )
 
 
 def rules():
