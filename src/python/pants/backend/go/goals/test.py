@@ -451,19 +451,17 @@ async def run_go_tests(
     # This allows tests to open dependencies on `file` targets regardless of where they are
     # located. See https://dave.cheney.net/2016/05/10/test-fixtures-in-go.
     working_dir = field_set.address.spec_path
-    field_set_extra_env, dependencies = await MultiGet(
+    field_set_extra_env, dependencies, binary_with_prefix = await MultiGet(
         Get(EnvironmentVars, EnvironmentVarsRequest(field_set.extra_env_vars.value or ())),
         Get(Targets, DependenciesRequest(field_set.dependencies)),
-    )
-    binary_with_prefix, files_sources = await MultiGet(
         Get(Digest, AddPrefix(test_binary.test_binary_digest, working_dir)),
-        Get(
-            SourceFiles,
-            SourceFilesRequest(
-                (dep.get(SourcesField) for dep in dependencies),
-                for_sources_types=(FileSourceField,),
-                enable_codegen=True,
-            ),
+    )
+    files_sources = await Get(
+        SourceFiles,
+        SourceFilesRequest(
+            (dep.get(SourcesField) for dep in dependencies),
+            for_sources_types=(FileSourceField,),
+            enable_codegen=True,
         ),
     )
     test_input_digest = await Get(
