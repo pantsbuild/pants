@@ -38,6 +38,21 @@ def scala_stdlib_jvm_lockfile(
     return scala_stdlib_jvm_lockfile_def.load(request)
 
 
+@pytest.fixture
+def antlr_jvm_lockfile_def() -> JVMLockfileFixtureDefinition:
+    return JVMLockfileFixtureDefinition(
+        "antlr.test.lock",
+        ["org.antlr:antlr4:4.11.1"],
+    )
+
+
+@pytest.fixture
+def antlr_jvm_lockfile(
+    antlr_jvm_lockfile_def: JVMLockfileFixtureDefinition, request
+) -> JVMLockfileFixture:
+    return antlr_jvm_lockfile_def.load(request)
+
+
 def test_java() -> None:
     sources = {
         "src/org/pantsbuild/test/Hello.java": dedent(
@@ -119,3 +134,20 @@ def test_scala(scala_stdlib_jvm_lockfile: JVMLockfileFixture) -> None:
         ]
         result = run_pants(args)
         assert result.stdout.strip() == "Hello, World!"
+
+
+def test_jvm_artifact(antlr_jvm_lockfile: JVMLockfileFixture) -> None:
+    sources = {
+        "BUILD": antlr_jvm_lockfile.requirements_as_jvm_artifact_targets(),
+        "lockfile": antlr_jvm_lockfile.serialized_lockfile.replace("{", "{{").replace("}", "}}"),
+    }
+    with setup_tmpdir(sources) as tmpdir:
+        args = [
+            "--backend-packages=pants.backend.experimental.java",
+            f'--jvm-resolves={{"jvm-default": "{tmpdir}/lockfile"}}',
+            "--jvm-default-resolve=jvm-default",
+            "run",
+            f"{tmpdir}:org.antlr_antlr4",
+        ]
+        result = run_pants(args)
+        assert result.stdout.splitlines()[0].strip() == "ANTLR Parser Generator  Version 4.11.1"
