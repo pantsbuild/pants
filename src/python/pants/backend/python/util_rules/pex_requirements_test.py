@@ -41,19 +41,15 @@ METADATA = PythonLockfileMetadataV3(
 def create_tool_lock(
     *,
     default_lock: bool = False,
-    uses_source_plugins: bool = False,
-    uses_project_interpreter_constraints: bool = False,
 ) -> ToolDefaultLockfile | ToolCustomLockfile:
     common_kwargs = dict(
         resolve_name="my_tool",
-        uses_source_plugins=uses_source_plugins,
-        uses_project_interpreter_constraints=uses_project_interpreter_constraints,
     )
     return (
-        ToolDefaultLockfile(file_content=FileContent("", b""), **common_kwargs)  # type: ignore[arg-type]
+        ToolDefaultLockfile(file_content=FileContent("", b""), **common_kwargs)
         if default_lock
         else ToolCustomLockfile(
-            file_path="lock.txt", file_path_description_of_origin="", **common_kwargs  # type: ignore[arg-type]
+            file_path="lock.txt", file_path_description_of_origin="", **common_kwargs
         )
     )
 
@@ -85,7 +81,7 @@ def test_invalid_lockfile_behavior_option() -> None:
 
 @pytest.mark.parametrize(
     "is_default_lock,invalid_reqs,invalid_interpreter_constraints,invalid_constraints_file,"
-    + "invalid_only_binary,invalid_no_binary,uses_source_plugins,uses_project_ic",
+    + "invalid_only_binary,invalid_no_binary",
     [
         (
             is_default_lock,
@@ -94,8 +90,6 @@ def test_invalid_lockfile_behavior_option() -> None:
             invalid_constraints_file,
             invalid_only_binary,
             invalid_no_binary,
-            source_plugins,
-            project_ics,
         )
         for is_default_lock in (True, False)
         for invalid_reqs in (True, False)
@@ -103,8 +97,6 @@ def test_invalid_lockfile_behavior_option() -> None:
         for invalid_constraints_file in (True, False)
         for invalid_only_binary in (True, False)
         for invalid_no_binary in (True, False)
-        for source_plugins in (True, False)
-        for project_ics in (True, False)
         if (invalid_reqs or invalid_interpreter_constraints or invalid_constraints_file)
     ],
 )
@@ -115,8 +107,6 @@ def test_validate_tool_lockfiles(
     invalid_constraints_file: bool,
     invalid_only_binary: bool,
     invalid_no_binary: bool,
-    uses_source_plugins: bool,
-    uses_project_ic: bool,
     caplog,
 ) -> None:
     runtime_interpreter_constraints = (
@@ -127,8 +117,6 @@ def test_validate_tool_lockfiles(
     req_strings = ["bad-req"] if invalid_reqs else [str(r) for r in METADATA.requirements]
     requirements = create_tool_lock(
         default_lock=is_default_lock,
-        uses_source_plugins=uses_source_plugins,
-        uses_project_interpreter_constraints=uses_project_ic,
     )
     validate_metadata(
         METADATA,
@@ -165,16 +153,12 @@ def test_validate_tool_lockfiles(
         "In the lockfile, but not in the input requirements: ['ansicolors', 'requests']",
         if_=invalid_reqs,
     )
-    contains(".source_plugins`, and", if_=invalid_reqs and uses_source_plugins)
+    contains(".source_plugins` (if applicable)", if_=invalid_reqs)
 
     contains("You have set interpreter constraints", if_=invalid_interpreter_constraints)
     contains(
-        "determines its interpreter constraints based on your code's own constraints.",
-        if_=invalid_interpreter_constraints and uses_project_ic,
-    )
-    contains(
-        ".interpreter_constraints`, or by using a new custom lockfile.",
-        if_=invalid_interpreter_constraints and not uses_project_ic,
+        ".interpreter_constraints` (if applicable), or by generating a new custom lockfile.",
+        if_=invalid_interpreter_constraints,
     )
 
     contains("The constraints file at c.txt has changed", if_=invalid_constraints_file)

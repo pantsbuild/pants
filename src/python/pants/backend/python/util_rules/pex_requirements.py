@@ -58,18 +58,12 @@ class LockfileContent:
 
 
 @dataclass(frozen=True)
-class _ToolLockfileMixin:
-    uses_source_plugins: bool
-    uses_project_interpreter_constraints: bool
-
-
-@dataclass(frozen=True)
-class ToolDefaultLockfile(LockfileContent, _ToolLockfileMixin):
+class ToolDefaultLockfile(LockfileContent):
     pass
 
 
 @dataclass(frozen=True)
-class ToolCustomLockfile(Lockfile, _ToolLockfileMixin):
+class ToolCustomLockfile(Lockfile):
     pass
 
 
@@ -490,7 +484,7 @@ def validate_metadata(
     msg = "".join(msg_iter).strip()
     if python_setup.invalid_lockfile_behavior == InvalidLockfileBehavior.error:
         raise InvalidLockfileError(msg)
-    logger.warning("%s", msg)
+    logger.warning(msg)
 
 
 def _common_failure_reasons(
@@ -563,12 +557,12 @@ def _invalid_tool_lockfile_error(
         yield softwrap(
             f"""
             - You have set different requirements than those used to generate the lockfile.
-            You can fix this by updating `[{tool_name}].version`
+            You can fix this by updating `[{tool_name}].version`,
+            `[{tool_name}].extra_requirements`, and/or
+            `[{tool_name}].source_plugins` (if applicable), or by using a new custom lockfile.
+            See {doc_url('python-third-party-dependencies')} for details.
             """
-        )
-        if lockfile.uses_source_plugins:
-            yield f", `[{tool_name}].source_plugins`,"
-        yield f" and/or `[{tool_name}].extra_requirements`, or by using a new custom lockfile.\n"
+        ) + "\n"
         if isinstance(metadata, PythonLockfileMetadataV2):
             not_in_user_reqs = metadata.requirements - user_requirements
             not_in_lock = user_requirements - metadata.requirements
@@ -593,20 +587,9 @@ def _invalid_tool_lockfile_error(
             f"""
             - You have set interpreter constraints (`{user_interpreter_constraints}`) that
             are not compatible with those used to generate the lockfile
-            (`{metadata.valid_for_interpreter_constraints}`).
-            """
-        )
-        yield softwrap(
-            f"""
-            You can fix this by not setting `[{tool_name}].interpreter_constraints`,
-            or by using a new custom lockfile.
-            """
-        ) if not lockfile.uses_project_interpreter_constraints else softwrap(
-            f"""
-            `{tool_name}` determines its interpreter constraints based on your code's own
-            constraints. To fix this error, you can either change your code's constraints
-            (see {doc_url('python-interpreter-compatibility')}) or generate a new
-            custom lockfile.
+            (`{metadata.valid_for_interpreter_constraints}`). You can fix this by adjusting
+            `[{tool_name}].interpreter_constraints` (if applicable), or by generating a new
+            custom lockfile. See {doc_url('python-third-party-dependencies')} for details.
             """
         )
         yield "\n\n"
