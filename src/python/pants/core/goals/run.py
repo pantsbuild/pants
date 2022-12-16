@@ -322,10 +322,10 @@ async def run(
 
 
 @rule_builder
-def _unsupported_debug_adapter_rules(r: RuleRegistry, cls: type[RunFieldSet]) -> None:
+def _unsupported_debug_adapter_rules(register: RuleRegistry, cls: type[RunFieldSet]) -> None:
     """Returns a rule that implements DebugAdapterRequest by raising an error."""
 
-    @r.register(rule(_param_type_overrides={"request": cls}))
+    @register(rule(_param_type_overrides={"request": cls}))
     async def get_run_debug_adapter_request(request: RunFieldSet) -> RunDebugAdapterRequest:
         raise NotImplementedError(
             "Running this target type with a debug adapter is not yet supported."
@@ -339,7 +339,7 @@ async def _run_request(request: RunFieldSet) -> RunInSandboxRequest:
 
 
 @rule_builder
-def _run_in_sandbox_behavior_rule(r: RuleRegistry, cls: type[RunFieldSet]) -> None:
+def _run_in_sandbox_behavior_rule(register: RuleRegistry, cls: type[RunFieldSet]) -> None:
     """Returns a default rule that helps fulfil `experimental_run_in_sandbox` targets.
 
     If `RunInSandboxBehavior.CUSTOM` is specified, rule implementors must write a rule that returns
@@ -348,7 +348,7 @@ def _run_in_sandbox_behavior_rule(r: RuleRegistry, cls: type[RunFieldSet]) -> No
 
     behavior = cls.run_in_sandbox_behavior
 
-    @r.register(
+    @register(
         rule(_param_type_overrides={"request": cls}),
         predicate=behavior == RunInSandboxBehavior.NOT_SUPPORTED,
     )
@@ -357,14 +357,14 @@ def _run_in_sandbox_behavior_rule(r: RuleRegistry, cls: type[RunFieldSet]) -> No
             "Running this target type within the sandbox is not yet supported."
         )
 
-    @r.register(
+    @register(
         rule(_param_type_overrides={"request": cls}),
         predicate=behavior == RunInSandboxBehavior.RUN_REQUEST_HERMETIC,
     )
     async def run_request_hermetic(request: RunFieldSet) -> RunInSandboxRequest:
         return await _run_request(request)
 
-    @r.register(
+    @register(
         _uncacheable_rule(_param_type_overrides={"request": cls}),
         predicate=behavior == RunInSandboxBehavior.RUN_REQUEST_NOT_HERMETIC,
     )
