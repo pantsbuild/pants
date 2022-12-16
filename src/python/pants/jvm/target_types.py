@@ -11,7 +11,7 @@ from typing import ClassVar, Iterable, Optional, Tuple, Type
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.core.goals.generate_lockfiles import UnrecognizedResolveNamesError
 from pants.core.goals.package import OutputPathField
-from pants.core.goals.run import RestartableField
+from pants.core.goals.run import RestartableField, RunFieldSet, RunInSandboxBehavior
 from pants.core.goals.test import TestExtraEnvVarsField, TestTimeoutField
 from pants.engine.addresses import Address
 from pants.engine.rules import collect_rules, rule
@@ -21,7 +21,6 @@ from pants.engine.target import (
     Dependencies,
     FieldDefaultFactoryRequest,
     FieldDefaultFactoryResult,
-    FieldSet,
     InvalidFieldException,
     InvalidTargetException,
     OptionalSingleSourceField,
@@ -260,7 +259,9 @@ class JvmArtifactResolveField(JvmResolveField):
 
 
 @dataclass(frozen=True)
-class JvmArtifactFieldSet(FieldSet):
+class JvmArtifactFieldSet(RunFieldSet):
+    run_in_sandbox_behavior = RunInSandboxBehavior.RUN_REQUEST_HERMETIC
+
     group: JvmArtifactGroupField
     artifact: JvmArtifactArtifactField
     version: JvmArtifactVersionField
