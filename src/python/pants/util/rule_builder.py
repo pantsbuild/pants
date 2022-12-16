@@ -25,9 +25,9 @@ class RuleRegistry:
         """Register the decorated function as a rule. The rule is not provided to the engine until
         `build` is called.
 
-        `rule_spec` should be a decorator from `pants.engine.rules` `predicate` is an optional
-        boolean that allows selective registration of rules. If     `predicate` is falsey, rule
-        registration is skipped.
+        * `rule_spec` should be a decorator from `pants.engine.rules`
+        *`predicate` is an optional boolean that allows selective registration of rules. If 
+         `predicate` is falsey, the rule is not registered.
         """
 
         def decorated(f: Callable[P, T]) -> Callable[P, T]:
@@ -43,7 +43,7 @@ class RuleRegistry:
 
 
 def rule_builder(f: Callable[Concatenate[RuleRegistry, P], None]) -> Callable[P, Iterable[Rule]]:
-    """Turns the decorated function into a Rule Builder, a callable that is provided with a
+    """Turns the decorated function into a Rule Builder: a callable that is provided with a
     `RuleRegistry` as its first parameter, which can be used to create new rules inside a function,
     which can be useful when rules need to be created selectively.
 
