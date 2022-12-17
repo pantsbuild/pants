@@ -29,6 +29,7 @@ from pants.backend.go.util_rules.coverage import (
     GenerateCoverageSetupCodeResult,
     GoCoverageConfig,
     GoCoverageData,
+    GoCoverMode,
 )
 from pants.backend.go.util_rules.first_party_pkg import (
     FallibleFirstPartyPkgAnalysis,
@@ -107,8 +108,15 @@ class GoTestRequest(TestRequest):
 
 
 @dataclass(frozen=True)
+class PrepareGoTestBinaryCoverageConfig:
+    coverage_mode: GoCoverMode
+    coverage_packages: tuple[str, ...]
+
+
+@dataclass(frozen=True)
 class PrepareGoTestBinaryRequest:
     field_set: GoTestFieldSet
+    coverage: PrepareGoTestBinaryCoverageConfig | None
 
 
 @dataclass(frozen=True)
@@ -203,8 +211,6 @@ def _lift_build_requests_with_coverage(
 @rule(desc="Prepare Go test binary", level=LogLevel.DEBUG)
 async def prepare_go_test_binary(
     request: PrepareGoTestBinaryRequest,
-    test_subsystem: TestSubsystem,
-    go_test_subsystem: GoTestSubsystem,
 ) -> FalliblePrepareGoTestBinaryResult:
     build_opts = await Get(
         GoBuildOptions, GoBuildOptionsFromTargetRequest(request.field_set.address)
@@ -243,6 +249,17 @@ async def prepare_go_test_binary(
     pkg_digest = maybe_pkg_digest.pkg_digest
     import_path = pkg_analysis.import_path
 
+    with_coverage = False
+    if request.coverage is not None:
+        with_coverage = True
+        build_opts = dataclasses.replace(
+            build_opts,
+            coverage_config=GoCoverageConfig(
+                cover_mode=request.coverage.coverage_mode,
+                import_path_include_patterns=request.coverage.coverage_packages,
+            ),
+        )
+
     testmain = await Get(
         GeneratedTestMain,
         GenerateTestMainRequest(
@@ -256,7 +273,7 @@ async def prepare_go_test_binary(
                 for name in pkg_analysis.xtest_go_files
             ),
             import_path=import_path,
-            register_cover=test_subsystem.use_coverage,
+            register_cover=with_coverage,
             address=request.field_set.address,
         ),
     )
@@ -271,17 +288,6 @@ async def prepare_go_test_binary(
             stdout="",
             stderr="",
             exit_code=0,
-        )
-
-    with_coverage = False
-    if test_subsystem.use_coverage:
-        with_coverage = True
-        build_opts = dataclasses.replace(
-            build_opts,
-            coverage_config=GoCoverageConfig(
-                cover_mode=go_test_subsystem.coverage_mode,
-                import_path_include_patterns=go_test_subsystem.coverage_packages,
-            ),
         )
 
     # Construct the build request for the package under test.
@@ -351,7 +357,7 @@ async def prepare_go_test_binary(
             GenerateCoverageSetupCodeResult,
             GenerateCoverageSetupCodeRequest(
                 packages=FrozenOrderedSet(coverage_metadata),
-                cover_mode=go_test_subsystem.coverage_mode,
+                cover_mode=request.coverage.coverage_mode,  # type: ignore[union-attr] # gated on with_coverage
             ),
         )
         coverage_setup_digest = coverage_setup_result.digest
@@ -427,8 +433,16 @@ async def run_go_tests(
 ) -> TestResult:
     field_set = batch.single_element
 
+    coverage: PrepareGoTestBinaryCoverageConfig | None = None
+    if test_subsystem.use_coverage:
+        coverage = PrepareGoTestBinaryCoverageConfig(
+            coverage_mode=go_test_subsystem.coverage_mode,
+            coverage_packages=go_test_subsystem.coverage_packages,
+        )
+
     fallible_test_binary = await Get(
-        FalliblePrepareGoTestBinaryResult, PrepareGoTestBinaryRequest(field_set=field_set)
+        FalliblePrepareGoTestBinaryResult,
+        PrepareGoTestBinaryRequest(field_set=field_set, coverage=coverage),
     )
 
     if fallible_test_binary.exit_code != 0:
