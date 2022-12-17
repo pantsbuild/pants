@@ -173,7 +173,9 @@ class GoTestSubsystem(Subsystem):
         help=softwrap(
             """
             Capture a goroutine blocking profile from the execution of the test runner. The profile will be written
-            to the file `block.out` in the test extra output directory.
+            to the file `block.out` in the test extra output directory. The test binary will also be written to
+            the test extra output directory.
+
             """
         ),
     )
@@ -183,7 +185,8 @@ class GoTestSubsystem(Subsystem):
         help=softwrap(
             """
             Capture a CPU profile from the execution of the test runner. The profile will be written to the
-            file `cpu.out` in the test extra output directory.
+            file `cpu.out` in the test extra output directory. The test binary will also be written to the
+            test extra output directory.
             """
         ),
     )
@@ -194,6 +197,7 @@ class GoTestSubsystem(Subsystem):
             """
             Capture an allocation profile from the execution of the test runner after tests have passed.
             The profile will be written to the file `mem.out` in the test extra output directory.
+            The test binary will also be written to the test extra output directory.
             """
         ),
     )
@@ -204,6 +208,7 @@ class GoTestSubsystem(Subsystem):
             """
             Capture a mutex contention profile from the execution of the test runner when all tests are
             complete. The profile will be written to the file `mem.out` in the test extra output directory.
+            The test binary will also be written to the test extra output directory.
             """
         ),
     )
@@ -216,6 +221,18 @@ class GoTestSubsystem(Subsystem):
             file `trace.out` in the test extra output directory.
             """
         ),
+    )
+
+    output_test_binary = BoolOption(
+        default=False,
+        help=softwrap(
+            """
+            Write the test binary to the test extra output directory.
+
+            This is similar to the `go test -c` option.
+            """
+        ),
+        advanced=True,
     )
 
     def coverage_output_dir(self, distdir: DistDir, address: Address, import_path: str) -> PurePath:
