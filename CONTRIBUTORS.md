@@ -24,6 +24,7 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Brian Larson
 + Brian Wickman
 + Bruno Bieth
++ Bryan Weber
 + Caitie McCaffrey
 + Caleb Lloyd
 + Carina C. Zona
@@ -114,6 +115,7 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Jan Paul Erkelens
 + Jason Jackson
 + Jason Song
++ Jay Crumb
 + Jeff Jenkins
 + Jeremy Hintz
 + Jessica Rosenfield
