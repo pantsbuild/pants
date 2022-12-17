@@ -540,6 +540,7 @@ async def run_go_tests(
 
     output_files = []
     maybe_profile_args = []
+    output_test_runner = False
 
     if test_subsystem.use_coverage:
         maybe_profile_args.append("-test.coverprofile=cover.out")
@@ -548,18 +549,22 @@ async def run_go_tests(
     if go_test_subsystem.block_profile:
         maybe_profile_args.append("-test.blockprofile=block.out")
         output_files.append("block.out")
+        output_test_runner = True
 
     if go_test_subsystem.cpu_profile:
         maybe_profile_args.append("-test.cpuprofile=cpu.out")
         output_files.append("cpu.out")
+        output_test_runner = True
 
     if go_test_subsystem.mem_profile:
         maybe_profile_args.append("-test.memprofile=mem.out")
         output_files.append("mem.out")
+        output_test_runner = True
 
     if go_test_subsystem.mutex_profile:
         maybe_profile_args.append("-test.mutexprofile=mutex.out")
         output_files.append("mutex.out")
+        output_test_runner = True
 
     if go_test_subsystem.trace:
         maybe_profile_args.append("-test.trace=trace.out")
@@ -596,7 +601,12 @@ async def run_go_tests(
     output_files = [x for x in output_files if x != "cover.out"]
     extra_output: Snapshot | None = None
     if output_files:
-        extra_output = await Get(Snapshot, Digest, result.output_digest)
+        output_digest = result.output_digest
+        if output_test_runner:
+            output_digest = await Get(
+                Digest, MergeDigests([output_digest, test_binary.test_binary_digest])
+            )
+        extra_output = await Get(Snapshot, Digest, output_digest)
 
     return TestResult.from_fallible_process_result(
         process_result=result,

@@ -814,5 +814,6 @@ def test_profile_options_write_results(rule_runner: RuleRunner) -> None:
         "cpu.out",
         "mem.out",
         "mutex.out",
+        "test_runner",
         "trace.out",
     ]
