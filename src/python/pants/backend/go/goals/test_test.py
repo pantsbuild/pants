@@ -789,15 +789,17 @@ def test_profile_options_write_results(rule_runner: RuleRunner) -> None:
             ),
         }
     )
-    rule_runner.set_options([
-        "--go-test-args=-v -bench=.",
-        "--go-test-block-profile",
-        "--go-test-cpu-profile",
-        "--go-test-mem-profile",
-        "--go-test-mutex-profile",
-        "--go-test-trace",
-
-    ], env_inherit={"PATH"})
+    rule_runner.set_options(
+        [
+            "--go-test-args=-v -bench=.",
+            "--go-test-block-profile",
+            "--go-test-cpu-profile",
+            "--go-test-mem-profile",
+            "--go-test-mutex-profile",
+            "--go-test-trace",
+        ],
+        env_inherit={"PATH"},
+    )
     tgt = rule_runner.get_target(Address("foo"))
     result = rule_runner.request(
         TestResult, [GoTestRequest.Batch("", (GoTestFieldSet.create(tgt),), None)]
