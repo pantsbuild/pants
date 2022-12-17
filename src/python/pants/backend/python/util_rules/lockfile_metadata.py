@@ -76,7 +76,6 @@ class PythonLockfileMetadata(LockfileMetadata):
     def is_valid_for(
         self,
         *,
-        is_tool: bool,
         expected_invalidation_digest: str | None,
         user_interpreter_constraints: InterpreterConstraints,
         interpreter_universe: Iterable[str],
@@ -122,7 +121,6 @@ class PythonLockfileMetadataV1(PythonLockfileMetadata):
     def is_valid_for(
         self,
         *,
-        is_tool: bool,
         expected_invalidation_digest: str | None,
         user_interpreter_constraints: InterpreterConstraints,
         interpreter_universe: Iterable[str],
@@ -192,7 +190,6 @@ class PythonLockfileMetadataV2(PythonLockfileMetadata):
     def is_valid_for(
         self,
         *,
-        is_tool: bool,
         expected_invalidation_digest: str | None,  # Not used by V2.
         user_interpreter_constraints: InterpreterConstraints,
         interpreter_universe: Iterable[str],
@@ -204,13 +201,7 @@ class PythonLockfileMetadataV2(PythonLockfileMetadata):
         no_binary: Iterable[str],
     ) -> LockfileMetadataValidation:
         failure_reasons = set()
-
-        invalid_reqs = (
-            self.requirements != set(user_requirements)
-            if is_tool
-            else not set(user_requirements).issubset(self.requirements)
-        )
-        if invalid_reqs:
+        if not set(user_requirements).issubset(self.requirements):
             failure_reasons.add(InvalidPythonLockfileReason.REQUIREMENTS_MISMATCH)
 
         if not self.valid_for_interpreter_constraints.contains(
@@ -273,7 +264,6 @@ class PythonLockfileMetadataV3(PythonLockfileMetadataV2):
     def is_valid_for(
         self,
         *,
-        is_tool: bool,
         expected_invalidation_digest: str | None,  # Validation digests are not used by V2.
         user_interpreter_constraints: InterpreterConstraints,
         interpreter_universe: Iterable[str],
@@ -286,7 +276,6 @@ class PythonLockfileMetadataV3(PythonLockfileMetadataV2):
         failure_reasons = (
             super()
             .is_valid_for(
-                is_tool=is_tool,
                 expected_invalidation_digest=expected_invalidation_digest,
                 user_interpreter_constraints=user_interpreter_constraints,
                 interpreter_universe=interpreter_universe,
