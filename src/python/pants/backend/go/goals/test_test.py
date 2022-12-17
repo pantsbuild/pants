@@ -806,3 +806,13 @@ def test_profile_options_write_results(rule_runner: RuleRunner) -> None:
     )
     assert result.exit_code == 0
     assert "PASS: TestAdd" in result.stdout
+
+    extra_output = result.extra_output
+    assert extra_output is not None
+    assert sorted(extra_output.files) == [
+        "block.out",
+        "cpu.out",
+        "mem.out",
+        "mutex.out",
+        "trace.out",
+    ]

@@ -48,7 +48,7 @@ from pants.core.target_types import FileSourceField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.fs import EMPTY_FILE_DIGEST, AddPrefix, Digest, MergeDigests
-from pants.engine.internals.native_engine import EMPTY_DIGEST
+from pants.engine.internals.native_engine import EMPTY_DIGEST, Snapshot
 from pants.engine.process import FallibleProcessResult, Process, ProcessCacheScope
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import Dependencies, DependenciesRequest, SourcesField, Target, Targets
@@ -594,15 +594,16 @@ async def run_go_tests(
         )
 
     output_files = [x for x in output_files if x != "cover.out"]
+    extra_output: Snapshot | None = None
     if output_files:
-        # TODO: What is the best way to arrange for these files to be output?
-        pass
+        extra_output = await Get(Snapshot, Digest, result.output_digest)
 
     return TestResult.from_fallible_process_result(
         process_result=result,
         address=field_set.address,
         output_setting=test_subsystem.output,
         coverage_data=coverage_data,
+        extra_output=extra_output,
     )
 
 
