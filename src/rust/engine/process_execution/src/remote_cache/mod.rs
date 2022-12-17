@@ -1,6 +1,6 @@
-#![allow(warnings)]
 // Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
+#![allow(warnings)]
 use std::collections::{BTreeMap, HashSet};
 use std::convert::TryInto;
 use std::fmt::{self, Debug};
