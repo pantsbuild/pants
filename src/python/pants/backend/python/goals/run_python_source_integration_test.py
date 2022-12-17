@@ -186,6 +186,9 @@ def test_run_sample_script(
         "--backend-packages=pants.backend.python",
         "--backend-packages=pants.backend.codegen.protobuf.python",
         "--source-root-patterns=['src_root1', 'src_root2']",
+        # NB: Each test file that tests the debug adapter should pick a unique port
+        #  so that different test files can run concurrently without port collisions.
+        "--debug-adapter-port=22334",
         *(
             (
                 "--python-default-run-goal-use-sandbox"

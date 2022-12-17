@@ -108,6 +108,9 @@ def _configure_pytest_runner(
     args = [
         "--backend-packages=pants.backend.python",
         f"--source-root-patterns={SOURCE_ROOT}",
+        # NB: Each test file that tests the debug adapter should pick a unique port
+        #  so that different test files can run concurrently without port collisions.
+        "--debug-adapter-port=22335",
         *(extra_args or ()),
     ]
     rule_runner.set_options(args, env=env, env_inherit={"PATH", "PYENV_ROOT", "HOME"})
