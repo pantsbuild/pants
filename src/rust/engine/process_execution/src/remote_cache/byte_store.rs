@@ -19,13 +19,18 @@ use tonic::Request;
 
 #[derive(Clone)]
 pub struct RemoteCache {
-  instance_name: Option<String>,
   byte_store: Arc<dyn ByteStoreProvider>,
 }
 
 impl fmt::Debug for RemoteCache {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     write!(f, "byte_store::RemoteCache(FIXME)")
+  }
+}
+
+impl RemoteCache {
+  pub fn new(byte_store: Arc<dyn ByteStoreProvider>) -> RemoteCache {
+    RemoteCache { byte_store }
   }
 }
 
