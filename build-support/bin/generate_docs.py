@@ -284,7 +284,6 @@ def run_pants_help_all() -> dict[str, Any]:
         "--plugins=[]",
         f"--backend-packages={repr(backends)}",
         "--no-verify-config",
-        "--remote-auth-plugin= ",
         "help-all",
     ]
     run = subprocess.run(argv, stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding="utf-8")
