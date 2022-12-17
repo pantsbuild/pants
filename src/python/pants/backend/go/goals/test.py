@@ -33,7 +33,9 @@ from pants.backend.go.util_rules.coverage import (
 from pants.backend.go.util_rules.first_party_pkg import (
     FallibleFirstPartyPkgAnalysis,
     FallibleFirstPartyPkgDigest,
+    FirstPartyPkgAnalysis,
     FirstPartyPkgAnalysisRequest,
+    FirstPartyPkgDigest,
     FirstPartyPkgDigestRequest,
 )
 from pants.backend.go.util_rules.goroot import GoRoot
@@ -102,6 +104,28 @@ class GoTestFieldSet(TestFieldSet):
 class GoTestRequest(TestRequest):
     tool_subsystem = GoTestSubsystem
     field_set_type = GoTestFieldSet
+
+
+@dataclass(frozen=True)
+class PrepareGoTestBinaryRequest:
+    field_set: GoTestFieldSet
+
+
+@dataclass(frozen=True)
+class PrepareGoTestBinaryResult:
+    test_binary_digest: Digest
+    test_binary_path: str
+    import_path: str
+    pkg_digest: FirstPartyPkgDigest
+    pkg_analysis: FirstPartyPkgAnalysis
+
+
+@dataclass(frozen=True)
+class FalliblePrepareGoTestBinaryResult:
+    binary: PrepareGoTestBinaryResult | None
+    stdout: str
+    stderr: str
+    exit_code: int
 
 
 def transform_test_args(args: Sequence[str], timeout_field_value: int | None) -> tuple[str, ...]:
@@ -176,40 +200,36 @@ def _lift_build_requests_with_coverage(
     return result
 
 
-@rule(desc="Test with Go", level=LogLevel.DEBUG)
-async def run_go_tests(
-    batch: GoTestRequest.Batch[GoTestFieldSet, Any],
+@rule(desc="Prepare Go test binary", level=LogLevel.DEBUG)
+async def prepare_go_test_binary(
+    request: PrepareGoTestBinaryRequest,
     test_subsystem: TestSubsystem,
     go_test_subsystem: GoTestSubsystem,
-    test_extra_env: TestExtraEnv,
-    goroot: GoRoot,
-) -> TestResult:
-    field_set = batch.single_element
-
-    build_opts = await Get(GoBuildOptions, GoBuildOptionsFromTargetRequest(field_set.address))
+) -> FalliblePrepareGoTestBinaryResult:
+    build_opts = await Get(
+        GoBuildOptions, GoBuildOptionsFromTargetRequest(request.field_set.address)
+    )
 
     maybe_pkg_analysis, maybe_pkg_digest, dependencies = await MultiGet(
         Get(
             FallibleFirstPartyPkgAnalysis,
-            FirstPartyPkgAnalysisRequest(field_set.address, build_opts=build_opts),
+            FirstPartyPkgAnalysisRequest(request.field_set.address, build_opts=build_opts),
         ),
         Get(
             FallibleFirstPartyPkgDigest,
-            FirstPartyPkgDigestRequest(field_set.address, build_opts=build_opts),
+            FirstPartyPkgDigestRequest(request.field_set.address, build_opts=build_opts),
         ),
-        Get(Targets, DependenciesRequest(field_set.dependencies)),
+        Get(Targets, DependenciesRequest(request.field_set.dependencies)),
     )
 
-    def compilation_failure(exit_code: int, stdout: str | None, stderr: str | None) -> TestResult:
-        return TestResult(
-            exit_code=exit_code,
+    def compilation_failure(
+        exit_code: int, stdout: str | None, stderr: str | None
+    ) -> FalliblePrepareGoTestBinaryResult:
+        return FalliblePrepareGoTestBinaryResult(
+            binary=None,
             stdout=stdout or "",
             stderr=stderr or "",
-            stdout_digest=EMPTY_FILE_DIGEST,
-            stderr_digest=EMPTY_FILE_DIGEST,
-            addresses=(field_set.address,),
-            output_setting=test_subsystem.output,
-            result_metadata=None,
+            exit_code=exit_code,
         )
 
     if maybe_pkg_analysis.analysis is None:
@@ -237,7 +257,7 @@ async def run_go_tests(
             ),
             import_path=import_path,
             register_cover=test_subsystem.use_coverage,
-            address=field_set.address,
+            address=request.field_set.address,
         ),
     )
 
@@ -246,7 +266,12 @@ async def run_go_tests(
         return compilation_failure(_exit_code, None, _stderr)
 
     if not testmain.has_tests and not testmain.has_xtests:
-        return TestResult.no_tests_found(field_set.address, output_setting=test_subsystem.output)
+        return FalliblePrepareGoTestBinaryResult(
+            binary=None,
+            stdout="",
+            stderr="",
+            exit_code=0,
+        )
 
     with_coverage = False
     if test_subsystem.use_coverage:
@@ -263,7 +288,7 @@ async def run_go_tests(
     maybe_test_pkg_build_request = await Get(
         FallibleBuildGoPackageRequest,
         BuildGoPackageTargetRequest(
-            field_set.address,
+            request.field_set.address,
             for_tests=True,
             with_coverage=with_coverage,
             build_opts=build_opts,
@@ -285,7 +310,7 @@ async def run_go_tests(
         maybe_xtest_pkg_build_request = await Get(
             FallibleBuildGoPackageRequest,
             BuildGoPackageTargetRequest(
-                field_set.address,
+                request.field_set.address,
                 for_xtests=True,
                 with_coverage=with_coverage,
                 build_opts=build_opts,
@@ -374,28 +399,70 @@ async def run_go_tests(
             build_opts=build_opts,
             import_config_path=import_config.CONFIG_PATH,
             output_filename="./test_runner",  # TODO: Name test binary the way that `go` does?
-            description=f"Link Go test binary for {field_set.address}",
+            description=f"Link Go test binary for {request.field_set.address}",
         ),
     )
+
+    return FalliblePrepareGoTestBinaryResult(
+        binary=PrepareGoTestBinaryResult(
+            test_binary_digest=binary.digest,
+            test_binary_path="./test_runner",
+            import_path=import_path,
+            pkg_digest=pkg_digest,
+            pkg_analysis=pkg_analysis,
+        ),
+        stdout="",
+        stderr="",
+        exit_code=0,
+    )
+
+
+@rule(desc="Test with Go", level=LogLevel.DEBUG)
+async def run_go_tests(
+    batch: GoTestRequest.Batch[GoTestFieldSet, Any],
+    test_subsystem: TestSubsystem,
+    go_test_subsystem: GoTestSubsystem,
+    test_extra_env: TestExtraEnv,
+    goroot: GoRoot,
+) -> TestResult:
+    field_set = batch.single_element
+
+    fallible_test_binary = await Get(
+        FalliblePrepareGoTestBinaryResult, PrepareGoTestBinaryRequest(field_set=field_set)
+    )
+
+    if fallible_test_binary.exit_code != 0:
+        return TestResult(
+            exit_code=fallible_test_binary.exit_code,
+            stdout=fallible_test_binary.stdout,
+            stderr=fallible_test_binary.stderr,
+            stdout_digest=EMPTY_FILE_DIGEST,
+            stderr_digest=EMPTY_FILE_DIGEST,
+            addresses=(field_set.address,),
+            output_setting=test_subsystem.output,
+            result_metadata=None,
+        )
+
+    test_binary = fallible_test_binary.binary
+    if test_binary is None:
+        return TestResult.no_tests_found(field_set.address, output_setting=test_subsystem.output)
 
     # To emulate Go's test runner, we set the working directory to the path of the `go_package`.
     # This allows tests to open dependencies on `file` targets regardless of where they are
     # located. See https://dave.cheney.net/2016/05/10/test-fixtures-in-go.
     working_dir = field_set.address.spec_path
-    field_set_extra_env_get = Get(
-        EnvironmentVars, EnvironmentVarsRequest(field_set.extra_env_vars.value or ())
+    field_set_extra_env, dependencies, binary_with_prefix = await MultiGet(
+        Get(EnvironmentVars, EnvironmentVarsRequest(field_set.extra_env_vars.value or ())),
+        Get(Targets, DependenciesRequest(field_set.dependencies)),
+        Get(Digest, AddPrefix(test_binary.test_binary_digest, working_dir)),
     )
-    binary_with_prefix, files_sources, field_set_extra_env = await MultiGet(
-        Get(Digest, AddPrefix(binary.digest, working_dir)),
-        Get(
-            SourceFiles,
-            SourceFilesRequest(
-                (dep.get(SourcesField) for dep in dependencies),
-                for_sources_types=(FileSourceField,),
-                enable_codegen=True,
-            ),
+    files_sources = await Get(
+        SourceFiles,
+        SourceFilesRequest(
+            (dep.get(SourcesField) for dep in dependencies),
+            for_sources_types=(FileSourceField,),
+            enable_codegen=True,
         ),
-        field_set_extra_env_get,
     )
     test_input_digest = await Get(
         Digest, MergeDigests((binary_with_prefix, files_sources.snapshot.digest))
@@ -427,7 +494,7 @@ async def run_go_tests(
         maybe_cover_output_file = ["cover.out"]
 
     test_run_args = [
-        "./test_runner",
+        test_binary.test_binary_path,
         *transform_test_args(
             go_test_subsystem.args,
             field_set.timeout.calculate_from_global_options(test_subsystem),
@@ -453,9 +520,9 @@ async def run_go_tests(
     if test_subsystem.use_coverage:
         coverage_data = GoCoverageData(
             coverage_digest=result.output_digest,
-            import_path=import_path,
-            sources_digest=pkg_digest.digest,
-            sources_dir_path=pkg_analysis.dir_path,
+            import_path=test_binary.import_path,
+            sources_digest=test_binary.pkg_digest.digest,
+            sources_dir_path=test_binary.pkg_analysis.dir_path,
             pkg_target_address=field_set.address,
         )
 
