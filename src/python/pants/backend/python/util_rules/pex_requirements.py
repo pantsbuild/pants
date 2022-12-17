@@ -470,7 +470,6 @@ def validate_metadata(
     # TODO(#12314): Improve the exception if invalid strings
     user_requirements = {PipRequirement.parse(i) for i in consumed_req_strings}
     validation = metadata.is_valid_for(
-        is_tool=isinstance(lockfile, (ToolCustomLockfile, ToolDefaultLockfile)),
         expected_invalidation_digest=lockfile.lockfile_hex_digest,
         user_interpreter_constraints=interpreter_constraints,
         interpreter_universe=python_setup.interpreter_versions_universe,
