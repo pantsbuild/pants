@@ -34,6 +34,7 @@ from pants.backend.python.target_types import (
 from pants.backend.python.util_rules import local_dists, pex_from_targets
 from pants.build_graph.address import Address
 from pants.core.goals.run import RunDebugAdapterRequest, RunRequest
+from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
 from pants.engine.process import InteractiveProcess
 from pants.engine.rules import QueryRule
 from pants.engine.target import Target
@@ -186,9 +187,7 @@ def test_run_sample_script(
         "--backend-packages=pants.backend.python",
         "--backend-packages=pants.backend.codegen.protobuf.python",
         "--source-root-patterns=['src_root1', 'src_root2']",
-        # NB: Each test file that tests the debug adapter should pick a unique port
-        #  so that different test files can run concurrently without port collisions.
-        "--debug-adapter-port=22334",
+        f"--debug-adapter-port={DebugAdapterSubsystem.port_for_testing()}",
         *(
             (
                 "--python-default-run-goal-use-sandbox"

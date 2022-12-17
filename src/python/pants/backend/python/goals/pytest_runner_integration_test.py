@@ -40,6 +40,7 @@ from pants.core.goals.test import (
     build_runtime_package_dependencies,
     get_filtered_environment,
 )
+from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
 from pants.core.util_rules import config_files, distdir
 from pants.core.util_rules.partitions import Partitions
 from pants.engine.addresses import Address
@@ -108,9 +109,7 @@ def _configure_pytest_runner(
     args = [
         "--backend-packages=pants.backend.python",
         f"--source-root-patterns={SOURCE_ROOT}",
-        # NB: Each test file that tests the debug adapter should pick a unique port
-        #  so that different test files can run concurrently without port collisions.
-        "--debug-adapter-port=22335",
+        f"--debug-adapter-port={DebugAdapterSubsystem.port_for_testing()}",
         *(extra_args or ()),
     ]
     rule_runner.set_options(args, env=env, env_inherit={"PATH", "PYENV_ROOT", "HOME"})
