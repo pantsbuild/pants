@@ -107,7 +107,7 @@ impl CommandRunner {
       remote::gha::ByteStore::new(
         &std::env::var("PANTS_REMOTE_GHA_CACHE_URL").expect("url env var not set"),
         &std::env::var("PANTS_REMOTE_GHA_RUNTIME_TOKEN").expect("token env var not set"),
-        "pants-remote-action",
+        "pants-remote-action-v2",
       )?,
     )));
     // let provider = Arc::new(reapi::RemoteCache::new(
