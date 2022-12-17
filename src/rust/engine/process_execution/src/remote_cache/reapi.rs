@@ -1,3 +1,6 @@
+use std::collections::BTreeMap;
+use std::time::Duration;
+
 use super::RemoteCacheProvider;
 use crate::remote::{
   apply_headers, make_execute_request, populate_fallible_execution_result, EntireExecuteRequest,
@@ -11,7 +14,8 @@ use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use remexec::action_cache_client::ActionCacheClient;
 use remexec::{ActionResult, Command, Tree};
 use std::sync::Arc;
-use tonic::Request;
+use tonic::{Code, Request};
+use workunit_store::Metric;
 
 pub struct RemoteCache {
   instance_name: Option<String>,
@@ -19,7 +23,14 @@ pub struct RemoteCache {
 }
 
 impl RemoteCache {
-  pub fn new() -> Result<RemoteCache, ()> {
+  pub fn new(
+    instance_name: Option<String>,
+    action_cache_address: &str,
+    root_ca_certs: Option<Vec<u8>>,
+    mut headers: BTreeMap<String, String>,
+    concurrency_limit: usize,
+    read_timeout: Duration,
+  ) -> Result<RemoteCache, String> {
     let tls_client_config = if action_cache_address.starts_with("https://") {
       Some(grpc_util::tls::Config::new_without_mtls(root_ca_certs).try_into()?)
     } else {
@@ -40,7 +51,10 @@ impl RemoteCache {
     );
     let action_cache_client = Arc::new(ActionCacheClient::new(channel));
 
-    Ok(RemoteCache { instance_name, action_cache_client })
+    Ok(RemoteCache {
+      instance_name,
+      action_cache_client,
+    })
   }
 }
 
@@ -91,9 +105,12 @@ impl RemoteCacheProvider for RemoteCache {
       },
       status_is_retryable,
     )
-    .await
-    .map_err(|s| status_to_str(&s))?;
-    // FIXME: how is this ever None?
-    Ok(Some(response.into_inner()))
+    .await;
+
+    match response {
+      Ok(response) => Ok(Some(response.into_inner())),
+      Err(status) if status.code() == Code::NotFound => Ok(None),
+      Err(status) => Err(status_to_str(&status)),
+    }
   }
 }

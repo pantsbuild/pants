@@ -82,7 +82,7 @@ pub struct CommandRunner {
   warnings_behavior: RemoteCacheWarningsBehavior,
   read_errors_counter: Arc<Mutex<BTreeMap<String, usize>>>,
   write_errors_counter: Arc<Mutex<BTreeMap<String, usize>>>,
-  provider: Arc<dyn RemoteCacheProvider>
+  provider: Arc<dyn RemoteCacheProvider>,
 }
 
 impl CommandRunner {
@@ -94,7 +94,7 @@ impl CommandRunner {
     store: Store,
     action_cache_address: &str,
     root_ca_certs: Option<Vec<u8>>,
-    mut headers: BTreeMap<String, String>,
+    headers: BTreeMap<String, String>,
     cache_read: bool,
     cache_write: bool,
     warnings_behavior: RemoteCacheWarningsBehavior,
@@ -103,10 +103,18 @@ impl CommandRunner {
     read_timeout: Duration,
     append_only_caches_base_path: Option<String>,
   ) -> Result<Self, String> {
-    let gha_store = Arc::new(remote::gha::ByteStore::new(
+    let provider = Arc::new(remote::gha::ByteStore::new(
       &std::env::var("PANTS_REMOTE_GHA_CACHE_URL").expect("url env var not set"),
       &std::env::var("PANTS_REMOTE_GHA_RUNTIME_TOKEN").expect("token env var not set"),
       "pants-remote-action",
+    )?);
+    let provider = Arc::new(reapi::RemoteCache::new(
+      instance_name.clone(),
+      action_cache_address,
+      root_ca_certs,
+      headers,
+      concurrency_limit,
+      read_timeout,
     )?);
 
     Ok(CommandRunner {
@@ -122,7 +130,7 @@ impl CommandRunner {
       warnings_behavior,
       read_errors_counter: Arc::new(Mutex::new(BTreeMap::new())),
       write_errors_counter: Arc::new(Mutex::new(BTreeMap::new())),
-      gha_store,
+      provider,
     })
   }
 
@@ -412,7 +420,8 @@ impl CommandRunner {
       .await?;
 
     self
-      .provider.update_action_result(action_digest, action_result)
+      .provider
+      .update_action_result(action_digest, action_result)
       .await?;
 
     Ok(())
@@ -567,10 +576,9 @@ async fn check_action_cache(
   instance_name: Option<String>,
   platform: Platform,
   context: &Context,
-  action_cache_client: Arc<ActionCacheClient<LayeredService>>,
+  provider: Arc<dyn RemoteCacheProvider>,
   store: Store,
   cache_content_behavior: CacheContentBehavior,
-  gha_store: Arc<remote::gha::ByteStore>,
 ) -> Result<Option<FallibleProcessResultWithPlatform>, ProcessError> {
   in_workunit!(
     "check_action_cache",
@@ -580,56 +588,44 @@ async fn check_action_cache(
       workunit.increment_counter(Metric::RemoteCacheRequests, 1);
 
       let start = Instant::now();
-      let client = action_cache_client.as_ref().clone();
-      let response = gha_store
-        .load_bytes(action_digest)
-        .map(|r| {
-          r.map_err(Status::unknown)
-            .and_then(|b| b.ok_or_else(|| Status::not_found("")))
-        })
-        .map(|r| {
-          r.and_then(|b| {
-            remexec::UpdateActionResultRequest::decode(b)
-              .map_err(|e| Status::unknown("decoding error"))
-          })
-        })
-        // retry_call(
-        //   client,
-        //   move |mut client| {
-        //     let request = remexec::GetActionResultRequest {
-        //       action_digest: Some(action_digest.into()),
-        //       instance_name: instance_name.clone().unwrap_or_default(),
-        //       ..remexec::GetActionResultRequest::default()
-        //     };
-        //     let request = apply_headers(Request::new(request), &context.build_id);
-        //     async move { client.get_action_result(request).await }
-        //   },
-        //   status_is_retryable,
-        // )
-        .and_then(|action_result| async move {
-          let action_result = action_result.action_result.expect("no result?");
-          //let action_result = action_result.into_inner();
-          let response = populate_fallible_execution_result(
-            store.clone(),
-            context.run_id,
-            &action_result,
-            platform,
-            false,
-            ProcessResultSource::HitRemotely,
-          )
-          .await
-          .map_err(|e| Status::unavailable(format!("Output roots could not be loaded: {e}")))?;
+      let response = provider
+        .get_action_result(action_digest, context)
+        .and_then(|response| async move {
+          match response {
+            Some(action_result) => {
+              let response = populate_fallible_execution_result(
+                store.clone(),
+                context.run_id,
+                &action_result,
+                platform,
+                false,
+                ProcessResultSource::HitRemotely,
+              )
+              .await
+              .map_err(|e| {
+                format!(
+                  "{:?}: Output roots could not be loaded: {e}",
+                  Code::Unavailable
+                )
+              })?;
 
-          let cache_content_valid = check_cache_content(&response, &store, cache_content_behavior)
-            .await
-            .map_err(|e| {
-              Status::unavailable(format!("Output content could not be validated: {e}"))
-            })?;
+              let cache_content_valid =
+                check_cache_content(&response, &store, cache_content_behavior)
+                  .await
+                  .map_err(|e| {
+                    format!(
+                      "{:?}: Output content could not be validated: {e}",
+                      Code::Unavailable
+                    )
+                  })?;
 
-          if cache_content_valid {
-            Ok(response)
-          } else {
-            Err(Status::not_found(""))
+              if cache_content_valid {
+                Ok(Some(response))
+              } else {
+                Ok(None)
+              }
+            }
+            None => Ok(None),
           }
         })
         .await;
@@ -639,23 +635,14 @@ async fn check_action_cache(
         start.elapsed().as_micros() as u64,
       );
 
-      match response {
-        Ok(response) => {
-          workunit.increment_counter(Metric::RemoteCacheRequestsCached, 1);
-          Ok(Some(response))
-        }
-        Err(status) => match status.code() {
-          Code::NotFound => {
-            workunit.increment_counter(Metric::RemoteCacheRequestsUncached, 1);
-            Ok(None)
-          }
-          _ => {
-            workunit.increment_counter(Metric::RemoteCacheReadErrors, 1);
-            // TODO: Ensure that we're catching missing digests.
-            Err(status_to_str(&status).into())
-          }
-        },
-      }
+      let counter = match response {
+        Ok(Some(_)) => Metric::RemoteCacheRequestsCached,
+        Ok(None) => Metric::RemoteCacheRequestsUncached,
+        Err(_) => Metric::RemoteCacheReadErrors,
+      };
+
+      workunit.increment_counter(counter, 1);
+      response.map_err(From::from)
     }
   )
   .await
