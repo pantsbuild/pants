@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import json
 import textwrap
 
 import pytest
@@ -19,9 +20,14 @@ from pants.backend.python.util_rules.pex_requirements import (
     ToolDefaultLockfile,
     _pex_lockfile_requirement_count,
     _strip_comments_from_pex_json_lockfile,
+    get_metadata,
     is_probably_pex_json_lockfile,
-    should_validate_metadata,
     validate_metadata,
+)
+from pants.core.util_rules.lockfile_metadata import (
+    BEGIN_LOCKFILE_HEADER,
+    END_LOCKFILE_HEADER,
+    InvalidLockfileError,
 )
 from pants.engine.fs import FileContent
 from pants.engine.internals.native_engine import EMPTY_DIGEST
@@ -65,18 +71,56 @@ def create_python_setup(
     )
 
 
-def test_invalid_lockfile_behavior_option() -> None:
-    """Test that you can toggle between warnings, errors, and ignoring."""
+def test_get_metadata() -> None:
+    # We don't get metadata if we've been told not to validate it.
+    python_setup = create_python_setup(behavior=InvalidLockfileBehavior.ignore)
+    metadata = get_metadata(python_setup, b"", None, "dummy", "#")
+    assert metadata is None
 
-    assert not should_validate_metadata(
-        create_tool_lock(), create_python_setup(InvalidLockfileBehavior.ignore)
+    python_setup = create_python_setup(behavior=InvalidLockfileBehavior.warn)
+
+    # If we are supposed to validate Pants-generated lockfiles, but there is no header
+    # block, then it's not a Pants-generated lockfile, so succeed but return no metadata.
+    metadata = get_metadata(python_setup, b"NO HEADER HERE", None, "dummy", "#")
+    assert metadata is None
+
+    # If we are supposed to validate Pants-generated lockfiles, and there is a header
+    # block, then succeed on valid JSON.
+    valid_lock_metadata = json.dumps(
+        {
+            "valid_for_interpreter_constraints": "dummy",
+            "requirements_invalidation_digest": "dummy",
+        }
     )
-    assert should_validate_metadata(
-        create_tool_lock(), create_python_setup(InvalidLockfileBehavior.warn)
+    metadata = get_metadata(
+        python_setup,
+        f"# {BEGIN_LOCKFILE_HEADER}\n# {valid_lock_metadata}\n# {END_LOCKFILE_HEADER}\n".encode(),
+        None,
+        "dummy",
+        "#",
     )
-    assert should_validate_metadata(
-        create_tool_lock(), create_python_setup(InvalidLockfileBehavior.error)
-    )
+    assert metadata is not None
+
+    # If we are supposed to validate Pants-generated lockfiles, and there is a header
+    # block, then fail on invalid JSON.
+    with pytest.raises(InvalidLockfileError):
+        get_metadata(
+            python_setup,
+            f"# {BEGIN_LOCKFILE_HEADER}\n# NOT JSON\n# {END_LOCKFILE_HEADER}\n".encode(),
+            None,
+            "dummy",
+            "#",
+        )
+    # If we are supposed to validate Pants-generated lockfiles, and there is a header
+    # block, then fail on JSON that doesn't have the keys we expect.
+    with pytest.raises(InvalidLockfileError):
+        get_metadata(
+            python_setup,
+            f"# {BEGIN_LOCKFILE_HEADER}\n# {{ 'a': 'b' }}\n# {END_LOCKFILE_HEADER}\n".encode(),
+            None,
+            "dummy",
+            "#",
+        )
 
 
 @pytest.mark.parametrize(
@@ -224,11 +268,6 @@ def test_validate_user_lockfiles(
         file_path="lock.txt",
         file_path_description_of_origin="foo",
         resolve_name="a",
-    )
-
-    # Ignore validation if resolves are manually managed.
-    assert not should_validate_metadata(
-        lockfile, create_python_setup(InvalidLockfileBehavior.warn, enable_resolves=False)
     )
 
     validate_metadata(
