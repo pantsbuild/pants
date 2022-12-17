@@ -604,6 +604,7 @@ async def run_go_tests(
         output_setting=test_subsystem.output,
         coverage_data=coverage_data,
         extra_output=extra_output,
+        log_extra_output=True,
     )
 
 
