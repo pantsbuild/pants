@@ -861,7 +861,9 @@ async def run_tests(
                 path_prefix=path_prefix,
             )
             if result.log_extra_output:
-                logger.info(f"Wrote extra output from test `{result.addresses[0]}` to `{path_prefix}`.")
+                logger.info(
+                    f"Wrote extra output from test `{result.addresses[0]}` to `{path_prefix}`."
+                )
 
     if test_subsystem.report:
         report_dir = test_subsystem.report_dir(distdir)
