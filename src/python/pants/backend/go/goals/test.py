@@ -48,7 +48,7 @@ from pants.core.target_types import FileSourceField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.fs import EMPTY_FILE_DIGEST, AddPrefix, Digest, MergeDigests
-from pants.engine.internals.native_engine import EMPTY_DIGEST
+from pants.engine.internals.native_engine import EMPTY_DIGEST, Snapshot
 from pants.engine.process import FallibleProcessResult, Process, ProcessCacheScope
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import Dependencies, DependenciesRequest, SourcesField, Target, Targets
@@ -423,6 +423,36 @@ async def prepare_go_test_binary(
     )
 
 
+_PROFILE_OPTIONS: dict[str, str] = {
+    "blockprofile": "--go-test-block-profile",
+    "coverprofile": "--test-use-coverage",
+    "cpuprofie": "--go-test-cpu-profile",
+    "memprofile": "--go-test-mem-profile",
+    "mutexprofile": "--go-test-mutex-profile",
+    "trace": "--go-test-trace",
+}
+
+
+def _ensure_no_profile_options(args: Sequence[str]) -> None:
+    for arg in args:
+        # Non-arguments stop option processing.
+        if arg[0] != "-":
+            break
+
+        # Stop processing since "-" is a non-argument and "--" is terminator.
+        if arg == "-" or arg == "--":
+            break
+
+        for go_name, pants_name in _PROFILE_OPTIONS.items():
+            if arg == f"-test.{go_name}" or arg.startswith(f"-test.{go_name}="):
+                raise ValueError(
+                    f"The `[go-test].args` option contains the Go test option `-{go_name}`. "
+                    "This is not supported because Pants needs to manage that option in order to know to "
+                    "extract the applicable output file from the execution sandbox. "
+                    f"Please use the Pants `{pants_name}` option instead."
+                )
+
+
 @rule(desc="Test with Go", level=LogLevel.DEBUG)
 async def run_go_tests(
     batch: GoTestRequest.Batch[GoTestFieldSet, Any],
@@ -501,31 +531,59 @@ async def run_go_tests(
         ProcessCacheScope.PER_SESSION if test_subsystem.force else ProcessCacheScope.SUCCESSFUL
     )
 
-    maybe_cover_args = []
-    maybe_cover_output_file = []
-    if test_subsystem.use_coverage:
-        maybe_cover_args = ["-test.coverprofile=cover.out"]
-        maybe_cover_output_file = ["cover.out"]
+    test_flags = transform_test_args(
+        go_test_subsystem.args,
+        field_set.timeout.calculate_from_global_options(test_subsystem),
+    )
 
-    test_run_args = [
-        test_binary.test_binary_path,
-        *transform_test_args(
-            go_test_subsystem.args,
-            field_set.timeout.calculate_from_global_options(test_subsystem),
-        ),
-        *maybe_cover_args,
-    ]
+    _ensure_no_profile_options(test_flags)
+
+    output_files = []
+    maybe_profile_args = []
+    output_test_binary = go_test_subsystem.output_test_binary
+
+    if test_subsystem.use_coverage:
+        maybe_profile_args.append("-test.coverprofile=cover.out")
+        output_files.append("cover.out")
+
+    if go_test_subsystem.block_profile:
+        maybe_profile_args.append("-test.blockprofile=block.out")
+        output_files.append("block.out")
+        output_test_binary = True
+
+    if go_test_subsystem.cpu_profile:
+        maybe_profile_args.append("-test.cpuprofile=cpu.out")
+        output_files.append("cpu.out")
+        output_test_binary = True
+
+    if go_test_subsystem.mem_profile:
+        maybe_profile_args.append("-test.memprofile=mem.out")
+        output_files.append("mem.out")
+        output_test_binary = True
+
+    if go_test_subsystem.mutex_profile:
+        maybe_profile_args.append("-test.mutexprofile=mutex.out")
+        output_files.append("mutex.out")
+        output_test_binary = True
+
+    if go_test_subsystem.trace:
+        maybe_profile_args.append("-test.trace=trace.out")
+        output_files.append("trace.out")
 
     result = await Get(
         FallibleProcessResult,
         Process(
-            argv=test_run_args,
+            argv=(
+                test_binary.test_binary_path,
+                *test_flags,
+                *maybe_profile_args,
+            ),
             env=extra_env,
             input_digest=test_input_digest,
             description=f"Run Go tests: {field_set.address}",
             cache_scope=cache_scope,
             working_directory=working_dir,
-            output_files=maybe_cover_output_file,
+            output_files=output_files,
             level=LogLevel.DEBUG,
         ),
     )
@@ -540,11 +598,23 @@ async def run_go_tests(
             pkg_target_address=field_set.address,
         )
 
+    output_files = [x for x in output_files if x != "cover.out"]
+    extra_output: Snapshot | None = None
+    if output_files or output_test_binary:
+        output_digest = result.output_digest
+        if output_test_binary:
+            output_digest = await Get(
+                Digest, MergeDigests([output_digest, test_binary.test_binary_digest])
+            )
+        extra_output = await Get(Snapshot, Digest, output_digest)
+
     return TestResult.from_fallible_process_result(
         process_result=result,
         address=field_set.address,
         output_setting=test_subsystem.output,
         coverage_data=coverage_data,
+        extra_output=extra_output,
+        log_extra_output=True,
     )
 
 
