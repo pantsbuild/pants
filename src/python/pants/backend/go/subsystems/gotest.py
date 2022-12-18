@@ -229,7 +229,7 @@ class GoTestSubsystem(Subsystem):
             """
             Write the test binary to the test extra output directory.
 
-            This is similar to the `go test -c` option.
+            This is similar to the `go test -c` option, but will still run the underlying test.
             """
         ),
         advanced=True,
