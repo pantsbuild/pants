@@ -207,7 +207,7 @@ class GoTestSubsystem(Subsystem):
         help=softwrap(
             """
             Capture a mutex contention profile from the execution of the test runner when all tests are
-            complete. The profile will be written to the file `mem.out` in the test extra output directory.
+            complete. The profile will be written to the file `mutex.out` in the test extra output directory.
             The test binary will also be written to the test extra output directory.
             """
         ),
