@@ -118,6 +118,7 @@ class DistBuildRequest:
     input: Digest
     working_directory: str  # Relpath within the input digest.
     build_time_source_roots: tuple[str, ...]  # Source roots for 1st party build-time deps.
+    output_path: str  # Location of the output file within dist/
 
     target_address_spec: str | None = None  # Only needed for logging etc.
     wheel_config_settings: FrozenDict[str, tuple[str, ...]] | None = None
@@ -203,7 +204,7 @@ async def run_pep517_build(request: DistBuildRequest, python_setup: PythonSetup)
         ),
     )
 
-    dist_dir = "dist"
+    dist_dir = os.path.join("dist", request.output_path)
     backend_shim_name = "backend_shim.py"
     backend_shim_path = os.path.join(request.working_directory, backend_shim_name)
     backend_shim_digest = await Get(

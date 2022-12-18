@@ -1379,6 +1379,21 @@ class PythonDistributionEntryPointsField(NestedDictStringToStringField, AsyncFie
     )
 
 
+class PythonDistributionOutputPathField(StringField, AsyncFieldMixin):
+    help = softwrap(
+        """
+        The path to the output distribution, relative the dist directtory.
+
+        If undefined, this default to the empty path, i.e. the output goes at the top
+        level of dist/
+        """
+    )
+    alias = "output_path"
+
+    def value_or_default(self) -> str:
+        return self.value or ""
+
+
 @dataclass(frozen=True)
 class PythonDistributionEntryPoint:
     """Note that this stores if the entry point comes from an address to a `pex_binary` target."""
@@ -1551,6 +1566,7 @@ class PythonDistribution(Target):
         SDistConfigSettingsField,
         BuildBackendEnvVarsField,
         LongDescriptionPathField,
+        PythonDistributionOutputPathField,
     )
     help = softwrap(
         f"""
