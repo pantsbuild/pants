@@ -13,7 +13,7 @@ from pants.core.util_rules.system_binaries import UnzipBinary
 from pants.core.util_rules.system_binaries import rules as system_binaries_rules
 from pants.engine.addresses import Addresses
 from pants.engine.internals.native_engine import Digest, MergeDigests, Snapshot
-from pants.engine.process import Process, ProcessResult
+from pants.engine.process import FallibleProcessResult, Process, ProcessResult
 from pants.engine.rules import Get, collect_rules, rule, rule_helper
 from pants.engine.target import CoarsenedTargets
 from pants.jvm.classpath import Classpath
@@ -90,13 +90,17 @@ async def _find_main_by_manifest(
     # JAR with a valid `Main-Class` in the manifest, we need to peek inside the manifest and
     # extract `main` ourself.
     manifest = await Get(
-        ProcessResult,
+        FallibleProcessResult,
         Process(
             description="Get manifest destails from classpath",
             argv=(unzip.path, "-p", jarfile, "META-INF/MANIFEST.MF"),
             input_digest=input_digest,
         ),
     )
+
+    if manifest.exit_code == 11:
+        # No manifest file present (occurs with e.g. first-party Java sources)
+        return None
 
     main_class_lines = [
         r.strip()
