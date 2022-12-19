@@ -62,16 +62,6 @@ class LockfileContent:
 
 
 @dataclass(frozen=True)
-class ToolDefaultLockfile(LockfileContent):
-    pass
-
-
-@dataclass(frozen=True)
-class ToolCustomLockfile(Lockfile):
-    pass
-
-
-@dataclass(frozen=True)
 class LoadedLockfile:
     """A lockfile after loading and header stripping.
 
