@@ -146,6 +146,5 @@ def rules():
     return [
         *collect_rules(),
         *jvm_target_types.rules(),
-        *JavaFieldSet.rules(),
-        *JavaFieldSet.run_request_rules(),
+        *JavaFieldSet.jvm_rules(),
     ]

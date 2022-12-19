@@ -6,7 +6,7 @@ from __future__ import annotations
 import dataclasses
 from abc import ABC, ABCMeta, abstractmethod
 from dataclasses import dataclass
-from typing import ClassVar, Iterable, Optional, Tuple, Type
+from typing import ClassVar, Iterable, Optional, Tuple, Type, Union
 
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.core.goals.generate_lockfiles import UnrecognizedResolveNamesError
@@ -103,12 +103,15 @@ class JvmRunnableSourceFieldSet(RunFieldSet):
     jdk_version: JvmJdkField
 
     @classmethod
-    def run_request_rules(cls) -> Iterable[Rule]:
-        yield from jvm_source_run_request_rule(cls)
+    def jvm_rules(cls) -> Iterable[Union[Rule, UnionRule]]:
+        yield from _jvm_source_run_request_rule(cls)
+        yield from cls.rules()
 
 
 @dataclass(frozen=True)
 class GenericJvmRunRequest:
+    """Allows the use of a generic rule to return a `RunRequest` based on the field set."""
+
     field_set: JvmRunnableSourceFieldSet
 
 
@@ -746,7 +749,7 @@ def jvm_resolve_field_default_factory(
 
 
 @memoized
-def jvm_source_run_request_rule(cls: type[JvmRunnableSourceFieldSet]) -> Iterable[Rule]:
+def _jvm_source_run_request_rule(cls: type[JvmRunnableSourceFieldSet]) -> Iterable[Rule]:
     from pants.jvm.run import rules as run_rules
 
     @rule(_param_type_overrides={"request": cls}, level=LogLevel.DEBUG)
@@ -760,8 +763,7 @@ def rules():
     return [
         *collect_rules(),
         UnionRule(FieldDefaultFactoryRequest, JvmResolveFieldDefaultFactoryRequest),
-        *JvmArtifactFieldSet.rules(),
-        *JvmArtifactFieldSet.run_request_rules(),
+        *JvmArtifactFieldSet.jvm_rules(),
     ]
 
 

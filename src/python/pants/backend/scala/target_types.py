@@ -360,7 +360,6 @@ def rules():
     return (
         *collect_rules(),
         *jvm_target_types.rules(),
-        *ScalaFieldSet.rules(),
-        *ScalaFieldSet.run_request_rules(),
+        *ScalaFieldSet.jvm_rules(),
         UnionRule(TargetFilesGeneratorSettingsRequest, ScalaSettingsRequest),
     )

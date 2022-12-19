@@ -5,7 +5,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from pants.engine.rules import collect_rules
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     AsyncFieldMixin,
@@ -234,7 +233,5 @@ class KotlincPluginTarget(Target):
 
 def rules():
     return [
-        *KotlinFieldSet.rules(),
-        *KotlinFieldSet.run_request_rules(),
-        *collect_rules(),
+        *KotlinFieldSet.jvm_rules(),
     ]
