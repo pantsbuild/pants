@@ -67,29 +67,6 @@ python_tests(
 )
 ```
 
-> 📘 Tip: Using the `pytest-xdist` plugin
->
-> Pants' default concurrency will run each test target in parallel. If you want to additionally parallelize _within_  each of your targets, you can do so by enabling built-in support for the `pytest-xdist` plugin:
->
-> ```toml pants.toml
-> [pytest]
-> xdist_enabled = True
-> ```
->
-> This will cause Pants to pass `-n <concurrency>` when running `pytest`.
->
-> By default, Pants will automatically compute the value of `<concurrency>` for each target based on the number of tests defined in the file and the number of available worker threads. You can instead set a hard-coded upper limit on the concurrency per target:
->
-> ```python BUILD
-> python_test(name="tests", source="tests.py", xdist_concurrency=4)
-> ```
->
-> To explicitly disable the use of `pytest-xdist` for a target, set `xdist_concurrency=0`. This can be necessary for tests that are not safe to run in parallel.
->
-> When `pytest-xdist` is in use, the `PYTEST_XDIST_WORKER` and `PYTEST_XDIST_WORKER_COUNT` environment variables will be automatically set. You can use those values to avoid collisions between parallel tests (i.e. by using `PYTEST_XDIST_WORKER` as a suffix for generated database names / file paths).
->
-> Note that use of `pytest-xdist` may cause high-level `pytest` fixtures to execute more often than expected. See the `pytest-xdist` docs [here](https://pypi.org/project/pytest-xdist/#making-session-scoped-fixtures-execute-only-once) for more details, and tips on how to mitigate this.
-
 Controlling output
 ------------------
 
@@ -195,6 +172,82 @@ python_tests(
     },
 )
 ```
+
+Batching and parallelism
+------------------------
+
+By default, Pants will schedule concurrent `pytest` runs for each `python_test` target passed to the `test` goal. This approach provides parallelism with fine-grained caching, but can have drawbacks in some situations:
+
+- `package`- and `session`-scoped `pytest` fixtures will execute once per `python_test` target, instead of once per directory / once overall. This can cause significant overhead if you have many tests scoped under a time-intensive fixture (i.e. a fixture that sets up a large DB schema).
+- Tests _within_ a `python_test` file will execute sequentially. This can be slow if you have large files containing many tests.
+
+### Batching tests
+
+Running multiple `python_test`s within a single `pytest` process can sometimes improve test performance by allowing reuse of expensive high-level `pytest` fixtures. Pants allows users to opt into this behavior via the `batch_compatibility_tag` field on `python_test`, with the following rules:
+
+- If the field is not set, the `python_test` is assumed to be incompatible with all others and will run in a dedicated `pytest` process.
+- If the field is set and is different from the value on some other `python_test`, the tests are explicitly incompatible and are guaranteed to not run in the same `pytest` process.
+- If the field is set and is equal to the value on some other `python_test`, the tests are explicitly compatible and _may_ run in the same `pytest` process.
+
+Compatible tests _may not_ end up in the same `pytest` batch if:
+
+- There are "too many" tests with the same `batch_compatibility_tag`, as determined by the `[test].batch_size` setting.
+- Compatible tess have some incompatibility in Pants metadata (i.e. different `resolve` or `extra_env_vars`).
+
+Compatible tests that _do_ end up in the same batch will run in a single `pytest` invocation. By default the tests will run sequentially, but they can be parallelized by enabling `pytest-xdist` (see below). A single success/failure result will be reported for the entire batch, and additional output files (i.e. XML results and coverage) will encapsulate all of the included `python_test`s.
+
+> 📘 Tip: finding failed tests in large batches
+>
+> It can sometimes be difficult to locate test failures in the logging output of a large `pytest` batch. You can pass the `-r` flag to `pytest` to make this investigation easier:
+>
+> ```bash
+> ❯ ./pants test :: -- -r
+> ```
+>
+> This will cause `pytest` to print a "summary report" at the end of its output, including the names of all failed tests. See the `pytest` docs [here](https://docs.pytest.org/en/6.2.x/usage.html#detailed-summary-report) for more information.
+
+The high-level `pytest` fixtures that motivate batched testing are often defined in a `conftest.py` near the root of your repository, applying to every test in a directory tree. In these cases, you can mark all the tests in the directory tree as compatible using the [`__defaults__` builtin](doc:targets#field-default-values):
+
+```python BUILD
+python_test_utils()
+
+__defaults__({(python_test, python_tests): dict(batch_compatibility_tag="your-tag-here"),})
+```
+
+> 🚧 Caching batched tests
+>
+> Batched test results are cached together by Pants, meaning that if any file in the batch changes (or if a file is added to / removed from the batch) then the entire batch will be invalidated and need to re-run. Depending on the time it takes to execute your fixtures and the number of tests sharing those fixtures, you may see better performance overall by _not_ marking tests as batch-compatible, improving your cache-hit rate to skip running tests more often.
+
+### Parallelism via `pytest-xdist`
+
+Pants includes built-in support for `pytest-xdist`, which can be enabled by setting:
+
+```toml pants.toml
+[pytest]
+xdist_enabled = True
+```
+
+This will cause Pants to pass `-n <concurrency>` when running `pytest`. When this is set, `pytest` will parallelize the tests _within_ your `python_test` file, instead of running them sequentially. If multiple `python_test`s are batched into the same process, `pytest-xdist` will parallelize the tests within _all_ of the files - this can help you regain the benefits of Pants' native concurrency when running batched tests.
+
+By default, Pants will automatically compute the value of `<concurrency>` for each target based on the number of tests defined in the file and the number of available worker threads. You can instead set a hard-coded upper limit on the concurrency per target:
+
+```python BUILD
+python_test(name="tests", source="tests.py", xdist_concurrency=4)
+```
+
+To explicitly disable the use of `pytest-xdist` for a target, set `xdist_concurrency=0`. This can be necessary for tests that are not safe to run in parallel.
+
+> 🚧 Parallelism in multiple concurrent processes
+>
+> Pants will limit the total number of parallel tests running across _all_ scheduled processes so that it does not exceed the configured value of `[GLOBAL].process_execution_local_parallelism` (by default, the number of CPUs available on the machine running Pants). For example, if your machine has 8 CPUs and Pants schedules 8 concurrent `pytest` processes with `pytest-xdist` enabled, it will pass `-n 1` to each process so that the total concurrency is 8.
+>
+> It is possible to work around this behavior by marking all of your `python_test` targets as batch-compatible and setting a very large value for `[test].batch_size`. This will cause Pants to schedule fewer processes (containing more `python_test`s each) overall, allowing for larger values of `-n <concurrency>`. Note however that this approach will limit the cacheability of your tests.
+
+When `pytest-xdist` is in use, the `PYTEST_XDIST_WORKER` and `PYTEST_XDIST_WORKER_COUNT` environment variables will be automatically set. You can use those values to avoid collisions between parallel tests (i.e. by using `PYTEST_XDIST_WORKER` as a suffix for generated database names / file paths).
+
+> 🚧 `pytest-xdist` and high-level fixtures
+>
+> Use of `pytest-xdist` may cause high-level `pytest` fixtures to execute more often than expected. See the `pytest-xdist` docs [here](https://pypi.org/project/pytest-xdist/#making-session-scoped-fixtures-execute-only-once) for more details, and tips on how to mitigate this.
 
 Force reruns with `--force`
 ---------------------------
