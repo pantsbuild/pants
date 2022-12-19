@@ -6,10 +6,16 @@ from typing import Iterable
 
 from pants.core.goals.package import BuiltPackage
 from pants.core.goals.run import RunRequest
-from pants.engine.process import Process
+from pants.core.util_rules.system_binaries import UnzipBinary
+from pants.engine.addresses import Addresses
+from pants.engine.internals.native_engine import Digest, MergeDigests
+from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.target import CoarsenedTargets
+from pants.jvm.classpath import Classpath
 from pants.jvm.jdk_rules import JdkEnvironment, JdkRequest, JvmProcess
 from pants.jvm.package.deploy_jar import DeployJarFieldSet
+from pants.jvm.target_types import JvmArtifactFieldSet
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
@@ -42,6 +48,64 @@ async def create_deploy_jar_run_request(
         ),
     )
 
+    return _post_process_jvm_process(proc, jdk)
+
+
+@rule(level=LogLevel.DEBUG)
+async def create_jvm_artifact_run_request(
+    field_set: JvmArtifactFieldSet,
+    unzip: UnzipBinary,
+) -> RunRequest:
+
+    jdk = await Get(JdkEnvironment, JdkRequest, JdkRequest.from_field(field_set.jdk_version))
+
+    artifacts = await Get(CoarsenedTargets, Addresses([field_set.address]))
+    classpath = await Get(Classpath, CoarsenedTargets, artifacts)
+
+    classpath_entries = list(classpath.args(prefix="{chroot}"))
+
+    input_digest = await Get(Digest, MergeDigests(classpath.digests()))
+
+    # Assume that the first entry is the artifact specified in `Addresses`?
+
+    # jvm only allows `-cp` or `-jar` to be specified, and `-jar` takes precedence. So, we need
+    # peek inside the JAR for the thing we want to run, and extract its `Main-Class` line from the
+    # manifest.
+    manifest = await Get(
+        ProcessResult,
+        Process(
+            description="Get manifest destails from classpath",
+            argv=(unzip.path, "-p", classpath_entries[0], "META-INF/MANIFEST.MF"),
+            input_digest=input_digest,
+        ),
+    )
+
+    main_class_line = [
+        r.strip()
+        for _, is_main, r in (
+            i.partition("Main-Class:") for i in manifest.stdout.decode().splitlines()
+        )
+        if is_main
+    ]
+    assert main_class_line
+    main_class = main_class_line[0]
+
+    proc = await Get(
+        Process,
+        JvmProcess(
+            jdk=jdk,
+            classpath_entries=classpath_entries,
+            argv=(main_class,),
+            input_digest=input_digest,
+            description=f"Run {field_set.address}",
+            use_nailgun=False,
+        ),
+    )
+
+    return _post_process_jvm_process(proc, jdk)
+
+
+def _post_process_jvm_process(proc: Process, jdk: JdkEnvironment) -> RunRequest:
     # TODO(#16104) This argument re-writing code should use the native {chroot} support.
     # See also `jdk_rules.py` for other argument re-writing code.
     def prefixed(arg: str, prefixes: Iterable[str]) -> str:
@@ -76,4 +140,5 @@ def rules():
     return [
         *collect_rules(),
         *DeployJarFieldSet.rules(),
+        *JvmArtifactFieldSet.rules(),
     ]
