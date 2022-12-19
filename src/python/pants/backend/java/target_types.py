@@ -24,6 +24,7 @@ from pants.jvm.target_types import (
     JvmJdkField,
     JvmProvidesTypesField,
     JvmResolveField,
+    JvmRunnableSourceFieldSet,
 )
 
 
@@ -36,7 +37,7 @@ class JavaGeneratorSourcesField(MultipleSourcesField):
 
 
 @dataclass(frozen=True)
-class JavaFieldSet(FieldSet):
+class JavaFieldSet(JvmRunnableSourceFieldSet):
     required_fields = (JavaSourceField,)
 
     sources: JavaSourceField
@@ -145,4 +146,6 @@ def rules():
     return [
         *collect_rules(),
         *jvm_target_types.rules(),
+        *JavaFieldSet.rules(),
+        *JavaFieldSet.run_request_rules(),
     ]

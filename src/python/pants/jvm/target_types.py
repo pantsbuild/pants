@@ -11,10 +11,11 @@ from typing import ClassVar, Iterable, Optional, Tuple, Type
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.core.goals.generate_lockfiles import UnrecognizedResolveNamesError
 from pants.core.goals.package import OutputPathField
-from pants.core.goals.run import RestartableField, RunFieldSet, RunInSandboxBehavior
+from pants.core.goals.run import RestartableField, RunFieldSet, RunInSandboxBehavior, RunRequest
 from pants.core.goals.test import TestExtraEnvVarsField, TestTimeoutField
 from pants.engine.addresses import Address
-from pants.engine.rules import collect_rules, rule
+from pants.engine.internals.selectors import Get
+from pants.engine.rules import Rule, collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     AsyncFieldMixin,
@@ -34,6 +35,8 @@ from pants.engine.target import (
 from pants.engine.unions import UnionRule
 from pants.jvm.subsystems import JvmSubsystem
 from pants.util.docutil import git_url
+from pants.util.logging import LogLevel
+from pants.util.memo import memoized
 from pants.util.strutil import bullet_list, pluralize, softwrap
 
 # -----------------------------------------------------------------------------------------------
@@ -86,6 +89,27 @@ class PrefixedJvmJdkField(JvmJdkField):
 
 class PrefixedJvmResolveField(JvmResolveField):
     alias = "jvm_resolve"
+
+
+# -----------------------------------------------------------------------------------------------
+# Targets that can be called with `./pants run` or `experimental_run_in_sandbox`
+# -----------------------------------------------------------------------------------------------
+NO_MAIN_CLASS = "org.pantsbuild.meta.no.main.class"
+
+
+@dataclass(frozen=True)
+class JvmRunnableSourceFieldSet(RunFieldSet):
+    run_in_sandbox_behavior = RunInSandboxBehavior.RUN_REQUEST_HERMETIC
+    jdk_version: JvmJdkField
+
+    @classmethod
+    def run_request_rules(cls) -> Iterable[Rule]:
+        yield from jvm_source_run_request_rule(cls)
+
+
+@dataclass(frozen=True)
+class GenericJvmRunRequest:
+    field_set: JvmRunnableSourceFieldSet
 
 
 # -----------------------------------------------------------------------------------------------
@@ -259,15 +283,13 @@ class JvmArtifactResolveField(JvmResolveField):
 
 
 @dataclass(frozen=True)
-class JvmArtifactFieldSet(RunFieldSet):
-    run_in_sandbox_behavior = RunInSandboxBehavior.RUN_REQUEST_HERMETIC
+class JvmArtifactFieldSet(JvmRunnableSourceFieldSet):
 
     group: JvmArtifactGroupField
     artifact: JvmArtifactArtifactField
     version: JvmArtifactVersionField
     packages: JvmArtifactPackagesField
     url: JvmArtifactUrlField
-    jdk_version: JvmJdkField
 
     required_fields = (
         JvmArtifactGroupField,
@@ -723,10 +745,23 @@ def jvm_resolve_field_default_factory(
     return FieldDefaultFactoryResult(lambda f: f.normalized_value(jvm))
 
 
+@memoized
+def jvm_source_run_request_rule(cls: type[JvmRunnableSourceFieldSet]) -> Iterable[Rule]:
+    from pants.jvm.run import rules as run_rules
+
+    @rule(_param_type_overrides={"request": cls}, level=LogLevel.DEBUG)
+    async def jvm_source_run_request(request: JvmRunnableSourceFieldSet) -> RunRequest:
+        return await Get(RunRequest, GenericJvmRunRequest(request))
+
+    return [*run_rules(), *collect_rules(locals())]
+
+
 def rules():
     return [
         *collect_rules(),
         UnionRule(FieldDefaultFactoryRequest, JvmResolveFieldDefaultFactoryRequest),
+        *JvmArtifactFieldSet.rules(),
+        *JvmArtifactFieldSet.run_request_rules(),
     ]
 
 

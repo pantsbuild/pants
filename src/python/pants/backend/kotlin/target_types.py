@@ -26,6 +26,7 @@ from pants.jvm.target_types import (
     JvmJdkField,
     JvmProvidesTypesField,
     JvmResolveField,
+    JvmRunnableSourceFieldSet,
 )
 from pants.util.strutil import softwrap
 
@@ -56,7 +57,7 @@ class KotlincConsumedPluginIdsField(StringSequenceField):
 
 
 @dataclass(frozen=True)
-class KotlinFieldSet(FieldSet):
+class KotlinFieldSet(JvmRunnableSourceFieldSet):
     required_fields = (KotlinSourceField,)
 
     sources: KotlinSourceField
@@ -232,4 +233,8 @@ class KotlincPluginTarget(Target):
 
 
 def rules():
-    return collect_rules()
+    return [
+        *KotlinFieldSet.rules(),
+        *KotlinFieldSet.run_request_rules(),
+        *collect_rules(),
+    ]

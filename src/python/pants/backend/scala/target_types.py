@@ -34,6 +34,7 @@ from pants.jvm.target_types import (
     JvmJdkField,
     JvmProvidesTypesField,
     JvmResolveField,
+    JvmRunnableSourceFieldSet,
 )
 from pants.util.strutil import softwrap
 
@@ -82,7 +83,7 @@ class ScalaConsumedPluginNamesField(StringSequenceField):
 
 
 @dataclass(frozen=True)
-class ScalaFieldSet(FieldSet):
+class ScalaFieldSet(JvmRunnableSourceFieldSet):
     required_fields = (ScalaSourceField,)
 
     sources: ScalaSourceField
@@ -359,5 +360,7 @@ def rules():
     return (
         *collect_rules(),
         *jvm_target_types.rules(),
+        *ScalaFieldSet.rules(),
+        *ScalaFieldSet.run_request_rules(),
         UnionRule(TargetFilesGeneratorSettingsRequest, ScalaSettingsRequest),
     )

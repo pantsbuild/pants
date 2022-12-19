@@ -22,7 +22,7 @@ from pants.jvm.jdk_rules import JdkEnvironment, JdkRequest, JvmProcess
 from pants.jvm.jdk_rules import rules as jdk_rules
 from pants.jvm.package.deploy_jar import DeployJarFieldSet
 from pants.jvm.package.deploy_jar import rules as deploy_jar_rules
-from pants.jvm.target_types import JvmArtifactFieldSet
+from pants.jvm.target_types import NO_MAIN_CLASS, GenericJvmRunRequest
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
@@ -106,7 +106,11 @@ async def _find_main_by_manifest(
         if is_main
     ]
 
-    return main_class_lines[0] if main_class_lines else None
+    if not main_class_lines:
+        return None
+    if main_class_lines[0] == NO_MAIN_CLASS:
+        return None
+    return main_class_lines[0]
 
 
 @rule_helper
@@ -145,7 +149,7 @@ async def _find_main_by_javap(
     )
 
     output = class_index.stdout.decode()
-    p = re.compile(r"^public class (.*?) .*?{(.*?)}$", flags=re.MULTILINE | re.DOTALL)
+    p = re.compile(r"^public .*?class (.*?) .*?{(.*?)}$", flags=re.MULTILINE | re.DOTALL)
     classes: list[tuple[str, str]] = re.findall(p, output)
     mains = tuple(
         classname
@@ -156,11 +160,13 @@ async def _find_main_by_javap(
     return mains
 
 
-@rule(level=LogLevel.DEBUG)
-async def create_jvm_artifact_run_request(
-    field_set: JvmArtifactFieldSet,
+@rule
+async def create_run_request(
+    request: GenericJvmRunRequest,
     unzip: UnzipBinary,
 ) -> RunRequest:
+
+    field_set = request.field_set
 
     jdk = await Get(JdkEnvironment, JdkRequest, JdkRequest.from_field(field_set.jdk_version))
 
@@ -224,7 +230,6 @@ def rules():
     return [
         *collect_rules(),
         *DeployJarFieldSet.rules(),
-        *JvmArtifactFieldSet.rules(),
         *deploy_jar_rules(),
         *system_binaries_rules(),
         *jdk_rules(),
