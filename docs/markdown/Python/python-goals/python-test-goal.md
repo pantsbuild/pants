@@ -183,7 +183,7 @@ By default, Pants will schedule concurrent `pytest` runs for each `python_test` 
 
 ### Batching tests
 
-Running multiple `python_test`s within a single `pytest` process can sometimes improve test performance by allowing reuse of expensive high-level `pytest` fixtures. Pants allows users to opt into this behavior via the `batch_compatibility_tag` field on `python_test`, with the following rules:
+Running multiple test files within a single `pytest` process can sometimes improve performance by allowing reuse of expensive high-level `pytest` fixtures. Pants allows users to opt into this behavior via the `batch_compatibility_tag` field on `python_test`, with the following rules:
 
 - If the field is not set, the `python_test` is assumed to be incompatible with all others and will run in a dedicated `pytest` process.
 - If the field is set and is different from the value on some other `python_test`, the tests are explicitly incompatible and are guaranteed to not run in the same `pytest` process.
@@ -194,7 +194,7 @@ Compatible tests _may not_ end up in the same `pytest` batch if:
 - There are "too many" tests with the same `batch_compatibility_tag`, as determined by the `[test].batch_size` setting.
 - Compatible tess have some incompatibility in Pants metadata (i.e. different `resolve` or `extra_env_vars`).
 
-Compatible tests that _do_ end up in the same batch will run in a single `pytest` invocation. By default the tests will run sequentially, but they can be parallelized by enabling `pytest-xdist` (see below). A single success/failure result will be reported for the entire batch, and additional output files (i.e. XML results and coverage) will encapsulate all of the included `python_test`s.
+Compatible tests that _do_ end up in the same batch will run in a single `pytest` invocation. By default the tests will run sequentially, but they can be parallelized by enabling `pytest-xdist` (see below). A single success/failure result will be reported for the entire batch, and additional output files (i.e. XML results and coverage) will encapsulate all of the included python test files.
 
 > 📘 Tip: finding failed tests in large batches
 >
@@ -216,7 +216,7 @@ __defaults__({(python_test, python_tests): dict(batch_compatibility_tag="your-ta
 
 > 🚧 Caching batched tests
 >
-> Batched test results are cached together by Pants, meaning that if any file in the batch changes (or if a file is added to / removed from the batch) then the entire batch will be invalidated and need to re-run. Depending on the time it takes to execute your fixtures and the number of tests sharing those fixtures, you may see better performance overall by _not_ marking tests as batch-compatible, improving your cache-hit rate to skip running tests more often.
+> Batched test results are cached together by Pants, meaning that if any file in the batch changes (or if a file is added to / removed from the batch) then the entire batch will be invalidated and need to re-run. Depending on the time it takes to execute your fixtures and the number of tests sharing those fixtures, you may see better performance overall by setting a lower value for `[test].batch_size`, improving your cache-hit rate to skip running tests more often.
 
 ### Parallelism via `pytest-xdist`
 
