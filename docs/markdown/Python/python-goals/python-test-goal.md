@@ -173,6 +173,26 @@ python_tests(
 )
 ```
 
+> 📘 Tip: avoiding collisions between concurrent `pytest` runs using env vars
+>
+> Sometimes your tests/code will need to reach outside of the sandbox, for example to initialize a test DB schema. In these cases you may see conflicts between concurrent `pytest` processes scheduled by Pants, when two or more tests try to set up / tear down the same resource concurrently. To avoid this issue, you can set `[pytest].execution_slot_var` to be a valid environment variable name. Pants will then inject a variable with that name into each `pytest` run, using the process execution slot ID (an integer) as the variable's value. You can then update your test code to check for the presence of the variable and incorporate its value into generated DB names / file paths. For example, in a project using `pytest-django` you could do:
+>
+> ```toml pants.toml
+> [pytest]
+> execution_slot_var = "PANTS_EXECUTION_SLOT"
+> ```
+> ```python src/conftest.py
+> from pytest_django.fixtures import _set_suffix_to_test_databases
+> from pytest_django.lazy_django import skip_if_no_django
+>
+> @pytest.fixture(scope="session")
+> def django_db_modify_db_settings():
+>     skip_if_no_django()
+>     if "PANTS_EXECUTION_SLOT" in os.environ:
+>         _set_suffix_to_test_databases(os.environ["PANTS_EXECUTION_SLOT"])
+> ```
+
+
 Batching and parallelism
 ------------------------
 
@@ -243,7 +263,7 @@ To explicitly disable the use of `pytest-xdist` for a target, set `xdist_concurr
 >
 > It is possible to work around this behavior by marking all of your `python_test` targets as batch-compatible and setting a very large value for `[test].batch_size`. This will cause Pants to schedule fewer processes (containing more `python_test`s each) overall, allowing for larger values of `-n <concurrency>`. Note however that this approach will limit the cacheability of your tests.
 
-When `pytest-xdist` is in use, the `PYTEST_XDIST_WORKER` and `PYTEST_XDIST_WORKER_COUNT` environment variables will be automatically set. You can use those values to avoid collisions between parallel tests (i.e. by using `PYTEST_XDIST_WORKER` as a suffix for generated database names / file paths).
+When `pytest-xdist` is in use, the `PYTEST_XDIST_WORKER` and `PYTEST_XDIST_WORKER_COUNT` environment variables will be automatically set. You can use those values (in addition to `[pytest].execution_slot_var`) to avoid collisions between parallel tests (i.e. by using the combination of `[pytest].execution_slot_var` and `PYTEST_XDIST_WORKER` as a suffix for generated database names / file paths).
 
 > 🚧 `pytest-xdist` and high-level fixtures
 >
