@@ -176,7 +176,7 @@ python_tests(
 Batching and parallelism
 ------------------------
 
-By default, Pants will schedule concurrent `pytest` runs for each `python_test` target passed to the `test` goal. This approach provides parallelism with fine-grained caching, but can have drawbacks in some situations:
+By default, Pants will schedule concurrent `pytest` runs for each python test file passed to the `test` goal. This approach provides parallelism with fine-grained caching, but can have drawbacks in some situations:
 
 - `package`- and `session`-scoped `pytest` fixtures will execute once per `python_test` target, instead of once per directory / once overall. This can cause significant overhead if you have many tests scoped under a time-intensive fixture (i.e. a fixture that sets up a large DB schema).
 - Tests _within_ a `python_test` file will execute sequentially. This can be slow if you have large files containing many tests.
