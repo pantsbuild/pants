@@ -97,10 +97,26 @@ class PrefixedJvmResolveField(JvmResolveField):
 NO_MAIN_CLASS = "org.pantsbuild.meta.no.main.class"
 
 
+class JvmMainClassNameField(StringField):
+    alias = "main"
+    required = False
+    default = None
+    help = softwrap(
+        """
+        `.`-separated name of the JVM class containing the `main()` method to be called when
+        executing this target. If not supplied, this will be calculated automatically, either by
+        inspecting the existing manifest (for 3rd-party JARs), or by inspecting the classes inside
+        the JAR, looking for a valid `main` method.  If a value cannot be calculated automatically,
+        you must supply a value for `run` to succeed.
+        """
+    )
+
+
 @dataclass(frozen=True)
 class JvmRunnableSourceFieldSet(RunFieldSet):
     run_in_sandbox_behavior = RunInSandboxBehavior.RUN_REQUEST_HERMETIC
     jdk_version: JvmJdkField
+    main_class: JvmMainClassNameField
 
     @classmethod
     def jvm_rules(cls) -> Iterable[Union[Rule, UnionRule]]:
@@ -312,6 +328,7 @@ class JvmArtifactTarget(Target):
         JvmArtifactResolveField,
         JvmArtifactExcludeDependenciesField,
         JvmJdkField,
+        JvmMainClassNameField,
     )
     help = softwrap(
         """
@@ -355,9 +372,9 @@ class JunitTestExtraEnvVarsField(TestExtraEnvVarsField):
 # -----------------------------------------------------------------------------------------------
 
 
-class JvmMainClassNameField(StringField):
-    alias = "main"
+class JvmRequiredMainClassNameField(JvmMainClassNameField):
     required = True
+    default = None
     help = softwrap(
         """
         `.`-separated name of the JVM class containing the `main()` method to be called when
@@ -665,7 +682,7 @@ class DeployJarTarget(Target):
         RestartableField,
         OutputPathField,
         JvmDependenciesField,
-        JvmMainClassNameField,
+        JvmRequiredMainClassNameField,
         JvmJdkField,
         JvmResolveField,
         DeployJarDuplicatePolicyField,

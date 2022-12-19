@@ -126,6 +126,47 @@ def test_java_direct() -> None:
         assert result.stdout.strip() == "Hello, World!"
 
 
+def test_java_direct_ambiguous_main() -> None:
+    sources = {
+        "src/org/pantsbuild/test/Hello.java": dedent(
+            """\
+            package org.pantsbuild.test;
+
+            public class Hello {{
+
+                public static class Misdirection {{
+                    public static void main(String[] args) {{
+                        System.out.println("This should not be printed");
+                    }}
+                }}
+
+                public static void main(String[] args) {{
+                    System.out.println("Hello, World!");
+                }}
+            }}
+            """
+        ),
+        "src/org/pantsbuild/test/BUILD": dedent(
+            """\
+            java_source(source="Hello.java", main="org.pantsbuild.test.Hello")
+            """
+        ),
+        "lockfile": EMPTY_RESOLVE,
+    }
+    with setup_tmpdir(sources) as tmpdir:
+        args = [
+            "--backend-packages=pants.backend.experimental.java",
+            f"--source-root-patterns=['{tmpdir}/src']",
+            "--pants-ignore=__pycache__",
+            f'--jvm-resolves={{"empty": "{tmpdir}/lockfile"}}',
+            "--jvm-default-resolve=empty",
+            "run",
+            f"{tmpdir}/src/org/pantsbuild/test/Hello.java",
+        ]
+        result = run_pants(args)
+        assert result.stdout.strip() == "Hello, World!"
+
+
 def test_scala_by_deploy_jar(scala_stdlib_jvm_lockfile: JVMLockfileFixture) -> None:
     sources = {
         "src/org/pantsbuild/test/Hello.scala": dedent(

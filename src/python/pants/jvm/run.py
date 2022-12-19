@@ -182,7 +182,9 @@ async def create_run_request(
     input_digest = await Get(Digest, MergeDigests(classpath.digests()))
 
     # Assume that the first entry in `classpath_entries` is the artifact specified in `Addresses`?
-    main_class = await _find_main(unzip, jdk, input_digest, classpath_entries[0])
+    main_class = field_set.main_class.value
+    if main_class is None:
+        main_class = await _find_main(unzip, jdk, input_digest, classpath_entries[0])
 
     proc = await Get(
         Process,

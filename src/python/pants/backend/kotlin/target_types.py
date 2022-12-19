@@ -23,6 +23,7 @@ from pants.jvm.target_types import (
     JunitTestSourceField,
     JunitTestTimeoutField,
     JvmJdkField,
+    JvmMainClassNameField,
     JvmProvidesTypesField,
     JvmResolveField,
     JvmRunnableSourceFieldSet,
@@ -88,6 +89,7 @@ class KotlinSourceTarget(Target):
         JvmResolveField,
         JvmProvidesTypesField,
         JvmJdkField,
+        JvmMainClassNameField,
     )
     help = "A single Kotlin source file containing application or library code."
 
@@ -113,6 +115,7 @@ class KotlinSourcesGeneratorTarget(TargetFilesGenerator):
         JvmResolveField,
         JvmJdkField,
         JvmProvidesTypesField,
+        JvmMainClassNameField,
     )
     help = "Generate a `kotlin_source` target for each file in the `sources` field."
 

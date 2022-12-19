@@ -32,6 +32,7 @@ from pants.jvm.target_types import (
     JunitTestSourceField,
     JunitTestTimeoutField,
     JvmJdkField,
+    JvmMainClassNameField,
     JvmProvidesTypesField,
     JvmResolveField,
     JvmRunnableSourceFieldSet,
@@ -259,6 +260,7 @@ class ScalaSourceTarget(Target):
         JvmResolveField,
         JvmProvidesTypesField,
         JvmJdkField,
+        JvmMainClassNameField,
     )
     help = "A single Scala source file containing application or library code."
 
@@ -306,6 +308,7 @@ class ScalaSourcesGeneratorTarget(TargetFilesGenerator):
         ScalaConsumedPluginNamesField,
         JvmResolveField,
         JvmJdkField,
+        JvmMainClassNameField,
         JvmProvidesTypesField,
     )
     settings_request_cls = ScalaSettingsRequest

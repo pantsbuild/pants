@@ -22,6 +22,7 @@ from pants.jvm.target_types import (
     JunitTestTimeoutField,
     JvmDependenciesField,
     JvmJdkField,
+    JvmMainClassNameField,
     JvmProvidesTypesField,
     JvmResolveField,
     JvmRunnableSourceFieldSet,
@@ -112,6 +113,7 @@ class JavaSourceTarget(Target):
         JvmDependenciesField,
         JavaSourceField,
         JvmResolveField,
+        JvmMainClassNameField,
         JvmProvidesTypesField,
         JvmJdkField,
     )
@@ -137,6 +139,7 @@ class JavaSourcesGeneratorTarget(TargetFilesGenerator):
         JvmDependenciesField,
         JvmResolveField,
         JvmJdkField,
+        JvmMainClassNameField,
         JvmProvidesTypesField,
     )
     help = "Generate a `java_source` target for each file in the `sources` field."

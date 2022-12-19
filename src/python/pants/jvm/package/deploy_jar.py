@@ -50,6 +50,7 @@ class DeployJarFieldSet(PackageFieldSet, RunFieldSet):
         JvmMainClassNameField,
         JvmJdkField,
         Dependencies,
+        OutputPathField,
     )
     run_in_sandbox_behavior = RunInSandboxBehavior.RUN_REQUEST_HERMETIC
 
