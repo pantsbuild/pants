@@ -16,8 +16,6 @@ from pants.backend.python.util_rules.pex_requirements import (
     Lockfile,
     ResolvePexConfig,
     ResolvePexConstraintsFile,
-    ToolCustomLockfile,
-    ToolDefaultLockfile,
     _pex_lockfile_requirement_count,
     _strip_comments_from_pex_json_lockfile,
     get_metadata,
@@ -29,7 +27,6 @@ from pants.core.util_rules.lockfile_metadata import (
     END_LOCKFILE_HEADER,
     InvalidLockfileError,
 )
-from pants.engine.fs import FileContent
 from pants.engine.internals.native_engine import EMPTY_DIGEST
 from pants.testutil.option_util import create_subsystem
 from pants.util.ordered_set import FrozenOrderedSet
@@ -42,22 +39,6 @@ METADATA = PythonLockfileMetadataV3(
     only_binary={"bdist"},
     no_binary={"sdist"},
 )
-
-
-def create_tool_lock(
-    *,
-    default_lock: bool = False,
-) -> ToolDefaultLockfile | ToolCustomLockfile:
-    common_kwargs = dict(
-        resolve_name="my_tool",
-    )
-    return (
-        ToolDefaultLockfile(file_content=FileContent("", b""), **common_kwargs)
-        if default_lock
-        else ToolCustomLockfile(
-            file_path="lock.txt", file_path_description_of_origin="", **common_kwargs
-        )
-    )
 
 
 def create_python_setup(
@@ -124,100 +105,6 @@ def test_get_metadata() -> None:
 
 
 @pytest.mark.parametrize(
-    "is_default_lock,invalid_reqs,invalid_interpreter_constraints,invalid_constraints_file,"
-    + "invalid_only_binary,invalid_no_binary",
-    [
-        (
-            is_default_lock,
-            invalid_reqs,
-            invalid_interpreter_constraints,
-            invalid_constraints_file,
-            invalid_only_binary,
-            invalid_no_binary,
-        )
-        for is_default_lock in (True, False)
-        for invalid_reqs in (True, False)
-        for invalid_interpreter_constraints in (True, False)
-        for invalid_constraints_file in (True, False)
-        for invalid_only_binary in (True, False)
-        for invalid_no_binary in (True, False)
-        if (invalid_reqs or invalid_interpreter_constraints or invalid_constraints_file)
-    ],
-)
-def test_validate_tool_lockfiles(
-    is_default_lock: bool,
-    invalid_reqs: bool,
-    invalid_interpreter_constraints: bool,
-    invalid_constraints_file: bool,
-    invalid_only_binary: bool,
-    invalid_no_binary: bool,
-    caplog,
-) -> None:
-    runtime_interpreter_constraints = (
-        InterpreterConstraints(["==2.7.*"])
-        if invalid_interpreter_constraints
-        else METADATA.valid_for_interpreter_constraints
-    )
-    req_strings = ["bad-req"] if invalid_reqs else [str(r) for r in METADATA.requirements]
-    requirements = create_tool_lock(
-        default_lock=is_default_lock,
-    )
-    validate_metadata(
-        METADATA,
-        runtime_interpreter_constraints,
-        requirements,
-        req_strings,
-        create_python_setup(InvalidLockfileBehavior.warn),
-        ResolvePexConfig(
-            indexes=("index",),
-            find_links=("find-links",),
-            manylinux=None,
-            constraints_file=ResolvePexConstraintsFile(
-                EMPTY_DIGEST,
-                "c.txt",
-                FrozenOrderedSet(
-                    {PipRequirement.parse("xyz" if invalid_constraints_file else "abc")}
-                ),
-            ),
-            no_binary=FrozenOrderedSet(["not-sdist" if invalid_no_binary else "sdist"]),
-            only_binary=FrozenOrderedSet(["not-bdist" if invalid_only_binary else "bdist"]),
-            path_mappings=(),
-        ),
-    )
-
-    def contains(msg: str, if_: bool) -> None:
-        assert (msg in caplog.text) is if_
-
-    contains("You are using the `<default>` lockfile provided by Pants", if_=is_default_lock)
-    contains("You are using the lockfile at lock.txt", if_=not is_default_lock)
-
-    contains("You have set different requirements", if_=invalid_reqs)
-    contains("In the input requirements, but not in the lockfile: ['bad-req']", if_=invalid_reqs)
-    contains(
-        "In the lockfile, but not in the input requirements: ['ansicolors', 'requests']",
-        if_=invalid_reqs,
-    )
-    contains(".source_plugins` (if applicable)", if_=invalid_reqs)
-
-    contains("You have set interpreter constraints", if_=invalid_interpreter_constraints)
-    contains(
-        ".interpreter_constraints` (if applicable), or by generating a new custom lockfile.",
-        if_=invalid_interpreter_constraints,
-    )
-
-    contains("The constraints file at c.txt has changed", if_=invalid_constraints_file)
-    contains("The `only_binary` arguments have changed", if_=invalid_only_binary)
-    contains("The `no_binary` arguments have changed", if_=invalid_no_binary)
-
-    contains(
-        "To generate a custom lockfile based on your current configuration", if_=is_default_lock
-    )
-    contains(
-        "To regenerate your lockfile based on your current configuration", if_=not is_default_lock
-    )
-
-
-@pytest.mark.parametrize(
     (
         "invalid_reqs,invalid_interpreter_constraints,invalid_constraints_file,invalid_only_binary,"
         + "invalid_no_binary,invalid_manylinux"
@@ -247,7 +134,7 @@ def test_validate_tool_lockfiles(
         )
     ],
 )
-def test_validate_user_lockfiles(
+def test_validate_lockfiles(
     invalid_reqs: bool,
     invalid_interpreter_constraints: bool,
     invalid_constraints_file: bool,
@@ -296,13 +183,17 @@ def test_validate_user_lockfiles(
     def contains(msg: str, if_: bool = True) -> None:
         assert (msg in caplog.text) is if_
 
-    contains("You are using the lockfile at lock.txt to install the resolve `a`")
+    contains("You are using the `a` lockfile at lock.txt with incompatible inputs")
     contains(
-        "The targets depend on requirements that are not in the lockfile: ['bad-req']",
+        "The lockfile does not provide all the necessary requirements",
+        if_=invalid_reqs,
+    )
+    contains(
+        "The requirements not provided by the `a` resolve are: ['bad-req']",
         if_=invalid_reqs,
     )
 
-    contains("The targets use interpreter constraints", if_=invalid_interpreter_constraints)
+    contains("The inputs use interpreter constraints", if_=invalid_interpreter_constraints)
 
     contains("The constraints file at c.txt has changed", if_=invalid_constraints_file)
     contains("The `only_binary` arguments have changed", if_=invalid_only_binary)
