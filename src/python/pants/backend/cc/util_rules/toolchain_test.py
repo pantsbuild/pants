@@ -68,6 +68,7 @@ def test_system_toolchain(rule_runner: RuleRunner) -> None:
     assert "-std=c++20" in cpp_toolchain.compile_flags
     assert "UNIT_TESTING" in cpp_toolchain.compile_defines
 
+
 @pytest.mark.skip(reason="This is a multi-gig file - skip until smaller alternatives can be found")
 def test_downloaded_toolchain(rule_runner: RuleRunner) -> None:
     rule_runner.set_options(
