@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import Enum
 
 from pants.engine.rules import collect_rules
 from pants.engine.target import (
@@ -17,7 +18,24 @@ from pants.engine.target import (
     generate_multiple_sources_field_help_message,
 )
 
-CC_FILE_EXTENSIONS = (".c", ".h", ".cc", ".cpp", ".hpp")
+# Using the extensions referenced in C++ Core Guidelines FAQ
+# https://isocpp.org/wiki/faq/coding-standards#hdr-file-ext
+# https://isocpp.org/wiki/faq/coding-standards#src-file-ext
+# NB: CMake uses these as the default C++ extensions: "C;M;c++;cc;cpp;cxx;mm;mpp;CPP;ixx;cppm"
+CC_HEADER_FILE_EXTENSIONS = (
+    ".h",
+    ".hh",
+    ".hpp",
+)
+C_SOURCE_FILE_EXTENSIONS = (".c",)
+CPP_SOURCE_FILE_EXTENSIONS = (".cc", ".cpp", ".cxx")
+CC_SOURCE_FILE_EXTENSIONS = C_SOURCE_FILE_EXTENSIONS + CPP_SOURCE_FILE_EXTENSIONS
+CC_FILE_EXTENSIONS = CC_HEADER_FILE_EXTENSIONS + CC_SOURCE_FILE_EXTENSIONS
+
+
+class CCLanguage(Enum):
+    C = "c"
+    CPP = "c++"
 
 
 class CCDependenciesField(Dependencies):
