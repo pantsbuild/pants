@@ -40,7 +40,6 @@ from pants.core.goals.test import (
     build_runtime_package_dependencies,
     get_filtered_environment,
 )
-from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
 from pants.core.util_rules import config_files, distdir
 from pants.core.util_rules.partitions import Partitions
 from pants.engine.addresses import Address
@@ -49,6 +48,7 @@ from pants.engine.process import InteractiveProcessResult
 from pants.engine.rules import Get, rule
 from pants.engine.target import Target
 from pants.engine.unions import UnionRule
+from pants.testutil.debug_adapter_util import debugadapter_port_for_testing
 from pants.testutil.python_interpreter_selection import (
     all_major_minor_python_versions,
     skip_unless_python27_and_python3_present,
@@ -109,7 +109,7 @@ def _configure_pytest_runner(
     args = [
         "--backend-packages=pants.backend.python",
         f"--source-root-patterns={SOURCE_ROOT}",
-        f"--debug-adapter-port={DebugAdapterSubsystem.port_for_testing()}",
+        f"--debug-adapter-port={debugadapter_port_for_testing()}",
         *(extra_args or ()),
     ]
     rule_runner.set_options(args, env=env, env_inherit={"PATH", "PYENV_ROOT", "HOME"})
