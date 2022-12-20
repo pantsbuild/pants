@@ -7,14 +7,18 @@ from typing import Iterable
 from pants.core.goals.package import BuiltPackage
 from pants.core.goals.run import RunRequest
 from pants.core.util_rules.system_binaries import UnzipBinary
+from pants.core.util_rules.system_binaries import rules as system_binaries_rules
 from pants.engine.addresses import Addresses
 from pants.engine.internals.native_engine import Digest, MergeDigests
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import CoarsenedTargets
 from pants.jvm.classpath import Classpath
+from pants.jvm.classpath import rules as classpath_rules
 from pants.jvm.jdk_rules import JdkEnvironment, JdkRequest, JvmProcess
+from pants.jvm.jdk_rules import rules as jdk_rules
 from pants.jvm.package.deploy_jar import DeployJarFieldSet
+from pants.jvm.package.deploy_jar import rules as deploy_jar_rules
 from pants.jvm.target_types import JvmArtifactFieldSet
 from pants.util.logging import LogLevel
 
@@ -141,4 +145,8 @@ def rules():
         *collect_rules(),
         *DeployJarFieldSet.rules(),
         *JvmArtifactFieldSet.rules(),
+        *deploy_jar_rules(),
+        *system_binaries_rules(),
+        *jdk_rules(),
+        *classpath_rules(),
     ]
