@@ -43,28 +43,28 @@ class CCToolchain:
     """A C/C++ toolchain."""
 
     compiler: str
-    compile_flags: tuple[str, ...] = ()
-    compile_defines: tuple[str, ...] = ()
-    link_flags: tuple[str, ...] = ()
+    compiler_flags: tuple[str, ...] = ()
+    compiler_definitions: tuple[str, ...] = ()
+    linker_flags: tuple[str, ...] = ()
     digest: Digest = EMPTY_DIGEST
 
     def __post_init__(self):
         # TODO: Should this error out to notify the user of a mistake? Or silently handle
         # Or just ensure all defines have -D right now?
-        if self.compile_defines:
-            sanitized_defines = [define.lstrip("-D") for define in self.compile_defines]
-            object.__setattr__(self, "compile_defines", tuple(sanitized_defines))
+        if self.compiler_definitions:
+            sanitized_definitions = [define.lstrip("-D") for define in self.compiler_definitions]
+            object.__setattr__(self, "compiler_definitions", tuple(sanitized_definitions))
 
     @property
     def compile_command(self) -> tuple[str, ...]:
         """The command to compile a C/C++ source file."""
-        command = [self.compiler, *self.compile_defines, *self.compile_flags]
+        command = [self.compiler, *self.compiler_definitions, *self.compiler_flags]
         return tuple(filter(None, command))
 
     @property
     def link_command(self) -> tuple[str, ...]:
         """The command to link a C/C++ binary."""
-        command = [self.compiler, *self.link_flags]
+        command = [self.compiler, *self.linker_flags]
         return tuple(filter(None, command))
 
 
@@ -102,18 +102,18 @@ async def _setup_downloadable_toolchain(
     extracted_archive = await Get(ExtractedArchive, Digest, maybe_archive_digest)
 
     # Populate the toolchain for C or C++ accordingly
-    if request.language == CCLanguage.CPP:
+    if request.language == CCLanguage.CXX:
         return CCToolchain(
-            compiler=subsystem.cpp_executable,
-            compile_flags=tuple(subsystem.cpp_compile_options),
-            compile_defines=tuple(subsystem.cpp_defines),
+            compiler=subsystem.cxx_executable,
+            compiler_flags=tuple(subsystem.cxx_compiler_flags),
+            compiler_definitions=tuple(subsystem.cxx_definitions),
             digest=extracted_archive.digest,
         )
 
     return CCToolchain(
         compiler=subsystem.c_executable,
-        compile_flags=tuple(subsystem.c_compile_options),
-        compile_defines=tuple(subsystem.c_defines),
+        compiler_flags=tuple(subsystem.c_compiler_flags),
+        compiler_definitions=tuple(subsystem.c_definitions),
         digest=extracted_archive.digest,
     )
 
@@ -135,19 +135,19 @@ async def _setup_system_toolchain(
     search_paths = tuple(OrderedSet(raw_search_paths))
 
     # Populate the toolchain for C or C++ accordingly
-    if request.language == CCLanguage.CPP:
-        cpp_executable = await _executable_path(tuple(subsystem.cpp_executable), search_paths)
+    if request.language == CCLanguage.CXX:
+        cpp_executable = await _executable_path(tuple(subsystem.cxx_executable), search_paths)
         return CCToolchain(
             cpp_executable,
-            compile_flags=tuple(subsystem.cpp_compile_options),
-            compile_defines=tuple(subsystem.cpp_defines),
+            compiler_flags=tuple(subsystem.cxx_compiler_flags),
+            compiler_definitions=tuple(subsystem.cxx_definitions),
         )
 
     c_executable = await _executable_path(tuple(subsystem.c_executable), search_paths)
     return CCToolchain(
         c_executable,
-        compile_flags=tuple(subsystem.c_compile_options),
-        compile_defines=tuple(subsystem.c_defines),
+        compiler_flags=tuple(subsystem.c_compiler_flags),
+        compiler_definitions=tuple(subsystem.c_definitions),
     )
 
 

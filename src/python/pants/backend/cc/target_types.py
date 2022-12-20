@@ -5,8 +5,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
+from typing import Iterable
 
-from pants.engine.rules import collect_rules
+from pants.engine.rules import Rule, collect_rules
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     Dependencies,
@@ -17,6 +18,7 @@ from pants.engine.target import (
     TargetFilesGenerator,
     generate_multiple_sources_field_help_message,
 )
+from pants.engine.unions import UnionRule
 
 # Using the extensions referenced in C++ Core Guidelines FAQ
 # https://isocpp.org/wiki/faq/coding-standards#hdr-file-ext
@@ -35,7 +37,7 @@ CC_FILE_EXTENSIONS = CC_HEADER_FILE_EXTENSIONS + CC_SOURCE_FILE_EXTENSIONS
 
 class CCLanguage(Enum):
     C = "c"
-    CPP = "c++"
+    CXX = "cxx"
 
 
 class CCDependenciesField(Dependencies):
@@ -98,5 +100,5 @@ class CCSourcesGeneratorTarget(TargetFilesGenerator):
     help = "Generate a `cc_source` target for each file in the `sources` field."
 
 
-def rules():
+def rules() -> Iterable[Rule | UnionRule]:
     return collect_rules()

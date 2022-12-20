@@ -17,7 +17,17 @@ logger = logging.getLogger(__name__)
 
 
 class CCOptions:
-    c_compile_options = StrListOption(
+    include_directories = StrListOption(
+        default=[],
+        help=softwrap(
+            """
+            A list of include directories passed to the compiler. Will be prefixed by -I at the command line.
+            These flags are merged with the target-level includes, with the target-level includes taking precedence.
+            """
+        ),
+    )
+
+    c_compiler_flags = StrListOption(
         default=["-std=c11"],
         help=softwrap(
             """
@@ -27,7 +37,7 @@ class CCOptions:
         ),
     )
 
-    c_defines = StrListOption(
+    c_definitions = StrListOption(
         default=None,
         help=softwrap(
             """
@@ -37,7 +47,7 @@ class CCOptions:
         ),
     )
 
-    cpp_compile_options = StrListOption(
+    cxx_compiler_flags = StrListOption(
         default=["-std=c++11"],
         help=softwrap(
             """
@@ -47,7 +57,7 @@ class CCOptions:
         ),
     )
 
-    cpp_defines = StrListOption(
+    cxx_definitions = StrListOption(
         default=None,
         help=softwrap(
             """
@@ -73,7 +83,7 @@ class CCSubsystem(Subsystem, CCOptions):
         ),
     )
 
-    cpp_executable = StrListOption(
+    cxx_executable = StrListOption(
         default=["clang++", "g++"],
         help=softwrap(
             """
@@ -115,7 +125,7 @@ class ExternalCCSubsystem(TemplatedExternalTool, CCOptions):
         ),
     )
 
-    cpp_executable = StrOption(
+    cxx_executable = StrOption(
         default="",
         help=softwrap(
             """
