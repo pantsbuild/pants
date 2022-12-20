@@ -2,6 +2,11 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from pants.backend.scala.dependency_inference.symbol_mapper import AllScalaTargets
 from pants.backend.scala.subsystems.scala import ScalaSubsystem
+from pants.backend.scala.util_rules.versions import (
+    ScalaArtifactsForVersionRequest,
+    ScalaArtifactsForVersionResult,
+)
+from pants.engine.internals.selectors import Get
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.jvm.goals.lockfile import (
@@ -35,7 +40,7 @@ class ConflictingScalaLibraryVersionInResolveError(ValueError):
 
 
 class MissingScalaLibraryInResolveError(ValueError):
-    def __init__(self, resolve_name: str, scala_version: str) -> None:
+    def __init__(self, resolve_name: str, scala_library_coordinate: Coordinate) -> None:
         super().__init__(
             f"The JVM resolve `{resolve_name}` does not contain a requirement for the Scala runtime. "
             "Since at least one Scala target type in this repository consumes this resolve, the resolve "
@@ -43,10 +48,10 @@ class MissingScalaLibraryInResolveError(ValueError):
             "Please add the following `jvm_artifact` target somewhere in the repository and re-run "
             f"`{bin_name()} generate-lockfiles --resolve={resolve_name}`:\n"
             "jvm_artifact(\n"
-            f'  name="{SCALA_LIBRARY_GROUP}_{SCALA_LIBRARY_ARTIFACT}_{scala_version}",\n'
-            f'  group="{SCALA_LIBRARY_GROUP}",\n',
-            f'  artifact="{SCALA_LIBRARY_ARTIFACT}",\n',
-            f'  version="{scala_version}",\n',
+            f'  name="{scala_library_coordinate.group}_{scala_library_coordinate.artifact}_{scala_library_coordinate.version}",\n'
+            f'  group="{scala_library_coordinate.group}",\n',
+            f'  artifact="{scala_library_coordinate.artifact}",\n',
+            f'  version="{scala_library_coordinate.version}",\n',
             f'  resolve="{resolve_name}",\n',
             ")",
         )
@@ -73,17 +78,15 @@ async def validate_scala_runtime_is_present_in_resolve(
         return ValidateJvmArtifactsForResolveResult()
 
     scala_version = scala_subsystem.version_for_resolve(request.resolve_name)
-    version_parts = scala_version.split(".")
-    if version_parts[0] == "3":
-        library_artifact = SCALA3_LIBRARY_ARTIFACT
-    else:
-        library_artifact = SCALA_LIBRARY_ARTIFACT
+    scala_artifacts = await Get(
+        ScalaArtifactsForVersionResult, ScalaArtifactsForVersionRequest(scala_version)
+    )
 
     has_scala_library_artifact = False
     for artifact in request.artifacts:
         if (
             artifact.coordinate.group == SCALA_LIBRARY_GROUP
-            and artifact.coordinate.artifact == library_artifact
+            and artifact.coordinate.artifact == scala_artifacts.library_coordinate.artifact
         ):
             if artifact.coordinate.version != scala_version:
                 raise ConflictingScalaLibraryVersionInResolveError(
@@ -95,7 +98,9 @@ async def validate_scala_runtime_is_present_in_resolve(
             has_scala_library_artifact = True
 
     if not has_scala_library_artifact:
-        raise MissingScalaLibraryInResolveError(request.resolve_name, scala_version)
+        raise MissingScalaLibraryInResolveError(
+            request.resolve_name, scala_artifacts.library_coordinate
+        )
 
     return ValidateJvmArtifactsForResolveResult()
 
