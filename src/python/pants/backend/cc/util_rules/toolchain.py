@@ -18,7 +18,7 @@ from pants.core.util_rules.system_binaries import (
     BinaryPaths,
     BinaryPathTest,
 )
-from pants.engine.environment import Environment, EnvironmentRequest
+from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.fs import DownloadFile
 from pants.engine.internals.native_engine import EMPTY_DIGEST, Digest
 from pants.engine.platform import Platform
@@ -129,7 +129,7 @@ async def _setup_system_toolchain(
     raw_search_paths = list(subsystem.search_paths)
     if "<PATH>" in raw_search_paths:
         i = raw_search_paths.index("<PATH>")
-        env = await Get(Environment, EnvironmentRequest(["PATH"]))
+        env = await Get(EnvironmentVars, EnvironmentVarsRequest(["PATH"]))
         system_path = env.get("PATH", "")
         raw_search_paths[i : i + 1] = system_path.split(os.pathsep)
 
