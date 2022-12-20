@@ -43,6 +43,7 @@ class CCToolchain:
     """A C/C++ toolchain."""
 
     compiler: str
+    # include_directories: tuple[str, ...] = () # TODO as part of the `check` goal to ensure source roots are handled
     compiler_flags: tuple[str, ...] = ()
     compiler_definitions: tuple[str, ...] = ()
     linker_flags: tuple[str, ...] = ()
