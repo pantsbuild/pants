@@ -196,7 +196,7 @@ python_tests(
 Batching and parallelism
 ------------------------
 
-By default, Pants will schedule concurrent `pytest` runs for each python test file passed to the `test` goal. This approach provides parallelism with fine-grained caching, but can have drawbacks in some situations:
+By default, Pants will schedule concurrent `pytest` runs for each Python test file passed to the `test` goal. This approach provides parallelism with fine-grained caching, but can have drawbacks in some situations:
 
 - `package`- and `session`-scoped `pytest` fixtures will execute once per `python_test` target, instead of once per directory / once overall. This can cause significant overhead if you have many tests scoped under a time-intensive fixture (i.e. a fixture that sets up a large DB schema).
 - Tests _within_ a `python_test` file will execute sequentially. This can be slow if you have large files containing many tests.
@@ -212,9 +212,9 @@ Running multiple test files within a single `pytest` process can sometimes impro
 Compatible tests _may not_ end up in the same `pytest` batch if:
 
 - There are "too many" tests with the same `batch_compatibility_tag`, as determined by the `[test].batch_size` setting.
-- Compatible tess have some incompatibility in Pants metadata (i.e. different `resolve` or `extra_env_vars`).
+- Compatible tests have some incompatibility in Pants metadata (i.e. different `resolve` or `extra_env_vars`).
 
-Compatible tests that _do_ end up in the same batch will run in a single `pytest` invocation. By default the tests will run sequentially, but they can be parallelized by enabling `pytest-xdist` (see below). A single success/failure result will be reported for the entire batch, and additional output files (i.e. XML results and coverage) will encapsulate all of the included python test files.
+Compatible tests that _do_ end up in the same batch will run in a single `pytest` invocation. By default the tests will run sequentially, but they can be parallelized by enabling `pytest-xdist` (see below). A single success/failure result will be reported for the entire batch, and additional output files (i.e. XML results and coverage) will encapsulate all of the included Python test files.
 
 > 📘 Tip: finding failed tests in large batches
 >
