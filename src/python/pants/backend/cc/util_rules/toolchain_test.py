@@ -9,9 +9,10 @@ from pants.backend.cc.dependency_inference.rules import rules as dep_inf_rules
 from pants.backend.cc.subsystems.compiler import rules as compiler_rules
 from pants.backend.cc.target_types import CCLanguage
 from pants.backend.cc.target_types import rules as target_type_rules
-from pants.backend.cc.util_rules.toolchain import CCToolchain, CCToolchainRequest
+from pants.backend.cc.util_rules.toolchain import CCProcess, CCToolchain, CCToolchainRequest
 from pants.backend.cc.util_rules.toolchain import rules as toolchain_rules
 from pants.core.util_rules import source_files
+from pants.engine.process import ProcessResult
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
@@ -25,6 +26,7 @@ def rule_runner() -> RuleRunner:
             *target_type_rules(),
             *toolchain_rules(),
             QueryRule(CCToolchain, (CCToolchainRequest,)),
+            QueryRule(ProcessResult, (CCProcess,)),
         ],
     )
     # Need to get the PATH so we can access system GCC or Clang
@@ -106,3 +108,18 @@ def test_downloaded_toolchain(rule_runner: RuleRunner) -> None:
     assert cxx_toolchain.compiler.endswith("arm-none-eabi-g++")
     assert "-std=c++20" in cxx_toolchain.compiler_flags
     assert "UNIT_TESTING" in cxx_toolchain.compiler_definitions
+
+
+def test_cc_process(rule_runner: RuleRunner) -> None:
+    rule_runner.set_options([], env_inherit={"PATH"})
+    result = rule_runner.request(
+        ProcessResult,
+        [
+            CCProcess(
+                args=("--version",),
+                language=CCLanguage.C,
+                description="Checking C compiler version",
+            )
+        ],
+    )
+    assert "gcc" in str(result.stdout) or "clang" in str(result.stdout)

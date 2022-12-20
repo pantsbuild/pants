@@ -186,6 +186,8 @@ async def setup_cc_process(request: CCProcess) -> Process:
     toolchain = await Get(CCToolchain, CCToolchainRequest(request.language))
 
     # TODO: What if this is for linking instead of compiling?
+    # TODO: From tdyas: Should there then be a CCCompilerProcess and CCLinkerProcess?
+    # Investigate further during `check` PR
     compiler_command = list(toolchain.compile_command)
 
     # If downloaded, this will be the toolchain, otherwise empty digest
