@@ -58,15 +58,15 @@ def test_system_toolchain(rule_runner: RuleRunner) -> None:
         ],
         env_inherit={"PATH"},
     )
-    cpp_toolchain = rule_runner.request(CCToolchain, [CCToolchainRequest(CCLanguage.CXX)])
-    assert cpp_toolchain.compile_command[0].endswith(
+    cxx_toolchain = rule_runner.request(CCToolchain, [CCToolchainRequest(CCLanguage.CXX)])
+    assert cxx_toolchain.compile_command[0].endswith(
         (
             "gcc++",
             "clang++",
         )
     )
-    assert "-std=c++20" in cpp_toolchain.compiler_flags
-    assert "UNIT_TESTING" in cpp_toolchain.compiler_definitions
+    assert "-std=c++20" in cxx_toolchain.compiler_flags
+    assert "UNIT_TESTING" in cxx_toolchain.compiler_definitions
 
 
 @pytest.mark.skip(reason="This is a multi-gig file - skip until smaller alternatives can be found")
@@ -102,7 +102,7 @@ def test_downloaded_toolchain(rule_runner: RuleRunner) -> None:
         ],
         env_inherit={"PATH"},
     )
-    cpp_toolchain = rule_runner.request(CCToolchain, [CCToolchainRequest(CCLanguage.CXX)])
-    assert cpp_toolchain.compiler.endswith("arm-none-eabi-g++")
-    assert "-std=c++20" in cpp_toolchain.compiler_flags
-    assert "UNIT_TESTING" in cpp_toolchain.compiler_definitions
+    cxx_toolchain = rule_runner.request(CCToolchain, [CCToolchainRequest(CCLanguage.CXX)])
+    assert cxx_toolchain.compiler.endswith("arm-none-eabi-g++")
+    assert "-std=c++20" in cxx_toolchain.compiler_flags
+    assert "UNIT_TESTING" in cxx_toolchain.compiler_definitions

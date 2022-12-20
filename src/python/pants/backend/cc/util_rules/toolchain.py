@@ -137,9 +137,9 @@ async def _setup_system_toolchain(
 
     # Populate the toolchain for C or C++ accordingly
     if request.language == CCLanguage.CXX:
-        cpp_executable = await _executable_path(tuple(subsystem.cxx_executable), search_paths)
+        cxx_executable = await _executable_path(tuple(subsystem.cxx_executable), search_paths)
         return CCToolchain(
-            cpp_executable,
+            cxx_executable,
             compiler_flags=tuple(subsystem.cxx_compiler_flags),
             compiler_definitions=tuple(subsystem.cxx_definitions),
         )
