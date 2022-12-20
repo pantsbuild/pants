@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import shutil
+
 import pytest
 
 from pants.backend.cc.dependency_inference.rules import rules as dep_inf_rules
@@ -35,6 +37,9 @@ def rule_runner() -> RuleRunner:
     return rule_runner
 
 
+@pytest.mark.skipif(
+    not shutil.which("clang") and not shutil.which("gcc"), reason="Requires a system cc compiler"
+)
 def test_system_toolchain(rule_runner: RuleRunner) -> None:
     rule_runner.set_options(
         [
@@ -111,6 +116,9 @@ def test_downloaded_toolchain(rule_runner: RuleRunner) -> None:
     assert "UNIT_TESTING" in cxx_toolchain.compiler_definitions
 
 
+@pytest.mark.skipif(
+    not shutil.which("clang") and not shutil.which("gcc"), reason="Requires a system cc compiler"
+)
 def test_cc_process(rule_runner: RuleRunner) -> None:
     rule_runner.set_options([], env_inherit={"PATH"})
     result = rule_runner.request(
