@@ -15,6 +15,7 @@ from pants.util.docutil import bin_name
 
 SCALA_LIBRARY_GROUP = "org.scala-lang"
 SCALA_LIBRARY_ARTIFACT = "scala-library"
+SCALA3_LIBRARY_ARTIFACT = "scala3-library_3"
 
 
 class ConflictingScalaLibraryVersionInResolveError(ValueError):
@@ -72,12 +73,17 @@ async def validate_scala_runtime_is_present_in_resolve(
         return ValidateJvmArtifactsForResolveResult()
 
     scala_version = scala_subsystem.version_for_resolve(request.resolve_name)
+    version_parts = scala_version.split(".")
+    if version_parts[0] == "3":
+        library_artifact = SCALA3_LIBRARY_ARTIFACT
+    else:
+        library_artifact = SCALA_LIBRARY_ARTIFACT
 
     has_scala_library_artifact = False
     for artifact in request.artifacts:
         if (
             artifact.coordinate.group == SCALA_LIBRARY_GROUP
-            and artifact.coordinate.artifact == SCALA_LIBRARY_ARTIFACT
+            and artifact.coordinate.artifact == library_artifact
         ):
             if artifact.coordinate.version != scala_version:
                 raise ConflictingScalaLibraryVersionInResolveError(
