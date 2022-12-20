@@ -14,7 +14,7 @@ from pants.backend.java.target_types import (
 )
 from pants.backend.java.target_types import rules as target_types_rules
 from pants.core.util_rules import archive
-from pants.jvm import common_rules
+from pants.jvm import jvm_common
 
 
 def target_types():
@@ -23,7 +23,7 @@ def target_types():
         JavaSourcesGeneratorTarget,
         JunitTestTarget,
         JunitTestsGeneratorTarget,
-        *common_rules.target_types(),
+        *jvm_common.target_types(),
     ]
 
 
@@ -37,9 +37,9 @@ def rules():
         *java_bsp_rules.rules(),
         *archive.rules(),
         *target_types_rules(),
-        *common_rules.rules(),
+        *jvm_common.rules(),
     ]
 
 
 def build_file_aliases():
-    return common_rules.build_file_aliases()
+    return jvm_common.build_file_aliases()

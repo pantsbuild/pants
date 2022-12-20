@@ -16,7 +16,7 @@ from pants.backend.scala.target_types import (
 )
 from pants.backend.scala.target_types import rules as target_types_rules
 from pants.backend.scala.test import scalatest
-from pants.jvm import common_rules
+from pants.jvm import jvm_common
 
 
 def target_types():
@@ -28,7 +28,7 @@ def target_types():
         ScalacPluginTarget,
         ScalatestTestTarget,
         ScalatestTestsGeneratorTarget,
-        *common_rules.target_types(),
+        *jvm_common.target_types(),
     ]
 
 
@@ -43,9 +43,9 @@ def rules():
         *target_types_rules(),
         *scala_lockfile_rules(),
         *bsp_rules(),
-        *common_rules.rules(),
+        *jvm_common.rules(),
     ]
 
 
 def build_file_aliases():
-    return common_rules.build_file_aliases()
+    return jvm_common.build_file_aliases()

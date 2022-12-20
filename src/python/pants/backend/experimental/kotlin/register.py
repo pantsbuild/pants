@@ -13,7 +13,7 @@ from pants.backend.kotlin.target_types import (
 from pants.backend.kotlin.target_types import rules as target_types_rules
 from pants.backend.kotlin.test.junit import rules as kotlin_junit_rules
 from pants.core.util_rules import source_files, system_binaries
-from pants.jvm import common_rules
+from pants.jvm import jvm_common
 
 
 def target_types():
@@ -23,7 +23,7 @@ def target_types():
         KotlincPluginTarget,
         KotlinJunitTestTarget,
         KotlinJunitTestsGeneratorTarget,
-        *common_rules.target_types(),
+        *jvm_common.target_types(),
     ]
 
 
@@ -38,9 +38,9 @@ def rules():
         *system_binaries.rules(),
         *source_files.rules(),
         *kotlin_junit_rules(),
-        *common_rules.rules(),
+        *jvm_common.rules(),
     ]
 
 
 def build_file_aliases():
-    return common_rules.build_file_aliases()
+    return jvm_common.build_file_aliases()
