@@ -71,6 +71,7 @@ def test_system_toolchain(rule_runner: RuleRunner) -> None:
     assert "UNIT_TESTING" in cxx_toolchain.compiler_definitions
 
 
+@pytest.mark.no_error_if_skipped
 @pytest.mark.skip(reason="This is a multi-gig file - skip until smaller alternatives can be found")
 def test_downloaded_toolchain(rule_runner: RuleRunner) -> None:
     rule_runner.set_options(
