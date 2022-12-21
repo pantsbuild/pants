@@ -65,9 +65,6 @@ class PythonRequirementFieldSet(RunFieldSet):
     resolve: PythonRequirementResolveField
     entry_point: PexEntryPointField
 
-    def __repr__(self):
-        return f"PythonRequirementFieldSet({self.requirements.value=}, {self.dependencies.value=}, {self.modules.value=}, {self.entry_point.value=})"
-
 
 @memoized
 def _invert_module_mapping(
