@@ -76,7 +76,11 @@ async def go_show_package_analysis(targets: Targets, console: Console) -> ShowGo
                 Get(
                     ThirdPartyPkgAnalysis,
                     ThirdPartyPkgAnalysisRequest(
-                        import_path, go_mod_info.digest, go_mod_info.mod_path, build_opts=build_opts
+                        import_path,
+                        go_mod_address,
+                        go_mod_info.digest,
+                        go_mod_info.mod_path,
+                        build_opts=build_opts,
                     ),
                 )
             )

@@ -251,6 +251,7 @@ async def setup_build_go_package_target_request(
             ThirdPartyPkgAnalysis,
             ThirdPartyPkgAnalysisRequest(
                 import_path,
+                _go_mod_address,
                 _go_mod_info.digest,
                 _go_mod_info.mod_path,
                 build_opts=request.build_opts,

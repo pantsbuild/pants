@@ -14,6 +14,7 @@ from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import CoarsenedTargets
 from pants.jvm.compile import ClasspathEntry, ClasspathEntryRequest, ClasspathEntryRequestFactory
+from pants.jvm.compile import rules as jvm_compile_rules
 from pants.jvm.resolve.key import CoursierResolveKey
 from pants.util.logging import LogLevel
 
@@ -135,4 +136,5 @@ def rules():
     return [
         *collect_rules(),
         *system_binaries.rules(),
+        *jvm_compile_rules(),
     ]

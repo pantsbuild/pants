@@ -14,6 +14,7 @@ from pants.core.goals.run import (
     Run,
     RunDebugAdapterRequest,
     RunFieldSet,
+    RunInSandboxBehavior,
     RunRequest,
     RunSubsystem,
     run,
@@ -70,11 +71,13 @@ def create_mock_run_debug_adapter_request(
 
 class TestRunFieldSet(RunFieldSet):
     required_fields = ()
+    run_in_sandbox_behavior = RunInSandboxBehavior.NOT_SUPPORTED
 
 
 @dataclass(frozen=True)
 class TestRunSecondaryFieldSet(RunFieldSet):
     required_fields = ()
+    run_in_sandbox_behavior = RunInSandboxBehavior.NOT_SUPPORTED
 
     just_borrowing: SecondaryOwnerField
 

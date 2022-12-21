@@ -310,6 +310,7 @@ async def infer_go_third_party_package_dependencies(
             ThirdPartyPkgAnalysis,
             ThirdPartyPkgAnalysisRequest(
                 request.field_set.import_path.value,
+                go_mod_address,
                 go_mod_info.digest,
                 go_mod_info.mod_path,
                 build_opts=build_opts,
@@ -373,6 +374,7 @@ async def generate_targets_from_go_mod(
     all_packages = await Get(
         AllThirdPartyPackages,
         AllThirdPartyPackagesRequest(
+            generator_addr,
             go_mod_info.digest,
             go_mod_info.mod_path,
             # TODO: There is a rule graph cycle in this rule if this rule tries to use GoBuildOptionsFromTargetRequest.

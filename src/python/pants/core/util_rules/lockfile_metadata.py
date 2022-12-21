@@ -68,6 +68,10 @@ class InvalidLockfileError(Exception):
     pass
 
 
+class NoLockfileMetadataBlock(InvalidLockfileError):
+    pass
+
+
 @dataclass(frozen=True)
 class LockfileMetadata:
     """Base class for metadata that is attached to a given lockfile.
@@ -126,7 +130,7 @@ class LockfileMetadata:
             lockfile_description = "this lockfile"
 
         if not metadata_lines:
-            raise InvalidLockfileError(
+            raise NoLockfileMetadataBlock(
                 f"Could not find a Pants metadata block in {lockfile_description}. {error_suffix}"
             )
 

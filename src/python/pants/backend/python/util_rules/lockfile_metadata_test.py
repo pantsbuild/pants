@@ -168,7 +168,6 @@ def test_is_valid_for_v1(user_digest, expected_digest, user_ic, expected_ic, mat
     assert (
         bool(
             m.is_valid_for(
-                is_tool=True,
                 expected_invalidation_digest=user_digest,
                 user_interpreter_constraints=InterpreterConstraints(user_ic),
                 interpreter_universe=INTERPRETER_UNIVERSE,
@@ -186,60 +185,44 @@ def test_is_valid_for_v1(user_digest, expected_digest, user_ic, expected_ic, mat
 _VALID_ICS = [">=3.5"]
 _VALID_REQS = ["ansicolors==0.1.0", "requests==1.0.0"]
 
-# Different scenarios that are the same for both tool lockfiles and user lockfiles.
-_LockfileConditions = (
-    [_VALID_ICS, _VALID_ICS, _VALID_REQS, _VALID_REQS, []],
-    [_VALID_ICS, _VALID_ICS, _VALID_REQS, list(reversed(_VALID_REQS)), []],
-    [
-        _VALID_ICS,
-        _VALID_ICS,
-        _VALID_REQS,
-        [_VALID_REQS[0], "requests==2.0.0"],
-        [InvalidPythonLockfileReason.REQUIREMENTS_MISMATCH],
-    ],
-    [
-        _VALID_ICS,
-        _VALID_ICS,
-        _VALID_REQS,
-        [_VALID_REQS[0], "different"],
-        [InvalidPythonLockfileReason.REQUIREMENTS_MISMATCH],
-    ],
-    [
-        _VALID_ICS,
-        _VALID_ICS,
-        _VALID_REQS,
-        [*_VALID_REQS, "a-third-req"],
-        [InvalidPythonLockfileReason.REQUIREMENTS_MISMATCH],
-    ],
-    [
-        _VALID_ICS,
-        ["==2.7.*"],
-        _VALID_REQS,
-        _VALID_REQS,
-        [InvalidPythonLockfileReason.INTERPRETER_CONSTRAINTS_MISMATCH],
-    ],
-)
-
 
 @pytest.mark.parametrize(
-    "is_tool, lock_ics, user_ics, lock_reqs, user_reqs, expected",
-    [
-        *([True, *conditions] for conditions in _LockfileConditions),
-        *([False, *conditions] for conditions in _LockfileConditions),
-        # Tools require exact matches, whereas user lockfiles only need to subset.
-        [False, _VALID_ICS, _VALID_ICS, _VALID_REQS, [_VALID_REQS[0]], []],
+    "lock_ics, user_ics, lock_reqs, user_reqs, expected",
+    (
+        [_VALID_ICS, _VALID_ICS, _VALID_REQS, _VALID_REQS, []],
+        [_VALID_ICS, _VALID_ICS, _VALID_REQS, list(reversed(_VALID_REQS)), []],
         [
-            True,
             _VALID_ICS,
             _VALID_ICS,
             _VALID_REQS,
-            [_VALID_REQS[0]],
+            [_VALID_REQS[0], "requests==2.0.0"],
             [InvalidPythonLockfileReason.REQUIREMENTS_MISMATCH],
         ],
-    ],
+        [
+            _VALID_ICS,
+            _VALID_ICS,
+            _VALID_REQS,
+            [_VALID_REQS[0], "different"],
+            [InvalidPythonLockfileReason.REQUIREMENTS_MISMATCH],
+        ],
+        [
+            _VALID_ICS,
+            _VALID_ICS,
+            _VALID_REQS,
+            [*_VALID_REQS, "a-third-req"],
+            [InvalidPythonLockfileReason.REQUIREMENTS_MISMATCH],
+        ],
+        [
+            _VALID_ICS,
+            ["==2.7.*"],
+            _VALID_REQS,
+            _VALID_REQS,
+            [InvalidPythonLockfileReason.INTERPRETER_CONSTRAINTS_MISMATCH],
+        ],
+        [_VALID_ICS, _VALID_ICS, _VALID_REQS, [_VALID_REQS[0]], []],
+    ),
 )
 def test_is_valid_for_interpreter_constraints_and_requirements(
-    is_tool: bool,
     user_ics: list[str],
     lock_ics: list[str],
     user_reqs: list[str],
@@ -259,7 +242,6 @@ def test_is_valid_for_interpreter_constraints_and_requirements(
         ),
     ]:
         result = m.is_valid_for(
-            is_tool=is_tool,
             expected_invalidation_digest="",
             user_interpreter_constraints=InterpreterConstraints(user_ics),
             interpreter_universe=INTERPRETER_UNIVERSE,
@@ -272,8 +254,7 @@ def test_is_valid_for_interpreter_constraints_and_requirements(
         assert result.failure_reasons == set(expected)
 
 
-@pytest.mark.parametrize("is_tool", [True, False])
-def test_is_valid_for_v3_metadata(is_tool: bool) -> None:
+def test_is_valid_for_v3_metadata() -> None:
     result = PythonLockfileMetadataV3(
         InterpreterConstraints([]),
         reqset(),
@@ -283,7 +264,6 @@ def test_is_valid_for_v3_metadata(is_tool: bool) -> None:
         only_binary={"bdist"},
         no_binary={"sdist"},
     ).is_valid_for(
-        is_tool=is_tool,
         expected_invalidation_digest="",
         user_interpreter_constraints=InterpreterConstraints([]),
         interpreter_universe=INTERPRETER_UNIVERSE,

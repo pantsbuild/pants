@@ -260,6 +260,19 @@ class ShellCommandCommandField(StringField):
     help = "Shell command to execute.\n\nThe command is executed as 'bash -c <command>' by default."
 
 
+class RunInSandboxRunnableField(StringField):
+    alias = "runnable"
+    required = True
+    help = softwrap(
+        """
+        Address to a target that can be invoked by the `run` goal (and does not set
+        `run_in_sandbox_behavior=NOT_SUPPORTED`). This will be executed along with any arguments
+        specified by `argv`, in a sandbox with that target's transitive dependencies, along with
+        the transitive dependencies specified by `execution_dependencies`.
+        """
+    )
+
+
 class ShellCommandOutputsField(StringSequenceField):
     alias = "outputs"
     help = softwrap(
@@ -344,6 +357,19 @@ class ShellCommandSourcesField(MultipleSourcesField):
     alias = "_sources"
     uses_source_roots = False
     expected_num_files = 0
+
+
+class RunInSandboxSourcesField(MultipleSourcesField):
+    # We solely register this field for codegen to work.
+    alias = "_sources"
+    uses_source_roots = False
+    expected_num_files = 0
+
+
+class RunInSandboxArgumentsField(StringSequenceField):
+    alias = "args"
+    default = ()
+    help = f"Extra arguments to pass into the `{RunInSandboxRunnableField.alias}` field."
 
 
 class ShellCommandTimeoutField(IntField):
@@ -438,6 +464,42 @@ class ShellCommandTarget(Target):
         insert the `outputs` into that consumer's context.
 
         The command may be retried and/or cancelled, so ensure that it is idempotent.
+        """
+    )
+
+
+class ShellRunInSandboxTarget(Target):
+    alias = "experimental_run_in_sandbox"
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        RunInSandboxRunnableField,
+        RunInSandboxArgumentsField,
+        ShellCommandExecutionDependenciesField,
+        ShellCommandOutputDependenciesField,
+        ShellCommandLogOutputField,
+        ShellCommandOutputFilesField,
+        ShellCommandOutputDirectoriesField,
+        RunInSandboxSourcesField,
+        ShellCommandTimeoutField,
+        ShellCommandToolsField,
+        ShellCommandExtraEnvVarsField,
+        EnvironmentField,
+    )
+    help = softwrap(
+        """
+        Execute any runnable target for its side effects.
+
+        Example BUILD file:
+
+            experimental_run_in_sandbox(
+                runnable=":python_source",
+                argv=[""],
+                tools=["tar", "curl", "cat", "bash", "env"],
+                execution_dependencies=[":scripts"],
+                outputs=["results/", "logs/my-script.log"],
+            )
+
+            shell_sources(name="scripts")
         """
     )
 

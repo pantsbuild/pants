@@ -8,13 +8,17 @@ from textwrap import dedent
 
 import pytest
 
+from pants.backend.python.goals.run_python_source import rules as run_python_source_rules
+from pants.backend.python.target_types import PythonSourceTarget
 from pants.backend.shell.target_types import (
     ShellCommandRunTarget,
     ShellCommandTarget,
     ShellCommandTestTarget,
+    ShellRunInSandboxTarget,
     ShellSourcesGeneratorTarget,
 )
 from pants.backend.shell.util_rules.shell_command import (
+    GenerateFilesFromRunInSandboxRequest,
     GenerateFilesFromShellCommandRequest,
     RunShellCommand,
     ShellCommandProcessFromTargetRequest,
@@ -32,6 +36,7 @@ from pants.engine.fs import EMPTY_SNAPSHOT, DigestContents
 from pants.engine.process import Process, ProcessExecutionFailure
 from pants.engine.target import (
     GeneratedSources,
+    GenerateSourcesRequest,
     MultipleSourcesField,
     TransitiveTargets,
     TransitiveTargetsRequest,
@@ -47,7 +52,9 @@ def rule_runner() -> RuleRunner:
             *shell_command_rules(),
             *source_files.rules(),
             *core_target_type_rules(),
+            *run_python_source_rules(),
             QueryRule(GeneratedSources, [GenerateFilesFromShellCommandRequest]),
+            QueryRule(GeneratedSources, [GenerateFilesFromRunInSandboxRequest]),
             QueryRule(Process, [ShellCommandProcessRequest]),
             QueryRule(Process, [EnvironmentName, ShellCommandProcessFromTargetRequest]),
             QueryRule(RunRequest, [RunShellCommand]),
@@ -59,8 +66,10 @@ def rule_runner() -> RuleRunner:
             ShellCommandRunTarget,
             ShellCommandTestTarget,
             ShellSourcesGeneratorTarget,
+            ShellRunInSandboxTarget,
             ArchiveTarget,
             FilesGeneratorTarget,
+            PythonSourceTarget,
         ],
     )
     rule_runner.set_options([], env_inherit={"PATH"})
@@ -68,16 +77,25 @@ def rule_runner() -> RuleRunner:
 
 
 def assert_shell_command_result(
-    rule_runner: RuleRunner, address: Address, expected_contents: dict[str, str]
+    rule_runner: RuleRunner,
+    address: Address,
+    expected_contents: dict[str, str],
+    generator_type: type[GenerateSourcesRequest] = GenerateFilesFromShellCommandRequest,
 ) -> None:
     target = rule_runner.get_target(address)
-    result = rule_runner.request(
-        GeneratedSources, [GenerateFilesFromShellCommandRequest(EMPTY_SNAPSHOT, target)]
-    )
+    result = rule_runner.request(GeneratedSources, [generator_type(EMPTY_SNAPSHOT, target)])
     assert result.snapshot.files == tuple(expected_contents)
     contents = rule_runner.request(DigestContents, [result.snapshot.digest])
     for fc in contents:
         assert fc.content == expected_contents[fc.path].encode()
+
+
+def assert_run_in_sandbox_result(
+    rule_runner: RuleRunner, address: Address, expected_contents: dict[str, str]
+) -> None:
+    return assert_shell_command_result(
+        rule_runner, address, expected_contents, GenerateFilesFromRunInSandboxRequest
+    )
 
 
 def assert_logged(caplog, expect_logged=None):
@@ -576,3 +594,37 @@ def test_shell_command_extra_env_vars(caplog, rule_runner: RuleRunner) -> None:
     )
 
     assert_logged(caplog, [(logging.INFO, "FOO=foo HELLO=world BAR=\n")])
+
+
+def test_run_runnable_in_sandbox(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/fruitcake.py": dedent(
+                """\
+                f = open("fruitcake.txt", "w")
+                f.write("fruitcake\\n")
+                f.close()
+                """
+            ),
+            "src/BUILD": dedent(
+                """\
+                python_source(
+                    source="fruitcake.py",
+                    name="fruitcake",
+                )
+
+                experimental_run_in_sandbox(
+                  name="run_fruitcake",
+                  runnable=":fruitcake",
+                  output_files=["fruitcake.txt"],
+                )
+                """
+            ),
+        }
+    )
+
+    assert_run_in_sandbox_result(
+        rule_runner,
+        Address("src", target_name="run_fruitcake"),
+        expected_contents={"src/fruitcake.txt": "fruitcake\n"},
+    )
