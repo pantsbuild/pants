@@ -338,7 +338,7 @@ jobs:
 
         '
     - name: Run Python test shard 0/3
-      run: './pants test --shard=0/3 ::
+      run: './pants test --shard=0/3 src/python/pants/backend/python/packaging/pyoxidizer
 
         '
     - continue-on-error: true
@@ -409,7 +409,7 @@ jobs:
 
         '
     - name: Run Python test shard 1/3
-      run: './pants test --shard=1/3 ::
+      run: './pants test --shard=1/3 src/python/pants/backend/python/packaging/pyoxidizer
 
         '
     - continue-on-error: true
@@ -480,7 +480,7 @@ jobs:
 
         '
     - name: Run Python test shard 2/3
-      run: './pants test --shard=2/3 ::
+      run: './pants test --shard=2/3 src/python/pants/backend/python/packaging/pyoxidizer
 
         '
     - continue-on-error: true
