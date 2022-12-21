@@ -1382,16 +1382,14 @@ class PythonDistributionEntryPointsField(NestedDictStringToStringField, AsyncFie
 class PythonDistributionOutputPathField(StringField, AsyncFieldMixin):
     help = softwrap(
         """
-        The path to the output distribution, relative the dist directtory.
+        The path to the output distribution, relative the dist directory.
 
-        If undefined, this default to the empty path, i.e. the output goes at the top
-        level of dist/
+        If undefined, this defaults to the empty path, i.e. the output goes at the top
+        level of the dist dir.
         """
     )
     alias = "output_path"
-
-    def value_or_default(self) -> str:
-        return self.value or ""
+    default = ""
 
 
 @dataclass(frozen=True)

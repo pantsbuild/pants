@@ -19,6 +19,7 @@ from pants.backend.python.util_rules.pex import Pex, PexRequest, VenvPex, VenvPe
 from pants.backend.python.util_rules.pex import rules as pex_rules
 from pants.backend.python.util_rules.pex_requirements import EntireLockfile, PexRequirements
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
+from pants.core.util_rules.distdir import DistDir
 from pants.engine.fs import (
     CreateDigest,
     Digest,
@@ -118,7 +119,7 @@ class DistBuildRequest:
     input: Digest
     working_directory: str  # Relpath within the input digest.
     build_time_source_roots: tuple[str, ...]  # Source roots for 1st party build-time deps.
-    output_path: str  # Location of the output file within dist/
+    output_path: str  # Location of the output file within dist dir.
 
     target_address_spec: str | None = None  # Only needed for logging etc.
     wheel_config_settings: FrozenDict[str, tuple[str, ...]] | None = None
@@ -190,7 +191,9 @@ def interpolate_backend_shim(dist_dir: str, request: DistBuildRequest) -> bytes:
 
 
 @rule
-async def run_pep517_build(request: DistBuildRequest, python_setup: PythonSetup) -> DistBuildResult:
+async def run_pep517_build(
+    request: DistBuildRequest, python_setup: PythonSetup, dist_dir: DistDir
+) -> DistBuildResult:
     # Note that this pex has no entrypoint. We use it to run our generated shim, which
     # in turn imports from and invokes the build backend.
     build_backend_pex = await Get(
@@ -204,14 +207,14 @@ async def run_pep517_build(request: DistBuildRequest, python_setup: PythonSetup)
         ),
     )
 
-    dist_dir = os.path.join("dist", request.output_path)
+    output_path: str = str(dist_dir.relpath / request.output_path)
     backend_shim_name = "backend_shim.py"
     backend_shim_path = os.path.join(request.working_directory, backend_shim_name)
     backend_shim_digest = await Get(
         Digest,
         CreateDigest(
             [
-                FileContent(backend_shim_path, interpolate_backend_shim(dist_dir, request)),
+                FileContent(backend_shim_path, interpolate_backend_shim(output_path, request)),
             ]
         ),
     )
@@ -233,7 +236,7 @@ async def run_pep517_build(request: DistBuildRequest, python_setup: PythonSetup)
             input_digest=merged_digest,
             extra_env=extra_env,
             working_directory=request.working_directory,
-            output_directories=(dist_dir,),  # Relative to the working_directory.
+            output_directories=(output_path,),  # Relative to the working_directory.
             description=(
                 f"Run {request.build_system.build_backend} for {request.target_address_spec}"
                 if request.target_address_spec
@@ -249,7 +252,7 @@ async def run_pep517_build(request: DistBuildRequest, python_setup: PythonSetup)
             if line.startswith(f"{dist_type}: "):
                 paths[dist_type] = line[len(dist_type) + 2 :].strip()
     # Note that output_digest paths are relative to the working_directory.
-    output_digest = await Get(Digest, RemovePrefix(result.output_digest, dist_dir))
+    output_digest = await Get(Digest, RemovePrefix(result.output_digest, output_path))
     output_snapshot = await Get(Snapshot, Digest, output_digest)
     for dist_type, path in paths.items():
         if path not in output_snapshot.files:
