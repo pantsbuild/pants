@@ -1266,6 +1266,7 @@ class PythonRequirementTarget(Target):
         PythonRequirementModulesField,
         PythonRequirementTypeStubModulesField,
         PythonRequirementResolveField,
+        PexEntryPointField,
     )
     help = softwrap(
         f"""

@@ -56,7 +56,10 @@ logger = logging.getLogger(__name__)
 class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
     run_in_sandbox_behavior = RunInSandboxBehavior.RUN_REQUEST_HERMETIC
 
-    required_fields = (PexEntryPointField,)
+    required_fields = (
+        PexEntryPointField,
+        PexScriptField,
+    )
 
     entry_point: PexEntryPointField
     script: PexScriptField
