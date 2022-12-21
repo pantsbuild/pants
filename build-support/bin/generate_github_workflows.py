@@ -504,7 +504,7 @@ def linux_x86_64_test_jobs(python_versions: list[str]) -> Jobs:
                 setup_toolchain_auth(),
                 {
                     "name": f"Run Python test shard {shard}",
-                    "run": f"./pants test --shard={shard} ::\n",
+                    "run": f"./pants test --shard={shard} src/python/pants/backend/python/packaging/pyoxidizer\n",
                 },
                 helper.upload_log_artifacts(name=f"python-test-{shard}"),
             ],
