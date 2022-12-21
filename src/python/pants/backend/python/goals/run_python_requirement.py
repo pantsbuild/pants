@@ -76,7 +76,11 @@ def _invert_module_mapping(
     """Provide an inverted module mapping that can specify the set of modules known to be fulfilled
     by a given target address."""
     d: dict[Address, list[str]] = defaultdict(list)
-    for module_name, providers in module_mapping.resolves_to_modules_to_providers[resolve].items():
+    modules_to_providers = module_mapping.resolves_to_modules_to_providers.get(resolve)
+    if not modules_to_providers:
+        return FrozenDict()
+
+    for module_name, providers in modules_to_providers.items():
         for provider in providers:
             d[provider.addr].append(module_name)
 
@@ -108,7 +112,7 @@ async def _resolve_entry_point(
     if modules and len(modules) == 1:
         # Unambiguous module specified in the `BUILD` file
         entry_point_module = modules[0]
-    elif len(module_mapping[field_set.address]) == 1:
+    elif len(module_mapping.get(field_set.address, ())) == 1:
         # Check the third-party module mapping
         entry_point_module = module_mapping[field_set.address][0]
     elif len(reqs) == 1:
