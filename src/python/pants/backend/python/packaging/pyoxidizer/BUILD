@@ -7,5 +7,5 @@ python_sources(overrides={"subsystem.py": {"dependencies": [":lock"]}})
 
 python_tests(
     name="tests",
-    overrides={"rules_integration_test.py": {"timeout": 4800}},
+    timeout=4800,
 )
