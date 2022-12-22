@@ -8,7 +8,6 @@ use async_oncecell::OnceCell;
 use fs::{DirectoryDigest, Permissions, RelativePath};
 use hashing::Digest;
 use parking_lot::Mutex;
-use std::time::Instant;
 use tempfile::TempDir;
 
 use crate::{Store, StoreError};
@@ -63,10 +62,7 @@ impl ImmutableInputs {
     digest: Digest,
     is_executable: bool,
   ) -> Result<PathBuf, StoreError> {
-    let start = Instant::now();
     let cell = self.0.contents.lock().entry(digest).or_default().clone();
-    let cell_now = Instant::now();
-    log::warn!("Getting the cell took {} us.", start.elapsed().as_micros());
 
     // We (might) need to initialize the value.
     //
@@ -97,7 +93,7 @@ impl ImmutableInputs {
     //
     // We take the final approach here currently (for simplicity's sake), but the advanced variant
     // of approach 2 might eventually be worthwhile.
-    let result = cell
+    cell
       .get_or_try_init(async {
         let chroot = TempDir::new_in(self.0.workdir.path()).map_err(|e| {
           format!(
@@ -121,12 +117,7 @@ impl ImmutableInputs {
         Ok(dest)
       })
       .await
-      .cloned();
-    log::warn!(
-      "get_or_try_init the cell took {} us.",
-      cell_now.elapsed().as_micros()
-    );
-    result
+      .cloned()
   }
 
   /// Returns an absolute Path to immutably consume the given Digest from.
