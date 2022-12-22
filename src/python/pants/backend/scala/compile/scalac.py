@@ -44,6 +44,7 @@ from pants.jvm.resolve.common import ArtifactRequirements
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
 from pants.jvm.strip_jar.strip_jar import StripJarRequest
 from pants.jvm.subsystems import JvmSubsystem
+from pants.jvm.target_types import NO_MAIN_CLASS
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
@@ -188,7 +189,7 @@ async def compile_scala_source(
                 # NB: We set a non-existent main-class so that using `-d` produces a `jar` manifest
                 # with stable content.
                 "-Xmain-class",
-                "no.main.class",
+                NO_MAIN_CLASS,
                 "-d",
                 output_file,
                 *sorted(

@@ -22,8 +22,10 @@ from pants.jvm.target_types import (
     JunitTestTimeoutField,
     JvmDependenciesField,
     JvmJdkField,
+    JvmMainClassNameField,
     JvmProvidesTypesField,
     JvmResolveField,
+    JvmRunnableSourceFieldSet,
 )
 
 
@@ -36,7 +38,7 @@ class JavaGeneratorSourcesField(MultipleSourcesField):
 
 
 @dataclass(frozen=True)
-class JavaFieldSet(FieldSet):
+class JavaFieldSet(JvmRunnableSourceFieldSet):
     required_fields = (JavaSourceField,)
 
     sources: JavaSourceField
@@ -111,6 +113,7 @@ class JavaSourceTarget(Target):
         JvmDependenciesField,
         JavaSourceField,
         JvmResolveField,
+        JvmMainClassNameField,
         JvmProvidesTypesField,
         JvmJdkField,
     )
@@ -136,6 +139,7 @@ class JavaSourcesGeneratorTarget(TargetFilesGenerator):
         JvmDependenciesField,
         JvmResolveField,
         JvmJdkField,
+        JvmMainClassNameField,
         JvmProvidesTypesField,
     )
     help = "Generate a `java_source` target for each file in the `sources` field."
@@ -145,4 +149,5 @@ def rules():
     return [
         *collect_rules(),
         *jvm_target_types.rules(),
+        *JavaFieldSet.jvm_rules(),
     ]

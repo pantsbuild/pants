@@ -1,6 +1,6 @@
 # Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-from pants.jvm import classpath, jdk_rules, resources, run
+from pants.jvm import classpath, jdk_rules, resources, run, run_deploy_jar
 from pants.jvm import util_rules as jvm_util_rules
 from pants.jvm.dependency_inference import symbol_mapper
 from pants.jvm.goals import lockfile
@@ -39,6 +39,7 @@ def rules():
         *jdk_rules.rules(),
         *jvm_tool.rules(),
         *run.rules(),
+        *run_deploy_jar.rules(),
         *war_rules(),
     ]
 

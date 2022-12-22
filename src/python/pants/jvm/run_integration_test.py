@@ -53,7 +53,7 @@ def antlr_jvm_lockfile(
     return antlr_jvm_lockfile_def.load(request)
 
 
-def test_java() -> None:
+def test_java_by_deploy_jar() -> None:
     sources = {
         "src/org/pantsbuild/test/Hello.java": dedent(
             """\
@@ -92,7 +92,82 @@ def test_java() -> None:
         assert result.stdout.strip() == "Hello, World!"
 
 
-def test_scala(scala_stdlib_jvm_lockfile: JVMLockfileFixture) -> None:
+def test_java_direct() -> None:
+    sources = {
+        "src/org/pantsbuild/test/Hello.java": dedent(
+            """\
+            package org.pantsbuild.test;
+
+            public class Hello {{
+                public static void main(String[] args) {{
+                    System.out.println("Hello, World!");
+                }}
+            }}
+            """
+        ),
+        "src/org/pantsbuild/test/BUILD": dedent(
+            """\
+            java_sources()
+            """
+        ),
+        "lockfile": EMPTY_RESOLVE,
+    }
+    with setup_tmpdir(sources) as tmpdir:
+        args = [
+            "--backend-packages=pants.backend.experimental.java",
+            f"--source-root-patterns=['{tmpdir}/src']",
+            "--pants-ignore=__pycache__",
+            f'--jvm-resolves={{"empty": "{tmpdir}/lockfile"}}',
+            "--jvm-default-resolve=empty",
+            "run",
+            f"{tmpdir}/src/org/pantsbuild/test/Hello.java",
+        ]
+        result = run_pants(args)
+        assert result.stdout.strip() == "Hello, World!"
+
+
+def test_java_direct_ambiguous_main() -> None:
+    sources = {
+        "src/org/pantsbuild/test/Hello.java": dedent(
+            """\
+            package org.pantsbuild.test;
+
+            public class Hello {{
+
+                public static class Misdirection {{
+                    public static void main(String[] args) {{
+                        System.out.println("This should not be printed");
+                    }}
+                }}
+
+                public static void main(String[] args) {{
+                    System.out.println("Hello, World!");
+                }}
+            }}
+            """
+        ),
+        "src/org/pantsbuild/test/BUILD": dedent(
+            """\
+            java_source(source="Hello.java", main="org.pantsbuild.test.Hello")
+            """
+        ),
+        "lockfile": EMPTY_RESOLVE,
+    }
+    with setup_tmpdir(sources) as tmpdir:
+        args = [
+            "--backend-packages=pants.backend.experimental.java",
+            f"--source-root-patterns=['{tmpdir}/src']",
+            "--pants-ignore=__pycache__",
+            f'--jvm-resolves={{"empty": "{tmpdir}/lockfile"}}',
+            "--jvm-default-resolve=empty",
+            "run",
+            f"{tmpdir}/src/org/pantsbuild/test/Hello.java",
+        ]
+        result = run_pants(args)
+        assert result.stdout.strip() == "Hello, World!"
+
+
+def test_scala_by_deploy_jar(scala_stdlib_jvm_lockfile: JVMLockfileFixture) -> None:
     sources = {
         "src/org/pantsbuild/test/Hello.scala": dedent(
             """\
@@ -131,6 +206,45 @@ def test_scala(scala_stdlib_jvm_lockfile: JVMLockfileFixture) -> None:
             "--scala-version-for-resolve={'jvm-default': '2.13.8'}",
             "run",
             f"{tmpdir}/src/org/pantsbuild/test:test_deploy_jar",
+        ]
+        result = run_pants(args)
+        assert result.stdout.strip() == "Hello, World!"
+
+
+def test_scala_direct(scala_stdlib_jvm_lockfile: JVMLockfileFixture) -> None:
+    sources = {
+        "src/org/pantsbuild/test/Hello.scala": dedent(
+            """\
+            package org.pantsbuild.test;
+
+            object Hello {{
+                def main(args: Array[String]): Unit = {{
+                    println("Hello, World!")
+                }}
+            }}
+
+            """
+        ),
+        "src/org/pantsbuild/test/BUILD": dedent(
+            """\
+            scala_sources()
+            """
+        ),
+        "BUILD": scala_stdlib_jvm_lockfile.requirements_as_jvm_artifact_targets(),
+        "lockfile": scala_stdlib_jvm_lockfile.serialized_lockfile.replace("{", "{{").replace(
+            "}", "}}"
+        ),
+    }
+    with setup_tmpdir(sources) as tmpdir:
+        args = [
+            "--backend-packages=pants.backend.experimental.scala",
+            f"--source-root-patterns=['{tmpdir}/src']",
+            "--pants-ignore=__pycache__",
+            f'--jvm-resolves={{"jvm-default": "{tmpdir}/lockfile"}}',
+            "--jvm-default-resolve=jvm-default",
+            "--scala-version-for-resolve={'jvm-default': '2.13.8'}",
+            "run",
+            f"{tmpdir}/src/org/pantsbuild/test/Hello.scala",
         ]
         result = run_pants(args)
         assert result.stdout.strip() == "Hello, World!"
