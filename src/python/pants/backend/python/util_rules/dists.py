@@ -119,7 +119,7 @@ class DistBuildRequest:
     input: Digest
     working_directory: str  # Relpath within the input digest.
     build_time_source_roots: tuple[str, ...]  # Source roots for 1st party build-time deps.
-    output_path: str  # Location of the output file within dist dir.
+    output_path: str  # Location of the output directory within dist dir.
 
     target_address_spec: str | None = None  # Only needed for logging etc.
     wheel_config_settings: FrozenDict[str, tuple[str, ...]] | None = None
