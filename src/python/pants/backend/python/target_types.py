@@ -292,7 +292,7 @@ class ConsoleScript(MainSpecification):
         return self.name
 
 
-class PexEntryPointField(AsyncFieldMixin, SecondaryOwnerMixin, Field):
+class EntryPointField(AsyncFieldMixin, SecondaryOwnerMixin, Field):
     alias = "entry_point"
     default = None
     help = softwrap(
@@ -333,6 +333,11 @@ class PexEntryPointField(AsyncFieldMixin, SecondaryOwnerMixin, Field):
         return {"includes": [full_glob]}
 
 
+class PexEntryPointField(EntryPointField):
+    # Specialist subclass for use with `PexBinary` targets.
+    pass
+
+
 # See `target_types_rules.py` for the `ResolvePexEntryPointRequest -> ResolvedPexEntryPoint` rule.
 @dataclass(frozen=True)
 class ResolvedPexEntryPoint:
@@ -344,7 +349,7 @@ class ResolvedPexEntryPoint:
 class ResolvePexEntryPointRequest:
     """Determine the `entry_point` for a `pex_binary` after applying all syntactic sugar."""
 
-    entry_point_field: PexEntryPointField
+    entry_point_field: EntryPointField
 
 
 class PexScriptField(Field):
@@ -1257,6 +1262,11 @@ class PythonRequirementResolveField(PythonResolveField):
     )
 
 
+class PythonRequirementEntryPointField(EntryPointField):
+    # Specialist subclass for matching `PythonRequirementTarget` when running.
+    pass
+
+
 class PythonRequirementTarget(Target):
     alias = "python_requirement"
     core_fields = (
@@ -1266,7 +1276,7 @@ class PythonRequirementTarget(Target):
         PythonRequirementModulesField,
         PythonRequirementTypeStubModulesField,
         PythonRequirementResolveField,
-        PexEntryPointField,
+        PythonRequirementEntryPointField,
     )
     help = softwrap(
         f"""
