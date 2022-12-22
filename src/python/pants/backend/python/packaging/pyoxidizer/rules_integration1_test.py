@@ -76,6 +76,7 @@ def test_end_to_end() -> None:
         ]
         package_result = run_pants(package_args)
         package_result.assert_success()
+        print(package_result.stderr)
 
         # Check that the binary is executable.
         bin_path = next(Path("dist", f"{tmpdir}.hellotest", "bin").glob("*/debug/install/bin"))
@@ -93,6 +94,8 @@ def test_end_to_end() -> None:
         run_result = run_pants(run_args)
         assert run_result.exit_code == 42
         assert run_result.stdout == "Hello world!\n"
+        print(run_result.stderr)
+        assert False
 
 
 @skip_on_linux_arm
@@ -120,3 +123,5 @@ def test_requires_wheels() -> None:
         result = run_pants(args)
         result.assert_failure()
         assert "InvalidTargetException" in result.stderr
+        print(result.stderr)
+        assert False
