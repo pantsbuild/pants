@@ -19,8 +19,8 @@ from pants.backend.python.dependency_inference.module_mapper import (
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
     EntryPoint,
-    PexEntryPointField,
     PythonRequirementDependenciesField,
+    PythonRequirementEntryPointField,
     PythonRequirementModulesField,
     PythonRequirementResolveField,
     PythonRequirementsField,
@@ -59,14 +59,14 @@ class PythonRequirementFieldSet(RunFieldSet):
         PythonRequirementModulesField,
         PythonRequirementTypeStubModulesField,
         PythonRequirementResolveField,
-        PexEntryPointField,
+        PythonRequirementEntryPointField,
     )
 
     requirements: PythonRequirementsField
     dependencies: PythonRequirementDependenciesField
     modules: PythonRequirementModulesField
     resolve: PythonRequirementResolveField
-    entry_point: PexEntryPointField
+    entry_point: PythonRequirementEntryPointField
 
 
 @memoized
