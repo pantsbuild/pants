@@ -5,7 +5,7 @@ remote_cache_read = true
 remote_cache_write = true
 
 [test]
-use_coverage = true
+use_coverage = false
 
 [pytest]
 args = ["--no-header", "--noskip", "-vv"]
