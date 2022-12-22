@@ -8,7 +8,7 @@ use async_oncecell::OnceCell;
 use fs::{DirectoryDigest, Permissions, RelativePath};
 use hashing::Digest;
 use parking_lot::Mutex;
-use std::time::{Instant};
+use std::time::Instant;
 use tempfile::TempDir;
 
 use crate::{Store, StoreError};
@@ -122,8 +122,11 @@ impl ImmutableInputs {
       })
       .await
       .cloned();
-      log::warn!("get_or_try_init the cell took {} us.", cell_now.elapsed().as_micros());
-      result
+    log::warn!(
+      "get_or_try_init the cell took {} us.",
+      cell_now.elapsed().as_micros()
+    );
+    result
   }
 
   /// Returns an absolute Path to immutably consume the given Digest from.
