@@ -87,6 +87,7 @@ async def go_sdk_invoke_setup(goroot: GoRoot) -> GoSdkRunSetup:
               cd "${GoSdkRunSetup.CHDIR_ENV}"
             fi
             if [ -n "${GoSdkRunSetup.SANDBOX_ROOT_ENV}" ]; then
+              export __PANTS_SANDBOX_ROOT__="$sandbox_root"
               args=("${{@//__PANTS_SANDBOX_ROOT__/$sandbox_root}}")
               set -- "${{args[@]}}"
             fi

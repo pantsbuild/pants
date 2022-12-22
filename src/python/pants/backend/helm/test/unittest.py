@@ -24,14 +24,7 @@ from pants.backend.helm.util_rules import tool
 from pants.backend.helm.util_rules.chart import HelmChart, HelmChartRequest
 from pants.backend.helm.util_rules.sources import HelmChartRoot, HelmChartRootRequest
 from pants.backend.helm.util_rules.tool import HelmProcess
-from pants.core.goals.test import (
-    TestDebugAdapterRequest,
-    TestDebugRequest,
-    TestFieldSet,
-    TestRequest,
-    TestResult,
-    TestSubsystem,
-)
+from pants.core.goals.test import TestFieldSet, TestRequest, TestResult, TestSubsystem
 from pants.core.target_types import ResourceSourceField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
@@ -45,7 +38,6 @@ from pants.engine.target import (
     TransitiveTargets,
     TransitiveTargetsRequest,
 )
-from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
@@ -166,24 +158,11 @@ async def run_helm_unittest(
     )
 
 
-@rule
-async def generate_helm_unittest_debug_request(_: HelmUnitTestRequest.Batch) -> TestDebugRequest:
-    raise NotImplementedError("Can not debug Helm unit tests")
-
-
-@rule
-async def generate_helm_unittest_debug_adapter_request(
-    _: HelmUnitTestRequest.Batch,
-) -> TestDebugAdapterRequest:
-    raise NotImplementedError("Can not debug Helm unit tests")
-
-
 def rules():
     return [
         *collect_rules(),
         *subsystem_rules(),
         *dependency_rules(),
         *tool.rules(),
-        UnionRule(TestFieldSet, HelmUnitTestFieldSet),
         *HelmUnitTestRequest.rules(),
     ]

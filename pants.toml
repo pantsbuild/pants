@@ -30,6 +30,7 @@ backend_packages.add = [
   "pants.backend.experimental.scala.lint.scalafmt",
   "pants.backend.experimental.scala.debug_goals",
   "pants.backend.experimental.visibility",
+  "pants.backend.tools.preamble",
   "pants.explorer.server",
   "internal_plugins.releases",
   "internal_plugins.test_lockfile_fixtures",
@@ -69,10 +70,10 @@ build_ignore.add = [
 
 unmatched_build_file_globs = "error"
 
-# TODO: May cause tests which experience missing digests to hang. If you experience an
-# issue, please change this to `fetch` and then report an issue on:
+# TODO: We would like to be able to use `validate` or `defer` here, but further hardening of
+# network codepaths is needed. See:
 #   https://github.com/pantsbuild/pants/issues/16096.
-cache_content_behavior = "validate"
+cache_content_behavior = "fetch"
 
 [anonymous-telemetry]
 enabled = true
@@ -174,6 +175,7 @@ extra_requirements.add = [
   "pygments",
 ]
 lockfile = "3rdparty/python/pytest.lock"
+execution_slot_var = "TEST_EXECUTION_SLOT"
 
 [test]
 extra_env_vars = [
@@ -199,8 +201,8 @@ lockfile = "3rdparty/python/mypy.lock"
 [coverage-py]
 interpreter_constraints = [">=3.7,<3.10"]
 
-[regex-lint]
-config = "@build-support/regexes/config.yaml"
+[preamble]
+template_by_globs = "@build-support/preambles/config.yaml"
 
 [generate-lockfiles]
 custom_command = "build-support/bin/generate_all_lockfiles.sh"

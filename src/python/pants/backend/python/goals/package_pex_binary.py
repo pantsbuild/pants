@@ -36,7 +36,7 @@ from pants.core.goals.package import (
     OutputPathField,
     PackageFieldSet,
 )
-from pants.core.goals.run import RunFieldSet
+from pants.core.goals.run import RunFieldSet, RunInSandboxBehavior
 from pants.core.target_types import FileSourceField
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
@@ -54,6 +54,8 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
+    run_in_sandbox_behavior = RunInSandboxBehavior.RUN_REQUEST_HERMETIC
+
     required_fields = (PexEntryPointField,)
 
     entry_point: PexEntryPointField

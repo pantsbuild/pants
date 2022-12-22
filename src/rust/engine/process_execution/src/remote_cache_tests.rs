@@ -1,3 +1,5 @@
+// Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
+// Licensed under the Apache License, Version 2.0 (see LICENSE).
 use std::collections::{BTreeMap, HashSet};
 use std::convert::TryInto;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -784,6 +786,7 @@ async fn make_action_result_basic() {
     remexec::OutputDirectory {
       path: "pets/cats".to_owned(),
       tree_digest: Some(TestTree::roland_at_root().digest().into()),
+      is_topologically_sorted: false,
     }
   );
 

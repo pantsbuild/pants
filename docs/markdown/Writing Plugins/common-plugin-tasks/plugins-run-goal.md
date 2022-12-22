@@ -72,7 +72,7 @@ from pants.engine.unions import UnionRule
 def rules():
     return [
       	*collect_rules(),
-        UnionRule(RunFieldSet, BashRunFieldSet),
+        *BashRunFieldSet.rules(),
     ]
 ```
 
@@ -156,7 +156,32 @@ def rules():
 
 Now, when you run `./pants run path/to/binary.sh`, Pants should run the program.
 
-4. Add tests (optional)
+4. Define `@rule`s for debugging
+------------------------------------
+
+`./pants run` exposes `--debug-adapter` options for debugging code. To hook into this behavior, opt-in in your `RunRequest` subclass and define an additional rule:
+
+```python
+from pants.core.goals.run import RunDebugAdapterRequest
+from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
+
+@dataclass(frozen=True)
+class BashRunFieldSet(RunFieldSet):
+    ...  # Fields from earlier
+    supports_debug_adapter = True  # Supports --debug-adapter
+
+
+@rule
+async def run_bash_binary_debug_adapter(
+    field_set: BashRunFieldSet,
+    debug_adapter: DebugAdapterSubsystem,
+) -> RunDebugAdapterRequest:
+    ...
+```
+
+Your rule should be configured to wait for client connection before continuing.
+
+5. Add tests (optional)
 -----------------------
 
 Refer to [Testing rules](doc:rules-api-testing). TODO

@@ -28,8 +28,11 @@ from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.jvm.jdk_rules import InternalJdk, JvmProcess
+from pants.jvm.jdk_rules import rules as jdk_rules
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
+from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
+from pants.jvm.resolve.jvm_tool import rules as jvm_tool_rules
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
@@ -193,20 +196,20 @@ async def run_jar_tool(
     return await Get(Digest, RemovePrefix(result.output_digest, output_prefix))
 
 
-_JAR_TOOL_SRC_PACKAGES = ["org.pantsbuild.args4j", "org.pantsbuild.tools.jar"]
+_JAR_TOOL_SRC_PACKAGES = ["args4j", "jar_tool_source"]
 
 
 def _load_jar_tool_sources() -> list[FileContent]:
     result = []
     for package in _JAR_TOOL_SRC_PACKAGES:
-        pkg_path = package.replace(".", os.path.sep)
-        relative_folder = os.path.join("src", pkg_path)
-        for basename in pkg_resources.resource_listdir(__name__, relative_folder):
+        # pkg_path = package.replace(".", os.path.sep)
+        # relative_folder = os.path.join("src", pkg_path)
+        for basename in pkg_resources.resource_listdir(__name__, package):
             result.append(
                 FileContent(
-                    path=os.path.join(pkg_path, basename),
+                    path=os.path.join(package, basename),
                     content=pkg_resources.resource_string(
-                        __name__, os.path.join(relative_folder, basename)
+                        __name__, os.path.join(package, basename)
                     ),
                 )
             )
@@ -300,5 +303,8 @@ async def generate_jartool_lockfile_request(
 def rules():
     return [
         *collect_rules(),
+        *coursier_fetch_rules(),
+        *jdk_rules(),
+        *jvm_tool_rules(),
         UnionRule(GenerateToolLockfileSentinel, JarToolGenerateLockfileSentinel),
     ]

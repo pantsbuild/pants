@@ -157,11 +157,11 @@ You only need to declare direct dependencies. Pants will pull in _transitive dep
 Field default values
 ====================
 
-As mentioned above in [BUILD files](doc:targets#build-files), most fields use sensible defaults. And for specific cases it is easy to provide some other value to a specific target. The issue is if you  want to apply a specific non-default value for a field on many targets. This can get unwieldy, error  prone and hard to maintain. Enter `__defaults__`.
+As mentioned above in [BUILD files](doc:targets#build-files), most target fields have sensible defaults. And it's easy to override those values on a specific target. But applying the same non-default value on many targets can get unwieldy, error-prone and hard to maintain. Enter `__defaults__`.
 
-Default field values per target are set using the `__defaults__` BUILD file symbol, and apply to the current subtree.
+Alternative default field values are set using the `__defaults__` BUILD file symbol, and apply to targets in the filesystem tree under that BUILD file's directory.
 
-The defaults are provided as a dictionary mapping targets to the default field values. Multiple targets may share the same set of default field values, when grouped together in parenthesis (as a Python tuple).
+The defaults are provided as a dictionary mapping target types to the default field values. Multiple target types may share the same set of default field values, when grouped together in parentheses (as a Python tuple).
 
 Use the `all` keyword argument to provide default field values that should apply to all targets.
 

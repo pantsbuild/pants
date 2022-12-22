@@ -48,6 +48,7 @@ from pants.engine.process import InteractiveProcessResult
 from pants.engine.rules import Get, rule
 from pants.engine.target import Target
 from pants.engine.unions import UnionRule
+from pants.testutil.debug_adapter_util import debugadapter_port_for_testing
 from pants.testutil.python_interpreter_selection import (
     all_major_minor_python_versions,
     skip_unless_python27_and_python3_present,
@@ -108,6 +109,7 @@ def _configure_pytest_runner(
     args = [
         "--backend-packages=pants.backend.python",
         f"--source-root-patterns={SOURCE_ROOT}",
+        f"--debug-adapter-port={debugadapter_port_for_testing()}",
         *(extra_args or ()),
     ]
     rule_runner.set_options(args, env=env, env_inherit={"PATH", "PYENV_ROOT", "HOME"})
@@ -128,6 +130,7 @@ def run_pytest(
     *,
     extra_args: list[str] | None = None,
     env: dict[str, str] | None = None,
+    test_debug_adapter: bool = True,
 ) -> TestResult:
     _configure_pytest_runner(rule_runner, extra_args=extra_args, env=env)
     batch = _get_pytest_batch(rule_runner, test_targets)
@@ -137,6 +140,19 @@ def run_pytest(
         with mock_console(rule_runner.options_bootstrapper):
             debug_result = rule_runner.run_interactive_process(debug_request.process)
             assert test_result.exit_code == debug_result.exit_code
+
+    if test_debug_adapter:
+        debug_adapter_request = rule_runner.request(TestDebugAdapterRequest, [batch])
+        if debug_adapter_request.process is not None:
+            with mock_console(rule_runner.options_bootstrapper) as mocked_console:
+                _, stdioreader = mocked_console
+                debug_adapter_result = rule_runner.run_interactive_process(
+                    debug_adapter_request.process
+                )
+                assert (
+                    test_result.exit_code == debug_adapter_result.exit_code
+                ), f"{stdioreader.get_stdout()}\n{stdioreader.get_stderr()}"
+
     return test_result
 
 
@@ -289,14 +305,14 @@ def test_uses_correct_python_version(rule_runner: RuleRunner) -> None:
     py2_tgt = rule_runner.get_target(
         Address(PACKAGE, target_name="py2", relative_file_path="tests.py")
     )
-    result = run_pytest(rule_runner, [py2_tgt], extra_args=extra_args)
+    result = run_pytest(rule_runner, [py2_tgt], extra_args=extra_args, test_debug_adapter=False)
     assert result.exit_code == 2
     assert "SyntaxError: invalid syntax" in result.stdout
 
     py3_tgt = rule_runner.get_target(
         Address(PACKAGE, target_name="py3", relative_file_path="tests.py")
     )
-    result = run_pytest(rule_runner, [py3_tgt], extra_args=extra_args)
+    result = run_pytest(rule_runner, [py3_tgt], extra_args=extra_args, test_debug_adapter=False)
     assert result.exit_code == 0
     assert f"{PACKAGE}/tests.py ." in result.stdout
 
@@ -802,7 +818,6 @@ def test_debug_adaptor_request_argv(rule_runner: RuleRunner) -> None:
         "./pytest_runner.pex_pex_shim.sh",
         "--listen",
         "127.0.0.1:5678",
-        "--wait-for-client",
         "-c",
         unittest.mock.ANY,
         "--color=no",

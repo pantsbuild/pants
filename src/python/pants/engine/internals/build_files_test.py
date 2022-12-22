@@ -11,6 +11,7 @@ import pytest
 
 from pants.build_graph.address import BuildFileAddressRequest, MaybeAddress, ResolveError
 from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.core.target_types import GenericTarget
 from pants.engine.addresses import Address, AddressInput, BuildFileAddress
 from pants.engine.fs import DigestContents, FileContent, PathGlobs
 from pants.engine.internals.build_files import (
@@ -56,7 +57,8 @@ def test_parse_address_family_empty() -> None:
         rule_args=[
             Parser(
                 build_root="",
-                target_type_aliases=[],
+                registered_target_types=RegisteredTargetTypes({}),
+                union_membership=UnionMembership({}),
                 object_aliases=BuildFileAliases(),
                 ignore_unrecognized_symbols=False,
             ),
@@ -99,7 +101,8 @@ def run_prelude_parsing_rule(prelude_content: str) -> BuildFilePreludeSymbols:
             BuildFileOptions((), prelude_globs=("prelude",)),
             Parser(
                 build_root="",
-                target_type_aliases=["target"],
+                registered_target_types=RegisteredTargetTypes({"target": GenericTarget}),
+                union_membership=UnionMembership({}),
                 object_aliases=BuildFileAliases(),
                 ignore_unrecognized_symbols=False,
             ),
@@ -180,7 +183,7 @@ class MockDepsField(Dependencies):
 
 
 class MockMultipleSourcesField(MultipleSourcesField):
-    pass
+    default = ("*.mock",)
 
 
 class MockTgt(Target):
@@ -376,6 +379,28 @@ def test_parametrize_defaults(target_adaptor_rule_runner: RuleRunner) -> None:
     assert target_adaptor.kwargs["tags"] == ParametrizeDefault(a=("a", "root"), b=("non-root", "b"))
 
 
+def test_augment_target_field_defaults(target_adaptor_rule_runner: RuleRunner) -> None:
+    target_adaptor_rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """
+                mock_tgt(
+                  sources=(
+                    "*.added",
+                    *mock_tgt.sources.default,
+                  ),
+                )
+                """
+            ),
+        },
+    )
+    target_adaptor = target_adaptor_rule_runner.request(
+        TargetAdaptor,
+        [TargetAdaptorRequest(Address(""), description_of_origin="tests")],
+    )
+    assert target_adaptor.kwargs["sources"] == ("*.added", "*.mock")
+
+
 def test_target_adaptor_not_found(target_adaptor_rule_runner: RuleRunner) -> None:
     with pytest.raises(ExecutionError) as exc:
         target_adaptor_rule_runner.request(
@@ -428,7 +453,8 @@ def test_build_files_share_globals() -> None:
             BuildFileOptions((), prelude_globs=("prelude",)),
             Parser(
                 build_root="",
-                target_type_aliases=[],
+                registered_target_types=RegisteredTargetTypes({}),
+                union_membership=UnionMembership({}),
                 object_aliases=BuildFileAliases(),
                 ignore_unrecognized_symbols=False,
             ),

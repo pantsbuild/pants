@@ -6,7 +6,9 @@ from __future__ import annotations
 import collections
 import json
 from dataclasses import asdict, dataclass, is_dataclass
-from typing import Any, Iterable
+from typing import Any, Iterable, Mapping
+
+from typing_extensions import Protocol, runtime_checkable
 
 from pants.engine.collection import Collection
 from pants.engine.console import Console
@@ -24,6 +26,14 @@ from pants.engine.target import (
     UnexpandedTargets,
 )
 from pants.option.option_types import BoolOption
+
+
+@runtime_checkable
+class Dictable(Protocol):
+    """Make possible to avoid adding concrete types to serialize objects."""
+
+    def asdict(self) -> Mapping[str, Any]:
+        ...
 
 
 class PeekSubsystem(Outputting, GoalSubsystem):
@@ -106,6 +116,8 @@ class _PeekJsonEncoder(json.JSONEncoder):
             return list(o)
         if isinstance(o, Field):
             return self.default(o.value)
+        if isinstance(o, Dictable):
+            return o.asdict()
         try:
             return super().default(o)
         except TypeError:

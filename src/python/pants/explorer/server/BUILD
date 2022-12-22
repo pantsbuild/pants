@@ -26,9 +26,11 @@ python_tests(
 __dependents_rules__(
     # Block any outside sources from pulling in code from this backend, as it is self contained and
     # have 3rd party dependencies that we don't want to leak to the core Pants distribution.
+    # N.B. although we have dependents rules in place for these 3rd party deps, those only block
+    # direct dependencies to them, not transitive ones, such as importing modules from this subtree.
     (
         "*",
-        build_file_dir() / "**",
+        "/**",
         "!*",
     ),
 )
