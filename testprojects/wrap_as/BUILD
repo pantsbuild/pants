@@ -26,5 +26,5 @@ experimental_wrap_as_resources(
 pex_binary(
     name="app",
     dependencies=[":python_dependency", ":resource_dependency"],
-    entry_point="testprojects.magic.hello_world",
+    entry_point="testprojects.wrap_as.hello_world",
 )

@@ -11,9 +11,9 @@ from typing import Iterable, Union
 from pants.core.target_types import FileSourceField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import UnparsedAddressInputs
+from pants.engine.fs import DigestSubset, PathGlobs
 from pants.engine.internals.native_engine import Digest, Snapshot
 from pants.engine.internals.selectors import Get
-from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Rule, collect_rules, rule, rule_helper
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
@@ -91,18 +91,11 @@ async def _wrap_source(wrapper: GenerateSourcesRequest) -> GeneratedSources:
     else:
         outputs_value = sources.files
 
-    # I'm sure there's a better way to do this, but this works for now.
     filter_digest = await Get(
-        ProcessResult,
-        Process(
-            argv=("/usr/bin/true",),
-            description="Filter digest",
-            input_digest=sources.snapshot.digest,
-            output_files=outputs_value,
-        ),
+        Digest, DigestSubset(sources.snapshot.digest, PathGlobs(outputs_value))
     )
 
-    snapshot = await Get(Snapshot, Digest, filter_digest.output_digest)
+    snapshot = await Get(Snapshot, Digest, filter_digest)
     return GeneratedSources(snapshot)
 
 
