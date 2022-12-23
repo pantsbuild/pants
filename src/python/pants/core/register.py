@@ -42,6 +42,7 @@ from pants.core.util_rules import (
     archive,
     config_files,
     external_tool,
+    reexport,
     source_files,
     stripped_source_files,
     subprocess_environment,
@@ -89,6 +90,7 @@ def rules():
         *stripped_source_files.rules(),
         *subprocess_environment.rules(),
         *system_binaries.rules(),
+        *reexport.rules(),
         *target_type_rules(),
     ]
 
@@ -107,6 +109,7 @@ def target_types():
         RemoteEnvironmentTarget,
         ResourcesGeneratorTarget,
         ResourceTarget,
+        *reexport.targets(),
     ]
 
 
