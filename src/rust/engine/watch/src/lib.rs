@@ -37,7 +37,7 @@ use std::time::Duration;
 use crossbeam_channel::{self, Receiver, RecvTimeoutError, TryRecvError};
 use fs::GitignoreStyleExcludes;
 use log::{debug, trace, warn};
-use notify::event::{Flag, ModifyKind};
+use notify::event::{Flag, MetadataKind, ModifyKind};
 use notify::{Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use parking_lot::Mutex;
 use task_executor::Executor;
@@ -197,6 +197,20 @@ impl InvalidationWatcher {
     canonical_build_root: &Path,
     ev: Event,
   ) {
+    if matches!(ev.kind, EventKind::Modify(ModifyKind::Metadata(_)))
+      && !matches!(
+        ev.kind,
+        EventKind::Modify(ModifyKind::Metadata(MetadataKind::Permissions))
+      )
+    {
+      // If only the metadata (AccessTime, WriteTime, Perms, Link Count, etc...) was changed
+      // (other than permissions, which include the executable bit) it doesn't change anything Pants
+      // particularly cares about. One could argue if the permissions/ownership changed Pants would
+      // care, but until the name/data changes (which would be a separate event) the substance of
+      // the file in Pants' eyes is the same.
+      return;
+    }
+
     let is_data_only_event = matches!(ev.kind, EventKind::Modify(ModifyKind::Data(_)));
     let flag = ev.flag();
 
