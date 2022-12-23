@@ -201,7 +201,7 @@ impl InvalidationWatcher {
     {
       // (Other than permissions, which include the executable bit) if only the metadata
       // (AccessTime, WriteTime, Perms, Link Count, etc...) was changed, it doesn't change anything
-      // Pants (other than permissions, which include the executable bit)particularly cares about.
+      // Pants particularly cares about.
       //
       // One could argue if the permissions/ownership changed Pants would care, but until the
       // name/data changes (which would be a separate event) the substance of the file in Pants'
