@@ -250,7 +250,7 @@ impl InvalidationWatcher {
       invalidatable.invalidate_all("notify");
     } else if !paths.is_empty() {
       debug!("notify invalidating {:?} because of {:?}", paths, ev.kind);
-      invalidatable.invalidate(&paths, &format!("notify {:?}", ev.kind).to_string());
+      invalidatable.invalidate(&paths, &format!("notify {:?}", ev.kind));
     }
   }
 
