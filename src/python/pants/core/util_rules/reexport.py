@@ -76,8 +76,12 @@ async def _reexport(wrapper: GenerateSourcesRequest) -> GeneratedSources:
     )
 
     outputs_value: Iterable[str] | None = request.get(ReExportOutputsField).value
-    if not outputs_value:
+    if outputs_value:
+        pass
+    elif default_extensions:
         outputs_value = [i for i in sources.files if any(i.endswith(j) for j in default_extensions)]
+    else:
+        outputs_value = sources.files
 
     # I'm sure there's a better way to do this, but this works for now.
     filter_digest = await Get(

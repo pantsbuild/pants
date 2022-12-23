@@ -33,6 +33,7 @@ from pants.core.target_types import (
     LockfileTarget,
     RelocatedFiles,
     ResourcesGeneratorTarget,
+    ResourceSourceField,
     ResourceTarget,
     http_source,
     per_platform,
@@ -52,10 +53,13 @@ from pants.core.util_rules.environments import (
     LocalEnvironmentTarget,
     RemoteEnvironmentTarget,
 )
+from pants.core.util_rules.reexport import reexport_rule_and_target
 from pants.engine.internals.parametrize import Parametrize
 from pants.goal import anonymous_telemetry, stats_aggregator
 from pants.source import source_root
 from pants.vcs import git
+
+reexport_resources = reexport_rule_and_target(ResourceSourceField, "experimental_export_resources")
 
 
 def rules():
@@ -90,6 +94,7 @@ def rules():
         *subprocess_environment.rules(),
         *system_binaries.rules(),
         *target_type_rules(),
+        *reexport_resources.rules,
     ]
 
 
@@ -107,6 +112,7 @@ def target_types():
         RemoteEnvironmentTarget,
         ResourcesGeneratorTarget,
         ResourceTarget,
+        *reexport_resources.target_types,
     ]
 
 
