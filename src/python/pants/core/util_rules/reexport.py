@@ -5,16 +5,16 @@
 from __future__ import annotations
 
 import logging
-from typing import Iterable
+from dataclasses import dataclass
+from typing import Iterable, Union
 
-from pants.backend.python.target_types import PythonSourceField
 from pants.core.target_types import FileSourceField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import UnparsedAddressInputs
 from pants.engine.internals.native_engine import Digest, Snapshot
 from pants.engine.internals.selectors import Get
 from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import collect_rules, rule
+from pants.engine.rules import Rule, collect_rules, rule, rule_helper
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     GeneratedSources,
@@ -31,16 +31,18 @@ from pants.engine.unions import UnionRule
 logger = logging.getLogger(__name__)
 
 
-class ActivateExportPythonTargetSourcesField(MultipleSourcesField):
-    # We solely register so that codegen can match a fieldset. One must be defined per target type.
+@dataclass(frozen=True)
+class ReexportRuleAndTarget:
+    rules: tuple[Union[Rule, UnionRule], ...]
+    target_types: tuple[type[Target], ...]
+
+
+class ActivateReexportTargetFieldBase(MultipleSourcesField):
+    # We solely register so that codegen can match a fieldset.
+    # One unique subclass must be defined per target type.
     alias = "_sources"
     uses_source_roots = False
     expected_num_files = 0
-
-
-class GenerateExportedPythonSourcesRequest(GenerateSourcesRequest):
-    input = ActivateExportPythonTargetSourcesField
-    output = PythonSourceField
 
 
 class ReExportInputsField(SpecialCasedDependencies):
@@ -53,20 +55,10 @@ class ReExportOutputsField(StringSequenceField):
     required = False
 
 
-class ExperimentalExportPython(Target):
-    alias = "experimental_export_python"
-    core_fields = (
-        *COMMON_TARGET_FIELDS,
-        ActivateExportPythonTargetSourcesField,
-        ReExportInputsField,
-        ReExportOutputsField,
-    )
-
-
-@rule
-async def magic(wrapper: GenerateExportedPythonSourcesRequest) -> GeneratedSources:
+@rule_helper
+async def _reexport(wrapper: GenerateSourcesRequest) -> GeneratedSources:
     request = wrapper.protocol_target
-    default_extensions = {i for i in wrapper.output.expected_file_extensions if i}
+    default_extensions = {i for i in (wrapper.output.expected_file_extensions or ()) if i}
 
     inputs = await Get(
         Targets,
@@ -102,14 +94,34 @@ async def magic(wrapper: GenerateExportedPythonSourcesRequest) -> GeneratedSourc
     return GeneratedSources(snapshot)
 
 
-def rules():
-    return [
-        *collect_rules(),
-        UnionRule(GenerateSourcesRequest, GenerateExportedPythonSourcesRequest),
-    ]
+def reexport_rule_and_target(
+    source_field_type: type[SourcesField], target_name: str
+) -> ReexportRuleAndTarget:
+    class ActivateReexportTargetField(ActivateReexportTargetFieldBase):
+        pass
 
+    class GenerateReexportedSourcesRequest(GenerateSourcesRequest):
+        input = ActivateReexportTargetField
+        output = source_field_type
 
-def targets():
-    return [
-        ExperimentalExportPython,
-    ]
+    class ExportTarget(Target):
+        alias = target_name
+        core_fields = (
+            *COMMON_TARGET_FIELDS,
+            ActivateReexportTargetField,
+            ReExportInputsField,
+            ReExportOutputsField,
+        )
+
+    # need to use `_param_type_overrides` to stop `@rule` from inspecting the source
+    @rule(_param_type_overrides={"request": GenerateReexportedSourcesRequest})
+    async def reexport(request: GenerateSourcesRequest) -> GeneratedSources:
+        return await _reexport(request)
+
+    return ReexportRuleAndTarget(
+        rules=(
+            *collect_rules(locals()),
+            UnionRule(GenerateSourcesRequest, GenerateReexportedSourcesRequest),
+        ),
+        target_types=(ExportTarget,),
+    )

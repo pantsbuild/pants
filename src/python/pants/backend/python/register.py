@@ -36,6 +36,7 @@ from pants.backend.python.target_types import (
     PexBinary,
     PythonDistribution,
     PythonRequirementTarget,
+    PythonSourceField,
     PythonSourcesGeneratorTarget,
     PythonSourceTarget,
     PythonTestsGeneratorTarget,
@@ -51,6 +52,9 @@ from pants.backend.python.util_rules import (
 )
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.core.target_types import TargetGeneratorSourcesHelperTarget
+from pants.core.util_rules.reexport import reexport_rule_and_target
+
+reexport_python = reexport_rule_and_target(PythonSourceField, "experimental_export_python")
 
 
 def build_file_aliases():
@@ -85,6 +89,7 @@ def rules():
         *pipenv_requirements.rules(),
         *poetry_requirements.rules(),
         *python_requirements.rules(),
+        *reexport_python.rules,
     )
 
 
@@ -104,4 +109,5 @@ def target_types():
         PipenvRequirementsTargetGenerator,
         PoetryRequirementsTargetGenerator,
         PythonRequirementsTargetGenerator,
+        *reexport_python.target_types,
     )
