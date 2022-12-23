@@ -247,21 +247,10 @@ class RunShellCommand(RunFieldSet):
     run_in_sandbox_behavior = RunInSandboxBehavior.NOT_SUPPORTED
 
 
-@dataclass(frozen=True)
-class Floozle:
-    request: GenerateSourcesRequest
-
-
 @rule(desc="Running shell command", level=LogLevel.DEBUG)
 async def run_shell_command(
     request: GenerateFilesFromShellCommandRequest,
 ) -> GeneratedSources:
-    return await Get(GeneratedSources, Floozle(request))
-
-
-@rule
-async def handle_floozle(request_: Floozle) -> GeneratedSources:
-    request = request_.request
     shell_command = request.protocol_target
     environment_name = await Get(
         EnvironmentName, EnvironmentNameRequest, EnvironmentNameRequest.from_target(shell_command)
