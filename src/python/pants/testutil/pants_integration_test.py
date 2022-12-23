@@ -199,7 +199,7 @@ def run_pants(
     command: Command,
     *,
     hermetic: bool = True,
-    use_pantsd: bool = True,
+    use_pantsd: bool = False,
     config: Mapping | None = None,
     extra_env: Mapping[str, str] | None = None,
     stdin_data: bytes | str | None = None,
