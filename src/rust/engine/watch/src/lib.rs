@@ -203,7 +203,7 @@ impl InvalidationWatcher {
       // (AccessTime, WriteTime, Perms, Link Count, etc...) was changed, it doesn't change anything
       // Pants particularly cares about.
       //
-      // One could argue if the permissions/ownership changed Pants would care, but until the
+      // One could argue if the ownership changed Pants would care, but until the
       // name/data changes (which would be a separate event) the substance of the file in Pants'
       // eyes is the same.
       return;
