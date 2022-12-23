@@ -9,6 +9,7 @@ import subprocess
 import sys
 from contextlib import contextmanager
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Iterator, List, Mapping, Union
 
 import pytest
@@ -215,7 +216,7 @@ def run_pants(
     :param stdin_data: Make this data available to be read from the process's stdin.
     """
     with temporary_workdir() as workdir:
-        return run_pants_with_workdir(
+        result =  run_pants_with_workdir(
             command,
             workdir=workdir,
             hermetic=hermetic,
@@ -224,6 +225,8 @@ def run_pants(
             stdin_data=stdin_data,
             extra_env=extra_env,
         )
+        print((Path(workdir) / "pants.log").read_text())
+        return result
 
 
 # -----------------------------------------------------------------------------------------------
