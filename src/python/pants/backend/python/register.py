@@ -52,9 +52,9 @@ from pants.backend.python.util_rules import (
 )
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.core.target_types import TargetGeneratorSourcesHelperTarget
-from pants.core.util_rules.reexport import reexport_rule_and_target
+from pants.core.util_rules.wrap_source import wrap_source_rule_and_target
 
-reexport_python = reexport_rule_and_target(PythonSourceField, "experimental_export_python")
+wrap_python = wrap_source_rule_and_target(PythonSourceField, "python_sources")
 
 
 def build_file_aliases():
@@ -89,7 +89,7 @@ def rules():
         *pipenv_requirements.rules(),
         *poetry_requirements.rules(),
         *python_requirements.rules(),
-        *reexport_python.rules,
+        *wrap_python.rules,
     )
 
 
@@ -109,5 +109,5 @@ def target_types():
         PipenvRequirementsTargetGenerator,
         PoetryRequirementsTargetGenerator,
         PythonRequirementsTargetGenerator,
-        *reexport_python.target_types,
+        *wrap_python.target_types,
     )

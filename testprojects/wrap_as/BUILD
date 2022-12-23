@@ -13,12 +13,12 @@ experimental_shell_command(
 )
 
 
-experimental_export_python(
+experimental_wrap_as_python_sources(
     name="python_dependency",
     inputs=[":manufacture_python_code"],
 )
 
-experimental_export_resources(
+experimental_wrap_as_resources(
     name="resource_dependency",
     inputs=[":manufacture_resource"],
 )

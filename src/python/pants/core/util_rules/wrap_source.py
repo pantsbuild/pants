@@ -27,17 +27,18 @@ from pants.engine.target import (
     Targets,
 )
 from pants.engine.unions import UnionRule
+from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
-class ReexportRuleAndTarget:
+class WrapSource:
     rules: tuple[Union[Rule, UnionRule], ...]
     target_types: tuple[type[Target], ...]
 
 
-class ActivateReexportTargetFieldBase(MultipleSourcesField):
+class ActivateWrapSourceTargetFieldBase(MultipleSourcesField):
     # We solely register so that codegen can match a fieldset.
     # One unique subclass must be defined per target type.
     alias = "_sources"
@@ -45,25 +46,32 @@ class ActivateReexportTargetFieldBase(MultipleSourcesField):
     expected_num_files = 0
 
 
-class ReExportInputsField(SpecialCasedDependencies):
+class WrapSourceInputsField(SpecialCasedDependencies):
     alias = "inputs"
     required = True
+    help = "The input targets that are to be made available by this target."
 
 
-class ReExportOutputsField(StringSequenceField):
+class WrapSourceOutputsField(StringSequenceField):
     alias = "outputs"
     required = False
+    help = softwrap(
+        "The output files that are made available in the new context by this target. If not "
+        "specified, the target will capture all files with the expected extensions for this "
+        "source format: see the help for the target for the specific extensions. If no extensions "
+        "are specified and this value is not specified, all input files will be returned."
+    )
 
 
 @rule_helper
-async def _reexport(wrapper: GenerateSourcesRequest) -> GeneratedSources:
+async def _wrap_source(wrapper: GenerateSourcesRequest) -> GeneratedSources:
     request = wrapper.protocol_target
     default_extensions = {i for i in (wrapper.output.expected_file_extensions or ()) if i}
 
     inputs = await Get(
         Targets,
         UnparsedAddressInputs,
-        request.get(ReExportInputsField).to_unparsed_address_inputs(),
+        request.get(WrapSourceInputsField).to_unparsed_address_inputs(),
     )
 
     sources = await Get(
@@ -75,7 +83,7 @@ async def _reexport(wrapper: GenerateSourcesRequest) -> GeneratedSources:
         ),
     )
 
-    outputs_value: Iterable[str] | None = request.get(ReExportOutputsField).value
+    outputs_value: Iterable[str] | None = request.get(WrapSourceOutputsField).value
     if outputs_value:
         pass
     elif default_extensions:
@@ -98,34 +106,48 @@ async def _reexport(wrapper: GenerateSourcesRequest) -> GeneratedSources:
     return GeneratedSources(snapshot)
 
 
-def reexport_rule_and_target(
-    source_field_type: type[SourcesField], target_name: str
-) -> ReexportRuleAndTarget:
-    class ActivateReexportTargetField(ActivateReexportTargetFieldBase):
+def wrap_source_rule_and_target(
+    source_field_type: type[SourcesField], target_name_suffix: str
+) -> WrapSource:
+
+    if source_field_type.expected_file_extensions:
+        outputs_help = (
+            "If `outputs` is not specified, all files with the following extensions will be "
+            "matched: " + ", ".join(source_field_type.expected_file_extensions)
+        )
+    else:
+        outputs_help = "If `outputs` is not specified, all files from `inputs` will be matched"
+
+    class ActivateWrapSourceTargetField(ActivateWrapSourceTargetFieldBase):
         pass
 
-    class GenerateReexportedSourcesRequest(GenerateSourcesRequest):
-        input = ActivateReexportTargetField
+    class GenerateWrapSourceSourcesRequest(GenerateSourcesRequest):
+        input = ActivateWrapSourceTargetField
         output = source_field_type
 
-    class ExportTarget(Target):
-        alias = target_name
+    class WrapSourceTarget(Target):
+        alias = f"experimental_wrap_as_{target_name_suffix}"
         core_fields = (
             *COMMON_TARGET_FIELDS,
-            ActivateReexportTargetField,
-            ReExportInputsField,
-            ReExportOutputsField,
+            ActivateWrapSourceTargetField,
+            WrapSourceInputsField,
+            WrapSourceOutputsField,
+        )
+        help = softwrap(
+            "Allow files and sources produced by the targets specified by `inputs` to be consumed "
+            f"by rules that specifically expect a `{source_field_type.__name__}`. Note that this "
+            f"rule does not modify the files in any way. {outputs_help}"
         )
 
     # need to use `_param_type_overrides` to stop `@rule` from inspecting the source
-    @rule(_param_type_overrides={"request": GenerateReexportedSourcesRequest})
-    async def reexport(request: GenerateSourcesRequest) -> GeneratedSources:
-        return await _reexport(request)
+    @rule(_param_type_overrides={"request": GenerateWrapSourceSourcesRequest})
+    async def wrap_source(request: GenerateSourcesRequest) -> GeneratedSources:
+        return await _wrap_source(request)
 
-    return ReexportRuleAndTarget(
+    return WrapSource(
         rules=(
             *collect_rules(locals()),
-            UnionRule(GenerateSourcesRequest, GenerateReexportedSourcesRequest),
+            UnionRule(GenerateSourcesRequest, GenerateWrapSourceSourcesRequest),
         ),
-        target_types=(ExportTarget,),
+        target_types=(WrapSourceTarget,),
     )
