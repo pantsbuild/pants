@@ -841,32 +841,27 @@ class HelpInfoExtracter:
         builtin_backends = discover_source_backends(
             Path(pants.backend.__file__).parent.parent, is_source_root=False
         )
-        inrepo_backends = (
-            chain.from_iterable(
-                discover_source_backends(Path(path_entry), is_source_root=True)
-                for path_entry in global_options.pythonpath
-            )
-            if "pythonpath" in global_options
-            else ()
+        inrepo_backends = chain.from_iterable(
+            discover_source_backends(Path(path_entry), is_source_root=True)
+            for path_entry in global_options.pythonpath
         )
-
         plugin_backends = discover_plugin_backends("pantsbuild.plugin")
+        enabled_backends = {
+            "pants.core",
+            "pants.backend.project_info",
+            *global_options.backend_packages,
+        }
 
         def get_backend_help_info_loader(
             discovered_backend: DiscoveredBackend,
         ) -> Callable[[], BackendHelpInfo]:
-            enabled_backends = {
-                "pants.core",
-                "pants.backend.project_info",
-                *global_options.backend_packages,
-            }
-
             def load() -> BackendHelpInfo:
                 return BackendHelpInfo(
                     name=discovered_backend.name,
                     description=cls.get_module_docstring(discovered_backend.register_py),
-                    enabled=discovered_backend.enabled
-                    or discovered_backend.name in enabled_backends,
+                    enabled=(
+                        discovered_backend.enabled or discovered_backend.name in enabled_backends
+                    ),
                     provider=discovered_backend.provider,
                 )
 

@@ -12,7 +12,7 @@ from pants.engine.unions import UnionMembership
 from pants.help.help_info_extracter import HelpInfoExtracter, pretty_print_type_hint, to_help_str
 from pants.option.config import Config
 from pants.option.global_options import GlobalOptions, LogLevelOption
-from pants.option.option_types import BoolOption, IntOption
+from pants.option.option_types import BoolOption, IntOption, StrListOption
 from pants.option.options import Options
 from pants.option.parser import Parser
 from pants.option.ranked_value import Rank, RankedValue
@@ -234,6 +234,10 @@ def test_get_all_help_info():
         # This is special in having a short option `-l`. Make sure it works.
         level = LogLevelOption()
 
+        # Options required by the plugin discovery extracter
+        backend_packages = StrListOption(help="")
+        pythonpath = StrListOption(help="")
+
     class Foo(Subsystem):
         options_scope = "foo"
         help = "A foo."
@@ -350,6 +354,54 @@ def test_get_all_help_info():
                         "choices": ("trace", "debug", "info", "warn", "error"),
                         "comma_separated_choices": "trace, debug, info, warn, error",
                         "target_field_name": None,
+                    },
+                    {
+                        "choices": None,
+                        "comma_separated_choices": None,
+                        "comma_separated_display_args": "--backend-packages=\"['<str>', '<str>', ...]\"",
+                        "config_key": "backend_packages",
+                        "default": [],
+                        "deprecated_message": None,
+                        "deprecation_active": False,
+                        "display_args": ("--backend-packages=\"['<str>', '<str>', ...]\"",),
+                        "env_var": "PANTS_BACKEND_PACKAGES",
+                        "help": "",
+                        "removal_hint": None,
+                        "removal_version": None,
+                        "scoped_cmd_line_args": ("--backend-packages",),
+                        "target_field_name": None,
+                        "typ": list,
+                        "unscoped_cmd_line_args": ("--backend-packages",),
+                        "value_history": {
+                            "ranked_values": (
+                                {"details": "", "rank": Rank.NONE, "value": []},
+                                {"details": "", "rank": Rank.HARDCODED, "value": []},
+                            ),
+                        },
+                    },
+                    {
+                        "choices": None,
+                        "comma_separated_choices": None,
+                        "comma_separated_display_args": "--pythonpath=\"['<str>', '<str>', ...]\"",
+                        "config_key": "pythonpath",
+                        "default": [],
+                        "deprecated_message": None,
+                        "deprecation_active": False,
+                        "display_args": ("--pythonpath=\"['<str>', '<str>', ...]\"",),
+                        "env_var": "PANTS_PYTHONPATH",
+                        "help": "",
+                        "removal_hint": None,
+                        "removal_version": None,
+                        "scoped_cmd_line_args": ("--pythonpath",),
+                        "target_field_name": None,
+                        "typ": list,
+                        "unscoped_cmd_line_args": ("--pythonpath",),
+                        "value_history": {
+                            "ranked_values": (
+                                {"details": "", "rank": Rank.NONE, "value": []},
+                                {"details": "", "rank": Rank.HARDCODED, "value": []},
+                            ),
+                        },
                     },
                 ),
                 "advanced": tuple(),
