@@ -4,6 +4,7 @@
 from enum import Enum
 from typing import Any, Iterable, List, Optional, Tuple, Union
 
+from pants.base.build_environment import get_buildroot
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.engine.goal import GoalSubsystem
 from pants.engine.rules import collect_rules, rule
@@ -236,7 +237,7 @@ def test_get_all_help_info():
 
         # Options required by the plugin discovery extracter
         backend_packages = StrListOption(help="")
-        pythonpath = StrListOption(help="")
+        pythonpath = StrListOption(help="", default=[f"{get_buildroot()}/pants-plugins"])
 
     class Foo(Subsystem):
         options_scope = "foo"
@@ -270,7 +271,7 @@ def test_get_all_help_info():
         env={},
         config=Config.load([]),
         known_scope_infos=[Global.get_scope_info(), Foo.get_scope_info(), Bar.get_scope_info()],
-        args=["./pants"],
+        args=["./pants", "--backend-packages=['internal_plugins.releases']"],
         bootstrap_option_values=None,
     )
     Global.register_options_on_scope(options, UnionMembership({}))
@@ -376,6 +377,11 @@ def test_get_all_help_info():
                             "ranked_values": (
                                 {"details": "", "rank": Rank.NONE, "value": []},
                                 {"details": "", "rank": Rank.HARDCODED, "value": []},
+                                {
+                                    "details": "from command-line flag",
+                                    "rank": Rank.FLAG,
+                                    "value": ["internal_plugins.releases"],
+                                },
                             ),
                         },
                     },
@@ -384,7 +390,7 @@ def test_get_all_help_info():
                         "comma_separated_choices": None,
                         "comma_separated_display_args": "--pythonpath=\"['<str>', '<str>', ...]\"",
                         "config_key": "pythonpath",
-                        "default": [],
+                        "default": [f"{get_buildroot()}/pants-plugins"],
                         "deprecated_message": None,
                         "deprecation_active": False,
                         "display_args": ("--pythonpath=\"['<str>', '<str>', ...]\"",),
@@ -399,7 +405,11 @@ def test_get_all_help_info():
                         "value_history": {
                             "ranked_values": (
                                 {"details": "", "rank": Rank.NONE, "value": []},
-                                {"details": "", "rank": Rank.HARDCODED, "value": []},
+                                {
+                                    "details": "",
+                                    "rank": Rank.HARDCODED,
+                                    "value": [f"{get_buildroot()}/pants-plugins"],
+                                },
                             ),
                         },
                     },
@@ -580,7 +590,26 @@ def test_get_all_help_info():
                 "used_in_rules": ("construct_scope_foo",),
             },
         },
-        "name_to_backend_help_info": {},
+        "name_to_backend_help_info": {
+            "pants.backend.python": {
+                "description": "Support for Python.\n\nSee https://www.pantsbuild.org/docs/python-backend.",
+                "enabled": False,
+                "name": "pants.backend.python",
+                "provider": "pants",
+            },
+            "internal_plugins.releases": {
+                "description": "",
+                "enabled": True,
+                "name": "internal_plugins.releases",
+                "provider": "pants-plugins",
+            },
+            "plugin.dist": {
+                "description": "This is an empty Pants plugin for the help info extracter test.",
+                "enabled": True,
+                "name": "plugin.dist",
+                "provider": "dummy-plugin",
+            },
+        },
     }
 
     # Break down this colossal structure into pieces so it is easier to spot where the issue is.
@@ -589,7 +618,7 @@ def test_get_all_help_info():
     for key in all_help_info_dict:
         actual = all_help_info_dict[key]
         expected = expected_all_help_info_dict[key]
-        assert expected == actual
+        assert (key, expected) == (key, actual)
 
 
 def test_pretty_print_type_hint() -> None:
