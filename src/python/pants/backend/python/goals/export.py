@@ -192,6 +192,8 @@ async def do_export(
             description,
             dest,
             post_processing_cmds=[
+                # export creates an empty directory for us when the digest gets written.
+                # We have to remove that before creating the symlink in its place.
                 PostProcessingCommand(["rmdir", output_path]),
                 PostProcessingCommand(["ln", "-s", venv_abspath, output_path]),
             ],
