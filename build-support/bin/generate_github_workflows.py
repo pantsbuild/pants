@@ -216,7 +216,7 @@ def install_rustup() -> Step:
         "run": dedent(
             """\
             curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -v -y --default-toolchain none
-            echo "PATH=${PATH}:${HOME}/.cargo/bin" >> $GITHUB_ENV
+            echo "${HOME}/.cargo/bin" >> $GITHUB_PATH
             """
         ),
     }
@@ -293,10 +293,10 @@ def download_apache_thrift() -> Step:
         "if": "runner.os == 'Linux'",
         "run": dedent(
             """\
-            mkdir -p "$HOME/.thrift"
-            curl --fail -L https://binaries.pantsbuild.org/bin/thrift/linux/x86_64/0.15.0/thrift -o "$HOME/.thrift/thrift"
-            chmod +x "$HOME/.thrift/thrift"
-            echo "PATH=${PATH}:${HOME}/.thrift" >> $GITHUB_ENV
+            mkdir -p "${HOME}/.thrift"
+            curl --fail -L https://binaries.pantsbuild.org/bin/thrift/linux/x86_64/0.15.0/thrift -o "${HOME}/.thrift/thrift"
+            chmod +x "${HOME}/.thrift/thrift"
+            echo "${HOME}/.thrift" >> $GITHUB_PATH
             """
         ),
     }
@@ -618,11 +618,12 @@ def build_wheels_job(platform: Platform, python_versions: list[str]) -> Jobs:
             install_rustup(),
             {
                 "name": "Expose Pythons",
-                "run": (
-                    'echo "PATH=${PATH}:'
-                    "/opt/python/cp37-cp37m/bin:"
-                    "/opt/python/cp38-cp38/bin:"
-                    '/opt/python/cp39-cp39/bin" >> $GITHUB_ENV'
+                "run": dedent(
+                    """\
+                    echo "/opt/python/cp37-cp37m/bin" >> $GITHUB_PATH
+                    echo "/opt/python/cp38-cp38/bin" >> $GITHUB_PATH
+                    echo "/opt/python/cp39-cp39/bin" >> $GITHUB_PATH
+                    """
                 ),
             },
         ]
