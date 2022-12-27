@@ -33,13 +33,14 @@ Env = Dict[str, str]
 
 class Platform(Enum):
     LINUX_X86_64 = "Linux-x86_64"
+    LINUX_ARM64 = "Linux-ARM64"
     MACOS10_15_X86_64 = "macOS10-15-x86_64"
     MACOS11_X86_64 = "macOS11-x86_64"
     MACOS11_ARM64 = "macOS11-ARM64"
 
 
 GITHUB_HOSTED = {Platform.LINUX_X86_64, Platform.MACOS11_X86_64}
-SELF_HOSTED = {Platform.MACOS10_15_X86_64, Platform.MACOS11_ARM64}
+SELF_HOSTED = {Platform.LINUX_ARM64, Platform.MACOS10_15_X86_64, Platform.MACOS11_ARM64}
 
 
 def gha_expr(expr: str) -> str:
@@ -256,37 +257,6 @@ def deploy_to_s3(when: str = "github.event_name == 'push'", scope: str | None = 
     }
 
 
-def setup_primary_python(install_python: bool = True) -> Sequence[Step]:
-    ret = []
-    if install_python:
-        ret.append(
-            {
-                "name": f"Set up Python {gha_expr('matrix.python-version')}",
-                "uses": "actions/setup-python@v4",
-                "with": {"python-version": f"{gha_expr('matrix.python-version')}"},
-            }
-        )
-    ret.append(
-        {
-            "name": f"Tell Pants to use Python {gha_expr('matrix.python-version')}",
-            "run": dedent(
-                f"""\
-                echo "PY=python{gha_expr('matrix.python-version')}" >> $GITHUB_ENV
-                echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=['=={gha_expr('matrix.python-version')}.*']" >> $GITHUB_ENV
-                """
-            ),
-        }
-    )
-    return ret
-
-
-def expose_all_pythons() -> Step:
-    return {
-        "name": "Expose Pythons",
-        "uses": "pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe",
-    }
-
-
 def download_apache_thrift() -> Step:
     return {
         "name": "Download Apache `thrift` binary (Linux)",
@@ -309,16 +279,30 @@ class Helper:
     def platform_name(self) -> str:
         return str(self.platform.value)
 
+    def job_name_suffix(self) -> str:
+        return self.platform_name().lower().replace("-", "_")
+
+    def job_name(self, prefix: str) -> str:
+        return f"{prefix}_{self.job_name_suffix()}"
+
     def runs_on(self) -> list[str]:
+        # GHA strongly recommends targeting the self-hosted label as well as
+        # any platform-specific labels, so we don't run on future GH-hosted
+        # platforms without realizing it.
+        ret = ["self-hosted"] if self.platform in SELF_HOSTED else []
         if self.platform == Platform.MACOS11_X86_64:
-            return ["macos-11"]
-        if self.platform == Platform.MACOS11_ARM64:
-            return ["macOS-11-ARM64"]
-        if self.platform == Platform.MACOS10_15_X86_64:
-            return ["macOS-10.15-X64"]
-        if self.platform == Platform.LINUX_X86_64:
-            return ["ubuntu-20.04"]
-        raise ValueError(f"Unsupported platform: {self.platform_name()}")
+            ret += ["macos-11"]
+        elif self.platform == Platform.MACOS11_ARM64:
+            ret += ["macOS-11-ARM64"]
+        elif self.platform == Platform.MACOS10_15_X86_64:
+            ret += ["macOS-10.15-X64"]
+        elif self.platform == Platform.LINUX_X86_64:
+            ret += ["ubuntu-20.04"]
+        elif self.platform == Platform.LINUX_ARM64:
+            ret += ["Linux", "ARM64"]
+        else:
+            raise ValueError(f"Unsupported platform: {self.platform_name()}")
+        return ret
 
     def platform_env(self):
         ret = {}
@@ -406,10 +390,48 @@ class Helper:
             },
         ]
 
-    def bootstrap_pants(self, *, install_python: bool) -> Sequence[Step]:
+    def setup_primary_python(self) -> Sequence[Step]:
+        ret = []
+        # We pre-install Pythons on our self-hosted platforms.
+        # We must set them up on Github-hosted platforms.
+        if self.platform in GITHUB_HOSTED:
+            ret.append(
+                {
+                    "name": f"Set up Python {gha_expr('matrix.python-version')}",
+                    "uses": "actions/setup-python@v4",
+                    "with": {"python-version": f"{gha_expr('matrix.python-version')}"},
+                }
+            )
+        ret.append(
+            {
+                "name": f"Tell Pants to use Python {gha_expr('matrix.python-version')}",
+                "run": dedent(
+                    f"""\
+                    echo "PY=python{gha_expr('matrix.python-version')}" >> $GITHUB_ENV
+                    echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=['=={gha_expr('matrix.python-version')}.*']" >> $GITHUB_ENV
+                    """
+                ),
+            }
+        )
+        return ret
+
+    def expose_all_pythons(self) -> Sequence[Step]:
+        ret = []
+        # Self-hosted runners already have all relevant pythons exposed on their PATH, so we
+        # only use this action on the GitHub-hosted platforms.
+        if self.platform in GITHUB_HOSTED:
+            ret.append(
+                {
+                    "name": "Expose Pythons",
+                    "uses": "pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe",
+                }
+            )
+        return ret
+
+    def bootstrap_pants(self) -> Sequence[Step]:
         return [
             *checkout(),
-            *setup_primary_python(install_python=install_python),
+            *self.setup_primary_python(),
             *self.bootstrap_caches(),
             setup_toolchain_auth(),
             {
@@ -482,71 +504,173 @@ class Helper:
         }
 
 
+class RustTesting(Enum):
+    NONE = "NONE"
+    SOME = "SOME"  # Most tests.
+    ALL = "ALL"  # All tests, lint and bench.
+
+
+def bootstrap_jobs(
+    helper: Helper,
+    python_versions: list[str],
+    validate_ci_config: bool,
+    rust_testing: RustTesting,
+) -> Jobs:
+    human_readable_job_name = "Bootstrap Pants"
+
+    if rust_testing == RustTesting.NONE:
+        human_readable_step_name = ""
+        step_cmd = ""
+    elif rust_testing == RustTesting.SOME:
+        human_readable_job_name += ", test Rust"
+        human_readable_step_name = "Test Rust"
+        # We pass --tests to skip doc tests because our generated protos contain
+        # invalid doc tests in their comments. We do not pass --all as BRFS tests don't
+        # pass on GHA MacOS containers.
+        step_cmd = helper.wrap_cmd("./cargo test --tests -- --nocapture")
+    elif rust_testing == RustTesting.ALL:
+        human_readable_job_name += ", test and lint Rust"
+        human_readable_step_name = "Test and lint Rust"
+        # We pass --tests to skip doc tests because our generated protos contain
+        # invalid doc tests in their comments.
+        step_cmd = dedent(
+            """\
+            ./build-support/bin/check_rust_pre_commit.sh
+            ./cargo test --all --tests -- --nocapture
+            ./cargo check --benches
+            """
+        )
+    else:
+        raise ValueError(f"Unrecognized RustTesting value: {rust_testing}")
+
+    if helper.platform in [Platform.LINUX_X86_64]:
+        step_cmd = "sudo apt-get install -y pkg-config fuse libfuse-dev\n" + step_cmd
+    human_readable_job_name += f" ({helper.platform_name()})"
+
+    return {
+        "name": human_readable_job_name,
+        "runs-on": helper.runs_on(),
+        "strategy": {"matrix": {"python-version": python_versions}},
+        "env": DISABLE_REMOTE_CACHE_ENV,
+        "timeout-minutes": 60,
+        "if": IS_PANTS_OWNER,
+        "steps": [
+            *helper.bootstrap_pants(),
+            *(
+                [
+                    {
+                        "name": "Validate CI config",
+                        "run": dedent(
+                            """\
+                    ./pants run build-support/bin/generate_github_workflows.py -- --check
+                    """
+                        ),
+                    }
+                ]
+                if validate_ci_config
+                else []
+            ),
+            *(
+                [
+                    {
+                        "name": human_readable_step_name,
+                        # We pass --tests to skip doc tests because our generated protos contain
+                        # invalid doc tests in their comments.
+                        "run": step_cmd,
+                        "env": {"TMPDIR": f"{gha_expr('runner.temp')}"},
+                        "if": DONT_SKIP_RUST,
+                    }
+                ]
+                if human_readable_step_name
+                else []
+            ),
+        ],
+    }
+
+
+def test_jobs(
+    helper: Helper, python_versions: list[str], shard: str | None, platform_specific: bool
+) -> Jobs:
+    human_readable_job_name = f"Test Python ({helper.platform_name()})"
+    human_readable_step_name = "Run Python tests"
+    log_name = "python-test"
+    pants_args = ["test"]
+    if shard:
+        human_readable_job_name += f" Shard {shard}"
+        human_readable_step_name = f"Run Python test shard {shard}"
+        log_name += f"-{shard}"
+        pants_args.append(f"--shard={shard}")
+    pants_args.append("::")
+    if platform_specific:
+        pants_args = (
+            ["--tag=+platform_specific_behavior"]
+            + pants_args
+            + ["--", "-m", "platform_specific_behavior"]
+        )
+    pants_args = ["./pants"] + pants_args
+    pants_args_str = " ".join(pants_args) + "\n"
+
+    return {
+        "name": human_readable_job_name,
+        "runs-on": helper.runs_on(),
+        "needs": helper.job_name("bootstrap_pants"),
+        "strategy": {"matrix": {"python-version": python_versions}},
+        "env": helper.platform_env(),
+        "timeout-minutes": 90,
+        "if": IS_PANTS_OWNER,
+        "steps": [
+            *checkout(),
+            install_jdk(),
+            *(
+                [install_go(), download_apache_thrift()]
+                if helper.platform == Platform.LINUX_X86_64
+                # Other platforms either don't run those tests, or have the binaries
+                # preinstalled on the self-hosted runners.
+                else []
+            ),
+            *helper.setup_primary_python(),
+            *helper.expose_all_pythons(),
+            helper.native_binaries_download(),
+            setup_toolchain_auth(),
+            {
+                "name": human_readable_step_name,
+                "run": pants_args_str,
+            },
+            helper.upload_log_artifacts(name=log_name),
+        ],
+    }
+
+
 def linux_x86_64_test_jobs(python_versions: list[str]) -> Jobs:
     helper = Helper(Platform.LINUX_X86_64)
 
     def test_python_linux(shard: str) -> dict[str, Any]:
-        return {
-            "name": f"Test Python ({helper.platform_name()}) Shard {shard}",
-            "runs-on": helper.runs_on(),
-            "needs": "bootstrap_pants_linux_x86_64",
-            "strategy": {"matrix": {"python-version": python_versions}},
-            "timeout-minutes": 90,
-            "if": IS_PANTS_OWNER,
-            "steps": [
-                *checkout(),
-                install_jdk(),
-                install_go(),
-                download_apache_thrift(),
-                *setup_primary_python(),
-                expose_all_pythons(),
-                helper.native_binaries_download(),
-                setup_toolchain_auth(),
-                {
-                    "name": f"Run Python test shard {shard}",
-                    "run": f"./pants test --shard={shard} ::\n",
-                },
-                helper.upload_log_artifacts(name=f"python-test-{shard}"),
-            ],
-        }
+        return test_jobs(helper, python_versions, shard, platform_specific=False)
 
+    shard_name_prefix = helper.job_name("test_python")
     jobs = {
-        "bootstrap_pants_linux_x86_64": {
-            "name": f"Bootstrap Pants, test and lint Rust ({helper.platform_name()})",
-            "runs-on": helper.runs_on(),
-            "strategy": {"matrix": {"python-version": python_versions}},
-            "env": DISABLE_REMOTE_CACHE_ENV,
-            "timeout-minutes": 40,
-            "if": IS_PANTS_OWNER,
-            "steps": [
-                *helper.bootstrap_pants(install_python=True),
-                {
-                    "name": "Validate CI config",
-                    "run": dedent(
-                        """\
-                        ./pants run build-support/bin/generate_github_workflows.py -- --check
-                        """
-                    ),
-                },
-                {
-                    "name": "Test and lint Rust",
-                    # We pass --tests to skip doc tests because our generated protos contain
-                    # invalid doc tests in their comments.
-                    "run": dedent(
-                        """\
-                        sudo apt-get install -y pkg-config fuse libfuse-dev
-                        ./build-support/bin/check_rust_pre_commit.sh
-                        ./cargo test --all --tests -- --nocapture
-                        ./cargo check --benches
-                        """
-                    ),
-                    "if": DONT_SKIP_RUST,
-                },
-            ],
-        },
-        "test_python_linux_x86_64_0": test_python_linux("0/3"),
-        "test_python_linux_x86_64_1": test_python_linux("1/3"),
-        "test_python_linux_x86_64_2": test_python_linux("2/3"),
+        helper.job_name("bootstrap_pants"): bootstrap_jobs(
+            helper, python_versions, validate_ci_config=True, rust_testing=RustTesting.ALL
+        ),
+        f"{shard_name_prefix}_0": test_python_linux("0/3"),
+        f"{shard_name_prefix}_1": test_python_linux("1/3"),
+        f"{shard_name_prefix}_2": test_python_linux("2/3"),
+    }
+    return jobs
+
+
+def linux_arm64_test_jobs(python_versions: list[str]) -> Jobs:
+    helper = Helper(Platform.LINUX_ARM64)
+    jobs = {
+        helper.job_name("bootstrap_pants"): bootstrap_jobs(
+            helper,
+            python_versions,
+            validate_ci_config=False,
+            rust_testing=RustTesting.SOME,
+        ),
+        helper.job_name("test_python"): test_jobs(
+            helper, python_versions, shard=None, platform_specific=True
+        ),
     }
     return jobs
 
@@ -554,65 +678,43 @@ def linux_x86_64_test_jobs(python_versions: list[str]) -> Jobs:
 def macos11_x86_64_test_jobs(python_versions: list[str]) -> Jobs:
     helper = Helper(Platform.MACOS11_X86_64)
     jobs = {
-        "bootstrap_pants_macos11_x86_64": {
-            "name": f"Bootstrap Pants, test Rust ({helper.platform_name()})",
-            "runs-on": helper.runs_on(),
-            "strategy": {"matrix": {"python-version": python_versions}},
-            "env": DISABLE_REMOTE_CACHE_ENV,
-            "timeout-minutes": 60,
-            "if": IS_PANTS_OWNER,
-            "steps": [
-                *helper.bootstrap_pants(install_python=True),
-                {
-                    "name": "Test Rust",
-                    # We pass --tests to skip doc tests because our generated protos contain
-                    # invalid doc tests in their comments. We do not pass --all as BRFS tests don't
-                    # pass on GHA MacOS containers.
-                    "run": helper.wrap_cmd("./cargo test --tests -- --nocapture"),
-                    "env": {"TMPDIR": f"{gha_expr('runner.temp')}"},
-                    "if": DONT_SKIP_RUST,
-                },
-            ],
-        },
-        "test_python_macos11_x86_64": {
-            "name": f"Test Python ({helper.platform_name()})",
-            "runs-on": helper.runs_on(),
-            "needs": "bootstrap_pants_macos11_x86_64",
-            "strategy": {"matrix": {"python-version": python_versions}},
-            "env": helper.platform_env(),
-            "timeout-minutes": 60,
-            "if": IS_PANTS_OWNER,
-            "steps": [
-                *checkout(),
-                install_jdk(),
-                *setup_primary_python(),
-                expose_all_pythons(),
-                helper.native_binaries_download(),
-                setup_toolchain_auth(),
-                {
-                    "name": "Run Python tests",
-                    "run": softwrap(
-                        """
-                        ./pants --tag=+platform_specific_behavior test ::
-                        -- -m platform_specific_behavior
-                        """
-                    ),
-                },
-                helper.upload_log_artifacts(name="python-test"),
-            ],
-        },
+        helper.job_name("bootstrap_pants"): bootstrap_jobs(
+            helper,
+            python_versions,
+            validate_ci_config=False,
+            rust_testing=RustTesting.SOME,
+        ),
+        helper.job_name("test_python"): test_jobs(
+            helper, python_versions, shard=None, platform_specific=True
+        ),
     }
     return jobs
 
 
 def build_wheels_job(platform: Platform, python_versions: list[str]) -> Jobs:
     helper = Helper(platform)
+    # For manylinux compatibility, we build Linux wheels in a container rather than directly
+    # on the Ubuntu runner. As a result, we have custom steps here to check out
+    # the code, install rustup and expose Pythons.
+    # TODO: Apply rust caching here.
     if platform == Platform.LINUX_X86_64:
-        # For manylinux compatibility, we build wheels in a container rather than directly
-        # on the Ubuntu runner. As a result, we have custom steps here to check out
-        # the code, install rustup and expose Pythons.
-        # TODO: Apply rust caching here.
-        container = "quay.io/pypa/manylinux2014_x86_64:latest"
+        container = {"image": "quay.io/pypa/manylinux2014_x86_64:latest"}
+    elif platform == Platform.LINUX_ARM64:
+        # Unfortunately Equinix do not support the CentOS 7 image on the hardware we've been
+        # generously given by the Runs on ARM program. Se we have to build in this image.
+        container = {
+            "image": "quay.io/pypa/manylinux2014_aarch64:latest",
+            # The uid/gid for the gha user and group we set up on the self-hosted runner.
+            # Necessary to avoid https://github.com/actions/runner/issues/434.
+            # Alternatively we could run absolutely everything in a container,
+            # or we could run the runner as root (which seems like a bad idea),
+            # or we can modify the standard image to include this user.
+            "options": "--user 1000:1000",
+        }
+    else:
+        container = None
+
+    if container:
         initial_steps = [
             *checkout(containerized=True),
             install_rustup(),
@@ -628,20 +730,18 @@ def build_wheels_job(platform: Platform, python_versions: list[str]) -> Jobs:
             },
         ]
     else:
-        container = None
         initial_steps = [
             *checkout(),
-            # Self-hosted runners already have all relevant pythons exposed on their PATH, so we
-            # only run expose_all_pythons() on the GitHub-hosted platforms.
-            *([expose_all_pythons()] if platform in GITHUB_HOSTED else []),
+            *helper.expose_all_pythons(),
             # NB: We only cache Rust, but not `native_engine.so` and the Pants
             # virtualenv. This is because we must build both these things with
             # multiple Python versions, whereas that caching assumes only one primary
             # Python version (marked via matrix.strategy).
             *helper.rust_caches(),
         ]
+
     return {
-        f"build_wheels_{str(platform.value).lower().replace('-', '_')}": {
+        helper.job_name("build_wheels"): {
             "if": f"({IS_PANTS_OWNER}) && ({DONT_SKIP_WHEELS})",
             "name": f"Build wheels ({str(platform.value)})",
             "runs-on": helper.runs_on(),
@@ -662,6 +762,7 @@ def build_wheels_job(platform: Platform, python_versions: list[str]) -> Jobs:
 def build_wheels_jobs() -> Jobs:
     return {
         **build_wheels_job(Platform.LINUX_X86_64, ALL_PYTHON_VERSIONS),
+        # **build_wheels_job(Platform.LINUX_ARM64, ALL_PYTHON_VERSIONS),
         **build_wheels_job(Platform.MACOS11_X86_64, ALL_PYTHON_VERSIONS),
         **build_wheels_job(Platform.MACOS10_15_X86_64, ALL_PYTHON_VERSIONS),
         **build_wheels_job(Platform.MACOS11_ARM64, [PYTHON39_VERSION]),
@@ -679,6 +780,7 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
         },
     }
     jobs.update(**linux_x86_64_test_jobs(python_versions))
+    # jobs.update(**linux_arm64_test_jobs(python_versions))
     jobs.update(**macos11_x86_64_test_jobs(python_versions))
     if not cron:
         jobs.update(**build_wheels_jobs())
@@ -693,7 +795,7 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                 "if": IS_PANTS_OWNER,
                 "steps": [
                     *checkout(),
-                    *setup_primary_python(),
+                    *linux_x86_64_helper.setup_primary_python(),
                     linux_x86_64_helper.native_binaries_download(),
                     setup_toolchain_auth(),
                     {
@@ -760,6 +862,8 @@ def cache_comparison_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
         ]
     )
 
+    helper = Helper(Platform.LINUX_X86_64)
+
     jobs = {
         "cache_comparison": {
             "runs-on": "ubuntu-latest",
@@ -770,8 +874,8 @@ def cache_comparison_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
             "steps": [
                 *checkout(),
                 setup_toolchain_auth(),
-                *setup_primary_python(),
-                expose_all_pythons(),
+                *helper.setup_primary_python(),
+                *helper.expose_all_pythons(),
                 {
                     "name": "Prepare cache comparison",
                     "run": dedent(

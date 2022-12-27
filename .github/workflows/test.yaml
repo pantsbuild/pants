@@ -104,7 +104,9 @@ jobs:
       run: './pants run build-support/bin/generate_github_workflows.py -- --check
 
         '
-    - if: needs.classify_changes.outputs.rust == 'true'
+    - env:
+        TMPDIR: ${{ runner.temp }}
+      if: needs.classify_changes.outputs.rust == 'true'
       name: Test and lint Rust
       run: 'sudo apt-get install -y pkg-config fuse libfuse-dev
 
@@ -119,7 +121,7 @@ jobs:
       matrix:
         python-version:
         - '3.7'
-    timeout-minutes: 40
+    timeout-minutes: 60
   bootstrap_pants_macos11_x86_64:
     env:
       PANTS_REMOTE_CACHE_READ: 'false'
@@ -224,7 +226,8 @@ jobs:
         - '3.7'
     timeout-minutes: 60
   build_wheels_linux_x86_64:
-    container: quay.io/pypa/manylinux2014_x86_64:latest
+    container:
+      image: quay.io/pypa/manylinux2014_x86_64:latest
     env:
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
@@ -300,6 +303,7 @@ jobs:
     needs:
     - classify_changes
     runs-on:
+    - self-hosted
     - macOS-10.15-X64
     steps:
     - name: Check out code
@@ -366,6 +370,7 @@ jobs:
     needs:
     - classify_changes
     runs-on:
+    - self-hosted
     - macOS-11-ARM64
     steps:
     - name: Check out code
@@ -619,6 +624,7 @@ jobs:
     - id: set_merge_ok
       run: echo 'merge_ok=true' >> ${GITHUB_OUTPUT}
   test_python_linux_x86_64_0:
+    env: {}
     if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only
       != 'true')
     name: Test Python (Linux-x86_64) Shard 0/3
@@ -692,6 +698,7 @@ jobs:
         - '3.7'
     timeout-minutes: 90
   test_python_linux_x86_64_1:
+    env: {}
     if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only
       != 'true')
     name: Test Python (Linux-x86_64) Shard 1/3
@@ -765,6 +772,7 @@ jobs:
         - '3.7'
     timeout-minutes: 90
   test_python_linux_x86_64_2:
+    env: {}
     if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only
       != 'true')
     name: Test Python (Linux-x86_64) Shard 2/3
@@ -881,7 +889,9 @@ jobs:
 
         '
     - name: Run Python tests
-      run: './pants --tag=+platform_specific_behavior test :: -- -m platform_specific_behavior'
+      run: './pants --tag=+platform_specific_behavior test :: -- -m platform_specific_behavior
+
+        '
     - continue-on-error: true
       if: always()
       name: Upload pants.log
@@ -893,7 +903,7 @@ jobs:
       matrix:
         python-version:
         - '3.7'
-    timeout-minutes: 60
+    timeout-minutes: 90
 name: Pull Request CI
 'on':
   pull_request: {}
