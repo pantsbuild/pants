@@ -886,7 +886,7 @@ pub fn setup_run_sh_script(
     } else {
       workdir_path.to_owned()
     };
-    let quoted_cwd = bash::escape(&cwd);
+    let quoted_cwd = bash::escape(cwd);
     str::from_utf8(&quoted_cwd)
       .map_err(|e| format!("{:?}", e))?
       .to_string()
@@ -909,7 +909,7 @@ cd {}
     .create_new(true)
     .write(true)
     .mode(USER_EXECUTABLE_MODE) // Executable for user, read-only for others.
-    .open(&full_file_path)
+    .open(full_file_path)
     .map_err(|e| format!("{:?}", e))?
     .write_all(full_script.as_bytes())
     .map_err(|e| format!("{:?}", e))

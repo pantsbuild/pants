@@ -1470,7 +1470,7 @@ pub fn extract_output_files(
   // method.
   if treat_tree_digest_as_final_directory_hack {
     match &action_result.output_directories[..] {
-      &[ref directory] => {
+      [directory] => {
         match require_digest(directory.tree_digest.as_ref()) {
           Ok(digest) => {
             return future::ready::<Result<_, StoreError>>(Ok(
