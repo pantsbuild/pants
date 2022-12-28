@@ -318,7 +318,6 @@ async def get_git_repo_version(description: str = "") -> GitTagVersion:
         Process(
             argv=[git_bin.path, "-C", os.getcwd(), "describe", "--tags"],
             description=description,
-            cache_scope=ProcessCacheScope.PER_SESSION,
         ),
     )
     return GitTagVersion(git_describe.stdout.decode().strip())
@@ -455,7 +454,6 @@ def rules():
 ```python pants-plugins/project_version/rules.py
 import dataclasses
 import json
-import logging
 import os
 from dataclasses import dataclass
 
@@ -476,8 +474,6 @@ from pants.engine.target import (
 )
 from pants.option.option_types import BoolOption
 from project_version.target_types import ProjectVersionSourceField, ProjectVersionTarget
-
-logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
