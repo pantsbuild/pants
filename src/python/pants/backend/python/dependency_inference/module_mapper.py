@@ -181,6 +181,7 @@ class FirstPartyPythonModuleMapping:
         If `resolve` is None, will not consider resolves, i.e. any `python_source` et al can be
         used. Otherwise, providers can only come from first-party targets with the resolve.
         """
+        # TODO: a way to filter the providers
         if resolve:
             return self._providers_for_resolve(module, resolve)
         return tuple(
@@ -418,6 +419,8 @@ async def map_module_to_address(
     first_party_mapping: FirstPartyPythonModuleMapping,
     third_party_mapping: ThirdPartyPythonModuleMapping,
 ) -> PythonModuleOwners:
+    # TODO: a way to filter the providers
+    # we need to filter the FirstPartyPythonModuleMapping here
     possible_providers: tuple[PossibleModuleProvider, ...] = (
         *third_party_mapping.providers_for_module(request.module, resolve=request.resolve),
         *first_party_mapping.providers_for_module(request.module, resolve=request.resolve),
@@ -445,6 +448,8 @@ async def map_module_to_address(
         itertools.chain(*[val[1] for val in type_to_closest_providers.values()])
     )
     addresses = tuple(provider.addr for provider in closest_providers)
+
+    # respect dep rules here?
 
     # Check that we have at most one closest provider for each provider type.
     # If we have more than one, signal ambiguity.

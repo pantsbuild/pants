@@ -44,6 +44,8 @@ from pants.engine.internals.graph import Owners, OwnersRequest
 from pants.engine.rules import Get, MultiGet, rule, rule_helper
 from pants.engine.target import (
     DependenciesRequest,
+    DependenciesRuleAction,
+    DependenciesRuleActionRequest,
     ExplicitlyProvidedDependencies,
     FieldSet,
     InferDependenciesRequest,
@@ -264,6 +266,57 @@ def _get_inferred_asset_deps(
     return {filepath: _resolve_single_asset(filepath) for filepath in assets}
 
 
+@rule_helper
+async def _disambiguate_or_mark_unowned(
+    address: Address,
+    resolve_results: dict[str, ImportResolveResult],
+    explicitly_provided_deps: ExplicitlyProvidedDependencies,
+) -> dict[str, ImportResolveResult]:
+    """Use dependency rules to disambiguate imports based on Address."""
+    ambiguous_results = {
+        import_name: result
+        for import_name, result in resolve_results
+        if result.status == ImportOwnerStatus.ambiguous
+    }
+    if not ambiguous_results:
+        return resolve_results
+
+    dependencies_rule_actions = await MuliGet(
+        Get(
+            DependenciesRuleAction,
+            DependenciesRuleActionRequest(
+                address=address,
+                dependencies=result.address,
+                description_of_origin=f"get dependency rules for {address} to import {import_name}",
+            ),
+        ) for import_name, result in ambiguous_results.items()
+    )
+    dep_rules_enabled = dependencies_rule_actions[0].address is not None
+
+    disambiguated_results = {import_name: result for import_name, result in resolve_results.items()}
+
+    for (import_name, result), dependencies_rule_action in zip(ambiguous_results.items(), dependencies_rule_actions):
+        ambiguous = result.address
+
+        if dep_rules_enabled:
+            ambiguous = (
+                address for address, rule_action in dependencies_rule_action.dependencies_rule
+                if rule_action == DependencyRuleAction.Allow
+            )
+            if len(ambiguous) == 1:
+                disambiguated_results[import_name] = ImportResolveResult(ImportOwnerStatus.disambiguated, ambiguous)
+                continue
+
+        maybe_disambiguated = explicitly_provided_deps.disambiguated(ambiguous )
+        if maybe_disambiguated:
+            disambiguated_results[import_name] = ImportResolveResult(ImportOwnerStatus.disambiguated, (maybe_disambiguated,))
+            continue
+
+        disambiguated_results[import_name] = ImportResolveResult(ImportOwnerStatus.unowned, ambiguous)
+
+    return disambiguated_results
+
+
 class ImportOwnerStatus(Enum):
     unambiguous = "unambiguous"
     disambiguated = "disambiguated"
@@ -283,27 +336,19 @@ def _get_imports_info(
     address: Address,
     owners_per_import: Iterable[PythonModuleOwners],
     parsed_imports: ParsedPythonImports,
-    explicitly_provided_deps: ExplicitlyProvidedDependencies,
 ) -> dict[str, ImportResolveResult]:
     def _resolve_single_import(owners, import_name) -> ImportResolveResult:
         if owners.unambiguous:
             return ImportResolveResult(ImportOwnerStatus.unambiguous, owners.unambiguous)
 
-        explicitly_provided_deps.maybe_warn_of_ambiguous_dependency_inference(
-            owners.ambiguous,
-            address,
-            import_reference="module",
-            context=f"The target {address} imports `{import_name}`",
-        )
-        maybe_disambiguated = explicitly_provided_deps.disambiguated(owners.ambiguous)
-        if maybe_disambiguated:
-            return ImportResolveResult(ImportOwnerStatus.disambiguated, (maybe_disambiguated,))
-        elif import_name.split(".")[0] in DEFAULT_UNOWNED_DEPENDENCIES:
+        if import_name.split(".")[0] in DEFAULT_UNOWNED_DEPENDENCIES:
             return ImportResolveResult(ImportOwnerStatus.unownable)
         elif parsed_imports[import_name].weak:
-            return ImportResolveResult(ImportOwnerStatus.weak_ignore)
+            # what is weak_ignore? should we try to disambiguate these?
+            return ImportResolveResult(ImportOwnerStatus.weak_ignore, owners.ambiguous)
         else:
-            return ImportResolveResult(ImportOwnerStatus.unowned)
+            # return ImportResolveResult(ImportOwnerStatus.unowned)
+            return ImportResolveResult(ImportOwnerStatus.ambiguous, owners.ambiguous)
 
     return {
         imp: _resolve_single_import(owners, imp)
@@ -320,6 +365,7 @@ def _collect_imports_info(
     - unowned
     """
 
+    # this is too late to disambiguate w/ dep rules
     return frozenset(
         addr
         for dep in resolve_result.values()
@@ -407,6 +453,7 @@ async def _handle_unowned_imports(
     parsed_imports: ParsedPythonImports,
     resolve: str,
 ) -> None:
+    # this is too late to disambiguate w/ dep rules
     if not unowned_imports or unowned_dependency_behavior is UnownedDependencyUsage.DoNothing:
         return
 
@@ -499,6 +546,7 @@ async def resolve_parsed_dependencies(
     python_infer_subsystem: PythonInferSubsystem,
 ) -> ResolvedParsedPythonDependencies:
     """Find the owning targets for the parsed dependencies."""
+    # this is probably the right place to disambiguate w/ dep rules
 
     parsed_imports = request.parsed_dependencies.imports
     parsed_assets = request.parsed_dependencies.assets
@@ -510,6 +558,8 @@ async def resolve_parsed_dependencies(
     )
 
     if parsed_imports:
+        req_address = request.field_set.address
+        # this is probably the right place to disambiguate w/ dep rules
         owners_per_import = await MultiGet(
             Get(
                 PythonModuleOwners,
@@ -518,11 +568,26 @@ async def resolve_parsed_dependencies(
             for imported_module in parsed_imports
         )
         resolve_results = _get_imports_info(
-            address=request.field_set.address,
+            address=req_address,
             owners_per_import=owners_per_import,
             parsed_imports=parsed_imports,
+        )
+        resolve_results = await _disambiguate_or_mark_unowned(
+            address=req_address,
+            resolve_results=resolve_results,
             explicitly_provided_deps=explicitly_provided_deps,
         )
+        for import_name, resolve_result in resolve_results.items():
+            if resolve_result.status in [
+                ImportOwnerResult.unambiguous, ImportOwnerResult.disambiguated,
+            ]:
+                continue
+            explicitly_provided_deps.maybe_warn_of_ambiguous_dependency_inference(
+                resolve_result.address,
+                req_address,
+                import_reference="module",
+                context=f"The target {req_address} imports `{import_name}`",
+            )
     else:
         resolve_results = {}
 
@@ -565,6 +630,7 @@ async def infer_python_dependencies_via_source(
         ResolvedParsedPythonDependencies,
         ResolvedParsedPythonDependenciesRequest(request.field_set, parsed_dependencies, resolve),
     )
+    # this is too late to disambiguate w/ dep rules
     import_deps, unowned_imports = _collect_imports_info(resolved_dependencies.resolve_results)
 
     asset_deps, unowned_assets = _collect_imports_info(resolved_dependencies.assets)
