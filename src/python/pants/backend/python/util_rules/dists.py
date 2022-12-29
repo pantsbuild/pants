@@ -20,7 +20,6 @@ from pants.backend.python.util_rules.pex import rules as pex_rules
 from pants.backend.python.util_rules.pex_requirements import EntireLockfile, PexRequirements
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.engine.fs import (
-    AddPrefix,
     CreateDigest,
     Digest,
     DigestContents,
@@ -252,10 +251,11 @@ async def run_pep517_build(request: DistBuildRequest, python_setup: PythonSetup)
     for line in output_lines:
         for dist_type in ["wheel", "sdist"]:
             if line.startswith(f"{dist_type}: "):
-                paths[dist_type] = line[len(dist_type) + 2 :].strip()
+                paths[dist_type] = os.path.join(
+                    request.output_path, line[len(dist_type) + 2 :].strip()
+                )
     # Note that output_digest paths are relative to the working_directory.
-    removed = await Get(Digest, RemovePrefix(result.output_digest, dist_dir))
-    output_digest = await Get(Digest, AddPrefix(removed, request.output_path))
+    output_digest = await Get(Digest, RemovePrefix(result.output_digest, dist_dir))
     output_snapshot = await Get(Snapshot, Digest, output_digest)
     for dist_type, path in paths.items():
         if path not in output_snapshot.files:

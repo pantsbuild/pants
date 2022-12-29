@@ -144,11 +144,8 @@ def test_output_path() -> None:
             extra_env={"PYTHON": sys.executable},
         )
         pants_run.assert_success()
-        dists = [
-            os.path.join(dirpath, f)
-            for dirpath, _, filenames in os.walk(dist_dir)
-            for f in filenames
-        ]
-        assert len(dists) == 2
-        for dist in dists:
-            assert dist.startswith(os.path.join(dist_dir, output_path))
+        dist_output_path = os.path.join(dist_dir, output_path)
+        dist_entires = os.listdir(os.path.join(dist_dir, output_path))
+        assert len(dist_entires) == 2
+        for entry in dist_entires:
+            assert os.path.isfile(os.path.join(dist_output_path, entry))
