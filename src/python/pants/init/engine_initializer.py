@@ -16,7 +16,7 @@ from pants.bsp.protocol import BSPHandlerMapping
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.core.util_rules import environments, system_binaries
 from pants.core.util_rules.environments import determine_bootstrap_environment
-from pants.engine import desktop, fs, process
+from pants.engine import desktop, download_file, fs, process
 from pants.engine.console import Console
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import PathGlobs, Snapshot, Workspace
@@ -272,6 +272,7 @@ class EngineInitializer:
                 *fs.rules(),
                 *dep_rules.rules(),
                 *desktop.rules(),
+                *download_file.rules(),
                 *git_rules(),
                 *graph.rules(),
                 *specs_rules.rules(),
