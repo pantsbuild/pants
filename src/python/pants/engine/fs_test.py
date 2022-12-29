@@ -3,7 +3,10 @@
 
 from __future__ import annotations
 
+import base64
+import datetime
 import hashlib
+import hmac
 import os
 import pkgutil
 import shutil
@@ -15,6 +18,7 @@ from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler
 from io import BytesIO
 from pathlib import Path
+from textwrap import dedent
 from typing import Callable, Dict, Iterable, List, Optional, Set, Union
 
 import pytest
@@ -49,7 +53,7 @@ from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import Get, goal_rule, rule
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 from pants.util.collections import assert_single_element
-from pants.util.contextutil import http_server, temporary_dir
+from pants.util.contextutil import environment_as, http_server, temporary_dir
 from pants.util.dirutil import relative_symlink, safe_file_dump
 
 
@@ -1133,6 +1137,95 @@ def test_download_https() -> None:
                 [DownloadFile(f"https://localhost:{port}/file.txt", DOWNLOADS_FILE_DIGEST)],
             )
 
+    assert snapshot.files == ("file.txt",)
+    assert snapshot.digest == DOWNLOADS_EXPECTED_DIRECTORY_DIGEST
+
+
+def _configure_aws_using_default_creds_file(tmp_path: Path) -> Dict[str, str]:
+    aws_config_dir = tmp_path / ".aws"
+    aws_config_dir.mkdir()
+    (aws_config_dir / "credentials").write_text(
+        dedent(
+            """\
+        [default]
+        aws_access_key_id = THISIDISPUBLIC
+        aws_secret_access_key = SUPERSECRETDONTTELLANYONE
+        """
+        )
+    )
+    return {"HOME": str(tmp_path)}
+
+
+def _configure_aws_using_coonfigured_creds_file(tmp_path: Path) -> Dict[str, str]:
+    (tmp_path / "credentials").write_text(
+        dedent(
+            """\
+        [default]
+        aws_access_key_id = THISIDISPUBLIC
+        aws_secret_access_key = SUPERSECRETDONTTELLANYONE
+        """
+        )
+    )
+    return {"AWS_SHARED_CREDENTIALS_FILE": str(tmp_path / "credentials")}
+
+
+def _configure_aws_using_env_vars(tmp_path: Path) -> Dict[str, str]:
+    return {
+        "AWS_ACCESS_KEY_ID": "THISIDISPUBLIC",
+        "AWS_SECRET_ACCESS_KEY": "SUPERSECRETDONTTELLANYONE",
+    }
+
+
+@pytest.mark.parametrize(
+    "env_var_getter",
+    [
+        _configure_aws_using_default_creds_file,
+        _configure_aws_using_coonfigured_creds_file,
+        _configure_aws_using_env_vars,
+    ],
+)
+def test_download_s3(downloads_rule_runner: RuleRunner, env_var_getter, tmp_path) -> None:
+    class S3HTTPHandler(BaseHTTPRequestHandler):
+        response_text = b"Hello, client!"
+
+        def do_HEAD(self):
+            self.send_headers()
+
+        def do_GET(self):
+            self.send_headers()
+            self.wfile.write(self.response_text)
+
+        def send_headers(self):
+            assert self.path == "/?bucket=bucket&key=keypart1/keypart2/file.txt"
+            date = self.headers["date"]
+            assert datetime.datetime.strptime(date, "%a, %d %b %Y %H:%M:%S +0000")
+            assert self.headers["content-type"] == "binary/octet-stream"
+            signature = hmac.digest(
+                "SUPERSECRETDONTTELLANYONE".encode("ascii"),
+                f"GET\n\nbinary/octet-stream\n{date}\n/bucket/keypart1/keypart2/file.txt".encode(
+                    "ascii"
+                ),
+                digest="sha1",
+            )
+            assert (
+                self.headers["authorization"]
+                == f"AWS THISIDISPUBLIC:{base64.b64encode(signature).decode('utf-8')}"
+            )
+
+            self.send_response(200)
+            self.send_header("Content-Type", "binary/octet-stream")
+            self.send_header("Content-Length", f"{len(self.response_text)}")
+            self.end_headers()
+
+    with http_server(S3HTTPHandler) as port:
+        with environment_as(
+            **env_var_getter(tmp_path),
+            TESTING_PANTS_S3_FMT_URL=f"http://localhost:{port}/?bucket={{}}&key={{}}",
+        ):
+            snapshot = downloads_rule_runner.request(
+                Snapshot,
+                [DownloadFile(f"s3://bucket/keypart1/keypart2/file.txt", DOWNLOADS_FILE_DIGEST)],
+            )
     assert snapshot.files == ("file.txt",)
     assert snapshot.digest == DOWNLOADS_EXPECTED_DIRECTORY_DIGEST
 

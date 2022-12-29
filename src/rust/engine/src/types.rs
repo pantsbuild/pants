@@ -26,6 +26,7 @@ pub struct Types {
   pub process_config_from_environment: TypeId,
   pub process_result: TypeId,
   pub process_result_metadata: TypeId,
+  pub complete_env_vars: TypeId,
   pub coroutine: TypeId,
   pub session_values: TypeId,
   pub run_id: TypeId,

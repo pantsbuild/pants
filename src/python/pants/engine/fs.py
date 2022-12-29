@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Iterable, Optional, Tuple, Union
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior as GlobMatchErrorBehavior
 from pants.engine.collection import Collection
 from pants.engine.engine_aware import SideEffecting
+from pants.engine.env_vars import CompleteEnvironmentVars
 from pants.engine.internals.native_engine import EMPTY_DIGEST as EMPTY_DIGEST  # noqa: F401
 from pants.engine.internals.native_engine import (  # noqa: F401
     EMPTY_FILE_DIGEST as EMPTY_FILE_DIGEST,
@@ -300,7 +301,7 @@ def rules():
         QueryRule(Digest, (PathGlobs,)),
         QueryRule(Digest, (AddPrefix,)),
         QueryRule(Digest, (RemovePrefix,)),
-        QueryRule(Digest, (DownloadFile,)),
+        QueryRule(Digest, (DownloadFile,CompleteEnvironmentVars)),
         QueryRule(Digest, (MergeDigests,)),
         QueryRule(Digest, (DigestSubset,)),
         QueryRule(DigestContents, (Digest,)),

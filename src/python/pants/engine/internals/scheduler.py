@@ -15,6 +15,7 @@ from typing_extensions import TypedDict
 
 from pants.engine.collection import Collection
 from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType, SideEffecting
+from pants.engine.env_vars import CompleteEnvironmentVars
 from pants.engine.fs import (
     CreateDigest,
     Digest,
@@ -162,6 +163,7 @@ class Scheduler:
             process=Process,
             process_result=FallibleProcessResult,
             process_result_metadata=ProcessResultMetadata,
+            complete_env_vars=CompleteEnvironmentVars,
             coroutine=CoroutineType,
             session_values=SessionValues,
             run_id=RunId,

@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std::collections::HashMap;
+use std::env;
 use std::env::current_dir;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
@@ -64,7 +65,13 @@ impl Intrinsics {
       Box::new(path_globs_to_paths),
     );
     intrinsics.insert(
-      Intrinsic::new(types.directory_digest, types.download_file),
+      Intrinsic {
+        product: types.directory_digest,
+        inputs: vec![
+          DependencyKey::new(types.download_file),
+          DependencyKey::new(types.complete_env_vars),
+        ],
+      },
       Box::new(download_file_to_digest),
     );
     intrinsics.insert(
@@ -350,8 +357,21 @@ fn download_file_to_digest(
   mut args: Vec<Value>,
 ) -> BoxFuture<'static, NodeResult<Value>> {
   async move {
+    let mut env_vars = Python::with_gil(|py| {
+      let value = args.pop().unwrap();
+      externs::convert_frozendict::<String>((*value.as_ref()).as_ref(py))
+    });
+
+    env_vars.retain(|k, _| k == "HOME" || k.starts_with("AWS_"));
+
     let key = Key::from_value(args.pop().unwrap()).map_err(Failure::from_py_err)?;
-    let snapshot = context.get(DownloadedFile(key)).await?;
+
+    // NB: We must remove the env vars we set before throwing any errors
+    env_vars.iter().for_each(|(k, v)| env::set_var(k, v));
+    let snapshot_result = context.get(DownloadedFile(key)).await;
+    env_vars.iter().for_each(|(k, _)| env::remove_var(k));
+
+    let snapshot = snapshot_result?;
     let gil = Python::acquire_gil();
     let value = Snapshot::store_directory_digest(gil.python(), snapshot.into())?;
     Ok(value)

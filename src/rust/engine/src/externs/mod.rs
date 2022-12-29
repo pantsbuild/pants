@@ -180,7 +180,11 @@ pub fn getattr_from_str_frozendict<'p, T: FromPyObject<'p>>(
   field: &str,
 ) -> BTreeMap<String, T> {
   let frozendict = getattr(value, field).unwrap();
-  let pydict: &PyDict = getattr(frozendict, "_data").unwrap();
+  convert_frozendict::<T>(frozendict)
+}
+
+pub fn convert_frozendict<'p, T: FromPyObject<'p>>(value: &'p PyAny) -> BTreeMap<String, T> {
+  let pydict: &PyDict = getattr(value, "_data").unwrap();
   pydict
     .items()
     .into_iter()

@@ -111,15 +111,20 @@ default = []
 address = { path = "address" }
 async_latch = { path = "async_latch" }
 async-trait = "0.1"
+aws-config = "0.52.0"
+aws-types = "0.52.0"
 protos = { path = "protos" }
 bytes = "1.2"
+base64 = "0.20.0"
 cache = { path = "cache" }
+chrono = "0.4.22"
 concrete_time = { path = "concrete_time" }
 crossbeam-channel = "0.5"
 # TODO: Waiting on https://github.com/Aeledfyr/deepsize/pull/{30,31,32}.
 deepsize = { git = "https://github.com/stuhood/deepsize.git", rev = "5c8bee5443fcafe4aaa9274490d354412d0955c1", features=["internment", "smallvec"] }
 derivative = "2.2"
 async-oncecell = "0.2"
+rust-crypto = "0.2.0"
 fnv = "1.0.5"
 fs = { path = "fs" }
 futures = "0.3"

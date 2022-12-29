@@ -1,16 +1,22 @@
 // Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+use std::env;
 use std::io::{self, Write};
 use std::pin::Pin;
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use aws_types::credentials::{Credentials, ProvideCredentials};
 use bytes::{BufMut, Bytes};
+use chrono::Utc;
+use crypto::hmac::Hmac;
+use crypto::mac::Mac;
+use crypto::sha1::Sha1;
 use futures::stream::StreamExt;
 use hashing::Digest;
 use humansize::{file_size_opts, FileSize};
-use reqwest::Error;
+use reqwest::{header, Error};
 use tokio_retry::strategy::{jitter, ExponentialBackoff};
 use tokio_retry::RetryIf;
 use url::Url;
@@ -90,6 +96,108 @@ impl StreamingDownload for NetDownload {
   }
 }
 
+struct S3Download {
+  stream: futures_core::stream::BoxStream<'static, Result<Bytes, Error>>,
+}
+
+impl S3Download {
+  fn get_bucket_and_key(url: &Url) -> (String, String) {
+    let mut path = url.path().to_string();
+    path.remove(0);
+    (url.host_str().unwrap().to_string(), path)
+  }
+
+  async fn get_aws_credentials() -> Result<Credentials, StreamingError> {
+    let config = aws_config::load_from_env().await;
+    let credential_provider = config
+      .credentials_provider()
+      .expect("a credentials provider is loaded");
+    let maybe_credentials = credential_provider.provide_credentials().await;
+    let credentials = maybe_credentials
+      .map_err(|err| StreamingError::Permanent(format!("Error loading AWS credentials: {err}")))?;
+    Ok(credentials)
+  }
+
+  async fn get_headers(bucket: &String, key: &String) -> Result<header::HeaderMap, StreamingError> {
+    let content_type = "binary/octet-stream";
+    let date = Utc::now().to_rfc2822();
+    let resource = format!("/{bucket}/{key}");
+    let unsigned_signature = format!("GET\n\n{content_type}\n{date}\n{resource}");
+
+    let credentials = S3Download::get_aws_credentials().await?;
+    let mut mac = Hmac::new(Sha1::new(), credentials.secret_access_key().as_bytes());
+    mac.input(unsigned_signature.as_bytes());
+    let result = mac.result();
+    let signature_hash = base64::encode(result.code());
+
+    let mut headers = header::HeaderMap::new();
+    headers.insert(
+      header::AUTHORIZATION,
+      format!("AWS {}:{}", credentials.access_key_id(), signature_hash)
+        .parse()
+        .unwrap(),
+    );
+    headers.insert(header::DATE, date.parse().unwrap());
+    headers.insert(header::CONTENT_TYPE, content_type.parse().unwrap());
+    Ok(headers)
+  }
+
+  async fn start(
+    core: &Arc<Core>,
+    url: Url,
+    file_name: String,
+  ) -> Result<S3Download, StreamingError> {
+    let (bucket, key) = S3Download::get_bucket_and_key(&url);
+    let url = env::var("TESTING_PANTS_S3_FMT_URL") // NB: We set this for testing
+      .unwrap_or_else(|_| "https://{}.s3.amazonaws.com/{}".to_string())
+      .replacen("{}", &bucket, 1)
+      .replacen("{}", &key, 1);
+
+    let response = core
+      .http_client
+      .get(url.clone())
+      .headers(S3Download::get_headers(&bucket, &key).await?)
+      .send()
+      .await
+      .map_err(|err| StreamingError::Retryable(format!("Error downloading file: {err}")))
+      .and_then(|res|
+        // Handle common HTTP errors.
+        if res.status().is_server_error() {
+          Err(StreamingError::Retryable(format!(
+            "Server error ({}) downloading file {} from {}",
+            res.status().as_str(),
+            file_name,
+            url,
+          )))
+        } else if res.status().is_client_error() {
+          Err(StreamingError::Permanent(format!(
+            "Client error ({}) downloading file {} from {}",
+            res.status().as_str(),
+            file_name,
+            url,
+          )))
+        } else {
+          Ok(res)
+        })?;
+
+    let byte_stream = Pin::new(Box::new(response.bytes_stream()));
+    Ok(S3Download {
+      stream: byte_stream,
+    })
+  }
+}
+
+#[async_trait]
+impl StreamingDownload for S3Download {
+  async fn next(&mut self) -> Option<Result<Bytes, String>> {
+    self
+      .stream
+      .next()
+      .await
+      .map(|result| result.map_err(|err| err.to_string()))
+  }
+}
+
 struct FileDownload {
   stream: tokio_util::io::ReaderStream<tokio::fs::File>,
 }
@@ -143,6 +251,8 @@ async fn attempt_download(
         )));
       }
       Box::new(FileDownload::start(url.path(), file_name).await?)
+    } else if url.scheme() == "s3" {
+      Box::new(S3Download::start(core, url.clone(), file_name).await?)
     } else {
       Box::new(NetDownload::start(core, url.clone(), file_name).await?)
     }

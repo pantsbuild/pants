@@ -177,9 +177,7 @@ class PantsDaemon(PantsDaemonProcessManager):
         # Switch log output to the daemon's log stream, and empty `env` and `argv` to encourage all
         # further usage of those variables to happen via engine APIs and options.
         self._close_stdio(pants_log_path(PurePath(global_bootstrap_options.pants_workdir)))
-        with initialize_stdio(global_bootstrap_options), argv_as(
-            tuple()
-        ), hermetic_environment_as():
+        with initialize_stdio(global_bootstrap_options), argv_as(tuple()), hermetic_environment_as():
             # Install signal and panic handling.
             ExceptionSink.install(
                 log_location=init_workdir(global_bootstrap_options), pantsd_instance=True
@@ -205,7 +203,6 @@ class PantsDaemon(PantsDaemonProcessManager):
 
 def launch_new_pantsd_instance():
     """An external entrypoint that spawns a new pantsd instance."""
-
     options_bootstrapper = OptionsBootstrapper.create(
         env=os.environ, args=sys.argv, allow_pantsrc=True
     )
