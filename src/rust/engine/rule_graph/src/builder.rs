@@ -627,8 +627,8 @@ impl<R: Rule> Builder<R> {
       #[allow(clippy::type_complexity)]
       let dependencies_by_key: Vec<Vec<(DependencyKey<R::TypeId>, NodeIndex<u32>)>> =
         Self::edges_by_dependency_key(&graph, node_id, false)
-          .into_iter()
-          .map(|(_, edge_refs)| {
+          .into_values()
+          .map(|edge_refs| {
             edge_refs
               .iter()
               .map(|edge_ref| (edge_ref.weight().0.clone(), edge_ref.target()))

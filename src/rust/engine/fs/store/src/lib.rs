@@ -862,7 +862,7 @@ impl Store {
       )
       .await?;
 
-      let ingested_file_sizes = ingested_digests.iter().map(|(digest, _)| digest.size_bytes);
+      let ingested_file_sizes = ingested_digests.keys().map(|digest| digest.size_bytes);
       let uploaded_file_sizes = digests_to_upload.iter().map(|digest| digest.size_bytes);
 
       Ok(UploadSummary {
