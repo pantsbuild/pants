@@ -71,14 +71,11 @@ async def download_file(
             handler.match_authority is None or handler.match_authority == parsed_url.netloc
         )
         if matches_scheme or matches_authority:
-            digest = await Get(
+            return await Get(
                 Digest, URLDownloadHandler, handler(request.url, request.expected_digest)
             )
-            break
-    else:
-        digest = await Get(Digest, NativeDownloadFile(request.url, request.expected_digest))
 
-    return digest
+    return await Get(Digest, NativeDownloadFile(request.url, request.expected_digest))
 
 
 def rules():

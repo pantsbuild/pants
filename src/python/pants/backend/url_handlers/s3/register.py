@@ -24,15 +24,14 @@ class DownloadS3URLHandler(URLDownloadHandler):
 
 @dataclass(frozen=True)
 class AWSCredentials:
-    access_key_id: str
-    secret_access_key: str
+    access_key: str
+    secret_key: str
 
 
 @rule
 async def access_aws_credentials() -> AWSCredentials:
     try:
-        import botocore.credentials  # pants: no-infer-dep
-        import botocore.session  # pants: no-infer-dep
+        from botocore import credentials, session
     except ImportError:
         logger.warning(
             softwrap(
@@ -49,12 +48,12 @@ async def access_aws_credentials() -> AWSCredentials:
         )
         raise
 
-    session = botocore.session.get_session()
-    creds = botocore.credentials.create_credential_resolver(session).load_credentials()
+    session = session.get_session()
+    creds = credentials.create_credential_resolver(session).load_credentials()
 
     return AWSCredentials(
-        access_key_id=creds.access_key,
-        secret_access_key=creds.secret_key,
+        access_key=creds.access_key,
+        secret_key=creds.secret_key,
     )
 
 
@@ -62,13 +61,11 @@ async def access_aws_credentials() -> AWSCredentials:
 async def download_s3_file(
     request: DownloadS3URLHandler, aws_credentials: AWSCredentials
 ) -> Digest:
-    import botocore.auth  # pants: no-infer-dep
-    import botocore.credentials  # pants: no-infer-dep
+    from botocore import auth  # pants: no-infer-dep
+    from botocore import credentials  # pants: no-infer-dep
 
-    boto_creds = botocore.credentials.Credentials(
-        aws_credentials.access_key_id, aws_credentials.secret_access_key
-    )
-    auth = botocore.auth.SigV3Auth(boto_creds)
+    boto_creds = credentials.Credentials(aws_credentials.access_key, aws_credentials.secret_key)
+    auth = auth.SigV3Auth(boto_creds)
     headers_container = SimpleNamespace(headers={})
     auth.add_auth(headers_container)
 
