@@ -3,6 +3,7 @@
 import logging
 from dataclasses import dataclass
 from types import SimpleNamespace
+from typing import Any
 from urllib.parse import urlparse
 
 from pants.engine.download_file import URLDownloadHandler
@@ -18,14 +19,9 @@ CONTENT_TYPE = "binary/octet-stream"
 logger = logging.getLogger(__name__)
 
 
-class DownloadS3URLHandler(URLDownloadHandler):
-    matches_scheme = "s3"
-
-
 @dataclass(frozen=True)
 class AWSCredentials:
-    access_key: str
-    secret_key: str
+    creds: Any
 
 
 @rule
@@ -51,34 +47,91 @@ async def access_aws_credentials() -> AWSCredentials:
     session = session.get_session()
     creds = credentials.create_credential_resolver(session).load_credentials()
 
-    return AWSCredentials(
-        access_key=creds.access_key,
-        secret_key=creds.secret_key,
+    return AWSCredentials(creds)
+
+
+# NB: The URL is expected to be in path-style
+# See https://docs.aws.amazon.com/AmazonS3/latest/userguide/VirtualHosting.html
+def _get_aws_auth_headers(url: str, aws_credentials: AWSCredentials):
+    from botocore import auth  # pants: no-infer-dep
+
+    request = SimpleNamespace(
+        url=url,
+        headers={},
+        method="GET",
+        auth_path=None,
     )
+    auth.HmacV1Auth(aws_credentials.creds).add_auth(request)
+    return request.headers
+
+
+class DownloadS3SchemeURL(URLDownloadHandler):
+    match_scheme = "s3"
 
 
 @rule
-async def download_s3_file(
-    request: DownloadS3URLHandler, aws_credentials: AWSCredentials
+async def download_file_from_s3_scheme(
+    request: DownloadS3SchemeURL, aws_credentials: AWSCredentials
 ) -> Digest:
-    from botocore import auth  # pants: no-infer-dep
-    from botocore import credentials  # pants: no-infer-dep
-
-    boto_creds = credentials.Credentials(aws_credentials.access_key, aws_credentials.secret_key)
-    auth = auth.SigV3Auth(boto_creds)
-    headers_container = SimpleNamespace(headers={})
-    auth.add_auth(headers_container)
-
     parsed_url = urlparse(request.url)
     bucket = parsed_url.netloc
     key = parsed_url.path
+    http_url = f"https://s3.amazonaws.com/{bucket}{key}"
+    headers = _get_aws_auth_headers(http_url, aws_credentials)
 
     digest = await Get(
         Digest,
         NativeDownloadFile(
-            url=f"https://{bucket}.s3.amazonaws.com{key}",
+            url=http_url,
             expected_digest=request.expected_digest,
-            auth_headers=headers_container.headers,
+            auth_headers=headers,
+        ),
+    )
+    return digest
+
+
+class DownloadS3AuthorityVirtualHostedStyleURL(URLDownloadHandler):
+    match_authority = "*.s3*amazonaws.com"
+
+
+@rule
+async def download_file_from_virtual_hosted_s3_authority(
+    request: DownloadS3AuthorityVirtualHostedStyleURL, aws_credentials: AWSCredentials
+) -> Digest:
+    parsed_url = urlparse(request.url)
+    bucket = parsed_url.netloc.split(".", 1)[0]
+    # NB: Turn this into a path-style request
+    path_style_url = f"https://s3.amazonaws.com/{bucket}{parsed_url.path}"
+    if parsed_url.query:
+        path_style_url += f"?{parsed_url.query}"
+    headers = _get_aws_auth_headers(path_style_url, aws_credentials)
+
+    digest = await Get(
+        Digest,
+        NativeDownloadFile(
+            url=request.url,
+            expected_digest=request.expected_digest,
+            auth_headers=headers,
+        ),
+    )
+    return digest
+
+
+class DownloadS3AuthorityPathStyleURL(URLDownloadHandler):
+    match_authority = "s3.*amazonaws.com"
+
+
+@rule
+async def download_file_from_path_s3_authority(
+    request: DownloadS3AuthorityPathStyleURL, aws_credentials: AWSCredentials
+) -> Digest:
+    headers = _get_aws_auth_headers(request.url, aws_credentials)
+    digest = await Get(
+        Digest,
+        NativeDownloadFile(
+            url=request.url,
+            expected_digest=request.expected_digest,
+            auth_headers=headers,
         ),
     )
     return digest
@@ -86,6 +139,8 @@ async def download_s3_file(
 
 def rules():
     return [
-        UnionRule(URLDownloadHandler, DownloadS3URLHandler),
+        UnionRule(URLDownloadHandler, DownloadS3SchemeURL),
+        UnionRule(URLDownloadHandler, DownloadS3AuthorityVirtualHostedStyleURL),
+        UnionRule(URLDownloadHandler, DownloadS3AuthorityPathStyleURL),
         *collect_rules(),
     ]

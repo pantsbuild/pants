@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
+from fnmatch import fnmatch
 from typing import ClassVar, Optional
 from urllib.parse import urlparse
 
@@ -44,12 +45,15 @@ class URLDownloadHandler:
     match_scheme: ClassVar[Optional[str]] = None
     """The scheme to match (e.g. 'ftp' or 's3') or `None` to match all schemes.
 
-    Note that 'http' and 'https' are two different schemes. In order to match either, you'll need to
-    register both.
+    The scheme is matched using `fnmatch`, see https://docs.python.org/3/library/fnmatch.html for more
+    information.
     """
 
     match_authority: ClassVar[Optional[str]] = None
     """The authority to match (e.g. 'pantsbuild.org' or 's3.amazonaws.com') or `None` to match all authorities.
+
+    The authority is matched using `fnmatch`, see https://docs.python.org/3/library/fnmatch.html for more
+    information.
 
     Note that the authority matches userinfo (e.g. 'me@pantsbuild.org' or 'me:password@pantsbuild.org')
     as well as port (e.g. 'pantsbuild.org:80').
@@ -68,9 +72,11 @@ async def download_file(
     handlers = union_membership.get(URLDownloadHandler)
     matched_handlers = []
     for handler in handlers:
-        matches_scheme = handler.match_scheme is None or handler.match_scheme == parsed_url.scheme
-        matches_authority = (
-            handler.match_authority is None or handler.match_authority == parsed_url.netloc
+        matches_scheme = handler.match_scheme is None or fnmatch(
+            parsed_url.scheme, handler.match_scheme
+        )
+        matches_authority = handler.match_authority is None or fnmatch(
+            parsed_url.netloc, handler.match_authority
         )
         if matches_scheme and matches_authority:
             matched_handlers.append(handler)

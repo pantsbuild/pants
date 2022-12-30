@@ -41,9 +41,32 @@ def test_no_union_members() -> None:
     assert digest == DOWNLOADS_EXPECTED_DIRECTORY_DIGEST
 
 
-def test_matches_scheme() -> None:
+@pytest.mark.parametrize(
+    "scheme, authority, url",
+    [
+        # Anything (every URL matches)
+        (None, None, "s3://pantsbuild.com/file.txt"),
+        (None, None, "http://pantsbuild.com/file.txt"),
+        (None, None, "http://awesome.pantsbuild.com/file.txt"),
+        # Scheme
+        ("s3", None, "s3://pantsbuild.com/file.txt"),
+        ("http*", None, "http://pantsbuild.com/file.txt"),
+        ("http*", None, "https://pantsbuild.com/file.txt"),
+        # Authority
+        (None, "pantsbuild.com", "s3://pantsbuild.com/file.txt"),
+        (None, "pantsbuild.com", "http://pantsbuild.com/file.txt"),
+        (None, "pantsbuild.com", "https://pantsbuild.com/file.txt"),
+        (None, "*.pantsbuild.com", "https://awesome.pantsbuild.com/file.txt"),
+        (None, "*.pantsbuild.com*", "https://awesome.pantsbuild.com/file.txt"),
+        (None, "*.pantsbuild.com*", "https://awesome.pantsbuild.com:80/file.txt"),
+        # Both
+        ("http*", "*.pantsbuild.com", "http://awesome.pantsbuild.com/file.txt"),
+    ],
+)
+def test_matches(scheme, authority, url) -> None:
     class UnionMember(URLDownloadHandler):
-        match_scheme = "s3"
+        match_scheme = scheme
+        match_authority = authority
 
         def mock_rule(self) -> Digest:
             assert isinstance(self, UnionMember)
@@ -54,7 +77,7 @@ def test_matches_scheme() -> None:
     digest = run_rule_with_mocks(
         download_file,
         rule_args=[
-            DownloadFile("s3://pantsbuild.com/file.txt", DOWNLOADS_FILE_DIGEST),
+            DownloadFile(url, DOWNLOADS_FILE_DIGEST),
             union_membership,
         ],
         mock_gets=[
@@ -74,83 +97,32 @@ def test_matches_scheme() -> None:
     assert digest == DOWNLOADS_EXPECTED_DIRECTORY_DIGEST
 
 
-def test_matches_authority() -> None:
+@pytest.mark.parametrize(
+    "scheme, authority, url",
+    [
+        # Scheme
+        ("s3", None, "http://pantsbuild.com/file.txt"),
+        ("s3", None, "as3://pantsbuild.com/file.txt"),
+        ("http", None, "https://pantsbuild.com/file.txt"),
+        # Authority
+        (None, "pantsbuild.com", "http://pantsbuild.com:80/file.txt"),
+        (None, "*.pantsbuild.com", "https://pantsbuild.com/file.txt"),
+        # Both
+        ("http", "*.pantsbuild.com", "https://awesome.pantsbuild.com/file.txt"),
+        ("https", "*.pantsbuild.com", "https://pantsbuild.com/file.txt"),
+    ],
+)
+def test_doesnt_match(scheme, authority, url) -> None:
     class UnionMember(URLDownloadHandler):
-        match_authority = "pantsbuild.com"
-
-        def mock_rule(self) -> Digest:
-            assert isinstance(self, UnionMember)
-            return DOWNLOADS_EXPECTED_DIRECTORY_DIGEST
+        match_scheme = scheme
+        match_authority = authority
 
     union_membership = UnionMembership({URLDownloadHandler: [UnionMember]})
 
     digest = run_rule_with_mocks(
         download_file,
         rule_args=[
-            DownloadFile("http://pantsbuild.com/file.txt", DOWNLOADS_FILE_DIGEST),
-            union_membership,
-        ],
-        mock_gets=[
-            MockGet(
-                output_type=Digest,
-                input_types=(URLDownloadHandler,),
-                mock=UnionMember.mock_rule,
-            ),
-            MockGet(
-                output_type=Digest,
-                input_types=(NativeDownloadFile,),
-                mock=lambda _: object(),
-            ),
-        ],
-        union_membership=union_membership,
-    )
-    assert digest == DOWNLOADS_EXPECTED_DIRECTORY_DIGEST
-
-
-def test_anything_matcher() -> None:
-    class UnionMember(URLDownloadHandler):
-        def mock_rule(self) -> Digest:
-            assert isinstance(self, UnionMember)
-            return DOWNLOADS_EXPECTED_DIRECTORY_DIGEST
-
-    union_membership = UnionMembership({URLDownloadHandler: [UnionMember]})
-
-    digest = run_rule_with_mocks(
-        download_file,
-        rule_args=[
-            DownloadFile("http://pantsbuild.com/file.txt", DOWNLOADS_FILE_DIGEST),
-            union_membership,
-        ],
-        mock_gets=[
-            MockGet(
-                output_type=Digest,
-                input_types=(URLDownloadHandler,),
-                mock=UnionMember.mock_rule,
-            ),
-            MockGet(
-                output_type=Digest,
-                input_types=(NativeDownloadFile,),
-                mock=lambda _: object(),
-            ),
-        ],
-        union_membership=union_membership,
-    )
-    assert digest == DOWNLOADS_EXPECTED_DIRECTORY_DIGEST
-
-
-def test_doesnt_match() -> None:
-    class AuthorityMatcher(URLDownloadHandler):
-        match_authority = "awesome.pantsbuild.com"
-
-    class SchemeMatcher(URLDownloadHandler):
-        match_scheme = "s3"
-
-    union_membership = UnionMembership({URLDownloadHandler: [AuthorityMatcher, SchemeMatcher]})
-
-    digest = run_rule_with_mocks(
-        download_file,
-        rule_args=[
-            DownloadFile("http://pantsbuild.com/file.txt", DOWNLOADS_FILE_DIGEST),
+            DownloadFile(url, DOWNLOADS_FILE_DIGEST),
             union_membership,
         ],
         mock_gets=[

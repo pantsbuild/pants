@@ -7,7 +7,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from pants.backend.url_handlers.s3.register import DownloadS3URLHandler
+from pants.backend.url_handlers.s3.register import DownloadS3SchemeURL
 from pants.backend.url_handlers.s3.register import rules as s3_rules
 from pants.engine.fs import Digest, FileDigest, NativeDownloadFile, Snapshot
 from pants.engine.rules import QueryRule
@@ -27,7 +27,7 @@ def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             *s3_rules(),
-            QueryRule(Snapshot, [DownloadS3URLHandler]),
+            QueryRule(Snapshot, [DownloadS3SchemeURL]),
         ],
         isolated_local_store=True,
     )
@@ -101,7 +101,7 @@ def test_download_s3(rule_runner: RuleRunner, monkeypatch_botocore, replace_url)
         replace_url(port)
         snapshot = rule_runner.request(
             Snapshot,
-            [DownloadS3URLHandler("s3://bucket/keypart1/keypart2/file.txt", DOWNLOADS_FILE_DIGEST)],
+            [DownloadS3SchemeURL("s3://bucket/keypart1/keypart2/file.txt", DOWNLOADS_FILE_DIGEST)],
         )
     assert snapshot.files == ("file.txt",)
     assert snapshot.digest == DOWNLOADS_EXPECTED_DIRECTORY_DIGEST
