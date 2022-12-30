@@ -48,7 +48,7 @@ class URLDownloadHandler:
     """
 
     match_authority: ClassVar[Optional[str]] = None
-    """The authority to match (e.g. 'pantsbuild.org' or 's3.amazonaws.com') or `None` to match all schemes.
+    """The authority to match (e.g. 'pantsbuild.org' or 's3.amazonaws.com') or `None` to match all authorities.
 
     Note that the authority matches userinfo (e.g. 'me@pantsbuild.org' or 'me:password@pantsbuild.org')
     as well as port (e.g. 'pantsbuild.org:80').
@@ -70,7 +70,7 @@ async def download_file(
         matches_authority = (
             handler.match_authority is None or handler.match_authority == parsed_url.netloc
         )
-        if matches_scheme or matches_authority:
+        if matches_scheme and matches_authority:
             return await Get(
                 Digest, URLDownloadHandler, handler(request.url, request.expected_digest)
             )
