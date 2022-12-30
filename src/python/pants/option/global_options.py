@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import enum
-import importlib
 import logging
 import os
 import re
@@ -247,18 +246,6 @@ class DynamicRemoteOptions:
         )
 
     @classmethod
-    def _get_auth_plugin_from_option(cls, remote_auth_plugin_option_value: str) -> Callable:
-        if ":" not in remote_auth_plugin_option_value:
-            raise OptionsError(
-                "Invalid value for `--remote-auth-plugin`: "
-                f"{remote_auth_plugin_option_value}. Please use the format "
-                "`path.to.module:my_func`."
-            )
-        auth_plugin_path, auth_plugin_func = remote_auth_plugin_option_value.split(":")
-        auth_plugin_module = importlib.import_module(auth_plugin_path)
-        return cast(Callable, getattr(auth_plugin_module, auth_plugin_func))
-
-    @classmethod
     def _use_oauth_token(cls, bootstrap_options: OptionValueContainer) -> DynamicRemoteOptions:
         oauth_token = (
             Path(bootstrap_options.remote_oauth_bearer_token_path).resolve().read_text().strip()
@@ -267,10 +254,6 @@ class DynamicRemoteOptions:
             raise OptionsError(
                 f"OAuth bearer token path {bootstrap_options.remote_oauth_bearer_token_path} "
                 "must not contain multiple lines."
-            )
-        if bootstrap_options.remote_auth_plugin:
-            raise OptionsError(
-                "OAuth bearer token path can not be used when setting the `[GLOBAL].remote_auth_plugin` option"
             )
 
         token_header = {"authorization": f"Bearer {oauth_token}"}
@@ -318,22 +301,20 @@ class DynamicRemoteOptions:
         cache_write = cast(bool, bootstrap_options.remote_cache_write)
         if not (execution or cache_read or cache_write):
             return cls.disabled(), None
-        if (
-            bootstrap_options.remote_auth_plugin
-            and bootstrap_options.remote_oauth_bearer_token_path
-        ):
+        if remote_auth_plugin_func and bootstrap_options.remote_oauth_bearer_token_path:
             raise OptionsError(
-                "Both `[GLOBAL].remote_auth_plugin` and `[GLOBAL].remote_auth_plugin` `[GLOBAL].remote_oauth_bearer_token_path` are set. This is not supported. Only one of those should be set in order to provide auth information for remote cache."
+                f"Both `{remote_auth_plugin_func}` and `[GLOBAL].remote_oauth_bearer_token_path` are set. "
+                "This is not supported. Only one of those should be set in order to provide auth information."
             )
         if bootstrap_options.remote_oauth_bearer_token_path:
             return cls._use_oauth_token(bootstrap_options), None
-        if bootstrap_options.remote_auth_plugin or remote_auth_plugin_func is not None:
+        if remote_auth_plugin_func is not None:
             return cls._use_auth_plugin(
                 bootstrap_options,
                 full_options=full_options,
                 env=env,
                 prior_result=prior_result,
-                remote_auth_plugin_func_from_entry_point=remote_auth_plugin_func,
+                remote_auth_plugin_func=remote_auth_plugin_func,
             )
         return cls._use_no_auth(bootstrap_options), None
 
@@ -373,19 +354,8 @@ class DynamicRemoteOptions:
         full_options: Options,
         env: CompleteEnvironmentVars,
         prior_result: AuthPluginResult | None,
-        remote_auth_plugin_func_from_entry_point: Callable | None,
+        remote_auth_plugin_func: Callable,
     ) -> tuple[DynamicRemoteOptions, AuthPluginResult | None]:
-        if not remote_auth_plugin_func_from_entry_point:
-            remote_auth_plugin_func = cls._get_auth_plugin_from_option(
-                bootstrap_options.remote_auth_plugin
-            )
-        else:
-            remote_auth_plugin_func = remote_auth_plugin_func_from_entry_point
-            if bootstrap_options.remote_auth_plugin:
-                raise OptionsError(
-                    "remote auth plugin already provided via entry point of a plugin. `[GLOBAL].remote_auth_plugin` should not be specified in options."
-                )
-
         execution = cast(bool, bootstrap_options.remote_execution)
         cache_read = cast(bool, bootstrap_options.remote_cache_read)
         cache_write = cast(bool, bootstrap_options.remote_cache_write)
@@ -410,7 +380,6 @@ class DynamicRemoteOptions:
         )
         plugin_name = (
             auth_plugin_result.plugin_name
-            or bootstrap_options.remote_auth_plugin
             or f"{remote_auth_plugin_func.__module__}.{remote_auth_plugin_func.__name__}"
         )
         if not auth_plugin_result.is_available:
@@ -421,7 +390,7 @@ class DynamicRemoteOptions:
             return cls.disabled(), None
 
         logger.debug(
-            f"`[GLOBAL].remote_auth_plugin` {plugin_name} succeeded. Remote caching/execution will be attempted."
+            f"Remote auth plugin `{plugin_name}` succeeded. Remote caching/execution will be attempted."
         )
         execution_headers = auth_plugin_result.execution_headers
         store_headers = auth_plugin_result.store_headers
@@ -1361,7 +1330,8 @@ class BootstrapOptions:
             This is used by some remote servers for routing. Consult your remote server for
             whether this should be set.
 
-            You can also use `[GLOBAL].remote_auth_plugin` to provide a plugin to dynamically set this value.
+            You can also use a Pants plugin which provides remote authentication to dynamically
+            set this value.
             """
         ),
     )
@@ -1390,52 +1360,6 @@ class BootstrapOptions:
             You can also manually add this header via `[GLOBAL].remote_execution_headers` and
             `[GLOBAL].remote_store_headers`, or use `[GLOBAL].remote_auth_plugin` to provide a plugin to
             dynamically set the relevant headers. Otherwise, no authorization will be performed.
-            """
-        ),
-    )
-    remote_auth_plugin = StrOption(
-        default=None,
-        advanced=True,
-        deprecation_start_version="2.15.0.dev2",
-        removal_version="2.16.0.dev3",
-        removal_hint=softwrap(
-            """
-            Remote auth plugins should now provide the function by implementing an entry point called remote_auth.
-
-            If you are developing a plugin, switch to using an entry point.
-
-            If you are only consuming a plugin from someone else, you can delete the remote_auth_plugin option
-            and now only need the plugin to be included in [GLOBAL].plugins
-            """
-        ),
-        help=softwrap(
-            """
-            Path to a plugin to dynamically configure remote caching and execution options.
-
-            Format: `path.to.module:my_func`. Pants will import your module and run your
-            function. Update the `--pythonpath` option to ensure your file is loadable.
-
-            The function should take the kwargs `initial_store_headers: dict[str, str]`,
-            `initial_execution_headers: dict[str, str]`, `options: Options` (from
-            pants.option.options), `env: dict[str, str]`, and
-            `prior_result: AuthPluginResult | None`. It should return an instance of
-            `AuthPluginResult` from `pants.option.global_options`.
-
-            Pants will replace the headers it would normally use with whatever your plugin
-            returns; usually, you should include the `initial_store_headers` and
-            `initial_execution_headers` in your result so that options like
-            `[GLOBAL].remote_store_headers` still work.
-
-            If you return `instance_name`, Pants will replace `[GLOBAL].remote_instance_name`
-            with this value.
-
-            If the returned auth state is `AuthPluginState.UNAVAILABLE`, Pants will disable
-            remote caching and execution.
-
-            If Pantsd is in use, `prior_result` will be the previous
-            `AuthPluginResult` returned by your plugin, which allows you to reuse the result.
-            Otherwise, if Pantsd has been restarted or is not used, the `prior_result` will
-            be `None`.
             """
         ),
     )

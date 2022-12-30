@@ -93,6 +93,8 @@ class TestResult(EngineAwareReturnType):
     xml_results: Snapshot | None = None
     # Any extra output (such as from plugins) that the test runner was configured to output.
     extra_output: Snapshot | None = None
+    # True if the core test rules should log that extra output was written.
+    log_extra_output: bool = False
 
     # Prevent this class from being detected by pytest as a test class.
     __test__ = False
@@ -137,6 +139,7 @@ class TestResult(EngineAwareReturnType):
         coverage_data: CoverageData | None = None,
         xml_results: Snapshot | None = None,
         extra_output: Snapshot | None = None,
+        log_extra_output: bool = False,
     ) -> TestResult:
         return TestResult(
             exit_code=process_result.exit_code,
@@ -150,6 +153,7 @@ class TestResult(EngineAwareReturnType):
             coverage_data=coverage_data,
             xml_results=xml_results,
             extra_output=extra_output,
+            log_extra_output=log_extra_output,
         )
 
     @staticmethod
@@ -161,6 +165,7 @@ class TestResult(EngineAwareReturnType):
         coverage_data: CoverageData | None = None,
         xml_results: Snapshot | None = None,
         extra_output: Snapshot | None = None,
+        log_extra_output: bool = False,
     ) -> TestResult:
         return TestResult(
             exit_code=process_result.exit_code,
@@ -174,6 +179,7 @@ class TestResult(EngineAwareReturnType):
             coverage_data=coverage_data,
             xml_results=xml_results,
             extra_output=extra_output,
+            log_extra_output=log_extra_output,
             partition_description=batch.partition_metadata.description,
         )
 
@@ -849,10 +855,15 @@ async def run_tests(
         console.print_stderr(_format_test_summary(result, run_id, console))
 
         if result.extra_output and result.extra_output.files:
+            path_prefix = str(distdir.relpath / "test" / result.path_safe_description)
             workspace.write_digest(
                 result.extra_output.digest,
-                path_prefix=str(distdir.relpath / "test" / result.path_safe_description),
+                path_prefix=path_prefix,
             )
+            if result.log_extra_output:
+                logger.info(
+                    f"Wrote extra output from test `{result.addresses[0]}` to `{path_prefix}`."
+                )
 
     if test_subsystem.report:
         report_dir = test_subsystem.report_dir(distdir)

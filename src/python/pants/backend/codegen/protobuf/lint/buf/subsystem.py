@@ -3,9 +3,11 @@
 
 from __future__ import annotations
 
+from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.core.util_rules.external_tool import TemplatedExternalTool
 from pants.engine.platform import Platform
-from pants.option.option_types import ArgsListOption, SkipOption
+from pants.option.option_types import ArgsListOption, BoolOption, FileOption, SkipOption
+from pants.util.strutil import softwrap
 
 
 class BufSubsystem(TemplatedExternalTool):
@@ -34,6 +36,43 @@ class BufSubsystem(TemplatedExternalTool):
     lint_skip = SkipOption("lint")
     format_args = ArgsListOption(example="--error-format json")
     lint_args = ArgsListOption(example="--error-format json")
+
+    config = FileOption(
+        default=None,
+        advanced=True,
+        help=lambda cls: softwrap(
+            f"""
+            Path to a config file understood by Buf
+            (https://docs.buf.build/configuration/overview).
+
+            Setting this option will disable `[{cls.options_scope}].config_discovery`. Use
+            this option if the config is located in a non-standard location.
+            """
+        ),
+    )
+    config_discovery = BoolOption(
+        default=True,
+        advanced=True,
+        help=lambda cls: softwrap(
+            f"""
+            If true, Pants will include any relevant root config files during runs
+            (`buf.yaml`, `buf.lock`, `buf.gen.yaml` and `buf.work.yaml`).
+
+            Use `[{cls.options_scope}].config` instead if your config is in a non-standard location.
+            """
+        ),
+    )
+
+    @property
+    def config_request(self) -> ConfigFilesRequest:
+        # Refer to https://docs.buf.build/configuration/overview.
+        return ConfigFilesRequest(
+            specified=self.config,
+            specified_option_name=f"{self.options_scope}.config",
+            discovery=self.config_discovery,
+            check_existence=["buf.yaml", "buf.lock", "buf.gen.yaml", "buf.work.yaml"],
+            check_content={},
+        )
 
     def generate_exe(self, plat: Platform) -> str:
         return "./buf/bin/buf"

@@ -680,8 +680,7 @@ def run_rule_with_mocks(
             else:
                 return res  # type: ignore[return-value]
         except StopIteration as e:
-            if e.args:
-                return e.value  # type: ignore[no-any-return]
+            return e.value  # type: ignore[no-any-return]
 
 
 @contextmanager

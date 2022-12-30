@@ -217,7 +217,7 @@ async def prepare_jdk_environment(
         coursier_jdk_option = shlex.quote(f"--jvm={version}")
 
     # TODO(#16104) This argument re-writing code should use the native {chroot} support.
-    # See also `run_deploy_jar` for other argument re-writing code.
+    # See also `run` for other argument re-writing code.
     def prefixed(arg: str) -> str:
         if arg.startswith("__"):
             return f"${{PANTS_INTERNAL_ABSOLUTE_PREFIX}}{arg}"

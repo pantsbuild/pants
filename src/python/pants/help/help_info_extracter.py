@@ -3,14 +3,16 @@
 
 from __future__ import annotations
 
+import ast
 import dataclasses
 import inspect
 import json
-from collections import defaultdict
+from collections import defaultdict, namedtuple
 from dataclasses import dataclass
 from enum import Enum
 from itertools import chain
 from operator import attrgetter
+from pathlib import Path
 from typing import (
     Any,
     Callable,
@@ -25,6 +27,9 @@ from typing import (
     get_type_hints,
 )
 
+import pkg_resources
+
+import pants.backend
 from pants.base import deprecated
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.core.util_rules.environments import option_field_name_for
@@ -383,6 +388,14 @@ class PluginAPITypeInfo:
 
 
 @dataclass(frozen=True)
+class BackendHelpInfo:
+    name: str
+    description: str
+    enabled: bool
+    provider: str
+
+
+@dataclass(frozen=True)
 class AllHelpInfo:
     """All available help info."""
 
@@ -391,6 +404,7 @@ class AllHelpInfo:
     name_to_target_type_info: LazyFrozenDict[str, TargetTypeHelpInfo]
     name_to_rule_info: LazyFrozenDict[str, RuleInfo]
     name_to_api_type_info: LazyFrozenDict[str, PluginAPITypeInfo]
+    name_to_backend_help_info: LazyFrozenDict[str, BackendHelpInfo]
 
     def non_deprecated_option_scope_help_infos(self):
         for oshi in self.scope_to_help_info.values():
@@ -529,6 +543,7 @@ class HelpInfoExtracter:
             name_to_target_type_info=name_to_target_type_info,
             name_to_rule_info=cls.get_rule_infos(build_configuration),
             name_to_api_type_info=cls.get_api_type_infos(build_configuration, union_membership),
+            name_to_backend_help_info=cls.get_backend_help_info(options),
         )
 
     @staticmethod
@@ -607,6 +622,11 @@ class HelpInfoExtracter:
     @staticmethod
     def maybe_cleandoc(doc: str | None) -> str | None:
         return doc and inspect.cleandoc(doc)
+
+    @staticmethod
+    def get_module_docstring(filename: str) -> str:
+        with open(filename) as fd:
+            return ast.get_docstring(ast.parse(fd.read(), filename)) or ""
 
     @classmethod
     def get_rule_infos(
@@ -778,6 +798,81 @@ class HelpInfoExtracter:
             {
                 f"{api_type.__module__}.{api_type.__name__}": get_api_type_info_loader(api_type)
                 for api_type in sorted(all_types, key=attrgetter("__name__"))
+            }
+        )
+
+    @classmethod
+    def get_backend_help_info(cls, options: Options) -> LazyFrozenDict[str, BackendHelpInfo]:
+        DiscoveredBackend = namedtuple(
+            "DiscoveredBackend", "provider, name, register_py, enabled", defaults=(False,)
+        )
+
+        def discover_source_backends(root: Path, is_source_root: bool) -> set[DiscoveredBackend]:
+            provider = root.name
+            source_root = f"{root}/" if is_source_root else f"{root.parent}/"
+            register_pys = root.glob("**/register.py")
+            backends = {
+                DiscoveredBackend(
+                    provider,
+                    str(register_py.parent).replace(source_root, "").replace("/", "."),
+                    str(register_py),
+                )
+                for register_py in register_pys
+            }
+            return backends
+
+        def discover_plugin_backends(entry_point_name: str) -> set[DiscoveredBackend]:
+            backends = {
+                DiscoveredBackend(
+                    entry_point.dist.project_name,
+                    entry_point.module_name,
+                    str(
+                        Path(entry_point.dist.location)
+                        / (entry_point.module_name.replace(".", "/") + ".py")
+                    ),
+                    True,
+                )
+                for entry_point in pkg_resources.iter_entry_points(entry_point_name)
+                if entry_point.dist is not None
+            }
+            return backends
+
+        global_options = options.for_global_scope()
+        builtin_backends = discover_source_backends(
+            Path(pants.backend.__file__).parent.parent, is_source_root=False
+        )
+        inrepo_backends = chain.from_iterable(
+            discover_source_backends(Path(path_entry), is_source_root=True)
+            for path_entry in global_options.pythonpath
+        )
+        plugin_backends = discover_plugin_backends("pantsbuild.plugin")
+        enabled_backends = {
+            "pants.core",
+            "pants.backend.project_info",
+            *global_options.backend_packages,
+        }
+
+        def get_backend_help_info_loader(
+            discovered_backend: DiscoveredBackend,
+        ) -> Callable[[], BackendHelpInfo]:
+            def load() -> BackendHelpInfo:
+                return BackendHelpInfo(
+                    name=discovered_backend.name,
+                    description=cls.get_module_docstring(discovered_backend.register_py),
+                    enabled=(
+                        discovered_backend.enabled or discovered_backend.name in enabled_backends
+                    ),
+                    provider=discovered_backend.provider,
+                )
+
+            return load
+
+        return LazyFrozenDict(
+            {
+                discovered_backend.name: get_backend_help_info_loader(discovered_backend)
+                for discovered_backend in sorted(
+                    chain(builtin_backends, inrepo_backends, plugin_backends)
+                )
             }
         )
 

@@ -4,14 +4,8 @@ colors = true
 remote_cache_read = true
 remote_cache_write = true
 
-[test]
-use_coverage = true
-
 [pytest]
 args = ["--no-header", "--noskip", "-vv"]
-
-[coverage-py]
-report = ["raw", "xml"]
 
 [auth]
 from_env_var = "TOOLCHAIN_AUTH_TOKEN"

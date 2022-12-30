@@ -32,8 +32,8 @@ from pants.backend.python.util_rules.partition import (
 from pants.backend.python.util_rules.pex import PexRequest
 from pants.backend.python.util_rules.pex_requirements import (
     EntireLockfile,
+    Lockfile,
     PexRequirements,
-    ToolCustomLockfile,
 )
 from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
@@ -216,7 +216,7 @@ class MyPy(PythonToolBase):
         if self.extra_type_stubs_lockfile == NO_TOOL_LOCKFILE:
             requirements = PexRequirements(self.extra_type_stubs)
         else:
-            tool_lockfile = ToolCustomLockfile(
+            tool_lockfile = Lockfile(
                 file_path=self.extra_type_stubs_lockfile,
                 file_path_description_of_origin=(
                     f"the option `[{self.options_scope}].extra_type_stubs_lockfile`"
