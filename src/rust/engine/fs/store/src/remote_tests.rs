@@ -336,5 +336,5 @@ pub async fn load_directory_proto_bytes(
 }
 
 async fn load_bytes(store: &ByteStore, digest: Digest) -> Result<Option<Bytes>, String> {
-  store.load_bytes_with(digest, |b| Ok(b)).await
+  store.load_bytes(digest).await
 }

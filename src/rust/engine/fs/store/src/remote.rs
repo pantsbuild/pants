@@ -337,14 +337,7 @@ impl ByteStore {
     .await
   }
 
-  pub async fn load_bytes_with<
-    T: Send + 'static,
-    F: Fn(Bytes) -> Result<T, String> + Send + Sync + Clone + 'static,
-  >(
-    &self,
-    digest: Digest,
-    f: F,
-  ) -> Result<Option<T>, String> {
+  pub async fn load_bytes(&self, digest: Digest) -> Result<Option<Bytes>, String> {
     let start = Instant::now();
     let store = self.clone();
     let instance_name = store.instance_name.clone().unwrap_or_default();
@@ -366,8 +359,8 @@ impl ByteStore {
     let client = self.byte_stream_client.as_ref().clone();
 
     let result_future = retry_call(
-      (client, request, f),
-      move |(mut client, request, f)| async move {
+      (client, request),
+      move |(mut client, request)| async move {
         let mut start_opt = Some(Instant::now());
         let stream_result = client.read(request).await;
 
@@ -376,7 +369,7 @@ impl ByteStore {
           Err(status) => {
             return match status.code() {
               Code::NotFound => Ok(None),
-              _ => Err(ByteStoreError::Grpc(status)),
+              _ => Err(status),
             }
           }
         };
@@ -404,37 +397,23 @@ impl ByteStore {
 
         let read_result: Result<Bytes, tonic::Status> = read_result_closure.await;
 
-        let maybe_bytes = match read_result {
-          Ok(bytes) => Some(bytes),
-          Err(status) => {
-            if status.code() == tonic::Code::NotFound {
-              None
-            } else {
-              return Err(ByteStoreError::Grpc(status));
-            }
-          }
-        };
-
-        match maybe_bytes {
-          Some(b) => f(b).map(Some).map_err(ByteStoreError::Other),
-          None => Ok(None),
+        match read_result {
+          Ok(bytes) => Ok(Some(bytes)),
+          Err(status) => match status.code() {
+            Code::NotFound => Ok(None),
+            _ => Err(status),
+          },
         }
       },
-      |err| match err {
-        ByteStoreError::Grpc(status) => status_is_retryable(status),
-        ByteStoreError::Other(_) => false,
-      },
+      status_is_retryable,
     );
 
     in_workunit!(
-      "load_bytes_with",
+      "load_bytes",
       Level::Trace,
       desc = Some(workunit_desc),
       |workunit| async move {
-        let result = result_future.await.map_err(|err| match err {
-          ByteStoreError::Grpc(status) => status_to_str(status),
-          ByteStoreError::Other(msg) => msg,
-        });
+        let result = result_future.await.map_err(status_to_str);
         workunit.record_observation(
           ObservationMetric::RemoteStoreReadBlobTimeMicros,
           start.elapsed().as_micros() as u64,

@@ -250,18 +250,12 @@ impl RemoteStore {
     let remote_store = self.store.clone();
     self
       .maybe_download(digest, async move {
-        // TODO(#17065): Now that we always copy from the remote store to the local store before
-        // executing the caller's logic against the local store,
-        // `remote::ByteStore::load_bytes_with` no longer needs to accept a function.
-        let bytes = remote_store
-          .load_bytes_with(digest, Ok)
-          .await?
-          .ok_or_else(|| {
-            StoreError::MissingDigest(
-              "Was not present in either the local or remote store".to_owned(),
-              digest,
-            )
-          })?;
+        let bytes = remote_store.load_bytes(digest).await?.ok_or_else(|| {
+          StoreError::MissingDigest(
+            "Was not present in either the local or remote store".to_owned(),
+            digest,
+          )
+        })?;
 
         f_remote(bytes.clone())?;
         let stored_digest = local_store
@@ -1062,21 +1056,14 @@ impl Store {
       return Err("Cannot load Trees from a remote without a remote".to_owned());
     };
 
-    let tree_opt = remote
-      .store
-      .load_bytes_with(tree_digest, |b| {
+    match remote.store.load_bytes(tree_digest).await? {
+      Some(b) => {
         let tree = Tree::decode(b).map_err(|e| format!("protobuf decode error: {:?}", e))?;
-        Ok(tree)
-      })
-      .await?;
-
-    let tree = match tree_opt {
-      Some(t) => t,
-      None => return Ok(None),
-    };
-
-    let trie = DigestTrie::try_from(tree)?;
-    Ok(Some(trie.into()))
+        let trie = DigestTrie::try_from(tree)?;
+        Ok(Some(trie.into()))
+      }
+      None => Ok(None),
+    }
   }
 
   pub async fn lease_all_recursively<'a, Ds: Iterator<Item = &'a Digest>>(
