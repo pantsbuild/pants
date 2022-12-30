@@ -134,7 +134,9 @@ $ ./pants project-version myapp:
 
 ## Exploring caching
 
-When you have run the goal a few times, you may have noticed that sometimes the command takes a few seconds to complete, and sometimes it completes immediately. If that's the case, then you have just seen [Pants caching](https://www.pantsbuild.org/docs/rules-api-tips#fyi-caching-semantics) working! Because we use Pants engine to read the `VERSION` file, it copies it into the cache. Pants knows that when the command is re-run, if there are no changes to the Python source code or the `VERSION` file, there's no need to re-run the code because the result is guaranteed to stay the same. If your plugin uses 3rd party Python packages dependencies, it can be worth checking whether the package has any side effects such as reading from the filesystem since this won't let you take full advantage of the Pants engine's caching mechanism.
+When you have run the goal a few times, you may have noticed that sometimes the command takes a few seconds to complete, and sometimes it completes immediately. If that's the case, then you have just seen [Pants caching](https://www.pantsbuild.org/docs/rules-api-tips#fyi-caching-semantics) working! Because we use Pants engine to read the `VERSION` file, it copies it into the cache. Pants knows that when the command is re-run, if there are no changes to the Python source code or the `VERSION` file, there's no need to re-run the code because the result is guaranteed to stay the same.
+
+If your plugin uses 3rd party Python packages dependencies, it can be worth checking whether the package has any side effects such as reading from the filesystem since this won't let you take full advantage of the Pants engine's caching mechanism. Keep in mind that the commands you run via Pants may be cancelled or retried any number of times, so ideally any side effects should be [idempotent](https://en.wikipedia.org/wiki/Idempotence). That is, it should not matter if it is run once or several times.
 
 You can confirm that cache is being used by adding [log statements](https://www.pantsbuild.org/docs/rules-api-logging). When run for the first time, the logging messages will show up; on subsequent runs, they won't because the code of the rules won't be executed.
 
@@ -192,7 +194,7 @@ $ ./pants project-version --as-json myapp: | jq
 
 Pants provides a way to automate generation of standard targets using the [`tailor`](https://www.pantsbuild.org/docs/reference-tailor) goal. If a monorepository has many projects, each containing a `VERSION` file, it might be useful to generate `version_file` targets in every directory where the relevant files are found. This is what Pants does, for instance, when Docker backend is enabled, and you have `Dockerfile` files in the codebase. To make this work for our use case, however, we need to introduce the `tailor` goal to the `VERSION` files.
 
-We've reached the moment when the documentation won't be of help: there are no instructions on how to extend the `tailor` goal. In a situation like this, it may be worth exploring the Pants codebase to see how this was done in other plugins that are part of the Pants. Once you find a piece of code that looks like it does what you want, you can copy it and tweak it to better suit your needs. For our use case, the code used in [generation of C++ source targets](https://github.com/pantsbuild/pants/blob/672ca1d662c76f2567e432347deee8949c14d35d/src/python/pants/backend/cc/goals/tailor.py) may get handy. After making a few changes, we have a new rule we can place in a new file:
+We've reached the moment when the documentation won't be of help: there are no instructions on how to extend the `tailor` goal. In a situation like this, it may be worth exploring the Pants codebase to see how this was done in other plugins that are part of Pants. Once you find a piece of code that looks like it does what you want, you can copy it and tweak it to better suit your needs. For our use case, the code used in [generation of C++ source targets](https://github.com/pantsbuild/pants/blob/672ca1d662c76f2567e432347deee8949c14d35d/src/python/pants/backend/cc/goals/tailor.py) may get handy. After making a few changes, we have a new rule we can place in a new file:
 
 ```python pants-plugins/project_version/tailor.py
 from __future__ import annotations
@@ -302,7 +304,7 @@ class GitTagVersion(str):
     pass
 
 @rule
-async def get_git_repo_version() -> GitTagVersion:
+async def get_git_repo_version(buildroot: BuildRoot) -> GitTagVersion:
     git_paths = await Get(
         BinaryPaths,
         BinaryPathRequest(
@@ -316,7 +318,7 @@ async def get_git_repo_version() -> GitTagVersion:
     git_describe = await Get(
         ProcessResult,
         Process(
-            argv=[git_bin.path, "-C", BuildRoot().path, "describe", "--tags"],
+            argv=[git_bin.path, "-C", buildroot.path, "describe", "--tags"],
             description="git describe --tags",
         ),
     )
@@ -391,7 +393,7 @@ This happens because of how Pants cache works. Modifying our repository tags doe
 git_describe = await Get(
     ProcessResult,
     Process(
-        argv=[git_bin.path, "-C", BuildRoot().path, "describe", "--tags"],
+        argv=[git_bin.path, "-C", buildroot.path, "describe", "--tags"],
         description="git describe --tags",
         cache_scope=ProcessCacheScope.PER_SESSION,
     ),
@@ -574,7 +576,7 @@ async def get_git_repo_version() -> GitTagVersion:
     git_describe = await Get(
         ProcessResult,
         Process(
-            argv=[git_bin.path, "-C", BuildRoot().path, "describe", "--tags"],
+            argv=[git_bin.path, "-C", buildroot.path, "describe", "--tags"],
             description="git describe --tags",
             cache_scope=ProcessCacheScope.PER_SESSION,
         ),
