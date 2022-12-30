@@ -50,7 +50,7 @@ impl NetDownload {
     file_name: String,
   ) -> Result<NetDownload, StreamingError> {
     let mut headers = HeaderMap::new();
-    for (k, v) in auth_headers.iter() {
+    for (k, v) in &auth_headers {
       headers.insert(
         HeaderName::from_bytes(k.as_bytes()).unwrap(),
         v.parse().unwrap(),

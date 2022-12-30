@@ -1,6 +1,8 @@
 # Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import pytest
+
 from pants.engine.download_file import URLDownloadHandler, download_file
 from pants.engine.fs import Digest, DownloadFile, FileDigest, NativeDownloadFile
 from pants.engine.unions import UnionMembership
@@ -166,3 +168,35 @@ def test_doesnt_match() -> None:
         union_membership=union_membership,
     )
     assert digest == DOWNLOADS_EXPECTED_DIRECTORY_DIGEST
+
+
+def test_too_many_matches() -> None:
+    class AuthorityMatcher(URLDownloadHandler):
+        match_authority = "pantsbuild.com"
+
+    class SchemeMatcher(URLDownloadHandler):
+        match_scheme = "http"
+
+    union_membership = UnionMembership({URLDownloadHandler: [AuthorityMatcher, SchemeMatcher]})
+
+    with pytest.raises(Exception, match=r"Too many registered URL handlers"):
+        run_rule_with_mocks(
+            download_file,
+            rule_args=[
+                DownloadFile("http://pantsbuild.com/file.txt", DOWNLOADS_FILE_DIGEST),
+                union_membership,
+            ],
+            mock_gets=[
+                MockGet(
+                    output_type=Digest,
+                    input_types=(URLDownloadHandler,),
+                    mock=lambda _: object(),
+                ),
+                MockGet(
+                    output_type=Digest,
+                    input_types=(NativeDownloadFile,),
+                    mock=lambda _: DOWNLOADS_EXPECTED_DIRECTORY_DIGEST,
+                ),
+            ],
+            union_membership=union_membership,
+        )

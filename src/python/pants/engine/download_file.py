@@ -10,6 +10,7 @@ from pants.engine.internals.native_engine import FileDigest
 from pants.engine.internals.selectors import Get
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionMembership, union
+from pants.util.strutil import bullet_list, softwrap
 
 
 @union
@@ -65,15 +66,29 @@ async def download_file(
 ) -> Digest:
     parsed_url = urlparse(request.url)
     handlers = union_membership.get(URLDownloadHandler)
+    matched_handlers = []
     for handler in handlers:
         matches_scheme = handler.match_scheme is None or handler.match_scheme == parsed_url.scheme
         matches_authority = (
             handler.match_authority is None or handler.match_authority == parsed_url.netloc
         )
         if matches_scheme and matches_authority:
-            return await Get(
-                Digest, URLDownloadHandler, handler(request.url, request.expected_digest)
+            matched_handlers.append(handler)
+
+    if len(matched_handlers) > 1:
+        raise Exception(
+            softwrap(
+                f"""
+                Too many registered URL handlers match the URL '{request.url}'.
+
+                Matched handlers:
+                {bullet_list(map(str, handlers))}
+                """
             )
+        )
+    if len(matched_handlers) == 1:
+        handler = matched_handlers[0]
+        return await Get(Digest, URLDownloadHandler, handler(request.url, request.expected_digest))
 
     return await Get(Digest, NativeDownloadFile(request.url, request.expected_digest))
 
