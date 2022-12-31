@@ -12,7 +12,6 @@ import subprocess
 
 from common import die
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -63,9 +62,7 @@ def perform_deploy(*, aws_cli_symlink_path: str | None = None, scope: str | None
 
 def install_aws_cli(symlink_path: str | None = None) -> None:
     env = {"AWS_CLI_SYMLINK_PATH": symlink_path} if symlink_path else {}
-    _run(
-        ["./build-support/bin/install_aws_cli.sh"], env={**os.environ, **env}
-    )
+    _run(["./build-support/bin/install_aws_cli.sh"], env={**os.environ, **env})
 
 
 def validate_authentication() -> None:
