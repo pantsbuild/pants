@@ -190,7 +190,7 @@ version = "0.13.0"
 source = "git+https://github.com/fussybeaver/bollard.git?rev=2d66d11b44aeff0373ece3d64a44b243e5152973#2d66d11b44aeff0373ece3d64a44b243e5152973"
 dependencies = [
  "base64",
- "bollard-stubs 1.42.0-rc.4",
+ "bollard-stubs",
  "bytes",
  "futures-core",
  "futures-util",
@@ -209,16 +209,6 @@ dependencies = [
  "tokio-util 0.7.4",
  "url",
  "winapi",
-]
-
-[[package]]
-name = "bollard-stubs"
-version = "1.42.0-rc.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ed59b5c00048f48d7af971b71f800fdf23e858844a6f9e4d32ca72e9399e7864"
-dependencies = [
- "serde",
- "serde_with",
 ]
 
 [[package]]
@@ -2366,7 +2356,7 @@ dependencies = [
  "async-trait",
  "bincode",
  "bollard",
- "bollard-stubs 1.42.0-rc.3",
+ "bollard-stubs",
  "bytes",
  "cache",
  "concrete_time",
