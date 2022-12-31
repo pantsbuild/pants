@@ -145,7 +145,7 @@ def test_output_path() -> None:
         )
         pants_run.assert_success()
         dist_output_path = os.path.join(dist_dir, output_path)
-        dist_entires = os.listdir(os.path.join(dist_dir, output_path))
-        assert len(dist_entires) == 2
-        for entry in dist_entires:
+        dist_entries = os.listdir(os.path.join(dist_dir, output_path))
+        assert len(dist_entries) == 2
+        for entry in dist_entries:
             assert os.path.isfile(os.path.join(dist_output_path, entry))
