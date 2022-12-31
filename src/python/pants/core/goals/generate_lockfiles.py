@@ -8,19 +8,22 @@ import logging
 from collections import defaultdict
 from dataclasses import dataclass
 from enum import Enum
-from typing import Callable, ClassVar, Iterable, Sequence
+from typing import Callable, ClassVar, Iterable, Iterator, Mapping, Protocol, Sequence, cast
 
 from pants.engine.collection import Collection
+from pants.engine.console import Console
 from pants.engine.environment import ChosenLocalEnvironmentName, EnvironmentName
 from pants.engine.fs import Digest, MergeDigests, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.internals.selectors import Effect, Get, MultiGet
-from pants.engine.process import InteractiveProcess, InteractiveProcessResult
+from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import collect_rules, goal_rule
 from pants.engine.target import Target
 from pants.engine.unions import UnionMembership, union
+from pants.help.maybe_color import MaybeColor
+from pants.option.global_options import GlobalOptions
 from pants.option.option_types import BoolOption, StrListOption, StrOption
 from pants.util.docutil import bin_name, doc_url
+from pants.util.frozendict import FrozenDict
 from pants.util.strutil import bullet_list, softwrap
 
 logger = logging.getLogger(__name__)
@@ -33,6 +36,7 @@ class GenerateLockfileResult:
     digest: Digest
     resolve_name: str
     path: str
+    generate_diff_cls: type[LockfileGenerateDiff] | None = None
 
 
 @union(in_scope_types=[EnvironmentName])
@@ -125,9 +129,155 @@ class RequestedUserResolveNames(Collection[str]):
     """
 
 
+@union
 @dataclass(frozen=True)
-class LockfileGeneratedPostProcessing:
-    process: InteractiveProcess | None = None
+class LockfileGenerateDiff:
+    lockfile: GenerateLockfileResult
+
+
+class RequirementVersion(Protocol):
+    """Protocol for backend specific implementations, to support language ecosystem specific version
+    formats and sort rules.
+
+    May support the `int` properties `major`, `minor` and `micro` to color diff based on semantic
+    step taken.
+    """
+
+    def __eq__(self, other) -> bool:
+        ...
+
+    def __gt__(self, other) -> bool:
+        ...
+
+    def __lt__(self, other) -> bool:
+        ...
+
+    def __str__(self) -> str:
+        ...
+
+
+RequirementName = str
+LockfileRequirements = FrozenDict[RequirementName, RequirementVersion]
+ChangedRequirements = FrozenDict[RequirementName, tuple[RequirementVersion, RequirementVersion]]
+
+
+@dataclass(frozen=True)
+class LockfileGenerateDiffResult:
+    path: str
+    resolve_name: str
+    added: LockfileRequirements
+    downgraded: ChangedRequirements
+    removed: LockfileRequirements
+    unchanged: LockfileRequirements
+    upgraded: ChangedRequirements
+
+    @classmethod
+    def create(
+        cls, path: str, resolve_name: str, old: LockfileRequirements, new: LockfileRequirements
+    ) -> LockfileGenerateDiffResult:
+        diff = {
+            name: (old[name], new[name])
+            for name in sorted({*old.keys(), *new.keys()})
+            if name in old and name in new
+        }
+        return cls(
+            path=path,
+            resolve_name=resolve_name,
+            added=cls.__get_lockfile_requirements(new, old),
+            downgraded=cls.__get_changed_requirements(diff, lambda prev, curr: prev > curr),
+            removed=cls.__get_lockfile_requirements(old, new),
+            unchanged=LockfileRequirements(
+                {name: curr for name, (prev, curr) in diff.items() if prev == curr}
+            ),
+            upgraded=cls.__get_changed_requirements(diff, lambda prev, curr: prev < curr),
+        )
+
+    @staticmethod
+    def __get_lockfile_requirements(
+        src: Mapping[str, RequirementVersion], exclude: Iterable[str]
+    ) -> LockfileRequirements:
+        return LockfileRequirements(
+            {name: version for name, version in src.items() if name not in exclude}
+        )
+
+    @staticmethod
+    def __get_changed_requirements(
+        src: Mapping[str, tuple[RequirementVersion, RequirementVersion]],
+        predicate: Callable[[RequirementVersion, RequirementVersion], bool],
+    ) -> ChangedRequirements:
+        return ChangedRequirements(
+            {name: prev_curr for name, prev_curr in src.items() if predicate(*prev_curr)}
+        )
+
+
+class LockfileDiffPrinter(MaybeColor):
+    def __init__(self, console: Console, color: bool, include_unchanged: bool) -> None:
+        super().__init__(color)
+        self.console = console
+        self.include_unchanged = include_unchanged
+
+    def print(self, diff: LockfileGenerateDiffResult) -> None:
+        output = "\n".join(self.output_sections(diff))
+        if not output:
+            return
+        self.console.print_stderr(
+            self.style(" " * 66, style="underline")
+            + f"\nLockfile diff: {diff.path} [{diff.resolve_name}]\n"
+            + output
+        )
+
+    def output_sections(self, diff: LockfileGenerateDiffResult) -> Iterator[str]:
+        if self.include_unchanged:
+            yield from self.output_reqs("Unchanged dependencies", diff.unchanged, fg="blue")
+        yield from self.output_changed("Upgraded dependencies", diff.upgraded)
+        yield from self.output_changed("!! Downgraded dependencies !!", diff.downgraded)
+        yield from self.output_reqs("Added dependencies", diff.added, fg="green", style="bold")
+        yield from self.output_reqs("Removed dependencies", diff.removed, fg="magenta")
+
+    def style(self, text: str, **kwargs) -> str:
+        return cast(str, self.maybe_color(text, **kwargs))
+
+    def title(self, text: str) -> str:
+        heading = f"== {text:^60} =="
+        return self.style("\n".join((" " * len(heading), heading, "")), style="underline")
+
+    def output_reqs(self, heading: str, reqs: LockfileRequirements, **kwargs) -> Iterator[str]:
+        if not reqs:
+            return
+
+        yield self.title(heading)
+        for name, version in reqs.items():
+            name_s = self.style(f"{name:30}", fg="yellow")
+            version_s = self.style(str(version), **kwargs)
+            yield f"  {name_s} {version_s}"
+
+    def output_changed(self, title: str, reqs: ChangedRequirements) -> Iterator[str]:
+        if not reqs:
+            return
+
+        yield self.title(title)
+        label = "-->"
+        for name, (prev, curr) in reqs.items():
+            bump_attrs = self.get_bump_attrs(prev, curr)
+            name_s = self.style(f"{name:30}", fg="yellow")
+            prev_s = self.style(f"{str(prev):10}", fg="cyan")
+            bump_s = self.style(f"{label:^7}", **bump_attrs)
+            curr_s = self.style(str(curr), **bump_attrs)
+            yield f"  {name_s} {prev_s} {bump_s} {curr_s}"
+
+    _BUMPS = (
+        ("major", dict(fg="red", style="bold")),
+        ("minor", dict(fg="yellow")),
+        ("micro", dict(fg="green")),
+        # Default style
+        (None, dict(fg="magenta")),
+    )
+
+    def get_bump_attrs(self, prev: RequirementVersion, curr: RequirementVersion) -> dict[str, str]:
+        for key, attrs in self._BUMPS:
+            if key and getattr(prev, key, None) != getattr(curr, key, None):
+                break
+        return attrs
 
 
 DEFAULT_TOOL_LOCKFILE = "<default>"
@@ -368,16 +518,26 @@ class GenerateLockfilesSubsystem(GoalSubsystem):
             """
         ),
     )
-    diff_generated = BoolOption(
+    diff = BoolOption(
         default=False,
         help=softwrap(
             """
             Print a summary of changed distributions after generating the lockfile.
-
-            Refer to the `lockfile-diff` subsystem help for more details.
             """
         ),
     )
+    diff_include_unchanged = BoolOption(
+        default=False,
+        help=softwrap(
+            """
+            Include unchanged distributions in the diff summary output. Implies `diff=true`.
+            """
+        ),
+    )
+
+    @property
+    def should_print_diff(self) -> bool:
+        return self.diff or self.diff_include_unchanged
 
 
 class GenerateLockfilesGoal(Goal):
@@ -391,6 +551,8 @@ async def generate_lockfiles_goal(
     union_membership: UnionMembership,
     generate_lockfiles_subsystem: GenerateLockfilesSubsystem,
     local_environment: ChosenLocalEnvironmentName,
+    console: Console,
+    global_options: GlobalOptions,
 ) -> GenerateLockfilesGoal:
     known_user_resolve_names = await MultiGet(
         Get(KnownUserResolveNames, KnownUserResolveNamesRequest, request())
@@ -439,31 +601,33 @@ async def generate_lockfiles_goal(
         for req in all_requests
     )
 
+    # Generate diffs before writing the new files to the workspace while the previous version is
+    # still untouched.
+    if generate_lockfiles_subsystem.should_print_diff:
+        diffs = await MultiGet(
+            Get(LockfileGenerateDiffResult, LockfileGenerateDiff, result.generate_diff_cls(result))
+            for result in results
+            if result.generate_diff_cls is not None
+        )
+    else:
+        diffs = ()
+
     # Lockfiles are actually written here. This would be an acceptable place to handle conflict
     # resolution behaviour if we start executing requests in multiple environments.
     merged_digest = await Get(Digest, MergeDigests(res.digest for res in results))
     workspace.write_digest(merged_digest)
+
     for result in results:
         logger.info(f"Wrote lockfile for the resolve `{result.resolve_name}` to {result.path}")
 
-        if not generate_lockfiles_subsystem.diff_generated:
-            continue
-
-        post_processing = await Get(
-            LockfileGeneratedPostProcessing,
-            {
-                result: GenerateLockfileResult,
-                local_environment.val: EnvironmentName,
-            },
+    if diffs:
+        diff_formatter = LockfileDiffPrinter(
+            console=console,
+            color=global_options.colors,
+            include_unchanged=generate_lockfiles_subsystem.diff_include_unchanged,
         )
-        if post_processing.process is not None:
-            _ = await Effect(
-                InteractiveProcessResult,
-                {
-                    post_processing.process: InteractiveProcess,
-                    local_environment.val: EnvironmentName,
-                },
-            )
+        for diff in diffs:
+            diff_formatter.print(diff)
 
     return GenerateLockfilesGoal(exit_code=0)
 

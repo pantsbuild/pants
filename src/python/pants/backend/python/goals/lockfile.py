@@ -15,6 +15,7 @@ from pants.backend.python.subsystems.python_tool_base import PythonToolRequireme
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import PythonRequirementResolveField, PythonRequirementsField
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
+from pants.backend.python.util_rules.lockfile_diff import PythonLockfileGenerateDiff
 from pants.backend.python.util_rules.lockfile_metadata import PythonLockfileMetadata
 from pants.backend.python.util_rules.pex_cli import PexCliProcess
 from pants.backend.python.util_rules.pex_requirements import (  # noqa: F401
@@ -221,7 +222,9 @@ async def generate_lockfile(
     final_lockfile_digest = await Get(
         Digest, CreateDigest([FileContent(req.lockfile_dest, lockfile_with_header)])
     )
-    return GenerateLockfileResult(final_lockfile_digest, req.resolve_name, req.lockfile_dest)
+    return GenerateLockfileResult(
+        final_lockfile_digest, req.resolve_name, req.lockfile_dest, PythonLockfileGenerateDiff
+    )
 
 
 class RequestedPythonUserResolveNames(RequestedUserResolveNames):

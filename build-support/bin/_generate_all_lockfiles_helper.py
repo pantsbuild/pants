@@ -45,7 +45,6 @@ from pants.backend.python.typecheck.mypy.subsystem import MyPy
 from pants.backend.scala.lint.scalafmt.subsystem import ScalafmtSubsystem
 from pants.backend.scala.subsystems.scalatest import Scalatest
 from pants.backend.terraform.dependency_inference import TerraformHcl2Parser
-from pants.core.subsystems.lockfile_diff import LockfileDiffSubsystem
 from pants.jvm.resolve.jvm_tool import JvmToolBase
 from pants.util.strutil import softwrap
 
@@ -115,7 +114,6 @@ AllTools = (
     DefaultTool.python(IPython),
     DefaultTool.python(Isort),
     DefaultTool.python(Lambdex, backend="pants.backend.awslambda.python"),
-    DefaultTool.python(LockfileDiffSubsystem),
     DefaultTool.python(MyPy, source_plugins=True),
     DefaultTool.python(PyTest),
     DefaultTool.python(PyUpgrade, backend="pants.backend.experimental.python.lint.pyupgrade"),
