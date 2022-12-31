@@ -538,6 +538,7 @@ def bootstrap_jobs(
             ./build-support/bin/check_rust_pre_commit.sh
             ./cargo test --all --tests -- --nocapture
             ./cargo check --benches
+            ./cargo doc
             """
         )
     else:
