@@ -1382,7 +1382,7 @@ class PythonDistributionEntryPointsField(NestedDictStringToStringField, AsyncFie
 class PythonDistributionOutputPathField(StringField, AsyncFieldMixin):
     help = softwrap(
         """
-        The path to the output distribution, relative the dist directory.
+        The path to the directory to write the distribution file to, relative the dist directory.
 
         If undefined, this defaults to the empty path, i.e. the output goes at the top
         level of the dist dir.

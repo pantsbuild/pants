@@ -204,7 +204,7 @@ async def run_pep517_build(request: DistBuildRequest, python_setup: PythonSetup)
         ),
     )
 
-    # This is the setuptools dist directory, not Pants's, so we harcode to dist/.
+    # This is the setuptools dist directory, not Pants's, so we hardcode to dist/.
     dist_dir = "dist"
     backend_shim_name = "backend_shim.py"
     backend_shim_path = os.path.join(request.working_directory, backend_shim_name)
