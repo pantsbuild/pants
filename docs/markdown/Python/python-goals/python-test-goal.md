@@ -590,3 +590,10 @@ python_tests(
 ```
 
 Take note that Pants uses some CLI args for its internal mechanism of controlling Pytest (`--color`, `--junit-xml`, `junit_family`, `--cov`, `--cov-report` and `--cov-config`). If these options are overridden, Pants Pytest handling may not work correctly. Set these at your own peril!
+
+Failures to collect tests
+-------------------------
+
+`pytest` follows [certain conventions for test discovery](https://docs.pytest.org/en/7.1.x/explanation/goodpractices.html#conventions-for-python-test-discovery), so if no (or only some) tests are run, it may be worth reviewing the documentation. Pants can help you find test modules that would not be collected by `pytest`. For instance, `./pants tailor --check ::` command would suggest creating targets for files that are not covered by glob expressions in your `BUILD` files (e.g. if a test module has a typo and is named `tes_connection.py`). You can also run `./pants --filter-target-type=python_test filedeps <test-dir>::` command to list all test files known to Pants and compare the output with the list of files that exist on disk.
+
+If your tests fail to import the source modules, it may be due to the import mode used by `pytest`, especially if you are using [namespace packages](https://packaging.python.org/en/latest/guides/packaging-namespace-packages/). Please review [Choosing an import mode](https://docs.pytest.org/en/7.1.x/explanation/goodpractices.html#choosing-an-import-mode) and [pytest import mechanisms and sys.path/PYTHONPATH](https://docs.pytest.org/en/7.1.x/explanation/pythonpath.html#import-modes) to learn more.
