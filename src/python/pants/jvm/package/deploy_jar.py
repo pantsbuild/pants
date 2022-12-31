@@ -28,7 +28,9 @@ from pants.jvm.compile import (
     FallibleClasspathEntry,
 )
 from pants.jvm.jar_tool.jar_tool import JarToolRequest
+from pants.jvm.jar_tool.jar_tool import rules as jar_tool_rules
 from pants.jvm.shading.rules import ShadedJar, ShadeJarRequest
+from pants.jvm.shading.rules import rules as shaded_jar_rules
 from pants.jvm.strip_jar.strip_jar import StripJarRequest
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import (
@@ -48,6 +50,7 @@ class DeployJarFieldSet(PackageFieldSet, RunFieldSet):
         JvmMainClassNameField,
         JvmJdkField,
         Dependencies,
+        OutputPathField,
     )
     run_in_sandbox_behavior = RunInSandboxBehavior.RUN_REQUEST_HERMETIC
 
@@ -173,6 +176,8 @@ def rules():
     return [
         *collect_rules(),
         *classpath.rules(),
+        *jar_tool_rules(),
+        *shaded_jar_rules(),
         UnionRule(PackageFieldSet, DeployJarFieldSet),
         UnionRule(ClasspathEntryRequest, DeployJarClasspathEntryRequest),
     ]

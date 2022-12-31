@@ -9,7 +9,17 @@ from abc import ABCMeta
 from dataclasses import dataclass
 from enum import Enum
 from itertools import filterfalse, tee
-from typing import Callable, ClassVar, Iterable, Mapping, NamedTuple, Optional, Tuple, TypeVar
+from typing import (
+    Callable,
+    ClassVar,
+    Iterable,
+    Mapping,
+    NamedTuple,
+    Optional,
+    Tuple,
+    TypeVar,
+    Union,
+)
 
 from typing_extensions import final
 
@@ -27,6 +37,7 @@ from pants.engine.process import InteractiveProcess, InteractiveProcessResult
 from pants.engine.rules import (
     Effect,
     Get,
+    Rule,
     _uncacheable_rule,
     collect_rules,
     goal_rule,
@@ -91,7 +102,7 @@ class RunFieldSet(FieldSet, metaclass=ABCMeta):
 
     @final
     @classmethod
-    def rules(cls) -> Iterable:
+    def rules(cls) -> Iterable[Union[Rule, UnionRule]]:
         yield UnionRule(RunFieldSet, cls)
         if not cls.supports_debug_adapter:
             yield from _unsupported_debug_adapter_rules(cls)

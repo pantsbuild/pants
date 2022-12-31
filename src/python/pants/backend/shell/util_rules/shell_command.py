@@ -95,7 +95,6 @@ class ShellCommandProcessRequest:
     timeout: int | None
     tools: tuple[str, ...]
     input_digest: Digest
-    immutable_input_digests: FrozenDict[str, Digest] | None
     append_only_caches: FrozenDict[str, str] | None
     output_files: tuple[str, ...]
     output_directories: tuple[str, ...]
@@ -137,7 +136,6 @@ async def _prepare_process_request_from_target(shell_command: Target) -> ShellCo
         output_files=output_files,
         output_directories=output_directories,
         fetch_env_vars=shell_command.get(ShellCommandExtraEnvVarsField).value or (),
-        immutable_input_digests=None,
         append_only_caches=None,
         supplied_env_var_values=None,
     )
@@ -351,7 +349,6 @@ async def run_in_sandbox_request(
         timeout=None,
         tools=(),
         input_digest=input_digest,
-        immutable_input_digests=FrozenDict(run_request.immutable_input_digests or {}),
         append_only_caches=FrozenDict(run_request.append_only_caches or {}),
         output_files=output_files,
         output_directories=output_directories,
@@ -432,7 +429,6 @@ async def prepare_shell_command_process(
     output_directories = shell_command.output_directories
     fetch_env_vars = shell_command.fetch_env_vars
     supplied_env_vars = shell_command.supplied_env_var_values or FrozenDict()
-    immutable_input_digests = shell_command.immutable_input_digests or FrozenDict()
     append_only_caches = shell_command.append_only_caches or FrozenDict()
 
     if interactive:
@@ -490,7 +486,6 @@ async def prepare_shell_command_process(
         timeout_seconds=timeout,
         working_directory=working_directory,
         append_only_caches=append_only_caches,
-        immutable_input_digests=immutable_input_digests,
     )
 
 

@@ -11,10 +11,14 @@ from pants.backend.scala.compile.scalac_plugins import (
 )
 from pants.backend.scala.dependency_inference import scala_parser, symbol_mapper
 from pants.backend.scala.dependency_inference.scala_parser import ScalaSourceDependencyAnalysis
-from pants.backend.scala.resolve.lockfile import SCALA_LIBRARY_ARTIFACT, SCALA_LIBRARY_GROUP
 from pants.backend.scala.subsystems.scala import ScalaSubsystem
 from pants.backend.scala.subsystems.scala_infer import ScalaInferSubsystem
 from pants.backend.scala.target_types import ScalaDependenciesField, ScalaSourceField
+from pants.backend.scala.util_rules import versions
+from pants.backend.scala.util_rules.versions import (
+    ScalaArtifactsForVersionRequest,
+    ScalaArtifactsForVersionResult,
+)
 from pants.build_graph.address import Address
 from pants.core.util_rules.source_files import SourceFilesRequest
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
@@ -34,7 +38,6 @@ from pants.jvm.dependency_inference.artifact_mapper import (
     find_jvm_artifacts_or_raise,
 )
 from pants.jvm.dependency_inference.symbol_mapper import SymbolMapping
-from pants.jvm.resolve.common import Coordinate
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmResolveField
 from pants.util.ordered_set import OrderedSet
@@ -138,13 +141,13 @@ async def resolve_scala_library_for_resolve(
     scala_subsystem: ScalaSubsystem,
 ) -> ScalaRuntimeForResolve:
     scala_version = scala_subsystem.version_for_resolve(request.resolve_name)
+    scala_artifacts = await Get(
+        ScalaArtifactsForVersionResult, ScalaArtifactsForVersionRequest(scala_version)
+    )
+
     addresses = find_jvm_artifacts_or_raise(
         required_coordinates=[
-            Coordinate(
-                group=SCALA_LIBRARY_GROUP,
-                artifact=SCALA_LIBRARY_ARTIFACT,
-                version=scala_version,
-            )
+            scala_artifacts.library_coordinate,
         ],
         resolve=request.resolve_name,
         jvm_artifact_targets=jvm_artifact_targets,
@@ -198,6 +201,7 @@ def rules():
         *scala_parser.rules(),
         *scalac_plugins.rules(),
         *symbol_mapper.rules(),
+        *versions.rules(),
         UnionRule(InferDependenciesRequest, InferScalaSourceDependencies),
         UnionRule(InferDependenciesRequest, InferScalaLibraryDependencyRequest),
         UnionRule(InferDependenciesRequest, InferScalaPluginDependenciesRequest),

@@ -28,8 +28,11 @@ from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.jvm.jdk_rules import InternalJdk, JvmProcess
+from pants.jvm.jdk_rules import rules as jdk_rules
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
+from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
+from pants.jvm.resolve.jvm_tool import rules as jvm_tool_rules
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
@@ -300,5 +303,8 @@ async def generate_jartool_lockfile_request(
 def rules():
     return [
         *collect_rules(),
+        *coursier_fetch_rules(),
+        *jdk_rules(),
+        *jvm_tool_rules(),
         UnionRule(GenerateToolLockfileSentinel, JarToolGenerateLockfileSentinel),
     ]

@@ -196,7 +196,7 @@ impl StubCASResponder {
     match maybe_bytes {
       Some(bytes) => Ok(
         bytes
-          .chunks(self.chunk_size_bytes as usize)
+          .chunks(self.chunk_size_bytes)
           .map(|b| ReadResponse {
             data: bytes.slice_ref(b),
           })
