@@ -1,22 +1,20 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import logging
+from __future__ import annotations
+
 import os
 import shutil
 import ssl
 import sys
 import tempfile
-import termios
 import threading
 import zipfile
 from contextlib import contextmanager
 from pathlib import Path
 from queue import Queue
 from socketserver import TCPServer
-from typing import IO, Any, Callable, Iterator, Mapping, Optional, Tuple, Type, Union
-
-from colors import green
+from typing import IO, Any, Callable, Iterator, Mapping
 
 from pants.util.dirutil import safe_delete
 
@@ -26,7 +24,7 @@ class InvalidZipPath(ValueError):
 
 
 @contextmanager
-def environment_as(**kwargs: Optional[str]) -> Iterator[None]:
+def environment_as(**kwargs: str | None) -> Iterator[None]:
     """Update the environment to the supplied values, for example:
 
     with environment_as(PYTHONPATH='foo:bar:baz',
@@ -36,7 +34,7 @@ def environment_as(**kwargs: Optional[str]) -> Iterator[None]:
     new_environment = kwargs
     old_environment = {}
 
-    def setenv(key: str, val: Optional[str]) -> None:
+    def setenv(key: str, val: str | None) -> None:
         if val is not None:
             os.environ[key] = val
         else:
@@ -70,7 +68,7 @@ def _restore_env(env: Mapping[str, str]) -> None:
 
 
 @contextmanager
-def hermetic_environment_as(**kwargs: Optional[str]) -> Iterator[None]:
+def hermetic_environment_as(**kwargs: str | None) -> Iterator[None]:
     """Set the environment to the supplied values from an empty state."""
     old_environment = os.environ.copy()
     _purge_env()
@@ -83,7 +81,7 @@ def hermetic_environment_as(**kwargs: Optional[str]) -> Iterator[None]:
 
 
 @contextmanager
-def argv_as(args: Tuple[str, ...]) -> Iterator[None]:
+def argv_as(args: tuple[str, ...]) -> Iterator[None]:
     """Temporarily set `sys.argv` to the supplied value."""
     old_args = sys.argv
     try:
@@ -94,69 +92,12 @@ def argv_as(args: Tuple[str, ...]) -> Iterator[None]:
 
 
 @contextmanager
-def _stdio_stream_as(src_fd: int, dst_fd: int, dst_sys_attribute: str, mode: str) -> Iterator[None]:
-    """Replace the given dst_fd and attribute on `sys` with an open handle to the given src_fd."""
-    src = None
-    if src_fd == -1:
-        src = open("/dev/null", mode)
-        src_fd = src.fileno()
-
-    # Capture the python and os level file handles.
-    old_dst = getattr(sys, dst_sys_attribute)
-    old_dst_fd = os.dup(dst_fd)
-    if src_fd != dst_fd:
-        os.dup2(src_fd, dst_fd)
-
-    # Open up a new file handle to temporarily replace the python-level io object, then yield.
-    new_dst = os.fdopen(dst_fd, mode)
-    is_atty = new_dst.isatty()
-    setattr(sys, dst_sys_attribute, new_dst)
-    try:
-        yield
-    finally:
-        try:
-            if src:
-                src.close()
-            if is_atty:
-                termios.tcdrain(dst_fd)
-            else:
-                new_dst.flush()
-            new_dst.close()
-        except BaseException:
-            pass
-
-        # Restore the python and os level file handles.
-        os.dup2(old_dst_fd, dst_fd)
-        setattr(sys, dst_sys_attribute, old_dst)
-
-
-@contextmanager
-def stdio_as(stdout_fd: int, stderr_fd: int, stdin_fd: int) -> Iterator[None]:
-    """Redirect sys.{stdout, stderr, stdin} to alternate file descriptors.
-
-    As a special case, if a given destination fd is `-1`, we will replace it with an open file handle
-    to `/dev/null`.
-
-    NB: If the filehandles for sys.{stdout, stderr, stdin} have previously been closed, it's
-    possible that the OS has repurposed fds `0, 1, 2` to represent other files or sockets. It's
-    impossible for this method to locate all python objects which refer to those fds, so it's up
-    to the caller to guarantee that `0, 1, 2` are safe to replace.
-
-    The streams expect unicode. To write and read bytes, access their buffer, e.g. `stdin.buffer.read()`.
-    """
-    with _stdio_stream_as(stdin_fd, 0, "stdin", "r"), _stdio_stream_as(
-        stdout_fd, 1, "stdout", "w"
-    ), _stdio_stream_as(stderr_fd, 2, "stderr", "w"):
-        yield
-
-
-@contextmanager
 def temporary_dir(
-    root_dir: Optional[str] = None,
+    root_dir: str | None = None,
     cleanup: bool = True,
-    suffix: Optional[str] = None,
-    permissions: Optional[int] = None,
-    prefix: Optional[str] = tempfile.template,
+    suffix: str | None = None,
+    permissions: int | None = None,
+    prefix: str | None = tempfile.template,
 ) -> Iterator[str]:
     """A with-context that creates a temporary directory.
 
@@ -165,7 +106,10 @@ def temporary_dir(
     You may specify the following keyword args:
     :param root_dir: The parent directory to create the temporary directory.
     :param cleanup: Whether or not to clean up the temporary directory.
+    :param suffix: If not None the directory name will end with this suffix.
     :param permissions: If provided, sets the directory permissions to this mode.
+    :param prefix: If not None, the directory name will begin with this prefix,
+                   otherwise a default prefix is used.
     """
     path = tempfile.mkdtemp(dir=root_dir, suffix=suffix, prefix=prefix)
 
@@ -180,10 +124,10 @@ def temporary_dir(
 
 @contextmanager
 def temporary_file_path(
-    root_dir: Optional[str] = None,
+    root_dir: str | None = None,
     cleanup: bool = True,
-    suffix: Optional[str] = None,
-    permissions: Optional[int] = None,
+    suffix: str | None = None,
+    permissions: int | None = None,
 ) -> Iterator[str]:
     """A with-context that creates a temporary file and returns its path.
 
@@ -200,10 +144,10 @@ def temporary_file_path(
 
 @contextmanager
 def temporary_file(
-    root_dir: Optional[str] = None,
+    root_dir: str | None = None,
     cleanup: bool = True,
-    suffix: Optional[str] = None,
-    permissions: Optional[int] = None,
+    suffix: str | None = None,
+    permissions: int | None = None,
     binary_mode: bool = True,
 ) -> Iterator[IO]:
     """A with-context that creates a temporary file and returns a writeable file descriptor to it.
@@ -232,8 +176,8 @@ def temporary_file(
 
 @contextmanager
 def overwrite_file_content(
-    file_path: Union[str, Path],
-    temporary_content: Optional[Union[bytes, str, Callable[[bytes], bytes]]] = None,
+    file_path: str | Path,
+    temporary_content: bytes | str | Callable[[bytes], bytes] | None = None,
 ) -> Iterator[None]:
     """A helper that resets a file after the method runs.
 
@@ -272,7 +216,7 @@ def pushd(directory: str) -> Iterator[str]:
 
 
 @contextmanager
-def open_zip(path_or_file: Union[str, Any], *args, **kwargs) -> Iterator[zipfile.ZipFile]:
+def open_zip(path_or_file: str | Any, *args, **kwargs) -> Iterator[zipfile.ZipFile]:
     """A with-context for zip files.
 
     Passes through *args and **kwargs to zipfile.ZipFile.
@@ -301,37 +245,8 @@ def open_zip(path_or_file: Union[str, Any], *args, **kwargs) -> Iterator[zipfile
 
 
 @contextmanager
-def maybe_profiled(profile_path: Optional[str]) -> Iterator[None]:
-    """A profiling context manager.
-
-    :param profile_path: The path to write profile information to. If `None`, this will no-op.
-    """
-    if not profile_path:
-        yield
-        return
-
-    import cProfile
-
-    profiler = cProfile.Profile()
-    try:
-        profiler.enable()
-        yield
-    finally:
-        profiler.disable()
-        profiler.dump_stats(profile_path)
-        view_cmd = green(
-            "gprof2dot -f pstats {path} | dot -Tpng -o {path}.png && open {path}.png".format(
-                path=profile_path
-            )
-        )
-        logging.getLogger().info(
-            f"Dumped profile data to: {profile_path}\nUse e.g. {view_cmd} to render and view."
-        )
-
-
-@contextmanager
-def http_server(handler_class: Type, ssl_context: Optional[ssl.SSLContext] = None) -> Iterator[int]:
-    def serve(port_queue: "Queue[int]", shutdown_queue: "Queue[bool]") -> None:
+def http_server(handler_class: type, ssl_context: ssl.SSLContext | None = None) -> Iterator[int]:
+    def serve(port_queue: Queue[int], shutdown_queue: Queue[bool]) -> None:
         httpd = TCPServer(("", 0), handler_class)
         httpd.timeout = 0.1
         if ssl_context:
@@ -341,8 +256,8 @@ def http_server(handler_class: Type, ssl_context: Optional[ssl.SSLContext] = Non
         while shutdown_queue.empty():
             httpd.handle_request()
 
-    port_queue: "Queue[int]" = Queue()
-    shutdown_queue: "Queue[bool]" = Queue()
+    port_queue: Queue[int] = Queue()
+    shutdown_queue: Queue[bool] = Queue()
     t = threading.Thread(target=lambda: serve(port_queue, shutdown_queue))
     t.daemon = True
     t.start()

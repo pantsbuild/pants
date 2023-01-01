@@ -1,6 +1,8 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import logging
 from dataclasses import dataclass
 
@@ -29,7 +31,7 @@ class PantsDaemonClient(PantsDaemonProcessManager):
     def __init__(self, bootstrap_options: Options):
         super().__init__(bootstrap_options, daemon_entrypoint=pants_daemon.__name__)
 
-    def maybe_launch(self) -> "PantsDaemonClient.Handle":
+    def maybe_launch(self) -> PantsDaemonClient.Handle:
         """Creates and launches a daemon instance if one does not already exist."""
         with self.lifecycle_lock:
             if self.needs_restart(self.options_fingerprint):
@@ -42,13 +44,13 @@ class PantsDaemonClient(PantsDaemonProcessManager):
                     metadata_base_dir=self._metadata_base_dir,
                 )
 
-    def restart(self) -> "PantsDaemonClient.Handle":
+    def restart(self) -> PantsDaemonClient.Handle:
         """Restarts a running daemon instance."""
         with self.lifecycle_lock:
             # N.B. This will call `pantsd.terminate()` before starting.
             return self._launch()
 
-    def _launch(self) -> "PantsDaemonClient.Handle":
+    def _launch(self) -> PantsDaemonClient.Handle:
         """Launches pantsd in a subprocess.
 
         N.B. This should always be called under care of the `lifecycle_lock`.

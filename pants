@@ -4,48 +4,31 @@
 
 # This bootstrap script runs pants from the live sources in this repo.
 #
-# Further support is added for projects wrapping pants with custom external extensions.  In the
-# future this will work differently (see: https://github.com/pantsbuild/pants/issues/5), but
-# currently pants extenders can invoke this script exporting a few environment variables to include
-# the extension source and requirements for development purposes:
-# WRAPPER_SRCPATH       This is a colon separated list of paths containing extension sourcecode.
-# WRAPPER_REQUIREMENTS  This is a colon separated list of pip install compatible requirements.txt
-#                       files.
-#
-# For example, with a wrapping project layed out like so:
-# /src/wrapper/
-#   src/main/python/
-#     wrapper/
-#       ...
-#   dependencies/python/
-#     BUILD
-#     requirements.txt
-#
-# And a pantsbuild/pants clone like so:
-# /src/pantsbuild-pants
-#
-# You could invoke pants in the wrapper with its custom extension enabled using a script like so:
-# /src/wrapper/pants
-# ==
-# #!/usr/bin/env bash
-# WRAPPER_REQUIREMENTS="/src/wrapper/dependencies/python/requirements.txt" \
-# WRAPPER_SRCPATH=/src/wrapper/src/main/python \
-#    exec /src/pantsbuild-pants/pants "$@"
-#
-# The script defaults to running with Python 3. To use a specific Python version,
-# such as 3.7, prefix the script with `PY=python3.7`.
+# The script defaults to running with either Python 3.7 or Python 3.8. To use another Python version,
+# prefix the script with `PY=python3.8`.
 
-set -e
+set -eo pipefail
 
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
-# Set RUN_PANTS_FROM_PEX to non-empty to cause this wrapper script to delegate directly
-# to ./pants.pex. We use this in CI to avoid bootstrapping in every shard.
-if [[ -n "${RUN_PANTS_FROM_PEX}" ]]; then
-  exec "${HERE}/pants.pex" "$@"
+# Source any custom bootstrap settings for Pants from PANTS_BOOTSTRAP if it exists.
+: "${PANTS_BOOTSTRAP:=.pants.bootstrap}"
+if [[ -f "${PANTS_BOOTSTRAP}" ]]; then
+  # shellcheck source=/dev/null
+  source "${PANTS_BOOTSTRAP}"
 fi
 
-# Otherwise, run directly from sources, bootstrapping if needed.
+# Exposes:
+# + determine_python: Determine which interpreter version to use.
+# shellcheck source=build-support/common.sh
+source "${HERE}/build-support/common.sh"
+
+PY="$(determine_python)"
+export PY
+
+if is_macos_arm; then
+  export PANTS_PYTHON_INTERPRETER_CONSTRAINTS="${PANTS_PYTHON_INTERPRETER_CONSTRAINTS:-"['==3.9.*']"}"
+fi
 
 # Exposes:
 # + activate_pants_venv: Activate a virtualenv for pants requirements, creating it if needed.
@@ -54,56 +37,44 @@ source "${HERE}/build-support/pants_venv"
 
 # Exposes:
 # + bootstrap_native_code: Builds target-specific native engine binaries.
-# shellcheck source=build-support/bin/native/bootstrap_code.sh
-source "${HERE}/build-support/bin/native/bootstrap_code.sh"
-
-export PY="${PY:-python3}"
-
-PANTS_EXE="${HERE}/src/python/pants/bin/pants_loader.py"
-
-if [[ -n "${WRAPPER_REQUIREMENTS}" ]]; then
-  # WONTFIX: fixing the array expansion is too difficult to be worth it. See https://github.com/koalaman/shellcheck/wiki/SC2207.
-  # shellcheck disable=SC2207
-  REQUIREMENTS=(
-    $(echo "${WRAPPER_REQUIREMENTS}" | tr : ' ')
-    "${REQUIREMENTS[@]}"
-  )
-fi
-
-PANTS_SRCPATH=(
-  "${HERE}/src/python"
-)
-if [[ -n "${WRAPPER_SRCPATH}" ]]; then
-  # WONTFIX: fixing the array expansion is too difficult to be worth it. See https://github.com/koalaman/shellcheck/wiki/SC2207.
-  # shellcheck disable=SC2207
-  PANTS_SRCPATH=(
-    $(echo "${WRAPPER_SRCPATH}" | tr : ' ')
-    "${PANTS_SRCPATH[@]}"
-  )
-fi
-PANTS_SRCPATH_STR="$(echo "${PANTS_SRCPATH[@]}" | tr ' ' :)"
+# shellcheck source=build-support/bin/rust/bootstrap_code.sh
+source "${HERE}/build-support/bin/rust/bootstrap_code.sh"
 
 function exec_pants_bare() {
+  PANTS_NATIVE_EXE="${HERE}/.pants"
+  PANTS_PY_EXE="${HERE}/src/python/pants/bin/pants_loader.py"
+  PANTS_SRCPATH="${HERE}/src/python"
+
   # Redirect activation and native bootstrap to ensure that they don't interfere with stdout.
   activate_pants_venv 1>&2
   bootstrap_native_code 1>&2
-  PYTHONPATH="${PANTS_SRCPATH_STR}:${PYTHONPATH}" RUNNING_PANTS_FROM_SOURCES=1 \
-    exec "${PY}" "${PANTS_EXE}" "$@"
+
+  if [ -n "${USE_NATIVE_PANTS}" ]; then
+    set +e
+    "${PANTS_NATIVE_EXE}" "$@"
+    result=$?
+    # N.B.: The native pants client currently relies on pantsd being up. If it's not, it will fail
+    # with exit code 75 (EX_TEMPFAIL in /usr/include/sysexits.h) and we should fall through to the
+    # python pants client which knows how to start up pantsd. This failure takes O(1ms); so has no
+    # appreciable impact on --no-pantsd runs.
+    if ((result != 75)); then
+      exit ${result}
+    fi
+    set -e
+  fi
+
+  if [ -n "${PANTS_DEBUG}" ]; then
+    if [[ "$*" != *"--no-pantsd"* ]]; then
+      echo "Error! Must pass '--no-pantsd' when using PANTS_DEBUG"
+      exit 1
+    fi
+    DEBUG_ARGS="-m debugpy --listen 127.0.0.1:5678 --wait-for-client"
+    echo "Will launch debugpy server at '127.0.0.1:5678' waiting for client connection."
+  fi
+
+  # shellcheck disable=SC2086
+  PYTHONPATH="${PANTS_SRCPATH}:${PYTHONPATH}" RUNNING_PANTS_FROM_SOURCES=1 \
+    exec ${PANTS_PREPEND_ARGS:-} "$(venv_dir)/bin/python" ${DEBUG_ARGS} "${PANTS_PY_EXE}" "$@"
 }
-
-if [[ -n "${WRAPPER_REQUIREMENTS}" ]]; then
-  log "*** Running pants with extra requirements: ${WRAPPER_REQUIREMENTS} ***"
-fi
-if [[ -n "${WRAPPER_SRCPATH}" ]]; then
-  log "*** Running pants with extra sources ${WRAPPER_SRCPATH} ***"
-fi
-
-if [[ -n "$PANTS_DEV" && "$PANTS_DEV" -eq 0 ]]; then
-  # Unexport PANTS_DEV if explicitly set to 0.
-  export -n PANTS_DEV
-else
-  # We're running against a Pants clone.
-  export PANTS_DEV=1
-fi
 
 exec_pants_bare "$@"

@@ -12,10 +12,12 @@ __pycache__/
 *~
 *#
 .#*
+.envrc
 .DS_Store
 .build.properties
 .buildcache/
 .coverage*
+.emacs.desktop*
 .idea
 /.vscode/
 .cache
@@ -29,6 +31,7 @@ __pycache__/
 .classpath
 .factorypath
 .python
+.python-version
 .pydevproject
 .pytest_cache/
 codegen/classes/
@@ -37,15 +40,12 @@ out/
 # remove root-level /bin, which is created by Eclipse
 /bin/
 /build-support/*.pex
-/build-support/virtualenvs
 /build-support/virtualenv-*
 /build-support/virtualenv.dist/
 /build-support/phab/
 /build-support/twine-deps.venv/
 /dist/
 /lib/
-# This is created by the very handy `build-support/bin/get_failing_travis_targets_for_pr.sh`.
-/logs/
 arc.sh
 BUILD.release*
 /pants.pex
@@ -56,3 +56,7 @@ GRTAGS
 GSYMS
 GTAGS
 .mypy_cache/
+/.pants
+/.pants.rc
+/.venv
+.tool-versions

@@ -6,8 +6,13 @@ from pathlib import Path
 
 from pants.base.build_root import BuildRoot
 from pants.engine.rules import collect_rules, rule
-from pants.fs.fs import is_child_of
 from pants.option.global_options import GlobalOptions
+from pants.util.strutil import softwrap
+
+
+def is_child_of(path: Path, directory: Path) -> bool:
+    abs_path = path if path.is_absolute() else directory.joinpath(path).resolve()
+    return directory == abs_path or directory in abs_path.parents
 
 
 class InvalidDistDir(Exception):
@@ -23,15 +28,19 @@ class DistDir:
 
 @rule
 async def get_distdir(global_options: GlobalOptions, buildroot: BuildRoot) -> DistDir:
-    return validate_distdir(Path(global_options.options.pants_distdir), buildroot.pathlib_path)
+    return validate_distdir(Path(global_options.pants_distdir), buildroot.pathlib_path)
 
 
 def validate_distdir(distdir: Path, buildroot: Path) -> DistDir:
     if not is_child_of(distdir, buildroot):
         raise InvalidDistDir(
-            f"When set to an absolute path, `--pants-distdir` must be relative to the build root."
-            f"You set it to {distdir}. Instead, use a relative path or an absolute path relative "
-            f"to the build root."
+            softwrap(
+                f"""
+            When set to an absolute path, `--pants-distdir` must be relative to the build root.
+            You set it to {distdir}. Instead, use a relative path or an absolute path relative
+            to the build root.
+            """
+            )
         )
     relpath = distdir.relative_to(buildroot) if distdir.is_absolute() else distdir
     return DistDir(relpath)

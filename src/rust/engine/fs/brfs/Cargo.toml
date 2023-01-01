@@ -1,31 +1,31 @@
 [package]
 name = "brfs"
 version = "0.0.1"
-edition = "2018"
+edition = "2021"
 authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 publish = false
 
 [dependencies]
-bazel_protos = { path = "../../process_execution/bazel_protos" }
-clap = "2"
-dirs = "1"
-env_logger = "0.5.4"
-errno = "0.2.3"
-fuse = "0.3.1"
+protos = { path = "../../protos" }
+clap = "3"
+dirs-next = "2"
+env_logger = "0.9.0"
+errno = "0.2.8"
+fuser = "0.11.1"
 futures = "0.3"
+grpc_util = { path = "../../grpc_util" }
 hashing = { path = "../../hashing" }
-libc = "0.2.39"
-log = "0.4.1"
-parking_lot = "0.11"
-protobuf = { version = "2.0.6", features = ["with-bytes"] }
-serverset = { path = "../../serverset" }
+libc = "0.2.137"
+log = "0.4.17"
+parking_lot = "0.12"
 store = { path = "../store" }
 task_executor = { path = "../../task_executor" }
-time = "0.1.39"
-tokio = { version = "0.2.22", features = ["rt-threaded", "macros", "signal", "stream"] }
+time = "0.3"
+tokio = { version = "1.21", features = ["rt-multi-thread", "macros", "signal"] }
+tokio-stream = { version = "0.1", features = ["signal"] }
 workunit_store = { path = "../../workunit_store" }
 
 [dev-dependencies]
-bytes = "0.4.5"
+bytes = "1.2"
 tempfile = "3"
 testutil = { path = "../../testutil" }

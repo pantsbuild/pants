@@ -14,21 +14,22 @@ from pants_test.pantsd.pantsd_integration_test_base import PantsDaemonIntegratio
 
 
 @ensure_daemon
-def test_goal_validation():
-    result = run_pants(["blah", "::"])
+def test_goal_validation(use_pantsd: bool) -> None:
+    result = run_pants(["blah", "::"], use_pantsd=use_pantsd)
     result.assert_failure()
     assert "Unknown goal: blah" in result.stdout
 
 
 def test_unimplemented_goals_noop() -> None:
-    # Running on a `files` target should usually fail, but it should no-op if no `run`
+    # Running on a `file` target should usually fail, but it should no-op if no `run`
     # implementations are activated.
-    with setup_tmpdir({"bad.txt": "", "BUILD": "files(sources=['f.txt')"}) as tmpdir:
+    with setup_tmpdir({"bad.txt": "", "BUILD": "file(source='f.txt')"}) as tmpdir:
         run_pants(["run", tmpdir]).assert_success()
         run_pants(["--backend-packages=['pants.backend.python']", "run", tmpdir]).assert_failure()
 
 
 @pytest.mark.skip(reason="Flaky test. https://github.com/pantsbuild/pants/issues/10478")
+@pytest.mark.no_error_if_skipped
 class TestGoalRuleIntegration(PantsDaemonIntegrationTestBase):
     hermetic = False
 

@@ -1,15 +1,18 @@
-use crate::remote::ByteStore;
-use crate::MEGABYTES;
+// Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
+// Licensed under the Apache License, Version 2.0 (see LICENSE).
+use std::collections::{BTreeMap, HashSet};
+use std::time::Duration;
+
 use bytes::Bytes;
-use futures::compat::Future01CompatExt;
+use grpc_util::tls;
 use hashing::Digest;
 use mock::StubCAS;
-use serverset::BackoffConfig;
-use std::collections::HashSet;
-use std::time::Duration;
 use testutil::data::{TestData, TestDirectory};
+use workunit_store::WorkunitStore;
 
-use crate::tests::{big_file_bytes, big_file_digest, big_file_fingerprint, new_cas};
+use crate::remote::ByteStore;
+use crate::tests::{big_file_bytes, big_file_fingerprint, new_cas};
+use crate::MEGABYTES;
 
 #[tokio::test]
 async fn loads_file() {
@@ -26,6 +29,7 @@ async fn loads_file() {
 
 #[tokio::test]
 async fn missing_file() {
+  let _ = WorkunitStore::setup_for_tests();
   let cas = StubCAS::empty();
 
   assert_eq!(
@@ -47,6 +51,7 @@ async fn load_directory() {
 
 #[tokio::test]
 async fn missing_directory() {
+  let _ = WorkunitStore::setup_for_tests();
   let cas = StubCAS::empty();
 
   assert_eq!(
@@ -61,20 +66,23 @@ async fn missing_directory() {
 
 #[tokio::test]
 async fn load_file_grpc_error() {
-  let cas = StubCAS::always_errors();
+  let _ = WorkunitStore::setup_for_tests();
+  let cas = StubCAS::cas_always_errors();
 
   let error = load_file_bytes(&new_byte_store(&cas), TestData::roland().digest())
     .await
     .expect_err("Want error");
   assert!(
     error.contains("StubCAS is configured to always fail"),
-    format!("Bad error message, got: {}", error)
+    "Bad error message, got: {}",
+    error
   )
 }
 
 #[tokio::test]
 async fn load_directory_grpc_error() {
-  let cas = StubCAS::always_errors();
+  let _ = WorkunitStore::setup_for_tests();
+  let cas = StubCAS::cas_always_errors();
 
   let error = load_directory_proto_bytes(
     &new_byte_store(&cas),
@@ -84,7 +92,8 @@ async fn load_directory_grpc_error() {
   .expect_err("Want error");
   assert!(
     error.contains("StubCAS is configured to always fail"),
-    format!("Bad error message, got: {}", error)
+    "Bad error message, got: {}",
+    error
   )
 }
 
@@ -134,14 +143,12 @@ async fn fetch_multiple_chunks_nonfactor() {
 
 #[tokio::test]
 async fn write_file_one_chunk() {
+  let _ = WorkunitStore::setup_for_tests();
   let testdata = TestData::roland();
   let cas = StubCAS::empty();
 
   let store = new_byte_store(&cas);
-  assert_eq!(
-    store.store_bytes(&testdata.bytes()).await,
-    Ok(testdata.digest())
-  );
+  assert_eq!(store.store_bytes(testdata.bytes()).await, Ok(()));
 
   let blobs = cas.blobs.lock();
   assert_eq!(blobs.get(&testdata.fingerprint()), Some(&testdata.bytes()));
@@ -149,19 +156,20 @@ async fn write_file_one_chunk() {
 
 #[tokio::test]
 async fn write_file_multiple_chunks() {
+  let _ = WorkunitStore::setup_for_tests();
   let cas = StubCAS::empty();
 
   let store = ByteStore::new(
-    vec![cas.address()],
+    &cas.address(),
     None,
-    None,
-    None,
-    1,
+    tls::Config::default(),
+    BTreeMap::new(),
     10 * 1024,
     Duration::from_secs(5),
-    BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
     1,
-    1,
+    256,
+    None,
+    0, // disable batch API, force streaming API
   )
   .unwrap();
 
@@ -169,10 +177,7 @@ async fn write_file_multiple_chunks() {
 
   let fingerprint = big_file_fingerprint();
 
-  assert_eq!(
-    store.store_bytes(&all_the_henries).await,
-    Ok(big_file_digest())
-  );
+  assert_eq!(store.store_bytes(all_the_henries.clone()).await, Ok(()));
 
   let blobs = cas.blobs.lock();
   assert_eq!(blobs.get(&fingerprint), Some(&all_the_henries));
@@ -186,21 +191,21 @@ async fn write_file_multiple_chunks() {
   for size in write_message_sizes.iter() {
     assert!(
       size <= &(10 * 1024),
-      format!("Size {} should have been <= {}", size, 10 * 1024)
+      "Size {} should have been <= {}",
+      size,
+      10 * 1024
     );
   }
 }
 
 #[tokio::test]
 async fn write_empty_file() {
+  let _ = WorkunitStore::setup_for_tests();
   let empty_file = TestData::empty();
   let cas = StubCAS::empty();
 
   let store = new_byte_store(&cas);
-  assert_eq!(
-    store.store_bytes(&empty_file.bytes()).await,
-    Ok(empty_file.digest())
-  );
+  assert_eq!(store.store_bytes(empty_file.bytes()).await, Ok(()));
 
   let blobs = cas.blobs.lock();
   assert_eq!(
@@ -211,45 +216,44 @@ async fn write_empty_file() {
 
 #[tokio::test]
 async fn write_file_errors() {
-  let cas = StubCAS::always_errors();
+  let _ = WorkunitStore::setup_for_tests();
+  let cas = StubCAS::cas_always_errors();
 
   let store = new_byte_store(&cas);
   let error = store
-    .store_bytes(&TestData::roland().bytes())
+    .store_bytes(TestData::roland().bytes())
     .await
     .expect_err("Want error");
   assert!(
-    error.contains("Error from server"),
-    format!("Bad error message, got: {}", error)
-  );
-  assert!(
     error.contains("StubCAS is configured to always fail"),
-    format!("Bad error message, got: {}", error)
+    "Bad error message, got: {}",
+    error
   );
 }
 
 #[tokio::test]
 async fn write_connection_error() {
   let store = ByteStore::new(
-    vec![String::from("doesnotexist.example")],
+    "http://doesnotexist.example",
     None,
-    None,
-    None,
-    1,
+    tls::Config::default(),
+    BTreeMap::new(),
     10 * 1024 * 1024,
     Duration::from_secs(1),
-    BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
     1,
-    1,
+    256,
+    None,
+    super::tests::STORE_BATCH_API_SIZE_LIMIT,
   )
   .unwrap();
   let error = store
-    .store_bytes(&TestData::roland().bytes())
+    .store_bytes(TestData::roland().bytes())
     .await
     .expect_err("Want error");
   assert!(
-    error.contains("Error attempting to upload digest"),
-    format!("Bad error message, got: {}", error)
+    error.contains("Unavailable: \"error trying to connect: dns error"),
+    "Bad error message, got: {}",
+    error
   );
 }
 
@@ -260,10 +264,7 @@ async fn list_missing_digests_none_missing() {
   let store = new_byte_store(&cas);
   assert_eq!(
     store
-      .list_missing_digests(
-        store.find_missing_blobs_request(vec![TestData::roland().digest()].iter()),
-      )
-      .compat()
+      .list_missing_digests(store.find_missing_blobs_request(vec![TestData::roland().digest()]),)
       .await,
     Ok(HashSet::new())
   );
@@ -271,6 +272,7 @@ async fn list_missing_digests_none_missing() {
 
 #[tokio::test]
 async fn list_missing_digests_some_missing() {
+  let _ = WorkunitStore::setup_for_tests();
   let cas = StubCAS::empty();
 
   let store = new_byte_store(&cas);
@@ -282,8 +284,7 @@ async fn list_missing_digests_some_missing() {
 
   assert_eq!(
     store
-      .list_missing_digests(store.find_missing_blobs_request(vec![digest].iter()),)
-      .compat()
+      .list_missing_digests(store.find_missing_blobs_request(vec![digest]))
       .await,
     Ok(digest_set)
   );
@@ -291,71 +292,34 @@ async fn list_missing_digests_some_missing() {
 
 #[tokio::test]
 async fn list_missing_digests_error() {
-  let cas = StubCAS::always_errors();
+  let _ = WorkunitStore::setup_for_tests();
+  let cas = StubCAS::cas_always_errors();
 
   let store = new_byte_store(&cas);
 
   let error = store
-    .list_missing_digests(
-      store.find_missing_blobs_request(vec![TestData::roland().digest()].iter()),
-    )
-    .compat()
+    .list_missing_digests(store.find_missing_blobs_request(vec![TestData::roland().digest()]))
     .await
     .expect_err("Want error");
   assert!(
     error.contains("StubCAS is configured to always fail"),
-    format!("Bad error message, got: {}", error)
+    "Bad error message, got: {}",
+    error
   );
-}
-
-#[tokio::test]
-async fn reads_from_multiple_cas_servers() {
-  let roland = TestData::roland();
-  let catnip = TestData::catnip();
-
-  let cas1 = StubCAS::builder().file(&roland).file(&catnip).build();
-  let cas2 = StubCAS::builder().file(&roland).file(&catnip).build();
-
-  let store = ByteStore::new(
-    vec![cas1.address(), cas2.address()],
-    None,
-    None,
-    None,
-    1,
-    10 * 1024 * 1024,
-    Duration::from_secs(1),
-    BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
-    1,
-    2,
-  )
-  .unwrap();
-
-  assert_eq!(
-    load_file_bytes(&store, roland.digest()).await,
-    Ok(Some(roland.bytes()))
-  );
-
-  assert_eq!(
-    load_file_bytes(&store, catnip.digest()).await,
-    Ok(Some(catnip.bytes()))
-  );
-
-  assert_eq!(cas1.read_request_count(), 1);
-  assert_eq!(cas2.read_request_count(), 1);
 }
 
 fn new_byte_store(cas: &StubCAS) -> ByteStore {
   ByteStore::new(
-    vec![cas.address()],
+    &cas.address(),
     None,
-    None,
-    None,
-    1,
+    tls::Config::default(),
+    BTreeMap::new(),
     10 * MEGABYTES,
     Duration::from_secs(1),
-    BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
     1,
-    1,
+    256,
+    None,
+    super::tests::STORE_BATCH_API_SIZE_LIMIT,
   )
   .unwrap()
 }
@@ -372,5 +336,8 @@ pub async fn load_directory_proto_bytes(
 }
 
 async fn load_bytes(store: &ByteStore, digest: Digest) -> Result<Option<Bytes>, String> {
-  store.load_bytes_with(digest, |b| Ok(b)).await
+  store
+    .load_bytes_with(digest, |b| Ok(b))
+    .await
+    .map_err(|err| format!("{}", err))
 }

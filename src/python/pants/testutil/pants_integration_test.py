@@ -1,23 +1,24 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import glob
 import os
 import subprocess
 import sys
-import unittest
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Any, Iterator, List, Mapping, Optional, Union
+from typing import Iterator, List, Mapping, Union
+
+import pytest
 
 from pants.base.build_environment import get_buildroot
-from pants.base.deprecated import warn_or_error
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE
 from pants.option.config import TomlSerializer
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.pantsd.pants_daemon_client import PantsDaemonClient
-from pants.testutil._process_handler import SubprocessProcessHandler
-from pants.util.contextutil import environment_as, temporary_dir
+from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import fast_relpath, safe_file_dump, safe_mkdir, safe_open
 from pants.util.osutil import Pid
 from pants.util.strutil import ensure_binary
@@ -35,34 +36,7 @@ class PantsResult:
     workdir: str
     pid: Pid
 
-    @property
-    def returncode(self) -> int:
-        warn_or_error(
-            removal_version="2.2.0.dev0",
-            deprecated_entity_description="the property PantsResult.returncode",
-            hint="Use `PantsResult.exit_code` instead.",
-        )
-        return self.exit_code
-
-    @property
-    def stdout_data(self) -> str:
-        warn_or_error(
-            removal_version="2.2.0.dev0",
-            deprecated_entity_description="the property PantsResult.stdout_data",
-            hint="Use `PantsResult.stdout` instead.",
-        )
-        return self.stdout
-
-    @property
-    def stderr_data(self) -> str:
-        warn_or_error(
-            removal_version="2.2.0.dev0",
-            deprecated_entity_description="the property PantsResult.stderr_data",
-            hint="Use `PantsResult.stderr` instead.",
-        )
-        return self.stderr
-
-    def _format_unexpected_error_code_msg(self, msg: Optional[str]) -> str:
+    def _format_unexpected_error_code_msg(self, msg: str | None) -> str:
         details = [msg] if msg else []
         details.append(" ".join(self.command))
         details.append(f"exit_code: {self.exit_code}")
@@ -74,10 +48,10 @@ class PantsResult:
         details.append(f"stderr:\n\t{indent(self.stderr)}")
         return "\n".join(details)
 
-    def assert_success(self, msg: Optional[str] = None) -> None:
+    def assert_success(self, msg: str | None = None) -> None:
         assert self.exit_code == 0, self._format_unexpected_error_code_msg(msg)
 
-    def assert_failure(self, msg: Optional[str] = None) -> None:
+    def assert_failure(self, msg: str | None = None) -> None:
         assert self.exit_code != 0, self._format_unexpected_error_code_msg(msg)
 
 
@@ -87,22 +61,11 @@ class PantsJoinHandle:
     process: subprocess.Popen
     workdir: str
 
-    def join(
-        self, stdin_data: Optional[Union[bytes, str]] = None, tee_output: bool = False
-    ) -> PantsResult:
+    def join(self, stdin_data: bytes | str | None = None) -> PantsResult:
         """Wait for the pants process to complete, and return a PantsResult for it."""
-
-        communicate_fn = self.process.communicate
-        if tee_output:
-            # TODO: MyPy complains that SubprocessProcessHandler.communicate_teeing_stdout_and_stderr does
-            # not have the same type signature as subprocess.Popen.communicate_teeing_stdout_and_stderr.
-            # It's possibly not worth trying to fix this because the type stubs for subprocess.Popen are
-            # very complex and also not very precise, given how many different configurations Popen can
-            # take.
-            communicate_fn = SubprocessProcessHandler(self.process).communicate_teeing_stdout_and_stderr  # type: ignore[assignment]
         if stdin_data is not None:
             stdin_data = ensure_binary(stdin_data)
-        (stdout, stderr) = communicate_fn(stdin_data)
+        (stdout, stderr) = self.process.communicate(stdin_data)
 
         if self.process.returncode != PANTS_SUCCEEDED_EXIT_CODE:
             render_logs(self.workdir)
@@ -123,16 +86,15 @@ def run_pants_with_workdir_without_waiting(
     workdir: str,
     hermetic: bool = True,
     use_pantsd: bool = True,
-    config: Optional[Mapping] = None,
-    extra_env: Optional[Mapping[str, str]] = None,
-    print_stacktrace: bool = True,
-    **kwargs: Any,
+    config: Mapping | None = None,
+    extra_env: Mapping[str, str] | None = None,
+    shell: bool = False,
+    set_pants_ignore: bool = True,
 ) -> PantsJoinHandle:
-    args = [
-        "--no-pantsrc",
-        f"--pants-workdir={workdir}",
-        f"--print-stacktrace={print_stacktrace}",
-    ]
+    args = ["--no-pantsrc", f"--pants-workdir={workdir}"]
+    if set_pants_ignore:
+        # FIXME: For some reason, Pants's CI adds this file and it is not ignored by default. Why?
+        args.append("--pants-ignore=+['.coverage.*']")
 
     pantsd_in_command = "--no-pantsd" in command or "--pantsd" in command
     pantsd_in_config = config and "GLOBAL" in config and "pantsd" in config["GLOBAL"]
@@ -141,6 +103,10 @@ def run_pants_with_workdir_without_waiting(
 
     if hermetic:
         args.append("--pants-config-files=[]")
+        if set_pants_ignore:
+            # Certain tests may be invoking `./pants test` for a pytest test with conftest discovery
+            # enabled. We should ignore the root conftest.py for these cases.
+            args.append("--pants-ignore=+['/conftest.py']")
 
     if config:
         toml_file_name = os.path.join(workdir, "pants.toml")
@@ -152,7 +118,7 @@ def run_pants_with_workdir_without_waiting(
 
     # Permit usage of shell=True and string-based commands to allow e.g. `./pants | head`.
     pants_command: Command
-    if kwargs.get("shell") is True:
+    if shell:
         assert not isinstance(command, list), "must pass command as a string when using shell=True"
         pants_command = " ".join([*pants_script, " ".join(args), command])
     else:
@@ -170,8 +136,6 @@ def run_pants_with_workdir_without_waiting(
         for h in (
             "HOME",
             "PATH",  # Needed to find Python interpreters and other binaries.
-            "PANTS_PROFILE",
-            "RUN_PANTS_FROM_PEX",
         ):
             value = os.getenv(h)
             if value is not None:
@@ -200,7 +164,7 @@ def run_pants_with_workdir_without_waiting(
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            **kwargs,
+            shell=shell,
         ),
         workdir=workdir,
     )
@@ -212,28 +176,33 @@ def run_pants_with_workdir(
     workdir: str,
     hermetic: bool = True,
     use_pantsd: bool = True,
-    config: Optional[Mapping] = None,
-    stdin_data: Optional[Union[bytes, str]] = None,
-    tee_output: bool = False,
-    **kwargs: Any,
+    config: Mapping | None = None,
+    extra_env: Mapping[str, str] | None = None,
+    stdin_data: bytes | str | None = None,
+    shell: bool = False,
+    set_pants_ignore: bool = True,
 ) -> PantsResult:
-    if config:
-        kwargs["config"] = config
     handle = run_pants_with_workdir_without_waiting(
-        command, workdir=workdir, hermetic=hermetic, use_pantsd=use_pantsd, **kwargs
+        command,
+        workdir=workdir,
+        hermetic=hermetic,
+        use_pantsd=use_pantsd,
+        shell=shell,
+        config=config,
+        extra_env=extra_env,
+        set_pants_ignore=set_pants_ignore,
     )
-    return handle.join(stdin_data=stdin_data, tee_output=tee_output)
+    return handle.join(stdin_data=stdin_data)
 
 
 def run_pants(
     command: Command,
     *,
     hermetic: bool = True,
-    use_pantsd: bool = True,
-    config: Optional[Mapping] = None,
-    extra_env: Optional[Mapping[str, str]] = None,
-    stdin_data: Optional[Union[bytes, str]] = None,
-    **kwargs: Any,
+    use_pantsd: bool = False,
+    config: Mapping | None = None,
+    extra_env: Mapping[str, str] | None = None,
+    stdin_data: bytes | str | None = None,
 ) -> PantsResult:
     """Runs Pants in a subprocess.
 
@@ -244,7 +213,6 @@ def run_pants(
         map of key -> value.
     :param extra_env: Set these env vars in the Pants process's environment.
     :param stdin_data: Make this data available to be read from the process's stdin.
-    :param kwargs: Extra keyword args to pass to `subprocess.Popen`.
     """
     with temporary_workdir() as workdir:
         return run_pants_with_workdir(
@@ -255,7 +223,6 @@ def run_pants(
             config=config,
             stdin_data=stdin_data,
             extra_env=extra_env,
-            **kwargs,
         )
 
 
@@ -313,37 +280,15 @@ def kill_daemon(pid_dir=None):
         pantsd_client.terminate()
 
 
-def ensure_daemon(f):
-    """A decorator for running an integration test with and without the daemon enabled."""
-
-    def wrapper(*args, **kwargs):
-        for enable_daemon in [False, True]:
-            enable_daemon_str = str(enable_daemon)
-            env = {
-                "HERMETIC_ENV": "PANTS_PANTSD,PANTS_SUBPROCESSDIR",
-                "PANTS_PANTSD": enable_daemon_str,
-            }
-            with environment_as(**env):
-                try:
-                    f(*args, **kwargs)
-                except Exception:
-                    print(f"Test failed with enable-pantsd={enable_daemon}:")
-                    if not enable_daemon:
-                        print(
-                            "Skipping run with pantsd=true because it already "
-                            "failed with pantsd=false."
-                        )
-                    raise
-                finally:
-                    kill_daemon()
-
-    return wrapper
+def ensure_daemon(func):
+    """A decorator to assist with running tests with and without the daemon enabled."""
+    return pytest.mark.parametrize("use_pantsd", [True, False])(func)
 
 
 def render_logs(workdir: str) -> None:
     """Renders all potentially relevant logs from the given workdir to stdout."""
     filenames = list(glob.glob(os.path.join(workdir, "logs/exceptions*log"))) + list(
-        glob.glob(os.path.join(workdir, "pantsd/pantsd.log"))
+        glob.glob(os.path.join(workdir, "pants.log"))
     )
     for filename in filenames:
         rel_filename = fast_relpath(filename, workdir)
@@ -353,134 +298,13 @@ def render_logs(workdir: str) -> None:
         print(f"{rel_filename} --- ")
 
 
-def read_pantsd_log(workdir: str) -> Iterator[str]:
-    """Yields all lines from the pantsd log under the given workdir."""
-    # Surface the pantsd log for easy viewing via pytest's `-s` (don't capture stdio) option.
-    for line in _read_log(f"{workdir}/pantsd/pantsd.log"):
-        yield line
+def read_pants_log(workdir: str) -> Iterator[str]:
+    """Yields all lines from the pants log under the given workdir."""
+    # Surface the pants log for easy viewing via pytest's `-s` (don't capture stdio) option.
+    yield from _read_log(f"{workdir}/pants.log")
 
 
 def _read_log(filename: str) -> Iterator[str]:
-    with open(filename, "r") as f:
+    with open(filename) as f:
         for line in f:
             yield line.rstrip()
-
-
-class PantsIntegrationTest(unittest.TestCase):
-    """A base class for integration tests that run Pants."""
-
-    # Classes can optionally override these.
-    hermetic = True  # If False, pants.toml will be used.
-    use_pantsd = True
-
-    def run_pants_with_workdir_without_waiting(
-        self,
-        command: Command,
-        *,
-        workdir: str,
-        config: Optional[Mapping] = None,
-        extra_env: Optional[Mapping[str, str]] = None,
-        **kwargs: Any,
-    ) -> PantsJoinHandle:
-        warn_or_error(
-            removal_version="2.2.0.dev0",
-            deprecated_entity_description="PantsIntegrationTest.run_pants_with_workdir_without_waiting()",
-            hint=(
-                "Use the top-level function `run_pants_with_workdir_without_waiting()`. "
-                "`PantsIntegrationTest` is deprecated."
-            ),
-        )
-        return run_pants_with_workdir_without_waiting(
-            command,
-            workdir=workdir,
-            hermetic=self.hermetic,
-            use_pantsd=self.use_pantsd,
-            config=config,
-            extra_env=extra_env,
-            **kwargs,
-        )
-
-    def run_pants_with_workdir(
-        self,
-        command: Command,
-        *,
-        workdir: str,
-        config: Optional[Mapping] = None,
-        stdin_data: Optional[Union[bytes, str]] = None,
-        tee_output: bool = False,
-        **kwargs: Any,
-    ) -> PantsResult:
-        warn_or_error(
-            removal_version="2.2.0.dev0",
-            deprecated_entity_description="PantsIntegrationTest.run_pants_with_workdir()",
-            hint=(
-                "Use the top-level function `run_pants_with_workdir()`. "
-                "`PantsIntegrationTest` is deprecated."
-            ),
-        )
-        return run_pants_with_workdir(
-            command,
-            workdir=workdir,
-            hermetic=self.hermetic,
-            use_pantsd=self.use_pantsd,
-            config=config,
-            stdin_data=stdin_data,
-            tee_output=tee_output,
-            **kwargs,
-        )
-
-    def run_pants(
-        self,
-        command: Command,
-        *,
-        config: Optional[Mapping] = None,
-        extra_env: Optional[Mapping[str, str]] = None,
-        stdin_data: Optional[Union[bytes, str]] = None,
-        **kwargs: Any,
-    ) -> PantsResult:
-        warn_or_error(
-            removal_version="2.2.0.dev0",
-            deprecated_entity_description="PantsIntegrationTest.run_pants()",
-            hint=(
-                "Use the top-level function `run_pants()`. `PantsIntegrationTest` is deprecated."
-            ),
-        )
-        return run_pants(
-            command,
-            hermetic=self.hermetic,
-            use_pantsd=self.use_pantsd,
-            config=config,
-            extra_env=extra_env,
-            stdin_data=stdin_data,
-            **kwargs,
-        )
-
-    @staticmethod
-    def assert_success(pants_run: PantsResult, msg: Optional[str] = None) -> None:
-        warn_or_error(
-            removal_version="2.2.0.dev0",
-            deprecated_entity_description="PantsIntegrationTest.assert_success()",
-            hint="Use `PantsResult.assert_success()`. `PantsIntegrationTest` is deprecated.",
-        )
-        pants_run.assert_success(msg)
-
-    @staticmethod
-    def assert_failure(pants_run: PantsResult, msg: Optional[str] = None) -> None:
-        warn_or_error(
-            removal_version="2.2.0.dev0",
-            deprecated_entity_description="PantsIntegrationTest.assert_failure()",
-            hint="Use `PantsResult.assert_failure()`. `PantsIntegrationTest` is deprecated.",
-        )
-        pants_run.assert_failure(msg)
-
-    @staticmethod
-    def temporary_workdir(cleanup: bool = True):
-        warn_or_error(
-            removal_version="2.2.0.dev0",
-            deprecated_entity_description="PantsIntegrationTest.temporary_workdir()",
-            hint=(
-                "Use the top-level function `temporary_workdir`. `PantsIntegrationTest` is "
-                "deprecated."
-            ),
-        )
-        return temporary_workdir(cleanup=cleanup)

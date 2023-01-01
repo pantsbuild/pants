@@ -57,6 +57,7 @@ def test_equality(cls: OrderedSetCls) -> None:
     assert set1 == cls([1, 2])
     assert set1 == cls([1, 1, 2, 2])
 
+    assert set1 != cls([1, 2, None])
     assert set1 != cls([2, 1])
     assert set1 != [2, 1]
     assert set1 != [2, 1, 1]
@@ -236,7 +237,7 @@ def test_intersection(cls: OrderedSetCls) -> None:
             results.append(mutation_result1)
 
             mutation_result2 = copy(set1)
-            mutation_result2 &= set2  # type: ignore[misc]
+            mutation_result2 &= set2
             results.append(mutation_result2)
         assert_results_are_the_same(results, sets=(set1, set2))
 
@@ -251,7 +252,7 @@ def test_difference(cls: OrderedSetCls) -> None:
             results.append(mutation_result1)
 
             mutation_result2 = copy(set1)
-            mutation_result2 -= set2  # type: ignore[misc]
+            mutation_result2 -= set2
             results.append(mutation_result2)
         assert_results_are_the_same(results, sets=(set1, set2))
 
@@ -266,7 +267,7 @@ def test_xor(cls: OrderedSetCls) -> None:
             results.append(mutation_result1)
 
             mutation_result2 = copy(set1)
-            mutation_result2 ^= set2  # type: ignore[misc]
+            mutation_result2 ^= set2
             results.append(mutation_result2)
         assert_results_are_the_same(results, sets=(set1, set2))
 
@@ -281,7 +282,7 @@ def test_union(cls: OrderedSetCls) -> None:
             results.append(mutation_result1)
 
             mutation_result2 = copy(set1)
-            mutation_result2 |= set2  # type: ignore[misc]
+            mutation_result2 |= set2
             results.append(mutation_result2)
         assert_results_are_the_same(results, sets=(set1, set2))
 

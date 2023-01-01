@@ -1,28 +1,53 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 from textwrap import dedent
 
 import pytest
 
+from pants.backend.project_info.filter_targets import FilterSubsystem, TargetGranularity
+from pants.base.exceptions import MappingError
 from pants.build_graph.address import Address
 from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.core.target_types import GenericTarget
+from pants.engine.internals.defaults import BuildFileDefaults, BuildFileDefaultsParserState
 from pants.engine.internals.mapper import (
     AddressFamily,
     AddressMap,
-    AddressSpecsFilter,
     DifferingFamiliesError,
     DuplicateNameError,
+    SpecsFilter,
 )
-from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser
+from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser, _unrecognized_symbol_func
 from pants.engine.internals.target_adaptor import TargetAdaptor
+from pants.engine.target import RegisteredTargetTypes, Tags, Target
+from pants.engine.unions import UnionMembership
+from pants.testutil.option_util import create_goal_subsystem
 from pants.util.frozendict import FrozenDict
 
 
-def parse_address_map(build_file: str) -> AddressMap:
+def parse_address_map(build_file: str, *, ignore_unrecognized_symbols: bool = False) -> AddressMap:
     path = "/dev/null"
-    parser = Parser(target_type_aliases=["thing"], object_aliases=BuildFileAliases())
-    address_map = AddressMap.parse(path, build_file, parser, BuildFilePreludeSymbols(FrozenDict()))
+    parser = Parser(
+        build_root="",
+        registered_target_types=RegisteredTargetTypes({"thing": GenericTarget}),
+        union_membership=UnionMembership({}),
+        object_aliases=BuildFileAliases(),
+        ignore_unrecognized_symbols=ignore_unrecognized_symbols,
+    )
+    address_map = AddressMap.parse(
+        path,
+        build_file,
+        parser,
+        BuildFilePreludeSymbols(FrozenDict()),
+        BuildFileDefaultsParserState.create(
+            "", BuildFileDefaults({}), RegisteredTargetTypes({}), UnionMembership({})
+        ),
+        dependents_rules=None,
+        dependencies_rules=None,
+    )
     assert path == address_map.path
     return address_map
 
@@ -47,6 +72,32 @@ def test_address_map_parse() -> None:
         "one": TargetAdaptor(type_alias="thing", name="one", age=42),
         "two": TargetAdaptor(type_alias="thing", name="two", age=37),
     } == address_map.name_to_target_adaptor
+
+
+def test_address_map_unrecognized_symbol() -> None:
+    build_file = dedent(
+        """
+        thing(name="one")
+        thing(name="bad", age=fake)
+        thing(name="two")
+        another_fake()
+        yet_another()
+        thing(name="three")
+        and_finally(age=fakey)
+        """
+    )
+    address_map = parse_address_map(build_file, ignore_unrecognized_symbols=True)
+    assert {
+        "one": TargetAdaptor(type_alias="thing", name="one"),
+        "bad": TargetAdaptor(type_alias="thing", name="bad", age=_unrecognized_symbol_func),
+        "two": TargetAdaptor(type_alias="thing", name="two"),
+        "three": TargetAdaptor(
+            type_alias="thing",
+            name="three",
+        ),
+    } == address_map.name_to_target_adaptor
+    with pytest.raises(MappingError):
+        parse_address_map(build_file, ignore_unrecognized_symbols=False)
 
 
 def test_address_map_duplicate_names() -> None:
@@ -127,24 +178,42 @@ def test_address_family_duplicate_names() -> None:
         )
 
 
-def test_address_specs_filter() -> None:
-    def make_target(target_name: str, **kwargs) -> TargetAdaptor:
-        parsed_address = Address("", target_name=target_name)
-        return TargetAdaptor(
-            type_alias="", name=parsed_address.target_name, address=parsed_address, **kwargs
-        )
+def test_specs_filter() -> None:
+    class MockTgt1(Target):
+        alias = "tgt1"
+        core_fields = (Tags,)
 
-    untagged_target = make_target(target_name="//:untagged")
-    b_tagged_target = make_target(target_name="//:b-tagged", tags=["b"])
-    a_and_b_tagged_target = make_target(target_name="//:a-and-b-tagged", tags=["a", "b"])
-    none_tagged_target = make_target(target_name="//:none-tagged-target", tags=None)
+    class MockTgt2(Target):
+        alias = "tgt2"
+        core_fields = (Tags,)
 
-    specs_filter = AddressSpecsFilter(tags=["-a", "+b"])
+    specs_filter = SpecsFilter.create(
+        create_goal_subsystem(
+            FilterSubsystem,
+            target_type=["tgt1"],
+            tag_regex=[],
+            address_regex=[],
+            granularity=TargetGranularity.all_targets,
+        ),
+        RegisteredTargetTypes({"tgt1": MockTgt1, "tgt2": MockTgt2}),
+        tags=["-a", "+b"],
+    )
 
-    def matches(tgt: TargetAdaptor) -> bool:
-        return specs_filter.matches(tgt.kwargs["address"], tgt)
+    def make_tgt1(name: str, tags: list[str] | None = None) -> MockTgt1:
+        return MockTgt1({Tags.alias: tags}, Address("", target_name=name))
 
-    assert matches(untagged_target) is False
-    assert matches(b_tagged_target) is True
-    assert matches(a_and_b_tagged_target) is False
-    assert matches(none_tagged_target) is False
+    def make_tgt2(name: str, tags: list[str] | None = None) -> MockTgt2:
+        return MockTgt2({Tags.alias: tags}, Address("", target_name=name))
+
+    untagged_tgt = make_tgt1(name="untagged")
+    tagged_tgt = make_tgt1(name="tagged", tags=["b"])
+
+    # Even though this has the tag `b`, it should be excluded because the target type.
+    tgt2 = make_tgt2("tgt2", tags=["b"])
+
+    def matches(tgt: Target) -> bool:
+        return specs_filter.matches(tgt)
+
+    assert matches(tagged_tgt) is True
+    assert matches(untagged_tgt) is False
+    assert matches(tgt2) is False

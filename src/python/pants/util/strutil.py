@@ -1,12 +1,15 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import re
 import shlex
-from typing import Dict, Iterable, List, Optional, Union
+import textwrap
+from typing import Iterable
 
 
-def ensure_binary(text_or_binary: Union[bytes, str]) -> bytes:
+def ensure_binary(text_or_binary: bytes | str) -> bytes:
     if isinstance(text_or_binary, bytes):
         return text_or_binary
     elif isinstance(text_or_binary, str):
@@ -15,7 +18,7 @@ def ensure_binary(text_or_binary: Union[bytes, str]) -> bytes:
         raise TypeError(f"Argument is neither text nor binary type.({type(text_or_binary)})")
 
 
-def ensure_text(text_or_binary: Union[bytes, str]) -> str:
+def ensure_text(text_or_binary: bytes | str) -> str:
     if isinstance(text_or_binary, bytes):
         return text_or_binary.decode()
     elif isinstance(text_or_binary, str):
@@ -24,7 +27,7 @@ def ensure_text(text_or_binary: Union[bytes, str]) -> str:
         raise TypeError(f"Argument is neither text nor binary type ({type(text_or_binary)})")
 
 
-def safe_shlex_split(text_or_binary: Union[bytes, str]) -> List[str]:
+def safe_shlex_split(text_or_binary: bytes | str) -> list[str]:
     """Split a string using shell-like syntax.
 
     Safe even on python versions whose shlex.split() method doesn't accept unicode.
@@ -60,7 +63,7 @@ def safe_shlex_join(arg_list: Iterable[str]) -> str:
 
 def create_path_env_var(
     new_entries: Iterable[str],
-    env: Optional[Dict[str, str]] = None,
+    env: dict[str, str] | None = None,
     env_var: str = "PATH",
     delimiter: str = ":",
     prepend: bool = False,
@@ -71,7 +74,7 @@ def create_path_env_var(
 
     prev_path = env.get(env_var, None)
     if prev_path is None:
-        path_dirs: List[str] = []
+        path_dirs: list[str] = []
     else:
         path_dirs = list(prev_path.split(delimiter))
 
@@ -85,11 +88,13 @@ def create_path_env_var(
     return delimiter.join(path_dirs)
 
 
-def pluralize(count: int, item_type: str) -> str:
+def pluralize(count: int, item_type: str, include_count: bool = True) -> str:
     """Pluralizes the item_type if the count does not equal one.
 
     For example `pluralize(1, 'apple')` returns '1 apple',
     while `pluralize(0, 'apple') returns '0 apples'.
+
+    When `include_count=False` does not add the count in front of the pluralized `item_type`.
 
     :return The count and inflected item_type together as a string
     """
@@ -97,11 +102,17 @@ def pluralize(count: int, item_type: str) -> str:
     def pluralize_string(x: str) -> str:
         if x.endswith("s"):
             return x + "es"
+        elif x.endswith("y"):
+            return x[:-1] + "ies"
         else:
             return x + "s"
 
-    text = f"{count} {(item_type if count == 1 else pluralize_string(item_type))}"
-    return text
+    pluralized_item = item_type if count == 1 else pluralize_string(item_type)
+    if not include_count:
+        return pluralized_item
+    else:
+        text = f"{count} {pluralized_item}"
+        return text
 
 
 def strip_prefix(string: str, prefix: str) -> str:
@@ -122,7 +133,7 @@ def strip_prefix(string: str, prefix: str) -> str:
 
 
 # NB: We allow bytes because `ProcessResult.std{err,out}` uses bytes.
-def strip_v2_chroot_path(v: Union[bytes, str]) -> str:
+def strip_v2_chroot_path(v: bytes | str) -> str:
     """Remove all instances of the chroot tmpdir path from the str so that it only uses relative
     paths.
 
@@ -132,4 +143,150 @@ def strip_v2_chroot_path(v: Union[bytes, str]) -> str:
     """
     if isinstance(v, bytes):
         v = v.decode()
-    return re.sub(r"/.*/process-execution[a-zA-Z0-9]+/", "", v)
+    return re.sub(r"/.*/pants-sandbox-[a-zA-Z0-9]+/", "", v)
+
+
+def hard_wrap(s: str, *, indent: int = 0, width: int = 96) -> list[str]:
+    """Hard wrap a string while still preserving any prior hard wrapping (new lines).
+
+    This works well when the input uses soft wrapping, e.g. via Python's implicit string
+    concatenation.
+
+    Usually, you will want to join the lines together with "\n".join().
+    """
+    # wrap() returns [] for an empty line, but we want to emit those, hence the `or [line]`.
+    return [
+        f"{' ' * indent}{wrapped_line}"
+        for line in s.splitlines()
+        for wrapped_line in textwrap.wrap(line, width=width - indent) or [line]
+    ]
+
+
+def bullet_list(elements: Iterable[str], max_elements: int = -1) -> str:
+    """Format a bullet list with padding.
+
+    Callers should normally use `\n\n` before and (if relevant) after this so that the bullets
+    appear as a distinct section.
+
+    The `max_elements` may be used to limit the number of bullet rows to output, and instead leave a
+    last bullet item with "* ... and N more".
+    """
+    if not elements:
+        return ""
+
+    if max_elements > 0:
+        elements = tuple(elements)
+        if len(elements) > max_elements:
+            elements = elements[: max_elements - 1] + (
+                f"... and {len(elements)-max_elements+1} more",
+            )
+
+    sep = "\n  * "
+    return f"  * {sep.join(elements)}"
+
+
+def first_paragraph(s: str) -> str:
+    """Get the first paragraph, where paragraphs are separated by blank lines."""
+    lines = s.splitlines()
+    first_blank_line_index = next(
+        (i for i, line in enumerate(lines) if line.strip() == ""), len(lines)
+    )
+    return " ".join(lines[:first_blank_line_index])
+
+
+# This is more conservative that it necessarily need be. In practice POSIX filesystems
+# support any printable character except the path separator (forward slash), but it's
+# better to be over-cautious.
+
+# TODO: <> may not be safe in Windows paths. When we support Windows we will probably
+#  want to detect that here and be more restrictive on that platform. But we do want
+#  to support <> where possible, because they appear in target partition descriptions
+#  (e.g., "CPython>=2.7,<3") and those are sometimes converted to paths.
+_non_path_safe_re = re.compile(r"[^a-zA-Z0-9_\-.()<>,= ]")
+
+
+def path_safe(s: str) -> str:
+    return _non_path_safe_re.sub("_", s)
+
+
+# TODO: This may be a bit too eager. Some strings might want to preserve multiple spaces in them
+# (e.g. a Python code block which has a comment in it would have 2 spaces before the "#", which
+# would be squashed by this eager regex). The challenge is that there's some overlap between prose
+# (which shouldn't need multiple spaces) and code (which might) for non-alphanumeric characters.
+# We can tighten as necessary.
+_super_space_re = re.compile(r"(\S)  +(\S)")
+_more_than_2_newlines = re.compile(r"\n{2}\n+")
+_leading_whitespace_re = re.compile(r"(^[ ]*)(?:[^ \n])", re.MULTILINE)
+
+
+def softwrap(text: str) -> str:
+    """Turns a multiline-ish string into a softwrapped string.
+
+    This is primarily used to turn strings in source code, which often have a single paragraph
+    span multiple source lines, into consistently formatted blocks for hardwrapping later.
+
+    Applies the following rules:
+        - Dedents the text (you also don't need to start your string with a backslash)
+            (The algorithm used for dedention simply looks at the first indented line and
+            unambiguously tries to strip that much indentation from every indented line thereafter.)
+        - Replaces all occurrences of multiple spaces in a sentence with a single space
+        - Replaces all occurrences of multiple newlines with exactly 2 newlines
+        - Replaces singular newlines with a space (to turn a paragraph into one long line)
+            - Unless the following line is indented, or begins with a `* ` (to indicate an item in a list),
+              in which case the newline and indentation are preserved.
+        - Double-newlines are preserved
+        - Extra indentation is preserved, and also preserves the indented line's ending
+            (If your indented line needs to be continued due to it being longer than the suggested
+            width, use trailing backlashes to line-continue the line. Because we squash multiple
+            spaces, this will "just work".)
+    """
+    if not text:
+        return text
+    # If callers didn't use a leading "\" thats OK.
+    if text[0] == "\n":
+        text = text[1:]
+
+    text = _more_than_2_newlines.sub("\n\n", text)
+    margin = _leading_whitespace_re.search(text)
+    if margin:
+        text = re.sub(r"(?m)^" + margin[1], "", text)
+
+    lines = text.splitlines(keepends=True)
+    # NB: collecting a list of strs and `"".join` is more performant than calling `+=` repeatedly.
+    result_strs = []
+    for i, line in enumerate(lines):
+        line = _super_space_re.sub(r"\1 \2", line)
+        next_line = lines[i + 1] if i + 1 < len(lines) else ""
+        if (
+            "\n" in (line, next_line)
+            or line.startswith(" ")
+            or next_line.startswith(" ")
+            or line.lstrip().startswith("* ")
+        ):
+            result_strs.append(line)
+        else:
+            result_strs.append(line.rstrip())
+            result_strs.append(" ")
+
+    return "".join(result_strs).rstrip()
+
+
+_MEMORY_UNITS = ["B", "KiB", "MiB", "GiB"]
+
+
+def fmt_memory_size(value: int, *, units: Iterable[str] = _MEMORY_UNITS) -> str:
+    """Formats a numeric value as amount of bytes alongside the biggest byte-based unit from the
+    list that represents the same amount without using decimals."""
+
+    if not units:
+        return str(value)
+
+    amount = value
+    unit_idx = 0
+
+    units = tuple(units)
+    while (amount >= 1024 and amount % 1024 == 0) and unit_idx < len(units) - 1:
+        amount = int(amount / 1024)
+        unit_idx += 1
+
+    return f"{int(amount)}{units[unit_idx]}"

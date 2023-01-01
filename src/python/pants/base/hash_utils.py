@@ -1,6 +1,8 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import hashlib
 import json
 import logging
@@ -8,7 +10,7 @@ import typing
 from collections import OrderedDict
 from collections.abc import Iterable, Mapping, Set
 from enum import Enum
-from typing import Any, Optional, Type, Union
+from typing import Any
 
 from pants.util.ordered_set import OrderedSet
 from pants.util.strutil import ensure_binary
@@ -16,7 +18,7 @@ from pants.util.strutil import ensure_binary
 logger = logging.getLogger(__name__)
 
 
-def hash_all(strs: typing.Iterable[Union[bytes, str]]) -> str:
+def hash_all(strs: typing.Iterable[bytes | str]) -> str:
     """Returns a hash of the concatenation of all the strings in strs using sha1."""
     digest = hashlib.sha1()
     for s in strs:
@@ -83,20 +85,16 @@ class CoercingEncoder(json.JSONEncoder):
             # We disallow OrderedSet (although it is not a stdlib collection) for the same reasons as
             # OrderedDict above.
             if isinstance(o, OrderedSet):
-                raise TypeError(
-                    "{cls} does not support OrderedSet inputs: {val!r}.".format(
-                        cls=type(self).__name__, val=o
-                    )
-                )
+                raise TypeError(f"{type(self).__name__} does not support OrderedSet inputs: {o!r}.")
             # Set order is arbitrary in python 3.6 and 3.7, so we need to keep this sorted() call.
             return sorted(self.default(i) for i in o)
         if isinstance(o, Iterable) and not isinstance(o, (bytes, list, str)):
-            return list(self.default(i) for i in o)
+            return [self.default(i) for i in o]
         logger.debug(
-            "Our custom json encoder {} is trying to hash a primitive type, but has gone through"
+            f"Our custom json encoder {type(self).__name__} is trying to hash a primitive type, but has gone through"
             "checking every other registered type class before. These checks are expensive,"
-            "so you should consider registering the type {} within"
-            "this function ({}.default)".format(type(self).__name__, type(o), type(self).__name__)
+            f"so you should consider registering the type {type(o)} within"
+            f"this function ({type(self).__name__}.default)"
         )
         return o
 
@@ -104,7 +102,7 @@ class CoercingEncoder(json.JSONEncoder):
         return super().encode(self.default(o))
 
 
-def json_hash(obj: Any, encoder: Optional[Type[json.JSONEncoder]] = CoercingEncoder) -> str:
+def json_hash(obj: Any, encoder: type[json.JSONEncoder] | None = CoercingEncoder) -> str:
     """Hashes `obj` by dumping to JSON.
 
     :API: public

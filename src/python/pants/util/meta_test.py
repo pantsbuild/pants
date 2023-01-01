@@ -6,13 +6,7 @@ from dataclasses import FrozenInstanceError, dataclass
 
 import pytest
 
-from pants.util.meta import (
-    SingletonMetaclass,
-    classproperty,
-    decorated_type_checkable,
-    frozen_after_init,
-    staticproperty,
-)
+from pants.util.meta import SingletonMetaclass, classproperty, frozen_after_init
 
 
 def test_singleton() -> None:
@@ -33,11 +27,6 @@ class WithProp:
     @classmethod
     def class_method(cls):
         return cls._value
-
-    @staticproperty
-    def static_property():  # type: ignore[misc]  # MyPy expects methods to have `self` or `cls`
-        """static_property docs."""
-        return "static_property"
 
     @staticmethod
     def static_method():
@@ -98,9 +87,6 @@ def test_access() -> None:
     assert "val0" == WithProp.class_method()
     assert "val0" == WithProp().class_method()
 
-    assert "static_property" == WithProp.static_property
-    assert "static_property" == WithProp().static_property
-
     assert "static_method" == WithProp.static_method()
     assert "static_method" == WithProp().static_method()
 
@@ -112,7 +98,6 @@ def test_has_attr() -> None:
 
 def test_docstring() -> None:
     assert "class_property docs." == WithProp.__dict__["class_property"].__doc__
-    assert "static_property docs." == WithProp.__dict__["static_property"].__doc__
 
 
 def test_override_value() -> None:
@@ -159,25 +144,17 @@ def test_set_attr():
     class SetValue:
         _x = "x0"
 
-        @staticproperty
-        def static_property():
-            return "s0"
-
         @classproperty
         def class_property(cls):
             return cls._x
 
     assert "x0" == SetValue.class_property
-    assert "s0" == SetValue.static_property
 
     # The @classproperty is gone, this is just a regular property now.
     SetValue.class_property = "x1"
     assert "x1" == SetValue.class_property
     # The source field is unmodified.
     assert "x0" == SetValue._x
-
-    SetValue.static_property = "s1"
-    assert "s1" == SetValue.static_property
 
 
 def test_delete_attr():
@@ -188,20 +165,12 @@ def test_delete_attr():
         def class_property(cls):
             return cls._y
 
-        @staticproperty
-        def static_property():
-            return "s0"
-
     assert "y0" == DeleteValue.class_property
-    assert "s0" == DeleteValue.static_property
 
     # The @classproperty is gone, but the source field is still alive.
     del DeleteValue.class_property
     assert hasattr(DeleteValue, "class_property") is False
     assert hasattr(DeleteValue, "_y") is True
-
-    del DeleteValue.static_property
-    assert hasattr(DeleteValue, "static_property") is False
 
 
 def test_abstract_classproperty():
@@ -242,32 +211,6 @@ def test_abstract_classproperty():
             return "hello"
 
     assert Concrete2.f == "hello"
-
-
-def test_decorated_type_checkable():
-    @decorated_type_checkable
-    def f(cls):
-        return f.define_instance_of(cls)
-
-    @f
-    class C:
-        pass
-
-    assert C._decorated_type_checkable_type == type(f)
-    assert f.is_instance(C) is True
-
-    # Check that .is_instance() is only true for exactly the decorator @g used on the class D!
-    @decorated_type_checkable
-    def g(cls):
-        return g.define_instance_of(cls)
-
-    @g
-    class D:
-        pass
-
-    assert D._decorated_type_checkable_type == type(g)
-    assert g.is_instance(D) is True
-    assert f.is_instance(D) is False
 
 
 def test_no_init() -> None:
@@ -313,6 +256,12 @@ def test_add_new_field_after_init() -> None:
     with pytest.raises(FrozenInstanceError):
         test.y = "abc"  # type: ignore[attr-defined]
 
+    with test._unfrozen():  # type: ignore[attr-defined]
+        test.y = "abc"  # type: ignore[attr-defined]
+
+    with pytest.raises(FrozenInstanceError):
+        test.z = "abc"  # type: ignore[attr-defined]
+
 
 def test_explicitly_call_setattr_after_init() -> None:
     @frozen_after_init
@@ -323,6 +272,12 @@ def test_explicitly_call_setattr_after_init() -> None:
     test = Test(x=0)
     with pytest.raises(FrozenInstanceError):
         setattr(test, "x", 1)
+
+    with test._unfrozen():  # type: ignore[attr-defined]
+        setattr(test, "x", 1)
+
+    with pytest.raises(FrozenInstanceError):
+        test.y = "abc"  # type: ignore[attr-defined]
 
 
 def test_works_with_dataclass() -> None:

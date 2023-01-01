@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
-from typing import Optional, Type, cast
+from typing import Optional, Tuple, Type, cast
 
 from pants.option.option_value_container import OptionValueContainer
 
@@ -26,31 +26,41 @@ class ScopeInfo:
     """Information about a scope."""
 
     scope: str
-    optionable_cls: Optional[Type] = None
-    # A ScopeInfo may have a deprecated_scope (from its associated optionable_cls), which represents a
-    # previous/deprecated name for a current/non-deprecated ScopeInfo. It may also be directly
-    # deprecated via this `removal_version`, which allows for the deprecation of an entire scope,
-    # including that of a SubsystemDependency (ie, deprecation of a dependency on a scoped Subsystem).
+    subsystem_cls: Optional[Type] = None
+    # A ScopeInfo may have a deprecated_scope (from its associated subsystem_cls), which represents
+    # a previous/deprecated name for a current/non-deprecated ScopeInfo. It may also be directly
+    # deprecated via this `removal_version`, which allows for the deprecation of an entire scope.
     removal_version: Optional[str] = None
     removal_hint: Optional[str] = None
 
+    # Command line goal scope flag.
+    is_goal: bool = False
+
+    # Builtin goals, such as `help` and `version` etc.
+    is_builtin: bool = False
+
     @property
     def description(self) -> str:
-        return cast(str, self._optionable_cls_attr("get_description", lambda: "")())
+        return cast(str, getattr(self.subsystem_cls, "help"))
 
     @property
     def deprecated_scope(self) -> Optional[str]:
-        return cast(Optional[str], self._optionable_cls_attr("deprecated_options_scope"))
+        return cast(Optional[str], self._subsystem_cls_attr("deprecated_options_scope"))
 
     @property
     def deprecated_scope_removal_version(self) -> Optional[str]:
         return cast(
             Optional[str],
-            self._optionable_cls_attr("deprecated_options_scope_removal_version"),
+            self._subsystem_cls_attr("deprecated_options_scope_removal_version"),
         )
 
-    def _optionable_cls_attr(self, name: str, default=None):
-        return getattr(self.optionable_cls, name) if self.optionable_cls else default
+    @property
+    def scope_aliases(self) -> Tuple[str, ...]:
+        """BuiltinGoal subsystems may define aliases."""
+        return cast(Tuple[str, ...], self._subsystem_cls_attr("aliases", ()))
+
+    def _subsystem_cls_attr(self, name: str, default=None):
+        return getattr(self.subsystem_cls, name, default) if self.subsystem_cls else default
 
 
 @dataclass(frozen=True)

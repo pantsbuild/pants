@@ -1,11 +1,18 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import unittest
 from textwrap import dedent
 from typing import Dict, List, Union
 
-from pants.option.custom_types import DictValueComponent, ListValueComponent, UnsetBool
+import pytest
+
+from pants.option.custom_types import (
+    DictValueComponent,
+    ListValueComponent,
+    UnsetBool,
+    _flatten_shlexed_list,
+    memory_size,
+)
 from pants.option.errors import ParseError
 
 ValidPrimitives = Union[int, str]
@@ -13,16 +20,62 @@ ParsedList = List[ValidPrimitives]
 ParsedDict = Dict[str, Union[ValidPrimitives, ParsedList]]
 
 
-class CustomTypesTest(unittest.TestCase):
-    def assert_list_parsed(self, s: str, *, expected: ParsedList) -> None:
+def test_memory_size() -> None:
+    assert memory_size("1GiB") == 1_073_741_824
+    assert memory_size(" 1  GiB ") == 1_073_741_824
+    assert memory_size("1.22GiB") == 1_309_965_025
+
+    assert memory_size("1MiB") == 1_048_576
+    assert memory_size(" 1  MiB ") == 1_048_576
+    assert memory_size("1.4MiB") == 1_468_006
+
+    assert memory_size("1KiB") == 1024
+    assert memory_size(" 1  KiB ") == 1024
+    assert memory_size("1.4KiB") == 1433
+
+    assert memory_size("10B") == 10
+    assert memory_size(" 10  B ") == 10
+    assert memory_size("10.4B") == 10
+
+    assert memory_size("10") == 10
+    assert memory_size(" 10 ") == 10
+    assert memory_size("10.4") == 10
+
+    # Must be a Bytes unit.
+    with pytest.raises(ParseError):
+        memory_size("1ft")
+    with pytest.raises(ParseError):
+        memory_size("1m")
+
+    # Invalid input.
+    with pytest.raises(ParseError):
+        memory_size("")
+    with pytest.raises(ParseError):
+        memory_size("foo")
+
+
+def test_flatten_shlexed_list() -> None:
+    assert _flatten_shlexed_list(["arg1", "arg2"]) == ["arg1", "arg2"]
+    assert _flatten_shlexed_list(["arg1 arg2"]) == ["arg1", "arg2"]
+    assert _flatten_shlexed_list(["arg1 arg2=foo", "--arg3"]) == ["arg1", "arg2=foo", "--arg3"]
+    assert _flatten_shlexed_list(["arg1='foo bar'", "arg2='baz'"]) == [
+        "arg1=foo bar",
+        "arg2=baz",
+    ]
+
+
+class TestCustomTypes:
+    @staticmethod
+    def assert_list_parsed(s: str, *, expected: ParsedList) -> None:
         assert expected == ListValueComponent.create(s).val
 
-    def assert_split_list(self, s: str, *, expected: List[str]) -> None:
-        self.assertEqual(expected, ListValueComponent._split_modifier_expr(s))
+    @staticmethod
+    def assert_split_list(s: str, *, expected: List[str]) -> None:
+        assert expected == ListValueComponent._split_modifier_expr(s)
 
     def test_unset_bool(self):
         # UnsetBool should only be use-able as a singleton value via its type.
-        with self.assertRaises(NotImplementedError):
+        with pytest.raises(NotImplementedError):
             UnsetBool()
 
     def test_dict(self) -> None:
@@ -36,7 +89,7 @@ class CustomTypesTest(unittest.TestCase):
         assert_dict_parsed('{ "a": [1, 2] + [3, 4] }', expected={"a": [1, 2, 3, 4]})
 
         def assert_dict_error(s: str) -> None:
-            with self.assertRaises(ParseError):
+            with pytest.raises(ParseError):
                 assert_dict_parsed(s, expected={})
 
         assert_dict_error("[]")
@@ -98,8 +151,9 @@ class CustomTypesTest(unittest.TestCase):
         self.assert_split_list("+1,2],-[3,4", expected=["+1,2]", "-[3,4"])
         self.assert_split_list("+(1,2],-[3,4)", expected=["+(1,2]", "-[3,4)"])
 
-    # The heuristic list modifier expression splitter cannot handle certain very unlikely cases.
-    @unittest.expectedFailure
+    @pytest.mark.xfail(
+        reason="The heuristic list modifier expression splitter cannot handle certain very unlikely cases."
+    )
     def test_split_unlikely_list_modifier_expression(self) -> None:
         # Example of the kind of (unlikely) values that will defeat our heuristic, regex-based
         # splitter of list modifier expressions.

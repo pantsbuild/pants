@@ -1,15 +1,12 @@
-# NB: shellcheck complains this is unused, but it's used by callers. See https://github.com/koalaman/shellcheck/wiki/SC2034.
-# shellcheck disable=SC2034
-CACHE_ROOT=${XDG_CACHE_HOME:-$HOME/.cache}/pants
+# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-TRAVIS_FOLD_STATE="/tmp/.travis_fold_current"
+# shellcheck shell=bash
 
-CLEAR_LINE="\x1b[K"
 COLOR_BLUE="\x1b[34m"
 COLOR_RED="\x1b[31m"
 COLOR_GREEN="\x1b[32m"
 COLOR_RESET="\x1b[0m"
-
 
 function log() {
   echo -e "$@" 1>&2
@@ -30,7 +27,7 @@ export elapsed_start_time
 
 function elapsed() {
   now=$(date '+%s')
-  elapsed_secs=$(( now - elapsed_start_time ))
+  elapsed_secs=$((now - elapsed_start_time))
   echo $elapsed_secs | awk '{printf "%02d:%02d\n",int($1/60), int($1%60)}'
 }
 
@@ -38,33 +35,48 @@ function banner() {
   echo -e "${COLOR_BLUE}[=== $(elapsed) $* ===]${COLOR_RESET}"
 }
 
-function travis_fold() {
-  local action=$1
-  local slug=$2
-  # Use the line clear terminal escape code to prevent the travis_fold lines from
-  # showing up if e.g. a user is running the calling script.
-  echo -en "travis_fold:${action}:${slug}\r${CLEAR_LINE}"
-}
-
-function start_travis_section() {
-  local slug="$1"
-  travis_fold start "${slug}"
-  /bin/echo -n "${slug}" > "${TRAVIS_FOLD_STATE}"
-  shift
-  local section="$*"
-  banner "${section}"
-}
-
-function end_travis_section() {
-  travis_fold end "$(cat ${TRAVIS_FOLD_STATE})"
-  rm -f "${TRAVIS_FOLD_STATE}"
-}
-
 function fingerprint_data() {
   git hash-object --stdin
 }
 
 function git_merge_base() {
-  # This prints the tracking branch if set and otherwise falls back to local "master".
-  git rev-parse --symbolic-full-name --abbrev-ref HEAD@\{upstream\} 2>/dev/null || echo 'master'
+  # This prints the tracking branch if set and otherwise falls back to the commit before HEAD.
+  # We fall back to the commit before HEAD to attempt to account for situations without a tracking
+  # branch, which might include `main` builds, but can also include branch-PR builds, where
+  # Travis checks out a specially crafted Github `+refs/pull/11516/merge` branch.
+  git rev-parse --symbolic-full-name --abbrev-ref HEAD@\{upstream\} 2> /dev/null || git rev-parse HEAD^
+}
+
+function determine_python() {
+  if [[ -n "${PY:-}" ]]; then
+    which "${PY}" && return 0
+  fi
+
+  local candidate_versions
+  if is_macos_arm; then
+    candidate_versions=('3.9')
+  else
+    candidate_versions=('3.7' '3.8' '3.9')
+  fi
+
+  for version in "${candidate_versions[@]}"; do
+    local interpreter_path
+    interpreter_path="$(command -v "python${version}")"
+    if [[ -z "${interpreter_path}" ]]; then
+      continue
+    fi
+    # Check if the Python version is installed via Pyenv but not activated.
+    if [[ "$("${interpreter_path}" --version 2>&1 > /dev/null)" == "pyenv: python${version}"* ]]; then
+      continue
+    fi
+    echo "${interpreter_path}" && return 0
+  done
+}
+
+function is_macos_arm() {
+  [[ $(uname -sm) == "Darwin arm64" ]]
+}
+
+function is_macos_big_sur() {
+  [[ $(uname) == "Darwin" && $(sw_vers -productVersion) = 11\.* ]]
 }

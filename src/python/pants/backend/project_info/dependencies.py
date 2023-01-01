@@ -2,10 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import itertools
-from enum import Enum
-from typing import Set, cast
 
-from pants.backend.python.target_types import PythonRequirementsField
 from pants.engine.addresses import Addresses
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
@@ -18,51 +15,26 @@ from pants.engine.target import (
     TransitiveTargetsRequest,
     UnexpandedTargets,
 )
-
-
-class DependencyType(Enum):
-    SOURCE = "source"
-    THIRD_PARTY = "3rdparty"
-    SOURCE_AND_THIRD_PARTY = "source-and-3rdparty"
+from pants.option.option_types import BoolOption
 
 
 class DependenciesSubsystem(LineOriented, GoalSubsystem):
-    """List the dependencies of the input files/targets."""
-
     name = "dependencies"
+    help = "List the dependencies of the input files/targets."
 
-    @classmethod
-    def register_options(cls, register):
-        super().register_options(register)
-        register(
-            "--transitive",
-            default=False,
-            type=bool,
-            help=(
-                "List all transitive dependencies. If unspecified, list direct dependencies only."
-            ),
-        )
-        register(
-            "--type",
-            type=DependencyType,
-            default=DependencyType.SOURCE,
-            help=(
-                "Which types of dependencies to list, where `source` means source code "
-                "dependencies and `3rdparty` means third-party requirement strings."
-            ),
-        )
-
-    @property
-    def transitive(self) -> bool:
-        return cast(bool, self.options.transitive)
-
-    @property
-    def type(self) -> DependencyType:
-        return cast(DependencyType, self.options.type)
+    transitive = BoolOption(
+        default=False,
+        help="List all transitive dependencies. If unspecified, list direct dependencies only.",
+    )
+    closed = BoolOption(
+        default=False,
+        help="Include the input targets in the output, along with the dependencies.",
+    )
 
 
 class Dependencies(Goal):
     subsystem_cls = DependenciesSubsystem
+    environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY
 
 
 @goal_rule
@@ -75,7 +47,11 @@ async def dependencies(
         )
         targets = Targets(transitive_targets.dependencies)
     else:
+        # NB: We must preserve target generators for the roots, i.e. not replace with their
+        # generated targets.
         target_roots = await Get(UnexpandedTargets, Addresses, addresses)
+        # NB: When determining dependencies, though, we replace target generators with their
+        # generated targets.
         dependencies_per_target_root = await MultiGet(
             Get(
                 Targets,
@@ -85,31 +61,13 @@ async def dependencies(
         )
         targets = Targets(itertools.chain.from_iterable(dependencies_per_target_root))
 
-    include_source = dependencies_subsystem.type in [
-        DependencyType.SOURCE,
-        DependencyType.SOURCE_AND_THIRD_PARTY,
-    ]
-    include_3rdparty = dependencies_subsystem.type in [
-        DependencyType.THIRD_PARTY,
-        DependencyType.SOURCE_AND_THIRD_PARTY,
-    ]
-
-    address_strings = set()
-    third_party_requirements: Set[str] = set()
+    address_strings = {addr.spec for addr in addresses} if dependencies_subsystem.closed else set()
     for tgt in targets:
-        if include_source:
-            address_strings.add(tgt.address.spec)
-        if include_3rdparty:
-            if tgt.has_field(PythonRequirementsField):
-                third_party_requirements.update(
-                    str(python_req) for python_req in tgt[PythonRequirementsField].value
-                )
+        address_strings.add(tgt.address.spec)
 
     with dependencies_subsystem.line_oriented(console) as print_stdout:
         for address in sorted(address_strings):
             print_stdout(address)
-        for requirement_string in sorted(third_party_requirements):
-            print_stdout(requirement_string)
 
     return Dependencies(exit_code=0)
 

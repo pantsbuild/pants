@@ -1,27 +1,49 @@
+// Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
+// Licensed under the Apache License, Version 2.0 (see LICENSE).
 use crate::local::ByteStore;
-use crate::{EntryType, ShrinkBehavior};
+use crate::{EntryType, LocalOptions, ShrinkBehavior};
 
 use std::path::Path;
 use std::time::Duration;
 
-use bytes::{BufMut, Bytes, BytesMut};
+use bytes::{Buf, BufMut, Bytes, BytesMut};
 use hashing::{Digest, Fingerprint};
 use tempfile::TempDir;
 use testutil::data::{TestData, TestDirectory};
-use tokio::time::delay_for;
+use tokio::time::sleep;
 use walkdir::WalkDir;
+
+// Store bytes using both the one-pass and two-pass APIs, and ensure identical results.
+async fn assert_store_bytes(
+  store: ByteStore,
+  entry_type: EntryType,
+  bytes: Bytes,
+  expected_digest: Digest,
+) {
+  let one_pass_digest = store
+    .store_bytes(entry_type, None, bytes.clone(), false)
+    .await
+    .unwrap();
+  let two_pass_digest = store
+    .store(entry_type, false, true, move || Ok(bytes.clone().reader()))
+    .await
+    .unwrap();
+  assert_eq!(expected_digest, one_pass_digest);
+  assert_eq!(one_pass_digest, two_pass_digest);
+}
 
 #[tokio::test]
 async fn save_file() {
   let dir = TempDir::new().unwrap();
 
   let testdata = TestData::roland();
-  assert_eq!(
-    new_store(dir.path())
-      .store_bytes(EntryType::File, testdata.bytes(), false,)
-      .await,
-    Ok(testdata.digest())
-  );
+  assert_store_bytes(
+    new_store(dir.path()),
+    EntryType::File,
+    testdata.bytes(),
+    testdata.digest(),
+  )
+  .await;
 }
 
 #[tokio::test]
@@ -29,16 +51,20 @@ async fn save_file_is_idempotent() {
   let dir = TempDir::new().unwrap();
 
   let testdata = TestData::roland();
-  new_store(dir.path())
-    .store_bytes(EntryType::File, testdata.bytes(), false)
-    .await
-    .unwrap();
-  assert_eq!(
-    new_store(dir.path())
-      .store_bytes(EntryType::File, testdata.bytes(), false,)
-      .await,
-    Ok(testdata.digest())
-  );
+  assert_store_bytes(
+    new_store(dir.path()),
+    EntryType::File,
+    testdata.bytes(),
+    testdata.digest(),
+  )
+  .await;
+  assert_store_bytes(
+    new_store(dir.path()),
+    EntryType::File,
+    testdata.bytes(),
+    testdata.digest(),
+  )
+  .await;
 }
 
 #[tokio::test]
@@ -68,12 +94,13 @@ async fn record_and_load_directory_proto() {
   let dir = TempDir::new().unwrap();
   let testdir = TestDirectory::containing_roland();
 
-  assert_eq!(
-    new_store(dir.path())
-      .store_bytes(EntryType::Directory, testdir.bytes(), false,)
-      .await,
-    Ok(testdir.digest())
-  );
+  assert_store_bytes(
+    new_store(dir.path()),
+    EntryType::Directory,
+    testdir.bytes(),
+    testdir.digest(),
+  )
+  .await;
 
   assert_eq!(
     load_directory_proto_bytes(&new_store(dir.path()), testdir.digest()).await,
@@ -97,10 +124,13 @@ async fn file_is_not_directory_proto() {
   let dir = TempDir::new().unwrap();
   let testdata = TestData::roland();
 
-  new_store(dir.path())
-    .store_bytes(EntryType::File, testdata.bytes(), false)
-    .await
-    .unwrap();
+  assert_store_bytes(
+    new_store(dir.path()),
+    EntryType::File,
+    testdata.bytes(),
+    testdata.digest(),
+  )
+  .await;
 
   assert_eq!(
     load_directory_proto_bytes(&new_store(dir.path()), testdata.digest()).await,
@@ -114,7 +144,7 @@ async fn garbage_collect_nothing_to_do() {
   let store = new_store(dir.path());
   let bytes = Bytes::from("0123456789");
   store
-    .store_bytes(EntryType::File, bytes.clone(), false)
+    .store_bytes(EntryType::File, None, bytes.clone(), false)
     .await
     .expect("Error storing");
   store
@@ -124,7 +154,7 @@ async fn garbage_collect_nothing_to_do() {
     load_bytes(
       &store,
       EntryType::File,
-      Digest(
+      Digest::new(
         Fingerprint::from_hex_string(
           "84d89877f0d4041efb6bf91a16f0248f2fd573e6af05c19f96bedb9f882f7882",
         )
@@ -143,14 +173,14 @@ async fn garbage_collect_nothing_to_do_with_lease() {
   let store = new_store(dir.path());
   let bytes = Bytes::from("0123456789");
   store
-    .store_bytes(EntryType::File, bytes.clone(), false)
+    .store_bytes(EntryType::File, None, bytes.clone(), false)
     .await
     .expect("Error storing");
   let file_fingerprint = Fingerprint::from_hex_string(
     "84d89877f0d4041efb6bf91a16f0248f2fd573e6af05c19f96bedb9f882f7882",
   )
   .unwrap();
-  let file_digest = Digest(file_fingerprint, 10);
+  let file_digest = Digest::new(file_fingerprint, 10);
   store
     .lease_all(vec![(file_digest, EntryType::File)].into_iter())
     .await
@@ -175,12 +205,12 @@ async fn garbage_collect_expired() {
   )
   .unwrap();
   let file_len = 10;
-  let file_digest = Digest(file_fingerprint, file_len);
+  let file_digest = Digest::new(file_fingerprint, file_len);
 
   // Store something (in a store with a shortened lease). Confirm that it hasn't immediately
   // expired, and then wait for it to expire.
   store
-    .store_bytes(EntryType::File, bytes.clone(), true)
+    .store_bytes(EntryType::File, None, bytes.clone(), true)
     .await
     .expect("Error storing");
   assert_eq!(
@@ -195,7 +225,7 @@ async fn garbage_collect_expired() {
   );
 
   // Wait for it to expire.
-  delay_for(lease_time * 2).await;
+  sleep(lease_time * 2).await;
   assert_eq!(
     0,
     store
@@ -213,19 +243,19 @@ async fn garbage_collect_remove_one_of_two_files_no_leases() {
     "84d89877f0d4041efb6bf91a16f0248f2fd573e6af05c19f96bedb9f882f7882",
   )
   .unwrap();
-  let digest_1 = Digest(fingerprint_1, 10);
+  let digest_1 = Digest::new(fingerprint_1, 10);
   let bytes_2 = Bytes::from("9876543210");
   let fingerprint_2 = Fingerprint::from_hex_string(
     "7619ee8cea49187f309616e30ecf54be072259b43760f1f550a644945d5572f2",
   )
   .unwrap();
-  let digest_2 = Digest(fingerprint_2, 10);
+  let digest_2 = Digest::new(fingerprint_2, 10);
   store
-    .store_bytes(EntryType::File, bytes_1.clone(), false)
+    .store_bytes(EntryType::File, None, bytes_1.clone(), false)
     .await
     .expect("Error storing");
   store
-    .store_bytes(EntryType::File, bytes_2.clone(), false)
+    .store_bytes(EntryType::File, None, bytes_2.clone(), false)
     .await
     .expect("Error storing");
   store
@@ -259,19 +289,19 @@ async fn garbage_collect_remove_both_files_no_leases() {
     "84d89877f0d4041efb6bf91a16f0248f2fd573e6af05c19f96bedb9f882f7882",
   )
   .unwrap();
-  let digest_1 = Digest(fingerprint_1, 10);
+  let digest_1 = Digest::new(fingerprint_1, 10);
   let bytes_2 = Bytes::from("9876543210");
   let fingerprint_2 = Fingerprint::from_hex_string(
     "7619ee8cea49187f309616e30ecf54be072259b43760f1f550a644945d5572f2",
   )
   .unwrap();
-  let digest_2 = Digest(fingerprint_2, 10);
+  let digest_2 = Digest::new(fingerprint_2, 10);
   store
-    .store_bytes(EntryType::File, bytes_1.clone(), false)
+    .store_bytes(EntryType::File, None, bytes_1.clone(), false)
     .await
     .expect("Error storing");
   store
-    .store_bytes(EntryType::File, bytes_2.clone(), false)
+    .store_bytes(EntryType::File, None, bytes_2.clone(), false)
     .await
     .expect("Error storing");
   store
@@ -300,15 +330,15 @@ async fn garbage_collect_remove_one_of_two_directories_no_leases() {
 
   let store = new_store(dir.path());
   store
-    .store_bytes(EntryType::Directory, testdir.bytes(), false)
+    .store_bytes(EntryType::Directory, None, testdir.bytes(), false)
     .await
     .expect("Error storing");
   store
-    .store_bytes(EntryType::Directory, other_testdir.bytes(), false)
+    .store_bytes(EntryType::Directory, None, other_testdir.bytes(), false)
     .await
     .expect("Error storing");
   store
-    .shrink(80, ShrinkBehavior::Fast)
+    .shrink(84, ShrinkBehavior::Fast)
     .expect("Error shrinking");
   let mut entries = Vec::new();
   entries.push(
@@ -338,12 +368,12 @@ async fn garbage_collect_remove_file_with_leased_directory() {
   let testdata = TestData::forty_chars();
 
   store
-    .store_bytes(EntryType::Directory, testdir.bytes(), true)
+    .store_bytes(EntryType::Directory, None, testdir.bytes(), true)
     .await
     .expect("Error storing");
 
   store
-    .store_bytes(EntryType::File, testdata.bytes(), false)
+    .store_bytes(EntryType::File, None, testdata.bytes(), false)
     .await
     .expect("Error storing");
 
@@ -371,12 +401,12 @@ async fn garbage_collect_remove_file_while_leased_file() {
   let testdir = TestDirectory::containing_roland();
 
   store
-    .store_bytes(EntryType::Directory, testdir.bytes(), false)
+    .store_bytes(EntryType::Directory, None, testdir.bytes(), false)
     .await
     .expect("Error storing");
   let forty_chars = TestData::forty_chars();
   store
-    .store_bytes(EntryType::File, forty_chars.bytes(), true)
+    .store_bytes(EntryType::File, None, forty_chars.bytes(), true)
     .await
     .expect("Error storing");
 
@@ -405,20 +435,19 @@ async fn garbage_collect_fail_because_too_many_leases() {
   let forty_chars = TestData::forty_chars();
 
   store
-    .store_bytes(EntryType::Directory, testdir.bytes(), true)
+    .store_bytes(EntryType::Directory, None, testdir.bytes(), true)
     .await
     .expect("Error storing");
   store
-    .store_bytes(EntryType::File, forty_chars.bytes(), true)
+    .store_bytes(EntryType::File, None, forty_chars.bytes(), true)
     .await
     .expect("Error storing");
-
   store
-    .store_bytes(EntryType::File, TestData::roland().bytes(), false)
+    .store_bytes(EntryType::File, None, TestData::roland().bytes(), false)
     .await
     .expect("Error storing");
 
-  assert_eq!(store.shrink(80, ShrinkBehavior::Fast), Ok(160));
+  assert_eq!(store.shrink(80, ShrinkBehavior::Fast), Ok(164));
 
   assert_eq!(
     load_bytes(&store, EntryType::File, forty_chars.digest()).await,
@@ -436,10 +465,10 @@ async fn garbage_collect_fail_because_too_many_leases() {
 async fn write_one_meg(store: &ByteStore, byte: u8) {
   let mut bytes = BytesMut::with_capacity(1024 * 1024);
   for _ in 0..1024 * 1024 {
-    bytes.put(byte);
+    bytes.put_u8(byte);
   }
   store
-    .store_bytes(EntryType::File, bytes.freeze(), false)
+    .store_bytes(EntryType::File, None, bytes.freeze(), false)
     .await
     .expect("Error storing");
 }
@@ -479,7 +508,7 @@ async fn entry_type_for_file() {
   let dir = TempDir::new().unwrap();
   let store = new_store(dir.path());
   store
-    .store_bytes(EntryType::Directory, testdir.bytes(), false)
+    .store_bytes(EntryType::Directory, None, testdir.bytes(), false)
     .await
     .expect("Error storing");
   prime_store_with_file_bytes(&store, testdata.bytes()).await;
@@ -496,7 +525,7 @@ async fn entry_type_for_directory() {
   let dir = TempDir::new().unwrap();
   let store = new_store(dir.path());
   store
-    .store_bytes(EntryType::Directory, testdir.bytes(), false)
+    .store_bytes(EntryType::Directory, None, testdir.bytes(), false)
     .await
     .expect("Error storing");
   prime_store_with_file_bytes(&store, testdata.bytes()).await;
@@ -513,7 +542,7 @@ async fn entry_type_for_missing() {
   let dir = TempDir::new().unwrap();
   let store = new_store(dir.path());
   store
-    .store_bytes(EntryType::Directory, testdir.bytes(), false)
+    .store_bytes(EntryType::Directory, None, testdir.bytes(), false)
     .await
     .expect("Error storing");
   prime_store_with_file_bytes(&store, testdata.bytes()).await;
@@ -532,7 +561,9 @@ async fn empty_file_is_known() {
   let empty_file = TestData::empty();
   assert_eq!(
     store
-      .load_bytes_with(EntryType::File, empty_file.digest(), |b| Bytes::from(b))
+      .load_bytes_with(EntryType::File, empty_file.digest(), |b| {
+        Bytes::copy_from_slice(b)
+      })
       .await,
     Ok(Some(empty_file.bytes())),
   )
@@ -545,7 +576,9 @@ async fn empty_directory_is_known() {
   let empty_dir = TestDirectory::empty();
   assert_eq!(
     store
-      .load_bytes_with(EntryType::Directory, empty_dir.digest(), |b| Bytes::from(b))
+      .load_bytes_with(EntryType::Directory, empty_dir.digest(), |b| {
+        Bytes::copy_from_slice(b)
+      })
       .await,
     Ok(Some(empty_dir.bytes())),
   )
@@ -564,7 +597,15 @@ pub fn new_store<P: AsRef<Path>>(dir: P) -> ByteStore {
 }
 
 pub fn new_store_with_lease_time<P: AsRef<Path>>(dir: P, lease_time: Duration) -> ByteStore {
-  ByteStore::new_with_lease_time(task_executor::Executor::new(), dir, lease_time).unwrap()
+  ByteStore::new_with_options(
+    task_executor::Executor::new(),
+    dir,
+    LocalOptions {
+      lease_time,
+      ..LocalOptions::default()
+    },
+  )
+  .unwrap()
 }
 
 pub async fn load_file_bytes(store: &ByteStore, digest: Digest) -> Result<Option<Bytes>, String> {
@@ -584,13 +625,13 @@ pub async fn load_bytes(
   digest: Digest,
 ) -> Result<Option<Bytes>, String> {
   store
-    .load_bytes_with(entry_type, digest, |b| Bytes::from(b))
+    .load_bytes_with(entry_type, digest, |b| Bytes::copy_from_slice(b))
     .await
 }
 
 async fn prime_store_with_file_bytes(store: &ByteStore, bytes: Bytes) -> Digest {
   store
-    .store_bytes(EntryType::File, bytes, false)
+    .store_bytes(EntryType::File, None, bytes, false)
     .await
     .expect("Error storing file bytes")
 }

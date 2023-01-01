@@ -1,9 +1,13 @@
 [package]
 version = "0.0.1"
-edition = "2018"
+edition = "2021"
 name = "engine"
 authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 publish = false
+
+# NOTE: See `src/rust/engine/.cargo/config` for `--cfg` flags enabled for these crates.
+# tokio_unstable is necessary for access to the `id`-related functions of tokio::task::JoinSet.
+# See https://docs.rs/tokio/1.21.1/tokio/task/struct.JoinSet.html#method.join_next_with_id.
 
 [profile.release]
 # Enable debug symbols in the `release` profile: doesn't add a noticeable overhead in size/speed,
@@ -13,14 +17,18 @@ debug = true
 codegen-units = 1
 
 [workspace]
+resolver = "2"
 # These are the packages which are built/tested when the --all flag is passed to cargo.
 #
 # We need to explicitly list these, because otherwise the standalone tools
 # (e.g. fs_util) won't be included when we build/test things.
 members = [
   ".",
-  "async_semaphore",
-  "boxfuture",
+  "address",
+  "async_latch",
+  "async_value",
+  "cache",
+  "client",
   "concrete_time",
   "fs",
   "fs/brfs",
@@ -28,18 +36,20 @@ members = [
   "fs/store",
   "graph",
   "hashing",
+  "stdio",
   "logging",
   "nailgun",
+  "options",
   "process_execution",
   "process_executor",
   "rule_graph",
-  "serverset",
   "sharded_lmdb",
   "task_executor",
   "testutil",
   "testutil/mock",
   "testutil/local_cas",
   "testutil/local_execution_server",
+  "tryfuture",
   "ui",
   "watch",
   "workunit_store"
@@ -55,26 +65,31 @@ members = [
 # On Ubuntu, that means installing libfuse-dev. On OSX, that means installing OSXFUSE.
 default-members = [
   ".",
-  "async_semaphore",
-  "boxfuture",
+  "address",
+  "async_latch",
+  "async_value",
+  "cache",
+  "client",
   "concrete_time",
   "fs",
   "fs/fs_util",
   "fs/store",
   "graph",
   "hashing",
+  "stdio",
   "logging",
   "nailgun",
+  "options",
   "process_execution",
   "process_executor",
   "rule_graph",
-  "serverset",
   "sharded_lmdb",
   "task_executor",
   "testutil",
   "testutil/mock",
   "testutil/local_cas",
   "testutil/local_execution_server",
+  "tryfuture",
   "ui",
   "watch",
   "workunit_store"
@@ -85,59 +100,72 @@ crate-type = ["cdylib"]
 
 [features]
 # NB: To actually load this crate from python, the `extension-module` feature must be enabled. But
-# unfortunately, enabling `extension-module` causes tests linked against `cpython` to fail. We
+# unfortunately, enabling `extension-module` causes tests linked against `pyo3` to fail. We
 # define a feature to enable that, but we do not enable it by default: someone building this module
 # in order to extract `libengine.so` should pass `cargo build .. --features=extension-module`.
 #  see https://github.com/PyO3/pyo3/issues/340
-extension-module = ["cpython/extension-module"]
+extension-module = ["pyo3/extension-module"]
 default = []
 
 [dependencies]
-async_semaphore = { path = "async_semaphore" }
+address = { path = "address" }
+async_latch = { path = "async_latch" }
 async-trait = "0.1"
-boxfuture = { path = "boxfuture" }
-bytes = "0.4.5"
+protos = { path = "protos" }
+bytes = "1.2"
+cache = { path = "cache" }
 concrete_time = { path = "concrete_time" }
-cpython = "0.5"
-crossbeam-channel = "0.4"
+crossbeam-channel = "0.5"
+# TODO: Waiting on https://github.com/Aeledfyr/deepsize/pull/{30,31,32}.
+deepsize = { git = "https://github.com/stuhood/deepsize.git", rev = "5c8bee5443fcafe4aaa9274490d354412d0955c1", features=["internment", "smallvec"] }
+derivative = "2.2"
+async-oncecell = "0.2"
 fnv = "1.0.5"
 fs = { path = "fs" }
-futures01 = { package = "futures", version = "0.1" }
-futures = { version = "0.3", features = ["compat"] }
+futures = "0.3"
+futures-core = "^0.3.23"
 graph = { path = "graph" }
+grpc_util = { path = "grpc_util" }
 hashing = { path = "hashing" }
-indexmap = "1.4"
-itertools = "0.8.2"
+humansize = "1.1"
+indexmap = "1.9"
+internment = "0.6"
+itertools = "0.10"
 lazy_static = "1"
+libc = "0.2.137"
 log = "0.4"
 logging = { path = "logging" }
 nailgun = { path = "nailgun" }
-num_enum = "0.4"
-parking_lot = "0.11"
+num_enum = "0.5"
+parking_lot = "0.12"
+petgraph = "0.6"
 process_execution = { path = "process_execution" }
-rand = "0.6"
+pyo3 = "0.16"
+rand = "0.8"
 regex = "1"
-reqwest = { version = "0.10", default_features = false, features = ["stream", "rustls-tls"] }
+reqwest = { version = "0.11", default_features = false, features = ["stream", "rustls-tls"] }
 rule_graph = { path = "rule_graph" }
-sharded_lmdb = { path = "sharded_lmdb" }
-smallvec = "0.6"
+smallvec = { version = "1", features=["union"] }
+stdio = { path = "stdio" }
 store = { path = "fs/store" }
+serde_json = "1.0"
 task_executor = { path = "task_executor" }
 tempfile = "3"
-time = "0.1.40"
-tokio = { version = "0.2.22", features = ["rt-threaded"] }
+testutil_mock = { package = "mock", path = "testutil/mock" }
+time = "0.3"
+tokio = { version = "1.21", features = ["macros", "rt", "rt-multi-thread"] }
+tokio-retry = "0.3"
+tokio-util = { version = "0.7", features = ["io"] }
+tryfuture = { path = "tryfuture" }
 ui = { path = "ui" }
-url = "2.1"
-uuid = { version = "0.7", features = ["v4"] }
+url = "2.3"
 watch = { path = "watch" }
 workunit_store = { path = "workunit_store" }
 
 [dev-dependencies]
 testutil = { path = "./testutil" }
 fs = { path = "./fs" }
-env_logger = "0.5.4"
+env_logger = "0.9.0"
 
-[patch.crates-io]
-# TODO: Remove patch when we can upgrade to an official released version of protobuf with a fix.
-# See: https://github.com/pantsbuild/pants/issues/7760 for context.
-protobuf = { git="https://github.com/pantsbuild/rust-protobuf", rev="171611c33ec92f07e1b7107327f6d0139a7afebf", version="2.0.6", features = ["with-bytes"] }
+[build-dependencies]
+pyo3-build-config = "0.17"

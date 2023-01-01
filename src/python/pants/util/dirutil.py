@@ -1,6 +1,8 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import atexit
 import errno
 import os
@@ -11,26 +13,15 @@ import threading
 import uuid
 from collections import defaultdict
 from contextlib import contextmanager
-from typing import (
-    Any,
-    Callable,
-    DefaultDict,
-    Iterator,
-    List,
-    Optional,
-    Sequence,
-    Set,
-    Tuple,
-    Union,
-    overload,
-)
+from pathlib import Path
+from typing import Any, Callable, DefaultDict, Iterator, Sequence, overload
 
 from typing_extensions import Literal
 
 from pants.util.strutil import ensure_text
 
 
-def longest_dir_prefix(path: str, prefixes: Sequence[str]) -> Optional[str]:
+def longest_dir_prefix(path: str, prefixes: Sequence[str]) -> str | None:
     """Given a list of prefixes, return the one that is the longest prefix to the given path.
 
     Returns None if there are no matches.
@@ -51,7 +42,7 @@ def fast_relpath(path: str, start: str) -> str:
     return relpath
 
 
-def fast_relpath_optional(path: str, start: str) -> Optional[str]:
+def fast_relpath_optional(path: str, start: str) -> str | None:
     """A prefix-based relpath, with no normalization or support for returning `..`.
 
     Returns None if `start` is not a directory-aware prefix of `path`.
@@ -72,7 +63,7 @@ def fast_relpath_optional(path: str, start: str) -> Optional[str]:
     return None
 
 
-def safe_mkdir(directory: str, clean: bool = False) -> None:
+def safe_mkdir(directory: str | Path, clean: bool = False) -> None:
     """Ensure a directory is present.
 
     If it's not there, create it.  If it is, no-op. If clean is True, ensure the dir is empty.
@@ -88,7 +79,7 @@ def safe_mkdir(directory: str, clean: bool = False) -> None:
             raise
 
 
-def safe_mkdir_for(path: str, clean: bool = False) -> None:
+def safe_mkdir_for(path: str | Path, clean: bool = False) -> None:
     """Ensure that the parent directory for a file is present.
 
     If it's not there, create it. If it is, no-op.
@@ -97,7 +88,7 @@ def safe_mkdir_for(path: str, clean: bool = False) -> None:
 
 
 def safe_file_dump(
-    filename: str, payload: Union[bytes, str] = "", mode: str = "w", makedirs: bool = False
+    filename: str, payload: bytes | str = "", mode: str = "w", makedirs: bool = False
 ) -> None:
     """Write a string to a file.
 
@@ -120,26 +111,26 @@ def safe_file_dump(
 
 
 @overload
-def maybe_read_file(filename: str) -> Optional[str]:
+def maybe_read_file(filename: str) -> str | None:
     ...
 
 
 @overload
-def maybe_read_file(filename: str, binary_mode: Literal[False]) -> Optional[str]:
+def maybe_read_file(filename: str, binary_mode: Literal[False]) -> str | None:
     ...
 
 
 @overload
-def maybe_read_file(filename: str, binary_mode: Literal[True]) -> Optional[bytes]:
+def maybe_read_file(filename: str, binary_mode: Literal[True]) -> bytes | None:
     ...
 
 
 @overload
-def maybe_read_file(filename: str, binary_mode: bool) -> Optional[Union[bytes, str]]:
+def maybe_read_file(filename: str, binary_mode: bool) -> bytes | str | None:
     ...
 
 
-def maybe_read_file(filename: str, binary_mode: bool = False) -> Optional[Union[bytes, str]]:
+def maybe_read_file(filename: str, binary_mode: bool = False) -> bytes | str | None:
     """Read and return the contents of a file in a single file.read().
 
     :param filename: The filename of the file to read.
@@ -148,7 +139,7 @@ def maybe_read_file(filename: str, binary_mode: bool = False) -> Optional[Union[
     """
     try:
         return read_file(filename, binary_mode=binary_mode)
-    except IOError:
+    except OSError:
         return None
 
 
@@ -168,11 +159,11 @@ def read_file(filename: str, binary_mode: Literal[True]) -> bytes:
 
 
 @overload
-def read_file(filename: str, binary_mode: bool) -> Union[str, bytes]:
+def read_file(filename: str, binary_mode: bool) -> bytes | str:
     ...
 
 
-def read_file(filename: str, binary_mode: bool = False) -> Union[bytes, str]:
+def read_file(filename: str, binary_mode: bool = False) -> bytes | str:
     """Read and return the contents of a file in a single file.read().
 
     :param filename: The filename of the file to read.
@@ -181,11 +172,11 @@ def read_file(filename: str, binary_mode: bool = False) -> Union[bytes, str]:
     """
     mode = "rb" if binary_mode else "r"
     with open(filename, mode) as f:
-        content: Union[bytes, str] = f.read()
+        content: bytes | str = f.read()
         return content
 
 
-def safe_walk(path: Union[bytes, str], **kwargs: Any) -> Iterator[Tuple[str, List[str], List[str]]]:
+def safe_walk(path: bytes | str, **kwargs: Any) -> Iterator[tuple[str, list[str], list[str]]]:
     """Just like os.walk, but ensures that the returned values are unicode objects.
 
     This isn't strictly safe, in that it is possible that some paths
@@ -203,8 +194,8 @@ def safe_walk(path: Union[bytes, str], **kwargs: Any) -> Iterator[Tuple[str, Lis
 
 
 _MkdtempCleanerType = Callable[[], None]
-_MKDTEMP_CLEANER: Optional[_MkdtempCleanerType] = None
-_MKDTEMP_DIRS: DefaultDict[int, Set[str]] = defaultdict(set)
+_MKDTEMP_CLEANER: _MkdtempCleanerType | None = None
+_MKDTEMP_DIRS: DefaultDict[int, set[str]] = defaultdict(set)
 _MKDTEMP_LOCK = threading.RLock()
 
 
@@ -246,7 +237,7 @@ def register_rmtree(directory: str, cleaner: _MkdtempCleanerType = _mkdtemp_atex
     return directory
 
 
-def safe_rmtree(directory: str) -> None:
+def safe_rmtree(directory: str | Path) -> None:
     """Delete a directory if it's present. If it's not present, no-op.
 
     Note that if the directory argument is a symlink, only the symlink will
@@ -269,7 +260,7 @@ def safe_open(filename, *args, **kwargs):
     return open(filename, *args, **kwargs)
 
 
-def safe_delete(filename: str) -> None:
+def safe_delete(filename: str | Path) -> None:
     """Delete a file safely.
 
     If it's not present, no-op.
@@ -294,7 +285,7 @@ def safe_concurrent_rename(src: str, dst: str) -> None:
         safe_delete(dst)
     try:
         shutil.move(src, dst)
-    except IOError as e:
+    except OSError as e:
         if e.errno != errno.EEXIST:
             raise
 
@@ -392,7 +383,7 @@ def relative_symlink(source_path: str, link_path: str) -> None:
             raise
 
 
-def touch(path: str, times: Optional[Union[int, Tuple[int, int]]] = None):
+def touch(path: str, times: int | tuple[int, int] | None = None):
     """Equivalent of unix `touch path`.
 
     :API: public

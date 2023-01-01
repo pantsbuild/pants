@@ -1,50 +1,47 @@
+// Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
+// Licensed under the Apache License, Version 2.0 (see LICENSE).
 use std::collections::{BTreeMap, BTreeSet};
+use std::fmt::{self, Debug};
+use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
-use std::time::Duration;
 
 use async_trait::async_trait;
-use futures::compat::Future01CompatExt;
 use futures::future::{FutureExt, TryFutureExt};
 use futures::stream::{BoxStream, StreamExt};
 use log::{debug, trace};
-use nails::execution::{child_channel, ChildInput, ChildOutput, Command};
+use nails::execution::{self, child_channel, ChildInput, Command};
+use store::{ImmutableInputs, Store};
+use task_executor::Executor;
 use tokio::net::TcpStream;
+use workunit_store::{in_workunit, Metric, RunningWorkunit};
 
-use crate::local::CapturedWorkdir;
-use crate::nailgun::nailgun_pool::NailgunProcessName;
+use crate::local::{prepare_workdir, CapturedWorkdir, ChildOutput};
 use crate::{
-  Context, FallibleProcessResultWithPlatform, MultiPlatformProcess, NamedCaches, Platform, Process,
-  ProcessMetadata,
+  Context, FallibleProcessResultWithPlatform, InputDigests, NamedCaches, Platform, Process,
+  ProcessError,
 };
 
 #[cfg(test)]
 pub mod tests;
 
-pub mod nailgun_pool;
+mod nailgun_pool;
 
 mod parsed_jvm_command_lines;
 #[cfg(test)]
 mod parsed_jvm_command_lines_tests;
 
-use async_semaphore::AsyncSemaphore;
-pub use nailgun_pool::NailgunPool;
+use nailgun_pool::NailgunPool;
 use parsed_jvm_command_lines::ParsedJVMCommandLines;
-use std::net::SocketAddr;
 
 // Hardcoded constants for connecting to nailgun
 static NAILGUN_MAIN_CLASS: &str = "com.martiansoftware.nailgun.NGServer";
 static ARGS_TO_START_NAILGUN: [&str; 1] = [":0"];
 
-///
-/// Constructs the Process that would be used
-/// to start the nailgun servers if we needed to.
-///
-// TODO(#8481) We should calculate the input_files by deeply fingerprinting the classpath.
 fn construct_nailgun_server_request(
+  client_request: Process,
+  input_digests: InputDigests,
   nailgun_name: &str,
   args_for_the_jvm: Vec<String>,
-  jdk: PathBuf,
-  platform_constraint: Option<Platform>,
 ) -> Process {
   let mut full_args = args_for_the_jvm;
   full_args.push(NAILGUN_MAIN_CLASS.to_string());
@@ -52,25 +49,22 @@ fn construct_nailgun_server_request(
 
   Process {
     argv: full_args,
-    env: BTreeMap::new(),
-    working_directory: None,
-    input_files: hashing::EMPTY_DIGEST,
+    input_digests,
     output_files: BTreeSet::new(),
     output_directories: BTreeSet::new(),
-    timeout: Some(Duration::new(1000, 0)),
-    description: format!("Start a nailgun server for {}", nailgun_name),
+    timeout: None,
+    description: format!("nailgun server for {}", nailgun_name),
     level: log::Level::Info,
-    append_only_caches: BTreeMap::new(),
-    jdk_home: Some(jdk),
-    platform_constraint,
-    is_nailgunnable: true,
     execution_slot_variable: None,
-    cache_failures: false,
+    env: client_request.env,
+    append_only_caches: client_request.append_only_caches,
+    ..client_request
   }
 }
 
 fn construct_nailgun_client_request(
   original_req: Process,
+  input_digests: InputDigests,
   client_main_class: String,
   mut client_args: Vec<String>,
 ) -> Process {
@@ -78,6 +72,9 @@ fn construct_nailgun_client_request(
   Process {
     argv: client_args,
     jdk_home: None,
+    input_digests,
+    // The append_only_caches are created and preserved by the server.
+    append_only_caches: BTreeMap::new(),
     ..original_req
   }
 }
@@ -91,50 +88,45 @@ fn construct_nailgun_client_request(
 /// Otherwise, it will just delegate to the regular local runner.
 ///
 pub struct CommandRunner {
-  inner: super::local::CommandRunner,
   nailgun_pool: NailgunPool,
-  async_semaphore: async_semaphore::AsyncSemaphore,
-  metadata: ProcessMetadata,
-  workdir_base: PathBuf,
-  executor: task_executor::Executor,
+  store: Store,
+  executor: Executor,
+  named_caches: NamedCaches,
+  immutable_inputs: ImmutableInputs,
 }
 
 impl CommandRunner {
   pub fn new(
-    runner: crate::local::CommandRunner,
-    metadata: ProcessMetadata,
     workdir_base: PathBuf,
-    executor: task_executor::Executor,
+    store: Store,
+    executor: Executor,
+    named_caches: NamedCaches,
+    immutable_inputs: ImmutableInputs,
+    nailgun_pool_size: usize,
   ) -> Self {
     CommandRunner {
-      inner: runner,
-      nailgun_pool: NailgunPool::new(),
-      async_semaphore: AsyncSemaphore::new(1),
-      metadata,
-      workdir_base,
+      nailgun_pool: NailgunPool::new(
+        workdir_base,
+        nailgun_pool_size,
+        store.clone(),
+        executor.clone(),
+      ),
+      store,
       executor,
+      named_caches,
+      immutable_inputs,
     }
   }
 
-  // Ensure that the workdir for the given nailgun name exists.
-  fn get_nailgun_workdir(&self, nailgun_name: &str) -> Result<PathBuf, String> {
-    let workdir = self.workdir_base.clone().join(nailgun_name);
-    if workdir.exists() {
-      debug!("Nailgun workdir {:?} exits. Reusing that...", &workdir);
-      Ok(workdir)
-    } else {
-      debug!("Creating nailgun workdir at {:?}", &workdir);
-      fs::safe_create_dir_all(&workdir)
-        .map_err(|err| format!("Error creating the nailgun workdir! {}", err))
-        .map(|_| workdir)
-    }
-  }
-
-  // TODO(#8527) Make this name the name of the task (in v1) or some other more intentional scope (v2).
-  //      Using the main class here is fragile, because two tasks might want to run the same main class,
-  //      but in different nailgun servers.
-  fn calculate_nailgun_name(main_class: &str) -> NailgunProcessName {
+  fn calculate_nailgun_name(main_class: &str) -> String {
     format!("nailgun_server_{}", main_class)
+  }
+}
+
+impl Debug for CommandRunner {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    f.debug_struct("nailgun::CommandRunner")
+      .finish_non_exhaustive()
   }
 }
 
@@ -142,152 +134,150 @@ impl CommandRunner {
 impl super::CommandRunner for CommandRunner {
   async fn run(
     &self,
-    req: MultiPlatformProcess,
     context: Context,
-  ) -> Result<FallibleProcessResultWithPlatform, String> {
-    let original_request = self.extract_compatible_request(&req).unwrap();
+    _workunit: &mut RunningWorkunit,
+    req: Process,
+  ) -> Result<FallibleProcessResultWithPlatform, ProcessError> {
+    debug!("Running request under nailgun:\n {:?}", req);
 
-    if !original_request.is_nailgunnable {
-      trace!("The request is not nailgunnable! Short-circuiting to regular process execution");
-      return self.inner.run(req, context).await;
-    }
-    debug!("Running request under nailgun:\n {:#?}", &original_request);
+    in_workunit!(
+      "run_nailgun_process",
+      // NB: See engine::nodes::NodeKey::workunit_level for more information on why this workunit
+      // renders at the Process's level.
+      req.level,
+      desc = Some(req.description.clone()),
+      |workunit| async move {
+        workunit.increment_counter(Metric::LocalExecutionRequests, 1);
 
-    let executor = self.executor.clone();
-    let store = self.inner.store.clone();
-    let ParsedJVMCommandLines {
-      client_main_class, ..
-    } = ParsedJVMCommandLines::parse_command_lines(&original_request.argv)?;
-    let nailgun_name = CommandRunner::calculate_nailgun_name(&client_main_class);
-    let workdir_for_this_nailgun = self.get_nailgun_workdir(&nailgun_name)?;
+        // Separate argument lists, to form distinct EPRs for
+        //  1. starting the nailgun server
+        //  2. running the client against it
+        let ParsedJVMCommandLines {
+          nailgun_args,
+          client_args,
+          client_main_class,
+          ..
+        } = ParsedJVMCommandLines::parse_command_lines(&req.argv)
+          .map_err(ProcessError::Unclassified)?;
 
-    self
-      .run_and_capture_workdir(
-        original_request,
-        context,
-        store,
-        executor,
-        true,
-        &workdir_for_this_nailgun,
-        Platform::current().unwrap(),
-      )
-      .await
+        let nailgun_name = CommandRunner::calculate_nailgun_name(&client_main_class);
+        let (client_input_digests, server_input_digests) =
+          req.input_digests.nailgun_client_and_server();
+        let client_req = construct_nailgun_client_request(
+          req.clone(),
+          client_input_digests,
+          client_main_class,
+          client_args,
+        );
+        let server_req =
+          construct_nailgun_server_request(req, server_input_digests, &nailgun_name, nailgun_args);
+        trace!("Running request under nailgun:\n {:#?}", &client_req);
+
+        // Get an instance of a nailgun server for this fingerprint, and then run in its directory.
+        let mut nailgun_process = self
+          .nailgun_pool
+          .acquire(server_req, &self.named_caches, &self.immutable_inputs)
+          .await
+          .map_err(|e| e.enrich("Failed to connect to nailgun"))?;
+
+        // Prepare the workdir.
+        let exclusive_spawn = prepare_workdir(
+          nailgun_process.workdir_path().to_owned(),
+          &client_req,
+          client_req.input_digests.input_files.clone(),
+          self.store.clone(),
+          self.executor.clone(),
+          &self.named_caches,
+          &self.immutable_inputs,
+          None,
+          None,
+        )
+        .await?;
+
+        let res = self
+          .run_and_capture_workdir(
+            client_req,
+            context,
+            self.store.clone(),
+            self.executor.clone(),
+            nailgun_process.workdir_path().to_owned(),
+            (nailgun_process.name().to_owned(), nailgun_process.address()),
+            exclusive_spawn,
+            Platform::current().unwrap(),
+          )
+          .await;
+
+        // NB: We explicitly release the BorrowedNailgunProcess, because when it is Dropped without
+        // release, it assumes that it has been canceled and kills the server.
+        nailgun_process.release().await?;
+
+        Ok(res?)
+      }
+    )
+    .await
   }
 
-  fn extract_compatible_request(&self, req: &MultiPlatformProcess) -> Option<Process> {
-    // Request compatibility should be the same as for the local runner, so we just delegate this.
-    self.inner.extract_compatible_request(req)
+  async fn shutdown(&self) -> Result<(), String> {
+    Ok(())
   }
 }
 
 #[async_trait]
 impl CapturedWorkdir for CommandRunner {
-  fn named_caches(&self) -> &NamedCaches {
-    self.inner.named_caches()
-  }
+  type WorkdirToken = (String, SocketAddr);
 
-  async fn run_in_workdir<'a, 'b, 'c>(
-    &'a self,
-    workdir_path: &'b Path,
+  async fn run_in_workdir<'s, 'c, 'w, 'r>(
+    &'s self,
+    _context: &'c Context,
+    workdir_path: &'w Path,
+    workdir_token: Self::WorkdirToken,
     req: Process,
-    context: Context,
     _exclusive_spawn: bool,
-  ) -> Result<BoxStream<'c, Result<ChildOutput, String>>, String> {
-    // Separate argument lists, to form distinct EPRs for (1) starting the nailgun server and (2) running the client in it.
-    let ParsedJVMCommandLines {
-      nailgun_args,
-      client_args,
-      client_main_class,
-    } = ParsedJVMCommandLines::parse_command_lines(&req.argv)?;
-
-    let nailgun_name = CommandRunner::calculate_nailgun_name(&client_main_class);
-    let nailgun_name2 = nailgun_name.clone();
-    let nailgun_name3 = nailgun_name.clone();
+  ) -> Result<BoxStream<'r, Result<ChildOutput, String>>, String> {
     let client_workdir = if let Some(working_directory) = &req.working_directory {
       workdir_path.join(working_directory)
     } else {
       workdir_path.to_path_buf()
     };
 
-    let jdk_home = req
-      .jdk_home
-      .clone()
-      .ok_or("JDK home must be specified for all nailgunnable requests.")?;
-    let nailgun_req = construct_nailgun_server_request(
-      &nailgun_name,
-      nailgun_args,
-      jdk_home,
-      req.platform_constraint,
-    );
-    trace!("Extracted nailgun request:\n {:#?}", &nailgun_req);
-
-    let nailgun_req_digest = crate::digest(
-      MultiPlatformProcess::from(nailgun_req.clone()),
-      &self.metadata,
-    );
-
-    let nailgun_pool = self.nailgun_pool.clone();
-    let req2 = req.clone();
-    let workdir_for_this_nailgun = self.get_nailgun_workdir(&nailgun_name)?;
-    let build_id = context.build_id;
-    let store = self.inner.store.clone();
-
-    // Streams to read child output from
-    let (stdio_write, stdio_read) = child_channel::<ChildOutput>();
-
-    let nails_command = self
-      .async_semaphore
-      .clone()
-      .with_acquired(move |_id| {
-        // Get the port of a running nailgun server (or a new nailgun server if it doesn't exist)
-        nailgun_pool
-          .connect(
-            nailgun_name.clone(),
-            nailgun_req,
-            workdir_for_this_nailgun,
-            nailgun_req_digest,
-            build_id,
-            store,
-            req.input_files,
-          )
-          .compat()
-      })
-      .map_err(|e| format!("Failed to connect to nailgun! {}", e))
-      .inspect(move |_| debug!("Connected to nailgun instance {}", &nailgun_name3))
-      .and_then(move |nailgun_port| {
-        // Run the client request in the nailgun we have active.
-        debug!("Got nailgun port {} for {}", nailgun_port, nailgun_name2);
-        let client_req = construct_nailgun_client_request(req2, client_main_class, client_args);
-        let cmd = Command {
-          command: client_req.argv[0].clone(),
-          args: client_req.argv[1..].to_vec(),
-          env: client_req
-            .env
-            .iter()
-            .map(|(k, v)| (k.clone(), v.clone()))
-            .collect(),
-          working_dir: client_workdir,
-        };
-        trace!("Client request: {:#?}", client_req);
-        let addr: SocketAddr = format!("127.0.0.1:{:?}", nailgun_port).parse().unwrap();
-        debug!("Connecting to server at {}...", addr);
-        TcpStream::connect(addr)
-          .and_then(move |stream| {
-            nails::client_handle_connection(
-              nails::Config::default(),
-              stream,
-              cmd,
-              stdio_write,
-              async {
-                let (_stdin_write, stdin_read) = child_channel::<ChildInput>();
-                stdin_read
-              },
-            )
+    let (name, addr) = workdir_token;
+    debug!("Connected to nailgun instance {} at {}...", name, addr);
+    let mut child = {
+      // Run the client request in the nailgun we have active.
+      let cmd = Command {
+        command: req.argv[0].clone(),
+        args: req.argv[1..].to_vec(),
+        env: req
+          .env
+          .iter()
+          .map(|(k, v)| (k.clone(), v.clone()))
+          .collect(),
+        working_dir: client_workdir,
+      };
+      TcpStream::connect(addr)
+        .and_then(move |stream| {
+          nails::client::handle_connection(nails::Config::default(), stream, cmd, async {
+            let (_stdin_write, stdin_read) = child_channel::<ChildInput>();
+            stdin_read
           })
-          .map_err(|e| format!("Error communicating with server: {}", e))
-          .map_ok(ChildOutput::Exit)
-      });
+        })
+        .map_err(|e| format!("Error communicating with nailgun server: {}", e))
+        .await?
+    };
 
-    Ok(futures::stream::select(stdio_read.map(Ok), nails_command.into_stream()).boxed())
+    let output_stream = child
+      .output_stream
+      .take()
+      .unwrap()
+      .map(|output| match output {
+        execution::ChildOutput::Stdout(bytes) => Ok(ChildOutput::Stdout(bytes)),
+        execution::ChildOutput::Stderr(bytes) => Ok(ChildOutput::Stderr(bytes)),
+      });
+    let exit_code = child
+      .wait()
+      .map_ok(ChildOutput::Exit)
+      .map_err(|e| format!("Error communicating with nailgun server: {}", e));
+
+    Ok(futures::stream::select(output_stream, exit_code.into_stream()).boxed())
   }
 }

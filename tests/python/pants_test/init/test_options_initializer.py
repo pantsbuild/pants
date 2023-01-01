@@ -3,43 +3,37 @@
 
 import unittest
 
-from pants.base.build_environment import get_buildroot
-from pants.base.exceptions import BuildConfigurationError
-from pants.init.options_initializer import BuildConfigInitializer, OptionsInitializer
-from pants.option.errors import OptionsError
+from pants.engine.env_vars import CompleteEnvironmentVars
+from pants.engine.internals.scheduler import ExecutionError
+from pants.init.options_initializer import OptionsInitializer
 from pants.option.options_bootstrapper import OptionsBootstrapper
 
 
 class OptionsInitializerTest(unittest.TestCase):
-    def test_invalid_version(self):
+    def test_invalid_version(self) -> None:
         options_bootstrapper = OptionsBootstrapper.create(
             env={},
             args=["--backend-packages=[]", "--pants-version=99.99.9999"],
             allow_pantsrc=False,
         )
-        build_config = BuildConfigInitializer.get(options_bootstrapper)
 
-        with self.assertRaises(BuildConfigurationError):
-            OptionsInitializer.create(options_bootstrapper, build_config)
+        env = CompleteEnvironmentVars({})
+        initializer = OptionsInitializer(options_bootstrapper)
+        with self.assertRaises(ExecutionError):
+            initializer.build_config(options_bootstrapper, env)
 
-    def test_global_options_validation(self):
+    def test_global_options_validation(self) -> None:
         # Specify an invalid combination of options.
         ob = OptionsBootstrapper.create(
-            env={}, args=["--backend-packages=[]", "--remote-execution"], allow_pantsrc=False
+            env={},
+            args=["--backend-packages=[]", "--no-watch-filesystem", "--loop"],
+            allow_pantsrc=False,
         )
-        build_config = BuildConfigInitializer.get(ob)
-        with self.assertRaises(OptionsError) as exc:
-            OptionsInitializer.create(ob, build_config)
-        self.assertIn("The `--remote-execution` option requires", str(exc.exception))
-
-    def test_invalidation_globs(self) -> None:
-        # Confirm that an un-normalized relative path in the pythonpath is filtered out.
-        suffix = "something-ridiculous"
-        ob = OptionsBootstrapper.create(
-            env={}, args=[f"--pythonpath=../{suffix}"], allow_pantsrc=False
+        env = CompleteEnvironmentVars({})
+        initializer = OptionsInitializer(ob)
+        with self.assertRaises(ExecutionError) as exc:
+            initializer.build_config(ob, env)
+        self.assertIn(
+            "The `--no-watch-filesystem` option may not be set if `--pantsd` or `--loop` is set.",
+            str(exc.exception),
         )
-        globs = OptionsInitializer.compute_pantsd_invalidation_globs(
-            get_buildroot(), ob.bootstrap_options.for_global_scope()
-        )
-        for glob in globs:
-            assert suffix not in glob

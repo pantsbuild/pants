@@ -1,19 +1,22 @@
 [package]
 version = "0.0.1"
-edition = "2018"
+edition = "2021"
 name = "logging"
 authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 publish = false
 
 [dependencies]
-colored = "1.9.0"
-chrono = "0.4.10"
+arc-swap = "1.5"
+colored = "2.0.0"
+chrono = "0.4.22"
 lazy_static = "1"
 log = "0.4"
-num_enum = "0.4"
-parking_lot = "0.11"
-tokio = { version = "0.2.22", features = ["rt-util"] }
-uuid = { version = "0.7", features = ["v4"] }
+num_enum = "0.5"
+parking_lot = "0.12"
+regex = "1"
+stdio = { path = "../stdio" }
+tokio = { version = "1.21" }
+uuid = { version = "1.1", features = ["v4"] }
 
 [build-dependencies]
-cargo_metadata = "0.10"
+cargo_metadata = "0.15"

@@ -1,37 +1,58 @@
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, ClassVar, Iterable, List, Optional, Set, Tuple, Type, cast
+from typing import Any, ClassVar, Iterable, Mapping, cast
 
 from pants.base.build_environment import get_buildroot
 from pants.base.build_root import BuildRoot
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE
 from pants.base.specs import Specs
+from pants.bsp.protocol import BSPHandlerMapping
 from pants.build_graph.build_configuration import BuildConfiguration
-from pants.engine import desktop, fs, platform, process
+from pants.core.util_rules import environments, system_binaries
+from pants.core.util_rules.environments import determine_bootstrap_environment
+from pants.engine import desktop, fs, process
 from pants.engine.console import Console
+from pants.engine.environment import EnvironmentName
 from pants.engine.fs import PathGlobs, Snapshot, Workspace
 from pants.engine.goal import Goal
-from pants.engine.internals import build_files, graph, options_parsing, uuid
-from pants.engine.internals.native import Native
+from pants.engine.internals import (
+    build_files,
+    dep_rules,
+    graph,
+    options_parsing,
+    platform_rules,
+    specs_rules,
+    synthetic_targets,
+)
+from pants.engine.internals.native_engine import PyExecutor, PySessionCancellationLatch
 from pants.engine.internals.parser import Parser
 from pants.engine.internals.scheduler import Scheduler, SchedulerSession
 from pants.engine.internals.selectors import Params
 from pants.engine.internals.session import SessionValues
-from pants.engine.process import InteractiveRunner
 from pants.engine.rules import QueryRule, collect_rules, rule
+from pants.engine.streaming_workunit_handler import rules as streaming_workunit_handler_rules
 from pants.engine.target import RegisteredTargetTypes
-from pants.engine.unions import UnionMembership
+from pants.engine.unions import UnionMembership, UnionRule
 from pants.init import specs_calculator
-from pants.init.options_initializer import OptionsInitializer
-from pants.option.global_options import DEFAULT_EXECUTION_OPTIONS, ExecutionOptions
-from pants.option.options_bootstrapper import OptionsBootstrapper
+from pants.option.global_options import (
+    DEFAULT_EXECUTION_OPTIONS,
+    DynamicRemoteOptions,
+    ExecutionOptions,
+    GlobalOptions,
+    LocalStoreOptions,
+)
+from pants.option.option_value_container import OptionValueContainer
 from pants.option.subsystem import Subsystem
+from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.vcs.changed import rules as changed_rules
+from pants.vcs.git import rules as git_rules
 
 logger = logging.getLogger(__name__)
 
@@ -47,12 +68,19 @@ class GraphScheduler:
         self,
         build_id,
         dynamic_ui: bool = False,
+        ui_use_prodash: bool = False,
         use_colors=True,
-        should_report_workunits=False,
-        session_values: Optional[SessionValues] = None,
-    ) -> "GraphSession":
+        max_workunit_level: LogLevel = LogLevel.DEBUG,
+        session_values: SessionValues | None = None,
+        cancellation_latch: PySessionCancellationLatch | None = None,
+    ) -> GraphSession:
         session = self.scheduler.new_session(
-            build_id, dynamic_ui, should_report_workunits, session_values=session_values
+            build_id,
+            dynamic_ui,
+            ui_use_prodash,
+            max_workunit_level=max_workunit_level,
+            session_values=session_values,
+            cancellation_latch=cancellation_latch,
         )
         console = Console(use_colors=use_colors, session=session if dynamic_ui else None)
         return GraphSession(session, console, self.goal_map)
@@ -67,19 +95,19 @@ class GraphSession:
     goal_map: Any
 
     # NB: Keep this in sync with the method `run_goal_rules`.
-    goal_param_types: ClassVar[Tuple[Type, ...]] = (Specs, Console, InteractiveRunner, Workspace)
+    goal_param_types: ClassVar[tuple[type, ...]] = (Specs, Console, Workspace, EnvironmentName)
 
-    def goal_consumed_subsystem_scopes(self, goal_name: str) -> Tuple[str, ...]:
+    def goal_consumed_subsystem_scopes(self, goal_name: str) -> tuple[str, ...]:
         """Return the scopes of subsystems that could be consumed while running the given goal."""
         goal_product = self.goal_map.get(goal_name)
         if not goal_product:
             return tuple()
         consumed_types = self.goal_consumed_types(goal_product)
         return tuple(
-            sorted({typ.options_scope for typ in consumed_types if issubclass(typ, Subsystem)})  # type: ignore[misc]
+            sorted({typ.options_scope for typ in consumed_types if issubclass(typ, Subsystem)})
         )
 
-    def goal_consumed_types(self, goal_product: Type) -> Set[Type]:
+    def goal_consumed_types(self, goal_product: type) -> set[type]:
         """Return the set of types that could possibly be consumed while running the given goal."""
         return set(
             self.scheduler_session.scheduler.rule_graph_consumed_types(
@@ -94,7 +122,7 @@ class GraphSession:
         goals: Iterable[str],
         specs: Specs,
         poll: bool = False,
-        poll_delay: Optional[float] = None,
+        poll_delay: float | None = None,
     ) -> int:
         """Runs @goal_rules sequentially and interactively by requesting their implicit Goal
         products.
@@ -105,20 +133,17 @@ class GraphSession:
         """
 
         workspace = Workspace(self.scheduler_session)
-        interactive_runner = InteractiveRunner(self.scheduler_session)
+        env_name = determine_bootstrap_environment(self.scheduler_session)
 
         for goal in goals:
             goal_product = self.goal_map[goal]
             # NB: We no-op for goals that have no implementation because no relevant backends are
             # registered. We might want to reconsider the behavior to instead warn or error when
             # trying to run something like `./pants run` without any backends registered.
-            is_implemented = union_membership.has_members_for_all(
-                goal_product.subsystem_cls.required_union_implementations
-            )
-            if not is_implemented:
+            if not goal_product.subsystem_cls.activated(union_membership):
                 continue
             # NB: Keep this in sync with the property `goal_param_types`.
-            params = Params(specs, self.console, workspace, interactive_runner)
+            params = Params(specs, self.console, workspace, env_name)
             logger.debug(f"requesting {goal_product} to satisfy execution of `{goal}` goal")
             try:
                 exit_code = self.scheduler_session.run_goal_rule(
@@ -140,76 +165,87 @@ class EngineInitializer:
         """Raised when a goal cannot be mapped to an @rule."""
 
     @staticmethod
-    def _make_goal_map_from_rules(rules):
-        goal_map = {}
+    def _make_goal_map_from_rules(rules) -> Mapping[str, type[Goal]]:
+        goal_map: dict[str, type[Goal]] = {}
         for r in rules:
             output_type = getattr(r, "output_type", None)
             if not output_type or not issubclass(output_type, Goal):
                 continue
+
             goal = r.output_type.name
-            if goal in goal_map:
-                raise EngineInitializer.GoalMappingError(
-                    f"could not map goal `{goal}` to rule `{r}`: already claimed by product "
-                    f"`{goal_map[goal]}`"
-                )
-            goal_map[goal] = r.output_type
+            deprecated_goal = r.output_type.subsystem_cls.deprecated_options_scope
+            for goal_name in [goal, deprecated_goal] if deprecated_goal else [goal]:
+                if goal_name in goal_map:
+                    raise EngineInitializer.GoalMappingError(
+                        f"could not map goal `{goal_name}` to rule `{r}`: already claimed by product "
+                        f"`{goal_map[goal_name]}`"
+                    )
+                goal_map[goal_name] = r.output_type
         return goal_map
 
     @staticmethod
     def setup_graph(
-        options_bootstrapper: OptionsBootstrapper,
+        bootstrap_options: OptionValueContainer,
         build_configuration: BuildConfiguration,
+        dynamic_remote_options: DynamicRemoteOptions,
+        executor: PyExecutor | None = None,
+        ignore_unrecognized_build_file_symbols: bool = False,
     ) -> GraphScheduler:
-        native = Native()
         build_root = get_buildroot()
-        bootstrap_options = options_bootstrapper.bootstrap_options.for_global_scope()
+        executor = executor or GlobalOptions.create_py_executor(bootstrap_options)
+        execution_options = ExecutionOptions.from_options(bootstrap_options, dynamic_remote_options)
+        local_store_options = LocalStoreOptions.from_options(bootstrap_options)
         return EngineInitializer.setup_graph_extended(
-            options_bootstrapper,
             build_configuration,
-            ExecutionOptions.from_bootstrap_options(bootstrap_options),
-            pants_ignore_patterns=OptionsInitializer.compute_pants_ignore(
-                build_root, bootstrap_options
-            ),
+            execution_options,
+            executor=executor,
+            pants_ignore_patterns=GlobalOptions.compute_pants_ignore(build_root, bootstrap_options),
             use_gitignore=bootstrap_options.pants_ignore_use_gitignore,
-            local_store_dir=bootstrap_options.local_store_dir,
+            local_store_options=local_store_options,
             local_execution_root_dir=bootstrap_options.local_execution_root_dir,
             named_caches_dir=bootstrap_options.named_caches_dir,
             ca_certs_path=bootstrap_options.ca_certs_path,
             build_root=build_root,
-            native=native,
             include_trace_on_error=bootstrap_options.print_stacktrace,
+            engine_visualize_to=bootstrap_options.engine_visualize_to,
+            watch_filesystem=bootstrap_options.watch_filesystem,
+            ignore_unrecognized_build_file_symbols=ignore_unrecognized_build_file_symbols,
         )
 
     @staticmethod
     def setup_graph_extended(
-        options_bootstrapper: OptionsBootstrapper,
         build_configuration: BuildConfiguration,
         execution_options: ExecutionOptions,
-        native: Native,
         *,
-        pants_ignore_patterns: List[str],
+        executor: PyExecutor,
+        pants_ignore_patterns: list[str],
         use_gitignore: bool,
-        local_store_dir: str,
+        local_store_options: LocalStoreOptions,
         local_execution_root_dir: str,
         named_caches_dir: str,
-        ca_certs_path: Optional[str] = None,
-        build_root: Optional[str] = None,
+        ca_certs_path: str | None = None,
+        build_root: str | None = None,
         include_trace_on_error: bool = True,
+        engine_visualize_to: str | None = None,
+        watch_filesystem: bool = True,
+        ignore_unrecognized_build_file_symbols: bool = False,
     ) -> GraphScheduler:
-        build_root = build_root or get_buildroot()
+        build_root_path = build_root or get_buildroot()
 
         rules = build_configuration.rules
-        union_membership = UnionMembership.from_rules(build_configuration.union_rules)
+        union_membership: UnionMembership
         registered_target_types = RegisteredTargetTypes.create(build_configuration.target_types)
 
-        bootstrap_options = options_bootstrapper.bootstrap_options.for_global_scope()
         execution_options = execution_options or DEFAULT_EXECUTION_OPTIONS
 
         @rule
         def parser_singleton() -> Parser:
             return Parser(
-                target_type_aliases=registered_target_types.aliases,
+                build_root=build_root_path,
+                registered_target_types=registered_target_types,
+                union_membership=union_membership,
                 object_aliases=build_configuration.registered_aliases,
+                ignore_unrecognized_symbols=ignore_unrecognized_build_file_symbols,
             )
 
         @rule
@@ -234,25 +270,56 @@ class EngineInitializer:
                 *collect_rules(locals()),
                 *build_files.rules(),
                 *fs.rules(),
+                *dep_rules.rules(),
                 *desktop.rules(),
+                *git_rules(),
                 *graph.rules(),
-                *uuid.rules(),
+                *specs_rules.rules(),
                 *options_parsing.rules(),
                 *process.rules(),
-                *platform.rules(),
+                *environments.rules(),
+                *system_binaries.rules(),
+                *platform_rules.rules(),
                 *changed_rules(),
+                *streaming_workunit_handler_rules(),
                 *specs_calculator.rules(),
+                *synthetic_targets.rules(),
                 *rules,
             )
         )
+
         goal_map = EngineInitializer._make_goal_map_from_rules(rules)
+
+        union_membership = UnionMembership.from_rules(
+            (
+                *build_configuration.union_rules,
+                *(r for r in rules if isinstance(r, UnionRule)),
+            )
+        )
+
+        # param types for goals with the `USES_ENVIRONMENT` behaviour (see `goal.py`)
+        environment_selecting_goal_param_types = [
+            t for t in GraphSession.goal_param_types if t != EnvironmentName
+        ]
         rules = FrozenOrderedSet(
             (
                 *rules,
                 # Install queries for each Goal.
                 *(
-                    QueryRule(goal_type, GraphSession.goal_param_types)
+                    QueryRule(
+                        goal_type,
+                        environment_selecting_goal_param_types
+                        if goal_type._selects_environments()
+                        else GraphSession.goal_param_types,
+                    )
                     for goal_type in goal_map.values()
+                ),
+                # Install queries for each request/response pair used by the BSP support.
+                # Note: These are necessary because the BSP support is a built-in goal that makes
+                # synchronous requests into the engine.
+                *(
+                    QueryRule(impl.response_type, (impl.request_type, Workspace, EnvironmentName))
+                    for impl in union_membership.get(BSPHandlerMapping)
                 ),
                 QueryRule(Snapshot, [PathGlobs]),  # Used by the SchedulerService.
             )
@@ -261,25 +328,26 @@ class EngineInitializer:
         def ensure_absolute_path(v: str) -> str:
             return Path(v).resolve().as_posix()
 
-        def ensure_optional_absolute_path(v: Optional[str]) -> Optional[str]:
+        def ensure_optional_absolute_path(v: str | None) -> str | None:
             if v is None:
                 return None
             return ensure_absolute_path(v)
 
         scheduler = Scheduler(
-            native=native,
             ignore_patterns=pants_ignore_patterns,
             use_gitignore=use_gitignore,
-            build_root=build_root,
-            local_store_dir=ensure_absolute_path(local_store_dir),
+            build_root=build_root_path,
             local_execution_root_dir=ensure_absolute_path(local_execution_root_dir),
             named_caches_dir=ensure_absolute_path(named_caches_dir),
             ca_certs_path=ensure_optional_absolute_path(ca_certs_path),
             rules=rules,
             union_membership=union_membership,
+            executor=executor,
             execution_options=execution_options,
+            local_store_options=local_store_options,
             include_trace_on_error=include_trace_on_error,
-            visualize_to_dir=bootstrap_options.native_engine_visualize_to,
+            visualize_to_dir=engine_visualize_to,
+            watch_filesystem=watch_filesystem,
         )
 
         return GraphScheduler(scheduler, goal_map)

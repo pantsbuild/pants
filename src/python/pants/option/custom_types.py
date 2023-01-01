@@ -1,11 +1,14 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import inspect
 import os
 import re
+import shlex
 from enum import Enum
-from typing import Dict, Iterable, List, Optional, Pattern, Sequence, Type, Union
+from typing import Iterable, Pattern, Sequence
 
 from pants.option.errors import ParseError
 from pants.util.eval import parse_expression
@@ -23,11 +26,11 @@ class UnsetBool:
 
     def __init__(self) -> None:
         raise NotImplementedError(
-            "UnsetBool cannot be instantiated. It should only be used as a " "sentinel type."
+            "UnsetBool cannot be instantiated. It should only be used as a sentinel type."
         )
 
     @classmethod
-    def coerce_bool(cls, value: Optional[Union[Type["UnsetBool"], bool]], default: bool) -> bool:
+    def coerce_bool(cls, value: type[UnsetBool] | bool | None, default: bool) -> bool:
         if value is None:
             return default
         if value is cls:
@@ -98,6 +101,63 @@ def shell_str(s: str) -> str:
     return s
 
 
+def workspace_path(s: str) -> str:
+    """Same type as 'str', but indicates string represents a directory path that is relative to
+    either the build root, or a BUILD file if prefix with `./`.
+
+    :API: public
+    """
+    if s.startswith("/"):
+        raise ParseError(
+            f"Invalid value: `{s}`. Expected a relative path, optionally in the form "
+            "`./relative/path` to make it relative to the BUILD files rather than the build root."
+        )
+    return s
+
+
+def memory_size(s: str | int | float) -> int:
+    """A string that normalizes the suffixes {GiB, MiB, KiB, B} into the number of bytes.
+
+    :API: public
+    """
+    if isinstance(s, (int, float)):
+        return int(s)
+    if not s:
+        raise ParseError("Missing value.")
+
+    original = s
+    s = s.lower().strip()
+
+    try:
+        return int(float(s))
+    except ValueError:
+        pass
+
+    invalid = ParseError(
+        f"Invalid value: `{original}`. Expected either a bare number or a number with one of "
+        f"`GiB`, `MiB`, `KiB`, or `B`."
+    )
+
+    def convert_to_bytes(power_of_2) -> int:
+        try:
+            return int(float(s[:-3]) * (2**power_of_2))  # type: ignore[index]
+        except TypeError:
+            raise invalid
+
+    if s.endswith("gib"):
+        return convert_to_bytes(30)
+    elif s.endswith("mib"):
+        return convert_to_bytes(20)
+    elif s.endswith("kib"):
+        return convert_to_bytes(10)
+    elif s.endswith("b"):
+        try:
+            return int(float(s[:-1]))
+        except TypeError:
+            raise invalid
+    raise invalid
+
+
 def _convert(val, acceptable_types):
     """Ensure that val is one of the acceptable types, converting it if needed.
 
@@ -109,7 +169,10 @@ def _convert(val, acceptable_types):
     """
     if isinstance(val, acceptable_types):
         return val
-    return parse_expression(val, acceptable_types, raise_type=ParseError)
+    try:
+        return parse_expression(val, acceptable_types)
+    except ValueError as e:
+        raise ParseError(str(e)) from e
 
 
 def _convert_list(val, member_type, is_enum):
@@ -117,6 +180,14 @@ def _convert_list(val, member_type, is_enum):
     if not is_enum:
         return converted
     return [item if isinstance(item, member_type) else member_type(item) for item in converted]
+
+
+def _flatten_shlexed_list(shlexed_args: Sequence[str]) -> list[str]:
+    """Convert a list of shlexed args into a flattened list of individual args.
+
+    For example, ['arg1 arg2=foo', '--arg3'] would be converted to ['arg1', 'arg2=foo', '--arg3'].
+    """
+    return [arg for shlexed_arg in shlexed_args for arg in shlex.split(shlexed_arg)]
 
 
 class ListValueComponent:
@@ -149,14 +220,14 @@ class ListValueComponent:
         return re.compile(r"(?<=\]|\))\s*,\s*(?=[+-](?:\[|\())")
 
     @classmethod
-    def _split_modifier_expr(cls, s: str) -> List[str]:
+    def _split_modifier_expr(cls, s: str) -> list[str]:
         # This check ensures that the first expression (before the first split point) is a modification.
         if s.startswith("+") or s.startswith("-"):
             return cls._get_modifier_expr_re().split(s)
         return [s]
 
     @classmethod
-    def merge(cls, components: Iterable["ListValueComponent"]) -> "ListValueComponent":
+    def merge(cls, components: Iterable[ListValueComponent]) -> ListValueComponent:
         """Merges components into a single component, applying their actions appropriately.
 
         This operation is associative:  M(M(a, b), c) == M(a, M(b, c)) == M(a, b, c).
@@ -178,13 +249,13 @@ class ListValueComponent:
                 raise ParseError(f"Unknown action for list value: {component._action}")
         return cls(action, appends, filters)
 
-    def __init__(self, action: str, appends: List, filters: List) -> None:
+    def __init__(self, action: str, appends: list, filters: list) -> None:
         self._action = action
         self._appends = appends
         self._filters = filters
 
     @property
-    def val(self) -> List:
+    def val(self) -> list:
         ret = list(self._appends)
         for x in self._filters:
             # Note: can't do ret.remove(x) because that only removes the first instance of x.
@@ -196,7 +267,7 @@ class ListValueComponent:
         return self._action
 
     @classmethod
-    def create(cls, value, member_type=str) -> "ListValueComponent":
+    def create(cls, value, member_type=str) -> ListValueComponent:
         """Interpret value as either a list or something to extend another list with.
 
         Note that we accept tuple literals, but the internal value is always a list.
@@ -206,6 +277,9 @@ class ListValueComponent:
                       indicating modification instead of replacement), or any allowed member_type.
                       May also be a comma-separated sequence of modifications.
         """
+        if isinstance(value, cls):  # Ensure idempotency.
+            return value
+
         if isinstance(value, bytes):
             value = value.decode()
 
@@ -218,11 +292,7 @@ class ListValueComponent:
         appends: Sequence[str] = []
         filters: Sequence[str] = []
         is_enum = inspect.isclass(member_type) and issubclass(member_type, Enum)
-        if isinstance(value, cls):  # Ensure idempotency.
-            action = value._action
-            appends = value._appends
-            filters = value._filters
-        elif isinstance(value, (list, tuple)):  # Ensure we can handle list-typed default values.
+        if isinstance(value, (list, tuple)):  # Ensure we can handle list-typed default values.
             action = cls.REPLACE
             appends = value
         elif value.startswith("[") or value.startswith("("):
@@ -238,6 +308,11 @@ class ListValueComponent:
             appends = [value]
         else:
             appends = _convert(f"[{value}]", list)
+
+        if member_type == shell_str:
+            appends = _flatten_shlexed_list(appends)
+            filters = _flatten_shlexed_list(filters)
+
         return cls(action, list(appends), list(filters))
 
     def __repr__(self) -> str:
@@ -257,7 +332,7 @@ class DictValueComponent:
     EXTEND = "EXTEND"
 
     @classmethod
-    def merge(cls, components: Iterable["DictValueComponent"]) -> "DictValueComponent":
+    def merge(cls, components: Iterable[DictValueComponent]) -> DictValueComponent:
         """Merges components into a single component, applying their actions appropriately.
 
         This operation is associative:  M(M(a, b), c) == M(a, M(b, c)) == M(a, b, c).
@@ -276,12 +351,12 @@ class DictValueComponent:
                 raise ParseError(f"Unknown action for dict value: {component.action}")
         return cls(action, val)
 
-    def __init__(self, action: str, val: Dict) -> None:
+    def __init__(self, action: str, val: dict) -> None:
         self.action = action
         self.val = val
 
     @classmethod
-    def create(cls, value) -> "DictValueComponent":
+    def create(cls, value) -> DictValueComponent:
         """Interpret value as either a dict or something to extend another dict with.
 
         :param value: The value to convert.  Can be an instance of DictValueComponent, a dict,

@@ -4,62 +4,42 @@
 from dataclasses import dataclass
 from typing import Tuple
 
-from pants.core.util_rules.pants_environment import PantsEnvironment
-from pants.engine.rules import collect_rules, rule
+from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
+from pants.engine.rules import Get, collect_rules, rule
+from pants.option.option_types import StrListOption
 from pants.option.subsystem import Subsystem
+from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
-
-# Names of env vars that can be set on all subprocesses via config.
-SETTABLE_ENV_VARS = (
-    # Customarily used to control i18n settings.
-    "LANG",
-    "LC_CTYPE",
-    "LC_ALL",
-    # Customarily used to control proxy settings in various processes.
-    "http_proxy",
-    "https_proxy",
-    "ftp_proxy",
-    "all_proxy",
-    "no_proxy",
-    "HTTP_PROXY",
-    "HTTPS_PROXY",
-    "FTP_PROXY",
-    "ALL_PROXY",
-    "NO_PROXY",
-    # Allow Requests to verify SSL certificates for HTTPS requests
-    # https://requests.readthedocs.io/en/master/user/advanced/#ssl-cert-verification
-    "REQUESTS_CA_BUNDLE",
-)
+from pants.util.strutil import softwrap
 
 
 # TODO: We may want to support different sets of env vars for different types of process.
 #  Can be done via scoped subsystems, possibly.  However we should only do this if there
 #  is a real need.
 class SubprocessEnvironment(Subsystem):
-    """Environment settings for forked subprocesses."""
-
     options_scope = "subprocess-environment"
+    help = "Environment settings for forked subprocesses."
 
-    @classmethod
-    def register_options(cls, register):
-        super().register_options(register)
-        register(
-            "--env-vars",
-            type=list,
-            member_type=str,
-            default=["LANG", "LC_CTYPE", "LC_ALL"],
-            advanced=True,
-            help=(
-                "Environment variables to set for process invocations. "
-                "Entries are either strings in the form `ENV_VAR=value` to set an explicit value; "
-                "or just `ENV_VAR` to copy the value from Pants's own environment.\n\nEach ENV_VAR "
-                f"must be one of {', '.join(f'`{v}`' for v in SETTABLE_ENV_VARS)}."
+    class EnvironmentAware:
+        _env_vars = StrListOption(
+            default=["LANG", "LC_CTYPE", "LC_ALL", "SSL_CERT_FILE", "SSL_CERT_DIR"],
+            help=softwrap(
+                f"""
+                Environment variables to set for process invocations.
+
+                Entries are either strings in the form `ENV_VAR=value` to set an explicit value;
+                or just `ENV_VAR` to copy the value from Pants's own environment.
+
+                See {doc_url('options#addremove-semantics')} for how to add and remove Pants's
+                default for this option.
+                """
             ),
+            advanced=True,
         )
 
-    @property
-    def env_vars_to_pass_to_subprocesses(self) -> Tuple[str, ...]:
-        return tuple(sorted(set(self.options.env_vars)))
+        @property
+        def env_vars_to_pass_to_subprocesses(self) -> Tuple[str, ...]:
+            return tuple(sorted(set(self._env_vars)))
 
 
 @dataclass(frozen=True)
@@ -68,12 +48,12 @@ class SubprocessEnvironmentVars:
 
 
 @rule
-def get_subprocess_environment(
-    subproc_env: SubprocessEnvironment, pants_env: PantsEnvironment
+async def get_subprocess_environment(
+    subproc_env: SubprocessEnvironment.EnvironmentAware,
 ) -> SubprocessEnvironmentVars:
     return SubprocessEnvironmentVars(
-        pants_env.get_subset(
-            subproc_env.env_vars_to_pass_to_subprocesses, allowed=SETTABLE_ENV_VARS
+        await Get(
+            EnvironmentVars, EnvironmentVarsRequest(subproc_env.env_vars_to_pass_to_subprocesses)
         )
     )
 

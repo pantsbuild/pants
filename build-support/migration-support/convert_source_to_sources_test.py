@@ -14,9 +14,9 @@ from pants.util.contextutil import temporary_dir
     "line",
     [
         "sources=['foo.py'],",
-        "sources= ('foo.py', ),"
-        "sources = {'foo.py'},"
-        "sources =['*.py'],"
+        "sources= ('foo.py', ),",
+        "sources = {'foo.py'},",
+        "sources =['*.py'],",
         'sources =["!ignore.java"],',
         'sources   =    (    "!ignore.java",   )',
         '     sources=[""]',

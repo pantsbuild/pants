@@ -10,9 +10,7 @@
   clippy::if_not_else,
   clippy::needless_continue,
   clippy::unseparated_literal_suffix,
-  // TODO: Falsely triggers for async/await:
-  //   see https://github.com/rust-lang/rust-clippy/issues/5360
-  // clippy::used_underscore_binding
+  clippy::used_underscore_binding
 )]
 // It is often more clear to show that nothing is being moved.
 #![allow(clippy::match_ref_pats)]
@@ -27,28 +25,31 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
+use std::fmt;
+use std::io::{self, Write};
+use std::str::FromStr;
+
 use byteorder::ByteOrder;
+use deepsize::DeepSizeOf;
 use digest::consts::U32;
 use generic_array::GenericArray;
 use serde::de::{MapAccess, Visitor};
-use serde::export::fmt::Error;
-use serde::export::Formatter;
 use serde::ser::{Serialize, SerializeStruct, Serializer};
 use serde::{Deserialize, Deserializer};
 use sha2::{Digest as Sha256Digest, Sha256};
-
-use std::fmt;
-use std::io::{self, Write};
 
 pub const EMPTY_FINGERPRINT: Fingerprint = Fingerprint([
   0xe3, 0xb0, 0xc4, 0x42, 0x98, 0xfc, 0x1c, 0x14, 0x9a, 0xfb, 0xf4, 0xc8, 0x99, 0x6f, 0xb9, 0x24,
   0x27, 0xae, 0x41, 0xe4, 0x64, 0x9b, 0x93, 0x4c, 0xa4, 0x95, 0x99, 0x1b, 0x78, 0x52, 0xb8, 0x55,
 ]);
-pub const EMPTY_DIGEST: Digest = Digest(EMPTY_FINGERPRINT, 0);
+pub const EMPTY_DIGEST: Digest = Digest {
+  hash: EMPTY_FINGERPRINT,
+  size_bytes: 0,
+};
 
 pub const FINGERPRINT_SIZE: usize = 32;
 
-#[derive(Clone, Copy, Eq, Hash, PartialEq, Ord, PartialOrd)]
+#[derive(Clone, Copy, DeepSizeOf, Eq, Hash, PartialEq, Ord, PartialOrd)]
 pub struct Fingerprint(pub [u8; FINGERPRINT_SIZE]);
 
 impl Fingerprint {
@@ -79,6 +80,7 @@ impl Fingerprint {
     &self.0
   }
 
+  #[allow(clippy::wrong_self_convention)]
   pub fn to_hex(&self) -> String {
     let mut s = String::new();
     for &byte in &self.0 {
@@ -133,7 +135,7 @@ impl<'de> Deserialize<'de> for Fingerprint {
     impl<'de> Visitor<'de> for FingerprintVisitor {
       type Value = Fingerprint;
 
-      fn expecting(&self, formatter: &mut Formatter) -> Result<(), Error> {
+      fn expecting(&self, formatter: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         formatter.write_str("struct Fingerprint")
       }
 
@@ -154,6 +156,22 @@ impl<'de> Deserialize<'de> for Fingerprint {
   }
 }
 
+impl FromStr for Fingerprint {
+  type Err = String;
+
+  fn from_str(s: &str) -> Result<Self, Self::Err> {
+    Fingerprint::from_hex_string(s)
+  }
+}
+
+impl TryFrom<&str> for Fingerprint {
+  type Error = String;
+
+  fn try_from(s: &str) -> Result<Self, Self::Error> {
+    Fingerprint::from_hex_string(s)
+  }
+}
+
 ///
 /// A Digest is a fingerprint, as well as the size in bytes of the plaintext for which that is the
 /// fingerprint.
@@ -161,8 +179,11 @@ impl<'de> Deserialize<'de> for Fingerprint {
 /// It is equivalent to a Bazel Remote Execution Digest, but without the overhead (and awkward API)
 /// of needing to create an entire protobuf to pass around the two fields.
 ///
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub struct Digest(pub Fingerprint, pub usize);
+#[derive(Clone, Copy, Debug, DeepSizeOf, Eq, Hash, PartialEq)]
+pub struct Digest {
+  pub hash: Fingerprint,
+  pub size_bytes: usize,
+}
 
 impl Serialize for Digest {
   fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -170,8 +191,8 @@ impl Serialize for Digest {
     S: Serializer,
   {
     let mut obj = serializer.serialize_struct("digest", 2)?;
-    obj.serialize_field("fingerprint", &self.0)?;
-    obj.serialize_field("size_bytes", &self.1)?;
+    obj.serialize_field("fingerprint", &self.hash)?;
+    obj.serialize_field("size_bytes", &self.size_bytes)?;
     obj.end()
   }
 }
@@ -223,7 +244,7 @@ impl<'de> Deserialize<'de> for Digest {
         }
         let fingerprint = fingerprint.ok_or_else(|| de::Error::missing_field("fingerprint"))?;
         let size_bytes = size_bytes.ok_or_else(|| de::Error::missing_field("size_bytes"))?;
-        Ok(Digest(fingerprint, size_bytes))
+        Ok(Digest::new(fingerprint, size_bytes))
       }
     }
 
@@ -233,11 +254,15 @@ impl<'de> Deserialize<'de> for Digest {
 }
 
 impl Digest {
+  pub fn new(hash: Fingerprint, size_bytes: usize) -> Digest {
+    Digest { hash, size_bytes }
+  }
+
   pub fn of_bytes(bytes: &[u8]) -> Self {
     let mut hasher = Sha256::default();
     hasher.update(bytes);
 
-    Digest(Fingerprint::from_bytes(hasher.finalize()), bytes.len())
+    Digest::new(Fingerprint::from_bytes(hasher.finalize()), bytes.len())
   }
 }
 
@@ -264,7 +289,7 @@ impl<W: Write> WriterHasher<W> {
   ///
   pub fn finish(self) -> (Digest, W) {
     (
-      Digest(
+      Digest::new(
         Fingerprint::from_bytes(self.hasher.finalize()),
         self.byte_count,
       ),

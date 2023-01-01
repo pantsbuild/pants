@@ -5,13 +5,14 @@ import pytest
 
 from pants.backend.project_info import count_loc
 from pants.backend.project_info.count_loc import CountLinesOfCode
-from pants.backend.python.target_types import PythonLibrary
+from pants.backend.python import target_types_rules
+from pants.backend.python.target_types import PythonSourcesGeneratorTarget
 from pants.core.util_rules import external_tool
-from pants.engine.target import Sources, Target
+from pants.engine.target import MultipleSourcesField, Target
 from pants.testutil.rule_runner import GoalRuleResult, RuleRunner
 
 
-class ElixirSources(Sources):
+class ElixirSources(MultipleSourcesField):
     default = ("*.ex",)
 
 
@@ -23,8 +24,12 @@ class ElixirTarget(Target):
 @pytest.fixture
 def rule_runner() -> RuleRunner:
     return RuleRunner(
-        rules=[*count_loc.rules(), *external_tool.rules()],
-        target_types=[PythonLibrary, ElixirTarget],
+        rules=[
+            *count_loc.rules(),
+            *external_tool.rules(),
+            *target_types_rules.rules(),
+        ],
+        target_types=[PythonSourcesGeneratorTarget, ElixirTarget],
     )
 
 
@@ -49,28 +54,29 @@ def assert_counts(
 
 def test_count_loc(rule_runner: RuleRunner) -> None:
     py_dir = "src/py/foo"
-    rule_runner.create_file(
-        f"{py_dir}/foo.py", '# A comment.\n\nprint("some code")\n# Another comment.'
-    )
-    rule_runner.create_file(f"{py_dir}/bar.py", '# A comment.\n\nprint("some more code")')
-    rule_runner.add_to_build_file(py_dir, "python_library()")
-
     elixir_dir = "src/elixir/foo"
-    rule_runner.create_file(f"{elixir_dir}/foo.ex", 'IO.puts("Some elixir")\n# A comment')
-    rule_runner.create_file(
-        f"{elixir_dir}/ignored.ex", "# We do not expect this file to appear in counts."
+    rule_runner.write_files(
+        {
+            f"{py_dir}/foo.py": '# A comment.\n\nprint("some code")\n# Another comment.',
+            f"{py_dir}/bar.py": '# A comment.\n\nprint("some more code")',
+            f"{py_dir}/BUILD": "python_sources(name='lib')",
+            f"{elixir_dir}/foo.ex": 'IO.puts("Some elixir")\n# A comment',
+            f"{elixir_dir}/ignored.ex": "# We do not expect this file to appear in counts.",
+            f"{elixir_dir}/BUILD": "elixir(name='lib', sources=['foo.ex'])",
+        }
     )
-    rule_runner.add_to_build_file(elixir_dir, "elixir(sources=['foo.ex'])")
-
-    result = rule_runner.run_goal_rule(CountLinesOfCode, args=[py_dir, elixir_dir])
+    result = rule_runner.run_goal_rule(
+        CountLinesOfCode, args=[f"{py_dir}:lib", f"{elixir_dir}:lib"]
+    )
     assert result.exit_code == 0
     assert_counts(result.stdout, "Python", num_files=2, blank=2, comment=3, code=2)
     assert_counts(result.stdout, "Elixir", comment=1, code=1)
 
 
 def test_passthrough_args(rule_runner: RuleRunner) -> None:
-    rule_runner.create_file("foo.py", "print('hello world!')\n")
-    rule_runner.add_to_build_file("", "python_library(name='foo')")
+    rule_runner.write_files(
+        {"foo.py": "print('hello world!')\n", "BUILD": "python_sources(name='foo')"}
+    )
     result = rule_runner.run_goal_rule(CountLinesOfCode, args=["//:foo", "--", "--no-cocomo"])
     assert result.exit_code == 0
     assert_counts(result.stdout, "Python", code=1)
@@ -80,8 +86,12 @@ def test_passthrough_args(rule_runner: RuleRunner) -> None:
 def test_files_without_owners(rule_runner: RuleRunner) -> None:
     """cloc works on any readable file in the build root, regardless of whether it's declared in a
     BUILD file."""
-    rule_runner.create_file("test/foo.ex", 'IO.puts("im a free thinker!")')
-    rule_runner.create_file("test/foo.hs", 'main = putStrLn "Whats Pants, precious?"')
+    rule_runner.write_files(
+        {
+            "test/foo.ex": 'IO.puts("im a free thinker!")',
+            "test/foo.hs": 'main = putStrLn "Whats Pants, precious?"',
+        }
+    )
     result = rule_runner.run_goal_rule(CountLinesOfCode, args=["test/foo.*"])
     assert result.exit_code == 0
     assert_counts(result.stdout, "Elixir", code=1)
@@ -90,6 +100,6 @@ def test_files_without_owners(rule_runner: RuleRunner) -> None:
 
 def test_no_sources_exits_gracefully(rule_runner: RuleRunner) -> None:
     py_dir = "src/py/foo"
-    rule_runner.add_to_build_file(py_dir, "python_library(sources=[])")
-    result = rule_runner.run_goal_rule(CountLinesOfCode, args=[py_dir])
+    rule_runner.write_files({f"{py_dir}/BUILD": "python_sources(name='lib')"})
+    result = rule_runner.run_goal_rule(CountLinesOfCode, args=[f"{py_dir}:lib"])
     assert result == GoalRuleResult.noop()

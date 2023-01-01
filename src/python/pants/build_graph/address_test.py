@@ -1,131 +1,183 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import warnings
-from typing import Optional
+from __future__ import annotations
 
 import pytest
 
-from pants.build_graph.address import Address, AddressInput, InvalidSpecPath, InvalidTargetName
-
-
-def assert_address_input_parsed(
-    spec: str,
-    *,
-    path_component: str,
-    target_component: Optional[str],
-    relative_to: Optional[str] = None
-) -> None:
-    ai = AddressInput.parse(spec, relative_to=relative_to)
-    assert ai.path_component == path_component
-    if target_component is None:
-        assert ai.target_component is None
-    else:
-        assert ai.target_component == target_component
+from pants.build_graph.address import (
+    Address,
+    AddressInput,
+    AddressParseException,
+    InvalidParametersError,
+    InvalidSpecPathError,
+    InvalidTargetNameError,
+    UnsupportedWildcardError,
+)
+from pants.util.frozendict import FrozenDict
 
 
 def test_address_input_parse_spec() -> None:
-    assert_address_input_parsed("a/b/c", path_component="a/b/c", target_component=None)
-    assert_address_input_parsed("a/b/c:c", path_component="a/b/c", target_component="c")
-    # The relative_to has no effect because we have a path.
-    assert_address_input_parsed(
-        "a/b/c", relative_to="here", path_component="a/b/c", target_component=None
+    def assert_parsed(
+        spec: str,
+        *,
+        path_component: str,
+        target_component: str | None = None,
+        parameters: dict[str, str] | None = None,
+        generated_component: str | None = None,
+        relative_to: str | None = None,
+    ) -> None:
+        ai = AddressInput.parse(spec, relative_to=relative_to, description_of_origin="tests")
+        assert ai.path_component == path_component
+        if target_component is None:
+            assert ai.target_component is None
+        else:
+            assert ai.target_component == target_component
+        assert ai.parameters == FrozenDict(parameters or {})
+        if generated_component is None:
+            assert ai.generated_component is None
+        else:
+            assert ai.generated_component == generated_component
+
+    assert_parsed("a/b/c", path_component="a/b/c")
+    assert_parsed("a/b/c:c", path_component="a/b/c", target_component="c")
+    assert_parsed("a/b/c#gen", path_component="a/b/c", generated_component="gen")
+    assert_parsed(
+        "a/b/c:c#gen", path_component="a/b/c", target_component="c", generated_component="gen"
     )
+    # The relative_to has no effect because we have a path.
+    assert_parsed("a/b/c", relative_to="here", path_component="a/b/c")
 
     # Relative address spec
-    assert_address_input_parsed(":c", path_component="", target_component="c")
-    assert_address_input_parsed(
-        ":c", relative_to="here", path_component="here", target_component="c"
+    assert_parsed(":c", path_component="", target_component="c")
+    assert_parsed(":c", relative_to="here", path_component="here", target_component="c")
+    assert_parsed("#gen", relative_to="here", path_component="here", generated_component="gen")
+    assert_parsed(
+        ":c#gen",
+        relative_to="here",
+        path_component="here",
+        target_component="c",
+        generated_component="gen",
     )
-    assert_address_input_parsed("//:c", relative_to="here", path_component="", target_component="c")
+    assert_parsed("//:c", relative_to="here", path_component="", target_component="c")
+    assert_parsed(
+        "//:c#gen",
+        relative_to="here",
+        path_component="",
+        target_component="c",
+        generated_component="gen",
+    )
+
+    # Parameters
+    assert_parsed("a@k=v", path_component="a", parameters={"k": "v"})
+    assert_parsed("a@k1=v1,k2=v2", path_component="a", parameters={"k1": "v1", "k2": "v2"})
+    assert_parsed(
+        "a#gen@k1=v1", generated_component="gen", path_component="a", parameters={"k1": "v1"}
+    )
+    assert_parsed("a@t", path_component="a@t")
+    assert_parsed("a@=", path_component="a@=")
+    assert_parsed("a@t,y", path_component="a@t,y")
+    assert_parsed("a@2.png:../t", path_component="a@2.png", target_component="../t")
 
     # Absolute spec
-    assert_address_input_parsed("//a/b/c", path_component="a/b/c", target_component=None)
-    assert_address_input_parsed("//a/b/c:c", path_component="a/b/c", target_component="c")
-    assert_address_input_parsed("//:c", path_component="", target_component="c")
-    assert_address_input_parsed("//:c", relative_to="here", path_component="", target_component="c")
+    assert_parsed("//a/b/c", path_component="a/b/c")
+    assert_parsed("//a/b/c:c", path_component="a/b/c", target_component="c")
+    assert_parsed("//:c", path_component="", target_component="c")
+    assert_parsed("//:c", relative_to="here", path_component="", target_component="c")
 
     # Files
-    assert_address_input_parsed("f.txt", path_component="f.txt", target_component=None)
-    assert_address_input_parsed("//f.txt", path_component="f.txt", target_component=None)
-    assert_address_input_parsed("a/b/c.txt", path_component="a/b/c.txt", target_component=None)
-    assert_address_input_parsed("a/b/c.txt:tgt", path_component="a/b/c.txt", target_component="tgt")
-    assert_address_input_parsed(
-        "a/b/c.txt:../tgt", path_component="a/b/c.txt", target_component="../tgt"
-    )
-    assert_address_input_parsed(
-        "//a/b/c.txt:tgt", path_component="a/b/c.txt", target_component="tgt"
-    )
-    assert_address_input_parsed(
-        "./f.txt", relative_to="here", path_component="here/f.txt", target_component=None
-    )
-    assert_address_input_parsed(
+    assert_parsed("f.txt", path_component="f.txt")
+    assert_parsed("//f.txt", path_component="f.txt")
+    assert_parsed("a/b/c.txt", path_component="a/b/c.txt")
+    assert_parsed("a/b/c.txt:tgt", path_component="a/b/c.txt", target_component="tgt")
+    assert_parsed("a/b/c.txt:../tgt", path_component="a/b/c.txt", target_component="../tgt")
+    assert_parsed("//a/b/c.txt:tgt", path_component="a/b/c.txt", target_component="tgt")
+    assert_parsed("./f.txt", relative_to="here", path_component="here/f.txt")
+    assert_parsed(
         "./subdir/f.txt:tgt",
         relative_to="here",
         path_component="here/subdir/f.txt",
         target_component="tgt",
     )
-    assert_address_input_parsed(
-        "subdir/f.txt", relative_to="here", path_component="subdir/f.txt", target_component=None
-    )
+    assert_parsed("subdir/f.txt", relative_to="here", path_component="subdir/f.txt")
+    assert_parsed("a/b/c.txt#gen", path_component="a/b/c.txt", generated_component="gen")
 
 
-def test_address_input_parse_bad_path_component() -> None:
-    def assert_bad_path_component(spec: str) -> None:
-        with pytest.raises(InvalidSpecPath):
-            AddressInput.parse(spec)
-
-    assert_bad_path_component("..")
-    assert_bad_path_component(".")
-
-    assert_bad_path_component("//..")
-    assert_bad_path_component("//.")
-
-    assert_bad_path_component("a/.")
-    assert_bad_path_component("a/..")
-    assert_bad_path_component("../a")
-    assert_bad_path_component("a/../a")
-
-    assert_bad_path_component("a/:a")
-    assert_bad_path_component("a/b/:b")
-
-    # Absolute paths are banned.
-    assert_bad_path_component("/a")
-    assert_bad_path_component("///a")
+@pytest.mark.parametrize(
+    "spec",
+    ["..", ".", "//..", "//.", "a/.", "a/..", "../a", "a/../a", "a/:a", "a/b/:b", "/a", "///a"],
+)
+def test_address_input_parse_bad_path_component(spec: str) -> None:
+    with pytest.raises(InvalidSpecPathError):
+        AddressInput.parse(spec, description_of_origin="tests")
 
 
-def test_address_bad_target_component() -> None:
-    def assert_bad_target_component(spec: str) -> None:
-        with pytest.raises(InvalidTargetName):
-            repr(AddressInput.parse(spec).dir_to_address())
-
-    # Missing target_component
-    assert_bad_target_component("")
-    assert_bad_target_component("a:")
-    assert_bad_target_component("a::")
-    assert_bad_target_component("//")
-    assert_bad_target_component("//:")
-
-    # Banned chars
-    assert_bad_target_component("//:@t")
-    assert_bad_target_component("//:!t")
-    assert_bad_target_component("//:?t")
-    assert_bad_target_component("//:=t")
-
-    # Deprecated banned chars. This should convert into an error in `2.2.0.dev1`.
-    with warnings.catch_warnings(record=True) as w:
-        AddressInput.parse(r"a:b\c").dir_to_address()
-        assert len(w) == 1
-        assert "deprecated" in str(w[0].message)
+@pytest.mark.parametrize(
+    "spec,expected",
+    [
+        ("a@t=,y", "one or more key=value pairs"),
+        ("a#", "non-empty generated target name"),
+    ],
+)
+def test_address_input_parse(spec: str, expected: str) -> None:
+    with pytest.raises(AddressParseException) as e:
+        AddressInput.parse(spec, description_of_origin="tests")
+    assert expected in str(e.value)
 
 
-def test_subproject_spec() -> None:
+@pytest.mark.parametrize(
+    "spec",
+    [
+        "",
+        "//",
+        "//:!t",
+        "//:?",
+        "//:=",
+        r"a:b\c",
+        "a:b/c",
+        "a:my#tgt#generated",
+    ],
+)
+def test_address_bad_target_component(spec: str) -> None:
+    with pytest.raises(InvalidTargetNameError):
+        AddressInput.parse(spec, description_of_origin="tests").dir_to_address()
+
+
+@pytest.mark.parametrize(
+    "spec",
+    [
+        "a::",
+        "a:",
+        "a:b:",
+        "a:b::",
+        "a#b:",
+    ],
+)
+def test_address_bad_wildcard(spec: str) -> None:
+    with pytest.raises(UnsupportedWildcardError):
+        AddressInput.parse(spec, description_of_origin="tests").dir_to_address()
+
+
+@pytest.mark.parametrize("spec", ["//:t#gen!", "//:t#gen?", "//:t#gen=", "//:t#gen#"])
+def test_address_generated_name(spec: str) -> None:
+    with pytest.raises(InvalidTargetNameError):
+        AddressInput.parse(spec, description_of_origin="tests").dir_to_address()
+
+
+@pytest.mark.parametrize("spec", ["//:t@k=#gen", "//:t@k#gen=v"])
+def test_address_invalid_params(spec: str) -> None:
+    with pytest.raises(InvalidParametersError):
+        AddressInput.parse(spec, description_of_origin="tests").dir_to_address()
+
+
+def test_address_input_subproject_spec() -> None:
     # Ensure that a spec referring to a subproject gets assigned to that subproject properly.
     def parse(spec, relative_to):
         return AddressInput.parse(
             spec,
             relative_to=relative_to,
             subproject_roots=["subprojectA", "path/to/subprojectB"],
+            description_of_origin="tests",
         )
 
     # Ensure that a spec in subprojectA is determined correctly.
@@ -169,39 +221,75 @@ def test_subproject_spec() -> None:
 
 
 def test_address_input_from_file() -> None:
-    assert AddressInput("a/b/c.txt", target_component=None).file_to_address() == Address(
-        "a/b", relative_file_path="c.txt"
-    )
-
-    assert AddressInput("a/b/c.txt", target_component="original").file_to_address() == Address(
-        "a/b", target_name="original", relative_file_path="c.txt"
-    )
-    assert AddressInput("a/b/c.txt", target_component="../original").file_to_address() == Address(
-        "a", target_name="original", relative_file_path="b/c.txt"
-    )
     assert AddressInput(
-        "a/b/c.txt", target_component="../../original"
+        "a/b/c.txt", target_component=None, description_of_origin="tests"
+    ).file_to_address() == Address("a/b", relative_file_path="c.txt")
+
+    assert AddressInput(
+        "a/b/c.txt", target_component="original", description_of_origin="tests"
+    ).file_to_address() == Address("a/b", target_name="original", relative_file_path="c.txt")
+    assert AddressInput(
+        "a/b/c.txt", target_component="../original", description_of_origin="tests"
+    ).file_to_address() == Address("a", target_name="original", relative_file_path="b/c.txt")
+    assert AddressInput(
+        "a/b/c.txt", target_component="../../original", description_of_origin="tests"
     ).file_to_address() == Address("", target_name="original", relative_file_path="a/b/c.txt")
 
     # These refer to targets "below" the file, which is illegal.
-    with pytest.raises(InvalidTargetName):
-        AddressInput("f.txt", target_component="subdir/tgt").file_to_address()
-    with pytest.raises(InvalidTargetName):
-        AddressInput("f.txt", target_component="subdir../tgt").file_to_address()
-    with pytest.raises(InvalidTargetName):
-        AddressInput("a/f.txt", target_component="../a/original").file_to_address()
+    with pytest.raises(InvalidTargetNameError):
+        AddressInput(
+            "f.txt", target_component="subdir/tgt", description_of_origin="tests"
+        ).file_to_address()
+    with pytest.raises(InvalidTargetNameError):
+        AddressInput(
+            "f.txt", target_component="subdir../tgt", description_of_origin="tests"
+        ).file_to_address()
+    with pytest.raises(InvalidTargetNameError):
+        AddressInput(
+            "a/f.txt", target_component="../a/original", description_of_origin="tests"
+        ).file_to_address()
 
     # Top-level files must include a target_name.
-    with pytest.raises(InvalidTargetName):
-        AddressInput("f.txt").file_to_address()
-    assert AddressInput("f.txt", target_component="tgt").file_to_address() == Address(
-        "", relative_file_path="f.txt", target_name="tgt"
-    )
+    with pytest.raises(InvalidTargetNameError):
+        AddressInput("f.txt", description_of_origin="tests").file_to_address()
+    assert AddressInput(
+        "f.txt", target_component="tgt", description_of_origin="tests"
+    ).file_to_address() == Address("", relative_file_path="f.txt", target_name="tgt")
 
 
 def test_address_input_from_dir() -> None:
-    assert AddressInput("a").dir_to_address() == Address("a")
-    assert AddressInput("a", target_component="b").dir_to_address() == Address("a", target_name="b")
+    assert AddressInput("a", description_of_origin="tests").dir_to_address() == Address("a")
+    assert AddressInput(
+        "a", target_component="b", description_of_origin="tests"
+    ).dir_to_address() == Address("a", target_name="b")
+    assert AddressInput(
+        "a", target_component="b", generated_component="gen", description_of_origin="tests"
+    ).dir_to_address() == Address("a", target_name="b", generated_name="gen")
+
+
+@pytest.mark.parametrize(
+    "addr,expected",
+    [
+        (AddressInput("dir", description_of_origin="tests"), "dir"),
+        (AddressInput("dir", "tgt", description_of_origin="tests"), "dir:tgt"),
+        (AddressInput("", "tgt", description_of_origin="tests"), "//:tgt"),
+        (AddressInput("dir", generated_component="gen", description_of_origin="tests"), "dir#gen"),
+        (
+            AddressInput("dir", "tgt", generated_component="gen", description_of_origin="tests"),
+            "dir#gen:tgt",
+        ),
+        (
+            AddressInput("dir", parameters={"k1": "v", "k2": "v"}, description_of_origin="tests"),
+            "dir@k1=v,k2=v",
+        ),
+        (
+            AddressInput("dir", "tgt", parameters={"k": "v"}, description_of_origin="tests"),
+            "dir:tgt@k=v",
+        ),
+    ],
+)
+def test_address_input_spec(addr: AddressInput, expected: str) -> None:
+    assert addr.spec == expected
 
 
 def test_address_normalize_target_name() -> None:
@@ -212,24 +300,32 @@ def test_address_normalize_target_name() -> None:
 
 
 def test_address_validate_build_in_spec_path() -> None:
-    with pytest.raises(InvalidSpecPath):
+    with pytest.raises(InvalidSpecPathError):
         Address("a/b/BUILD")
-    with pytest.raises(InvalidSpecPath):
+    with pytest.raises(InvalidSpecPathError):
         Address("a/b/BUILD.ext")
-    with pytest.raises(InvalidSpecPath):
+    with pytest.raises(InvalidSpecPathError):
         Address("a/b/BUILD", target_name="foo")
 
-    # It's fine to use BUILD in the relative_file_path or target_name, though.
+    # It's fine to use BUILD in the relative_file_path, target_name, or generated_name, though.
     assert Address("a/b", relative_file_path="BUILD").spec == "a/b/BUILD"
     assert Address("a/b", target_name="BUILD").spec == "a/b:BUILD"
+    assert Address("a/b", generated_name="BUILD").spec == "a/b#BUILD"
 
 
 def test_address_equality() -> None:
     assert "Not really an address" != Address("a/b", target_name="c")
 
+    assert Address("dir") == Address("dir")
+    assert Address("dir") == Address("dir", target_name="dir")
+    assert Address("dir") != Address("another_dir")
+
     assert Address("a/b", target_name="c") == Address("a/b", target_name="c")
     assert Address("a/b", target_name="c") != Address("a/b", target_name="d")
     assert Address("a/b", target_name="c") != Address("a/z", target_name="c")
+
+    assert Address("dir", generated_name="generated") == Address("dir", generated_name="generated")
+    assert Address("dir", generated_name="generated") != Address("dir", generated_name="foo")
 
     assert Address("a/b", target_name="c") != Address(
         "a/b", relative_file_path="c", target_name="original"
@@ -245,9 +341,37 @@ def test_address_spec() -> None:
         assert str(address) == expected
         assert address.path_safe_spec == expected_path_spec
 
-    assert_spec(Address("a/b"), expected="a/b", expected_path_spec="a.b")
+    assert_spec(Address("a/b"), expected="a/b:b", expected_path_spec="a.b")
+
     assert_spec(Address("a/b", target_name="c"), expected="a/b:c", expected_path_spec="a.b.c")
     assert_spec(Address("", target_name="root"), expected="//:root", expected_path_spec=".root")
+
+    assert_spec(
+        Address("a/b", generated_name="generated"),
+        expected="a/b#generated",
+        expected_path_spec="a.b@generated",
+    )
+    assert_spec(
+        Address("a/b", generated_name="generated/f.ext"),
+        expected="a/b#generated/f.ext",
+        expected_path_spec="a.b@generated.f.ext",
+    )
+    assert_spec(
+        Address("a/b", target_name="generator", generated_name="generated"),
+        expected="a/b:generator#generated",
+        expected_path_spec="a.b.generator@generated",
+    )
+    assert_spec(
+        Address("a/b", target_name="generator", generated_name="generated/f.ext"),
+        expected="a/b:generator#generated/f.ext",
+        expected_path_spec="a.b.generator@generated.f.ext",
+    )
+    assert_spec(
+        Address("", target_name="root", generated_name="generated"),
+        expected="//:root#generated",
+        expected_path_spec=".root@generated",
+    )
+
     assert_spec(
         Address("a/b", relative_file_path="c.txt", target_name="c"),
         expected="a/b/c.txt:c",
@@ -279,61 +403,150 @@ def test_address_spec() -> None:
         expected_path_spec="a.b.subdir.dir2.f.txt@@b",
     )
 
+    assert_spec(
+        Address("", target_name="template", parameters={"k1": "v", "k2": "v"}),
+        expected="//:template@k1=v,k2=v",
+        expected_path_spec=".template@@k1=v,k2=v",
+    )
+    assert_spec(
+        Address("a/b", parameters={"k1": "v", "k2": "v"}),
+        expected="a/b@k1=v,k2=v",
+        expected_path_spec="a.b@@k1=v,k2=v",
+    )
+    assert_spec(
+        Address("a/b", generated_name="gen", parameters={"k": "v"}),
+        expected="a/b#gen@k=v",
+        expected_path_spec="a.b@gen@@k=v",
+    )
+    assert_spec(
+        Address("a/b", relative_file_path="f.ext", parameters={"k": "v"}),
+        expected="a/b/f.ext@k=v",
+        expected_path_spec="a.b.f.ext@@k=v",
+    )
 
-def test_address_maybe_convert_to_build_target() -> None:
-    def assert_converts_to_base_target(generated_addr: Address, *, expected: Address) -> None:
-        assert generated_addr.maybe_convert_to_build_target() == expected
 
-    assert_converts_to_base_target(
+@pytest.mark.parametrize(
+    "params,expected", (({}, ""), ({"k": "v"}, "@k=v"), ({"k1": "v", "k2": "v"}, "@k1=v,k2=v"))
+)
+def test_address_parameters_repr(params: dict[str, str], expected: str) -> None:
+    assert Address("", target_name="foo", parameters=params).parameters_repr == expected
+
+
+def test_address_maybe_convert_to_target_generator() -> None:
+    def assert_converts(addr: Address, *, expected: Address) -> None:
+        assert addr.maybe_convert_to_target_generator() == expected
+
+    assert_converts(
+        Address(
+            "a/b",
+            target_name="c",
+            generated_name="generated",
+        ),
+        expected=Address("a/b", target_name="c"),
+    )
+    assert_converts(Address("a/b", generated_name="generated"), expected=Address("a/b"))
+    assert_converts(Address("a/b", generated_name="subdir/generated"), expected=Address("a/b"))
+
+    assert_converts(
         Address("a/b", relative_file_path="c.txt", target_name="c"),
         expected=Address("a/b", target_name="c"),
     )
-    assert_converts_to_base_target(
-        Address("a/b", relative_file_path="c.txt"), expected=Address("a/b")
-    )
-    assert_converts_to_base_target(
-        Address("a/b", relative_file_path="subdir/f.txt"), expected=Address("a/b")
-    )
-    assert_converts_to_base_target(
+    assert_converts(Address("a/b", relative_file_path="c.txt"), expected=Address("a/b"))
+    assert_converts(Address("a/b", relative_file_path="subdir/f.txt"), expected=Address("a/b"))
+    assert_converts(
         Address("a/b", relative_file_path="subdir/f.txt", target_name="original"),
         expected=Address("a/b", target_name="original"),
     )
 
-    def assert_base_target_noops(addr: Address) -> None:
-        assert addr.maybe_convert_to_build_target() is addr
+    def assert_noops(addr: Address) -> None:
+        assert addr.maybe_convert_to_target_generator() is addr
 
-    assert_base_target_noops(Address("a/b", target_name="c"))
-    assert_base_target_noops(Address("a/b"))
+    assert_noops(Address("a/b", target_name="c"))
+    assert_noops(Address("a/b"))
 
 
-def test_address_spec_to_address_input() -> None:
-    """This smoke tests that Address.spec <-> AddressInput.parse() is idempotent."""
-
-    def assert_conversion(address: Address, *, expected: AddressInput) -> None:
-        assert AddressInput.parse(address.spec) == expected
-
-    assert_conversion(Address("a/b/c"), expected=AddressInput("a/b/c"))
-    assert_conversion(Address("a/b/c", target_name="tgt"), expected=AddressInput("a/b/c", "tgt"))
-
-    assert_conversion(
-        Address("a/b/c", relative_file_path="f.txt"), expected=AddressInput("a/b/c/f.txt")
+def test_address_create_generated() -> None:
+    assert Address("dir", target_name="generator").create_generated("generated") == Address(
+        "dir", target_name="generator", generated_name="generated"
     )
-    assert_conversion(
-        Address("a/b/c", relative_file_path="f.txt", target_name="tgt"),
-        expected=AddressInput("a/b/c/f.txt", "tgt"),
-    )
+    with pytest.raises(AssertionError):
+        Address("", target_name="t", relative_file_path="f.ext").create_generated("gen")
+    with pytest.raises(AssertionError):
+        Address("", target_name="t", generated_name="gen").create_generated("gen")
 
-    assert_conversion(Address("", target_name="tgt"), expected=AddressInput("", "tgt"))
-    assert_conversion(
-        Address("", relative_file_path="f.txt", target_name="tgt"),
-        expected=AddressInput("f.txt", "tgt"),
-    )
 
-    assert_conversion(
-        Address("a/b/c", relative_file_path="subdir/f.txt"),
-        expected=AddressInput("a/b/c/subdir/f.txt", "../c"),
-    )
-    assert_conversion(
-        Address("a/b/c", relative_file_path="subdir/f.txt", target_name="tgt"),
-        expected=AddressInput("a/b/c/subdir/f.txt", "../tgt"),
-    )
+@pytest.mark.parametrize(
+    "addr,expected",
+    [
+        (
+            Address("a/b/c"),
+            AddressInput("a/b/c", target_component="c", description_of_origin="tests"),
+        ),
+        (
+            Address("a/b/c", target_name="tgt"),
+            AddressInput("a/b/c", "tgt", description_of_origin="tests"),
+        ),
+        (
+            Address("a/b/c", target_name="tgt", generated_name="gen"),
+            AddressInput("a/b/c", "tgt", generated_component="gen", description_of_origin="tests"),
+        ),
+        (
+            Address("a/b/c", target_name="tgt", generated_name="dir/gen"),
+            AddressInput(
+                "a/b/c", "tgt", generated_component="dir/gen", description_of_origin="tests"
+            ),
+        ),
+        (
+            Address("a/b/c", relative_file_path="f.txt"),
+            AddressInput("a/b/c/f.txt", description_of_origin="tests"),
+        ),
+        (
+            Address("a/b/c", relative_file_path="f.txt", target_name="tgt"),
+            AddressInput("a/b/c/f.txt", "tgt", description_of_origin="tests"),
+        ),
+        (Address("", target_name="tgt"), AddressInput("", "tgt", description_of_origin="tests")),
+        (
+            Address("", target_name="tgt", generated_name="gen"),
+            AddressInput("", "tgt", generated_component="gen", description_of_origin="tests"),
+        ),
+        (
+            Address("", target_name="tgt", relative_file_path="f.txt"),
+            AddressInput("f.txt", "tgt", description_of_origin="tests"),
+        ),
+        (
+            Address("a/b/c", relative_file_path="subdir/f.txt"),
+            AddressInput("a/b/c/subdir/f.txt", "../c", description_of_origin="tests"),
+        ),
+        (
+            Address("a/b/c", relative_file_path="subdir/f.txt", target_name="tgt"),
+            AddressInput("a/b/c/subdir/f.txt", "../tgt", description_of_origin="tests"),
+        ),
+        (
+            Address("", target_name="t", parameters={"k": "v"}),
+            AddressInput("", "t", parameters={"k": "v"}, description_of_origin="tests"),
+        ),
+        (
+            Address("", target_name="t", parameters={"k": "v"}, generated_name="gen"),
+            AddressInput(
+                "",
+                "t",
+                parameters={"k": "v"},
+                generated_component="gen",
+                description_of_origin="tests",
+            ),
+        ),
+        (
+            Address("", target_name="t", parameters={"k": ""}),
+            AddressInput("", "t", parameters={"k": ""}, description_of_origin="tests"),
+        ),
+        (
+            Address("", target_name="t", parameters={"k1": "v1", "k2": "v2"}),
+            AddressInput(
+                "", "t", parameters={"k1": "v1", "k2": "v2"}, description_of_origin="tests"
+            ),
+        ),
+    ],
+)
+def test_address_spec_to_address_input(addr: Address, expected: AddressInput) -> None:
+    """Check that Address.spec <-> AddressInput.parse() is idempotent."""
+    assert AddressInput.parse(addr.spec, description_of_origin="tests") == expected

@@ -1,6 +1,8 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 from enum import Enum
 from functools import total_ordering
@@ -19,21 +21,19 @@ class Rank(Enum):
 
     _rank: int
 
-    def __new__(cls, rank: int, display: str) -> "Rank":
-        member: "Rank" = object.__new__(cls)
+    def __new__(cls, rank: int, display: str) -> Rank:
+        member: Rank = object.__new__(cls)
         member._value_ = display
         member._rank = rank
         return member
 
-    def __lt__(self, other: Any) -> Union["NotImplemented", bool]:
+    def __lt__(self, other: Any) -> bool:
         if type(other) != Rank:
             return NotImplemented
         return self._rank < other._rank
 
 
 Value = Union[str, int, float, None, Dict, Enum, List]
-
-
 ValueAndDetails = Tuple[Optional[Value], Optional[str]]
 
 
@@ -80,7 +80,7 @@ class RankedValue:
         config_default_val: ValueAndDetails,
         hardcoded_val: ValueAndDetails,
         default: ValueAndDetails,
-    ) -> Iterator["RankedValue"]:
+    ) -> Iterator[RankedValue]:
         """Yield the non-None values from highest-ranked to lowest, as RankedValue instances."""
         if flag_val[0] is not None:
             yield RankedValue(Rank.FLAG, *flag_val)
@@ -96,4 +96,4 @@ class RankedValue:
 
     rank: Rank
     value: Value
-    details: Optional[str] = None  # Optional details about the derivation of the value.
+    details: str | None = None  # Optional details about the derivation of the value.

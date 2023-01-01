@@ -1,13 +1,12 @@
 // Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use std::collections::HashMap;
-use std::hash;
+use std::sync::atomic;
 
-use cpython::{ObjectProtocol, PyClone, PyErr, PyType, Python, PythonObject, ToPyObject};
+use pyo3::prelude::*;
+use pyo3::types::PyDict;
 
-use crate::core::{Key, TypeId, Value, FNV};
-use crate::externs;
+use crate::python::{Key, TypeId};
 
 ///
 /// A struct that encapsulates interning of python `Value`s as comparable `Key`s.
@@ -33,94 +32,38 @@ use crate::externs;
 ///      avoided doing this so far because it would hide a relatively expensive operation behind
 ///      those usually-inexpensive traits).
 ///
-#[derive(Default)]
+/// To avoid deadlocks, methods of Interns require that the GIL is held, and then explicitly release
+/// it before acquiring inner locks. That way we can guarantee that these locks are always acquired
+/// before the GIL (Value equality in particular might re-acquire it).
+///
 pub struct Interns {
-  forward_keys: HashMap<InternKey, Key, FNV>,
-  reverse_keys: HashMap<Key, Value, FNV>,
-  forward_types: HashMap<InternType, TypeId, FNV>,
-  reverse_types: HashMap<TypeId, PyType, FNV>,
-  id_generator: u64,
+  // A mapping between Python objects and integer ids.
+  keys: Py<PyDict>,
+  id_generator: atomic::AtomicU64,
 }
 
 impl Interns {
-  pub fn new() -> Interns {
-    Interns::default()
-  }
-
-  pub fn key_insert(&mut self, py: Python, v: Value) -> Result<Key, PyErr> {
-    let intern_key = InternKey(v.hash(py)?, v.to_py_object(py).into());
-
-    let key = if let Some(key) = self.forward_keys.get(&intern_key) {
-      *key
-    } else {
-      let id = self.id_generator;
-      self.id_generator += 1;
-      let key = Key::new(id, self.type_insert(py, v.get_type(py)));
-      self.forward_keys.insert(intern_key, key);
-      self.reverse_keys.insert(key, v);
-      key
-    };
-    Ok(key)
-  }
-
-  pub fn key_get(&self, k: &Key) -> &Value {
-    self
-      .reverse_keys
-      .get(&k)
-      .unwrap_or_else(|| panic!("Previously memoized object disappeared for {:?}", k))
-  }
-
-  pub fn type_insert(&mut self, py: Python, v: PyType) -> TypeId {
-    let intern_type = InternType(v.as_object().hash(py).unwrap(), v.clone_ref(py));
-
-    if let Some(type_id) = self.forward_types.get(&intern_type) {
-      *type_id
-    } else {
-      let id = self.id_generator;
-      self.id_generator += 1;
-      let type_id = TypeId(id);
-      self.forward_types.insert(intern_type, type_id);
-      self.reverse_types.insert(type_id, v);
-      type_id
+  pub fn new() -> Self {
+    Self {
+      keys: Python::with_gil(|py| PyDict::new(py).into()),
+      id_generator: atomic::AtomicU64::default(),
     }
   }
 
-  pub fn type_get(&self, k: &TypeId) -> &PyType {
-    self
-      .reverse_types
-      .get(&k)
-      .unwrap_or_else(|| panic!("Previously memoized object disappeared for {:?}", k))
-  }
-}
+  pub fn key_insert(&self, py: Python, v: PyObject) -> PyResult<Key> {
+    let (id, type_id): (u64, TypeId) = {
+      let v = v.as_ref(py);
+      let keys = self.keys.as_ref(py);
+      let id: u64 = if let Some(key) = keys.get_item(v) {
+        key.extract()?
+      } else {
+        let id = self.id_generator.fetch_add(1, atomic::Ordering::Relaxed);
+        keys.set_item(v, id)?;
+        id
+      };
+      (id, v.get_type().into())
+    };
 
-struct InternKey(isize, Value);
-
-impl Eq for InternKey {}
-
-impl PartialEq for InternKey {
-  fn eq(&self, other: &InternKey) -> bool {
-    externs::equals(&self.1, &other.1)
-  }
-}
-
-impl hash::Hash for InternKey {
-  fn hash<H: hash::Hasher>(&self, state: &mut H) {
-    self.0.hash(state);
-  }
-}
-
-struct InternType(isize, PyType);
-
-impl Eq for InternType {}
-
-impl PartialEq for InternType {
-  fn eq(&self, other: &InternType) -> bool {
-    self.1 == other.1
-  }
-}
-
-impl hash::Hash for InternType {
-  fn hash<H: hash::Hasher>(&self, state: &mut H) {
-    self.0.hash(state);
+    Ok(Key::new(id, type_id, v.into()))
   }
 }

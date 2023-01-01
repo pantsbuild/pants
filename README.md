@@ -16,19 +16,20 @@ Some noteworthy features include:
 
 Documentation: [www.pantsbuild.org](https://www.pantsbuild.org/).
 
-We release to [PyPI](https://pypi.org/pypi)
-[![version](https://img.shields.io/pypi/v/pantsbuild.pants.svg)](https://pypi.org/pypi/pantsbuild.pants)
-[![license](https://img.shields.io/pypi/l/pantsbuild.pants.svg)](https://pypi.org/pypi/pantsbuild.pants)
-
-We use [Travis CI](https://travis-ci.org) to verify the build
-[![Build Status](https://travis-ci.com/pantsbuild/pants.svg?branch=master)](https://travis-ci.com/pantsbuild/pants/branches).
-
 # Requirements
 
 To run Pants, you need:
 
 * Linux or macOS.
-* Python 3.6+ discoverable on your `PATH`.
-* A C compiler, system headers, Python headers (to compile native Python modules) and the `libffi`
- library and headers (to compile and link modules that use CFFI to access native code).
+* Python 3.7+ discoverable on your `PATH`.
+* A C compiler, system headers and Python headers (to compile native Python modules).
 * Internet access (so that Pants can fully bootstrap itself).
+
+# Credits
+
+We release to [PyPI](https://pypi.org/pypi)
+
+[![version](https://img.shields.io/pypi/v/pantsbuild.pants.svg)](https://pypi.org/pypi/pantsbuild.pants)
+[![license](https://img.shields.io/pypi/l/pantsbuild.pants.svg)](https://pypi.org/pypi/pantsbuild.pants)
+
+<img width="150" height="61" src="https://uploads-ssl.webflow.com/5ac3c046c82724970fc60918/5c019d917bba312af7553b49_MacStadium-developerlogo.png">

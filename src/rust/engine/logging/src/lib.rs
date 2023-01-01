@@ -10,9 +10,7 @@
   clippy::if_not_else,
   clippy::needless_continue,
   clippy::unseparated_literal_suffix,
-  // TODO: Falsely triggers for async/await:
-  //   see https://github.com/rust-lang/rust-clippy/issues/5360
-  // clippy::used_underscore_binding
+  clippy::used_underscore_binding
 )]
 // It is often more clear to show that nothing is being moved.
 #![allow(clippy::match_ref_pats)]
@@ -48,8 +46,6 @@ macro_rules! debug_log {
 }
 
 pub mod logger;
-
-pub use logger::{get_destination, scope_task_destination, set_thread_destination, Destination};
 
 pub type Logger = logger::PantsLogger;
 

@@ -3,76 +3,63 @@
 
 import itertools
 from pathlib import PurePath
-from typing import Iterable, cast
+from typing import Iterable
 
 from pants.base.build_root import BuildRoot
-from pants.engine.addresses import Address, Addresses, BuildFileAddress
+from pants.build_graph.address import BuildFileAddressRequest
+from pants.engine.addresses import Addresses, BuildFileAddress
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
 from pants.engine.target import (
     HydratedSources,
     HydrateSourcesRequest,
-    Sources,
+    SourcesField,
     Target,
-    Targets,
     TransitiveTargets,
     TransitiveTargetsRequest,
     UnexpandedTargets,
 )
+from pants.option.option_types import BoolOption
+from pants.util.strutil import softwrap
 
 
 class FiledepsSubsystem(LineOriented, GoalSubsystem):
-    """List all source and BUILD files a target depends on."""
-
     name = "filedeps"
+    help = "List all source and BUILD files a target depends on."
 
-    @classmethod
-    def register_options(cls, register):
-        super().register_options(register)
-        register(
-            "--absolute",
-            type=bool,
-            default=False,
-            help=(
-                "If True, output with absolute path. If unspecified, output with path relative to "
-                "the build root."
-            ),
-        )
-        register(
-            "--globs",
-            type=bool,
-            default=False,
-            help=(
-                "Instead of outputting filenames, output the original globs used in the BUILD "
-                "file. This will not include exclude globs (i.e. globs that start with `!`)."
-            ),
-        )
-        register(
-            "--transitive",
-            type=bool,
-            default=False,
-            help=(
-                "If True, list files from all dependencies, including transitive dependencies. If "
-                "unspecified, only list files from the target."
-            ),
-        )
-
-    @property
-    def absolute(self) -> bool:
-        return cast(bool, self.options.absolute)
-
-    @property
-    def globs(self) -> bool:
-        return cast(bool, self.options.globs)
-
-    @property
-    def transitive(self) -> bool:
-        return cast(bool, self.options.transitive)
+    absolute = BoolOption(
+        default=False,
+        help=softwrap(
+            """
+            If True, output with absolute path. If unspecified, output with path relative to
+            the build root.
+            """
+        ),
+    )
+    globs = BoolOption(
+        default=False,
+        help=softwrap(
+            """
+            Instead of outputting filenames, output the original globs used in the BUILD
+            file. This will not include exclude globs (i.e. globs that start with `!`).
+            """
+        ),
+    )
+    transitive = BoolOption(
+        default=False,
+        help=softwrap(
+            """
+            If True, list files from all dependencies, including transitive dependencies. If
+            unspecified, only list files from the target.
+            """
+        ),
+    )
 
 
 class Filedeps(Goal):
     subsystem_cls = FiledepsSubsystem
+    environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY
 
 
 @goal_rule
@@ -88,23 +75,28 @@ async def file_deps(
             TransitiveTargets, TransitiveTargetsRequest(addresses, include_special_cased_deps=True)
         )
         targets = transitive_targets.closure
-    elif filedeps_subsystem.globs:
-        targets = await Get(UnexpandedTargets, Addresses, addresses)
     else:
-        targets = await Get(Targets, Addresses, addresses)
+        # NB: We must preserve target generators, not replace with their generated targets.
+        targets = await Get(UnexpandedTargets, Addresses, addresses)
 
     build_file_addresses = await MultiGet(
-        Get(BuildFileAddress, Address, tgt.address) for tgt in targets
+        Get(
+            BuildFileAddress,
+            BuildFileAddressRequest(tgt.address, description_of_origin="CLI arguments"),
+        )
+        for tgt in targets
     )
     unique_rel_paths = {bfa.rel_path for bfa in build_file_addresses}
 
     if filedeps_subsystem.globs:
         unique_rel_paths.update(
-            itertools.chain.from_iterable(tgt.get(Sources).filespec["includes"] for tgt in targets)
+            itertools.chain.from_iterable(
+                tgt.get(SourcesField).filespec["includes"] for tgt in targets
+            )
         )
     else:
         all_hydrated_sources = await MultiGet(
-            Get(HydratedSources, HydrateSourcesRequest(tgt.get(Sources))) for tgt in targets
+            Get(HydratedSources, HydrateSourcesRequest(tgt.get(SourcesField))) for tgt in targets
         )
         unique_rel_paths.update(
             itertools.chain.from_iterable(

@@ -1,6 +1,7 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import atexit
 import datetime
 import faulthandler
 import logging
@@ -10,7 +11,7 @@ import sys
 import threading
 import traceback
 from contextlib import contextmanager
-from typing import Callable, Dict, Iterator, Optional
+from typing import Callable, Dict, Iterator
 
 import psutil
 import setproctitle
@@ -74,7 +75,6 @@ class SignalHandler:
             child_process.send_signal(received_signal)
 
     def handle_sigint(self, signum: int, _frame):
-        ExceptionSink._signal_sent = signum
         self._send_signal_to_children(signum, "SIGINT")
         raise KeyboardInterrupt("User interrupted execution with control-c!")
 
@@ -101,18 +101,21 @@ class SignalHandler:
                 )
 
     def handle_sigquit(self, signum, _frame):
-        ExceptionSink._signal_sent = signum
         self._send_signal_to_children(signum, "SIGQUIT")
         raise self.SignalHandledNonLocalExit(signum, "SIGQUIT")
 
     def handle_sigterm(self, signum, _frame):
-        ExceptionSink._signal_sent = signum
         self._send_signal_to_children(signum, "SIGTERM")
         raise self.SignalHandledNonLocalExit(signum, "SIGTERM")
 
 
 class ExceptionSink:
-    """A mutable singleton object representing where exceptions should be logged to."""
+    """A mutable singleton object representing where exceptions should be logged to.
+
+    The ExceptionSink should be installed in any process that is running Pants @rules via the
+    engine. Notably, this does _not_ include the pantsd client, which does its own signal handling
+    directly in order to forward information to the pantsd server.
+    """
 
     # NB: see the bottom of this file where we call reset_log_location() and other mutators in order
     # to properly setup global state.
@@ -131,18 +134,28 @@ class ExceptionSink:
     _pid_specific_error_fileobj = None
     _shared_error_fileobj = None
 
-    # Stores a signal received by the signal-handling logic so that rust code can check for it.
-    _signal_sent: Optional[int] = None
-
     def __new__(cls, *args, **kwargs):
-        raise TypeError("Instances of {} are not allowed to be constructed!".format(cls.__name__))
+        raise TypeError(
+            "Instances of {} are not allowed to be constructed! Call install() instead.".format(
+                cls.__name__
+            )
+        )
 
     class ExceptionSinkError(Exception):
         pass
 
     @classmethod
-    def signal_sent(cls) -> Optional[int]:
-        return cls._signal_sent
+    def install(cls, log_location: str, pantsd_instance: bool) -> None:
+        """Setup global state for this process, such as signal handlers and sys.excepthook."""
+
+        # Set the log location for writing logs before bootstrap options are parsed.
+        cls.reset_log_location(log_location)
+
+        # NB: Mutate process-global state!
+        sys.excepthook = ExceptionSink.log_exception
+
+        # Setup a default signal handler.
+        cls.reset_signal_handler(SignalHandler(pantsd_instance=pantsd_instance))
 
     # All reset_* methods are ~idempotent!
     @classmethod
@@ -177,7 +190,7 @@ class ExceptionSink:
         shared_log_path = cls.exceptions_log_path(in_dir=new_log_location)
         assert pid_specific_log_path != shared_log_path
         try:
-            pid_specific_error_stream = safe_open(pid_specific_log_path, mode="w")
+            pid_specific_error_stream = cls.open_pid_specific_error_stream(pid_specific_log_path)
             shared_error_stream = safe_open(shared_log_path, mode="a")
         except Exception as e:
             raise cls.ExceptionSinkError(
@@ -201,17 +214,32 @@ class ExceptionSink:
         cls._shared_error_fileobj = shared_error_stream
 
     @classmethod
+    def open_pid_specific_error_stream(cls, path):
+        ret = safe_open(path, mode="w")
+
+        def unlink_if_empty():
+            try:
+                if os.path.getsize(path) == 0:
+                    os.unlink(path)
+            except OSError:
+                pass
+
+        # NB: This will only get called if nothing fatal happens, but that's precisely when we want
+        # to get called. If anything fatal happens there should be an exception written to the log,
+        # and therefore we don't want to unlink it.
+        atexit.register(unlink_if_empty)
+        return ret
+
+    @classmethod
     def exceptions_log_path(cls, for_pid=None, in_dir=None):
         """Get the path to either the shared or pid-specific fatal errors log file."""
         if for_pid is None:
             intermediate_filename_component = ""
         else:
             assert isinstance(for_pid, Pid)
-            intermediate_filename_component = ".{}".format(for_pid)
+            intermediate_filename_component = f".{for_pid}"
         in_dir = in_dir or cls._log_dir
-        return os.path.join(
-            in_dir, ".pids", "exceptions{}.log".format(intermediate_filename_component)
-        )
+        return os.path.join(in_dir, f"exceptions{intermediate_filename_component}.log")
 
     @classmethod
     def _log_exception(cls, msg):
@@ -335,7 +363,7 @@ pid: {pid}
         if should_print_backtrace:
             traceback_string = "\n{}".format("".join(traceback_lines))
         else:
-            traceback_string = " {}".format(cls._traceback_omitted_default_text)
+            traceback_string = f" {cls._traceback_omitted_default_text}"
         return traceback_string
 
     _UNHANDLED_EXCEPTION_LOG_FORMAT = """\
@@ -346,7 +374,7 @@ Exception message: {exception_message}{maybe_newline}
     @classmethod
     def _format_unhandled_exception_log(cls, exc, tb, add_newline, should_print_backtrace):
         exc_type = type(exc)
-        exception_full_name = "{}.{}".format(exc_type.__module__, exc_type.__name__)
+        exception_full_name = f"{exc_type.__module__}.{exc_type.__name__}"
         exception_message = str(exc) if exc else "(no message)"
         maybe_newline = "\n" if add_newline else ""
         return cls._UNHANDLED_EXCEPTION_LOG_FORMAT.format(
@@ -379,7 +407,7 @@ Exception message: {exception_message}{maybe_newline}
             )
             cls._log_exception(exception_log_entry)
         except Exception as e:
-            extra_err_msg = "Additional error logging unhandled exception {}: {}".format(exc, e)
+            extra_err_msg = f"Additional error logging unhandled exception {exc}: {e}"
             logger.error(extra_err_msg)
 
         # The rust logger implementation will have its own stacktrace, but at import time, we want
@@ -419,15 +447,3 @@ Exception message: {exception_message}{maybe_newline}
 
         # Print the output via standard logging.
         logger.error(terminal_log_entry)
-
-
-# Setup global state such as signal handlers and sys.excepthook with probably-safe values at module
-# import time.
-# Set the log location for writing logs before bootstrap options are parsed.
-ExceptionSink.reset_log_location(os.getcwd())
-
-# NB: Mutate process-global state!
-sys.excepthook = ExceptionSink.log_exception
-
-# Setup a default signal handler.
-ExceptionSink.reset_signal_handler(SignalHandler(pantsd_instance=False))

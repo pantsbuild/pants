@@ -8,33 +8,36 @@ from pants.engine.fs import Digest, MergeDigests, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
 from pants.engine.target import (
+    FilteredTargets,
     GenerateSourcesRequest,
     HydratedSources,
     HydrateSourcesRequest,
     RegisteredTargetTypes,
-    Sources,
-    Targets,
+    SourcesField,
 )
 from pants.engine.unions import UnionMembership
+from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
 
 
 class ExportCodegenSubsystem(GoalSubsystem):
-    """Write generated files to `dist/codegen` for use outside of Pants."""
-
     name = "export-codegen"
+    help = "Write generated files to `dist/codegen` for use outside of Pants."
 
-    required_union_implementations = (GenerateSourcesRequest,)
+    @classmethod
+    def activated(cls, union_membership: UnionMembership) -> bool:
+        return GenerateSourcesRequest in union_membership
 
 
 class ExportCodegen(Goal):
     subsystem_cls = ExportCodegenSubsystem
+    environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY  # TODO(#17129) — Migrate this.
 
 
 @goal_rule
 async def export_codegen(
-    targets: Targets,
+    targets: FilteredTargets,
     union_membership: UnionMembership,
     workspace: Workspace,
     dist_dir: DistDir,
@@ -43,12 +46,14 @@ async def export_codegen(
     # We run all possible code generators. Running codegen requires specifying the expected
     # output_type, so we must inspect what is possible to generate.
     all_generate_request_types = union_membership.get(GenerateSourcesRequest)
-    inputs_to_outputs = {req.input: req.output for req in all_generate_request_types}
+    inputs_to_outputs = {
+        req.input: req.output for req in all_generate_request_types if req.exportable
+    }
     codegen_sources_fields_with_output = []
     for tgt in targets:
-        if not tgt.has_field(Sources):
+        if not tgt.has_field(SourcesField):
             continue
-        sources = tgt[Sources]
+        sources = tgt[SourcesField]
         for input_type in inputs_to_outputs:
             if isinstance(sources, input_type):
                 output_type = inputs_to_outputs[input_type]
@@ -64,8 +69,12 @@ async def export_codegen(
             }
         )
         logger.warning(
-            "No codegen files/targets matched. All codegen target types: "
-            f"{', '.join(codegen_targets)}"
+            softwrap(
+                f"""
+                No codegen files/targets matched. All codegen target types:
+                {', '.join(codegen_targets)}
+                """
+            )
         )
         return ExportCodegen(exit_code=0)
 
@@ -73,12 +82,12 @@ async def export_codegen(
         Get(
             HydratedSources,
             HydrateSourcesRequest(
-                sources_and_output_type[0],
-                for_sources_types=(sources_and_output_type[1],),
+                sources,
+                for_sources_types=(output_type,),
                 enable_codegen=True,
             ),
         )
-        for sources_and_output_type in codegen_sources_fields_with_output
+        for sources, output_type in codegen_sources_fields_with_output
     )
 
     merged_digest = await Get(

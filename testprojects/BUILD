@@ -2,9 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 files(
-  name = 'pants_plugins_directory',
-  sources = ['pants-plugins/**/*'],
-  dependencies = [
-    'src/python/pants/testutil',
-  ],
+    name="pants_plugins_directory",
+    sources=["pants-plugins/**/*"],
 )

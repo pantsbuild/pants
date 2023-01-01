@@ -4,12 +4,12 @@
 """Autoformatter for Python import statements.
 
 See https://www.pantsbuild.org/docs/python-linters-and-formatters and
-https://timothycrosley.github.io/isort/.
+https://pycqa.github.io/isort/.
 """
 
-from pants.backend.python.lint import python_fmt
 from pants.backend.python.lint.isort import rules as isort_rules
+from pants.backend.python.lint.isort import skip_field, subsystem
 
 
 def rules():
-    return (*isort_rules.rules(), *python_fmt.rules())
+    return (*isort_rules.rules(), *skip_field.rules(), *subsystem.rules())

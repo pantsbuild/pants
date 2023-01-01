@@ -3,9 +3,9 @@
 
 import pytest
 
+from pants.backend.python.subsystems.repos import PythonRepos
 from pants.engine.rules import SubsystemRule
 from pants.option.scope import GLOBAL_SCOPE, Scope, ScopedOptions
-from pants.python.python_repos import PythonRepos
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 from pants.util.logging import LogLevel
 

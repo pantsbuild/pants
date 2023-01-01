@@ -1,15 +1,15 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from textwrap import dedent
-from typing import Any, Optional, Tuple, Type, Union
+from __future__ import annotations
+
+from typing import Any
+
+from pants.util.strutil import softwrap
 
 
 def parse_expression(
-    val: str,
-    acceptable_types: Union[Type, Tuple[Type, ...]],
-    name: Optional[str] = None,
-    raise_type: Type[BaseException] = ValueError,
+    val: str, acceptable_types: type | tuple[type, ...], name: str | None = None
 ) -> Any:
     """Attempts to parse the given `val` as a python expression of the specified `acceptable_types`.
 
@@ -17,7 +17,6 @@ def parse_expression(
     :param acceptable_types: The acceptable types of the parsed object.
     :param name: An optional logical name for the value being parsed; ie if the literal val
                         represents a person's age, 'age'.
-    :param raise_type: The type of exception to raise for all failures; ValueError by default.
     :raises: If `val` is not a valid python literal expression or it is but evaluates to an object
              that is not a an instance of one of the `acceptable_types`.
     """
@@ -26,7 +25,7 @@ def parse_expression(
         return typ.__name__
 
     if not isinstance(val, str):
-        raise raise_type(
+        raise ValueError(
             f"The raw `val` is not a str.  Given {val} of type {format_type(type(val))}."
         )
 
@@ -44,12 +43,12 @@ def parse_expression(
     try:
         parsed_value = eval(val)
     except Exception as e:
-        raise raise_type(
-            dedent(
-                f"""\
+        raise ValueError(
+            softwrap(
+                f"""
                 The {get_name()} cannot be evaluated as a literal expression: {e!r}
                 Given raw value:
-                {format_raw_value()}
+                  {format_raw_value()}
                 """
             )
         )
@@ -61,20 +60,19 @@ def parse_expression(
                 yield types
             elif isinstance(types, tuple):
                 for item in types:
-                    for typ in iter_types(item):
-                        yield typ
+                    yield from iter_types(item)
             else:
                 raise ValueError(
                     f"The given acceptable_types is not a valid type (tuple): {acceptable_types}"
                 )
 
         expected_types = ", ".join(format_type(t) for t in iter_types(acceptable_types))
-        raise raise_type(
-            dedent(
-                f"""\
+        raise ValueError(
+            softwrap(
+                f"""
                 The {get_name()} is not of the expected type(s): {expected_types}:
                 Given the following raw value that evaluated to type {format_type(type(parsed_value))}:
-                {format_raw_value()}
+                  {format_raw_value()}
                 """
             )
         )

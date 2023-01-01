@@ -11,7 +11,7 @@ def _branch_name(revision_str: str) -> str:
     return PantsReleases._branch_name(Version(revision_str))
 
 
-def test_branch_name_master() -> None:
+def test_branch_name_main() -> None:
     assert "1.1.x" == _branch_name("1.1.0-dev1")
     assert "1.1.x" == _branch_name("1.1.0dev1")
     assert "1.1.x" == _branch_name("1.1.0.dev1")

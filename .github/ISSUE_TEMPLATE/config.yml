@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: The Pants Documentation Site
+    url: https://www.pantsbuild.org/
+    about: You can find a lot of useful information here.
+  - name: The Pants Community Chat
+    url: https://www.pantsbuild.org/docs/getting-help
+    about: We're a friendly community, and happy to answer questions!

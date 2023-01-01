@@ -10,9 +10,7 @@
   clippy::if_not_else,
   clippy::needless_continue,
   clippy::unseparated_literal_suffix,
-  // TODO: Falsely triggers for async/await:
-  //   see https://github.com/rust-lang/rust-clippy/issues/5360
-  // clippy::used_underscore_binding
+  clippy::used_underscore_binding
 )]
 // It is often more clear to show that nothing is being moved.
 #![allow(clippy::match_ref_pats)]
@@ -29,32 +27,37 @@
 #![type_length_limit = "44109434"]
 
 use std::collections::hash_map::Entry::{Occupied, Vacant};
-use std::collections::HashMap;
-use std::convert::TryInto;
+use std::collections::{BTreeMap, HashMap};
 use std::ffi::{OsStr, OsString};
 use std::path::Path;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::Arc;
+use std::time;
 
+use clap::{Arg, Command};
 use futures::future::FutureExt;
+use grpc_util::tls;
 use hashing::{Digest, Fingerprint};
 use log::{debug, error, warn};
 use parking_lot::Mutex;
-use store::Store;
+use protos::gen::build::bazel::remote::execution::v2 as remexec;
+use protos::require_digest;
+use store::{Store, StoreError};
 use tokio::signal::unix::{signal, SignalKind};
-use tokio::stream::StreamExt;
 use tokio::task;
+use tokio_stream::wrappers::SignalStream;
+use tokio_stream::StreamExt;
 
-const TTL: time::Timespec = time::Timespec { sec: 0, nsec: 0 };
+const TTL: time::Duration = time::Duration::from_secs(0);
 
-const CREATE_TIME: time::Timespec = time::Timespec { sec: 1, nsec: 0 };
+const CREATE_TIME: time::SystemTime = time::SystemTime::UNIX_EPOCH;
 
-fn dir_attr_for(inode: Inode) -> fuse::FileAttr {
-  attr_for(inode, 0, fuse::FileType::Directory, 0x555)
+fn dir_attr_for(inode: Inode) -> fuser::FileAttr {
+  attr_for(inode, 0, fuser::FileType::Directory, 0x555)
 }
 
-fn attr_for(inode: Inode, size: u64, kind: fuse::FileType, perm: u16) -> fuse::FileAttr {
-  fuse::FileAttr {
+fn attr_for(inode: Inode, size: u64, kind: fuser::FileType, perm: u16) -> fuser::FileAttr {
+  fuser::FileAttr {
     ino: inode,
     size: size,
     // TODO: Find out whether blocks is actually important
@@ -69,6 +72,8 @@ fn attr_for(inode: Inode, size: u64, kind: fuse::FileType, perm: u16) -> fuse::F
     uid: 0,
     gid: 0,
     rdev: 0,
+    // TODO: Find out whether blksize is actually important
+    blksize: 1,
     flags: 0,
   }
 }
@@ -84,7 +89,7 @@ pub fn digest_from_filepath(str: &str) -> Result<Digest, String> {
     .ok_or_else(|| format!("Invalid digest: {} wasn't of form fingerprint-size", str))?
     .parse::<usize>()
     .map_err(|err| format!("Invalid digest; size {} not a number: {}", str, err))?;
-  Ok(Digest(fingerprint, size_bytes))
+  Ok(Digest::new(fingerprint, size_bytes))
 }
 
 type Inode = u64;
@@ -109,19 +114,19 @@ struct InodeDetails {
 #[derive(Debug)]
 struct ReaddirEntry {
   inode: Inode,
-  kind: fuse::FileType,
+  kind: fuser::FileType,
   name: OsString,
 }
 
 enum Node {
-  Directory(bazel_protos::remote_execution::DirectoryNode),
-  File(bazel_protos::remote_execution::FileNode),
+  Directory(remexec::DirectoryNode),
+  File(remexec::FileNode),
 }
 
 #[derive(Clone, Copy, Debug)]
 pub enum BRFSEvent {
-  INIT,
-  DESTROY,
+  Init,
+  Destroy,
 }
 
 struct BuildResultFS {
@@ -155,16 +160,16 @@ impl BuildResultFS {
 impl BuildResultFS {
   pub fn node_for_digest(
     &mut self,
-    directory: &bazel_protos::remote_execution::Directory,
+    directory: &remexec::Directory,
     filename: &str,
   ) -> Option<Node> {
-    for file in directory.get_files() {
-      if file.get_name() == filename {
+    for file in &directory.files {
+      if file.name == filename {
         return Some(Node::File(file.clone()));
       }
     }
-    for child in directory.get_directories() {
-      if child.get_name() == filename {
+    for child in &directory.directories {
+      if child.name == filename {
         return Some(Node::Directory(child.clone()));
       }
     }
@@ -191,7 +196,7 @@ impl BuildResultFS {
           .runtime
           .block_on(async move { store.load_file_bytes_with(digest, |_| ()).await })
         {
-          Ok(Some(((), _metadata))) => {
+          Ok(()) => {
             let executable_inode = self.next_inode;
             self.next_inode += 1;
             let non_executable_inode = self.next_inode;
@@ -219,8 +224,8 @@ impl BuildResultFS {
               non_executable_inode
             }))
           }
-          Ok(None) => Ok(None),
-          Err(err) => Err(err),
+          Err(StoreError::MissingDigest { .. }) => Ok(None),
+          Err(err) => Err(err.to_string()),
         }
       }
     }
@@ -235,7 +240,7 @@ impl BuildResultFS {
           .runtime
           .block_on(async move { store.load_directory(digest).await })
         {
-          Ok(Some(_)) => {
+          Ok(_) => {
             // TODO: Kick off some background futures to pre-load the contents of this Directory into
             // an in-memory cache. Keep a background CPU pool driving those Futures.
             let inode = self.next_inode;
@@ -251,25 +256,25 @@ impl BuildResultFS {
             );
             Ok(Some(inode))
           }
-          Ok(None) => Ok(None),
-          Err(err) => Err(err),
+          Err(StoreError::MissingDigest { .. }) => Ok(None),
+          Err(err) => Err(err.to_string()),
         }
       }
     }
   }
 
-  pub fn file_attr_for(&mut self, inode: Inode) -> Option<fuse::FileAttr> {
+  pub fn file_attr_for(&mut self, inode: Inode) -> Option<fuser::FileAttr> {
     self.inode_digest_cache.get(&inode).map(|f| {
       attr_for(
         inode,
-        f.digest.1 as u64,
-        fuse::FileType::RegularFile,
+        f.digest.size_bytes as u64,
+        fuser::FileType::RegularFile,
         if f.is_executable { 0o555 } else { 0o444 },
       )
     })
   }
 
-  pub fn dir_attr_for(&mut self, digest: Digest) -> Result<fuse::FileAttr, i32> {
+  pub fn dir_attr_for(&mut self, digest: Digest) -> Result<fuser::FileAttr, i32> {
     match self.inode_for_directory(digest) {
       Ok(Some(inode)) => Ok(dir_attr_for(inode)),
       Ok(None) => Err(libc::ENOENT),
@@ -285,22 +290,22 @@ impl BuildResultFS {
       ROOT => Ok(vec![
         ReaddirEntry {
           inode: ROOT,
-          kind: fuse::FileType::Directory,
+          kind: fuser::FileType::Directory,
           name: OsString::from("."),
         },
         ReaddirEntry {
           inode: ROOT,
-          kind: fuse::FileType::Directory,
+          kind: fuser::FileType::Directory,
           name: OsString::from(".."),
         },
         ReaddirEntry {
           inode: DIGEST_ROOT,
-          kind: fuse::FileType::Directory,
+          kind: fuser::FileType::Directory,
           name: OsString::from("digest"),
         },
         ReaddirEntry {
           inode: DIRECTORY_ROOT,
-          kind: fuse::FileType::Directory,
+          kind: fuser::FileType::Directory,
           name: OsString::from("directory"),
         },
       ]),
@@ -330,45 +335,45 @@ impl BuildResultFS {
             .block_on(async move { store.load_directory(digest).await });
 
           match maybe_directory {
-            Ok(Some((directory, _metadata))) => {
+            Ok(directory) => {
               let mut entries = vec![
                 ReaddirEntry {
                   inode: inode,
-                  kind: fuse::FileType::Directory,
+                  kind: fuser::FileType::Directory,
                   name: OsString::from("."),
                 },
                 ReaddirEntry {
                   inode: DIRECTORY_ROOT,
-                  kind: fuse::FileType::Directory,
+                  kind: fuser::FileType::Directory,
                   name: OsString::from(".."),
                 },
               ];
 
-              let directories = directory.get_directories().iter().map(|directory| {
+              let directories = directory.directories.iter().map(|directory| {
                 (
-                  directory.get_digest(),
-                  directory.get_name(),
-                  fuse::FileType::Directory,
+                  directory.digest.clone(),
+                  directory.name.clone(),
+                  fuser::FileType::Directory,
                   true,
                 )
               });
-              let files = directory.get_files().iter().map(|file| {
+              let files = directory.files.iter().map(|file| {
                 (
-                  file.get_digest(),
-                  file.get_name(),
-                  fuse::FileType::RegularFile,
-                  file.get_is_executable(),
+                  file.digest.clone(),
+                  file.name.clone(),
+                  fuser::FileType::RegularFile,
+                  file.is_executable,
                 )
               });
 
               for (digest, name, filetype, is_executable) in directories.chain(files) {
-                let child_digest = digest.try_into().map_err(|err| {
+                let child_digest = require_digest(digest.as_ref()).map_err(|err| {
                   error!("Error parsing digest: {:?}", err);
                   libc::ENOENT
                 })?;
                 let maybe_child_inode = match filetype {
-                  fuse::FileType::Directory => self.inode_for_directory(child_digest),
-                  fuse::FileType::RegularFile => self.inode_for_file(child_digest, is_executable),
+                  fuser::FileType::Directory => self.inode_for_directory(child_digest),
+                  fuser::FileType::RegularFile => self.inode_for_file(child_digest, is_executable),
                   _ => unreachable!(),
                 };
                 match maybe_child_inode {
@@ -391,7 +396,7 @@ impl BuildResultFS {
 
               Ok(entries)
             }
-            Ok(None) => Err(libc::ENOENT),
+            Err(StoreError::MissingDigest { .. }) => Err(libc::ENOENT),
             Err(err) => {
               error!("Error loading directory {:?}: {}", digest, err);
               Err(libc::EINVAL)
@@ -409,25 +414,29 @@ impl BuildResultFS {
 //  2: /digest
 //  3: /directory
 //  ... created on demand and cached for the lifetime of the program.
-impl fuse::Filesystem for BuildResultFS {
-  fn init(&mut self, _req: &fuse::Request) -> Result<(), libc::c_int> {
-    self.sender.send(BRFSEvent::INIT).map_err(|_| 1)
+impl fuser::Filesystem for BuildResultFS {
+  fn init(
+    &mut self,
+    _req: &fuser::Request,
+    _config: &mut fuser::KernelConfig,
+  ) -> Result<(), libc::c_int> {
+    self.sender.send(BRFSEvent::Init).map_err(|_| 1)
   }
 
-  fn destroy(&mut self, _req: &fuse::Request) {
+  fn destroy(&mut self) {
     self
       .sender
-      .send(BRFSEvent::DESTROY)
-      .unwrap_or_else(|err| warn!("Failed to send {:?} event: {}", BRFSEvent::DESTROY, err))
+      .send(BRFSEvent::Destroy)
+      .unwrap_or_else(|err| warn!("Failed to send {:?} event: {}", BRFSEvent::Destroy, err))
   }
 
   // Used to answer stat calls
   fn lookup(
     &mut self,
-    _req: &fuse::Request<'_>,
+    _req: &fuser::Request<'_>,
     parent: Inode,
     name: &OsStr,
-    reply: fuse::ReplyEntry,
+    reply: fuser::ReplyEntry,
   ) {
     let runtime = self.runtime.clone();
     runtime.enter(|| {
@@ -468,31 +477,35 @@ impl fuse::Filesystem for BuildResultFS {
             .and_then(|cache_entry| {
               let store = self.store.clone();
               let parent_digest = cache_entry.digest;
-              self
+              let directory = self
                 .runtime
                 .block_on(async move { store.load_directory(parent_digest).await })
-                .map_err(|err| {
-                  error!("Error reading directory {:?}: {}", parent_digest, err);
-                  libc::EINVAL
-                })?
-                .and_then(|(directory, _metadata)| self.node_for_digest(&directory, filename))
+                .map_err(|err| match err {
+                  StoreError::MissingDigest { .. } => libc::ENOENT,
+                  err => {
+                    error!("Error reading directory {:?}: {}", parent_digest, err);
+                    libc::EINVAL
+                  }
+                })?;
+              self
+                .node_for_digest(&directory, filename)
                 .ok_or(libc::ENOENT)
             })
             .and_then(|node| match node {
               Node::Directory(directory_node) => {
-                let digest = directory_node.get_digest().try_into().map_err(|err| {
+                let digest = require_digest(directory_node.digest.as_ref()).map_err(|err| {
                   error!("Error parsing digest: {:?}", err);
                   libc::ENOENT
                 })?;
                 self.dir_attr_for(digest)
               }
               Node::File(file_node) => {
-                let digest = file_node.get_digest().try_into().map_err(|err| {
+                let digest = require_digest(file_node.digest.as_ref()).map_err(|err| {
                   error!("Error parsing digest: {:?}", err);
                   libc::ENOENT
                 })?;
                 self
-                  .inode_for_file(digest, file_node.get_is_executable())
+                  .inode_for_file(digest, file_node.is_executable)
                   .map_err(|err| {
                     error!("Error loading file by digest {}: {}", filename, err);
                     libc::EINVAL
@@ -514,7 +527,7 @@ impl fuse::Filesystem for BuildResultFS {
     })
   }
 
-  fn getattr(&mut self, _req: &fuse::Request<'_>, inode: Inode, reply: fuse::ReplyAttr) {
+  fn getattr(&mut self, _req: &fuser::Request<'_>, inode: Inode, reply: fuser::ReplyAttr) {
     let runtime = self.runtime.clone();
     runtime.enter(|| match inode {
       ROOT => reply.attr(&TTL, &dir_attr_for(ROOT)),
@@ -540,12 +553,14 @@ impl fuse::Filesystem for BuildResultFS {
   // TODO: Find out whether fh is ever passed if open isn't explicitly implemented (and whether offset is ever negative)
   fn read(
     &mut self,
-    _req: &fuse::Request<'_>,
+    _req: &fuser::Request<'_>,
     inode: Inode,
     _fh: u64,
     offset: i64,
     size: u32,
-    reply: fuse::ReplyData,
+    _flags: i32,
+    _lock_owner: Option<u64>,
+    reply: fuser::ReplyData,
   ) {
     let runtime = self.runtime.clone();
     runtime.enter(|| {
@@ -572,19 +587,20 @@ impl fuse::Filesystem for BuildResultFS {
                 })
                 .await
             })
-            .map(|v| {
-              if v.is_none() {
-                let maybe_reply = reply2.lock().take();
-                if let Some(reply) = maybe_reply {
-                  reply.error(libc::ENOENT);
-                }
-              }
-            })
             .or_else(|err| {
-              error!("Error loading bytes for {:?}: {}", digest, err);
               let maybe_reply = reply2.lock().take();
-              if let Some(reply) = maybe_reply {
-                reply.error(libc::EINVAL);
+              match err {
+                StoreError::MissingDigest { .. } => {
+                  if let Some(reply) = maybe_reply {
+                    reply.error(libc::ENOENT);
+                  }
+                }
+                err => {
+                  error!("Error loading bytes for {:?}: {}", digest, err);
+                  if let Some(reply) = maybe_reply {
+                    reply.error(libc::EINVAL);
+                  }
+                }
               }
               Ok(())
             });
@@ -597,12 +613,12 @@ impl fuse::Filesystem for BuildResultFS {
 
   fn readdir(
     &mut self,
-    _req: &fuse::Request<'_>,
+    _req: &fuser::Request<'_>,
     inode: Inode,
     // TODO: Find out whether fh is ever passed if open isn't explicitly implemented (and whether offset is ever negative)
     _fh: u64,
     offset: i64,
-    mut reply: fuse::ReplyDirectory,
+    mut reply: fuser::ReplyDirectory,
   ) {
     let runtime = self.runtime.clone();
     runtime.enter(|| {
@@ -629,10 +645,10 @@ impl fuse::Filesystem for BuildResultFS {
   // If this isn't implemented, OSX will try to manipulate ._ files to manage xattrs out of band, which adds both overhead and logspam.
   fn listxattr(
     &mut self,
-    _req: &fuse::Request<'_>,
+    _req: &fuser::Request<'_>,
     _inode: Inode,
     _size: u32,
-    reply: fuse::ReplyXattr,
+    reply: fuser::ReplyXattr,
   ) {
     let runtime = self.runtime.clone();
     runtime.enter(|| {
@@ -641,22 +657,23 @@ impl fuse::Filesystem for BuildResultFS {
   }
 }
 
-pub fn mount<'a, P: AsRef<Path>>(
+pub fn mount<P: AsRef<Path>>(
   mount_path: P,
   store: Store,
   runtime: task_executor::Executor,
-) -> std::io::Result<(fuse::BackgroundSession<'a>, Receiver<BRFSEvent>)> {
+) -> std::io::Result<(fuser::BackgroundSession, Receiver<BRFSEvent>)> {
   // TODO: Work out how to disable caching in the filesystem
-  let options = ["-o", "ro", "-o", "fsname=brfs", "-o", "noapplexattr"]
-    .iter()
-    .map(<&str>::as_ref)
-    .collect::<Vec<&OsStr>>();
+  let options = vec![
+    fuser::MountOption::RO,
+    fuser::MountOption::FSName("brfs".to_owned()),
+    fuser::MountOption::CUSTOM("noapplexattr".to_owned()),
+  ];
 
   let (sender, receiver) = channel();
   let brfs = BuildResultFS::new(sender, runtime, store);
 
   debug!("About to spawn_mount with options {:?}", options);
-  let result = unsafe { fuse::spawn_mount(brfs, &mount_path, &options) };
+  let result = fuser::spawn_mount2(brfs, &mount_path, &options);
   // N.B.: The session won't be used by the caller, but we return it since a reference must be
   // maintained to prevent early dropping which unmounts the filesystem.
   result.map(|session| (session, receiver))
@@ -668,87 +685,112 @@ async fn main() {
 
   let default_store_path = Store::default_path();
 
-  let args = clap::App::new("brfs")
+  let args = Command::new("brfs")
     .arg(
-      clap::Arg::with_name("local-store-path")
+      Arg::new("local-store-path")
         .takes_value(true)
         .long("local-store-path")
         .default_value_os(default_store_path.as_ref())
         .required(false),
     ).arg(
-      clap::Arg::with_name("server-address")
+      Arg::new("server-address")
         .takes_value(true)
         .long("server-address")
         .required(false),
     ).arg(
-      clap::Arg::with_name("remote-instance-name")
+      Arg::new("remote-instance-name")
         .takes_value(true)
         .long("remote-instance-name")
         .required(false),
     ).arg(
-      clap::Arg::with_name("root-ca-cert-file")
+      Arg::new("root-ca-cert-file")
         .help("Path to file containing root certificate authority certificates. If not set, TLS will not be used when connecting to the remote.")
         .takes_value(true)
         .long("root-ca-cert-file")
         .required(false)
     ).arg(
-      clap::Arg::with_name("oauth-bearer-token-file")
+      Arg::new("oauth-bearer-token-file")
         .help("Path to file containing oauth bearer token. If not set, no authorization will be provided to remote servers.")
         .takes_value(true)
         .long("oauth-bearer-token-file")
         .required(false)
     ).arg(
-      clap::Arg::with_name("mount-path")
+      Arg::new("mount-path")
         .required(true)
         .takes_value(true),
-    ).get_matches();
+    )
+    .arg(
+      Arg::new("rpc-concurrency-limit")
+          .help("Maximum concurrenct RPCs to the service.")
+          .takes_value(true)
+          .long("rpc-concurrency-limit")
+          .required(false)
+          .default_value("128")
+    ).arg(
+    Arg::new("batch-api-size-limit")
+        .help("Maximum total size of blobs allowed to be sent in a single batch API call to the remote store.")
+        .takes_value(true)
+        .long("batch-api-size-limit")
+        .required(false)
+        .default_value("4194304")
+  )
+      .get_matches();
 
   let mount_path = args.value_of("mount-path").unwrap();
   let store_path = args.value_of("local-store-path").unwrap();
 
-  let root_ca_certs = if let Some(path) = args.value_of("root-ca-cert-file") {
-    Some(std::fs::read(path).expect("Error reading root CA certs file"))
-  } else {
-    None
-  };
+  let root_ca_certs = args
+    .value_of("root-ca-cert-file")
+    .map(|path| std::fs::read(path).expect("Error reading root CA certs file"));
 
-  let oauth_bearer_token = if let Some(path) = args.value_of("oauth-bearer-token-file") {
-    Some(std::fs::read_to_string(path).expect("Error reading oauth bearer token file"))
-  } else {
-    None
-  };
+  let mut headers = BTreeMap::new();
+  if let Some(oauth_path) = args.value_of("oauth-bearer-token-file") {
+    let token = match std::fs::read_to_string(oauth_path) {
+      Ok(token) => token,
+      Err(err) => {
+        error!(
+          "Error reading oauth bearer token from {:?}: {}",
+          oauth_path, err
+        );
+        std::process::exit(1);
+      }
+    };
+    headers.insert(
+      "authorization".to_owned(),
+      format!("Bearer {}", token.trim()),
+    );
+  }
 
   let runtime = task_executor::Executor::new();
 
+  let local_only_store =
+    Store::local_only(runtime.clone(), store_path).expect("Error making local store.");
   let store = match args.value_of("server-address") {
-    Some(address) => Store::with_remote(
-      runtime.clone(),
-      &store_path,
-      vec![address.to_owned()],
-      args.value_of("remote-instance-name").map(str::to_owned),
-      root_ca_certs,
-      oauth_bearer_token,
-      1,
-      4 * 1024 * 1024,
-      std::time::Duration::from_secs(5 * 60),
-      // TODO: Take a command line arg.
-      serverset::BackoffConfig::new(
-        std::time::Duration::from_secs(1),
-        1.2,
-        std::time::Duration::from_secs(20),
+    Some(address) => local_only_store
+      .into_with_remote(
+        address,
+        args.value_of("remote-instance-name").map(str::to_owned),
+        tls::Config::new_without_mtls(root_ca_certs),
+        headers,
+        4 * 1024 * 1024,
+        std::time::Duration::from_secs(5 * 60),
+        1,
+        args
+          .value_of_t::<usize>("rpc-concurrency-limit")
+          .expect("Bad rpc-concurrency-limit flag"),
+        None,
+        args
+          .value_of_t::<usize>("batch-api-size-limit")
+          .expect("Bad batch-api-size-limit flag"),
       )
-      .expect("Error making BackoffConfig"),
-      1,
-      1,
-    ),
-    None => Store::local_only(runtime.clone(), &store_path),
-  }
-  .expect("Error making store");
+      .expect("Error making remote store"),
+    None => local_only_store,
+  };
 
   #[derive(Clone, Copy, Debug)]
   enum Sig {
-    INT,
-    TERM,
+    Int,
+    Term,
     Unmount,
   }
 
@@ -756,13 +798,14 @@ async fn main() {
   where
     F: Fn() -> SignalKind,
   {
-    signal(install_fn())
-      .unwrap_or_else(|_| panic!("Failed to install SIG{:?} handler", sig))
-      .map(move |_| Some(sig))
+    SignalStream::new(
+      signal(install_fn()).unwrap_or_else(|_| panic!("Failed to install SIG{:?} handler", sig)),
+    )
+    .map(move |_| Some(sig))
   }
 
-  let sigint = install_handler(SignalKind::interrupt, Sig::INT);
-  let sigterm = install_handler(SignalKind::terminate, Sig::TERM);
+  let sigint = install_handler(SignalKind::interrupt, Sig::Int);
+  let sigterm = install_handler(SignalKind::terminate, Sig::Term);
 
   match mount(mount_path, store, runtime.clone()) {
     Err(err) => {
@@ -774,8 +817,8 @@ async fn main() {
     }
     Ok((_, receiver)) => {
       match receiver.recv().unwrap() {
-        BRFSEvent::INIT => debug!("Store {} mounted at {}", store_path, mount_path),
-        BRFSEvent::DESTROY => {
+        BRFSEvent::Init => debug!("Store {} mounted at {}", store_path, mount_path),
+        BRFSEvent::Destroy => {
           warn!("Externally unmounted before we could mount.");
           return;
         }
@@ -785,8 +828,8 @@ async fn main() {
         // N.B.: In practice recv always errs and we exercise the or branch. It seems the sender
         // side thread always exits (which drops our BuildResultFS) before we get a chance to
         // complete the read.
-        match receiver.recv().unwrap_or(BRFSEvent::DESTROY) {
-          BRFSEvent::DESTROY => Some(Sig::Unmount),
+        match receiver.recv().unwrap_or(BRFSEvent::Destroy) {
+          BRFSEvent::Destroy => Some(Sig::Unmount),
           event => {
             warn!("Received unexpected event {:?}", event);
             None

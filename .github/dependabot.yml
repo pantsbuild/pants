@@ -1,0 +1,15 @@
+version: 2
+updates:
+  - package-ecosystem: "cargo"
+    directory: "/src/rust/engine"
+    open-pull-requests-limit: 5
+    rebase-strategy: auto
+    labels:
+      - "category:internal"
+    schedule:
+      interval: "weekly" 
+      day: "wednesday"
+      time: "03:00"
+      timezone: "US/Pacific"
+    reviewers:
+      - stuhood

@@ -1,68 +1,116 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import re
 from textwrap import dedent
-from typing import Iterable, Set, cast
+from typing import cast
 
 import pytest
 
-from pants.base.exceptions import ResolveError
-from pants.base.specs import (
-    AddressLiteralSpec,
-    AddressSpec,
-    AddressSpecs,
-    AscendantAddresses,
-    DescendantAddresses,
-    SiblingAddresses,
-)
+from pants.build_graph.address import BuildFileAddressRequest, MaybeAddress, ResolveError
 from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants.engine.addresses import Address, Addresses, AddressInput, BuildFileAddress
+from pants.core.target_types import GenericTarget
+from pants.engine.addresses import Address, AddressInput, BuildFileAddress
 from pants.engine.fs import DigestContents, FileContent, PathGlobs
 from pants.engine.internals.build_files import (
     AddressFamilyDir,
+    BuildFileOptions,
+    OptionalAddressFamily,
     evaluate_preludes,
     parse_address_family,
 )
+from pants.engine.internals.defaults import ParametrizeDefault
+from pants.engine.internals.dep_rules import MaybeBuildFileDependencyRulesImplementation
+from pants.engine.internals.parametrize import Parametrize
 from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser
 from pants.engine.internals.scheduler import ExecutionError
-from pants.engine.internals.target_adaptor import TargetAdaptor
-from pants.engine.target import Dependencies, Sources, Tags, Target
-from pants.option.global_options import GlobalOptions
-from pants.testutil.option_util import create_subsystem
-from pants.testutil.rule_runner import MockGet, QueryRule, RuleRunner, run_rule_with_mocks
+from pants.engine.internals.synthetic_targets import (
+    SyntheticAddressMaps,
+    SyntheticAddressMapsRequest,
+)
+from pants.engine.internals.target_adaptor import TargetAdaptor, TargetAdaptorRequest
+from pants.engine.target import (
+    Dependencies,
+    MultipleSourcesField,
+    RegisteredTargetTypes,
+    StringField,
+    Tags,
+    Target,
+)
+from pants.engine.unions import UnionMembership
+from pants.testutil.rule_runner import (
+    MockGet,
+    QueryRule,
+    RuleRunner,
+    engine_error,
+    run_rule_with_mocks,
+)
 from pants.util.frozendict import FrozenDict
 
 
 def test_parse_address_family_empty() -> None:
     """Test that parsing an empty BUILD file results in an empty AddressFamily."""
-    af = run_rule_with_mocks(
+    optional_af = run_rule_with_mocks(
         parse_address_family,
         rule_args=[
-            Parser(target_type_aliases=[], object_aliases=BuildFileAliases()),
-            create_subsystem(GlobalOptions, build_patterns=["BUILD"], build_ignore=[]),
+            Parser(
+                build_root="",
+                registered_target_types=RegisteredTargetTypes({}),
+                union_membership=UnionMembership({}),
+                object_aliases=BuildFileAliases(),
+                ignore_unrecognized_symbols=False,
+            ),
+            BuildFileOptions(("BUILD",)),
             BuildFilePreludeSymbols(FrozenDict()),
             AddressFamilyDir("/dev/null"),
+            RegisteredTargetTypes({}),
+            UnionMembership({}),
+            MaybeBuildFileDependencyRulesImplementation(None),
         ],
         mock_gets=[
             MockGet(
                 output_type=DigestContents,
-                input_type=PathGlobs,
+                input_types=(PathGlobs,),
                 mock=lambda _: DigestContents([FileContent(path="/dev/null/BUILD", content=b"")]),
+            ),
+            MockGet(
+                output_type=OptionalAddressFamily,
+                input_types=(AddressFamilyDir,),
+                mock=lambda _: OptionalAddressFamily("/dev"),
+            ),
+            MockGet(
+                output_type=SyntheticAddressMaps,
+                input_types=(SyntheticAddressMapsRequest,),
+                mock=lambda _: SyntheticAddressMaps(),
             ),
         ],
     )
+    assert optional_af.path == "/dev/null"
+    assert optional_af.address_family is not None
+    af = optional_af.address_family
+    assert af.namespace == "/dev/null"
     assert len(af.name_to_target_adaptors) == 0
 
 
 def run_prelude_parsing_rule(prelude_content: str) -> BuildFilePreludeSymbols:
     symbols = run_rule_with_mocks(
         evaluate_preludes,
-        rule_args=[create_subsystem(GlobalOptions, build_file_prelude_globs=["prelude"])],
+        rule_args=[
+            BuildFileOptions((), prelude_globs=("prelude",)),
+            Parser(
+                build_root="",
+                registered_target_types=RegisteredTargetTypes({"target": GenericTarget}),
+                union_membership=UnionMembership({}),
+                object_aliases=BuildFileAliases(),
+                ignore_unrecognized_symbols=False,
+            ),
+        ],
         mock_gets=[
             MockGet(
                 output_type=DigestContents,
-                input_type=PathGlobs,
+                input_types=(PathGlobs,),
                 mock=lambda _: DigestContents(
                     [FileContent(path="/dev/null/prelude", content=prelude_content.encode())]
                 ),
@@ -89,7 +137,7 @@ def test_prelude_parsing_illegal_import() -> None:
         """\
         import os
         def make_target():
-            python_library()
+            python_sources()
         """
     )
     with pytest.raises(
@@ -99,74 +147,136 @@ def test_prelude_parsing_illegal_import() -> None:
         run_prelude_parsing_rule(prelude_content)
 
 
+def test_prelude_exceptions() -> None:
+    prelude_content = dedent(
+        """\
+        def abort():
+            raise ValueError
+        """
+    )
+    result = run_prelude_parsing_rule(prelude_content)
+    assert "ValueError" not in result.symbols
+    with pytest.raises(ValueError):
+        result.symbols["abort"]()
+
+
+def test_prelude_references_builtin_symbols() -> None:
+    prelude_content = dedent(
+        """\
+        def make_a_target():
+            # Can't call it outside of the context of a BUILD file, less we get internal errors
+            target
+        """
+    )
+    result = run_prelude_parsing_rule(prelude_content)
+    # In the real world, this would define the target (note it doesn't need to return, as BUILD files
+    # don't). In the test we're just ensuring we don't get a `NameError`
+    result.symbols["make_a_target"]()
+
+
+class ResolveField(StringField):
+    alias = "resolve"
+
+
+class MockDepsField(Dependencies):
+    pass
+
+
+class MockMultipleSourcesField(MultipleSourcesField):
+    default = ("*.mock",)
+
+
 class MockTgt(Target):
     alias = "mock_tgt"
-    core_fields = (Dependencies, Sources, Tags)
+    core_fields = (MockDepsField, MockMultipleSourcesField, Tags, ResolveField)
 
 
 def test_resolve_address() -> None:
-    rule_runner = RuleRunner(rules=[QueryRule(Address, (AddressInput,))])
+    rule_runner = RuleRunner(
+        rules=[QueryRule(Address, [AddressInput]), QueryRule(MaybeAddress, [AddressInput])]
+    )
+    rule_runner.write_files({"a/b/c.txt": "", "f.txt": ""})
 
     def assert_is_expected(address_input: AddressInput, expected: Address) -> None:
         assert rule_runner.request(Address, [address_input]) == expected
 
-    rule_runner.create_file("a/b/c.txt")
     assert_is_expected(
-        AddressInput("a/b/c.txt"), Address("a/b", target_name=None, relative_file_path="c.txt")
+        AddressInput("a/b/c.txt", description_of_origin="tests"),
+        Address("a/b", target_name=None, relative_file_path="c.txt"),
     )
     assert_is_expected(
-        AddressInput("a/b"), Address("a/b", target_name=None, relative_file_path=None)
+        AddressInput("a/b", description_of_origin="tests"),
+        Address("a/b", target_name=None, relative_file_path=None),
     )
 
-    assert_is_expected(AddressInput("a/b", target_component="c"), Address("a/b", target_name="c"))
     assert_is_expected(
-        AddressInput("a/b/c.txt", target_component="c"),
+        AddressInput("a/b", target_component="c", description_of_origin="tests"),
+        Address("a/b", target_name="c"),
+    )
+    assert_is_expected(
+        AddressInput("a/b/c.txt", target_component="c", description_of_origin="tests"),
         Address("a/b", relative_file_path="c.txt", target_name="c"),
     )
 
     # Top-level addresses will not have a path_component, unless they are a file address.
-    rule_runner.create_file("f.txt")
     assert_is_expected(
-        AddressInput("f.txt", target_component="original"),
+        AddressInput("f.txt", target_component="original", description_of_origin="tests"),
         Address("", relative_file_path="f.txt", target_name="original"),
     )
-    assert_is_expected(AddressInput("", target_component="t"), Address("", target_name="t"))
+    assert_is_expected(
+        AddressInput("", target_component="t", description_of_origin="tests"),
+        Address("", target_name="t"),
+    )
 
-    with pytest.raises(ExecutionError) as exc:
-        rule_runner.request(Address, [AddressInput("a/b/fake")])
-    assert "'a/b/fake' does not exist on disk" in str(exc.value)
+    bad_address_input = AddressInput("a/b/fake", description_of_origin="tests")
+    expected_err = "'a/b/fake' does not exist on disk"
+    with engine_error(ResolveError, contains=expected_err):
+        rule_runner.request(Address, [bad_address_input])
+    maybe_addr = rule_runner.request(MaybeAddress, [bad_address_input])
+    assert isinstance(maybe_addr.val, ResolveError)
+    assert expected_err in str(maybe_addr.val)
 
 
 @pytest.fixture
 def target_adaptor_rule_runner() -> RuleRunner:
-    return RuleRunner(rules=[QueryRule(TargetAdaptor, (Address,))], target_types=[MockTgt])
+    return RuleRunner(
+        rules=[QueryRule(TargetAdaptor, (TargetAdaptorRequest,))],
+        target_types=[MockTgt],
+        objects={"parametrize": Parametrize},
+    )
 
 
 def test_target_adaptor_parsed_correctly(target_adaptor_rule_runner: RuleRunner) -> None:
-    target_adaptor_rule_runner.add_to_build_file(
-        "helloworld",
-        dedent(
-            """\
-            mock_tgt(
-                fake_field=42,
-                dependencies=[
-                    # Because we don't follow dependencies or even parse dependencies, this
-                    # self-cycle should be fine.
-                    "helloworld",
-                    ":sibling",
-                    "helloworld/util",
-                    "helloworld/util:tests",
-                ],
+    target_adaptor_rule_runner.write_files(
+        {
+            "helloworld/dir/BUILD": dedent(
+                """\
+                mock_tgt(
+                    fake_field=42,
+                    dependencies=[
+                        # Because we don't follow dependencies or even parse dependencies, this
+                        # self-cycle should be fine.
+                        ":dir",
+                        ":sibling",
+                        "helloworld/util",
+                        "helloworld/util:tests",
+                    ],
+                    build_file_dir=f"build file's dir is: {build_file_dir()}"
+                )
+
+                mock_tgt(name='t2')
+                """
             )
-            """
-        ),
+        }
     )
-    addr = Address("helloworld")
-    target_adaptor = target_adaptor_rule_runner.request(TargetAdaptor, [addr])
-    assert target_adaptor.name == "helloworld"
+    target_adaptor = target_adaptor_rule_runner.request(
+        TargetAdaptor,
+        [TargetAdaptorRequest(Address("helloworld/dir"), description_of_origin="tests")],
+    )
+    assert target_adaptor.name is None
     assert target_adaptor.type_alias == "mock_tgt"
     assert target_adaptor.kwargs["dependencies"] == [
-        "helloworld",
+        ":dir",
         ":sibling",
         "helloworld/util",
         "helloworld/util:tests",
@@ -174,206 +284,210 @@ def test_target_adaptor_parsed_correctly(target_adaptor_rule_runner: RuleRunner)
     # NB: TargetAdaptors do not validate what fields are valid. The Target API should error
     # when encountering this, but it's fine at this stage.
     assert target_adaptor.kwargs["fake_field"] == 42
+    assert target_adaptor.kwargs["build_file_dir"] == "build file's dir is: helloworld/dir"
+
+    target_adaptor = target_adaptor_rule_runner.request(
+        TargetAdaptor,
+        [
+            TargetAdaptorRequest(
+                Address("helloworld/dir", target_name="t2"), description_of_origin="tests"
+            )
+        ],
+    )
+    assert target_adaptor.name == "t2"
+    assert target_adaptor.type_alias == "mock_tgt"
+
+
+def test_target_adaptor_defaults_applied(target_adaptor_rule_runner: RuleRunner) -> None:
+    target_adaptor_rule_runner.write_files(
+        {
+            "helloworld/dir/BUILD": dedent(
+                """\
+                __defaults__({mock_tgt: dict(resolve="mock")}, all=dict(tags=["24"]))
+                mock_tgt(tags=["42"])
+                mock_tgt(name='t2')
+                """
+            )
+        }
+    )
+    target_adaptor = target_adaptor_rule_runner.request(
+        TargetAdaptor,
+        [TargetAdaptorRequest(Address("helloworld/dir"), description_of_origin="tests")],
+    )
+    assert target_adaptor.name is None
+    assert target_adaptor.kwargs["resolve"] == "mock"
+    assert target_adaptor.kwargs["tags"] == ["42"]
+
+    target_adaptor = target_adaptor_rule_runner.request(
+        TargetAdaptor,
+        [
+            TargetAdaptorRequest(
+                Address("helloworld/dir", target_name="t2"), description_of_origin="tests"
+            )
+        ],
+    )
+    assert target_adaptor.name == "t2"
+    assert target_adaptor.kwargs["resolve"] == "mock"
+
+    # The defaults are not frozen until after the BUILD file have been fully parsed, so this is a
+    # list rather than a tuple at this time.
+    assert target_adaptor.kwargs["tags"] == ["24"]
+
+
+def test_inherit_defaults(target_adaptor_rule_runner: RuleRunner) -> None:
+    target_adaptor_rule_runner.write_files(
+        {
+            "BUILD": """__defaults__(all=dict(tags=["root"]))""",
+            "helloworld/dir/BUILD": dedent(
+                """\
+                __defaults__({mock_tgt: dict(resolve="mock")}, extend=True)
+                mock_tgt()
+                """
+            ),
+        }
+    )
+    target_adaptor = target_adaptor_rule_runner.request(
+        TargetAdaptor,
+        [TargetAdaptorRequest(Address("helloworld/dir"), description_of_origin="tests")],
+    )
+    assert target_adaptor.name is None
+    assert target_adaptor.kwargs["resolve"] == "mock"
+
+    # The defaults originates from a parent BUILD file, and as such has been frozen.
+    assert target_adaptor.kwargs["tags"] == ("root",)
+
+
+def test_parametrize_defaults(target_adaptor_rule_runner: RuleRunner) -> None:
+    target_adaptor_rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                __defaults__(
+                  all=dict(
+                    tags=parametrize(a=["a", "root"], b=["non-root", "b"])
+                  )
+                )
+                """
+            ),
+            "helloworld/dir/BUILD": "mock_tgt()",
+        }
+    )
+    target_adaptor = target_adaptor_rule_runner.request(
+        TargetAdaptor,
+        [TargetAdaptorRequest(Address("helloworld/dir"), description_of_origin="tests")],
+    )
+    assert target_adaptor.kwargs["tags"] == ParametrizeDefault(a=("a", "root"), b=("non-root", "b"))
+
+
+def test_augment_target_field_defaults(target_adaptor_rule_runner: RuleRunner) -> None:
+    target_adaptor_rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """
+                mock_tgt(
+                  sources=(
+                    "*.added",
+                    *mock_tgt.sources.default,
+                  ),
+                )
+                """
+            ),
+        },
+    )
+    target_adaptor = target_adaptor_rule_runner.request(
+        TargetAdaptor,
+        [TargetAdaptorRequest(Address(""), description_of_origin="tests")],
+    )
+    assert target_adaptor.kwargs["sources"] == ("*.added", "*.mock")
 
 
 def test_target_adaptor_not_found(target_adaptor_rule_runner: RuleRunner) -> None:
     with pytest.raises(ExecutionError) as exc:
-        target_adaptor_rule_runner.request(TargetAdaptor, [Address("helloworld")])
+        target_adaptor_rule_runner.request(
+            TargetAdaptor,
+            [TargetAdaptorRequest(Address("helloworld"), description_of_origin="tests")],
+        )
     assert "Directory \\'helloworld\\' does not contain any BUILD files" in str(exc)
 
-    target_adaptor_rule_runner.add_to_build_file("helloworld", "mock_tgt(name='other_tgt')")
+    target_adaptor_rule_runner.write_files({"helloworld/BUILD": "mock_tgt(name='other_tgt')"})
     expected_rx_str = re.escape(
-        "'helloworld' was not found in namespace 'helloworld'. Did you mean one of:\n  :other_tgt"
+        "The target name ':helloworld' is not defined in the directory helloworld"
     )
     with pytest.raises(ExecutionError, match=expected_rx_str):
-        target_adaptor_rule_runner.request(TargetAdaptor, [Address("helloworld")])
+        target_adaptor_rule_runner.request(
+            TargetAdaptor,
+            [TargetAdaptorRequest(Address("helloworld"), description_of_origin="tests")],
+        )
 
 
 def test_build_file_address() -> None:
     rule_runner = RuleRunner(
-        rules=[QueryRule(BuildFileAddress, (Address,))], target_types=[MockTgt]
+        rules=[QueryRule(BuildFileAddress, [BuildFileAddressRequest])], target_types=[MockTgt]
     )
-    rule_runner.create_file("helloworld/BUILD.ext", "mock_tgt()")
+    rule_runner.write_files({"helloworld/BUILD.ext": "mock_tgt()"})
 
     def assert_bfa_resolved(address: Address) -> None:
-        expected_bfa = BuildFileAddress(rel_path="helloworld/BUILD.ext", address=address)
-        bfa = rule_runner.request(BuildFileAddress, [address])
+        expected_bfa = BuildFileAddress(address, "helloworld/BUILD.ext")
+        bfa = rule_runner.request(
+            BuildFileAddress, [BuildFileAddressRequest(address, description_of_origin="tests")]
+        )
         assert bfa == expected_bfa
 
     assert_bfa_resolved(Address("helloworld"))
-    # File addresses should use their BUILD target to find the BUILD file.
+    # Generated targets should use their target generator's BUILD file.
+    assert_bfa_resolved(Address("helloworld", generated_name="f.txt"))
     assert_bfa_resolved(Address("helloworld", relative_file_path="f.txt"))
 
 
-@pytest.fixture
-def address_specs_rule_runner() -> RuleRunner:
-    return RuleRunner(
-        rules=[QueryRule(Addresses, (AddressSpecs,))],
-        target_types=[MockTgt],
-    )
+def test_build_files_share_globals() -> None:
+    """Test that a macro in a prelude can reference another macro in another prelude.
 
+    At some point a change was made to separate the globals/locals dict (uninentional) which has the
+    unintended side-effect of having the `__globals__` of a macro not contain references to every
+    other symbol in every other prelude.
+    """
 
-def resolve_address_specs(
-    rule_runner: RuleRunner,
-    specs: Iterable[AddressSpec],
-) -> Set[Address]:
-    result = rule_runner.request(Addresses, [AddressSpecs(specs, filter_by_global_options=True)])
-    return set(result)
-
-
-def test_address_specs_deduplication(address_specs_rule_runner: RuleRunner) -> None:
-    """When multiple specs cover the same address, we should deduplicate to one single Address."""
-    address_specs_rule_runner.create_file("demo/f.txt")
-    address_specs_rule_runner.add_to_build_file("demo", "mock_tgt(sources=['f.txt'])")
-    # We also include a file address to ensure that that is included in the result.
-    specs = [
-        AddressLiteralSpec("demo", "demo"),
-        AddressLiteralSpec("demo/f.txt", "demo"),
-        SiblingAddresses("demo"),
-        DescendantAddresses("demo"),
-        AscendantAddresses("demo"),
-    ]
-    assert resolve_address_specs(address_specs_rule_runner, specs) == {
-        Address("demo"),
-        Address("demo", relative_file_path="f.txt"),
-    }
-
-
-def test_address_specs_filter_by_tag(address_specs_rule_runner: RuleRunner) -> None:
-    address_specs_rule_runner.set_options(["--tag=+integration"])
-    address_specs_rule_runner.create_file("demo/f.txt")
-    address_specs_rule_runner.add_to_build_file(
-        "demo",
-        dedent(
-            """\
-            mock_tgt(name="a", sources=["f.txt"])
-            mock_tgt(name="b", sources=["f.txt"], tags=["integration"])
-            mock_tgt(name="c", sources=["f.txt"], tags=["ignore"])
-            """
-        ),
-    )
-    assert resolve_address_specs(address_specs_rule_runner, [SiblingAddresses("demo")]) == {
-        Address("demo", target_name="b")
-    }
-
-    # The same filtering should work when given literal addresses, including file addresses.
-    # For file addresses, we look up the `tags` field of the original BUILD target.
-    literals_result = resolve_address_specs(
-        address_specs_rule_runner,
-        [
-            AddressLiteralSpec("demo", "a"),
-            AddressLiteralSpec("demo", "b"),
-            AddressLiteralSpec("demo", "c"),
-            AddressLiteralSpec("demo/f.txt", "a"),
-            AddressLiteralSpec("demo/f.txt", "b"),
-            AddressLiteralSpec("demo/f.txt", "c"),
+    symbols = run_rule_with_mocks(
+        evaluate_preludes,
+        rule_args=[
+            BuildFileOptions((), prelude_globs=("prelude",)),
+            Parser(
+                build_root="",
+                registered_target_types=RegisteredTargetTypes({}),
+                union_membership=UnionMembership({}),
+                object_aliases=BuildFileAliases(),
+                ignore_unrecognized_symbols=False,
+            ),
+        ],
+        mock_gets=[
+            MockGet(
+                output_type=DigestContents,
+                input_types=(PathGlobs,),
+                mock=lambda _: DigestContents(
+                    [
+                        FileContent(
+                            path="/dev/null/prelude1",
+                            content=dedent(
+                                """\
+                                def hello():
+                                    pass
+                                """
+                            ).encode(),
+                        ),
+                        FileContent(
+                            path="/dev/null/prelude2",
+                            content=dedent(
+                                """\
+                                def world():
+                                    pass
+                                """
+                            ).encode(),
+                        ),
+                    ]
+                ),
+            ),
         ],
     )
-    assert literals_result == {
-        Address("demo", relative_file_path="f.txt", target_name="b"),
-        Address("demo", target_name="b"),
-    }
-
-
-def test_address_specs_filter_by_exclude_pattern(address_specs_rule_runner: RuleRunner) -> None:
-    address_specs_rule_runner.set_options(["--exclude-target-regexp=exclude_me.*"])
-    address_specs_rule_runner.create_file("demo/f.txt")
-    address_specs_rule_runner.add_to_build_file(
-        "demo",
-        dedent(
-            """\
-            mock_tgt(name="exclude_me", sources=["f.txt"])
-            mock_tgt(name="not_me", sources=["f.txt"])
-            """
-        ),
-    )
-
-    assert resolve_address_specs(address_specs_rule_runner, [SiblingAddresses("demo")]) == {
-        Address("demo", target_name="not_me")
-    }
-
-    # The same filtering should work when given literal addresses, including file addresses.
-    # The filtering will operate against the normalized Address.spec.
-    literals_result = resolve_address_specs(
-        address_specs_rule_runner,
-        [
-            AddressLiteralSpec("demo", "exclude_me"),
-            AddressLiteralSpec("demo", "not_me"),
-            AddressLiteralSpec("demo/f.txt", "exclude_me"),
-            AddressLiteralSpec("demo/f.txt", "not_me"),
-        ],
-    )
-
-    assert literals_result == {
-        Address("demo", relative_file_path="f.txt", target_name="not_me"),
-        Address("demo", target_name="not_me"),
-    }
-
-
-def test_address_specs_do_not_exist(address_specs_rule_runner: RuleRunner) -> None:
-    address_specs_rule_runner.create_file("real/f.txt")
-    address_specs_rule_runner.add_to_build_file("real", "mock_tgt(sources=['f.txt'])")
-    address_specs_rule_runner.add_to_build_file("empty", "# empty")
-
-    def assert_resolve_error(specs: Iterable[AddressSpec], *, expected: str) -> None:
-        with pytest.raises(ExecutionError) as exc:
-            resolve_address_specs(address_specs_rule_runner, specs)
-        assert expected in str(exc.value)
-
-    # Literal addresses require both a BUILD file to exist and for a target to be resolved.
-    assert_resolve_error(
-        [AddressLiteralSpec("fake", "tgt")], expected="'fake' does not exist on disk"
-    )
-    assert_resolve_error(
-        [AddressLiteralSpec("fake/f.txt", "tgt")],
-        expected="'fake/f.txt' does not exist on disk",
-    )
-    did_you_mean = ResolveError.did_you_mean(
-        bad_name="fake_tgt", known_names=["real"], namespace="real"
-    )
-    assert_resolve_error([AddressLiteralSpec("real", "fake_tgt")], expected=str(did_you_mean))
-    assert_resolve_error([AddressLiteralSpec("real/f.txt", "fake_tgt")], expected=str(did_you_mean))
-
-    # SiblingAddresses require the BUILD file to exist, but are okay if no targets are resolved.
-    assert_resolve_error(
-        [SiblingAddresses("fake")],
-        expected=(
-            "'fake' does not contain any BUILD files, but 'fake:' expected matching targets "
-            "there."
-        ),
-    )
-    assert not resolve_address_specs(address_specs_rule_runner, [SiblingAddresses("empty")])
-
-    # DescendantAddresses requires at least one match, even if BUILD files exist.
-    assert_resolve_error(
-        [DescendantAddresses("fake"), DescendantAddresses("empty")],
-        expected="Address spec 'fake::' does not match any targets",
-    )
-
-    # AscendantAddresses does not require any matches or BUILD files.
-    assert not resolve_address_specs(
-        address_specs_rule_runner, [AscendantAddresses("fake"), AscendantAddresses("empty")]
-    )
-
-
-def test_address_specs_file_does_not_belong_to_target(
-    address_specs_rule_runner: RuleRunner,
-) -> None:
-    """Even if a file's address file exists and target exist, we should validate that the file
-    actually belongs to that target."""
-    address_specs_rule_runner.create_file("demo/f.txt")
-    address_specs_rule_runner.add_to_build_file(
-        "demo",
-        dedent(
-            """\
-            mock_tgt(name='owner', sources=['f.txt'])
-            mock_tgt(name='not_owner')
-            """
-        ),
-    )
-
-    with pytest.raises(ExecutionError) as exc:
-        resolve_address_specs(
-            address_specs_rule_runner, [AddressLiteralSpec("demo/f.txt", "not_owner")]
-        )
-    assert "does not match a file demo/f.txt" in str(exc.value)
+    assert symbols.symbols["hello"].__globals__ is symbols.symbols["world"].__globals__
+    assert "world" in symbols.symbols["hello"].__globals__
+    assert "hello" in symbols.symbols["world"].__globals__

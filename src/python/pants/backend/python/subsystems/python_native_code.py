@@ -1,53 +1,53 @@
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import os
-from typing import Dict, Tuple
+from __future__ import annotations
 
-from pants.engine.rules import collect_rules
+from typing import Sequence
+
+from pants.option.option_types import StrListOption
 from pants.option.subsystem import Subsystem
 from pants.util.strutil import safe_shlex_join, safe_shlex_split
 
 
-class PythonNativeCode(Subsystem):
-    """Options for building native code using Python, e.g. when resolving distributions."""
+class PythonNativeCodeSubsystem(Subsystem):
 
     options_scope = "python-native-code"
+    help = "Options for building native code using Python, e.g. when resolving distributions."
 
-    @classmethod
-    def register_options(cls, register):
-        super().register_options(register)
+    class EnvironmentAware(Subsystem.EnvironmentAware):
+        env_vars_used_by_options = ("CPPFLAGS", "LDFLAGS")
+
         # TODO(#7735): move the --cpp-flags and --ld-flags to a general subprocess support subsystem.
-        register(
-            "--cpp-flags",
-            type=list,
-            default=safe_shlex_split(os.environ.get("CPPFLAGS", "")),
+        _cpp_flags = StrListOption(
+            default=["<CPPFLAGS>"],
+            help=(
+                "Override the `CPPFLAGS` environment variable for any forked subprocesses. "
+                "Use the value `['<CPPFLAGS>']` to inherit the value of the `CPPFLAGS` "
+                "environment variable from your runtime environment target."
+            ),
             advanced=True,
-            help="Override the `CPPFLAGS` environment variable for any forked subprocesses.",
         )
-        register(
-            "--ld-flags",
-            type=list,
-            default=safe_shlex_split(os.environ.get("LDFLAGS", "")),
+        _ld_flags = StrListOption(
+            default=["<LDFLAGS>"],
+            help=(
+                "Override the `LDFLAGS` environment variable for any forked subprocesses. "
+                "Use the value `['<LDFLAGS>']` to inherit the value of the `LDFLAGS` environment "
+                "variable from your runtime environment target."
+            ),
             advanced=True,
-            help="Override the `LDFLAGS` environment variable for any forked subprocesses.",
         )
 
-    @property
-    def cpp_flags(self) -> Tuple[str, ...]:
-        return tuple(self.options.cpp_flags)
+        @property
+        def subprocess_env_vars(self) -> dict[str, str]:
+            return {
+                "CPPFLAGS": safe_shlex_join(self._iter_values("CPPFLAGS", self._cpp_flags)),
+                "LDFLAGS": safe_shlex_join(self._iter_values("LDFLAGS", self._ld_flags)),
+            }
 
-    @property
-    def ld_flags(self) -> Tuple[str, ...]:
-        return tuple(self.options.ld_flags)
-
-    @property
-    def environment_dict(self) -> Dict[str, str]:
-        return {
-            "CPPFLAGS": safe_shlex_join(self.cpp_flags),
-            "LDFLAGS": safe_shlex_join(self.ld_flags),
-        }
-
-
-def rules():
-    return collect_rules()
+        def _iter_values(self, env_var: str, values: Sequence[str]):
+            for value in values:
+                if value == f"<{env_var}>":
+                    yield from safe_shlex_split(self._options_env.get(env_var, ""))
+                else:
+                    yield value

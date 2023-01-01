@@ -1,10 +1,18 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-python_library()
+resource(name="lockfile", source="bandit.lock")
 
-python_integration_tests(
-  name='integration',
-  uses_pants_run=False,
-  timeout=240,
+python_sources(
+    overrides={"subsystem.py": {"dependencies": [":lockfile"]}},
+)
+
+python_tests(
+    name="tests",
+    overrides={
+        "rules_integration_test.py": {
+            "timeout": 240,
+            "tags": ["platform_specific_behavior"],
+        }
+    },
 )

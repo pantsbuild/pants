@@ -1,9 +1,11 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import copy
 from dataclasses import dataclass
-from typing import Dict, Iterator, List, Optional
+from typing import Iterator
 
 from pants.option.ranked_value import Rank, RankedValue, Value
 
@@ -11,10 +13,10 @@ Key = str
 
 
 class OptionValueContainerBuilder:
-    def __init__(self, value_map: Optional[Dict[Key, RankedValue]] = None) -> None:
-        self._value_map: Dict[Key, RankedValue] = value_map if value_map else {}
+    def __init__(self, value_map: dict[Key, RankedValue] | None = None) -> None:
+        self._value_map: dict[Key, RankedValue] = value_map if value_map else {}
 
-    def update(self, other: "OptionValueContainerBuilder") -> None:
+    def update(self, other: OptionValueContainerBuilder) -> None:
         """Set other's values onto this object.
 
         For each key, highest ranked value wins. In a tie, other's value wins.
@@ -39,7 +41,7 @@ class OptionValueContainerBuilder:
             return super().__setattr__(key, value)
         self._set(key, value)
 
-    def build(self) -> "OptionValueContainer":
+    def build(self) -> OptionValueContainer:
         return OptionValueContainer(copy.copy(self._value_map))
 
 
@@ -58,9 +60,9 @@ class OptionValueContainer:
        See ranked_value.py for more details.
     """
 
-    _value_map: Dict[Key, RankedValue]
+    _value_map: dict[Key, RankedValue]
 
-    def get_explicit_keys(self) -> List[Key]:
+    def get_explicit_keys(self) -> list[Key]:
         """Returns the keys for any values that were set explicitly (via flag, config, or env
         var)."""
         ret = []
@@ -106,13 +108,13 @@ class OptionValueContainer:
         """
         return self.get_rank(key) in (Rank.NONE, Rank.HARDCODED)
 
-    def get(self, key: Key, default: Optional[Value] = None):
+    def get(self, key: Key, default: Value | None = None):
         # Support dict-like dynamic access.  See also __getitem__ below.
         if key not in self._value_map:
             return default
         return self._get_underlying_value(key)
 
-    def as_dict(self) -> Dict[Key, Value]:
+    def as_dict(self) -> dict[Key, Value]:
         return {key: self.get(key) for key in self._value_map}
 
     def to_builder(self) -> OptionValueContainerBuilder:
@@ -141,5 +143,4 @@ class OptionValueContainer:
 
     def __iter__(self) -> Iterator[Key]:
         """Returns an iterator over all option names, in lexicographical order."""
-        for name in sorted(self._value_map.keys()):
-            yield name
+        yield from sorted(self._value_map.keys())

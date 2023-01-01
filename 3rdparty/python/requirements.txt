@@ -1,31 +1,54 @@
+# Note: Adding a third-party dependency is usually frowned upon because it increases the time
+# to install Pants.
+# This is particularly painful for CI, where the installation of Pants is often slow.
+# Additionally, it increases the surface area of Pants's supply chain for security.
+# Consider pinging us on Slack if you're thinking a new dependency might be needed.
+
 ansicolors==1.1.8
-beautifulsoup4>=4.6.0,<4.7
-dataclasses==0.6
-fasteners==0.15.0
+chevron==0.14.0
+fasteners==0.16.3
+freezegun==1.2.1
 
-# The MyPy requirement should be maintained in lockstep with the requirement the Pants repo uses
-# for the mypy task since it configures custom MyPy plugins. That requirement can be found via:
-#
-#   ./pants \
-#       options \
-#         --output-format=json \
-#         --scope=mypy \
-#         --name=version \
-#     | jq -r '."mypy.version".value'
-#
-mypy==0.782
+# Note: we use humbug to report telemetry. When upgrading, ensure the new version maintains the
+# anonymity promise we make here: https://www.pantsbuild.org/docs/anonymous-telemetry
+humbug==0.2.7
 
-packaging==20.4
-pathspec==0.8.0
-pex==2.1.21
-psutil==5.7.0
-pystache==0.5.4
-# This should be kept in sync with `pytest.py`.
-pytest>=6.0.1,<6.1
-PyYAML>=5.3.1,<5.4
-requests[security]>=2.20.1
-setproctitle==1.1.10
-setuptools>=50.3.0,<50.4
+importlib_resources==5.0.*
+ijson==3.1.4
+packaging==21.3
+pex==2.1.116
+psutil==5.9.0
+# This should be compatible with pytest.py, although it can be looser so that we don't
+# over-constrain pantsbuild.pants.testutil
+# Pytest 7.1.0 introduced a significant bug that is apparently not fixed as of 7.1.1 (the most
+# recent release at the time of writing). see https://github.com/pantsbuild/pants/issues/14990.
+# TODO: Once this issue is fixed, loosen this to allow the version to float above the bad ones.
+#  E.g., as default_version = "pytest>=6.2.4,<8,!=7.1.0,!=7.1.1"
+pytest>=6.2.4,<7.1.0
+python-lsp-jsonrpc==1.0.0
+PyYAML>=6.0,<7.0
+requests[security]>=2.28.1
+setproctitle==1.3.2
+setuptools>=63.1.0,<64.0
 toml==0.10.2
-typed-ast>=1.4.1,<1.5
-typing-extensions==3.7.4.2
+types-freezegun==1.1.6
+types-PyYAML==6.0.3
+types-requests==2.28.1
+types-setuptools==62.6.1
+types-toml==0.10.8
+typing-extensions==4.3.0
+mypy-typing-asserts==0.1.1
+
+
+# This dependency is only for debugging Pants itself, and should never be imported
+debugpy==1.6.0
+
+# These dependencies must only be used from the explorer backend, and no code outside that backend
+# may import anything from it, so these libraries are not ending up as requirements of Pants itself.
+fastapi==0.78.0
+starlette==0.19.1
+strawberry-graphql[fastapi]==0.114.0
+uvicorn[standard]==0.17.6
+
+beautifulsoup4==4.11.1 # Util for webcrawling for pulling in tool versions
+python-gnupg==0.4.9 # For validating signatures

@@ -1,26 +1,33 @@
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+
 import importlib
 import locale
 import os
+import sys
+import time
 import warnings
-from textwrap import dedent
+
+from pants import ox
+from pants.base.exiter import PANTS_FAILED_EXIT_CODE
+from pants.bin.pants_env_vars import (
+    DAEMON_ENTRYPOINT,
+    IGNORE_UNRECOGNIZED_ENCODING,
+    RECURSION_LIMIT,
+)
+from pants.bin.pants_runner import PantsRunner
+from pants.util.strutil import softwrap
 
 
 class PantsLoader:
-    """Loads and executes entrypoints."""
+    """Initial entrypoint for pants.
 
-    ENTRYPOINT_ENV_VAR = "PANTS_ENTRYPOINT"
-    DEFAULT_ENTRYPOINT = "pants.bin.pants_exe:main"
-
-    ENCODING_IGNORE_ENV_VAR = "PANTS_IGNORE_UNRECOGNIZED_ENCODING"
-
-    class InvalidLocaleError(Exception):
-        """Raised when a valid locale can't be found."""
+    Executes a pants_runner by default, or executs a pantsd-specific entrypoint.
+    """
 
     @staticmethod
-    def setup_warnings():
+    def setup_warnings() -> None:
         # We want to present warnings to the user, set this up before importing any of our own code,
         # to ensure all deprecation warnings are seen, including module deprecations.
         # The "default" action displays a warning for a particular file and line number exactly once.
@@ -40,58 +47,80 @@ class PantsLoader:
         )
 
     @classmethod
-    def ensure_locale(cls):
-        # Sanity check for locale, See https://github.com/pantsbuild/pants/issues/2465.
-        # This check is done early to give good feedback to user on how to fix the problem. Other
-        # libraries called by Pants may fail with more obscure errors.
+    def ensure_locale(cls) -> None:
+        """Ensure the locale uses UTF-8 encoding, or prompt for an explicit bypass."""
+
         encoding = locale.getpreferredencoding()
         if (
             encoding.lower() != "utf-8"
-            and os.environ.get(cls.ENCODING_IGNORE_ENV_VAR, None) is None
+            and os.environ.get(IGNORE_UNRECOGNIZED_ENCODING, None) is None
         ):
-            raise cls.InvalidLocaleError(
-                dedent(
-                    """
-                    Your system's preferred encoding is `{}`, but Pants requires `UTF-8`.
+            raise RuntimeError(
+                softwrap(
+                    f"""
+                    Your system's preferred encoding is `{encoding}`, but Pants requires `UTF-8`.
                     Specifically, Python's `locale.getpreferredencoding()` must resolve to `UTF-8`.
 
-                    Fix it by setting the LC_* and LANG environment settings. Example:
+                    You can fix this by setting the LC_* and LANG environment variables, e.g.:
                       LC_ALL=en_US.UTF-8
                       LANG=en_US.UTF-8
-                    Or, bypass it by setting the below environment variable.
-                      {}=1
-                    Note: we cannot guarantee consistent behavior with this bypass enabled.
-                    """.format(
-                        encoding, cls.ENCODING_IGNORE_ENV_VAR
-                    )
+                    Or, bypass it by setting {IGNORE_UNRECOGNIZED_ENCODING}=1. Note that
+                    pants may exhibit inconsistent behavior if this check is bypassed.
+                    """
                 )
             )
 
     @staticmethod
-    def determine_entrypoint(env_var, default):
-        return os.environ.pop(env_var, default)
+    def run_alternate_entrypoint(entrypoint: str) -> None:
+        try:
+            module_path, func_name = entrypoint.split(":", 1)
+        except ValueError:
+            print(
+                f"{DAEMON_ENTRYPOINT} must be of the form `module.path:callable`", file=sys.stderr
+            )
+            sys.exit(PANTS_FAILED_EXIT_CODE)
+
+        module = importlib.import_module(module_path)
+        entrypoint_fn = getattr(module, func_name)
+        entrypoint_fn()
 
     @staticmethod
-    def load_and_execute(entrypoint):
-        assert ":" in entrypoint, "ERROR: entrypoint must be of the form `module.path:callable`"
-        module_path, func_name = entrypoint.split(":", 1)
-        module = importlib.import_module(module_path)
-        entrypoint_main = getattr(module, func_name)
-        assert callable(entrypoint_main), "ERROR: entrypoint `{}` is not callable".format(
-            entrypoint
-        )
-        entrypoint_main()
+    def run_default_entrypoint() -> None:
+        start_time = time.time()
+        try:
+            runner = PantsRunner(args=sys.argv, env=os.environ)
+            exit_code = runner.run(start_time)
+        except KeyboardInterrupt as e:
+            print(f"Interrupted by user:\n{e}", file=sys.stderr)
+            exit_code = PANTS_FAILED_EXIT_CODE
+        sys.exit(exit_code)
 
     @classmethod
-    def run(cls):
+    def main(cls) -> None:
         cls.setup_warnings()
         cls.ensure_locale()
-        entrypoint = cls.determine_entrypoint(cls.ENTRYPOINT_ENV_VAR, cls.DEFAULT_ENTRYPOINT)
-        cls.load_and_execute(entrypoint)
+
+        sys.setrecursionlimit(int(os.environ.get(RECURSION_LIMIT, "10000")))
+
+        entrypoint = os.environ.pop(DAEMON_ENTRYPOINT, None)
+
+        if entrypoint:
+            cls.run_alternate_entrypoint(entrypoint)
+        else:
+            cls.run_default_entrypoint()
 
 
-def main():
-    PantsLoader.run()
+def main() -> None:
+    ox.bootstrap_pyoxidizer()
+
+    # In our `PyOxidizer`-generated binary, sometimes we'll be attempting to load this
+    # like a Python interpreter in order to run `pex` and its child processes. If we
+    # detect such an invocation, we'll try to run it, and then quit this process before
+    # getting into Pants itself.
+    if ox.is_oxidized and ox.pex_main():
+        return
+
+    PantsLoader.main()
 
 
 if __name__ == "__main__":

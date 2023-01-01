@@ -5,15 +5,18 @@ import os
 import re
 import signal
 import time
-from textwrap import dedent
+from pathlib import Path
 from typing import List, Tuple
+
+import pytest
 
 from pants.base.build_environment import get_buildroot
 from pants.base.exception_sink import ExceptionSink
 from pants.testutil.pants_integration_test import run_pants_with_workdir
-from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import read_file
 from pants_test.pantsd.pantsd_integration_test_base import PantsDaemonIntegrationTestBase
+
+pytestmark = pytest.mark.platform_specific_behavior
 
 
 def lifecycle_stub_cmdline() -> List[str]:
@@ -45,7 +48,7 @@ def get_log_file_paths(workdir: str, pid: int) -> Tuple[str, str]:
     return (pid_specific_log_file, shared_log_file)
 
 
-def assert_unhandled_exception_log_matches(pid: int, file_contents: str, namespace: str) -> None:
+def assert_unhandled_exception_log_matches(pid: int, file_contents: str) -> None:
     regex_str = f"""\
 timestamp: ([^\n]+)
 process title: ([^\n]+)
@@ -54,9 +57,7 @@ pid: {pid}
 Exception caught: \\([^)]*\\)
 (.|\n)*
 
-Exception message:.* 1 Exception encountered:
-
-  ResolveError: 'this-target-does-not-exist' was not found in namespace '{namespace}'\\. Did you mean one of:
+Exception message:.*
 """
     assert re.match(regex_str, file_contents)
 
@@ -74,78 +75,22 @@ Signal {signum} \\({signame}\\) was raised\\. Exiting with failure\\.
     assert re.search(regex_str, contents)
 
 
-def test_logs_unhandled_exception() -> None:
-    directory = "testprojects/src/python/hello/main"
-    with temporary_dir() as tmpdir:
-        pants_run = run_pants_with_workdir(
-            ["--no-pantsd", "list", f"{directory}:this-target-does-not-exist"],
-            workdir=tmpdir,
-            # The backtrace should be omitted when --print-stacktrace=False.
-            print_stacktrace=False,
-            hermetic=False,
-        )
+def test_logs_unhandled_exception(tmp_path: Path) -> None:
+    pants_run = run_pants_with_workdir(
+        # The backtrace should be omitted when --print-stacktrace=False.
+        [*lifecycle_stub_cmdline(), "--no-print-stacktrace"],
+        workdir=tmp_path.as_posix(),
+        extra_env={"_RAISE_EXCEPTION_ON_IMPORT": "True"},
+    )
 
-        pants_run.assert_failure()
+    pants_run.assert_failure()
 
-        regex = f"'this-target-does-not-exist' was not found in namespace '{directory}'\\. Did you mean one of:"
-        assert re.search(regex, pants_run.stderr)
+    regex = "exception during import!"
+    assert re.search(regex, pants_run.stderr)
 
-        pid_specific_log_file, shared_log_file = get_log_file_paths(tmpdir, pants_run.pid)
-        assert_unhandled_exception_log_matches(
-            pants_run.pid, read_file(pid_specific_log_file), namespace=directory
-        )
-        assert_unhandled_exception_log_matches(
-            pants_run.pid, read_file(shared_log_file), namespace=directory
-        )
-
-
-def test_fails_ctrl_c_on_import() -> None:
-    with temporary_dir() as tmpdir:
-        # TODO: figure out the cwd of the pants subprocess, not just the "workdir"!
-        pants_run = run_pants_with_workdir(
-            lifecycle_stub_cmdline(),
-            workdir=tmpdir,
-            extra_env={"_RAISE_KEYBOARDINTERRUPT_ON_IMPORT": "True"},
-        )
-        pants_run.assert_failure()
-
-        assert (
-            dedent(
-                """\
-                Interrupted by user:
-                ctrl-c during import!
-                """
-            )
-            in pants_run.stderr
-        )
-
-        pid_specific_log_file, shared_log_file = get_log_file_paths(tmpdir, pants_run.pid)
-
-        assert "" == read_file(pid_specific_log_file)
-        assert "" == read_file(shared_log_file)
-
-
-def test_fails_ctrl_c_ffi_extern() -> None:
-    with temporary_dir() as tmpdir:
-        pants_run = run_pants_with_workdir(
-            command=lifecycle_stub_cmdline(),
-            workdir=tmpdir,
-            extra_env={"_RAISE_KEYBOARDINTERRUPT_IN_EXTERNS": "True"},
-        )
-        pants_run.assert_failure()
-
-        assert (
-            "KeyboardInterrupt: ctrl-c interrupted execution of a ffi method!" in pants_run.stderr
-        )
-
-        pid_specific_log_file, shared_log_file = get_log_file_paths(tmpdir, pants_run.pid)
-
-        assert "KeyboardInterrupt: ctrl-c interrupted execution of a ffi method!" in read_file(
-            pid_specific_log_file
-        )
-        assert "KeyboardInterrupt: ctrl-c interrupted execution of a ffi method!" in read_file(
-            shared_log_file
-        )
+    pid_specific_log_file, shared_log_file = get_log_file_paths(tmp_path.as_posix(), pants_run.pid)
+    assert_unhandled_exception_log_matches(pants_run.pid, read_file(pid_specific_log_file))
+    assert_unhandled_exception_log_matches(pants_run.pid, read_file(shared_log_file))
 
 
 class ExceptionSinkIntegrationTest(PantsDaemonIntegrationTestBase):
@@ -193,4 +138,4 @@ Thread [^\n]+ \\(most recent call first\\):
             assert re.search(regex_str, read_file(pid_specific_log_file))
 
             # faulthandler.enable() only allows use of a single logging file at once for fatal tracebacks.
-            self.assertEqual("", read_file(shared_log_file))
+            assert "" == read_file(shared_log_file)

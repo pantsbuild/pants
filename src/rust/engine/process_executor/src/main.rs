@@ -10,9 +10,7 @@
   clippy::if_not_else,
   clippy::needless_continue,
   clippy::unseparated_literal_suffix,
-  // TODO: Falsely triggers for async/await:
-  //   see https://github.com/rust-lang/rust-clippy/issues/5360
-  // clippy::used_underscore_binding
+  clippy::used_underscore_binding
 )]
 // It is often more clear to show that nothing is being moved.
 #![allow(clippy::match_ref_pats)]
@@ -29,19 +27,186 @@
 #![type_length_limit = "1257309"]
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::convert::TryFrom;
 use std::iter::{FromIterator, Iterator};
 use std::path::PathBuf;
 use std::process::exit;
+use std::sync::Arc;
 use std::time::Duration;
 
-use clap::{value_t, App, AppSettings, Arg};
-use fs::RelativePath;
-use futures::compat::Future01CompatExt;
+use fs::{DirectoryDigest, Permissions, RelativePath};
 use hashing::{Digest, Fingerprint};
-use process_execution::{Context, NamedCaches, Platform, ProcessMetadata};
-use store::{BackoffConfig, Store};
-use workunit_store::WorkunitStore;
+use process_execution::{
+  local::KeepSandboxes, CacheContentBehavior, Context, InputDigests, NamedCaches, Platform,
+  ProcessCacheScope, ProcessExecutionStrategy,
+};
+use prost::Message;
+use protos::gen::build::bazel::remote::execution::v2::{Action, Command};
+use protos::gen::buildbarn::cas::UncachedActionResult;
+use protos::require_digest;
+use store::{ImmutableInputs, Store};
+use structopt::StructOpt;
+use workunit_store::{in_workunit, Level, WorkunitStore};
+
+#[derive(Clone, Debug, Default)]
+struct ProcessMetadata {
+  instance_name: Option<String>,
+  cache_key_gen_version: Option<String>,
+}
+
+#[derive(StructOpt)]
+struct CommandSpec {
+  #[structopt(last = true)]
+  argv: Vec<String>,
+
+  /// Fingerprint (hex string) of the digest to use as the input file tree.
+  #[structopt(long)]
+  input_digest: Option<Fingerprint>,
+
+  /// Length of the proto-bytes whose digest to use as the input file tree.
+  #[structopt(long)]
+  input_digest_length: Option<usize>,
+
+  /// Extra platform properties to set on the execution request during remote execution.
+  #[structopt(long)]
+  extra_platform_property: Vec<String>,
+
+  /// Environment variables with which the process should be run.
+  #[structopt(long)]
+  env: Vec<String>,
+
+  /// Symlink a JDK from .jdk in the working directory.
+  /// For local execution, symlinks to the value of this flag.
+  /// For remote execution, just requests that some JDK is symlinked if this flag has any value.
+  /// https://github.com/pantsbuild/pants/issues/6416 will make this less weird in the future.
+  #[structopt(long)]
+  jdk: Option<PathBuf>,
+
+  /// Path to file that is considered to be output.
+  #[structopt(long)]
+  output_file_path: Vec<PathBuf>,
+
+  /// Path to directory that is considered to be output.
+  #[structopt(long)]
+  output_directory_path: Vec<PathBuf>,
+
+  /// Path to execute the binary at relative to its input digest root.
+  #[structopt(long)]
+  working_directory: Option<PathBuf>,
+
+  #[structopt(long)]
+  concurrency_available: Option<usize>,
+
+  #[structopt(long)]
+  cache_key_gen_version: Option<String>,
+}
+
+#[derive(StructOpt)]
+struct ActionDigestSpec {
+  /// Fingerprint (hex string) of the digest of the action to run.
+  #[structopt(long)]
+  action_digest: Option<Fingerprint>,
+
+  /// Length of the proto-bytes whose digest is the action to run.
+  #[structopt(long)]
+  action_digest_length: Option<usize>,
+}
+
+#[derive(StructOpt)]
+#[structopt(name = "process_executor", setting = structopt::clap::AppSettings::TrailingVarArg)]
+struct Opt {
+  #[structopt(flatten)]
+  command: CommandSpec,
+
+  #[structopt(flatten)]
+  action_digest: ActionDigestSpec,
+
+  #[structopt(long)]
+  buildbarn_url: Option<String>,
+
+  #[structopt(long)]
+  run_under: Option<String>,
+
+  /// The name of a directory (which may or may not exist), where the output tree will be materialized.
+  #[structopt(long)]
+  materialize_output_to: Option<PathBuf>,
+
+  /// Path to workdir.
+  #[structopt(long)]
+  work_dir: Option<PathBuf>,
+
+  ///Path to lmdb directory used for local file storage.
+  #[structopt(long)]
+  local_store_path: Option<PathBuf>,
+
+  /// Path to a directory to be used for named caches.
+  #[structopt(long)]
+  named_cache_path: Option<PathBuf>,
+
+  #[structopt(long)]
+  remote_instance_name: Option<String>,
+
+  /// The host:port of the gRPC server to connect to. Forces remote execution.
+  /// If unspecified, local execution will be performed.
+  #[structopt(long)]
+  server: Option<String>,
+
+  /// Path to file containing root certificate authority certificates for the execution server.
+  /// If not set, TLS will not be used when connecting to the execution server.
+  #[structopt(long)]
+  execution_root_ca_cert_file: Option<PathBuf>,
+
+  /// Path to file containing oauth bearer token for communication with the execution server.
+  /// If not set, no authorization will be provided to remote servers.
+  #[structopt(long)]
+  execution_oauth_bearer_token_path: Option<PathBuf>,
+
+  /// The host:port of the gRPC CAS server to connect to.
+  #[structopt(long)]
+  cas_server: Option<String>,
+
+  /// Path to file containing root certificate authority certificates for the CAS server.
+  /// If not set, TLS will not be used when connecting to the CAS server.
+  #[structopt(long)]
+  cas_root_ca_cert_file: Option<PathBuf>,
+
+  /// Path to file containing oauth bearer token for communication with the CAS server.
+  /// If not set, no authorization will be provided to remote servers.
+  #[structopt(long)]
+  cas_oauth_bearer_token_path: Option<PathBuf>,
+
+  /// Number of bytes to include per-chunk when uploading bytes.
+  /// grpc imposes a hard message-size limit of around 4MB.
+  #[structopt(long, default_value = "3145728")]
+  upload_chunk_bytes: usize,
+
+  /// Number of retries per request to the store service.
+  #[structopt(long, default_value = "3")]
+  store_rpc_retries: usize,
+
+  /// Number of concurrent requests to the store service.
+  #[structopt(long, default_value = "128")]
+  store_rpc_concurrency: usize,
+
+  /// Total size of blobs allowed to be sent in a single API call.
+  #[structopt(long, default_value = "4194304")]
+  store_batch_api_size_limit: usize,
+
+  /// Number of concurrent requests to the execution service.
+  #[structopt(long, default_value = "128")]
+  execution_rpc_concurrency: usize,
+
+  /// Number of concurrent requests to the cache service.
+  #[structopt(long, default_value = "128")]
+  cache_rpc_concurrency: usize,
+
+  /// Overall timeout in seconds for each request from time of submission.
+  #[structopt(long, default_value = "600")]
+  overall_deadline_secs: u64,
+
+  /// Extra header to pass on remote execution request.
+  #[structopt(long)]
+  header: Vec<String>,
+}
 
 /// A binary which takes args of format:
 ///  process_executor --env=FOO=bar --env=SOME=value --input-digest=abc123 --input-digest-length=80
@@ -53,366 +218,123 @@ use workunit_store::WorkunitStore;
 #[tokio::main]
 async fn main() {
   env_logger::init();
-  let workunit_store = WorkunitStore::new(false);
+  let workunit_store = WorkunitStore::new(false, log::Level::Debug);
   workunit_store.init_thread_state(None);
 
-  let args = App::new("process_executor")
-    .arg(
-      Arg::with_name("work-dir")
-        .long("work-dir")
-        .takes_value(true)
-        .help("Path to workdir"),
-    )
-    .arg(
-      Arg::with_name("local-store-path")
-        .long("local-store-path")
-        .takes_value(true)
-        .help("Path to lmdb directory used for local file storage"),
-    )
-    .arg(
-      Arg::with_name("named-cache-path")
-        .long("named-cache-path")
-        .takes_value(true)
-        .help("Path to a directory to be used for named caches")
-    )
-    .arg(
-      Arg::with_name("input-digest")
-        .long("input-digest")
-        .takes_value(true)
-        .required(true)
-        .help("Fingerprint (hex string) of the digest to use as the input file tree."),
-    )
-    .arg(
-      Arg::with_name("input-digest-length")
-        .long("input-digest-length")
-        .takes_value(true)
-        .required(true)
-        .help("Length of the proto-bytes whose digest to use as the input file tree."),
-    )
-    .arg(
-      Arg::with_name("working-directory")
-        .long("working-directory")
-        .takes_value(true)
-        .required(false)
-        .help("Path to execute the binary at relative to its input digest root.")
-    )
-    .arg(
-      Arg::with_name("server")
-        .long("server")
-        .takes_value(true)
-        .help(
-          "The host:port of the gRPC server to connect to. Forces remote execution. \
-           If unspecified, local execution will be performed.",
-        ),
-    )
-      .arg(
-        Arg::with_name("execution-root-ca-cert-file")
-            .help("Path to file containing root certificate authority certificates for the execution server. If not set, TLS will not be used when connecting to the execution server.")
-            .takes_value(true)
-            .long("execution-root-ca-cert-file")
-            .required(false)
-      )
-      .arg(
-        Arg::with_name("execution-oauth-bearer-token-path")
-            .help("Path to file containing oauth bearer token for communication with the execution server. If not set, no authorization will be provided to remote servers.")
-            .takes_value(true)
-            .long("execution-oauth-bearer-token-path")
-            .required(false)
-      )
-      .arg(
-      Arg::with_name("cas-server")
-        .long("cas-server")
-        .takes_value(true)
-        .help("The host:port of the gRPC CAS server to connect to."),
-    )
-      .arg(
-        Arg::with_name("cas-root-ca-cert-file")
-            .help("Path to file containing root certificate authority certificates for the CAS server. If not set, TLS will not be used when connecting to the CAS server.")
-            .takes_value(true)
-            .long("cas-root-ca-cert-file")
-            .required(false)
-      )
-      .arg(
-        Arg::with_name("cas-oauth-bearer-token-path")
-            .help("Path to file containing oauth bearer token for communication with the CAS server. If not set, no authorization will be provided to remote servers.")
-            .takes_value(true)
-            .long("cas-oauth-bearer-token-path")
-            .required(false)
-      )
-      .arg(Arg::with_name("remote-instance-name")
-          .takes_value(true)
-          .long("remote-instance-name")
-          .required(false))
-      .arg(Arg::with_name("cache-key-gen-version")
-          .takes_value(true)
-          .long("cache-key-gen-version")
-          .required(false))
-      .arg(
-        Arg::with_name("upload-chunk-bytes")
-            .help("Number of bytes to include per-chunk when uploading bytes. grpc imposes a hard message-size limit of around 4MB.")
-            .takes_value(true)
-            .long("chunk-bytes")
-            .required(false)
-            .default_value("3145728") // 3MB
-      )
-    .arg(
-      Arg::with_name("extra-platform-property")
-        .long("extra-platform-property")
-        .takes_value(true)
-        .multiple(true)
-        .help("Extra platform properties to set on the execution request."),
-    )
-      .arg(
-        Arg::with_name("header")
-            .long("header")
-            .takes_value(true)
-            .multiple(true)
-            .help("Extra header to pass on remote execution request."),
-      )
-    .arg(
-      Arg::with_name("env")
-        .long("env")
-        .takes_value(true)
-        .multiple(true)
-        .help("Environment variables with which the process should be run."),
-    )
-      .arg(
-        Arg::with_name("jdk")
-            .long("jdk")
-            .takes_value(true)
-            .required(false)
-            .help("Symlink a JDK from .jdk in the working directory. For local execution, symlinks to the value of this flag. For remote execution, just requests that some JDK is symlinked if this flag has any value. https://github.com/pantsbuild/pants/issues/6416 will make this less weird in the future.")
-      )
-      .arg(
-        Arg::with_name("platform-constraint")
-            .long("platform-constraint")
-            .takes_value(true)
-            .required(false)
-            .help("Whether the process is only compatible with a certain platform. Options are 'linux' and 'darwin'. If left off, will default to no constraints.")
-      )
-      .arg(
-          Arg::with_name("use-nailgun")
-              .long("use-nailgun")
-              .takes_value(true)
-              .required(false)
-              .default_value("false")
-              .help("Whether or not to enable running the process through a Nailgun server.\
-                        This will likely start a new Nailgun server as a side effect.")
-      )
-      .arg(
-        Arg::with_name("overall-deadline-secs")
-            .long("overall-deadline-secs")
-            .takes_value(true)
-            .required(false)
-            .default_value("600")
-            .help("Overall timeout in seconds for each request from time of submission")
-      )
-      .setting(AppSettings::TrailingVarArg)
-    .arg(
-      Arg::with_name("argv")
-        .multiple(true)
-        .last(true)
-        .required(true),
-    )
-    .arg(
-        Arg::with_name("output-file-path")
-            .long("output-file-path")
-            .takes_value(true)
-            .multiple(true)
-            .required(false)
-            .help("Path to file that is considered to be output."),
-    )
-    .arg(
-      Arg::with_name("output-directory-path")
-          .long("output-directory-path")
-          .takes_value(true)
-          .multiple(true)
-          .required(false)
-          .help("Path to directory that is considered to be output."),
-    )
-    .arg(
-      Arg::with_name("materialize-output-to")
-          .long("materialize-output-to")
-          .takes_value(true)
-          .required(false)
-          .help("The name of a directory (which may or may not exist), where the output tree will be materialized.")
-    )
-    .arg(
-      Arg::with_name("store-connection-limit")
-          .help("Number of concurrent servers to allow connections to.")
-          .takes_value(true)
-          .long("store-connection-limit")
-          .required(false)
-          .default_value("3")
-    )
-    .get_matches();
+  let args = Opt::from_args();
 
-  let argv: Vec<String> = args
-    .values_of("argv")
-    .unwrap()
-    .map(str::to_string)
-    .collect();
-  let env = args
-    .values_of("env")
-    .map(collection_from_keyvalues::<_, BTreeMap<_, _>>)
-    .unwrap_or_default();
-  let platform_properties = args
-    .values_of("extra-platform-property")
-    .map(collection_from_keyvalues::<_, Vec<_>>)
-    .unwrap_or_default();
-  let work_dir_base = args
-    .value_of("work-dir")
-    .map(PathBuf::from)
-    .unwrap_or_else(std::env::temp_dir);
-  let local_store_path = args
-    .value_of("local-store-path")
-    .map(PathBuf::from)
-    .unwrap_or_else(Store::default_path);
-  let named_cache_path = args
-    .value_of("named-cache-path")
-    .map(PathBuf::from)
-    .unwrap_or_else(NamedCaches::default_path);
-  let server_arg = args.value_of("server");
-  let remote_instance_arg = args.value_of("remote-instance-name").map(str::to_owned);
-  let output_files = if let Some(values) = args.values_of("output-file-path") {
-    values
-      .map(RelativePath::new)
-      .collect::<Result<BTreeSet<_>, _>>()
-      .unwrap()
-  } else {
-    BTreeSet::new()
-  };
-  let output_directories = if let Some(values) = args.values_of("output-directory-path") {
-    values
-      .map(RelativePath::new)
-      .collect::<Result<BTreeSet<_>, _>>()
-      .unwrap()
-  } else {
-    BTreeSet::new()
-  };
-  let headers = args
-    .values_of("headers")
-    .map(collection_from_keyvalues::<_, BTreeMap<_, _>>)
-    .unwrap_or_default();
-  let overall_deadline_secs = value_t!(args.value_of("overall-deadline-secs"), u64).unwrap_or(3600);
+  let mut headers: BTreeMap<String, String> = collection_from_keyvalues(args.header.iter());
 
   let executor = task_executor::Executor::new();
 
-  let store = match (server_arg, args.value_of("cas-server")) {
-    (Some(_server), Some(cas_server)) => {
-      let chunk_size =
-        value_t!(args.value_of("upload-chunk-bytes"), usize).expect("Bad upload-chunk-bytes flag");
+  let local_store_path = args
+    .local_store_path
+    .clone()
+    .unwrap_or_else(Store::default_path);
 
-      let root_ca_certs = if let Some(path) = args.value_of("cas-root-ca-cert-file") {
-        Some(std::fs::read(path).expect("Error reading root CA certs file"))
-      } else {
-        None
-      };
+  let local_only_store =
+    Store::local_only(executor.clone(), local_store_path).expect("Error making local store");
+  let store = match (&args.server, &args.cas_server) {
+    (_, Some(cas_server)) => {
+      let root_ca_certs = args
+        .cas_root_ca_cert_file
+        .as_ref()
+        .map(|path| std::fs::read(path).expect("Error reading root CA certs file"));
 
-      let oauth_bearer_token = if let Some(path) = args.value_of("cas-oauth-bearer-token-path") {
-        Some(std::fs::read_to_string(path).expect("Error reading oauth bearer token file"))
-      } else {
-        None
-      };
+      let mut headers = BTreeMap::new();
+      if let Some(ref oauth_path) = args.cas_oauth_bearer_token_path {
+        let token =
+          std::fs::read_to_string(oauth_path).expect("Error reading oauth bearer token file");
+        headers.insert(
+          "authorization".to_owned(),
+          format!("Bearer {}", token.trim()),
+        );
+      }
 
-      Store::with_remote(
-        executor.clone(),
-        local_store_path,
-        vec![cas_server.to_owned()],
-        remote_instance_arg.clone(),
-        root_ca_certs,
-        oauth_bearer_token,
-        1,
-        chunk_size,
+      local_only_store.into_with_remote(
+        cas_server,
+        args.remote_instance_name.clone(),
+        grpc_util::tls::Config::new_without_mtls(root_ca_certs),
+        headers,
+        args.upload_chunk_bytes,
         Duration::from_secs(30),
-        // TODO: Take a command line arg.
-        BackoffConfig::new(Duration::from_secs(1), 1.2, Duration::from_secs(20)).unwrap(),
-        3,
-        value_t!(args.value_of("store-connection-limit"), usize)
-          .expect("Bad store-connection-limit flag"),
+        args.store_rpc_retries,
+        args.store_rpc_concurrency,
+        None,
+        args.store_batch_api_size_limit,
       )
     }
-    (None, None) => Store::local_only(executor.clone(), local_store_path),
-    _ => panic!("Must specify either both --server and --cas-server or neither."),
+    (None, None) => Ok(local_only_store),
+    _ => panic!("Can't specify --server without --cas-server"),
   }
-  .expect("Error making store");
+  .expect("Error making remote store");
 
-  let input_files = {
-    let fingerprint = Fingerprint::from_hex_string(args.value_of("input-digest").unwrap())
-      .expect("Bad input-digest");
-    let length = args
-      .value_of("input-digest-length")
-      .unwrap()
-      .parse::<usize>()
-      .expect("input-digest-length must be a non-negative number");
-    Digest(fingerprint, length)
-  };
+  let (mut request, process_metadata) = make_request(&store, &args)
+    .await
+    .expect("Failed to construct request");
 
-  let working_directory = args
-    .value_of("working-directory")
-    .map(|path| RelativePath::new(path).expect("working-directory must be a relative path"));
-  let is_nailgunnable: bool = args.value_of("use-nailgun").unwrap().parse().unwrap();
+  if let Some(run_under) = args.run_under {
+    let run_under = shlex::split(&run_under).expect("Could not shlex --run-under arg");
+    request.argv = run_under
+      .into_iter()
+      .chain(request.argv.into_iter())
+      .collect();
+  }
+  let workdir = args.work_dir.unwrap_or_else(std::env::temp_dir);
 
-  let platform_constraint = match args.value_of("target-platform") {
-    Some(s) => {
-      let plat = Platform::try_from(s.to_string()).expect("invalid value for `target-platform");
-      Some(plat)
-    }
-    None => None,
-  };
-
-  let request = process_execution::Process {
-    argv,
-    env,
-    working_directory,
-    input_files,
-    output_files,
-    output_directories,
-    timeout: Some(Duration::new(15 * 60, 0)),
-    description: "process_executor".to_string(),
-    level: log::Level::Info,
-    append_only_caches: BTreeMap::new(),
-    jdk_home: args.value_of("jdk").map(PathBuf::from),
-    platform_constraint,
-    is_nailgunnable,
-    execution_slot_variable: None,
-    cache_failures: false,
-  };
-
-  let runner: Box<dyn process_execution::CommandRunner> = match server_arg {
+  let runner: Box<dyn process_execution::CommandRunner> = match args.server {
     Some(address) => {
-      let root_ca_certs = if let Some(path) = args.value_of("execution-root-ca-cert-file") {
-        Some(std::fs::read(path).expect("Error reading root CA certs file"))
-      } else {
-        None
-      };
+      let root_ca_certs = args
+        .execution_root_ca_cert_file
+        .map(|path| std::fs::read(path).expect("Error reading root CA certs file"));
 
-      let oauth_bearer_token =
-        if let Some(path) = args.value_of("execution-oauth-bearer-token-path") {
-          Some(std::fs::read_to_string(path).expect("Error reading oauth bearer token file"))
-        } else {
-          None
-        };
+      if let Some(oauth_path) = args.execution_oauth_bearer_token_path {
+        let token =
+          std::fs::read_to_string(oauth_path).expect("Error reading oauth bearer token file");
+        headers.insert(
+          "authorization".to_owned(),
+          format!("Bearer {}", token.trim()),
+        );
+      }
+
+      let remote_runner = process_execution::remote::CommandRunner::new(
+        &address,
+        process_metadata.instance_name.clone(),
+        process_metadata.cache_key_gen_version.clone(),
+        None,
+        root_ca_certs.clone(),
+        headers.clone(),
+        store.clone(),
+        executor.clone(),
+        Duration::from_secs(args.overall_deadline_secs),
+        Duration::from_millis(100),
+        args.execution_rpc_concurrency,
+        None,
+      )
+      .expect("Failed to make remote command runner");
 
       let command_runner_box: Box<dyn process_execution::CommandRunner> = {
         Box::new(
-          process_execution::remote::CommandRunner::new(
-            address,
-            vec![address.to_owned()],
-            ProcessMetadata {
-              instance_name: remote_instance_arg,
-              cache_key_gen_version: args.value_of("cache-key-gen-version").map(str::to_owned),
-              platform_properties,
-            },
-            root_ca_certs,
-            oauth_bearer_token,
-            headers,
+          process_execution::remote_cache::CommandRunner::new(
+            Arc::new(remote_runner),
+            process_metadata.instance_name.clone(),
+            process_metadata.cache_key_gen_version.clone(),
+            executor,
             store.clone(),
-            Platform::Linux,
-            Duration::from_secs(overall_deadline_secs),
-            Duration::from_millis(100),
+            &address,
+            root_ca_certs,
+            headers,
+            true,
+            true,
+            process_execution::remote_cache::RemoteCacheWarningsBehavior::Backoff,
+            CacheContentBehavior::Defer,
+            args.cache_rpc_concurrency,
+            Duration::from_secs(2),
+            args
+              .named_cache_path
+              .map(|p| p.to_string_lossy().to_string()),
           )
-          .expect("Failed to make command runner"),
+          .expect("Failed to make remote cache command runner"),
         )
       };
 
@@ -421,21 +343,32 @@ async fn main() {
     None => Box::new(process_execution::local::CommandRunner::new(
       store.clone(),
       executor,
-      work_dir_base,
-      NamedCaches::new(named_cache_path),
-      true,
+      workdir.clone(),
+      NamedCaches::new(
+        args
+          .named_cache_path
+          .unwrap_or_else(NamedCaches::default_path),
+      ),
+      ImmutableInputs::new(store.clone(), &workdir).unwrap(),
+      KeepSandboxes::Never,
     )) as Box<dyn process_execution::CommandRunner>,
   };
 
-  let result = runner
-    .run(request.into(), Context::default())
-    .await
-    .expect("Error executing");
+  let result = in_workunit!("process_executor", Level::Info, |workunit| async move {
+    runner.run(Context::default(), workunit, request).await
+  })
+  .await
+  .expect("Error executing");
 
-  if let Some(output) = args.value_of("materialize-output-to").map(PathBuf::from) {
+  if let Some(output) = args.materialize_output_to {
     store
-      .materialize_directory(output, result.output_directory)
-      .compat()
+      .materialize_directory(
+        output,
+        result.output_directory,
+        &BTreeSet::new(),
+        None,
+        Permissions::Writable,
+      )
       .await
       .unwrap();
   }
@@ -443,30 +376,314 @@ async fn main() {
   let stdout: Vec<u8> = store
     .load_file_bytes_with(result.stdout_digest, |bytes| bytes.to_vec())
     .await
-    .unwrap()
-    .unwrap()
-    .0;
+    .unwrap();
 
   let stderr: Vec<u8> = store
     .load_file_bytes_with(result.stderr_digest, |bytes| bytes.to_vec())
     .await
-    .unwrap()
-    .unwrap()
-    .0;
+    .unwrap();
 
   print!("{}", String::from_utf8(stdout).unwrap());
   eprint!("{}", String::from_utf8(stderr).unwrap());
   exit(result.exit_code);
 }
 
-fn collection_from_keyvalues<'a, It, Col>(keyvalues: It) -> Col
+async fn make_request(
+  store: &Store,
+  args: &Opt,
+) -> Result<(process_execution::Process, ProcessMetadata), String> {
+  let (execution_strategy, platform) = if args.server.is_some() {
+    let strategy = ProcessExecutionStrategy::RemoteExecution(collection_from_keyvalues(
+      args.command.extra_platform_property.iter(),
+    ));
+    (strategy, Platform::Linux_x86_64)
+  } else {
+    (
+      ProcessExecutionStrategy::Local,
+      Platform::current().unwrap(),
+    )
+  };
+
+  match (
+    args.command.input_digest,
+    args.command.input_digest_length,
+    args.action_digest.action_digest,
+    args.action_digest.action_digest_length,
+    args.buildbarn_url.as_ref(),
+  ) {
+    (Some(input_digest), Some(input_digest_length), None, None, None) => {
+      make_request_from_flat_args(store, args, Digest::new(input_digest, input_digest_length), execution_strategy, platform).await
+
+    }
+    (None, None, Some(action_fingerprint), Some(action_digest_length), None) => {
+      extract_request_from_action_digest(
+        store,
+        Digest::new(action_fingerprint, action_digest_length),
+        execution_strategy,
+        platform,
+        args.remote_instance_name.clone(),
+        args.command.cache_key_gen_version.clone(),
+      ).await
+    }
+    (None, None, None, None, Some(buildbarn_url)) => {
+      extract_request_from_buildbarn_url(
+        store,
+        buildbarn_url,
+        execution_strategy,
+        platform,
+        args.command.cache_key_gen_version.clone()
+      ).await
+    }
+    (None, None, None, None, None) => {
+      Err("Must specify either action input digest or action digest or buildbarn URL".to_owned())
+    }
+    _ => {
+      Err("Unsupported combination of arguments - can only set one of action digest or all other action-specifying flags".to_owned())
+    }
+  }
+}
+
+async fn make_request_from_flat_args(
+  store: &Store,
+  args: &Opt,
+  input_files: Digest,
+  execution_strategy: ProcessExecutionStrategy,
+  platform: Platform,
+) -> Result<(process_execution::Process, ProcessMetadata), String> {
+  let output_files = args
+    .command
+    .output_file_path
+    .iter()
+    .map(RelativePath::new)
+    .collect::<Result<BTreeSet<_>, _>>()?;
+  let output_directories = args
+    .command
+    .output_directory_path
+    .iter()
+    .map(RelativePath::new)
+    .collect::<Result<BTreeSet<_>, _>>()?;
+
+  let working_directory = args
+    .command
+    .working_directory
+    .clone()
+    .map(|path| {
+      RelativePath::new(path)
+        .map_err(|err| format!("working-directory must be a relative path: {:?}", err))
+    })
+    .transpose()?;
+
+  // TODO: Add support for immutable inputs.
+  let input_digests = InputDigests::new(
+    store,
+    DirectoryDigest::from_persisted_digest(input_files),
+    BTreeMap::default(),
+    BTreeSet::default(),
+  )
+  .await
+  .map_err(|e| format!("Could not create input digest for process: {:?}", e))?;
+
+  let process = process_execution::Process {
+    argv: args.command.argv.clone(),
+    env: collection_from_keyvalues(args.command.env.iter()),
+    working_directory,
+    input_digests,
+    output_files,
+    output_directories,
+    timeout: Some(Duration::new(15 * 60, 0)),
+    description: "process_executor".to_string(),
+    level: Level::Info,
+    append_only_caches: BTreeMap::new(),
+    jdk_home: args.command.jdk.clone(),
+    platform,
+    execution_slot_variable: None,
+    concurrency_available: args.command.concurrency_available.unwrap_or(0),
+    cache_scope: ProcessCacheScope::Always,
+    execution_strategy,
+    remote_cache_speculation_delay: Duration::from_millis(0),
+  };
+  let metadata = ProcessMetadata {
+    instance_name: args.remote_instance_name.clone(),
+    cache_key_gen_version: args.command.cache_key_gen_version.clone(),
+  };
+  Ok((process, metadata))
+}
+
+#[allow(clippy::redundant_closure)] // False positives for prost::Message::decode: https://github.com/rust-lang/rust-clippy/issues/5939
+async fn extract_request_from_action_digest(
+  store: &Store,
+  action_digest: Digest,
+  execution_strategy: ProcessExecutionStrategy,
+  platform: Platform,
+  instance_name: Option<String>,
+  cache_key_gen_version: Option<String>,
+) -> Result<(process_execution::Process, ProcessMetadata), String> {
+  let action = store
+    .load_file_bytes_with(action_digest, |bytes| Action::decode(bytes))
+    .await
+    .map_err(|e| e.enrich("Could not load action proto from CAS").to_string())?
+    .map_err(|err| {
+      format!(
+        "Error deserializing action proto {:?}: {:?}",
+        action_digest, err
+      )
+    })?;
+
+  let command_digest = require_digest(&action.command_digest)
+    .map_err(|err| format!("Bad Command digest: {:?}", err))?;
+  let command = store
+    .load_file_bytes_with(command_digest, |bytes| Command::decode(bytes))
+    .await
+    .map_err(|e| {
+      e.enrich("Could not load command proto from CAS")
+        .to_string()
+    })?
+    .map_err(|err| {
+      format!(
+        "Error deserializing command proto {:?}: {:?}",
+        command_digest, err
+      )
+    })?;
+  let working_directory = if command.working_directory.is_empty() {
+    None
+  } else {
+    Some(
+      RelativePath::new(command.working_directory)
+        .map_err(|err| format!("working-directory must be a relative path: {:?}", err))?,
+    )
+  };
+
+  let input_digests = InputDigests::with_input_files(DirectoryDigest::from_persisted_digest(
+    require_digest(&action.input_root_digest)
+      .map_err(|err| format!("Bad input root digest: {:?}", err))?,
+  ));
+
+  // In case the local Store doesn't have the input root Directory,
+  // have it fetch it and identify it as a Directory, so that it doesn't get confused about the unknown metadata.
+  store
+    .load_directory(input_digests.complete.as_digest())
+    .await
+    .map_err(|e| e.to_string())?;
+
+  let process = process_execution::Process {
+    argv: command.arguments,
+    env: command
+      .environment_variables
+      .iter()
+      .filter(|env| {
+        // Filter out environment variables which will be (re-)set by ExecutionRequest
+        // construction.
+        env.name != process_execution::remote::CACHE_KEY_TARGET_PLATFORM_ENV_VAR_NAME
+      })
+      .map(|env| (env.name.clone(), env.value.clone()))
+      .collect(),
+    working_directory,
+    input_digests,
+    output_files: command
+      .output_files
+      .iter()
+      .map(RelativePath::new)
+      .collect::<Result<_, _>>()?,
+    output_directories: command
+      .output_directories
+      .iter()
+      .map(RelativePath::new)
+      .collect::<Result<_, _>>()?,
+    timeout: action.timeout.map(|timeout| {
+      Duration::from_nanos(timeout.nanos as u64 + timeout.seconds as u64 * 1000000000)
+    }),
+    execution_slot_variable: None,
+    concurrency_available: 0,
+    description: "".to_string(),
+    level: Level::Error,
+    append_only_caches: BTreeMap::new(),
+    jdk_home: None,
+    platform,
+    cache_scope: ProcessCacheScope::Always,
+    execution_strategy,
+    remote_cache_speculation_delay: Duration::from_millis(0),
+  };
+
+  let metadata = ProcessMetadata {
+    instance_name,
+    cache_key_gen_version,
+  };
+
+  Ok((process, metadata))
+}
+
+async fn extract_request_from_buildbarn_url(
+  store: &Store,
+  buildbarn_url: &str,
+  execution_strategy: ProcessExecutionStrategy,
+  platform: Platform,
+  cache_key_gen_version: Option<String>,
+) -> Result<(process_execution::Process, ProcessMetadata), String> {
+  let url_parts: Vec<&str> = buildbarn_url.trim_end_matches('/').split('/').collect();
+  if url_parts.len() < 4 {
+    return Err("Buildbarn URL didn't have enough parts".to_owned());
+  }
+  let interesting_parts = &url_parts[url_parts.len() - 4..url_parts.len()];
+  let kind = interesting_parts[0];
+  let instance = interesting_parts[1];
+
+  let action_digest = match kind {
+    "action" => {
+      let action_fingerprint = Fingerprint::from_hex_string(interesting_parts[2])?;
+      let action_digest_length: usize = interesting_parts[3]
+        .parse()
+        .map_err(|err| format!("Couldn't parse action digest length as a number: {:?}", err))?;
+      Digest::new(action_fingerprint, action_digest_length)
+    }
+    "uncached_action_result" => {
+      let action_result_fingerprint = Fingerprint::from_hex_string(interesting_parts[2])?;
+      let action_result_digest_length: usize = interesting_parts[3].parse().map_err(|err| {
+        format!(
+          "Couldn't parse uncached action digest result length as a number: {:?}",
+          err
+        )
+      })?;
+      let action_result_digest =
+        Digest::new(action_result_fingerprint, action_result_digest_length);
+
+      let action_result = store
+        .load_file_bytes_with(action_result_digest, |bytes| {
+          UncachedActionResult::decode(bytes)
+        })
+        .await
+        .map_err(|e| e.enrich("Could not load action result proto").to_string())?
+        .map_err(|err| format!("Error deserializing action result proto: {:?}", err))?;
+
+      require_digest(&action_result.action_digest)?
+    }
+    _ => {
+      return Err(format!(
+        "Wrong kind in buildbarn URL; wanted action or uncached_action_result, got {}",
+        kind
+      ));
+    }
+  };
+
+  extract_request_from_action_digest(
+    store,
+    action_digest,
+    execution_strategy,
+    platform,
+    Some(instance.to_owned()),
+    cache_key_gen_version,
+  )
+  .await
+}
+
+fn collection_from_keyvalues<Str, It, Col>(keyvalues: It) -> Col
 where
-  It: Iterator<Item = &'a str>,
+  Str: AsRef<str>,
+  It: Iterator<Item = Str>,
   Col: FromIterator<(String, String)>,
 {
   keyvalues
     .map(|kv| {
-      let mut parts = kv.splitn(2, '=');
+      let mut parts = kv.as_ref().splitn(2, '=');
       (
         parts.next().unwrap().to_string(),
         parts.next().unwrap_or_default().to_string(),

@@ -1,147 +1,123 @@
 // Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use crate::core::Value;
+use std::sync::Arc;
+
 use crate::externs;
-use crate::nodes::lift_directory_digest;
-use crate::Failure;
-use crate::Types;
+use crate::externs::fs::PyFileDigest;
+use crate::nodes::{lift_directory_digest, lift_file_digest};
+use crate::Value;
 
-use cpython::{PyDict, PyObject, PyString, Python};
-use hashing::Digest;
-use workunit_store::Level;
+use pyo3::prelude::*;
+use pyo3::types::PyDict;
 
-// TODO all `retrieve` implementations should add a check that the `Value` actually subclasses
-// `EngineAware`
+use workunit_store::{ArtifactOutput, Level, RunningWorkunit, UserMetadataItem, WorkunitMetadata};
 
-pub trait EngineAwareInformation {
-  type MaybeOutput;
-  fn retrieve(types: &Types, value: &Value) -> Option<Self::MaybeOutput>;
-}
+// Note: these functions should not panic, but we also don't preserve errors (e.g. to log) because
+// we rely on MyPy to catch TypeErrors with using the APIs incorrectly. So we convert errors to
+// be like the user did not set extra metadata.
 
-pub struct EngineAwareLevel {}
+#[derive(Default, Clone, Debug)]
+pub(crate) struct EngineAwareReturnType;
 
-impl EngineAwareInformation for EngineAwareLevel {
-  type MaybeOutput = Level;
+impl EngineAwareReturnType {
+  pub(crate) fn update_workunit(workunit: &mut RunningWorkunit, task_result: &PyAny) {
+    workunit.update_metadata(|old| {
+      let new_level = Self::level(task_result);
 
-  fn retrieve(_types: &Types, value: &Value) -> Option<Level> {
-    let new_level_val = externs::call_method(value.as_ref(), "level", &[]).ok()?;
-    let new_level_val = externs::check_for_python_none(new_level_val)?;
-    externs::val_to_log_level(&new_level_val).ok()
-  }
-}
-
-pub struct Message {}
-
-impl EngineAwareInformation for Message {
-  type MaybeOutput = String;
-
-  fn retrieve(_types: &Types, value: &Value) -> Option<String> {
-    let msg_val = externs::call_method(&value, "message", &[]).ok()?;
-    let msg_val = externs::check_for_python_none(msg_val)?;
-    Some(externs::val_to_str(&msg_val))
-  }
-}
-
-pub struct Metadata;
-
-impl EngineAwareInformation for Metadata {
-  type MaybeOutput = Vec<(String, Value)>;
-
-  fn retrieve(_types: &Types, value: &Value) -> Option<Self::MaybeOutput> {
-    let metadata_val = match externs::call_method(&value, "metadata", &[]) {
-      Ok(value) => value,
-      Err(py_err) => {
-        let failure = Failure::from_py_err(py_err);
-        log::error!("Error calling `metadata` method: {}", failure);
+      // If the metadata already existed, or if its level changed, we need to update it.
+      let (mut metadata, level) = if let Some((metadata, old_level)) = old {
+        (metadata, new_level.unwrap_or(old_level))
+      } else if let Some(level) = new_level {
+        (WorkunitMetadata::default(), level)
+      } else {
         return None;
-      }
-    };
-
-    let metadata_val = externs::check_for_python_none(metadata_val)?;
-    let gil = Python::acquire_gil();
-    let py = gil.python();
-
-    let mut output = Vec::new();
-    let metadata_dict: &PyDict = metadata_val.cast_as::<PyDict>(py).ok()?;
-
-    for (key, value) in metadata_dict.items(py).into_iter() {
-      let key_name: String = match key.extract(py) {
-        Ok(s) => s,
-        Err(e) => {
-          log::error!(
-            "Error in EngineAware.metadata() implementation - non-string key: {:?}",
-            e
-          );
-          return None;
-        }
       };
 
-      output.push((key_name, Value::from(value)));
+      metadata.message = Self::message(task_result);
+      metadata
+        .artifacts
+        .extend(Self::artifacts(task_result).unwrap_or_default());
+      metadata
+        .user_metadata
+        .extend(metadata_for(task_result).unwrap_or_default());
+      Some((metadata, level))
+    });
+  }
+
+  fn level(obj: &PyAny) -> Option<Level> {
+    let level_val = obj.call_method0("level").ok()?;
+    if level_val.is_none() {
+      return None;
+    }
+    externs::val_to_log_level(level_val).ok()
+  }
+
+  fn message(obj: &PyAny) -> Option<String> {
+    let msg_val = obj.call_method0("message").ok()?;
+    if msg_val.is_none() {
+      return None;
+    }
+    msg_val.extract().ok()
+  }
+
+  fn artifacts(obj: &PyAny) -> Option<Vec<(String, ArtifactOutput)>> {
+    let artifacts_val = obj.call_method0("artifacts").ok()?;
+    if artifacts_val.is_none() {
+      return None;
+    }
+
+    let artifacts_dict = artifacts_val.cast_as::<PyDict>().ok()?;
+    let mut output = Vec::new();
+
+    for kv_pair in artifacts_dict.items().into_iter() {
+      let (key, value): (String, &PyAny) = kv_pair.extract().ok()?;
+      let artifact_output = if value.is_instance_of::<PyFileDigest>().unwrap_or(false) {
+        lift_file_digest(value).map(ArtifactOutput::FileDigest)
+      } else {
+        let digest_value = value.getattr("digest").ok()?;
+        lift_directory_digest(digest_value).map(|dd| ArtifactOutput::Snapshot(Arc::new(dd)))
+      }
+      .ok()?;
+      output.push((key, artifact_output));
     }
     Some(output)
   }
+
+  pub(crate) fn is_cacheable(obj: &PyAny) -> Option<bool> {
+    obj.call_method0("cacheable").ok()?.extract().ok()
+  }
 }
 
-pub struct Artifacts {}
+pub struct EngineAwareParameter;
 
-impl EngineAwareInformation for Artifacts {
-  type MaybeOutput = Vec<(String, Digest)>;
-
-  fn retrieve(types: &Types, value: &Value) -> Option<Self::MaybeOutput> {
-    let artifacts_val = match externs::call_method(&value, "artifacts", &[]) {
-      Ok(value) => value,
-      Err(py_err) => {
-        let failure = Failure::from_py_err(py_err);
-        log::error!("Error calling `artifacts` method: {}", failure);
-        return None;
-      }
-    };
-    let artifacts_val = externs::check_for_python_none(artifacts_val)?;
-    let gil = Python::acquire_gil();
-    let py = gil.python();
-    let artifacts_dict: &PyDict = artifacts_val.cast_as::<PyDict>(py).ok()?;
-    let mut output = Vec::new();
-
-    for (key, value) in artifacts_dict.items(py).into_iter() {
-      let key_name: String = match key.cast_as::<PyString>(py) {
-        Ok(s) => s.to_string_lossy(py).into(),
-        Err(e) => {
-          log::error!(
-            "Error in EngineAware.artifacts() implementation - non-string key: {:?}",
-            e
-          );
-          return None;
-        }
-      };
-      let digest_value: PyObject = externs::getattr(&value, "digest")
-        .map_err(|e| {
-          log::error!("Error in EngineAware.artifacts() - no `digest` attr: {}", e);
-        })
-        .ok()?;
-      let digest = match lift_directory_digest(types, &Value::new(digest_value)) {
-        Ok(digest) => digest,
-        Err(e) => {
-          log::error!("Error in EngineAware.artifacts() implementation: {}", e);
-          return None;
-        }
-      };
-
-      output.push((key_name, digest));
+impl EngineAwareParameter {
+  pub fn debug_hint(obj: &PyAny) -> Option<String> {
+    let hint = obj.call_method0("debug_hint").ok()?;
+    if hint.is_none() {
+      return None;
     }
-    Some(output)
+    hint.extract().ok()
+  }
+
+  pub fn metadata(obj: &PyAny) -> Vec<(String, UserMetadataItem)> {
+    metadata_for(obj).unwrap_or_default()
   }
 }
 
-pub struct DebugHint {}
-
-impl EngineAwareInformation for DebugHint {
-  type MaybeOutput = String;
-
-  fn retrieve(_types: &Types, value: &Value) -> Option<String> {
-    externs::call_method(&value, "debug_hint", &[])
-      .ok()
-      .and_then(externs::check_for_python_none)
-      .map(|val| externs::val_to_str(&val))
+fn metadata_for(obj: &PyAny) -> Option<Vec<(String, UserMetadataItem)>> {
+  let metadata_val = obj.call_method0("metadata").ok()?;
+  if metadata_val.is_none() {
+    return None;
   }
+
+  let mut output = Vec::new();
+  let metadata_dict = metadata_val.cast_as::<PyDict>().ok()?;
+
+  for kv_pair in metadata_dict.items().into_iter() {
+    let (key, py_any): (String, &PyAny) = kv_pair.extract().ok()?;
+    let value: Value = Value::new(py_any.into());
+    output.push((key, UserMetadataItem::PyValue(Arc::new(value))));
+  }
+  Some(output)
 }

@@ -1,15 +1,22 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from dataclasses import dataclass
-from typing import Iterable, Optional, Sequence, Tuple
+from __future__ import annotations
 
-from pants.base.exceptions import ResolveError
+from dataclasses import dataclass
+from typing import Iterable, Sequence
+
 from pants.build_graph.address import Address as Address
 from pants.build_graph.address import AddressInput as AddressInput  # noqa: F401: rexport.
 from pants.build_graph.address import BuildFileAddress as BuildFileAddress  # noqa: F401: rexport.
+from pants.build_graph.address import (  # noqa: F401: rexport.
+    BuildFileAddressRequest as BuildFileAddressRequest,
+)
+from pants.build_graph.address import MaybeAddress as MaybeAddress  # noqa: F401: rexport.
+from pants.build_graph.address import ResolveError
 from pants.engine.collection import Collection
 from pants.util.meta import frozen_after_init
+from pants.util.strutil import bullet_list
 
 
 def assert_single_address(addresses: Sequence[Address]) -> None:
@@ -17,10 +24,9 @@ def assert_single_address(addresses: Sequence[Address]) -> None:
     if len(addresses) == 0:
         raise ResolveError("No targets were matched.")
     if len(addresses) > 1:
-        output = "\n  * ".join(address.spec for address in addresses)
         raise ResolveError(
             "Expected a single target, but was given multiple targets.\n\n"
-            f"Did you mean one of:\n  * {output}"
+            f"Did you mean one of these?\n\n{bullet_list(address.spec for address in addresses)}"
         )
 
 
@@ -49,11 +55,25 @@ class UnparsedAddressInputs:
     references like `:sibling` work properly.
 
     Unlike the `dependencies` field, this type does not work with `!` and `!!` ignores.
+
+    Set `description_of_origin` to a value like "CLI arguments" or "the `dependencies` field
+    from {tgt.address}". It is used for better error messages.
     """
 
-    values: Tuple[str, ...]
-    relative_to: Optional[str]
+    values: tuple[str, ...]
+    relative_to: str | None
+    description_of_origin: str
+    skip_invalid_addresses: bool
 
-    def __init__(self, values: Iterable[str], *, owning_address: Optional[Address]) -> None:
+    def __init__(
+        self,
+        values: Iterable[str],
+        *,
+        owning_address: Address | None,
+        description_of_origin: str,
+        skip_invalid_addresses: bool = False,
+    ) -> None:
         self.values = tuple(values)
         self.relative_to = owning_address.spec_path if owning_address else None
+        self.description_of_origin = description_of_origin
+        self.skip_invalid_addresses = skip_invalid_addresses

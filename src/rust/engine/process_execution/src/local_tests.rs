@@ -1,25 +1,27 @@
-use tempfile;
-use testutil;
-
-use crate::{
-  local::USER_EXECUTABLE_MODE, CacheDest, CacheName, CommandRunner as CommandRunnerTrait, Context,
-  FallibleProcessResultWithPlatform, NamedCaches, Platform, Process, RelativePath,
-};
-use hashing::EMPTY_DIGEST;
-use shell_quote::bash;
-use spectral::{assert_that, string::StrAssertions};
-use std;
-use std::collections::BTreeMap;
-use std::os::unix::fs::PermissionsExt;
+// Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
+// Licensed under the Apache License, Version 2.0 (see LICENSE).
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::path::PathBuf;
 use std::str;
 use std::time::Duration;
-use store::Store;
+
+use maplit::hashset;
+use shell_quote::bash;
+use spectral::{assert_that, string::StrAssertions};
 use tempfile::TempDir;
+
+use fs::EMPTY_DIRECTORY_DIGEST;
+use store::{ImmutableInputs, Store};
 use testutil::data::{TestData, TestDirectory};
-use testutil::path::find_bash;
+use testutil::path::{find_bash, which};
 use testutil::{owned_string_vec, relative_paths};
-use workunit_store::WorkunitStore;
+use workunit_store::{RunningWorkunit, WorkunitStore};
+
+use crate::{
+  local, local::KeepSandboxes, CacheName, CommandRunner as CommandRunnerTrait, Context,
+  FallibleProcessResultWithPlatform, InputDigests, NamedCaches, Platform, Process, ProcessError,
+  RelativePath,
+};
 
 #[derive(PartialEq, Debug)]
 struct LocalTestResult {
@@ -31,9 +33,6 @@ struct LocalTestResult {
 #[tokio::test]
 #[cfg(unix)]
 async fn stdout() {
-  let workunit_store = WorkunitStore::new(false);
-  workunit_store.init_thread_state(None);
-
   let result = run_command_locally(Process::new(owned_string_vec(&["/bin/echo", "-n", "foo"])))
     .await
     .unwrap();
@@ -41,16 +40,12 @@ async fn stdout() {
   assert_eq!(result.stdout_bytes, "foo".as_bytes());
   assert_eq!(result.stderr_bytes, "".as_bytes());
   assert_eq!(result.original.exit_code, 0);
-  assert_eq!(result.original.output_directory, EMPTY_DIGEST);
-  assert_eq!(result.original.execution_attempts, vec![]);
+  assert_eq!(result.original.output_directory, *EMPTY_DIRECTORY_DIGEST);
 }
 
 #[tokio::test]
 #[cfg(unix)]
 async fn stdout_and_stderr_and_exit_code() {
-  let workunit_store = WorkunitStore::new(false);
-  workunit_store.init_thread_state(None);
-
   let result = run_command_locally(Process::new(owned_string_vec(&[
     "/bin/bash",
     "-c",
@@ -62,16 +57,12 @@ async fn stdout_and_stderr_and_exit_code() {
   assert_eq!(result.stdout_bytes, "foo".as_bytes());
   assert_eq!(result.stderr_bytes, "bar".as_bytes());
   assert_eq!(result.original.exit_code, 1);
-  assert_eq!(result.original.output_directory, EMPTY_DIGEST);
-  assert_eq!(result.original.execution_attempts, vec![]);
+  assert_eq!(result.original.output_directory, *EMPTY_DIRECTORY_DIGEST);
 }
 
 #[tokio::test]
 #[cfg(unix)]
 async fn capture_exit_code_signal() {
-  let workunit_store = WorkunitStore::new(false);
-  workunit_store.init_thread_state(None);
-
   // Launch a process that kills itself with a signal.
   let result = run_command_locally(Process::new(owned_string_vec(&[
     "/bin/bash",
@@ -84,16 +75,13 @@ async fn capture_exit_code_signal() {
   assert_eq!(result.stdout_bytes, "".as_bytes());
   assert_eq!(result.stderr_bytes, "".as_bytes());
   assert_eq!(result.original.exit_code, -15);
-  assert_eq!(result.original.output_directory, EMPTY_DIGEST);
+  assert_eq!(result.original.output_directory, *EMPTY_DIRECTORY_DIGEST);
   assert_eq!(result.original.platform, Platform::current().unwrap());
 }
 
 #[tokio::test]
 #[cfg(unix)]
 async fn env() {
-  let workunit_store = WorkunitStore::new(false);
-  workunit_store.init_thread_state(None);
-
   let mut env: BTreeMap<String, String> = BTreeMap::new();
   env.insert("FOO".to_string(), "foo".to_string());
   env.insert("BAR".to_string(), "not foo".to_string());
@@ -123,9 +111,6 @@ async fn env() {
 #[tokio::test]
 #[cfg(unix)]
 async fn env_is_deterministic() {
-  let workunit_store = WorkunitStore::new(false);
-  workunit_store.init_thread_state(None);
-
   fn make_request() -> Process {
     let mut env = BTreeMap::new();
     env.insert("FOO".to_string(), "foo".to_string());
@@ -141,21 +126,15 @@ async fn env_is_deterministic() {
 
 #[tokio::test]
 async fn binary_not_found() {
-  let workunit_store = WorkunitStore::new(false);
-  workunit_store.init_thread_state(None);
-
   let err_string = run_command_locally(Process::new(owned_string_vec(&["echo", "-n", "foo"])))
     .await
     .expect_err("Want Err");
-  assert!(err_string.contains("Failed to execute"));
-  assert!(err_string.contains("echo"));
+  assert!(err_string.to_string().contains("Failed to execute"));
+  assert!(err_string.to_string().contains("echo"));
 }
 
 #[tokio::test]
 async fn output_files_none() {
-  let workunit_store = WorkunitStore::new(false);
-  workunit_store.init_thread_state(None);
-
   let result = run_command_locally(Process::new(owned_string_vec(&[
     &find_bash(),
     "-c",
@@ -167,22 +146,18 @@ async fn output_files_none() {
   assert_eq!(result.stdout_bytes, "".as_bytes());
   assert_eq!(result.stderr_bytes, "".as_bytes());
   assert_eq!(result.original.exit_code, 0);
-  assert_eq!(result.original.output_directory, EMPTY_DIGEST);
-  assert_eq!(result.original.execution_attempts, vec![]);
+  assert_eq!(result.original.output_directory, *EMPTY_DIRECTORY_DIGEST);
 }
 
 #[tokio::test]
 async fn output_files_one() {
-  let workunit_store = WorkunitStore::new(false);
-  workunit_store.init_thread_state(None);
-
   let result = run_command_locally(
     Process::new(vec![
       find_bash(),
       "-c".to_owned(),
-      format!("echo -n {} > {}", TestData::roland().string(), "roland"),
+      format!("echo -n {} > roland.ext", TestData::roland().string()),
     ])
-    .output_files(relative_paths(&["roland"]).collect()),
+    .output_files(relative_paths(&["roland.ext"]).collect()),
   )
   .await
   .unwrap();
@@ -192,28 +167,24 @@ async fn output_files_one() {
   assert_eq!(result.original.exit_code, 0);
   assert_eq!(
     result.original.output_directory,
-    TestDirectory::containing_roland().digest()
+    TestDirectory::containing_roland().directory_digest()
   );
   assert_eq!(result.original.platform, Platform::current().unwrap());
 }
 
 #[tokio::test]
 async fn output_dirs() {
-  let workunit_store = WorkunitStore::new(false);
-  workunit_store.init_thread_state(None);
-
   let result = run_command_locally(
     Process::new(vec![
       find_bash(),
       "-c".to_owned(),
       format!(
-        "/bin/mkdir cats && echo -n {} > {} ; echo -n {} > treats",
+        "/bin/mkdir cats && echo -n {} > cats/roland.ext ; echo -n {} > treats.ext",
         TestData::roland().string(),
-        "cats/roland",
         TestData::catnip().string()
       ),
     ])
-    .output_files(relative_paths(&["treats"]).collect())
+    .output_files(relative_paths(&["treats.ext"]).collect())
     .output_directories(relative_paths(&["cats"]).collect()),
   )
   .await
@@ -224,27 +195,24 @@ async fn output_dirs() {
   assert_eq!(result.original.exit_code, 0);
   assert_eq!(
     result.original.output_directory,
-    TestDirectory::recursive().digest()
+    TestDirectory::recursive().directory_digest()
   );
   assert_eq!(result.original.platform, Platform::current().unwrap());
 }
 
 #[tokio::test]
 async fn output_files_many() {
-  let workunit_store = WorkunitStore::new(false);
-  workunit_store.init_thread_state(None);
-
   let result = run_command_locally(
     Process::new(vec![
       find_bash(),
       "-c".to_owned(),
       format!(
-        "echo -n {} > cats/roland ; echo -n {} > treats",
+        "echo -n {} > cats/roland.ext ; echo -n {} > treats.ext",
         TestData::roland().string(),
         TestData::catnip().string()
       ),
     ])
-    .output_files(relative_paths(&["cats/roland", "treats"]).collect()),
+    .output_files(relative_paths(&["cats/roland.ext", "treats.ext"]).collect()),
   )
   .await
   .unwrap();
@@ -254,27 +222,23 @@ async fn output_files_many() {
   assert_eq!(result.original.exit_code, 0);
   assert_eq!(
     result.original.output_directory,
-    TestDirectory::recursive().digest()
+    TestDirectory::recursive().directory_digest()
   );
   assert_eq!(result.original.platform, Platform::current().unwrap());
 }
 
 #[tokio::test]
 async fn output_files_execution_failure() {
-  let workunit_store = WorkunitStore::new(false);
-  workunit_store.init_thread_state(None);
-
   let result = run_command_locally(
     Process::new(vec![
       find_bash(),
       "-c".to_owned(),
       format!(
-        "echo -n {} > {} ; exit 1",
-        TestData::roland().string(),
-        "roland"
+        "echo -n {} > roland.ext ; exit 1",
+        TestData::roland().string()
       ),
     ])
-    .output_files(relative_paths(&["roland"]).collect()),
+    .output_files(relative_paths(&["roland.ext"]).collect()),
   )
   .await
   .unwrap();
@@ -284,24 +248,21 @@ async fn output_files_execution_failure() {
   assert_eq!(result.original.exit_code, 1);
   assert_eq!(
     result.original.output_directory,
-    TestDirectory::containing_roland().digest()
+    TestDirectory::containing_roland().directory_digest()
   );
   assert_eq!(result.original.platform, Platform::current().unwrap());
 }
 
 #[tokio::test]
 async fn output_files_partial_output() {
-  let workunit_store = WorkunitStore::new(false);
-  workunit_store.init_thread_state(None);
-
   let result = run_command_locally(
     Process::new(vec![
       find_bash(),
       "-c".to_owned(),
-      format!("echo -n {} > {}", TestData::roland().string(), "roland"),
+      format!("echo -n {} > roland.ext", TestData::roland().string()),
     ])
     .output_files(
-      relative_paths(&["roland", "susannah"])
+      relative_paths(&["roland.ext", "susannah"])
         .into_iter()
         .collect(),
     ),
@@ -314,23 +275,20 @@ async fn output_files_partial_output() {
   assert_eq!(result.original.exit_code, 0);
   assert_eq!(
     result.original.output_directory,
-    TestDirectory::containing_roland().digest()
+    TestDirectory::containing_roland().directory_digest()
   );
   assert_eq!(result.original.platform, Platform::current().unwrap());
 }
 
 #[tokio::test]
 async fn output_overlapping_file_and_dir() {
-  let workunit_store = WorkunitStore::new(false);
-  workunit_store.init_thread_state(None);
-
   let result = run_command_locally(
     Process::new(vec![
       find_bash(),
       "-c".to_owned(),
-      format!("echo -n {} > cats/roland", TestData::roland().string()),
+      format!("echo -n {} > cats/roland.ext", TestData::roland().string()),
     ])
-    .output_files(relative_paths(&["cats/roland"]).collect())
+    .output_files(relative_paths(&["cats/roland.ext"]).collect())
     .output_directories(relative_paths(&["cats"]).collect()),
   )
   .await
@@ -341,47 +299,44 @@ async fn output_overlapping_file_and_dir() {
   assert_eq!(result.original.exit_code, 0);
   assert_eq!(
     result.original.output_directory,
-    TestDirectory::nested().digest()
+    TestDirectory::nested().directory_digest()
   );
   assert_eq!(result.original.platform, Platform::current().unwrap());
 }
 
 #[tokio::test]
 async fn append_only_cache_created() {
-  let workunit_store = WorkunitStore::new(false);
-  workunit_store.init_thread_state(None);
-
   let name = "geo";
-  let dest = format!(".cache/{}", name);
+  let dest_base = ".cache";
   let cache_name = CacheName::new(name.to_owned()).unwrap();
-  let cache_dest = CacheDest::new(dest.clone()).unwrap();
+  let cache_dest = RelativePath::new(format!("{}/{}", dest_base, name)).unwrap();
   let result = run_command_locally(
-    Process::new(vec!["/bin/ls".to_owned(), dest.clone()])
+    Process::new(owned_string_vec(&["/bin/ls", dest_base]))
       .append_only_caches(vec![(cache_name, cache_dest)].into_iter().collect()),
   )
   .await
   .unwrap();
 
-  assert_eq!(result.stdout_bytes, format!("{}\n", dest).as_bytes());
+  assert_eq!(result.stdout_bytes, format!("{}\n", name).as_bytes());
   assert_eq!(result.stderr_bytes, "".as_bytes());
   assert_eq!(result.original.exit_code, 0);
-  assert_eq!(result.original.output_directory, EMPTY_DIGEST);
+  assert_eq!(result.original.output_directory, *EMPTY_DIRECTORY_DIGEST);
   assert_eq!(result.original.platform, Platform::current().unwrap());
 }
 
 #[tokio::test]
 async fn jdk_symlink() {
-  let workunit_store = WorkunitStore::new(false);
-  workunit_store.init_thread_state(None);
-
   let preserved_work_tmpdir = TempDir::new().unwrap();
   let roland = TestData::roland().bytes();
-  std::fs::write(preserved_work_tmpdir.path().join("roland"), roland.clone())
-    .expect("Writing temporary file");
+  std::fs::write(
+    preserved_work_tmpdir.path().join("roland.ext"),
+    roland.clone(),
+  )
+  .expect("Writing temporary file");
 
-  let mut process = Process::new(vec!["/bin/cat".to_owned(), ".jdk/roland".to_owned()]);
+  let mut process = Process::new(vec!["/bin/cat".to_owned(), ".jdk/roland.ext".to_owned()]);
   process.timeout = one_second();
-  process.description = "cat roland".to_string();
+  process.description = "cat roland.ext".to_string();
   process.jdk_home = Some(preserved_work_tmpdir.path().to_path_buf());
 
   let result = run_command_locally(process).await.unwrap();
@@ -389,27 +344,106 @@ async fn jdk_symlink() {
   assert_eq!(result.stdout_bytes, roland);
   assert_eq!(result.stderr_bytes, "".as_bytes());
   assert_eq!(result.original.exit_code, 0);
-  assert_eq!(result.original.output_directory, EMPTY_DIGEST);
+  assert_eq!(result.original.output_directory, *EMPTY_DIRECTORY_DIGEST);
   assert_eq!(result.original.platform, Platform::current().unwrap());
 }
 
 #[tokio::test]
+#[cfg(unix)]
+async fn test_apply_chroot() {
+  let mut env: BTreeMap<String, String> = BTreeMap::new();
+  env.insert("PATH".to_string(), "/usr/bin:{chroot}/bin".to_string());
+
+  let work_dir = TempDir::new().unwrap();
+  let mut req = Process::new(owned_string_vec(&["/usr/bin/env"])).env(env.clone());
+  local::apply_chroot(work_dir.path().to_str().unwrap(), &mut req);
+
+  let path = format!("/usr/bin:{}/bin", work_dir.path().to_str().unwrap());
+
+  assert_eq!(&path, req.env.get(&"PATH".to_string()).unwrap());
+}
+
+#[tokio::test]
+async fn test_chroot_placeholder() {
+  let (_, mut workunit) = WorkunitStore::setup_for_tests();
+  let mut env: BTreeMap<String, String> = BTreeMap::new();
+  env.insert("PATH".to_string(), "/usr/bin:{chroot}/bin".to_string());
+
+  let work_tmpdir = TempDir::new().unwrap();
+  let work_root = work_tmpdir.path().to_owned();
+
+  let result = run_command_locally_in_dir(
+    Process::new(vec!["/usr/bin/env".to_owned()]).env(env.clone()),
+    work_root.clone(),
+    KeepSandboxes::Always,
+    &mut workunit,
+    None,
+    None,
+  )
+  .await
+  .unwrap();
+
+  let stdout = String::from_utf8(result.stdout_bytes.to_vec()).unwrap();
+  let got_env: BTreeMap<String, String> = stdout
+    .split("\n")
+    .filter(|line| !line.is_empty())
+    .map(|line| line.splitn(2, "="))
+    .map(|mut parts| {
+      (
+        parts.next().unwrap().to_string(),
+        parts.next().unwrap_or("").to_string(),
+      )
+    })
+    .collect();
+
+  let path = format!("/usr/bin:{}", work_root.to_str().unwrap());
+  assert!(got_env.get(&"PATH".to_string()).unwrap().starts_with(&path));
+  assert!(got_env.get(&"PATH".to_string()).unwrap().ends_with("/bin"));
+}
+
+#[tokio::test]
 async fn test_directory_preservation() {
-  let workunit_store = WorkunitStore::new(false);
-  workunit_store.init_thread_state(None);
+  let (_, mut workunit) = WorkunitStore::setup_for_tests();
 
   let preserved_work_tmpdir = TempDir::new().unwrap();
   let preserved_work_root = preserved_work_tmpdir.path().to_owned();
 
-  let bash_contents = format!("echo -n {} > {}", TestData::roland().string(), "roland");
-  let argv = vec![find_bash(), "-c".to_owned(), bash_contents.clone()];
+  let store_dir = TempDir::new().unwrap();
+  let executor = task_executor::Executor::new();
+  let store = Store::local_only(executor.clone(), store_dir.path()).unwrap();
+
+  // Prepare the store to contain /cats/roland.ext, because the EPR needs to materialize it and then run
+  // from the ./cats directory.
+  store
+    .store_file_bytes(TestData::roland().bytes(), false)
+    .await
+    .expect("Error saving file bytes");
+  store
+    .record_directory(&TestDirectory::containing_roland().directory(), true)
+    .await
+    .expect("Error saving directory");
+  store
+    .record_directory(&TestDirectory::nested().directory(), true)
+    .await
+    .expect("Error saving directory");
+
+  let cp = which("cp").expect("No cp on $PATH.");
+  let bash_contents = format!("echo $PWD && {} roland.ext ..", cp.display());
+  let argv = vec![find_bash(), "-c".to_owned(), bash_contents.to_owned()];
+
+  let mut process =
+    Process::new(argv.clone()).output_files(relative_paths(&["roland.ext"]).collect());
+  process.input_digests =
+    InputDigests::with_input_files(TestDirectory::nested().directory_digest());
+  process.working_directory = Some(RelativePath::new("cats").unwrap());
 
   let result = run_command_locally_in_dir(
-    Process::new(argv.clone()).output_files(relative_paths(&["roland"]).collect()),
+    process,
     preserved_work_root.clone(),
-    false,
-    None,
-    None,
+    KeepSandboxes::Always,
+    &mut workunit,
+    Some(store),
+    Some(executor),
   )
   .await;
   result.unwrap();
@@ -420,18 +454,26 @@ async fn test_directory_preservation() {
   let subdirs = testutil::file::list_dir(&preserved_work_root);
   assert_eq!(subdirs.len(), 1);
 
-  // Then look for a file like e.g. `/tmp/abc1234/process-execution7zt4pH/roland`
-  let rolands_path = preserved_work_root.join(&subdirs[0]).join("roland");
-  assert!(rolands_path.exists());
+  // Then look for a file like e.g. `/tmp/abc1234/pants-sandbox-7zt4pH/roland.ext`
+  let rolands_path = preserved_work_root.join(&subdirs[0]).join("roland.ext");
+  assert!(&rolands_path.exists());
 
   // Ensure that when a directory is preserved, a __run.sh file is created with the process's
   // command line and environment variables.
   let run_script_path = preserved_work_root.join(&subdirs[0]).join("__run.sh");
-  assert!(run_script_path.exists());
-  let script_metadata = std::fs::metadata(&run_script_path).unwrap();
+  assert!(&run_script_path.exists());
 
-  // Ensure the script is executable.
-  assert!(USER_EXECUTABLE_MODE & script_metadata.permissions().mode() != 0);
+  std::fs::remove_file(&rolands_path).expect("Failed to remove roland.");
+
+  // Confirm the script when run directly sets up the proper CWD.
+  let mut child = std::process::Command::new(&run_script_path)
+    .spawn()
+    .expect("Failed to launch __run.sh");
+  let status = child
+    .wait()
+    .expect("Failed to gather the result of __run.sh.");
+  assert_eq!(Some(0), status.code());
+  assert!(rolands_path.exists());
 
   // Ensure the bash command line is provided.
   let bytes_quoted_command_line = bash::escape(&bash_contents);
@@ -443,8 +485,7 @@ async fn test_directory_preservation() {
 
 #[tokio::test]
 async fn test_directory_preservation_error() {
-  let workunit_store = WorkunitStore::new(false);
-  workunit_store.init_thread_state(None);
+  let (_, mut workunit) = WorkunitStore::setup_for_tests();
 
   let preserved_work_tmpdir = TempDir::new().unwrap();
   let preserved_work_root = preserved_work_tmpdir.path().to_owned();
@@ -455,7 +496,8 @@ async fn test_directory_preservation_error() {
   run_command_locally_in_dir(
     Process::new(vec!["doesnotexist".to_owned()]),
     preserved_work_root.clone(),
-    false,
+    KeepSandboxes::Always,
+    &mut workunit,
     None,
     None,
   )
@@ -469,9 +511,6 @@ async fn test_directory_preservation_error() {
 
 #[tokio::test]
 async fn all_containing_directories_for_outputs_are_created() {
-  let workunit_store = WorkunitStore::new(false);
-  workunit_store.init_thread_state(None);
-
   let result = run_command_locally(
     Process::new(vec![
       find_bash(),
@@ -480,11 +519,11 @@ async fn all_containing_directories_for_outputs_are_created() {
         // mkdir would normally fail, since birds/ doesn't yet exist, as would echo, since cats/
         // does not exist, but we create the containing directories for all outputs before the
         // process executes.
-        "/bin/mkdir birds/falcons && echo -n {} > cats/roland",
+        "/bin/mkdir birds/falcons && echo -n {} > cats/roland.ext",
         TestData::roland().string()
       ),
     ])
-    .output_files(relative_paths(&["cats/roland"]).collect())
+    .output_files(relative_paths(&["cats/roland.ext"]).collect())
     .output_directories(relative_paths(&["birds/falcons"]).collect()),
   )
   .await
@@ -495,16 +534,13 @@ async fn all_containing_directories_for_outputs_are_created() {
   assert_eq!(result.original.exit_code, 0);
   assert_eq!(
     result.original.output_directory,
-    TestDirectory::nested_dir_and_file().digest()
+    TestDirectory::nested_dir_and_file().directory_digest()
   );
   assert_eq!(result.original.platform, Platform::current().unwrap());
 }
 
 #[tokio::test]
 async fn output_empty_dir() {
-  let workunit_store = WorkunitStore::new(false);
-  workunit_store.init_thread_state(None);
-
   let result = run_command_locally(
     Process::new(vec![
       find_bash(),
@@ -521,20 +557,17 @@ async fn output_empty_dir() {
   assert_eq!(result.original.exit_code, 0);
   assert_eq!(
     result.original.output_directory,
-    TestDirectory::containing_falcons_dir().digest()
+    TestDirectory::containing_falcons_dir().directory_digest()
   );
   assert_eq!(result.original.platform, Platform::current().unwrap());
 }
 
 #[tokio::test]
 async fn timeout() {
-  let workunit_store = WorkunitStore::new(false);
-  workunit_store.init_thread_state(None);
-
   let argv = vec![
     find_bash(),
     "-c".to_owned(),
-    "/bin/sleep 0.2; /bin/echo -n 'European Burmese'".to_string(),
+    "/bin/echo -n 'Calculating...'; /bin/sleep 0.5; /bin/echo -n 'European Burmese'".to_string(),
   ];
 
   let mut process = Process::new(argv);
@@ -544,22 +577,23 @@ async fn timeout() {
   let result = run_command_locally(process).await.unwrap();
 
   assert_eq!(result.original.exit_code, -15);
-  let error_msg = String::from_utf8(result.stdout_bytes.to_vec()).unwrap();
-  assert_that(&error_msg).contains("Exceeded timeout");
-  assert_that(&error_msg).contains("sleepy-cat");
+  let stdout = String::from_utf8(result.stdout_bytes.to_vec()).unwrap();
+  let stderr = String::from_utf8(result.stderr_bytes.to_vec()).unwrap();
+  assert_that(&stdout).contains("Calculating...");
+  assert_that(&stderr).contains("Exceeded timeout");
+  assert_that(&stderr).contains("sleepy-cat");
 }
 
 #[tokio::test]
 async fn working_directory() {
-  let workunit_store = WorkunitStore::new(false);
-  workunit_store.init_thread_state(None);
+  let (_, mut workunit) = WorkunitStore::setup_for_tests();
 
   let store_dir = TempDir::new().unwrap();
   let executor = task_executor::Executor::new();
   let store = Store::local_only(executor.clone(), store_dir.path()).unwrap();
 
-  // Prepare the store to contain /cats/roland, because the EPR needs to materialize it and then run
-  // from the ./cats directory.
+  // Prepare the store to contain /cats/roland.ext, because the EPR needs to materialize it and
+  // then run from the ./cats directory.
   store
     .store_file_bytes(TestData::roland().bytes(), false)
     .await
@@ -577,63 +611,213 @@ async fn working_directory() {
 
   let mut process = Process::new(vec![find_bash(), "-c".to_owned(), "/bin/ls".to_string()]);
   process.working_directory = Some(RelativePath::new("cats").unwrap());
-  process.input_files = TestDirectory::nested().digest();
+  process.output_directories = relative_paths(&["roland.ext"]).collect::<BTreeSet<_>>();
+  process.input_digests =
+    InputDigests::with_input_files(TestDirectory::nested().directory_digest());
   process.timeout = one_second();
   process.description = "confused-cat".to_string();
 
   let result = run_command_locally_in_dir(
     process,
     work_dir.path().to_owned(),
-    true,
+    KeepSandboxes::Never,
+    &mut workunit,
     Some(store),
     Some(executor),
   )
   .await
   .unwrap();
 
-  assert_eq!(result.stdout_bytes, "roland\n".as_bytes());
+  assert_eq!(result.stdout_bytes, "roland.ext\n".as_bytes());
   assert_eq!(result.stderr_bytes, "".as_bytes());
   assert_eq!(result.original.exit_code, 0);
-  assert_eq!(result.original.output_directory, EMPTY_DIGEST);
+  assert_eq!(
+    result.original.output_directory,
+    TestDirectory::containing_roland().directory_digest()
+  );
   assert_eq!(result.original.platform, Platform::current().unwrap());
 }
 
-async fn run_command_locally(req: Process) -> Result<LocalTestResult, String> {
+#[tokio::test]
+async fn immutable_inputs() {
+  let (_, mut workunit) = WorkunitStore::setup_for_tests();
+
+  let store_dir = TempDir::new().unwrap();
+  let executor = task_executor::Executor::new();
+  let store = Store::local_only(executor.clone(), store_dir.path()).unwrap();
+
+  store
+    .store_file_bytes(TestData::roland().bytes(), false)
+    .await
+    .expect("Error saving file bytes");
+  store
+    .record_directory(&TestDirectory::containing_roland().directory(), true)
+    .await
+    .expect("Error saving directory");
+  store
+    .record_directory(&TestDirectory::containing_falcons_dir().directory(), true)
+    .await
+    .expect("Error saving directory");
+
+  let work_dir = TempDir::new().unwrap();
+
+  let mut process = Process::new(vec![find_bash(), "-c".to_owned(), "/bin/ls".to_string()]);
+  process.input_digests = InputDigests::new(
+    &store,
+    TestDirectory::containing_falcons_dir().directory_digest(),
+    {
+      let mut map = BTreeMap::new();
+      map.insert(
+        RelativePath::new("cats").unwrap(),
+        TestDirectory::containing_roland().directory_digest(),
+      );
+      map
+    },
+    BTreeSet::default(),
+  )
+  .await
+  .unwrap();
+  process.timeout = one_second();
+  process.description = "confused-cat".to_string();
+
+  let result = run_command_locally_in_dir(
+    process,
+    work_dir.path().to_owned(),
+    KeepSandboxes::Never,
+    &mut workunit,
+    Some(store),
+    Some(executor),
+  )
+  .await
+  .unwrap();
+
+  let stdout_lines = str::from_utf8(&result.stdout_bytes)
+    .unwrap()
+    .lines()
+    .collect::<HashSet<_>>();
+  assert_eq!(stdout_lines, hashset! {"falcons", "cats"});
+  assert_eq!(result.stderr_bytes, "".as_bytes());
+  assert_eq!(result.original.exit_code, 0);
+}
+
+#[tokio::test]
+async fn prepare_workdir_exclusive_relative() {
+  // Test that we detect that we should should exclusive spawn when a relative path that points
+  // outside of a working directory is used.
+  let _ = WorkunitStore::setup_for_tests();
+
+  let store_dir = TempDir::new().unwrap();
+  let executor = task_executor::Executor::new();
+  let store = Store::local_only(executor.clone(), store_dir.path()).unwrap();
+  let (_caches_dir, named_caches, immutable_inputs) =
+    named_caches_and_immutable_inputs(store.clone());
+
+  store
+    .store_file_bytes(TestData::roland().bytes(), false)
+    .await
+    .expect("Error saving file bytes");
+  store
+    .store_file_bytes(TestData::catnip().bytes(), false)
+    .await
+    .expect("Error saving file bytes");
+  store
+    .record_directory(&TestDirectory::recursive().directory(), true)
+    .await
+    .expect("Error saving directory");
+  store
+    .record_directory(&TestDirectory::containing_roland().directory(), true)
+    .await
+    .expect("Error saving directory");
+
+  let work_dir = TempDir::new().unwrap();
+
+  // NB: This path is not marked executable, but that isn't (currently) relevant to the heuristic.
+  let mut process = Process::new(vec!["../treats.ext".to_owned()])
+    .working_directory(Some(RelativePath::new("cats").unwrap()));
+  process.input_digests = InputDigests::new(
+    &store,
+    TestDirectory::recursive().directory_digest(),
+    BTreeMap::new(),
+    BTreeSet::new(),
+  )
+  .await
+  .unwrap();
+
+  let exclusive_spawn = local::prepare_workdir(
+    work_dir.path().to_owned(),
+    &process,
+    TestDirectory::recursive().directory_digest(),
+    store,
+    executor,
+    &named_caches,
+    &immutable_inputs,
+    None,
+    None,
+  )
+  .await
+  .unwrap();
+
+  assert_eq!(exclusive_spawn, true);
+}
+
+pub(crate) fn named_caches_and_immutable_inputs(
+  store: Store,
+) -> (TempDir, NamedCaches, ImmutableInputs) {
+  let root = TempDir::new().unwrap();
+  let root_path = root.path().to_owned();
+  let named_cache_dir = root_path.join("named");
+
+  (
+    root,
+    NamedCaches::new(named_cache_dir),
+    ImmutableInputs::new(store, &root_path).unwrap(),
+  )
+}
+
+async fn run_command_locally(req: Process) -> Result<LocalTestResult, ProcessError> {
+  let (_, mut workunit) = WorkunitStore::setup_for_tests();
   let work_dir = TempDir::new().unwrap();
   let work_dir_path = work_dir.path().to_owned();
-  run_command_locally_in_dir(req, work_dir_path, true, None, None).await
+  run_command_locally_in_dir(
+    req,
+    work_dir_path,
+    KeepSandboxes::Never,
+    &mut workunit,
+    None,
+    None,
+  )
+  .await
 }
 
 async fn run_command_locally_in_dir(
   req: Process,
   dir: PathBuf,
-  cleanup: bool,
+  cleanup: KeepSandboxes,
+  workunit: &mut RunningWorkunit,
   store: Option<Store>,
   executor: Option<task_executor::Executor>,
-) -> Result<LocalTestResult, String> {
+) -> Result<LocalTestResult, ProcessError> {
   let store_dir = TempDir::new().unwrap();
-  let named_cache_dir = TempDir::new().unwrap();
   let executor = executor.unwrap_or_else(|| task_executor::Executor::new());
   let store =
     store.unwrap_or_else(|| Store::local_only(executor.clone(), store_dir.path()).unwrap());
+  let (_caches_dir, named_caches, immutable_inputs) =
+    named_caches_and_immutable_inputs(store.clone());
   let runner = crate::local::CommandRunner::new(
     store.clone(),
     executor.clone(),
-    dir,
-    NamedCaches::new(named_cache_dir.path().to_owned()),
+    dir.clone(),
+    named_caches,
+    immutable_inputs,
     cleanup,
   );
-  let original = runner.run(req.into(), Context::default()).await?;
-  let stdout_bytes: Vec<u8> = store
-    .load_file_bytes_with(original.stdout_digest, |bytes| bytes.into())
-    .await?
-    .unwrap()
-    .0;
-  let stderr_bytes: Vec<u8> = store
-    .load_file_bytes_with(original.stderr_digest, |bytes| bytes.into())
-    .await?
-    .unwrap()
-    .0;
+  let original = runner.run(Context::default(), workunit, req.into()).await?;
+  let stdout_bytes = store
+    .load_file_bytes_with(original.stdout_digest, |bytes| bytes.to_vec())
+    .await?;
+  let stderr_bytes = store
+    .load_file_bytes_with(original.stderr_digest, |bytes| bytes.to_vec())
+    .await?;
   Ok(LocalTestResult {
     original,
     stdout_bytes,

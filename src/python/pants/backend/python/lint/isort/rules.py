@@ -1,162 +1,102 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Tuple
 
+from pants.backend.python.lint.isort.skip_field import SkipIsortField
 from pants.backend.python.lint.isort.subsystem import Isort
-from pants.backend.python.lint.python_fmt import PythonFmtRequest
-from pants.backend.python.target_types import PythonSources
+from pants.backend.python.target_types import PythonSourceField
 from pants.backend.python.util_rules import pex
-from pants.backend.python.util_rules.pex import (
-    Pex,
-    PexInterpreterConstraints,
-    PexProcess,
-    PexRequest,
-    PexRequirements,
-)
-from pants.core.goals.fmt import FmtResult
-from pants.core.goals.lint import LintRequest, LintResult, LintResults
-from pants.core.util_rules import stripped_source_files
-from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.fs import (
-    Digest,
-    GlobExpansionConjunction,
-    GlobMatchErrorBehavior,
-    MergeDigests,
-    PathGlobs,
-)
-from pants.engine.process import FallibleProcessResult, Process, ProcessResult
+from pants.backend.python.util_rules.pex import PexRequest, PexResolveInfo, VenvPex, VenvPexProcess
+from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
+from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
+from pants.core.util_rules.partitions import PartitionerType
+from pants.engine.fs import Digest, MergeDigests
+from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import FieldSet
-from pants.engine.unions import UnionRule
+from pants.engine.target import FieldSet, Target
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 
 
 @dataclass(frozen=True)
 class IsortFieldSet(FieldSet):
-    required_fields = (PythonSources,)
+    required_fields = (PythonSourceField,)
 
-    sources: PythonSources
+    source: PythonSourceField
+
+    @classmethod
+    def opt_out(cls, tgt: Target) -> bool:
+        return tgt.get(SkipIsortField).value
 
 
-class IsortRequest(PythonFmtRequest, LintRequest):
+class IsortRequest(FmtTargetsRequest):
     field_set_type = IsortFieldSet
+    tool_subsystem = Isort
+    partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 
-@dataclass(frozen=True)
-class SetupRequest:
-    request: IsortRequest
-    check_only: bool
-
-
-@dataclass(frozen=True)
-class Setup:
-    process: Process
-    original_digest: Digest
-
-
-def generate_args(*, source_files: SourceFiles, isort: Isort, check_only: bool) -> Tuple[str, ...]:
-    # NB: isort auto-discovers config files. There is no way to hardcode them via command line
-    # flags. So long as the files are in the Pex's input files, isort will use the config.
-    args = []
-    if check_only:
-        args.append("--check-only")
-    args.extend(isort.args)
-    args.extend(source_files.files)
+def generate_argv(
+    source_files: tuple[str, ...], isort: Isort, *, is_isort5: bool
+) -> Tuple[str, ...]:
+    args = [*isort.args]
+    if is_isort5 and len(isort.config) == 1:
+        explicitly_configured_config_args = [
+            arg
+            for arg in isort.args
+            if (
+                arg.startswith("--sp")
+                or arg.startswith("--settings-path")
+                or arg.startswith("--settings-file")
+                or arg.startswith("--settings")
+            )
+        ]
+        # TODO: Deprecate manually setting this option, but wait until we deprecate
+        #  `[isort].config` to be a string rather than list[str] option.
+        if not explicitly_configured_config_args:
+            args.append(f"--settings={isort.config[0]}")
+    args.extend(source_files)
     return tuple(args)
 
 
-@rule(level=LogLevel.DEBUG)
-async def setup_isort(setup_request: SetupRequest, isort: Isort) -> Setup:
-    isort_pex_request = Get(
-        Pex,
-        PexRequest(
-            output_filename="isort.pex",
-            internal_only=True,
-            requirements=PexRequirements(isort.all_requirements),
-            interpreter_constraints=PexInterpreterConstraints(isort.interpreter_constraints),
-            entry_point=isort.entry_point,
-        ),
+@rule(desc="Format with isort", level=LogLevel.DEBUG)
+async def isort_fmt(request: IsortRequest.Batch, isort: Isort) -> FmtResult:
+    isort_pex_get = Get(VenvPex, PexRequest, isort.to_pex_request())
+    config_files_get = Get(
+        ConfigFiles, ConfigFilesRequest, isort.config_request(request.snapshot.dirs)
     )
+    isort_pex, config_files = await MultiGet(isort_pex_get, config_files_get)
 
-    config_digest_request = Get(
-        Digest,
-        PathGlobs(
-            globs=isort.config,
-            glob_match_error_behavior=GlobMatchErrorBehavior.error,
-            conjunction=GlobExpansionConjunction.all_match,
-            description_of_origin="the option `--isort-config`",
-        ),
-    )
-
-    source_files_request = Get(
-        SourceFiles,
-        SourceFilesRequest(field_set.sources for field_set in setup_request.request.field_sets),
-    )
-
-    source_files, isort_pex, config_digest = await MultiGet(
-        source_files_request, isort_pex_request, config_digest_request
-    )
-    source_files_snapshot = (
-        source_files.snapshot
-        if setup_request.request.prior_formatter_result is None
-        else setup_request.request.prior_formatter_result
-    )
+    # Isort 5+ changes how config files are handled. Determine which semantics we should use.
+    is_isort5 = False
+    if isort.config:
+        isort_pex_info = await Get(PexResolveInfo, VenvPex, isort_pex)
+        isort_info = isort_pex_info.find("isort")
+        is_isort5 = isort_info is not None and isort_info.version.major >= 5
 
     input_digest = await Get(
-        Digest,
-        MergeDigests((source_files_snapshot.digest, isort_pex.digest, config_digest)),
+        Digest, MergeDigests((request.snapshot.digest, config_files.snapshot.digest))
     )
 
-    process = await Get(
-        Process,
-        PexProcess(
+    result = await Get(
+        ProcessResult,
+        VenvPexProcess(
             isort_pex,
-            argv=generate_args(
-                source_files=source_files, isort=isort, check_only=setup_request.check_only
-            ),
+            argv=generate_argv(request.files, isort, is_isort5=is_isort5),
             input_digest=input_digest,
-            output_files=source_files_snapshot.files,
-            description=f"Run isort on {pluralize(len(setup_request.request.field_sets), 'file')}.",
+            output_files=request.files,
+            description=f"Run isort on {pluralize(len(request.files), 'file')}.",
             level=LogLevel.DEBUG,
         ),
     )
-    return Setup(process, original_digest=source_files_snapshot.digest)
-
-
-@rule(desc="Format with isort", level=LogLevel.DEBUG)
-async def isort_fmt(request: IsortRequest, isort: Isort) -> FmtResult:
-    if isort.skip:
-        return FmtResult.skip(formatter_name="isort")
-    setup = await Get(Setup, SetupRequest(request, check_only=False))
-    result = await Get(ProcessResult, Process, setup.process)
-    return FmtResult.from_process_result(
-        result,
-        original_digest=setup.original_digest,
-        formatter_name="isort",
-        strip_chroot_path=True,
-    )
-
-
-@rule(desc="Lint with isort", level=LogLevel.DEBUG)
-async def isort_lint(request: IsortRequest, isort: Isort) -> LintResults:
-    if isort.skip:
-        return LintResults([], linter_name="isort")
-    setup = await Get(Setup, SetupRequest(request, check_only=True))
-    result = await Get(FallibleProcessResult, Process, setup.process)
-    return LintResults(
-        [LintResult.from_fallible_process_result(result, strip_chroot_path=True)],
-        linter_name="isort",
-    )
+    return await FmtResult.create(request, result, strip_chroot_path=True)
 
 
 def rules():
     return [
         *collect_rules(),
-        UnionRule(PythonFmtRequest, IsortRequest),
-        UnionRule(LintRequest, IsortRequest),
+        *IsortRequest.rules(),
         *pex.rules(),
-        *stripped_source_files.rules(),
     ]

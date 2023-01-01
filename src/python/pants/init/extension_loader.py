@@ -2,14 +2,19 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import importlib
+import logging
 import traceback
 from typing import Dict, List, Optional
 
 from pkg_resources import Requirement, WorkingSet
 
+from pants import ox
 from pants.base.exceptions import BackendConfigurationError
 from pants.build_graph.build_configuration import BuildConfiguration
+from pants.goal.builtins import register_builtin_goals
 from pants.util.ordered_set import FrozenOrderedSet
+
+logger = logging.getLogger(__name__)
 
 
 class PluginLoadingError(Exception):
@@ -40,6 +45,7 @@ def load_backends_and_plugins(
     bc_builder = bc_builder or BuildConfiguration.Builder()
     load_build_configuration_from_source(bc_builder, backends)
     load_plugins(bc_builder, plugins, working_set)
+    register_builtin_goals(bc_builder)
     return bc_builder.create()
 
 
@@ -54,8 +60,8 @@ def load_plugins(
     is already on the path and an error will be thrown if it is not. Plugins should define their
     entrypoints in the `pantsbuild.plugin` group when configuring their distribution.
 
-    Like source backends, the `build_file_aliases`, `global_subsystems` and `register_goals` methods
-    are called if those entry points are defined.
+    Like source backends, the `build_file_aliases`, and `register_goals` methods are called if
+    those entry points are defined.
 
     * Plugins are loaded in the order they are provided. *
 
@@ -89,13 +95,20 @@ def load_plugins(
                     raise PluginLoadOrderError(f"Plugin {plugin} must be loaded after {dep}")
         if "target_types" in entries:
             target_types = entries["target_types"].load()()
-            build_configuration.register_target_types(target_types)
+            build_configuration.register_target_types(req.key, target_types)
         if "build_file_aliases" in entries:
             aliases = entries["build_file_aliases"].load()()
             build_configuration.register_aliases(aliases)
         if "rules" in entries:
             rules = entries["rules"].load()()
-            build_configuration.register_rules(rules)
+            build_configuration.register_rules(req.key, rules)
+        if "remote_auth" in entries:
+            remote_auth_func = entries["remote_auth"].load()
+            logger.debug(
+                f"register remote auth function {remote_auth_func.__module__}.{remote_auth_func.__name__} from plugin: {plugin}"
+            )
+            build_configuration.register_remote_auth_plugin(remote_auth_func)
+
         loaded[dist.as_requirement().key] = dist
 
 
@@ -109,6 +122,7 @@ def load_build_configuration_from_source(
     :raises: :class:``pants.base.exceptions.BuildConfigurationError`` if there is a problem loading
       the build configuration.
     """
+    # NB: Backends added here must be explicit dependencies of this module.
     backend_packages = FrozenOrderedSet(["pants.core", "pants.backend.project_info", *backends])
     for backend_package in backend_packages:
         load_backend(build_configuration, backend_package)
@@ -125,12 +139,13 @@ def load_backend(build_configuration: BuildConfiguration.Builder, backend_packag
     """
     backend_module = backend_package + ".register"
     try:
-        module = importlib.import_module(backend_module)
+        with ox.traditional_import_machinery():
+            module = importlib.import_module(backend_module)
     except ImportError as ex:
         traceback.print_exc()
         raise BackendConfigurationError(f"Failed to load the {backend_module} backend: {ex!r}")
 
-    def invoke_entrypoint(name):
+    def invoke_entrypoint(name: str):
         entrypoint = getattr(module, name, lambda: None)
         try:
             return entrypoint()
@@ -142,10 +157,16 @@ def load_backend(build_configuration: BuildConfiguration.Builder, backend_packag
 
     target_types = invoke_entrypoint("target_types")
     if target_types:
-        build_configuration.register_target_types(target_types)
+        build_configuration.register_target_types(backend_package, target_types)
     build_file_aliases = invoke_entrypoint("build_file_aliases")
     if build_file_aliases:
         build_configuration.register_aliases(build_file_aliases)
     rules = invoke_entrypoint("rules")
     if rules:
-        build_configuration.register_rules(rules)
+        build_configuration.register_rules(backend_package, rules)
+    remote_auth_func = getattr(module, "remote_auth", None)
+    if remote_auth_func:
+        logger.debug(
+            f"register remote auth function {remote_auth_func.__module__}.{remote_auth_func.__name__} from backend: {backend_package}"
+        )
+        build_configuration.register_remote_auth_plugin(remote_auth_func)

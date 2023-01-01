@@ -1,18 +1,23 @@
 [package]
 name = "ui"
 version = "0.0.1"
-edition = "2018"
+edition = "2021"
 authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 
 [lib]
 path = "src/console_ui.rs"
 
 [dependencies]
-indicatif = "0.14.0"
-futures01 = { package = "futures", version = "0.1" }
-futures = { version = "0.3", features = ["compat"] }
-indexmap = "1.4"
-uuid = { version = "0.7", features = ["v4"] }
+console = "0.15.2"
+futures = "0.3"
+indexmap = "1.9"
+indicatif = "0.17"
 logging = { path = "../logging" }
+parking_lot = "0.12"
+# TODO: See https://github.com/Byron/prodash/pull/9.
+prodash = { git = "https://github.com/stuhood/prodash", rev = 'stuhood/raw-messages-draft', version = "16", default-features = false, features = ["progress-tree", "render-line", "render-line-termion"] }
+stdio = { path = "../stdio" }
+terminal_size = "0.1.15"
 task_executor = { path = "../task_executor" }
+uuid = { version = "1.1", features = ["v4"] }
 workunit_store = { path = "../workunit_store" }

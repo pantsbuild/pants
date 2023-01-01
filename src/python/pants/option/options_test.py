@@ -1,30 +1,33 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import json
-import os
 import shlex
 import unittest.mock
-import warnings
-from collections import defaultdict
+from contextlib import contextmanager
 from enum import Enum
 from functools import partial
 from textwrap import dedent
-from typing import Any, Dict, List, Optional, Union, cast
+from typing import Any, Callable, Dict, cast
 
 import pytest
 import toml
 import yaml
 from packaging.version import Version
 
-from pants.base.deprecated import CodeRemovedError
+from pants.base.deprecated import CodeRemovedError, warn_or_error
 from pants.base.hash_utils import CoercingEncoder
+from pants.engine.fs import FileContent
 from pants.option.config import Config
 from pants.option.custom_types import UnsetBool, file_option, shell_str, target_option
 from pants.option.errors import (
     BooleanConversionError,
     BooleanOptionNameWithNo,
+    DefaultValueType,
     FromfileError,
+    HelpType,
     ImplicitValIsNone,
     InvalidKwarg,
     InvalidMemberType,
@@ -32,22 +35,18 @@ from pants.option.errors import (
     MutuallyExclusiveOptionError,
     NoOptionNames,
     OptionAlreadyRegistered,
-    OptionNameDash,
     OptionNameDoubleDash,
     ParseError,
-    RecursiveSubsystemOption,
-    Shadowing,
 )
 from pants.option.global_options import GlobalOptions
-from pants.option.optionable import Optionable
+from pants.option.option_types import StrOption
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.parser import Parser
-from pants.option.parser_hierarchy import enclosing_scope
 from pants.option.ranked_value import Rank, RankedValue
 from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
+from pants.option.subsystem import Subsystem
 from pants.util.contextutil import temporary_file, temporary_file_path
-from pants.util.dirutil import safe_mkdtemp
 
 _FAKE_CUR_VERSION = "1.0.0.dev0"
 
@@ -57,7 +56,7 @@ def global_scope() -> ScopeInfo:
 
 
 def task(scope: str) -> ScopeInfo:
-    return ScopeInfo(scope)
+    return ScopeInfo(scope, is_goal=True)
 
 
 def intermediate(scope: str) -> ScopeInfo:
@@ -68,135 +67,471 @@ def subsystem(scope: str) -> ScopeInfo:
     return ScopeInfo(scope)
 
 
-class _FakeOptionValues:
-    def __init__(self, option_values):
-        self._option_values = option_values
-
-    def __iter__(self):
-        return iter(self._option_values.keys())
-
-    def __getitem__(self, key):
-        return getattr(self, key)
-
-    def get(self, key, default=None):
-        if hasattr(self, key):
-            return getattr(self, key, default)
-        return default
-
-    def __getattr__(self, key):
-        try:
-            value = self._option_values[key]
-        except KeyError:
-            # Instead of letting KeyError raise here, re-raise an AttributeError to not break getattr().
-            raise AttributeError(key)
-        return value.value if isinstance(value, RankedValue) else value
-
-    def get_rank(self, key):
-        value = self._option_values[key]
-        return value.rank if isinstance(value, RankedValue) else Rank.FLAG
-
-    def is_flagged(self, key):
-        return self.get_rank(key) == Rank.FLAG
-
-    def is_default(self, key):
-        return self.get_rank(key) in (Rank.NONE, Rank.HARDCODED)
-
-    @property
-    def option_values(self):
-        return self._option_values
+def create_options(
+    scopes: list[str],
+    register_fn: Callable[[Options], None],
+    args: list[str] | None = None,
+    *,
+    env: dict[str, str] | None = None,
+    config: dict[str, dict[str, Any]] | None = None,
+    extra_scope_infos: list[ScopeInfo] | None = None,
+) -> Options:
+    options = Options.create(
+        env=env or {},
+        config=Config.load([FileContent("pants.toml", toml.dumps(config or {}).encode())]),
+        known_scope_infos=[*(ScopeInfo(scope) for scope in scopes), *(extra_scope_infos or ())],
+        args=["./pants", *(args or ())],
+    )
+    register_fn(options)
+    return options
 
 
-def create_options(options, passthru_args=None, fingerprintable_options=None):
-    """Create a fake Options object for testing.
+# ----------------------------------------------------------------------------------------
+# Boolean handling.
+# ----------------------------------------------------------------------------------------
 
-    Note that the returned object only provides access to the provided options values. There is
-    no registration mechanism on this object. Code under test shouldn't care about resolving
-    cmd-line flags vs. config vs. env vars etc. etc.
 
-    :param dict options: A dict of scope -> (dict of option name -> value).
-    :param list passthru_args: A list of passthrough command line argument values.
-    :param dict fingerprintable_options: A dict of scope -> (dict of option name -> option type).
-                                         This registry should contain entries for any of the
-                                         `options` that are expected to contribute to fingerprinting.
-    :returns: An fake `Options` object encapsulating the given scoped options.
-    """
-    fingerprintable = fingerprintable_options or defaultdict(dict)
+def register_bool_opts(opts: Options) -> None:
+    opts.register(GLOBAL_SCOPE, "--default-missing", type=bool)
+    opts.register(GLOBAL_SCOPE, "--default-true", type=bool, default=True)
+    opts.register(GLOBAL_SCOPE, "--default-false", type=bool, default=False)
+    opts.register(GLOBAL_SCOPE, "--unset", type=bool, default=UnsetBool)
+    opts.register(GLOBAL_SCOPE, "--implicit-true", type=bool, implicit_value=True)
+    opts.register(GLOBAL_SCOPE, "--implicit-false", type=bool, implicit_value=False)
+    opts.register(
+        GLOBAL_SCOPE,
+        "--implicit-false-default-false",
+        type=bool,
+        implicit_value=False,
+        default=False,
+    )
+    opts.register(
+        GLOBAL_SCOPE, "--implicit-false-default-true", type=bool, implicit_value=False, default=True
+    )
 
-    class FakeOptions:
-        def for_scope(self, scope):
-            # TODO(John Sirois): Some users pass in A dict of scope -> _FakeOptionValues instead of a
-            # dict of scope -> (dict of option name -> value).  Clean up these usages and kill this
-            # accommodation.
-            options_for_this_scope = options.get(scope) or {}
-            if isinstance(options_for_this_scope, _FakeOptionValues):
-                options_for_this_scope = options_for_this_scope.option_values
 
-            if passthru_args:
-                # TODO: This is _very_ partial support for passthrough args: this should be
-                # inspecting the kwargs of option registrations to decide which arguments to
-                # extend: this explicit `passthrough_args` argument is only passthrough because
-                # it is marked as such.
-                pa = options_for_this_scope.get("passthrough_args", [])
-                if isinstance(pa, RankedValue):
-                    pa = pa.value
-                options_for_this_scope["passthrough_args"] = [*pa, *passthru_args]
+def test_bool_explicit_values() -> None:
+    def register(opt: Options) -> None:
+        opt.register(GLOBAL_SCOPE, "--opt", type=bool)
 
-            scoped_options = {}
-            if scope:
-                scoped_options.update(self.for_scope(enclosing_scope(scope)).option_values)
-            scoped_options.update(options_for_this_scope)
-            return _FakeOptionValues(scoped_options)
+    def assert_val(arg: str, expected: bool) -> None:
+        global_options = create_options(
+            [GLOBAL_SCOPE], register, [f"--opt={arg}"]
+        ).for_global_scope()
+        assert global_options.opt is expected
 
-        def for_global_scope(self):
-            return self.for_scope(GLOBAL_SCOPE)
+    assert_val("false", False)
+    assert_val("False", False)
+    assert_val("true", True)
+    assert_val("True", True)
 
-        def items(self):
-            return list(options.items())
 
-        @property
-        def scope_to_flags(self):
-            return {}
+def test_bool_defaults() -> None:
+    opts = create_options([GLOBAL_SCOPE], register_bool_opts).for_global_scope()
+    assert opts.default_missing is False
+    assert opts.default_true is True
+    assert opts.default_false is False
 
-        def get_fingerprintable_for_scope(self, bottom_scope):
-            """Returns a list of fingerprintable (option type, option value) pairs for the given
-            scope.
+    assert opts.unset is None
 
-            Note that this method only collects values for a single scope, NOT from
-            all enclosing scopes as in the Options class!
+    assert opts.implicit_true is False
+    assert opts.implicit_false is True
+    assert opts.implicit_false_default_false is False
+    assert opts.implicit_false_default_true is True
 
-            :param str bottom_scope: The scope to gather fingerprintable options for.
-            """
-            pairs = []
-            option_values = self.for_scope(bottom_scope)
-            for option_name, option_type in fingerprintable[bottom_scope].items():
-                pairs.append((option_type, option_values[option_name]))
-            return pairs
 
-        def __getitem__(self, scope):
-            return self.for_scope(scope)
+def test_bool_args() -> None:
+    opts = create_options(
+        [GLOBAL_SCOPE],
+        register_bool_opts,
+        [
+            "--default-missing",
+            "--default-true",
+            "--default-false",
+            "--unset",
+            "--implicit-true",
+            "--implicit-false",
+            "--implicit-false-default-false",
+            "--implicit-false-default-true",
+        ],
+    ).for_global_scope()
+    assert opts.default_missing is True
+    assert opts.default_true is True
+    assert opts.default_false is True
 
-    return FakeOptions()
+    assert opts.unset is True
+
+    assert opts.implicit_true is True
+    assert opts.implicit_false is False
+    assert opts.implicit_false_default_false is False
+    assert opts.implicit_false_default_true is False
+
+
+def test_bool_negate() -> None:
+    opts = create_options(
+        [GLOBAL_SCOPE],
+        register_bool_opts,
+        [
+            "--no-default-missing",
+            "--no-default-true",
+            "--no-default-false",
+            "--no-unset",
+            "--no-implicit-true",
+            "--no-implicit-false",
+            "--no-implicit-false-default-false",
+            "--no-implicit-false-default-true",
+        ],
+    ).for_global_scope()
+    assert opts.default_missing is False
+    assert opts.default_true is False
+    assert opts.default_false is False
+
+    assert opts.unset is False
+
+    assert opts.implicit_true is False
+    assert opts.implicit_false is True
+    assert opts.implicit_false_default_false is True
+    assert opts.implicit_false_default_true is True
+
+
+@pytest.mark.parametrize("val", [False, True])
+def test_bool_config(val: bool) -> None:
+    opt_names = (
+        "default_missing",
+        "default_true",
+        "default_false",
+        "implicit_true",
+        "implicit_false",
+        "implicit_false_default_false",
+        "implicit_false_default_true",
+    )
+    opts = create_options(
+        [GLOBAL_SCOPE], register_bool_opts, config={"GLOBAL": {opt: val for opt in opt_names}}
+    ).for_global_scope()
+    for opt in opt_names:
+        assert opts[opt] is val, f"option {opt} has value {opts[opt]} but expected {val}"
+
+
+@pytest.mark.parametrize("val", (11, "AlmostTrue"))
+def test_bool_invalid_value(val: Any) -> None:
+    def register(opts: Options) -> None:
+        opts.register(GLOBAL_SCOPE, "--opt", type=bool)
+
+    with pytest.raises(BooleanConversionError):
+        create_options([GLOBAL_SCOPE], register, config={"GLOBAL": {"opt": val}}).for_global_scope()
+
+
+# ----------------------------------------------------------------------------------------
+# Type checks
+# ----------------------------------------------------------------------------------------
+
+
+@contextmanager
+def no_exception():
+    """use in tests as placeholder for a pytest.raises, when no exception is expected."""
+    yield None
+
+
+@pytest.mark.parametrize(
+    "option_kwargs, assert_expected",
+    [
+        (
+            dict(type=str, default=""),
+            no_exception(),
+        ),
+        (
+            dict(type=str, default=42),
+            pytest.raises(
+                DefaultValueType, match=r"Default value int\(42\) does not match option type str\."
+            ),
+        ),
+        (
+            dict(type=bool, default="True"),
+            no_exception(),
+        ),
+        (
+            dict(type=bool, default=True),
+            no_exception(),
+        ),
+        (
+            dict(type=bool, default="not a bool"),
+            pytest.raises(
+                BooleanConversionError, match=r'Got "not a bool"\. Expected "True" or "False"\.'
+            ),
+        ),
+        (
+            dict(type=int, default=1.0),
+            pytest.raises(
+                DefaultValueType,
+                match=r"Default value float\(1\.0\) does not match option type int\. \[option --opt in global scope\]\.",
+            ),
+        ),
+        (
+            dict(type=list, member_type=int, default="[1, 2, 3]"),
+            no_exception(),
+        ),
+        (
+            dict(type=list, member_type=int, default="[1, 2.1, 3]"),
+            pytest.raises(
+                DefaultValueType,
+                match=r"Default member value type mismatch\.\n\n    Member value float\(2\.1\) does not match list option type int\.",
+            ),
+        ),
+        (
+            dict(type=list, member_type=float, default="[1.1, 2.0, 3.3]"),
+            no_exception(),
+        ),
+        (
+            dict(type=list, member_type=float, default="[1.1, 2.2, '3.3']"),
+            pytest.raises(
+                DefaultValueType,
+                match=r"Member value str\('3\.3'\) does not match list option type float\.",
+            ),
+        ),
+        (
+            dict(type=dict, default="{'foo': 'bar'}"),
+            no_exception(),
+        ),
+        (
+            dict(type=dict, default="['foo', 'bar']"),
+            pytest.raises(ParseError, match=r"Invalid dict value: \['foo', 'bar'\]"),
+        ),
+    ],
+)
+def test_default_value_type_assert(option_kwargs, assert_expected):
+    def register(opts: Options) -> None:
+        opts.register(GLOBAL_SCOPE, "--opt", **option_kwargs)
+
+    with assert_expected:
+        create_options([GLOBAL_SCOPE], register).for_scope(GLOBAL_SCOPE)
+
+
+# ----------------------------------------------------------------------------------------
+# Deprecations.
+# ----------------------------------------------------------------------------------------
+
+
+def test_deprecated_options(caplog) -> None:
+    def register(opts: Options) -> None:
+        opts.register(
+            GLOBAL_SCOPE, "--old1", removal_version="999.99.9.dev0", removal_hint="Stop it."
+        )
+        opts.register(
+            GLOBAL_SCOPE,
+            "--bool1",
+            type=bool,
+            removal_version="999.99.9.dev0",
+            removal_hint="¡Basta!",
+        )
+        opts.register("scope", "--valid")
+        opts.register(
+            "scope", "--old2", removal_version="999.99.9.dev0", removal_hint="Stop with the scope."
+        )
+        opts.register(
+            "scope",
+            "--bool2",
+            type=bool,
+            removal_version="999.99.9.dev0",
+            removal_hint="¡Basta but scoped!",
+        )
+
+    def assert_deprecated(
+        scope: str,
+        opt: str,
+        args: list[str],
+        *,
+        expected: str | bool,
+        env: dict[str, str] | None = None,
+        config: dict[str, dict[str, str]] | None = None,
+    ) -> None:
+        caplog.clear()
+        warn_or_error.clear()  # type: ignore[attr-defined]
+        opts = create_options([GLOBAL_SCOPE, "scope"], register, args, env=env, config=config)
+        assert opts.for_scope(scope)[opt] == expected
+        assert len(caplog.records) == 1
+        assert "is scheduled to be removed in version" in caplog.text
+        assert opt in caplog.text
+
+    assert_deprecated(GLOBAL_SCOPE, "old1", ["--old1=x"], expected="x")
+    assert_deprecated(GLOBAL_SCOPE, "bool1", ["--bool1"], expected=True)
+    assert_deprecated(GLOBAL_SCOPE, "bool1", ["--no-bool1"], expected=False)
+    assert_deprecated("scope", "old2", ["scope", "--old2=x"], expected="x")
+    assert_deprecated("scope", "old2", ["--scope-old2=x"], expected="x")
+    assert_deprecated("scope", "bool2", ["scope", "--bool2"], expected=True)
+    assert_deprecated("scope", "bool2", ["scope", "--no-bool2"], expected=False)
+    assert_deprecated("scope", "bool2", ["--scope-bool2"], expected=True)
+    assert_deprecated("scope", "bool2", ["--no-scope-bool2"], expected=False)
+
+    assert_deprecated(GLOBAL_SCOPE, "old1", [], env={"PANTS_GLOBAL_OLD1": "x"}, expected="x")
+    assert_deprecated("scope", "old2", [], env={"PANTS_SCOPE_OLD2": "x"}, expected="x")
+
+    assert_deprecated(GLOBAL_SCOPE, "old1", [], config={"GLOBAL": {"old1": "x"}}, expected="x")
+    assert_deprecated("scope", "old2", [], config={"scope": {"old2": "x"}}, expected="x")
+
+    # Make sure the warnings don't come out for regular options.
+    caplog.clear()
+    warn_or_error.clear()  # type: ignore[attr-defined]
+    assert (
+        create_options([GLOBAL_SCOPE, "scope"], register, ["--scope-valid=x"])
+        .for_scope("scope")
+        .valid
+        == "x"
+    )
+    assert not caplog.records
+
+
+def test_deprecated_options_error() -> None:
+    def register(opts: Options) -> None:
+        opts.register(GLOBAL_SCOPE, "--expired", removal_version="0.0.1.dev0")
+
+    with pytest.raises(CodeRemovedError):
+        create_options([GLOBAL_SCOPE], register, [])
+
+
+@unittest.mock.patch("pants.base.deprecated.PANTS_SEMVER", Version(_FAKE_CUR_VERSION))
+def test_deprecated_options_start_version(caplog) -> None:
+    def register(opts: Options) -> None:
+        opts.register(
+            GLOBAL_SCOPE,
+            "--delayed",
+            removal_version="999.99.9.dev0",
+            deprecation_start_version="500.0.0.dev0",
+        )
+        opts.register(
+            GLOBAL_SCOPE,
+            "--past-start",
+            removal_version="999.99.9.dev0",
+            deprecation_start_version=_FAKE_CUR_VERSION,
+        )
+
+    caplog.clear()
+    assert (
+        create_options([GLOBAL_SCOPE], register, ["--delayed=x"]).for_global_scope().delayed == "x"
+    )
+    assert not caplog.records
+
+    assert (
+        create_options([GLOBAL_SCOPE], register, ["--past-start=x"]).for_global_scope().past_start
+        == "x"
+    )
+    assert len(caplog.records) == 1
+    assert "is scheduled to be removed in version" in caplog.text
+    assert "past_start" in caplog.text
+
+
+def test_scope_deprecation(caplog) -> None:
+    # This test demonstrates that two different new scopes can deprecate the same
+    # old scope. I.e., it's possible to split an old scope's options among multiple new scopes.
+    class Subsystem1(Subsystem):
+        options_scope = "new1"
+        deprecated_options_scope = "deprecated"
+        deprecated_options_scope_removal_version = "9999.9.9.dev0"
+
+        foo = StrOption(default=None, help="")
+        bar = StrOption(default=None, help="")
+        baz = StrOption(default=None, help="")
+
+    class Subsystem2(Subsystem):
+        options_scope = "new2"
+        deprecated_options_scope = "deprecated"
+        deprecated_options_scope_removal_version = "9999.9.9.dev0"
+
+        qux = StrOption(default=None, help="")
+
+    def register(opts: Options) -> None:
+        opts.register(Subsystem1.options_scope, "--foo")
+        opts.register(Subsystem1.options_scope, "--bar")
+        opts.register(Subsystem1.options_scope, "--baz")
+        opts.register(Subsystem2.options_scope, "--qux")
+
+    opts = create_options(
+        [GLOBAL_SCOPE],
+        register,
+        ["--new1-baz=vv"],
+        extra_scope_infos=[Subsystem1.get_scope_info(), Subsystem2.get_scope_info()],
+        config={
+            Subsystem1.options_scope: {"foo": "xx"},
+            Subsystem1.deprecated_options_scope: {
+                "foo": "yy",
+                "bar": "zz",
+                "baz": "ww",
+                "qux": "uu",
+            },
+        },
+    )
+
+    caplog.clear()
+    vals1 = opts.for_scope(Subsystem1.options_scope)
+    assert len(caplog.records) == 1
+    assert Subsystem1.deprecated_options_scope in caplog.text
+    assert "foo" in caplog.text
+    # Deprecated scope takes precedence at equal rank, but new scope takes precedence at higher
+    # rank.
+    assert vals1.foo == "yy"
+    assert vals1.bar == "zz"
+    assert vals1.baz == "vv"
+
+    caplog.clear()
+    vals2 = opts.for_scope(Subsystem2.options_scope)
+    assert len(caplog.records) == 1
+    assert Subsystem1.deprecated_options_scope in caplog.text
+    assert "qux" in caplog.text
+    assert vals2.qux == "uu"
+
+
+def test_scope_deprecation_default_config_section(caplog) -> None:
+    # Confirms that a DEFAULT option does not trigger deprecation warnings for a deprecated scope.
+    class Subsystem1(Subsystem):
+        options_scope = "new"
+        deprecated_options_scope = "deprecated"
+        deprecated_options_scope_removal_version = "9999.9.9.dev0"
+
+    def register(opts: Options) -> None:
+        opts.register(Subsystem1.options_scope, "--foo")
+
+    opts = create_options(
+        [GLOBAL_SCOPE],
+        register,
+        [],
+        extra_scope_infos=[Subsystem1.get_scope_info()],
+        config={"DEFAULT": {"foo": "aa"}, Subsystem1.options_scope: {"foo": "xx"}},
+    )
+    caplog.clear()
+    assert opts.for_scope(Subsystem1.options_scope).foo == "xx"
+    assert not caplog.records
+
+
+# ----------------------------------------------------------------------------------------
+# Legacy Unittest TestCase.
+# ----------------------------------------------------------------------------------------
 
 
 class OptionsTest(unittest.TestCase):
     @staticmethod
-    def _create_config(config: Optional[Dict[str, Dict[str, str]]] = None) -> Config:
-        with open(os.path.join(safe_mkdtemp(), "test_config.toml"), "w") as fp:
-            toml.dump(config or {}, fp)
-        return Config.load(config_paths=[fp.name])
+    def _create_config(
+        config: dict[str, dict[str, str]] | None = None,
+        config2: dict[str, dict[str, str]] | None = None,
+    ) -> Config:
+        return Config.load(
+            [
+                FileContent("test_config.toml", toml.dumps(config or {}).encode()),
+                FileContent("test_config2.toml", toml.dumps(config2 or {}).encode()),
+            ]
+        )
 
     def _parse(
         self,
         *,
         flags: str = "",
-        env: Optional[Dict[str, str]] = None,
-        config: Optional[Dict[str, Dict[str, Any]]] = None,
+        env: dict[str, str] | None = None,
+        config: dict[str, dict[str, Any]] | None = None,
+        config2: dict[str, dict[str, Any]] | None = None,
         bootstrap_option_values=None,
     ) -> Options:
         args = ["./pants", *shlex.split(flags)]
         options = Options.create(
             env=env or {},
-            config=self._create_config(config),
+            config=self._create_config(config, config2),
             known_scope_infos=OptionsTest._known_scope_infos,
             args=args,
             bootstrap_option_values=bootstrap_option_values,
@@ -205,24 +540,26 @@ class OptionsTest(unittest.TestCase):
         return options
 
     _known_scope_infos = [
-        global_scope(),
-        intermediate("compile"),
-        task("compile.java"),
-        task("compile.scala"),
-        task("cache.compile.scala"),
-        intermediate("stale"),
-        intermediate("test"),
-        task("test.junit"),
-        subsystem("passconsumer"),
-        task("simple"),
-        task("simple-dashed"),
-        task("scoped.a.bit"),
-        task("scoped.and-dashed"),
-        task("fromfile"),
-        task("fingerprinting"),
-        task("enum-opt"),
-        task("separate-enum-opt-scope"),
-        task("other-enum-scope"),
+        ScopeInfo(scope)
+        for scope in (
+            GLOBAL_SCOPE,
+            "anotherscope",
+            "compile",
+            "compile.java",
+            "stale",
+            "test",
+            "test.junit",
+            "passconsumer",
+            "simple",
+            "simple-dashed",
+            "scoped.a.bit",
+            "scoped.and-dashed",
+            "fromfile",
+            "fingerprinting",
+            "enum-opt",
+            "separate-enum-opt-scope",
+            "other-enum-scope",
+        )
     ]
 
     class SomeEnumOption(Enum):
@@ -235,8 +572,16 @@ class OptionsTest(unittest.TestCase):
         def register_global(*args, **kwargs):
             options.register(GLOBAL_SCOPE, *args, **kwargs)
 
-        register_global("-z", "--verbose", type=bool, help="Verbose output.", recursive=True)
-        register_global("-n", "--num", type=int, default=99, recursive=True, fingerprint=True)
+        register_global("--verbose", type=bool, help="Verbose output.")
+        register_global("--num", type=int, default=99)
+
+        # NB: `-l` on the global scope is the only short arg we allow. We need to make sure it
+        # works.
+        register_global("-l", "--level", type=str, help="What level to use.")
+
+        # Test that we can use the same name on the global scope and another scope.
+        options.register("anotherscope", "--num", type=int, default=99)
+
         register_global("--y", type=list, member_type=int)
         register_global(
             "--v2", help="Two-letter long-form option, used to test option name suggestions."
@@ -245,17 +590,7 @@ class OptionsTest(unittest.TestCase):
 
         register_global("--pants-foo")
         register_global("--bar-baz")
-        register_global("--store-true-flag", type=bool, fingerprint=True)
-        register_global("--store-false-flag", type=bool, implicit_value=False)
-        register_global("--store-true-def-true-flag", type=bool, default=True)
-        register_global("--store-true-def-false-flag", type=bool, default=False)
-        register_global(
-            "--store-false-def-false-flag", type=bool, implicit_value=False, default=False
-        )
-        register_global(
-            "--store-false-def-true-flag", type=bool, implicit_value=False, default=True
-        )
-        register_global("--def-unset-bool-flag", type=bool, default=UnsetBool)
+        register_global("--store-true-flag", type=bool)
 
         # Choices.
         register_global("--str-choices", choices=["foo", "bar"])
@@ -283,41 +618,6 @@ class OptionsTest(unittest.TestCase):
         # Implicit value.
         register_global("--implicit-valuey", default="default", implicit_value="implicit")
 
-        # For the design doc example test.
-        register_global("--a", type=int, recursive=True)
-        register_global("--b", type=int, recursive=True)
-
-        # Deprecated global options
-        register_global(
-            "--global-crufty",
-            removal_version="999.99.9.dev0",
-            removal_hint="use a less crufty global option",
-        )
-        register_global(
-            "--global-crufty-boolean",
-            type=bool,
-            removal_version="999.99.9.dev0",
-            removal_hint="say no to crufty global options",
-        )
-        register_global(
-            "--global-delayed-deprecated-option",
-            removal_version="999.99.9.dev0",
-            deprecation_start_version="500.0.0.dev0",
-        )
-        register_global(
-            "--global-delayed-but-already-passed-deprecated-option",
-            removal_version="999.99.9.dev0",
-            deprecation_start_version=_FAKE_CUR_VERSION,
-        )
-
-        # Test that an option past the `removal_version` fails at option registration time.
-        with self.assertRaises(CodeRemovedError):
-            register_global(
-                "--global-crufty-expired",
-                removal_version="0.0.1.dev0",
-                removal_hint="use a less crufty global option",
-            )
-
         # Mutual Exclusive options
         register_global("--mutex-foo", mutually_exclusive_group="mutex")
         register_global("--mutex-bar", mutually_exclusive_group="mutex")
@@ -326,38 +626,18 @@ class OptionsTest(unittest.TestCase):
         register_global("--new-name")
         register_global("--old-name", mutually_exclusive_group="new_name")
 
-        # For the design doc example test.
-        options.register("compile", "--c", type=int)
-
-        # Test deprecated options with a scope
-        options.register("stale", "--still-good")
-        options.register(
-            "stale",
-            "--crufty",
-            removal_version="999.99.9.dev0",
-            removal_hint="use a less crufty stale scoped option",
-        )
-        options.register(
-            "stale",
-            "--crufty-boolean",
-            type=bool,
-            removal_version="999.99.9.dev0",
-            removal_hint="say no to crufty, stale scoped options",
-        )
-
         # Test mutual exclusive options with a scope
-        options.register("stale", "--mutex-a", mutually_exclusive_group="crufty_mutex")
-        options.register("stale", "--mutex-b", mutually_exclusive_group="crufty_mutex")
+        options.register("stale", "--mutex-a", mutually_exclusive_group="scope_mutex")
+        options.register("stale", "--mutex-b", mutually_exclusive_group="scope_mutex")
         options.register("stale", "--crufty-old", mutually_exclusive_group="crufty_new")
         options.register("stale", "--crufty-new")
 
-        # For task identity test
-        options.register("compile.scala", "--modifycompile", fingerprint=True)
-        options.register("compile.scala", "--modifylogs")
+        # For scoped fingerprintable test
+        options.register("compile", "--modifycompile")
+        options.register("compile", "--modifylogs", fingerprint=False)
         options.register(
-            "compile.scala",
+            "compile",
             "--modifypassthrough",
-            fingerprint=True,
             passthrough=True,
             type=list,
             member_type=str,
@@ -378,10 +658,12 @@ class OptionsTest(unittest.TestCase):
         options.register("fromfile", "--appendvalue", type=list, member_type=int)
 
         # For fingerprint tests
-        options.register("fingerprinting", "--inverted")  # Implicitly: daemon=True
-        options.register("fingerprinting", "--definitely-not-inverted", daemon=False)
-        options.register("fingerprinting", "--fingerprinted", fingerprint=True)
-        options.register("fingerprinting", "--definitely-not-fingerprinted", fingerprint=False)
+        register_global("--implicitly-fingerprinted")
+        register_global("--explicitly-fingerprinted", fingerprint=True)
+        register_global("--explicitly-not-fingerprinted", fingerprint=False)
+        register_global("--implicitly-not-daemoned")
+        register_global("--explicitly-not-daemoned", daemon=False)
+        register_global("--explicitly-daemoned", daemon=True)
 
         # For enum tests
         options.register("enum-opt", "--some-enum", type=self.SomeEnumOption)
@@ -413,90 +695,85 @@ class OptionsTest(unittest.TestCase):
         )
         options = create_options_object(env={"PANTS_FOO_BAR": "123"})
         options.register(GLOBAL_SCOPE, "--foo-bar", type=int)
-        self.assertEqual(123, options.for_global_scope().foo_bar)
+        assert 123 == options.for_global_scope().foo_bar
 
         options = create_options_object(env={"PANTS_FOO_BAR": "['123','456']"})
         options.register(GLOBAL_SCOPE, "--foo-bar", type=list, member_type=int)
-        self.assertEqual([123, 456], options.for_global_scope().foo_bar)
+        assert [123, 456] == options.for_global_scope().foo_bar
 
     def test_arg_scoping(self) -> None:
         # Some basic smoke tests.
         options = self._parse(flags="--verbose")
-        self.assertEqual(True, options.for_global_scope().verbose)
-        options = self._parse(flags="-z compile path/to/tgt")
-        self.assertEqual(["path/to/tgt"], options.specs)
-        self.assertEqual(True, options.for_global_scope().verbose)
+        assert options.for_global_scope().verbose is True
+        options = self._parse(flags="--verbose compile path/to/tgt")
+        assert ["path/to/tgt"] == options.specs
+        assert options.for_global_scope().verbose is True
 
-        with self.assertRaises(ParseError):
+        options = self._parse(flags="-linfo")
+        assert options.for_global_scope().level == "info"
+        options = self._parse(flags="--level=info compile path/to/tgt")
+        assert ["path/to/tgt"] == options.specs
+        assert options.for_global_scope().level == "info"
+
+        with pytest.raises(ParseError):
             self._parse(flags="--unregistered-option compile").for_global_scope()
 
-        # Scoping of different values of the same option.
-        # Also tests the --no-* boolean flag inverses.
-        options = self._parse(flags="--verbose compile.java --no-verbose")
-        self.assertEqual(True, options.for_global_scope().verbose)
-        self.assertEqual(True, options.for_scope("compile").verbose)
-        self.assertEqual(False, options.for_scope("compile.java").verbose)
-
-        options = self._parse(
-            flags="--verbose compile --no-verbose compile.java -z test test.junit --no-verbose"
-        )
-        self.assertEqual(True, options.for_global_scope().verbose)
-        self.assertEqual(False, options.for_scope("compile").verbose)
-        self.assertEqual(True, options.for_scope("compile.java").verbose)
-        self.assertEqual(True, options.for_scope("test").verbose)
-        self.assertEqual(False, options.for_scope("test.junit").verbose)
+        # Scoping of different values of options with the same name in different scopes.
+        options = self._parse(flags="--num=11 anotherscope --num=22")
+        assert 11 == options.for_global_scope().num
+        assert 22 == options.for_scope("anotherscope").num
 
         # Test list-typed option.
         global_options = self._parse(config={"DEFAULT": {"y": ["88", "-99"]}}).for_global_scope()
-        self.assertEqual([88, -99], global_options.y)
+        assert [88, -99] == global_options.y
 
         global_options = self._parse(
             flags="--y=5 --y=-6 --y=77", config={"DEFAULT": {"y": ["88", "-99"]}}
         ).for_global_scope()
-        self.assertEqual([88, -99, 5, -6, 77], global_options.y)
+        assert [88, -99, 5, -6, 77] == global_options.y
 
         global_options = self._parse().for_global_scope()
-        self.assertEqual([], global_options.y)
+        assert [] == global_options.y
 
         global_options = self._parse(
             env={"PANTS_CONFIG_OVERRIDE": "['123','456']"}
         ).for_global_scope()
-        self.assertEqual(["123", "456"], global_options.config_override)
+        assert ["123", "456"] == global_options.config_override
 
         global_options = self._parse(env={"PANTS_CONFIG_OVERRIDE": "['']"}).for_global_scope()
-        self.assertEqual([""], global_options.config_override)
+        assert [""] == global_options.config_override
 
         global_options = self._parse(
             flags="--listy='[1, 2]'", config={"DEFAULT": {"listy": "[3, 4]"}}
         ).for_global_scope()
-        self.assertEqual([1, 2], global_options.listy)
+        assert [1, 2] == global_options.listy
 
         # Test dict-typed option.
         global_options = self._parse(flags='--dicty=\'{"c": "d"}\'').for_global_scope()
-        self.assertEqual({"c": "d"}, global_options.dicty)
+        assert {"c": "d"} == global_options.dicty
 
         # Test list-of-dict-typed option.
         global_options = self._parse(
             flags='--dict-listy=\'[{"c": "d"}, {"e": "f"}]\''
         ).for_global_scope()
-        self.assertEqual([{"c": "d"}, {"e": "f"}], global_options.dict_listy)
+        assert [{"c": "d"}, {"e": "f"}] == global_options.dict_listy
 
         # Test target-typed option.
         global_options = self._parse().for_global_scope()
-        self.assertEqual("//:a", global_options.targety)
+        assert "//:a" == global_options.targety
         global_options = self._parse(flags="--targety=//:foo").for_global_scope()
-        self.assertEqual("//:foo", global_options.targety)
+        assert "//:foo" == global_options.targety
 
         # Test list-of-target-typed option.
         global_options = self._parse(
             flags='--target-listy=\'["//:foo", "//:bar"]\''
         ).for_global_scope()
-        self.assertEqual(["//:foo", "//:bar"], global_options.target_listy)
+        assert ["//:foo", "//:bar"] == global_options.target_listy
 
         # Test file-typed option.
         with temporary_file_path() as fp:
             global_options = self._parse(flags=f'--filey="{fp}"').for_global_scope()
-            self.assertEqual(fp, global_options.filey)
+            assert fp == global_options.filey
 
         # Test list-of-file-typed option.
         with temporary_file_path() as fp1:
@@ -504,101 +781,23 @@ class OptionsTest(unittest.TestCase):
                 global_options = self._parse(
                     flags=f'--file-listy="{fp1}" --file-listy="{fp2}"'
                 ).for_global_scope()
-                self.assertEqual([fp1, fp2], global_options.file_listy)
-
-    def test_explicit_boolean_values(self) -> None:
-        def assert_boolean_value(*, arg: str, expected: bool) -> None:
-            global_options = self._parse(flags=f"--verbose={arg}").for_global_scope()
-            assert global_options.verbose is expected
-
-        assert_boolean_value(arg="false", expected=False)
-        assert_boolean_value(arg="False", expected=False)
-        assert_boolean_value(arg="true", expected=True)
-        assert_boolean_value(arg="True", expected=True)
-
-    def test_boolean_defaults(self) -> None:
-        global_options = self._parse().for_global_scope()
-        self.assertFalse(global_options.store_true_flag)
-        self.assertTrue(global_options.store_false_flag)
-        self.assertFalse(global_options.store_true_def_false_flag)
-        self.assertTrue(global_options.store_true_def_true_flag)
-        self.assertFalse(global_options.store_false_def_false_flag)
-        self.assertTrue(global_options.store_false_def_true_flag)
-        self.assertIsNone(global_options.def_unset_bool_flag)
-
-    def test_boolean_set_option(self) -> None:
-        global_options = self._parse(
-            flags="--store-true-flag --store-false-flag --store-true-def-true-flag "
-            "--store-true-def-false-flag --store-false-def-true-flag --store-false-def-false-flag "
-            "--def-unset-bool-flag"
-        ).for_global_scope()
-        self.assertTrue(global_options.store_true_flag)
-        self.assertFalse(global_options.store_false_flag)
-        self.assertTrue(global_options.store_true_def_false_flag)
-        self.assertTrue(global_options.store_true_def_true_flag)
-        self.assertFalse(global_options.store_false_def_false_flag)
-        self.assertFalse(global_options.store_false_def_true_flag)
-        self.assertTrue(global_options.def_unset_bool_flag)
-
-    def test_boolean_negate_option(self) -> None:
-        global_options = self._parse(
-            flags="--no-store-true-flag --no-store-false-flag  --no-store-true-def-true-flag "
-            "--no-store-true-def-false-flag --no-store-false-def-true-flag "
-            "--no-store-false-def-false-flag --no-def-unset-bool-flag"
-        ).for_global_scope()
-        self.assertFalse(global_options.store_true_flag)
-        self.assertTrue(global_options.store_false_flag)
-        self.assertFalse(global_options.store_true_def_false_flag)
-        self.assertFalse(global_options.store_true_def_true_flag)
-        self.assertTrue(global_options.store_false_def_false_flag)
-        self.assertTrue(global_options.store_false_def_true_flag)
-        self.assertFalse(global_options.def_unset_bool_flag)
-
-    def test_boolean_config_override(self) -> None:
-        def assert_options_set(value: bool) -> None:
-            global_options = self._parse(
-                config={
-                    "DEFAULT": {
-                        "store_true_flag": value,
-                        "store_false_flag": value,
-                        "store_true_def_true_flag": value,
-                        "store_true_def_false_flag": value,
-                        "store_false_def_true_flag": value,
-                        "store_false_def_false_flag": value,
-                        "def_unset_bool_flag": value,
-                    },
-                },
-            ).for_global_scope()
-            assert global_options.store_true_flag == value
-            assert global_options.store_false_flag == value
-            assert global_options.store_true_def_false_flag == value
-            assert global_options.store_true_def_true_flag == value
-            assert global_options.store_false_def_false_flag == value
-            assert global_options.store_false_def_true_flag == value
-            assert global_options.def_unset_bool_flag == value
-
-        assert_options_set(False)
-        assert_options_set(True)
-
-    def test_boolean_invalid_value(self) -> None:
-        def assert_invalid_value(val) -> None:
-            with self.assertRaises(BooleanConversionError):
-                self._parse(config={"DEFAULT": {"store_true_flag": val}}).for_global_scope()
-
-        assert_invalid_value(11)
-        assert_invalid_value("AlmostTrue")
+                assert [fp1, fp2] == global_options.file_listy
 
     def test_list_option(self) -> None:
         def check(
             *,
-            expected: List[int],
+            expected: list[int],
             flags: str = "",
-            env_val: Optional[str] = None,
-            config_val: Optional[str] = None,
+            env_val: str | None = None,
+            config_val: str | None = None,
+            config2_val: str | None = None,
         ) -> None:
             env = {"PANTS_GLOBAL_LISTY": env_val} if env_val else None
             config = {"GLOBAL": {"listy": config_val}} if config_val else None
-            global_options = self._parse(flags=flags, env=env, config=config).for_global_scope()
+            config2 = {"GLOBAL": {"listy": config2_val}} if config2_val else None
+            global_options = self._parse(
+                flags=flags, env=env, config=config, config2=config2
+            ).for_global_scope()
             assert global_options.listy == expected
 
         default = [1, 2, 3]
@@ -619,8 +818,12 @@ class OptionsTest(unittest.TestCase):
         check(
             flags="--listy=+[8,9]",
             env_val="+[6,7]",
-            config_val="+[4,5]",
-            expected=[*default, 4, 5, 6, 7, 8, 9],
+            config_val="+[4,5],+[45]",
+            expected=[*default, 4, 5, 45, 6, 7, 8, 9],
+        )
+        check(
+            config_val="+[4,5],-[4]",
+            expected=[*default, 5],
         )
 
         # Appending and filtering across env, config and flags (in the right order).
@@ -628,7 +831,8 @@ class OptionsTest(unittest.TestCase):
             flags="--listy=-[1,5,6]",
             env_val="+[6,7]",
             config_val="+[4,5]",
-            expected=[2, 3, 4, 7],
+            config2_val="+[99]",
+            expected=[2, 3, 4, 99, 7],
         )
         check(
             flags="--listy=+[8,9]",
@@ -636,6 +840,17 @@ class OptionsTest(unittest.TestCase):
             config_val="+[4,5],-[3]",
             expected=[1, 2, 8, 9],
         )
+        # Appending a value from a fromfile.
+        with temporary_file(binary_mode=False) as fp:
+            fp.write("-[3]")
+            fp.close()
+            check(
+                flags="--listy=+[8,9]",
+                env_val="-[4,5]",
+                config_val="+[4,5]",
+                config2_val=f"@{fp.name}",
+                expected=[1, 2, 8, 9],
+            )
 
         # Overwriting from env, then appending and filtering.
         check(
@@ -650,7 +865,8 @@ class OptionsTest(unittest.TestCase):
             flags="--listy=+[8,9]",
             env_val="+[6,7]",
             config_val="[4,5]",
-            expected=[4, 5, 6, 7, 8, 9],
+            config2_val="-[4]",
+            expected=[5, 6, 7, 8, 9],
         )
 
         # Overwriting from flags.
@@ -689,10 +905,10 @@ class OptionsTest(unittest.TestCase):
     def test_dict_list_option(self) -> None:
         def check(
             *,
-            expected: List[Dict[str, int]],
+            expected: list[dict[str, int]],
             flags: str = "",
-            env_val: Optional[str] = None,
-            config_val: Optional[str] = None,
+            env_val: str | None = None,
+            config_val: str | None = None,
         ) -> None:
             env = {"PANTS_GLOBAL_DICT_LISTY": env_val} if env_val else None
             config = {"GLOBAL": {"dict_listy": config_val}} if config_val else None
@@ -728,10 +944,10 @@ class OptionsTest(unittest.TestCase):
     def test_target_list_option(self) -> None:
         def check(
             *,
-            expected: List[str],
+            expected: list[str],
             flags: str = "",
-            env_val: Optional[str] = None,
-            config_val: Optional[str] = None,
+            env_val: str | None = None,
+            config_val: str | None = None,
         ) -> None:
             env = {"PANTS_GLOBAL_TARGET_LISTY": env_val} if env_val else None
             config = {"GLOBAL": {"target_listy": config_val}} if config_val else None
@@ -759,10 +975,10 @@ class OptionsTest(unittest.TestCase):
     def test_shell_str_list(self) -> None:
         def check(
             *,
-            expected: List[str],
+            expected: list[str],
             flags: str = "",
-            env_val: Optional[str] = None,
-            config_val: Optional[str] = None,
+            env_val: str | None = None,
+            config_val: str | None = None,
         ) -> None:
             env = {"PANTS_GLOBAL_SHELL_STR_LISTY": env_val} if env_val else None
             config = {"GLOBAL": {"shell_str_listy": config_val}} if config_val else None
@@ -792,12 +1008,16 @@ class OptionsTest(unittest.TestCase):
     def test_dict_option(self) -> None:
         def check(
             *,
-            expected: Dict[str, str],
+            expected: dict[str, str],
             flags: str = "",
-            config_val: Optional[str] = None,
+            config_val: str | None = None,
+            config2_val: str | None = None,
         ) -> None:
             config = {"GLOBAL": {"dicty": config_val}} if config_val else None
-            global_options = self._parse(flags=flags, config=config).for_global_scope()
+            config2 = {"GLOBAL": {"dicty": config2_val}} if config2_val else None
+            global_options = self._parse(
+                flags=flags, config=config, config2=config2
+            ).for_global_scope()
             assert global_options.dicty == expected
 
         default = {"a": "b"}
@@ -811,6 +1031,12 @@ class OptionsTest(unittest.TestCase):
 
         check(config_val='{"c": "d"}', expected=specified_args)
         check(config_val='+{"c": "d"}', expected=all_args)
+        check(
+            config_val='+{"c": "d"}',
+            config2_val='+{"e": "f"}',
+            flags='--dicty=\'+{"g": "h"}\'',
+            expected={**all_args, "e": "f", "g": "h"},
+        )
         check(
             config_val='+{"c": "d"}',
             flags='--dicty=\'+{"e": "f"}\'',
@@ -827,58 +1053,43 @@ class OptionsTest(unittest.TestCase):
 
     def test_defaults(self) -> None:
         # Hard-coded defaults.
-        options = self._parse(flags="compile.java -n33")
-        self.assertEqual(99, options.for_global_scope().num)
-        self.assertEqual(99, options.for_scope("compile").num)
-        self.assertEqual(33, options.for_scope("compile.java").num)
-        self.assertEqual(99, options.for_scope("test").num)
-        self.assertEqual(99, options.for_scope("test.junit").num)
-
-        options = self._parse(flags="compile -n22 compile.java -n33")
-        self.assertEqual(99, options.for_global_scope().num)
-        self.assertEqual(22, options.for_scope("compile").num)
-        self.assertEqual(33, options.for_scope("compile.java").num)
+        options = self._parse(flags="anotherscope")
+        assert 99 == options.for_global_scope().num
+        assert 99 == options.for_scope("anotherscope").num
 
         # Get defaults from config and environment.
-        config = {"DEFAULT": {"num": "88"}, "compile": {"num": "77"}, "compile.java": {"num": "66"}}
-        options = self._parse(flags="compile.java -n22", config=config)
-        self.assertEqual(88, options.for_global_scope().num)
-        self.assertEqual(77, options.for_scope("compile").num)
-        self.assertEqual(22, options.for_scope("compile.java").num)
+        config = {"DEFAULT": {"num": "88"}, "anotherscope": {"num": "77"}}
+        options = self._parse(flags="anotherscope", config=config)
+        assert 88 == options.for_global_scope().num
+        assert 77 == options.for_scope("anotherscope").num
 
-        env = {"PANTS_COMPILE_NUM": "55"}
-        options = self._parse(flags="compile", env=env, config=config)
-        self.assertEqual(88, options.for_global_scope().num)
-        self.assertEqual(55, options.for_scope("compile").num)
-        self.assertEqual(55, options.for_scope("compile.java").num)
-
-        options = self._parse(flags="compile.java -n44", env=env, config=config)
-        self.assertEqual(88, options.for_global_scope().num)
-        self.assertEqual(55, options.for_scope("compile").num)
-        self.assertEqual(44, options.for_scope("compile.java").num)
+        env = {"PANTS_ANOTHERSCOPE_NUM": "55"}
+        options = self._parse(flags="anotherscope", env=env, config=config)
+        assert 88 == options.for_global_scope().num
+        assert 55 == options.for_scope("anotherscope").num
 
     def test_choices(self) -> None:
         options = self._parse(flags="--str-choices=foo")
-        self.assertEqual("foo", options.for_global_scope().str_choices)
+        assert "foo" == options.for_global_scope().str_choices
         options = self._parse(config={"DEFAULT": {"str_choices": "bar"}})
-        self.assertEqual("bar", options.for_global_scope().str_choices)
-        with self.assertRaises(ParseError):
+        assert "bar" == options.for_global_scope().str_choices
+        with pytest.raises(ParseError):
             options = self._parse(flags="--str-choices=baz")
             options.for_global_scope()
-        with self.assertRaises(ParseError):
+        with pytest.raises(ParseError):
             options = self._parse(config={"DEFAULT": {"str_choices": "baz"}})
             options.for_global_scope()
 
         options = self._parse(flags="--int-choices=42 --int-choices=99")
-        self.assertEqual([42, 99], options.for_global_scope().int_choices)
+        assert [42, 99] == options.for_global_scope().int_choices
 
     def test_parse_dest(self) -> None:
-        self.assertEqual("thing", Parser.parse_dest("--thing"))
-        self.assertEqual("other_thing", Parser.parse_dest("--thing", dest="other_thing"))
+        assert "thing" == Parser.parse_dest("--thing")
+        assert "other_thing" == Parser.parse_dest("--thing", dest="other_thing")
 
     def test_validation(self) -> None:
         def assertError(expected_error, *args, **kwargs):
-            with self.assertRaises(expected_error):
+            with pytest.raises(expected_error):
                 options = Options.create(
                     args=["./pants"],
                     env={},
@@ -889,7 +1100,7 @@ class OptionsTest(unittest.TestCase):
                 options.for_global_scope()
 
         assertError(NoOptionNames)
-        assertError(OptionNameDash, "badname")
+        assertError(OptionNameDoubleDash, "badname")
         assertError(OptionNameDoubleDash, "-badname")
         assertError(InvalidKwarg, "--foo", badkwarg=42)
         assertError(ImplicitValIsNone, "--foo", implicit_value=None)
@@ -898,7 +1109,8 @@ class OptionsTest(unittest.TestCase):
         assertError(MemberTypeNotAllowed, "--foo", type=dict, member_type=int)
         assertError(InvalidMemberType, "--foo", type=list, member_type=set)
         assertError(InvalidMemberType, "--foo", type=list, member_type=list)
-        assertError(InvalidMemberType, "--foo", type=list, member_type=list)
+        assertError(HelpType, "--foo", help=())
+        assertError(HelpType, "--foo", help=("Help!",))
 
     def test_implicit_value(self) -> None:
         def check(*, flag: str = "", expected: str) -> None:
@@ -919,81 +1131,11 @@ class OptionsTest(unittest.TestCase):
         options.register("", "--opt1")
         options.register("foo", "-o", "--opt2")
 
-        def assert_raises_shadowing(*, scope: str, args: List[str]) -> None:
-            with self.assertRaises(Shadowing):
-                options.register(scope, *args)
-
-        assert_raises_shadowing(scope="", args=["--opt2"])
-        assert_raises_shadowing(scope="bar", args=["--opt1"])
-        assert_raises_shadowing(scope="foo.bar", args=["--opt1"])
-        assert_raises_shadowing(scope="foo.bar", args=["--opt2"])
-        assert_raises_shadowing(scope="foo.bar", args=["--opt1", "--opt3"])
-        assert_raises_shadowing(scope="foo.bar", args=["--opt3", "--opt2"])
-
-    def test_recursion(self) -> None:
-        # Recursive option.
-        options = self._parse(flags="-n=5 compile -n=6")
-        self.assertEqual(5, options.for_global_scope().num)
-        self.assertEqual(6, options.for_scope("compile").num)
-
-        # Non-recursive option.
-        options = self._parse(flags="--bar-baz=foo")
-        self.assertEqual("foo", options.for_global_scope().bar_baz)
-        options = self._parse(flags="compile --bar-baz=foo")
-        with self.assertRaises(ParseError):
-            options.for_scope("compile")
-
-    def test_no_recursive_subsystem_options(self) -> None:
-        options = Options.create(
-            env={},
-            config=self._create_config(),
-            known_scope_infos=[global_scope(), subsystem("foo")],
-            args=["./pants"],
-        )
-        # All subsystem options are implicitly recursive (a subscope of subsystem scope represents
-        # a separate instance of the subsystem, so it needs all the options).
-        # We disallow explicit specification of recursive (even if set to True), to avoid confusion.
-        with self.assertRaises(RecursiveSubsystemOption):
-            options.register("foo", "--bar", recursive=False)
-            options.for_scope("foo")
-        with self.assertRaises(RecursiveSubsystemOption):
-            options.register("foo", "--baz", recursive=True)
-            options.for_scope("foo")
-
     def test_is_known_scope(self) -> None:
         options = self._parse()
         for scope_info in self._known_scope_infos:
-            self.assertTrue(options.is_known_scope(scope_info.scope))
-        self.assertFalse(options.is_known_scope("nonexistent_scope"))
-
-    def test_designdoc_example(self) -> None:
-        # The example from the design doc.
-        # Get defaults from config and environment.
-        config = {
-            "DEFAULT": {"b": "99"},
-            "compile": {"a": "88", "c": "77"},
-        }
-
-        env = {"PANTS_COMPILE_C": "66"}
-
-        options = self._parse(
-            flags="--a=1 compile --b=2 compile.java --a=3 --c=4",
-            env=env,
-            config=config,
-        )
-
-        self.assertEqual(1, options.for_global_scope().a)
-        self.assertEqual(99, options.for_global_scope().b)
-        with self.assertRaises(AttributeError):
-            options.for_global_scope().c
-
-        self.assertEqual(1, options.for_scope("compile").a)
-        self.assertEqual(2, options.for_scope("compile").b)
-        self.assertEqual(66, options.for_scope("compile").c)
-
-        self.assertEqual(3, options.for_scope("compile.java").a)
-        self.assertEqual(2, options.for_scope("compile.java").b)
-        self.assertEqual(4, options.for_scope("compile.java").c)
+            assert options.is_known_scope(scope_info.scope)
+        assert not options.is_known_scope("nonexistent_scope")
 
     def test_file_spec_args(self) -> None:
         with temporary_file(binary_mode=False) as tmp:
@@ -1014,7 +1156,7 @@ class OptionsTest(unittest.TestCase):
             bootstrap_options = bootstrapper.bootstrap_options.for_global_scope()
             options = self._parse(flags=flags, bootstrap_option_values=bootstrap_options)
             sorted_specs = sorted(options.specs)
-            self.assertEqual(["bar", "fleem:tgt", "foo", "morx:tgt"], sorted_specs)
+            assert ["bar", "fleem:tgt", "foo", "morx:tgt"] == sorted_specs
 
     def test_passthru_args_subsystems_and_goals(self):
         # Test that passthrough args are applied.
@@ -1028,16 +1170,15 @@ class OptionsTest(unittest.TestCase):
             "passconsumer", "--passthing", passthrough=True, type=list, member_type=str
         )
 
-        self.assertEqual(
-            ["bar", "--baz", "@dont_fromfile_expand_me"],
-            options.for_scope("passconsumer").passthing,
-        )
+        assert ["bar", "--baz", "@dont_fromfile_expand_me"] == options.for_scope(
+            "passconsumer"
+        ).passthing
 
     def test_at_most_one_goal_with_passthru_args(self):
         with pytest.raises(Options.AmbiguousPassthroughError) as exc:
             Options.create(
                 env={},
-                config={},
+                config=self._create_config(),
                 known_scope_infos=[global_scope(), task("test"), task("fmt")],
                 args=["./pants", "test", "fmt", "target", "--", "bar", "--baz"],
             )
@@ -1046,10 +1187,44 @@ class OptionsTest(unittest.TestCase):
             "(args after `--`) is ambiguous."
         ) in str(exc.value)
 
+    def test_passthru_args_not_interpreted(self):
+        # Test that passthrough args are not interpreted.
+        options = Options.create(
+            env={},
+            config=self._create_config(
+                {"consumer": {"shlexed": ["from config"], "string": ["from config"]}}
+            ),
+            known_scope_infos=[global_scope(), task("test"), subsystem("consumer")],
+            args=[
+                "./pants",
+                "--consumer-shlexed=a",
+                "--consumer-string=b",
+                "test",
+                "--",
+                "[bar]",
+                "multi token from passthrough",
+            ],
+        )
+        options.register(
+            "consumer", "--shlexed", passthrough=True, type=list, member_type=shell_str
+        )
+        options.register("consumer", "--string", passthrough=True, type=list, member_type=str)
+
+        assert [
+            "from",
+            "config",
+            "a",
+            "[bar]",
+            "multi token from passthrough",
+        ] == options.for_scope("consumer").shlexed
+        assert ["from config", "b", "[bar]", "multi token from passthrough"] == options.for_scope(
+            "consumer"
+        ).string
+
     def test_global_scope_env_vars(self):
         def check_pants_foo(expected_val, env):
             val = self._parse(env=env).for_global_scope().pants_foo
-            self.assertEqual(expected_val, val)
+            assert expected_val == val
 
         check_pants_foo(
             "AAA", {"PANTS_GLOBAL_PANTS_FOO": "AAA", "PANTS_PANTS_FOO": "BBB", "PANTS_FOO": "CCC"}
@@ -1064,7 +1239,7 @@ class OptionsTest(unittest.TestCase):
 
         def check_bar_baz(expected_val, env):
             val = self._parse(env=env).for_global_scope().bar_baz
-            self.assertEqual(expected_val, val)
+            assert expected_val == val
 
         check_bar_baz(
             "AAA", {"PANTS_GLOBAL_BAR_BAZ": "AAA", "PANTS_BAR_BAZ": "BBB", "BAR_BAZ": "CCC"}
@@ -1076,159 +1251,31 @@ class OptionsTest(unittest.TestCase):
     def test_scoped_env_vars(self) -> None:
         def check_scoped_spam(scope, expected_val, env):
             val = self._parse(env=env).for_scope(scope).spam
-            self.assertEqual(expected_val, val)
+            assert expected_val == val
 
         check_scoped_spam("simple", "value", {"PANTS_SIMPLE_SPAM": "value"})
         check_scoped_spam("simple-dashed", "value", {"PANTS_SIMPLE_DASHED_SPAM": "value"})
         check_scoped_spam("scoped.a.bit", "value", {"PANTS_SCOPED_A_BIT_SPAM": "value"})
         check_scoped_spam("scoped.and-dashed", "value", {"PANTS_SCOPED_AND_DASHED_SPAM": "value"})
 
-    def test_drop_flag_values(self) -> None:
-        options = self._parse(
-            flags="--bar-baz=fred -n33 --pants-foo=red enum-opt --some-enum=another-value simple -n1",
-            env={"PANTS_FOO": "BAR"},
-            config={"simple": {"num": 42}, "enum-opt": {"some-enum": "a-value"}},
-        )
-        defaulted_only_options = options.drop_flag_values()
-
-        # No option value supplied in any form.
-        self.assertEqual("fred", options.for_global_scope().bar_baz)
-        self.assertIsNone(defaulted_only_options.for_global_scope().bar_baz)
-
-        # A defaulted option value.
-        self.assertEqual(33, options.for_global_scope().num)
-        self.assertEqual(99, defaulted_only_options.for_global_scope().num)
-
-        # A config specified option value.
-        self.assertEqual(1, options.for_scope("simple").num)
-        self.assertEqual(42, defaulted_only_options.for_scope("simple").num)
-
-        # An env var specified option value.
-        self.assertEqual("red", options.for_global_scope().pants_foo)
-        self.assertEqual("BAR", defaulted_only_options.for_global_scope().pants_foo)
-
-        # Overriding an enum option value.
-        self.assertEqual(self.SomeEnumOption.another_value, options.for_scope("enum-opt").some_enum)
-
-        # Getting the default value for an enum option.
-        self.assertEqual(
-            self.SomeEnumOption.a_value,
-            defaulted_only_options.for_scope("separate-enum-opt-scope").some_enum_with_default,
-        )
-
     def test_enum_option_type_parse_error(self) -> None:
-        self.maxDiff = None
         with pytest.raises(ParseError) as exc:
             options = self._parse(flags="enum-opt --some-enum=invalid-value")
-            options.for_scope("enum-opt").some_enum
+            options.for_scope("enum-opt")
+
         assert (
-            "Error applying type 'SomeEnumOption' to option value 'invalid-value', for option "
-            "'--some_enum' in scope 'enum-opt'"
+            "Invalid choice 'invalid-value'. "
+            "Choose from: a-value, another-value, yet-another, one-more"
         ) in str(exc.value)
 
-    def test_deprecated_options(self) -> None:
-        def assert_deprecation_triggered(
-            *,
-            flags: str = "",
-            option: str,
-            expected: Union[str, bool],
-            scope: Optional[str] = None,
-            env: Optional[Dict[str, str]] = None,
-            config: Optional[Dict[str, Dict[str, str]]] = None,
-        ) -> None:
-            warnings.simplefilter("always")
-            with pytest.warns(DeprecationWarning) as record:
-                options = self._parse(flags=flags, env=env, config=config)
-                scoped_options = (
-                    options.for_global_scope() if not scope else options.for_scope(scope)
-                )
+    def test_non_enum_option_type_parse_error(self) -> None:
+        with pytest.raises(ParseError) as exc:
+            options = self._parse(flags="--num=not-a-number")
+            options.for_global_scope()
 
-            assert getattr(scoped_options, option) == expected
-            assert len(record) == 1
-            assert "will be removed in version" in str(record[0].message)
-            assert option in str(record[0].message)
-
-        assert_deprecation_triggered(
-            flags="--global-crufty=crufty1",
-            option="global_crufty",
-            expected="crufty1",
-        )
-        assert_deprecation_triggered(
-            flags="--global-crufty-boolean",
-            option="global_crufty_boolean",
-            expected=True,
-        )
-        assert_deprecation_triggered(
-            flags="--no-global-crufty-boolean",
-            option="global_crufty_boolean",
-            expected=False,
-        )
-        assert_deprecation_triggered(
-            flags="stale --crufty=stale_and_crufty",
-            scope="stale",
-            option="crufty",
-            expected="stale_and_crufty",
-        )
-
-        assert_scoped_boolean_deprecation = partial(
-            assert_deprecation_triggered, scope="stale", option="crufty_boolean"
-        )
-        assert_scoped_boolean_deprecation(flags="stale --crufty-boolean", expected=True)
-        assert_scoped_boolean_deprecation(flags="stale --no-crufty-boolean", expected=False)
-        assert_scoped_boolean_deprecation(flags="--stale-crufty-boolean", expected=True)
-        assert_scoped_boolean_deprecation(flags="--no-stale-crufty-boolean", expected=False)
-
-        assert_deprecation_triggered(
-            env={"PANTS_GLOBAL_CRUFTY": "crufty1"},
-            option="global_crufty",
-            expected="crufty1",
-        )
-        assert_deprecation_triggered(
-            env={"PANTS_STALE_CRUFTY": "stale_and_crufty"},
-            scope="stale",
-            option="crufty",
-            expected="stale_and_crufty",
-        )
-
-        assert_deprecation_triggered(
-            config={"GLOBAL": {"global_crufty": "crufty1"}},
-            option="global_crufty",
-            expected="crufty1",
-        )
-        assert_deprecation_triggered(
-            config={"stale": {"crufty": "stale_and_crufty"}},
-            scope="stale",
-            option="crufty",
-            expected="stale_and_crufty",
-        )
-
-        # Make sure the warnings don't come out for regular options.
-        with pytest.warns(None) as record:
-            self._parse(flags="stale --pants-foo stale --still-good")
-        assert len(record) == 0
-
-    @unittest.mock.patch("pants.base.deprecated.PANTS_SEMVER", Version(_FAKE_CUR_VERSION))
-    def test_delayed_deprecated_option(self) -> None:
-        warnings.simplefilter("always")
-        with pytest.warns(None) as record:
-            delayed_deprecation_option_value = (
-                self._parse(flags="--global-delayed-deprecated-option=xxx")
-                .for_global_scope()
-                .global_delayed_deprecated_option
-            )
-            assert delayed_deprecation_option_value == "xxx"
-            assert len(record) == 0
-
-        with pytest.warns(DeprecationWarning) as record:
-            delayed_passed_option_value = (
-                self._parse(flags="--global-delayed-but-already-passed-deprecated-option=xxx")
-                .for_global_scope()
-                .global_delayed_but_already_passed_deprecated_option
-            )
-            assert delayed_passed_option_value == "xxx"
-            assert len(record) == 1
-            assert "will be removed in version" in str(record[0].message)
-            assert "global_delayed_but_already_passed_deprecated_option" in str(record[0].message)
+        assert (
+            "Error applying type 'int' to option value 'not-a-number': invalid literal for int()"
+        ) in str(exc.value)
 
     def test_mutually_exclusive_options(self) -> None:
         """Ensure error is raised when mutual exclusive options are given together."""
@@ -1236,11 +1283,11 @@ class OptionsTest(unittest.TestCase):
         def assert_mutually_exclusive_raised(
             *,
             flags: str,
-            scope: Optional[str] = None,
-            env: Optional[Dict[str, str]] = None,
-            config: Optional[Dict[str, Dict[str, str]]] = None,
+            scope: str | None = None,
+            env: dict[str, str] | None = None,
+            config: dict[str, dict[str, str]] | None = None,
         ) -> None:
-            with self.assertRaises(MutuallyExclusiveOptionError):
+            with pytest.raises(MutuallyExclusiveOptionError):
                 options = self._parse(flags=flags, env=env, config=config)
                 if scope:
                     options.for_scope(scope)
@@ -1290,163 +1337,66 @@ class OptionsTest(unittest.TestCase):
             scope="stale",
         )
 
-        def assert_other_option_also_set(
-            *,
-            flags: str = "",
-            other_option: str,
-            scope: Optional[str] = None,
-            env: Optional[Dict[str, str]] = None,
-            config: Optional[Dict[str, Dict[str, str]]] = None,
+        # Mutexes should not impact the `dest`. We spot check that here.
+        def assert_option_set(
+            flags: str,
+            option: str,
+            expected: str | None,
         ) -> None:
-            options = self._parse(flags=flags, env=env, config=config)
-            scoped_options = options.for_global_scope() if not scope else options.for_scope(scope)
-            assert getattr(scoped_options, other_option) == "orz"
+            options = self._parse(flags=flags).for_global_scope()
+            assert getattr(options, option) == expected
 
-        assert_other_option_also_set(flags="--mutex-foo=orz", other_option="mutex")
-        assert_other_option_also_set(flags="--old-name=orz", other_option="new_name")
-        assert_other_option_also_set(
-            flags="stale --mutex-a=orz",
-            other_option="crufty_mutex",
-            scope="stale",
-        )
-        assert_other_option_also_set(
-            flags="stale --crufty-old=orz",
-            other_option="crufty_new",
-            scope="stale",
-        )
-        assert_other_option_also_set(env={"PANTS_GLOBAL_MUTEX_BAZ": "orz"}, other_option="mutex")
-        assert_other_option_also_set(env={"PANTS_OLD_NAME": "orz"}, other_option="new_name")
-        assert_other_option_also_set(
-            env={"PANTS_STALE_MUTEX_B": "orz"},
-            other_option="crufty_mutex",
-            scope="stale",
-        )
-        assert_other_option_also_set(
-            config={"stale": {"crufty_old": "orz"}},
-            other_option="crufty_new",
-            scope="stale",
-        )
-
-    def test_middle_scoped_options(self) -> None:
-        """Make sure the rules for inheriting from a hierarchy of scopes.
-
-        Values should follow
-         1. A short circuit scan for a value from the following sources in-order:
-            flags, env, config, hardcoded defaults
-         2. Values for each source follow the . hierarchy scoping rule
-            within that source.
-        """
-
-        # Short circuit using command line.
-        options = self._parse(flags="--a=100 compile --a=99")
-        self.assertEqual(100, options.for_global_scope().a)
-        self.assertEqual(99, options.for_scope("compile").a)
-        self.assertEqual(99, options.for_scope("compile.java").a)
-
-        options = self._parse(config={"DEFAULT": {"a": 100}, "compile": {"a": 99}})
-        self.assertEqual(100, options.for_global_scope().a)
-        self.assertEqual(99, options.for_scope("compile").a)
-        self.assertEqual(99, options.for_scope("compile.java").a)
-
-        options = self._parse(env={"PANTS_A": "100", "PANTS_COMPILE_A": "99"})
-        self.assertEqual(100, options.for_global_scope().a)
-        self.assertEqual(99, options.for_scope("compile").a)
-        self.assertEqual(99, options.for_scope("compile.java").a)
-
-        # Command line has precedence over config.
-        options = self._parse(flags="compile --a=99", config={"DEFAULT": {"a": 100}})
-        self.assertEqual(100, options.for_global_scope().a)
-        self.assertEqual(99, options.for_scope("compile").a)
-        self.assertEqual(99, options.for_scope("compile.java").a)
-
-        # Command line has precedence over environment.
-        options = self._parse(flags="compile --a=99", env={"PANTS_A": "100"})
-        self.assertEqual(100, options.for_global_scope().a)
-        self.assertEqual(99, options.for_scope("compile").a)
-        self.assertEqual(99, options.for_scope("compile.java").a)
-
-        # Env has precedence over config.
-        options = self._parse(config={"DEFAULT": {"a": 100}}, env={"PANTS_COMPILE_A": "99"})
-        self.assertEqual(100, options.for_global_scope().a)
-        self.assertEqual(99, options.for_scope("compile").a)
-        self.assertEqual(99, options.for_scope("compile.java").a)
-
-        # Command line global overrides the middle scope setting in then env.
-        options = self._parse(flags="--a=100", env={"PANTS_COMPILE_A": "99"})
-        self.assertEqual(100, options.for_global_scope().a)
-        self.assertEqual(100, options.for_scope("compile").a)
-        self.assertEqual(100, options.for_scope("compile.java").a)
-
-        # Command line global overrides the middle scope in config.
-        options = self._parse(flags="--a=100 ", config={"compile": {"a": 99}})
-        self.assertEqual(100, options.for_global_scope().a)
-        self.assertEqual(100, options.for_scope("compile").a)
-        self.assertEqual(100, options.for_scope("compile.java").a)
-
-        # Env global overrides the middle scope in config.
-        options = self._parse(
-            flags="--a=100 ", config={"compile": {"a": 99}}, env={"PANTS_A": "100"}
-        )
-        self.assertEqual(100, options.for_global_scope().a)
-        self.assertEqual(100, options.for_scope("compile").a)
-        self.assertEqual(100, options.for_scope("compile.java").a)
+        assert_option_set("--mutex-foo=orz", "mutex_foo", "orz")
+        assert_option_set("--mutex-foo=orz", "mutex_bar", None)
+        assert_option_set("--mutex-foo=orz", "mutex_baz", None)
+        assert_option_set("--mutex-bar=orz", "mutex_bar", "orz")
 
     def test_complete_scopes(self) -> None:
-        self.assertEqual(
-            {intermediate("foo"), intermediate("foo.bar"), task("foo.bar.baz")},
-            set(Options.complete_scopes({task("foo.bar.baz")})),
-        )
-        self.assertEqual(
-            {global_scope(), intermediate("foo"), intermediate("foo.bar"), task("foo.bar.baz")},
-            set(Options.complete_scopes({GlobalOptions.get_scope_info(), task("foo.bar.baz")})),
-        )
-        self.assertEqual(
-            {intermediate("foo"), intermediate("foo.bar"), task("foo.bar.baz")},
-            set(Options.complete_scopes({intermediate("foo"), task("foo.bar.baz")})),
-        )
-        self.assertEqual(
-            {
-                intermediate("foo"),
-                intermediate("foo.bar"),
-                task("foo.bar.baz"),
-                intermediate("qux"),
-                task("qux.quux"),
-            },
-            set(Options.complete_scopes({task("foo.bar.baz"), task("qux.quux")})),
+        class OptCls:
+            deprecated_options_scope = "deprecated"
+
+        assert {ScopeInfo("foo"), ScopeInfo("bar")} == set(
+            Options.complete_scopes([ScopeInfo("foo"), ScopeInfo("bar")])
         )
 
+        assert {ScopeInfo("foo"), ScopeInfo("bar", OptCls), ScopeInfo("deprecated", OptCls)} == set(
+            Options.complete_scopes([ScopeInfo("foo"), ScopeInfo("bar", OptCls)])
+        )
+
+        with pytest.raises(Options.DuplicateScopeError):
+            Options.complete_scopes([ScopeInfo("foo"), ScopeInfo("bar"), ScopeInfo("foo")])
+
     def test_get_fingerprintable_for_scope(self) -> None:
-        # Note: tests handling recursive and non-recursive options from enclosing scopes correctly.
         options = self._parse(
-            flags='--store-true-flag --num=88 compile.scala --num=77 --modifycompile="blah blah blah" '
+            flags='--store-true-flag --num=88 compile --modifycompile="blah blah blah" '
             '--modifylogs="durrrr" -- -d -v'
         )
 
         # NB: Passthrough args end up on our `--modifypassthrough` arg.
-        pairs = options.get_fingerprintable_for_scope("compile.scala")
-        self.assertEqual(
-            [(str, "blah blah blah"), (str, ["-d", "-v"]), (bool, True), (int, 77)], pairs
-        )
+        pairs = options.get_fingerprintable_for_scope("compile")
+        assert [(str, "blah blah blah"), (str, ["-d", "-v"])] == pairs
 
     def test_fingerprintable(self) -> None:
         options = self._parse(
-            flags="fingerprinting --fingerprinted=shall_be_fingerprinted "
-            "--definitely-not-fingerprinted=shant_be_fingerprinted"
+            flags="--implicitly-fingerprinted=shall_be_fingerprinted "
+            "--explicitly-fingerprinted=also_shall_be_fingerprinted "
+            "--explicitly-not-fingerprinted=shant_be_fingerprinted"
         )
-        pairs = options.get_fingerprintable_for_scope("fingerprinting")
-        self.assertIn((str, "shall_be_fingerprinted"), pairs)
-        self.assertNotIn((str, "shant_be_fingerprinted"), pairs)
+        pairs = options.get_fingerprintable_for_scope(GLOBAL_SCOPE)
+        assert (str, "shall_be_fingerprinted") in pairs
+        assert (str, "also_shall_be_fingerprinted") in pairs
+        assert (str, "shant_be_fingerprinted") not in pairs
 
-    def test_fingerprintable_inverted(self) -> None:
+    def test_fingerprintable_daemon_only(self) -> None:
         options = self._parse(
-            flags="fingerprinting --inverted=shall_be_fingerprinted "
-            "--definitely-not-inverted=shant_be_fingerprinted"
+            flags="--explicitly-daemoned=shall_be_fingerprinted "
+            "--explicitly-not-daemoned=shant_be_fingerprinted "
+            "--implicitly-not-daemoned=also_shant_be_fingerprinted"
         )
-        pairs = options.get_fingerprintable_for_scope(
-            "fingerprinting", fingerprint_key="daemon", invert=True
-        )
-        self.assertIn((str, "shall_be_fingerprinted"), pairs)
-        self.assertNotIn((str, "shant_be_fingerprinted"), pairs)
+        pairs = options.get_fingerprintable_for_scope(GLOBAL_SCOPE, daemon_only=True)
+        assert (str, "shall_be_fingerprinted") in pairs
+        assert (str, "shant_be_fingerprinted") not in pairs
+        assert (str, "also_shant_be_fingerprinted") not in pairs
 
     def assert_fromfile(self, parse_func, expected_append=None, append_contents=None):
         def _do_assert_fromfile(dest, expected, contents, passthru_flags=""):
@@ -1454,7 +1404,7 @@ class OptionsTest(unittest.TestCase):
                 fp.write(contents)
                 fp.close()
                 options = parse_func(dest, fp.name, passthru_flags)
-                self.assertEqual(expected, options.for_scope("fromfile")[dest])
+                assert expected == options.for_scope("fromfile")[dest]
 
         _do_assert_fromfile(dest="string", expected="jake", contents="jake")
         _do_assert_fromfile(dest="intvalue", expected=42, contents="42")
@@ -1543,7 +1493,7 @@ class OptionsTest(unittest.TestCase):
             json.dump(val, fp)
             fp.close()
             options = self._parse(flags=f"fromfile --{'dictvalue'}=@{fp.name}")
-            self.assertEqual(val, options.for_scope("fromfile")["dictvalue"])
+            assert val == options.for_scope("fromfile")["dictvalue"]
 
     def test_fromfile_yaml(self) -> None:
         val = {"a": {"b": 1}, "c": [2, 3]}
@@ -1551,66 +1501,52 @@ class OptionsTest(unittest.TestCase):
             yaml.safe_dump(val, fp)
             fp.close()
             options = self._parse(flags=f"fromfile --{'dictvalue'}=@{fp.name}")
-            self.assertEqual(val, options.for_scope("fromfile")["dictvalue"])
+            assert val == options.for_scope("fromfile")["dictvalue"]
+
+    def test_fromfile_yaml_trailing_newlines_matter(self) -> None:
+        with temporary_file(suffix=".yaml", binary_mode=False) as fp:
+            fp.write(
+                dedent(
+                    """\
+                        a: |+
+                          multiline
+                    """
+                )
+            )
+            fp.close()
+            options = self._parse(flags=f"fromfile --{'dictvalue'}=@{fp.name}")
+            assert {"a": "multiline\n"} == options.for_scope("fromfile")["dictvalue"]
 
     def test_fromfile_error(self) -> None:
         options = self._parse(flags="fromfile --string=@/does/not/exist")
-        with self.assertRaises(FromfileError):
+        with pytest.raises(FromfileError):
             options.for_scope("fromfile")
 
     def test_fromfile_escape(self) -> None:
         options = self._parse(flags=r"fromfile --string=@@/does/not/exist")
-        self.assertEqual("@/does/not/exist", options.for_scope("fromfile").string)
+        assert "@/does/not/exist" == options.for_scope("fromfile").string
 
     def test_ranked_value_equality(self) -> None:
         none = RankedValue(Rank.NONE, None)
         some = RankedValue(Rank.HARDCODED, "some")
-        self.assertEqual(RankedValue(Rank.NONE, None), none)
-        self.assertEqual(RankedValue(Rank.HARDCODED, "some"), some)
-        self.assertNotEqual(some, none)
-        self.assertEqual(some, RankedValue(Rank.HARDCODED, "some"))
-        self.assertNotEqual(some, RankedValue(Rank.HARDCODED, "few"))
-        self.assertNotEqual(some, RankedValue(Rank.CONFIG, "some"))
-
-    def test_pants_global_designdoc_example(self) -> None:
-        # The example from the design doc.
-        # Get defaults from config and environment.
-        config = {
-            "GLOBAL": {"b": "99"},
-            "compile": {"a": "88", "c": "77"},
-        }
-
-        env = {"PANTS_COMPILE_C": "66"}
-
-        options = self._parse(
-            flags="--a=1 compile --b=2 compile.java --a=3 --c=4",
-            env=env,
-            config=config,
-        )
-
-        self.assertEqual(1, options.for_global_scope().a)
-        self.assertEqual(99, options.for_global_scope().b)
-        with self.assertRaises(AttributeError):
-            options.for_global_scope().c
-
-        self.assertEqual(1, options.for_scope("compile").a)
-        self.assertEqual(2, options.for_scope("compile").b)
-        self.assertEqual(66, options.for_scope("compile").c)
-
-        self.assertEqual(3, options.for_scope("compile.java").a)
-        self.assertEqual(2, options.for_scope("compile.java").b)
-        self.assertEqual(4, options.for_scope("compile.java").c)
+        assert RankedValue(Rank.NONE, None) == none
+        assert RankedValue(Rank.HARDCODED, "some") == some
+        assert some != none
+        assert some == RankedValue(Rank.HARDCODED, "some")
+        assert some != RankedValue(Rank.HARDCODED, "few")
+        assert some != RankedValue(Rank.CONFIG, "some")
 
     def test_pants_global_with_default(self) -> None:
         """This test makes sure values under [DEFAULT] still gets read."""
         # This cast shouldn't be necessary - likely a bug in MyPy. Once this gets fixed, MyPy will
         # tell us that we can remove the cast.
         config = cast(
-            Dict[str, Dict[str, Any]], {"DEFAULT": {"b": "99"}, "GLOBAL": {"store_true_flag": True}}
+            Dict[str, Dict[str, Any]],
+            {"DEFAULT": {"num": "99"}, "GLOBAL": {"store_true_flag": True}},
         )
         global_options = self._parse(config=config).for_global_scope()
-        self.assertEqual(99, global_options.b)
-        self.assertTrue(global_options.store_true_flag)
+        assert 99 == global_options.num
+        assert global_options.store_true_flag
 
     def test_double_registration(self) -> None:
         options = Options.create(
@@ -1620,7 +1556,7 @@ class OptionsTest(unittest.TestCase):
             args=shlex.split("./pants"),
         )
         options.register(GLOBAL_SCOPE, "--foo-bar")
-        with self.assertRaises(OptionAlreadyRegistered):
+        with pytest.raises(OptionAlreadyRegistered):
             options.register(GLOBAL_SCOPE, "--foo-bar")
 
     def test_enum_serializability(self) -> None:
@@ -1628,181 +1564,6 @@ class OptionsTest(unittest.TestCase):
         # This test spot-checks that enum types can be serialized.
         options = self._parse(flags="enum-opt --some-enum=another-value")
         json.dumps({"foo": [options.for_scope("enum-opt").as_dict()]}, cls=CoercingEncoder)
-
-    def test_scope_deprecation(self) -> None:
-        # Note: This test demonstrates that two different new scopes can deprecate the same
-        # old scope. I.e., it's possible to split an old scope's options among multiple new scopes.
-        warnings.simplefilter("always")
-
-        class DummyOptionable1(Optionable):
-            options_scope = "new-scope1"
-            deprecated_options_scope = "deprecated-scope"
-            deprecated_options_scope_removal_version = "9999.9.9.dev0"
-
-        class DummyOptionable2(Optionable):
-            options_scope = "new-scope2"
-            deprecated_options_scope = "deprecated-scope"
-            deprecated_options_scope_removal_version = "9999.9.9.dev0"
-
-        options = Options.create(
-            env={},
-            config=self._create_config(
-                {
-                    "GLOBAL": {"inherited": "aa"},
-                    DummyOptionable1.options_scope: {"foo": "xx"},
-                    DummyOptionable1.deprecated_options_scope: {
-                        "foo": "yy",
-                        "bar": "zz",
-                        "baz": "ww",
-                        "qux": "uu",
-                    },
-                }
-            ),
-            known_scope_infos=[
-                global_scope(),
-                DummyOptionable1.get_scope_info(),
-                DummyOptionable2.get_scope_info(),
-            ],
-            args=shlex.split("./pants --new-scope1-baz=vv"),
-        )
-
-        options.register(GLOBAL_SCOPE, "--inherited")
-        options.register(DummyOptionable1.options_scope, "--foo")
-        options.register(DummyOptionable1.options_scope, "--bar")
-        options.register(DummyOptionable1.options_scope, "--baz")
-        options.register(DummyOptionable2.options_scope, "--qux")
-
-        with pytest.warns(DeprecationWarning) as record:
-            vals1 = options.for_scope(DummyOptionable1.options_scope)
-
-        # Check that we got a warning, but not for the inherited option.
-        assert len(record) == 1
-        assert "inherited" not in str(record[0].message)
-
-        # Check values.
-        # Deprecated scope takes precedence at equal rank.
-        self.assertEqual("yy", vals1.foo)
-        self.assertEqual("zz", vals1.bar)
-        # New scope takes precedence at higher rank.
-        self.assertEqual("vv", vals1.baz)
-
-        with pytest.warns(DeprecationWarning) as record:
-            vals2 = options.for_scope(DummyOptionable2.options_scope)
-
-        # Check that we got a warning.
-        assert len(record) == 1
-        assert "inherited" not in str(record[0].message)
-
-        # Check values.
-        self.assertEqual("uu", vals2.qux)
-
-    def test_scope_deprecation_parent(self) -> None:
-        # Note: This test demonstrates that a scope can mark itself as deprecating a subscope of
-        # another scope.
-        warnings.simplefilter("always")
-
-        class DummyOptionable1(Optionable):
-            options_scope = "test"
-
-            @classmethod
-            def register_options(cls, register):
-                super().register_options(register)
-                register("--bar")
-
-        class DummyOptionable2(Optionable):
-            options_scope = "lint"
-            deprecated_options_scope = "test.a-bit-linty"
-            deprecated_options_scope_removal_version = "9999.9.9.dev0"
-
-            @classmethod
-            def register_options(cls, register):
-                super().register_options(register)
-                register("--foo")
-
-        known_scope_infos = (
-            [global_scope()]
-            + list(DummyOptionable1.known_scope_infos())
-            + list(DummyOptionable2.known_scope_infos())
-        )
-
-        options = Options.create(
-            env={},
-            config=self._create_config(),
-            known_scope_infos=known_scope_infos,
-            args=shlex.split("./pants --test-a-bit-linty-foo=vv"),
-        )
-
-        # NB: Order matters here, because Optionables are typically registered in sorted order.
-        DummyOptionable2.register_options_on_scope(options)
-        DummyOptionable1.register_options_on_scope(options)
-
-        with pytest.warns(DeprecationWarning) as record:
-            vals = options.for_scope(DummyOptionable2.options_scope)
-
-        # Check that we got a warning, but also the correct value.
-        assert len(record) == 1
-        assert vals.foo == "vv"
-
-    def test_scope_deprecation_defaults(self) -> None:
-        # Confirms that a DEFAULT option does not trigger deprecation warnings for a deprecated scope.
-        warnings.simplefilter("always")
-
-        class DummyOptionable1(Optionable):
-            options_scope = "new-scope1"
-            deprecated_options_scope = "deprecated-scope"
-            deprecated_options_scope_removal_version = "9999.9.9.dev0"
-
-        options = Options.create(
-            env={},
-            config=self._create_config(
-                {"DEFAULT": {"foo": "aa"}, DummyOptionable1.options_scope: {"foo": "xx"}}
-            ),
-            known_scope_infos=[global_scope(), DummyOptionable1.get_scope_info()],
-            args=shlex.split("./pants"),
-        )
-
-        options.register(DummyOptionable1.options_scope, "--foo")
-
-        with pytest.warns(None) as record:
-            vals1 = options.for_scope(DummyOptionable1.options_scope)
-
-        # Check that we got no warnings and that the actual scope took precedence.
-        assert len(record) == 0
-        assert vals1.foo == "xx"
-
-    def test_scope_dependency_deprecation(self) -> None:
-        # Test that a dependency scope can be deprecated.
-        warnings.simplefilter("always")
-
-        class DummyOptionable1(Optionable):
-            options_scope = "scope"
-
-        options = Options.create(
-            env={},
-            config=self._create_config(),
-            known_scope_infos=[
-                global_scope(),
-                DummyOptionable1.get_scope_info(),
-                # A deprecated, scoped dependency on `DummyOptionable1`. This
-                # imitates the construction of Subsystem.known_scope_infos.
-                ScopeInfo(
-                    DummyOptionable1.subscope("sub"),
-                    DummyOptionable1,
-                    removal_version="9999.9.9.dev0",
-                    removal_hint="Sayonara!",
-                ),
-            ],
-            args=shlex.split("./pants --scope-sub-foo=vv"),
-        )
-
-        options.register(DummyOptionable1.options_scope, "--foo")
-
-        with pytest.warns(DeprecationWarning) as record:
-            vals1 = options.for_scope(DummyOptionable1.subscope("sub"))
-
-        # Check that we got a warning, but also the correct value.
-        assert len(record) == 1
-        assert vals1.foo == "vv"
 
     def test_list_of_enum_single_value(self) -> None:
         options = self._parse(flags="other-enum-scope --some-list-enum=another-value")

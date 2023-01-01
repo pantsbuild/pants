@@ -1,45 +1,91 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
 from textwrap import dedent
 
-from pants.backend.codegen.protobuf.python import python_protobuf_subsystem
+from pants.backend.codegen.protobuf import target_types
+from pants.backend.codegen.protobuf.python import additional_fields, python_protobuf_subsystem
 from pants.backend.codegen.protobuf.python.python_protobuf_subsystem import (
-    InjectPythonProtobufDependencies,
+    InferPythonProtobufDependencies,
+    PythonProtobufDependenciesInferenceFieldSet,
 )
-from pants.backend.codegen.protobuf.target_types import ProtobufDependencies, ProtobufLibrary
-from pants.core.target_types import Files
+from pants.backend.codegen.protobuf.target_types import ProtobufSourcesGeneratorTarget
+from pants.backend.codegen.utils import (
+    AmbiguousPythonCodegenRuntimeLibrary,
+    MissingPythonCodegenRuntimeLibrary,
+)
+from pants.backend.python.dependency_inference import module_mapper
+from pants.backend.python.target_types import PythonRequirementTarget
+from pants.core.util_rules import stripped_source_files
 from pants.engine.addresses import Address
-from pants.engine.target import InjectedDependencies
-from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.engine.target import InferredDependencies
+from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error
 
 
-def test_inject_dependencies() -> None:
+def test_find_protobuf_python_requirement() -> None:
     rule_runner = RuleRunner(
         rules=[
             *python_protobuf_subsystem.rules(),
-            QueryRule(InjectedDependencies, (InjectPythonProtobufDependencies,)),
+            *target_types.rules(),
+            *module_mapper.rules(),
+            *stripped_source_files.rules(),
+            *additional_fields.rules(),
+            QueryRule(InferredDependencies, (InferPythonProtobufDependencies,)),
         ],
-        target_types=[ProtobufLibrary, Files],
+        target_types=[ProtobufSourcesGeneratorTarget, PythonRequirementTarget],
+    )
+
+    rule_runner.write_files(
+        {"codegen/dir/f.proto": "", "codegen/dir/BUILD": "protobuf_sources(grpc=True)"}
     )
     rule_runner.set_options(
         [
-            "--backend-packages=pants.backend.codegen.protobuf.python",
-            "--python-protobuf-runtime-dependencies=protos:injected_dep",
+            "--python-resolves={'python-default': '', 'another': ''}",
+            "--python-enable-resolves",
+            # Turn off python synthetic lockfile targets to make the test simpler.
+            "--no-python-enable-lockfile-targets",
         ]
     )
-    # Note that injected deps can be any target type for `--python-protobuf-runtime-dependencies`.
-    rule_runner.add_to_build_file(
-        "protos",
-        dedent(
-            """\
-            protobuf_library()
-            files(name="injected_dep", sources=[])
-            """
-        ),
+    proto_tgt = rule_runner.get_target(Address("codegen/dir", relative_file_path="f.proto"))
+    request = InferPythonProtobufDependencies(
+        PythonProtobufDependenciesInferenceFieldSet.create(proto_tgt)
     )
-    tgt = rule_runner.get_target(Address("protos"))
-    injected = rule_runner.request(
-        InjectedDependencies, [InjectPythonProtobufDependencies(tgt[ProtobufDependencies])]
+
+    # Start with no relevant requirements.
+    with engine_error(MissingPythonCodegenRuntimeLibrary, contains="protobuf"):
+        rule_runner.request(InferredDependencies, [request])
+    rule_runner.write_files({"proto1/BUILD": "python_requirement(requirements=['protobuf'])"})
+    with engine_error(MissingPythonCodegenRuntimeLibrary, contains="grpcio"):
+        rule_runner.request(InferredDependencies, [request])
+
+    # If exactly one, match it.
+    rule_runner.write_files({"grpc1/BUILD": "python_requirement(requirements=['grpc'])"})
+    assert rule_runner.request(InferredDependencies, [request]) == InferredDependencies(
+        [Address("proto1"), Address("grpc1")]
     )
-    assert injected == InjectedDependencies([Address("protos", target_name="injected_dep")])
+
+    # Multiple is fine if from other resolve.
+    rule_runner.write_files(
+        {
+            "another_resolve/BUILD": dedent(
+                """\
+                python_requirement(name='r1', requirements=['protobuf'], resolve='another')
+                python_requirement(name='r2', requirements=['grpc'], resolve='another')
+                """
+            )
+        }
+    )
+    assert rule_runner.request(InferredDependencies, [request]) == InferredDependencies(
+        [Address("proto1"), Address("grpc1")]
+    )
+
+    # If multiple from the same resolve, error.
+    rule_runner.write_files({"grpc2/BUILD": "python_requirement(requirements=['grpc'])"})
+    with engine_error(
+        AmbiguousPythonCodegenRuntimeLibrary, contains="['grpc1:grpc1', 'grpc2:grpc2']"
+    ):
+        rule_runner.request(InferredDependencies, [request])
+    rule_runner.write_files({"proto2/BUILD": "python_requirement(requirements=['protobuf'])"})
+    with engine_error(
+        AmbiguousPythonCodegenRuntimeLibrary, contains="['proto1:proto1', 'proto2:proto2']"
+    ):
+        rule_runner.request(InferredDependencies, [request])

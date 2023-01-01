@@ -114,9 +114,9 @@ class SchedulerService(PantsService):
 
     def _check_pidfile(self):
         try:
-            with open(self._pidfile, "r") as f:
+            with open(self._pidfile) as f:
                 pid_from_file = f.read()
-        except IOError:
+        except OSError:
             raise Exception(f"Could not read pants pidfile at {self._pidfile}.")
         if int(pid_from_file) != self._pid:
             raise Exception(f"Another instance of pantsd is running at {pid_from_file}")
@@ -124,10 +124,11 @@ class SchedulerService(PantsService):
     def _check_memory_usage(self):
         memory_usage_in_bytes = psutil.Process(self._pid).memory_info()[0]
         if memory_usage_in_bytes > self._max_memory_usage_in_bytes:
+            bytes_per_mib = 1_048_576
             raise Exception(
-                f"pantsd process {self._pid} was using "
-                f"{memory_usage_in_bytes} bytes of memory (above the limit of "
-                f"{self._max_memory_usage_in_bytes} bytes)."
+                f"pantsd process {self._pid} was using {memory_usage_in_bytes / bytes_per_mib:.2f} "
+                f"MiB of memory (above the `--pantsd-max-memory-usage` limit of "
+                f"{self._max_memory_usage_in_bytes / bytes_per_mib:.2f} MiB)."
             )
 
     def _check_invalidation_watcher_liveness(self):
@@ -139,7 +140,7 @@ class SchedulerService(PantsService):
         # that exist at startup are the only ones that can affect the running daemon.
         globs, _ = self._invalidation_globs_and_snapshot
         self._invalidation_globs_and_snapshot = (globs, self._get_snapshot(globs, poll=False))
-        self._logger.debug("watching invalidation patterns: {}".format(globs))
+        self._logger.debug(f"watching invalidation patterns: {globs}")
         pidfile_deadline = time.time() + self.PIDFILE_GRACE_PERIOD
 
         while not self._state.is_terminating:
@@ -155,3 +156,4 @@ class SchedulerService(PantsService):
                 # Watcher failed for some reason
                 self._logger.critical(f"The scheduler was invalidated: {e!r}")
                 self.terminate()
+        self._scheduler_session.cancel()

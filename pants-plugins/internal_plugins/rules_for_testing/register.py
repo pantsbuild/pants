@@ -11,10 +11,12 @@ class ListAndDieForTestingSubsystem(GoalSubsystem):
     """A fast and deadly variant of `./pants list`."""
 
     name = "list-and-die-for-testing"
+    help = "A fast and deadly variant of `./pants list`."
 
 
 class ListAndDieForTesting(Goal):
     subsystem_cls = ListAndDieForTestingSubsystem
+    environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY
 
 
 @goal_rule

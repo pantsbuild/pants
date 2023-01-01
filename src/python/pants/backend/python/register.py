@@ -6,79 +6,102 @@
 See https://www.pantsbuild.org/docs/python-backend.
 """
 
+from pants.backend.python import target_types_rules
 from pants.backend.python.dependency_inference import rules as dependency_inference_rules
 from pants.backend.python.goals import (
     coverage_py,
+    export,
+    lockfile,
     package_pex_binary,
     pytest_runner,
     repl,
     run_pex_binary,
+    run_python_requirement,
+    run_python_source,
     setup_py,
+    tailor,
 )
-from pants.backend.python.macros.pants_requirement import PantsRequirement
-from pants.backend.python.macros.pipenv_requirements import PipenvRequirements
+from pants.backend.python.macros import (
+    pipenv_requirements,
+    poetry_requirements,
+    python_requirements,
+)
+from pants.backend.python.macros.pipenv_requirements import PipenvRequirementsTargetGenerator
+from pants.backend.python.macros.poetry_requirements import PoetryRequirementsTargetGenerator
 from pants.backend.python.macros.python_artifact import PythonArtifact
-from pants.backend.python.macros.python_requirements import PythonRequirements
-from pants.backend.python.subsystems import python_native_code
+from pants.backend.python.macros.python_requirements import PythonRequirementsTargetGenerator
+from pants.backend.python.subsystems import debugpy
 from pants.backend.python.target_types import (
+    PexBinariesGeneratorTarget,
     PexBinary,
     PythonDistribution,
-    PythonLibrary,
-    PythonRequirementLibrary,
-    PythonRequirementsFile,
-    PythonTests,
+    PythonRequirementTarget,
+    PythonSourcesGeneratorTarget,
+    PythonSourceTarget,
+    PythonTestsGeneratorTarget,
+    PythonTestTarget,
+    PythonTestUtilsGeneratorTarget,
 )
-from pants.backend.python.target_types import rules as target_type_rules
 from pants.backend.python.util_rules import (
     ancestor_files,
-    extract_pex,
+    local_dists,
     pex,
-    pex_cli,
-    pex_environment,
     pex_from_targets,
     python_sources,
 )
 from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.core.target_types import TargetGeneratorSourcesHelperTarget
 
 
 def build_file_aliases():
-    return BuildFileAliases(
-        objects={"python_artifact": PythonArtifact, "setup_py": PythonArtifact},
-        context_aware_object_factories={
-            "python_requirements": PythonRequirements,
-            "pipenv_requirements": PipenvRequirements,
-            PantsRequirement.alias: PantsRequirement,
-        },
-    )
+    return BuildFileAliases(objects={"python_artifact": PythonArtifact, "setup_py": PythonArtifact})
 
 
 def rules():
     return (
+        *target_types_rules.rules(),
+        # Subsystems
         *coverage_py.rules(),
+        *debugpy.rules(),
+        # Util rules
         *ancestor_files.rules(),
-        *extract_pex.rules(),
-        *python_sources.rules(),
         *dependency_inference_rules.rules(),
         *pex.rules(),
-        *pex_cli.rules(),
-        *pex_environment.rules(),
         *pex_from_targets.rules(),
-        *pytest_runner.rules(),
+        *python_sources.rules(),
+        # Goals
         *package_pex_binary.rules(),
-        *python_native_code.rules(),
+        *pytest_runner.rules(),
         *repl.rules(),
         *run_pex_binary.rules(),
-        *target_type_rules(),
+        *run_python_requirement.rules(),
+        *run_python_source.rules(),
         *setup_py.rules(),
+        *tailor.rules(),
+        *local_dists.rules(),
+        *export.rules(),
+        *lockfile.rules(),
+        # Macros.
+        *pipenv_requirements.rules(),
+        *poetry_requirements.rules(),
+        *python_requirements.rules(),
     )
 
 
 def target_types():
-    return [
+    return (
         PexBinary,
+        PexBinariesGeneratorTarget,
         PythonDistribution,
-        PythonLibrary,
-        PythonRequirementLibrary,
-        PythonRequirementsFile,
-        PythonTests,
-    ]
+        TargetGeneratorSourcesHelperTarget,
+        PythonRequirementTarget,
+        PythonSourcesGeneratorTarget,
+        PythonSourceTarget,
+        PythonTestsGeneratorTarget,
+        PythonTestTarget,
+        PythonTestUtilsGeneratorTarget,
+        # Macros.
+        PipenvRequirementsTargetGenerator,
+        PoetryRequirementsTargetGenerator,
+        PythonRequirementsTargetGenerator,
+    )

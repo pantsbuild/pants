@@ -1,24 +1,33 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import itertools
 import os
 import warnings
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Iterable, List, Mapping, Sequence, Set, Tuple, Type
+from typing import TYPE_CHECKING, Iterable, Mapping, Sequence
 
-from pants.base.build_environment import get_default_pants_config_file
+from pants.base.build_environment import get_default_pants_config_file, pants_version
+from pants.base.exceptions import BuildConfigurationError
+from pants.engine.unions import UnionMembership
+from pants.option.alias import CliAlias
 from pants.option.config import Config
-from pants.option.custom_types import ListValueComponent
-from pants.option.global_options import GlobalOptions
-from pants.option.optionable import Optionable
+from pants.option.custom_types import DictValueComponent, ListValueComponent
+from pants.option.global_options import BootstrapOptions, GlobalOptions
+from pants.option.option_types import collect_options_info
 from pants.option.options import Options
 from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
+from pants.option.subsystem import Subsystem
 from pants.util.dirutil import read_file
 from pants.util.memo import memoized_method, memoized_property
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import ensure_text
+
+if TYPE_CHECKING:
+    from pants.build_graph.build_configuration import BuildConfiguration
 
 
 @dataclass(frozen=True)
@@ -26,10 +35,11 @@ class OptionsBootstrapper:
     """Holds the result of the first stage of options parsing, and assists with parsing full
     options."""
 
-    env_tuples: Tuple[Tuple[str, str], ...]
-    bootstrap_args: Tuple[str, ...]
-    args: Tuple[str, ...]
+    env_tuples: tuple[tuple[str, str], ...]
+    bootstrap_args: tuple[str, ...]
+    args: tuple[str, ...]
     config: Config
+    alias: CliAlias
 
     def __repr__(self) -> str:
         env = {pair[0]: pair[1] for pair in self.env_tuples}
@@ -39,7 +49,7 @@ class OptionsBootstrapper:
         return f"OptionsBootstrapper(args={args}, env={env}, config={self.config})"
 
     @staticmethod
-    def get_config_file_paths(env, args) -> List[str]:
+    def get_config_file_paths(env, args) -> list[str]:
         """Get the location of the config files.
 
         The locations are specified by the --pants-config-files option.  However we need to load the
@@ -89,33 +99,28 @@ class OptionsBootstrapper:
             args=args,
         )
 
-        def register_global(*args, **kwargs):
+        for options_info in collect_options_info(BootstrapOptions):
             # Only use of Options.register?
-            bootstrap_options.register(GLOBAL_SCOPE, *args, **kwargs)
+            bootstrap_options.register(
+                GLOBAL_SCOPE, *options_info.flag_names, **options_info.flag_options
+            )
 
-        GlobalOptions.register_bootstrap_options(register_global)
         return bootstrap_options
 
     @classmethod
     def create(
         cls, env: Mapping[str, str], args: Sequence[str], *, allow_pantsrc: bool
-    ) -> "OptionsBootstrapper":
+    ) -> OptionsBootstrapper:
         """Parses the minimum amount of configuration necessary to create an OptionsBootstrapper.
 
-        :param env: An environment dictionary, or None to use `os.environ`.
-        :param args: An args array, or None to use `sys.argv`.
+        :param env: An environment dictionary.
+        :param args: An args array.
         :param allow_pantsrc: True to allow pantsrc files to be used. Unless tests are expecting to
           consume pantsrc files, they should pass False in order to avoid reading files from
           absolute paths. Production usecases should pass True to allow options values to make the
           decision of whether to respect pantsrc files.
         """
         with warnings.catch_warnings(record=True):
-            env = {k: v for k, v in env.items() if k.startswith("PANTS_")}
-            args = tuple(args)
-
-            flags = set()
-            short_flags = set()
-
             # We can't use pants.engine.fs.FileContent here because it would cause a circular dep.
             @dataclass(frozen=True)
             class FileContent:
@@ -128,35 +133,11 @@ class OptionsBootstrapper:
                     read_file(path, binary_mode=True),
                 )
 
-            def capture_the_flags(*args: str, **kwargs) -> None:
-                for arg in args:
-                    flags.add(arg)
-                    if len(arg) == 2:
-                        short_flags.add(arg)
-                    elif kwargs.get("type") == bool:
-                        flags.add(f"--no-{arg[2:]}")
-
-            GlobalOptions.register_bootstrap_options(capture_the_flags)
-
-            def is_bootstrap_option(arg: str) -> bool:
-                components = arg.split("=", 1)
-                if components[0] in flags:
-                    return True
-                for flag in short_flags:
-                    if arg.startswith(flag):
-                        return True
-                return False
-
-            # Take just the bootstrap args, so we don't choke on other global-scope args on the cmd line.
-            # Stop before '--' since args after that are pass-through and may have duplicate names to our
-            # bootstrap options.
-            bargs = ("./pants",) + tuple(
-                filter(is_bootstrap_option, itertools.takewhile(lambda arg: arg != "--", args))
-            )
+            bargs = cls._get_bootstrap_args(args)
 
             config_file_paths = cls.get_config_file_paths(env=env, args=args)
             config_files_products = [filecontent_for(p) for p in config_file_paths]
-            pre_bootstrap_config = Config.load_file_contents(config_files_products)
+            pre_bootstrap_config = Config.load(config_files_products, env=env)
 
             initial_bootstrap_options = cls.parse_bootstrap_options(
                 env, bargs, pre_bootstrap_config
@@ -175,18 +156,67 @@ class OptionsBootstrapper:
                 full_config_paths.extend(existing_rcfiles)
 
             full_config_files_products = [filecontent_for(p) for p in full_config_paths]
-            post_bootstrap_config = Config.load_file_contents(
+            post_bootstrap_config = Config.load(
                 full_config_files_products,
                 seed_values=bootstrap_option_values.as_dict(),
+                env=env,
             )
 
-            env_tuples = tuple(sorted(env.items(), key=lambda x: x[0]))
-            return cls(
-                env_tuples=env_tuples, bootstrap_args=bargs, args=args, config=post_bootstrap_config
+            # Finally, we expand any aliases and re-populate the bootstrap args, in case there
+            # were any from aliases.
+            # stuhood: This could potentially break the rust client when aliases are used:
+            # https://github.com/pantsbuild/pants/pull/13228#discussion_r728223889
+            alias_vals = post_bootstrap_config.get("cli", "alias")
+            val = DictValueComponent.merge([DictValueComponent.create(v) for v in alias_vals]).val
+            alias = CliAlias.from_dict(val)
+
+            args = alias.expand_args(tuple(args))
+            bargs = cls._get_bootstrap_args(args)
+
+            # We need to set this env var to allow various static help strings to reference the
+            # right name (via `pants.util.docutil`), and we need to do it as early as possible to
+            # avoid needing to lazily import code to avoid chicken-and-egg-problems. This is the
+            # earliest place it makes sense to do so and is generically used by both the local and
+            # remote pants runners.
+            os.environ["PANTS_BIN_NAME"] = bootstrap_option_values.pants_bin_name
+
+            env_tuples = tuple(
+                sorted(
+                    (item for item in env.items() if item[0].startswith("PANTS_")),
+                )
             )
+            return cls(
+                env_tuples=env_tuples,
+                bootstrap_args=bargs,
+                args=args,
+                config=post_bootstrap_config,
+                alias=alias,
+            )
+
+    @classmethod
+    def _get_bootstrap_args(cls, args: Sequence[str]) -> tuple[str, ...]:
+        # TODO(13244): there is a typing issue with `memoized_classmethod`.
+        options = GlobalOptions.get_options_flags()  # type: ignore[call-arg]
+
+        def is_bootstrap_option(arg: str) -> bool:
+            components = arg.split("=", 1)
+            if components[0] in options.flags:
+                return True
+            for flag in options.short_flags:
+                if arg.startswith(flag):
+                    return True
+            return False
+
+        # Take just the bootstrap args, so we don't choke on other global-scope args on the cmd line.
+        # Stop before '--' since args after that are pass-through and may have duplicate names to our
+        # bootstrap options.
+        bargs = ("<ignored>",) + tuple(
+            filter(is_bootstrap_option, itertools.takewhile(lambda arg: arg != "--", args))
+        )
+        return bargs
 
     @memoized_property
-    def env(self) -> Dict[str, str]:
+    def env(self) -> dict[str, str]:
         return dict(self.env_tuples)
 
     @memoized_property
@@ -206,7 +236,12 @@ class OptionsBootstrapper:
         return self.bootstrap_options
 
     @memoized_method
-    def _full_options(self, known_scope_infos: FrozenOrderedSet[ScopeInfo]) -> Options:
+    def _full_options(
+        self,
+        known_scope_infos: FrozenOrderedSet[ScopeInfo],
+        union_membership: UnionMembership,
+        allow_unknown_options: bool = False,
+    ) -> Options:
         bootstrap_option_values = self.get_bootstrap_options().for_global_scope()
         options = Options.create(
             self.env,
@@ -214,18 +249,24 @@ class OptionsBootstrapper:
             known_scope_infos,
             args=self.args,
             bootstrap_option_values=bootstrap_option_values,
+            allow_unknown_options=allow_unknown_options,
         )
 
-        distinct_optionable_classes: Set[Type[Optionable]] = set()
+        distinct_subsystem_classes: set[type[Subsystem]] = set()
         for ksi in known_scope_infos:
-            if not ksi.optionable_cls or ksi.optionable_cls in distinct_optionable_classes:
+            if not ksi.subsystem_cls or ksi.subsystem_cls in distinct_subsystem_classes:
                 continue
-            distinct_optionable_classes.add(ksi.optionable_cls)
-            ksi.optionable_cls.register_options_on_scope(options)
+            distinct_subsystem_classes.add(ksi.subsystem_cls)
+            ksi.subsystem_cls.register_options_on_scope(options, union_membership)
 
         return options
 
-    def get_full_options(self, known_scope_infos: Iterable[ScopeInfo]) -> Options:
+    def full_options_for_scopes(
+        self,
+        known_scope_infos: Iterable[ScopeInfo],
+        union_membership: UnionMembership,
+        allow_unknown_options: bool = False,
+    ) -> Options:
         """Get the full Options instance bootstrapped by this object for the given known scopes.
 
         :param known_scope_infos: ScopeInfos for all scopes that may be encountered.
@@ -233,5 +274,30 @@ class OptionsBootstrapper:
                   scopes.
         """
         return self._full_options(
-            FrozenOrderedSet(sorted(known_scope_infos, key=lambda si: si.scope))
+            FrozenOrderedSet(sorted(known_scope_infos, key=lambda si: si.scope)),
+            union_membership,
+            allow_unknown_options=allow_unknown_options,
         )
+
+    def full_options(
+        self, build_configuration: BuildConfiguration, union_membership: UnionMembership
+    ) -> Options:
+        global_bootstrap_options = self.get_bootstrap_options().for_global_scope()
+        if global_bootstrap_options.pants_version != pants_version():
+            raise BuildConfigurationError(
+                f"Version mismatch: Requested version was {global_bootstrap_options.pants_version}, "
+                f"our version is {pants_version()}."
+            )
+
+        # Parse and register options.
+        known_scope_infos = [
+            subsystem.get_scope_info() for subsystem in build_configuration.all_subsystems
+        ]
+        options = self.full_options_for_scopes(
+            known_scope_infos,
+            union_membership,
+            allow_unknown_options=build_configuration.allow_unknown_options,
+        )
+        GlobalOptions.validate_instance(options.for_global_scope())
+        self.alias.check_name_conflicts(options.known_scope_to_info)
+        return options

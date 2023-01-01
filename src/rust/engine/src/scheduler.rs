@@ -5,25 +5,22 @@ use std::collections::{HashMap, HashSet};
 use std::convert::TryInto;
 use std::io;
 use std::path::{Path, PathBuf};
-use std::sync::{mpsc, Arc};
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+use deepsize::DeepSizeOf;
 use futures::{future, FutureExt};
+use log::debug;
+use tokio::time;
 
 use crate::context::{Context, Core};
-use crate::core::{Failure, Params, TypeId, Value};
-use crate::externs::{self};
-use crate::nodes::{NodeKey, Select, Visualizer};
+use crate::nodes::{NodeKey, Select};
+use crate::python::{Failure, Params, TypeId, Value};
+use crate::session::{ObservedValueResult, Root, Session};
 
-use cpython::Python;
-use graph::{InvalidationResult, LastObserved};
-use log::{debug, info, warn};
-use parking_lot::{Mutex, RwLock};
-use task_executor::Executor;
+use graph::LastObserved;
 use ui::ConsoleUI;
-use uuid::Uuid;
 use watch::Invalidatable;
-use workunit_store::{UserMetadataPyValue, WorkunitStore};
 
 pub enum ExecutionTermination {
   // Raised as a vanilla keyboard interrupt on the python side.
@@ -34,255 +31,7 @@ pub enum ExecutionTermination {
   Fatal(String),
 }
 
-enum ExecutionEvent {
-  Completed(Vec<ObservedValueResult>),
-  Stderr(String),
-}
-
-type ObservedValueResult = Result<(Value, Option<LastObserved>), Failure>;
-
-// Root requests are limited to Select nodes, which produce (python) Values.
-type Root = Select;
-
-// When enabled, the interval at which all stragglers that have been running for longer than a
-// threshold should be logged. The threshold might become configurable, but this might not need
-// to be.
-const STRAGGLER_LOGGING_INTERVAL: Duration = Duration::from_secs(30);
-
-///
-/// An enum for the two cases of `--[no-]dynamic-ui`.
-///
-enum SessionDisplay {
-  // The dynamic UI is enabled, and the ConsoleUI should interact with a TTY.
-  ConsoleUI(ConsoleUI),
-  // The dynamic UI is disabled, and we should use only logging.
-  Logging {
-    straggler_threshold: Duration,
-    straggler_deadline: Option<Instant>,
-  },
-}
-
-///
-/// A Session represents a related series of requests (generally: one run of the pants CLI) on an
-/// underlying Scheduler, and is a useful scope for metrics.
-///
-/// Both Scheduler and Session are exposed to python and expected to be used by multiple threads, so
-/// they use internal mutability in order to avoid exposing locks to callers.
-///
-struct InnerSession {
-  // The total size of the graph at Session-creation time.
-  preceding_graph_size: usize,
-  // The set of roots that have been requested within this session, with associated LastObserved
-  // times if they were polled.
-  roots: Mutex<HashMap<Root, Option<LastObserved>>>,
-  // The display mechanism to use in this Session.
-  display: Mutex<SessionDisplay>,
-  // A place to store info about workunits in rust part
-  workunit_store: WorkunitStore,
-  // The unique id for this Session: used for metrics gathering purposes.
-  build_id: String,
-  // Per-Session values that have been set for this session.
-  session_values: Mutex<Value>,
-  // An id used to control the visibility of uncacheable rules. Generally this is identical for an
-  // entire Session, but in some cases (in particular, a `--loop`) the caller wants to retain the
-  // same Session while still observing new values for uncacheable rules like Goals.
-  //
-  // TODO: Figure out how the `--loop` interplays with metrics. It's possible that for metrics
-  // purposes, each iteration of a loop should be considered to be a new Session, but for now the
-  // Session/build_id would be stable.
-  run_id: Mutex<Uuid>,
-  should_report_workunits: bool,
-  workunit_metadata_map: RwLock<HashMap<UserMetadataPyValue, Value>>,
-}
-
-#[derive(Clone)]
-pub struct Session(Arc<InnerSession>);
-
-impl Session {
-  pub fn new(
-    scheduler: &Scheduler,
-    should_render_ui: bool,
-    build_id: String,
-    should_report_workunits: bool,
-    session_values: Value,
-  ) -> Session {
-    let workunit_store = WorkunitStore::new(!should_render_ui);
-    let display = Mutex::new(if should_render_ui {
-      SessionDisplay::ConsoleUI(ConsoleUI::new(
-        workunit_store.clone(),
-        scheduler.core.local_parallelism,
-      ))
-    } else {
-      SessionDisplay::Logging {
-        // TODO: This threshold should likely be configurable, but the interval we render at
-        // probably does not need to be.
-        straggler_threshold: Duration::from_secs(60),
-        straggler_deadline: None,
-      }
-    });
-
-    let inner_session = InnerSession {
-      preceding_graph_size: scheduler.core.graph.len(),
-      roots: Mutex::new(HashMap::new()),
-      display,
-      workunit_store,
-      build_id,
-      session_values: Mutex::new(session_values),
-      run_id: Mutex::new(Uuid::new_v4()),
-      should_report_workunits,
-      workunit_metadata_map: RwLock::new(HashMap::new()),
-    };
-    Session(Arc::new(inner_session))
-  }
-
-  pub fn with_metadata_map<F, T>(&self, f: F) -> T
-  where
-    F: Fn(&mut HashMap<UserMetadataPyValue, Value>) -> T,
-  {
-    f(&mut self.0.workunit_metadata_map.write())
-  }
-
-  fn extend(&self, new_roots: Vec<(Root, Option<LastObserved>)>) {
-    let mut roots = self.0.roots.lock();
-    roots.extend(new_roots);
-  }
-
-  fn zip_last_observed(&self, inputs: &[Root]) -> Vec<(Root, Option<LastObserved>)> {
-    let roots = self.0.roots.lock();
-    inputs
-      .iter()
-      .map(|root| {
-        let last_observed = roots.get(root).cloned().unwrap_or(None);
-        (root.clone(), last_observed)
-      })
-      .collect()
-  }
-
-  fn root_nodes(&self) -> Vec<NodeKey> {
-    let roots = self.0.roots.lock();
-    roots.keys().map(|r| r.clone().into()).collect()
-  }
-
-  pub fn session_values(&self) -> Value {
-    self.0.session_values.lock().clone()
-  }
-
-  pub fn preceding_graph_size(&self) -> usize {
-    self.0.preceding_graph_size
-  }
-
-  pub fn should_report_workunits(&self) -> bool {
-    self.0.should_report_workunits
-  }
-
-  pub fn workunit_store(&self) -> WorkunitStore {
-    self.0.workunit_store.clone()
-  }
-
-  pub fn build_id(&self) -> &String {
-    &self.0.build_id
-  }
-
-  pub fn run_id(&self) -> Uuid {
-    let run_id = self.0.run_id.lock();
-    *run_id
-  }
-
-  pub fn new_run_id(&self) {
-    let mut run_id = self.0.run_id.lock();
-    *run_id = Uuid::new_v4();
-  }
-
-  pub async fn write_stdout(&self, msg: &str) -> Result<(), String> {
-    if let SessionDisplay::ConsoleUI(ref mut ui) = *self.0.display.lock() {
-      ui.write_stdout(msg).await
-    } else {
-      print!("{}", msg);
-      Ok(())
-    }
-  }
-
-  pub fn write_stderr(&self, msg: &str) {
-    if let SessionDisplay::ConsoleUI(ref mut ui) = *self.0.display.lock() {
-      ui.write_stderr(msg);
-    } else {
-      eprint!("{}", msg);
-    }
-  }
-
-  pub async fn with_console_ui_disabled<F: FnOnce() -> T, T>(&self, f: F) -> T {
-    match *self.0.display.lock() {
-      SessionDisplay::ConsoleUI(ref mut ui) => ui.with_console_ui_disabled(f).await,
-      SessionDisplay::Logging { .. } => f(),
-    }
-  }
-
-  fn maybe_display_initialize(&self, executor: &Executor, sender: &mpsc::Sender<ExecutionEvent>) {
-    let result = match *self.0.display.lock() {
-      SessionDisplay::ConsoleUI(ref mut ui) => {
-        let sender = sender.clone();
-        ui.initialize(
-          executor.clone(),
-          Box::new(move |msg: &str| {
-            // If we fail to send, it's because the execute loop has exited: we fail the callback to
-            // have the logging module directly log to stderr at that point.
-            sender
-              .send(ExecutionEvent::Stderr(msg.to_owned()))
-              .map_err(|_| ())
-          }),
-        )
-      }
-      SessionDisplay::Logging {
-        ref mut straggler_deadline,
-        ..
-      } => {
-        *straggler_deadline = Some(Instant::now() + STRAGGLER_LOGGING_INTERVAL);
-        Ok(())
-      }
-    };
-    if let Err(e) = result {
-      warn!("{}", e);
-    }
-  }
-
-  pub async fn maybe_display_teardown(&self) {
-    let teardown = match *self.0.display.lock() {
-      SessionDisplay::ConsoleUI(ref mut ui) => ui.teardown().boxed(),
-      SessionDisplay::Logging {
-        ref mut straggler_deadline,
-        ..
-      } => {
-        *straggler_deadline = None;
-        async { Ok(()) }.boxed()
-      }
-    };
-    if let Err(e) = teardown.await {
-      warn!("{}", e);
-    }
-  }
-
-  fn maybe_display_render(&self) {
-    match *self.0.display.lock() {
-      SessionDisplay::ConsoleUI(ref mut ui) => ui.render(),
-      SessionDisplay::Logging {
-        straggler_threshold,
-        ref mut straggler_deadline,
-      } => {
-        if straggler_deadline
-          .map(|sd| sd < Instant::now())
-          .unwrap_or(false)
-        {
-          *straggler_deadline = Some(Instant::now() + STRAGGLER_LOGGING_INTERVAL);
-          self
-            .0
-            .workunit_store
-            .log_straggling_workunits(straggler_threshold);
-        }
-      }
-    }
-  }
-}
-
+#[derive(Default)]
 pub struct ExecutionRequest {
   // Set of roots for an execution, in the order they were declared.
   pub roots: Vec<Root>,
@@ -306,17 +55,6 @@ pub struct ExecutionRequest {
   pub timeout: Option<Duration>,
 }
 
-impl ExecutionRequest {
-  pub fn new() -> ExecutionRequest {
-    ExecutionRequest {
-      roots: Vec::new(),
-      poll: false,
-      poll_delay: None,
-      timeout: None,
-    }
-  }
-}
-
 ///
 /// Represents the state of an execution of a Graph.
 ///
@@ -336,7 +74,7 @@ impl Scheduler {
     self
       .core
       .graph
-      .visualize(Visualizer::default(), &session.root_nodes(), path, &context)
+      .visualize(&session.roots_nodes(), path, &context)
   }
 
   pub fn add_root_select(
@@ -349,16 +87,18 @@ impl Scheduler {
       .core
       .rule_graph
       .find_root_edges(params.type_ids(), product)?;
-    request
-      .roots
-      .push(Select::new_from_edges(params, product, &edges));
+    request.roots.push(Select::new_from_edges(
+      params,
+      &rule_graph::DependencyKey::new(product),
+      &edges,
+    ));
     Ok(())
   }
 
   ///
   /// Invalidate the invalidation roots represented by the given Paths.
   ///
-  pub fn invalidate(&self, paths: &HashSet<PathBuf>) -> usize {
+  pub fn invalidate_paths(&self, paths: &HashSet<PathBuf>) -> usize {
     self.core.graph.invalidate(paths, "external")
   }
 
@@ -366,15 +106,14 @@ impl Scheduler {
   /// Invalidate all filesystem dependencies in the graph.
   ///
   pub fn invalidate_all_paths(&self) -> usize {
-    let InvalidationResult { cleared, dirtied } = self
-      .core
-      .graph
-      .invalidate_from_roots(|node| node.fs_subject().is_some());
-    info!(
-      "invalidation: cleared {} and dirtied {} nodes for all paths",
-      cleared, dirtied
-    );
-    cleared + dirtied
+    self.core.graph.invalidate_all("external")
+  }
+
+  ///
+  /// Invalidate the entire graph.
+  ///
+  pub fn invalidate_all(&self) {
+    self.core.graph.clear();
   }
 
   ///
@@ -388,7 +127,7 @@ impl Scheduler {
       self
         .core
         .graph
-        .visit_live_reachable(&session.root_nodes(), &context, |n, _| {
+        .visit_live_reachable(&session.roots_nodes(), &context, |n, _| {
           if n.fs_subject().is_some() {
             count += 1;
           }
@@ -404,6 +143,36 @@ impl Scheduler {
   }
 
   ///
+  /// Returns references to all Python objects held alive by the graph, and a summary of sizes of
+  /// Rust structs as a count and total size.
+  ///
+  pub fn live_items(
+    &self,
+    session: &Session,
+  ) -> (Vec<Value>, HashMap<&'static str, (usize, usize)>) {
+    let context = Context::new(self.core.clone(), session.clone());
+    let mut items = vec![];
+    let mut sizes: HashMap<&'static str, (usize, usize)> = HashMap::new();
+    // TODO: Creation of a Context is exposed in https://github.com/Aeledfyr/deepsize/pull/31.
+    let mut deep_context = deepsize::Context::new();
+    self.core.graph.visit_live(&context, |k, v| {
+      if let NodeKey::Task(ref t) = k {
+        items.extend(t.params.keys().map(|k| k.to_value()));
+        items.push(v.clone().try_into().unwrap());
+      }
+      let mut entry = sizes.entry(k.workunit_name()).or_insert_with(|| (0, 0));
+      entry.0 += 1;
+      entry.1 += {
+        std::mem::size_of_val(&k)
+          + k.deep_size_of_children(&mut deep_context)
+          + std::mem::size_of_val(&v)
+          + v.deep_size_of_children(&mut deep_context)
+      };
+    });
+    (items, sizes)
+  }
+
+  ///
   /// Return unit if the Scheduler is still valid, or an error string if something has invalidated
   /// the Scheduler, indicating that it should re-initialize. See InvalidationWatcher.
   ///
@@ -411,7 +180,11 @@ impl Scheduler {
     let core = self.core.clone();
     self.core.executor.block_on(async move {
       // Confirm that our InvalidationWatcher is still alive.
-      core.watcher.is_valid().await
+      if let Some(watcher) = &core.watcher {
+        watcher.is_valid().await
+      } else {
+        Ok(())
+      }
     })
   }
 
@@ -439,53 +212,42 @@ impl Scheduler {
       let (result, last_observed) = context
         .core
         .graph
-        .poll(root.into(), last_observed, poll_delay, &context)
+        .poll(root.into(), last_observed, poll_delay, context)
         .await?;
       (result, Some(last_observed))
     } else {
-      let result = context.core.graph.create(root.into(), &context).await?;
+      let result = context.core.graph.create(root.into(), context).await?;
       (result, None)
     };
 
-    let invocation_result = result
-      .try_into()
-      .unwrap_or_else(|e| panic!("A Node implementation was ambiguous: {:?}", e));
-    match invocation_result {
-      Err(err) => Err(err),
-      Ok(val) => Ok((val, last_observed)),
-    }
+    Ok((
+      result
+        .try_into()
+        .unwrap_or_else(|e| panic!("A Node implementation was ambiguous: {:?}", e)),
+      last_observed,
+    ))
   }
 
   ///
-  /// Attempts to complete all of the given roots, and send a FinalResult on the given mpsc Sender,
-  /// which allows the caller to poll a channel for the result without blocking uninterruptibly
-  /// on a Future.
+  /// Attempts to complete all of the given roots.
   ///
-  fn execute_helper(
-    &self,
+  async fn execute_helper(
     request: &ExecutionRequest,
     session: &Session,
-    sender: mpsc::Sender<ExecutionEvent>,
-  ) {
-    let context = Context::new(self.core.clone(), session.clone());
-    let roots = session.zip_last_observed(&request.roots);
+  ) -> Vec<ObservedValueResult> {
+    let context = Context::new(session.core().clone(), session.clone());
+    let roots = session.roots_zip_last_observed(&request.roots);
     let poll = request.poll;
     let poll_delay = request.poll_delay;
-    let core = context.core.clone();
-    let _join = core.executor.spawn(async move {
-      let res = future::join_all(
-        roots
-          .into_iter()
-          .map(|(root, last_observed)| {
-            Self::poll_or_create(&context, root, last_observed, poll, poll_delay)
-          })
-          .collect::<Vec<_>>(),
-      )
-      .await;
-
-      // The receiver may have gone away due to timeout.
-      let _ = sender.send(ExecutionEvent::Completed(res));
-    });
+    future::join_all(
+      roots
+        .into_iter()
+        .map(|(root, last_observed)| {
+          Self::poll_or_create(&context, root, last_observed, poll, poll_delay)
+        })
+        .collect::<Vec<_>>(),
+    )
+    .await
   }
 
   fn execute_record_results(
@@ -494,7 +256,7 @@ impl Scheduler {
     results: Vec<ObservedValueResult>,
   ) -> Vec<Result<Value, Failure>> {
     // Store the roots that were operated on and their LastObserved values.
-    session.extend(
+    session.roots_extend(
       results
         .iter()
         .zip(roots.iter())
@@ -521,7 +283,6 @@ impl Scheduler {
     &self,
     request: &ExecutionRequest,
     session: &Session,
-    python_signal_fn: Value,
   ) -> Result<Vec<Result<Value, Failure>>, ExecutionTermination> {
     debug!(
       "Launching {} roots (poll={}).",
@@ -531,47 +292,41 @@ impl Scheduler {
 
     let interval = ConsoleUI::render_interval();
     let deadline = request.timeout.map(|timeout| Instant::now() + timeout);
+    let executor = self.core.executor.clone();
 
     // Spawn and wait for all roots to complete.
-    let (sender, receiver) = mpsc::channel();
-    session.maybe_display_initialize(&self.core.executor, &sender);
-    self.execute_helper(request, session, sender);
-    let result = loop {
-      let execution_event = receiver.recv_timeout(Self::refresh_delay(interval, deadline));
+    self.core.executor.block_on(async move {
+      session.maybe_display_initialize(&executor).await;
+      let mut execution_task = Self::execute_helper(request, session).boxed();
 
-      if let Some(termination) = maybe_break_execution_loop(&python_signal_fn) {
-        return Err(termination);
-      }
-
-      match execution_event {
-        Ok(ExecutionEvent::Completed(res)) => {
-          // Completed successfully.
-          break Ok(Self::execute_record_results(&request.roots, &session, res));
-        }
-        Ok(ExecutionEvent::Stderr(stderr)) => {
-          session.write_stderr(&stderr);
-        }
-        Err(mpsc::RecvTimeoutError::Timeout) => {
-          if deadline.map(|d| d < Instant::now()).unwrap_or(false) {
-            // The timeout on the request has been exceeded.
-            break Err(ExecutionTermination::PollTimeout);
-          } else {
-            // Just a receive timeout. render and continue.
-            session.maybe_display_render();
+      let mut refresh_delay = time::sleep(Self::refresh_delay(interval, deadline)).boxed();
+      let result = loop {
+        tokio::select! {
+          _ = session.cancelled() => {
+            // The Session was cancelled.
+            break Err(ExecutionTermination::KeyboardInterrupt)
+          }
+          _ = &mut refresh_delay => {
+            // It's time to render a new frame (or maybe to time out entirely if the deadline has
+            // elapsed).
+            if deadline.map(|d| d < Instant::now()).unwrap_or(false) {
+              // The timeout on the request has been exceeded.
+              break Err(ExecutionTermination::PollTimeout);
+            } else {
+              // Just a receive timeout. render and continue.
+              session.maybe_display_render();
+            }
+            refresh_delay = time::sleep(Self::refresh_delay(interval, deadline)).boxed();
+          }
+          res = &mut execution_task => {
+            // Completed successfully.
+            break Ok(Self::execute_record_results(&request.roots, session, res));
           }
         }
-        Err(mpsc::RecvTimeoutError::Disconnected) => {
-          break Err(ExecutionTermination::Fatal(
-            "Execution threads exited early.".to_owned(),
-          ));
-        }
-      }
-    };
-    self
-      .core
-      .executor
-      .block_on(session.maybe_display_teardown());
-    result
+      };
+      session.maybe_display_teardown().await;
+      result
+    })
   }
 
   fn refresh_delay(refresh_interval: Duration, deadline: Option<Instant>) -> Duration {
@@ -579,36 +334,6 @@ impl Scheduler {
       .and_then(|deadline| deadline.checked_duration_since(Instant::now()))
       .map(|duration_till_deadline| std::cmp::min(refresh_interval, duration_till_deadline))
       .unwrap_or(refresh_interval)
-  }
-}
-
-pub fn maybe_break_execution_loop(python_signal_fn: &Value) -> Option<ExecutionTermination> {
-  match externs::call_function(&python_signal_fn, &[]) {
-    Ok(value) => {
-      if externs::is_truthy(&value) {
-        Some(ExecutionTermination::KeyboardInterrupt)
-      } else {
-        None
-      }
-    }
-    Err(mut e) => {
-      let gil = Python::acquire_gil();
-      let py = gil.python();
-      if e
-        .instance(py)
-        .cast_as::<cpython::exc::KeyboardInterrupt>(py)
-        .is_ok()
-      {
-        Some(ExecutionTermination::KeyboardInterrupt)
-      } else {
-        let failure = Failure::from_py_err_with_gil(py, e);
-        std::mem::drop(gil);
-        Some(ExecutionTermination::Fatal(format!(
-          "Error when checking Python signal state: {}",
-          failure
-        )))
-      }
-    }
   }
 }
 

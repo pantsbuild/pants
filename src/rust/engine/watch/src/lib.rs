@@ -10,9 +10,7 @@
   clippy::if_not_else,
   clippy::needless_continue,
   clippy::unseparated_literal_suffix,
-  // TODO: Falsely triggers for async/await:
-  //   see https://github.com/rust-lang/rust-clippy/issues/5360
-  // clippy::used_underscore_binding
+  clippy::used_underscore_binding
 )]
 // It is often more clear to show that nothing is being moved.
 #![allow(clippy::match_ref_pats)]
@@ -39,7 +37,8 @@ use std::time::Duration;
 use crossbeam_channel::{self, Receiver, RecvTimeoutError, TryRecvError};
 use fs::GitignoreStyleExcludes;
 use log::{debug, trace, warn};
-use notify::{RecommendedWatcher, RecursiveMode, Watcher};
+use notify::event::{Flag, MetadataKind, ModifyKind};
+use notify::{Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use parking_lot::Mutex;
 use task_executor::Executor;
 
@@ -64,7 +63,7 @@ type WatcherTaskInputs = (
   Arc<GitignoreStyleExcludes>,
   PathBuf,
   crossbeam_channel::Sender<String>,
-  Receiver<notify::Result<notify::Event>>,
+  Receiver<notify::Result<Event>>,
 );
 
 pub struct InvalidationWatcher(Mutex<Inner>);
@@ -82,12 +81,18 @@ impl InvalidationWatcher {
     let canonical_build_root =
       std::fs::canonicalize(build_root.as_path()).map_err(|e| format!("{:?}", e))?;
     let (watch_sender, watch_receiver) = crossbeam_channel::unbounded();
-    let mut watcher: RecommendedWatcher = Watcher::new_immediate(move |ev| {
+    let mut watcher: RecommendedWatcher = notify::recommended_watcher(move |ev| {
       if watch_sender.send(ev).is_err() {
         // The watch thread shutting down first is ok, because it can exit when the Invalidatable
         // is dropped.
         debug!("Watch thread has shutdown, but Watcher is still running.");
       }
+    })
+    .and_then(|mut watcher| {
+      // We attempt to consume precise events to skip invalidating parent directories for
+      // data-change events, but `handle_event` should safely operate without them.
+      let _ = watcher.configure(notify::Config::PreciseEvents(true))?;
+      Ok(watcher)
     })
     .map_err(|e| format!("Failed to begin watching the filesystem: {}", e))?;
 
@@ -99,7 +104,7 @@ impl InvalidationWatcher {
     // much more efficiently so we do that instead on Linux.
     if cfg!(target_os = "macos") {
       watcher
-        .watch(canonical_build_root.clone(), RecursiveMode::Recursive)
+        .watch(&canonical_build_root, RecursiveMode::Recursive)
         .map_err(|e| {
           format!(
             "Failed to begin recursively watching files in the build root: {}",
@@ -132,7 +137,7 @@ impl InvalidationWatcher {
       .expect("An InvalidationWatcher can only be started once.");
 
     InvalidationWatcher::start_background_thread(
-      Arc::downgrade(&invalidatable),
+      Arc::downgrade(invalidatable),
       ignorer,
       canonical_build_root,
       liveness_sender,
@@ -146,10 +151,9 @@ impl InvalidationWatcher {
     ignorer: Arc<GitignoreStyleExcludes>,
     canonical_build_root: PathBuf,
     liveness_sender: crossbeam_channel::Sender<String>,
-    watch_receiver: Receiver<notify::Result<notify::Event>>,
+    watch_receiver: Receiver<notify::Result<Event>>,
   ) -> thread::JoinHandle<()> {
     thread::spawn(move || {
-      logging::set_thread_destination(logging::Destination::Pantsd);
       let exit_msg = loop {
         let event_res = watch_receiver.recv_timeout(Duration::from_millis(10));
         let invalidatable = if let Some(g) = invalidatable.upgrade() {
@@ -159,51 +163,7 @@ impl InvalidationWatcher {
           break "The watcher was shut down.".to_string();
         };
         match event_res {
-          Ok(Ok(ev)) => {
-            let paths: HashSet<_> = ev
-              .paths
-              .into_iter()
-              .filter_map(|path| {
-                // relativize paths to build root.
-                let path_relative_to_build_root = if path.starts_with(&canonical_build_root) {
-                  // Unwrapping is fine because we check that the path starts with
-                  // the build root above.
-                  path.strip_prefix(&canonical_build_root).unwrap().into()
-                } else {
-                  path
-                };
-                // To avoid having to stat paths for events we will eventually ignore we "lie" to the ignorer
-                // to say that no path is a directory, they could be if someone chmod's or creates a dir.
-                // This maintains correctness by ensuring that at worst we have false negative events, where a directory
-                // only glob (one that ends in `/` ) was supposed to ignore a directory path, but didn't because we claimed it was a file. That
-                // directory path will be used to invalidate nodes, but won't invalidate anything because its path is somewhere
-                // out of our purview.
-                if ignorer.is_ignored_or_child_of_ignored_path(
-                  &path_relative_to_build_root,
-                  /* is_dir */ false,
-                ) {
-                  trace!("notify ignoring {:?}", path_relative_to_build_root);
-                  None
-                } else {
-                  Some(path_relative_to_build_root)
-                }
-              })
-              .flat_map(|path_relative_to_build_root| {
-                let mut paths_to_invalidate: Vec<PathBuf> = vec![];
-                if let Some(parent_dir) = path_relative_to_build_root.parent() {
-                  paths_to_invalidate.push(parent_dir.to_path_buf());
-                }
-                paths_to_invalidate.push(path_relative_to_build_root);
-                paths_to_invalidate
-              })
-              .collect();
-
-            // Only invalidate stuff if we have paths that weren't filtered out by gitignore.
-            if !paths.is_empty() {
-              debug!("notify invalidating {:?} because of {:?}", paths, ev.kind);
-              invalidatable.invalidate(&paths, "notify");
-            };
-          }
+          Ok(Ok(ev)) => Self::handle_event(&*invalidatable, &ignorer, &canonical_build_root, ev),
           Ok(Err(err)) => {
             if let notify::ErrorKind::PathNotFound = err.kind {
               warn!("Path(s) did not exist: {:?}", err.paths);
@@ -223,6 +183,87 @@ impl InvalidationWatcher {
       warn!("File watcher exiting with: {}", exit_msg);
       let _ = liveness_sender.send(exit_msg);
     })
+  }
+
+  ///
+  /// Handle a single invalidation Event.
+  ///
+  /// This method must not assume that it receives PreciseEvents, because construction does not
+  /// validate that it is possible to enable them.
+  ///
+  fn handle_event<I: Invalidatable>(
+    invalidatable: &I,
+    ignorer: &GitignoreStyleExcludes,
+    canonical_build_root: &Path,
+    ev: Event,
+  ) {
+    if matches!(ev.kind, EventKind::Modify(ModifyKind::Metadata(mk)) if mk != MetadataKind::Permissions)
+    {
+      // (Other than permissions, which include the executable bit) if only the metadata
+      // (AccessTime, WriteTime, Perms, Link Count, etc...) was changed, it doesn't change anything
+      // Pants particularly cares about.
+      //
+      // One could argue if the ownership changed Pants would care, but until the
+      // name/data changes (which would be a separate event) the substance of the file in Pants'
+      // eyes is the same.
+      return;
+    }
+
+    let is_data_only_event = matches!(ev.kind, EventKind::Modify(ModifyKind::Data(_)));
+    let flag = ev.flag();
+
+    let paths: HashSet<_> = ev
+      .paths
+      .into_iter()
+      .filter_map(|path| {
+        // relativize paths to build root.
+        let path_relative_to_build_root = if path.starts_with(canonical_build_root) {
+          // Unwrapping is fine because we check that the path starts with
+          // the build root above.
+          path.strip_prefix(canonical_build_root).unwrap().into()
+        } else {
+          path
+        };
+        // To avoid having to stat paths for events we will eventually ignore we "lie" to
+        // the ignorer to say that no path is a directory (although they could be if someone
+        // chmod's or creates a dir).
+        //
+        // This maintains correctness by ensuring that at worst we have false negative
+        // events, where a directory-only glob (one that ends in `/` ) was supposed to
+        // ignore a directory path, but didn't because we claimed it was a file. That
+        // directory path will be used to invalidate nodes, but won't invalidate anything
+        // because its path is somewhere out of our purview.
+        if ignorer.is_ignored_or_child_of_ignored_path(
+          &path_relative_to_build_root,
+          /* is_dir */ false,
+        ) {
+          trace!("notify ignoring {:?}", path_relative_to_build_root);
+          None
+        } else {
+          Some(path_relative_to_build_root)
+        }
+      })
+      .flat_map(|path_relative_to_build_root| {
+        let mut paths_to_invalidate: Vec<PathBuf> = Vec::with_capacity(2);
+        if !is_data_only_event {
+          // If the event is anything other than a data change event (a change to the content of
+          // a file), then we additionally invalidate the parent of the path.
+          if let Some(parent_dir) = path_relative_to_build_root.parent() {
+            paths_to_invalidate.push(parent_dir.to_path_buf());
+          }
+        }
+        paths_to_invalidate.push(path_relative_to_build_root);
+        paths_to_invalidate
+      })
+      .collect();
+
+    if flag == Some(Flag::Rescan) {
+      debug!("notify queue overflowed: invalidating all paths");
+      invalidatable.invalidate_all("notify");
+    } else if !paths.is_empty() {
+      debug!("notify invalidating {:?} because of {:?}", paths, ev.kind);
+      invalidatable.invalidate(&paths, "notify");
+    }
   }
 
   ///
@@ -283,6 +324,7 @@ impl InvalidationWatcher {
 
 pub trait Invalidatable: Send + Sync + 'static {
   fn invalidate(&self, paths: &HashSet<PathBuf>, caller: &str) -> usize;
+  fn invalidate_all(&self, caller: &str) -> usize;
 }
 
 ///

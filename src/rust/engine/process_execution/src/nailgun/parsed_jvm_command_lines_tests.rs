@@ -1,3 +1,5 @@
+// Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
+// Licensed under the Apache License, Version 2.0 (see LICENSE).
 use crate::nailgun::parsed_jvm_command_lines::ParsedJVMCommandLines;
 
 // TODO we should be able to use https://docs.rs/crate/derive_builder/0.8.0
@@ -136,22 +138,6 @@ fn parses_cli_without_jvm_args() {
   assert_eq!(
     parse_result,
     Ok(cli_without_jvm_args.render_to_parsed_args())
-  )
-}
-
-#[test]
-fn fails_to_parse_cli_without_jdk() {
-  let cli_without_jdk = CLIBuilder::empty()
-    .with_nailgun_args()
-    .with_main_class()
-    .build();
-
-  let parse_result =
-    ParsedJVMCommandLines::parse_command_lines(&cli_without_jdk.render_to_full_cli());
-
-  assert_eq!(
-    parse_result,
-    Err("Every command line must start with a call to the jdk.".to_string())
   )
 }
 

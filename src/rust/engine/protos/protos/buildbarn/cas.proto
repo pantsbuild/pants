@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package buildbarn.cas;
+
+import "build/bazel/remote/execution/v2/remote_execution.proto";
+
+option go_package = "github.com/buildbarn/bb-storage/pkg/proto/cas";
+
+// UncachedActionResult is a custom message that is stored into the
+// Content Addressable Storage. The Action Cache is only permitted to
+// contain ActionResults of successful builds. In our case we also want
+// to provide the user insight as to why their build fails by storing
+// the ActionResult upon failure.
+//
+// This message is written into the ContentAddressableStorage by
+// bb_worker by the CachingBuildExecutor. The digest is returned to the
+// user by providing a URL to bb_browser as a message in the
+// ExecuteResponse.
+message UncachedActionResult {
+  reserved 2;
+
+  build.bazel.remote.execution.v2.Digest action_digest = 1;
+  build.bazel.remote.execution.v2.ExecuteResponse execute_response = 3;
+}

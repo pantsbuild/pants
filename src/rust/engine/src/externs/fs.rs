@@ -1,85 +1,496 @@
 // Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-#![deny(warnings)]
-// Enable all clippy lints except for many of the pedantic ones. It's a shame this needs to be copied and pasted across crates, but there doesn't appear to be a way to include inner attributes from a common source.
-#![deny(
-  clippy::all,
-  clippy::default_trait_access,
-  clippy::expl_impl_clone_on_copy,
-  clippy::if_not_else,
-  clippy::needless_continue,
-  clippy::unseparated_literal_suffix,
-// TODO: Falsely triggers for async/await:
-//   see https://github.com/rust-lang/rust-clippy/issues/5360
-// clippy::used_underscore_binding
-)]
-// It is often more clear to show that nothing is being moved.
-#![allow(clippy::match_ref_pats)]
-// Subjective style.
-#![allow(
-  clippy::len_without_is_empty,
-  clippy::redundant_field_names,
-  clippy::too_many_arguments
-)]
-// Default isn't as big a deal as people seem to think it is.
-#![allow(clippy::new_without_default, clippy::new_ret_no_self)]
-// Arc<Mutex> can be more clear than needing to grok Orderings:
-#![allow(clippy::mutex_atomic)]
-// File-specific allowances to silence internal warnings of `py_class!`.
-#![allow(
-  unused_braces,
-  clippy::used_underscore_binding,
-  clippy::transmute_ptr_to_ptr,
-  clippy::zero_ptr
-)]
+use std::collections::hash_map::DefaultHasher;
+use std::fmt;
+use std::hash::{Hash, Hasher};
+use std::path::{Path, PathBuf};
 
-use std::borrow::Cow;
+use itertools::Itertools;
+use pyo3::basic::CompareOp;
+use pyo3::exceptions::{PyException, PyTypeError, PyValueError};
+use pyo3::prelude::*;
+use pyo3::types::{PyIterator, PyString, PyTuple, PyType};
 
-use cpython::{
-  exc, py_class, CompareOp, PyErr, PyObject, PyResult, Python, PythonObject, ToPyObject,
+use fs::{
+  DirectoryDigest, FilespecMatcher, GlobExpansionConjunction, PathGlobs, StrictGlobMatching,
+  EMPTY_DIRECTORY_DIGEST,
 };
-use hashing::{Digest, Fingerprint};
+use hashing::{Digest, Fingerprint, EMPTY_DIGEST};
+use store::Snapshot;
 
-/// TODO: See https://github.com/dgrunwald/rust-cpython/issues/242
-pub fn new_py_digest(digest: Digest) -> PyResult<PyDigest> {
-  let gil = Python::acquire_gil();
-  PyDigest::create_instance(gil.python(), digest)
+use crate::Failure;
+
+pub(crate) fn register(m: &PyModule) -> PyResult<()> {
+  m.add_class::<PyDigest>()?;
+  m.add_class::<PyFileDigest>()?;
+  m.add_class::<PySnapshot>()?;
+  m.add_class::<PyMergeDigests>()?;
+  m.add_class::<PyAddPrefix>()?;
+  m.add_class::<PyRemovePrefix>()?;
+  m.add_class::<PyFilespecMatcher>()?;
+
+  m.add("EMPTY_DIGEST", PyDigest(EMPTY_DIRECTORY_DIGEST.clone()))?;
+  m.add("EMPTY_FILE_DIGEST", PyFileDigest(EMPTY_DIGEST))?;
+  m.add("EMPTY_SNAPSHOT", PySnapshot(Snapshot::empty()))?;
+
+  m.add_function(wrap_pyfunction!(default_cache_path, m)?)?;
+  Ok(())
 }
 
-py_class!(pub class PyDigest |py| {
-    data digest: Digest;
-    def __new__(_cls, fingerprint: Cow<str>, serialized_bytes_length: usize) -> PyResult<Self> {
-      let fingerprint = Fingerprint::from_hex_string(&fingerprint)
-        .map_err(|e| {
-          PyErr::new::<exc::Exception, _>(py, format!("Invalid digest hex: {}", e))
-        })?;
-      Self::create_instance(py, Digest(fingerprint, serialized_bytes_length))
-    }
+///
+/// A marker indicating that a `StoreError` is being converted into a python exception, since retry
+/// via #11331 needs to preserve `Failure` information across Python boundaries.
+///
+/// TODO: Any use of `PyErr::from(Failure::from(StoreError))` would trigger this same conversion,
+/// so this method can eventually be replaced with direct conversion via `?`.
+///
+pub fn possible_store_missing_digest(e: store::StoreError) -> PyErr {
+  let failure: Failure = e.into();
+  failure.into()
+}
 
-    @property def fingerprint(&self) -> PyResult<String> {
-      Ok(self.digest(py).0.to_hex())
-    }
+#[pyclass(name = "Digest")]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PyDigest(pub DirectoryDigest);
 
-    @property def serialized_bytes_length(&self) -> PyResult<usize> {
-      Ok(self.digest(py).1)
-    }
+impl fmt::Display for PyDigest {
+  fn fmt(&self, f: &mut fmt::Formatter) -> std::fmt::Result {
+    let digest = self.0.as_digest();
+    write!(
+      f,
+      "Digest('{}', {})",
+      digest.hash.to_hex(),
+      digest.size_bytes,
+    )
+  }
+}
 
-    def __richcmp__(&self, other: PyDigest, op: CompareOp) -> PyResult<PyObject> {
-      match op {
-        CompareOp::Eq => {
-          let res = self.digest(py) == other.digest(py);
-          Ok(res.to_py_object(py).into_object())
-        },
-        CompareOp::Ne => {
-          let res = self.digest(py) != other.digest(py);
-          Ok(res.to_py_object(py).into_object())
-        }
-        _ => Ok(py.NotImplemented()),
-      }
-    }
+#[pymethods]
+impl PyDigest {
+  /// NB: This constructor is only safe for use in testing, or when there is some other guarantee
+  /// that the Digest has been persisted.
+  #[new]
+  fn __new__(fingerprint: &str, serialized_bytes_length: usize) -> PyResult<Self> {
+    let fingerprint = Fingerprint::from_hex_string(fingerprint)
+      .map_err(|e| PyValueError::new_err(format!("Invalid digest hex: {}", e)))?;
+    Ok(Self(DirectoryDigest::from_persisted_digest(Digest::new(
+      fingerprint,
+      serialized_bytes_length,
+    ))))
+  }
 
-    def __hash__(&self) -> PyResult<u64> {
-      Ok(self.digest(py).0.prefix_hash())
+  fn __hash__(&self) -> u64 {
+    self.0.as_digest().hash.prefix_hash()
+  }
+
+  fn __repr__(&self) -> String {
+    format!("{}", self)
+  }
+
+  fn __richcmp__(&self, other: &PyDigest, op: CompareOp, py: Python) -> PyObject {
+    match op {
+      CompareOp::Eq => (self == other).into_py(py),
+      CompareOp::Ne => (self != other).into_py(py),
+      _ => py.NotImplemented(),
     }
-});
+  }
+
+  #[getter]
+  fn fingerprint(&self) -> String {
+    self.0.as_digest().hash.to_hex()
+  }
+
+  #[getter]
+  fn serialized_bytes_length(&self) -> usize {
+    self.0.as_digest().size_bytes
+  }
+}
+
+#[pyclass(name = "FileDigest")]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PyFileDigest(pub Digest);
+
+#[pymethods]
+impl PyFileDigest {
+  #[new]
+  fn __new__(fingerprint: &str, serialized_bytes_length: usize) -> PyResult<Self> {
+    let fingerprint = Fingerprint::from_hex_string(fingerprint)
+      .map_err(|e| PyValueError::new_err(format!("Invalid file digest hex: {}", e)))?;
+    Ok(Self(Digest::new(fingerprint, serialized_bytes_length)))
+  }
+
+  fn __hash__(&self) -> u64 {
+    self.0.hash.prefix_hash()
+  }
+
+  fn __repr__(&self) -> String {
+    format!(
+      "FileDigest('{}', {})",
+      self.0.hash.to_hex(),
+      self.0.size_bytes
+    )
+  }
+
+  fn __richcmp__(&self, other: &PyFileDigest, op: CompareOp, py: Python) -> PyObject {
+    match op {
+      CompareOp::Eq => (self == other).into_py(py),
+      CompareOp::Ne => (self != other).into_py(py),
+      _ => py.NotImplemented(),
+    }
+  }
+
+  #[getter]
+  fn fingerprint(&self) -> String {
+    self.0.hash.to_hex()
+  }
+
+  #[getter]
+  fn serialized_bytes_length(&self) -> usize {
+    self.0.size_bytes
+  }
+}
+
+#[pyclass(name = "Snapshot")]
+pub struct PySnapshot(pub Snapshot);
+
+#[pymethods]
+impl PySnapshot {
+  #[classmethod]
+  fn _unsafe_create(
+    _cls: &PyType,
+    py_digest: PyDigest,
+    files: Vec<String>,
+    dirs: Vec<String>,
+  ) -> PyResult<Self> {
+    let snapshot =
+      unsafe { Snapshot::create_for_testing_ffi(py_digest.0.as_digest(), files, dirs) };
+    Ok(Self(snapshot.map_err(PyException::new_err)?))
+  }
+
+  fn __hash__(&self) -> u64 {
+    self.0.digest.hash.prefix_hash()
+  }
+
+  fn __repr__(&self) -> PyResult<String> {
+    Ok(format!(
+      "Snapshot(digest=({}, {}), dirs=({}), files=({}))",
+      self.0.digest.hash.to_hex(),
+      self.0.digest.size_bytes,
+      self
+        .0
+        .directories()
+        .into_iter()
+        .map(|d| d.display().to_string())
+        .collect::<Vec<_>>()
+        .join(","),
+      self
+        .0
+        .files()
+        .into_iter()
+        .map(|d| d.display().to_string())
+        .collect::<Vec<_>>()
+        .join(","),
+    ))
+  }
+
+  fn __richcmp__(&self, other: &PySnapshot, op: CompareOp, py: Python) -> PyObject {
+    match op {
+      CompareOp::Eq => (self.0.digest == other.0.digest).into_py(py),
+      CompareOp::Ne => (self.0.digest != other.0.digest).into_py(py),
+      _ => py.NotImplemented(),
+    }
+  }
+
+  #[getter]
+  fn digest(&self) -> PyDigest {
+    PyDigest(self.0.clone().into())
+  }
+
+  #[getter]
+  fn files<'py>(&self, py: Python<'py>) -> &'py PyTuple {
+    let files = self.0.files();
+    PyTuple::new(
+      py,
+      files
+        .into_iter()
+        .map(|path| PyString::new(py, &path.to_string_lossy()))
+        .collect::<Vec<_>>(),
+    )
+  }
+
+  #[getter]
+  fn dirs<'py>(&self, py: Python<'py>) -> &'py PyTuple {
+    let dirs = self.0.directories();
+    PyTuple::new(
+      py,
+      dirs
+        .into_iter()
+        .map(|path| PyString::new(py, &path.to_string_lossy()))
+        .collect::<Vec<_>>(),
+    )
+  }
+
+  // NB: Prefix with underscore. The Python call will be hidden behind a helper which returns a much
+  // richer type.
+  fn _diff<'py>(&self, other: &PySnapshot, py: Python<'py>) -> &'py PyTuple {
+    let result = self.0.tree.diff(&other.0.tree);
+
+    let into_tuple = |x: &Vec<PathBuf>| -> &'py PyTuple {
+      PyTuple::new(
+        py,
+        x.iter()
+          .map(|path| PyString::new(py, &path.to_string_lossy()))
+          .collect::<Vec<_>>(),
+      )
+    };
+
+    PyTuple::new(
+      py,
+      vec![
+        into_tuple(&result.our_unique_files),
+        into_tuple(&result.our_unique_dirs),
+        into_tuple(&result.their_unique_files),
+        into_tuple(&result.their_unique_dirs),
+        into_tuple(&result.changed_files),
+      ],
+    )
+  }
+}
+
+#[pyclass(name = "MergeDigests")]
+#[derive(Debug, PartialEq, Eq)]
+pub struct PyMergeDigests(pub Vec<DirectoryDigest>);
+
+#[pymethods]
+impl PyMergeDigests {
+  #[new]
+  fn __new__(digests: &PyAny, py: Python) -> PyResult<Self> {
+    let digests: PyResult<Vec<DirectoryDigest>> = PyIterator::from_object(py, digests)?
+      .map(|v| {
+        let py_digest = v?.extract::<PyDigest>()?;
+        Ok(py_digest.0)
+      })
+      .collect();
+    Ok(Self(digests?))
+  }
+
+  fn __hash__(&self) -> u64 {
+    let mut s = DefaultHasher::new();
+    self.0.hash(&mut s);
+    s.finish()
+  }
+
+  fn __repr__(&self) -> String {
+    let digests = self
+      .0
+      .iter()
+      .map(|d| format!("{}", PyDigest(d.clone())))
+      .join(", ");
+    format!("MergeDigests([{}])", digests)
+  }
+
+  fn __richcmp__(&self, other: &PyMergeDigests, op: CompareOp, py: Python) -> PyObject {
+    match op {
+      CompareOp::Eq => (self == other).into_py(py),
+      CompareOp::Ne => (self != other).into_py(py),
+      _ => py.NotImplemented(),
+    }
+  }
+}
+
+#[pyclass(name = "AddPrefix")]
+#[derive(Debug, PartialEq, Eq)]
+pub struct PyAddPrefix {
+  pub digest: DirectoryDigest,
+  pub prefix: PathBuf,
+}
+
+#[pymethods]
+impl PyAddPrefix {
+  #[new]
+  fn __new__(digest: PyDigest, prefix: PathBuf) -> Self {
+    Self {
+      digest: digest.0,
+      prefix,
+    }
+  }
+
+  fn __hash__(&self) -> u64 {
+    let mut s = DefaultHasher::new();
+    self.digest.as_digest().hash.prefix_hash().hash(&mut s);
+    self.prefix.hash(&mut s);
+    s.finish()
+  }
+
+  fn __repr__(&self) -> String {
+    format!(
+      "AddPrefix('{}', {})",
+      PyDigest(self.digest.clone()),
+      self.prefix.display()
+    )
+  }
+
+  fn __richcmp__(&self, other: &PyAddPrefix, op: CompareOp, py: Python) -> PyObject {
+    match op {
+      CompareOp::Eq => (self == other).into_py(py),
+      CompareOp::Ne => (self != other).into_py(py),
+      _ => py.NotImplemented(),
+    }
+  }
+}
+
+#[pyclass(name = "RemovePrefix")]
+#[derive(Debug, PartialEq, Eq)]
+pub struct PyRemovePrefix {
+  pub digest: DirectoryDigest,
+  pub prefix: PathBuf,
+}
+
+#[pymethods]
+impl PyRemovePrefix {
+  #[new]
+  fn __new__(digest: PyDigest, prefix: PathBuf) -> Self {
+    Self {
+      digest: digest.0,
+      prefix,
+    }
+  }
+
+  fn __hash__(&self) -> u64 {
+    let mut s = DefaultHasher::new();
+    self.digest.as_digest().hash.prefix_hash().hash(&mut s);
+    self.prefix.hash(&mut s);
+    s.finish()
+  }
+
+  fn __repr__(&self) -> String {
+    format!(
+      "RemovePrefix('{}', {})",
+      PyDigest(self.digest.clone()),
+      self.prefix.display()
+    )
+  }
+
+  fn __richcmp__(&self, other: &PyRemovePrefix, op: CompareOp, py: Python) -> PyObject {
+    match op {
+      CompareOp::Eq => (self == other).into_py(py),
+      CompareOp::Ne => (self != other).into_py(py),
+      _ => py.NotImplemented(),
+    }
+  }
+}
+
+// -----------------------------------------------------------------------------
+// PathGlobs
+// -----------------------------------------------------------------------------
+
+struct PyPathGlobs(PathGlobs);
+
+impl<'source> FromPyObject<'source> for PyPathGlobs {
+  fn extract(obj: &'source PyAny) -> PyResult<Self> {
+    let globs: Vec<String> = obj.getattr("globs")?.extract()?;
+
+    let description_of_origin_field = obj.getattr("description_of_origin")?;
+    let description_of_origin = if description_of_origin_field.is_none() {
+      None
+    } else {
+      Some(description_of_origin_field.extract()?)
+    };
+
+    let match_behavior_str: &str = obj
+      .getattr("glob_match_error_behavior")?
+      .getattr("value")?
+      .extract()?;
+    let match_behavior = StrictGlobMatching::create(match_behavior_str, description_of_origin)
+      .map_err(PyValueError::new_err)?;
+
+    let conjunction_str: &str = obj.getattr("conjunction")?.getattr("value")?.extract()?;
+    let conjunction =
+      GlobExpansionConjunction::create(conjunction_str).map_err(PyValueError::new_err)?;
+
+    Ok(PyPathGlobs(PathGlobs::new(
+      globs,
+      match_behavior,
+      conjunction,
+    )))
+  }
+}
+
+// -----------------------------------------------------------------------------
+// FilespecMatcher
+// -----------------------------------------------------------------------------
+
+#[pyclass(name = "FilespecMatcher")]
+#[derive(Debug)]
+pub struct PyFilespecMatcher(FilespecMatcher);
+
+#[pymethods]
+impl PyFilespecMatcher {
+  #[new]
+  fn __new__(includes: Vec<String>, excludes: Vec<String>, py: Python) -> PyResult<Self> {
+    // Parsing the globs has shown up in benchmarks
+    // (https://github.com/pantsbuild/pants/issues/16122), so we use py.allow_threads().
+    let matcher =
+      py.allow_threads(|| FilespecMatcher::new(includes, excludes).map_err(PyValueError::new_err))?;
+    Ok(Self(matcher))
+  }
+
+  fn __hash__(&self) -> u64 {
+    let mut s = DefaultHasher::new();
+    self.0.include_globs().hash(&mut s);
+    self.0.exclude_globs().hash(&mut s);
+    s.finish()
+  }
+
+  fn __repr__(&self) -> String {
+    let includes = self
+      .0
+      .include_globs()
+      .iter()
+      .map(|pattern| pattern.to_string())
+      .join(", ");
+    let excludes = self.0.exclude_globs().join(", ");
+    format!("FilespecMatcher(includes=['{includes}'], excludes=[{excludes}])",)
+  }
+
+  fn __richcmp__(&self, other: &PyFilespecMatcher, op: CompareOp, py: Python) -> PyObject {
+    match op {
+      CompareOp::Eq => (self.0.include_globs() == other.0.include_globs()
+        && self.0.exclude_globs() == other.0.exclude_globs())
+      .into_py(py),
+      CompareOp::Ne => (self.0.include_globs() != other.0.include_globs()
+        || self.0.exclude_globs() != other.0.exclude_globs())
+      .into_py(py),
+      _ => py.NotImplemented(),
+    }
+  }
+
+  fn matches(&self, paths: Vec<String>, py: Python) -> PyResult<Vec<String>> {
+    py.allow_threads(|| {
+      Ok(
+        paths
+          .into_iter()
+          .filter(|p| self.0.matches(Path::new(p)))
+          .collect(),
+      )
+    })
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Utils
+// -----------------------------------------------------------------------------
+
+#[pyfunction]
+fn default_cache_path() -> PyResult<String> {
+  fs::default_cache_path()
+    .into_os_string()
+    .into_string()
+    .map_err(|s| {
+      PyTypeError::new_err(format!(
+        "Default cache path {:?} could not be converted to a string.",
+        s
+      ))
+    })
+}

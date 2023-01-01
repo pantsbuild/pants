@@ -8,7 +8,7 @@ case "$(uname)" in
   "Darwin")
     os="mac"
     base="$(uname -r)"
-    os_version="10.$(( ${base%%.*} - 4))"
+    os_version="10.$((${base%%.*} - 4))"
     ;;
   "Linux")
     os="linux"

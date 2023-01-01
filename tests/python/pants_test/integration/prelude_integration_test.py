@@ -12,16 +12,17 @@ def test_build_file_prelude() -> None:
         "prelude.py": dedent(
             """\
             def make_binary_macro():
-                pex_binary(name="main", sources=["main.py"])
+                pex_binary(name="main", entry_point="main.py")
             """
         ),
-        "BUILD": "make_binary_macro()",
+        "BUILD": "python_sources()\nmake_binary_macro()",
         "main.py": "print('Hello world!')",
     }
     with setup_tmpdir(sources) as tmpdir:
         run = run_pants(
             [
                 "--backend-packages=pants.backend.python",
+                "--print-stacktrace",
                 f"--build-file-prelude-globs={os.path.join(tmpdir, 'prelude.py')}",
                 "run",
                 f"{tmpdir}:main",

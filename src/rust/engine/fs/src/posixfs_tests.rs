@@ -1,18 +1,16 @@
-use tempfile;
-use testutil;
+// Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
+// Licensed under the Apache License, Version 2.0 (see LICENSE).
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
+
+use hashing::EMPTY_DIGEST;
+use testutil::make_file;
 
 use crate::{
-  Dir, DirectoryListing, File, GitignoreStyleExcludes, GlobExpansionConjunction, GlobMatching,
-  Link, PathGlobs, PathStat, PathStatGetter, PosixFS, Stat, StrictGlobMatching, SymlinkBehavior,
-  VFS,
+  DigestTrie, Dir, DirectoryListing, File, GitignoreStyleExcludes, GlobExpansionConjunction,
+  GlobMatching, Link, PathGlobs, PathStat, PathStatGetter, PosixFS, Stat, StrictGlobMatching,
+  SymlinkBehavior, TypedPath, Vfs,
 };
-
-use async_trait::async_trait;
-use std;
-use std::collections::HashMap;
-use std::path::{Components, Path, PathBuf};
-use std::sync::Arc;
-use testutil::make_file;
 
 #[tokio::test]
 async fn is_executable_false() {
@@ -29,37 +27,16 @@ async fn is_executable_true() {
 }
 
 #[tokio::test]
-async fn read_file() {
+async fn file_path() {
   let dir = tempfile::TempDir::new().unwrap();
   let path = PathBuf::from("marmosets");
-  let content = "cute".as_bytes().to_vec();
-  make_file(
-    &std::fs::canonicalize(dir.path()).unwrap().join(&path),
-    &content,
-    0o600,
-  );
   let fs = new_posixfs(&dir.path());
-  let file_content = fs
-    .read_file(&File {
-      path: path.clone(),
-      is_executable: false,
-    })
-    .await
-    .unwrap();
-  assert_eq!(file_content.path, path);
-  assert_eq!(file_content.content, content);
-}
-
-#[tokio::test]
-async fn read_file_missing() {
-  let dir = tempfile::TempDir::new().unwrap();
-  new_posixfs(&dir.path())
-    .read_file(&File {
-      path: PathBuf::from("marmosets"),
-      is_executable: false,
-    })
-    .await
-    .expect_err("Expected error");
+  let expected_path = std::fs::canonicalize(dir.path()).unwrap().join(&path);
+  let actual_path = fs.file_path(&File {
+    path: path.clone(),
+    is_executable: false,
+  });
+  assert_eq!(actual_path, expected_path);
 }
 
 #[tokio::test]
@@ -112,10 +89,13 @@ async fn stat_symlink() {
   make_file(&dir.path().join(&path), &[], 0o600);
 
   let link_path = PathBuf::from("remarkably_similar_marmoset");
-  std::os::unix::fs::symlink(&dir.path().join(path), dir.path().join(&link_path)).unwrap();
+  std::os::unix::fs::symlink(&dir.path().join(path.clone()), dir.path().join(&link_path)).unwrap();
   assert_eq!(
     posix_fs.stat_sync(link_path.clone()).unwrap().unwrap(),
-    super::Stat::Link(Link(link_path))
+    super::Stat::Link(Link {
+      path: link_path,
+      target: dir.path().join(path)
+    })
   )
 }
 
@@ -140,9 +120,12 @@ async fn stat_symlink_oblivious() {
 
 #[tokio::test]
 async fn stat_other() {
-  new_posixfs("/dev")
-    .stat_sync(PathBuf::from("null"))
-    .expect_err("Want error");
+  assert_eq!(
+    new_posixfs("/dev")
+      .stat_sync(PathBuf::from("null"))
+      .unwrap(),
+    None,
+  );
 }
 
 #[tokio::test]
@@ -212,7 +195,10 @@ async fn scandir() {
         is_executable: true,
       }),
       Stat::Dir(Dir(hammock.clone())),
-      Stat::Link(Link(remarkably_similar_marmoset.clone())),
+      Stat::Link(Link {
+        path: remarkably_similar_marmoset.clone(),
+        target: dir.path().join(&a_marmoset)
+      }),
       Stat::File(File {
         path: sneaky_marmoset.clone(),
         is_executable: false,
@@ -346,7 +332,24 @@ async fn memfs_expand_basic() {
   // Create two files, with the effect that there is a nested directory for the longer path.
   let p1 = PathBuf::from("some/file");
   let p2 = PathBuf::from("some/other");
-  let fs = Arc::new(MemFS::new(vec![p1.clone(), p2.join("file")]));
+  let p3 = p2.join("file");
+
+  let fs = DigestTrie::from_unique_paths(
+    vec![
+      TypedPath::File {
+        path: &p1,
+        is_executable: false,
+      },
+      TypedPath::File {
+        path: &p3,
+        is_executable: false,
+      },
+    ],
+    &vec![(p1.clone(), EMPTY_DIGEST), (p3.clone(), EMPTY_DIGEST)]
+      .into_iter()
+      .collect(),
+  )
+  .unwrap();
   let globs = PathGlobs::new(
     vec!["some/*".into()],
     StrictGlobMatching::Ignore,
@@ -356,7 +359,9 @@ async fn memfs_expand_basic() {
   .unwrap();
 
   assert_eq!(
-    fs.expand_globs(globs).await.unwrap(),
+    fs.expand_globs(globs, SymlinkBehavior::Oblivious, None)
+      .await
+      .unwrap(),
     vec![
       PathStat::file(
         p1.clone(),
@@ -409,6 +414,7 @@ async fn read_mock_files(input: Vec<PathBuf>, posix_fs: &Arc<PosixFS>) -> Vec<St
       let path_stat: PathStat = item.unwrap();
       match path_stat {
         PathStat::Dir { stat, .. } => Stat::Dir(stat),
+        PathStat::Link { stat, .. } => Stat::Link(stat),
         PathStat::File { stat, .. } => Stat::File(stat),
       }
     })
@@ -464,77 +470,4 @@ async fn test_basic_gitignore_functionality() {
   assert!(posix_fs_2.is_ignored(&stats[1]));
   assert!(!posix_fs_2.is_ignored(&stats[2]));
   assert!(posix_fs_2.is_ignored(&stats[3]));
-}
-
-///
-/// An in-memory implementation of VFS, useful for precisely reproducing glob matching behavior for
-/// a set of file paths.
-///
-pub struct MemFS {
-  contents: HashMap<Dir, Arc<DirectoryListing>>,
-}
-
-impl MemFS {
-  pub fn new(paths: Vec<PathBuf>) -> MemFS {
-    let mut unordered_contents = HashMap::new();
-    let empty_path = PathBuf::new();
-    for path in paths {
-      Self::add_path(&mut unordered_contents, &empty_path, path.components());
-    }
-    let contents = unordered_contents
-      .into_iter()
-      .map(|(dir, mut stats)| {
-        stats.sort_by(|a, b| a.path().cmp(b.path()));
-        (dir, Arc::new(DirectoryListing(stats)))
-      })
-      .collect();
-    MemFS { contents }
-  }
-
-  fn add_path(
-    contents: &mut HashMap<Dir, Vec<Stat>>,
-    path_so_far: &Path,
-    mut remainder: Components,
-  ) -> bool {
-    if let Some(component) = remainder.next() {
-      // The component represents a directory if it has child components: otherwise, a file.
-      let path = path_so_far.join(component);
-      let stat = if Self::add_path(contents, &path, remainder) {
-        Stat::dir(path)
-      } else {
-        Stat::file(path, false)
-      };
-      contents
-        .entry(Dir(path_so_far.to_owned()))
-        .or_insert_with(Vec::new)
-        .push(stat);
-      true
-    } else {
-      false
-    }
-  }
-}
-
-#[async_trait]
-impl VFS<String> for Arc<MemFS> {
-  async fn read_link(&self, link: &Link) -> Result<PathBuf, String> {
-    // The creation of a static filesystem does not allow for Links.
-    Err(format!("{:?} does not exist within this filesystem.", link))
-  }
-
-  async fn scandir(&self, dir: Dir) -> Result<Arc<DirectoryListing>, String> {
-    self
-      .contents
-      .get(&dir)
-      .cloned()
-      .ok_or_else(|| format!("{:?} does not exist within this filesystem.", dir))
-  }
-
-  fn is_ignored(&self, _stat: &Stat) -> bool {
-    false
-  }
-
-  fn mk_error(msg: &str) -> String {
-    msg.to_owned()
-  }
 }

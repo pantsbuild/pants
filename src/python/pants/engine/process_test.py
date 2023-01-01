@@ -1,34 +1,47 @@
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import os
+from __future__ import annotations
 
 import pytest
 
-from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, DigestContents, FileContent
+from pants.engine.fs import (
+    EMPTY_DIGEST,
+    CreateDigest,
+    Digest,
+    DigestContents,
+    DigestEntries,
+    Directory,
+    FileContent,
+    SymlinkEntry,
+)
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.process import (
-    BinaryPathRequest,
-    BinaryPaths,
     FallibleProcessResult,
     InteractiveProcess,
+    InteractiveProcessResult,
     Process,
+    ProcessCacheScope,
     ProcessResult,
 )
-from pants.testutil.rule_runner import QueryRule, RuleRunner
-from pants.util.contextutil import environment_as, temporary_dir
-from pants.util.dirutil import safe_mkdir, touch
+from pants.testutil.rule_runner import QueryRule, RuleRunner, mock_console
+from pants.util.contextutil import environment_as
+
+
+def new_rule_runner() -> RuleRunner:
+    return RuleRunner(
+        rules=[
+            QueryRule(ProcessResult, [Process]),
+            QueryRule(FallibleProcessResult, [Process]),
+            QueryRule(InteractiveProcessResult, [InteractiveProcess]),
+            QueryRule(DigestEntries, [Digest]),
+        ],
+    )
 
 
 @pytest.fixture
 def rule_runner() -> RuleRunner:
-    return RuleRunner(
-        rules=[
-            QueryRule(BinaryPaths, [BinaryPathRequest]),
-            QueryRule(ProcessResult, [Process]),
-            QueryRule(FallibleProcessResult, [Process]),
-        ],
-    )
+    return new_rule_runner()
 
 
 def test_argv_executable(rule_runner: RuleRunner) -> None:
@@ -69,11 +82,24 @@ def test_env(rule_runner: RuleRunner) -> None:
     assert b"VAR2=VAL" in result.stdout
 
 
-def test_output_digest(rule_runner: RuleRunner) -> None:
+@pytest.mark.parametrize("working_directory", ["", "subdir"])
+def test_output_digest(rule_runner: RuleRunner, working_directory) -> None:
+    # Test that the output files are relative to the working directory, both in how
+    # they're specified, and their paths in the output_digest.
+    input_digest = (
+        rule_runner.request(
+            Digest,
+            [CreateDigest([Directory(working_directory)])],
+        )
+        if working_directory
+        else EMPTY_DIGEST
+    )
     process = Process(
+        input_digest=input_digest,
         argv=("/bin/bash", "-c", "echo -n 'European Burmese' > roland"),
         description="echo roland",
         output_files=("roland",),
+        working_directory=working_directory,
     )
     result = rule_runner.request(ProcessResult, [process])
     assert result.output_digest == Digest(
@@ -87,14 +113,14 @@ def test_output_digest(rule_runner: RuleRunner) -> None:
 
 def test_timeout(rule_runner: RuleRunner) -> None:
     process = Process(
-        argv=("/bin/bash", "-c", "/bin/sleep 0.2; /bin/echo -n 'European Burmese'"),
+        argv=("/bin/bash", "-c", "/bin/sleep 0.5; /bin/echo -n 'European Burmese'"),
         timeout_seconds=0.1,
         description="sleepy-cat",
     )
     result = rule_runner.request(FallibleProcessResult, [process])
     assert result.exit_code != 0
-    assert b"Exceeded timeout" in result.stdout
-    assert b"sleepy-cat" in result.stdout
+    assert b"Exceeded timeout" in result.stderr
+    assert b"sleepy-cat" in result.stderr
 
 
 def test_failing_process(rule_runner: RuleRunner) -> None:
@@ -105,6 +131,119 @@ def test_failing_process(rule_runner: RuleRunner) -> None:
     with pytest.raises(ExecutionError) as exc:
         rule_runner.request(ProcessResult, [process])
     assert "Process 'failure' failed with exit code 1." in str(exc.value)
+
+
+def test_cache_scope_always(rule_runner: RuleRunner) -> None:
+    # Should not re-run on failure, even in a new Session.
+    process = Process(
+        argv=("/bin/bash", "-c", "echo $RANDOM && exit 1"),
+        cache_scope=ProcessCacheScope.ALWAYS,
+        description="failure",
+    )
+    result_one = rule_runner.request(FallibleProcessResult, [process])
+    rule_runner.new_session("session two")
+    rule_runner.set_options([])
+    result_two = rule_runner.request(FallibleProcessResult, [process])
+    assert result_one is result_two
+
+
+def test_cache_scope_successful(rule_runner: RuleRunner) -> None:
+    # Should not re-run on success, even in a new Session.
+    process = Process(
+        argv=("/bin/bash", "-c", "echo $RANDOM"),
+        cache_scope=ProcessCacheScope.SUCCESSFUL,
+        description="success",
+    )
+    result_one = rule_runner.request(FallibleProcessResult, [process])
+
+    rule_runner.new_session("session one")
+    rule_runner.set_options([])
+    result_two = rule_runner.request(FallibleProcessResult, [process])
+    assert result_one is result_two
+
+    # Should re-run on failure, but only in a new Session.
+    process = Process(
+        argv=("/bin/bash", "-c", "echo $RANDOM && exit 1"),
+        cache_scope=ProcessCacheScope.SUCCESSFUL,
+        description="failure",
+    )
+    result_three = rule_runner.request(FallibleProcessResult, [process])
+    result_four = rule_runner.request(FallibleProcessResult, [process])
+
+    rule_runner.new_session("session two")
+    rule_runner.set_options([])
+    result_five = rule_runner.request(FallibleProcessResult, [process])
+    assert result_three is result_four
+    assert result_four != result_five
+
+
+def test_cache_scope_per_restart() -> None:
+    success_argv = ("/bin/bash", "-c", "echo $RANDOM")
+    failure_argv = ("/bin/bash", "-c", "echo $RANDOM; exit 1")
+
+    always_cache_success = Process(
+        success_argv, cache_scope=ProcessCacheScope.PER_RESTART_ALWAYS, description="foo"
+    )
+    always_cache_failure = Process(
+        failure_argv, cache_scope=ProcessCacheScope.PER_RESTART_ALWAYS, description="foo"
+    )
+    success_cache_success = Process(
+        success_argv, cache_scope=ProcessCacheScope.PER_RESTART_SUCCESSFUL, description="foo"
+    )
+    success_cache_failure = Process(
+        failure_argv, cache_scope=ProcessCacheScope.PER_RESTART_SUCCESSFUL, description="foo"
+    )
+
+    runner_one = new_rule_runner()
+
+    def run1(process: Process) -> FallibleProcessResult:
+        return runner_one.request(FallibleProcessResult, [process])
+
+    always_cache_success_res1 = run1(always_cache_success)
+    always_cache_failure_res1 = run1(always_cache_failure)
+    success_cache_success_res1 = run1(success_cache_success)
+    success_cache_failure_res1 = run1(success_cache_failure)
+
+    runner_one.new_session("new session")
+    runner_one.set_options([])
+    always_cache_success_res2 = run1(always_cache_success)
+    always_cache_failure_res2 = run1(always_cache_failure)
+    success_cache_success_res2 = run1(success_cache_success)
+    success_cache_failure_res2 = run1(success_cache_failure)
+
+    # Even with a new session, most results should be memoized.
+    assert always_cache_success_res1 is always_cache_success_res2
+    assert always_cache_failure_res1 is always_cache_failure_res2
+    assert success_cache_success_res1 is success_cache_success_res2
+    assert success_cache_failure_res1 != success_cache_failure_res2
+
+    # But a new scheduler removes all memoization. We do not cache to disk.
+    runner_two = new_rule_runner()
+
+    def run2(process: Process) -> FallibleProcessResult:
+        return runner_two.request(FallibleProcessResult, [process])
+
+    assert run2(always_cache_success) != always_cache_success_res1
+    assert run2(always_cache_failure) != always_cache_failure_res1
+    assert run2(success_cache_success) != success_cache_success_res1
+    assert run2(success_cache_failure) != success_cache_failure_res1
+
+
+def test_cache_scope_per_session(rule_runner: RuleRunner) -> None:
+    process = Process(
+        argv=("/bin/bash", "-c", "echo $RANDOM"),
+        cache_scope=ProcessCacheScope.PER_SESSION,
+        description="random",
+    )
+    result_one = rule_runner.request(FallibleProcessResult, [process])
+    result_two = rule_runner.request(FallibleProcessResult, [process])
+    assert result_one is result_two
+
+    rule_runner.new_session("next attempt")
+    rule_runner.set_options([])
+    result_three = rule_runner.request(FallibleProcessResult, [process])
+    # Should re-run in a new Session.
+    assert result_one != result_three
 
 
 # TODO: Move to fs_test.py.
@@ -124,36 +263,39 @@ def test_create_files(rule_runner: RuleRunner) -> None:
     assert result.stdout == b"hellogoodbye"
 
 
-def test_interactive_process_cannot_have_input_files_and_workspace() -> None:
-    mock_digest = Digest(EMPTY_DIGEST.fingerprint, 1)
-    with pytest.raises(ValueError):
-        InteractiveProcess(argv=["/bin/echo"], input_digest=mock_digest, run_in_workspace=True)
+def test_process_output_symlink_aware(rule_runner: RuleRunner) -> None:
+    process = Process(
+        argv=("/bin/ln", "-s", "dest", "source"),
+        output_files=["source"],
+        description="",
+        working_directory="",
+    )
+    result = rule_runner.request(ProcessResult, [process])
+    entries = rule_runner.request(DigestEntries, [result.output_digest])
+    assert entries == DigestEntries([SymlinkEntry("source", "dest")])
 
 
-def test_find_binary_non_existent(rule_runner: RuleRunner) -> None:
-    with temporary_dir() as tmpdir:
-        search_path = [tmpdir]
-        binary_paths = rule_runner.request(
-            BinaryPaths, [BinaryPathRequest(binary_name="anybin", search_path=search_path)]
-        )
-        assert binary_paths.first_path is None
-
-
-def test_find_binary_on_path_without_bash(rule_runner: RuleRunner) -> None:
-    # Test that locating a binary on a PATH which does not include bash works (by recursing to
-    # locate bash first).
-    binary_name = "mybin"
-    binary_dir = "bin"
-    with temporary_dir() as tmpdir:
-        binary_dir_abs = os.path.join(tmpdir, binary_dir)
-        binary_path_abs = os.path.join(binary_dir_abs, binary_name)
-        safe_mkdir(binary_dir_abs)
-        touch(binary_path_abs)
-
-        search_path = [binary_dir_abs]
-        binary_paths = rule_runner.request(
-            BinaryPaths, [BinaryPathRequest(binary_name=binary_name, search_path=search_path)]
-        )
-        assert os.path.exists(os.path.join(binary_dir_abs, binary_name))
-        assert binary_paths.first_path is not None
-        assert binary_paths.first_path.path == binary_path_abs
+@pytest.mark.parametrize("run_in_workspace", [True, False])
+def test_interactive_process_inputs(rule_runner: RuleRunner, run_in_workspace: bool) -> None:
+    digest0 = rule_runner.request(Digest, [CreateDigest([FileContent("file0", b"")])])
+    digest1 = rule_runner.request(Digest, [CreateDigest([FileContent("file1", b"")])])
+    digest2 = rule_runner.request(
+        Digest, [CreateDigest([FileContent("file2", b""), FileContent("file3", b"")])]
+    )
+    process = InteractiveProcess(
+        argv=["/bin/bash", "-c", "ls -1 '{chroot}'"],
+        env={"BAZ": "QUX"},
+        input_digest=digest0,
+        immutable_input_digests={"prefix1": digest1, "prefix2": digest2},
+        append_only_caches={"cache_name": "append_only0"},
+        run_in_workspace=run_in_workspace,
+    )
+    with mock_console(rule_runner.options_bootstrapper) as (_, stdio_reader):
+        result = rule_runner.run_interactive_process(process)
+        assert result.exit_code == 0
+        assert set(stdio_reader.get_stdout().splitlines()) == {
+            "append_only0",
+            "file0",
+            "prefix1",
+            "prefix2",
+        }

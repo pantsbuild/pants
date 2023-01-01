@@ -1,7 +1,9 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from typing import Iterable, Mapping, Optional, Type, TypeVar, Union, cast
+from __future__ import annotations
+
+from typing import Iterable, Mapping, TypeVar
 
 from pants.engine.goal import GoalSubsystem
 from pants.option.option_value_container import OptionValueContainer, OptionValueContainerBuilder
@@ -11,9 +13,7 @@ from pants.option.subsystem import Subsystem
 
 
 def create_options_bootstrapper(
-    args: Optional[Iterable[str]] = None,
-    *,
-    env: Optional[Mapping[str, str]] = None,
+    args: Iterable[str] | None = None, *, env: Mapping[str, str] | None = None
 ) -> OptionsBootstrapper:
     return OptionsBootstrapper.create(
         args=("--pants-config-files=[]", *(args or [])),
@@ -22,8 +22,8 @@ def create_options_bootstrapper(
     )
 
 
-def _create_scoped_options(
-    default_rank: Rank, **options: Union[RankedValue, Value]
+def create_option_value_container(
+    default_rank: Rank = Rank.NONE, **options: RankedValue | Value
 ) -> OptionValueContainer:
     scoped_options = OptionValueContainerBuilder()
     for key, value in options.items():
@@ -37,9 +37,9 @@ _GS = TypeVar("_GS", bound=GoalSubsystem)
 
 
 def create_goal_subsystem(
-    goal_subsystem_type: Type[_GS],
+    goal_subsystem_type: type[_GS],
     default_rank: Rank = Rank.NONE,
-    **options: Union[RankedValue, Value],
+    **options: RankedValue | Value,
 ) -> _GS:
     """Creates a new goal subsystem instance populated with the given option values.
 
@@ -48,8 +48,7 @@ def create_goal_subsystem(
     :param options: The option values to populate the new goal subsystem instance with.
     """
     return goal_subsystem_type(
-        scope=goal_subsystem_type.name,
-        options=_create_scoped_options(default_rank, **options),
+        options=create_option_value_container(default_rank, **options),
     )
 
 
@@ -57,7 +56,7 @@ _SS = TypeVar("_SS", bound=Subsystem)
 
 
 def create_subsystem(
-    subsystem_type: Type[_SS], default_rank: Rank = Rank.NONE, **options: Union[RankedValue, Value]
+    subsystem_type: type[_SS], default_rank: Rank = Rank.NONE, **options: RankedValue | Value
 ) -> _SS:
     """Creates a new subsystem instance populated with the given option values.
 
@@ -65,8 +64,6 @@ def create_subsystem(
     :param default_rank: The rank to assign any raw option values passed.
     :param options: The option values to populate the new subsystem instance with.
     """
-    options_scope = cast(str, subsystem_type.options_scope)
     return subsystem_type(
-        scope=options_scope,
-        options=_create_scoped_options(default_rank, **options),
+        options=create_option_value_container(default_rank, **options),
     )

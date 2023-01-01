@@ -1,23 +1,32 @@
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 from enum import Enum
-from typing import List, Optional, Tuple, cast
+from typing import List, cast
 
-from pants.backend.project_info import dependees
-from pants.backend.project_info.dependees import Dependees, DependeesRequest
+from pants.backend.project_info import dependents
+from pants.backend.project_info.dependents import Dependents, DependentsRequest
 from pants.base.build_environment import get_buildroot
-from pants.engine.addresses import Address
+from pants.base.deprecated import resolve_conflicting_options
+from pants.engine.addresses import Address, Addresses
 from pants.engine.collection import Collection
 from pants.engine.internals.graph import Owners, OwnersRequest
+from pants.engine.internals.mapper import SpecsFilter
 from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.target import UnexpandedTargets
+from pants.option.option_types import EnumOption, StrOption
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.subsystem import Subsystem
-from pants.vcs.git import Git
+from pants.util.docutil import doc_url
+from pants.util.ordered_set import FrozenOrderedSet
+from pants.util.strutil import softwrap
+from pants.vcs.git import GitWorktree
 
 
-class DependeesOption(Enum):
+class DependentsOption(Enum):
     NONE = "none"
     DIRECT = "direct"
     TRANSITIVE = "transitive"
@@ -25,8 +34,8 @@ class DependeesOption(Enum):
 
 @dataclass(frozen=True)
 class ChangedRequest:
-    sources: Tuple[str, ...]
-    dependees: DependeesOption
+    sources: tuple[str, ...]
+    dependents: DependentsOption
 
 
 class ChangedAddresses(Collection[Address]):
@@ -34,19 +43,56 @@ class ChangedAddresses(Collection[Address]):
 
 
 @rule
-async def find_changed_owners(request: ChangedRequest) -> ChangedAddresses:
-    owners = await Get(Owners, OwnersRequest(request.sources))
-    if request.dependees == DependeesOption.NONE:
-        return ChangedAddresses(owners)
-    dependees_with_roots = await Get(
-        Dependees,
-        DependeesRequest(
-            owners,
-            transitive=request.dependees == DependeesOption.TRANSITIVE,
-            include_roots=True,
+async def find_changed_owners(
+    request: ChangedRequest, specs_filter: SpecsFilter
+) -> ChangedAddresses:
+    no_dependents = request.dependents == DependentsOption.NONE
+    owners = await Get(
+        Owners,
+        OwnersRequest(
+            request.sources,
+            # If `--changed-dependents` is used, we cannot eagerly filter out root targets. We
+            # need to first find their dependents, and only then should we filter. See
+            # https://github.com/pantsbuild/pants/issues/15544
+            filter_by_global_options=no_dependents,
+            # Changing a BUILD file might impact the targets it defines.
+            match_if_owning_build_file_included_in_sources=True,
         ),
     )
-    return ChangedAddresses(dependees_with_roots)
+    if no_dependents:
+        return ChangedAddresses(owners)
+
+    # See https://github.com/pantsbuild/pants/issues/15313. We filter out target generators because
+    # they are not useful as aliases for their generated targets in the context of
+    # `--changed-since`. Including them makes it look like all sibling targets from the same
+    # target generator have also changed.
+    #
+    # However, we also must be careful to preserve if target generators are direct owners, which
+    # happens when a generated file is deleted.
+    owner_target_generators = FrozenOrderedSet(
+        addr.maybe_convert_to_target_generator() for addr in owners if addr.is_generated_target
+    )
+    dependents = await Get(
+        Dependents,
+        DependentsRequest(
+            owners,
+            transitive=request.dependents == DependentsOption.TRANSITIVE,
+            include_roots=False,
+        ),
+    )
+    result = FrozenOrderedSet(owners) | (dependents - owner_target_generators)
+    if specs_filter.is_specified:
+        # Finally, we must now filter out the result to only include what matches our tags, as the
+        # last step of https://github.com/pantsbuild/pants/issues/15544.
+        #
+        # Note that we use `UnexpandedTargets` rather than `Targets` or `FilteredTargets` so that
+        # we preserve target generators.
+        result_as_tgts = await Get(UnexpandedTargets, Addresses(result))
+        result = FrozenOrderedSet(
+            tgt.address for tgt in result_as_tgts if specs_filter.matches(tgt)
+        )
+
+    return ChangedAddresses(result)
 
 
 @dataclass(frozen=True)
@@ -57,61 +103,71 @@ class ChangedOptions:
     configured, so the normal mechanisms like `SubsystemRule` would not work properly.
     """
 
-    since: Optional[str]
-    diffspec: Optional[str]
-    dependees: DependeesOption
+    since: str | None
+    diffspec: str | None
+    dependents: DependentsOption
 
     @classmethod
-    def from_options(cls, options: OptionValueContainer) -> "ChangedOptions":
-        return cls(options.since, options.diffspec, options.dependees)
+    def from_options(cls, options: OptionValueContainer) -> ChangedOptions:
+        dependents = resolve_conflicting_options(
+            old_option="dependees",
+            new_option="dependents",
+            old_scope=Changed.options_scope,
+            new_scope=Changed.options_scope,
+            old_container=options,
+            new_container=options,
+        )
+        return cls(options.since, options.diffspec, dependents)
 
     @property
     def provided(self) -> bool:
         return bool(self.since) or bool(self.diffspec)
 
-    def changed_files(self, git: Git) -> List[str]:
+    def changed_files(self, git_worktree: GitWorktree) -> list[str]:
         """Determines the files changed according to SCM/workspace and options."""
         if self.diffspec:
-            return cast(List[str], git.changes_in(self.diffspec, relative_to=get_buildroot()))
+            return cast(
+                List[str], git_worktree.changes_in(self.diffspec, relative_to=get_buildroot())
+            )
 
-        changes_since = self.since or git.current_rev_identifier
+        changes_since = self.since or git_worktree.current_rev_identifier
         return cast(
             List[str],
-            git.changed_files(
+            git_worktree.changed_files(
                 from_commit=changes_since, include_untracked=True, relative_to=get_buildroot()
             ),
         )
 
 
 class Changed(Subsystem):
-    """Tell Pants to detect what files and targets have changed from Git.
-
-    See https://www.pantsbuild.org/docs/advanced-target-selection.
-    """
-
     options_scope = "changed"
+    help = softwrap(
+        f"""
+        Tell Pants to detect what files and targets have changed from Git.
 
-    @classmethod
-    def register_options(cls, register):
-        register(
-            "--since",
-            type=str,
-            default=None,
-            help="Calculate changes since this Git spec (commit range/SHA/ref).",
-        )
-        register(
-            "--diffspec",
-            type=str,
-            default=None,
-            help="Calculate changes contained within a given Git spec (commit range/SHA/ref).",
-        )
-        register(
-            "--dependees",
-            type=DependeesOption,
-            default=DependeesOption.NONE,
-            help="Include direct or transitive dependees of changed targets.",
-        )
+        See {doc_url('advanced-target-selection')}.
+        """
+    )
+
+    since = StrOption(
+        default=None,
+        help="Calculate changes since this Git spec (commit range/SHA/ref).",
+    )
+    diffspec = StrOption(
+        default=None,
+        help="Calculate changes contained within a given Git spec (commit range/SHA/ref).",
+    )
+    dependents = EnumOption(
+        default=DependentsOption.NONE,
+        help="Include direct or transitive dependents of changed targets.",
+    )
+    dependees = EnumOption(
+        default=DependentsOption.NONE,
+        help="Include direct or transitive dependents of changed targets.",
+        removal_version="2.23.0.dev0",
+        removal_hint="Use --dependents instead",
+    )
 
 
 def rules():
-    return [*collect_rules(), *dependees.rules()]
+    return [*collect_rules(), *dependents.rules()]

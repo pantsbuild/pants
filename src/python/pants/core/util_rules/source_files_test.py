@@ -1,18 +1,20 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import itertools
 from functools import partial
 from pathlib import PurePath
-from typing import Iterable, List, NamedTuple, Type
+from typing import Iterable, NamedTuple
 
 import pytest
 
-from pants.core.target_types import FilesSources
+from pants.core.target_types import FileSourceField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.core.util_rules.source_files import rules as source_files_rules
 from pants.engine.addresses import Address
-from pants.engine.target import Sources as SourcesField
+from pants.engine.target import MultipleSourcesField, SourcesField
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
@@ -28,11 +30,16 @@ def rule_runner() -> RuleRunner:
 
 class TargetSources(NamedTuple):
     source_root: str
-    source_files: List[str]
+    source_files: str | list[str]
 
     @property
-    def full_paths(self) -> List[str]:
-        return [PurePath(self.source_root, name).as_posix() for name in self.source_files]
+    def full_paths(self) -> list[str]:
+        return [
+            PurePath(self.source_root, name).as_posix()
+            for name in (
+                self.source_files if isinstance(self.source_files, list) else (self.source_files,)
+            )
+        ]
 
 
 SOURCES1 = TargetSources("src/python", ["s1.py", "s2.py", "s3.py"])
@@ -45,13 +52,13 @@ def mock_sources_field(
     sources: TargetSources,
     *,
     include_sources: bool = True,
-    sources_field_cls: Type[SourcesField] = SourcesField,
+    sources_field_cls: type[SourcesField] = MultipleSourcesField,
 ) -> SourcesField:
     sources_field = sources_field_cls(
         sources.source_files if include_sources else [],
-        address=Address(sources.source_root, target_name="lib"),
+        Address(sources.source_root, target_name="lib"),
     )
-    rule_runner.create_files(path=sources.source_root, files=sources.source_files)
+    rule_runner.write_files({fp: "" for fp in sources.full_paths})
     return sources_field
 
 
@@ -90,9 +97,20 @@ def test_address_specs(rule_runner: RuleRunner) -> None:
     )
 
 
-def test_file_sources(rule_runner: RuleRunner) -> None:
+def test_unrooted_sources(rule_runner: RuleRunner) -> None:
+    """Any SourcesField with `uses_source_roots=False`, such as `FilesSources`, should be marked as
+    unrooted sources."""
+    sources = TargetSources("src/python", "README.md")
+    field = mock_sources_field(rule_runner, sources, sources_field_cls=FileSourceField)
+    assert_sources_resolved(
+        rule_runner, [field], expected=[sources], expected_unrooted=sources.full_paths
+    )
+
+    class CustomSources(MultipleSourcesField):
+        uses_source_roots = False
+
     sources = TargetSources("src/python", ["README.md"])
-    field = mock_sources_field(rule_runner, sources, sources_field_cls=FilesSources)
+    field = mock_sources_field(rule_runner, sources, sources_field_cls=CustomSources)
     assert_sources_resolved(
         rule_runner, [field], expected=[sources], expected_unrooted=sources.full_paths
     )

@@ -1,3 +1,5 @@
+// Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
+// Licensed under the Apache License, Version 2.0 (see LICENSE).
 #[test]
 fn hashes() {
   let mut src = "meep".as_bytes();
@@ -6,7 +8,7 @@ fn hashes() {
   let mut hasher = super::WriterHasher::new(dst);
   assert_eq!(std::io::copy(&mut src, &mut hasher).unwrap(), 4);
   let want = (
-    super::Digest(
+    super::Digest::new(
       super::Fingerprint::from_hex_string(
         "23e92dfba8fb0c93cfba31ad2962b4e35a47054296d1d375d7f7e13e0185de7a",
       )

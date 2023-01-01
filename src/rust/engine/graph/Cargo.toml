@@ -1,20 +1,23 @@
 [package]
 version = "0.0.1"
-edition = "2018"
+edition = "2021"
 name = "graph"
 authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 publish = false
 
 [dependencies]
 async-trait = "0.1"
+async_value = { path = "../async_value" }
 fnv = "1.0.5"
 futures = "0.3"
+fixedbitset = "0.4"
 log = "0.4"
-parking_lot = "0.11"
-petgraph = "0.4.5"
-tokio = { version = "0.2.22", features = ["time"] }
+parking_lot = "0.12"
+petgraph = "0.6"
+task_executor = { path = "../task_executor" }
+tokio = { version = "1.21", features = ["time", "parking_lot"] }
 
 [dev-dependencies]
-rand = "0.6"
-env_logger = "0.5.4"
-tokio = { version = "0.2.22", features = ["macros", "rt-threaded", "time"] }
+rand = "0.8"
+env_logger = "0.9.0"
+tokio = { version = "1.21", features = ["macros", "rt-multi-thread", "time"] }

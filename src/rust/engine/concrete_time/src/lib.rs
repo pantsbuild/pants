@@ -10,9 +10,7 @@
   clippy::if_not_else,
   clippy::needless_continue,
   clippy::unseparated_literal_suffix,
-  // TODO: Falsely triggers for async/await:
-  //   see https://github.com/rust-lang/rust-clippy/issues/5360
-  // clippy::used_underscore_binding
+  clippy::used_underscore_binding
 )]
 // It is often more clear to show that nothing is being moved.
 #![allow(clippy::match_ref_pats)]
@@ -27,6 +25,7 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
+use deepsize::DeepSizeOf;
 use serde_derive::Serialize;
 
 /// A concrete data representation of a duration.
@@ -40,7 +39,7 @@ use serde_derive::Serialize;
 ///
 /// It can be used to represent a timestamp (as a duration since the unix epoch) or simply a
 /// duration between two arbitrary timestamps.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
+#[derive(Debug, DeepSizeOf, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
 pub struct Duration {
   /// How many seconds did this `Duration` last?
   pub secs: u64,
@@ -64,9 +63,9 @@ impl From<std::time::Duration> for Duration {
   }
 }
 
-impl Into<std::time::Duration> for Duration {
-  fn into(self) -> std::time::Duration {
-    std::time::Duration::new(self.secs, self.nanos)
+impl From<Duration> for std::time::Duration {
+  fn from(duration: Duration) -> std::time::Duration {
+    std::time::Duration::new(duration.secs, duration.nanos)
   }
 }
 
@@ -116,30 +115,28 @@ impl TimeSpan {
     }
   }
 
-  fn std_duration_from_protobuf_timestamp(
-    t: &protobuf::well_known_types::Timestamp,
-  ) -> std::time::Duration {
+  fn std_duration_from_timestamp(t: &prost_types::Timestamp) -> std::time::Duration {
     std::time::Duration::new(t.seconds as u64, t.nanos as u32)
   }
 
-  /// Construct a `TimeSpan` given a start and an end `Timestamp` from protobuf
+  /// Construct a `TimeSpan` given a start and an end `Timestamp` from protobuf timestamp.
   pub fn from_start_and_end(
-    start: &protobuf::well_known_types::Timestamp,
-    end: &protobuf::well_known_types::Timestamp,
+    start: &prost_types::Timestamp,
+    end: &prost_types::Timestamp,
     time_span_description: &str,
   ) -> Result<Self, String> {
-    let start = Self::std_duration_from_protobuf_timestamp(start);
-    let end = Self::std_duration_from_protobuf_timestamp(end);
-    let time_span = end.checked_sub(start).map(|duration| TimeSpan {
-      start: start.into(),
-      duration: duration.into(),
-    });
-    time_span.ok_or_else(|| {
-      format!(
+    let start = Self::std_duration_from_timestamp(start);
+    let end = Self::std_duration_from_timestamp(end);
+    match end.checked_sub(start) {
+      Some(duration) => Ok(TimeSpan {
+        start: start.into(),
+        duration: duration.into(),
+      }),
+      None => Err(format!(
         "Got negative {} time: {:?} - {:?}",
         time_span_description, end, start
-      )
-    })
+      )),
+    }
   }
 }
 

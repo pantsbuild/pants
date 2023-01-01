@@ -12,6 +12,8 @@ from pants.engine.platform import Platform
 from pants.util.contextutil import temporary_dir
 from pants.util.enums import match
 
+pytestmark = pytest.mark.platform_specific_behavior
+
 
 def _gen_sink_subclass():
     # Avoid modifying global state by generating a subclass.
@@ -19,11 +21,6 @@ def _gen_sink_subclass():
         pass
 
     return AnonymousSink
-
-
-def test_default_log_location():
-    sink = _gen_sink_subclass()
-    assert os.getcwd() == sink._log_dir
 
 
 def test_reset_log_location():
@@ -50,16 +47,24 @@ def test_set_invalid_log_location():
     with pytest.raises(ExceptionSink.ExceptionSinkError) as exc:
         sink.reset_log_location("/")
     err_str = {
-        Platform.darwin: (
+        Platform.macos_arm64: (
             "The provided log location path at '/' is not writable or could not be created: "
             "[Errno 21] Is a directory: '/'."
         ),
-        Platform.linux: (
+        Platform.macos_x86_64: (
+            "The provided log location path at '/' is not writable or could not be created: "
+            "[Errno 21] Is a directory: '/'."
+        ),
+        Platform.linux_arm64: (
             "Error opening fatal error log streams for log location '/': [Errno 13] Permission "
-            "denied: '/.pids'"
+            "denied:"
+        ),
+        Platform.linux_x86_64: (
+            "Error opening fatal error log streams for log location '/': [Errno 13] Permission "
+            "denied:"
         ),
     }
-    assert match(Platform.current, err_str) in str(exc.value)
+    assert match(Platform.create_for_localhost(), err_str) in str(exc.value)
 
 
 def test_log_exception():
@@ -78,7 +83,9 @@ def test_log_exception():
             getproctitle_mock.assert_called_once()
 
         # This should have created two log files, one specific to the current pid.
-        assert os.listdir(tmpdir) == [".pids"]
+        logfiles = os.listdir(tmpdir)
+        assert len(logfiles) == 2
+        assert "exceptions.log" in logfiles
 
         cur_process_error_log_path = ExceptionSink.exceptions_log_path(for_pid=pid, in_dir=tmpdir)
         assert os.path.isfile(cur_process_error_log_path) is True
@@ -96,9 +103,9 @@ sys.argv: ([^\n]+)
 pid: {pid}
 XXX
 """
-        with open(cur_process_error_log_path, "r") as cur_pid_file:
+        with open(cur_process_error_log_path) as cur_pid_file:
             assert bool(re.search(err_rx, cur_pid_file.read()))
-        with open(shared_error_log_path, "r") as shared_log_file:
+        with open(shared_error_log_path) as shared_log_file:
             assert bool(re.search(err_rx, shared_log_file.read()))
 
 
@@ -116,8 +123,8 @@ def test_backup_logging_on_fatal_error(caplog):
     def assert_log(log_file_type: str, log):
         assert bool(
             re.search(
-                fr"Error logging the message 'XXX' to the {log_file_type} file handle for .* at "
-                fr"pid {os.getpid()}",
+                rf"Error logging the message 'XXX' to the {log_file_type} file handle for .* at "
+                rf"pid {os.getpid()}",
                 log.msg,
             )
         )

@@ -14,7 +14,7 @@ The first stable release of the ``1.14.x`` series, with no changes since ``rc3``
 API Changes
 ~~~~~~~~~~~
 
-* Add flags to processs_executor that say where to materialize output and what output is (#7201)
+* Add flags to process_executor that say where to materialize output and what output is (#7201)
   `PR #7201 <https://github.com/pantsbuild/pants/pull/7201>`_
 
 * Resolve all platforms from all python targets (#7156)

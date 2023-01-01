@@ -1,50 +1,32 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import logging
 from typing import Dict, cast
 
 from pants.engine.addresses import Address, Addresses
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
 from pants.engine.rules import Get, collect_rules, goal_rule
-from pants.engine.target import DescriptionField, ProvidesField, UnexpandedTargets
+from pants.engine.target import DescriptionField, UnexpandedTargets
+from pants.option.option_types import BoolOption
+
+logger = logging.getLogger(__name__)
 
 
 class ListSubsystem(LineOriented, GoalSubsystem):
-    """Lists all targets matching the file or target arguments."""
-
     name = "list"
+    help = "Lists all targets matching the file or target arguments."
 
-    @classmethod
-    def register_options(cls, register):
-        super().register_options(register)
-        register(
-            "--provides",
-            type=bool,
-            default=False,
-            help=(
-                "List only targets that provide an artifact, displaying the columns specified by "
-                "--provides-columns."
-            ),
-        )
-        register(
-            "--documented",
-            type=bool,
-            default=False,
-            help="Print only targets that are documented with a description.",
-        )
-
-    @property
-    def provides(self) -> bool:
-        return cast(bool, self.options.provides)
-
-    @property
-    def documented(self) -> bool:
-        return cast(bool, self.options.documented)
+    documented = BoolOption(
+        default=False,
+        help="Print only targets that are documented with a description.",
+    )
 
 
 class List(Goal):
     subsystem_cls = ListSubsystem
+    environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY
 
 
 @goal_rule
@@ -52,28 +34,11 @@ async def list_targets(
     addresses: Addresses, list_subsystem: ListSubsystem, console: Console
 ) -> List:
     if not addresses:
-        console.print_stderr(f"WARNING: No targets were matched in goal `{list_subsystem.name}`.")
-        return List(exit_code=0)
-
-    if list_subsystem.provides and list_subsystem.documented:
-        raise ValueError(
-            "Cannot specify both `--list-documented` and `--list-provides` at the same time. "
-            "Please choose one."
-        )
-
-    if list_subsystem.provides:
-        targets = await Get(UnexpandedTargets, Addresses, addresses)
-        addresses_with_provide_artifacts = {
-            tgt.address: tgt[ProvidesField].value
-            for tgt in targets
-            if tgt.get(ProvidesField).value is not None
-        }
-        with list_subsystem.line_oriented(console) as print_stdout:
-            for address, artifact in addresses_with_provide_artifacts.items():
-                print_stdout(f"{address.spec} {artifact}")
+        logger.warning(f"No targets were matched in goal `{list_subsystem.name}`.")
         return List(exit_code=0)
 
     if list_subsystem.documented:
+        # We must preserve target generators, not replace with their generated targets.
         targets = await Get(UnexpandedTargets, Addresses, addresses)
         addresses_with_descriptions = cast(
             Dict[Address, str],

@@ -1,19 +1,31 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import functools
 import os
 import time
+import unittest
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Iterator, Optional, Tuple
+from typing import Any, Callable, Iterator, Mapping
 
 from colors import bold, cyan, magenta
 
 from pants.pantsd.process_manager import ProcessManager
-from pants.testutil.pants_integration_test import PantsIntegrationTest, kill_daemon, read_pantsd_log
+from pants.testutil.pants_integration_test import (
+    PantsJoinHandle,
+    PantsResult,
+    kill_daemon,
+    read_pants_log,
+    run_pants,
+    run_pants_with_workdir,
+    run_pants_with_workdir_without_waiting,
+)
 from pants.util.collections import recursively_update
 from pants.util.contextutil import temporary_dir
+from pants.util.dirutil import maybe_read_file
 
 
 def banner(s):
@@ -43,6 +55,39 @@ def attempts(
     raise AssertionError(f"After {count} attempts in {timeout} seconds: {msg}")
 
 
+def launch_waiter(
+    *, workdir: str, config: Mapping | None = None, cleanup_wait_time: int = 0
+) -> tuple[PantsJoinHandle, int, int, str]:
+    """Launch a process that will wait forever for a file to be created.
+
+    Returns the pants client handle, the pid of the waiting process, the pid of a child of the
+    waiting process, and the file to create to cause the waiting child to exit.
+    """
+    file_to_make = os.path.join(workdir, "some_magic_file")
+    waiter_pid_file = os.path.join(workdir, "pid_file")
+    child_pid_file = os.path.join(workdir, "child_pid_file")
+
+    argv = [
+        "run",
+        "testprojects/src/python/coordinated_runs:waiter",
+        "--",
+        file_to_make,
+        waiter_pid_file,
+        child_pid_file,
+        str(cleanup_wait_time),
+    ]
+    client_handle = run_pants_with_workdir_without_waiting(argv, workdir=workdir, config=config)
+    waiter_pid = -1
+    for _ in attempts("The waiter process should have written its pid."):
+        waiter_pid_str = maybe_read_file(waiter_pid_file)
+        child_pid_str = maybe_read_file(child_pid_file)
+        if waiter_pid_str and child_pid_str:
+            waiter_pid = int(waiter_pid_str)
+            child_pid = int(child_pid_str)
+            break
+    return client_handle, waiter_pid, child_pid, file_to_make
+
+
 class PantsDaemonMonitor(ProcessManager):
     def __init__(self, metadata_base_dir: str):
         super().__init__(name="pantsd", metadata_base_dir=metadata_base_dir)
@@ -62,16 +107,6 @@ class PantsDaemonMonitor(ProcessManager):
         self._started = True
         self._check_pantsd_is_alive()
         return self.pid
-
-    def assert_pantsd_runner_started(self, client_pid, timeout=12):
-        return self.await_metadata_by_name(
-            name="nailgun-client",
-            metadata_key=str(client_pid),
-            ongoing_msg="client to start",
-            completed_msg="client started",
-            timeout=timeout,
-            caster=int,
-        )
 
     def _check_pantsd_is_alive(self):
         self._log()
@@ -110,16 +145,29 @@ class PantsdRunContext:
     runner: Callable[..., Any]
     checker: PantsDaemonMonitor
     workdir: str
-    pantsd_config: Dict[str, Any]
+    pantsd_config: dict[str, Any]
 
 
-class PantsDaemonIntegrationTestBase(PantsIntegrationTest):
-    use_pantsd = False  # We set our own ad-hoc pantsd configuration in most of these tests.
+class PantsDaemonIntegrationTestBase(unittest.TestCase):
+    @staticmethod
+    def run_pants(*args, **kwargs) -> PantsResult:
+        # We set our own ad-hoc pantsd configuration in most of these tests.
+        return run_pants(*args, **{**kwargs, **{"use_pantsd": False}})
+
+    @staticmethod
+    def run_pants_with_workdir(*args, **kwargs) -> PantsResult:
+        # We set our own ad-hoc pantsd configuration in most of these tests.
+        return run_pants_with_workdir(*args, **{**kwargs, **{"use_pantsd": False}})
+
+    @staticmethod
+    def run_pants_with_workdir_without_waiting(*args, **kwargs) -> PantsJoinHandle:
+        # We set our own ad-hoc pantsd configuration in most of these tests.
+        return run_pants_with_workdir_without_waiting(*args, **{**kwargs, **{"use_pantsd": False}})
 
     @contextmanager
     def pantsd_test_context(
-        self, *, log_level: str = "info", extra_config: Optional[Dict[str, Any]] = None
-    ) -> Iterator[Tuple[str, Dict[str, Any], PantsDaemonMonitor]]:
+        self, *, log_level: str = "info", extra_config: dict[str, Any] | None = None
+    ) -> Iterator[tuple[str, dict[str, Any], PantsDaemonMonitor]]:
         with temporary_dir(root_dir=os.getcwd()) as workdir_base:
             pid_dir = os.path.join(workdir_base, ".pids")
             workdir = os.path.join(workdir_base, ".workdir.pants.d")
@@ -129,6 +177,11 @@ class PantsDaemonIntegrationTestBase(PantsIntegrationTest):
                     "pantsd": True,
                     "level": log_level,
                     "pants_subprocessdir": pid_dir,
+                    "backend_packages": [
+                        # Provide goals used by various tests.
+                        "pants.backend.python",
+                        "pants.backend.python.lint.flake8",
+                    ],
                 }
             }
 
@@ -139,14 +192,14 @@ class PantsDaemonIntegrationTestBase(PantsIntegrationTest):
             checker = PantsDaemonMonitor(pid_dir)
             kill_daemon(pid_dir)
             try:
-                yield (workdir, pantsd_config, checker)
+                yield workdir, pantsd_config, checker
                 kill_daemon(pid_dir)
                 checker.assert_stopped()
             finally:
-                banner("BEGIN pantsd.log")
-                for line in read_pantsd_log(workdir):
+                banner("BEGIN pants.log")
+                for line in read_pants_log(workdir):
                     print(line)
-                banner("END pantsd.log")
+                banner("END pants.log")
 
     @contextmanager
     def pantsd_successful_run_context(self, *args, **kwargs) -> Iterator[PantsdRunContext]:
@@ -157,8 +210,8 @@ class PantsDaemonIntegrationTestBase(PantsIntegrationTest):
     def pantsd_run_context(
         self,
         log_level: str = "info",
-        extra_config: Optional[Dict[str, Any]] = None,
-        extra_env: Optional[Dict[str, str]] = None,
+        extra_config: dict[str, Any] | None = None,
+        extra_env: dict[str, str] | None = None,
         success: bool = True,
     ) -> Iterator[PantsdRunContext]:
         with self.pantsd_test_context(log_level=log_level, extra_config=extra_config) as (
@@ -189,13 +242,13 @@ class PantsDaemonIntegrationTestBase(PantsIntegrationTest):
         workdir: str,
         config,
         cmd,
-        extra_config={},
-        extra_env={},
+        extra_config=None,
+        extra_env=None,
         success=True,
         expected_runs: int = 1,
     ):
         combined_config = config.copy()
-        recursively_update(combined_config, extra_config)
+        recursively_update(combined_config, extra_config or {})
         print(
             bold(
                 cyan(
@@ -208,7 +261,7 @@ class PantsDaemonIntegrationTestBase(PantsIntegrationTest):
         run_count = self._run_count(workdir)
         start_time = time.time()
         run = self.run_pants_with_workdir(
-            cmd, workdir=workdir, config=combined_config, extra_env=extra_env
+            cmd, workdir=workdir, config=combined_config, extra_env=extra_env or {}
         )
         elapsed = time.time() - start_time
         print(bold(cyan(f"\ncompleted in {elapsed} seconds")))

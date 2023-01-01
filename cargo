@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
+
+# shellcheck source=build-support/common.sh
+source "${REPO_ROOT}/build-support/common.sh"
+
+PY="$(determine_python)"
+export PY
+export PYO3_PYTHON="${PY}"
+export PYTHON_SYS_EXECUTABLE="${PY}" # Consumed by the cpython crate.
+if is_macos_big_sur; then
+  # With Big Sur, MacOS changed its versioning scheme from 10.X to 11.X. A pantsbuild.pants
+  # wheel built on Big Sur will declare its platform (in its name) as macosx_11_0. Unfortunately
+  # pip does not yet recognize that as a compatible platform for Big Sur.
+  # Fortunately, Big Sur may also be identified as 10.16, for backwards compatibility with the old
+  # versioning scheme. Setting MACOSX_DEPLOYMENT_TARGET=10.16 when building the wheel will cause
+  # that wheel to declare its platform as macosx_10_16, which pip will then happily install.
+  # However, in order to build the wheel as macosx_10_16 we must also build the native code for
+  # that platform string, hence this setting here.
+  export MACOSX_DEPLOYMENT_TARGET=10.16
+fi
+
+if ! command -v rustup &> /dev/null; then
+  die "Please install Rustup and ensure \`rustup\` is on your PATH (usually by adding ~/.cargo/bin). See https://rustup.rs."
+fi
+
+cd "${REPO_ROOT}/src/rust/engine" || exit "${PIPESTATUS[0]}"
+exec cargo "$@"

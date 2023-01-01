@@ -5,24 +5,28 @@
 
 from pants.backend.project_info import (
     count_loc,
-    dependees,
     dependencies,
+    dependents,
     filedeps,
     filter_targets,
     list_roots,
     list_targets,
-    source_file_validator,
+    paths,
+    peek,
+    regex_lint,
 )
 
 
 def rules():
     return [
         *count_loc.rules(),
-        *dependees.rules(),
         *dependencies.rules(),
+        *dependents.rules(),
         *filedeps.rules(),
         *filter_targets.rules(),
         *list_roots.rules(),
         *list_targets.rules(),
-        *source_file_validator.rules(),
+        *paths.rules(),
+        *peek.rules(),
+        *regex_lint.rules(),
     ]

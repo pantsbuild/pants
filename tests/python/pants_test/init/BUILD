@@ -2,12 +2,17 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_tests(
-  name='tests',
-  timeout = 270,
-  dependencies=[
-    # Used by `test_options_initializer`.
-    '//:build_root',
-  ],
+    name="tests",
+    timeout=360,
+    overrides={
+        ("test_options_initializer.py", "test_plugin_resolver.py"): {
+            "dependencies": [
+                "//BUILD_ROOT:files",
+                # These tests load `pants.toml`, which references many of these plugins.
+                "src/python/pants/bin:plugins",
+            ],
+        }
+    },
 )
 
-python_library()
+python_sources()

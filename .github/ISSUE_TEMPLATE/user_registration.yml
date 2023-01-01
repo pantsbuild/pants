@@ -1,0 +1,51 @@
+name: "Support Pants - list my company on pantsbuild.org"
+description: Add a company or organization to the Who Uses Pants page
+title: "Please add XXXXXX to the public list of Pants Users"
+labels: [user-registration]
+assignees:
+  - benjyw
+  - cczona
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping grow the Pants community by being featured on the public list of Pants Users!
+  - type: input
+    id: name
+    attributes:
+      label: "Company name"
+      description: The name of your company/organization.
+      placeholder: e.g., Acme
+    validations:
+      required: true
+  - type: input
+    id: website
+    attributes:
+      label: "Company website"
+      description: Your company's main website
+      placeholder: e.g., https://www.acme.com
+    validations:
+      required: true
+  - type: textarea
+    id: logo
+    attributes:
+      label: Company logo
+      description: |
+        We'd love to use your company's logo on the Users Page!
+
+        By attaching it here, permission is granted to display this logo on pantsbuild.org 
+        in affirmation that the organization uses Pants. No other usage rights are granted to 
+        the organization's intellectual property. Please ensure that you have the right to 
+        grant us permission to use the logo in this manner before adding it. 
+
+        If you're unsure, please submit this page without the logo, and we can revisit it later,
+        if/when permission has been established. The other information is still very helpful!
+      placeholder: Drag and drop a .jpg or .png image of your company logo into this box.
+      value:
+    validations:
+      required: false
+  - type: markdown
+    attributes:
+      value: |
+        After creating the issue, please email verify@pantsbuild.org from your company
+        email address with a link to the newly-created issue. That's it, and thanks again!

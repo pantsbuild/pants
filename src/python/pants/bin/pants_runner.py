@@ -3,14 +3,15 @@
 
 import logging
 import os
+import sys
 import warnings
 from dataclasses import dataclass
 from typing import List, Mapping
 
 from pants.base.exception_sink import ExceptionSink
 from pants.base.exiter import ExitCode
-from pants.bin.remote_pants_runner import RemotePantsRunner
-from pants.init.logging import setup_logging, setup_warning_filtering
+from pants.engine.env_vars import CompleteEnvironmentVars
+from pants.init.logging import initialize_stdio, stdio_destination
 from pants.init.util import init_workdir
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.options_bootstrapper import OptionsBootstrapper
@@ -37,7 +38,7 @@ class PantsRunner:
         terminate_pantsd = self.will_terminate_pantsd()
 
         if terminate_pantsd:
-            logger.debug("Pantsd terminating goal detected: {}".format(self.args))
+            logger.debug(f"Pantsd terminating goal detected: {self.args}")
 
         # If we want concurrent pants runs, we can't have pantsd enabled.
         return (
@@ -55,7 +56,7 @@ class PantsRunner:
         # this warning.
         pythonpath = os.environ.pop("PYTHONPATH", None)
         if pythonpath and not os.environ.pop("RUNNING_PANTS_FROM_SOURCES", None):
-            logger.warning(f"Scrubbed PYTHONPATH={pythonpath} from the environment.")
+            logger.debug(f"Scrubbed PYTHONPATH={pythonpath} from the environment.")
 
     def run(self, start_time: float) -> ExitCode:
         self.scrub_pythonpath()
@@ -67,24 +68,35 @@ class PantsRunner:
             bootstrap_options = options_bootstrapper.bootstrap_options
             global_bootstrap_options = bootstrap_options.for_global_scope()
 
-        # Initialize the workdir early enough to ensure that logging has a destination.
-        workdir_src = init_workdir(global_bootstrap_options)
-        ExceptionSink.reset_log_location(workdir_src)
-
-        setup_warning_filtering(global_bootstrap_options.ignore_pants_warnings or [])
         # We enable logging here, and everything before it will be routed through regular
         # Python logging.
-        setup_logging(global_bootstrap_options, stderr_logging=True)
+        stdin_fileno = sys.stdin.fileno()
+        stdout_fileno = sys.stdout.fileno()
+        stderr_fileno = sys.stderr.fileno()
+        with initialize_stdio(global_bootstrap_options), stdio_destination(
+            stdin_fileno=stdin_fileno,
+            stdout_fileno=stdout_fileno,
+            stderr_fileno=stderr_fileno,
+        ):
+            # N.B. We inline imports to speed up the python thin client run, and avoids importing
+            # engine types until after the runner has had a chance to set PANTS_BIN_NAME.
 
-        if self._should_run_with_pantsd(global_bootstrap_options):
-            try:
-                remote_runner = RemotePantsRunner(self.args, self.env, options_bootstrapper)
-                return remote_runner.run()
-            except RemotePantsRunner.Fallback as e:
-                logger.warning("Client exception: {!r}, falling back to non-daemon mode".format(e))
+            if self._should_run_with_pantsd(global_bootstrap_options):
+                from pants.bin.remote_pants_runner import RemotePantsRunner
 
-        # N.B. Inlining this import speeds up the python thin client run by about 100ms.
-        from pants.bin.local_pants_runner import LocalPantsRunner
+                try:
+                    remote_runner = RemotePantsRunner(self.args, self.env, options_bootstrapper)
+                    return remote_runner.run(start_time)
+                except RemotePantsRunner.Fallback as e:
+                    logger.warning(f"Client exception: {e!r}, falling back to non-daemon mode")
 
-        runner = LocalPantsRunner.create(env=self.env, options_bootstrapper=options_bootstrapper)
-        return runner.run(start_time)
+            from pants.bin.local_pants_runner import LocalPantsRunner
+
+            # We only install signal handling via ExceptionSink if the run will execute in this process.
+            ExceptionSink.install(
+                log_location=init_workdir(global_bootstrap_options), pantsd_instance=False
+            )
+            runner = LocalPantsRunner.create(
+                env=CompleteEnvironmentVars(self.env), options_bootstrapper=options_bootstrapper
+            )
+            return runner.run(start_time)

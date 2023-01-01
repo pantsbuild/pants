@@ -1,7 +1,9 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from typing import Any, ClassVar, Iterable, Tuple, TypeVar, Union, cast, overload
+from __future__ import annotations
+
+from typing import Any, ClassVar, Iterable, Tuple, TypeVar, cast, overload
 
 from pants.util.ordered_set import FrozenOrderedSet
 
@@ -23,21 +25,23 @@ class Collection(Tuple[T, ...]):
     N.B: Collection instances are only considered equal if both their types and contents are equal.
     """
 
-    @overload  # noqa: F811
+    @overload  # type: ignore[override]  # noqa: F811
     def __getitem__(self, index: int) -> T:
         ...
 
     @overload  # noqa: F811
-    def __getitem__(self, index: slice) -> "Collection[T]":
+    def __getitem__(self, index: slice) -> Collection[T]:
         ...
 
-    def __getitem__(self, index: Union[int, slice]) -> Union[T, "Collection[T]"]:  # noqa: F811
+    def __getitem__(self, index: int | slice) -> T | Collection[T]:  # noqa: F811
         result = super().__getitem__(index)
         if isinstance(index, int):
             return cast(T, result)
         return self.__class__(cast(Tuple[T, ...], result))
 
     def __eq__(self, other: Any) -> bool:
+        if self is other:
+            return True
         return type(self) == type(other) and super().__eq__(other)
 
     def __ne__(self, other: Any) -> bool:
@@ -76,7 +80,9 @@ class DeduplicatedCollection(FrozenOrderedSet[T]):
     sort_input: ClassVar[bool] = False
 
     def __init__(self, iterable: Iterable[T] = ()) -> None:
-        super().__init__(iterable if not self.sort_input else sorted(iterable))
+        super().__init__(
+            iterable if not self.sort_input else sorted(iterable)  # type: ignore[type-var]
+        )
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}({list(self._items)})"

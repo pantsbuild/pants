@@ -10,25 +10,21 @@ to run via `./pants run`.
 
 We want to allow direct invocation of scripts for these reasons:
 1) Consistency with how we invoke Bash scripts, which notably may _not_ be ran via `./pants run`.
-2) More ergonomic command line arguments, e.g. `./build-support/bin/generate_travis_yaml.py [args]`,
-   rather than `./pants run build-support/bin:generate_travis_yaml -- [args]`.
-3) Avoid undesired dependencies on Pants for certain scripts. For example, `shellcheck.py`
-   lints the `./pants` script, and we would like the script to still work even if `./pants`
-   breaks. If we had to rely on invoking via `./pants run`, this would not be possible.
+2) More ergonomic command line arguments, e.g. `./build-support/bin/generate_github_workflows.py [args]`,
+   rather than `./pants run build-support/bin:generate_github_workflows -- [args]`.
+3) Avoid undesired dependencies on Pants for certain scripts.
 
 Callers of this file, however, are free to dogfood Pants as they'd like, and any script
 may be called via `./pants run` instead of direct invocation if desired.
 """
+from __future__ import annotations
 
 import subprocess
 import time
-from contextlib import contextmanager
-from pathlib import Path
-from typing import Iterator, NoReturn, Tuple
+from typing import NoReturn
 
 _SCRIPT_START_TIME = time.time()
 
-_CLEAR_LINE = "\x1b[K"
 _COLOR_BLUE = "\x1b[34m"
 _COLOR_RED = "\x1b[31m"
 _COLOR_GREEN = "\x1b[32m"
@@ -48,7 +44,7 @@ def banner(message: str) -> None:
     print(f"{_COLOR_BLUE}[=== {minutes:02d}:{seconds:02d} {message} ===]{_COLOR_RESET}")
 
 
-def elapsed_time() -> Tuple[int, int]:
+def elapsed_time() -> tuple[int, int]:
     now = time.time()
     elapsed_seconds = int(now - _SCRIPT_START_TIME)
     return elapsed_seconds // 60, elapsed_seconds % 60
@@ -65,21 +61,4 @@ def git_merge_base() -> str:
     process = subprocess.run(
         get_tracking_branch, stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding="utf-8"
     )
-    return str(process.stdout.rstrip()) if process.stdout else "master"
-
-
-@contextmanager
-def travis_section(slug: str, message: str) -> Iterator[None]:
-    travis_fold_state_path = Path("/tmp/.travis_fold_current")
-
-    def travis_fold(*, action: str, target: str) -> None:
-        print(f"travis_fold:{action}:{target}\r{_CLEAR_LINE}", end="")
-
-    travis_fold(action="start", target=slug)
-    travis_fold_state_path.write_text(slug)
-    banner(message)
-    try:
-        yield
-    finally:
-        travis_fold(action="end", target=travis_fold_state_path.read_text().splitlines()[0])
-        travis_fold_state_path.unlink()
+    return str(process.stdout.rstrip()) if process.stdout else "main"

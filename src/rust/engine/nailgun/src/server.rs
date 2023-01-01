@@ -1,50 +1,26 @@
 // Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-#![deny(warnings)]
-// Enable all clippy lints except for many of the pedantic ones. It's a shame this needs to be copied and pasted across crates, but there doesn't appear to be a way to include inner attributes from a common source.
-#![deny(
-  clippy::all,
-  clippy::default_trait_access,
-  clippy::expl_impl_clone_on_copy,
-  clippy::if_not_else,
-  clippy::needless_continue,
-  clippy::unseparated_literal_suffix,
-// TODO: Falsely triggers for async/await:
-//   see https://github.com/rust-lang/rust-clippy/issues/5360
-// clippy::used_underscore_binding
-)]
-// It is often more clear to show that nothing is being moved.
-#![allow(clippy::match_ref_pats)]
-// Subjective style.
-#![allow(
-  clippy::len_without_is_empty,
-  clippy::redundant_field_names,
-  clippy::too_many_arguments
-)]
-// Default isn't as big a deal as people seem to think it is.
-#![allow(clippy::new_without_default, clippy::new_ret_no_self)]
-// Arc<Mutex> can be more clear than needing to grok Orderings:
-#![allow(clippy::mutex_atomic)]
-
-use nails::execution::{self, sink_for, stream_for, ChildInput, ChildOutput, ExitCode};
-use nails::{Child, Nail};
-use task_executor::Executor;
-use tokio::fs::File;
-use tokio::net::TcpListener;
-use tokio::sync::{Notify, RwLock};
-
 use std::collections::HashMap;
+use std::fs::OpenOptions;
 use std::io;
 use std::net::Ipv4Addr;
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use async_latch::AsyncLatch;
 use bytes::Bytes;
-use futures::channel::{mpsc, oneshot};
+use futures::channel::oneshot;
 use futures::{future, sink, stream, FutureExt, SinkExt, StreamExt, TryStreamExt};
-use log::{debug, error, info};
+use log::{debug, info};
+use nails::execution::{self, child_channel, sink_for, ChildInput, ChildOutput, ExitCode};
+use nails::Nail;
+use task_executor::Executor;
+use tokio::fs::File;
+use tokio::net::TcpListener;
+use tokio::sync::{mpsc, Notify, RwLock};
+use tokio_stream::wrappers::UnboundedReceiverStream;
 
 pub struct Server {
   exit_sender: oneshot::Sender<()>,
@@ -120,7 +96,7 @@ impl Server {
     config: nails::Config,
     nail: impl Nail,
     mut should_exit: oneshot::Receiver<()>,
-    mut listener: TcpListener,
+    listener: TcpListener,
   ) -> Result<(), String> {
     // While connections are ongoing, they acquire `read`; before shutting down, the server
     // acquires `write`.
@@ -156,8 +132,8 @@ impl Server {
         let ongoing_connections = ongoing_connections.clone();
         async move {
           let ongoing_connection_guard = ongoing_connections.read().await;
-          connection_started.notify();
-          let result = nails::server_handle_connection(config, nail, tcp_stream).await;
+          connection_started.notify_one();
+          let result = nails::server::handle_connection(config, nail, tcp_stream).await;
           std::mem::drop(ongoing_connection_guard);
           result
         }
@@ -197,6 +173,7 @@ impl Server {
 
 pub struct RawFdExecution {
   pub cmd: execution::Command,
+  pub cancelled: AsyncLatch,
   pub stdin_fd: RawFd,
   pub stdout_fd: RawFd,
   pub stderr_fd: RawFd,
@@ -226,71 +203,69 @@ struct RawFdNail {
 }
 
 impl Nail for RawFdNail {
-  fn spawn(
-    &self,
-    cmd: execution::Command,
-    input_stream: mpsc::Receiver<ChildInput>,
-  ) -> Result<Child, io::Error> {
+  fn spawn(&self, cmd: execution::Command) -> Result<nails::server::Child, io::Error> {
     let env = cmd.env.iter().cloned().collect::<HashMap<_, _>>();
 
     // Handle stdin.
     let (stdin_handle, stdin_sink) = Self::input(Self::ttypath_from_env(&env, 0))?;
-    let accepts_stdin = if let Some(mut stdin_sink) = stdin_sink {
-      let mut input_stream = input_stream.filter_map(|child_input| {
-        Box::pin(async move {
-          match child_input {
-            ChildInput::Stdin(bytes) => Some(Ok(bytes)),
-            ChildInput::StdinEOF => None,
-          }
-        })
-      });
+    let maybe_stdin_write = if let Some(mut stdin_sink) = stdin_sink {
+      let (stdin_write, stdin_read) = child_channel::<ChildInput>();
+      // Spawn a task that will propagate the input stream.
       let _join = self.executor.spawn(async move {
-        stdin_sink.send_all(&mut input_stream).map(|_| ()).await;
+        let mut input_stream = stdin_read.map(|child_input| match child_input {
+          ChildInput::Stdin(bytes) => Ok(bytes),
+        });
+        let _ = stdin_sink.send_all(&mut input_stream).await;
       });
-      true
+      Some(stdin_write)
     } else {
       // Stdin will be handled directly by the TTY.
-      false
+      None
     };
 
     // And stdout/stderr.
-    let (stdout_stream, stdout_handle) = Self::output(Self::ttypath_from_env(&env, 1))?;
-    let (stderr_stream, stderr_handle) = Self::output(Self::ttypath_from_env(&env, 2))?;
+    let (stdout_stream, stdout_handle) = Self::output(Self::ttypath_from_env(&env, 1), false)?;
+    // N.B.: POSIX demands stderr is opened read-write and some programs, like pagers, rely on this.
+    // See: https://pubs.opengroup.org/onlinepubs/9699919799/functions/stdin.html
+    let (stderr_stream, stderr_handle) = Self::output(Self::ttypath_from_env(&env, 2), true)?;
+
+    // Set up a cancellation token that is triggered on client shutdown.
+    let cancelled = AsyncLatch::new();
+    let shutdown = {
+      let cancelled = cancelled.clone();
+      async move {
+        cancelled.trigger();
+      }
+    };
 
     // Spawn the underlying function as a blocking task, and capture its exit code to append to the
     // output stream.
     let nail = self.clone();
-    let exit_code_future = self.executor.spawn_blocking(move || {
-      // NB: This closure captures the stdio handles, and will drop/close them when it completes.
-      (nail.runner)(RawFdExecution {
-        cmd,
-        stdin_fd: stdin_handle.as_raw_fd(),
-        stdout_fd: stdout_handle.as_raw_fd(),
-        stderr_fd: stderr_handle.as_raw_fd(),
-      })
-    });
-
-    // Fully consume the stdout/stderr streams before waiting on the exit stream.
-    let stdout_stream = stdout_stream.map_ok(ChildOutput::Stdout);
-    let stderr_stream = stderr_stream.map_ok(ChildOutput::Stderr);
-    let exit_stream = exit_code_future
-      .into_stream()
-      .map(|exit_code| Ok(ChildOutput::Exit(exit_code)));
-    let output_stream = stream::select(stdout_stream, stderr_stream)
-      .chain(exit_stream)
-      .map(|res| match res {
-        Ok(o) => o,
-        Err(e) => {
-          error!("IO error interacting with the runner: {:?}", e);
-          ChildOutput::Exit(ExitCode(-1))
-        }
+    let exit_code = self
+      .executor
+      .spawn_blocking(move || {
+        // NB: This closure captures the stdio handles, and will drop/close them when it completes.
+        (nail.runner)(RawFdExecution {
+          cmd,
+          cancelled,
+          stdin_fd: stdin_handle.as_raw_fd(),
+          stdout_fd: stdout_handle.as_raw_fd(),
+          stderr_fd: stderr_handle.as_raw_fd(),
+        })
       })
       .boxed();
 
-    Ok(Child {
+    // Select a single stdout/stderr stream.
+    let stdout_stream = stdout_stream.map_ok(ChildOutput::Stdout);
+    let stderr_stream = stderr_stream.map_ok(ChildOutput::Stderr);
+    let output_stream = stream::select(stdout_stream, stderr_stream).boxed();
+
+    Ok(nails::server::Child::new(
       output_stream,
-      accepts_stdin,
-    })
+      maybe_stdin_write,
+      exit_code,
+      Some(shutdown.boxed()),
+    ))
   }
 }
 
@@ -305,13 +280,13 @@ impl RawFdNail {
   fn input(
     tty_path: Option<PathBuf>,
   ) -> Result<(Box<dyn AsRawFd + Send>, Option<impl sink::Sink<Bytes>>), io::Error> {
-    if let Some(tty_path) = tty_path {
-      Ok((Box::new(std::fs::File::open(tty_path)?), None))
+    if let Some(tty) = Self::try_open_tty(tty_path, OpenOptions::new().read(true)) {
+      Ok((Box::new(tty), None))
     } else {
-      let (stdin_reader, stdin_writer) = os_pipe::pipe()?;
+      let (pipe_reader, pipe_writer) = os_pipe::pipe()?;
       let write_handle =
-        File::from_std(unsafe { std::fs::File::from_raw_fd(stdin_writer.into_raw_fd()) });
-      Ok((Box::new(stdin_reader), Some(sink_for(write_handle))))
+        File::from_std(unsafe { std::fs::File::from_raw_fd(pipe_writer.into_raw_fd()) });
+      Ok((Box::new(pipe_reader), Some(sink_for(write_handle))))
     }
   }
 
@@ -323,6 +298,7 @@ impl RawFdNail {
   #[allow(clippy::type_complexity)]
   fn output(
     tty_path: Option<PathBuf>,
+    read_write: bool,
   ) -> Result<
     (
       stream::BoxStream<'static, Result<Bytes, io::Error>>,
@@ -330,18 +306,39 @@ impl RawFdNail {
     ),
     io::Error,
   > {
-    if let Some(tty_path) = tty_path {
-      let tty = std::fs::OpenOptions::new()
+    if let Some(tty) = Self::try_open_tty(
+      tty_path,
+      OpenOptions::new()
+        .read(read_write)
         .write(true)
-        .create(false)
-        .open(tty_path)?;
+        .create(false),
+    ) {
       Ok((stream::empty().boxed(), Box::new(tty)))
     } else {
-      let (stdin_reader, stdin_writer) = os_pipe::pipe()?;
-      let read_handle =
-        File::from_std(unsafe { std::fs::File::from_raw_fd(stdin_reader.into_raw_fd()) });
-      Ok((stream_for(read_handle).boxed(), Box::new(stdin_writer)))
+      let (pipe_reader, pipe_writer) = os_pipe::pipe()?;
+      let read_handle = unsafe { std::fs::File::from_raw_fd(pipe_reader.into_raw_fd()) };
+      Ok((
+        blocking_stream_for(read_handle).boxed(),
+        Box::new(pipe_writer),
+      ))
     }
+  }
+
+  ///
+  /// Attempt to open the given TTY-path, logging any errors.
+  ///
+  fn try_open_tty(tty_path: Option<PathBuf>, open_options: &OpenOptions) -> Option<std::fs::File> {
+    let tty_path = tty_path?;
+    open_options
+      .open(&tty_path)
+      .map_err(|e| {
+        log::debug!(
+          "Failed to open TTY at {}: {:?}, falling back to socket access.",
+          tty_path.display(),
+          e
+        );
+      })
+      .ok()
   }
 
   ///
@@ -352,4 +349,30 @@ impl RawFdNail {
       .get(&format!("NAILGUN_TTY_PATH_{}", fd_number))
       .map(PathBuf::from)
   }
+}
+
+// TODO: See https://github.com/pantsbuild/pants/issues/16969.
+pub fn blocking_stream_for<R: io::Read + Send + Sized + 'static>(
+  mut r: R,
+) -> impl futures::Stream<Item = Result<Bytes, io::Error>> {
+  let (sender, receiver) = mpsc::unbounded_channel();
+  std::thread::spawn(move || {
+    let mut buf = [0; 4096];
+    loop {
+      match r.read(&mut buf) {
+        Ok(0) => break,
+        Ok(n) => {
+          if sender.send(Ok(Bytes::copy_from_slice(&buf[..n]))).is_err() {
+            break;
+          }
+        }
+        Err(ref e) if e.kind() == io::ErrorKind::Interrupted => {}
+        Err(e) => {
+          let _ = sender.send(Err(e));
+          break;
+        }
+      }
+    }
+  });
+  UnboundedReceiverStream::new(receiver)
 }

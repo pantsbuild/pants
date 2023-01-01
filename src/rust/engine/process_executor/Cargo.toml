@@ -1,20 +1,25 @@
 [package]
 version = "0.0.1"
-edition = "2018"
+edition = "2021"
 name = "process_executor"
 authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 publish = false
 
 [dependencies]
-clap = "2"
-dirs = "1"
-env_logger = "0.5.4"
+protos = { path = "../protos" }
+clap = "3"
+dirs-next = "2"
+env_logger = "0.9.0"
 fs = { path = "../fs" }
-futures = { version = "0.3", features = ["compat"] }
+futures = "0.3"
+grpc_util = { path = "../grpc_util" }
 hashing = { path = "../hashing" }
 log = "0.4"
 process_execution = { path = "../process_execution" }
+prost = "0.9"
+shlex = "1.1.0"
 store = { path = "../fs/store" }
+structopt = "0.3.26"
 task_executor = { path = "../task_executor" }
-tokio = { version = "0.2.22", features = ["rt-threaded", "macros"] }
+tokio = { version = "1.21", features = ["rt-multi-thread", "macros"] }
 workunit_store = { path = "../workunit_store"}

@@ -1,192 +1,461 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
+import enum
+import itertools
+import logging
 from collections import defaultdict
 from dataclasses import dataclass
+from functools import total_ordering
 from pathlib import PurePath
-from typing import DefaultDict, Dict, List, Optional, Set, Tuple, cast
+from typing import DefaultDict, Iterable, Mapping, Tuple
 
-from pants.backend.python.target_types import (
-    ModuleMappingField,
-    PythonRequirementsField,
-    PythonSources,
+from packaging.utils import canonicalize_name as canonicalize_project_name
+
+from pants.backend.python.dependency_inference.default_module_mapping import (
+    DEFAULT_MODULE_MAPPING,
+    DEFAULT_TYPE_STUB_MODULE_MAPPING,
 )
-from pants.base.specs import AddressSpecs, DescendantAddresses
-from pants.core.util_rules.stripped_source_files import StrippedSourceFileNames
+from pants.backend.python.subsystems.setup import PythonSetup
+from pants.backend.python.target_types import (
+    PythonRequirementModulesField,
+    PythonRequirementResolveField,
+    PythonRequirementsField,
+    PythonRequirementTypeStubModulesField,
+    PythonResolveField,
+    PythonSourceField,
+)
+from pants.core.util_rules.stripped_source_files import StrippedFileName, StrippedFileNameRequest
 from pants.engine.addresses import Address
-from pants.engine.collection import Collection
+from pants.engine.environment import EnvironmentName
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import SourcesPathsRequest, Targets
+from pants.engine.target import AllTargets, Target
+from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
+from pants.util.strutil import softwrap
+
+logger = logging.getLogger(__name__)
+
+ResolveName = str
+
+
+@total_ordering
+class ModuleProviderType(enum.Enum):
+    TYPE_STUB = enum.auto()
+    IMPL = enum.auto()
+
+    def __lt__(self, other) -> bool:
+        if not isinstance(other, ModuleProviderType):
+            return NotImplemented
+        return self.name < other.name
+
+
+@dataclass(frozen=True, order=True)
+class ModuleProvider:
+    addr: Address
+    typ: ModuleProviderType
+
+
+@dataclass(frozen=True, order=True)
+class PossibleModuleProvider:
+    provider: ModuleProvider
+    # 0 = The provider mapped to the module itself, 1 = the provider mapped to its parent, etc.
+    ancestry: int
+
+
+def module_from_stripped_path(path: PurePath) -> str:
+    module_name_with_slashes = (
+        path.parent if path.name in ("__init__.py", "__init__.pyi") else path.with_suffix("")
+    )
+    return module_name_with_slashes.as_posix().replace("/", ".")
 
 
 @dataclass(frozen=True)
-class PythonModule:
-    module: str
-
-    @classmethod
-    def create_from_stripped_path(cls, path: PurePath) -> "PythonModule":
-        module_name_with_slashes = (
-            path.parent if path.name == "__init__.py" else path.with_suffix("")
-        )
-        return cls(module_name_with_slashes.as_posix().replace("/", "."))
+class AllPythonTargets:
+    first_party: tuple[Target, ...]
+    third_party: tuple[Target, ...]
 
 
-@dataclass(frozen=True)
-class FirstPartyModuleToAddressMapping:
-    """A mapping of module names to owning addresses.
+@rule(desc="Find all Python targets in project", level=LogLevel.DEBUG)
+def find_all_python_projects(all_targets: AllTargets) -> AllPythonTargets:
+    first_party = []
+    third_party = []
+    for tgt in all_targets:
+        if tgt.has_field(PythonSourceField):
+            first_party.append(tgt)
+        if tgt.has_field(PythonRequirementsField):
+            third_party.append(tgt)
+    return AllPythonTargets(tuple(first_party), tuple(third_party))
 
-    All mapped addresses will be file addresses, aka generated subtargets. That is, each target
-    will own no more than one single source file.
 
-    If there are >1 original owning targets that refer to the same module—such as `//:a` and `//:b` both owning module
-    `foo`—then we will not add any of the targets to the mapping because there is ambiguity. (We make an exception if
-    one target is an implementation (.py file) and the other is a type stub (.pyi file).
+# -----------------------------------------------------------------------------------------------
+# First-party module mapping
+# -----------------------------------------------------------------------------------------------
+
+
+class FirstPartyPythonMappingImpl(
+    FrozenDict[ResolveName, FrozenDict[str, Tuple[ModuleProvider, ...]]]
+):
+    """A mapping of each resolve name to the first-party module names contained and their owning
+    addresses.
+
+    This contains the modules from a specific implementation, e.g. a codegen backend. All
+    implementations then get merged.
     """
 
-    # The mapping should either have 1 or 2 addresses per module, depending on if there is a type
-    # stub.
-    mapping: FrozenDict[str, Tuple[Address, ...]]
+    @classmethod
+    def create(
+        cls,
+        resolves_to_modules_to_providers: Mapping[
+            ResolveName, Mapping[str, Iterable[ModuleProvider]]
+        ],
+    ) -> FirstPartyPythonMappingImpl:
+        return FirstPartyPythonMappingImpl(
+            (
+                resolve,
+                FrozenDict(
+                    (mod, tuple(sorted(providers))) for mod, providers in sorted(mapping.items())
+                ),
+            )
+            for resolve, mapping in sorted(resolves_to_modules_to_providers.items())
+        )
 
-    def addresses_for_module(self, module: str) -> Tuple[Address, ...]:
-        targets = self.mapping.get(module)
-        if targets:
-            return targets
-        # If the module is not found, try the parent, if any. This is to accommodate `from`
-        # imports, where we don't care about the specific symbol, but only the module. For example,
-        # with `from my_project.app import App`, we only care about the `my_project.app` part.
+
+@union(in_scope_types=[EnvironmentName])
+class FirstPartyPythonMappingImplMarker:
+    """An entry point for a specific implementation of mapping module names to owning targets for
+    Python import dependency inference.
+
+    All implementations will be merged together. Any modules that show up in multiple
+    implementations will be marked ambiguous.
+    """
+
+
+@dataclass(frozen=True)
+class FirstPartyPythonModuleMapping:
+    resolves_to_modules_to_providers: FrozenDict[
+        ResolveName, FrozenDict[str, Tuple[ModuleProvider, ...]]
+    ]
+
+    """A merged mapping of each resolve name to the first-party module names contained and their
+    owning addresses.
+
+    This mapping may have been constructed from multiple distinct implementations, e.g.
+    implementations for each codegen backends.
+    """
+
+    def _providers_for_resolve(
+        self, module: str, resolve: str
+    ) -> tuple[PossibleModuleProvider, ...]:
+        mapping = self.resolves_to_modules_to_providers.get(resolve)
+        if not mapping:
+            return ()
+
+        result = mapping.get(module, ())
+        if result:
+            return tuple(PossibleModuleProvider(provider, 0) for provider in result)
+
+        # If the module is not found, try the parent, if any. This is to handle `from` imports
+        # where the "module" we were handed was actually a symbol inside the module.
+        # E.g., with `from my_project.app import App`, we would be passed "my_project.app.App".
         #
-        # We do not look past the direct parent, as this could cause multiple ambiguous owners to be resolved. This
-        # contrasts with the third-party module mapping, which will try every ancestor.
+        # We do not look past the direct parent, as this could cause multiple ambiguous owners to
+        # be resolved. This contrasts with the third-party module mapping, which will try every
+        # ancestor.
+        # TODO: Now that we capture the ancestry, we could look past the direct parent.
+        #  One reason to do so would be to unify more of the FirstParty and ThirdParty impls.
         if "." not in module:
             return ()
         parent_module = module.rsplit(".", maxsplit=1)[0]
-        return self.mapping.get(parent_module, ())
+        parent_providers = mapping.get(parent_module, ())
+        return tuple(PossibleModuleProvider(mp, 1) for mp in parent_providers)
+
+    def providers_for_module(
+        self, module: str, resolve: str | None
+    ) -> tuple[PossibleModuleProvider, ...]:
+        """Find all providers for the module.
+
+        If `resolve` is None, will not consider resolves, i.e. any `python_source` et al can be
+        used. Otherwise, providers can only come from first-party targets with the resolve.
+        """
+        if resolve:
+            return self._providers_for_resolve(module, resolve)
+        return tuple(
+            itertools.chain.from_iterable(
+                self._providers_for_resolve(module, resolve)
+                for resolve in list(self.resolves_to_modules_to_providers.keys())
+            )
+        )
 
 
-@rule(desc="Creating map of first party targets to Python modules", level=LogLevel.DEBUG)
-async def map_first_party_modules_to_addresses() -> FirstPartyModuleToAddressMapping:
-    all_expanded_targets = await Get(Targets, AddressSpecs([DescendantAddresses("")]))
-    candidate_targets = tuple(tgt for tgt in all_expanded_targets if tgt.has_field(PythonSources))
-    stripped_sources_per_target = await MultiGet(
-        Get(StrippedSourceFileNames, SourcesPathsRequest(tgt[PythonSources]))
-        for tgt in candidate_targets
+@rule(level=LogLevel.DEBUG)
+async def merge_first_party_module_mappings(
+    union_membership: UnionMembership,
+) -> FirstPartyPythonModuleMapping:
+    all_mappings = await MultiGet(
+        Get(
+            FirstPartyPythonMappingImpl,
+            FirstPartyPythonMappingImplMarker,
+            marker_cls(),
+        )
+        for marker_cls in union_membership.get(FirstPartyPythonMappingImplMarker)
     )
-
-    modules_to_addresses: DefaultDict[str, List[Address]] = defaultdict(list)
-    modules_with_multiple_implementations: Set[str] = set()
-    for tgt, stripped_sources in zip(candidate_targets, stripped_sources_per_target):
-        for stripped_f in stripped_sources:
-            module = PythonModule.create_from_stripped_path(PurePath(stripped_f)).module
-            if module in modules_to_addresses:
-                # We check if one of the targets is an implementation (.py file) and the other is
-                # a type stub (.pyi file), which we allow. Otherwise, we have ambiguity.
-                either_targets_are_type_stubs = len(modules_to_addresses[module]) == 1 and (
-                    tgt.address.filename.endswith(".pyi")
-                    or modules_to_addresses[module][0].filename.endswith(".pyi")
-                )
-                if either_targets_are_type_stubs:
-                    modules_to_addresses[module].append(tgt.address)
-                else:
-                    modules_with_multiple_implementations.add(module)
-            else:
-                modules_to_addresses[module].append(tgt.address)
-
-    # Remove modules with ambiguous owners.
-    for module in modules_with_multiple_implementations:
-        modules_to_addresses.pop(module)
-    return FirstPartyModuleToAddressMapping(
+    resolves_to_modules_to_providers: DefaultDict[
+        ResolveName, DefaultDict[str, list[ModuleProvider]]
+    ] = defaultdict(lambda: defaultdict(list))
+    for mapping_impl in all_mappings:
+        for resolve, modules_to_providers in mapping_impl.items():
+            for module, providers in modules_to_providers.items():
+                resolves_to_modules_to_providers[resolve][module].extend(providers)
+    return FirstPartyPythonModuleMapping(
         FrozenDict(
-            {
-                module: tuple(sorted(addresses))
-                for module, addresses in sorted(modules_to_addresses.items())
-            }
+            (
+                resolve,
+                FrozenDict(
+                    (mod, tuple(sorted(providers))) for mod, providers in sorted(mapping.items())
+                ),
+            )
+            for resolve, mapping in sorted(resolves_to_modules_to_providers.items())
         )
     )
 
 
-@dataclass(frozen=True)
-class ThirdPartyModuleToAddressMapping:
-    mapping: FrozenDict[str, Address]
+# This is only used to register our implementation with the plugin hook via unions. Note that we
+# implement this like any other plugin implementation so that we can run them all in parallel.
+class FirstPartyPythonTargetsMappingMarker(FirstPartyPythonMappingImplMarker):
+    pass
 
-    def address_for_module(self, module: str) -> Optional[Address]:
-        target = self.mapping.get(module)
-        if target is not None:
-            return target
+
+@rule(desc="Creating map of first party Python targets to Python modules", level=LogLevel.DEBUG)
+async def map_first_party_python_targets_to_modules(
+    _: FirstPartyPythonTargetsMappingMarker,
+    all_python_targets: AllPythonTargets,
+    python_setup: PythonSetup,
+) -> FirstPartyPythonMappingImpl:
+    stripped_file_per_target = await MultiGet(
+        Get(StrippedFileName, StrippedFileNameRequest(tgt[PythonSourceField].file_path))
+        for tgt in all_python_targets.first_party
+    )
+
+    resolves_to_modules_to_providers: DefaultDict[
+        ResolveName, DefaultDict[str, list[ModuleProvider]]
+    ] = defaultdict(lambda: defaultdict(list))
+    for tgt, stripped_file in zip(all_python_targets.first_party, stripped_file_per_target):
+        resolve = tgt[PythonResolveField].normalized_value(python_setup)
+        stripped_f = PurePath(stripped_file.value)
+        provider_type = (
+            ModuleProviderType.TYPE_STUB if stripped_f.suffix == ".pyi" else ModuleProviderType.IMPL
+        )
+        module = module_from_stripped_path(stripped_f)
+        resolves_to_modules_to_providers[resolve][module].append(
+            ModuleProvider(tgt.address, provider_type)
+        )
+
+    return FirstPartyPythonMappingImpl.create(resolves_to_modules_to_providers)
+
+
+# -----------------------------------------------------------------------------------------------
+# Third party module mapping
+# -----------------------------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class ThirdPartyPythonModuleMapping:
+    """A mapping of each resolve to the modules they contain and the addresses providing those
+    modules."""
+
+    resolves_to_modules_to_providers: FrozenDict[
+        ResolveName, FrozenDict[str, Tuple[ModuleProvider, ...]]
+    ]
+
+    def _providers_for_resolve(
+        self, module: str, resolve: str, ancestry: int = 0
+    ) -> tuple[PossibleModuleProvider, ...]:
+        mapping = self.resolves_to_modules_to_providers.get(resolve)
+        if not mapping:
+            return ()
+
+        result = mapping.get(module, ())
+        if result:
+            return tuple(PossibleModuleProvider(mp, ancestry) for mp in result)
+
         # If the module is not found, recursively try the ancestor modules, if any. For example,
         # pants.task.task.Task -> pants.task.task -> pants.task -> pants
         if "." not in module:
-            return None
+            return ()
         parent_module = module.rsplit(".", maxsplit=1)[0]
-        return self.address_for_module(parent_module)
+        return self._providers_for_resolve(parent_module, resolve, ancestry + 1)
+
+    def providers_for_module(
+        self, module: str, resolve: str | None
+    ) -> tuple[PossibleModuleProvider, ...]:
+        """Find all providers for the module.
+
+        If `resolve` is None, will not consider resolves, i.e. any `python_requirement` can be
+        consumed. Otherwise, providers can only come from `python_requirements` with the resolve.
+        """
+        if resolve:
+            return self._providers_for_resolve(module, resolve)
+        return tuple(
+            itertools.chain.from_iterable(
+                self._providers_for_resolve(module, resolve)
+                for resolve in list(self.resolves_to_modules_to_providers.keys())
+            )
+        )
 
 
 @rule(desc="Creating map of third party targets to Python modules", level=LogLevel.DEBUG)
-async def map_third_party_modules_to_addresses() -> ThirdPartyModuleToAddressMapping:
-    all_targets = await Get(Targets, AddressSpecs([DescendantAddresses("")]))
-    modules_to_addresses: Dict[str, Address] = {}
-    modules_with_multiple_owners: Set[str] = set()
-    for tgt in all_targets:
-        if not tgt.has_field(PythonRequirementsField):
-            continue
-        module_map = tgt.get(ModuleMappingField).value or {}  # type: ignore[var-annotated]
-        for python_req in tgt[PythonRequirementsField].value:
-            modules = module_map.get(
-                python_req.project_name,
-                [python_req.project_name.lower().replace("-", "_")],
-            )
+async def map_third_party_modules_to_addresses(
+    all_python_targets: AllPythonTargets,
+    python_setup: PythonSetup,
+) -> ThirdPartyPythonModuleMapping:
+    resolves_to_modules_to_providers: DefaultDict[
+        ResolveName, DefaultDict[str, list[ModuleProvider]]
+    ] = defaultdict(lambda: defaultdict(list))
+
+    for tgt in all_python_targets.third_party:
+        resolve = tgt[PythonRequirementResolveField].normalized_value(python_setup)
+
+        def add_modules(modules: Iterable[str], *, type_stub: bool = False) -> None:
             for module in modules:
-                if module in modules_to_addresses:
-                    modules_with_multiple_owners.add(module)
+                resolves_to_modules_to_providers[resolve][module].append(
+                    ModuleProvider(
+                        tgt.address,
+                        ModuleProviderType.TYPE_STUB if type_stub else ModuleProviderType.IMPL,
+                    )
+                )
+
+        explicit_modules = tgt.get(PythonRequirementModulesField).value
+        if explicit_modules:
+            add_modules(explicit_modules)
+            continue
+
+        explicit_stub_modules = tgt.get(PythonRequirementTypeStubModulesField).value
+        if explicit_stub_modules:
+            add_modules(explicit_stub_modules, type_stub=True)
+            continue
+
+        # Else, fall back to defaults.
+        for req in tgt[PythonRequirementsField].value:
+            # NB: We don't use `canonicalize_project_name()` for the fallback value because we
+            # want to preserve `.` in the module name. See
+            # https://www.python.org/dev/peps/pep-0503/#normalized-names.
+            proj_name = canonicalize_project_name(req.project_name)
+            fallback_value = req.project_name.strip().lower().replace("-", "_")
+
+            in_stubs_map = proj_name in DEFAULT_TYPE_STUB_MODULE_MAPPING
+            starts_with_prefix = fallback_value.startswith(("types_", "stubs_"))
+            ends_with_prefix = fallback_value.endswith(("_types", "_stubs"))
+            if proj_name not in DEFAULT_MODULE_MAPPING and (
+                in_stubs_map or starts_with_prefix or ends_with_prefix
+            ):
+                if in_stubs_map:
+                    stub_modules = DEFAULT_TYPE_STUB_MODULE_MAPPING[proj_name]
                 else:
-                    modules_to_addresses[module] = tgt.address
-    # Remove modules with ambiguous owners.
-    for module in modules_with_multiple_owners:
-        modules_to_addresses.pop(module)
-    return ThirdPartyModuleToAddressMapping(FrozenDict(sorted(modules_to_addresses.items())))
+                    stub_modules = (
+                        fallback_value[6:] if starts_with_prefix else fallback_value[:-6],
+                    )
+                add_modules(stub_modules, type_stub=True)
+            else:
+                add_modules(DEFAULT_MODULE_MAPPING.get(proj_name, (fallback_value,)))
+
+    return ThirdPartyPythonModuleMapping(
+        FrozenDict(
+            (
+                resolve,
+                FrozenDict(
+                    (mod, tuple(sorted(providers))) for mod, providers in sorted(mapping.items())
+                ),
+            )
+            for resolve, mapping in sorted(resolves_to_modules_to_providers.items())
+        )
+    )
 
 
-class PythonModuleOwners(Collection[Address]):
+# -----------------------------------------------------------------------------------------------
+# module -> owners
+# -----------------------------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class PythonModuleOwners:
     """The target(s) that own a Python module.
 
-    If >1 targets own the same module, and they're implementations (vs .pyi type stubs), the
-    collection should be empty. The collection should never be > 2.
+    Up to 2 targets can unambiguously own the same module, if one is an implementation and the other
+    is a .pyi type stub. It is ambiguous for >1 implementation target to own the same module, and
+    those targets will be put into `ambiguous` instead of `unambiguous`. Therefore, `unambiguous`
+    should never be >2; and only 1 of `unambiguous` and `ambiguous` should have targets.
     """
+
+    unambiguous: tuple[Address, ...]
+    ambiguous: tuple[Address, ...] = ()
+
+    def __post_init__(self) -> None:
+        if self.unambiguous and self.ambiguous:
+            raise AssertionError(
+                softwrap(
+                    """
+                    A module has both unambiguous and ambiguous owners, which is a bug in the
+                    dependency inference code. Please file a bug report at
+                    https://github.com/pantsbuild/pants/issues/new.
+                    """
+                )
+            )
+
+
+@dataclass(frozen=True)
+class PythonModuleOwnersRequest:
+    module: str
+    resolve: str | None
 
 
 @rule
 async def map_module_to_address(
-    module: PythonModule,
-    first_party_mapping: FirstPartyModuleToAddressMapping,
-    third_party_mapping: ThirdPartyModuleToAddressMapping,
+    request: PythonModuleOwnersRequest,
+    first_party_mapping: FirstPartyPythonModuleMapping,
+    third_party_mapping: ThirdPartyPythonModuleMapping,
 ) -> PythonModuleOwners:
-    third_party_address = third_party_mapping.address_for_module(module.module)
-    first_party_addresses = first_party_mapping.addresses_for_module(module.module)
-
-    # It's possible for a user to write type stubs (`.pyi` files) for their third-party dependencies. We check if that
-    # happened, but we're strict in validating that there is only a single third party address and a single first-party
-    # address referring to a `.pyi` file; otherwise, we have ambiguous implementations, so no-op.
-    third_party_resolved_only = third_party_address and not first_party_addresses
-    third_party_resolved_with_type_stub = (
-        third_party_address
-        and len(first_party_addresses) == 1
-        and first_party_addresses[0].filename.endswith(".pyi")
+    possible_providers: tuple[PossibleModuleProvider, ...] = (
+        *third_party_mapping.providers_for_module(request.module, resolve=request.resolve),
+        *first_party_mapping.providers_for_module(request.module, resolve=request.resolve),
     )
 
-    if third_party_resolved_only:
-        return PythonModuleOwners([cast(Address, third_party_address)])
-    if third_party_resolved_with_type_stub:
-        return PythonModuleOwners([cast(Address, third_party_address), first_party_addresses[0]])
-    # Else, we have ambiguity between the third-party and first-party addresses.
-    if third_party_address and first_party_addresses:
-        return PythonModuleOwners()
+    # We attempt to disambiguate conflicting providers by taking - for each provider type -
+    # the providers for the closest ancestors to the requested modules. This prevents
+    # issues with namespace packages that are split between first-party and third-party
+    # (e.g., https://github.com/pantsbuild/pants/discussions/17286).
 
-    # We're done with looking at third-party addresses, and now solely look at first-party.
-    if first_party_addresses:
-        return PythonModuleOwners(first_party_addresses)
-    return PythonModuleOwners()
+    # Map from provider type to mutable pair of
+    # [closest ancestry, list of provider of that type at that ancestry level].
+    type_to_closest_providers: dict[ModuleProviderType, list] = defaultdict(lambda: [999, []])
+    for possible_provider in possible_providers:
+        val = type_to_closest_providers[possible_provider.provider.typ]
+        if possible_provider.ancestry < val[0]:
+            val[0] = possible_provider.ancestry
+            val[1] = []
+        # NB This must come after the < check above, so we handle the possible_provider
+        # that caused that check to pass.
+        if possible_provider.ancestry == val[0]:
+            val[1].append(possible_provider.provider)
+
+    closest_providers: list[ModuleProvider] = list(
+        itertools.chain(*[val[1] for val in type_to_closest_providers.values()])
+    )
+    addresses = tuple(provider.addr for provider in closest_providers)
+
+    # Check that we have at most one closest provider for each provider type.
+    # If we have more than one, signal ambiguity.
+    if any(len(val[1]) > 1 for val in type_to_closest_providers.values()):
+        return PythonModuleOwners((), ambiguous=addresses)
+
+    return PythonModuleOwners(addresses)
 
 
 def rules():
-    return collect_rules()
+    return (
+        *collect_rules(),
+        UnionRule(FirstPartyPythonMappingImplMarker, FirstPartyPythonTargetsMappingMarker),
+    )

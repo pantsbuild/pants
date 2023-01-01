@@ -1,3 +1,5 @@
+// Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
+// Licensed under the Apache License, Version 2.0 (see LICENSE).
 use std::cmp;
 use std::collections::{HashMap, HashSet};
 use std::future::Future;
@@ -8,15 +10,21 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use async_trait::async_trait;
+use futures::future;
 use parking_lot::Mutex;
 use rand::{self, Rng};
-use tokio::time::{delay_for, timeout, Elapsed};
+use task_executor::Executor;
+use tokio::time::{error::Elapsed, sleep, timeout};
 
 use crate::{EntryId, Graph, InvalidationResult, Node, NodeContext, NodeError, Stats};
 
+fn empty_graph() -> Arc<Graph<TNode>> {
+  Arc::new(Graph::new(Executor::new()))
+}
+
 #[tokio::test]
 async fn create() {
-  let graph = Arc::new(Graph::new());
+  let graph = empty_graph();
   let context = TContext::new(graph.clone());
   assert_eq!(
     graph.create(TNode::new(2), &context).await,
@@ -26,7 +34,7 @@ async fn create() {
 
 #[tokio::test]
 async fn invalidate_and_clean() {
-  let graph = Arc::new(Graph::new());
+  let graph = empty_graph();
   let context = TContext::new(graph.clone());
 
   // Create three nodes.
@@ -41,7 +49,7 @@ async fn invalidate_and_clean() {
 
   // Clear the middle Node, which dirties the upper node.
   assert_eq!(
-    graph.invalidate_from_roots(|&TNode(n, _)| n == 1),
+    graph.invalidate_from_roots(true, |n| n.id == 1),
     InvalidationResult {
       cleared: 1,
       dirtied: 1
@@ -61,7 +69,7 @@ async fn invalidate_and_clean() {
 
 #[tokio::test]
 async fn invalidate_and_rerun() {
-  let graph = Arc::new(Graph::new());
+  let graph = empty_graph();
   let context = TContext::new(graph.clone());
 
   // Create three nodes.
@@ -76,7 +84,7 @@ async fn invalidate_and_rerun() {
 
   // Clear the middle Node, which dirties the upper node.
   assert_eq!(
-    graph.invalidate_from_roots(|&TNode(n, _)| n == 1),
+    graph.invalidate_from_roots(true, |n| n.id == 1),
     InvalidationResult {
       cleared: 1,
       dirtied: 1
@@ -94,8 +102,55 @@ async fn invalidate_and_rerun() {
 }
 
 #[tokio::test]
+async fn invalidate_uncacheable() {
+  let graph = empty_graph();
+
+  // Create three nodes, with the middle node as uncacheable.
+  let context = {
+    let mut uncacheable = HashSet::new();
+    uncacheable.insert(TNode::new(1));
+    TContext::new(graph.clone()).with_uncacheable(uncacheable)
+  };
+  assert_eq!(
+    graph.create(TNode::new(2), &context).await,
+    Ok(vec![T(0, 0), T(1, 0), T(2, 0)])
+  );
+  assert_eq!(
+    context.runs(),
+    vec![TNode::new(2), TNode::new(1), TNode::new(0)]
+  );
+
+  // Clear the bottom Node, which dirties the middle and upper node.
+  assert_eq!(
+    graph.invalidate_from_roots(true, |n| n.id == 0),
+    InvalidationResult {
+      cleared: 1,
+      dirtied: 2
+    }
+  );
+
+  // Re-request in the same session with new salt, and validate that all three re-run.
+  let context = context.with_salt(1);
+  assert_eq!(
+    graph.create(TNode::new(2), &context).await,
+    Ok(vec![T(0, 1), T(1, 1), T(2, 1)])
+  );
+  assert_eq!(
+    context.runs(),
+    vec![
+      TNode::new(2),
+      TNode::new(1),
+      TNode::new(0),
+      TNode::new(1),
+      TNode::new(0),
+      TNode::new(2)
+    ]
+  );
+}
+
+#[tokio::test]
 async fn invalidate_with_changed_dependencies() {
-  let graph = Arc::new(Graph::new());
+  let graph = empty_graph();
   let context = TContext::new(graph.clone());
 
   // Create three nodes.
@@ -106,7 +161,7 @@ async fn invalidate_with_changed_dependencies() {
 
   // Clear the middle Node, which dirties the upper node.
   assert_eq!(
-    graph.invalidate_from_roots(|&TNode(n, _)| n == 1),
+    graph.invalidate_from_roots(true, |n| n.id == 1),
     InvalidationResult {
       cleared: 1,
       dirtied: 1
@@ -115,7 +170,7 @@ async fn invalidate_with_changed_dependencies() {
 
   // Request with a new context that truncates execution at the middle Node.
   let context = TContext::new(graph.clone())
-    .with_dependencies(vec![(TNode::new(1), None)].into_iter().collect());
+    .with_dependencies(vec![(TNode::new(1), vec![])].into_iter().collect());
   assert_eq!(
     graph.create(TNode::new(2), &context).await,
     Ok(vec![T(1, 0), T(2, 0)])
@@ -124,7 +179,7 @@ async fn invalidate_with_changed_dependencies() {
   // Confirm that dirtying the bottom Node does not affect the middle/upper Nodes, which no
   // longer depend on it.
   assert_eq!(
-    graph.invalidate_from_roots(|&TNode(n, _)| n == 0),
+    graph.invalidate_from_roots(true, |n| n.id == 0),
     InvalidationResult {
       cleared: 1,
       dirtied: 0,
@@ -132,9 +187,10 @@ async fn invalidate_with_changed_dependencies() {
   );
 }
 
+#[ignore] // flaky: https://github.com/pantsbuild/pants/issues/10839
 #[tokio::test]
 async fn invalidate_randomly() {
-  let graph = Arc::new(Graph::new());
+  let graph = empty_graph();
 
   let invalidations = 10;
   let sleep_per_invalidation = Duration::from_millis(100);
@@ -151,8 +207,8 @@ async fn invalidate_randomly() {
       invalidations -= 1;
 
       // Invalidate a random node in the graph.
-      let candidate = rng.gen_range(0, range);
-      graph2.invalidate_from_roots(|&TNode(n, _)| n == candidate);
+      let candidate = rng.gen_range(0..range);
+      graph2.invalidate_from_roots(true, |n: &TNode| n.id == candidate);
 
       thread::sleep(sleep_per_invalidation);
     }
@@ -200,7 +256,7 @@ async fn invalidate_randomly() {
 
 #[tokio::test]
 async fn poll_cacheable() {
-  let graph = Arc::new(Graph::new());
+  let graph = empty_graph();
   let context = TContext::new(graph.clone());
 
   // Poll with an empty graph should succeed.
@@ -227,7 +283,7 @@ async fn poll_cacheable() {
   }
 
   // Invalidating something and re-polling should re-compute.
-  graph.invalidate_from_roots(|&TNode(n, _)| n == 0);
+  graph.invalidate_from_roots(true, |n| n.id == 0);
   let (result, _) = graph
     .poll(TNode::new(2), Some(token2), None, &context)
     .await
@@ -238,7 +294,7 @@ async fn poll_cacheable() {
 #[tokio::test]
 async fn poll_uncacheable() {
   let _logger = env_logger::try_init();
-  let graph = Arc::new(Graph::new());
+  let graph = empty_graph();
   // Create a context where the middle node is uncacheable.
   let context = {
     let mut uncacheable = HashSet::new();
@@ -261,7 +317,7 @@ async fn poll_uncacheable() {
   }
 
   // Invalidating something and re-polling should re-compute.
-  graph.invalidate_from_roots(|&TNode(n, _)| n == 0);
+  graph.invalidate_from_roots(true, |n| n.id == 0);
   let (result, _) = graph
     .poll(TNode::new(2), Some(token1), None, &context)
     .await
@@ -271,7 +327,7 @@ async fn poll_uncacheable() {
 
 #[tokio::test]
 async fn uncacheable_dependents_of_uncacheable_node() {
-  let graph = Arc::new(Graph::new());
+  let graph = empty_graph();
 
   // Create a context for which the bottommost Node is not cacheable.
   let context = {
@@ -312,27 +368,27 @@ async fn uncacheable_dependents_of_uncacheable_node() {
 }
 
 #[tokio::test]
-async fn uncacheable_node_only_runs_once() {
+async fn non_restartable_node_only_runs_once() {
   let _logger = env_logger::try_init();
-  let graph = Arc::new(Graph::new());
+  let graph = empty_graph();
 
   let context = {
-    let mut uncacheable = HashSet::new();
-    uncacheable.insert(TNode::new(1));
-    let delay_for_root = Duration::from_millis(1000);
+    let mut non_restartable = HashSet::new();
+    non_restartable.insert(TNode::new(1));
+    let sleep_root = Duration::from_millis(1000);
     let mut delays = HashMap::new();
-    delays.insert(TNode::new(0), delay_for_root);
+    delays.insert(TNode::new(0), sleep_root);
     TContext::new(graph.clone())
-      .with_uncacheable(uncacheable)
+      .with_non_restartable(non_restartable)
       .with_delays(delays)
   };
 
   let graph2 = graph.clone();
   let (send, recv) = mpsc::channel::<()>();
   let _join = thread::spawn(move || {
-    recv.recv_timeout(Duration::from_millis(100)).unwrap();
+    recv.recv_timeout(Duration::from_secs(10)).unwrap();
     thread::sleep(Duration::from_millis(50));
-    graph2.invalidate_from_roots(|&TNode(n, _)| n == 0);
+    graph2.invalidate_from_roots(true, |n| n.id == 0);
   });
 
   send.send(()).unwrap();
@@ -340,24 +396,18 @@ async fn uncacheable_node_only_runs_once() {
     graph.create(TNode::new(2), &context).await,
     Ok(vec![T(0, 0), T(1, 0), T(2, 0)])
   );
-  // TNode(0) and TNode(2) are cleared and dirtied (respectively) before completing, and
-  // so run twice each. But the uncacheable node runs once.
+  // TNode(0) is cleared before completing, and so will run twice. But the non_restartable node and its
+  // dependent each run once.
   assert_eq!(
     context.runs(),
-    vec![
-      TNode::new(2),
-      TNode::new(1),
-      TNode::new(0),
-      TNode::new(2),
-      TNode::new(0),
-    ]
+    vec![TNode::new(2), TNode::new(1), TNode::new(0), TNode::new(0),]
   );
 }
 
 #[tokio::test]
 async fn uncacheable_deps_is_cleaned_for_the_session() {
   let _logger = env_logger::try_init();
-  let graph = Arc::new(Graph::new());
+  let graph = empty_graph();
 
   let context = {
     let mut uncacheable = HashSet::new();
@@ -392,7 +442,7 @@ async fn uncacheable_deps_is_cleaned_for_the_session() {
 #[tokio::test]
 async fn dirtied_uncacheable_deps_node_re_runs() {
   let _logger = env_logger::try_init();
-  let graph = Arc::new(Graph::new());
+  let graph = empty_graph();
 
   let context = {
     let mut uncacheable = HashSet::new();
@@ -422,7 +472,7 @@ async fn dirtied_uncacheable_deps_node_re_runs() {
   };
 
   // Clear the middle node, which will dirty the top node, and then clean both of them.
-  graph.invalidate_from_roots(|&TNode(n, _)| n == 1);
+  graph.invalidate_from_roots(true, |n| n.id == 1);
   assert_eq!(
     graph.create(TNode::new(2), &context).await,
     Ok(vec![T(0, 0), T(1, 0), T(2, 0)])
@@ -452,12 +502,12 @@ async fn dirtied_uncacheable_deps_node_re_runs() {
 #[tokio::test]
 async fn retries() {
   let _logger = env_logger::try_init();
-  let graph = Arc::new(Graph::new());
+  let graph = empty_graph();
 
   let context = {
-    let delay_for_root = Duration::from_millis(100);
+    let sleep_root = Duration::from_millis(100);
     let mut delays = HashMap::new();
-    delays.insert(TNode::new(0), delay_for_root);
+    delays.insert(TNode::new(0), sleep_root);
     TContext::new(graph.clone()).with_delays(delays)
   };
 
@@ -467,7 +517,7 @@ async fn retries() {
   let graph2 = graph.clone();
   let join_handle = thread::spawn(move || loop {
     thread::sleep(sleep_per_invalidation);
-    graph2.invalidate_from_roots(|&TNode(n, _)| n == 0);
+    graph2.invalidate_from_roots(true, |n| n.id == 0);
     if Instant::now() > invalidation_deadline {
       break;
     }
@@ -482,16 +532,19 @@ async fn retries() {
 }
 
 #[tokio::test]
-async fn canceled_immediately() {
+async fn canceled_on_invalidation() {
   let _logger = env_logger::try_init();
   let invalidation_delay = Duration::from_millis(10);
-  let graph = Arc::new(Graph::new_with_invalidation_delay(invalidation_delay));
+  let graph = Arc::new(Graph::new_with_invalidation_delay(
+    Executor::new(),
+    invalidation_delay,
+  ));
 
-  let delay_for_middle = Duration::from_millis(2000);
+  let sleep_middle = Duration::from_millis(2000);
   let start_time = Instant::now();
   let context = {
     let mut delays = HashMap::new();
-    delays.insert(TNode::new(1), delay_for_middle);
+    delays.insert(TNode::new(1), sleep_middle);
     TContext::new(graph.clone()).with_delays(delays)
   };
 
@@ -500,12 +553,12 @@ async fn canceled_immediately() {
   // invalidation to ensure that work actually starts before being invalidated.
   let iterations = 3;
   let sleep_per_invalidation = invalidation_delay * 10;
-  assert!(delay_for_middle > sleep_per_invalidation * 3);
+  assert!(sleep_middle > sleep_per_invalidation * 3);
   let graph2 = graph.clone();
   let _join = thread::spawn(move || {
     for _ in 0..iterations {
       thread::sleep(sleep_per_invalidation);
-      graph2.invalidate_from_roots(|&TNode(n, _)| n == 1);
+      graph2.invalidate_from_roots(true, |n| n.id == 1);
     }
   });
   assert_eq!(
@@ -514,7 +567,7 @@ async fn canceled_immediately() {
   );
 
   // We should have waited much less than the time it would have taken to complete three times.
-  assert!(Instant::now() < start_time + (delay_for_middle * iterations));
+  assert!(Instant::now() < start_time + (sleep_middle * iterations));
 
   // And the top nodes should have seen three aborts.
   assert_eq!(
@@ -531,26 +584,105 @@ async fn canceled_immediately() {
 }
 
 #[tokio::test]
+async fn canceled_on_loss_of_interest() {
+  let _logger = env_logger::try_init();
+  let graph = empty_graph();
+
+  let sleep_middle = Duration::from_millis(2000);
+  let start_time = Instant::now();
+  let context = {
+    let mut delays = HashMap::new();
+    delays.insert(TNode::new(1), sleep_middle);
+    TContext::new(graph.clone()).with_delays(delays)
+  };
+
+  // Start a run, but cancel it well before the delayed middle node can complete.
+  tokio::select! {
+    _ = sleep(Duration::from_millis(100)) => {},
+    _ = graph.create(TNode::new(2), &context) => { panic!("Should have timed out.") }
+  }
+
+  // Then start again, and allow to run to completion.
+  assert_eq!(
+    graph.create(TNode::new(2), &context).await,
+    Ok(vec![T(0, 0), T(1, 0), T(2, 0)])
+  );
+
+  // We should have waited more than the delay, but less than the time it would have taken to
+  // run twice.
+  assert!(Instant::now() >= start_time + sleep_middle);
+  assert!(Instant::now() < start_time + (sleep_middle * 2));
+
+  // And the top nodes should have seen one abort each.
+  assert_eq!(vec![TNode::new(2), TNode::new(1),], context.aborts(),);
+}
+
+#[tokio::test]
+async fn clean_speculatively() {
+  let _logger = env_logger::try_init();
+  let graph = empty_graph();
+
+  // Create a graph with a node with two dependencies, one of which takes much longer
+  // to run.
+  let mut dependencies = vec![
+    (TNode::new(3), vec![TNode::new(2), TNode::new(1)]),
+    (TNode::new(2), vec![TNode::new(0)]),
+    (TNode::new(1), vec![TNode::new(0)]),
+  ]
+  .into_iter()
+  .collect::<HashMap<_, _>>();
+  let delay = Duration::from_millis(2000);
+  let context = {
+    let mut delays = HashMap::new();
+    delays.insert(TNode::new(2), delay);
+    TContext::new(graph.clone())
+      .with_delays(delays)
+      .with_dependencies(dependencies.clone())
+  };
+
+  // Run it to completion, and then clear a node at the bottom of the graph to force cleaning of
+  // both dependencies.
+  assert_eq!(
+    graph.create(TNode::new(3), &context).await,
+    Ok(vec![T(0, 0), T(2, 0), T(3, 0)])
+  );
+  graph.invalidate_from_roots(true, |n| n == &TNode::new(0));
+
+  // Then request again with the slow node removed from the dependencies, and confirm that it is
+  // cleaned much sooner than it would been if it had waited for the slow node.
+  dependencies.insert(TNode::new(3), vec![TNode::new(1)]);
+  let context = context.with_salt(1).with_dependencies(dependencies);
+  let start_time = Instant::now();
+  assert_eq!(
+    graph.create(TNode::new(3), &context).await,
+    Ok(vec![T(0, 1), T(1, 1), T(3, 1)])
+  );
+  assert!(Instant::now() < start_time + delay);
+  assert_eq!(context.stats().cleaning_failed, 3);
+}
+
+#[tokio::test]
 async fn cyclic_failure() {
   // Confirms that an attempt to create a cycle fails.
-  let graph = Arc::new(Graph::new());
+  let graph = empty_graph();
   let top = TNode::new(2);
   let context = TContext::new(graph.clone()).with_dependencies(
     // Request creation of a cycle by sending the bottom most node to the top.
-    vec![(TNode::new(0), Some(top))].into_iter().collect(),
+    vec![(TNode::new(0), vec![top])].into_iter().collect(),
   );
 
   assert_eq!(
     graph.create(TNode::new(2), &context).await,
-    Err(TError::Cyclic)
+    Err(TError::Cyclic(vec![0, 2, 1]))
   );
 }
 
 #[tokio::test]
 async fn cyclic_dirtying() {
+  let _logger = env_logger::try_init();
   // Confirms that a dirtied path between two nodes is able to reverse direction while being
   // cleaned.
-  let graph = Arc::new(Graph::new());
+  let graph = empty_graph();
   let initial_top = TNode::new(2);
   let initial_bot = TNode::new(0);
 
@@ -562,12 +694,15 @@ async fn cyclic_dirtying() {
   );
 
   // Clear the bottom node, and then clean it with a context that causes the path to reverse.
-  graph.invalidate_from_roots(|n| n == &initial_bot);
+  graph.invalidate_from_roots(true, |n| n == &initial_bot);
   let context_up = context_down.with_salt(1).with_dependencies(
     // Reverse the path from bottom to top.
-    vec![(TNode::new(1), None), (TNode::new(0), Some(TNode::new(1)))]
-      .into_iter()
-      .collect(),
+    vec![
+      (TNode::new(1), vec![]),
+      (TNode::new(0), vec![TNode::new(1)]),
+    ]
+    .into_iter()
+    .collect(),
   );
 
   let res = graph.create(initial_bot, &context_up).await;
@@ -577,105 +712,6 @@ async fn cyclic_dirtying() {
   let res = graph.create(initial_top, &context_up).await;
 
   assert_eq!(res, Ok(vec![T(1, 1), T(2, 1)]));
-}
-
-#[tokio::test]
-async fn critical_path() {
-  use super::entry::Entry;
-  // First, let's describe the scenario with plain data.
-  //
-  // We label the nodes with static strings to help visualise the situation.
-  // The first element of each tuple is a readable label. The second element represents the
-  // duration for this action.
-  let nodes = [
-    ("download jvm", 10),
-    ("download a", 1),
-    ("download b", 2),
-    ("download c", 3),
-    ("compile a", 3),
-    ("compile b", 20),
-    ("compile c", 5),
-  ];
-  let deps = [
-    ("download jvm", "compile a"),
-    ("download jvm", "compile b"),
-    ("download jvm", "compile c"),
-    ("download a", "compile a"),
-    ("download b", "compile b"),
-    ("download c", "compile c"),
-    ("compile a", "compile c"),
-    ("compile b", "compile c"),
-  ];
-
-  // Describe a few transformations to navigate between our readable data and the actual types
-  // needed for the graph.
-  let tnode = |node: &str| {
-    TNode::new(
-      nodes
-        .iter()
-        .map(|(k, _)| k)
-        .position(|label| &node == label)
-        .unwrap(),
-    )
-  };
-  let node_key = |node: &str| tnode(node);
-  let node_entry = |node: &str| Entry::new(node_key(node));
-  let node_and_duration_from_entry = |entry: &super::entry::Entry<TNode>| nodes[entry.node().0];
-  let node_duration =
-    |entry: &super::entry::Entry<TNode>| Duration::from_secs(node_and_duration_from_entry(entry).1);
-
-  // Construct a graph and populate it with the nodes and edges prettily defined above.
-  let graph = Graph::new();
-  {
-    let inner = &mut graph.inner.lock();
-    for (node, _) in &nodes {
-      let node_index = inner.pg.add_node(node_entry(node));
-      inner.nodes.insert(node_key(node), node_index);
-    }
-    for (src, dst) in &deps {
-      let src = inner.nodes[&node_key(src)];
-      let dst = inner.nodes[&node_key(dst)];
-      inner.pg.add_edge(src, dst, 1.0);
-    }
-  }
-
-  // Calculate the critical path and validate it.
-  {
-    // The roots are all the sources, so we're covering the entire graph
-    let roots = ["download jvm", "download a", "download b", "download c"]
-      .iter()
-      .map(|n| tnode(n))
-      .collect::<Vec<_>>();
-    let (expected_total_duration, expected_critical_path) = (
-      Duration::from_secs(35),
-      vec!["download jvm", "compile b", "compile c"],
-    );
-    let (total_duration, critical_path) = graph.critical_path(&roots, &node_duration);
-    assert_eq!(expected_total_duration, total_duration);
-    let critical_path = critical_path
-      .iter()
-      .map(|entry| node_and_duration_from_entry(entry).0)
-      .collect::<Vec<_>>();
-    assert_eq!(expected_critical_path, critical_path);
-  }
-  {
-    // The roots exclude some nodes ("download jvm", "download a") from the graph.
-    let roots = ["download b", "download c"]
-      .iter()
-      .map(|n| tnode(n))
-      .collect::<Vec<_>>();
-    let (expected_total_duration, expected_critical_path) = (
-      Duration::from_secs(27),
-      vec!["download b", "compile b", "compile c"],
-    );
-    let (total_duration, critical_path) = graph.critical_path(&roots, &node_duration);
-    assert_eq!(expected_total_duration, total_duration);
-    let critical_path = critical_path
-      .iter()
-      .map(|entry| node_and_duration_from_entry(entry).0)
-      .collect::<Vec<_>>();
-    assert_eq!(expected_critical_path, critical_path);
-  }
 }
 
 ///
@@ -690,21 +726,29 @@ struct T(usize, usize);
 /// to the result.
 ///
 #[derive(Clone, Debug)]
-struct TNode(usize, bool /*cacheability*/);
+struct TNode {
+  pub id: usize,
+  restartable: bool,
+  cacheable: bool,
+}
 impl TNode {
   fn new(id: usize) -> Self {
-    TNode(id, true)
+    TNode {
+      id,
+      restartable: true,
+      cacheable: true,
+    }
   }
 }
 impl PartialEq for TNode {
   fn eq(&self, other: &Self) -> bool {
-    self.0 == other.0
+    self.id == other.id
   }
 }
 impl Eq for TNode {}
 impl Hash for TNode {
   fn hash<H: Hasher>(&self, state: &mut H) {
-    self.0.hash(state);
+    self.id.hash(state);
   }
 }
 #[async_trait]
@@ -716,21 +760,38 @@ impl Node for TNode {
   async fn run(self, context: TContext) -> Result<Vec<T>, TError> {
     let mut abort_guard = context.abort_guard(self.clone());
     context.ran(self.clone());
-    let token = T(self.0, context.salt());
+    let token = T(self.id, context.salt());
     context.maybe_delay(&self).await;
-    let res = if let Some(dep) = context.dependency_of(&self) {
-      let mut v = context.get(dep).await?;
-      v.push(token);
-      Ok(v)
-    } else {
-      Ok(vec![token])
+    let res = match context.dependencies_of(&self) {
+      deps if !deps.is_empty() => {
+        // Request all dependencies, but include only the first in our output value.
+        let mut values = future::try_join_all(
+          deps
+            .into_iter()
+            .map(|dep| context.get(dep))
+            .collect::<Vec<_>>(),
+        )
+        .await?;
+        let mut v = values.swap_remove(0);
+        v.push(token);
+        Ok(v)
+      }
+      _ => Ok(vec![token]),
     };
     abort_guard.did_not_abort();
     res
   }
 
+  fn restartable(&self) -> bool {
+    self.restartable
+  }
+
   fn cacheable(&self) -> bool {
-    self.1
+    self.cacheable
+  }
+
+  fn cyclic_error(path: &[&Self]) -> Self::Error {
+    TError::Cyclic(path.iter().map(|n| n.id).collect())
   }
 }
 
@@ -797,12 +858,12 @@ struct TContext {
   // outside world". A test that wants to "change the outside world" and observe its effect on the
   // graph should change the salt to do so.
   salt: usize,
-  // A mapping from source to optional destination that drives what values each TNode depends on.
+  // A mapping from source to destinations that drives what values each TNode depends on.
   // If there is no entry in this map for a node, then TNode::run will default to requesting
-  // the next smallest node. Finally, if a None entry is present, a node will have no
-  // dependencies.
-  edges: Arc<HashMap<TNode, Option<TNode>>>,
+  // the next smallest node.
+  edges: Arc<HashMap<TNode, Vec<TNode>>>,
   delays: Arc<HashMap<TNode, Duration>>,
+  non_restartable: Arc<HashSet<TNode>>,
   uncacheable: Arc<HashSet<TNode>>,
   graph: Arc<Graph<TNode>>,
   aborts: Arc<Mutex<Vec<TNode>>>,
@@ -824,6 +885,7 @@ impl NodeContext for TContext {
       salt: self.salt,
       edges: self.edges.clone(),
       delays: self.delays.clone(),
+      non_restartable: self.non_restartable.clone(),
       uncacheable: self.uncacheable.clone(),
       graph: self.graph.clone(),
       aborts: self.aborts.clone(),
@@ -857,6 +919,7 @@ impl TContext {
       salt: 0,
       edges: Arc::default(),
       delays: Arc::default(),
+      non_restartable: Arc::default(),
       uncacheable: Arc::default(),
       graph,
       aborts: Arc::default(),
@@ -866,13 +929,18 @@ impl TContext {
     }
   }
 
-  fn with_dependencies(mut self, edges: HashMap<TNode, Option<TNode>>) -> TContext {
+  fn with_dependencies(mut self, edges: HashMap<TNode, Vec<TNode>>) -> TContext {
     self.edges = Arc::new(edges);
     self
   }
 
   fn with_delays(mut self, delays: HashMap<TNode, Duration>) -> TContext {
     self.delays = Arc::new(delays);
+    self
+  }
+
+  fn with_non_restartable(mut self, non_restartable: HashSet<TNode>) -> TContext {
+    self.non_restartable = Arc::new(non_restartable);
     self
   }
 
@@ -920,25 +988,25 @@ impl TContext {
 
   async fn maybe_delay(&self, node: &TNode) {
     if let Some(delay) = self.delays.get(node) {
-      delay_for(*delay).await;
+      sleep(*delay).await;
     }
   }
 
   ///
   /// If the given TNode should declare a dependency on another TNode, returns that dependency.
   ///
-  fn dependency_of(&self, node: &TNode) -> Option<TNode> {
+  fn dependencies_of(&self, node: &TNode) -> Vec<TNode> {
     match self.edges.get(node) {
-      Some(Some(ref dep)) => Some(dep.clone()),
-      Some(None) => None,
-      None if node.0 > 0 => {
-        let new_node_id = node.0 - 1;
-        Some(TNode(
-          new_node_id,
-          !self.uncacheable.contains(&TNode::new(new_node_id)),
-        ))
+      Some(deps) => deps.clone(),
+      None if node.id > 0 => {
+        let new_node_id = node.id - 1;
+        vec![TNode {
+          id: new_node_id,
+          restartable: !self.non_restartable.contains(&TNode::new(new_node_id)),
+          cacheable: !self.uncacheable.contains(&TNode::new(new_node_id)),
+        }]
       }
-      None => None,
+      None => vec![],
     }
   }
 
@@ -976,15 +1044,11 @@ impl Drop for AbortGuard {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum TError {
-  Cyclic,
+  Cyclic(Vec<usize>),
   Invalidated,
 }
 impl NodeError for TError {
   fn invalidated() -> Self {
     TError::Invalidated
-  }
-
-  fn cyclic(_path: Vec<String>) -> Self {
-    TError::Cyclic
   }
 }

@@ -8,7 +8,6 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Dict, KeysView, Tuple
 
-from pants.engine.internals.native import Native
 from pants.util.meta import frozen_after_init
 
 logger = logging.getLogger(__name__)
@@ -74,7 +73,7 @@ class PantsService(ABC):
         self._state.mark_terminating()
 
 
-class _ServiceState(object):
+class _ServiceState:
     """A threadsafe state machine for controlling a service running in another thread.
 
     The state machine represents two stable states:
@@ -110,9 +109,7 @@ class _ServiceState(object):
 
     def _set_state(self, state, *valid_states):
         if valid_states and self._state not in valid_states:
-            raise AssertionError(
-                "Cannot move {} to `{}` while it is `{}`.".format(self, state, self._state)
-            )
+            raise AssertionError(f"Cannot move {self} to `{state}` while it is `{self._state}`.")
         self._state = state
         self._condition.notify_all()
 
@@ -213,12 +210,7 @@ class PantsServices:
     @classmethod
     def _make_thread(cls, service):
         name = f"{service.__class__.__name__}Thread"
-
-        def target():
-            Native().override_thread_logging_destination_to_just_pantsd()
-            service.run()
-
-        t = threading.Thread(target=target, name=name)
+        t = threading.Thread(target=service.run, name=name)
         t.daemon = True
         return t
 

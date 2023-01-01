@@ -1,58 +1,31 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+# The `pantsbuild.pants.testutil` distribution is built as one version for all the various Python
+# versions supported. However the build script used to build the `pantsbuild.pants` wheels runs for
+# each separate Python version to produce version specific wheels, so we need to cancel the default
+# interpreter constraints set by that process, using the `setup_py.python_requires` field, and also
+# tagging the wheel for all the supported Python versions.
 python_distribution(
-  name='testutil_wheel',
-  dependencies=[
-    ':testutil',
-    ':int-test-for-export',
-  ],
-  setup_py_commands=["bdist_wheel", "--python-tag", "py37.py38", "sdist"],
-  provides=setup_py(
-    name='pantsbuild.pants.testutil',
-    description='Test support for writing Pants plugins.',
-    classifiers=[
-      'Topic :: Software Development :: Testing',
-    ]
-  ),
+    name="testutil_wheel",
+    dependencies=[":testutil", ":py_typed"],
+    provides=setup_py(
+        name="pantsbuild.pants.testutil",
+        description="Test support for writing Pants plugins.",
+        classifiers=["Topic :: Software Development :: Testing"],
+        # N.B.: Must match [python] interpreter_constraints in pants.toml.
+        python_requires=">=3.7,<3.10",
+    ),
 )
 
-python_library(
-  sources=[
-    "*.py",
-    "!rule_runner.py",
-    "!test_base.py",
-    "!pants_integration_test.py",
-    "!_test.py",
-  ],
+python_sources(
+    sources=["*.py", "pants_integration_test.py", "!_test.py"],
+    overrides={
+        "pants_integration_test.py": {
+            "dependencies": ["//BUILD_ROOT:files", "src/python/pants/__main__.py"]
+        },
+        "rule_runner.py": {"dependencies": ["//BUILD_ROOT:files"]},
+    },
 )
 
-python_library(
-  name="rule_runner",
-  sources=["rule_runner.py", "test_base.py"],
-  dependencies=["//:build_root"],
-)
-
-python_library(
-  name = 'int-test-for-export',
-  sources = ['pants_integration_test.py'],
-  dependencies = [
-    '//:build_root',
-    'src/python/pants:entry_point'
-  ],
-)
-
-target(
-  name = 'int-test',
-  dependencies=[
-    ':int-test-for-export',
-    # NB: 'pants_integration_test.py' runs ./pants in a subprocess using the PYTHONPATH
-    # of the testrunner. We include the pants binary itself to fully populate the path.
-    'src/python/pants/bin:pants_local_binary',
-  ],
-)
-
-python_tests(
-  name='tests',
-  sources=['*_test.py', '!pants_integration_test.py']
-)
+resource(name="py_typed", source="py.typed")

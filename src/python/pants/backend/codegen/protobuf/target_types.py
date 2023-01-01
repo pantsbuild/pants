@@ -1,32 +1,136 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants.engine.target import COMMON_TARGET_FIELDS, BoolField, Dependencies, Sources, Target
+from pants.backend.codegen.protobuf.protoc import Protoc
+from pants.engine.rules import collect_rules, rule
+from pants.engine.target import (
+    COMMON_TARGET_FIELDS,
+    AllTargets,
+    BoolField,
+    Dependencies,
+    MultipleSourcesField,
+    OverridesField,
+    SingleSourceField,
+    Target,
+    TargetFilesGenerator,
+    TargetFilesGeneratorSettings,
+    TargetFilesGeneratorSettingsRequest,
+    Targets,
+    generate_file_based_overrides_field_help_message,
+    generate_multiple_sources_field_help_message,
+)
+from pants.engine.unions import UnionRule
+from pants.util.docutil import doc_url
+from pants.util.logging import LogLevel
+from pants.util.strutil import softwrap
 
 
-# NB: We subclass Dependencies so that specific backends can add dependency injection rules to
-# Protobuf targets.
-class ProtobufDependencies(Dependencies):
+class ProtobufDependenciesField(Dependencies):
     pass
 
 
-class ProtobufSources(Sources):
-    default = ("*.proto",)
+class ProtobufGrpcToggleField(BoolField):
+    alias = "grpc"
+    default = False
+    help = "Whether to generate gRPC code or not."
+
+
+class AllProtobufTargets(Targets):
+    pass
+
+
+@rule(desc="Find all Protobuf targets in project", level=LogLevel.DEBUG)
+def find_all_protobuf_targets(targets: AllTargets) -> AllProtobufTargets:
+    return AllProtobufTargets(tgt for tgt in targets if tgt.has_field(ProtobufSourceField))
+
+
+# -----------------------------------------------------------------------------------------------
+# `protobuf_source` target
+# -----------------------------------------------------------------------------------------------
+
+
+class ProtobufSourceField(SingleSourceField):
     expected_file_extensions = (".proto",)
 
 
-class ProtobufGrcpToggle(BoolField):
-    """Whether to generate gRPC code or not."""
+class ProtobufSourceTarget(Target):
+    alias = "protobuf_source"
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        ProtobufDependenciesField,
+        ProtobufSourceField,
+        ProtobufGrpcToggleField,
+    )
+    help = softwrap(
+        f"""
+        A single Protobuf file used to generate various languages.
 
-    alias = "grpc"
-    default = False
+        See language-specific docs:
+            Python: {doc_url('protobuf-python')}
+            Go: {doc_url('protobuf-go')}
+        """
+    )
 
 
-class ProtobufLibrary(Target):
-    """Protobuf files used to generate various languages.
+# -----------------------------------------------------------------------------------------------
+# `protobuf_sources` target generator
+# -----------------------------------------------------------------------------------------------
 
-    See https://www.pantsbuild.org/docs/protobuf.
-    """
 
-    alias = "protobuf_library"
-    core_fields = (*COMMON_TARGET_FIELDS, ProtobufDependencies, ProtobufSources, ProtobufGrcpToggle)
+class GeneratorSettingsRequest(TargetFilesGeneratorSettingsRequest):
+    pass
+
+
+@rule
+def generator_settings(
+    _: GeneratorSettingsRequest,
+    protoc: Protoc,
+) -> TargetFilesGeneratorSettings:
+    return TargetFilesGeneratorSettings(
+        add_dependencies_on_all_siblings=not protoc.dependency_inference
+    )
+
+
+class ProtobufSourcesGeneratingSourcesField(MultipleSourcesField):
+    default = ("*.proto",)
+    expected_file_extensions = (".proto",)
+    help = generate_multiple_sources_field_help_message(
+        "Example: `sources=['example.proto', 'new_*.proto', '!old_ignore*.proto']`"
+    )
+
+
+class ProtobufSourcesOverridesField(OverridesField):
+    help = generate_file_based_overrides_field_help_message(
+        ProtobufSourceTarget.alias,
+        """
+        overrides={
+            "foo.proto": {"grpc": True},
+            "bar.proto": {"description": "our user model"},
+            ("foo.proto", "bar.proto"): {"tags": ["overridden"]},
+        }
+        """,
+    )
+
+
+class ProtobufSourcesGeneratorTarget(TargetFilesGenerator):
+    alias = "protobuf_sources"
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        ProtobufSourcesGeneratingSourcesField,
+        ProtobufSourcesOverridesField,
+    )
+    generated_target_cls = ProtobufSourceTarget
+    copied_fields = COMMON_TARGET_FIELDS
+    moved_fields = (
+        ProtobufGrpcToggleField,
+        ProtobufDependenciesField,
+    )
+    settings_request_cls = GeneratorSettingsRequest
+    help = "Generate a `protobuf_source` target for each file in the `sources` field."
+
+
+def rules():
+    return [
+        *collect_rules(),
+        UnionRule(TargetFilesGeneratorSettingsRequest, GeneratorSettingsRequest),
+    ]

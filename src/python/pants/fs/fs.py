@@ -3,7 +3,6 @@
 
 import hashlib
 import os
-from pathlib import Path
 
 # The max filename length for HFS+, extX and NTFS is 255, but many systems also have limits on the
 # total path length (made up of multiple filenames), so we include some additional buffer.
@@ -30,7 +29,7 @@ def safe_filename(name, extension=None, digest=None, max_length=_MAX_FILENAME_LE
     max_length: the maximum desired file name length
     """
     if os.path.basename(name) != name:
-        raise ValueError("Name must be a filename, handed a path: {}".format(name))
+        raise ValueError(f"Name must be a filename, handed a path: {name}")
 
     ext = extension or ""
     filename = name + ext
@@ -47,7 +46,7 @@ def safe_filename(name, extension=None, digest=None, max_length=_MAX_FILENAME_LE
         prefix = name[:ps_len]
         suffix = name[-ps_len:] if ps_len > 0 else ""
 
-        safe_name = "{}{}{}{}{}{}".format(prefix, sep, hexdigest, sep, suffix, ext)
+        safe_name = f"{prefix}{sep}{hexdigest}{sep}{suffix}{ext}"
         if len(safe_name) > max_length:
             raise ValueError(
                 "Digest {} failed to produce a filename <= {} "
@@ -62,8 +61,3 @@ def safe_filename_from_path(path, **kwargs):
     First converts it into a name by replacing separator characters, and then calls safe_filename.
     """
     return safe_filename(path.strip(os.path.sep).replace(os.path.sep, "."), **kwargs)
-
-
-def is_child_of(path: Path, directory: Path) -> bool:
-    abs_path = path if path.is_absolute() else directory.joinpath(path).resolve()
-    return directory == abs_path or directory in abs_path.parents

@@ -10,9 +10,7 @@
   clippy::if_not_else,
   clippy::needless_continue,
   clippy::unseparated_literal_suffix,
-  // TODO: Falsely triggers for async/await:
-  //   see https://github.com/rust-lang/rust-clippy/issues/5360
-  // clippy::used_underscore_binding
+  clippy::used_underscore_binding
 )]
 // It is often more clear to show that nothing is being moved.
 #![allow(clippy::match_ref_pats)]
@@ -27,18 +25,21 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
-use bytes::Bytes;
-use hashing::{Fingerprint, FINGERPRINT_SIZE};
+use std::collections::{HashMap, HashSet};
+use std::fmt;
+use std::fmt::Debug;
+use std::io::{self, Read};
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
+use std::time::{self, Duration};
+
+use bytes::{BufMut, Bytes};
+use hashing::{Digest, Fingerprint, WriterHasher, FINGERPRINT_SIZE};
 use lmdb::{
   self, Database, DatabaseFlags, Environment, EnvironmentCopyFlags, EnvironmentFlags,
   RwTransaction, Transaction, WriteFlags,
 };
 use log::trace;
-use std::collections::HashMap;
-use std::fmt;
-use std::path::{Path, PathBuf};
-use std::sync::Arc;
-use std::time::{self, Duration};
 use tempfile::TempDir;
 
 ///
@@ -100,17 +101,22 @@ impl AsRef<[u8]> for VersionedFingerprint {
   }
 }
 
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
+struct EnvironmentId(u8);
+
 // Each LMDB directory can have at most one concurrent writer.
 // We use this type to shard storage into 16 LMDB directories, based on the first 4 bits of the
 // fingerprint being stored, so that we can write to them in parallel.
 #[derive(Debug, Clone)]
 pub struct ShardedLmdb {
   // First Database is content, second is leases.
-  lmdbs: HashMap<u8, (Arc<Environment>, Database, Database)>,
+  lmdbs: HashMap<EnvironmentId, (EnvironmentId, PathBuf, Arc<Environment>, Database, Database)>,
   root_path: PathBuf,
-  max_size: usize,
+  max_size_per_shard: usize,
   executor: task_executor::Executor,
   lease_time: Duration,
+  shard_count: u8,
+  shard_fingerprint_mask: u8,
 }
 
 impl ShardedLmdb {
@@ -120,9 +126,7 @@ impl ShardedLmdb {
   // we actually store in the database. This way, data stored with a version
   // of pants on one schema version will not conflict with data stored
   // with a different version of pants on a different schema version.
-  pub fn schema_version() -> u8 {
-    2
-  }
+  pub const SCHEMA_VERSION: u8 = 2;
 
   // max_size is the maximum size the databases together will be allowed to grow to.
   // When calling this function, we will attempt to allocate that much virtual (not resident) memory
@@ -134,11 +138,36 @@ impl ShardedLmdb {
     max_size: usize,
     executor: task_executor::Executor,
     lease_time: Duration,
+    shard_count: u8,
   ) -> Result<ShardedLmdb, String> {
+    if shard_count.count_ones() != 1 {
+      return Err(format!(
+        "The shard_count must be a power of two: got {}.",
+        shard_count
+      ));
+    }
+
+    let max_size_per_shard = max_size / (shard_count as usize);
+    // We select which shard to use by masking to select only the relevant number of high order bits
+    // from the high order byte of each stored key.
+    let shard_fingerprint_mask = {
+      // Create a mask of the appropriate width.
+      let mask_width = shard_count.trailing_zeros();
+      let mut mask = 0_u8;
+      for _ in 0..mask_width {
+        mask <<= 1;
+        mask |= 1;
+      }
+      // Then move it into the high order bits.
+      mask.rotate_left(Self::shard_shift(shard_count) as u32)
+    };
+
     trace!("Initializing ShardedLmdb at root {:?}", root_path);
     let mut lmdbs = HashMap::new();
 
-    for (env, dir, fingerprint_prefix) in ShardedLmdb::envs(&root_path, max_size)? {
+    for (env, dir, environment_id) in
+      ShardedLmdb::envs(&root_path, max_size_per_shard, shard_count)?
+    {
       let content_database = env
         .create_db(Some("content-versioned"), DatabaseFlags::empty())
         .map_err(|e| {
@@ -158,40 +187,61 @@ impl ShardedLmdb {
         })?;
 
       lmdbs.insert(
-        fingerprint_prefix,
-        (Arc::new(env), content_database, lease_database),
+        environment_id,
+        (
+          environment_id,
+          dir,
+          Arc::new(env),
+          content_database,
+          lease_database,
+        ),
       );
     }
 
     Ok(ShardedLmdb {
       lmdbs,
       root_path,
-      max_size,
+      max_size_per_shard,
       executor,
       lease_time,
+      shard_count,
+      shard_fingerprint_mask,
     })
   }
 
-  fn envs(root_path: &Path, max_size: usize) -> Result<Vec<(Environment, PathBuf, u8)>, String> {
-    let mut envs = Vec::with_capacity(0x10);
-    for b in 0x00..0x10 {
-      let fingerprint_prefix = b << 4;
-      let mut dirname = String::new();
-      fmt::Write::write_fmt(&mut dirname, format_args!("{:x}", fingerprint_prefix)).unwrap();
-      let dirname = dirname[0..1].to_owned();
-      let dir = root_path.join(dirname);
+  ///
+  /// Return the left shift value that will place the relevant portion of a byte (for the given
+  /// shard count, which is asserted in the constructor to be a power of two) into the high order
+  /// bits of a byte.
+  ///
+  fn shard_shift(shard_count: u8) -> u8 {
+    let mask_width = shard_count.trailing_zeros() as u8;
+    8 - mask_width
+  }
+
+  fn envs(
+    root_path: &Path,
+    max_size_per_shard: usize,
+    shard_count: u8,
+  ) -> Result<Vec<(Environment, PathBuf, EnvironmentId)>, String> {
+    let shard_shift = Self::shard_shift(shard_count);
+
+    let mut envs = Vec::with_capacity(shard_count as usize);
+    for b in 0..shard_count {
+      let dir = root_path.join(format!("{:x}", b));
       fs::safe_create_dir_all(&dir)
         .map_err(|err| format!("Error making directory for store at {:?}: {:?}", dir, err))?;
+      let fingerprint_prefix = b.rotate_left(shard_shift as u32);
       envs.push((
-        ShardedLmdb::make_env(&dir, max_size)?,
+        ShardedLmdb::make_env(&dir, max_size_per_shard)?,
         dir,
-        fingerprint_prefix,
+        EnvironmentId(fingerprint_prefix),
       ));
     }
     Ok(envs)
   }
 
-  fn make_env(dir: &Path, max_size: usize) -> Result<Environment, String> {
+  fn make_env(dir: &Path, max_size_per_shard: usize) -> Result<Environment, String> {
     Environment::new()
       // NO_SYNC
       // =======
@@ -226,18 +276,30 @@ impl ShardedLmdb {
       .set_flags(EnvironmentFlags::NO_SYNC | EnvironmentFlags::NO_TLS)
       // 2 DBs; one for file contents, one for leases.
       .set_max_dbs(2)
-      .set_map_size(max_size)
+      .set_map_size(max_size_per_shard)
       .open(dir)
       .map_err(|e| format!("Error making env for store at {:?}: {}", dir, e))
   }
 
   // First Database is content, second is leases.
   pub fn get(&self, fingerprint: &Fingerprint) -> (Arc<Environment>, Database, Database) {
-    self.lmdbs[&(fingerprint.0[0] & 0xF0)].clone()
+    let (_, _, env, db1, db2) = self.get_raw(&fingerprint.0);
+    (env.clone(), *db1, *db2)
+  }
+
+  pub(crate) fn get_raw(
+    &self,
+    fingerprint: &[u8],
+  ) -> &(EnvironmentId, PathBuf, Arc<Environment>, Database, Database) {
+    &self.lmdbs[&EnvironmentId(fingerprint[0] & self.shard_fingerprint_mask)]
   }
 
   pub fn all_lmdbs(&self) -> Vec<(Arc<Environment>, Database, Database)> {
-    self.lmdbs.values().cloned().collect()
+    self
+      .lmdbs
+      .values()
+      .map(|(_, _, env, db1, db2)| (env.clone(), *db1, *db2))
+      .collect()
   }
 
   pub async fn remove(&self, fingerprint: Fingerprint) -> Result<bool, String> {
@@ -245,7 +307,7 @@ impl ShardedLmdb {
     self
       .executor
       .spawn_blocking(move || {
-        let effective_key = VersionedFingerprint::new(fingerprint, ShardedLmdb::schema_version());
+        let effective_key = VersionedFingerprint::new(fingerprint, ShardedLmdb::SCHEMA_VERSION);
         let (env, db, _lease_database) = store.get(&fingerprint);
         let del_res = env.begin_rw_txn().and_then(|mut txn| {
           txn.del(db, &effective_key, None)?;
@@ -265,62 +327,271 @@ impl ShardedLmdb {
       .await
   }
 
+  ///
+  /// Singular form of `Self::exists_batch`. When checking the existence of more than one item,
+  /// prefer `Self::exists_batch`.
+  ///
   pub async fn exists(&self, fingerprint: Fingerprint) -> Result<bool, String> {
+    let missing = self.exists_batch(vec![fingerprint]).await?;
+    Ok(missing.contains(&fingerprint))
+  }
+
+  ///
+  /// Determine which of the given Fingerprints are already present in the store,
+  /// returning them as a set.
+  ///
+  pub async fn exists_batch(
+    &self,
+    fingerprints: Vec<Fingerprint>,
+  ) -> Result<HashSet<Fingerprint>, String> {
     let store = self.clone();
-    let effective_key = VersionedFingerprint::new(fingerprint, ShardedLmdb::schema_version());
     self
       .executor
       .spawn_blocking(move || {
-        let fingerprint = effective_key.get_fingerprint();
-        let (env, db, _) = store.get(&fingerprint);
-        let txn = env
-          .begin_ro_txn()
-          .map_err(|err| format!("Failed to begin read transaction: {:?}", err))?;
-        match txn.get(db, &effective_key) {
-          Ok(_) => Ok(true),
-          Err(lmdb::Error::NotFound) => Ok(false),
-          Err(err) => Err(format!(
-            "Error reading from store when checking existence of {}: {}",
-            fingerprint, err
-          )),
+        // Group the items by the Environment that they will be applied to.
+        let mut items_by_env = HashMap::new();
+        let mut exists = HashSet::new();
+
+        for fingerprint in &fingerprints {
+          let effective_key = VersionedFingerprint::new(*fingerprint, ShardedLmdb::SCHEMA_VERSION);
+          let (env_id, _, env, db, _) = store.get_raw(&fingerprint.0);
+
+          let (_, _, batch) = items_by_env
+            .entry(*env_id)
+            .or_insert_with(|| (env.clone(), *db, vec![]));
+          batch.push(effective_key);
         }
+
+        // Open and commit a Transaction per Environment. Since we never have more than one
+        // Transaction open at a time, we don't have to worry about ordering.
+        for (_, (env, db, batch)) in items_by_env {
+          env
+            .begin_ro_txn()
+            .and_then(|txn| {
+              for effective_key in &batch {
+                let get_res = txn.get(db, &effective_key);
+                match get_res {
+                  Ok(_) => {
+                    exists.insert(effective_key.get_fingerprint());
+                  }
+                  Err(lmdb::Error::NotFound) => (),
+                  Err(err) => return Err(err),
+                };
+              }
+              txn.commit()
+            })
+            .map_err(|e| {
+              format!(
+                "Error checking existence of fingerprints {:?}: {}",
+                batch
+                  .iter()
+                  .map(|key| key.get_fingerprint())
+                  .collect::<Vec<_>>(),
+                e
+              )
+            })?;
+        }
+        Ok(exists)
       })
       .await
   }
 
+  ///
+  /// Singular form of `Self::store_bytes_batch`. When storing more than one item in parallel,
+  /// prefer `Self::store_bytes_batch`.
+  ///
   pub async fn store_bytes(
     &self,
-    fingerprint: Fingerprint,
+    fingerprint: Option<Fingerprint>,
     bytes: Bytes,
     initial_lease: bool,
-  ) -> Result<(), String> {
+  ) -> Result<Fingerprint, String> {
+    let fingerprints = self
+      .store_bytes_batch(vec![(fingerprint, bytes)], initial_lease)
+      .await?;
+    Ok(fingerprints[0])
+  }
+
+  ///
+  /// Store the given Bytes instances under the given Fingerprints, or under their computed
+  /// Fingerprints. For large/streaming usecases, prefer `Self::store`.
+  ///
+  /// See also: `Self::store_bytes`.
+  ///
+  pub async fn store_bytes_batch(
+    &self,
+    items: Vec<(Option<Fingerprint>, Bytes)>,
+    initial_lease: bool,
+  ) -> Result<Vec<Fingerprint>, String> {
     let store = self.clone();
     self
       .executor
       .spawn_blocking(move || {
-        let effective_key = VersionedFingerprint::new(fingerprint, ShardedLmdb::schema_version());
-        let (env, db, lease_database) = store.get(&fingerprint);
-        let put_res = env.begin_rw_txn().and_then(|mut txn| {
-          txn.put(db, &effective_key, &bytes, WriteFlags::NO_OVERWRITE)?;
-          if initial_lease {
-            store.lease_inner(
-              lease_database,
-              &effective_key,
-              store.lease_until_secs_since_epoch(),
-              &mut txn,
-            )?;
-          }
-          txn.commit()
-        });
+        // Group the items by the Environment that they will be applied to.
+        let mut items_by_env = HashMap::new();
+        let mut fingerprints = Vec::new();
+        for (maybe_fingerprint, bytes) in items {
+          let fingerprint = maybe_fingerprint.unwrap_or_else(|| Digest::of_bytes(&bytes).hash);
+          let effective_key = VersionedFingerprint::new(fingerprint, ShardedLmdb::SCHEMA_VERSION);
+          let (env_id, _, env, db, lease_database) = store.get_raw(&fingerprint.0);
 
-        match put_res {
-          Ok(()) => Ok(()),
-          Err(lmdb::Error::KeyExist) => Ok(()),
-          Err(err) => Err(format!(
-            "Error storing versioned key {:?}: {}",
-            effective_key.to_hex(),
-            err
-          )),
+          let (_, _, _, batch) = items_by_env
+            .entry(*env_id)
+            .or_insert_with(|| (env.clone(), *db, *lease_database, vec![]));
+          batch.push((effective_key, bytes));
+          fingerprints.push(fingerprint);
+        }
+
+        // Open and commit a Transaction per Environment. Since we never have more than one
+        // Transaction open at a time, we don't have to worry about ordering.
+        for (_, (env, db, lease_database, batch)) in items_by_env {
+          env
+            .begin_rw_txn()
+            .and_then(|mut txn| {
+              for (effective_key, bytes) in &batch {
+                let put_res = txn.put(db, &effective_key, &bytes, WriteFlags::NO_OVERWRITE);
+                match put_res {
+                  Ok(()) => (),
+                  Err(lmdb::Error::KeyExist) => continue,
+                  Err(err) => return Err(err),
+                }
+                if initial_lease {
+                  store.lease_inner(
+                    lease_database,
+                    effective_key,
+                    store.lease_until_secs_since_epoch(),
+                    &mut txn,
+                  )?;
+                }
+              }
+              txn.commit()
+            })
+            .map_err(|e| {
+              format!(
+                "Error storing fingerprints {:?}: {}",
+                batch
+                  .iter()
+                  .map(|(key, _)| key.to_hex())
+                  .collect::<Vec<_>>(),
+                e
+              )
+            })?;
+        }
+
+        Ok(fingerprints)
+      })
+      .await
+  }
+
+  ///
+  /// Stores the given Read instance under its computed digest. This method performs two passes
+  /// over the source to 1) hash it, 2) store it. If !data_is_immutable, the second pass will
+  /// re-hash the data to confirm that it hasn't changed.
+  ///
+  /// If the Read instance gets longer between Reads, we will not detect that here, but any
+  /// captured data will still be valid.
+  ///
+  pub async fn store<F, R>(
+    &self,
+    initial_lease: bool,
+    data_is_immutable: bool,
+    data_provider: F,
+  ) -> Result<Digest, String>
+  where
+    R: Read + Debug,
+    F: Fn() -> Result<R, io::Error> + Send + 'static,
+  {
+    let store = self.clone();
+    self
+      .executor
+      .spawn_blocking(move || {
+        let mut attempts = 0;
+        loop {
+          // First pass: compute the Digest.
+          let digest = {
+            let mut read = data_provider().map_err(|e| format!("Failed to read: {}", e))?;
+            let mut hasher = WriterHasher::new(io::sink());
+            let _ = io::copy(&mut read, &mut hasher)
+              .map_err(|e| format!("Failed to read from {:?}: {}", read, e))?;
+            hasher.finish().0
+          };
+
+          let effective_key = VersionedFingerprint::new(digest.hash, ShardedLmdb::SCHEMA_VERSION);
+          let (env, db, lease_database) = store.get(&digest.hash);
+          let put_res: Result<(), StoreError> = env
+            .begin_rw_txn()
+            .map_err(StoreError::Lmdb)
+            .and_then(|mut txn| {
+              // Second pass: copy into the reserved memory.
+              let mut writer = txn
+                .reserve(
+                  db,
+                  &effective_key,
+                  digest.size_bytes,
+                  WriteFlags::NO_OVERWRITE,
+                )?
+                .writer();
+              let mut read = data_provider().map_err(|e| format!("Failed to read: {}", e))?;
+              let should_retry = if data_is_immutable {
+                // Trust that the data hasn't changed, and only validate its length.
+                let copied = io::copy(&mut read, &mut writer).map_err(|e| {
+                  format!(
+                    "Failed to copy from {:?} or store in {:?}: {:?}",
+                    read, env, e
+                  )
+                })?;
+
+                // Should retry if the file got shorter between reads.
+                copied as usize != digest.size_bytes
+              } else {
+                // Confirm that the data hasn't changed.
+                let mut hasher = WriterHasher::new(writer);
+                let _ = io::copy(&mut read, &mut hasher).map_err(|e| {
+                  format!(
+                    "Failed to copy from {:?} or store in {:?}: {:?}",
+                    read, env, e
+                  )
+                })?;
+
+                // Should retry if the Digest changed between reads.
+                digest != hasher.finish().0
+              };
+
+              if should_retry {
+                let msg = format!("Input {:?} changed while reading.", read);
+                log::debug!("{}", msg);
+                return Err(StoreError::Retry(msg));
+              }
+
+              if initial_lease {
+                store.lease_inner(
+                  lease_database,
+                  &effective_key,
+                  store.lease_until_secs_since_epoch(),
+                  &mut txn,
+                )?;
+              }
+              txn.commit()?;
+              Ok(())
+            });
+
+          match put_res {
+            Ok(()) => return Ok(digest),
+            Err(StoreError::Retry(msg)) => {
+              // Input changed during reading: maybe retry.
+              if attempts > 10 {
+                return Err(msg);
+              } else {
+                attempts += 1;
+                continue;
+              }
+            }
+            Err(StoreError::Lmdb(lmdb::Error::KeyExist)) => return Ok(digest),
+            Err(StoreError::Lmdb(err)) => {
+              return Err(format!("Error storing {:?}: {}", digest, err))
+            }
+            Err(StoreError::Io(err)) => return Err(format!("Error storing {:?}: {}", digest, err)),
+          };
         }
       })
       .await
@@ -336,7 +607,7 @@ impl ShardedLmdb {
         env.begin_rw_txn().and_then(|mut txn| {
           store.lease_inner(
             lease_database,
-            &VersionedFingerprint::new(fingerprint, ShardedLmdb::schema_version()),
+            &VersionedFingerprint::new(fingerprint, ShardedLmdb::SCHEMA_VERSION),
             until_secs_since_epoch,
             &mut txn,
           )?;
@@ -370,22 +641,22 @@ impl ShardedLmdb {
 
   pub async fn load_bytes_with<
     T: Send + 'static,
-    F: Fn(&[u8]) -> Result<T, String> + Send + Sync + 'static,
+    F: FnMut(&[u8]) -> Result<T, String> + Send + Sync + 'static,
   >(
     &self,
     fingerprint: Fingerprint,
-    f: F,
+    mut f: F,
   ) -> Result<Option<T>, String> {
     let store = self.clone();
-    let effective_key = VersionedFingerprint::new(fingerprint, ShardedLmdb::schema_version());
+    let effective_key = VersionedFingerprint::new(fingerprint, ShardedLmdb::SCHEMA_VERSION);
     self
       .executor
       .spawn_blocking(move || {
         let (env, db, _) = store.get(&fingerprint);
         let ro_txn = env
           .begin_ro_txn()
-          .map_err(|err| format!("Failed to begin read transaction: {}", err));
-        ro_txn.and_then(|txn| match txn.get(db, &effective_key) {
+          .map_err(|err| format!("Failed to begin read transaction: {}", err))?;
+        match ro_txn.get(db, &effective_key) {
           Ok(bytes) => f(bytes).map(Some),
           Err(lmdb::Error::NotFound) => Ok(None),
           Err(err) => Err(format!(
@@ -393,14 +664,16 @@ impl ShardedLmdb {
             effective_key.to_hex(),
             err,
           )),
-        })
+        }
       })
       .await
   }
 
   #[allow(clippy::useless_conversion)] // False positive: https://github.com/rust-lang/rust-clippy/issues/3913
   pub fn compact(&self) -> Result<(), String> {
-    for (env, old_dir, _) in ShardedLmdb::envs(&self.root_path, self.max_size)? {
+    for (env, old_dir, _) in
+      ShardedLmdb::envs(&self.root_path, self.max_size_per_shard, self.shard_count)?
+    {
       let new_dir = TempDir::new_in(old_dir.parent().unwrap()).expect("TODO");
       env
         .copy(new_dir.path(), EnvironmentCopyFlags::COMPACT)
@@ -414,7 +687,7 @@ impl ShardedLmdb {
         })?;
       std::fs::remove_dir_all(&old_dir)
         .map_err(|e| format!("Error removing old store at {:?}: {}", old_dir, e))?;
-      std::fs::rename(&new_dir.path(), &old_dir).map_err(|e| {
+      std::fs::rename(new_dir.path(), &old_dir).map_err(|e| {
         format!(
           "Error replacing {:?} with {:?}: {}",
           old_dir,
@@ -429,3 +702,24 @@ impl ShardedLmdb {
     Ok(())
   }
 }
+
+enum StoreError {
+  Lmdb(lmdb::Error),
+  Io(String),
+  Retry(String),
+}
+
+impl From<lmdb::Error> for StoreError {
+  fn from(err: lmdb::Error) -> Self {
+    Self::Lmdb(err)
+  }
+}
+
+impl From<String> for StoreError {
+  fn from(err: String) -> Self {
+    Self::Io(err)
+  }
+}
+
+#[cfg(test)]
+mod tests;

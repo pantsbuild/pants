@@ -1,17 +1,18 @@
+// Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
+// Licensed under the Apache License, Version 2.0 (see LICENSE).
 use crate::Server;
 
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
-use futures::future;
-use nails::execution::{child_channel, ChildInput, ChildOutput, Command, ExitCode};
-use nails::{client_handle_connection, Config};
+use futures::{future, FutureExt};
+use nails::execution::{child_channel, ChildInput, Command, ExitCode};
+use nails::Config;
 use task_executor::Executor;
 use tokio::net::TcpStream;
-use tokio::runtime::Handle;
 use tokio::sync::Notify;
-use tokio::time::delay_for;
+use tokio::time::sleep;
 
 #[tokio::test]
 async fn spawn_and_bind() {
@@ -47,8 +48,8 @@ async fn shutdown_awaits_ongoing() {
     let connection_accepted = connection_accepted.clone();
     let should_complete_connection = should_complete_connection.clone();
     move |_| {
-      connection_accepted.notify();
-      Handle::current().block_on(should_complete_connection.notified());
+      connection_accepted.notify_one();
+      tokio::runtime::Handle::current().block_on(should_complete_connection.notified());
       exit_code
     }
   })
@@ -62,18 +63,18 @@ async fn shutdown_awaits_ongoing() {
   let mut server_shutdown = tokio::spawn(server.shutdown());
 
   // Confirm that the client doesn't return, and that the server doesn't shutdown.
-  match future::select(client_completed, delay_for(Duration::from_millis(500))).await {
+  match future::select(client_completed, sleep(Duration::from_millis(500)).boxed()).await {
     future::Either::Right((_, c_c)) => client_completed = c_c,
-    x => panic!("Client should not have completed: {:?}", x),
+    _ => panic!("Client should not have completed"),
   }
-  match future::select(server_shutdown, delay_for(Duration::from_millis(500))).await {
+  match future::select(server_shutdown, sleep(Duration::from_millis(500)).boxed()).await {
     future::Either::Right((_, s_s)) => server_shutdown = s_s,
-    x => panic!("Server should not have shut down: {:?}", x),
+    _ => panic!("Server should not have shut down"),
   }
 
   // Then signal completion of the connection, and confirm that both the client and server exit
   // cleanly.
-  should_complete_connection.notify();
+  should_complete_connection.notify_one();
   assert_eq!(exit_code, client_completed.await.unwrap().unwrap());
   server_shutdown.await.unwrap().unwrap();
 }
@@ -85,12 +86,12 @@ async fn run_client(port: u16) -> Result<ExitCode, String> {
     env: vec![],
     working_dir: PathBuf::from("/dev/null"),
   };
-  let (stdio_write, _stdio_read) = child_channel::<ChildOutput>();
   let stream = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
-  client_handle_connection(Config::default(), stream, cmd, stdio_write, async {
+  let child = nails::client::handle_connection(Config::default(), stream, cmd, async {
     let (_stdin_write, stdin_read) = child_channel::<ChildInput>();
     stdin_read
   })
   .await
-  .map_err(|e| e.to_string())
+  .map_err(|e| e.to_string())?;
+  child.wait().await.map_err(|e| e.to_string())
 }

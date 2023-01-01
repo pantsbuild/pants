@@ -1,32 +1,15 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import functools
-import threading
+import os
+from typing import Any, Mapping
+
+from typing_extensions import Protocol
 
 
-class Storage(threading.local):
-    def __init__(self, rel_path):
-        self.clear(rel_path)
-
-    def clear(self, rel_path):
-        self.rel_path = rel_path
-        self.objects_by_name = dict()
-        self.objects = []
-
-    def add(self, obj, name=None):
-        if name is not None:
-            # NB: `src/python/pants/engine/mapper.py` will detect an overwritten object later.
-            self.objects_by_name[name] = obj
-        self.objects.append(obj)
-
-    def add_if_not_exists(self, name, obj_creator):
-        if name is None:
-            raise ValueError("Method requires a `name`d object.")
-        obj = self.objects_by_name.get(name)
-        if obj is None:
-            obj = self.objects_by_name[name] = obj_creator()
-        return obj
+class FilePathOracle(Protocol):
+    def filepath(self) -> str:
+        ...
 
 
 class ParseContext:
@@ -37,60 +20,48 @@ class ParseContext:
     in its `__init__`).
     """
 
-    def __init__(self, rel_path, type_aliases):
+    def __init__(
+        self, build_root: str, type_aliases: Mapping[str, Any], filepath_oracle: FilePathOracle
+    ) -> None:
         """Create a ParseContext.
 
-        :param rel_path: The (build file) path that the parse is currently operating on: initially None.
-        :param type_aliases: A dictionary of alias name strings or alias classes to a callable
-          constructor for the alias.
+        :param build_root: The absolute path to the build root.
+        :param type_aliases: A dictionary of BUILD file symbols.
+        :param filepath_oracle: An oracle than can be queried for the current BUILD file name.
         """
-
+        self._build_root = build_root
         self._type_aliases = type_aliases
-        self._storage = Storage(rel_path)
+        self._filepath_oracle = filepath_oracle
 
-    def create_object(self, alias, *args, **kwargs):
+    def create_object(self, alias: str, *args: Any, **kwargs: Any) -> Any:
         """Constructs the type with the given alias using the given args and kwargs.
-
-        NB: aliases may be the alias' object type itself if that type is known.
 
         :API: public
 
-        :param alias: Either the type alias or the type itself.
-        :type alias: string|type
-        :param *args: These pass through to the underlying callable object.
-        :param **kwargs: These pass through to the underlying callable object.
+        :param alias: The type alias.
+        :param args: These pass through to the underlying callable object.
+        :param kwargs: These pass through to the underlying callable object.
         :returns: The created object.
         """
         object_type = self._type_aliases.get(alias)
         if object_type is None:
-            raise KeyError("There is no type registered for alias {0}".format(alias))
+            raise KeyError(f"There is no type registered for alias {alias}")
+        if not callable(object_type):
+            raise TypeError(
+                f"Asked to call {alias} with args {args} and kwargs {kwargs} but it is not "
+                f"callable, its a {type(alias).__name__}."
+            )
         return object_type(*args, **kwargs)
 
-    def create_object_if_not_exists(self, alias, name=None, *args, **kwargs):
-        """Constructs the type with the given alias using the given args and kwargs.
-
-        NB: aliases may be the alias' object type itself if that type is known.
+    @property
+    def rel_path(self) -> str:
+        """Relative path from the build root to the directory of the BUILD file being parsed.
 
         :API: public
-
-        :param alias: Either the type alias or the type itself.
-        :type alias: string|type
-        :param *args: These pass through to the underlying callable object.
-        :param **kwargs: These pass through to the underlying callable object.
-        :returns: The created object, or an existing object with the same `name`.
         """
-        if name is None:
-            raise ValueError("Method requires an object `name`.")
-        obj_creator = functools.partial(self.create_object, alias, name=name, *args, **kwargs)
-        return self._storage.add_if_not_exists(name, obj_creator)
+        return os.path.dirname(self._filepath_oracle.filepath())
 
     @property
-    def rel_path(self):
-        """Relative path from the build root to the BUILD file the context aware object is called
-        in.
-
-        :API: public
-
-        :rtype string
-        """
-        return self._storage.rel_path
+    def build_root(self) -> str:
+        """Absolute path of the build root."""
+        return self._build_root

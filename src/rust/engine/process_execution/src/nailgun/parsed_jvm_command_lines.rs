@@ -1,3 +1,5 @@
+// Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
+// Licensed under the Apache License, Version 2.0 (see LICENSE).
 use itertools::Itertools;
 use std::slice::Iter;
 
@@ -33,12 +35,9 @@ impl ParsedJVMCommandLines {
   pub fn parse_command_lines(args: &[String]) -> Result<ParsedJVMCommandLines, String> {
     let mut args_to_consume = args.iter();
 
-    let jdk = Self::parse_jdk(&mut args_to_consume)?;
-    let nailgun_args_before_classpath =
-      Self::parse_jvm_args_that_are_not_classpath(&mut args_to_consume)?;
+    let nailgun_args_before_classpath = Self::parse_to_classpath(&mut args_to_consume)?;
     let (classpath_flag, classpath_value) = Self::parse_classpath(&mut args_to_consume)?;
-    let nailgun_args_after_classpath =
-      Self::parse_jvm_args_that_are_not_classpath(&mut args_to_consume)?;
+    let nailgun_args_after_classpath = Self::parse_jvm_args(&mut args_to_consume)?;
     let main_class = Self::parse_main_class(&mut args_to_consume)?;
     let client_args = Self::parse_to_end(&mut args_to_consume)?;
 
@@ -49,8 +48,7 @@ impl ParsedJVMCommandLines {
       ));
     }
 
-    let mut nailgun_args = vec![jdk];
-    nailgun_args.extend(nailgun_args_before_classpath);
+    let mut nailgun_args = nailgun_args_before_classpath;
     nailgun_args.push(classpath_flag);
     nailgun_args.push(classpath_value);
     nailgun_args.extend(nailgun_args_after_classpath);
@@ -62,22 +60,10 @@ impl ParsedJVMCommandLines {
     })
   }
 
-  fn parse_jdk(args_to_consume: &mut Iter<String>) -> Result<String, String> {
-    args_to_consume
-      .next()
-      .filter(|&e| e == ".jdk/bin/java")
-      .ok_or_else(|| "Every command line must start with a call to the jdk.".to_string())
-      .map(|e| e.clone())
-  }
-
-  fn parse_jvm_args_that_are_not_classpath(
-    args_to_consume: &mut Iter<String>,
-  ) -> Result<Vec<String>, String> {
+  fn parse_to_classpath(args_to_consume: &mut Iter<String>) -> Result<Vec<String>, String> {
     Ok(
       args_to_consume
-        .take_while_ref(|elem| {
-          ParsedJVMCommandLines::is_flag(elem) && !ParsedJVMCommandLines::is_classpath_flag(elem)
-        })
+        .take_while_ref(|elem| !ParsedJVMCommandLines::is_classpath_flag(elem))
         .cloned()
         .collect(),
     )
@@ -86,7 +72,7 @@ impl ParsedJVMCommandLines {
   fn parse_classpath(args_to_consume: &mut Iter<String>) -> Result<(String, String), String> {
     let classpath_flag = args_to_consume
       .next()
-      .filter(|e| ParsedJVMCommandLines::is_classpath_flag(&e))
+      .filter(|e| ParsedJVMCommandLines::is_classpath_flag(e))
       .ok_or_else(|| "No classpath flag found.".to_string())
       .map(|e| e.clone())?;
 
@@ -106,6 +92,15 @@ impl ParsedJVMCommandLines {
       .clone();
 
     Ok((classpath_flag, classpath_value))
+  }
+
+  fn parse_jvm_args(args_to_consume: &mut Iter<String>) -> Result<Vec<String>, String> {
+    Ok(
+      args_to_consume
+        .take_while_ref(|elem| ParsedJVMCommandLines::is_flag(elem))
+        .cloned()
+        .collect(),
+    )
   }
 
   fn parse_main_class(args_to_consume: &mut Iter<String>) -> Result<String, String> {

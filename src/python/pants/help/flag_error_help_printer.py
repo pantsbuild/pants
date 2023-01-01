@@ -10,6 +10,7 @@ from pants.help.maybe_color import MaybeColor
 from pants.option.errors import UnknownFlagsError
 from pants.option.options import Options
 from pants.option.scope import GLOBAL_SCOPE
+from pants.util.docutil import bin_name
 
 
 class FlagErrorHelpPrinter(MaybeColor):
@@ -17,7 +18,6 @@ class FlagErrorHelpPrinter(MaybeColor):
 
     def __init__(self, options: Options):
         super().__init__(options.for_global_scope().colors)
-        self._bin_name = options.for_global_scope().pants_bin_name
         self._all_help_info = HelpInfoExtracter.get_all_help_info(
             options,
             # We only care about the options-related help info, so we pass in
@@ -48,10 +48,10 @@ class FlagErrorHelpPrinter(MaybeColor):
                     f"come before any goals, or after any file/target arguments."
                 )
             elif did_you_mean:
-                print(f"Did you mean {', '.join(self.maybe_cyan(g) for g in did_you_mean)}?")
-
+                formatted_matches = self._format_did_you_mean_matches(did_you_mean)
+                print(f"Did you mean {formatted_matches}?")
             help_cmd = (
-                f"{self._bin_name} help"
+                f"{bin_name()} help"
                 f"{'' if err.arg_scope == GLOBAL_SCOPE else (' ' + err.arg_scope)}"
             )
             print(f"Use `{self.maybe_green(help_cmd)}` to get help.")

@@ -1,23 +1,16 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import re
-from typing import Callable, Optional
+from typing import Callable
 
 
 def assert_equal_with_printing(
-    test_case, expected, actual, uniform_formatter: Optional[Callable[[str], str]] = None
+    expected, actual, uniform_formatter: Callable[[str], str] | None = None
 ):
-    """Asserts equality, but also prints the values so they can be compared on failure.
-
-    Usage:
-
-       class FooTest(unittest.TestCase):
-         assert_equal_with_printing = assert_equal_with_printing
-
-         def test_foo(self):
-           self.assert_equal_with_printing("a", "b")
-    """
+    """Asserts equality, but also prints the values so they can be compared on failure."""
     str_actual = str(actual)
     print("Expected:")
     print(expected)
@@ -27,8 +20,7 @@ def assert_equal_with_printing(
     if uniform_formatter is not None:
         expected = uniform_formatter(expected)
         str_actual = uniform_formatter(str_actual)
-
-    test_case.assertEqual(expected, str_actual)
+    assert expected == str_actual
 
 
 def remove_locations_from_traceback(trace: str) -> str:

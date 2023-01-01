@@ -10,9 +10,7 @@
   clippy::if_not_else,
   clippy::needless_continue,
   clippy::unseparated_literal_suffix,
-  // TODO: Falsely triggers for async/await:
-  //   see https://github.com/rust-lang/rust-clippy/issues/5360
-  // clippy::used_underscore_binding
+  clippy::used_underscore_binding
 )]
 // It is often more clear to show that nothing is being moved.
 #![allow(clippy::match_ref_pats)]
@@ -27,11 +25,11 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
-use bazel_protos::{
-  operations::Operation,
-  remote_execution::{Digest, ExecuteRequest},
-};
 use mock::execution_server::{ExpectedAPICall, MockExecution, MockOperation, TestServer};
+use protos::{
+  gen::build::bazel::remote::execution::v2::{Digest, ExecuteRequest},
+  gen::google::longrunning::Operation,
+};
 use std::io::Read;
 
 use structopt::StructOpt;
@@ -61,16 +59,18 @@ fn main() {
 
   // When the request is executed, perform this operation
   let operation = MockOperation {
-    op: Ok(Some(Operation::new())),
+    op: Ok(Some(Operation::default())),
     duration: None,
   };
 
   // The request our server expects to receive
-  let mut request = ExecuteRequest::new();
-  let mut digest = Digest::new();
-  digest.set_hash(options.request_hash);
-  digest.set_size_bytes(options.request_size);
-  request.set_action_digest(digest);
+  let request = ExecuteRequest {
+    action_digest: Some(Digest {
+      hash: options.request_hash,
+      size_bytes: options.request_size,
+    }),
+    ..ExecuteRequest::default()
+  };
 
   let execution = MockExecution::new(vec![ExpectedAPICall::Execute {
     execute_request: request,

@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 
-# NB: pre-commit runs in the context of GIT_WORK_TREE, ie: pwd == REPO_ROOT
+set -e
 
+# NB: pre-commit runs in the context of GIT_WORK_TREE, ie: pwd == REPO_ROOT
 source build-support/common.sh
 
 # Commit hooks set $GIT_DIR by default to .git
@@ -13,56 +14,26 @@ if [[ -n "${GIT_DIR}" && "${GIT_DIR}" != /* ]]; then
   export GIT_DIR
 fi
 
-set -e
-
 MERGE_BASE="$(git_merge_base)"
 
-# When travis builds a tag, it does so in a shallow clone without master fetched, which
-# fails in pants changed.
-if git rev-parse --verify "${MERGE_BASE}" &>/dev/null; then
-  if git diff "${MERGE_BASE}" --name-only | grep '\.rs$' > /dev/null; then
-    # Clippy happens on a different Travis CI shard because of separate caching concerns.
-    # The TRAVIS env var is documented here:
-    #   https://docs.travis-ci.com/user/environment-variables/#default-environment-variables
-    if [[ "${TRAVIS}" != "true" ]]; then
-      echo "* Running cargo clippy"
-      ./build-support/bin/check_clippy.sh || exit 1
-    fi
-    echo "* Checking formatting of Rust files"
-    ./build-support/bin/check_rust_formatting.sh || exit 1
-    echo "* Checking Rust target headers"
-    build-support/bin/check_rust_target_headers.sh || exit 1
-  fi
-
-  echo "* Checking MyPy"
-  ./pants --changed-since="${MERGE_BASE}" --changed-dependees=transitive --tag='-nolint' typecheck || exit 1
-
-  echo "* Checking Flake8 and formatting"
-  ./pants --changed-since="${MERGE_BASE}" --tag='-nolint' lint || \
-    die "If there were formatting errors, run \`./pants --changed-since=$(git rev-parse --symbolic "${MERGE_BASE}") fmt\`"
-
-  if git diff "${MERGE_BASE}" --name-only | grep build-support/bin/generate_travis_yml.py > /dev/null; then
-    echo "* Checking .travis.yml generation"
-    actual_travis_yml=$(<.travis.yml)
-    expected_travis_yml=$(./pants run build-support/bin:generate_travis_yml)
-    [ "${expected_travis_yml}" == "${actual_travis_yml}" ] || \
-      die "Travis config generator changed, but .travis.yml file was not regenerated. See the header of .travis.yml for instructions."
-  fi
-else
-  echo "* Skipping import/lint checks in partial working copy."
+if git diff "${MERGE_BASE}" --name-only | grep '\.rs$' > /dev/null; then
+  ./build-support/bin/check_rust_pre_commit.sh
 fi
 
-echo "* Checking shell scripts via shellcheck"
-./build-support/bin/shellcheck.py || exit 1
+echo "* Typechecking"
+./pants --changed-since="${MERGE_BASE}" --changed-dependents=transitive check
 
-echo "* Checking shell scripts via our custom linter"
-./build-support/bin/check_shell.sh || exit 1
+echo "* Checking linters, formatters, and headers"
+./pants --changed-since="${MERGE_BASE}" lint ||
+  die "If there were formatting errors, run \`./pants --changed-since=$(git rev-parse --symbolic "${MERGE_BASE}") fmt\`"
+
+if git diff "${MERGE_BASE}" --name-only | grep build-support/bin/generate_github_workflows.py > /dev/null; then
+  echo "* Checking GitHub workflows generation"
+  ./pants run build-support/bin/generate_github_workflows.py -- --check
+fi
 
 echo "* Checking __init__.py files"
-./build-support/bin/check_inits.py || exit 1
-
-echo "* Checking headers"
-./pants validate '**' || exit 1
+./pants run build-support/bin/check_inits.py
 
 echo "* Checking for banned imports"
-./build-support/bin/check_banned_imports.py || exit 1
+./pants run build-support/bin/check_banned_imports.py

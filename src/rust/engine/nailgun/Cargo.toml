@@ -1,18 +1,20 @@
 [package]
 version = "0.0.1"
-edition = "2018"
+edition = "2021"
 name = "nailgun"
 authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 publish = false
 
 [dependencies]
-bytes = "0.5"
-futures = "0.3.5"
+async_latch = { path = "../async_latch" }
+bytes = "1.2"
+futures = "0.3"
 log = "0.4"
-nails = "0.7.0"
-os_pipe = "0.9"
+nails = "0.13"
+os_pipe = "1.0"
 task_executor = { path = "../task_executor" }
-tokio = { version = "0.2.22", features = ["tcp", "fs", "sync", "io-std"] }
+tokio = { version = "1.21", features = ["fs", "io-std", "io-util", "net", "signal", "sync"] }
+tokio-stream = "0.1"
 
 [dev-dependencies]
-tokio = { version = "0.2.22", features = ["dns", "rt-threaded", "macros", "tcp", "io-std"] }
+tokio = { version = "1.21", features = ["io-std", "macros", "net", "rt-multi-thread"] }

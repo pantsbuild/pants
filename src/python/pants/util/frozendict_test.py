@@ -1,12 +1,13 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from collections import OrderedDict
+from collections import OrderedDict, defaultdict
 from dataclasses import dataclass
+from typing import DefaultDict
 
 import pytest
 
-from pants.util.frozendict import FrozenDict
+from pants.util.frozendict import FrozenDict, LazyFrozenDict
 
 
 def test_flexible_constructor() -> None:
@@ -68,7 +69,7 @@ def test_get() -> None:
 def test_iter() -> None:
     fd1 = FrozenDict({"a": 0, "b": 1})
     assert list(iter(fd1)) == ["a", "b"]
-    assert [k for k in fd1] == ["a", "b"]
+    assert list(fd1) == ["a", "b"]
 
 
 def test_keys() -> None:
@@ -98,6 +99,23 @@ def test_eq() -> None:
     assert fd1 != d1
 
 
+@pytest.mark.xfail(reason="FrozenDict equality broken for different insertion orders.")
+def test_eq_different_orders() -> None:
+    fd1 = FrozenDict({"a": 0, "b": 1})
+    fd2 = FrozenDict({"b": 1, "a": 0})
+    assert fd1 == fd2
+
+
+def test_lt() -> None:
+    d = {"a": 0, "b": 1}
+    assert FrozenDict(d) < FrozenDict({"a": 1, "b": 2})
+    # Order matters.
+    assert FrozenDict(d) < FrozenDict({"b": 1, "a": 0})
+    # Must be an instance of FrozenDict.
+    with pytest.raises(TypeError):
+        FrozenDict(d) < d
+
+
 def test_hash() -> None:
     d1 = {"a": 0, "b": 1}
     assert hash(FrozenDict(d1)) == hash(FrozenDict(d1))
@@ -124,3 +142,27 @@ def test_works_with_dataclasses() -> None:
         FrozenDict({Mutable(0): "a"})
     with pytest.raises(TypeError):
         FrozenDict({"a": Mutable(0)})
+
+
+def test_lazy_frozen_dict() -> None:
+    loaded: DefaultDict[str, int] = defaultdict(int)
+
+    def load_value(s: str) -> str:
+        loaded[s] += 1
+        return "".join(reversed(s))
+
+    ld1 = LazyFrozenDict({"a": lambda: load_value("1234"), "b": lambda: load_value("abcd")})
+    hashvalue = hash(ld1)
+    assert len(ld1) == 2
+    assert len(loaded) == 0
+
+    # Test memoization, that we don't invoke the loader twice.
+    assert ld1["b"] == "dcba"
+    assert ld1["b"] == "dcba"
+
+    assert loaded == {"abcd": 1}
+    assert ld1["a"] == "4321"
+    assert len(loaded) == 2
+
+    # Hash value should be stable regardless if we've loaded the values or not.
+    assert hash(ld1) == hashvalue

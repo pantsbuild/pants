@@ -1,9 +1,18 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 import os
 import subprocess
+from functools import lru_cache
+from typing import Iterable
 from unittest import skipIf
+
+import _pytest.mark.structures
+import pytest
+
+from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 
 PY_2 = "2"
 PY_3 = "3"
@@ -12,6 +21,7 @@ PY_27 = "2.7"
 PY_36 = "3.6"
 PY_37 = "3.7"
 PY_38 = "3.8"
+PY_39 = "3.9"
 
 
 def has_python_version(version):
@@ -24,6 +34,7 @@ def has_python_version(version):
     return python_interpreter_path(version) is not None
 
 
+@lru_cache()
 def python_interpreter_path(version):
     """Returns the interpreter path if the current system has the specified version of python.
 
@@ -84,6 +95,11 @@ def skip_unless_python38_present(func):
     return skip_unless_all_pythons_present(PY_38)(func)
 
 
+def skip_unless_python39_present(func):
+    """A test skip decorator that only runs a test method if python3.9 is present."""
+    return skip_unless_all_pythons_present(PY_39)(func)
+
+
 def skip_unless_python27_and_python3_present(func):
     """A test skip decorator that only runs a test method if python2.7 and python3 are present."""
     return skip_unless_all_pythons_present(PY_27, PY_3)(func)
@@ -97,3 +113,28 @@ def skip_unless_python27_and_python36_present(func):
 def skip_unless_python36_and_python37_present(func):
     """A test skip decorator that only runs a test method if python3.6 and python3.7 are present."""
     return skip_unless_all_pythons_present(PY_36, PY_37)(func)
+
+
+def all_major_minor_python_versions(
+    constraints: Iterable[str],
+) -> tuple[_pytest.mark.structures.ParameterSet, ...]:
+    """All major.minor Python versions used by the interpreter constraints.
+
+    This is intended to be used with `@pytest.mark.parametrize()` to run a test with every relevant
+    Python interpreter.
+    """
+    versions = InterpreterConstraints(constraints).partition_into_major_minor_versions(
+        # Please update this when new stable Python versions are released to CI.
+        interpreter_universe=["2.7", "3.6", "3.7", "3.8", "3.9"]
+    )
+
+    return tuple(
+        pytest.param(
+            version,
+            marks=pytest.mark.skipif(
+                not has_python_version(version),
+                reason=f"Could not find python {version} on system. Skipping.",
+            ),
+        )
+        for version in versions
+    )

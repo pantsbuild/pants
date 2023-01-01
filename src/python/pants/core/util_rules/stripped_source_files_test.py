@@ -1,23 +1,34 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from typing import List, Sequence
+from __future__ import annotations
+
+from typing import Sequence
 
 import pytest
 
 from pants.core.util_rules import stripped_source_files
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.core.util_rules.stripped_source_files import StrippedSourceFileNames, StrippedSourceFiles
+from pants.core.util_rules.stripped_source_files import (
+    StrippedFileName,
+    StrippedFileNameRequest,
+    StrippedSourceFileNames,
+    StrippedSourceFiles,
+)
 from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_SNAPSHOT
 from pants.engine.internals.scheduler import ExecutionError
-from pants.engine.target import Sources, SourcesPathsRequest, Target
+from pants.engine.target import MultipleSourcesField, SourcesPathsRequest, Target
 from pants.testutil.rule_runner import QueryRule, RuleRunner
+
+
+class MyMultipleSourcesField(MultipleSourcesField):
+    pass
 
 
 class TargetWithSources(Target):
     alias = "target"
-    core_fields = (Sources,)
+    core_fields = (MyMultipleSourcesField,)
 
 
 @pytest.fixture
@@ -28,6 +39,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(SourceFiles, [SourceFilesRequest]),
             QueryRule(StrippedSourceFiles, [SourceFiles]),
             QueryRule(StrippedSourceFileNames, [SourcesPathsRequest]),
+            QueryRule(StrippedFileName, [StrippedFileNameRequest]),
         ],
         target_types=[TargetWithSources],
     )
@@ -38,7 +50,7 @@ def get_stripped_files(
     request: SourceFiles,
     *,
     source_root_patterns: Sequence[str] = ("src/python", "src/java", "tests/python"),
-) -> List[str]:
+) -> list[str]:
     rule_runner.set_options([f"--source-root-patterns={repr(source_root_patterns)}"])
     result = rule_runner.request(StrippedSourceFiles, [request])
     return list(result.snapshot.files)
@@ -46,10 +58,10 @@ def get_stripped_files(
 
 def test_strip_snapshot(rule_runner: RuleRunner) -> None:
     def get_stripped_files_for_snapshot(
-        paths: List[str],
+        paths: list[str],
         *,
         source_root_patterns: Sequence[str] = ("src/python", "src/java", "tests/python"),
-    ) -> List[str]:
+    ) -> list[str]:
         input_snapshot = rule_runner.make_snapshot_of_empty_files(paths)
         request = SourceFiles(input_snapshot, ())
         return get_stripped_files(rule_runner, request, source_root_patterns=source_root_patterns)
@@ -58,12 +70,9 @@ def test_strip_snapshot(rule_runner: RuleRunner) -> None:
     assert get_stripped_files_for_snapshot(["src/python/project/example.py"]) == [
         "project/example.py"
     ]
-    assert (
-        get_stripped_files_for_snapshot(
-            ["src/python/project/example.py"],
-        )
-        == ["project/example.py"]
-    )
+    assert get_stripped_files_for_snapshot(
+        ["src/python/project/example.py"],
+    ) == ["project/example.py"]
 
     assert get_stripped_files_for_snapshot(["src/java/com/project/example.java"]) == [
         "com/project/example.java"
@@ -103,37 +112,47 @@ def test_strip_snapshot(rule_runner: RuleRunner) -> None:
 
 def test_strip_source_file_names(rule_runner: RuleRunner) -> None:
     def assert_stripped_source_file_names(
-        address: Address, *, source_root: str, expected: List[str]
+        address: Address, *, source_root: str, expected: list[str]
     ) -> None:
         rule_runner.set_options([f"--source-root-patterns=['{source_root}']"])
         tgt = rule_runner.get_target(address)
-        result = rule_runner.request(StrippedSourceFileNames, [SourcesPathsRequest(tgt[Sources])])
+        result = rule_runner.request(
+            StrippedSourceFileNames, [SourcesPathsRequest(tgt[MultipleSourcesField])]
+        )
         assert set(result) == set(expected)
 
-    rule_runner.create_file("src/java/com/project/example.java")
-    rule_runner.add_to_build_file("src/java/com/project", "target(sources=['*.java'])")
+    rule_runner.write_files(
+        {
+            "src/java/com/project/example.java": "",
+            "src/java/com/project/BUILD": "target(sources=['*.java'])",
+            "src/python/script.py": "",
+            "src/python/BUILD": "target(sources=['*.py'])",
+            "data.json": "",
+            # Test a source root at the repo root. We have performance optimizations for this case
+            # because there is nothing to strip.
+            #
+            # Also, gracefully handle an empty sources field.
+            "BUILD": "target(name='json', sources=['*.json'])\ntarget(name='empty', sources=[])",
+        }
+    )
     assert_stripped_source_file_names(
         Address("src/java/com/project"),
         source_root="src/java",
         expected=["com/project/example.java"],
     )
-
-    rule_runner.create_file("src/python/script.py")
-    rule_runner.add_to_build_file("src/python", "target(sources=['*.py'])")
     assert_stripped_source_file_names(
         Address("src/python"), source_root="src/python", expected=["script.py"]
     )
-
-    # Test a source root at the repo root. We have performance optimizations for this case
-    # because there is nothing to strip.
-    rule_runner.create_file("data.json")
-    rule_runner.add_to_build_file("", "target(name='json', sources=['*.json'])\n")
     assert_stripped_source_file_names(
         Address("", target_name="json"), source_root="/", expected=["data.json"]
     )
-
-    # Gracefully handle an empty sources field.
-    rule_runner.add_to_build_file("", "target(name='empty', sources=[])")
     assert_stripped_source_file_names(
         Address("", target_name="empty"), source_root="/", expected=[]
     )
+
+
+@pytest.mark.parametrize("source_root,expected", [("root", "f.txt"), ("/", "root/f.txt")])
+def test_strip_file_name(rule_runner: RuleRunner, source_root: str, expected: str) -> None:
+    rule_runner.set_options([f"--source-root-patterns=['{source_root}']"])
+    result = rule_runner.request(StrippedFileName, [StrippedFileNameRequest("root/f.txt")])
+    assert result.value == expected

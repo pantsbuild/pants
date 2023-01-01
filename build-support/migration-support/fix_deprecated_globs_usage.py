@@ -23,13 +23,13 @@ from typing import Dict, List, NamedTuple, Optional, Set, Union
 
 def main() -> None:
     args = create_parser().parse_args()
-    build_files: Set[Path] = set(
+    build_files: Set[Path] = {
         fp
         for folder in args.folders
         for fp in [*folder.rglob("BUILD"), *folder.rglob("BUILD.*")]
         # Check that it really is a BUILD file
         if fp.is_file() and fp.stem == "BUILD"
-    )
+    }
     updates: Dict[Path, List[str]] = {}
     for build in build_files:
         try:

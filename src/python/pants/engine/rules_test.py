@@ -1,9 +1,7 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import ast
 import re
-import unittest
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
@@ -15,43 +13,43 @@ import pytest
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.engine_testutil import assert_equal_with_printing
-from pants.engine.internals.native import Native
+from pants.engine.internals.native_engine import PyExecutor
 from pants.engine.internals.scheduler import Scheduler
-from pants.engine.internals.selectors import GetConstraints, GetParseError
 from pants.engine.rules import (
+    DuplicateRuleError,
     Get,
     MissingParameterTypeAnnotation,
     MissingReturnTypeAnnotation,
     QueryRule,
     RuleIndex,
     UnrecognizedRuleArgument,
-    _RuleVisitor,
     goal_rule,
     rule,
+    rule_helper,
 )
 from pants.engine.unions import UnionMembership
-from pants.option.global_options import DEFAULT_EXECUTION_OPTIONS
+from pants.option.global_options import DEFAULT_EXECUTION_OPTIONS, DEFAULT_LOCAL_STORE_OPTIONS
 from pants.testutil.rule_runner import MockGet, run_rule_with_mocks
-from pants.testutil.test_base import TestBase
 from pants.util.enums import match
 from pants.util.logging import LogLevel
 
+_EXECUTOR = PyExecutor(core_threads=2, max_threads=4)
 
-def create_scheduler(rules, validate=True, native=None):
+
+def create_scheduler(rules, validate=True):
     """Create a Scheduler."""
-    native = native or Native()
     return Scheduler(
-        native=native,
         ignore_patterns=[],
         use_gitignore=False,
         build_root=str(Path.cwd()),
-        local_store_dir="./.pants.d/lmdb_store",
-        local_execution_root_dir="./.pants.d",
+        local_execution_root_dir=".",
         named_caches_dir="./.pants.d/named_caches",
         ca_certs_path=None,
         rules=rules,
         union_membership=UnionMembership({}),
+        executor=_EXECUTOR,
         execution_options=DEFAULT_EXECUTION_OPTIONS,
+        local_store_options=DEFAULT_LOCAL_STORE_OPTIONS,
         validate_reachability=validate,
     )
 
@@ -80,128 +78,11 @@ def fmt_rule(
     gets_str = ""
     if gets:
         get_members = f",{line_sep}".join(
-            f"Get({product_subject_pair[0]}, {product_subject_pair[1]})"
+            f"Get({product_subject_pair[0]}, [{product_subject_pair[1]}])"
             for product_subject_pair in gets
         )
         gets_str = f", gets=[{optional_line_sep}{get_members}{optional_line_sep}]"
     return f"@rule({fmt_rust_function(rule)}({params_str}) -> {product}{gets_str})"
-
-
-class RuleVisitorTest(unittest.TestCase):
-    @staticmethod
-    def _parse_rule_gets(rule_text: str, **types: Type) -> List[GetConstraints]:
-        rule_visitor = _RuleVisitor(
-            resolve_type=lambda name: types[name], source_file_name="parse_rules.py"
-        )
-        rule_visitor.visit(ast.parse(rule_text))
-        return rule_visitor.gets
-
-    @classmethod
-    def _parse_single_get(cls, rule_text: str, **types) -> GetConstraints:
-        gets = cls._parse_rule_gets(rule_text, **types)
-        assert len(gets) == 1, f"Expected 1 Get expression, found {len(gets)}."
-        return gets[0]
-
-    def test_single_get(self) -> None:
-        get = self._parse_single_get(
-            dedent(
-                """
-                async def rule():
-                    a = await Get(A, B, 42)
-                """
-            ),
-            A=str,
-            B=int,
-        )
-        assert get.output_type == str
-        assert get.input_type == int
-
-    def test_multiple_gets(self) -> None:
-        gets = self._parse_rule_gets(
-            dedent(
-                """
-                async def rule():
-                    a = await Get(A, B, 42)
-                    if len(a) > 1:
-                        c = await Get(C, A("bob"))
-                """
-            ),
-            A=str,
-            B=int,
-            C=bool,
-        )
-
-        assert len(gets) == 2
-        get_a, get_c = gets
-
-        assert get_a.output_type == str
-        assert get_a.input_type == int
-
-        assert get_c.output_type == bool
-        assert get_c.input_type == str
-
-    def test_multiget_homogeneous(self) -> None:
-        get = self._parse_single_get(
-            dedent(
-                """
-                async def rule():
-                    a = await MultiGet(Get(A, B(x)) for x in range(5))
-                """
-            ),
-            A=str,
-            B=int,
-        )
-        assert get.output_type == str
-        assert get.input_type == int
-
-    def test_multiget_heterogeneous(self) -> None:
-        gets = self._parse_rule_gets(
-            dedent(
-                """
-                async def rule():
-                    a = await MultiGet(Get(A, B, 42), Get(B, A('bob')))
-                """
-            ),
-            A=str,
-            B=int,
-        )
-
-        assert len(gets) == 2
-        get_a, get_b = gets
-
-        assert get_a.output_type == str
-        assert get_a.input_type == int
-
-        assert get_b.output_type == int
-        assert get_b.input_type == str
-
-    def test_get_no_index_call_no_subject_call_allowed(self) -> None:
-        gets = self._parse_rule_gets("get_type: type = Get")
-        assert len(gets) == 0
-
-    def test_valid_get_unresolvable_product_type(self) -> None:
-        with pytest.raises(KeyError):
-            self._parse_rule_gets("Get(DNE, A(42))", A=int)
-
-    def test_valid_get_unresolvable_subject_declared_type(self) -> None:
-        with pytest.raises(KeyError):
-            self._parse_rule_gets("Get(int, DNE, 'bob')")
-
-    def test_invalid_get_no_subject_args(self) -> None:
-        with pytest.raises(GetParseError):
-            self._parse_rule_gets("Get(A, )", A=int)
-
-    def test_invalid_get_too_many_subject_args(self) -> None:
-        with pytest.raises(GetParseError):
-            self._parse_rule_gets("Get(A, B, 'bob', 3)", A=int, B=str)
-
-    def test_invalid_get_invalid_subject_arg_no_constructor_call(self) -> None:
-        with pytest.raises(GetParseError):
-            self._parse_rule_gets("Get(A, 'bob')", A=int)
-
-    def test_invalid_get_invalid_product_type_not_a_type_name(self) -> None:
-        with pytest.raises(GetParseError):
-            self._parse_rule_gets("Get(call(), A('bob'))", A=str)
 
 
 @dataclass(frozen=True)
@@ -313,7 +194,7 @@ def fmt_non_param_edge(
             via_return_func = color
     else:
         return_func_fmt = return_func.format()
-        via_return_func = "-> {" + f'"{return_func_fmt}\nfor {product_name}"' + "}"
+        via_return_func = f'-> {{"{return_func_fmt}\nfor {product_name}"}}'
 
     via_func_subject = RuleFormatRequest.format_rule(subject)
 
@@ -340,29 +221,29 @@ def remove_whitespace_from_graph_output(s: str) -> str:
     return no_pre_or_post_quotes_whitespace.strip()
 
 
-def assert_equal_graph_output(test_case, expected, actual):
+def assert_equal_graph_output(expected, actual):
     return assert_equal_with_printing(
-        test_case, expected, actual, uniform_formatter=remove_whitespace_from_graph_output
+        expected, actual, uniform_formatter=remove_whitespace_from_graph_output
     )
 
 
 class A:
-    def __repr__(self):
+    def __repr__(self) -> str:
         return "A()"
 
 
 class B:
-    def __repr__(self):
+    def __repr__(self) -> str:
         return "B()"
 
 
 class C:
-    def __repr__(self):
+    def __repr__(self) -> str:
         return "C()"
 
 
 class D:
-    def __repr__(self):
+    def __repr__(self) -> str:
         return "D()"
 
 
@@ -371,7 +252,7 @@ def noop(*args):
 
 
 class SubA(A):
-    def __repr__(self):
+    def __repr__(self) -> str:
         return "SubA()"
 
 
@@ -383,6 +264,7 @@ class ExampleSubsystem(GoalSubsystem):
 
 class Example(Goal):
     subsystem_cls = ExampleSubsystem
+    environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY
 
 
 @goal_rule
@@ -392,32 +274,32 @@ async def a_goal_rule_generator(console: Console) -> Example:
     return Example(exit_code=0)
 
 
-class RuleTest(TestBase):
-    def test_run_rule_goal_rule_generator(self):
+class TestRule:
+    def test_run_rule_goal_rule_generator(self) -> None:
         res = run_rule_with_mocks(
             a_goal_rule_generator,
             rule_args=[Console()],
-            mock_gets=[MockGet(output_type=A, input_type=str, mock=lambda _: A())],
+            mock_gets=[MockGet(output_type=A, input_types=(str,), mock=lambda _: A())],
         )
-        self.assertEqual(res, Example(0))
+        assert res == Example(0)
 
     def test_side_effecting_inputs(self) -> None:
         @goal_rule
         def valid_rule(console: Console, b: str) -> Example:
             return Example(exit_code=0)
 
-        with self.assertRaises(ValueError) as cm:
+        with pytest.raises(ValueError) as cm:
 
             @rule
             def invalid_rule(console: Console, b: str) -> bool:
                 return False
 
-        error_str = str(cm.exception)
+        error_str = str(cm.value)
         assert (
-            "(@rule pants.engine.rules_test:invalid_rule) has a side-effecting parameter"
+            "(@rule pants.engine.rules_test:invalid_rule) may not have a side-effecting parameter"
             in error_str
         )
-        assert "pants.util.meta.Console" in error_str
+        assert "pants.engine.console.Console" in error_str
 
 
 def test_rule_index_creation_fails_with_bad_declaration_type():
@@ -429,28 +311,31 @@ def test_rule_index_creation_fails_with_bad_declaration_type():
     )
 
 
-class RuleArgumentAnnotationTest(unittest.TestCase):
-    def test_annotations_kwargs(self):
+class TestRuleArgumentAnnotation:
+    def test_annotations_kwargs(self) -> None:
         @rule(level=LogLevel.INFO)
         def a_named_rule(a: int, b: str) -> bool:
             return False
 
-        self.assertIsNotNone(a_named_rule.rule)
-        self.assertEqual(a_named_rule.rule.canonical_name, "pants.engine.rules_test.a_named_rule")
-        self.assertEqual(a_named_rule.rule.desc, None)
-        self.assertEqual(a_named_rule.rule.level, LogLevel.INFO)
+        assert a_named_rule.rule is not None
+        assert (
+            a_named_rule.rule.canonical_name
+            == "pants.engine.rules_test.TestRuleArgumentAnnotation.test_annotations_kwargs.a_named_rule"
+        )
+        assert a_named_rule.rule.desc is None
+        assert a_named_rule.rule.level == LogLevel.INFO
 
         @rule(canonical_name="something_different", desc="Human readable desc")
         def another_named_rule(a: int, b: str) -> bool:
             return False
 
-        self.assertIsNotNone(a_named_rule.rule)
-        self.assertEqual(another_named_rule.rule.canonical_name, "something_different")
-        self.assertEqual(another_named_rule.rule.desc, "Human readable desc")
-        self.assertEqual(another_named_rule.rule.level, LogLevel.TRACE)
+        assert a_named_rule.rule is not None
+        assert another_named_rule.rule.canonical_name == "something_different"
+        assert another_named_rule.rule.desc == "Human readable desc"
+        assert another_named_rule.rule.level == LogLevel.TRACE
 
-    def test_bogus_rules(self):
-        with self.assertRaises(UnrecognizedRuleArgument):
+    def test_bogus_rules(self) -> None:
+        with pytest.raises(UnrecognizedRuleArgument):
 
             @rule(bogus_kwarg="TOTALLY BOGUS!!!!!!")
             def a_named_rule(a: int, b: str) -> bool:
@@ -463,46 +348,46 @@ class RuleArgumentAnnotationTest(unittest.TestCase):
 
         assert some_goal_rule.rule.desc == "`example` goal"
 
-    def test_can_override_goal_rule_name(self):
+    def test_can_override_goal_rule_name(self) -> None:
         @goal_rule(canonical_name="some_other_name")
         def some_goal_rule() -> Example:
             return Example(exit_code=0)
 
         name = some_goal_rule.rule.canonical_name
-        self.assertEqual(name, "some_other_name")
+        assert name == "some_other_name"
 
 
-class GraphVertexTypeAnnotationTest(unittest.TestCase):
+class TestGraphVertexTypeAnnotation:
     def test_nominal(self):
         @rule
         def dry(a: int, b: str, c: float) -> bool:
             return False
 
-        self.assertIsNotNone(dry.rule)
+        assert dry.rule is not None
 
-    def test_missing_return_annotation(self):
-        with self.assertRaises(MissingReturnTypeAnnotation):
+    def test_missing_return_annotation(self) -> None:
+        with pytest.raises(MissingReturnTypeAnnotation):
 
             @rule
             def dry(a: int, b: str, c: float):
                 return False
 
     def test_bad_return_annotation(self):
-        with self.assertRaises(MissingReturnTypeAnnotation):
+        with pytest.raises(MissingReturnTypeAnnotation):
 
             @rule
             def dry(a: int, b: str, c: float) -> 42:
                 return False
 
-    def test_missing_parameter_annotation(self):
-        with self.assertRaises(MissingParameterTypeAnnotation):
+    def test_missing_parameter_annotation(self) -> None:
+        with pytest.raises(MissingParameterTypeAnnotation):
 
             @rule
             def dry(a: int, b, c: float) -> bool:
                 return False
 
     def test_bad_parameter_annotation(self):
-        with self.assertRaises(MissingParameterTypeAnnotation):
+        with pytest.raises(MissingParameterTypeAnnotation):
 
             @rule
             def dry(a: int, b: 42, c: float) -> bool:
@@ -532,10 +417,8 @@ def test_goal_rule_not_returning_a_goal() -> None:
     assert str(exc.value) == "An `@goal_rule` must return a subclass of `engine.goal.Goal`."
 
 
-class RuleGraphTest(TestBase):
-    maxDiff = None
-
-    def test_ruleset_with_ambiguity(self):
+class TestRuleGraph:
+    def test_ruleset_with_ambiguity(self) -> None:
         @rule
         def a_from_b_and_c(b: B, c: C) -> A:
             pass
@@ -545,11 +428,10 @@ class RuleGraphTest(TestBase):
             pass
 
         rules = [a_from_b_and_c, a_from_c_and_b, QueryRule(A, (B, C))]
-        with self.assertRaises(Exception) as cm:
+        with pytest.raises(Exception) as cm:
             create_scheduler(rules)
 
         assert_equal_graph_output(
-            self,
             dedent(
                 f"""\
                 Encountered 1 rule graph error:
@@ -559,10 +441,10 @@ class RuleGraphTest(TestBase):
                     ]
                 """
             ),
-            str(cm.exception),
+            str(cm.value),
         )
 
-    def test_ruleset_with_valid_root(self):
+    def test_ruleset_with_valid_root(self) -> None:
         @rule
         def a_from_b(b: B) -> A:
             pass
@@ -570,28 +452,29 @@ class RuleGraphTest(TestBase):
         rules = [a_from_b, QueryRule(A, (B,))]
         create_scheduler(rules)
 
-    def test_ruleset_with_unreachable_root(self):
+    def test_ruleset_with_unreachable_root(self) -> None:
         @rule
         def a_from_b(b: B) -> A:
             pass
 
         rules = [a_from_b, QueryRule(A, ())]
-        with self.assertRaises(Exception) as cm:
+        with pytest.raises(Exception) as cm:
             create_scheduler(rules)
         assert (
             "No installed rules return the type B, and it was not provided by potential "
             "callers of "
-        ) in str(cm.exception)
+        ) in str(cm.value)
         assert (
             "If that type should be computed by a rule, ensure that that rule is installed."
-        ) in str(cm.exception)
+        ) in str(cm.value)
         assert (
             "If it should be provided by a caller, ensure that it is included in any relevant "
             "Query or Get."
-        ) in str(cm.exception)
+        ) in str(cm.value)
 
     @pytest.mark.skip(reason="TODO(#10649): figure out if this tests is still relevant.")
-    def test_not_fulfillable_duplicated_dependency(self):
+    @pytest.mark.no_error_if_skipped
+    def test_not_fulfillable_duplicated_dependency(self) -> None:
         # If a rule depends on another rule+subject in two ways, and one of them is unfulfillable
         # Only the unfulfillable one should be in the errors.
 
@@ -613,11 +496,10 @@ class RuleGraphTest(TestBase):
             d_from_a_and_suba,
         ]
 
-        with self.assertRaises(Exception) as cm:
+        with pytest.raises(Exception) as cm:
             create_scheduler(rules)
 
         assert_equal_graph_output(
-            self,
             dedent(
                 f"""\
                 Rules with errors: 2
@@ -630,13 +512,14 @@ class RuleGraphTest(TestBase):
                       {fmt_rule(a_from_c)} for SubA: Was unfulfillable.
                 """
             ).strip(),
-            str(cm.exception),
+            str(cm.value),
         )
 
     @pytest.mark.skip(
         reason="TODO(#10649): Fix and re-enable once reachability checks are restored."
     )
-    def test_unreachable_rule(self):
+    @pytest.mark.no_error_if_skipped
+    def test_unreachable_rule(self) -> None:
         """Test that when one rule "shadows" another, we get an error."""
 
         @rule
@@ -648,10 +531,10 @@ class RuleGraphTest(TestBase):
             return D()
 
         rules = [d_singleton, d_for_b, QueryRule(D, (B,))]
-        with self.assertRaises(Exception) as cm:
+        with pytest.raises(Exception) as cm:
             create_scheduler(rules)
 
-        self.assert_equal_with_printing(
+        assert_equal_with_printing(
             dedent(
                 f"""\
                 Rules with errors: 1
@@ -660,10 +543,10 @@ class RuleGraphTest(TestBase):
                     Was not reachable, either because no rules could produce the params or because it was shadowed by another @rule.
                 """
             ).strip(),
-            str(cm.exception),
+            str(cm.value),
         )
 
-    def test_smallest_full_test(self):
+    def test_smallest_full_test(self) -> None:
         @rule
         def a_from_suba(suba: SubA) -> A:
             pass
@@ -671,7 +554,6 @@ class RuleGraphTest(TestBase):
         rules = [a_from_suba, QueryRule(A, (SubA,))]
         fullgraph = self.create_full_graph(rules)
         assert_equal_graph_output(
-            self,
             dedent(
                 f"""\
                 digraph {{
@@ -686,7 +568,7 @@ class RuleGraphTest(TestBase):
             fullgraph,
         )
 
-    def test_smallest_full_test_multiple_root_subject_types(self):
+    def test_smallest_full_test_multiple_root_subject_types(self) -> None:
         @rule
         def a_from_suba(suba: SubA) -> A:
             pass
@@ -698,7 +580,6 @@ class RuleGraphTest(TestBase):
         rules = [a_from_suba, QueryRule(A, (SubA,)), b_from_a, QueryRule(B, (A,))]
         fullgraph = self.create_full_graph(rules)
         assert_equal_graph_output(
-            self,
             dedent(
                 f"""\
                 digraph {{
@@ -716,7 +597,7 @@ class RuleGraphTest(TestBase):
             fullgraph,
         )
 
-    def test_single_rule_depending_on_subject_selection(self):
+    def test_single_rule_depending_on_subject_selection(self) -> None:
         @rule
         def a_from_suba(suba: SubA) -> A:
             pass
@@ -724,7 +605,6 @@ class RuleGraphTest(TestBase):
         rules = [a_from_suba, QueryRule(A, (SubA,))]
         subgraph = self.create_subgraph(A, rules, SubA())
         assert_equal_graph_output(
-            self,
             dedent(
                 f"""\
                 digraph {{
@@ -739,7 +619,7 @@ class RuleGraphTest(TestBase):
             subgraph,
         )
 
-    def test_multiple_selects(self):
+    def test_multiple_selects(self) -> None:
         @rule
         def a_from_suba_and_b(suba: SubA, b: B) -> A:
             pass
@@ -751,7 +631,6 @@ class RuleGraphTest(TestBase):
         rules = [a_from_suba_and_b, b, QueryRule(A, (SubA,))]
         subgraph = self.create_subgraph(A, rules, SubA())
         assert_equal_graph_output(
-            self,
             dedent(
                 f"""\
                 digraph {{
@@ -768,7 +647,7 @@ class RuleGraphTest(TestBase):
             subgraph,
         )
 
-    def test_potentially_ambiguous_get(self):
+    def test_potentially_ambiguous_get(self) -> None:
         # In this case, we validate that a Get is satisfied by a rule that actually consumes its
         # parameter, rather than by having the same dependency rule consume a parameter that was
         # already in the context.
@@ -791,7 +670,6 @@ class RuleGraphTest(TestBase):
         rules = [a, b_from_suba, suba_from_c, QueryRule(A, (SubA,))]
         subgraph = self.create_subgraph(A, rules, SubA())
         assert_equal_graph_output(
-            self,
             dedent(
                 f"""\
                 digraph {{
@@ -809,7 +687,7 @@ class RuleGraphTest(TestBase):
             subgraph,
         )
 
-    def test_one_level_of_recursion(self):
+    def test_one_level_of_recursion(self) -> None:
         @rule
         def a_from_b(b: B) -> A:
             pass
@@ -821,7 +699,6 @@ class RuleGraphTest(TestBase):
         rules = [a_from_b, b_from_suba, QueryRule(A, (SubA,))]
         subgraph = self.create_subgraph(A, rules, SubA())
         assert_equal_graph_output(
-            self,
             dedent(
                 f"""\
                 digraph {{
@@ -838,7 +715,8 @@ class RuleGraphTest(TestBase):
         )
 
     @pytest.mark.skip(reason="TODO(#10649): figure out if this tests is still relevant.")
-    def test_noop_removal_in_subgraph(self):
+    @pytest.mark.no_error_if_skipped
+    def test_noop_removal_in_subgraph(self) -> None:
         @rule
         def a_from_c(c: C) -> A:
             pass
@@ -854,7 +732,6 @@ class RuleGraphTest(TestBase):
         rules = [a_from_c, a, b_singleton, QueryRule(A, (SubA,))]
         subgraph = self.create_subgraph(A, rules, SubA(), validate=False)
         assert_equal_graph_output(
-            self,
             dedent(
                 f"""\
                 digraph {{
@@ -871,7 +748,8 @@ class RuleGraphTest(TestBase):
         )
 
     @pytest.mark.skip(reason="TODO(#10649): figure out if this tests is still relevant.")
-    def test_noop_removal_full_single_subject_type(self):
+    @pytest.mark.no_error_if_skipped
+    def test_noop_removal_full_single_subject_type(self) -> None:
         @rule
         def a_from_c(c: C) -> A:
             pass
@@ -883,7 +761,6 @@ class RuleGraphTest(TestBase):
         rules = [a_from_c, a, QueryRule(A, (SubA,))]
         fullgraph = self.create_full_graph(rules, validate=False)
         assert_equal_graph_output(
-            self,
             dedent(
                 f"""\
                 digraph {{
@@ -900,7 +777,8 @@ class RuleGraphTest(TestBase):
         )
 
     @pytest.mark.skip(reason="TODO(#10649): figure out if this tests is still relevant.")
-    def test_root_tuple_removed_when_no_matches(self):
+    @pytest.mark.no_error_if_skipped
+    def test_root_tuple_removed_when_no_matches(self) -> None:
         @rule
         def a_from_c(c: C) -> A:
             pass
@@ -917,7 +795,6 @@ class RuleGraphTest(TestBase):
         fullgraph = self.create_full_graph(rules, validate=False)
 
         assert_equal_graph_output(
-            self,
             dedent(
                 f"""\
                 digraph {{
@@ -936,7 +813,8 @@ class RuleGraphTest(TestBase):
         )
 
     @pytest.mark.skip(reason="TODO(#10649): figure out if this tests is still relevant.")
-    def test_noop_removal_transitive(self):
+    @pytest.mark.no_error_if_skipped
+    def test_noop_removal_transitive(self) -> None:
         # If a noop-able rule has rules that depend on it,
         # they should be removed from the graph.
 
@@ -960,7 +838,6 @@ class RuleGraphTest(TestBase):
         subgraph = self.create_subgraph(A, rules, SubA(), validate=False)
 
         assert_equal_graph_output(
-            self,
             dedent(
                 f"""\
                 digraph {{
@@ -976,7 +853,7 @@ class RuleGraphTest(TestBase):
             subgraph,
         )
 
-    def test_matching_singleton(self):
+    def test_matching_singleton(self) -> None:
         @rule
         def a_from_suba(suba: SubA, b: B) -> A:
             return A()
@@ -988,7 +865,6 @@ class RuleGraphTest(TestBase):
         rules = [a_from_suba, b_singleton, QueryRule(A, (SubA,))]
         subgraph = self.create_subgraph(A, rules, SubA())
         assert_equal_graph_output(
-            self,
             dedent(
                 f"""\
                 digraph {{
@@ -1006,7 +882,8 @@ class RuleGraphTest(TestBase):
         )
 
     @pytest.mark.skip(reason="TODO(#10649): figure out if this tests is still relevant.")
-    def test_depends_on_multiple_one_noop(self):
+    @pytest.mark.no_error_if_skipped
+    def test_depends_on_multiple_one_noop(self) -> None:
         @rule
         def a_from_c(c: C) -> A:
             pass
@@ -1022,7 +899,6 @@ class RuleGraphTest(TestBase):
         rules = [a_from_c, a_from_suba, b_from_a, QueryRule(A, (SubA,))]
         subgraph = self.create_subgraph(B, rules, SubA(), validate=False)
         assert_equal_graph_output(
-            self,
             dedent(
                 f"""\
                 digraph {{
@@ -1038,7 +914,7 @@ class RuleGraphTest(TestBase):
             subgraph,
         )
 
-    def test_multiple_depend_on_same_rule(self):
+    def test_multiple_depend_on_same_rule(self) -> None:
         @rule
         def a_from_suba(suba: SubA) -> A:
             pass
@@ -1061,7 +937,6 @@ class RuleGraphTest(TestBase):
         ]
         fullgraph = self.create_full_graph(rules)
         assert_equal_graph_output(
-            self,
             dedent(
                 f"""\
                 digraph {{
@@ -1083,7 +958,8 @@ class RuleGraphTest(TestBase):
         )
 
     @pytest.mark.skip(reason="TODO(#10649): figure out if this tests is still relevant.")
-    def test_get_simple(self):
+    @pytest.mark.no_error_if_skipped
+    def test_get_simple(self) -> None:
         @rule
         async def a() -> A:  # type: ignore[return]
             _ = await Get(B, D, D())  # noqa: F841
@@ -1095,7 +971,6 @@ class RuleGraphTest(TestBase):
         rules = [a, b_from_d, QueryRule(A, (SubA,))]
         subgraph = self.create_subgraph(A, rules, SubA())
         assert_equal_graph_output(
-            self,
             dedent(
                 f"""\
                 digraph {{
@@ -1121,4 +996,77 @@ class RuleGraphTest(TestBase):
         scheduler = create_scheduler(rules, validate=validate)
         return "\n".join(scheduler.rule_subgraph_visualization([type(subject)], requested_product))
 
-    assert_equal_with_printing = assert_equal_with_printing
+
+def test_duplicated_rules() -> None:
+    err = (
+        r"Redeclaring rule pants\.engine\.rules_test\.test_duplicated_rules\.dup_a with "
+        r"<function test_duplicated_rules\.<locals>\.dup_a at .*> at line \d+, previously defined "
+        r"by <function test_duplicated_rules\.<locals>\.dup_a at .*> at line \d+\."
+    )
+    with pytest.raises(DuplicateRuleError, match=err):
+
+        @rule
+        async def dup_a() -> A:
+            return A()
+
+        @rule  # type: ignore[no-redef] # noqa: F811
+        async def dup_a() -> B:  # noqa: F811
+            return B()
+
+
+def test_param_type_overrides() -> None:
+    type1 = int  # use a runtime type
+
+    @rule(_param_type_overrides={"param1": type1, "param2": dict})
+    async def dont_injure_humans(param1: str, param2, param3: list) -> A:
+        return A()
+
+    assert dont_injure_humans.rule.input_selectors == (int, dict, list)
+
+    with pytest.raises(ValueError, match="paramX"):
+
+        @rule(_param_type_overrides={"paramX": int})
+        async def obey_human_orders() -> A:
+            return A()
+
+    with pytest.raises(MissingParameterTypeAnnotation, match="must be a type"):
+
+        @rule(_param_type_overrides={"param1": "A string"})
+        async def protect_existence(param1) -> A:
+            return A()
+
+
+def test_invalid_rule_helper_name() -> None:
+    with pytest.raises(ValueError, match="must be private"):
+
+        @rule_helper
+        async def foo() -> A:
+            pass
+
+    @rule_helper(_public=True)
+    async def bar() -> A:
+        pass
+
+
+def test_cant_be_both_rule_and_rule_helper() -> None:
+    with pytest.raises(ValueError, match="Cannot use both @rule and @rule_helper"):
+
+        @rule_helper
+        @rule
+        async def _func1() -> A:
+            pass
+
+    with pytest.raises(ValueError, match="Cannot use both @rule and @rule_helper"):
+
+        @rule
+        @rule_helper
+        async def _func2() -> A:
+            pass
+
+
+def test_synchronous_rule_helper() -> None:
+    with pytest.raises(ValueError, match="must be async"):
+
+        @rule_helper
+        def _foo() -> A:
+            pass

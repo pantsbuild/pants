@@ -1,17 +1,21 @@
-Created by running `./build-support/bin/contributors.sh`.
+Created by running `./pants run build-support/bin/contributors.py`.
 
++ A. Alonso Dominguez
 + Aaron Mitchell
 + Adam Chainz
++ Adam Retter
 + Alan Paulin
 + Alan Velasco
 + Alex Schmitt
 + Alexander Johnson
-+ Alyssa Pohahau
++ Alexey Tereshenkov
++ Andreas Stenius
 + Andrew Hamilton
 + Andy Reitz
 + Antoine Tollenaere
 + Asher Foa
 + Bardur Arantsson
++ Bastian Wegge
 + Benjy Weinberger
 + Bill Farner
 + Billy "Hyun Joon" Seol
@@ -20,7 +24,11 @@ Created by running `./build-support/bin/contributors.sh`.
 + Brian Larson
 + Brian Wickman
 + Bruno Bieth
++ Bryan Weber
 + Caitie McCaffrey
++ Caleb Lloyd
++ Carina C. Zona
++ Caspar Krieger
 + Chris Aniszczyk
 + Chris Borckholder
 + Chris Burroughs
@@ -28,8 +36,13 @@ Created by running `./build-support/bin/contributors.sh`.
 + Chris Heisterkamp
 + Chris Livingston
 + Chris Pesto
++ Chris Targett
++ Chris Williams
 + Christopher Livingston
++ Christopher Maier
++ Christopher Neugebauer
 + Cody Gibb
++ Colin Taylor
 + Craig Schertz
 + Cristian Matache
 + Damon Revoe
@@ -38,6 +51,8 @@ Created by running `./build-support/bin/contributors.sh`.
 + Dan Harrison
 + Daniel Anderson
 + Daniel Bentley
++ Daniel Goldman
++ Daniel Moran
 + Daniel Peebles
 + Daniel Wagner-Hall
 + Danny McClanahan
@@ -46,8 +61,10 @@ Created by running `./build-support/bin/contributors.sh`.
 + David Taylor
 + David Turner
 + Derek Young
++ Dimitrios Bariamis
 + Divij Rajkumar
 + Dominic Hamon
++ Doron Somech
 + Dorothy Ordogh
 + Drew Rothstein
 + Dumitru Daniliuc
@@ -59,27 +76,37 @@ Created by running `./build-support/bin/contributors.sh`.
 + Eric Arellano
 + Eric Ayers
 + Eric Danielson
++ Eric Jacob
 + Eric Lindvall
 + Eugene Burmako
 + Evan Jones
++ Evgeny Kravchenko
 + Fatin H
 + Fedor Korotkov
 + Fiona Condone
++ Flo
 + Florian Leibert
++ Fredrik Ekholdt
 + Gabriel Gonzalez
 + Garrett Malmquist
 + Gary M. Josack
++ Gordon Cassie
 + Greg Shuflin
++ Grzegorz Kossakowski
 + Guy Marom
 + Harley Cooper
 + Henry Fuller
++ Herbert Rusznak
++ Huon Wilson
 + Hwasung Lee
 + Ian Tabolt
 + Igor Morozov
 + Ikai Lan
++ In-Ho Yi
 + Itay Donanhirsh
 + Ity Kaul
 + Jackson Davis
++ Jacob Floyd
 + Jake Donham
 + Jakub Bujny
 + James Bench
@@ -88,6 +115,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Jan Paul Erkelens
 + Jason Jackson
 + Jason Song
++ Jay Crumb
 + Jeff Jenkins
 + Jeremy Hintz
 + Jessica Rosenfield
@@ -97,21 +125,28 @@ Created by running `./build-support/bin/contributors.sh`.
 + Joe Smith
 + Johan Oskarsson
 + John Barry
++ John Basila
 + John Chee
 + John Gallagher
 + John Ioannidis
 + John Sirois
 + John Townsend
 + Jon Boulle
++ Jonas Stendahl
 + Jonathan Coveney
 + Jonathan D. Simms
 + Jonathan Sokolowski
++ Joseph Tilahun
++ Josh Reed
 + Josh Soref
++ Josh Suereth
++ Joshua Cannon
 + Joshua Cohen
 + Joshua Humphries
 + Justin Trobec
 + Karin Lundberg
 + Kaushik Srenevasan
++ Ken Howard
 + Ken Kawamoto
 + Kevin Oliver
 + Kevin Sweeney
@@ -124,10 +159,12 @@ Created by running `./build-support/bin/contributors.sh`.
 + Lei Wang
 + Leo Kim
 + Lex Spoon
++ Liam Wilson
 + Luc Cary
 + Luca Clementi
 + Lukasz Jastrzebski
 + Marc Abramowitz
++ Marcelo Trylesinski
 + Marcin Podolski
 + Marek Żarnowski
 + Marilyn Cruz
@@ -135,6 +172,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Mark Chu-Carroll
 + Mark Davis
 + Mark McBride
++ Martim Lobao
 + Mateo Rodriguez
 + Mathew Jennings
 + Mathieu Sabourin
@@ -145,6 +183,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Maxim Khutornenko
 + Maxim Popenko
 + Michael Doherty
++ Michael Glass
 + Michal Bryc
 + Mike Cripps
 + Mike Lindsey
@@ -153,9 +192,12 @@ Created by running `./build-support/bin/contributors.sh`.
 + Mohamed Abdi
 + Moses Nakamura
 + Nadav Samet
++ Nathan Levesque
++ Neeraj Kashyap
 + Neil Sanchala
 + Nicholas Santos
 + Nik Shkrob
++ Nimrod Shlagman
 + Nitay Joffe
 + Nora Howard
 + Ny Saechao
@@ -168,55 +210,75 @@ Created by running `./build-support/bin/contributors.sh`.
 + Patrick Lawson
 + Patrick Liu
 + Paul Groudas
++ Paul Phillips
 + Paul Yau
 + Peiyu Wang
++ Peter A. I. Forsyth
 + Peter Seibel
++ Peter Vlugter
 + Pierre Chevalier
++ Pierre DAL-PRA
 + Qicheng Ma
 + Raúl Cuza
++ Rhys Madigan
 + Robert Stapenhurst
 + Roger Jiang
 + Roman Andriadi
 + Rushal Verma
++ Ryan King
++ Ryan Scott Brown
 + Ryan Williams
 + Sameer Arora
 + Sameer Brenn
 + Sara Solano
++ Scott Lessans
 + Senthil Kumaran
 + SergeKireev
 + Sergey Serebryakov
 + Shane Delmore
++ Shantanu Kumar
 + Shuo Li
 + Simeon Franklin
 + Srikanth Kotagiri
 + Stefan Sauer
 + Stephan Erb
 + Stu Hood
++ Suresh Joshi
++ Tal Amuyal
 + Tansy Arron-Walker
 + Ted Dziuba
 + Tejal Desai
 + Thales Menato
 + Tianshuo Deng
 + Tien Nguyen
++ Tim Gates
 + Tim Treptow
 + Timur Abishev
 + Tina Huang
 + Todd Stumpf
++ Tom Dimiduk
 + Tom Dyas
 + Tom Howland
++ Tom Solberg
 + Tomasz Godzik
 + Tomasz Pasternak
 + Travis Crawford
 + Troy Howard
 + Tushar Singh
 + Ugo Di Girolamo
++ Walter Scheper
 + Wei An
 + Wilhelmina Drengwitz
 + Win Wang
 + Wolfram Arnold
 + Xaelias
 + Yi Cheng
++ Yoav Alon
 + Yuhan GUO
 + Yujie Chen
 + billybecker
++ eugene yokota
++ hephex
++ twunderlich-grapl
++ wimax-grapl
 + Ólafur Páll Geirsson

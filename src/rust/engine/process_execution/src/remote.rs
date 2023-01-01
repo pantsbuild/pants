@@ -1,44 +1,68 @@
+// Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
+// Licensed under the Apache License, Version 2.0 (see LICENSE).
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, HashMap};
 use std::convert::TryInto;
-use std::path::PathBuf;
+use std::fmt::{self, Debug, Write};
+use std::io::Cursor;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use std::time::SystemTime;
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime};
 
+use async_oncecell::OnceCell;
 use async_trait::async_trait;
-use bazel_protos::call_option;
-use bazel_protos::error_details::PreconditionFailure;
-use bazel_protos::remote_execution::{
-  Action, Command, ExecuteRequest, ExecuteResponse, ExecutedActionMetadata, WaitExecutionRequest,
-};
-use bazel_protos::status::Status;
-use boxfuture::{try_future, BoxFuture, Boxable};
 use bytes::Bytes;
-use concrete_time::TimeSpan;
-use double_checked_cell_async::DoubleCheckedCell;
-use fs::{self, File, PathStat};
-use futures::compat::{Future01CompatExt, Stream01CompatExt};
-use futures::future::{self, TryFutureExt};
-use futures::{Stream, StreamExt};
-use futures01::Future as Future01;
-use hashing::{Digest, Fingerprint};
+use futures::future::{self, BoxFuture, TryFutureExt};
+use futures::{FutureExt, Stream, StreamExt};
 use log::{debug, trace, warn, Level};
-use protobuf::{self, Message, ProtobufEnum};
+use prost::Message;
+use protos::gen::build::bazel::remote::execution::v2 as remexec;
+use protos::gen::google::longrunning::{
+  operations_client::OperationsClient, CancelOperationRequest, Operation,
+};
+use protos::gen::google::rpc::{PreconditionFailure, Status as StatusProto};
+use protos::require_digest;
 use rand::{thread_rng, Rng};
-use store::{Snapshot, SnapshotOps, Store, StoreFileByDigest};
-use workunit_store::{with_workunit, Metric, SpanId, WorkunitMetadata, WorkunitStore};
+use remexec::{
+  capabilities_client::CapabilitiesClient, execution_client::ExecutionClient,
+  execution_stage::Value as ExecutionStageValue, Action, Command, ExecuteRequest, ExecuteResponse,
+  ExecutedActionMetadata, ServerCapabilities, WaitExecutionRequest,
+};
+use tonic::metadata::BinaryMetadataValue;
+use tonic::{Code, Request, Status};
+use tryfuture::try_future;
+use uuid::Uuid;
+
+use concrete_time::TimeSpan;
+use fs::{self, DirectoryDigest, File, PathStat, RelativePath, EMPTY_DIRECTORY_DIGEST};
+use grpc_util::headers_to_http_header_map;
+use grpc_util::prost::MessageExt;
+use grpc_util::{layered_service, status_to_str, LayeredService};
+use hashing::{Digest, Fingerprint};
+use store::{Snapshot, SnapshotOps, Store, StoreError, StoreFileByDigest};
+use task_executor::Executor;
+use workunit_store::{
+  in_workunit, Metric, ObservationMetric, RunId, RunningWorkunit, SpanId, UserMetadataItem,
+  WorkunitMetadata, WorkunitStore,
+};
 
 use crate::{
-  Context, ExecutionStats, FallibleProcessResultWithPlatform, MultiPlatformProcess, Platform,
-  Process, ProcessMetadata,
+  CacheName, Context, FallibleProcessResultWithPlatform, Platform, Process, ProcessCacheScope,
+  ProcessError, ProcessExecutionStrategy, ProcessResultMetadata, ProcessResultSource,
 };
-use bazel_protos::remote_execution_grpc::ActionCacheClient;
 
 // Environment variable which is exclusively used for cache key invalidation.
 // This may be not specified in an Process, and may be populated only by the
 // CommandRunner.
 pub const CACHE_KEY_GEN_VERSION_ENV_VAR_NAME: &str = "PANTS_CACHE_KEY_GEN_VERSION";
+
+// Environment variable which is used to differentiate between running in Docker vs. local vs.
+// remote execution.
+pub const CACHE_KEY_EXECUTION_STRATEGY: &str = "PANTS_CACHE_KEY_EXECUTION_STRATEGY";
+
+// Environment variable which is used to include a unique value for cache busting of processes that
+// have indicated that they should never be cached.
+pub const CACHE_KEY_SALT_ENV_VAR_NAME: &str = "PANTS_CACHE_KEY_SALT";
 
 // Environment variable which is exclusively used for cache key invalidation.
 // This may be not specified in an Process, and may be populated only by the
@@ -47,16 +71,17 @@ pub const CACHE_KEY_TARGET_PLATFORM_ENV_VAR_NAME: &str = "PANTS_CACHE_KEY_TARGET
 
 #[derive(Debug)]
 pub enum OperationOrStatus {
-  Operation(bazel_protos::operations::Operation),
-  Status(bazel_protos::status::Status),
+  Operation(Operation),
+  Status(StatusProto),
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum ExecutionError {
-  // String is the error message.
-  Fatal(String),
-  // Digests are Files and Directories which have been reported to be missing. May be incomplete.
-  MissingDigests(Vec<Digest>),
+  Fatal(ProcessError),
+  // Digests are Files and Directories which have been reported to be missing remotely (unlike
+  // `{Process,Store}Error::MissingDigest`, which indicates that a digest doesn't exist anywhere
+  // in the configured Stores). May be incomplete.
+  MissingRemoteDigests(Vec<Digest>),
   // The server indicated that the request hit a timeout. Generally this is the timeout that the
   // client has pushed down on the ExecutionRequest.
   Timeout,
@@ -81,125 +106,151 @@ pub enum ExecutionError {
 /// optimizations to shave off a round-trip in the future.
 #[derive(Clone)]
 pub struct CommandRunner {
-  metadata: ProcessMetadata,
-  platform: Platform,
+  instance_name: Option<String>,
+  process_cache_namespace: Option<String>,
+  append_only_caches_base_path: Option<String>,
   store: Store,
-  headers: BTreeMap<String, String>,
-  channel: grpcio::Channel,
-  env: Arc<grpcio::Environment>,
-  execution_client: Arc<bazel_protos::remote_execution_grpc::ExecutionClient>,
-  action_cache_client: Arc<bazel_protos::remote_execution_grpc::ActionCacheClient>,
+  executor: Executor,
+  execution_client: Arc<ExecutionClient<LayeredService>>,
+  operations_client: Arc<OperationsClient<LayeredService>>,
   overall_deadline: Duration,
   retry_interval_duration: Duration,
-  capabilities_cell: Arc<DoubleCheckedCell<bazel_protos::remote_execution::ServerCapabilities>>,
-  capabilities_client: Arc<bazel_protos::remote_execution_grpc::CapabilitiesClient>,
+  capabilities_cell: Arc<OnceCell<ServerCapabilities>>,
+  capabilities_client: Arc<CapabilitiesClient<LayeredService>>,
 }
 
 enum StreamOutcome {
   Complete(OperationOrStatus),
-  StreamClosed(Option<String>),
+  StreamClosed,
+}
+
+enum OperationStreamItem {
+  Running(ExecutionStageValue),
+  Outcome(StreamOutcome),
+}
+
+/// A single remote Operation, with a `Drop` implementation to cancel the work if our client goes
+/// away.
+struct RunningOperation {
+  name: Option<String>,
+  operations_client: Arc<OperationsClient<LayeredService>>,
+  executor: Executor,
+  process_level: Level,
+  process_description: String,
+}
+
+impl RunningOperation {
+  fn new(
+    operations_client: Arc<OperationsClient<LayeredService>>,
+    executor: Executor,
+    process_level: Level,
+    process_description: String,
+  ) -> Self {
+    Self {
+      name: None,
+      operations_client,
+      executor,
+      process_level,
+      process_description,
+    }
+  }
+
+  /// Marks the operation completed, which will avoid attempts to cancel it when this struct is
+  /// dropped.
+  fn completed(&mut self) {
+    let _ = self.name.take();
+  }
+}
+
+impl Drop for RunningOperation {
+  fn drop(&mut self) {
+    if let Some(operation_name) = self.name.take() {
+      debug!("Canceling remote operation {operation_name}");
+      let mut operations_client = self.operations_client.as_ref().clone();
+      let _ = self.executor.spawn(async move {
+        operations_client
+          .cancel_operation(CancelOperationRequest {
+            name: operation_name,
+          })
+          .await
+      });
+    }
+  }
 }
 
 impl CommandRunner {
   /// Construct a new CommandRunner
   pub fn new(
-    address: &str,
-    store_servers: Vec<String>,
-    metadata: ProcessMetadata,
+    execution_address: &str,
+    instance_name: Option<String>,
+    process_cache_namespace: Option<String>,
+    append_only_caches_base_path: Option<String>,
     root_ca_certs: Option<Vec<u8>>,
-    oauth_bearer_token: Option<String>,
     headers: BTreeMap<String, String>,
     store: Store,
-    platform: Platform,
+    executor: Executor,
     overall_deadline: Duration,
     retry_interval_duration: Duration,
+    execution_concurrency_limit: usize,
+    capabilities_cell_opt: Option<Arc<OnceCell<ServerCapabilities>>>,
   ) -> Result<Self, String> {
-    let env = Arc::new(grpcio::EnvBuilder::new().build());
-    let channel = {
-      let builder = grpcio::ChannelBuilder::new(env.clone());
-      if let Some(ref root_ca_certs) = root_ca_certs {
-        let creds = grpcio::ChannelCredentialsBuilder::new()
-          .root_cert(root_ca_certs.clone())
-          .build();
-        builder.secure_connect(address, creds)
-      } else {
-        builder.connect(address)
-      }
-    };
-    let execution_client = Arc::new(bazel_protos::remote_execution_grpc::ExecutionClient::new(
-      channel.clone(),
-    ));
+    let execution_use_tls = execution_address.starts_with("https://");
 
-    let store_channel = {
-      let store_server = store_servers
-        .get(0)
-        .ok_or_else(|| "At least one store_server must be specified".to_owned())?;
-      let builder = grpcio::ChannelBuilder::new(env.clone());
-      if let Some(ref root_ca_certs) = root_ca_certs {
-        let creds = grpcio::ChannelCredentialsBuilder::new()
-          .root_cert(root_ca_certs.clone())
-          .build();
-        builder.secure_connect(&store_server, creds)
-      } else {
-        builder.connect(&store_server)
-      }
+    let tls_client_config = if execution_use_tls {
+      Some(grpc_util::tls::Config::new_without_mtls(root_ca_certs).try_into()?)
+    } else {
+      None
     };
-    let action_cache_client = Arc::new(
-      bazel_protos::remote_execution_grpc::ActionCacheClient::new(store_channel),
+
+    let mut execution_headers = headers;
+    let execution_endpoint = grpc_util::create_endpoint(
+      execution_address,
+      tls_client_config.as_ref().filter(|_| execution_use_tls),
+      &mut execution_headers,
+    )?;
+    let execution_http_headers = headers_to_http_header_map(&execution_headers)?;
+    let execution_channel = layered_service(
+      tonic::transport::Channel::balance_list(vec![execution_endpoint].into_iter()),
+      execution_concurrency_limit,
+      execution_http_headers,
+      None,
     );
-
-    let mut headers = headers;
-    if let Some(oauth_bearer_token) = oauth_bearer_token {
-      headers.insert(
-        String::from("authorization"),
-        format!("Bearer {}", oauth_bearer_token.trim()),
-      );
-    }
-
-    // Validate any configured static headers.
-    call_option(&headers, None)?;
-
-    let capabilities_client =
-      Arc::new(bazel_protos::remote_execution_grpc::CapabilitiesClient::new(channel.clone()));
+    let execution_client = Arc::new(ExecutionClient::new(execution_channel.clone()));
+    let operations_client = Arc::new(OperationsClient::new(execution_channel.clone()));
+    let capabilities_client = Arc::new(CapabilitiesClient::new(execution_channel));
 
     let command_runner = CommandRunner {
-      metadata,
-      headers,
-      channel,
-      env,
+      instance_name,
+      process_cache_namespace,
+      append_only_caches_base_path,
       execution_client,
-      action_cache_client,
+      operations_client,
       store,
-      platform,
+      executor,
       overall_deadline,
       retry_interval_duration,
-      capabilities_cell: Arc::new(DoubleCheckedCell::new()),
+      capabilities_cell: capabilities_cell_opt.unwrap_or_else(|| Arc::new(OnceCell::new())),
       capabilities_client,
     };
 
     Ok(command_runner)
   }
 
-  pub fn platform(&self) -> Platform {
-    self.platform
-  }
-
-  async fn get_capabilities(
-    &self,
-  ) -> Result<&bazel_protos::remote_execution::ServerCapabilities, String> {
+  async fn get_capabilities(&self) -> Result<&remexec::ServerCapabilities, String> {
     let capabilities_fut = async {
-      let opt = call_option(&self.headers, None)?;
-      let mut request = bazel_protos::remote_execution::GetCapabilitiesRequest::new();
-      if let Some(s) = self.metadata.instance_name.as_ref() {
+      let mut request = remexec::GetCapabilitiesRequest::default();
+      if let Some(s) = self.instance_name.as_ref() {
         request.instance_name = s.clone();
       }
-      self
-        .capabilities_client
-        .get_capabilities_async_opt(&request, opt)
-        .unwrap()
-        .compat()
+
+      let request = apply_headers(Request::new(request), "");
+
+      let mut client = self.capabilities_client.as_ref().clone();
+      client
+        .get_capabilities(request)
         .await
-        .map_err(rpcerror_to_string)
+        .map(|r| r.into_inner())
+        .map_err(status_to_str)
     };
 
     self
@@ -208,69 +259,162 @@ impl CommandRunner {
       .await
   }
 
-  // Monitors the operation stream returned by the REv2 Execute and WaitExecution methods.
-  // Outputs progress reported by the server and returns the next actionable operation
-  // or gRPC status back to the main loop (plus the operation name so the main loop can
-  // reconnect).
-  async fn wait_on_operation_stream<S>(&self, mut stream: S, build_id: &str) -> StreamOutcome
+  async fn wait_on_operation_stream_item<S>(
+    stream: &mut S,
+    context: &Context,
+    running_operation: &mut RunningOperation,
+    start_time_opt: &mut Option<Instant>,
+  ) -> OperationStreamItem
   where
-    S: Stream<Item = Result<bazel_protos::operations::Operation, grpcio::Error>> + Unpin,
+    S: Stream<Item = Result<Operation, Status>> + Unpin,
   {
-    let mut operation_name_opt: Option<String> = None;
+    let item = stream.next().await;
+
+    if let Some(start_time) = start_time_opt.take() {
+      let timing: Result<u64, _> = Instant::now()
+        .duration_since(start_time)
+        .as_micros()
+        .try_into();
+      if let Ok(obs) = timing {
+        context.workunit_store.record_observation(
+          ObservationMetric::RemoteExecutionRPCFirstResponseTimeMicros,
+          obs,
+        );
+      }
+    }
+
+    match item {
+      Some(Ok(operation)) => {
+        trace!(
+          "wait_on_operation_stream (build_id={}): got operation: {:?}",
+          &context.build_id,
+          &operation
+        );
+
+        // Extract the operation name.
+        // Note: protobuf can return empty string for an empty field so convert empty strings
+        // to None.
+        running_operation.name = Some(operation.name.clone()).filter(|s| !s.trim().is_empty());
+
+        if operation.done {
+          // Continue monitoring if the operation is not complete.
+          OperationStreamItem::Outcome(StreamOutcome::Complete(OperationOrStatus::Operation(
+            operation,
+          )))
+        } else {
+          // Otherwise, return to the main loop with the operation as the result.
+          OperationStreamItem::Running(
+            Self::maybe_extract_execution_stage(&operation).unwrap_or(ExecutionStageValue::Unknown),
+          )
+        }
+      }
+
+      Some(Err(err)) => {
+        debug!("wait_on_operation_stream: got error: {:?}", err);
+        let status_proto = StatusProto {
+          code: err.code() as i32,
+          message: err.message().to_string(),
+          ..StatusProto::default()
+        };
+        OperationStreamItem::Outcome(StreamOutcome::Complete(OperationOrStatus::Status(
+          status_proto,
+        )))
+      }
+
+      None => {
+        // Stream disconnected unexpectedly.
+        debug!("wait_on_operation_stream: unexpected disconnect from RE server");
+        OperationStreamItem::Outcome(StreamOutcome::StreamClosed)
+      }
+    }
+  }
+
+  /// Monitors the operation stream returned by the REv2 Execute and WaitExecution methods.
+  /// Outputs progress reported by the server and returns the next actionable operation
+  /// or gRPC status back to the main loop (plus the operation name so the main loop can
+  /// reconnect).
+  async fn wait_on_operation_stream<S>(
+    mut stream: S,
+    context: &Context,
+    running_operation: &mut RunningOperation,
+  ) -> StreamOutcome
+  where
+    S: Stream<Item = Result<Operation, Status>> + Unpin + Send,
+  {
+    let mut start_time_opt = Some(Instant::now());
 
     trace!(
       "wait_on_operation_stream (build_id={}): monitoring stream",
-      build_id
+      &context.build_id
     );
 
+    // If the server returns an `ExecutionStage` other than `Unknown`, then we assume that it
+    // implements reporting when the operation actually begins `Executing` (as opposed to being
+    // `Queued`, etc), and will wait to create a workunit until we see the `Executing` stage.
+    //
+    // We start by consuming the prefix of the stream before we receive an `Executing` or `Unknown` stage.
     loop {
-      match stream.next().await {
-        Some(Ok(operation)) => {
-          trace!(
-            "wait_on_operation_stream (build_id={}): got operation: {:?}",
-            build_id,
-            &operation
-          );
-
-          // Extract the operation name.
-          // Note: protobuf can return empty string for an empty field so convert empty strings
-          // to None.
-          operation_name_opt =
-            Some(operation.get_name().to_string()).filter(|s| !s.trim().is_empty());
-
-          // Continue monitoring if the operation is not complete.
-          if !operation.get_done() {
-            continue;
-          }
-
-          // Otherwise, return to the main loop with the operation as the result.
-          return StreamOutcome::Complete(OperationOrStatus::Operation(operation));
+      match Self::wait_on_operation_stream_item(
+        &mut stream,
+        context,
+        running_operation,
+        &mut start_time_opt,
+      )
+      .await
+      {
+        OperationStreamItem::Running(
+          ExecutionStageValue::Unknown | ExecutionStageValue::Executing,
+        ) => {
+          // Either the server doesn't know how to report the stage, or the operation has
+          // actually begun executing serverside: proceed to the suffix.
+          break;
         }
-
-        Some(Err(err)) => {
-          debug!("wait_on_operation_stream: got error: {:?}", err);
-          match rpcerror_to_status_or_string(&err) {
-            Ok(status) => return StreamOutcome::Complete(OperationOrStatus::Status(status)),
-            Err(message) => {
-              let code = match err {
-                grpcio::Error::RpcFailure(rpc_status) => rpc_status.status,
-                _ => grpcio::RpcStatusCode::UNKNOWN,
-              };
-              let mut status = bazel_protos::status::Status::new();
-              status.set_code(code.into());
-              status.set_message(format!("gRPC error: {}", message));
-              return StreamOutcome::Complete(OperationOrStatus::Status(status));
-            }
-          }
+        OperationStreamItem::Running(_) => {
+          // The operation has not reached an ExecutionStage that we recognize as
+          // "executing" (likely: it is queued, doing a cache lookup, etc): keep waiting.
+          continue;
         }
-
-        None => {
-          // Stream disconnected unexpectedly.
-          debug!("wait_on_operation_stream: unexpected disconnect from RE server");
-          return StreamOutcome::StreamClosed(operation_name_opt);
-        }
+        OperationStreamItem::Outcome(outcome) => return outcome,
       }
     }
+
+    // Start a workunit to represent the execution of the work, and consume the rest of the stream.
+    in_workunit!(
+      "run_remote_process",
+      // NB: See engine::nodes::NodeKey::workunit_level for more information on why this workunit
+      // renders at the Process's level.
+      running_operation.process_level,
+      desc = Some(running_operation.process_description.clone()),
+      |_workunit| async move {
+        loop {
+          match Self::wait_on_operation_stream_item(
+            &mut stream,
+            context,
+            running_operation,
+            &mut start_time_opt,
+          )
+          .await
+          {
+            OperationStreamItem::Running(
+              ExecutionStageValue::Queued | ExecutionStageValue::CacheCheck,
+            ) => {
+              // The server must have cancelled and requeued the work: although this isn't an error
+              // per-se, it is much easier for us to re-open the stream than to treat this as a
+              // nested loop. In particular:
+              // 1. we can't break/continue out of a workunit
+              // 2. the stream needs to move into the workunit, and can't move back out
+              break StreamOutcome::StreamClosed;
+            }
+            OperationStreamItem::Running(_) => {
+              // The operation is still running.
+              continue;
+            }
+            OperationStreamItem::Outcome(outcome) => break outcome,
+          }
+        }
+      }
+    )
+    .await
   }
 
   // Store the remote timings into the workunit store.
@@ -279,238 +423,300 @@ impl CommandRunner {
     execute_response: &ExecuteResponse,
     metadata: &ExecutedActionMetadata,
   ) {
-    let workunit_state = workunit_store::expect_workunit_state();
-    let workunit_store = workunit_state.store;
-    let parent_id = workunit_state.parent_id;
-    let result_cached = execute_response.get_cached_result();
+    let workunit_thread_handle = workunit_store::expect_workunit_store_handle();
+    let workunit_store = workunit_thread_handle.store;
+    let parent_id = workunit_thread_handle.parent_id;
+    let result_cached = execute_response.cached_result;
 
-    match TimeSpan::from_start_and_end(
-      metadata.get_queued_timestamp(),
-      metadata.get_worker_start_timestamp(),
-      "remote queue",
+    if let (Some(queued_timestamp), Some(worker_start_timestamp)) = (
+      metadata.queued_timestamp.as_ref(),
+      metadata.worker_start_timestamp.as_ref(),
     ) {
-      Ok(time_span) => {
-        maybe_add_workunit(
+      let span_result =
+        TimeSpan::from_start_and_end(queued_timestamp, worker_start_timestamp, "remote queue");
+      match span_result {
+        Ok(time_span) => maybe_add_workunit(
           result_cached,
           "remote execution action scheduling",
+          Level::Trace,
           time_span,
           parent_id,
           &workunit_store,
-          WorkunitMetadata::with_level(Level::Debug),
-        );
+          WorkunitMetadata::default(),
+        ),
+        Err(s) => warn!("{}", s),
       }
-      Err(s) => warn!("{}", s),
-    };
+    }
 
-    match TimeSpan::from_start_and_end(
-      metadata.get_input_fetch_start_timestamp(),
-      metadata.get_input_fetch_completed_timestamp(),
-      "remote input fetch",
+    if let (Some(input_fetch_start_timestamp), Some(input_fetch_completed_timestamp)) = (
+      metadata.input_fetch_start_timestamp.as_ref(),
+      metadata.input_fetch_completed_timestamp.as_ref(),
     ) {
-      Ok(time_span) => {
-        maybe_add_workunit(
+      let span_result = TimeSpan::from_start_and_end(
+        input_fetch_start_timestamp,
+        input_fetch_completed_timestamp,
+        "remote input fetch",
+      );
+      match span_result {
+        Ok(time_span) => maybe_add_workunit(
           result_cached,
           "remote execution worker input fetching",
+          Level::Trace,
           time_span,
           parent_id,
           &workunit_store,
-          WorkunitMetadata::with_level(Level::Debug),
-        );
+          WorkunitMetadata::default(),
+        ),
+        Err(s) => warn!("{}", s),
       }
-      Err(s) => warn!("{}", s),
     }
 
-    match TimeSpan::from_start_and_end(
-      metadata.get_execution_start_timestamp(),
-      metadata.get_execution_completed_timestamp(),
-      "remote execution",
+    if let (Some(execution_start_timestamp), Some(execution_completed_timestamp)) = (
+      metadata.execution_start_timestamp.as_ref(),
+      metadata.execution_completed_timestamp.as_ref(),
     ) {
-      Ok(time_span) => {
-        maybe_add_workunit(
+      let span_result = TimeSpan::from_start_and_end(
+        execution_start_timestamp,
+        execution_completed_timestamp,
+        "remote execution",
+      );
+      match span_result {
+        Ok(time_span) => maybe_add_workunit(
           result_cached,
           "remote execution worker command executing",
+          Level::Trace,
           time_span,
           parent_id,
           &workunit_store,
-          WorkunitMetadata::with_level(Level::Debug),
-        );
+          WorkunitMetadata::default(),
+        ),
+        Err(s) => warn!("{}", s),
       }
-      Err(s) => warn!("{}", s),
     }
 
-    match TimeSpan::from_start_and_end(
-      metadata.get_output_upload_start_timestamp(),
-      metadata.get_output_upload_completed_timestamp(),
-      "remote output store",
+    if let (Some(output_upload_start_timestamp), Some(output_upload_completed_timestamp)) = (
+      metadata.output_upload_start_timestamp.as_ref(),
+      metadata.output_upload_completed_timestamp.as_ref(),
     ) {
-      Ok(time_span) => {
-        maybe_add_workunit(
+      let span_result = TimeSpan::from_start_and_end(
+        output_upload_start_timestamp,
+        output_upload_completed_timestamp,
+        "remote output store",
+      );
+      match span_result {
+        Ok(time_span) => maybe_add_workunit(
           result_cached,
           "remote execution worker output uploading",
+          Level::Trace,
           time_span,
           parent_id,
           &workunit_store,
-          WorkunitMetadata::with_level(Level::Debug),
-        );
+          WorkunitMetadata::default(),
+        ),
+        Err(s) => warn!("{}", s),
       }
-      Err(s) => warn!("{}", s),
     }
   }
 
   fn extract_missing_digests(&self, precondition_failure: &PreconditionFailure) -> ExecutionError {
-    let mut missing_digests = Vec::with_capacity(precondition_failure.get_violations().len());
+    let mut missing_digests = Vec::with_capacity(precondition_failure.violations.len());
 
-    for violation in precondition_failure.get_violations() {
-      if violation.get_field_type() != "MISSING" {
-        return ExecutionError::Fatal(format!(
-          "Unknown PreconditionFailure violation: {:?}",
-          violation
-        ));
+    for violation in &precondition_failure.violations {
+      if violation.r#type != "MISSING" {
+        return ExecutionError::Fatal(
+          format!("Unknown PreconditionFailure violation: {:?}", violation).into(),
+        );
       }
 
-      let parts: Vec<_> = violation.get_subject().split('/').collect();
+      let parts: Vec<_> = violation.subject.split('/').collect();
       if parts.len() != 3 || parts[0] != "blobs" {
-        return ExecutionError::Fatal(format!(
-          "Received FailedPrecondition MISSING but didn't recognize subject {}",
-          violation.get_subject()
-        ));
+        return ExecutionError::Fatal(
+          format!(
+            "Received FailedPrecondition MISSING but didn't recognize subject {}",
+            violation.subject
+          )
+          .into(),
+        );
       }
 
       let fingerprint = match Fingerprint::from_hex_string(parts[1]) {
         Ok(f) => f,
         Err(e) => {
-          return ExecutionError::Fatal(format!("Bad digest in missing blob: {}: {}", parts[1], e))
+          return ExecutionError::Fatal(
+            format!("Bad digest in missing blob: {}: {}", parts[1], e).into(),
+          )
         }
       };
 
       let size = match parts[2].parse::<usize>() {
         Ok(s) => s,
         Err(e) => {
-          return ExecutionError::Fatal(format!("Missing blob had bad size: {}: {}", parts[2], e))
+          return ExecutionError::Fatal(
+            format!("Missing blob had bad size: {}: {}", parts[2], e).into(),
+          )
         }
       };
 
-      missing_digests.push(Digest(fingerprint, size));
+      missing_digests.push(Digest::new(fingerprint, size));
     }
 
     if missing_digests.is_empty() {
       return ExecutionError::Fatal(
-        "Error from remote execution: FailedPrecondition, but no details".to_owned(),
+        "Error from remote execution: FailedPrecondition, but no details"
+          .to_owned()
+          .into(),
       );
     }
 
-    ExecutionError::MissingDigests(missing_digests)
+    ExecutionError::MissingRemoteDigests(missing_digests)
+  }
+
+  /// If set, extract `ExecuteOperationMetadata` from the `Operation`.
+  fn maybe_extract_execution_stage(operation: &Operation) -> Option<ExecutionStageValue> {
+    let metadata = operation.metadata.as_ref()?;
+
+    let eom = remexec::ExecuteOperationMetadata::decode(&metadata.value[..])
+      .map(Some)
+      .unwrap_or_else(|e| {
+        log::warn!("Invalid ExecuteOperationMetadata from server: {e:?}");
+        None
+      })?;
+
+    ExecutionStageValue::from_i32(eom.stage)
   }
 
   // pub(crate) for testing
   pub(crate) async fn extract_execute_response(
     &self,
+    run_id: RunId,
+    platform: Platform,
     operation_or_status: OperationOrStatus,
   ) -> Result<FallibleProcessResultWithPlatform, ExecutionError> {
     trace!("Got operation response: {:?}", operation_or_status);
 
     let status = match operation_or_status {
       OperationOrStatus::Operation(operation) => {
-        assert!(operation.get_done(), "operation was not marked done");
-        if operation.has_error() {
-          warn!("protocol violation: REv2 prohibits setting Operation::error");
-          return Err(ExecutionError::Fatal(format_error(&operation.get_error())));
-        }
+        assert!(operation.done, "operation was not marked done");
 
-        if !operation.has_response() {
-          return Err(ExecutionError::Fatal(
-            "Operation finished but no response supplied".to_string(),
-          ));
-        }
-
-        let mut execute_response = bazel_protos::remote_execution::ExecuteResponse::new();
-        execute_response
-          .merge_from_bytes(operation.get_response().get_value())
-          .map_err(|e| ExecutionError::Fatal(format!("Invalid ExecuteResponse: {:?}", e)))?;
+        use protos::gen::google::longrunning::operation::Result as OperationResult;
+        let execute_response = match operation.result {
+          Some(OperationResult::Response(response_any)) => {
+            remexec::ExecuteResponse::decode(&response_any.value[..]).map_err(|e| {
+              ExecutionError::Fatal(format!("Invalid ExecuteResponse: {:?}", e).into())
+            })?
+          }
+          Some(OperationResult::Error(rpc_status)) => {
+            // Infrastructure error. Retry it.
+            let msg = format_error(&rpc_status);
+            debug!("got operation error for runid {:?}: {}", &run_id, &msg);
+            return Err(ExecutionError::Retryable(msg));
+          }
+          None => {
+            return Err(ExecutionError::Fatal(
+              "Operation finished but no response supplied"
+                .to_owned()
+                .into(),
+            ));
+          }
+        };
 
         debug!("Got (nested) execute response: {:?}", execute_response);
 
-        if execute_response.get_result().has_execution_metadata() {
-          let metadata = execute_response.get_result().get_execution_metadata();
-          self.save_workunit_timings(&execute_response, &metadata);
+        if let Some(ref metadata) = execute_response
+          .result
+          .as_ref()
+          .and_then(|ar| ar.execution_metadata.clone())
+        {
+          self.save_workunit_timings(&execute_response, metadata);
         }
 
-        let status = execute_response.take_status();
-        if grpcio::RpcStatusCode::from(status.get_code()) == grpcio::RpcStatusCode::OK {
-          return Ok(
-            populate_fallible_execution_result(
-              self.store.clone(),
-              execute_response.get_result(),
-              vec![],
-              self.platform,
-              false,
-            )
-            .compat()
-            .await
-            .map_err(ExecutionError::Fatal)?,
-          );
+        let rpc_status = execute_response.status.unwrap_or_default();
+        if rpc_status.code == Code::Ok as i32 {
+          let action_result = if let Some(ref action_result) = execute_response.result {
+            action_result
+          } else {
+            warn!("REv2 protocol violation: action result not set");
+            return Err(ExecutionError::Fatal(
+              "REv2 protocol violation: action result not set"
+                .to_owned()
+                .into(),
+            ));
+          };
+
+          return populate_fallible_execution_result(
+            self.store.clone(),
+            run_id,
+            action_result,
+            platform,
+            false,
+            if execute_response.cached_result {
+              ProcessResultSource::HitRemotely
+            } else {
+              ProcessResultSource::RanRemotely
+            },
+          )
+          .await
+          .map_err(|e| ExecutionError::Fatal(e.into()));
         }
 
-        status
+        rpc_status
       }
       OperationOrStatus::Status(status) => status,
     };
 
-    match grpcio::RpcStatusCode::from(status.get_code()) {
-      grpcio::RpcStatusCode::OK => unreachable!(),
+    match Code::from_i32(status.code) {
+      Code::Ok => unreachable!(),
 
-      grpcio::RpcStatusCode::DEADLINE_EXCEEDED => Err(ExecutionError::Timeout),
+      Code::DeadlineExceeded => Err(ExecutionError::Timeout),
 
-      grpcio::RpcStatusCode::FAILED_PRECONDITION => {
-        let details = match status.get_details() {
-          [] => return Err(ExecutionError::Fatal(status.get_message().to_owned())),
-          [details] => details,
-          _ => {
-            return Err(ExecutionError::Fatal(format!(
-              "Received multiple failure details in ExecuteResponse's status field: {:?}",
-              status.get_details()
-            )))
-          }
+      Code::FailedPrecondition => {
+        let details = if status.details.is_empty() {
+          return Err(ExecutionError::Fatal(status.message.into()));
+        } else if status.details.len() > 1 {
+          // TODO(tonic): Should we be able to handle multiple details protos?
+          return Err(ExecutionError::Fatal(
+            "too many detail protos for precondition failure"
+              .to_owned()
+              .into(),
+          ));
+        } else {
+          &status.details[0]
         };
 
-        let mut precondition_failure = PreconditionFailure::new();
-        let full_name = format!(
-          "type.googleapis.com/{}",
-          precondition_failure.descriptor().full_name()
-        );
-        if details.get_type_url() != full_name {
-          return Err(ExecutionError::Fatal(format!(
+        let full_name = format!("type.googleapis.com/{}", "google.rpc.PreconditionFailure");
+        if details.type_url != full_name {
+          return Err(ExecutionError::Fatal(
+            format!(
             "Received PreconditionFailure, but didn't know how to resolve it: {}, protobuf type {}",
-            status.get_message(),
-            details.get_type_url()
-          )));
+            status.message, details.type_url
+          )
+            .into(),
+          ));
         }
 
         // Decode the precondition failure.
-        precondition_failure
-          .merge_from_bytes(details.get_value())
+        let precondition_failure = PreconditionFailure::decode(Cursor::new(&details.value))
           .map_err(|e| {
-            ExecutionError::Fatal(format!(
-              "Error deserializing PreconditionFailure proto: {:?}",
-              e
-            ))
+            ExecutionError::Fatal(
+              format!("Error deserializing PreconditionFailure proto: {:?}", e).into(),
+            )
           })?;
 
         Err(self.extract_missing_digests(&precondition_failure))
       }
 
-      grpcio::RpcStatusCode::ABORTED
-      | grpcio::RpcStatusCode::INTERNAL
-      | grpcio::RpcStatusCode::RESOURCE_EXHAUSTED
-      | grpcio::RpcStatusCode::UNAVAILABLE
-      | grpcio::RpcStatusCode::UNKNOWN => {
-        Err(ExecutionError::Retryable(status.get_message().to_owned()))
-      }
-      code => Err(ExecutionError::Fatal(format!(
-        "Error from remote execution: {:?}: {:?}",
-        code,
-        status.get_message()
-      ))),
+      Code::Aborted
+      | Code::Internal
+      | Code::ResourceExhausted
+      | Code::Unavailable
+      | Code::Unknown => Err(ExecutionError::Retryable(status.message)),
+      code => Err(ExecutionError::Fatal(
+        format!(
+          "Error from remote execution: {:?}: {:?}",
+          code, status.message,
+        )
+        .into(),
+      )),
     }
   }
 
@@ -527,43 +733,45 @@ impl CommandRunner {
     execute_request: ExecuteRequest,
     process: Process,
     context: &Context,
-  ) -> Result<FallibleProcessResultWithPlatform, String> {
+    workunit: &mut RunningWorkunit,
+  ) -> Result<FallibleProcessResultWithPlatform, ProcessError> {
     const MAX_RETRIES: u32 = 5;
     const MAX_BACKOFF_DURATION: Duration = Duration::from_secs(10);
 
     let start_time = Instant::now();
-    let mut current_operation_name: Option<String> = None;
+
+    let mut running_operation = RunningOperation::new(
+      self.operations_client.clone(),
+      self.executor.clone(),
+      process.level,
+      process.description.clone(),
+    );
     let mut num_retries = 0;
 
     loop {
       // If we are currently retrying a request, then delay using an exponential backoff.
       if num_retries > 0 {
-        context
-          .workunit_store
-          .increment_counter(Metric::RemoteExecutionRPCRetries, 1);
+        workunit.increment_counter(Metric::RemoteExecutionRPCRetries, 1);
 
-        let multiplier = thread_rng().gen_range(0, 2_u32.pow(num_retries) + 1);
+        let multiplier = thread_rng().gen_range(0..2_u32.pow(num_retries) + 1);
         let sleep_time = self.retry_interval_duration * multiplier;
         let sleep_time = sleep_time.min(MAX_BACKOFF_DURATION);
         debug!("delaying {:?} before retry", sleep_time);
-        tokio::time::delay_for(sleep_time).await;
+        tokio::time::sleep(sleep_time).await;
       }
 
-      let call_opt = call_option(&self.headers, Some(context.build_id.clone()))?;
-      let rpc_result = match current_operation_name {
+      let rpc_result = match running_operation.name {
         None => {
           // The request has not been submitted yet. Submit the request using the REv2
           // Execute method.
           debug!(
             "no current operation: submitting execute request: build_id={}; execute_request={:?}",
-            context.build_id, execute_request
+            context.build_id, &execute_request
           );
-          context
-            .workunit_store
-            .increment_counter(Metric::RemoteExecutionRPCExecute, 1);
-          self
-            .execution_client
-            .execute_opt(&execute_request, call_opt)
+          workunit.increment_counter(Metric::RemoteExecutionRPCExecute, 1);
+          let mut client = self.execution_client.as_ref().clone();
+          let request = apply_headers(Request::new(execute_request.clone()), &context.build_id);
+          client.execute(request).await
         }
 
         Some(ref operation_name) => {
@@ -573,27 +781,25 @@ impl CommandRunner {
             "existing operation: reconnecting to operation stream: build_id={}; operation_name={}",
             context.build_id, operation_name
           );
-          context
-            .workunit_store
-            .increment_counter(Metric::RemoteExecutionRPCWaitExecution, 1);
-          let mut wait_execution_request = WaitExecutionRequest::new();
-          wait_execution_request.set_name(operation_name.to_owned());
-          self
-            .execution_client
-            .wait_execution_opt(&wait_execution_request, call_opt)
+          workunit.increment_counter(Metric::RemoteExecutionRPCWaitExecution, 1);
+          let wait_execution_request = WaitExecutionRequest {
+            name: operation_name.to_owned(),
+          };
+          let mut client = self.execution_client.as_ref().clone();
+          let request = apply_headers(Request::new(wait_execution_request), &context.build_id);
+          client.wait_execution(request).await
         }
       };
 
       // Take action based on whether we received an output stream or whether there is an
       // error to resolve.
       let actionable_result = match rpc_result {
-        Ok(operation_stream) => {
+        Ok(operation_stream_response) => {
           // Monitor the operation stream until there is an actionable operation
           // or status to interpret.
-          let compat_stream = operation_stream.compat();
-          let stream_outcome = self
-            .wait_on_operation_stream(compat_stream, &context.build_id)
-            .await;
+          let operation_stream = operation_stream_response.into_inner();
+          let stream_outcome =
+            Self::wait_on_operation_stream(operation_stream, context, &mut running_operation).await;
 
           match stream_outcome {
             StreamOutcome::Complete(status) => {
@@ -602,20 +808,25 @@ impl CommandRunner {
                 context.build_id,
                 status
               );
+              // We completed this operation.
+              running_operation.completed();
               status
             }
-            StreamOutcome::StreamClosed(operation_name_opt) => {
-              trace!("wait_on_operation_stream (build_id={}) returned stream close, will retry operation_name={:?}", context.build_id, operation_name_opt);
+            StreamOutcome::StreamClosed => {
+              trace!(
+                "wait_on_operation_stream (build_id={}) returned stream close, \
+                     will retry operation_name={:?}",
+                context.build_id,
+                running_operation.name
+              );
 
               // Check if the number of request attempts sent thus far have exceeded the number
               // of retries allowed since the last successful connection. (There is no point in
               // continually submitting a request if ultimately futile.)
               if num_retries >= MAX_RETRIES {
-                context
-                  .workunit_store
-                  .increment_counter(Metric::RemoteExecutionRPCErrors, 1);
+                workunit.increment_counter(Metric::RemoteExecutionRPCErrors, 1);
                 return Err(
-                  "Too many failures from server. The last event was the server disconnecting with no error given.".to_owned(),
+                  "Too many failures from server. The last event was the server disconnecting with no error given.".to_owned().into(),
                 );
               } else {
                 // Increment the retry counter and allow loop to retry.
@@ -623,33 +834,31 @@ impl CommandRunner {
               }
 
               // Iterate the loop to reconnect to the operation.
-              current_operation_name = operation_name_opt;
               continue;
             }
           }
         }
-        Err(err) => match err {
-          grpcio::Error::RpcFailure(rpc_status) => {
-            let mut status = Status::new();
-            status.code = rpc_status.status.into();
-            OperationOrStatus::Status(status)
-          }
-          _ => {
-            context
-              .workunit_store
-              .increment_counter(Metric::RemoteExecutionRPCErrors, 1);
-            return Err(format!("gRPC error: {}", err));
-          }
-        },
+        Err(status) => {
+          let status_proto = StatusProto {
+            code: status.code() as i32,
+            message: status.message().to_owned(),
+            ..StatusProto::default()
+          };
+          // `OperationOrStatus` always represents a completed operation, so this operation
+          // is completed.
+          running_operation.completed();
+          OperationOrStatus::Status(status_proto)
+        }
       };
 
-      match self.extract_execute_response(actionable_result).await {
+      match self
+        .extract_execute_response(context.run_id, process.platform, actionable_result)
+        .await
+      {
         Ok(result) => return Ok(result),
         Err(err) => match err {
           ExecutionError::Fatal(e) => {
-            context
-              .workunit_store
-              .increment_counter(Metric::RemoteExecutionRPCErrors, 1);
+            workunit.increment_counter(Metric::RemoteExecutionRPCErrors, 1);
             return Err(e);
           }
           ExecutionError::Retryable(e) => {
@@ -658,19 +867,16 @@ impl CommandRunner {
             // continually submitting a request if ultimately futile.)
             trace!("retryable error: {}", e);
             if num_retries >= MAX_RETRIES {
-              context
-                .workunit_store
-                .increment_counter(Metric::RemoteExecutionRPCErrors, 1);
-              return Err(format!(
-                "Too many failures from server. The last error was: {}",
-                e
-              ));
+              workunit.increment_counter(Metric::RemoteExecutionRPCErrors, 1);
+              return Err(
+                format!("Too many failures from server. The last error was: {}", e).into(),
+              );
             } else {
               // Increment the retry counter and allow loop to retry.
               num_retries += 1;
             }
           }
-          ExecutionError::MissingDigests(missing_digests) => {
+          ExecutionError::MissingRemoteDigests(missing_digests) => {
             trace!(
               "Server reported missing digests; trying to upload: {:?}",
               missing_digests,
@@ -679,22 +885,20 @@ impl CommandRunner {
             let _ = self
               .store
               .ensure_remote_has_recursive(missing_digests)
-              .compat()
               .await?;
           }
           ExecutionError::Timeout => {
-            context
-              .workunit_store
-              .increment_counter(Metric::RemoteExecutionTimeouts, 1);
-            return populate_fallible_execution_result_for_timeout(
+            workunit.increment_counter(Metric::RemoteExecutionTimeouts, 1);
+            let result = populate_fallible_execution_result_for_timeout(
               &self.store,
+              context,
               &process.description,
               process.timeout,
               start_time.elapsed(),
-              Vec::new(),
-              self.platform,
+              process.platform,
             )
-            .await;
+            .await?;
+            return Ok(result);
           }
         },
       }
@@ -702,22 +906,43 @@ impl CommandRunner {
   }
 }
 
+impl Debug for CommandRunner {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    f.debug_struct("remote::CommandRunner")
+      .finish_non_exhaustive()
+  }
+}
+
 #[async_trait]
 impl crate::CommandRunner for CommandRunner {
-  /// Run the given MultiPlatformProcess via the Remote Execution API.
+  /// Run the given Process via the Remote Execution API.
   async fn run(
     &self,
-    request: MultiPlatformProcess,
     context: Context,
-  ) -> Result<FallibleProcessResultWithPlatform, String> {
+    _workunit: &mut RunningWorkunit,
+    request: Process,
+  ) -> Result<FallibleProcessResultWithPlatform, ProcessError> {
     // Retrieve capabilities for this server.
     let capabilities = self.get_capabilities().await?;
     trace!("RE capabilities: {:?}", &capabilities);
 
     // Construct the REv2 ExecuteRequest and related data for this execution request.
-    let request = self.extract_compatible_request(&request).unwrap();
-    let store = self.store.clone();
-    let (action, command, execute_request) = make_execute_request(&request, self.metadata.clone())?;
+    let EntireExecuteRequest {
+      action,
+      command,
+      execute_request,
+      input_root_digest,
+    } = make_execute_request(
+      &request,
+      self.instance_name.clone(),
+      self.process_cache_namespace.clone(),
+      &self.store,
+      self
+        .append_only_caches_base_path
+        .as_ref()
+        .map(|s| s.as_ref()),
+    )
+    .await?;
     let build_id = context.build_id.clone();
 
     debug!("Remote execution: {}", request.description);
@@ -731,153 +956,207 @@ impl crate::CommandRunner for CommandRunner {
     let deadline_duration = self.overall_deadline + request.timeout.unwrap_or_default();
 
     // Ensure the action and command are stored locally.
-    let (command_digest, action_digest) = with_workunit(
-      context.workunit_store.clone(),
-      "ensure_action_stored_locally".to_owned(),
-      WorkunitMetadata::with_level(Level::Debug),
-      ensure_action_stored_locally(&self.store, &command, &action),
-      |_, md| md,
-    )
-    .await?;
-
-    // Check the remote Action Cache to see if this request was already computed.
-    // If so, return immediately with the result.
-    let cached_response_opt = with_workunit(
-      context.workunit_store.clone(),
-      "check_action_cache".to_owned(),
-      WorkunitMetadata::with_level(Level::Debug),
-      check_action_cache(
-        action_digest,
-        &self.metadata,
-        self.platform,
-        &context,
-        self.action_cache_client.clone(),
-        &self.headers,
-        self.store.clone(),
-      ),
-      |_, md| md,
-    )
-    .await?;
-    debug!(
-      "action cache response: build_id={}; digest={:?}: {:?}",
-      &build_id, action_digest, cached_response_opt
-    );
-    if let Some(cached_response) = cached_response_opt {
-      return Ok(cached_response);
-    }
+    let (command_digest, action_digest) =
+      ensure_action_stored_locally(&self.store, &command, &action).await?;
 
     // Upload the action (and related data, i.e. the embedded command and input files).
-    with_workunit(
-      context.workunit_store.clone(),
-      "ensure_action_uploaded".to_owned(),
-      WorkunitMetadata::with_level(Level::Debug),
-      ensure_action_uploaded(&store, command_digest, action_digest, request.input_files),
-      |_, md| md,
+    ensure_action_uploaded(
+      &self.store,
+      command_digest,
+      action_digest,
+      Some(input_root_digest),
     )
     .await?;
 
     // Submit the execution request to the RE server for execution.
-    context
-      .workunit_store
-      .increment_counter(Metric::RemoteExecutionRequests, 1);
-    let result_fut = self.run_execute_request(execute_request, request, &context);
-    let timeout_fut = tokio::time::timeout(deadline_duration, result_fut);
-    let response = with_workunit(
-      context.workunit_store.clone(),
-      "run_execute_request".to_owned(),
-      WorkunitMetadata::with_level(Level::Debug),
-      timeout_fut,
-      |result, mut metadata| {
-        if result.is_err() {
-          metadata.level = Level::Error;
-          metadata.desc = Some(format!(
-            "remote execution timed out after {:?}",
-            deadline_duration
-          ));
+    let context2 = context.clone();
+    in_workunit!(
+      "run_execute_request",
+      // NB: The process has not actually started running until the server has notified us that it
+      // has: see `wait_on_operation_stream`.
+      Level::Debug,
+      user_metadata = vec![(
+        "action_digest".to_owned(),
+        UserMetadataItem::String(format!("{action_digest:?}")),
+      )],
+      |workunit| async move {
+        workunit.increment_counter(Metric::RemoteExecutionRequests, 1);
+        let result_fut = self.run_execute_request(execute_request, request, &context2, workunit);
+
+        // Detect whether the operation ran or hit the deadline timeout.
+        match tokio::time::timeout(deadline_duration, result_fut).await {
+          Ok(Ok(result)) => {
+            workunit.increment_counter(Metric::RemoteExecutionSuccess, 1);
+            Ok(result)
+          }
+          Ok(Err(err)) => {
+            workunit.increment_counter(Metric::RemoteExecutionErrors, 1);
+            Err(err.enrich(&format!("For action {action_digest:?}")))
+          }
+          Err(tokio::time::error::Elapsed { .. }) => {
+            // The Err in this match arm originates from the timeout future.
+            debug!(
+              "remote execution for build_id={} timed out after {:?}",
+              &build_id, deadline_duration
+            );
+            workunit.update_metadata(|initial| {
+              let initial = initial.map(|(m, _)| m).unwrap_or_default();
+              Some((
+                WorkunitMetadata {
+                  desc: Some(format!(
+                    "remote execution timed out after {:?}",
+                    deadline_duration
+                  )),
+                  ..initial
+                },
+                Level::Error,
+              ))
+            });
+            workunit.increment_counter(Metric::RemoteExecutionTimeouts, 1);
+            Err(format!("remote execution timed out after {:?}", deadline_duration).into())
+          }
         }
-        metadata
       },
     )
-    .await;
-
-    // Detect whether the operation ran or hit the deadline timeout.
-    match response {
-      Ok(result) => {
-        if result.is_ok() {
-          context
-            .workunit_store
-            .increment_counter(Metric::RemoteExecutionSuccess, 1);
-        } else {
-          context
-            .workunit_store
-            .increment_counter(Metric::RemoteExecutionErrors, 1);
-        }
-        result
-      }
-      Err(_) => {
-        // The Err in this match arm originates from the timeout future.
-        debug!(
-          "remote execution for build_id={} timed out after {:?}",
-          &build_id, deadline_duration
-        );
-        context
-          .workunit_store
-          .increment_counter(Metric::RemoteExecutionTimeouts, 1);
-        Err(format!(
-          "remote execution timed out after {:?}",
-          deadline_duration
-        ))
-      }
-    }
+    .await
   }
 
-  // TODO: This is a copy of the same method on crate::remote::CommandRunner.
-  fn extract_compatible_request(&self, req: &MultiPlatformProcess) -> Option<Process> {
-    for compatible_constraint in vec![None, self.platform.into()].iter() {
-      if let Some(compatible_req) = req.0.get(compatible_constraint) {
-        return Some(compatible_req.clone());
-      }
-    }
-    None
+  async fn shutdown(&self) -> Result<(), String> {
+    Ok(())
   }
 }
 
 fn maybe_add_workunit(
   result_cached: bool,
-  name: &str,
+  name: &'static str,
+  level: Level,
   time_span: concrete_time::TimeSpan,
   parent_id: Option<SpanId>,
   workunit_store: &WorkunitStore,
   metadata: WorkunitMetadata,
 ) {
-  if !result_cached {
+  if !result_cached && workunit_store.max_level() >= level {
     let start_time: SystemTime = SystemTime::UNIX_EPOCH + time_span.start.into();
     let end_time: SystemTime = start_time + time_span.duration.into();
-    workunit_store.add_completed_workunit(
-      name.to_string(),
-      start_time,
-      end_time,
-      parent_id,
-      metadata,
-    );
+    workunit_store.add_completed_workunit(name, level, start_time, end_time, parent_id, metadata);
   }
 }
 
-pub fn make_execute_request(
+fn make_wrapper_for_append_only_caches(
+  caches: &BTreeMap<CacheName, RelativePath>,
+  base_path: &str,
+  working_directory: Option<&str>,
+) -> Result<String, String> {
+  let mut script = String::new();
+  writeln!(&mut script, "#!/bin/sh").map_err(|err| format!("write! failed: {err:?}"))?;
+
+  // Setup the append-only caches.
+  for (cache_name, path) in caches {
+    writeln!(
+      &mut script,
+      "/bin/mkdir -p '{}/{}'",
+      base_path,
+      cache_name.name()
+    )
+    .map_err(|err| format!("write! failed: {err:?}"))?;
+    if let Some(parent) = path.parent() {
+      writeln!(&mut script, "/bin/mkdir -p '{}'", parent.to_string_lossy())
+        .map_err(|err| format!("write! failed: {err}"))?;
+    }
+    writeln!(
+      &mut script,
+      "/bin/ln -s '{}/{}' '{}'",
+      base_path,
+      cache_name.name(),
+      path.as_path().to_string_lossy()
+    )
+    .map_err(|err| format!("write! failed: {err}"))?;
+  }
+
+  // Change into any working directory.
+  //
+  // Note: When this wrapper script is in effect, Pants will not set the `working_directory`
+  // field on the `ExecuteRequest` so that this wrapper script can operate in the input root
+  // first.
+  if let Some(path) = working_directory {
+    writeln!(
+      &mut script,
+      concat!(
+        "cd '{0}'\n",
+        "if [ \"$?\" != 0 ]; then\n",
+        "  echo \"pants-wrapper: Failed to change working directory to: {0}\" 1>&2\n",
+        "  exit 1\n",
+        "fi\n",
+      ),
+      path
+    )
+    .map_err(|err| format!("write! failed: {err}"))?;
+  }
+
+  // Finally, execute the process.
+  writeln!(&mut script, "exec \"$@\"").map_err(|err| format!("write! failed: {err:?}"))?;
+  Ok(script)
+}
+
+/// Return type for `make_execute_request`. Contains all of the generated REAPI protobufs for
+/// a particular `Process`.
+#[derive(Clone, Debug, PartialEq)]
+pub struct EntireExecuteRequest {
+  pub action: Action,
+  pub command: Command,
+  pub execute_request: ExecuteRequest,
+  pub input_root_digest: DirectoryDigest,
+}
+
+pub async fn make_execute_request(
   req: &Process,
-  metadata: ProcessMetadata,
-) -> Result<
-  (
-    bazel_protos::remote_execution::Action,
-    bazel_protos::remote_execution::Command,
-    bazel_protos::remote_execution::ExecuteRequest,
-  ),
-  String,
-> {
-  let mut command = bazel_protos::remote_execution::Command::new();
-  command.set_arguments(protobuf::RepeatedField::from_vec(req.argv.clone()));
+  instance_name: Option<String>,
+  cache_key_gen_version: Option<String>,
+  store: &Store,
+  append_only_caches_base_path: Option<&str>,
+) -> Result<EntireExecuteRequest, String> {
+  const WRAPPER_SCRIPT: &str = "./__pants_wrapper__";
+
+  // Implement append-only caches by running a wrapper script before the actual program
+  // to be invoked in the remote environment.
+  let wrapper_script_digest_opt = match (append_only_caches_base_path, &req.append_only_caches) {
+    (Some(base_path), caches) if !caches.is_empty() => {
+      let script = make_wrapper_for_append_only_caches(
+        caches,
+        base_path,
+        req.working_directory.as_ref().and_then(|p| p.to_str()),
+      )?;
+      let digest = store
+        .store_file_bytes(Bytes::from(script), false)
+        .await
+        .map_err(|err| format!("Failed to store wrapper script for remote execution: {err}"))?;
+      let path = RelativePath::new(Path::new(WRAPPER_SCRIPT))?;
+      let snapshot = store.snapshot_of_one_file(path, digest, true).await?;
+      let directory_digest = DirectoryDigest::new(snapshot.digest, snapshot.tree);
+      Some(directory_digest)
+    }
+    _ => None,
+  };
+
+  let arguments = match &wrapper_script_digest_opt {
+    Some(_) => {
+      let mut args = Vec::with_capacity(req.argv.len() + 1);
+      args.push(WRAPPER_SCRIPT.to_string());
+      args.extend(req.argv.iter().cloned());
+      args
+    }
+    None => req.argv.clone(),
+  };
+
+  let mut command = remexec::Command {
+    arguments,
+    ..remexec::Command::default()
+  };
+
   for (name, value) in &req.env {
-    if name == CACHE_KEY_GEN_VERSION_ENV_VAR_NAME || name == CACHE_KEY_TARGET_PLATFORM_ENV_VAR_NAME
+    if name == CACHE_KEY_GEN_VERSION_ENV_VAR_NAME
+      || name == CACHE_KEY_TARGET_PLATFORM_ENV_VAR_NAME
+      || name == CACHE_KEY_SALT_ENV_VAR_NAME
     {
       return Err(format!(
         "Cannot set env var with name {} as that is reserved for internal use by pants",
@@ -885,42 +1164,56 @@ pub fn make_execute_request(
       ));
     }
 
-    let mut env = bazel_protos::remote_execution::Command_EnvironmentVariable::new();
-    env.set_name(name.to_string());
-    env.set_value(value.to_string());
-    command.mut_environment_variables().push(env);
+    command
+      .environment_variables
+      .push(remexec::command::EnvironmentVariable {
+        name: name.to_string(),
+        value: value.to_string(),
+      });
   }
 
-  let ProcessMetadata {
-    instance_name,
-    cache_key_gen_version,
-    mut platform_properties,
-  } = metadata;
-
-  // TODO: Disabling append-only caches in remoting until server support exists due to
-  //       interaction with how servers match platform properties.
-  // if !req.append_only_caches.is_empty() {
-  //   platform_properties.extend(NamedCaches::platform_properties(
-  //     &req.append_only_caches,
-  //     &cache_key_gen_version,
-  //   ));
-  // }
+  let mut platform_properties = match req.execution_strategy.clone() {
+    ProcessExecutionStrategy::RemoteExecution(properties) => properties,
+    _ => vec![],
+  };
 
   if let Some(cache_key_gen_version) = cache_key_gen_version {
-    let mut env = bazel_protos::remote_execution::Command_EnvironmentVariable::new();
-    env.set_name(CACHE_KEY_GEN_VERSION_ENV_VAR_NAME.to_string());
-    env.set_value(cache_key_gen_version);
-    command.mut_environment_variables().push(env);
+    command
+      .environment_variables
+      .push(remexec::command::EnvironmentVariable {
+        name: CACHE_KEY_GEN_VERSION_ENV_VAR_NAME.to_string(),
+        value: cache_key_gen_version,
+      });
+  }
+
+  command
+    .environment_variables
+    .push(remexec::command::EnvironmentVariable {
+      name: CACHE_KEY_EXECUTION_STRATEGY.to_string(),
+      value: req.execution_strategy.cache_value(),
+    });
+
+  if matches!(
+    req.cache_scope,
+    ProcessCacheScope::PerSession
+      | ProcessCacheScope::PerRestartAlways
+      | ProcessCacheScope::PerRestartSuccessful
+  ) {
+    command
+      .environment_variables
+      .push(remexec::command::EnvironmentVariable {
+        name: CACHE_KEY_SALT_ENV_VAR_NAME.to_string(),
+        value: Uuid::new_v4().to_string(),
+      });
   }
 
   {
-    let mut env = bazel_protos::remote_execution::Command_EnvironmentVariable::new();
-    env.set_name(CACHE_KEY_TARGET_PLATFORM_ENV_VAR_NAME.to_string());
-    env.set_value(match req.platform_constraint {
-      Some(plat) => plat.into(),
-      None => "none".to_string(),
-    });
-    command.mut_environment_variables().push(env);
+    command
+      .environment_variables
+      .push(remexec::command::EnvironmentVariable {
+        name: CACHE_KEY_TARGET_PLATFORM_ENV_VAR_NAME.to_string(),
+        value: req.platform.into(),
+      });
   }
 
   let mut output_files = req
@@ -933,7 +1226,7 @@ pub fn make_execute_request(
     })
     .collect::<Result<Vec<String>, String>>()?;
   output_files.sort();
-  command.set_output_files(protobuf::RepeatedField::from_vec(output_files));
+  command.output_files = output_files;
 
   let mut output_directories = req
     .output_directories
@@ -945,15 +1238,17 @@ pub fn make_execute_request(
     })
     .collect::<Result<Vec<String>, String>>()?;
   output_directories.sort();
-  command.set_output_directories(protobuf::RepeatedField::from_vec(output_directories));
+  command.output_directories = output_directories;
 
   if let Some(working_directory) = &req.working_directory {
-    command.set_working_directory(
-      working_directory
+    // Do not set `working_directory` if a wrapper script is in use because the wrapper script
+    // will change to the working directory itself.
+    if wrapper_script_digest_opt.is_none() {
+      command.working_directory = working_directory
         .to_str()
         .map(str::to_owned)
-        .unwrap_or_else(|| panic!("Non-UTF8 working directory path: {:?}", working_directory)),
-    )
+        .unwrap_or_else(|| panic!("Non-UTF8 working directory path: {:?}", working_directory));
+    }
   }
 
   if req.jdk_home.is_some() {
@@ -966,13 +1261,17 @@ pub fn make_execute_request(
     platform_properties.push(("JDK_SYMLINK".to_owned(), ".jdk".to_owned()));
   }
 
+  // Extract `Platform` proto from the `Command` to avoid a partial move of `Command`.
+  let mut command_platform = command.platform.take().unwrap_or_default();
+
+  // Add configured platform properties to the `Platform`.
   for (name, value) in platform_properties {
-    command.mut_platform().mut_properties().push({
-      let mut property = bazel_protos::remote_execution::Platform_Property::new();
-      property.set_name(name.clone());
-      property.set_value(value.clone());
-      property
-    });
+    command_platform
+      .properties
+      .push(remexec::platform::Property {
+        name: name.clone(),
+        value: value.clone(),
+      });
   }
 
   // Sort the platform properties.
@@ -984,46 +1283,71 @@ pub fn make_execute_request(
   //   is done by code point, equivalently, by the UTF-8 bytes.
   //
   // Note: BuildBarn enforces this requirement.
-  command
-    .mut_platform()
-    .mut_properties()
+  command_platform
+    .properties
     .sort_by(|x, y| match x.name.cmp(&y.name) {
       Ordering::Equal => x.value.cmp(&y.value),
       v => v,
     });
 
+  // Store the separate copy back into the Command proto.
+  command.platform = Some(command_platform);
+
   // Sort the environment variables. REv2 spec requires sorting by name for same reasons that
   // platform properties are sorted, i.e. consistent hashing.
   command
-    .mut_environment_variables()
+    .environment_variables
     .sort_by(|x, y| x.name.cmp(&y.name));
 
-  let mut action = bazel_protos::remote_execution::Action::new();
-  action.set_command_digest((&digest(&command)?).into());
-  action.set_input_root_digest((&req.input_files).into());
+  let input_root_digest: DirectoryDigest = match &wrapper_script_digest_opt {
+    Some(wrapper_digest) => {
+      let digests = vec![
+        req.input_digests.complete.clone(),
+        wrapper_digest.to_owned(),
+      ];
+      store
+        .merge(digests)
+        .await
+        .map_err(|err| format!("store error: {err}"))?
+    }
+    None => req.input_digests.complete.clone(),
+  };
+
+  let mut action = remexec::Action {
+    command_digest: Some((&digest(&command)?).into()),
+    input_root_digest: Some(input_root_digest.as_digest().into()),
+    ..remexec::Action::default()
+  };
 
   if let Some(timeout) = req.timeout {
-    let mut timeout_duration = protobuf::well_known_types::Duration::new();
-    timeout_duration.set_seconds(timeout.as_secs() as i64);
-    timeout_duration.set_nanos(timeout.subsec_nanos() as i32);
-    action.set_timeout(timeout_duration);
+    action.timeout = Some(prost_types::Duration::from(timeout));
   }
 
-  let mut execute_request = bazel_protos::remote_execution::ExecuteRequest::new();
-  if let Some(instance_name) = instance_name {
-    execute_request.set_instance_name(instance_name);
-  }
-  execute_request.set_action_digest((&digest(&action)?).into());
+  let execute_request = remexec::ExecuteRequest {
+    action_digest: Some((&digest(&action)?).into()),
+    instance_name: instance_name.unwrap_or_else(|| "".to_owned()),
+    // We rely on the RemoteCache command runner for caching with remote execution. We always
+    // disable remote servers from doing caching themselves not only to avoid wasted work, but
+    // more importantly because they do not have our same caching semantics, e.g.
+    // `ProcessCacheScope.SUCCESSFUL` vs `ProcessCacheScope.ALWAYS`.
+    skip_cache_lookup: true,
+    ..remexec::ExecuteRequest::default()
+  };
 
-  Ok((action, command, execute_request))
+  Ok(EntireExecuteRequest {
+    action,
+    command,
+    execute_request,
+    input_root_digest,
+  })
 }
 
-pub async fn populate_fallible_execution_result_for_timeout(
+async fn populate_fallible_execution_result_for_timeout(
   store: &Store,
+  context: &Context,
   description: &str,
   timeout: Option<Duration>,
   elapsed: Duration,
-  execution_attempts: Vec<ExecutionStats>,
   platform: Platform,
 ) -> Result<FallibleProcessResultWithPlatform, String> {
   let timeout_msg = if let Some(timeout) = timeout {
@@ -1038,9 +1362,13 @@ pub async fn populate_fallible_execution_result_for_timeout(
     stdout_digest,
     stderr_digest: hashing::EMPTY_DIGEST,
     exit_code: -libc::SIGTERM,
-    output_directory: hashing::EMPTY_DIGEST,
-    execution_attempts,
+    output_directory: EMPTY_DIRECTORY_DIGEST.clone(),
     platform,
+    metadata: ProcessResultMetadata::new(
+      Some(elapsed.into()),
+      ProcessResultSource::RanRemotely,
+      context.run_id,
+    ),
   })
 }
 
@@ -1051,91 +1379,89 @@ pub async fn populate_fallible_execution_result_for_timeout(
 /// of the ActionResult/ExecuteResponse stored in the local cache. When
 /// `treat_tree_digest_as_final_directory_hack` is true, then that final merged directory
 /// will be extracted from the tree_digest of the single output directory.
-pub fn populate_fallible_execution_result(
+pub(crate) async fn populate_fallible_execution_result(
   store: Store,
-  action_result: &bazel_protos::remote_execution::ActionResult,
-  execution_attempts: Vec<ExecutionStats>,
+  run_id: RunId,
+  action_result: &remexec::ActionResult,
   platform: Platform,
   treat_tree_digest_as_final_directory_hack: bool,
-) -> impl Future01<Item = FallibleProcessResultWithPlatform, Error = String> {
-  let exit_code = action_result.get_exit_code();
-  extract_stdout(&store, action_result)
-    .join(extract_stderr(&store, action_result))
-    .join(extract_output_files(
+  source: ProcessResultSource,
+) -> Result<FallibleProcessResultWithPlatform, StoreError> {
+  let (stdout_digest, stderr_digest, output_directory) = future::try_join3(
+    extract_stdout(&store, action_result),
+    extract_stderr(&store, action_result),
+    extract_output_files(
       store,
       action_result,
       treat_tree_digest_as_final_directory_hack,
-    ))
-    .and_then(move |((stdout_digest, stderr_digest), output_directory)| {
-      Ok(FallibleProcessResultWithPlatform {
-        stdout_digest,
-        stderr_digest,
-        exit_code,
-        output_directory,
-        execution_attempts,
-        platform,
-      })
-    })
-    .to_boxed()
+    ),
+  )
+  .await?;
+
+  Ok(FallibleProcessResultWithPlatform {
+    stdout_digest,
+    stderr_digest,
+    exit_code: action_result.exit_code,
+    output_directory,
+    platform,
+    metadata: action_result.execution_metadata.clone().map_or(
+      ProcessResultMetadata::new(None, source, run_id),
+      |metadata| ProcessResultMetadata::new_from_metadata(metadata, source, run_id),
+    ),
+  })
 }
 
-fn extract_stdout(
+fn extract_stdout<'a>(
   store: &Store,
-  action_result: &bazel_protos::remote_execution::ActionResult,
-) -> BoxFuture<Digest, String> {
-  if action_result.has_stdout_digest() {
-    let stdout_digest_result: Result<Digest, String> = action_result.get_stdout_digest().try_into();
-    let stdout_digest =
-      try_future!(stdout_digest_result.map_err(|err| format!("Error extracting stdout: {}", err)));
-    Box::pin(async move { Ok(stdout_digest) })
-      .compat()
-      .to_boxed()
-  } else {
-    let store = store.clone();
-    let stdout_raw = Bytes::from(action_result.get_stdout_raw());
-    Box::pin(async move {
+  action_result: &'a remexec::ActionResult,
+) -> BoxFuture<'a, Result<Digest, StoreError>> {
+  let store = store.clone();
+  async move {
+    if let Some(digest_proto) = &action_result.stdout_digest {
+      let stdout_digest_result: Result<Digest, String> = digest_proto.try_into();
+      let stdout_digest =
+        stdout_digest_result.map_err(|err| format!("Error extracting stdout: {}", err))?;
+      Ok(stdout_digest)
+    } else {
+      let stdout_raw = Bytes::copy_from_slice(&action_result.stdout_raw);
       let digest = store
         .store_file_bytes(stdout_raw, true)
         .map_err(move |error| format!("Error storing raw stdout: {:?}", error))
         .await?;
       Ok(digest)
-    })
-    .compat()
-    .to_boxed()
+    }
   }
+  .boxed()
 }
 
-fn extract_stderr(
+fn extract_stderr<'a>(
   store: &Store,
-  action_result: &bazel_protos::remote_execution::ActionResult,
-) -> BoxFuture<Digest, String> {
-  if action_result.has_stderr_digest() {
-    let stderr_digest_result: Result<Digest, String> = action_result.get_stderr_digest().try_into();
-    let stderr_digest =
-      try_future!(stderr_digest_result.map_err(|err| format!("Error extracting stderr: {}", err)));
-    Box::pin(async move { Ok(stderr_digest) })
-      .compat()
-      .to_boxed()
-  } else {
-    let store = store.clone();
-    let stderr_raw = Bytes::from(action_result.get_stderr_raw());
-    Box::pin(async move {
+  action_result: &'a remexec::ActionResult,
+) -> BoxFuture<'a, Result<Digest, StoreError>> {
+  let store = store.clone();
+  async move {
+    if let Some(digest_proto) = &action_result.stderr_digest {
+      let stderr_digest_result: Result<Digest, String> = digest_proto.try_into();
+      let stderr_digest =
+        stderr_digest_result.map_err(|err| format!("Error extracting stderr: {}", err))?;
+      Ok(stderr_digest)
+    } else {
+      let stderr_raw = Bytes::copy_from_slice(&action_result.stderr_raw);
       let digest = store
         .store_file_bytes(stderr_raw, true)
         .map_err(move |error| format!("Error storing raw stderr: {:?}", error))
         .await?;
       Ok(digest)
-    })
-    .compat()
-    .to_boxed()
+    }
   }
+  .boxed()
 }
 
 pub fn extract_output_files(
   store: Store,
-  action_result: &bazel_protos::remote_execution::ActionResult,
+  action_result: &remexec::ActionResult,
   treat_tree_digest_as_final_directory_hack: bool,
-) -> BoxFuture<Digest, String> {
+) -> BoxFuture<'static, Result<DirectoryDigest, StoreError>> {
   // HACK: The caching CommandRunner stores the digest of the Directory that merges all output
   // files and output directories in the `tree_digest` field of the `output_directories` field
   // of the ActionResult/ExecuteResponse stored in the local cache. When
@@ -1143,25 +1469,35 @@ pub fn extract_output_files(
   // directory from the tree_digest and skip the merging performed by the remainder of this
   // method.
   if treat_tree_digest_as_final_directory_hack {
-    match action_result.get_output_directories() {
-      &[ref directory] => {
-        let directory_digest = directory.get_tree_digest().try_into();
-        return BoxFuture::from(Box::new(futures::future::ready(directory_digest).compat()));
+    match &action_result.output_directories[..] {
+      [directory] => {
+        match require_digest(directory.tree_digest.as_ref()) {
+          Ok(digest) => {
+            return future::ready::<Result<_, StoreError>>(Ok(
+              DirectoryDigest::from_persisted_digest(digest),
+            ))
+            .boxed()
+          }
+          Err(err) => return futures::future::err(err.into()).boxed(),
+        };
       }
       _ => {
-        let err_fut = futures::future::err(
-          "illegal state: treat_tree_digest_as_final_directory_hack expected single output directory".to_owned()
-        );
-        return BoxFuture::from(Box::new(err_fut.compat()));
+        return futures::future::err(
+          "illegal state: treat_tree_digest_as_final_directory_hack \
+          expected single output directory"
+            .to_owned()
+            .into(),
+        )
+        .boxed();
       }
     }
   }
 
   // Get Digests of output Directories.
   // Then we'll make a Directory for the output files, and merge them.
-  let mut directory_digests = Vec::with_capacity(action_result.get_output_directories().len() + 1);
+  let mut directory_digests = Vec::with_capacity(action_result.output_directories.len() + 1);
   // TODO: Maybe take rather than clone
-  let output_directories = action_result.get_output_directories().to_owned();
+  let output_directories = action_result.output_directories.clone();
   for dir in output_directories {
     let store = store.clone();
     directory_digests.push(
@@ -1173,48 +1509,39 @@ pub fn extract_output_files(
         // Retrieve the Tree proto and hash its root `Directory` proto to obtain the digest
         // of the output directory needed to construct the series of `Directory` protos needed
         // for the final merge of the output directories.
-        log::info!("processing dir={:?}", dir);
-        let tree_digest: Digest = dir.get_tree_digest().try_into()?;
-        let root_digest_opt = store.load_tree_from_remote(tree_digest).await?;
-        let root_digest = root_digest_opt
+        let tree_digest: Digest = require_digest(dir.tree_digest.as_ref())?;
+        let directory_digest = store
+          .load_tree_from_remote(tree_digest)
+          .await?
           .ok_or_else(|| format!("Tree with digest {:?} was not in remote", tree_digest))?;
 
-        let mut digest = root_digest;
-
-        if !dir.get_path().is_empty() {
-          for component in dir.get_path().rsplit('/') {
-            let component = component.to_owned();
-            let mut directory = bazel_protos::remote_execution::Directory::new();
-            directory.mut_directories().push({
-              let mut node = bazel_protos::remote_execution::DirectoryNode::new();
-              node.set_name(component);
-              node.set_digest((&digest).into());
-              node
-            });
-            digest = store.record_directory(&directory, true).await?;
-          }
-        }
-        let res: Result<_, String> = Ok(digest);
-        res
+        store
+          .add_prefix(directory_digest, &RelativePath::new(dir.path)?)
+          .await
       })
-      .map_err(|err| format!("Error saving remote output directory: {}", err)),
+      .map_err(|err| {
+        format!(
+          "Error saving remote output directory to local cache: {}",
+          err
+        )
+      }),
     );
   }
 
   // Make a directory for the files
   let mut path_map = HashMap::new();
   let path_stats_result: Result<Vec<PathStat>, String> = action_result
-    .get_output_files()
+    .output_files
     .iter()
     .map(|output_file| {
-      let output_file_path_buf = PathBuf::from(output_file.get_path());
-      let digest: Result<Digest, String> = output_file.get_digest().try_into();
+      let output_file_path_buf = PathBuf::from(output_file.path.clone());
+      let digest: Result<Digest, String> = require_digest(output_file.digest.as_ref());
       path_map.insert(output_file_path_buf.clone(), digest?);
       Ok(PathStat::file(
         output_file_path_buf.clone(),
         File {
           path: output_file_path_buf,
-          is_executable: output_file.get_is_executable(),
+          is_executable: output_file.is_executable,
         },
       ))
     })
@@ -1236,7 +1563,7 @@ pub fn extract_output_files(
   }
 
   impl StoreFileByDigest<String> for StoreOneOffRemoteDigest {
-    fn store_by_digest(&self, file: File) -> BoxFuture<Digest, String> {
+    fn store_by_digest(&self, file: File) -> future::BoxFuture<'static, Result<Digest, String>> {
       match self.map_of_paths_to_digests.get(&file.path) {
         Some(digest) => future::ok(*digest),
         None => future::err(format!(
@@ -1244,110 +1571,60 @@ pub fn extract_output_files(
           file.path
         )),
       }
-      .compat()
-      .to_boxed()
+      .boxed()
     }
   }
 
-  Box::pin(async move {
-    let files_digest = Snapshot::digest_from_path_stats(
-      store.clone(),
-      StoreOneOffRemoteDigest::new(path_map),
-      path_stats,
-    )
-    .map_err(move |error| {
-      format!(
-        "Error when storing the output file directory info in the remote CAS: {:?}",
-        error
-      )
-    });
+  async move {
+    let files_snapshot =
+      Snapshot::from_path_stats(StoreOneOffRemoteDigest::new(path_map), path_stats).map_err(
+        move |error| {
+          format!(
+            "Error when storing the output file directory info in the remote CAS: {:?}",
+            error
+          )
+        },
+      );
 
-    let (files_digest, mut directory_digests) =
-      future::try_join(files_digest, future::try_join_all(directory_digests)).await?;
+    let (files_snapshot, mut directory_digests) =
+      future::try_join(files_snapshot, future::try_join_all(directory_digests)).await?;
 
-    directory_digests.push(files_digest);
+    directory_digests.push(files_snapshot.into());
 
     store
       .merge(directory_digests)
-      .map_err(|err| format!("Error when merging output files and directories: {:?}", err))
+      .map_err(|err| err.enrich("Error when merging output files and directories"))
       .await
-  })
-  .compat()
-  .to_boxed()
+  }
+  .boxed()
 }
 
-/// Check the remote Action Cache for a cached result of running the given `action_digest`.
-///
-/// This check is necessary because some RE servers do not short-circuit the Execute method
-/// by checking the Action Cache (e.g., BuildBarn). Thus, this client must check the cache
-/// explicitly in order to avoid duplicating already-cached work. This behavior matches
-/// the Bazel RE client.
-pub async fn check_action_cache(
-  action_digest: Digest,
-  metadata: &ProcessMetadata,
-  platform: Platform,
-  context: &Context,
-  action_cache_client: Arc<ActionCacheClient>,
-  headers: &BTreeMap<String, String>,
-  store: Store,
-) -> Result<Option<FallibleProcessResultWithPlatform>, String> {
-  context
-    .workunit_store
-    .increment_counter(Metric::RemoteCacheRequests, 1);
+/// Apply REAPI request metadata header to a `tonic::Request`.
+pub(crate) fn apply_headers<T>(mut request: Request<T>, build_id: &str) -> Request<T> {
+  let reapi_request_metadata = remexec::RequestMetadata {
+    tool_details: Some(remexec::ToolDetails {
+      tool_name: "pants".into(),
+      ..remexec::ToolDetails::default()
+    }),
+    tool_invocation_id: build_id.to_string(),
+    ..remexec::RequestMetadata::default()
+  };
 
-  let mut request = bazel_protos::remote_execution::GetActionResultRequest::new();
-  if let Some(ref instance_name) = metadata.instance_name {
-    request.set_instance_name(instance_name.clone());
-  }
-  request.set_action_digest(action_digest.into());
+  let md = request.metadata_mut();
+  md.insert_bin(
+    "google.devtools.remoteexecution.v1test.requestmetadata-bin",
+    BinaryMetadataValue::try_from_bytes(&reapi_request_metadata.to_bytes()).unwrap(),
+  );
 
-  let call_opt = call_option(headers, Some(context.build_id.clone()))?;
-
-  let action_result_response = action_cache_client
-    .get_action_result_async_opt(&request, call_opt)
-    .unwrap()
-    .compat()
-    .await;
-
-  match action_result_response {
-    Ok(action_result) => {
-      let response =
-        populate_fallible_execution_result(store.clone(), &action_result, vec![], platform, false)
-          .compat()
-          .await?;
-      context
-        .workunit_store
-        .increment_counter(Metric::RemoteCacheRequestsCached, 1);
-      Ok(Some(response))
-    }
-    Err(err) => match err {
-      grpcio::Error::RpcFailure(rpc_status)
-        if rpc_status.status == grpcio::RpcStatusCode::NOT_FOUND =>
-      {
-        context
-          .workunit_store
-          .increment_counter(Metric::RemoteCacheRequestsUncached, 1);
-        Ok(None)
-      }
-      _ => {
-        context
-          .workunit_store
-          .increment_counter(Metric::RemoteCacheReadErrors, 1);
-        Err(rpcerror_to_string(err))
-      }
-    },
-  }
+  request
 }
 
-pub async fn store_proto_locally<P: protobuf::Message>(
+pub async fn store_proto_locally<P: prost::Message>(
   store: &Store,
   proto: &P,
 ) -> Result<Digest, String> {
-  let command_bytes = proto
-    .write_to_bytes()
-    .map_err(|e| format!("Error serializing proto {:?}", e))?;
   store
-    .store_file_bytes(Bytes::from(command_bytes), true)
+    .store_file_bytes(proto.to_bytes(), true)
     .await
     .map_err(|e| format!("Error saving proto to local store: {:?}", e))
 }
@@ -1366,66 +1643,45 @@ pub async fn ensure_action_stored_locally(
   Ok((command_digest, action_digest))
 }
 
+///
+/// Ensure that the Action and Command (and optionally their input files, likely depending on
+/// whether we are in a remote execution context, or a pure cache-usage context) are uploaded.
+///
 pub async fn ensure_action_uploaded(
   store: &Store,
   command_digest: Digest,
   action_digest: Digest,
-  input_files: Digest,
-) -> Result<(), String> {
-  let _ = store
-    .ensure_remote_has_recursive(vec![command_digest, action_digest, input_files])
-    .compat()
-    .await?;
-  Ok(())
+  input_files: Option<DirectoryDigest>,
+) -> Result<(), StoreError> {
+  in_workunit!(
+    "ensure_action_uploaded",
+    Level::Trace,
+    desc = Some(format!("ensure action uploaded for {:?}", action_digest)),
+    |_workunit| async move {
+      let mut digests = vec![command_digest, action_digest];
+      if let Some(input_files) = input_files {
+        // TODO: Port ensure_remote_has_recursive. See #13112.
+        store
+          .ensure_directory_digest_persisted(input_files.clone())
+          .await?;
+        digests.push(input_files.todo_as_digest());
+      }
+      let _ = store.ensure_remote_has_recursive(digests).await?;
+      Ok(())
+    },
+  )
+  .await
 }
 
-pub fn format_error(error: &bazel_protos::status::Status) -> String {
-  let error_code_enum = bazel_protos::code::Code::from_i32(error.get_code());
+pub fn format_error(error: &StatusProto) -> String {
+  let error_code_enum = Code::from_i32(error.code);
   let error_code = match error_code_enum {
-    Some(x) => format!("{:?}", x),
-    None => format!("{:?}", error.get_code()),
+    Code::Unknown => format!("{:?}", error.code),
+    x => format!("{:?}", x),
   };
-  format!("{}: {}", error_code, error.get_message())
+  format!("{}: {}", error_code, error.message)
 }
 
-fn rpcerror_to_status_or_string(
-  error: &grpcio::Error,
-) -> Result<bazel_protos::status::Status, String> {
-  match error {
-    grpcio::Error::RpcFailure(grpcio::RpcStatus {
-      status_proto_bytes: Some(status_proto_bytes),
-      ..
-    }) => {
-      let mut status_proto = bazel_protos::status::Status::new();
-      status_proto.merge_from_bytes(&status_proto_bytes).unwrap();
-      Ok(status_proto)
-    }
-    grpcio::Error::RpcFailure(grpcio::RpcStatus {
-      status, details, ..
-    }) => Err(format!(
-      "{:?}: {:?}",
-      status,
-      details
-        .as_ref()
-        .map(|s| s.as_str())
-        .unwrap_or_else(|| "[no message]")
-    )),
-    err => Err(format!("{:?}", err)),
-  }
-}
-
-pub(crate) fn rpcerror_to_string(error: grpcio::Error) -> String {
-  match error {
-    grpcio::Error::RpcFailure(status) => format!(
-      "{:?}: {:?}",
-      status.status,
-      status.details.unwrap_or_else(|| "[no message]".to_string())
-    ),
-    err => format!("{:?}", err),
-  }
-}
-
-pub fn digest(message: &dyn Message) -> Result<Digest, String> {
-  let bytes = message.write_to_bytes().map_err(|e| format!("{:?}", e))?;
-  Ok(Digest::of_bytes(&bytes))
+pub fn digest<T: prost::Message>(message: &T) -> Result<Digest, String> {
+  Ok(Digest::of_bytes(&message.to_bytes()))
 }

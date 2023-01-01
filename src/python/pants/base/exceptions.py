@@ -1,7 +1,12 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from typing import Iterable
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from pants.engine.internals.native_engine import PyFailure
 
 
 class TargetDefinitionException(Exception):
@@ -30,15 +35,13 @@ class MappingError(Exception):
     """Indicates an error mapping addressable objects."""
 
 
-class ResolveError(MappingError):
-    """Indicates an error resolving targets."""
+class NativeEngineFailure(Exception):
+    """A wrapper around a `Failure` instance.
 
-    @classmethod
-    def did_you_mean(
-        cls, *, bad_name: str, known_names: Iterable[str], namespace: str
-    ) -> "ResolveError":
-        possibilities = "\n  ".join(f":{target_name}" for target_name in sorted(known_names))
-        return cls(
-            f"'{bad_name}' was not found in namespace '{namespace}'. Did you mean one "
-            f"of:\n  {possibilities}"
-        )
+    TODO: This type is defined in Python because pyo3 doesn't support declaring Exceptions with
+    additional fields. See https://github.com/PyO3/pyo3/issues/295
+    """
+
+    def __init__(self, msg: str, failure: PyFailure) -> None:
+        super().__init__(msg)
+        self.failure = failure

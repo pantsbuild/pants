@@ -1,33 +1,36 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import os
-from pathlib import Path, PurePath
-from typing import Iterable, Union
+from __future__ import annotations
 
+import os.path
+from pathlib import Path, PurePath
+from typing import Iterable
+
+from pants.base.build_environment import get_buildroot
+from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.base.specs import (
     AddressLiteralSpec,
-    AddressSpec,
-    AddressSpecs,
-    DescendantAddresses,
-    FilesystemGlobSpec,
-    FilesystemIgnoreSpec,
-    FilesystemLiteralSpec,
-    FilesystemSpec,
-    FilesystemSpecs,
-    SiblingAddresses,
+    DirGlobSpec,
+    DirLiteralSpec,
+    FileGlobSpec,
+    FileLiteralSpec,
+    RawSpecs,
+    RecursiveGlobSpec,
+    Spec,
     Specs,
 )
-from pants.util.ordered_set import OrderedSet
+from pants.engine.internals import native_engine
+from pants.util.frozendict import FrozenDict
 
 
 class SpecsParser:
-    """Parses address selectors and filesystem specs as passed from the command line.
+    """Parses specs as passed from the command line.
 
     See the `specs` module for more information on the types of objects returned.
     This class supports some flexibility in the path portion of the spec to allow for more natural
     command line use cases like tab completion leaving a trailing / for directories and relative
-    paths, ie both of these::
+    paths, i.e. both of these::
 
       ./src/::
       /absolute/path/to/project/src/::
@@ -36,15 +39,13 @@ class SpecsParser:
     normalized to::
 
       src::
-
-    The above expression would choose every target under src.
     """
 
     class BadSpecError(Exception):
-        """Indicates an unparseable command line address selector."""
+        """Indicates an unparseable command line selector."""
 
-    def __init__(self, root_dir: str) -> None:
-        self._root_dir = os.path.realpath(root_dir)
+    def __init__(self, root_dir: str | None = None) -> None:
+        self._root_dir = os.path.realpath(root_dir or get_buildroot())
 
     def _normalize_spec_path(self, path: str) -> str:
         is_abs = not path.startswith("//") and os.path.isabs(path)
@@ -64,45 +65,84 @@ class SpecsParser:
             normalized = ""
         return normalized
 
-    def parse_spec(self, spec: str) -> Union[AddressSpec, FilesystemSpec]:
-        """Parse the given spec into an `AddressSpec` or `FilesystemSpec` object.
+    def parse_spec(self, spec: str) -> tuple[Spec, bool]:
+        """Parse the given spec string and also return `true` if it's an ignore.
 
         :raises: CmdLineSpecParser.BadSpecError if the address selector could not be parsed.
         """
-        if spec.endswith("::"):
-            spec_path = spec[: -len("::")]
-            return DescendantAddresses(directory=self._normalize_spec_path(spec_path))
-        if spec.endswith(":"):
-            spec_path = spec[: -len(":")]
-            return SiblingAddresses(directory=self._normalize_spec_path(spec_path))
-        if ":" in spec:
-            spec_parts = spec.rsplit(":", 1)
-            spec_path = self._normalize_spec_path(spec_parts[0])
-            return AddressLiteralSpec(path_component=spec_path, target_component=spec_parts[1])
-        if spec.startswith("!"):
-            return FilesystemIgnoreSpec(spec[1:])
-        if "*" in spec:
-            return FilesystemGlobSpec(spec)
+        is_ignore = False
+        if spec.startswith("-"):
+            is_ignore = True
+            spec = spec[1:]
+
+        (
+            (
+                path_component,
+                target_component,
+                generated_component,
+                parameters,
+            ),
+            wildcard,
+        ) = native_engine.address_spec_parse(spec)
+
+        if wildcard == "::":
+            return RecursiveGlobSpec(directory=self._normalize_spec_path(path_component)), is_ignore
+        if wildcard == ":":
+            return DirGlobSpec(directory=self._normalize_spec_path(path_component)), is_ignore
+        if target_component or generated_component or parameters:
+            return (
+                AddressLiteralSpec(
+                    path_component=self._normalize_spec_path(path_component),
+                    target_component=target_component,
+                    generated_component=generated_component,
+                    parameters=FrozenDict(sorted(parameters)),
+                ),
+                is_ignore,
+            )
+        if "*" in path_component:
+            return FileGlobSpec(spec), is_ignore
         if PurePath(spec).suffix:
-            return FilesystemLiteralSpec(self._normalize_spec_path(spec))
+            return FileLiteralSpec(self._normalize_spec_path(spec)), is_ignore
         spec_path = self._normalize_spec_path(spec)
+        if spec_path == ".":
+            return DirLiteralSpec(""), is_ignore
+        # Some paths that look like dirs can actually be files without extensions.
         if Path(self._root_dir, spec_path).is_file():
-            return FilesystemLiteralSpec(spec_path)
-        # Else we apply address shorthand, i.e. `src/python/pants/util` ->
-        # `src/python/pants/util:util`
-        return AddressLiteralSpec(path_component=spec_path, target_component=PurePath(spec).name)
+            return FileLiteralSpec(spec_path), is_ignore
+        return DirLiteralSpec(spec_path), is_ignore
 
-    def parse_specs(self, specs: Iterable[str]) -> Specs:
-        address_specs: OrderedSet[AddressSpec] = OrderedSet()
-        filesystem_specs: OrderedSet[FilesystemSpec] = OrderedSet()
+    def parse_specs(
+        self,
+        specs: Iterable[str],
+        *,
+        description_of_origin: str,
+        unmatched_glob_behavior: GlobMatchErrorBehavior = GlobMatchErrorBehavior.error,
+    ) -> Specs:
+        include_specs = []
+        ignore_specs = []
         for spec_str in specs:
-            parsed_spec = self.parse_spec(spec_str)
-            if isinstance(parsed_spec, AddressSpec):
-                address_specs.add(parsed_spec)
+            spec, is_ignore = self.parse_spec(spec_str)
+            if is_ignore:
+                ignore_specs.append(spec)
             else:
-                filesystem_specs.add(parsed_spec)
+                include_specs.append(spec)
 
-        return Specs(
-            AddressSpecs(address_specs, filter_by_global_options=True),
-            FilesystemSpecs(filesystem_specs),
+        includes = RawSpecs.create(
+            include_specs,
+            description_of_origin=description_of_origin,
+            unmatched_glob_behavior=unmatched_glob_behavior,
+            filter_by_global_options=True,
         )
+        ignores = RawSpecs.create(
+            ignore_specs,
+            description_of_origin=description_of_origin,
+            unmatched_glob_behavior=unmatched_glob_behavior,
+            # By setting the below to False, we will end up matching some targets
+            # that cannot have been resolved by the include specs. For example, if the user runs
+            # `--filter-target-type=my_tgt :: !dir::`, the ignores may match targets that are not
+            # my_tgt. However, there also is no harm in over-matching with ignores. Setting
+            # this to False (over-conservatively?) ensures that if a user says to ignore
+            # something, we definitely do.
+            filter_by_global_options=False,
+        )
+        return Specs(includes, ignores)

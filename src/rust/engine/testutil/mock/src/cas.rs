@@ -1,43 +1,83 @@
+// Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
+// Licensed under the Apache License, Version 2.0 (see LICENSE).
 use std::collections::HashMap;
-use std::convert::TryInto;
+use std::net::SocketAddr;
+use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
+use std::time::Duration;
 
 use bytes::Bytes;
-use futures01::{Future, IntoFuture, Stream};
-use grpcio::RpcContext;
-use hashing::{Digest, Fingerprint};
+use futures::FutureExt;
+use grpc_util::hyper::AddrIncomingWithStream;
+use hashing::Fingerprint;
 use parking_lot::Mutex;
+use protos::gen::build::bazel::remote::execution::v2 as remexec;
+use protos::gen::google::bytestream::byte_stream_server::ByteStreamServer;
+use remexec::action_cache_server::ActionCacheServer;
+use remexec::capabilities_server::CapabilitiesServer;
+use remexec::content_addressable_storage_server::ContentAddressableStorageServer;
 use testutil::data::{TestData, TestDirectory, TestTree};
+use tonic::transport::Server;
+
+use crate::action_cache_service::{ActionCacheHandle, ActionCacheResponder};
+use crate::cas_service::StubCASResponder;
 
 ///
-/// Implements the ContentAddressableStorage gRPC API, answering read requests with either known
-/// content, NotFound for valid but unknown content, or InvalidArguments for bad arguments.
+/// Implements the:
+/// * ContentAddressableStorage
+/// * ActionCache
+/// * Capabilities
+/// ...gRPC APIs.
+///
+/// NB: You might expect that these services could be generically composed, but the
+/// `tonic::{Server, Router}` builder pattern changes its type with each call to `add_service`,
+/// making it very challenging to wrap. Instead, we statically compose them.
 ///
 pub struct StubCAS {
-  server_transport: grpcio::Server,
+  // CAS fields.
+  // TODO: These are inlined (rather than namespaced) for backwards compatibility.
   read_request_count: Arc<Mutex<usize>>,
   pub write_message_sizes: Arc<Mutex<Vec<usize>>>,
   pub blobs: Arc<Mutex<HashMap<Fingerprint, Bytes>>>,
+  // AC fields.
+  pub action_cache: ActionCacheHandle,
+  // Generic server fields.
+  local_addr: SocketAddr,
+  shutdown_sender: Option<tokio::sync::oneshot::Sender<()>>,
+}
+
+impl Drop for StubCAS {
+  fn drop(&mut self) {
+    if let Some(s) = self.shutdown_sender.take() {
+      let _ = s.send(());
+    }
+  }
 }
 
 pub struct StubCASBuilder {
-  always_errors: bool,
+  ac_always_errors: bool,
+  cas_always_errors: bool,
   chunk_size_bytes: Option<usize>,
   content: HashMap<Fingerprint, Bytes>,
   port: Option<u16>,
   instance_name: Option<String>,
   required_auth_token: Option<String>,
+  ac_read_delay: Duration,
+  ac_write_delay: Duration,
 }
 
 impl StubCASBuilder {
   pub fn new() -> Self {
     StubCASBuilder {
-      always_errors: false,
+      ac_always_errors: false,
+      cas_always_errors: false,
       chunk_size_bytes: None,
       content: HashMap::new(),
       port: None,
       instance_name: None,
       required_auth_token: None,
+      ac_read_delay: Duration::from_millis(0),
+      ac_write_delay: Duration::from_millis(0),
     }
   }
 }
@@ -81,8 +121,23 @@ impl StubCASBuilder {
     self
   }
 
-  pub fn always_errors(mut self) -> Self {
-    self.always_errors = true;
+  pub fn ac_always_errors(mut self) -> Self {
+    self.ac_always_errors = true;
+    self
+  }
+
+  pub fn cas_always_errors(mut self) -> Self {
+    self.cas_always_errors = true;
+    self
+  }
+
+  pub fn ac_read_delay(mut self, duration: Duration) -> Self {
+    self.ac_read_delay = duration;
+    self
+  }
+
+  pub fn ac_write_delay(mut self, duration: Duration) -> Self {
+    self.ac_write_delay = duration;
     self
   }
 
@@ -103,14 +158,62 @@ impl StubCASBuilder {
   }
 
   pub fn build(self) -> StubCAS {
-    StubCAS::new(
-      self.chunk_size_bytes.unwrap_or(1024),
-      self.content,
-      self.port.unwrap_or(0),
-      self.always_errors,
-      self.instance_name,
-      self.required_auth_token,
-    )
+    let read_request_count = Arc::new(Mutex::new(0));
+    let write_message_sizes = Arc::new(Mutex::new(Vec::new()));
+    let blobs = Arc::new(Mutex::new(self.content));
+    let cas_responder = StubCASResponder {
+      chunk_size_bytes: self.chunk_size_bytes.unwrap_or(1024),
+      instance_name: self.instance_name,
+      blobs: blobs.clone(),
+      always_errors: self.cas_always_errors,
+      read_request_count: read_request_count.clone(),
+      write_message_sizes: write_message_sizes.clone(),
+      required_auth_header: self.required_auth_token.map(|t| format!("Bearer {}", t)),
+    };
+
+    let action_map = Arc::new(Mutex::new(HashMap::new()));
+    let ac_always_errors = Arc::new(AtomicBool::new(self.ac_always_errors));
+    let ac_responder = ActionCacheResponder {
+      action_map: action_map.clone(),
+      always_errors: ac_always_errors.clone(),
+      read_delay: self.ac_read_delay,
+      write_delay: self.ac_write_delay,
+    };
+
+    let addr = format!("127.0.0.1:{}", self.port.unwrap_or(0))
+      .parse()
+      .expect("failed to parse IP address");
+    let incoming = hyper::server::conn::AddrIncoming::bind(&addr).expect("failed to bind port");
+    let local_addr = incoming.local_addr();
+    let incoming = AddrIncomingWithStream(incoming);
+
+    let (shutdown_sender, shutdown_receiver) = tokio::sync::oneshot::channel();
+
+    tokio::spawn(async move {
+      let mut server = Server::builder();
+      let router = server
+        .add_service(ActionCacheServer::new(ac_responder.clone()))
+        .add_service(ByteStreamServer::new(cas_responder.clone()))
+        .add_service(ContentAddressableStorageServer::new(cas_responder.clone()))
+        .add_service(CapabilitiesServer::new(cas_responder));
+
+      router
+        .serve_with_incoming_shutdown(incoming, shutdown_receiver.map(drop))
+        .await
+        .unwrap();
+    });
+
+    StubCAS {
+      read_request_count,
+      write_message_sizes,
+      blobs,
+      action_cache: ActionCacheHandle {
+        action_map,
+        always_errors: ac_always_errors,
+      },
+      local_addr,
+      shutdown_sender: Some(shutdown_sender),
+    }
   }
 }
 
@@ -119,475 +222,26 @@ impl StubCAS {
     StubCASBuilder::new()
   }
 
-  ///
-  /// # Arguments
-  /// * `chunk_size_bytes` - The maximum number of bytes of content to include per streamed message.
-  ///                        Messages will saturate until the last one, which may be smaller than
-  ///                        this value.
-  ///                        If a negative value is given, all requests will receive an error.
-  /// * `blobs`            - Known Fingerprints and their content responses. These are not checked
-  ///                        for correctness.
-  /// * `port`             - The port for the CAS to listen to.
-  fn new(
-    chunk_size_bytes: usize,
-    blobs: HashMap<Fingerprint, Bytes>,
-    port: u16,
-    always_errors: bool,
-    instance_name: Option<String>,
-    required_auth_token: Option<String>,
-  ) -> StubCAS {
-    let env = Arc::new(grpcio::Environment::new(1));
-    let read_request_count = Arc::new(Mutex::new(0));
-    let write_message_sizes = Arc::new(Mutex::new(Vec::new()));
-    let blobs = Arc::new(Mutex::new(blobs));
-    let responder = StubCASResponder {
-      chunk_size_bytes,
-      instance_name,
-      blobs: blobs.clone(),
-      always_errors,
-      read_request_count: read_request_count.clone(),
-      write_message_sizes: write_message_sizes.clone(),
-      required_auth_header: required_auth_token.map(|t| format!("Bearer {}", t)),
-    };
-    let mut server_transport = grpcio::ServerBuilder::new(env)
-      .register_service(bazel_protos::bytestream_grpc::create_byte_stream(
-        responder.clone(),
-      ))
-      .register_service(
-        bazel_protos::remote_execution_grpc::create_content_addressable_storage(responder.clone()),
-      )
-      .register_service(bazel_protos::remote_execution_grpc::create_capabilities(
-        responder,
-      ))
-      .bind("localhost", port)
-      .build()
-      .unwrap();
-    server_transport.start();
-
-    StubCAS {
-      server_transport,
-      read_request_count,
-      write_message_sizes,
-      blobs,
-    }
-  }
-
   pub fn empty() -> StubCAS {
     StubCAS::builder().build()
   }
 
-  pub fn always_errors() -> StubCAS {
-    StubCAS::builder().always_errors().build()
+  pub fn cas_always_errors() -> StubCAS {
+    StubCAS::builder().cas_always_errors().build()
   }
 
   ///
   /// The address on which this server is listening over insecure HTTP transport.
   ///
   pub fn address(&self) -> String {
-    let bind_addr = self.server_transport.bind_addrs().next().unwrap();
-    format!("{}:{}", bind_addr.0, bind_addr.1)
+    format!("http://{}", self.local_addr)
   }
 
   pub fn read_request_count(&self) -> usize {
     *self.read_request_count.lock()
   }
-}
 
-#[derive(Clone, Debug)]
-pub struct StubCASResponder {
-  chunk_size_bytes: usize,
-  instance_name: Option<String>,
-  blobs: Arc<Mutex<HashMap<Fingerprint, Bytes>>>,
-  always_errors: bool,
-  required_auth_header: Option<String>,
-  pub read_request_count: Arc<Mutex<usize>>,
-  pub write_message_sizes: Arc<Mutex<Vec<usize>>>,
-}
-
-macro_rules! check_auth {
-  ($self:ident, $ctx:ident, $sink:ident) => {
-    if let Some(ref required_auth_header) = $self.required_auth_header {
-      let authorization_headers: Vec<_> = $ctx
-        .request_headers()
-        .iter()
-        .filter(|(key, _value)| &key.to_lowercase() == "authorization")
-        .map(|(_key, value)| value)
-        .collect();
-      if authorization_headers.len() != 1
-        || authorization_headers[0] != required_auth_header.as_bytes()
-      {
-        $ctx.spawn(
-          $sink
-            .fail(grpcio::RpcStatus::new(
-              grpcio::RpcStatusCode::UNAUTHENTICATED,
-              Some(format!(
-                "Bad Authorization header; want {:?} got {:?}",
-                required_auth_header.as_bytes(),
-                authorization_headers
-              )),
-            ))
-            .then(|_| Ok(())),
-        );
-        return;
-      }
-    }
-  };
-}
-
-macro_rules! check_instance_name {
-  ($self:ident, $req:ident, $sink:ident) => {
-    if $req.instance_name != $self.instance_name() {
-      $sink.fail(grpcio::RpcStatus::new(
-        grpcio::RpcStatusCode::NOT_FOUND,
-        Some(format!(
-          "Wrong instance_name; want {:?} got {:?}",
-          $self.instance_name(),
-          $req.instance_name
-        )),
-      ));
-      return;
-    }
-  };
-}
-
-impl StubCASResponder {
-  fn instance_name(&self) -> String {
-    self.instance_name.clone().unwrap_or_default()
-  }
-
-  fn read_internal(
-    &self,
-    req: &bazel_protos::bytestream::ReadRequest,
-  ) -> Result<Vec<bazel_protos::bytestream::ReadResponse>, grpcio::RpcStatus> {
-    let parts: Vec<_> = req.get_resource_name().splitn(4, '/').collect();
-    if parts.len() != 4
-      || parts.get(0) != Some(&self.instance_name().as_ref())
-      || parts.get(1) != Some(&"blobs")
-    {
-      return Err(grpcio::RpcStatus::new(
-        grpcio::RpcStatusCode::INVALID_ARGUMENT,
-        Some(format!(
-          "Bad resource name format {} - want {}/blobs/some-sha256/size",
-          req.get_resource_name(),
-          self.instance_name(),
-        )),
-      ));
-    }
-    let digest = parts[2];
-    let fingerprint = Fingerprint::from_hex_string(digest).map_err(|e| {
-      grpcio::RpcStatus::new(
-        grpcio::RpcStatusCode::INVALID_ARGUMENT,
-        Some(format!("Bad digest {}: {}", digest, e)),
-      )
-    })?;
-    if self.always_errors {
-      return Err(grpcio::RpcStatus::new(
-        grpcio::RpcStatusCode::INTERNAL,
-        Some("StubCAS is configured to always fail".to_owned()),
-      ));
-    }
-    let blobs = self.blobs.lock();
-    let maybe_bytes = blobs.get(&fingerprint);
-    match maybe_bytes {
-      Some(bytes) => Ok(
-        bytes
-          .chunks(self.chunk_size_bytes as usize)
-          .map(|b| {
-            let mut resp = bazel_protos::bytestream::ReadResponse::new();
-            resp.set_data(Bytes::from(b));
-            resp
-          })
-          .collect(),
-      ),
-      None => Err(grpcio::RpcStatus::new(
-        grpcio::RpcStatusCode::NOT_FOUND,
-        Some(format!("Did not find digest {}", fingerprint)),
-      )),
-    }
-  }
-
-  ///
-  /// Sends a stream of responses down a sink, in ctx's threadpool.
-  ///
-  fn send<Item, S>(
-    &self,
-    ctx: &grpcio::RpcContext<'_>,
-    sink: grpcio::ServerStreamingSink<Item>,
-    stream: S,
-  ) where
-    Item: Send + 'static,
-    S: Stream<Item = (Item, grpcio::WriteFlags), Error = grpcio::Error> + Send + 'static,
-  {
-    ctx.spawn(stream.forward(sink).map(|_| ()).map_err(|_| ()));
-  }
-}
-
-impl bazel_protos::bytestream_grpc::ByteStream for StubCASResponder {
-  fn read(
-    &self,
-    ctx: grpcio::RpcContext<'_>,
-    req: bazel_protos::bytestream::ReadRequest,
-    sink: grpcio::ServerStreamingSink<bazel_protos::bytestream::ReadResponse>,
-  ) {
-    {
-      let mut request_count = self.read_request_count.lock();
-      *request_count += 1;
-    }
-    check_auth!(self, ctx, sink);
-
-    match self.read_internal(&req) {
-      Ok(response) => self.send(
-        &ctx,
-        sink,
-        futures01::stream::iter_ok(
-          response
-            .into_iter()
-            .map(|chunk| (chunk, grpcio::WriteFlags::default())),
-        ),
-      ),
-      Err(err) => {
-        ctx.spawn(sink.fail(err).then(|_| Ok(())));
-      }
-    }
-  }
-
-  fn write(
-    &self,
-    ctx: grpcio::RpcContext<'_>,
-    stream: grpcio::RequestStream<bazel_protos::bytestream::WriteRequest>,
-    sink: grpcio::ClientStreamingSink<bazel_protos::bytestream::WriteResponse>,
-  ) {
-    check_auth!(self, ctx, sink);
-
-    let always_errors = self.always_errors;
-    let write_message_sizes = self.write_message_sizes.clone();
-    let blobs = self.blobs.clone();
-    let instance_name = self.instance_name();
-    ctx.spawn(
-      stream
-        .collect()
-        .into_future()
-        .and_then(move |reqs| {
-          let mut maybe_resource_name = None;
-          let mut want_next_offset = 0;
-          let mut bytes = Bytes::new();
-          for req in reqs {
-            match maybe_resource_name {
-              None => maybe_resource_name = Some(req.get_resource_name().to_owned()),
-              Some(ref resource_name) => {
-                if resource_name != req.get_resource_name() {
-                  return Err(grpcio::Error::RpcFailure(grpcio::RpcStatus::new(
-                    grpcio::RpcStatusCode::INVALID_ARGUMENT,
-                    Some(format!(
-                      "All resource names in stream must be the same. Got {} but earlier saw {}",
-                      req.get_resource_name(),
-                      resource_name
-                    )),
-                  )));
-                }
-              }
-            }
-            if req.get_write_offset() != want_next_offset {
-              return Err(grpcio::Error::RpcFailure(grpcio::RpcStatus::new(
-                grpcio::RpcStatusCode::INVALID_ARGUMENT,
-                Some(format!(
-                  "Missing chunk. Expected next offset {}, got next offset: {}",
-                  want_next_offset,
-                  req.get_write_offset()
-                )),
-              )));
-            }
-            want_next_offset += req.get_data().len() as i64;
-            write_message_sizes.lock().push(req.get_data().len());
-            bytes.extend(req.get_data());
-          }
-          Ok((maybe_resource_name, bytes))
-        })
-        .map_err(move |err: grpcio::Error| match err {
-          grpcio::Error::RpcFailure(status) => status,
-          e => grpcio::RpcStatus::new(grpcio::RpcStatusCode::UNKNOWN, Some(format!("{:?}", e))),
-        })
-        .and_then(
-          move |(maybe_resource_name, bytes)| match maybe_resource_name {
-            None => Err(grpcio::RpcStatus::new(
-              grpcio::RpcStatusCode::INVALID_ARGUMENT,
-              Some("Stream saw no messages".to_owned()),
-            )),
-            Some(resource_name) => {
-              let parts: Vec<_> = resource_name.splitn(6, '/').collect();
-              if parts.len() != 6
-                || parts.get(0) != Some(&instance_name.as_ref())
-                || parts.get(1) != Some(&"uploads")
-                || parts.get(3) != Some(&"blobs")
-              {
-                return Err(grpcio::RpcStatus::new(
-                  grpcio::RpcStatusCode::INVALID_ARGUMENT,
-                  Some(format!("Bad resource name: {}", resource_name)),
-                ));
-              }
-              let fingerprint = match Fingerprint::from_hex_string(parts[4]) {
-                Ok(f) => f,
-                Err(err) => {
-                  return Err(grpcio::RpcStatus::new(
-                    grpcio::RpcStatusCode::INVALID_ARGUMENT,
-                    Some(format!(
-                      "Bad fingerprint in resource name: {}: {}",
-                      parts[4], err
-                    )),
-                  ));
-                }
-              };
-              let size = match parts[5].parse::<usize>() {
-                Ok(s) => s,
-                Err(err) => {
-                  return Err(grpcio::RpcStatus::new(
-                    grpcio::RpcStatusCode::INVALID_ARGUMENT,
-                    Some(format!("Bad size in resource name: {}: {}", parts[5], err)),
-                  ));
-                }
-              };
-              if size != bytes.len() {
-                return Err(grpcio::RpcStatus::new(
-                  grpcio::RpcStatusCode::INVALID_ARGUMENT,
-                  Some(format!(
-                    "Size was incorrect: resource name said size={} but got {}",
-                    size,
-                    bytes.len()
-                  )),
-                ));
-              }
-
-              if always_errors {
-                return Err(grpcio::RpcStatus::new(
-                  grpcio::RpcStatusCode::INTERNAL,
-                  Some("StubCAS is configured to always fail".to_owned()),
-                ));
-              }
-
-              {
-                let mut blobs = blobs.lock();
-                blobs.insert(fingerprint, bytes);
-              }
-
-              let mut response = bazel_protos::bytestream::WriteResponse::new();
-              response.set_committed_size(size as i64);
-              Ok(response)
-            }
-          },
-        )
-        .then(move |result| match result {
-          Ok(resp) => sink.success(resp),
-          Err(err) => sink.fail(err),
-        })
-        .then(move |_| Ok(())),
-    );
-  }
-
-  fn query_write_status(
-    &self,
-    _ctx: grpcio::RpcContext<'_>,
-    _req: bazel_protos::bytestream::QueryWriteStatusRequest,
-    sink: grpcio::UnarySink<bazel_protos::bytestream::QueryWriteStatusResponse>,
-  ) {
-    sink.fail(grpcio::RpcStatus::new(
-      grpcio::RpcStatusCode::UNIMPLEMENTED,
-      None,
-    ));
-  }
-}
-
-impl bazel_protos::remote_execution_grpc::ContentAddressableStorage for StubCASResponder {
-  fn find_missing_blobs(
-    &self,
-    ctx: grpcio::RpcContext<'_>,
-    req: bazel_protos::remote_execution::FindMissingBlobsRequest,
-    sink: grpcio::UnarySink<bazel_protos::remote_execution::FindMissingBlobsResponse>,
-  ) {
-    check_auth!(self, ctx, sink);
-
-    if self.always_errors {
-      sink.fail(grpcio::RpcStatus::new(
-        grpcio::RpcStatusCode::INTERNAL,
-        Some("StubCAS is configured to always fail".to_owned()),
-      ));
-      return;
-    }
-
-    check_instance_name!(self, req, sink);
-
-    let blobs = self.blobs.lock();
-    let mut response = bazel_protos::remote_execution::FindMissingBlobsResponse::new();
-    for digest in req.get_blob_digests() {
-      let hashing_digest_result: Result<Digest, String> = digest.try_into();
-      let hashing_digest = hashing_digest_result.expect("Bad digest");
-      if !blobs.contains_key(&hashing_digest.0) {
-        response.mut_missing_blob_digests().push(digest.clone())
-      }
-    }
-    sink.success(response);
-  }
-
-  fn batch_read_blobs(
-    &self,
-    _: RpcContext<'_>,
-    _: bazel_protos::remote_execution::BatchReadBlobsRequest,
-    sink: grpcio::UnarySink<bazel_protos::remote_execution::BatchReadBlobsResponse>,
-  ) {
-    sink.fail(grpcio::RpcStatus::new(
-      grpcio::RpcStatusCode::UNIMPLEMENTED,
-      None,
-    ));
-  }
-
-  fn batch_update_blobs(
-    &self,
-    _ctx: grpcio::RpcContext<'_>,
-    _req: bazel_protos::remote_execution::BatchUpdateBlobsRequest,
-    sink: grpcio::UnarySink<bazel_protos::remote_execution::BatchUpdateBlobsResponse>,
-  ) {
-    sink.fail(grpcio::RpcStatus::new(
-      grpcio::RpcStatusCode::UNIMPLEMENTED,
-      None,
-    ));
-  }
-
-  fn get_tree(
-    &self,
-    _ctx: grpcio::RpcContext<'_>,
-    _req: bazel_protos::remote_execution::GetTreeRequest,
-    _sink: grpcio::ServerStreamingSink<bazel_protos::remote_execution::GetTreeResponse>,
-  ) {
-    // Our client doesn't currently use get_tree, so we don't bother implementing it.
-    // We will need to if the client starts wanting to use it.
-    unimplemented!()
-  }
-}
-
-impl bazel_protos::remote_execution_grpc::Capabilities for StubCASResponder {
-  fn get_capabilities(
-    &self,
-    _ctx: grpcio::RpcContext<'_>,
-    req: bazel_protos::remote_execution::GetCapabilitiesRequest,
-    sink: grpcio::UnarySink<bazel_protos::remote_execution::ServerCapabilities>,
-  ) {
-    check_instance_name!(self, req, sink);
-
-    let mut response = bazel_protos::remote_execution::ServerCapabilities::new();
-    let cache_capabilities = response.mut_cache_capabilities();
-    cache_capabilities.set_digest_function(vec![
-      bazel_protos::remote_execution::DigestFunction_Value::SHA256,
-    ]);
-    cache_capabilities.max_batch_total_size_bytes = 0;
-
-    response.mut_execution_capabilities().digest_function =
-      bazel_protos::remote_execution::DigestFunction_Value::SHA256;
-    response.mut_execution_capabilities().exec_enabled = true;
-
-    let mut max_semver = bazel_protos::semver::SemVer::new();
-    max_semver.major = 2;
-    max_semver.minor = 999;
-    response.set_high_api_version(max_semver);
-
-    sink.success(response);
+  pub fn remove(&self, fingerprint: Fingerprint) -> bool {
+    self.blobs.lock().remove(&fingerprint).is_some()
   }
 }

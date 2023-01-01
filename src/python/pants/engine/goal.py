@@ -4,11 +4,17 @@
 from abc import abstractmethod
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Callable, ClassVar, Iterator, Tuple, Type, cast
+from enum import Enum
+from typing import TYPE_CHECKING, Callable, ClassVar, Iterator, Type, cast
 
 from typing_extensions import final
 
+from pants.base.deprecated import deprecated_conditional
+from pants.engine.unions import UnionMembership
+from pants.option.option_types import StrOption
+from pants.option.scope import ScopeInfo
 from pants.option.subsystem import Subsystem
+from pants.util.docutil import doc_url
 from pants.util.meta import classproperty
 
 if TYPE_CHECKING:
@@ -27,15 +33,23 @@ class GoalSubsystem(Subsystem):
     ```
     @rule
     def list(console: Console, list_subsystem: ListSubsystem) -> List:
-      transitive = list_subsystem.options.transitive
-      documented = list_subsystem.options.documented
+      transitive = list_subsystem.transitive
+      documented = list_subsystem.documented
       ...
     ```
     """
 
-    # If the goal requires downstream implementations to work properly, such as `test` and `run`,
-    # it should declare the union types that must have members.
-    required_union_implementations: Tuple[Type, ...] = ()
+    @classmethod
+    def activated(cls, union_membership: UnionMembership) -> bool:
+        """Return `False` if this goal should not show up in `./pants help`.
+
+        Usually this is determined by checking `MyType in union_membership`.
+        """
+        return True
+
+    @classmethod
+    def create_scope_info(cls, **scope_info_kwargs) -> ScopeInfo:
+        return super().create_scope_info(is_goal=True, **scope_info_kwargs)
 
     @classproperty
     @abstractmethod
@@ -44,7 +58,7 @@ class GoalSubsystem(Subsystem):
         for its options."""
 
     @classproperty
-    def options_scope(cls) -> str:  # type: ignore[override]
+    def options_scope(cls) -> str:
         return cast(str, cls.name)
 
 
@@ -68,8 +82,50 @@ class Goal:
     value to indicate whether the rule exited cleanly.
     """
 
+    class EnvironmentBehavior(Enum):
+        """Indicates that a goal's behavior with respect to environments has not been considered.
+
+        If set, will trigger a deprecation warning. If the desired behavior is to stay pinned to
+        defaults, changing to `LOCAL_ONLY` will silence the warning for this goal.
+        """
+
+        UNMIGRATED = 1
+
+        """ Indicates that the goal will always operate on the local environment target.
+
+        This is largely the same behavior as Pants has had pre-2.15. Set to this value to silence
+        the deprecation warning that arises from using `UNMIGRATED`."""
+        LOCAL_ONLY = 2
+
+        f""" Indicates that the goal chooses the environments to use to execute rules within the goal.
+
+        This requires migration work to be done by the goal author. See
+        {doc_url('plugin-upgrade-guide')}.
+        """
+        USES_ENVIRONMENTS = 3
+
     exit_code: int
     subsystem_cls: ClassVar[Type[GoalSubsystem]]
+
+    f"""Indicates that a Goal has been migrated to compute EnvironmentNames to build targets in.
+
+    All goals in `pantsbuild/pants` should be migrated before the 2.15.x branch is cut, but end
+    user goals have until `2.17.0.dev0` to migrate.
+
+    See {doc_url('plugin-upgrade-guide')}.
+    """
+    environment_behavior: ClassVar[EnvironmentBehavior] = EnvironmentBehavior.UNMIGRATED
+
+    @classmethod
+    def _selects_environments(cls) -> bool:
+        deprecated_conditional(
+            lambda: cls.environment_behavior == Goal.EnvironmentBehavior.UNMIGRATED,
+            "2.17.0.dev0",
+            f"Setting `Goal.environment_behavior=EnvironmentBehavior.UNMIGRATED` for `Goal` "
+            f"`{cls.name}`",
+            hint=f"See {doc_url('plugin-upgrade-guide')}\n",
+        )
+        return cls.environment_behavior == Goal.EnvironmentBehavior.USES_ENVIRONMENTS
 
     @final
     @classproperty
@@ -85,14 +141,11 @@ class Outputting:
     Useful for goals whose purpose is to emit output to the end user (as distinct from incidental logging to stderr).
     """
 
-    @classmethod
-    def register_options(cls, register):
-        super().register_options(register)
-        register(
-            "--output-file",
-            metavar="<path>",
-            help="Output the goal's stdout to this file. If unspecified, outputs to stdout.",
-        )
+    output_file = StrOption(
+        default=None,
+        metavar="<path>",
+        help="Output the goal's stdout to this file. If unspecified, outputs to stdout.",
+    )
 
     @final
     @contextmanager
@@ -108,11 +161,11 @@ class Outputting:
     @contextmanager
     def output_sink(self, console: "Console") -> Iterator:
         stdout_file = None
-        if self.options.output_file:  # type: ignore[attr-defined]
-            stdout_file = open(self.options.output_file, "w")  # type: ignore[attr-defined]
+        if self.output_file:
+            stdout_file = open(self.output_file, "w")
             output_sink = stdout_file
         else:
-            output_sink = console.stdout
+            output_sink = console.stdout  # type: ignore[assignment]
         try:
             yield output_sink
         finally:
@@ -122,15 +175,11 @@ class Outputting:
 
 
 class LineOriented(Outputting):
-    @classmethod
-    def register_options(cls, register):
-        super().register_options(register)
-        register(
-            "--sep",
-            default="\\n",
-            metavar="<separator>",
-            help="String to use to separate lines in line-oriented output.",
-        )
+    sep = StrOption(
+        default="\\n",
+        metavar="<separator>",
+        help="String to use to separate lines in line-oriented output.",
+    )
 
     @final
     @contextmanager
@@ -139,6 +188,6 @@ class LineOriented(Outputting):
 
         The passed options instance will generally be the `Goal.Options` of an `Outputting` `Goal`.
         """
-        sep = self.options.sep.encode().decode("unicode_escape")  # type: ignore[attr-defined]
+        sep = self.sep.encode().decode("unicode_escape")
         with self.output_sink(console) as output_sink:
             yield lambda msg: print(msg, file=output_sink, end=sep)

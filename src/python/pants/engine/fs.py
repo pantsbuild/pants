@@ -1,59 +1,44 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 from enum import Enum
 from typing import TYPE_CHECKING, Iterable, Optional, Tuple, Union
 
+# Note: several of these types are re-exported as the public API of `engine/fs.py`.
+from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior as GlobMatchErrorBehavior
 from pants.engine.collection import Collection
-from pants.engine.internals.native_engine import PyDigest
-from pants.engine.rules import QueryRule, side_effecting
-from pants.option.global_options import GlobMatchErrorBehavior as GlobMatchErrorBehavior
+from pants.engine.engine_aware import SideEffecting
+from pants.engine.internals.native_engine import EMPTY_DIGEST as EMPTY_DIGEST  # noqa: F401
+from pants.engine.internals.native_engine import (  # noqa: F401
+    EMPTY_FILE_DIGEST as EMPTY_FILE_DIGEST,
+)
+from pants.engine.internals.native_engine import EMPTY_SNAPSHOT as EMPTY_SNAPSHOT  # noqa: F401
+from pants.engine.internals.native_engine import AddPrefix as AddPrefix
+from pants.engine.internals.native_engine import Digest as Digest
+from pants.engine.internals.native_engine import FileDigest as FileDigest
+from pants.engine.internals.native_engine import MergeDigests as MergeDigests
+from pants.engine.internals.native_engine import RemovePrefix as RemovePrefix
+from pants.engine.internals.native_engine import Snapshot as Snapshot
+from pants.engine.rules import QueryRule
 from pants.util.meta import frozen_after_init
 
 if TYPE_CHECKING:
     from pants.engine.internals.scheduler import SchedulerSession
 
 
-"""A Digest is a lightweight reference to a set of files known about by the engine.
-
-You can use `await Get(Snapshot, Digest)` to set the file names referred to, or use `await
-Get(DigestContents, Digest)` to see the actual file content.
-"""
-Digest = PyDigest
-
-
-@dataclass(frozen=True)
-class Snapshot:
-    """A Snapshot is a collection of sorted file paths and dir paths fingerprinted by their
-    names/content.
-
-    You can lift a `Digest` to a `Snapshot` with `await Get(Snapshot, Digest, my_digest)`.
-    """
-
-    digest: Digest
-    files: Tuple[str, ...]
-    dirs: Tuple[str, ...]
-
-
 @dataclass(frozen=True)
 class Paths:
     """A Paths object is a collection of sorted file paths and dir paths.
 
-    Paths is like a Snapshot, but has a performance optimization that it does digest the files or
-    save them to the LMDB store.
+    Paths is like a Snapshot, but has the performance optimization that it does not digest the files
+    or save them to the LMDB store.
     """
 
     files: Tuple[str, ...]
     dirs: Tuple[str, ...]
-
-
-@dataclass(frozen=True)
-class FileDigest:
-    """A FileDigest is a digest that refers to a file's content, without its name."""
-
-    fingerprint: str
-    serialized_bytes_length: int
 
 
 @dataclass(frozen=True)
@@ -76,6 +61,37 @@ class FileContent:
 
 
 @dataclass(frozen=True)
+class FileEntry:
+    """An indirect reference to the content of a file by digest.
+
+    This can be used to create a new Digest with `Get(Digest, CreateDigest)`. You can also get back
+    a list of `FileEntry` objects by using `Get(DigestEntries, Digest)`.
+    """
+
+    path: str
+    file_digest: FileDigest
+    is_executable: bool = False
+
+
+@dataclass(frozen=True)
+class SymlinkEntry:
+    """A symlink pointing to a target path.
+
+    For the symlink target:
+        - uses a a forward slash `/` path separator.
+        - can be relative to the parent directory of the symlink or can be an absolute path starting with `/`.
+        - Allows `..` components anywhere in the path (as logical canonicalization may lead to
+            different behavior in the presence of directory symlinks).
+
+    See also the REAPI for a SymlinkNode:
+    https://github.com/bazelbuild/remote-apis/blob/aa29b91f336b9be2c5370297210b67a6654c0b72/build/bazel/remote/execution/v2/remote_execution.proto#L882
+    """
+
+    path: str
+    target: str
+
+
+@dataclass(frozen=True)
 class Directory:
     """The path to a directory.
 
@@ -89,11 +105,26 @@ class Directory:
 
 
 class DigestContents(Collection[FileContent]):
-    """The file contents of a Digest."""
+    """The file contents of a Digest.
+
+    Although the contents of the Digest are not memoized across `@rules` or across runs (each
+    request for `DigestContents` will load the file content from disk), this API should still
+    generally only be used for small inputs, since concurrency might mean that very many `@rule`s
+    are holding `DigestContents` simultaneously.
+    """
 
 
-class CreateDigest(Collection[Union[FileContent, Directory]]):
-    """A request to create a Digest with the input FileContent and/or Directory values.
+class DigestEntries(Collection[Union[FileEntry, SymlinkEntry, Directory]]):
+    """The indirect file contents of a Digest.
+
+    DigestEntries is a collection of FileEntry/SymlinkEntry/Directory instances representing,
+    respectively, actual files, actual symlinks, and empty directories present in the Digest.
+    """
+
+
+class CreateDigest(Collection[Union[FileContent, FileEntry, SymlinkEntry, Directory]]):
+    """A request to create a Digest with the input FileContent/FileEntry/SymlinkEntry/Directory
+    values.
 
     The engine will create any parent directories necessary, e.g. `FileContent('a/b/c.txt')` will
     result in `a/`, `a/b`, and `a/b/c.txt` being created. You only need to use `Directory` to
@@ -121,14 +152,14 @@ class PathGlobs:
     globs: Tuple[str, ...]
     glob_match_error_behavior: GlobMatchErrorBehavior
     conjunction: GlobExpansionConjunction
-    description_of_origin: str
+    description_of_origin: str | None
 
     def __init__(
         self,
         globs: Iterable[str],
         glob_match_error_behavior: GlobMatchErrorBehavior = GlobMatchErrorBehavior.ignore,
         conjunction: GlobExpansionConjunction = GlobExpansionConjunction.any_match,
-        description_of_origin: Optional[str] = None,
+        description_of_origin: str | None = None,
     ) -> None:
         """A request to find files given a set of globs.
 
@@ -149,7 +180,7 @@ class PathGlobs:
         self.globs = tuple(sorted(globs))
         self.glob_match_error_behavior = glob_match_error_behavior
         self.conjunction = conjunction
-        self.description_of_origin = description_of_origin or ""
+        self.description_of_origin = description_of_origin
         self.__post_init__()
 
     def __post_init__(self) -> None:
@@ -191,6 +222,10 @@ class PathGlobsAndRoot:
 class DigestSubset:
     """A request to get a subset of a digest.
 
+    The digest will be traversed symlink-oblivious to match the provided globs. If you require a
+    symlink-aware subset, you can access the digest's entries `Get(DigestEntries, Digest, digest)`,
+    filter them out, and create a new digest: `Get(Digest, CreateDigest(...))`.
+
     Example:
 
         result = await Get(Digest, DigestSubset(original_digest, PathGlobs(["subdir1", "f.txt"]))
@@ -200,55 +235,9 @@ class DigestSubset:
     globs: PathGlobs
 
 
-@dataclass(unsafe_hash=True)
-class MergeDigests:
-    digests: Tuple[Digest, ...]
-
-    def __init__(self, digests: Iterable[Digest]) -> None:
-        """A request to merge several digests into one single digest.
-
-        This will fail if there are any conflicting changes, such as two digests having the same
-        file but with different content.
-
-        Example:
-
-            result = await Get(Digest, MergeDigests([digest1, digest2])
-        """
-        self.digests = tuple(digests)
-
-
-@dataclass(frozen=True)
-class RemovePrefix:
-    """A request to remove the specified prefix path from every file and directory in the digest.
-
-    This will fail if there are any files or directories in the original input digest without the
-    specified digest.
-
-    Example:
-
-        result = await Get(Digest, RemovePrefix(input_digest, "my_dir")
-    """
-
-    digest: Digest
-    prefix: str
-
-
-@dataclass(frozen=True)
-class AddPrefix:
-    """A request to add the specified prefix path to every file and directory in the digest.
-
-    Example:
-
-        result = await Get(Digest, AddPrefix(input_digest, "my_dir")
-    """
-
-    digest: Digest
-    prefix: str
-
-
 @dataclass(frozen=True)
 class DownloadFile:
-    """Download an asset via a GET request.
+    """Retrieve the contents of a file via an HTTP GET request or directly for local file:// URLs.
 
     To compute the `expected_digest`, manually download the file, then run `shasum -a 256` to
     compute the fingerprint and `wc -c` to compute the expected length of the downloaded file in
@@ -259,37 +248,49 @@ class DownloadFile:
     expected_digest: FileDigest
 
 
-@side_effecting
 @dataclass(frozen=True)
-class Workspace:
+class Workspace(SideEffecting):
     """A handle for operations that mutate the local filesystem."""
 
     _scheduler: "SchedulerSession"
+    _enforce_effects: bool = True
 
-    def write_digest(self, digest: Digest, *, path_prefix: Optional[str] = None) -> None:
+    def write_digest(
+        self, digest: Digest, *, path_prefix: Optional[str] = None, side_effecting: bool = True
+    ) -> None:
         """Write a digest to disk, relative to the build root.
 
         You should not use this in a `for` loop due to slow performance. Instead, call `await
         Get(Digest, MergeDigests)` beforehand.
+
+        As an advanced usecase, if the digest is known to be written to a temporary or idempotent
+        location, side_effecting=False may be passed to avoid tracking this write as a side effect.
         """
+        if side_effecting:
+            self.side_effected()
         self._scheduler.write_digest(digest, path_prefix=path_prefix)
 
 
-_EMPTY_FINGERPRINT = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-EMPTY_DIGEST = Digest(fingerprint=_EMPTY_FINGERPRINT, serialized_bytes_length=0)
-EMPTY_FILE_DIGEST = FileDigest(fingerprint=_EMPTY_FINGERPRINT, serialized_bytes_length=0)
-EMPTY_SNAPSHOT = Snapshot(EMPTY_DIGEST, files=(), dirs=())
-
-
 @dataclass(frozen=True)
-class SpecsSnapshot:
+class SpecsPaths(Paths):
     """All files matched by command line specs.
 
     `@goal_rule`s may request this when they only need source files to operate and do not need any
     target information. This allows running on files with no owning targets.
     """
 
-    snapshot: Snapshot
+
+@dataclass(frozen=True)
+class SnapshotDiff:
+    our_unique_files: tuple[str, ...] = ()
+    our_unique_dirs: tuple[str, ...] = ()
+    their_unique_files: tuple[str, ...] = ()
+    their_unique_dirs: tuple[str, ...] = ()
+    changed_files: tuple[str, ...] = ()
+
+    @classmethod
+    def from_snapshots(cls, ours: Snapshot, theirs: Snapshot) -> "SnapshotDiff":
+        return cls(*ours._diff(theirs))
 
 
 def rules():

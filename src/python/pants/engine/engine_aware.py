@@ -1,11 +1,16 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from abc import ABC
-from typing import Any, Dict, Optional
+from __future__ import annotations
 
-from pants.engine.fs import Snapshot
+from abc import ABC
+from typing import TYPE_CHECKING, Any
+
+from pants.engine.internals import native_engine
 from pants.util.logging import LogLevel
+
+if TYPE_CHECKING:
+    from pants.engine.fs import FileDigest, Snapshot
 
 
 class EngineAwareParameter(ABC):
@@ -16,9 +21,18 @@ class EngineAwareParameter(ABC):
     will do nothing; otherwise, it will use the additional metadata provided.
     """
 
-    def debug_hint(self) -> Optional[str]:
+    def debug_hint(self) -> str | None:
         """If implemented, this string will be shown in `@rule` debug contexts if that rule takes
         the annotated type as a parameter."""
+        return None
+
+    def metadata(self) -> dict[str, Any] | None:
+        """If implemented, adds arbitrary key-value pairs to the `metadata` entry of the `@rule`.
+
+        If multiple Params to a `@rule` have metadata, the metadata will be merged in a
+        deterministic but unspecified order.
+        """
+
         return None
 
 
@@ -31,7 +45,7 @@ class EngineAwareReturnType(ABC):
     otherwise, it will use the additional metadata provided.
     """
 
-    def level(self) -> Optional[LogLevel]:
+    def level(self) -> LogLevel | None:
         """If implemented, this method will modify the level of the workunit associated with any
         `@rule`s that return the annotated type.
 
@@ -40,7 +54,7 @@ class EngineAwareReturnType(ABC):
         """
         return None
 
-    def message(self) -> Optional[str]:
+    def message(self) -> str | None:
         """If implemented, this adds a result message to the workunit for any `@rule`'s that return
         the annotated type.
 
@@ -49,16 +63,51 @@ class EngineAwareReturnType(ABC):
         """
         return None
 
-    def artifacts(self) -> Optional[Dict[str, Snapshot]]:
+    def cacheable(self) -> bool:
+        """Allows a return type to be conditionally marked uncacheable.
+
+        An uncacheable value is recomputed in each Session: this can be useful if the level or
+        message should be rendered as sideeffects in each Session.
+        """
+        return True
+
+    def artifacts(self) -> dict[str, FileDigest | Snapshot] | None:
         """If implemented, this sets the `artifacts` entry for the workunit of any `@rule`'s that
         return the annotated type.
 
-        `artifacts` is a mapping of arbitrary string keys to `Snapshot`s.
+        `artifacts` is a mapping of arbitrary string keys to `Snapshot`s or `FileDigest`s.
         """
         return None
 
-    def metadata(self) -> Optional[Dict[str, Any]]:
-        """If implemented, adds arbitrary key-value pairs to the `metadata` entry of the `@rule`
-        workunit."""
+    def metadata(self) -> dict[str, Any] | None:
+        """If implemented, adds arbitrary key-value pairs to the `metadata` entry of the `@rule`.
+
+        If a @rule has `metadata` supplied by `EngineAwareParameter`s, the data will be merged, with
+        only colliding keys overwritten.
+        """
 
         return None
+
+
+class SideEffecting(ABC):
+    """Marks a class as providing side-effecting APIs, which are handled specially in @rules.
+
+    Implementers of SideEffecting classes should ensure that `def side_effected` is called before
+    the class causes side-effects.
+
+    Note that logging is _not_ considered to be a side-effect, but other types of output to stdio
+    are.
+    """
+
+    # Used to disable enforcement of effects in tests.
+    _enforce_effects: bool
+
+    def side_effected(self) -> None:
+        # NB: This method is implemented by manipulating a thread/task-local property which will
+        # only be in scope if the SideEffecting property has correctly been identified on a @rule
+        # Parameter.
+        #
+        # TODO: As part of #10542, it's possible that all side-effecting methods will need to
+        # become async instead, which would avoid the need for a thread/task-local.
+        if self._enforce_effects:
+            native_engine.task_side_effected()

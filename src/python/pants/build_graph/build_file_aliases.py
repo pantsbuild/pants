@@ -1,8 +1,10 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable
 
 from pants.base.parse_context import ParseContext
 from pants.util.frozendict import FrozenDict
@@ -44,7 +46,7 @@ class BuildFileAliases:
             )
 
     @classmethod
-    def _validate_objects(cls, objects: Optional[Dict[str, Any]]) -> FrozenDict[str, Any]:
+    def _validate_objects(cls, objects: dict[str, Any] | None) -> FrozenDict[str, Any]:
         if not objects:
             return FrozenDict()
 
@@ -54,7 +56,7 @@ class BuildFileAliases:
 
     @classmethod
     def _validate_context_aware_object_factories(
-        cls, context_aware_object_factories: Optional[Dict[str, ContextAwareObjectFactory]]
+        cls, context_aware_object_factories: dict[str, ContextAwareObjectFactory] | None
     ) -> FrozenDict[str, ContextAwareObjectFactory]:
         if not context_aware_object_factories:
             return FrozenDict()
@@ -72,8 +74,8 @@ class BuildFileAliases:
 
     def __init__(
         self,
-        objects: Optional[Dict[str, Any]] = None,
-        context_aware_object_factories: Optional[Dict[str, ContextAwareObjectFactory]] = None,
+        objects: dict[str, Any] | None = None,
+        context_aware_object_factories: dict[str, ContextAwareObjectFactory] | None = None,
     ) -> None:
         """
         :API: public
@@ -97,7 +99,7 @@ class BuildFileAliases:
         """
         return self._context_aware_object_factories
 
-    def merge(self, other: "BuildFileAliases") -> "BuildFileAliases":
+    def merge(self, other: BuildFileAliases) -> BuildFileAliases:
         """Merges a set of build file aliases and returns a new set of aliases containing both.
 
         Any duplicate aliases from `other` will trump.
@@ -105,10 +107,10 @@ class BuildFileAliases:
         :API: public
         """
         if not isinstance(other, BuildFileAliases):
-            raise TypeError("Can only merge other BuildFileAliases, given {0}".format(other))
+            raise TypeError(f"Can only merge other BuildFileAliases, given {other}")
 
         def merge(*items):
-            merged: Dict = {}
+            merged: dict = {}
             for item in items:
                 merged.update(item)
             return merged

@@ -10,9 +10,7 @@
   clippy::if_not_else,
   clippy::needless_continue,
   clippy::unseparated_literal_suffix,
-  // TODO: Falsely triggers for async/await:
-  //   see https://github.com/rust-lang/rust-clippy/issues/5360
-  // clippy::used_underscore_binding
+  clippy::used_underscore_binding
 )]
 // It is often more clear to show that nothing is being moved.
 #![allow(clippy::match_ref_pats)]
@@ -27,7 +25,7 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
-use clap::{App, Arg};
+use clap::{Arg, Command};
 use mock::StubCAS;
 use std::io;
 use std::io::Read;
@@ -36,21 +34,21 @@ fn main() -> Result<(), String> {
   env_logger::init();
   let mut stdin = io::stdin();
 
-  let matches = &App::new("local_cas")
+  let matches = &Command::new("local_cas")
     .about("An in-memory implementation of a CAS, to test remote execution utilities.")
     .arg(
-      Arg::with_name("port")
+      Arg::new("port")
         .long("port")
-        .short("p")
+        .short('p')
         .required(false)
         .takes_value(true)
         .help("Port that the CAS should listen to.")
         .default_value("0"),
     )
     .arg(
-      Arg::with_name("instance-name")
+      Arg::new("instance-name")
         .long("instance-name")
-        .short("i")
+        .short('i')
         .required(false)
         .takes_value(true)
         .default_value(""),
