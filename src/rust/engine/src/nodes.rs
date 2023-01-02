@@ -1152,9 +1152,9 @@ impl Task {
             }
             Err(throw @ Failure::Throw { .. }) => {
               input = None;
-              err = Some(PyErr::from(throw)); // XXX TODO preserve stack traces.. etc
+              err = Some(PyErr::from(throw));
             }
-            Err(Failure::Invalidated) | Err(Failure::MissingDigest(_, _)) => todo!(),
+            Err(failure) => break Err(failure),
           }
         }
         externs::GeneratorResponse::GetMulti(gets) => {
@@ -1167,14 +1167,14 @@ impl Task {
             }
             Err(throw @ Failure::Throw { .. }) => {
               input = None;
-              err = Some(PyErr::from(throw)); // XXX TODO preserve stack traces.. etc
+              err = Some(PyErr::from(throw));
             }
-            Err(Failure::Invalidated) | Err(Failure::MissingDigest(_, _)) => todo!(),
+            Err(failure) => break Err(failure),
           }
         }
         externs::GeneratorResponse::Break(val, type_id) => {
           break Ok((val, type_id));
-        } // externs::GeneratorResponse::Throw(err) => break Err(err),  // XXX
+        }
       }
     }
   }

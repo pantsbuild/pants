@@ -293,37 +293,6 @@ pub fn generator_send(
       })
       .collect::<Result<Vec<_>, _>>()?;
     Ok(GeneratorResponse::GetMulti(gets))
-
-  //} else if let Ok(throw) = response.extract::<PyRef<PyGeneratorResponseThrow>>() {
-  //   Err(Failure::from_py_err_with_gil(
-  //     py,
-  //     PyErr::from_value(throw.0.as_ref(py)),
-  //   )) // XXX
-  // let new_err_val = Value::new(throw.0.clone_ref(py));
-  // match err {
-  //   Some(err) => {
-  //     // If this is the same error that we previously sent, then just return the previous error to
-  //     // preserve the stacktraces.
-  //     let err_is_same_as_last_time = err
-  //       .as_py_err()
-  //       .map(|previous_err_val| previous_err_val == &new_err_val)
-  //       .unwrap_or(false);
-  //     if err_is_same_as_last_time {
-  //       // Ok(GeneratorResponse::Throw(err))
-  //       Err(err)
-  //     } else {
-  //       // Otherwise, the error was handled, but another error was raised in that handling, so we
-  //       // create a new Failure instance, and join the tracebacks.
-  //       let new_failure = Failure::from_py_err_with_gil(py, throw.0.clone_ref(py));
-  //       // let joined_failure = err.join_tracebacks(new_failure);
-  //       // Ok(GeneratorResponse::Throw(joined_failure))
-
-  //       Err(new_failure)  // XXX
-  //     }
-  //   }
-  //   // We didn't have an error before, but we do now, so just return a new Failure instance.
-  //   None => Err(Failure::from_py_err_with_gil(py, throw.0.clone_ref(py))),  // XXX
-  // }
   } else {
     panic!(
       "native_engine_generator_send returned unrecognized type: {:?}",
@@ -584,5 +553,4 @@ pub enum GeneratorResponse {
   Break(Value, TypeId),
   Get(Get),
   GetMulti(Vec<Get>),
-  // Throw(Failure),  XXX
 }

@@ -53,9 +53,7 @@ def test_use_params() -> None:
     assert result_str == consumes_a_and_b(a, b)
 
     # But not a subset.
-    expected_msg = (
-        "No installed QueryRules can compute str given input Params((A, EnvironmentName)), but"
-    )
+    expected_msg = "No installed QueryRules can compute str given input Params(A), but"
     with pytest.raises(Exception, match=re.escape(expected_msg)):
         rule_runner.request(str, [a])
 
@@ -434,7 +432,7 @@ def test_trace_includes_nested_exception_traceback() -> None:
 
         Traceback (most recent call last):
           File LOCATION-INFO, in native_engine_generator_send
-            res = rule.send(arg) if throw is None else rule.throw(throw)
+            res = rule.send(arg) if err is None else rule.throw(throw or err)
           File LOCATION-INFO, in catch_and_reraise
             raise Exception("nested exception!") from e
         Exception: nested exception!

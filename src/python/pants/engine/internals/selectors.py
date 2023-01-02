@@ -5,8 +5,6 @@ from __future__ import annotations
 
 import ast
 import itertools
-
-# XXX from traceback import TracebackException
 from dataclasses import dataclass
 from typing import (
     TYPE_CHECKING,
@@ -606,7 +604,6 @@ NativeEngineGeneratorResponse = Union[
     PyGeneratorResponseGet,
     PyGeneratorResponseGetMulti,
     PyGeneratorResponseBreak,
-    # PyGeneratorResponseThrow,
 ]
 
 
@@ -615,7 +612,7 @@ def native_engine_generator_send(
 ) -> NativeEngineGeneratorResponse:
     throw = err and err.failure.get_error()
     try:
-        res = rule.send(arg) if throw is None else rule.throw(throw)
+        res = rule.send(arg) if err is None else rule.throw(throw or err)
     except StopIteration as e:
         return PyGeneratorResponseBreak(e.value)
     except Exception as e:
@@ -643,15 +640,3 @@ def native_engine_generator_send(
                     """
                 )
             )
-
-
-# except Exception as e:
-# XXX
-# Read the stack, and place it into an attribute on the exception object. This is
-# consumed within the rust code to produce a combined stacktrace in cases where an
-# exception was raised while trying to handle another exception.
-# wrapped = TracebackException.from_exception(e)
-# formatted_stack = list(wrapped.format())
-# e._formatted_stack = formatted_stack  # type: ignore[attr-defined]
-
-# return PyGeneratorResponseThrow(e)

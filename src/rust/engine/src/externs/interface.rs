@@ -83,7 +83,6 @@ fn native_engine(py: Python, m: &PyModule) -> PyO3Result<()> {
   m.add_class::<externs::PyGeneratorResponseBreak>()?;
   m.add_class::<externs::PyGeneratorResponseGet>()?;
   m.add_class::<externs::PyGeneratorResponseGetMulti>()?;
-  m.add_class::<externs::PyGeneratorResponseThrow>()?;
 
   m.add_function(wrap_pyfunction!(stdio_initialize, m)?)?;
   m.add_function(wrap_pyfunction!(stdio_thread_console_set, m)?)?;
@@ -497,7 +496,7 @@ fn py_result_from_root(py: Python, result: Result<Value, Failure>) -> PyResult {
           let msg = format!("{}", f);
           let python_traceback = Failure::native_traceback(&msg);
           (
-            externs::create_exception(py, msg), // XXX KAOS TODO :: PR -> `externs::create_value_error(py, msg)`
+            externs::create_exception(py, msg),
             python_traceback,
             Vec::new(),
           )
