@@ -5,16 +5,20 @@ from __future__ import annotations
 
 import ast
 import itertools
+
+# XXX from traceback import TracebackException
 from dataclasses import dataclass
 from typing import (
     TYPE_CHECKING,
     Any,
+    Coroutine,
     Generator,
     Generic,
     Iterable,
     Sequence,
     Tuple,
     TypeVar,
+    Union,
     cast,
     overload,
 )
@@ -23,6 +27,7 @@ from pants.engine.internals.native_engine import (
     PyGeneratorResponseBreak,
     PyGeneratorResponseGet,
     PyGeneratorResponseGetMulti,
+    PyGeneratorResponseThrow,
 )
 from pants.util.meta import frozen_after_init
 from pants.util.strutil import softwrap
@@ -590,11 +595,26 @@ class Params:
         self.params = tuple(args)
 
 
+# A specification for how the native engine interacts with @rule coroutines:
+# - coroutines may await on any of `Get`, `MultiGet`, `Effect` or other coroutines decorated with `@rule_helper`.
+# - we will send back a single `Any` or a tuple of `Any` to the coroutine, depending upon the variant of `Get`.
+# - a coroutine will eventually return a single `Any`.
+RuleSend = Union[Any, Tuple[Any, ...]]
+RuleYield = Union[Get, Tuple[Get, ...]]
+RuleCoroutine = Coroutine[RuleYield, RuleSend, Any]
+NativeEngineGeneratorResponse = Union[
+    PyGeneratorResponseGet,
+    PyGeneratorResponseGetMulti,
+    PyGeneratorResponseBreak,
+    PyGeneratorResponseThrow,
+]
+
+
 def native_engine_generator_send(
-    func, arg
-) -> PyGeneratorResponseGet | PyGeneratorResponseGetMulti | PyGeneratorResponseBreak:
+    func: RuleCoroutine, arg: RuleSend | None, err: Exception | None
+) -> NativeEngineGeneratorResponse:
     try:
-        res = func.send(arg)
+        res = func.throw(err) if err is not None else func.send(arg)
         # It isn't necessary to differentiate between `Get` and `Effect` here, as the static
         # analysis of `@rule`s has already validated usage.
         if isinstance(res, (Get, Effect)):
@@ -604,8 +624,14 @@ def native_engine_generator_send(
         else:
             raise ValueError(f"internal engine error: unrecognized coroutine result {res}")
     except StopIteration as e:
-        if not e.args:
-            raise
-        # This was a `return` from a coroutine, as opposed to a `StopIteration` raised
-        # by calling `next()` on an empty iterator.
         return PyGeneratorResponseBreak(e.value)
+    except Exception as e:
+        # XXX
+        # Read the stack, and place it into an attribute on the exception object. This is
+        # consumed within the rust code to produce a combined stacktrace in cases where an
+        # exception was raised while trying to handle another exception.
+        # wrapped = TracebackException.from_exception(e)
+        # formatted_stack = list(wrapped.format())
+        # e._formatted_stack = formatted_stack  # type: ignore[attr-defined]
+
+        return PyGeneratorResponseThrow(e)

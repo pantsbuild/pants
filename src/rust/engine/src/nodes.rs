@@ -1127,7 +1127,7 @@ impl Task {
 
   ///
   /// Given a python generator Value, loop to request the generator's dependencies until
-  /// it completes with a result Value.
+  /// it completes with a result Value or fails with an error.
   ///
   async fn generate(
     context: &Context,
@@ -1137,26 +1137,44 @@ impl Task {
     generator: Value,
   ) -> NodeResult<(Value, TypeId)> {
     let mut input: Option<Value> = None;
+    let mut err: Option<Value> = None;
     loop {
       let context = context.clone();
       let params = params.clone();
-      let response = Python::with_gil(|py| {
-        let input = input.unwrap_or_else(|| Value::from(py.None()));
-        externs::generator_send(py, &generator, &input)
-      })?;
+      let response = Python::with_gil(|py| externs::generator_send(py, &generator, input, err))?;
       match response {
         externs::GeneratorResponse::Get(get) => {
-          let values = Self::gen_get(&context, workunit, &params, entry, vec![get]).await?;
-          input = Some(values.into_iter().next().unwrap());
+          let result = Self::gen_get(&context, workunit, &params, entry, vec![get]).await;
+          match result {
+            Ok(values) => {
+              input = Some(values.into_iter().next().unwrap());
+              err = None;
+            }
+            Err(Failure::Throw { val, .. }) => {
+              input = None;
+              err = Some(val); // XXX TODO preserve stack traces.. etc
+            }
+            Err(Failure::Invalidated) | Err(Failure::MissingDigest(_, _)) => todo!(),
+          }
         }
         externs::GeneratorResponse::GetMulti(gets) => {
-          let values = Self::gen_get(&context, workunit, &params, entry, gets).await?;
-          let gil = Python::acquire_gil();
-          input = Some(externs::store_tuple(gil.python(), values));
+          let result = Self::gen_get(&context, workunit, &params, entry, gets).await;
+          match result {
+            Ok(values) => {
+              let gil = Python::acquire_gil();
+              input = Some(externs::store_tuple(gil.python(), values));
+              err = None;
+            }
+            Err(Failure::Throw { val, .. }) => {
+              input = None;
+              err = Some(val); // XXX TODO preserve stack traces.. etc
+            }
+            Err(Failure::Invalidated) | Err(Failure::MissingDigest(_, _)) => todo!(),
+          }
         }
         externs::GeneratorResponse::Break(val, type_id) => {
           break Ok((val, type_id));
-        }
+        } // externs::GeneratorResponse::Throw(err) => break Err(err),  // XXX
       }
     }
   }

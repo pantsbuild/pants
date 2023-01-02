@@ -418,6 +418,9 @@ class PyGeneratorResponseGet(Generic[_Output]):
 class PyGeneratorResponseGetMulti:
     def __init__(self, gets: tuple[PyGeneratorResponseGet, ...]) -> None: ...
 
+class PyGeneratorResponseThrow:
+    def __init__(self, err: Exception) -> None: ...
+
 # ------------------------------------------------------------------------------
 # (uncategorized)
 # ------------------------------------------------------------------------------

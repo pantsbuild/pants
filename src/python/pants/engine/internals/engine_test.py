@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import itertools
+import re
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -21,6 +22,7 @@ from pants.engine.fs import (
     Digest,
     DigestContents,
     FileContent,
+    MergeDigests,
     Snapshot,
 )
 from pants.engine.internals.engine_testutil import (
@@ -1006,3 +1008,35 @@ def test_union_member_construction(run_tracker: RunTracker) -> None:
     )
 
     assert "yep" == rule_runner.request(str, [])
+
+
+@dataclass(frozen=True)
+class FileInput:
+    filename: str
+
+
+@dataclass(frozen=True)
+class MergedOutput:
+    digest: Digest
+
+
+@rule
+async def catch_merge_digests_error(file_input: FileInput) -> MergedOutput:
+    # Create two separate digests writing different contents to the same file path.
+    input_1 = CreateDigest((FileContent(path=file_input.filename, content=b"yes"),))
+    input_2 = CreateDigest((FileContent(path=file_input.filename, content=b"no"),))
+    digests = await MultiGet(Get(Digest, CreateDigest, input_1), Get(Digest, CreateDigest, input_2))
+    try:
+        merged = await Get(Digest, MergeDigests(digests))
+    except Exception as e:
+        raise Exception(f"error merging digests for input {file_input}: {e}")
+    return MergedOutput(merged)
+
+
+def test_catch_intrinsic_error() -> None:
+    rule_runner = RuleRunner(
+        rules=[catch_merge_digests_error, QueryRule(MergedOutput, (FileInput,))]
+    )
+    msg = re.escape("error merging digests for input FileInput(filename='some-file.txt')")
+    with pytest.raises(ExecutionError, match=msg):
+        rule_runner.request(MergedOutput, (FileInput("some-file.txt"),))
