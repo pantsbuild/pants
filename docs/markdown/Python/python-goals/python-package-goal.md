@@ -149,8 +149,8 @@ python_requirement(name="gunicorn", requirements=["gunicorn==20.1.0"])
 pex_binary(
   name="myservice_bin",
   script="gunicorn",
-  inject_args=["myproduct.myservice.wsgi:app", "--name=myservice"],
-  inject_env={"MY_ENV_VAR=1"},
+  args=["myproduct.myservice.wsgi:app", "--name=myservice"],
+  env={"MY_ENV_VAR=1"},
   dependencies=[":gunicorn"],
 )
 ```

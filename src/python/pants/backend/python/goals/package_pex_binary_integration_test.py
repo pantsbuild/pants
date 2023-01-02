@@ -124,8 +124,8 @@ def test_layout(rule_runner: RuleRunner, layout: PexLayout) -> None:
                 python_sources(name="lib")
                 pex_binary(
                     entry_point="app.py",
-                    inject_args=['123', 'abc'],
-                    inject_env={{'FOO': 'xxx', 'BAR': 'yyy'}},
+                    args=['123', 'abc'],
+                    env={{'FOO': 'xxx', 'BAR': 'yyy'}},
                     layout="{layout.value}",
                 )
                 """

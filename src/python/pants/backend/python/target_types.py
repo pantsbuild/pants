@@ -377,8 +377,8 @@ class PexScriptField(Field):
         return ConsoleScript(value)
 
 
-class PexInjectArgsField(StringSequenceField):
-    alias = "inject_args"
+class PexArgsField(StringSequenceField):
+    alias = "args"
     help = softwrap(
         """
         Freeze these command-line args into the PEX. Allows you to run generic entry points
@@ -387,8 +387,8 @@ class PexInjectArgsField(StringSequenceField):
     )
 
 
-class PexInjectEnvField(DictStringToStringField):
-    alias = "inject_env"
+class PexEnvField(DictStringToStringField):
+    alias = "env"
     help = softwrap(
         """
         Freeze these environment variables into the PEX. Allows you to run generic entry points
@@ -680,8 +680,8 @@ class PexBinary(Target):
         *_PEX_BINARY_COMMON_FIELDS,
         PexEntryPointField,
         PexScriptField,
-        PexInjectArgsField,
-        PexInjectEnvField,
+        PexArgsField,
+        PexEnvField,
         OutputPathField,
     )
     help = softwrap(

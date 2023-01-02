@@ -6,10 +6,12 @@ from dataclasses import dataclass
 from typing import Tuple
 
 from pants.backend.python.target_types import (
+    PexArgsField,
     PexBinaryDefaults,
     PexCompletePlatformsField,
     PexEmitWarningsField,
     PexEntryPointField,
+    PexEnvField,
     PexExecutionMode,
     PexExecutionModeField,
     PexIgnoreErrorsField,
@@ -17,8 +19,6 @@ from pants.backend.python.target_types import (
     PexIncludeSourcesField,
     PexIncludeToolsField,
     PexInheritPathField,
-    PexInjectArgsField,
-    PexInjectEnvField,
     PexLayout,
     PexLayoutField,
     PexPlatformsField,
@@ -63,8 +63,8 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
 
     entry_point: PexEntryPointField
     script: PexScriptField
-    inject_args: PexInjectArgsField
-    inject_env: PexInjectEnvField
+    args: PexArgsField
+    env: PexEnvField
 
     output_path: OutputPathField
     emit_warnings: PexEmitWarningsField
@@ -155,8 +155,8 @@ async def package_pex_binary(
             addresses=[field_set.address],
             internal_only=False,
             main=resolved_entry_point.val or field_set.script.value,
-            inject_args=field_set.inject_args.value or [],
-            inject_env=field_set.inject_env.value or FrozenDict[str, str](),
+            inject_args=field_set.args.value or [],
+            inject_env=field_set.env.value or FrozenDict[str, str](),
             platforms=PexPlatforms.create_from_platforms_field(field_set.platforms),
             complete_platforms=complete_platforms,
             output_filename=output_filename,
