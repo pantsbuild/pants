@@ -44,6 +44,16 @@ pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
 #[pyclass]
 pub struct PyFailure(pub Failure);
 
+#[pymethods]
+impl PyFailure {
+  fn get_error(&self, py: Python) -> PyObject {
+    match &self.0 {
+      Failure::Throw { val, .. } => val.to_object(py),
+      _ => py.None(),
+    }
+  }
+}
+
 // TODO: We import this exception type because `pyo3` doesn't support declaring exceptions with
 // additional fields. See https://github.com/PyO3/pyo3/issues/295
 import_exception!(pants.base.exceptions, NativeEngineFailure);
@@ -246,7 +256,7 @@ pub fn generator_send(
   py: Python,
   generator: &Value,
   arg: Option<Value>,
-  err: Option<Value>,
+  err: Option<PyErr>,
 ) -> Result<GeneratorResponse, Failure> {
   let selectors = py.import("pants.engine.internals.selectors").unwrap();
   let native_engine_generator_send = selectors.getattr("native_engine_generator_send").unwrap();
@@ -255,7 +265,7 @@ pub fn generator_send(
     None => py.None(),
   };
   let py_err = match err {
-    Some(err) => err.to_object(py),
+    Some(err) => err.into_py(py),
     None => py.None(),
   };
   let response = native_engine_generator_send
@@ -283,29 +293,30 @@ pub fn generator_send(
       })
       .collect::<Result<Vec<_>, _>>()?;
     Ok(GeneratorResponse::GetMulti(gets))
-  } else if let Ok(throw) = response.extract::<PyRef<PyGeneratorResponseThrow>>() {
-    Err(Failure::from_py_err_with_gil(
-      py,
-      PyErr::from_value(throw.0.as_ref(py)),
-    )) // XXX
-       // let new_err_val = Value::new(throw.0.clone_ref(py));
-       // match err {
-       //   Some(err) => {
-       //     // If this is the same error that we previously sent, then just return the previous error to
-       //     // preserve the stacktraces.
-       //     let err_is_same_as_last_time = err
-       //       .as_py_err()
-       //       .map(|previous_err_val| previous_err_val == &new_err_val)
-       //       .unwrap_or(false);
-       //     if err_is_same_as_last_time {
-       //       // Ok(GeneratorResponse::Throw(err))
-       //       Err(err)
-       //     } else {
-       //       // Otherwise, the error was handled, but another error was raised in that handling, so we
-       //       // create a new Failure instance, and join the tracebacks.
-       //       let new_failure = Failure::from_py_err_with_gil(py, throw.0.clone_ref(py));
-       //       // let joined_failure = err.join_tracebacks(new_failure);
-       //       // Ok(GeneratorResponse::Throw(joined_failure))
+
+  //} else if let Ok(throw) = response.extract::<PyRef<PyGeneratorResponseThrow>>() {
+  //   Err(Failure::from_py_err_with_gil(
+  //     py,
+  //     PyErr::from_value(throw.0.as_ref(py)),
+  //   )) // XXX
+  // let new_err_val = Value::new(throw.0.clone_ref(py));
+  // match err {
+  //   Some(err) => {
+  //     // If this is the same error that we previously sent, then just return the previous error to
+  //     // preserve the stacktraces.
+  //     let err_is_same_as_last_time = err
+  //       .as_py_err()
+  //       .map(|previous_err_val| previous_err_val == &new_err_val)
+  //       .unwrap_or(false);
+  //     if err_is_same_as_last_time {
+  //       // Ok(GeneratorResponse::Throw(err))
+  //       Err(err)
+  //     } else {
+  //       // Otherwise, the error was handled, but another error was raised in that handling, so we
+  //       // create a new Failure instance, and join the tracebacks.
+  //       let new_failure = Failure::from_py_err_with_gil(py, throw.0.clone_ref(py));
+  //       // let joined_failure = err.join_tracebacks(new_failure);
+  //       // Ok(GeneratorResponse::Throw(joined_failure))
 
   //       Err(new_failure)  // XXX
   //     }

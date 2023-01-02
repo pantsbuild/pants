@@ -20,7 +20,8 @@ from pants.engine.process import InteractiveProcess, InteractiveProcessResult
 # (core)
 # ------------------------------------------------------------------------------
 
-class PyFailure: ...
+class PyFailure:
+    def get_error(self) -> Exception | None: ...
 
 # ------------------------------------------------------------------------------
 # Address (parsing)

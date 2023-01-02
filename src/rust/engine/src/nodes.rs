@@ -17,7 +17,7 @@ use futures::future::{self, BoxFuture, FutureExt, TryFutureExt};
 use grpc_util::prost::MessageExt;
 use internment::Intern;
 use protos::gen::pants::cache::{CacheKey, CacheKeyType, ObservedUrl};
-use pyo3::prelude::{Py, PyAny, Python};
+use pyo3::prelude::{Py, PyAny, PyErr, Python};
 use pyo3::IntoPy;
 use url::Url;
 
@@ -1137,7 +1137,7 @@ impl Task {
     generator: Value,
   ) -> NodeResult<(Value, TypeId)> {
     let mut input: Option<Value> = None;
-    let mut err: Option<Value> = None;
+    let mut err: Option<PyErr> = None;
     loop {
       let context = context.clone();
       let params = params.clone();
@@ -1150,9 +1150,9 @@ impl Task {
               input = Some(values.into_iter().next().unwrap());
               err = None;
             }
-            Err(Failure::Throw { val, .. }) => {
+            Err(throw @ Failure::Throw { .. }) => {
               input = None;
-              err = Some(val); // XXX TODO preserve stack traces.. etc
+              err = Some(PyErr::from(throw)); // XXX TODO preserve stack traces.. etc
             }
             Err(Failure::Invalidated) | Err(Failure::MissingDigest(_, _)) => todo!(),
           }
@@ -1165,9 +1165,9 @@ impl Task {
               input = Some(externs::store_tuple(gil.python(), values));
               err = None;
             }
-            Err(Failure::Throw { val, .. }) => {
+            Err(throw @ Failure::Throw { .. }) => {
               input = None;
-              err = Some(val); // XXX TODO preserve stack traces.. etc
+              err = Some(PyErr::from(throw)); // XXX TODO preserve stack traces.. etc
             }
             Err(Failure::Invalidated) | Err(Failure::MissingDigest(_, _)) => todo!(),
           }

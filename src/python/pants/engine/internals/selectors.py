@@ -23,11 +23,11 @@ from typing import (
     overload,
 )
 
+from pants.base.exceptions import NativeEngineFailure
 from pants.engine.internals.native_engine import (
     PyGeneratorResponseBreak,
     PyGeneratorResponseGet,
     PyGeneratorResponseGetMulti,
-    PyGeneratorResponseThrow,
 )
 from pants.util.meta import frozen_after_init
 from pants.util.strutil import softwrap
@@ -606,15 +606,27 @@ NativeEngineGeneratorResponse = Union[
     PyGeneratorResponseGet,
     PyGeneratorResponseGetMulti,
     PyGeneratorResponseBreak,
-    PyGeneratorResponseThrow,
+    # PyGeneratorResponseThrow,
 ]
 
 
 def native_engine_generator_send(
-    func: RuleCoroutine, arg: RuleSend | None, err: Exception | None
+    rule: RuleCoroutine, arg: RuleSend | None, err: NativeEngineFailure | None
 ) -> NativeEngineGeneratorResponse:
+    throw = err and err.failure.get_error()
     try:
-        res = func.throw(err) if err is not None else func.send(arg)
+        res = rule.send(arg) if throw is None else rule.throw(throw)
+    except StopIteration as e:
+        return PyGeneratorResponseBreak(e.value)
+    except Exception as e:
+        if e.__cause__ is throw:
+            # Preserve the engine traceback by using the wrapped failure error as cause. The cause
+            # will be swapped back again in
+            # `src/rust/engine/src/python.rs:Failure::from_py_err_with_gil()` to preserve the python
+            # traceback.
+            e.__cause__ = err
+        raise
+    else:
         # It isn't necessary to differentiate between `Get` and `Effect` here, as the static
         # analysis of `@rule`s has already validated usage.
         if isinstance(res, (Get, Effect)):
@@ -622,16 +634,24 @@ def native_engine_generator_send(
         elif type(res) in (tuple, list):
             return PyGeneratorResponseGetMulti(res)
         else:
-            raise ValueError(f"internal engine error: unrecognized coroutine result {res}")
-    except StopIteration as e:
-        return PyGeneratorResponseBreak(e.value)
-    except Exception as e:
-        # XXX
-        # Read the stack, and place it into an attribute on the exception object. This is
-        # consumed within the rust code to produce a combined stacktrace in cases where an
-        # exception was raised while trying to handle another exception.
-        # wrapped = TracebackException.from_exception(e)
-        # formatted_stack = list(wrapped.format())
-        # e._formatted_stack = formatted_stack  # type: ignore[attr-defined]
+            raise ValueError(
+                softwrap(
+                    f"""
+                    Async @rule error: unrecognized await object
 
-        return PyGeneratorResponseThrow(e)
+                    Expected a rule query such as `Get(..)` or similar, but got: {res!r}
+                    """
+                )
+            )
+
+
+# except Exception as e:
+# XXX
+# Read the stack, and place it into an attribute on the exception object. This is
+# consumed within the rust code to produce a combined stacktrace in cases where an
+# exception was raised while trying to handle another exception.
+# wrapped = TracebackException.from_exception(e)
+# formatted_stack = list(wrapped.format())
+# e._formatted_stack = formatted_stack  # type: ignore[attr-defined]
+
+# return PyGeneratorResponseThrow(e)
