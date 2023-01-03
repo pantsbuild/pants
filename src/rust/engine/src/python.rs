@@ -459,8 +459,8 @@ impl Failure {
           engine_traceback,
           python_traceback,
         }) => {
-          // Preserve tracebacks (both engine and python) from upstream error by cloning the engine
-          // traceback and restoring the original python exception cause.
+          // Preserve tracebacks (both engine and python) from upstream error by using any existing
+          // engine traceback and restoring the original python exception cause.
           py_err.set_cause(py, Some(PyErr::from_value((*val.0).as_ref(py))));
           (
             format!(

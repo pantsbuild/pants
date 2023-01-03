@@ -516,17 +516,6 @@ impl PyGeneratorResponseGetMulti {
   }
 }
 
-#[pyclass]
-pub struct PyGeneratorResponseThrow(PyObject);
-
-#[pymethods]
-impl PyGeneratorResponseThrow {
-  #[new]
-  fn __new__(val: PyObject) -> Self {
-    Self(val)
-  }
-}
-
 #[derive(Debug)]
 pub struct Get {
   pub output: TypeId,
