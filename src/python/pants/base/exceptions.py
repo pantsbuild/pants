@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from pants.engine.internals.native_engine import EngineError as EngineError  # noqa: F401
 from pants.engine.internals.native_engine import (  # noqa: F401
     IncorrectProductError as IncorrectProductError,
 )

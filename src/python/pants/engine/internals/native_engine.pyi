@@ -480,8 +480,11 @@ class PyThreadLocals:
 class PollTimeout(Exception):
     pass
 
-class IntrinsicError(ValueError):
+class EngineError(Exception):
+    pass
+
+class IntrinsicError(EngineError):
     """Exceptions raised for failures within intrinsic methods implemented in Rust."""
 
-class IncorrectProductError(TypeError):
+class IncorrectProductError(EngineError):
     """Exceptions raised when a rule's return value doesn't match its declared type."""
