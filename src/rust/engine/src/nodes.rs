@@ -1215,7 +1215,7 @@ impl Task {
               let val = Value::new(res.into_py(py));
               (val, type_id)
             })
-            .map_err(Failure::from_py_err)
+            .map_err(Failure::from)
         })
       })
       .await?;

@@ -445,12 +445,6 @@ impl Failure {
     }
   }
 
-  pub fn from_py_err(py_err: PyErr) -> Failure {
-    let gil = Python::acquire_gil();
-    let py = gil.python();
-    Failure::from_py_err_with_gil(py, py_err)
-  }
-
   pub fn from_py_err_with_gil(py: Python, py_err: PyErr) -> Failure {
     // If this is a wrapped Failure, return it immediately.
     if let Some(failure) = Failure::from_wrapped_failure(py, &py_err) {
