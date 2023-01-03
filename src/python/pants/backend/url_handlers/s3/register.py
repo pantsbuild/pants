@@ -4,10 +4,11 @@ import logging
 from dataclasses import dataclass
 from types import SimpleNamespace
 from typing import Any
-from urllib.parse import urlparse
+from urllib.parse import urlsplit
 
 from pants.engine.download_file import URLDownloadHandler
 from pants.engine.fs import Digest, NativeDownloadFile
+from pants.engine.internals.native_engine import FileDigest
 from pants.engine.internals.selectors import Get
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
@@ -50,19 +51,56 @@ async def access_aws_credentials() -> AWSCredentials:
     return AWSCredentials(creds)
 
 
-# NB: The URL is expected to be in path-style
-# See https://docs.aws.amazon.com/AmazonS3/latest/userguide/VirtualHosting.html
-def _get_aws_auth_headers(url: str, aws_credentials: AWSCredentials):
-    from botocore import auth  # pants: no-infer-dep
+@dataclass(frozen=True)
+class S3DownloadFile:
+    region: str
+    bucket: str
+    key: str
+    query: str
+    expected_digest: FileDigest
 
-    request = SimpleNamespace(
-        url=url,
+
+@rule
+async def download_from_s3(request: S3DownloadFile, aws_credentials: AWSCredentials) -> Digest:
+    from botocore import auth, exceptions  # pants: no-infer-dep
+
+    # NB: The URL for auth is expected to be in path-style
+    path_style_url = "https://s3"
+    if request.region:
+        path_style_url += f".{request.region}"
+    path_style_url += f".amazonaws.com/{request.bucket}/{request.key}"
+    if request.query:
+        path_style_url += f"?{request.query}"
+
+    http_request = SimpleNamespace(
+        url=path_style_url,
         headers={},
         method="GET",
         auth_path=None,
     )
-    auth.HmacV1Auth(aws_credentials.creds).add_auth(request)
-    return request.headers
+    # NB: The added Auth header doesn't need to be valid when accessing a public bucket. When
+    # hand-testing, you MUST test against a private bucket to ensure it works for private buckets too.
+    signer = auth.HmacV1Auth(aws_credentials.creds)
+    try:
+        signer.add_auth(http_request)
+    except exceptions.NoCredentialsError:
+        pass  # The user can still access public S3 buckets without credentials
+
+    virtual_hosted_url = f"https://{request.bucket}.s3"
+    if request.region:
+        virtual_hosted_url += f".{request.region}"
+    virtual_hosted_url += f".amazonaws.com/{request.key}"
+    if request.query:
+        virtual_hosted_url += f"?{request.query}"
+
+    return await Get(
+        Digest,
+        NativeDownloadFile(
+            url=virtual_hosted_url,
+            expected_digest=request.expected_digest,
+            auth_headers=http_request.headers,
+        ),
+    )
 
 
 class DownloadS3SchemeURL(URLDownloadHandler):
@@ -70,24 +108,18 @@ class DownloadS3SchemeURL(URLDownloadHandler):
 
 
 @rule
-async def download_file_from_s3_scheme(
-    request: DownloadS3SchemeURL, aws_credentials: AWSCredentials
-) -> Digest:
-    parsed_url = urlparse(request.url)
-    bucket = parsed_url.netloc
-    key = parsed_url.path
-    http_url = f"https://s3.amazonaws.com/{bucket}{key}"
-    headers = _get_aws_auth_headers(http_url, aws_credentials)
-
-    digest = await Get(
+async def download_file_from_s3_scheme(request: DownloadS3SchemeURL) -> Digest:
+    split = urlsplit(request.url)
+    return await Get(
         Digest,
-        NativeDownloadFile(
-            url=http_url,
+        S3DownloadFile(
+            region="",
+            bucket=split.netloc,
+            key=split.path[1:],
+            query="",
             expected_digest=request.expected_digest,
-            auth_headers=headers,
         ),
     )
-    return digest
 
 
 class DownloadS3AuthorityVirtualHostedStyleURL(URLDownloadHandler):
@@ -98,23 +130,18 @@ class DownloadS3AuthorityVirtualHostedStyleURL(URLDownloadHandler):
 async def download_file_from_virtual_hosted_s3_authority(
     request: DownloadS3AuthorityVirtualHostedStyleURL, aws_credentials: AWSCredentials
 ) -> Digest:
-    parsed_url = urlparse(request.url)
-    bucket = parsed_url.netloc.split(".", 1)[0]
-    # NB: Turn this into a path-style request
-    path_style_url = f"https://s3.amazonaws.com/{bucket}{parsed_url.path}"
-    if parsed_url.query:
-        path_style_url += f"?{parsed_url.query}"
-    headers = _get_aws_auth_headers(path_style_url, aws_credentials)
-
-    digest = await Get(
+    split = urlsplit(request.url)
+    bucket, aws_netloc = split.netloc.split(".", 1)
+    return await Get(
         Digest,
-        NativeDownloadFile(
-            url=request.url,
+        S3DownloadFile(
+            region=aws_netloc.split(".")[1] if aws_netloc.count(".") == 3 else "",
+            bucket=bucket,
+            key=split.path[1:],
+            query=split.query,
             expected_digest=request.expected_digest,
-            auth_headers=headers,
         ),
     )
-    return digest
 
 
 class DownloadS3AuthorityPathStyleURL(URLDownloadHandler):
@@ -125,16 +152,18 @@ class DownloadS3AuthorityPathStyleURL(URLDownloadHandler):
 async def download_file_from_path_s3_authority(
     request: DownloadS3AuthorityPathStyleURL, aws_credentials: AWSCredentials
 ) -> Digest:
-    headers = _get_aws_auth_headers(request.url, aws_credentials)
-    digest = await Get(
+    split = urlsplit(request.url)
+    _, bucket, key = split.path.split("/", 2)
+    return await Get(
         Digest,
-        NativeDownloadFile(
-            url=request.url,
+        S3DownloadFile(
+            region=split.netloc.split(".")[1] if split.netloc.count(".") == 3 else "",
+            bucket=bucket,
+            key=key,
+            query=split.query,
             expected_digest=request.expected_digest,
-            auth_headers=headers,
         ),
     )
-    return digest
 
 
 def rules():

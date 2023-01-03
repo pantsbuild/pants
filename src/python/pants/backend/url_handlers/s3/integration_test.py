@@ -7,7 +7,11 @@ from types import SimpleNamespace
 
 import pytest
 
-from pants.backend.url_handlers.s3.register import DownloadS3SchemeURL
+from pants.backend.url_handlers.s3.register import (
+    DownloadS3AuthorityPathStyleURL,
+    DownloadS3AuthorityVirtualHostedStyleURL,
+    DownloadS3SchemeURL,
+)
 from pants.backend.url_handlers.s3.register import rules as s3_rules
 from pants.engine.fs import Digest, FileDigest, NativeDownloadFile, Snapshot
 from pants.engine.rules import QueryRule
@@ -28,6 +32,8 @@ def rule_runner() -> RuleRunner:
         rules=[
             *s3_rules(),
             QueryRule(Snapshot, [DownloadS3SchemeURL]),
+            QueryRule(Snapshot, [DownloadS3AuthorityVirtualHostedStyleURL]),
+            QueryRule(Snapshot, [DownloadS3AuthorityPathStyleURL]),
         ],
         isolated_local_store=True,
     )
@@ -35,42 +41,49 @@ def rule_runner() -> RuleRunner:
 
 @pytest.fixture
 def monkeypatch_botocore(monkeypatch):
-    botocore = SimpleNamespace()
-    fake_session = object()
-    fake_creds = SimpleNamespace(access_key="ACCESS", secret_key="SECRET")
-    botocore.session = SimpleNamespace(get_session=lambda: fake_session)
+    def do_patching(expected_url):
+        botocore = SimpleNamespace()
+        botocore.exceptions = SimpleNamespace(NoCredentialsError=Exception)
+        fake_session = object()
+        fake_creds = SimpleNamespace(access_key="ACCESS", secret_key="SECRET")
+        botocore.session = SimpleNamespace(get_session=lambda: fake_session)
 
-    def fake_resolver_creator(session):
-        assert session is fake_session
-        return SimpleNamespace(load_credentials=lambda: fake_creds)
+        def fake_resolver_creator(session):
+            assert session is fake_session
+            return SimpleNamespace(load_credentials=lambda: fake_creds)
 
-    def fake_creds_ctor(access_key, secret_key):
-        assert access_key == fake_creds.access_key
-        assert secret_key == fake_creds.secret_key
-        return fake_creds
+        def fake_creds_ctor(access_key, secret_key):
+            assert access_key == fake_creds.access_key
+            assert secret_key == fake_creds.secret_key
+            return fake_creds
 
-    botocore.credentials = SimpleNamespace(
-        create_credential_resolver=fake_resolver_creator, Credentials=fake_creds_ctor
-    )
-
-    def fake_auth_ctor(creds):
-        assert creds is fake_creds
-        return SimpleNamespace(
-            add_auth=lambda request: request.headers.__setitem__("AUTH", "TOKEN")
+        botocore.credentials = SimpleNamespace(
+            create_credential_resolver=fake_resolver_creator, Credentials=fake_creds_ctor
         )
 
-    botocore.auth = SimpleNamespace(SigV3Auth=fake_auth_ctor)
+        def fake_auth_ctor(creds):
+            assert creds is fake_creds
 
-    monkeypatch.setitem(sys.modules, "botocore", botocore)
+            def add_auth(request):
+                request.url == expected_url
+                request.headers["AUTH"] = "TOKEN"
+
+            return SimpleNamespace(add_auth=add_auth)
+
+        botocore.auth = SimpleNamespace(HmacV1Auth=fake_auth_ctor)
+
+        monkeypatch.setitem(sys.modules, "botocore", botocore)
+
+    return do_patching
 
 
 @pytest.fixture
 def replace_url(monkeypatch):
-    def with_port(port):
+    def with_port(expected_url, port):
         old_native_download_file_init = NativeDownloadFile.__init__
 
         def new_init(self, **kwargs):
-            assert kwargs["url"] == "https://bucket.s3.amazonaws.com/keypart1/keypart2/file.txt"
+            assert kwargs["url"] == expected_url
             kwargs["url"] = f"http://localhost:{port}/file.txt"
             return old_native_download_file_init(self, **kwargs)
 
@@ -79,7 +92,76 @@ def replace_url(monkeypatch):
     return with_port
 
 
-def test_download_s3(rule_runner: RuleRunner, monkeypatch_botocore, replace_url) -> None:
+@pytest.mark.parametrize(
+    "request_url, expected_auth_url, expected_native_url, req_type",
+    [
+        (
+            "s3://bucket/keypart1/keypart2/file.txt",
+            "https://bucket.s3.amazonaws.com/keypart1/keypart2/file.txt",
+            "https://bucket.s3.amazonaws.com/keypart1/keypart2/file.txt",
+            DownloadS3SchemeURL,
+        ),
+        # Path-style
+        (
+            "https://s3.amazonaws.com/bucket/keypart1/keypart2/file.txt",
+            "https://s3.amazonaws.com/bucket/keypart1/keypart2/file.txt",
+            "https://bucket.s3.amazonaws.com/keypart1/keypart2/file.txt",
+            DownloadS3AuthorityPathStyleURL,
+        ),
+        (
+            "https://s3.amazonaws.com/bucket/keypart1/keypart2/file.txt?versionId=ABC123",
+            "https://s3.amazonaws.com/bucket/keypart1/keypart2/file.txt?versionId=ABC123",
+            "https://bucket.s3.amazonaws.com/keypart1/keypart2/file.txt?versionId=ABC123",
+            DownloadS3AuthorityPathStyleURL,
+        ),
+        (
+            "https://s3.us-west-2.amazonaws.com/bucket/keypart1/keypart2/file.txt",
+            "https://s3.us-west-2.amazonaws.com/bucket/keypart1/keypart2/file.txt",
+            "https://bucket.s3.us-west-2.amazonaws.com/keypart1/keypart2/file.txt",
+            DownloadS3AuthorityPathStyleURL,
+        ),
+        (
+            "https://s3.us-west-2.amazonaws.com/bucket/keypart1/keypart2/file.txt?versionId=ABC123",
+            "https://s3.us-west-2.amazonaws.com/bucket/keypart1/keypart2/file.txt?versionId=ABC123",
+            "https://bucket.s3.us-west-2.amazonaws.com/keypart1/keypart2/file.txt?versionId=ABC123",
+            DownloadS3AuthorityPathStyleURL,
+        ),
+        # Virtual-hosted-style
+        (
+            "https://bucket.s3.amazonaws.com/keypart1/keypart2/file.txt",
+            "https://s3.amazonaws.com/bucket/keypart1/keypart2/file.txt",
+            "https://bucket.s3.amazonaws.com/keypart1/keypart2/file.txt",
+            DownloadS3AuthorityVirtualHostedStyleURL,
+        ),
+        (
+            "https://bucket.s3.amazonaws.com/keypart1/keypart2/file.txt?versionId=ABC123",
+            "https://s3.amazonaws.com/bucket/keypart1/keypart2/file.txt?versionId=ABC123",
+            "https://bucket.s3.amazonaws.com/keypart1/keypart2/file.txt?versionId=ABC123",
+            DownloadS3AuthorityVirtualHostedStyleURL,
+        ),
+        (
+            "https://bucket.s3.amazonaws.com/keypart1/keypart2/file.txt?versionId=ABC123",
+            "https://s3.amazonaws.com/bucket/keypart1/keypart2/file.txt?versionId=ABC123",
+            "https://bucket.s3.amazonaws.com/keypart1/keypart2/file.txt?versionId=ABC123",
+            DownloadS3AuthorityVirtualHostedStyleURL,
+        ),
+        (
+            "https://bucket.s3.us-west-2.amazonaws.com/keypart1/keypart2/file.txt",
+            "https://s3.us-west-2.amazonaws.com/bucket/keypart1/keypart2/file.txt",
+            "https://bucket.s3.us-west-2.amazonaws.com/keypart1/keypart2/file.txt",
+            DownloadS3AuthorityVirtualHostedStyleURL,
+        ),
+    ],
+)
+def test_download_s3(
+    rule_runner: RuleRunner,
+    monkeypatch_botocore,
+    request_url: str,
+    expected_auth_url: str,
+    expected_native_url: str,
+    req_type: type,
+    replace_url,
+) -> None:
     class S3HTTPHandler(BaseHTTPRequestHandler):
         response_text = b"Hello, client!"
 
@@ -97,11 +179,12 @@ def test_download_s3(rule_runner: RuleRunner, monkeypatch_botocore, replace_url)
             self.send_header("Content-Length", f"{len(self.response_text)}")
             self.end_headers()
 
+    monkeypatch_botocore(expected_auth_url)
     with http_server(S3HTTPHandler) as port:
-        replace_url(port)
+        replace_url(expected_native_url, port)
         snapshot = rule_runner.request(
             Snapshot,
-            [DownloadS3SchemeURL("s3://bucket/keypart1/keypart2/file.txt", DOWNLOADS_FILE_DIGEST)],
+            [req_type(request_url, DOWNLOADS_FILE_DIGEST)],
         )
     assert snapshot.files == ("file.txt",)
     assert snapshot.digest == DOWNLOADS_EXPECTED_DIRECTORY_DIGEST

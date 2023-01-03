@@ -28,7 +28,7 @@ def test_no_union_members() -> None:
             MockGet(
                 output_type=Digest,
                 input_types=(URLDownloadHandler,),
-                mock=lambda _: object(),
+                mock=lambda _: None,
             ),
             MockGet(
                 output_type=Digest,
@@ -89,7 +89,7 @@ def test_matches(scheme, authority, url) -> None:
             MockGet(
                 output_type=Digest,
                 input_types=(NativeDownloadFile,),
-                mock=lambda _: object(),
+                mock=lambda _: None,
             ),
         ],
         union_membership=union_membership,
@@ -129,7 +129,7 @@ def test_doesnt_match(scheme, authority, url) -> None:
             MockGet(
                 output_type=Digest,
                 input_types=(URLDownloadHandler,),
-                mock=lambda _: object(),
+                mock=lambda _: None,
             ),
             MockGet(
                 output_type=Digest,
@@ -162,7 +162,7 @@ def test_too_many_matches() -> None:
                 MockGet(
                     output_type=Digest,
                     input_types=(URLDownloadHandler,),
-                    mock=lambda _: object(),
+                    mock=lambda _: None,
                 ),
                 MockGet(
                     output_type=Digest,
