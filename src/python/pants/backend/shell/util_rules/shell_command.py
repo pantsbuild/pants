@@ -19,11 +19,12 @@ from pants.backend.shell.target_types import (
     ShellCommandCommandField,
     ShellCommandExecutionDependenciesField,
     ShellCommandExtraEnvVarsField,
+    ShellCommandIsInteractiveField,
     ShellCommandLogOutputField,
     ShellCommandOutputDirectoriesField,
     ShellCommandOutputFilesField,
     ShellCommandOutputsField,
-    ShellCommandRunWorkdirField,
+    ShellCommandWorkdirField,
     ShellCommandSourcesField,
     ShellCommandTimeoutField,
     ShellCommandToolsField,
@@ -111,11 +112,8 @@ class ShellCommandProcessFromTargetRequest:
 async def _prepare_process_request_from_target(shell_command: Target) -> ShellCommandProcessRequest:
     description = f"the `{shell_command.alias}` at `{shell_command.address}`"
 
-    interactive = shell_command.has_field(ShellCommandRunWorkdirField)
-    if interactive:
-        working_directory = shell_command[ShellCommandRunWorkdirField].value or ""
-    else:
-        working_directory = shell_command.address.spec_path
+    interactive = shell_command.has_field(ShellCommandIsInteractiveField)
+    working_directory = shell_command[ShellCommandWorkdirField].value
 
     command = shell_command[ShellCommandCommandField].value
     if not command:
@@ -240,7 +238,7 @@ async def prepare_process_request_from_target(
 class RunShellCommand(RunFieldSet):
     required_fields = (
         ShellCommandCommandField,
-        ShellCommandRunWorkdirField,
+        ShellCommandWorkdirField,
     )
     run_in_sandbox_behavior = RunInSandboxBehavior.NOT_SUPPORTED
 
@@ -325,7 +323,7 @@ async def run_in_sandbox_request(
     )
     run_field_set: RunFieldSet = field_sets.field_sets[0]
 
-    working_directory = shell_command.address.spec_path
+    working_directory = shell_command[ShellCommandWorkdirField].value
 
     # Must be run in target environment so that the binaries/envvars match the execution
     # environment when we actually run the process.

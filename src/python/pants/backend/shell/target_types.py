@@ -366,6 +366,13 @@ class RunInSandboxSourcesField(MultipleSourcesField):
     expected_num_files = 0
 
 
+class ShellCommandIsInteractiveField(MultipleSourcesField):
+    # We use this to determine whether this is an interactive process.
+    alias = "_is_interactive"
+    uses_source_roots = False
+    expected_num_files = 0
+
+
 class RunInSandboxArgumentsField(StringSequenceField):
     alias = "args"
     default = ()
@@ -410,7 +417,7 @@ class ShellCommandLogOutputField(BoolField):
     help = "Set to true if you want the output from the command logged to the console."
 
 
-class ShellCommandRunWorkdirField(StringField):
+class ShellCommandWorkdirField(StringField):
     alias = "workdir"
     default = "."
     help = "Sets the current working directory of the command, relative to the project root."
@@ -441,6 +448,7 @@ class ShellCommandTarget(Target):
         ShellCommandTimeoutField,
         ShellCommandToolsField,
         ShellCommandExtraEnvVarsField,
+        ShellCommandWorkdirField,
         EnvironmentField,
     )
     help = softwrap(
@@ -483,6 +491,7 @@ class ShellRunInSandboxTarget(Target):
         ShellCommandTimeoutField,
         ShellCommandToolsField,
         ShellCommandExtraEnvVarsField,
+        ShellCommandWorkdirField,
         EnvironmentField,
     )
     help = softwrap(
@@ -510,7 +519,8 @@ class ShellCommandRunTarget(Target):
         *COMMON_TARGET_FIELDS,
         ShellCommandExecutionDependenciesField,
         ShellCommandCommandField,
-        ShellCommandRunWorkdirField,
+        ShellCommandWorkdirField,
+        ShellCommandIsInteractiveField,
     )
     help = softwrap(
         """
