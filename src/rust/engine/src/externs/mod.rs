@@ -13,7 +13,7 @@ use lazy_static::lazy_static;
 use pyo3::exceptions::{PyException, PyTypeError};
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict, PyTuple, PyType};
-use pyo3::{import_exception, intern};
+use pyo3::{create_exception, import_exception, intern};
 use pyo3::{FromPyObject, ToPyObject};
 use smallvec::{smallvec, SmallVec};
 
@@ -35,10 +35,21 @@ mod stdio;
 pub mod testutil;
 pub mod workunits;
 
-pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
+pub fn register(py: Python, m: &PyModule) -> PyResult<()> {
   m.add_class::<PyFailure>()?;
+  m.add("EngineError", py.get_type::<EngineError>())?;
+  m.add("IntrinsicError", py.get_type::<IntrinsicError>())?;
+  m.add(
+    "IncorrectProductError",
+    py.get_type::<IncorrectProductError>(),
+  )?;
+
   Ok(())
 }
+
+create_exception!(native_engine, EngineError, PyException);
+create_exception!(native_engine, IntrinsicError, EngineError);
+create_exception!(native_engine, IncorrectProductError, EngineError);
 
 #[derive(Clone)]
 #[pyclass]
@@ -49,7 +60,9 @@ impl PyFailure {
   fn get_error(&self, py: Python) -> PyObject {
     match &self.0 {
       Failure::Throw { val, .. } => val.to_object(py),
-      _ => py.None(),
+      f @ (Failure::Invalidated | Failure::MissingDigest { .. }) => {
+        EngineError::new_err(format!("{}", f)).into_py(py)
+      }
     }
   }
 }
@@ -236,15 +249,8 @@ pub fn doc_url(py: Python, slug: &str) -> String {
 }
 
 pub fn create_exception(py: Python, msg: String) -> Value {
-  Value::new(PyException::new_err(msg).into_py(py))
+  Value::new(IntrinsicError::new_err(msg).into_py(py))
 }
-
-// pub fn into_value_result(py_result: PyResult<&PyAny>) -> Result<Value, Failure> {
-//   match py_result {
-//     Ok(obj) => Ok(Value::from(obj)),
-//     Err(err) => Err(Failure::from_py_err(err)),
-//   }
-// }
 
 pub fn call_function<'py>(func: &'py PyAny, args: &[Value]) -> PyResult<&'py PyAny> {
   let args: Vec<PyObject> = args.iter().map(|v| v.clone().into()).collect();

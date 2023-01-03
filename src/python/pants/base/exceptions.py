@@ -5,6 +5,11 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from pants.engine.internals.native_engine import (  # noqa: F401
+    IncorrectProductError as IncorrectProductError,
+)
+from pants.engine.internals.native_engine import IntrinsicError as IntrinsicError  # noqa: F401
+
 if TYPE_CHECKING:
     from pants.engine.internals.native_engine import PyFailure
 

@@ -1232,10 +1232,13 @@ impl Task {
     }
 
     if result_type != self.task.product {
-      return Err(throw(format!(
-        "{:?} returned a result value that did not satisfy its constraints: {:?}",
-        self.task.func, result_val
-      )));
+      return Err(
+        externs::IncorrectProductError::new_err(format!(
+          "{:?} returned a result value that did not satisfy its constraints: {:?}",
+          self.task.func, result_val
+        ))
+        .into(),
+      );
     }
 
     if self.task.engine_aware_return_type {

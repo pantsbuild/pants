@@ -9,9 +9,8 @@ from typing import Any
 
 import pytest
 
+from pants.base.exceptions import IncorrectProductError
 from pants.engine.internals.engine_testutil import remove_locations_from_traceback
-
-# from pants.engine.internals.native import IncorrectProductError
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import Get, rule
 from pants.engine.unions import UnionRule, union
@@ -311,8 +310,7 @@ def return_a_wrong_product_type(input_with_nothing: InputWithNothing) -> A:
 async def catch_a_wrong_product_type(input_with_nothing: InputWithNothing) -> B:
     try:
         _ = await Get(A, InputWithNothing, input_with_nothing)
-    # except IncorrectProductError as e:
-    except Exception as e:
+    except IncorrectProductError as e:
         raise Exception(f"caught product type error: {e}")
     return B()
 

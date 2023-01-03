@@ -377,6 +377,14 @@ impl From<PyObject> for Value {
   }
 }
 
+impl From<PyErr> for Value {
+  fn from(py_err: PyErr) -> Self {
+    let gil = Python::acquire_gil();
+    let py = gil.python();
+    Value::new(py_err.into_py(py))
+  }
+}
+
 ///
 /// A short required name, and optional human readable description for a single frame of a Failure.
 ///
@@ -572,6 +580,14 @@ impl From<Failure> for PyErr {
 impl From<String> for Failure {
   fn from(err: String) -> Self {
     throw(err)
+  }
+}
+
+impl From<PyErr> for Failure {
+  fn from(py_err: PyErr) -> Self {
+    let gil = Python::acquire_gil();
+    let py = gil.python();
+    Failure::from_py_err_with_gil(py, py_err)
   }
 }
 
