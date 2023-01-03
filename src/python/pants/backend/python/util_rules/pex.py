@@ -527,7 +527,7 @@ async def build_pex(
 
     for injected_arg in request.inject_args:
         argv.extend(["--inject-args", str(injected_arg)])
-    for k, v in request.inject_env.items():
+    for k, v in sorted(request.inject_env.items()):
         argv.extend(["--inject-env", f"{k}={v}"])
 
     # TODO(John Sirois): Right now any request requirements will shadow corresponding pex path
