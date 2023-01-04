@@ -20,7 +20,7 @@ pub struct Types {
   pub remove_prefix: TypeId,
   pub create_digest: TypeId,
   pub digest_subset: TypeId,
-  pub download_file: TypeId,
+  pub native_download_file: TypeId,
   pub platform: TypeId,
   pub process: TypeId,
   pub process_config_from_environment: TypeId,

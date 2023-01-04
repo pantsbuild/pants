@@ -14,6 +14,7 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Andy Reitz
 + Antoine Tollenaere
 + Asher Foa
++ Aurelien Didier
 + Bardur Arantsson
 + Bastian Wegge
 + Benjy Weinberger

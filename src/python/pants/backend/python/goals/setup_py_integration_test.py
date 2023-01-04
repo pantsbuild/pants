@@ -111,3 +111,41 @@ def test_deterministic_package_data() -> None:
             "b/b.txt": "",
         },
     )
+
+
+def test_output_path() -> None:
+    dist_dir = "dist"
+    output_path = os.path.join("nondefault", "output_dir")
+    files = {
+        "foo/BUILD": dedent(
+            f"""\
+            python_sources()
+
+            python_distribution(
+                name="dist",
+                dependencies=[":foo"],
+                provides=python_artifact(name="foo", version="2.3.4"),
+                output_path="{output_path}"
+            )
+            """
+        ),
+        "foo/source.py": "",
+    }
+    pyver = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
+
+    with setup_tmpdir(files) as source_dir:
+        pants_run = run_pants(
+            [
+                "--backend-packages=pants.backend.python",
+                f"--python-interpreter-constraints=['=={pyver}']",
+                "package",
+                f"{source_dir}/foo:dist",
+            ],
+            extra_env={"PYTHON": sys.executable},
+        )
+        pants_run.assert_success()
+        dist_output_path = os.path.join(dist_dir, output_path)
+        dist_entries = os.listdir(os.path.join(dist_dir, output_path))
+        assert len(dist_entries) == 2
+        for entry in dist_entries:
+            assert os.path.isfile(os.path.join(dist_output_path, entry))

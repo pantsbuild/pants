@@ -138,6 +138,8 @@ class PexRequest(EngineAwareParameter):
     sources: Digest | None
     additional_inputs: Digest
     main: MainSpecification | None
+    inject_args: tuple[str, ...]
+    inject_env: FrozenDict[str, str]
     additional_args: tuple[str, ...]
     pex_path: tuple[Pex, ...]
     description: str | None = dataclasses.field(compare=False)
@@ -156,6 +158,8 @@ class PexRequest(EngineAwareParameter):
         sources: Digest | None = None,
         additional_inputs: Digest | None = None,
         main: MainSpecification | None = None,
+        inject_args: Iterable[str] = (),
+        inject_env: Mapping[str, str] = FrozenDict(),
         additional_args: Iterable[str] = (),
         pex_path: Iterable[Pex] = (),
         description: str | None = None,
@@ -189,6 +193,8 @@ class PexRequest(EngineAwareParameter):
             directly in the Pex, but should be present in the environment when building the Pex.
         :param main: The main for the built Pex, equivalent to Pex's `-e` or '-c' flag. If
             left off, the Pex will open up as a REPL.
+        :param inject_args: Command line arguments to freeze in to the PEX.
+        :param inject_env: Environment variables to freeze in to the PEX.
         :param additional_args: Any additional Pex flags.
         :param pex_path: Pex files to add to the PEX_PATH.
         :param description: A human-readable description to render in the dynamic UI when building
@@ -207,6 +213,8 @@ class PexRequest(EngineAwareParameter):
         self.sources = sources
         self.additional_inputs = additional_inputs or EMPTY_DIGEST
         self.main = main
+        self.inject_args = tuple(inject_args)
+        self.inject_env = FrozenDict(inject_env)
         self.additional_args = tuple(additional_args)
         self.pex_path = tuple(pex_path)
         self.description = description
@@ -516,6 +524,11 @@ async def build_pex(
 
     if request.main is not None:
         argv.extend(request.main.iter_pex_args())
+
+    for injected_arg in request.inject_args:
+        argv.extend(["--inject-args", str(injected_arg)])
+    for k, v in sorted(request.inject_env.items()):
+        argv.extend(["--inject-env", f"{k}={v}"])
 
     # TODO(John Sirois): Right now any request requirements will shadow corresponding pex path
     #  requirements, which could lead to problems. Support shading python binaries.
