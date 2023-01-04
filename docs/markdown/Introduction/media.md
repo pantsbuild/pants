@@ -20,6 +20,7 @@ January 3, 2023
 
 November 4, 2022
 "Introducing Pants to Oxbotica"
+<https://blog.pantsbuild.org/introducing-pants-to-oxbotica/>
 
 > Self-driving vehicle company's successful journey to adopting Pants locally and in CI.
 
