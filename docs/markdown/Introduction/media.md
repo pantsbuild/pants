@@ -34,7 +34,8 @@ September 1, 2022
 
 
 October 27, 2022
-"Part 2: Building a Python ecosystem for efficient and reliable development" <https://www.coinbase.com/blog/part-2-building-a-python-ecosystem-for-efficient-and-reliable-development>
+"Part 2: Building a Python ecosystem for efficient and reliable development"
+<https://www.coinbase.com/blog/part-2-building-a-python-ecosystem-for-efficient-and-reliable-development>
 
 > Explains the technical details of the continuous integration/continuous delivery (CI/CD) infrastructure and dependency management of the company's Python ecosystem.
 
