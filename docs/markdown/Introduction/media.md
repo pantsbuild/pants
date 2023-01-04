@@ -35,7 +35,7 @@ September 1, 2022
 
 
 October 27, 2022
-"Part 2: Building a Python ecosystem for efficient and reliable development"
+"Part 2: Building a Python ecosystem for efficient and reliable development"  
 <https://www.coinbase.com/blog/part-2-building-a-python-ecosystem-for-efficient-and-reliable-development>
 
 > Explains the technical details of the continuous integration/continuous delivery (CI/CD) infrastructure and dependency management of the company's Python ecosystem.
@@ -52,7 +52,7 @@ August 24, 2022
 
 August 12, 2022  
 "Astranis Case Study: Wrangling Python In a Monorepo"
-<https://blog.pantsbuild.org/astranis-case-study-wrangling-python-in-a-monorepo/>
+<https://blog.pantsbuild.org/astranis-case-study-wrangling-python-in-a-monorepo/>  
 
 > <i>"...We found it incredibly easy to hook in our existing remote caching systems to Pants, and added other nice features like running tailor in a check-only mode to highlight any inconsistencies in our repo. As a side benefit, Pants has helped us gain better insight into our repository by being able to easily scan for and report the transitive dependencies of modules. Having that insight has helped us plan out how to minimize the coupling of our modules..."</i>
 
