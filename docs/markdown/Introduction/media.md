@@ -69,15 +69,38 @@ October 2, 2021
 <https://g-cassie.github.io/2021/10/02/django-pants.html>
 
 
-## Posts & Articles
+## Tutorials
 
 ### Doctrine.fr Engineering blog
 
 Nov 25, 2022  
-[**Tutorial**] "Industrialized Python code with Pylint plugins in Pants"  
+"Industrialized Python code with Pylint plugins in Pants"  
 <https://medium.com/doctrine/industrialized-python-code-with-pylint-plugins-in-pants-321d9cbad07a>
 
 > What if you needed to put strict code convention rules through a linter and apply them with the help of Pants?
+
+### Suresh Joshi
+
+April 4, 2022  
+"It's Pants Plugins All the Way Down"  
+<https://sureshjoshi.com/development/pants-plugin-code-quality>  
+
+> A follow-up to "Your first Pants plugin" detailing how to manage code quality via plugins, continuous integration checks, and pre-commit hooks.
+
+January 25, 2022  
+"Your first Pants plugin"  
+<https://sureshjoshi.com/development/first-pants-plugin>  
+
+> A newcomer's walk-through of the code and experience of writing one's first Pants plugin.
+
+### Gordon Cassie
+
+October 30, 2021  
+"Getting Started With Pants and Django"  
+<https://g-cassie.github.io/2021/10/30/django-pants-tutorial-pt1.html>
+
+
+## Posts & Articles
 
 ### Dev.to
 
@@ -87,20 +110,6 @@ July 25, 2022
 
 > How the cache solutions offered by CI providers work, why they are often of limited benefit, and how Pants supports a much more effective caching paradigm. 
 
-### Suresh Joshi
-
-April 4, 2022  
-[**Tutorial**] "It's Pants Plugins All the Way Down"  
-<https://sureshjoshi.com/development/pants-plugin-code-quality>  
-
-> A follow-up to "Your first Pants plugin" detailing how to manage code quality via plugins, continuous integration checks, and pre-commit hooks.
-
-January 25, 2022  
-[**Tutorial**] "Your first Pants plugin"  
-<https://sureshjoshi.com/development/first-pants-plugin>  
-
-> A newcomer's walk-through of the code and experience of writing one's first Pants plugin.
-
 ### Software Development Times
 
 January 18, 2022  
@@ -108,12 +117,6 @@ January 18, 2022
 <https://sdtimes.com/softwaredev/the-monorepo-approach-to-code-management/> 
 
 > <i>"If you’re responsible for your organization’s codebase architecture, then at some point you have to make some emphatic choices about how to manage growth in a scalable way..."</i>
-
-### Gordon Cassie
-
-October 30, 2021  
-[**Tutorial**] "Getting Started With Pants and Django (Part 1)"  
-<https://g-cassie.github.io/2021/10/30/django-pants-tutorial-pt1.html>
 
 ### Semaphore Blog
 
