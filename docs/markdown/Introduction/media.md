@@ -4,8 +4,71 @@ slug: "media"
 excerpt: "Learn more about Pants and related topics from these talks, posts and podcasts featuring Pants contributors and users."
 hidden: false
 createdAt: "2021-04-18T17:27:18.361Z"
-updatedAt: "2022-09-08T22:02:38.457Z"
+updatedAt: "2023-01-04T22:02:38.457Z"
 ---
+
+## Case Studies
+
+### Tweag
+
+January 3, 2023
+"From adopting Pants, to generalizing our CI to multiple Python versions" <https://blog.pantsbuild.org/tweag-case-study/>
+
+> Describes why and how the maintainers of Bazel's Haskell rules chose to used Pants for a client's Python monorepo.
+
+### Oxbotica
+
+November 4, 2022
+"Introducing Pants to Oxbotica"
+
+> Self-driving vehicle company's successful journey to adopting Pants locally and in CI.
+
+
+### Coinbase
+
+September 1, 2022  
+"Part 1: Building a Python ecosystem for efficient and reliable development"  
+<https://blog.coinbase.com/building-a-python-ecosystem-for-efficient-and-reliable-development-d986c97a94a0>
+
+> Describes how the company developed an efficient, reliable Python ecosystem using Pants, and solved the challenge of managing Python applications at a large scale at Coinbase.
+
+
+October 27, 2022
+"Part 2: Building a Python ecosystem for efficient and reliable development" <https://www.coinbase.com/blog/part-2-building-a-python-ecosystem-for-efficient-and-reliable-development>
+
+> Explains the technical details of the continuous integration/continuous delivery (CI/CD) infrastructure and dependency management of the company's Python ecosystem.
+
+### IBM Developer Blog
+
+August 24, 2022  
+"Incrementally migrating a Python monorepo from Bazel to Pants"  
+<https://developer.ibm.com/blogs/case-study-incrementally-migrating-a-python-monorepo-from-bazel-to-pants/>  
+
+> Watson Orders is an IBM Silicon Valley based technology development group targeting the development of world-class conversational AI. This posts walks through the process of migrating off Bazel, where they maintained 19,000 lines of BUILD file metadata, to Pants where that was slashed to 2,400 lines thanks to [dependency inference](doc:/how-does-pants-work#dependency-inference). CI build time for PRs dropped from 10-12 minutes with Bazel to under 4 minutes with Pants.
+
+### Astranis Space Technologies
+
+August 12, 2022  
+"Astranis Case Study: Wrangling Python In a Monorepo"
+<https://blog.pantsbuild.org/astranis-case-study-wrangling-python-in-a-monorepo/>
+
+> <i>"...We found it incredibly easy to hook in our existing remote caching systems to Pants, and added other nice features like running tailor in a check-only mode to highlight any inconsistencies in our repo. As a side benefit, Pants has helped us gain better insight into our repository by being able to easily scan for and report the transitive dependencies of modules. Having that insight has helped us plan out how to minimize the coupling of our modules..."</i>
+
+### Twitter Engineering
+
+December 31, 2021  
+"Advancing Jupyter Notebooks at Twitter - Part 1"  
+<https://blog.twitter.com/engineering/en_us/topics/infrastructure/2021/advancing-jupyter-notebooks-at-twitter---part-1--a-first-class-d>  
+
+> About the intersection of Twitter data science, monorepos, Pants, Pex, and the [pants-jupyter-plugin](https://github.com/pantsbuild/pants-jupyter-plugin).
+
+### iManage
+
+October 2, 2021  
+"Putting Pants On: One Thing We Did Right After 5 Years with Django"  
+<https://g-cassie.github.io/2021/10/02/django-pants.html>
+
+
 ## Posts & Articles
 
 ### Doctrine.fr Engineering blog
@@ -15,30 +78,6 @@ Nov 25, 2022
 <https://medium.com/doctrine/industrialized-python-code-with-pylint-plugins-in-pants-321d9cbad07a>
 
 > What if you needed to put strict code convention rules through a linter and apply them with the help of Pants?
-
-### Coinbase Blog
-
-September 1, 2022  
-[**Case Study**] "Building a Python ecosystem for efficient and reliable development"  
-<https://blog.coinbase.com/building-a-python-ecosystem-for-efficient-and-reliable-development-d986c97a94a0>
-
-> Part 1 of 2. Describes how the company developed an efficient, reliable Python ecosystem using Pants, and solved the challenge of managing Python applications at a large scale at Coinbase.
-
-### IBM Developer Blog
-
-August 24, 2022  
-[**Case Study**] "Incrementally migrating a Python monorepo from Bazel to Pants"  
-<https://developer.ibm.com/blogs/case-study-incrementally-migrating-a-python-monorepo-from-bazel-to-pants/>  
-
-> Watson Orders is an IBM Silicon Valley based technology development group targeting the development of world-class conversational AI. This posts walks through the process of migrating off Bazel, where they maintained 19,000 lines of BUILD file metadata, to Pants where that was slashed to 2,400 lines thanks to [dependency inference](doc:/how-does-pants-work#dependency-inference). CI build time for PRs dropped from 10-12 minutes with Bazel to under 4 minutes with Pants.
-
-### Astranis Space Technologies
-
-August 12, 2022  
-[**Case Study**] "Astranis Case Study: Wrangling Python In a Monorepo"
-<https://blog.pantsbuild.org/astranis-case-study-wrangling-python-in-a-monorepo/>
-
-> <i>"...We found it incredibly easy to hook in our existing remote caching systems to Pants, and added other nice features like running tailor in a check-only mode to highlight any inconsistencies in our repo. As a side benefit, Pants has helped us gain better insight into our repository by being able to easily scan for and report the transitive dependencies of modules. Having that insight has helped us plan out how to minimize the coupling of our modules..."</i>
 
 ### Dev.to
 
@@ -70,23 +109,11 @@ January 18, 2022
 
 > <i>"If you’re responsible for your organization’s codebase architecture, then at some point you have to make some emphatic choices about how to manage growth in a scalable way..."</i>
 
-### Twitter Engineering
-
-December 31, 2021  
-[**Case Study**] "Advancing Jupyter Notebooks at Twitter - Part 1"  
-<https://blog.twitter.com/engineering/en_us/topics/infrastructure/2021/advancing-jupyter-notebooks-at-twitter---part-1--a-first-class-d>  
-
-> About the intersection of Twitter data science, monorepos, Pants, Pex, and the [pants-jupyter-plugin](https://github.com/pantsbuild/pants-jupyter-plugin).
-
 ### Gordon Cassie
 
 October 30, 2021  
 [**Tutorial**] "Getting Started With Pants and Django (Part 1)"  
 <https://g-cassie.github.io/2021/10/30/django-pants-tutorial-pt1.html>
-
-October 2, 2021  
-[**Case Study**] "Putting Pants On: One Thing We Did Right After 5 Years with Django"  
-<https://g-cassie.github.io/2021/10/02/django-pants.html>
 
 ### Semaphore Blog
 
