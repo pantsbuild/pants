@@ -24,10 +24,10 @@ from pants.backend.shell.target_types import (
     ShellCommandOutputDirectoriesField,
     ShellCommandOutputFilesField,
     ShellCommandOutputsField,
-    ShellCommandWorkdirField,
     ShellCommandSourcesField,
     ShellCommandTimeoutField,
     ShellCommandToolsField,
+    ShellCommandWorkdirField,
 )
 from pants.backend.shell.util_rules.builtin import BASH_BUILTIN_COMMANDS
 from pants.base.deprecated import warn_or_error
@@ -91,7 +91,7 @@ class GenerateFilesFromRunInSandboxRequest(GenerateSourcesRequest):
 class ShellCommandProcessRequest:
     description: str
     interactive: bool
-    working_directory: str
+    working_directory: str | None
     command: str
     timeout: int | None
     tools: tuple[str, ...]
@@ -114,6 +114,9 @@ async def _prepare_process_request_from_target(shell_command: Target) -> ShellCo
 
     interactive = shell_command.has_field(ShellCommandIsInteractiveField)
     working_directory = shell_command[ShellCommandWorkdirField].value
+
+    if interactive and working_directory is None:
+        working_directory = "."
 
     command = shell_command[ShellCommandCommandField].value
     if not command:
@@ -456,8 +459,9 @@ async def prepare_shell_command_process(
     input_digest = await Get(Digest, MergeDigests([shell_command.input_digest, work_dir]))
 
     if interactive:
+        _working_directory = working_directory or "."
         relpath = os.path.relpath(
-            working_directory or ".", start="/" if os.path.isabs(working_directory) else "."
+            _working_directory or ".", start="/" if os.path.isabs(_working_directory) else "."
         )
         boot_script = f"cd {shlex.quote(relpath)}; " if relpath != "." else ""
     else:

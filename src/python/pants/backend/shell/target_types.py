@@ -419,7 +419,7 @@ class ShellCommandLogOutputField(BoolField):
 
 class ShellCommandWorkdirField(StringField):
     alias = "workdir"
-    default = "."
+    default = None
     help = "Sets the current working directory of the command, relative to the project root."
 
 
