@@ -763,7 +763,7 @@ def build_wheels_job(platform: Platform, python_versions: list[str]) -> Jobs:
 def build_wheels_jobs() -> Jobs:
     return {
         **build_wheels_job(Platform.LINUX_X86_64, ALL_PYTHON_VERSIONS),
-        # **build_wheels_job(Platform.LINUX_ARM64, ALL_PYTHON_VERSIONS),
+        **build_wheels_job(Platform.LINUX_ARM64, ALL_PYTHON_VERSIONS),
         **build_wheels_job(Platform.MACOS11_X86_64, ALL_PYTHON_VERSIONS),
         **build_wheels_job(Platform.MACOS10_15_X86_64, ALL_PYTHON_VERSIONS),
         **build_wheels_job(Platform.MACOS11_ARM64, [PYTHON39_VERSION]),
@@ -781,7 +781,7 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
         },
     }
     jobs.update(**linux_x86_64_test_jobs(python_versions))
-    # jobs.update(**linux_arm64_test_jobs(python_versions))
+    jobs.update(**linux_arm64_test_jobs(python_versions))
     jobs.update(**macos11_x86_64_test_jobs(python_versions))
     if not cron:
         jobs.update(**build_wheels_jobs())
