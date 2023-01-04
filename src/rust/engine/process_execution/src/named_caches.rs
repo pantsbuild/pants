@@ -87,7 +87,7 @@ impl NamedCaches {
   /// An iterator over platform properties that should be added for the given named caches, and the
   /// given named cache namespace value.
   ///
-  /// See https://docs.google.com/document/d/1n_MVVGjrkTKTPKHqRPlyfFzQyx2QioclMG_Q3DMUgYk/edit#.
+  /// See <https://docs.google.com/document/d/1n_MVVGjrkTKTPKHqRPlyfFzQyx2QioclMG_Q3DMUgYk/edit#>.
   ///
   pub fn platform_properties<'a>(
     caches: &'a BTreeMap<CacheName, RelativePath>,

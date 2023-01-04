@@ -79,7 +79,7 @@ const MAX_LINK_DEPTH: u8 = 64;
 
 type LinkDepth = u8;
 
-/// Follows the unix XDB base spec: http://standards.freedesktop.org/basedir-spec/latest/index.html.
+/// Follows the unix XDB base spec: <http://standards.freedesktop.org/basedir-spec/latest/index.html>.
 pub fn default_cache_path() -> PathBuf {
   let cache_path = std::env::var(XDG_CACHE_HOME)
     .ok()

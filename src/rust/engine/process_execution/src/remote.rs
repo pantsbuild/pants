@@ -90,7 +90,7 @@ pub enum ExecutionError {
 }
 
 /// Implementation of CommandRunner that runs a command via the Bazel Remote Execution API
-/// (https://docs.google.com/document/d/1AaGk7fOPByEvpAbqeXIyE8HX_A3_axxNnvroblTZ_6s/edit).
+/// (<https://docs.google.com/document/d/1AaGk7fOPByEvpAbqeXIyE8HX_A3_axxNnvroblTZ_6s/edit>).
 ///
 /// Results are streamed from the output stream of the Execute function (and possibly the
 /// WaitExecution function if `CommandRunner` needs to reconnect).
