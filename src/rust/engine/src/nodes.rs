@@ -17,7 +17,7 @@ use futures::future::{self, BoxFuture, FutureExt, TryFutureExt};
 use grpc_util::prost::MessageExt;
 use internment::Intern;
 use protos::gen::pants::cache::{CacheKey, CacheKeyType, ObservedUrl};
-use pyo3::prelude::{Py, PyAny, Python};
+use pyo3::prelude::{Py, PyAny, PyErr, Python};
 use pyo3::IntoPy;
 use url::Url;
 
@@ -1127,7 +1127,7 @@ impl Task {
 
   ///
   /// Given a python generator Value, loop to request the generator's dependencies until
-  /// it completes with a result Value.
+  /// it completes with a result Value or fails with an error.
   ///
   async fn generate(
     context: &Context,
@@ -1137,22 +1137,40 @@ impl Task {
     generator: Value,
   ) -> NodeResult<(Value, TypeId)> {
     let mut input: Option<Value> = None;
+    let mut err: Option<PyErr> = None;
     loop {
       let context = context.clone();
       let params = params.clone();
-      let response = Python::with_gil(|py| {
-        let input = input.unwrap_or_else(|| Value::from(py.None()));
-        externs::generator_send(py, &generator, &input)
-      })?;
+      let response = Python::with_gil(|py| externs::generator_send(py, &generator, input, err))?;
       match response {
         externs::GeneratorResponse::Get(get) => {
-          let values = Self::gen_get(&context, workunit, &params, entry, vec![get]).await?;
-          input = Some(values.into_iter().next().unwrap());
+          let result = Self::gen_get(&context, workunit, &params, entry, vec![get]).await;
+          match result {
+            Ok(values) => {
+              input = Some(values.into_iter().next().unwrap());
+              err = None;
+            }
+            Err(throw @ Failure::Throw { .. }) => {
+              input = None;
+              err = Some(PyErr::from(throw));
+            }
+            Err(failure) => break Err(failure),
+          }
         }
         externs::GeneratorResponse::GetMulti(gets) => {
-          let values = Self::gen_get(&context, workunit, &params, entry, gets).await?;
-          let gil = Python::acquire_gil();
-          input = Some(externs::store_tuple(gil.python(), values));
+          let result = Self::gen_get(&context, workunit, &params, entry, gets).await;
+          match result {
+            Ok(values) => {
+              let gil = Python::acquire_gil();
+              input = Some(externs::store_tuple(gil.python(), values));
+              err = None;
+            }
+            Err(throw @ Failure::Throw { .. }) => {
+              input = None;
+              err = Some(PyErr::from(throw));
+            }
+            Err(failure) => break Err(failure),
+          }
         }
         externs::GeneratorResponse::Break(val, type_id) => {
           break Ok((val, type_id));
@@ -1197,7 +1215,7 @@ impl Task {
               let val = Value::new(res.into_py(py));
               (val, type_id)
             })
-            .map_err(Failure::from_py_err)
+            .map_err(Failure::from)
         })
       })
       .await?;
@@ -1214,10 +1232,13 @@ impl Task {
     }
 
     if result_type != self.task.product {
-      return Err(throw(format!(
-        "{:?} returned a result value that did not satisfy its constraints: {:?}",
-        self.task.func, result_val
-      )));
+      return Err(
+        externs::IncorrectProductError::new_err(format!(
+          "{:?} returned a result value that did not satisfy its constraints: {:?}",
+          self.task.func, result_val
+        ))
+        .into(),
+      );
     }
 
     if self.task.engine_aware_return_type {

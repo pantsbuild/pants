@@ -350,7 +350,7 @@ fn download_file_to_digest(
   mut args: Vec<Value>,
 ) -> BoxFuture<'static, NodeResult<Value>> {
   async move {
-    let key = Key::from_value(args.pop().unwrap()).map_err(Failure::from_py_err)?;
+    let key = Key::from_value(args.pop().unwrap()).map_err(Failure::from)?;
     let snapshot = context.get(DownloadedFile(key)).await?;
     let gil = Python::acquire_gil();
     let value = Snapshot::store_directory_digest(gil.python(), snapshot.into())?;
