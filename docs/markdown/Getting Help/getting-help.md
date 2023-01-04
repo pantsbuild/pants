@@ -27,7 +27,7 @@ We encourage you to introduce yourself in the `#welcome` channel!
 Blog
 ----
 
-Read [blog.pantsbuild.org](https://blog.pantsbuild.org/) to find elaboration on new features, tutorials, reveals of upcoming features, insights into what we're thinking about and working on, and behind-the-scenes interviews with Pants users and maintainers.
+Read [blog.pantsbuild.org](https://blog.pantsbuild.org/) to find elaboration on new features, tutorials, reveals of upcoming features, insights into what we're thinking about and working on, case studies, and behind-the-scenes interviews with Pants users and maintainers.
 
 Newsletter
 ----------
