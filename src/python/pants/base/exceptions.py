@@ -44,6 +44,13 @@ class MappingError(Exception):
 class NativeEngineFailure(Exception):
     """A wrapper around a `Failure` instance.
 
+    The failure instance being wrapped can come from an exception raised in a rule. When this
+    failure is returned to a requesting rule it is first unwrapped so the original exception will be
+    presented in the rule, thus the `NativeEngineFailure` exception will not be seen in rule code.
+
+    This is different from the other `EngineError` based exceptions which doesn't originate from
+    rule code.
+
     TODO: This type is defined in Python because pyo3 doesn't support declaring Exceptions with
     additional fields. See https://github.com/PyO3/pyo3/issues/295
     """

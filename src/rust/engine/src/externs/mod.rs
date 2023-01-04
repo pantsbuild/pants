@@ -57,11 +57,11 @@ pub struct PyFailure(pub Failure);
 
 #[pymethods]
 impl PyFailure {
-  fn get_error(&self, py: Python) -> PyObject {
+  fn get_error(&self, py: Python) -> PyErr {
     match &self.0 {
-      Failure::Throw { val, .. } => val.to_object(py),
+      Failure::Throw { val, .. } => val.into_py(py),
       f @ (Failure::Invalidated | Failure::MissingDigest { .. }) => {
-        EngineError::new_err(format!("{}", f)).into_py(py)
+        EngineError::new_err(format!("{}", f))
       }
     }
   }
@@ -266,16 +266,17 @@ pub fn generator_send(
 ) -> Result<GeneratorResponse, Failure> {
   let selectors = py.import("pants.engine.internals.selectors").unwrap();
   let native_engine_generator_send = selectors.getattr("native_engine_generator_send").unwrap();
-  let py_arg = match arg {
-    Some(arg) => arg.to_object(py),
-    None => py.None(),
-  };
-  let py_err = match err {
-    Some(err) => err.into_py(py),
-    None => py.None(),
+  let py_arg = match (arg, err) {
+    (Some(arg), None) => arg.to_object(py),
+    (None, Some(err)) => err.into_py(py),
+    (None, None) => py.None(),
+    (Some(arg), Some(err)) => panic!(
+      "generator_send got both value and error: arg={:?}, err={:?}",
+      arg, err
+    ),
   };
   let response = native_engine_generator_send
-    .call1((generator.to_object(py), py_arg, py_err))
+    .call1((generator.to_object(py), py_arg))
     .map_err(|py_err| Failure::from_py_err_with_gil(py, py_err))?;
 
   if let Ok(b) = response.extract::<PyRef<PyGeneratorResponseBreak>>() {

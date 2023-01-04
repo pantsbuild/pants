@@ -9,7 +9,7 @@ use std::{fmt, hash};
 use deepsize::{known_deep_size, DeepSizeOf};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyType};
-use pyo3::{FromPyObject, ToPyObject};
+use pyo3::{FromPyObject, IntoPy, ToPyObject};
 use smallvec::SmallVec;
 
 use hashing::Digest;
@@ -382,6 +382,12 @@ impl From<PyErr> for Value {
     let gil = Python::acquire_gil();
     let py = gil.python();
     Value::new(py_err.into_py(py))
+  }
+}
+
+impl IntoPy<PyErr> for &Value {
+  fn into_py(self, py: Python) -> PyErr {
+    PyErr::from_value((*self.0).as_ref(py))
   }
 }
 

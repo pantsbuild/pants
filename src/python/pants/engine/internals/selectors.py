@@ -597,9 +597,19 @@ class Params:
 # - coroutines may await on any of `Get`, `MultiGet`, `Effect` or other coroutines decorated with `@rule_helper`.
 # - we will send back a single `Any` or a tuple of `Any` to the coroutine, depending upon the variant of `Get`.
 # - a coroutine will eventually return a single `Any`.
-RuleSend = Union[Any, Tuple[Any, ...]]
-RuleYield = Union[Get, Tuple[Get, ...]]
-RuleCoroutine = Coroutine[RuleYield, RuleSend, Any]
+RuleInput = Union[
+    # The value used to "start" a Generator.
+    None,
+    # A single value requested by a Get.
+    Any,
+    # Multiple values requested by a MultiGet.
+    Tuple[Any, ...],
+    # An exception to be raised in the Generator.
+    NativeEngineFailure,
+]
+RuleOutput = Union[Get, Tuple[Get, ...]]
+RuleResult = Any
+RuleCoroutine = Coroutine[RuleOutput, RuleInput, RuleResult]
 NativeEngineGeneratorResponse = Union[
     PyGeneratorResponseGet,
     PyGeneratorResponseGetMulti,
@@ -608,15 +618,16 @@ NativeEngineGeneratorResponse = Union[
 
 
 def native_engine_generator_send(
-    rule: RuleCoroutine, arg: RuleSend | None, err: NativeEngineFailure | None
+    rule: RuleCoroutine, arg: RuleInput
 ) -> NativeEngineGeneratorResponse:
+    err = arg if isinstance(arg, NativeEngineFailure) else None
     throw = err and err.failure.get_error()
     try:
         res = rule.send(arg) if err is None else rule.throw(throw or err)
     except StopIteration as e:
         return PyGeneratorResponseBreak(e.value)
     except Exception as e:
-        if e.__cause__ is throw:
+        if throw and e.__cause__ is throw:
             # Preserve the engine traceback by using the wrapped failure error as cause. The cause
             # will be swapped back again in
             # `src/rust/engine/src/python.rs:Failure::from_py_err_with_gil()` to preserve the python

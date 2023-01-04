@@ -480,8 +480,10 @@ class PyThreadLocals:
 class PollTimeout(Exception):
     pass
 
+# Prefer to import these exception types from `pants.base.exceptions`
+
 class EngineError(Exception):
-    pass
+    """Base exception used for errors originating from the native engine."""
 
 class IntrinsicError(EngineError):
     """Exceptions raised for failures within intrinsic methods implemented in Rust."""

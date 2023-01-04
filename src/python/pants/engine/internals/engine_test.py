@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import itertools
-import re
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -12,6 +11,7 @@ from typing import List, Optional, Tuple
 import pytest
 
 from pants.backend.python.target_types import PythonSourcesGeneratorTarget
+from pants.base.exceptions import IntrinsicError
 from pants.base.specs import Specs
 from pants.base.specs_parser import SpecsParser
 from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
@@ -42,8 +42,9 @@ from pants.engine.streaming_workunit_handler import (
 from pants.engine.unions import UnionRule, union
 from pants.goal.run_tracker import RunTracker
 from pants.testutil.option_util import create_options_bootstrapper
-from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error
 from pants.util.logging import LogLevel
+from pants.util.strutil import softwrap
 
 
 class A:
@@ -1020,6 +1021,10 @@ class MergedOutput:
     digest: Digest
 
 
+class MergeErr(Exception):
+    pass
+
+
 @rule
 async def catch_merge_digests_error(file_input: FileInput) -> MergedOutput:
     # Create two separate digests writing different contents to the same file path.
@@ -1028,8 +1033,8 @@ async def catch_merge_digests_error(file_input: FileInput) -> MergedOutput:
     digests = await MultiGet(Get(Digest, CreateDigest, input_1), Get(Digest, CreateDigest, input_2))
     try:
         merged = await Get(Digest, MergeDigests(digests))
-    except Exception as e:
-        raise Exception(f"error merging digests for input {file_input}: {e}")
+    except IntrinsicError as e:
+        raise MergeErr(f"error merging digests for input {file_input}: {e}")
     return MergedOutput(merged)
 
 
@@ -1037,6 +1042,11 @@ def test_catch_intrinsic_error() -> None:
     rule_runner = RuleRunner(
         rules=[catch_merge_digests_error, QueryRule(MergedOutput, (FileInput,))]
     )
-    msg = re.escape("error merging digests for input FileInput(filename='some-file.txt')")
-    with pytest.raises(ExecutionError, match=msg):
+    msg = softwrap(
+        """\
+        error merging digests for input FileInput(filename='some-file.txt'): Can only merge
+        Directories with no duplicates, but found 2 duplicate entries in :
+        """
+    )
+    with engine_error(MergeErr, contains=msg):
         rule_runner.request(MergedOutput, (FileInput("some-file.txt"),))
