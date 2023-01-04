@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import TYPE_CHECKING, Iterable, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Iterable, Mapping, Optional, Tuple, Union
 
 # Note: several of these types are re-exported as the public API of `engine/fs.py`.
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior as GlobMatchErrorBehavior
@@ -23,6 +23,7 @@ from pants.engine.internals.native_engine import MergeDigests as MergeDigests
 from pants.engine.internals.native_engine import RemovePrefix as RemovePrefix
 from pants.engine.internals.native_engine import Snapshot as Snapshot
 from pants.engine.rules import QueryRule
+from pants.util.frozendict import FrozenDict
 from pants.util.meta import frozen_after_init
 
 if TYPE_CHECKING:
@@ -248,6 +249,34 @@ class DownloadFile:
     expected_digest: FileDigest
 
 
+@frozen_after_init
+@dataclass(unsafe_hash=True)
+class NativeDownloadFile:
+    """Retrieve the contents of a file via an HTTP GET request or directly for local file:// URLs.
+
+    This request is handled directly by the native engine without any additional coercion by plugins,
+    and therefore should only be used in cases where the URL is known to be publicly accessible.
+    Otherwise, callers should use `DownloadFile`.
+
+    The auth_headers are part of this nodes' cache key for memoization (changing a header invalidates
+    prior results) but are not part of the underlying cache key for the local/remote cache (changing
+    a header won't re-download a file if the file was previously downloaded).
+    """
+
+    url: str
+    expected_digest: FileDigest
+    # NB: This mapping can be of any arbitrary headers, but should be limited to those required for
+    # authorization.
+    auth_headers: FrozenDict[str, str]
+
+    def __init__(
+        self, url: str, expected_digest: FileDigest, auth_headers: Mapping[str, str] | None = None
+    ) -> None:
+        self.url = url
+        self.expected_digest = expected_digest
+        self.auth_headers = FrozenDict(auth_headers or {})
+
+
 @dataclass(frozen=True)
 class Workspace(SideEffecting):
     """A handle for operations that mutate the local filesystem."""
@@ -300,7 +329,7 @@ def rules():
         QueryRule(Digest, (PathGlobs,)),
         QueryRule(Digest, (AddPrefix,)),
         QueryRule(Digest, (RemovePrefix,)),
-        QueryRule(Digest, (DownloadFile,)),
+        QueryRule(Digest, (NativeDownloadFile,)),
         QueryRule(Digest, (MergeDigests,)),
         QueryRule(Digest, (DigestSubset,)),
         QueryRule(DigestContents, (Digest,)),

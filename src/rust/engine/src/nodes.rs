@@ -969,6 +969,7 @@ impl DownloadedFile {
     &self,
     core: Arc<Core>,
     url: Url,
+    auth_headers: BTreeMap<String, String>,
     digest: hashing::Digest,
   ) -> Result<store::Snapshot, String> {
     let file_name = url
@@ -986,6 +987,7 @@ impl DownloadedFile {
     // See if we have observed this URL and Digest before: if so, see whether we already have the
     // Digest fetched. The extra layer of indirection through the PersistentCache is to sanity
     // check that a Digest has ever been observed at the given URL.
+    // NB: The auth_headers are not part of the key.
     let url_key = Self::url_key(&url, digest);
     let have_observed_url = core.local_cache.load(&url_key).await?.is_some();
 
@@ -999,7 +1001,7 @@ impl DownloadedFile {
         .is_ok());
 
     if !usable_in_store {
-      downloads::download(core.clone(), url, file_name, digest).await?;
+      downloads::download(core.clone(), url, auth_headers, file_name, digest).await?;
       // The value was successfully fetched and matched the digest: record in the ObservedUrls
       // cache.
       core.local_cache.store(&url_key, Bytes::from("")).await?;
@@ -1008,19 +1010,21 @@ impl DownloadedFile {
   }
 
   async fn run_node(self, context: Context) -> NodeResult<store::Snapshot> {
-    let (url_str, expected_digest) = Python::with_gil(|py| {
+    let (url_str, expected_digest, auth_headers) = Python::with_gil(|py| {
       let py_download_file_val = self.0.to_value();
       let py_download_file = (*py_download_file_val).as_ref(py);
       let url_str: String = externs::getattr(py_download_file, "url").unwrap();
+      let auth_headers = externs::getattr_from_str_frozendict(py_download_file, "auth_headers");
       let py_file_digest: PyFileDigest =
         externs::getattr(py_download_file, "expected_digest").unwrap();
-      let res: NodeResult<(String, Digest)> = Ok((url_str, py_file_digest.0));
+      let res: NodeResult<(String, Digest, BTreeMap<String, String>)> =
+        Ok((url_str, py_file_digest.0, auth_headers));
       res
     })?;
     let url = Url::parse(&url_str)
       .map_err(|err| throw(format!("Error parsing URL {}: {}", url_str, err)))?;
     self
-      .load_or_download(context.core, url, expected_digest)
+      .load_or_download(context.core, url, auth_headers, expected_digest)
       .await
       .map_err(throw)
   }

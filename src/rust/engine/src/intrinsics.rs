@@ -48,6 +48,7 @@ pub struct Intrinsics {
   intrinsics: IndexMap<Intrinsic, IntrinsicFn>,
 }
 
+// NB: Keep in sync with `rules()` in `src/python/pants/engine/fs.py`.
 impl Intrinsics {
   pub fn new(types: &Types) -> Intrinsics {
     let mut intrinsics: IndexMap<Intrinsic, IntrinsicFn> = IndexMap::new();
@@ -64,7 +65,7 @@ impl Intrinsics {
       Box::new(path_globs_to_paths),
     );
     intrinsics.insert(
-      Intrinsic::new(types.directory_digest, types.download_file),
+      Intrinsic::new(types.directory_digest, types.native_download_file),
       Box::new(download_file_to_digest),
     );
     intrinsics.insert(
