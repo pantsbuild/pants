@@ -299,9 +299,9 @@ impl RemoteStore {
 ///
 /// Store keeps content on disk, and can optionally delegate to backfill its on-disk storage by
 /// fetching files from a remote server which implements the gRPC bytestream interface
-/// (see https://github.com/googleapis/googleapis/blob/master/google/bytestream/bytestream.proto)
+/// (see <https://github.com/googleapis/googleapis/blob/master/google/bytestream/bytestream.proto>)
 /// as specified by the gRPC remote execution interface (see
-/// https://github.com/googleapis/googleapis/blob/master/google/devtools/remoteexecution/v1test/)
+/// <https://github.com/googleapis/googleapis/blob/master/google/devtools/remoteexecution/v1test/>)
 ///
 /// It can also write back to a remote gRPC server, but will only do so when explicitly instructed
 /// to do so.
@@ -1061,7 +1061,7 @@ impl Store {
   /// the Directory protos that comprise the output directories from a remote execution
   /// reported by an ActionResult.
   ///
-  /// Returns an Option<DirectoryDigest> representing the `root` of the Tree (if it in fact
+  /// Returns an `Option<DirectoryDigest>` representing the `root` of the Tree (if it in fact
   /// exists in the remote CAS).
   ///
   /// This method requires that this Store be configured with a remote CAS, and will return an
