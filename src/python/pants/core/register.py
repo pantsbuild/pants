@@ -34,6 +34,7 @@ from pants.core.target_types import (
     RelocatedFiles,
     ResourcesGeneratorTarget,
     ResourceTarget,
+    SubsystemTarget,
     http_source,
     per_platform,
 )
@@ -45,6 +46,7 @@ from pants.core.util_rules import (
     source_files,
     stripped_source_files,
     subprocess_environment,
+    synthetic_targets,
     system_binaries,
 )
 from pants.core.util_rules.environments import (
@@ -88,6 +90,7 @@ def rules():
         *stats_aggregator.rules(),
         *stripped_source_files.rules(),
         *subprocess_environment.rules(),
+        *synthetic_targets.rules(),
         *system_binaries.rules(),
         *target_type_rules(),
     ]
@@ -107,6 +110,7 @@ def target_types():
         RemoteEnvironmentTarget,
         ResourcesGeneratorTarget,
         ResourceTarget,
+        SubsystemTarget,
     ]
 
 
