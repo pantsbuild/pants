@@ -100,6 +100,69 @@ October 30, 2021
 <https://g-cassie.github.io/2021/10/30/django-pants-tutorial-pt1.html>
 
 
+## Podcasts
+
+### The Real Python Podcast
+
+Episode 137: Start Using a Build System & Continuous Integration in Python
+December 16, 2022
+
+> What advantages can a build system provide for a Python developer? What new skills are required when working with a team of developers? Pants core maintainer and co-author Benjy Weinberger discusses Pants and getting started with continuous integration (CI).
+
+### Happy Path Programming Podcast
+
+Episode 72: Pants Makes Developers Happier and More Productive, with Benjy Weinberger
+December 16, 2022
+<https://anchor.fm/happypathprogramming/episodes/72-Pants-Makes-Developers-Happier--More-Productive-with-Benjy-Weinberger-e1sc1uj>
+
+
+### Humans of Devops
+
+Season 3, Episode 69: The Curse of Knowledge  
+March 7, 2022  
+<https://audioboom.com/posts/8043212-the-curse-of-knowledge-with-eric-arellano-and-nick-grisafi>  
+
+> Pants core maintainer Eric Arellano and Pants contributor Nick Grisafi discuss what Pants team has learned from philosophical concepts such as The Curse of Knowledge, Beginners Mind, and The Power of the Outsider.
+
+### Podcast.\_\_init\_\_
+
+Episode 352: Simplify And Scale Your Software Development Cycles By Putting On Pants (Build Tool)  
+February 14, 2022  
+<https://www.pythonpodcast.com/pants-software-development-lifecycle-tool-episode-352/>  
+
+> Pants core maintainers Stu Hood, Eric Arellano, and Andreas Stenius guest.
+
+### Software Engineering Daily
+
+Build Tools with Benjy Weinberger  
+January 17, 2022  
+<https://softwareengineeringdaily.com/2022/01/17/build-tools-with-benjy-weinberger/>
+
+### Semaphore Uncut
+
+Episode 33: Monorepo and Building at Scale  
+April 13, 2021  
+<https://semaphoreci.com/blog/monorepo-building-at-scale>  
+
+> Pants core maintainer Benjy Weinberger guests.
+
+### Angelneers
+
+Episode 28: Shifting Build Execution Paradigm  
+February 12, 2021  
+<https://angelneers.com/podcast/28-shifting-build-execution-paradigm/>  
+
+> Pants core maintainer Benjy Weinberger guests.
+
+### Podcast.\_\_init\_\_
+
+Episode 290: Pants Has Got Your Python Monorepo Covered  
+November 23, 2020  
+<https://www.pythonpodcast.com/pants-monorepo-build-tool-episode-290/>  
+
+> Pants core maintainers Stu Hood and Eric Arellano guest.
+
+
 ## Posts & Articles
 
 ### Dev.to
@@ -224,68 +287,6 @@ May 13, 2020
 <https://www.youtube.com/watch?v=mLyW6oAExW0>  
 <https://speakerdeck.com/benjyw/how-the-pants-build-system-leverages-python-3-features>
 
-
-## Podcasts
-
-### The Real Python Podcast
-
-Episode 137: Start Using a Build System & Continuous Integration in Python
-December 16, 2022
-
-> What advantages can a build system provide for a Python developer? What new skills are required when working with a team of developers? Pants core maintainer and co-author Benjy Weinberger discusses Pants and getting started with continuous integration (CI).
-
-### Happy Path Programming Podcast
-
-Episode 72: Pants Makes Developers Happier and More Productive, with Benjy Weinberger
-December 16, 2022
-<https://anchor.fm/happypathprogramming/episodes/72-Pants-Makes-Developers-Happier--More-Productive-with-Benjy-Weinberger-e1sc1uj>
-
-
-### Humans of Devops
-
-Season 3, Episode 69: The Curse of Knowledge  
-March 7, 2022  
-<https://audioboom.com/posts/8043212-the-curse-of-knowledge-with-eric-arellano-and-nick-grisafi>  
-
-> Pants core maintainer Eric Arellano and Pants contributor Nick Grisafi discuss what Pants team has learned from philosophical concepts such as The Curse of Knowledge, Beginners Mind, and The Power of the Outsider.
-
-### Podcast.\_\_init\_\_
-
-Episode 352: Simplify And Scale Your Software Development Cycles By Putting On Pants (Build Tool)  
-February 14, 2022  
-<https://www.pythonpodcast.com/pants-software-development-lifecycle-tool-episode-352/>  
-
-> Pants core maintainers Stu Hood, Eric Arellano, and Andreas Stenius guest.
-
-### Software Engineering Daily
-
-Build Tools with Benjy Weinberger  
-January 17, 2022  
-<https://softwareengineeringdaily.com/2022/01/17/build-tools-with-benjy-weinberger/>
-
-### Semaphore Uncut
-
-Episode 33: Monorepo and Building at Scale  
-April 13, 2021  
-<https://semaphoreci.com/blog/monorepo-building-at-scale>  
-
-> Pants core maintainer Benjy Weinberger guests.
-
-### Angelneers
-
-Episode 28: Shifting Build Execution Paradigm  
-February 12, 2021  
-<https://angelneers.com/podcast/28-shifting-build-execution-paradigm/>  
-
-> Pants core maintainer Benjy Weinberger guests.
-
-### Podcast.\_\_init\_\_
-
-Episode 290: Pants Has Got Your Python Monorepo Covered  
-November 23, 2020  
-<https://www.pythonpodcast.com/pants-monorepo-build-tool-episode-290/>  
-
-> Pants core maintainers Stu Hood and Eric Arellano guest.
 
 ## YouTube
 
