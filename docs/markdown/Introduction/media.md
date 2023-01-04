@@ -14,7 +14,7 @@ updatedAt: "2023-01-04T22:02:38.457Z"
 January 3, 2023
 "From adopting Pants, to generalizing our CI to multiple Python versions" <https://blog.pantsbuild.org/tweag-case-study/>
 
-> Describes why and how the maintainers of Bazel's Haskell rules chose to used Pants for a client's Python monorepo.
+> Describes why and how the maintainers of Bazel's Haskell rules chose to used Pants for a client's Python monorepo. Also covers some gotchas for newcomers.
 
 ### Oxbotica
 
