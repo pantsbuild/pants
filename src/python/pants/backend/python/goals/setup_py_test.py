@@ -55,6 +55,7 @@ from pants.backend.python.target_types import (
 )
 from pants.backend.python.util_rules import dists, python_sources
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
+from pants.base.exceptions import IntrinsicError
 from pants.core.goals.package import BuiltPackage
 from pants.core.target_types import FileTarget, ResourcesGeneratorTarget, ResourceTarget
 from pants.core.target_types import rules as core_target_types_rules
@@ -615,7 +616,7 @@ def test_generate_long_description_field_from_non_existing_file(
     assert_chroot_error(
         chroot_rule_runner,
         Address("src/python/foo", target_name="foo-dist"),
-        Exception,
+        IntrinsicError,
     )
 
 
