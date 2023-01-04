@@ -224,7 +224,22 @@ May 13, 2020
 <https://www.youtube.com/watch?v=mLyW6oAExW0>  
 <https://speakerdeck.com/benjyw/how-the-pants-build-system-leverages-python-3-features>
 
+
 ## Podcasts
+
+### The Real Python Podcast
+
+Episode 137: Start Using a Build System & Continuous Integration in Python
+December 16, 2022
+
+> What advantages can a build system provide for a Python developer? What new skills are required when working with a team of developers? Pants core maintainer and co-author Benjy Weinberger discusses Pants and getting started with continuous integration (CI).
+
+### Happy Path Programming Podcast
+
+Episode 72: Pants Makes Developers Happier and More Productive, with Benjy Weinberger
+December 16, 2022
+<https://anchor.fm/happypathprogramming/episodes/72-Pants-Makes-Developers-Happier--More-Productive-with-Benjy-Weinberger-e1sc1uj>
+
 
 ### Humans of Devops
 
