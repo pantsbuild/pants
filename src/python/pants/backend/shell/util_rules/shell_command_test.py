@@ -128,6 +128,7 @@ def test_sources_and_files(rule_runner: RuleRunner) -> None:
                   output_files=["message.txt"],
                   output_directories=["res"],
                   command="./script.sh",
+                  workdir=f"{build_file_dir()}",
                 )
 
                 files(
@@ -180,7 +181,7 @@ def test_quotes_command(rule_runner: RuleRunner) -> None:
     assert_shell_command_result(
         rule_runner,
         Address("src", target_name="quotes"),
-        expected_contents={"src/out.log": "foo bar\n"},
+        expected_contents={"out.log": "foo bar\n"},
     )
 
 
@@ -203,8 +204,50 @@ def test_chained_shell_commands(rule_runner: RuleRunner) -> None:
                   name="msg",
                   tools=["cp", "echo"],
                   output_files=["msg"],
+                  command="echo 'shell_command:b' >> msg",
+                  execution_dependencies=["src/a:msg"],
+                )
+                """
+            ),
+        }
+    )
+
+    assert_shell_command_result(
+        rule_runner,
+        Address("src/a", target_name="msg"),
+        expected_contents={"msg": "shell_command:a\n"},
+    )
+
+    assert_shell_command_result(
+        rule_runner,
+        Address("src/b", target_name="msg"),
+        expected_contents={"msg": "shell_command:a\nshell_command:b\n"},
+    )
+
+
+def test_chained_shell_commands_with_workdir(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/a/BUILD": dedent(
+                """\
+                experimental_shell_command(
+                  name="msg",
+                  tools=["echo"],
+                  output_files=["msg"],
+                  command="echo 'shell_command:a' > msg",
+                  workdir=f"{build_file_dir()}",
+                )
+                """
+            ),
+            "src/b/BUILD": dedent(
+                """\
+                experimental_shell_command(
+                  name="msg",
+                  tools=["cp", "echo"],
+                  output_files=["msg"],
                   command="cp ../a/msg . ; echo 'shell_command:b' >> msg",
                   execution_dependencies=["src/a:msg"],
+                  workdir=f"{build_file_dir()}",
                 )
                 """
             ),
@@ -308,14 +351,14 @@ def test_shell_command_masquerade_as_a_files_target(rule_runner: RuleRunner) -> 
         ],
     )
 
-    assert sources.files == ("src/contents.txt",)
+    assert sources.files == ("contents.txt",)
     assert sources.unrooted_files == sources.files
 
     contents = rule_runner.request(DigestContents, [sources.snapshot.digest])
     assert len(contents) == 1
 
     fc = contents[0]
-    assert fc.path == "src/contents.txt"
+    assert fc.path == "contents.txt"
     assert fc.content == b"contents\n"
 
 
@@ -342,7 +385,7 @@ def test_package_dependencies(caplog, rule_runner: RuleRunner) -> None:
 
                 experimental_shell_command(
                   name="test",
-                  command="ls .",
+                  command="ls src",
                   tools=["ls"],
                   log_output=True,
                   execution_dependencies=[":msg-archive"],
@@ -450,12 +493,12 @@ def test_execution_dependencies(caplog, rule_runner: RuleRunner) -> None:
     assert_shell_command_result(
         rule_runner,
         Address("src", target_name="expect_success_1"),
-        expected_contents={"src/output.txt": "message\nmessage\n"},
+        expected_contents={"output.txt": "message\nmessage\n"},
     )
     assert_shell_command_result(
         rule_runner,
         Address("src", target_name="expect_success_2"),
-        expected_contents={"src/output.txt": "message\nmessage\n"},
+        expected_contents={"output.txt": "message\nmessage\n"},
     )
 
 
@@ -496,7 +539,7 @@ def test_old_style_dependencies(caplog, rule_runner: RuleRunner) -> None:
     assert_shell_command_result(
         rule_runner,
         Address("src", target_name="expect_success"),
-        expected_contents={"src/output.txt": "message\nmessage\n"},
+        expected_contents={"output.txt": "message\nmessage\n"},
     )
 
 
@@ -617,6 +660,41 @@ def test_run_runnable_in_sandbox(rule_runner: RuleRunner) -> None:
                   name="run_fruitcake",
                   runnable=":fruitcake",
                   output_files=["fruitcake.txt"],
+                )
+                """
+            ),
+        }
+    )
+
+    assert_run_in_sandbox_result(
+        rule_runner,
+        Address("src", target_name="run_fruitcake"),
+        expected_contents={"fruitcake.txt": "fruitcake\n"},
+    )
+
+
+def test_run_runnable_in_sandbox_with_workdir(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/fruitcake.py": dedent(
+                """\
+                f = open("fruitcake.txt", "w")
+                f.write("fruitcake\\n")
+                f.close()
+                """
+            ),
+            "src/BUILD": dedent(
+                """\
+                python_source(
+                    source="fruitcake.py",
+                    name="fruitcake",
+                )
+
+                experimental_run_in_sandbox(
+                  name="run_fruitcake",
+                  runnable=":fruitcake",
+                  output_files=["fruitcake.txt"],
+                  workdir=f"{build_file_dir()}",
                 )
                 """
             ),

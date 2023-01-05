@@ -21,6 +21,7 @@ from pants.backend.shell.target_types import (
     ShellCommandExtraEnvVarsField,
     ShellCommandIsInteractiveField,
     ShellCommandLogOutputField,
+    ShellCommandOutputDependenciesField,
     ShellCommandOutputDirectoriesField,
     ShellCommandOutputFilesField,
     ShellCommandOutputsField,
@@ -149,6 +150,10 @@ async def _execution_environment_from_dependencies(shell_command: Target) -> Dig
         shell_command.get(ShellCommandExecutionDependenciesField).value is not None
     )
 
+    any_dependencies_defined = (
+        shell_command.get(ShellCommandOutputDependenciesField).value is not None
+    )
+
     # If we're specifying the `dependencies` as relevant to the execution environment, then include
     # this command as a root for the transitive dependency search for execution dependencies.
     maybe_this_target = (shell_command.address,) if not runtime_dependencies_defined else ()
@@ -160,7 +165,7 @@ async def _execution_environment_from_dependencies(shell_command: Target) -> Dig
             UnparsedAddressInputs,
             shell_command.get(ShellCommandExecutionDependenciesField).to_unparsed_address_inputs(),
         )
-    else:
+    elif any_dependencies_defined:
         runtime_dependencies = Addresses()
         warn_or_error(
             "2.17.0.dev0",
@@ -175,6 +180,8 @@ async def _execution_environment_from_dependencies(shell_command: Target) -> Dig
             ),
             print_warning=True,
         )
+    else:
+        runtime_dependencies = Addresses()
 
     transitive = await Get(
         TransitiveTargets,
@@ -238,6 +245,16 @@ async def prepare_process_request_from_target(
     return await Get(Process, ShellCommandProcessRequest, scpr)
 
 
+@rule_helper
+async def _output_snapshot_in_correct_directory(
+    output_digest: Digest, output_directory: str | None
+) -> Snapshot:
+    if output_directory:
+        return await Get(Snapshot, AddPrefix(output_digest, output_directory))
+    else:
+        return await Get(Snapshot, Digest, output_digest)
+
+
 class RunShellCommand(RunFieldSet):
     required_fields = (
         ShellCommandCommandField,
@@ -288,8 +305,9 @@ async def run_shell_command(
         if result.stderr:
             logger.warning(result.stderr.decode())
 
-    working_directory = shell_command.address.spec_path
-    output = await Get(Snapshot, AddPrefix(result.output_digest, working_directory))
+    working_directory = shell_command[ShellCommandWorkdirField].value
+    output = await _output_snapshot_in_correct_directory(result.output_digest, working_directory)
+
     return GeneratedSources(output)
 
 
@@ -371,8 +389,9 @@ async def run_in_sandbox_request(
         if result.stderr:
             logger.warning(result.stderr.decode())
 
-    working_directory = shell_command.address.spec_path
-    output = await Get(Snapshot, AddPrefix(result.output_digest, working_directory))
+    working_directory = shell_command[ShellCommandWorkdirField].value
+    output = await _output_snapshot_in_correct_directory(result.output_digest, working_directory)
+
     return GeneratedSources(output)
 
 

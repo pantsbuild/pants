@@ -420,7 +420,11 @@ class ShellCommandLogOutputField(BoolField):
 class ShellCommandWorkdirField(StringField):
     alias = "workdir"
     default = None
-    help = "Sets the current working directory of the command, relative to the project root."
+    help = (
+        "Sets the current working directory of the command, relative to the project root. If not "
+        "set, use the project root. To use the location of the `BUILD` file, use "
+        '`f"{build_file_dir()}"`.'
+    )
 
 
 class ShellCommandTestDependenciesField(ShellCommandExecutionDependenciesField):
