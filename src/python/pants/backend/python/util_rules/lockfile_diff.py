@@ -6,9 +6,14 @@ from __future__ import annotations
 import itertools
 import logging
 from dataclasses import dataclass
-from typing import Any, Mapping
+from typing import TYPE_CHECKING, Any, Mapping
 
-from packaging.version import LegacyVersion, Version, parse
+from packaging.version import parse
+
+if TYPE_CHECKING:
+    # We seem to get a version of `packaging` that doesn't have `LegacyVersion` when running
+    # pytest..
+    from packaging.version import LegacyVersion, Version
 
 from pants.backend.python.util_rules.pex_requirements import (
     LoadedLockfile,
@@ -16,6 +21,7 @@ from pants.backend.python.util_rules.pex_requirements import (
     Lockfile,
     LockfileContent,
 )
+from pants.base.exceptions import EngineError
 from pants.core.goals.generate_lockfiles import (
     LockfileGenerateDiff,
     LockfileGenerateDiffResult,
@@ -23,7 +29,7 @@ from pants.core.goals.generate_lockfiles import (
     RequirementName,
 )
 from pants.engine.fs import Digest, DigestContents
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.unions import UnionRule
 
 logger = logging.getLogger(__name__)
@@ -35,7 +41,7 @@ class PythonLockfileGenerateDiff(LockfileGenerateDiff):
 
 @dataclass(frozen=True, order=True)
 class PythonRequirementVersion:
-    _parsed: Version | LegacyVersion
+    _parsed: LegacyVersion | Version
 
     @classmethod
     def parse(cls, version: str) -> PythonRequirementVersion:
@@ -78,8 +84,9 @@ async def generate_python_lockfile_diff(
 ) -> LockfileGenerateDiffResult:
     lockfile = request.lockfile
     new_content = await Get(DigestContents, Digest, lockfile.digest)
-    old, new = await MultiGet(
-        Get(
+    try:
+        # May fail in case this file doesn't exist yet.
+        old = await Get(
             LoadedLockfile,
             LoadedLockfileRequest(
                 Lockfile(
@@ -89,23 +96,27 @@ async def generate_python_lockfile_diff(
                 ),
                 parse_lockfile=True,
             ),
-        ),
-        Get(
-            LoadedLockfile,
-            LoadedLockfileRequest(
-                LockfileContent(
-                    file_content=next(c for c in new_content if c.path == lockfile.path),
-                    resolve_name=lockfile.resolve_name,
-                ),
-                parse_lockfile=True,
+        )
+    except EngineError:
+        old = None
+
+    new = await Get(
+        LoadedLockfile,
+        LoadedLockfileRequest(
+            LockfileContent(
+                file_content=next(c for c in new_content if c.path == lockfile.path),
+                resolve_name=lockfile.resolve_name,
             ),
+            parse_lockfile=True,
         ),
     )
 
     return LockfileGenerateDiffResult.create(
         path=lockfile.path,
         resolve_name=lockfile.resolve_name,
-        old=_pex_lockfile_requirements(old.lockfile_data),
+        old=_pex_lockfile_requirements(
+            old.lockfile_data if isinstance(old, LoadedLockfile) else None
+        ),
         new=_pex_lockfile_requirements(new.lockfile_data),
     )
 

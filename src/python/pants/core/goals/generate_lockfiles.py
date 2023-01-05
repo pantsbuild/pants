@@ -628,6 +628,7 @@ async def generate_lockfiles_goal(
         )
         for diff in diffs:
             diff_formatter.print(diff)
+        console.print_stderr("\n")
 
     return GenerateLockfilesGoal(exit_code=0)
 
