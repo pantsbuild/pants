@@ -7,13 +7,17 @@ from pants.backend.kotlin.target_types import (
     KotlincPluginTarget,
     KotlinJunitTestsGeneratorTarget,
     KotlinJunitTestTarget,
+    KotlinSourceField,
     KotlinSourcesGeneratorTarget,
     KotlinSourceTarget,
 )
 from pants.backend.kotlin.target_types import rules as target_types_rules
 from pants.backend.kotlin.test.junit import rules as kotlin_junit_rules
 from pants.core.util_rules import source_files, system_binaries
+from pants.core.util_rules.wrap_source import wrap_source_rule_and_target
 from pants.jvm import jvm_common
+
+wrap_kotlin = wrap_source_rule_and_target(KotlinSourceField, "kotlin_sources")
 
 
 def target_types():
@@ -24,6 +28,7 @@ def target_types():
         KotlinJunitTestTarget,
         KotlinJunitTestsGeneratorTarget,
         *jvm_common.target_types(),
+        *wrap_kotlin.target_types,
     ]
 
 
@@ -39,6 +44,7 @@ def rules():
         *source_files.rules(),
         *kotlin_junit_rules(),
         *jvm_common.rules(),
+        *wrap_kotlin.rules,
     ]
 
 

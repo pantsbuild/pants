@@ -9,6 +9,7 @@ from pants.backend.scala.target_types import (
     ScalacPluginTarget,
     ScalaJunitTestsGeneratorTarget,
     ScalaJunitTestTarget,
+    ScalaSourceField,
     ScalaSourcesGeneratorTarget,
     ScalaSourceTarget,
     ScalatestTestsGeneratorTarget,
@@ -16,7 +17,10 @@ from pants.backend.scala.target_types import (
 )
 from pants.backend.scala.target_types import rules as target_types_rules
 from pants.backend.scala.test import scalatest
+from pants.core.util_rules.wrap_source import wrap_source_rule_and_target
 from pants.jvm import jvm_common
+
+wrap_scala = wrap_source_rule_and_target(ScalaSourceField, "scala_sources")
 
 
 def target_types():
@@ -29,6 +33,7 @@ def target_types():
         ScalatestTestTarget,
         ScalatestTestsGeneratorTarget,
         *jvm_common.target_types(),
+        *wrap_scala.target_types,
     ]
 
 
@@ -44,6 +49,7 @@ def rules():
         *scala_lockfile_rules(),
         *bsp_rules(),
         *jvm_common.rules(),
+        *wrap_scala.rules,
     ]
 
 
