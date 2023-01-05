@@ -106,12 +106,25 @@ def test_export(py_resolve_format: PythonResolveExportFormat) -> None:
         ).assert_success()
 
     export_prefix = os.path.join("dist", "export", "python", "virtualenvs")
+    assert os.path.isdir(
+        export_prefix
+    ), f"expected export prefix dir '{export_prefix}' does not exist"
     py_minor_version = f"{platform.python_version_tuple()[0]}.{platform.python_version_tuple()[1]}"
     for resolve, ansicolors_version in [("a", "1.1.8"), ("b", "1.0.2")]:
-        export_dir = os.path.join(export_prefix, resolve, platform.python_version())
+        export_resolve_dir = os.path.join(export_prefix, resolve)
+        assert os.path.isdir(
+            export_resolve_dir
+        ), f"expected export resolve dir '{export_resolve_dir}' does not exist"
+
+        export_dir = os.path.join(export_resolve_dir, platform.python_version())
         assert os.path.isdir(export_dir), f"expected export dir '{export_dir}' does not exist"
+        if py_resolve_format == PythonResolveExportFormat.symlinked_immutable_virtualenv:
+            assert os.path.islink(
+                export_dir
+            ), f"expected export dir '{export_dir}' is not a symlink"
 
         lib_dir = os.path.join(export_dir, "lib", f"python{py_minor_version}", "site-packages")
+        assert os.path.isdir(lib_dir), f"expected export lib dir '{lib_dir}' does not exist"
         expected_ansicolors_dir = os.path.join(
             lib_dir, f"ansicolors-{ansicolors_version}.dist-info"
         )

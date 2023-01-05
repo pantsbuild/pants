@@ -38,7 +38,7 @@ jobs:
       uses: actions/cache@v3
       with:
         key: Linux-x86_64-rustup-${{ hashFiles('rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.65.0-*
+        path: '~/.rustup/toolchains/1.66.0-*
 
           ~/.rustup/update-hashes
 
@@ -104,7 +104,9 @@ jobs:
       run: './pants run build-support/bin/generate_github_workflows.py -- --check
 
         '
-    - if: needs.classify_changes.outputs.rust == 'true'
+    - env:
+        TMPDIR: ${{ runner.temp }}
+      if: needs.classify_changes.outputs.rust == 'true'
       name: Test and lint Rust
       run: 'sudo apt-get install -y pkg-config fuse libfuse-dev
 
@@ -114,12 +116,14 @@ jobs:
 
         ./cargo check --benches
 
+        ./cargo doc
+
         '
     strategy:
       matrix:
         python-version:
         - '3.7'
-    timeout-minutes: 40
+    timeout-minutes: 60
   bootstrap_pants_macos11_x86_64:
     env:
       PANTS_REMOTE_CACHE_READ: 'false'
@@ -151,7 +155,7 @@ jobs:
       uses: actions/cache@v3
       with:
         key: macOS11-x86_64-rustup-${{ hashFiles('rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.65.0-*
+        path: '~/.rustup/toolchains/1.66.0-*
 
           ~/.rustup/update-hashes
 
@@ -224,7 +228,8 @@ jobs:
         - '3.7'
     timeout-minutes: 60
   build_wheels_linux_x86_64:
-    container: quay.io/pypa/manylinux2014_x86_64:latest
+    container:
+      image: quay.io/pypa/manylinux2014_x86_64:latest
     env:
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
@@ -247,12 +252,17 @@ jobs:
       run: 'curl --proto ''=https'' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s --
         -v -y --default-toolchain none
 
-        echo "PATH=${PATH}:${HOME}/.cargo/bin" >> $GITHUB_ENV
+        echo "${HOME}/.cargo/bin" >> $GITHUB_PATH
 
         '
     - name: Expose Pythons
-      run: echo "PATH=${PATH}:/opt/python/cp37-cp37m/bin:/opt/python/cp38-cp38/bin:/opt/python/cp39-cp39/bin"
-        >> $GITHUB_ENV
+      run: 'echo "/opt/python/cp37-cp37m/bin" >> $GITHUB_PATH
+
+        echo "/opt/python/cp38-cp38/bin" >> $GITHUB_PATH
+
+        echo "/opt/python/cp39-cp39/bin" >> $GITHUB_PATH
+
+        '
     - if: github.event_name != 'pull_request'
       name: Setup toolchain auth
       run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
@@ -295,6 +305,7 @@ jobs:
     needs:
     - classify_changes
     runs-on:
+    - self-hosted
     - macOS-10.15-X64
     steps:
     - name: Check out code
@@ -305,7 +316,7 @@ jobs:
       uses: actions/cache@v3
       with:
         key: macOS10-15-x86_64-rustup-${{ hashFiles('rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.65.0-*
+        path: '~/.rustup/toolchains/1.66.0-*
 
           ~/.rustup/update-hashes
 
@@ -361,6 +372,7 @@ jobs:
     needs:
     - classify_changes
     runs-on:
+    - self-hosted
     - macOS-11-ARM64
     steps:
     - name: Check out code
@@ -371,7 +383,7 @@ jobs:
       uses: actions/cache@v3
       with:
         key: macOS11-ARM64-rustup-${{ hashFiles('rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.65.0-*
+        path: '~/.rustup/toolchains/1.66.0-*
 
           ~/.rustup/update-hashes
 
@@ -435,7 +447,7 @@ jobs:
       uses: actions/cache@v3
       with:
         key: macOS11-x86_64-rustup-${{ hashFiles('rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.65.0-*
+        path: '~/.rustup/toolchains/1.66.0-*
 
           ~/.rustup/update-hashes
 
@@ -614,6 +626,7 @@ jobs:
     - id: set_merge_ok
       run: echo 'merge_ok=true' >> ${GITHUB_OUTPUT}
   test_python_linux_x86_64_0:
+    env: {}
     if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only
       != 'true')
     name: Test Python (Linux-x86_64) Shard 0/3
@@ -638,14 +651,14 @@ jobs:
         go-version: 1.17.1
     - if: runner.os == 'Linux'
       name: Download Apache `thrift` binary (Linux)
-      run: 'mkdir -p "$HOME/.thrift"
+      run: 'mkdir -p "${HOME}/.thrift"
 
         curl --fail -L https://binaries.pantsbuild.org/bin/thrift/linux/x86_64/0.15.0/thrift
-        -o "$HOME/.thrift/thrift"
+        -o "${HOME}/.thrift/thrift"
 
-        chmod +x "$HOME/.thrift/thrift"
+        chmod +x "${HOME}/.thrift/thrift"
 
-        echo "PATH=${PATH}:${HOME}/.thrift" >> $GITHUB_ENV
+        echo "${HOME}/.thrift" >> $GITHUB_PATH
 
         '
     - name: Set up Python ${{ matrix.python-version }}
@@ -687,6 +700,7 @@ jobs:
         - '3.7'
     timeout-minutes: 90
   test_python_linux_x86_64_1:
+    env: {}
     if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only
       != 'true')
     name: Test Python (Linux-x86_64) Shard 1/3
@@ -711,14 +725,14 @@ jobs:
         go-version: 1.17.1
     - if: runner.os == 'Linux'
       name: Download Apache `thrift` binary (Linux)
-      run: 'mkdir -p "$HOME/.thrift"
+      run: 'mkdir -p "${HOME}/.thrift"
 
         curl --fail -L https://binaries.pantsbuild.org/bin/thrift/linux/x86_64/0.15.0/thrift
-        -o "$HOME/.thrift/thrift"
+        -o "${HOME}/.thrift/thrift"
 
-        chmod +x "$HOME/.thrift/thrift"
+        chmod +x "${HOME}/.thrift/thrift"
 
-        echo "PATH=${PATH}:${HOME}/.thrift" >> $GITHUB_ENV
+        echo "${HOME}/.thrift" >> $GITHUB_PATH
 
         '
     - name: Set up Python ${{ matrix.python-version }}
@@ -760,6 +774,7 @@ jobs:
         - '3.7'
     timeout-minutes: 90
   test_python_linux_x86_64_2:
+    env: {}
     if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only
       != 'true')
     name: Test Python (Linux-x86_64) Shard 2/3
@@ -784,14 +799,14 @@ jobs:
         go-version: 1.17.1
     - if: runner.os == 'Linux'
       name: Download Apache `thrift` binary (Linux)
-      run: 'mkdir -p "$HOME/.thrift"
+      run: 'mkdir -p "${HOME}/.thrift"
 
         curl --fail -L https://binaries.pantsbuild.org/bin/thrift/linux/x86_64/0.15.0/thrift
-        -o "$HOME/.thrift/thrift"
+        -o "${HOME}/.thrift/thrift"
 
-        chmod +x "$HOME/.thrift/thrift"
+        chmod +x "${HOME}/.thrift/thrift"
 
-        echo "PATH=${PATH}:${HOME}/.thrift" >> $GITHUB_ENV
+        echo "${HOME}/.thrift" >> $GITHUB_PATH
 
         '
     - name: Set up Python ${{ matrix.python-version }}
@@ -876,7 +891,9 @@ jobs:
 
         '
     - name: Run Python tests
-      run: './pants --tag=+platform_specific_behavior test :: -- -m platform_specific_behavior'
+      run: './pants --tag=+platform_specific_behavior test :: -- -m platform_specific_behavior
+
+        '
     - continue-on-error: true
       if: always()
       name: Upload pants.log
@@ -888,7 +905,7 @@ jobs:
       matrix:
         python-version:
         - '3.7'
-    timeout-minutes: 60
+    timeout-minutes: 90
 name: Pull Request CI
 'on':
   pull_request: {}

@@ -41,7 +41,6 @@ def test_no_warn_if_explicitly_on() -> None:
     result = run_pants(
         ["roots"],
         config={"anonymous-telemetry": {"enabled": True, "repo_id": 36 * "a"}},
-        use_pantsd=False,
     )
     result.assert_success()
     assert _no_explicit_setting_msg not in result.stderr

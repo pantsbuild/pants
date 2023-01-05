@@ -81,8 +81,7 @@ const GIGABYTES: usize = 1024 * MEGABYTES;
 // NB: These numbers were chosen after micro-benchmarking the code on one machine at the time of
 // writing. They were chosen using a rough equation from the microbenchmarks that are optimized
 // for somewhere between 2 and 3 uses of the corresponding entry to "break even".
-// Number set impossibly high to disable the linking feature -- see #17754 for tracking.
-const IMMUTABLE_FILE_SIZE_LIMIT: usize = usize::MAX - 1; // was: 512 * KILOBYTES;
+const IMMUTABLE_FILE_SIZE_LIMIT: usize = 512 * KILOBYTES;
 
 mod local;
 #[cfg(test)]
@@ -300,9 +299,9 @@ impl RemoteStore {
 ///
 /// Store keeps content on disk, and can optionally delegate to backfill its on-disk storage by
 /// fetching files from a remote server which implements the gRPC bytestream interface
-/// (see https://github.com/googleapis/googleapis/blob/master/google/bytestream/bytestream.proto)
+/// (see <https://github.com/googleapis/googleapis/blob/master/google/bytestream/bytestream.proto>)
 /// as specified by the gRPC remote execution interface (see
-/// https://github.com/googleapis/googleapis/blob/master/google/devtools/remoteexecution/v1test/)
+/// <https://github.com/googleapis/googleapis/blob/master/google/devtools/remoteexecution/v1test/>)
 ///
 /// It can also write back to a remote gRPC server, but will only do so when explicitly instructed
 /// to do so.
@@ -863,7 +862,7 @@ impl Store {
       )
       .await?;
 
-      let ingested_file_sizes = ingested_digests.iter().map(|(digest, _)| digest.size_bytes);
+      let ingested_file_sizes = ingested_digests.keys().map(|digest| digest.size_bytes);
       let uploaded_file_sizes = digests_to_upload.iter().map(|digest| digest.size_bytes);
 
       Ok(UploadSummary {
@@ -1062,7 +1061,7 @@ impl Store {
   /// the Directory protos that comprise the output directories from a remote execution
   /// reported by an ActionResult.
   ///
-  /// Returns an Option<DirectoryDigest> representing the `root` of the Tree (if it in fact
+  /// Returns an `Option<DirectoryDigest>` representing the `root` of the Tree (if it in fact
   /// exists in the remote CAS).
   ///
   /// This method requires that this Store be configured with a remote CAS, and will return an

@@ -139,6 +139,22 @@ You must explicitly add the dependencies you'd like to the `dependencies` field.
 
 This does not work with file arguments; you must use the target address, like `./pants package helloworld:black_bin`.
 
+### Injecting command-line arguments and environment variables
+
+You can use the `inject_args` and `inject_env` fields to "freeze" command-line arguments and environment variables into the PEX file. This can save you from having to create shim files around generic binaries. For example:
+
+```python myproduct/myservice/BUILD
+python_requirement(name="gunicorn", requirements=["gunicorn==20.1.0"])
+
+pex_binary(
+  name="myservice_bin",
+  script="gunicorn",
+  args=["myproduct.myservice.wsgi:app", "--name=myservice"],
+  env={"MY_ENV_VAR=1"},
+  dependencies=[":gunicorn"],
+)
+```
+
 > 🚧 PEX files may be platform-specific
 > 
 > If your code's requirements include distributions that include native code, then the resulting PEX file will only run on the platform it was built on. 

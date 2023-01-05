@@ -118,6 +118,7 @@ class DistBuildRequest:
     input: Digest
     working_directory: str  # Relpath within the input digest.
     build_time_source_roots: tuple[str, ...]  # Source roots for 1st party build-time deps.
+    output_path: str  # Location of the output directory within dist dir.
 
     target_address_spec: str | None = None  # Only needed for logging etc.
     wheel_config_settings: FrozenDict[str, tuple[str, ...]] | None = None
@@ -203,6 +204,7 @@ async def run_pep517_build(request: DistBuildRequest, python_setup: PythonSetup)
         ),
     )
 
+    # This is the setuptools dist directory, not Pants's, so we hardcode to dist/.
     dist_dir = "dist"
     backend_shim_name = "backend_shim.py"
     backend_shim_path = os.path.join(request.working_directory, backend_shim_name)
@@ -210,7 +212,10 @@ async def run_pep517_build(request: DistBuildRequest, python_setup: PythonSetup)
         Digest,
         CreateDigest(
             [
-                FileContent(backend_shim_path, interpolate_backend_shim(dist_dir, request)),
+                FileContent(
+                    backend_shim_path,
+                    interpolate_backend_shim(os.path.join(dist_dir, request.output_path), request),
+                ),
             ]
         ),
     )
@@ -246,7 +251,9 @@ async def run_pep517_build(request: DistBuildRequest, python_setup: PythonSetup)
     for line in output_lines:
         for dist_type in ["wheel", "sdist"]:
             if line.startswith(f"{dist_type}: "):
-                paths[dist_type] = line[len(dist_type) + 2 :].strip()
+                paths[dist_type] = os.path.join(
+                    request.output_path, line[len(dist_type) + 2 :].strip()
+                )
     # Note that output_digest paths are relative to the working_directory.
     output_digest = await Get(Digest, RemovePrefix(result.output_digest, dist_dir))
     output_snapshot = await Get(Snapshot, Digest, output_digest)

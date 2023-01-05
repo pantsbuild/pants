@@ -146,7 +146,7 @@ impl Executor {
   /// Unlike tokio::spawn, if the background Task panics, the returned Future will too.
   ///
   /// If the returned Future is dropped, the computation will still continue to completion: see
-  /// https://docs.rs/tokio/0.2.20/tokio/task/struct.JoinHandle.html
+  /// <https://docs.rs/tokio/0.2.20/tokio/task/struct.JoinHandle.html>
   ///
   pub fn spawn<O: Send + 'static, F: Future<Output = O> + Send + 'static>(
     &self,
@@ -182,7 +182,7 @@ impl Executor {
   /// too.
   ///
   /// If the returned Future is dropped, the computation will still continue to completion: see
-  /// https://docs.rs/tokio/0.2.20/tokio/task/struct.JoinHandle.html
+  /// <https://docs.rs/tokio/0.2.20/tokio/task/struct.JoinHandle.html>
   ///
   pub fn spawn_blocking<F: FnOnce() -> R + Send + 'static, R: Send + 'static>(
     &self,
