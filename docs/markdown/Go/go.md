@@ -8,7 +8,7 @@ updatedAt: "2022-07-25T23:52:25.735Z"
 ---
 > 🚧 Go support is beta stage
 >
-> We are done implementing the initial core functionality for Pants's initial Go support ([tracked here](https://github.com/pantsbuild/pants/projects/21)). However, there may be some edge cases we aren't yet handling. There are also some features that are not yet supported like Cgo files and vendoring, which we'd love your input on how to prioritize!
+> We are done implementing the initial core functionality for Pants's initial Go support ([tracked here](https://github.com/pantsbuild/pants/projects/21)). However, there may be some edge cases we aren't yet handling. There are also some features that are not yet supported like vendoring, which we'd love your input on how to prioritize!
 >
 > Please share feedback for what you need to use Pants with your Go project by either [opening a GitHub issue](https://github.com/pantsbuild/pants/issues/new/choose) or [joining our Slack](doc:community)!
 
@@ -25,10 +25,6 @@ updatedAt: "2022-07-25T23:52:25.735Z"
 > 📘 Example Go repository
 >
 > Check out [github.com/pantsbuild/example-golang](https://github.com/pantsbuild/example-golang) to try out Pants's Go support.
-
-> 🚧 Assumes you're using a single Go module
->
-> We do not yet support multiple first-party Go modules. If you are using multiple modules, we invite you to share your use case on <https://github.com/pantsbuild/pants/issues/13114>. (For example, if you are using a `replace` directive.)
 
 Initial setup
 -------------

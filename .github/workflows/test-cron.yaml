@@ -113,6 +113,8 @@ jobs:
 
         ./cargo check --benches
 
+        ./cargo doc
+
         '
     strategy:
       matrix:

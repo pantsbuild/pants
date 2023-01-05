@@ -6,6 +6,7 @@ from __future__ import annotations
 import dataclasses
 import functools
 import os
+import re
 import sys
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -113,7 +114,10 @@ def logging(original_function=None, *, level: LogLevel = LogLevel.INFO):
 
 @contextmanager
 def engine_error(
-    expected_underlying_exception: type[Exception] = Exception, *, contains: str | None = None
+    expected_underlying_exception: type[Exception] = Exception,
+    *,
+    contains: str | None = None,
+    normalize_tracebacks: bool = False,
 ) -> Iterator[None]:
     """A context manager to catch `ExecutionError`s in tests and check that the underlying exception
     is expected.
@@ -124,6 +128,10 @@ def engine_error(
             rule_runner.request(OutputType, [input])
 
     Will raise AssertionError if no ExecutionError occurred.
+
+    Set `normalize_tracebacks=True` to replace file locations and addresses in the error message
+    with fixed values for testability, and check `contains` against the `ExecutionError` message
+    instead of the underlying error only.
     """
     try:
         yield
@@ -143,17 +151,30 @@ def engine_error(
                 f"{type(underlying)} rather than the expected type "
                 f"{expected_underlying_exception}:\n\n{underlying}"
             )
-        if contains is not None and contains not in str(underlying):
-            raise AssertionError(
-                "Expected value not found in exception.\n"
-                f"expected: {contains}\n\n"
-                f"exception: {underlying}"
-            )
+        if contains is not None:
+            if normalize_tracebacks:
+                errmsg = remove_locations_from_traceback(str(exec_error))
+            else:
+                errmsg = str(underlying)
+            if contains not in errmsg:
+                raise AssertionError(
+                    "Expected value not found in exception.\n"
+                    f"=> Expected: {contains}\n\n"
+                    f"=> Actual: {errmsg}"
+                )
     else:
         raise AssertionError(
             "DID NOT RAISE ExecutionError with underlying exception type "
             f"{expected_underlying_exception}."
         )
+
+
+def remove_locations_from_traceback(trace: str) -> str:
+    location_pattern = re.compile(r'"/.*", line \d+')
+    address_pattern = re.compile(r"0x[0-9a-f]+")
+    new_trace = location_pattern.sub("LOCATION-INFO", trace)
+    new_trace = address_pattern.sub("0xEEEEEEEEE", new_trace)
+    return new_trace
 
 
 # -----------------------------------------------------------------------------------------------

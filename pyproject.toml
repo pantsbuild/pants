@@ -54,6 +54,7 @@ show_traceback = true
 
 [[tool.mypy.overrides]]
 module = [
+    "botocore",
     "bs4",
     "chevron",
     "colors",

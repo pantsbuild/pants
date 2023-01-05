@@ -42,6 +42,7 @@ from pants.engine.target import (
     AsyncFieldMixin,
     BoolField,
     Dependencies,
+    DictStringToStringField,
     DictStringToStringSequenceField,
     Field,
     IntField,
@@ -376,6 +377,26 @@ class PexScriptField(Field):
         return ConsoleScript(value)
 
 
+class PexArgsField(StringSequenceField):
+    alias = "args"
+    help = softwrap(
+        """
+        Freeze these command-line args into the PEX. Allows you to run generic entry points
+        on specific arguments without creating a shim file.
+        """
+    )
+
+
+class PexEnvField(DictStringToStringField):
+    alias = "env"
+    help = softwrap(
+        """
+        Freeze these environment variables into the PEX. Allows you to run generic entry points
+        on a specific environment without creating a shim file.
+        """
+    )
+
+
 class PexPlatformsField(StringSequenceField):
     alias = "platforms"
     help = softwrap(
@@ -659,6 +680,8 @@ class PexBinary(Target):
         *_PEX_BINARY_COMMON_FIELDS,
         PexEntryPointField,
         PexScriptField,
+        PexArgsField,
+        PexEnvField,
         OutputPathField,
     )
     help = softwrap(
@@ -1390,6 +1413,19 @@ class PythonDistributionEntryPointsField(NestedDictStringToStringField, AsyncFie
     )
 
 
+class PythonDistributionOutputPathField(StringField, AsyncFieldMixin):
+    help = softwrap(
+        """
+        The path to the directory to write the distribution file to, relative the dist directory.
+
+        If undefined, this defaults to the empty path, i.e. the output goes at the top
+        level of the dist dir.
+        """
+    )
+    alias = "output_path"
+    default = ""
+
+
 @dataclass(frozen=True)
 class PythonDistributionEntryPoint:
     """Note that this stores if the entry point comes from an address to a `pex_binary` target."""
@@ -1562,6 +1598,7 @@ class PythonDistribution(Target):
         SDistConfigSettingsField,
         BuildBackendEnvVarsField,
         LongDescriptionPathField,
+        PythonDistributionOutputPathField,
     )
     help = softwrap(
         f"""

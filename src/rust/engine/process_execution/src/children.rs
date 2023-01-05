@@ -16,7 +16,7 @@ const GRACEFUL_SHUTDOWN_POLL_TIME: time::Duration = time::Duration::from_millis(
 ///
 /// TODO: If this API is useful, we should consider extending it to parented Nailgun processes
 /// and to all local execution in general. It could also be adjusted for sending other posix
-/// signals in sequence for https://github.com/pantsbuild/pants/issues/13230.
+/// signals in sequence for <https://github.com/pantsbuild/pants/issues/13230>.
 pub struct ManagedChild {
   child: Child,
   graceful_shutdown_timeout: time::Duration,

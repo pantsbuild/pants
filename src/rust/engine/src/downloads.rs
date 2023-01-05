@@ -1,6 +1,7 @@
 // Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+use std::collections::BTreeMap;
 use std::io::{self, Write};
 use std::pin::Pin;
 use std::sync::Arc;
@@ -10,6 +11,7 @@ use bytes::{BufMut, Bytes};
 use futures::stream::StreamExt;
 use hashing::Digest;
 use humansize::{file_size_opts, FileSize};
+use reqwest::header::{HeaderMap, HeaderName};
 use reqwest::Error;
 use tokio_retry::strategy::{jitter, ExponentialBackoff};
 use tokio_retry::RetryIf;
@@ -44,11 +46,21 @@ impl NetDownload {
   async fn start(
     core: &Arc<Core>,
     url: Url,
+    auth_headers: BTreeMap<String, String>,
     file_name: String,
   ) -> Result<NetDownload, StreamingError> {
+    let mut headers = HeaderMap::new();
+    for (k, v) in &auth_headers {
+      headers.insert(
+        HeaderName::from_bytes(k.as_bytes()).unwrap(),
+        v.parse().unwrap(),
+      );
+    }
+
     let response = core
       .http_client
       .get(url.clone())
+      .headers(headers)
       .send()
       .await
       .map_err(|err| StreamingError::Retryable(format!("Error downloading file: {err}")))
@@ -127,6 +139,7 @@ impl StreamingDownload for FileDownload {
 async fn attempt_download(
   core: &Arc<Core>,
   url: &Url,
+  auth_headers: &BTreeMap<String, String>,
   file_name: String,
   expected_digest: Digest,
 ) -> Result<(Digest, Bytes), StreamingError> {
@@ -144,7 +157,7 @@ async fn attempt_download(
       }
       Box::new(FileDownload::start(url.path(), file_name).await?)
     } else {
-      Box::new(NetDownload::start(core, url.clone(), file_name).await?)
+      Box::new(NetDownload::start(core, url.clone(), auth_headers.clone(), file_name).await?)
     }
   };
 
@@ -195,6 +208,7 @@ async fn attempt_download(
 pub async fn download(
   core: Arc<Core>,
   url: Url,
+  auth_headers: BTreeMap<String, String>,
   file_name: String,
   expected_digest: hashing::Digest,
 ) -> Result<(), String> {
@@ -215,7 +229,15 @@ pub async fn download(
       let retry_strategy = ExponentialBackoff::from_millis(10).map(jitter).take(4);
       RetryIf::spawn(
         retry_strategy,
-        || attempt_download(&core2, &url, file_name.clone(), expected_digest),
+        || {
+          attempt_download(
+            &core2,
+            &url,
+            &auth_headers,
+            file_name.clone(),
+            expected_digest,
+          )
+        },
         |err: &StreamingError| matches!(err, StreamingError::Retryable(_)),
       )
       .await

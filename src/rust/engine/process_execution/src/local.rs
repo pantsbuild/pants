@@ -591,7 +591,7 @@ pub trait CapturedWorkdir {
   ///
   /// See the documentation note in `CommandRunner` in this file for more details.
   ///
-  /// TODO(John Sirois): https://github.com/pantsbuild/pants/issues/10601
+  /// TODO(John Sirois): <https://github.com/pantsbuild/pants/issues/10601>
   ///  Centralize local spawning to one object - we currently spawn here (in
   ///  process_execution::local::CommandRunner) to launch user `Process`es and in
   ///  process_execution::nailgun::CommandRunner when a jvm nailgun server needs to be started. The
