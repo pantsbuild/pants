@@ -107,9 +107,11 @@ async def _prepare_process_request_from_target(shell_command: Target) -> ShellCo
     description = f"the `{shell_command.alias}` at `{shell_command.address}`"
 
     interactive = shell_command.has_field(ShellCommandIsInteractiveField)
-    working_directory = shell_command[ShellCommandWorkdirField].value
+    working_directory = _parse_working_directory(
+        shell_command[ShellCommandWorkdirField].value or "", shell_command.address
+    )
 
-    if interactive and working_directory is None:
+    if interactive and not working_directory:
         working_directory = "."
 
     command = shell_command[ShellCommandCommandField].value
@@ -325,7 +327,9 @@ async def run_in_sandbox_request(
     )
     run_field_set: RunFieldSet = field_sets.field_sets[0]
 
-    working_directory = shell_command[ShellCommandWorkdirField].value
+    working_directory = _parse_working_directory(
+        shell_command[ShellCommandWorkdirField].value or "", shell_command.address
+    )
 
     # Must be run in target environment so that the binaries/envvars match the execution
     # environment when we actually run the process.
@@ -516,6 +520,27 @@ def _output_at_build_root(process: Process, bash: BashBinary) -> Process:
         output_directories=output_directories,
         output_files=output_files,
     )
+
+
+def _parse_working_directory(workdir_in: str, address: Address) -> str:
+    """Convert the `workdir` field into something that can be understood by `Process`."""
+
+    reldir = address.spec_path
+
+    def florp() -> str:
+        if workdir_in == ".":
+            return reldir
+        elif workdir_in.startswith("./"):
+            return os.path.join(reldir, workdir_in[2:])
+        elif workdir_in.startswith("/"):
+            return workdir_in[1:]
+        else:
+            return workdir_in
+
+    out = florp()
+    logger.warning(f"{workdir_in=} {reldir=} {out=}")
+
+    return out
 
 
 @rule

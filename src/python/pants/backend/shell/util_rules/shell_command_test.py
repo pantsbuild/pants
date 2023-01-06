@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import shlex
 from textwrap import dedent
 
@@ -812,3 +813,51 @@ def test_cannot_escape_build_root(rule_runner: RuleRunner) -> None:
             Address("src", target_name="quotes"),
             expected_contents={"../../invalid.txt": "foosh\n"},
         )
+
+
+@pytest.mark.parametrize(
+    ("workdir", "file_location"),
+    (
+        ("src", "src"),
+        (".", "src"),
+        ("./", "src"),
+        ("/", ""),
+        ("", ""),
+        ("/src", "src"),
+    ),
+)
+def test_working_directory_special_values(
+    rule_runner: RuleRunner, workdir: str, file_location: str
+) -> None:
+    rule_runner.write_files(
+        {
+            "src/fruitcake.py": dedent(
+                """\
+                f = open("fruitcake.txt", "w")
+                f.write("fruitcake\\n")
+                f.close()
+                """
+            ),
+            "src/BUILD": dedent(
+                f"""\
+                python_source(
+                    source="fruitcake.py",
+                    name="fruitcake",
+                )
+
+                experimental_run_in_sandbox(
+                  name="run_fruitcake",
+                  runnable=":fruitcake",
+                  output_files=["fruitcake.txt"],
+                  workdir="{workdir}",
+                )
+                """
+            ),
+        }
+    )
+
+    assert_run_in_sandbox_result(
+        rule_runner,
+        Address("src", target_name="run_fruitcake"),
+        expected_contents={os.path.join(file_location, "fruitcake.txt"): "fruitcake\n"},
+    )
