@@ -277,9 +277,13 @@ class ShellCommandOutputsField(StringSequenceField):
     alias = "outputs"
     help = softwrap(
         """
-        Specify the shell command output files and directories.
+        Specify the shell command output files and directories, relative to the `BUILD` file's
+        directory.
 
         Use a trailing slash on directory names, i.e. `my_dir/`.
+
+        Relative paths (including `..`) may be used, as long as the path does not ascend further
+        than the build root.
         """
     )
     removal_hint = "To fix, use `output_files` and `output_directories` instead."
@@ -292,10 +296,14 @@ class ShellCommandOutputFilesField(StringSequenceField):
     default = ()
     help = softwrap(
         """
-        Specify the shell command's output files to capture.
+        Specify the shell command's output files to capture, relative to the `BUILD` file's
+        directory.
 
         For directories, use `output_directories`. At least one of `output_files` and
         `output_directories` must be specified.
+
+        Relative paths (including `..`) may be used, as long as the path does not ascend further
+        than the build root.
         """
     )
 
@@ -307,10 +315,13 @@ class ShellCommandOutputDirectoriesField(StringSequenceField):
     help = softwrap(
         """
         Specify full directories (including recursive descendants) of output to capture from the
-        shell command.
+        shell command, relative to the `BUILD` file's directory.
 
-        For files, use `output_files`. At least one of `output_files` and
+        For individual files, use `output_files`. At least one of `output_files` and
         `output_directories` must be specified.
+
+        Relative paths (including `..`) may be used, as long as the path does not ascend further
+        than the build root.
         """
     )
 
