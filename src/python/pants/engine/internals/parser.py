@@ -227,11 +227,19 @@ class Parser:
         global_symbols = {**self._symbols, **extra_symbols.symbols}
 
         if self.ignore_unrecognized_symbols:
+            defined_symbols = set()
             while True:
                 try:
                     exec(build_file_content, global_symbols)
                 except NameError as e:
                     bad_symbol = _extract_symbol_from_name_error(e)
+                    if bad_symbol in defined_symbols:
+                        # We have previously attempted to define this symbol, but have received
+                        # another error for it. This can indicate that the symbol is being used
+                        # from code which has already been compiled, such as builtin functions.
+                        raise
+                    defined_symbols.add(bad_symbol)
+
                     global_symbols[bad_symbol] = _unrecognized_symbol_func
                     self._parse_state.reset(
                         filepath=filepath,

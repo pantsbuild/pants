@@ -77,7 +77,7 @@ def create_bootstrap_scheduler(
             bc_builder.create(),
             DynamicRemoteOptions.disabled(),
             executor,
-            ignore_unrecognized_build_file_symbols=True,
+            is_bootstrap=True,
         ).scheduler
     )
 
