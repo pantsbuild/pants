@@ -21,6 +21,7 @@ from pants.engine.internals.build_files import (
     parse_address_family,
 )
 from pants.engine.internals.defaults import ParametrizeDefault
+from pants.engine.internals.mapper import AddressFamily
 from pants.engine.internals.parametrize import Parametrize
 from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser
 from pants.engine.internals.scheduler import ExecutionError
@@ -463,3 +464,32 @@ def test_build_files_share_globals() -> None:
     assert symbols.symbols["hello"].__globals__ is symbols.symbols["world"].__globals__
     assert "world" in symbols.symbols["hello"].__globals__
     assert "hello" in symbols.symbols["world"].__globals__
+
+
+def test_macro_undefined_symbol_bootstrap() -> None:
+    # Tests that an undefined symbol in a macro is ignored while bootstrapping. Ignoring undeclared
+    # symbols during parsing is insufficient, because we would need to re-evaluate the preludes after
+    # adding each additional undefined symbol to scope.
+    rule_runner = RuleRunner(
+        rules=[QueryRule(AddressFamily, [AddressFamilyDir])],
+        is_bootstrap=True,
+    )
+    rule_runner.write_files(
+        {
+            "prelude.py": dedent(
+                """
+                def uses_undefined():
+                    return this_is_undefined()
+                """
+            ),
+            "BUILD": dedent(
+                """
+                uses_undefined()
+                """
+            ),
+        }
+    )
+
+    # Parse the root BUILD file.
+    address_family = rule_runner.request(AddressFamily, [AddressFamilyDir("")])
+    assert not address_family.name_to_target_adaptors
