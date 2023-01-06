@@ -17,7 +17,6 @@ from pants.backend.python.dependency_inference.parse_python_dependencies import 
 from pants.backend.python.dependency_inference.rules import (
     ImportResolveResult,
     PythonImportDependenciesInferenceFieldSet,
-    PythonInferSubsystem,
     ResolvedParsedPythonDependencies,
     ResolvedParsedPythonDependenciesRequest,
     UnownedImportsPossibleOwners,
@@ -27,6 +26,7 @@ from pants.backend.python.dependency_inference.rules import (
     _find_other_owners_for_unowned_imports,
     import_rules,
 )
+from pants.backend.python.dependency_inference.subsystem import PythonInferSubsystem
 from pants.backend.python.goals.run_python_source import PythonSourceFieldSet
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.build_graph.address import Address
