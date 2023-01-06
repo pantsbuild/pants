@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import logging
+import shlex
 from textwrap import dedent
 
 import pytest
@@ -33,6 +34,7 @@ from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import EMPTY_SNAPSHOT, DigestContents
+from pants.engine.internals.native_engine import IntrinsicError
 from pants.engine.process import Process, ProcessExecutionFailure
 from pants.engine.target import (
     GeneratedSources,
@@ -551,20 +553,54 @@ def test_shell_command_boot_script(rule_runner: RuleRunner) -> None:
     tgt = rule_runner.get_target(Address("src", target_name="boot-script-test"))
     res = rule_runner.request(Process, [ShellCommandProcessFromTargetRequest(tgt)])
     assert "bash" in res.argv[0]
-    assert res.argv[1:] == (
-        "-c",
-        (
+    assert res.argv[1] == "-c"
+    assert res.argv[2].startswith("cd src &&")
+    assert "bash -c" in res.argv[2]
+    assert res.argv[2].endswith(
+        shlex.quote(
             "$mkdir -p .bin;"
             "for tool in $TOOLS; do $ln -sf ${!tool} .bin; done;"
             'export PATH="$PWD/.bin";'
             "./command.script"
-        ),
+        )
     )
 
     tools = sorted({"python3_8", "mkdir", "ln"})
     assert sorted(res.env["TOOLS"].split()) == tools
     for tool in tools:
         assert res.env[tool].endswith(f"/{tool.replace('_', '.')}")
+
+
+def test_shell_command_boot_script_in_build_root(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                experimental_shell_command(
+                  name="boot-script-test",
+                  tools=[
+                    "python3.8",
+                  ],
+                  command="./command.script",
+                )
+                """
+            ),
+        }
+    )
+
+    tgt = rule_runner.get_target(Address("", target_name="boot-script-test"))
+    res = rule_runner.request(Process, [ShellCommandProcessFromTargetRequest(tgt)])
+    assert "bash" in res.argv[0]
+    assert res.argv[1] == "-c"
+    assert "bash -c" in res.argv[2]
+    assert res.argv[2].endswith(
+        shlex.quote(
+            "$mkdir -p .bin;"
+            "for tool in $TOOLS; do $ln -sf ${!tool} .bin; done;"
+            'export PATH="$PWD/.bin";'
+            "./command.script"
+        )
+    )
 
 
 def test_shell_command_extra_env_vars(caplog, rule_runner: RuleRunner) -> None:
@@ -628,3 +664,73 @@ def test_run_runnable_in_sandbox(rule_runner: RuleRunner) -> None:
         Address("src", target_name="run_fruitcake"),
         expected_contents={"src/fruitcake.txt": "fruitcake\n"},
     )
+
+
+def test_relative_directories(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/BUILD": dedent(
+                """\
+                experimental_shell_command(
+                  name="quotes",
+                  tools=["echo"],
+                  command='echo foosh > ../foosh.txt',
+                  output_files=["../foosh.txt"],
+                )
+                """
+            ),
+        }
+    )
+
+    assert_shell_command_result(
+        rule_runner,
+        Address("src", target_name="quotes"),
+        expected_contents={"foosh.txt": "foosh\n"},
+    )
+
+
+def test_relative_directories_2(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/BUILD": dedent(
+                """\
+                experimental_shell_command(
+                  name="quotes",
+                  tools=["echo"],
+                  command='echo foosh > ../newdir/foosh.txt',
+                  output_files=["../newdir/foosh.txt"],
+                )
+                """
+            ),
+        }
+    )
+
+    assert_shell_command_result(
+        rule_runner,
+        Address("src", target_name="quotes"),
+        expected_contents={"newdir/foosh.txt": "foosh\n"},
+    )
+
+
+def test_cannot_escape_build_root(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/BUILD": dedent(
+                """\
+                experimental_shell_command(
+                  name="quotes",
+                  tools=["echo"],
+                  command='echo foosh > ../../invalid.txt',
+                  output_files=["../../invalid.txt"],
+                )
+                """
+            ),
+        }
+    )
+
+    with engine_error(IntrinsicError):
+        assert_shell_command_result(
+            rule_runner,
+            Address("src", target_name="quotes"),
+            expected_contents={"../../invalid.txt": "foosh\n"},
+        )
