@@ -148,6 +148,10 @@ async def _execution_environment_from_dependencies(shell_command: Target) -> Dig
         shell_command.get(ShellCommandExecutionDependenciesField).value is not None
     )
 
+    any_dependencies_defined = (
+        shell_command.get(ShellCommandOutputDependenciesField).value is not None
+    )
+
     # If we're specifying the `dependencies` as relevant to the execution environment, then include
     # this command as a root for the transitive dependency search for execution dependencies.
     maybe_this_target = (shell_command.address,) if not runtime_dependencies_defined else ()
@@ -159,7 +163,7 @@ async def _execution_environment_from_dependencies(shell_command: Target) -> Dig
             UnparsedAddressInputs,
             shell_command.get(ShellCommandExecutionDependenciesField).to_unparsed_address_inputs(),
         )
-    else:
+    elif any_dependencies_defined:
         runtime_dependencies = Addresses()
         warn_or_error(
             "2.17.0.dev0",
@@ -174,6 +178,8 @@ async def _execution_environment_from_dependencies(shell_command: Target) -> Dig
             ),
             print_warning=True,
         )
+    else:
+        runtime_dependencies = Addresses()
 
     transitive = await Get(
         TransitiveTargets,
