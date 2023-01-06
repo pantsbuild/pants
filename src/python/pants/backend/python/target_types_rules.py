@@ -19,7 +19,8 @@ from pants.backend.python.dependency_inference.module_mapper import (
     PythonModuleOwners,
     PythonModuleOwnersRequest,
 )
-from pants.backend.python.dependency_inference.rules import PythonInferSubsystem, import_rules
+from pants.backend.python.dependency_inference.rules import import_rules
+from pants.backend.python.dependency_inference.subsystem import PythonInferSubsystem
 from pants.backend.python.goals.setup_py import InvalidEntryPoint
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
@@ -236,6 +237,7 @@ async def infer_pex_binary_entry_point_dependency(
         PythonModuleOwnersRequest(
             entry_point.val.module,
             resolve=request.field_set.resolve.normalized_value(python_setup),
+            locality=request.field_set.address.spec_path,
         ),
     )
     address = request.field_set.address

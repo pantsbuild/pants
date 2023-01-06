@@ -11,7 +11,8 @@ from pants.backend.python.dependency_inference.module_mapper import (
     PythonModuleOwners,
     PythonModuleOwnersRequest,
 )
-from pants.backend.python.dependency_inference.rules import PythonInferSubsystem, import_rules
+from pants.backend.python.dependency_inference.rules import import_rules
+from pants.backend.python.dependency_inference.subsystem import PythonInferSubsystem
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import PexCompletePlatformsField, PythonResolveField
 from pants.core.goals.package import OutputPathField
@@ -171,7 +172,9 @@ async def infer_cloud_function_handler_dependency(
     owners = await Get(
         PythonModuleOwners,
         PythonModuleOwnersRequest(
-            module, resolve=request.field_set.resolve.normalized_value(python_setup)
+            module,
+            resolve=request.field_set.resolve.normalized_value(python_setup),
+            locality=request.field_set.address.spec_path,
         ),
     )
     address = request.field_set.address
