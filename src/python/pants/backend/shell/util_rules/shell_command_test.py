@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import logging
+import shlex
 from textwrap import dedent
 
 import pytest
@@ -553,7 +554,8 @@ def test_shell_command_boot_script(rule_runner: RuleRunner) -> None:
     assert "bash" in res.argv[0]
     assert res.argv[1:] == (
         "-c",
-        (
+        "cd src && /bin/bash -c "
+        + shlex.quote(
             "$mkdir -p .bin;"
             "for tool in $TOOLS; do $ln -sf ${!tool} .bin; done;"
             'export PATH="$PWD/.bin";'
