@@ -31,6 +31,7 @@ from pants.engine.internals.target_adaptor import TargetAdaptor, TargetAdaptorRe
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import RegisteredTargetTypes
 from pants.engine.unions import UnionMembership
+from pants.init.bootstrap_scheduler import BootstrapStatus
 from pants.option.global_options import GlobalOptions
 from pants.util.frozendict import FrozenDict
 from pants.util.strutil import softwrap
@@ -44,11 +45,16 @@ class BuildFileOptions:
 
 
 @rule
-def extract_build_file_options(global_options: GlobalOptions) -> BuildFileOptions:
+def extract_build_file_options(
+    global_options: GlobalOptions,
+    bootstrap_status: BootstrapStatus,
+) -> BuildFileOptions:
     return BuildFileOptions(
         patterns=global_options.build_patterns,
         ignores=global_options.build_ignore,
-        prelude_globs=global_options.build_file_prelude_globs,
+        prelude_globs=(
+            () if bootstrap_status.in_progress else global_options.build_file_prelude_globs
+        ),
     )
 
 
