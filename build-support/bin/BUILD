@@ -16,7 +16,12 @@ python_sources(
 
 python_tests(
     name="py_tests",
-    overrides={"reversion_test.py": {"timeout": 90, "dependencies": ["3rdparty/python#pex"]}},
+    overrides={
+        "reversion_test.py": {"timeout": 90, "dependencies": ["3rdparty/python#pex"]},
+        "generate_json_schema_test.py": {
+            "dependencies": ["build-support/bin/json_schema_testdata:json_schema_samples"]
+        },
+    },
 )
 
 pex_binary(
