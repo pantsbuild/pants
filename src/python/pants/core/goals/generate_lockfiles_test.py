@@ -404,8 +404,10 @@ def test_diff_printer(
         LockfileRequirements(new_reqs),
     )
     diff_formatter.print(diff)
+    call = console.print_stderr.mock_calls[0]
+    args = call[1]  # For py3.7 compat, otherwise `call.args` works.
     actual_output = softwrap(
         # Strip all spaces before newlines.
-        re.sub(" +\n", "\n", console.print_stderr.mock_calls[0].args[0])
+        re.sub(" +\n", "\n", args[0])
     )
     assert actual_output == expect_output
