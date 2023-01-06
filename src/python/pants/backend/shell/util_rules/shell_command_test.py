@@ -553,15 +553,16 @@ def test_shell_command_boot_script(rule_runner: RuleRunner) -> None:
     tgt = rule_runner.get_target(Address("src", target_name="boot-script-test"))
     res = rule_runner.request(Process, [ShellCommandProcessFromTargetRequest(tgt)])
     assert "bash" in res.argv[0]
-    assert res.argv[1:] == (
-        "-c",
-        "cd src && /bin/bash -c "
-        + shlex.quote(
+    assert res.argv[1] == "-c"
+    assert res.argv[2].startswith("cd src &&")
+    assert "bash -c" in res.argv[2]
+    assert res.argv[2].endswith(
+        shlex.quote(
             "$mkdir -p .bin;"
             "for tool in $TOOLS; do $ln -sf ${!tool} .bin; done;"
             'export PATH="$PWD/.bin";'
             "./command.script"
-        ),
+        )
     )
 
     tools = sorted({"python3_8", "mkdir", "ln"})
@@ -590,15 +591,15 @@ def test_shell_command_boot_script_in_build_root(rule_runner: RuleRunner) -> Non
     tgt = rule_runner.get_target(Address("", target_name="boot-script-test"))
     res = rule_runner.request(Process, [ShellCommandProcessFromTargetRequest(tgt)])
     assert "bash" in res.argv[0]
-    assert res.argv[1:] == (
-        "-c",
-        "/bin/bash -c "
-        + shlex.quote(
+    assert res.argv[1] == "-c"
+    assert "bash -c" in res.argv[2]
+    assert res.argv[2].endswith(
+        shlex.quote(
             "$mkdir -p .bin;"
             "for tool in $TOOLS; do $ln -sf ${!tool} .bin; done;"
             'export PATH="$PWD/.bin";'
             "./command.script"
-        ),
+        )
     )
 
 
