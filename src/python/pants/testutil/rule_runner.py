@@ -234,6 +234,7 @@ class RuleRunner:
         extra_session_values: dict[Any, Any] | None = None,
         max_workunit_verbosity: LogLevel = LogLevel.DEBUG,
         inherent_environment: EnvironmentName | None = EnvironmentName(None),
+        is_bootstrap: bool = False,
     ) -> None:
 
         bootstrap_args = [*bootstrap_args]
@@ -323,6 +324,7 @@ class RuleRunner:
                 ),
                 ca_certs_path=ca_certs_path,
                 engine_visualize_to=None,
+                is_bootstrap=is_bootstrap,
             ).scheduler
         )
 
