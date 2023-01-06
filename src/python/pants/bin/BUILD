@@ -32,6 +32,7 @@ target(
         "src/python/pants/backend/experimental/codegen/thrift/apache/java",
         "src/python/pants/backend/experimental/codegen/thrift/scrooge/java",
         "src/python/pants/backend/experimental/codegen/thrift/scrooge/scala",
+        "src/python/pants/backend/experimental/cue",
         "src/python/pants/backend/experimental/debian",
         "src/python/pants/backend/experimental/go",
         "src/python/pants/backend/experimental/go/lint/vet",
