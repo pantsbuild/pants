@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import itertools
 import logging
 import os
@@ -20,6 +21,7 @@ from pants.backend.shell.target_types import (
     ShellCommandExecutionDependenciesField,
     ShellCommandExtraEnvVarsField,
     ShellCommandLogOutputField,
+    ShellCommandOutputDependenciesField,
     ShellCommandOutputDirectoriesField,
     ShellCommandOutputFilesField,
     ShellCommandOutputsField,
@@ -45,15 +47,7 @@ from pants.core.util_rules.system_binaries import (
 from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.environment import EnvironmentName
-from pants.engine.fs import (
-    EMPTY_DIGEST,
-    AddPrefix,
-    CreateDigest,
-    Digest,
-    Directory,
-    MergeDigests,
-    Snapshot,
-)
+from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, Directory, MergeDigests, Snapshot
 from pants.engine.process import FallibleProcessResult, Process, ProcessResult, ProductDescription
 from pants.engine.rules import Get, MultiGet, collect_rules, rule, rule_helper
 from pants.engine.target import (
@@ -148,6 +142,10 @@ async def _execution_environment_from_dependencies(shell_command: Target) -> Dig
         shell_command.get(ShellCommandExecutionDependenciesField).value is not None
     )
 
+    any_dependencies_defined = (
+        shell_command.get(ShellCommandOutputDependenciesField).value is not None
+    )
+
     # If we're specifying the `dependencies` as relevant to the execution environment, then include
     # this command as a root for the transitive dependency search for execution dependencies.
     maybe_this_target = (shell_command.address,) if not runtime_dependencies_defined else ()
@@ -159,7 +157,7 @@ async def _execution_environment_from_dependencies(shell_command: Target) -> Dig
             UnparsedAddressInputs,
             shell_command.get(ShellCommandExecutionDependenciesField).to_unparsed_address_inputs(),
         )
-    else:
+    elif any_dependencies_defined:
         runtime_dependencies = Addresses()
         warn_or_error(
             "2.17.0.dev0",
@@ -174,6 +172,8 @@ async def _execution_environment_from_dependencies(shell_command: Target) -> Dig
             ),
             print_warning=True,
         )
+    else:
+        runtime_dependencies = Addresses()
 
     transitive = await Get(
         TransitiveTargets,
@@ -287,8 +287,7 @@ async def run_shell_command(
         if result.stderr:
             logger.warning(result.stderr.decode())
 
-    working_directory = shell_command.address.spec_path
-    output = await Get(Snapshot, AddPrefix(result.output_digest, working_directory))
+    output = await Get(Snapshot, Digest, result.output_digest)
     return GeneratedSources(output)
 
 
@@ -370,8 +369,7 @@ async def run_in_sandbox_request(
         if result.stderr:
             logger.warning(result.stderr.decode())
 
-    working_directory = shell_command.address.spec_path
-    output = await Get(Snapshot, AddPrefix(result.output_digest, working_directory))
+    output = await Get(Snapshot, Digest, result.output_digest)
     return GeneratedSources(output)
 
 
@@ -476,7 +474,7 @@ async def prepare_shell_command_process(
             ).split("\n")
         )
 
-    return Process(
+    proc = Process(
         argv=(bash.path, "-c", boot_script + command),
         description=f"Running {description}",
         env=command_env,
@@ -486,6 +484,35 @@ async def prepare_shell_command_process(
         timeout_seconds=timeout,
         working_directory=working_directory,
         append_only_caches=append_only_caches,
+    )
+
+    if not interactive:
+        return _output_at_build_root(proc, bash)
+    else:
+        # `InteractiveProcess`es don't need to be wrapped since files aren't being captured.
+        return proc
+
+
+def _output_at_build_root(process: Process, bash: BashBinary) -> Process:
+
+    working_directory = process.working_directory or ""
+
+    output_directories = process.output_directories
+    output_files = process.output_files
+    if working_directory:
+        output_directories = tuple(os.path.join(working_directory, d) for d in output_directories)
+        output_files = tuple(os.path.join(working_directory, d) for d in output_files)
+
+    cd = f"cd {shlex.quote(working_directory)} && " if working_directory else ""
+    shlexed_argv = " ".join(shlex.quote(arg) for arg in process.argv)
+    new_argv = (bash.path, "-c", f"{cd}{shlexed_argv}")
+
+    return dataclasses.replace(
+        process,
+        argv=new_argv,
+        working_directory=None,
+        output_directories=output_directories,
+        output_files=output_files,
     )
 
 
