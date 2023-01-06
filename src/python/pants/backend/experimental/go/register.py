@@ -35,7 +35,7 @@ from pants.backend.go.util_rules import (
 )
 from pants.core.util_rules.wrap_source import wrap_source_rule_and_target
 
-wrap_golang = wrap_source_rule_and_target(GoPackageSourcesField, "kotlin_sources")
+wrap_golang = wrap_source_rule_and_target(GoPackageSourcesField, "go_package_sources")
 
 
 def target_types():
