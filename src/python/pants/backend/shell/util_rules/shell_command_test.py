@@ -34,6 +34,7 @@ from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import EMPTY_SNAPSHOT, DigestContents
+from pants.engine.internals.native_engine import IntrinsicError
 from pants.engine.process import Process, ProcessExecutionFailure
 from pants.engine.target import (
     GeneratedSources,
@@ -653,3 +654,50 @@ def test_relative_directories(rule_runner: RuleRunner) -> None:
         Address("src", target_name="quotes"),
         expected_contents={"foosh.txt": "foosh\n"},
     )
+
+
+def test_relative_directories_2(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/BUILD": dedent(
+                """\
+                experimental_shell_command(
+                  name="quotes",
+                  tools=["echo"],
+                  command='echo foosh > ../newdir/foosh.txt',
+                  output_files=["../newdir/foosh.txt"],
+                )
+                """
+            ),
+        }
+    )
+
+    assert_shell_command_result(
+        rule_runner,
+        Address("src", target_name="quotes"),
+        expected_contents={"newdir/foosh.txt": "foosh\n"},
+    )
+
+
+def test_cannot_escape_build_root(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/BUILD": dedent(
+                """\
+                experimental_shell_command(
+                  name="quotes",
+                  tools=["echo"],
+                  command='echo foosh > ../../invalid.txt',
+                  output_files=["../../invalid.txt"],
+                )
+                """
+            ),
+        }
+    )
+
+    with engine_error(IntrinsicError):
+        assert_shell_command_result(
+            rule_runner,
+            Address("src", target_name="quotes"),
+            expected_contents={"../../invalid.txt": "foosh\n"},
+        )
