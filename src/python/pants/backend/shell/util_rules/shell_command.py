@@ -495,9 +495,7 @@ async def prepare_shell_command_process(
 
 def _output_at_build_root(process: Process, bash: BashBinary) -> Process:
 
-    working_directory = process.working_directory
-    if working_directory is None:
-        working_directory = ""
+    working_directory = process.working_directory or ""
 
     output_directories = process.output_directories
     output_files = process.output_files
@@ -505,9 +503,9 @@ def _output_at_build_root(process: Process, bash: BashBinary) -> Process:
         output_directories = tuple(os.path.join(working_directory, d) for d in output_directories)
         output_files = tuple(os.path.join(working_directory, d) for d in output_files)
 
-    cd = f"cd {shlex.quote(working_directory)} &&" if working_directory else ""
+    cd = f"cd {shlex.quote(working_directory)} && " if working_directory else ""
     shlexed_argv = " ".join(shlex.quote(arg) for arg in process.argv)
-    new_argv = (bash.path, "-c", f"{cd} {shlexed_argv}")
+    new_argv = (bash.path, "-c", f"{cd}{shlexed_argv}")
 
     return dataclasses.replace(
         process,

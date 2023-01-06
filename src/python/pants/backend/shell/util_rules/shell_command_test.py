@@ -570,6 +570,38 @@ def test_shell_command_boot_script(rule_runner: RuleRunner) -> None:
         assert res.env[tool].endswith(f"/{tool.replace('_', '.')}")
 
 
+def test_shell_command_boot_script_in_build_root(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                experimental_shell_command(
+                  name="boot-script-test",
+                  tools=[
+                    "python3.8",
+                  ],
+                  command="./command.script",
+                )
+                """
+            ),
+        }
+    )
+
+    tgt = rule_runner.get_target(Address("", target_name="boot-script-test"))
+    res = rule_runner.request(Process, [ShellCommandProcessFromTargetRequest(tgt)])
+    assert "bash" in res.argv[0]
+    assert res.argv[1:] == (
+        "-c",
+        "/bin/bash -c "
+        + shlex.quote(
+            "$mkdir -p .bin;"
+            "for tool in $TOOLS; do $ln -sf ${!tool} .bin; done;"
+            'export PATH="$PWD/.bin";'
+            "./command.script"
+        ),
+    )
+
+
 def test_shell_command_extra_env_vars(caplog, rule_runner: RuleRunner) -> None:
     caplog.set_level(logging.INFO)
     caplog.clear()
