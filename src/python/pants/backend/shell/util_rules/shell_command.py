@@ -527,20 +527,14 @@ def _parse_working_directory(workdir_in: str, address: Address) -> str:
 
     reldir = address.spec_path
 
-    def florp() -> str:
-        if workdir_in == ".":
-            return reldir
-        elif workdir_in.startswith("./"):
-            return os.path.join(reldir, workdir_in[2:])
-        elif workdir_in.startswith("/"):
-            return workdir_in[1:]
-        else:
-            return workdir_in
-
-    out = florp()
-    logger.warning(f"{workdir_in=} {reldir=} {out=}")
-
-    return out
+    if workdir_in == ".":
+        return reldir
+    elif workdir_in.startswith("./"):
+        return os.path.join(reldir, workdir_in[2:])
+    elif workdir_in.startswith("/"):
+        return workdir_in[1:]
+    else:
+        return workdir_in
 
 
 @rule

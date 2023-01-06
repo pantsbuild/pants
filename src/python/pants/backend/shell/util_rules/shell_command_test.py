@@ -131,7 +131,7 @@ def test_sources_and_files(rule_runner: RuleRunner) -> None:
                   output_files=["message.txt"],
                   output_directories=["res"],
                   command="./script.sh",
-                  workdir=f"{build_file_dir()}",
+                  workdir=".",
                 )
 
                 files(
@@ -238,7 +238,7 @@ def test_chained_shell_commands_with_workdir(rule_runner: RuleRunner) -> None:
                   tools=["echo"],
                   output_files=["msg"],
                   command="echo 'shell_command:a' > msg",
-                  workdir=f"{build_file_dir()}",
+                  workdir=".",
                 )
                 """
             ),
@@ -250,7 +250,7 @@ def test_chained_shell_commands_with_workdir(rule_runner: RuleRunner) -> None:
                   output_files=["msg"],
                   command="cp ../a/msg . ; echo 'shell_command:b' >> msg",
                   execution_dependencies=["src/a:msg"],
-                  workdir=f"{build_file_dir()}",
+                  workdir=".",
                 )
                 """
             ),
@@ -588,6 +588,7 @@ def test_shell_command_boot_script(rule_runner: RuleRunner) -> None:
                     "python3.8",
                   ],
                   command="./command.script",
+                  workdir=".",
                 )
                 """
             ),
@@ -731,7 +732,7 @@ def test_run_runnable_in_sandbox_with_workdir(rule_runner: RuleRunner) -> None:
                   name="run_fruitcake",
                   runnable=":fruitcake",
                   output_files=["fruitcake.txt"],
-                  workdir=f"{build_file_dir()}",
+                  workdir=".",
                 )
                 """
             ),
@@ -755,6 +756,7 @@ def test_relative_directories(rule_runner: RuleRunner) -> None:
                   tools=["echo"],
                   command='echo foosh > ../foosh.txt',
                   output_files=["../foosh.txt"],
+                  workdir=".",
                 )
                 """
             ),
@@ -778,6 +780,7 @@ def test_relative_directories_2(rule_runner: RuleRunner) -> None:
                   tools=["echo"],
                   command='echo foosh > ../newdir/foosh.txt',
                   output_files=["../newdir/foosh.txt"],
+                  workdir=".",
                 )
                 """
             ),
@@ -801,6 +804,7 @@ def test_cannot_escape_build_root(rule_runner: RuleRunner) -> None:
                   tools=["echo"],
                   command='echo foosh > ../../invalid.txt',
                   output_files=["../../invalid.txt"],
+                  workdir=".",
                 )
                 """
             ),
