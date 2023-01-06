@@ -1,6 +1,6 @@
 # Introduction
 
-In this tutorial, we continue from where we've left in the [first tutorial](docs/markdown/Writing Plugins/tutorials/01-create-new-goal-with-a-custom-target.md). Having now a complete goal with a custom target, we are ready to make certain improvements and learn more advanced concepts that you would likely find useful when working on your own plugins.
+In this tutorial, we continue from where we've left in the [previous tutorial](doc:create-a-new-goal). Having now a complete goal with a custom target, we are ready to make certain improvements and learn more advanced concepts that you would likely find useful when working on your own plugins.
 
 ## Adding a custom `source` field
 
