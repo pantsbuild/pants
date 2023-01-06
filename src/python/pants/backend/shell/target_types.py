@@ -434,11 +434,9 @@ class ShellCommandWorkdirField(StringField):
     help = softwrap(
         "Sets the current working directory of the command, relative to the project root. If not "
         "set, use the project root.\n\n"
-        "The following special values are supported:\n\n"
-        "* `.`: the location of the `BUILD` file that defines this target.\n"
-        "* `/`: the project root.\n"
-        "\n"
-        "Directories may be specified relative to either of these special values."
+        "To specify the location of the `BUILD` file, use `.`. Values beginning with `.` are "
+        "relative to the location of the `BUILD` file.\n\n"
+        "To specify the project/build root, use `/` or the empty string."
     )
 
 
