@@ -630,3 +630,26 @@ def test_run_runnable_in_sandbox(rule_runner: RuleRunner) -> None:
         Address("src", target_name="run_fruitcake"),
         expected_contents={"src/fruitcake.txt": "fruitcake\n"},
     )
+
+
+def test_relative_directories(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/BUILD": dedent(
+                """\
+                experimental_shell_command(
+                  name="quotes",
+                  tools=["echo"],
+                  command='echo foosh > ../foosh.txt',
+                  output_files=["../foosh.txt"],
+                )
+                """
+            ),
+        }
+    )
+
+    assert_shell_command_result(
+        rule_runner,
+        Address("src", target_name="quotes"),
+        expected_contents={"foosh.txt": "foosh\n"},
+    )
