@@ -8,7 +8,7 @@ import logging
 from collections import defaultdict
 from dataclasses import dataclass
 from enum import Enum
-from typing import Callable, ClassVar, Iterable, Iterator, Mapping, Sequence, cast
+from typing import Callable, ClassVar, Iterable, Iterator, Mapping, Sequence, Tuple, cast
 
 from typing_extensions import Protocol
 
@@ -160,7 +160,7 @@ class RequirementVersion(Protocol):
 
 RequirementName = str
 LockfileRequirements = FrozenDict[RequirementName, RequirementVersion]
-ChangedRequirements = FrozenDict[RequirementName, tuple[RequirementVersion, RequirementVersion]]
+ChangedRequirements = FrozenDict[RequirementName, Tuple[RequirementVersion, RequirementVersion]]
 
 
 @dataclass(frozen=True)
