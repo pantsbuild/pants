@@ -533,7 +533,7 @@ def test_macro_undefined_symbol_bootstrap() -> None:
 def test_build_file_env_vars(target_adaptor_rule_runner: RuleRunner) -> None:
     target_adaptor_rule_runner.write_files(
         {
-            "src/BUILD": dedent(
+            "BUILD": dedent(
                 """
                 mock_tgt(
                   description=env("MOCK_DESC"),
@@ -549,7 +549,7 @@ def test_build_file_env_vars(target_adaptor_rule_runner: RuleRunner) -> None:
     target_adaptor_rule_runner.set_options([], env={"MOCK_DESC": "from env", "TAG": "tag"})
     target_adaptor = target_adaptor_rule_runner.request(
         TargetAdaptor,
-        [TargetAdaptorRequest(Address("src"), description_of_origin="tests")],
+        [TargetAdaptorRequest(Address(""), description_of_origin="tests")],
     )
     assert target_adaptor.kwargs["description"] == "from env"
     assert target_adaptor.kwargs["tags"] == ["default", "tag"]

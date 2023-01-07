@@ -6,8 +6,8 @@ from __future__ import annotations
 import ast
 import builtins
 import itertools
-import logging
 import os.path
+import sys
 from dataclasses import dataclass
 from pathlib import PurePath
 from typing import Any, Sequence, cast
@@ -48,8 +48,6 @@ from pants.init.bootstrap_scheduler import BootstrapStatus
 from pants.option.global_options import GlobalOptions
 from pants.util.frozendict import FrozenDict
 from pants.util.strutil import softwrap
-
-logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -194,9 +192,14 @@ class BUILDFileEnvVarExtractor(ast.NodeVisitor):
     def visit_Call(self, node: ast.Call):
         is_env = isinstance(node.func, ast.Name) and node.func.id == "env"
         for arg in node.args:
-            if is_env and isinstance(arg, ast.Constant):
-                self.env_vars.add(arg.value)
-                return
+            if is_env:
+                if sys.version_info[0:2] < (3, 8):
+                    value = arg.s if isinstance(arg, ast.Str) else None
+                else:
+                    value = arg.value if isinstance(arg, ast.Constant) else None
+                if value is not None:
+                    self.env_vars.add(value)
+                    return
             else:
                 is_env = False
             self.visit(arg)
@@ -211,11 +214,6 @@ async def extract_env_vars(
 ) -> EnvironmentVars:
     """For BUILD file env vars, we only ever consult the local systems env."""
     env_vars = BUILDFileEnvVarExtractor.get_env_vars(request.file_content)
-    if env_vars:
-        logging.info(
-            f"Fetch env vars for {env_vars} from {session_values[CompleteEnvironmentVars]}"
-        )
-
     return await Get(
         EnvironmentVars,
         {
@@ -294,7 +292,6 @@ async def parse_address_family(
     all_env_vars = await MultiGet(
         Get(EnvironmentVars, BUILDFileEnvironmentVariablesRequest(fc)) for fc in digest_contents
     )
-    logging.info(f"Parsing {directory.path}, env vars: {all_env_vars}")
 
     address_maps = [
         AddressMap.parse(
