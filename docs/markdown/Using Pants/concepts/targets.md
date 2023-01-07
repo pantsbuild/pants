@@ -53,6 +53,7 @@ BUILD files are very hermetic in nature with no support for using `import` or ot
 ```python helloworld/pkg/BUILD
 python_distribution(
   name="helloworld-dist",
+  description=env("DIST_DESC", "Set the `DIST_DESC` env variable to override this value."),
   provides=python_artifact(
     name="helloworld",
     version=env("HELLO_WORLD_VERSION"),
