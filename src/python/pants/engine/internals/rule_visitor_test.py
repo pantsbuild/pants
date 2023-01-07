@@ -52,12 +52,16 @@ class InnerScope:
     container_instance = container_instance
 
 
-def assert_awaitables(func, awaitable_types: Iterable[tuple[type | list[type], type]]):
+OutT = type
+InT = type
+
+
+def assert_awaitables(func, awaitable_types: Iterable[tuple[OutT, InT | list[InT]]]):
     gets = collect_awaitables(func)
-    actual_types = tuple((list(get.input_types), get.output_type) for get in gets)
+    actual_types = tuple((get.output_type, list(get.input_types)) for get in gets)
     expected_types = tuple(
-        (([input_] if isinstance(input_, type) else input_), output)
-        for input_, output in awaitable_types
+        (output, ([input_] if isinstance(input_, type) else input_))
+        for output, input_ in awaitable_types
     )
     assert actual_types == expected_types
 
@@ -66,14 +70,14 @@ def test_single_get() -> None:
     async def rule():
         await Get(STR, INT, 42)
 
-    assert_awaitables(rule, [(int, str)])
+    assert_awaitables(rule, [(str, int)])
 
 
 def test_get_multi_param_syntax() -> None:
     async def rule():
         await Get(str, {42: int, "towel": str})
 
-    assert_awaitables(rule, [([int, str], str)])
+    assert_awaitables(rule, [(str, [int, str])])
 
 
 def test_multiple_gets() -> None:
@@ -82,21 +86,21 @@ def test_multiple_gets() -> None:
         if len(a) > 1:
             await Get(BOOL, STR("bob"))
 
-    assert_awaitables(rule, [(int, str), (str, bool)])
+    assert_awaitables(rule, [(str, int), (bool, str)])
 
 
 def test_multiget_homogeneous() -> None:
     async def rule():
         await MultiGet(Get(STR, INT(x)) for x in range(5))
 
-    assert_awaitables(rule, [(int, str)])
+    assert_awaitables(rule, [(str, int)])
 
 
 def test_multiget_heterogeneous() -> None:
     async def rule():
         await MultiGet(Get(STR, INT, 42), Get(INT, STR("bob")))
 
-    assert_awaitables(rule, [(int, str), (str, int)])
+    assert_awaitables(rule, [(str, int), (int, str)])
 
 
 def test_attribute_lookup() -> None:
@@ -104,7 +108,7 @@ def test_attribute_lookup() -> None:
         await Get(InnerScope.STR, InnerScope.INT, 42)
         await Get(InnerScope.STR, InnerScope.INT(42))
 
-    assert_awaitables(rule1, [(int, str), (int, str)])
+    assert_awaitables(rule1, [(str, int), (str, int)])
 
 
 def test_get_no_index_call_no_subject_call_allowed() -> None:
@@ -118,7 +122,7 @@ def test_rule_helpers_free_functions() -> None:
     async def rule():
         _top_helper(1)
 
-    assert_awaitables(rule, [(int, str), (str, int)])
+    assert_awaitables(rule, [(str, int), (int, str)])
 
 
 def test_rule_helpers_class_methods() -> None:
@@ -149,12 +153,12 @@ def test_rule_helpers_class_methods() -> None:
     # Rule helpers must be called via module-scoped attribute lookup
     assert_awaitables(rule1, [])
     assert_awaitables(rule1_inner, [])
-    assert_awaitables(rule2, [(int, str), (str, int)])
-    assert_awaitables(rule2_inner, [(int, str), (str, int)])
-    assert_awaitables(rule3, [(int, str), (str, int)])
-    assert_awaitables(rule3_inner, [(int, str), (str, int)])
-    assert_awaitables(rule4, [(int, str)])
-    assert_awaitables(rule4_inner, [(int, str)])
+    assert_awaitables(rule2, [(str, int), (int, str)])
+    assert_awaitables(rule2_inner, [(str, int), (int, str)])
+    assert_awaitables(rule3, [(str, int), (int, str)])
+    assert_awaitables(rule3_inner, [(str, int), (int, str)])
+    assert_awaitables(rule4, [(str, int)])
+    assert_awaitables(rule4_inner, [(str, int)])
 
 
 def test_valid_get_unresolvable_product_type() -> None:
