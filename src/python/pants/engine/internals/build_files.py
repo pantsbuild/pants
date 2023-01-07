@@ -210,12 +210,16 @@ async def extract_env_vars(
     session_values: SessionValues,
 ) -> EnvironmentVars:
     """For BUILD file env vars, we only ever consult the local systems env."""
+    env_vars = BUILDFileEnvVarExtractor.get_env_vars(request.file_content)
+    if env_vars:
+        logging.info(
+            f"Fetch env vars for {env_vars} from {session_values[CompleteEnvironmentVars]}"
+        )
+
     return await Get(
         EnvironmentVars,
         {
-            EnvironmentVarsRequest(
-                BUILDFileEnvVarExtractor.get_env_vars(request.file_content)
-            ): EnvironmentVarsRequest,
+            EnvironmentVarsRequest(env_vars): EnvironmentVarsRequest,
             session_values[CompleteEnvironmentVars]: CompleteEnvironmentVars,
         },
     )
