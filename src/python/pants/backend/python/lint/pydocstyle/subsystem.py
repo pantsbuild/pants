@@ -14,11 +14,7 @@ from pants.backend.python.goals.lockfile import (
 from pants.backend.python.lint.pydocstyle.skip_field import SkipPydocstyleField
 from pants.backend.python.subsystems.python_tool_base import ExportToolOption, PythonToolBase
 from pants.backend.python.subsystems.setup import PythonSetup
-from pants.backend.python.target_types import (
-    ConsoleScript,
-    InterpreterConstraintsField,
-    PythonSourceField,
-)
+from pants.backend.python.target_types import ConsoleScript, PythonSourceField
 from pants.backend.python.util_rules.partition import _find_all_unique_interpreter_constraints
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.util_rules.config_files import ConfigFilesRequest
@@ -36,7 +32,6 @@ class PydocstyleFieldSet(FieldSet):
     required_fields = (PythonSourceField,)
 
     source: PythonSourceField
-    interpreter_constraints: InterpreterConstraintsField
 
     @classmethod
     def opt_out(cls, tgt: Target) -> bool:
@@ -50,6 +45,9 @@ class Pydocstyle(PythonToolBase):
 
     default_version = "pydocstyle[toml]>=6.1.1,<7.0"
     default_main = ConsoleScript("pydocstyle")
+
+    register_interpreter_constraints = True
+    default_interpreter_constraints = ["CPython>=3.7,<4"]
 
     register_lockfile = True
     default_lockfile_resource = ("pants.backend.python.lint.pydocstyle", "pydocstyle.lock")
@@ -138,14 +136,14 @@ class PydocstyleExportSentinel(ExportPythonToolSentinel):
     level=LogLevel.DEBUG,
 )
 async def pydocstyle_export(
-    _: PydocstyleExportSentinel, pydocstyle: Pydocstyle, python_setup: PythonSetup
+    _: PydocstyleExportSentinel,
+    pydocstyle: Pydocstyle,
 ) -> ExportPythonTool:
     if not pydocstyle.export:
         return ExportPythonTool(resolve_name=pydocstyle.options_scope, pex_request=None)
-    constraints = await _find_all_unique_interpreter_constraints(python_setup, PydocstyleFieldSet)
     return ExportPythonTool(
         resolve_name=pydocstyle.options_scope,
-        pex_request=pydocstyle.to_pex_request(interpreter_constraints=constraints),
+        pex_request=pydocstyle.to_pex_request(),
     )
 
 
