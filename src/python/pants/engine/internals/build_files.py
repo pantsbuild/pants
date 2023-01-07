@@ -6,6 +6,7 @@ from __future__ import annotations
 import ast
 import builtins
 import itertools
+import logging
 import os.path
 from dataclasses import dataclass
 from pathlib import PurePath
@@ -47,6 +48,8 @@ from pants.init.bootstrap_scheduler import BootstrapStatus
 from pants.option.global_options import GlobalOptions
 from pants.util.frozendict import FrozenDict
 from pants.util.strutil import softwrap
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -287,6 +290,7 @@ async def parse_address_family(
     all_env_vars = await MultiGet(
         Get(EnvironmentVars, BUILDFileEnvironmentVariablesRequest(fc)) for fc in digest_contents
     )
+    logging.info(f"Parsing {directory.path}, env vars: {all_env_vars}")
 
     address_maps = [
         AddressMap.parse(
