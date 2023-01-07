@@ -80,11 +80,13 @@ def main() -> None:
 
     schema: Dict[str, Any] = dict()
     schema["$schema"] = "http://json-schema.org/draft-04/schema#"
-    schema["description"] = "https://www.pantsbuild.org/"
+    schema["description"] = "Pants configuration file schema: https://www.pantsbuild.org/"
     schema["properties"] = ruleset
+    # custom plugins may have own configuration sections
+    schema["additionalProperties"] = True
 
     with open(GENERATED_JSON_SCHEMA_FILENAME, "w") as fh:
-        fh.write(json.dumps(schema, indent=4))
+        fh.write(json.dumps(schema, indent=4, sort_keys=True))
 
 
 def create_parser() -> argparse.ArgumentParser:
