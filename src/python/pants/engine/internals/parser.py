@@ -290,7 +290,7 @@ def error_on_imports(build_file_content: str, filepath: str) -> None:
             f"Import used in {filepath} at line {lineno}. Import statements are banned in "
             "BUILD files and macros (that act like a normal BUILD file) because they can easily "
             "break Pants caching and lead to stale results. "
-            f"\n\nInstead, consider writing a plugin ({doc_url('plugins-overview')}."
+            f"\n\nInstead, consider writing a plugin ({doc_url('plugins-overview')})."
         )
 
 
