@@ -192,17 +192,22 @@ class BUILDFileEnvVarExtractor(ast.NodeVisitor):
     def visit_Call(self, node: ast.Call):
         is_env = isinstance(node.func, ast.Name) and node.func.id == "env"
         for arg in node.args:
-            if is_env:
-                if sys.version_info[0:2] < (3, 8):
-                    value = arg.s if isinstance(arg, ast.Str) else None
-                else:
-                    value = arg.value if isinstance(arg, ast.Constant) else None
-                if value is not None:
-                    self.env_vars.add(value)
-                    return
+            if not is_env:
+                self.visit(arg)
+                continue
+
+            # Only first arg may be checked as env name
+            is_env = False
+
+            if sys.version_info[0:2] < (3, 8):
+                value = arg.s if isinstance(arg, ast.Str) else None
             else:
-                is_env = False
-            self.visit(arg)
+                value = arg.value if isinstance(arg, ast.Constant) else None
+            if value:
+                # Found env name in this call, we're done here.
+                self.env_vars.add(value)
+                return
+
         for kwarg in node.keywords:
             self.visit(kwarg)
 

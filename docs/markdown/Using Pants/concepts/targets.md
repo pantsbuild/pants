@@ -48,9 +48,7 @@ You can autoformat `BUILD` files by enabling a `BUILD` file formatter by adding 
 Environment variables
 ---------------------
 
-BUILD files are very hermetic in nature with no support for using `import` or other I/O
-operations. In order to have dynamic data in BUILD files, you may inject values from the environment
-using the `env()` function. It takes the variable name and optional default value as arguments.
+BUILD files are very hermetic in nature with no support for using `import` or other I/O operations. In order to have dynamic data in BUILD files, you may inject values from the local environment using the `env()` function. It takes the variable name and optional default value as arguments.
 
 ```python helloworld/pkg/BUILD
 python_distribution(
