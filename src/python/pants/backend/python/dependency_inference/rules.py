@@ -57,6 +57,7 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionRule
 from pants.option.global_options import OwnersNotFoundBehavior
+from pants.source.source_root import SourceRoot, SourceRootRequest
 from pants.util.docutil import doc_url
 from pants.util.strutil import bullet_list, softwrap
 
@@ -254,7 +255,8 @@ async def find_other_owners_for_unowned_import(
     python_setup: PythonSetup,
 ) -> UnownedImportPossibleOwners:
     other_owner_from_other_resolves = await Get(
-        PythonModuleOwners, PythonModuleOwnersRequest(req.unowned_import, resolve=None)
+        PythonModuleOwners,
+        PythonModuleOwnersRequest(req.unowned_import, resolve=None, locality=None),
     )
 
     owners = other_owner_from_other_resolves
@@ -380,15 +382,21 @@ async def resolve_parsed_dependencies(
         ExplicitlyProvidedDependencies, DependenciesRequest(request.field_set.dependencies)
     )
 
+    # Only set locality if needed, to avoid unnecessary rule graph memoization misses.
+    # When set, use the source root, which is useful in practice, but incurs fewer memoization
+    # misses than using the full spec_path.
+    locality = None
+    if python_infer_subsystem.local_disambiguation:
+        source_root = await Get(
+            SourceRoot, SourceRootRequest, SourceRootRequest.for_address(request.field_set.address)
+        )
+        locality = source_root.path
+
     if parsed_imports:
         owners_per_import = await MultiGet(
             Get(
                 PythonModuleOwners,
-                PythonModuleOwnersRequest(
-                    imported_module,
-                    resolve=request.resolve,
-                    locality=request.field_set.address.spec_path,
-                ),
+                PythonModuleOwnersRequest(imported_module, request.resolve, locality),
             )
             for imported_module in parsed_imports
         )

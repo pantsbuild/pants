@@ -232,12 +232,22 @@ async def infer_pex_binary_entry_point_dependency(
     if entry_point.val is None:
         return InferredDependencies([])
 
+    # Only set locality if needed, to avoid unnecessary rule graph memoization misses.
+    # When set, use the source root, which is useful in practice, but incurs fewer memoization
+    # misses than using the full spec_path.
+    locality = None
+    if python_infer_subsystem.local_disambiguation:
+        source_root = await Get(
+            SourceRoot, SourceRootRequest, SourceRootRequest.for_address(request.field_set.address)
+        )
+        locality = source_root.path
+
     owners = await Get(
         PythonModuleOwners,
         PythonModuleOwnersRequest(
             entry_point.val.module,
             resolve=request.field_set.resolve.normalized_value(python_setup),
-            locality=request.field_set.address.spec_path,
+            locality=locality,
         ),
     )
     address = request.field_set.address
