@@ -14,6 +14,7 @@
             "--[no-]log-show-rust-3rdparty"
           ],
           "env_var": "PANTS_LOG_SHOW_RUST_3RDPARTY",
+          "fromfile": false,
           "help": "Whether to show/hide logging done by 3rdparty Rust crates used by the Pants engine.",
           "removal_hint": null,
           "removal_version": null,
@@ -54,6 +55,7 @@
             "--ignore-warnings=\"['<str>', '<str>', ...]\""
           ],
           "env_var": "PANTS_IGNORE_WARNINGS",
+          "fromfile": false,
           "help": "Ignore logs and warnings matching these strings.\n\nNormally, Pants will look for literal matches from the start of the log/warning message, but you can prefix the ignore with `$regex$` for Pants to instead treat your string as a regex pattern. For example:\n\n    ignore_warnings = [\n        \"DEPRECATED: option 'config' in scope 'flake8' will be removed\",\n        '$regex$:No files\\s*'\n    ]",
           "removal_hint": null,
           "removal_version": null,
@@ -101,6 +103,7 @@
             "--level=<LogLevel>"
           ],
           "env_var": "PANTS_LEVEL",
+          "fromfile": false,
           "help": "Set the logging level.",
           "removal_hint": null,
           "removal_version": null,
@@ -143,6 +146,7 @@
             "--[no-]process-cleanup"
           ],
           "env_var": "PANTS_PROCESS_CLEANUP",
+          "fromfile": false,
           "help": "If false, Pants will not clean up local directories used as chroots for running processes. Pants will log their location so that you can inspect the chroot, and run the `__run.sh` script to recreate the process using the same argv and environment variables used by Pants. This option is useful for debugging.",
           "removal_hint": "Use the `keep_sandboxes` option instead.",
           "removal_version": "3.0.0.dev0",

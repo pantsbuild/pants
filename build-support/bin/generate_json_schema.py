@@ -49,7 +49,10 @@ def build_scope_properties(ruleset: dict, options: Iterable[dict], scope: str) -
         else:
             typ = PYTHON_TO_JSON_TYPE_MAPPING.get(option["typ"])
             if typ:
-                properties[option["config_key"]]["type"] = typ
+                # options may allow providing value inline or loading from a filepath string
+                properties[option["config_key"]]["type"] = (
+                    [typ, "string"] if option["fromfile"] else typ
+                )
 
     return ruleset
 
