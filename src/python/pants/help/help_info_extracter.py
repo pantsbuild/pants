@@ -96,7 +96,7 @@ class OptionHelpInfo:
     removal_version: If deprecated: The version at which this option is to be removed.
     removal_hint: If deprecated: The removal hint message registered for this option.
     choices: If this option has a constrained set of choices, a tuple of the stringified choices.
-    fromfile: Whether the option value will be loaded from a file specified with the `@filepath`.
+    fromfile: Supports reading the option value from a file when using `@filepath`.
     """
 
     display_args: tuple[str, ...]
