@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Iterable
 
 import pytest
@@ -11,7 +12,7 @@ from pants.engine.internals.rule_visitor import collect_awaitables
 from pants.engine.internals.selectors import Get, GetParseError, MultiGet
 from pants.engine.rules import rule_helper
 
-# The visitor inspects the module for definitions, so these must be at module scope
+# The visitor inspects the module for definitions.
 STR = str
 INT = int
 BOOL = bool
@@ -217,3 +218,44 @@ def test_invalid_get_dict_value_not_type() -> None:
 
     with pytest.raises(ValueError):
         collect_awaitables(rule)
+
+
+@dataclass(frozen=True)
+class Request:
+    arg1: str
+    arg2: float
+
+    @rule_helper
+    async def _helped(self) -> Request:
+        return self
+
+
+def test_deep_infer_types() -> None:
+    async def rule(request: Request):
+        # 1
+        r = await request._helped()
+        Get(int, r.arg1)
+        # 2
+        s = request.arg2
+        Get(bool, s)
+        # 3, 4
+        a, b = await MultiGet(
+            Get(list, str),
+            Get(tuple, str),
+        )
+        # 5
+        Get(dict, a)
+        # 6
+        Get(dict, b)
+
+    assert_awaitables(
+        rule,
+        [
+            (int, str),
+            (bool, float),
+            (list, str),
+            (tuple, str),
+            (dict, list),
+            (dict, tuple),
+        ],
+    )

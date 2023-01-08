@@ -7,10 +7,14 @@ import inspect
 import itertools
 import logging
 import sys
+import typing
+from contextlib import contextmanager
 from functools import partial
-from typing import Any, Callable, List
+from typing import Any, Callable, Iterator, List
 
+from pants.base.exceptions import RuleTypeError
 from pants.engine.internals.selectors import AwaitableConstraints, GetParseError
+from pants.util.backport import get_annotations
 from pants.util.memo import memoized
 
 logger = logging.getLogger(__name__)
@@ -28,6 +32,61 @@ def _get_starting_indent(source: str) -> int:
     return 0
 
 
+def _node_str(node: ast.AST) -> str:
+    if isinstance(node, ast.Name):
+        return node.id
+    if isinstance(node, ast.Attribute):
+        return ".".join([_node_str(node.value), node.attr])
+    if isinstance(node, ast.Call):
+        return _node_str(node.func)
+    return str(node)
+
+
+class _TypeStack:
+    def __init__(self, module_name: str) -> None:
+        self.root = sys.modules[module_name]
+        self._stack: list[dict[str, Any]] = []
+        self.push(self.root)
+
+    def __repr__(self) -> str:
+        from pprint import pformat
+
+        return f"TypeStack<\n{pformat(self._stack)}\n>"
+
+    def __getitem__(self, name: str) -> Any:
+        for ns in reversed(self._stack):
+            if name in ns:
+                return ns[name]
+        return self.root.__builtins__.get(name, None)
+
+    def __setitem__(self, name: str, value: Any) -> None:
+        self._stack[-1][name] = value
+
+    def push(self, frame: object) -> None:
+        ns = dict(frame if isinstance(frame, dict) else frame.__dict__)
+        self._stack.append(ns)
+
+    def pop(self) -> None:
+        assert len(self._stack) > 1
+        self._stack.pop()
+
+
+def _lookup_annotation(obj: Any, attr: str) -> Any:
+    """Get type assocated with a particular attribute on object. This can get hairy, especially on
+    Python <3.10.
+
+    https://docs.python.org/3/howto/annotations.html#accessing-the-annotations-dict-of-an-object-in-python-3-9-and-older
+    For this reason, we've copied the `inspect.get_annotations` method from CPython `main` branch.
+    """
+    if hasattr(obj, attr):
+        return getattr(obj, attr)
+    else:
+        try:
+            return get_annotations(obj, eval_str=True).get(attr)
+        except (NameError, TypeError):
+            return None
+
+
 class _AwaitableCollector(ast.NodeVisitor):
     def __init__(self, func: Callable):
         self.func = func
@@ -38,9 +97,13 @@ class _AwaitableCollector(ast.NodeVisitor):
 
         self.source_file = inspect.getsourcefile(func)
 
-        self.owning_module = sys.modules[func.__module__]
+        self.types = _TypeStack(func.__module__)
         self.awaitables: List[AwaitableConstraints] = []
         self.visit(ast.parse(source))
+
+    def _format(self, node: ast.AST, msg: str) -> str:
+        lineno = node.lineno + self.func.__code__.co_firstlineno - 1
+        return f"{self.source_file}:{lineno}: {msg}"
 
     def _lookup(self, attr: ast.expr) -> Any:
         names = []
@@ -56,27 +119,29 @@ class _AwaitableCollector(ast.NodeVisitor):
             return attr
 
         name = names.pop()
-        result = (
-            getattr(self.owning_module, name)
-            if hasattr(self.owning_module, name)
-            else self.owning_module.__builtins__.get(name, None)
-        )
+        result = self.types[name]
         while result is not None and names:
-            result = getattr(result, names.pop(), None)
-
+            result = _lookup_annotation(result, names.pop())
         return result
 
     def _check_constraint_arg_type(self, resolved: Any, node: ast.AST) -> type:
-        lineno = node.lineno + self.func.__code__.co_firstlineno - 1
         if resolved is None:
-            raise ValueError(
-                f"Could not resolve type `{node}` in top level of module "
-                f"{self.owning_module.__name__} defined in {self.source_file}:{lineno}"
+            raise RuleTypeError(
+                self._format(
+                    node,
+                    (
+                        f"Could not resolve type for `{_node_str(node)}` in module "
+                        f"{self.types.root.__name__}.\n"
+                        "This may be a limitation of the Pants rule type inference."
+                    ),
+                )
             )
         elif not isinstance(resolved, type):
-            raise ValueError(
-                f"Expected a `type`, but got: {resolved}"
-                + f" (type `{type(resolved).__name__}`) in {self.source_file}:{lineno}"
+            raise RuleTypeError(
+                self._format(
+                    node,
+                    f"Expected a type, but got: {resolved!r} (type `{type(resolved).__name__}`)",
+                )
             )
         return resolved
 
@@ -87,8 +152,12 @@ class _AwaitableCollector(ast.NodeVisitor):
         parse_error = partial(GetParseError, get_args=get_args, source_file_name=self.source_file)
 
         if len(get_args) not in (2, 3):
+            # TODO: fix parse error message formatting... (TODO: create ticket)
             raise parse_error(
-                f"Expected either two or three arguments, but got {len(get_args)} arguments."
+                self._format(
+                    call_node,
+                    f"Expected either two or three arguments, but got {len(get_args)} arguments.",
+                )
             )
 
         output_node = get_args[0]
@@ -127,6 +196,77 @@ class _AwaitableCollector(ast.NodeVisitor):
                 self.awaitables.extend(collect_awaitables(attr))
 
         self.generic_visit(call_node)
+
+    def visit_AsyncFunctionDef(self, rule: ast.AsyncFunctionDef) -> None:
+        with self._visit_rule_args(rule.args):
+            self.generic_visit(rule)
+
+    def visit_FunctionDef(self, rule: ast.FunctionDef) -> None:
+        with self._visit_rule_args(rule.args):
+            self.generic_visit(rule)
+
+    @contextmanager
+    def _visit_rule_args(self, node: ast.arguments) -> Iterator[None]:
+        self.types.push(
+            {
+                a.arg: self.types[a.annotation.id]
+                for a in node.args
+                if isinstance(a.annotation, ast.Name)
+            }
+        )
+        try:
+            yield
+        finally:
+            self.types.pop()
+
+    def visit_Assign(self, assign_node: ast.Assign) -> None:
+        awaitables_idx = len(self.awaitables)
+        self.generic_visit(assign_node)
+        collected_awaitables = self.awaitables[awaitables_idx:]
+        value = None
+        node: ast.AST = assign_node
+        while True:
+            if isinstance(node, (ast.Assign, ast.Await)):
+                node = node.value
+                continue
+            if isinstance(node, ast.Call):
+                f = self._lookup(node.func)
+                if isinstance(node.func, ast.Name) and node.func.id == "MultiGet":
+                    value = tuple(get.output_type for get in collected_awaitables)
+                elif f is not None:
+                    value = _lookup_annotation(f, "return")
+                    typ = typing.get_origin(value)
+                    if isinstance(typ, type):
+                        args = typing.get_args(value)
+                        if issubclass(typ, (list, set, tuple)):
+                            value = tuple(args)
+            elif isinstance(node, (ast.Name, ast.Attribute)):
+                value = self._lookup(node)
+            break
+
+        for tgt in assign_node.targets:
+            if isinstance(tgt, ast.Name):
+                names = [tgt.id]
+                values = [value]
+            elif isinstance(tgt, ast.Tuple):
+                names = [el.id for el in tgt.elts if isinstance(el, ast.Name)]
+                values = value or itertools.cycle([None])  # type: ignore[assignment]
+            else:
+                # subscript, etc..
+                continue
+            try:
+                for name, value in zip(names, values):
+                    self.types[name] = value
+            except TypeError as e:
+                logger.debug(
+                    self._format(
+                        node,
+                        (
+                            "Rule visitor failed to inspect assignment expression for "
+                            f"{names} - {values}: {e}"
+                        ),
+                    )
+                )
 
 
 @memoized
