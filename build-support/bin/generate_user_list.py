@@ -83,6 +83,7 @@ _orgs = (
     ),
     Org("IBM", "https://www.ibm.com/", None),
     Org("iManage", "https://imanage.com/", "https://files.readme.io/0f7b5f6-imanage-small.png"),
+    Org("Kaiko", "https://www.kaiko.ai/", "https://files.readme.io/069b55d-kaiko.png"),
     Org("Lablup", "https://lablup.com/", "https://files.readme.io/a94d375-lablup-small.png"),
     Org("Myst AI", "https://www.myst.ai/", "https://files.readme.io/802d8fa-myst_ai_small.png"),
     Org("Ocrolus", "https://www.ocrolus.com/", "https://files.readme.io/ff166fa-ocrolus-small.png"),
