@@ -7,21 +7,24 @@ import inspect
 import itertools
 import logging
 import sys
-import typing
 from contextlib import contextmanager
 from functools import partial
 from typing import Any, Callable, Iterator, List
 
+import typing_extensions
+
 from pants.base.exceptions import RuleTypeError
-from pants.engine.internals.selectors import AwaitableConstraints, GetParseError
+from pants.engine.internals.selectors import (
+    Awaitable,
+    AwaitableConstraints,
+    Effect,
+    GetParseError,
+    MultiGet,
+)
 from pants.util.backport import get_annotations
 from pants.util.memo import memoized
 
 logger = logging.getLogger(__name__)
-
-
-def _is_awaitable_constraint(call_node: ast.Call) -> bool:
-    return isinstance(call_node.func, ast.Name) and call_node.func.id in ("Get", "Effect")
 
 
 def _get_starting_indent(source: str) -> int:
@@ -32,13 +35,19 @@ def _get_starting_indent(source: str) -> int:
     return 0
 
 
-def _node_str(node: ast.AST) -> str:
+def _node_str(node: Any) -> str:
     if isinstance(node, ast.Name):
         return node.id
     if isinstance(node, ast.Attribute):
         return ".".join([_node_str(node.value), node.attr])
     if isinstance(node, ast.Call):
         return _node_str(node.func)
+    if sys.version_info[0:2] < (3, 8):
+        if isinstance(node, ast.Str):
+            return node.s
+    else:
+        if isinstance(node, ast.Constant):
+            return str(node.value)
     return str(node)
 
 
@@ -85,6 +94,25 @@ def _lookup_annotation(obj: Any, attr: str) -> Any:
             return get_annotations(obj, eval_str=True).get(attr)
         except (NameError, TypeError):
             return None
+
+
+def _lookup_return_type(func: Callable) -> Any:
+    ret = _lookup_annotation(func, "return")
+    typ = typing_extensions.get_origin(ret)
+    if isinstance(typ, type):
+        args = typing_extensions.get_args(ret)
+        if issubclass(typ, (list, set, tuple)):
+            return tuple(args)
+    return ret
+
+
+def _returns_awaitable(func: Any) -> bool:
+    if not callable(func):
+        return False
+    ret = _lookup_return_type(func)
+    if not isinstance(ret, tuple):
+        ret = (ret,)
+    return any(issubclass(r, Awaitable) for r in ret if isinstance(r, type))
 
 
 class _AwaitableCollector(ast.NodeVisitor):
@@ -140,14 +168,12 @@ class _AwaitableCollector(ast.NodeVisitor):
             raise RuleTypeError(
                 self._format(
                     node,
-                    f"Expected a type, but got: {resolved!r} (type `{type(resolved).__name__}`)",
+                    f"Expected a type, but got: {type(resolved).__name__} {_node_str(resolved)!r}",
                 )
             )
         return resolved
 
-    def _get_awaitable(self, call_node: ast.Call) -> AwaitableConstraints:
-        func = self._lookup(call_node.func)
-        is_effect = func.__name__ == "Effect"
+    def _get_awaitable(self, call_node: ast.Call, is_effect: bool) -> AwaitableConstraints:
         get_args = call_node.args
         parse_error = partial(GetParseError, get_args=get_args, source_file_name=self.source_file)
 
@@ -188,12 +214,14 @@ class _AwaitableCollector(ast.NodeVisitor):
         )
 
     def visit_Call(self, call_node: ast.Call) -> None:
-        if _is_awaitable_constraint(call_node):
-            self.awaitables.append(self._get_awaitable(call_node))
-        else:
-            attr = self._lookup(call_node.func)
-            if hasattr(attr, "rule_helper"):
-                self.awaitables.extend(collect_awaitables(attr))
+        func = self._lookup(call_node.func)
+        if func is not None:
+            if isinstance(func, type) and issubclass(func, Awaitable):
+                self.awaitables.append(
+                    self._get_awaitable(call_node, is_effect=issubclass(func, Effect))
+                )
+            elif inspect.iscoroutinefunction(func) or _returns_awaitable(func):
+                self.awaitables.extend(collect_awaitables(func))
 
         self.generic_visit(call_node)
 
@@ -231,15 +259,10 @@ class _AwaitableCollector(ast.NodeVisitor):
                 continue
             if isinstance(node, ast.Call):
                 f = self._lookup(node.func)
-                if isinstance(node.func, ast.Name) and node.func.id == "MultiGet":
+                if f is MultiGet:
                     value = tuple(get.output_type for get in collected_awaitables)
                 elif f is not None:
-                    value = _lookup_annotation(f, "return")
-                    typ = typing.get_origin(value)
-                    if isinstance(typ, type):
-                        args = typing.get_args(value)
-                        if issubclass(typ, (list, set, tuple)):
-                            value = tuple(args)
+                    value = _lookup_return_type(f)
             elif isinstance(node, (ast.Name, ast.Attribute)):
                 value = self._lookup(node)
             break

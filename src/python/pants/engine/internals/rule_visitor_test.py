@@ -8,6 +8,7 @@ from typing import Iterable
 
 import pytest
 
+from pants.base.exceptions import RuleTypeError
 from pants.engine.internals.rule_visitor import collect_awaitables
 from pants.engine.internals.selectors import Get, GetParseError, MultiGet
 from pants.engine.rules import rule_helper
@@ -166,7 +167,7 @@ def test_valid_get_unresolvable_product_type() -> None:
     async def rule():
         Get(DNE, STR(42))  # noqa: F821
 
-    with pytest.raises(ValueError):
+    with pytest.raises(RuleTypeError, match="Could not resolve type for `DNE` in module"):
         collect_awaitables(rule)
 
 
@@ -174,7 +175,7 @@ def test_valid_get_unresolvable_subject_declared_type() -> None:
     async def rule():
         Get(int, DNE, "bob")  # noqa: F821
 
-    with pytest.raises(ValueError):
+    with pytest.raises(RuleTypeError, match="Could not resolve type for `DNE` in module"):
         collect_awaitables(rule)
 
 
@@ -200,7 +201,7 @@ def test_invalid_get_invalid_subject_arg_no_constructor_call() -> None:
     async def rule():
         Get(STR, "bob")
 
-    with pytest.raises(ValueError):
+    with pytest.raises(RuleTypeError, match="Expected a type, but got: Constant 'bob'"):
         collect_awaitables(rule)
 
 
@@ -208,7 +209,7 @@ def test_invalid_get_invalid_product_type_not_a_type_name() -> None:
     async def rule():
         Get(call(), STR("bob"))  # noqa: F821
 
-    with pytest.raises(ValueError):
+    with pytest.raises(RuleTypeError, match="Expected a type, but got: Call 'call'"):
         collect_awaitables(rule)
 
 
@@ -216,7 +217,7 @@ def test_invalid_get_dict_value_not_type() -> None:
     async def rule():
         Get(int, {"str": "not a type"})
 
-    with pytest.raises(ValueError):
+    with pytest.raises(RuleTypeError, match="Expected a type, but got: Constant 'not a type'"):
         collect_awaitables(rule)
 
 
@@ -225,9 +226,12 @@ class Request:
     arg1: str
     arg2: float
 
-    @rule_helper
     async def _helped(self) -> Request:
         return self
+
+    @staticmethod
+    def create_get() -> Get:
+        return Get(Request, int)
 
 
 def test_deep_infer_types() -> None:
@@ -247,15 +251,21 @@ def test_deep_infer_types() -> None:
         Get(dict, a)
         # 6
         Get(dict, b)
+        # 7 -- this is huge!
+        c = Request.create_get()
+        # 8 -- the `c` is already accounted for, make sure it's not duplicated.
+        await MultiGet([c, Get(str, dict)])
 
     assert_awaitables(
         rule,
         [
-            (int, str),
-            (bool, float),
-            (list, str),
-            (tuple, str),
-            (dict, list),
-            (dict, tuple),
+            (int, str),  # 1
+            (bool, float),  # 2
+            (list, str),  # 3
+            (tuple, str),  # 4
+            (dict, list),  # 5
+            (dict, tuple),  # 6
+            (Request, int),  # 7
+            (str, dict),  # 8
         ],
     )
