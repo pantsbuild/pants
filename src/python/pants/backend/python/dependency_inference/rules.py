@@ -26,6 +26,7 @@ from pants.backend.python.dependency_inference.parse_python_dependencies import 
     ParsePythonDependenciesRequest,
 )
 from pants.backend.python.dependency_inference.subsystem import (
+    AmbiguityResolution,
     InitFilesInference,
     PythonInferSubsystem,
     UnownedDependencyUsage,
@@ -386,7 +387,7 @@ async def resolve_parsed_dependencies(
     # When set, use the source root, which is useful in practice, but incurs fewer memoization
     # misses than using the full spec_path.
     locality = None
-    if python_infer_subsystem.local_disambiguation:
+    if python_infer_subsystem.ambiguity_resolution == AmbiguityResolution.by_source_root:
         source_root = await Get(
             SourceRoot, SourceRootRequest, SourceRootRequest.for_address(request.field_set.address)
         )

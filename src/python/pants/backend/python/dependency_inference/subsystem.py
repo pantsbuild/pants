@@ -27,6 +27,13 @@ class InitFilesInference(Enum):
     never = "never"
 
 
+class AmbiguityResolution(Enum):
+    """How to resolve ambiguous symbol ownership."""
+
+    none = "none"
+    by_source_root = "by_source_root"
+
+
 class PythonInferSubsystem(Subsystem):
     options_scope = "python-infer"
     help = "Options controlling which dependencies will be inferred for Python targets."
@@ -141,15 +148,21 @@ class PythonInferSubsystem(Subsystem):
             """
         ),
     )
-    local_disambiguation = BoolOption(
-        default=False,
+    ambiguity_resolution = EnumOption(
+        default=AmbiguityResolution.none,
         help=softwrap(
-            """
-            If multiple sources provide the same symbol, choose the one with the closest common
-            ancestor to the consumer of the symbol.  This is useful when multiple projects in
-            different source roots provide the same symbols (because of repeated first-party
-            module paths or overlapping requirements.txt) and you want to resolve the ambiguity
-            locally in each project.
+            f"""
+            When multiple sources provide the same symbol, how to choose the provider to use.
+
+            - {AmbiguityResolution.none}: Do not attempt to resolve this ambiguity. No dependency
+              will be inferred, and warnings will be logged.
+
+            - {AmbiguityResolution.by_source_root}:  Choose the provider with the closest common
+              ancestor to the consumer's source root.  If the provider is under the same source
+              root then this will be the source root itself.
+              This is useful when multiple projects in different source roots provide the same
+              symbols (because of repeated first-party module paths or overlapping
+              requirements.txt) and you want to resolve the ambiguity locally in each project.
             """
         ),
     )

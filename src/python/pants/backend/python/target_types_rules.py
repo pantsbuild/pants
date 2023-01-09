@@ -20,7 +20,10 @@ from pants.backend.python.dependency_inference.module_mapper import (
     PythonModuleOwnersRequest,
 )
 from pants.backend.python.dependency_inference.rules import import_rules
-from pants.backend.python.dependency_inference.subsystem import PythonInferSubsystem
+from pants.backend.python.dependency_inference.subsystem import (
+    AmbiguityResolution,
+    PythonInferSubsystem,
+)
 from pants.backend.python.goals.setup_py import InvalidEntryPoint
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
@@ -236,7 +239,7 @@ async def infer_pex_binary_entry_point_dependency(
     # When set, use the source root, which is useful in practice, but incurs fewer memoization
     # misses than using the full spec_path.
     locality = None
-    if python_infer_subsystem.local_disambiguation:
+    if python_infer_subsystem.ambiguity_resolution == AmbiguityResolution.by_source_root:
         source_root = await Get(
             SourceRoot, SourceRootRequest, SourceRootRequest.for_address(request.field_set.address)
         )

@@ -670,7 +670,7 @@ def test_resolving_ambiguity_by_filesystem_proximity(rule_runner: RuleRunner) ->
     rule_runner.set_options(
         [
             "--source-root-patterns=['root1', 'root2', 'root3']",
-            "--python-infer-local-disambiguation",
+            "--python-infer-ambiguity-resolution=by_source_root",
         ]
     )
     rule_runner.write_files(

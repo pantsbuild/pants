@@ -19,7 +19,6 @@ from pants.backend.python.dependency_inference.default_module_mapping import (
     DEFAULT_MODULE_MAPPING,
     DEFAULT_TYPE_STUB_MODULE_MAPPING,
 )
-from pants.backend.python.dependency_inference.subsystem import PythonInferSubsystem
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
     PythonRequirementModulesField,
@@ -412,7 +411,7 @@ class PythonModuleOwners:
 class PythonModuleOwnersRequest:
     module: str
     resolve: str | None
-    # If available and enabled resolve ambiguity by choosing the symbol provider with the
+    # If specified, resolve ambiguity by choosing the symbol provider with the
     # closest common ancestor to this path. Must be a path relative to the build root.
     locality: str | None = None
 
@@ -420,7 +419,6 @@ class PythonModuleOwnersRequest:
 @rule
 async def map_module_to_address(
     request: PythonModuleOwnersRequest,
-    python_infer_subsystem: PythonInferSubsystem,
     first_party_mapping: FirstPartyPythonModuleMapping,
     third_party_mapping: ThirdPartyPythonModuleMapping,
 ) -> PythonModuleOwners:
@@ -448,7 +446,7 @@ async def map_module_to_address(
         if possible_provider.ancestry == val[0]:
             val[1].append(possible_provider.provider)
 
-    if python_infer_subsystem.local_disambiguation and request.locality:
+    if request.locality:
         # For each provider type, if we have more than one provider left, prefer
         # the one with the closest common ancestor to the requester.
         for val in type_to_closest_providers.values():
