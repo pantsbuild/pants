@@ -201,7 +201,7 @@ def test_invalid_get_invalid_subject_arg_no_constructor_call() -> None:
     async def rule():
         Get(STR, "bob")
 
-    with pytest.raises(RuleTypeError, match="Expected a type, but got: Constant 'bob'"):
+    with pytest.raises(RuleTypeError, match="Expected a type, but got: (Str|Constant) 'bob'"):
         collect_awaitables(rule)
 
 
