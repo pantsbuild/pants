@@ -6,7 +6,7 @@ resource(
     source="dependency_parser.py",
 )
 
-# Also expose script as python sources so it gets formatted/linted/checked.
+# Also expose script as a python source so it gets formatted/linted/checked.
 python_source(
     name="dependency_parser_source",
     source="dependency_parser.py",
