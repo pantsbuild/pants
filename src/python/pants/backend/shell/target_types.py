@@ -574,6 +574,7 @@ class ShellCommandTestTarget(Target):
         ShellCommandExtraEnvVarsField,
         EnvironmentField,
         SkipShellCommandTestsField,
+        ShellCommandWorkdirField,
     )
     help = softwrap(
         """
