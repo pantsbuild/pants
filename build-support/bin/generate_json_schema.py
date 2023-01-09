@@ -34,7 +34,8 @@ def build_scope_properties(ruleset: dict, options: Iterable[dict], scope: str) -
 
     There are custom types (e.g. `file_option` or `LogLevel`) for which one cannot safely infer a
     type, so no type is added to the ruleset. If there are choices, there is no need to provide
-    "type" for the schema (assuming all choices share the same type). Otherwise, a provided `typ`
+    "type" for the schema (assuming all choices share the same type). If an option value can be
+    loaded from a file, a union of `string` and option's `typ` is used. Otherwise, a provided `typ`
     field is used.
     """
     for option in options:
@@ -50,9 +51,10 @@ def build_scope_properties(ruleset: dict, options: Iterable[dict], scope: str) -
             typ = PYTHON_TO_JSON_TYPE_MAPPING.get(option["typ"])
             if typ:
                 # options may allow providing value inline or loading from a filepath string
-                properties[option["config_key"]]["type"] = (
-                    [typ, "string"] if option["fromfile"] else typ
-                )
+                if option.get("fromfile"):
+                    properties[option["config_key"]]["oneOf"] = [{"type": typ}, {"type": "string"}]
+                else:
+                    properties[option["config_key"]]["type"] = typ
 
     return ruleset
 
@@ -87,6 +89,7 @@ def main() -> None:
     schema["properties"] = ruleset
     # custom plugins may have own configuration sections
     schema["additionalProperties"] = True
+    schema["type"] = "object"
 
     with open(GENERATED_JSON_SCHEMA_FILENAME, "w") as fh:
         fh.write(json.dumps(schema, indent=4, sort_keys=True))
