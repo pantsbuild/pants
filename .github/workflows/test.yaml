@@ -372,7 +372,8 @@ jobs:
       run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
 
         '
-    - env: {}
+    - env:
+        PANTS_CONFIG_FILES: +['pants.ci.toml','pants.ci.aarch64.toml']
       name: Build wheels
       run: '[[ "${GITHUB_EVENT_NAME}" == "pull_request" ]] && export MODE=debug
 
@@ -800,7 +801,8 @@ jobs:
     - id: set_merge_ok
       run: echo 'merge_ok=true' >> ${GITHUB_OUTPUT}
   test_python_linux_arm64:
-    env: {}
+    env:
+      PANTS_CONFIG_FILES: +['pants.ci.toml','pants.ci.aarch64.toml']
     if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only
       != 'true')
     name: Test Python (Linux-ARM64)

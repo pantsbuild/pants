@@ -312,6 +312,8 @@ class Helper:
             ret["ARCHFLAGS"] = "-arch x86_64"
         if self.platform == Platform.MACOS11_ARM64:
             ret["ARCHFLAGS"] = "-arch arm64"
+        if self.platform == Platform.LINUX_ARM64:
+            ret["PANTS_CONFIG_FILES"] = "+['pants.ci.toml','pants.ci.aarch64.toml']"
         return ret
 
     def wrap_cmd(self, cmd: str) -> str:

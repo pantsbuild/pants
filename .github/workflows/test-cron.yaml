@@ -387,7 +387,8 @@ jobs:
         - '3.9'
     timeout-minutes: 30
   test_python_linux_arm64:
-    env: {}
+    env:
+      PANTS_CONFIG_FILES: +['pants.ci.toml','pants.ci.aarch64.toml']
     if: github.repository_owner == 'pantsbuild'
     name: Test Python (Linux-ARM64)
     needs: bootstrap_pants_linux_arm64
