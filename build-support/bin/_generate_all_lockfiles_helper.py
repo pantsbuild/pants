@@ -130,7 +130,7 @@ AllTools = (
     DefaultTool.python(TwineSubsystem),
     DefaultTool.python(Yamllint, backend="pants.backend.experimental.tools.yamllint"),
     DefaultTool.python(Yapf, backend="pants.backend.python.lint.yapf"),
-    DefaultTool.python(Ruff, backend="pants.backend.python.lint.ruff"),
+    DefaultTool.python(Ruff, backend="pants.backend.experimental.python.lint.ruff"),
     # JVM
     DefaultTool.jvm(AvroSubsystem, backend="pants.backend.experimental.codegen.avro.java"),
     DefaultTool.jvm(GoogleJavaFormatSubsystem),

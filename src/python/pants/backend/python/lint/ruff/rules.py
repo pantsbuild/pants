@@ -6,8 +6,7 @@ from __future__ import annotations
 from pants.backend.python.lint.ruff.subsystem import Ruff, RuffFieldSet
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
-from pants.core.goals.fix import FixTargetsRequest
-from pants.core.goals.fmt import FmtResult
+from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.partitions import PartitionerType
 from pants.engine.fs import Digest, MergeDigests
@@ -17,19 +16,15 @@ from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 
 
-class RuffRequest(FixTargetsRequest):
+class RuffRequest(FmtTargetsRequest):
     field_set_type = RuffFieldSet
     tool_subsystem = Ruff
     partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 
-@rule(desc="Fix with ruff", level=LogLevel.DEBUG)
-async def ruff_fix(request: RuffRequest.Batch, ruff: Ruff) -> FmtResult:
-    ruff_pex_get = Get(
-        VenvPex,
-        PexRequest,
-        ruff.to_pex_request(interpreter_constraints=request.partition_metadata),
-    )
+@rule(desc="Format with ruff", level=LogLevel.DEBUG)
+async def ruff_fmt(request: RuffRequest.Batch, ruff: Ruff) -> FmtResult:
+    ruff_pex_get = Get(VenvPex, PexRequest, ruff.to_pex_request())
 
     config_files_get = Get(
         ConfigFiles, ConfigFilesRequest, ruff.config_request(request.snapshot.dirs)

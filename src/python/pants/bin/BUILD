@@ -51,6 +51,7 @@ target(
         "src/python/pants/backend/experimental/python/lint/add_trailing_comma",
         "src/python/pants/backend/experimental/python/lint/autoflake",
         "src/python/pants/backend/experimental/python/lint/pyupgrade",
+        "src/python/pants/backend/experimental/python/lint/ruff",
         "src/python/pants/backend/experimental/python/packaging/pyoxidizer",
         "src/python/pants/backend/experimental/python/typecheck/pyright",
         "src/python/pants/backend/experimental/scala",
