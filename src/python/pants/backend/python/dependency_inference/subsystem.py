@@ -154,15 +154,15 @@ class PythonInferSubsystem(Subsystem):
             f"""
             When multiple sources provide the same symbol, how to choose the provider to use.
 
-            - {AmbiguityResolution.none}: Do not attempt to resolve this ambiguity. No dependency
-              will be inferred, and warnings will be logged.
+            {AmbiguityResolution.none.value}: Do not attempt to resolve this ambiguity.
+            No dependency will be inferred, and warnings will be logged.
 
-            - {AmbiguityResolution.by_source_root}:  Choose the provider with the closest common
-              ancestor to the consumer's source root.  If the provider is under the same source
-              root then this will be the source root itself.
-              This is useful when multiple projects in different source roots provide the same
-              symbols (because of repeated first-party module paths or overlapping
-              requirements.txt) and you want to resolve the ambiguity locally in each project.
+            {AmbiguityResolution.by_source_root.value}:  Choose the provider with the closest common
+            ancestor to the consumer's source root.  If the provider is under the same source
+            root then this will be the source root itself.
+            This is useful when multiple projects in different source roots provide the same
+            symbols (because of repeated first-party module paths or overlapping
+            requirements.txt) and you want to resolve the ambiguity locally in each project.
             """
         ),
     )
