@@ -217,7 +217,9 @@ def test_invalid_get_dict_value_not_type() -> None:
     async def rule():
         Get(int, {"str": "not a type"})
 
-    with pytest.raises(RuleTypeError, match="Expected a type, but got: Constant 'not a type'"):
+    with pytest.raises(
+        RuleTypeError, match="Expected a type, but got: (Str|Constant) 'not a type'"
+    ):
         collect_awaitables(rule)
 
 
