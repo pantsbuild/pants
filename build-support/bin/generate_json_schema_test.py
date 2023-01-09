@@ -8,9 +8,12 @@ from generate_json_schema import GENERATED_JSON_SCHEMA_FILENAME, main
 
 def test_main():
     """Test generating a JSON schema using a simplified output of the `./pants help-all` command."""
-    cliargs = Mock()
-    cliargs.all_help_file = "build-support/bin/json_schema_testdata/all_help_sample_output.json"
-    with patch("generate_json_schema.get_args", lambda *args, **kwargs: cliargs):
+    with patch(
+        "generate_json_schema.get_args",
+        lambda *args, **kwargs: Mock(
+            all_help_file="build-support/bin/json_schema_testdata/all_help_sample_output.json"
+        ),
+    ):
         main()
 
     with open(GENERATED_JSON_SCHEMA_FILENAME) as fh:
