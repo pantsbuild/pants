@@ -377,6 +377,13 @@ class RunInSandboxSourcesField(MultipleSourcesField):
     expected_num_files = 0
 
 
+class ShellCommandIsInteractiveField(MultipleSourcesField):
+    # We use this to determine whether this is an interactive process.
+    alias = "_is_interactive"
+    uses_source_roots = False
+    expected_num_files = 0
+
+
 class RunInSandboxArgumentsField(StringSequenceField):
     alias = "args"
     default = ()
@@ -421,10 +428,16 @@ class ShellCommandLogOutputField(BoolField):
     help = "Set to true if you want the output from the command logged to the console."
 
 
-class ShellCommandRunWorkdirField(StringField):
+class ShellCommandWorkdirField(StringField):
     alias = "workdir"
-    default = "."
-    help = "Sets the current working directory of the command, relative to the project root."
+    default = None
+    help = softwrap(
+        "Sets the current working directory of the command, relative to the project root. If not "
+        "set, use the project root.\n\n"
+        "To specify the location of the `BUILD` file, use `.`. Values beginning with `.` are "
+        "relative to the location of the `BUILD` file.\n\n"
+        "To specify the project/build root, use `/` or the empty string."
+    )
 
 
 class ShellCommandTestDependenciesField(ShellCommandExecutionDependenciesField):
@@ -452,6 +465,7 @@ class ShellCommandTarget(Target):
         ShellCommandTimeoutField,
         ShellCommandToolsField,
         ShellCommandExtraEnvVarsField,
+        ShellCommandWorkdirField,
         EnvironmentField,
     )
     help = softwrap(
@@ -494,6 +508,7 @@ class ShellRunInSandboxTarget(Target):
         ShellCommandTimeoutField,
         ShellCommandToolsField,
         ShellCommandExtraEnvVarsField,
+        ShellCommandWorkdirField,
         EnvironmentField,
     )
     help = softwrap(
@@ -521,7 +536,8 @@ class ShellCommandRunTarget(Target):
         *COMMON_TARGET_FIELDS,
         ShellCommandExecutionDependenciesField,
         ShellCommandCommandField,
-        ShellCommandRunWorkdirField,
+        ShellCommandWorkdirField,
+        ShellCommandIsInteractiveField,
     )
     help = softwrap(
         """
@@ -558,6 +574,7 @@ class ShellCommandTestTarget(Target):
         ShellCommandExtraEnvVarsField,
         EnvironmentField,
         SkipShellCommandTestsField,
+        ShellCommandWorkdirField,
     )
     help = softwrap(
         """

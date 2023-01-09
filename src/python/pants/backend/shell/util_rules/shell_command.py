@@ -20,15 +20,16 @@ from pants.backend.shell.target_types import (
     ShellCommandCommandField,
     ShellCommandExecutionDependenciesField,
     ShellCommandExtraEnvVarsField,
+    ShellCommandIsInteractiveField,
     ShellCommandLogOutputField,
     ShellCommandOutputDependenciesField,
     ShellCommandOutputDirectoriesField,
     ShellCommandOutputFilesField,
     ShellCommandOutputsField,
-    ShellCommandRunWorkdirField,
     ShellCommandSourcesField,
     ShellCommandTimeoutField,
     ShellCommandToolsField,
+    ShellCommandWorkdirField,
 )
 from pants.backend.shell.util_rules.builtin import BASH_BUILTIN_COMMANDS
 from pants.base.deprecated import warn_or_error
@@ -84,7 +85,7 @@ class GenerateFilesFromRunInSandboxRequest(GenerateSourcesRequest):
 class ShellCommandProcessRequest:
     description: str
     interactive: bool
-    working_directory: str
+    working_directory: str | None
     command: str
     timeout: int | None
     tools: tuple[str, ...]
@@ -105,11 +106,13 @@ class ShellCommandProcessFromTargetRequest:
 async def _prepare_process_request_from_target(shell_command: Target) -> ShellCommandProcessRequest:
     description = f"the `{shell_command.alias}` at `{shell_command.address}`"
 
-    interactive = shell_command.has_field(ShellCommandRunWorkdirField)
-    if interactive:
-        working_directory = shell_command[ShellCommandRunWorkdirField].value or ""
-    else:
-        working_directory = shell_command.address.spec_path
+    interactive = shell_command.has_field(ShellCommandIsInteractiveField)
+    working_directory = _parse_working_directory(
+        shell_command[ShellCommandWorkdirField].value or "", shell_command.address
+    )
+
+    if interactive and not working_directory:
+        working_directory = "."
 
     command = shell_command[ShellCommandCommandField].value
     if not command:
@@ -240,7 +243,7 @@ async def prepare_process_request_from_target(
 class RunShellCommand(RunFieldSet):
     required_fields = (
         ShellCommandCommandField,
-        ShellCommandRunWorkdirField,
+        ShellCommandWorkdirField,
     )
     run_in_sandbox_behavior = RunInSandboxBehavior.NOT_SUPPORTED
 
@@ -324,7 +327,9 @@ async def run_in_sandbox_request(
     )
     run_field_set: RunFieldSet = field_sets.field_sets[0]
 
-    working_directory = shell_command.address.spec_path
+    working_directory = _parse_working_directory(
+        shell_command[ShellCommandWorkdirField].value or "", shell_command.address
+    )
 
     # Must be run in target environment so that the binaries/envvars match the execution
     # environment when we actually run the process.
@@ -456,8 +461,9 @@ async def prepare_shell_command_process(
     input_digest = await Get(Digest, MergeDigests([shell_command.input_digest, work_dir]))
 
     if interactive:
+        _working_directory = working_directory or "."
         relpath = os.path.relpath(
-            working_directory or ".", start="/" if os.path.isabs(working_directory) else "."
+            _working_directory or ".", start="/" if os.path.isabs(_working_directory) else "."
         )
         boot_script = f"cd {shlex.quote(relpath)}; " if relpath != "." else ""
     else:
@@ -514,6 +520,21 @@ def _output_at_build_root(process: Process, bash: BashBinary) -> Process:
         output_directories=output_directories,
         output_files=output_files,
     )
+
+
+def _parse_working_directory(workdir_in: str, address: Address) -> str:
+    """Convert the `workdir` field into something that can be understood by `Process`."""
+
+    reldir = address.spec_path
+
+    if workdir_in == ".":
+        return reldir
+    elif workdir_in.startswith("./"):
+        return os.path.join(reldir, workdir_in[2:])
+    elif workdir_in.startswith("/"):
+        return workdir_in[1:]
+    else:
+        return workdir_in
 
 
 @rule
