@@ -19,7 +19,7 @@ class Yamllint(PythonToolBase):
     default_interpreter_constraints = ["CPython>=3.6,<4"]
 
     config_file_name = StrOption(
-        "--config-file-glob",
+        "--config-file-name",
         default=".yamllint",
         advanced=True,
         help=lambda cls: softwrap(

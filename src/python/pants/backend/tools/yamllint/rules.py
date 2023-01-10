@@ -2,8 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
-import itertools
-import logging
 import os
 from collections import defaultdict
 from dataclasses import dataclass
@@ -21,8 +19,6 @@ from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
-
-logger = logging.getLogger(__name__)
 
 
 class YamllintRequest(LintFilesRequest):
@@ -125,14 +121,18 @@ async def partition_inputs(
     )
 
     return Partitions(
-        itertools.chain(
-            (
+        (
+            *(
                 Partition(tuple(files), PartitionInfo(config_snapshot=config_snapshot))
                 for files, config_snapshot in zip(
                     source_files_by_config_file.values(), config_file_snapshots
                 )
             ),
-            iter((Partition(tuple(default_source_files), PartitionInfo(config_snapshot=None)),)),
+            *(
+                (Partition(tuple(default_source_files), PartitionInfo(config_snapshot=None)),)
+                if default_source_files
+                else ()
+            ),
         )
     )
 
@@ -142,8 +142,6 @@ async def run_yamllint(request: YamllintRequest.Batch[Any, Any], yamllint: Yamll
     yamllint_bin = await Get(Pex, PexRequest, yamllint.to_pex_request())
 
     partition_info = cast(PartitionInfo, request.partition_metadata)
-    logger.debug(f"{partition_info=}")
-    logger.debug(f"{request.elements=}")
 
     snapshot = await Get(Snapshot, PathGlobs(request.elements))
 
