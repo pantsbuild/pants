@@ -451,6 +451,8 @@ async def map_module_to_address(
         # the one with the closest common ancestor to the requester.
         for val in type_to_closest_providers.values():
             providers = val[1]
+            if len(providers) < 2:
+                continue
             providers_with_closest_common_ancestor: list[ModuleProvider] = []
             closest_common_ancestor_len = 0
             for provider in providers:
