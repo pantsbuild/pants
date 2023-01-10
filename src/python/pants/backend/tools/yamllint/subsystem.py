@@ -3,8 +3,7 @@
 
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import ConsoleScript
-from pants.core.util_rules.config_files import ConfigFilesRequest
-from pants.option.option_types import ArgsListOption, FileOption, SkipOption
+from pants.option.option_types import ArgsListOption, SkipOption, StrListOption, StrOption
 from pants.util.strutil import softwrap
 
 
@@ -19,31 +18,38 @@ class Yamllint(PythonToolBase):
     register_interpreter_constraints = True
     default_interpreter_constraints = ["CPython>=3.6,<4"]
 
-    config = FileOption(
-        "--config",
-        default=None,
+    config_file_name = StrOption(
+        "--config-file-glob",
+        default=".yamllint",
         advanced=True,
         help=lambda cls: softwrap(
             """
-            Path to a config file understood by yamllint
-            (https://yamllint.readthedocs.io/en/stable/configuration.html).
+            Name of a config file understood by yamllint (https://yamllint.readthedocs.io/en/stable/configuration.html).
+            The plugin will search the ancestors of each directory in which YAML files are found for a config file of this name.
             """
+        ),
+    )
+
+    file_glob_include = StrListOption(
+        "--include",
+        default=["**/*.yml", "**/*.yaml"],
+        help=lambda cls: softwrap(
+            """
+                Glob for which YAML files to lint.
+                """
+        ),
+    )
+
+    file_glob_exclude = StrListOption(
+        "--exclude",
+        default=[],
+        help=lambda cls: softwrap(
+            """
+                Glob for which YAML files to exclude from linting.
+                """
         ),
     )
 
     args = ArgsListOption(example="-d relaxed")
 
     skip = SkipOption("lint")
-
-    def config_request(self) -> ConfigFilesRequest:
-        candidates = [
-            ".yamllint",
-            ".yamllint.yaml",
-            ".yamllint.yml",
-        ]
-        return ConfigFilesRequest(
-            specified=self.config,
-            specified_option_name=f"[{self.options_scope}].config",
-            discovery=True,
-            check_existence=candidates,
-        )

@@ -2,19 +2,20 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from __future__ import annotations
+
 from typing import Any, List
 
 import pytest
 
 from pants.backend.python.util_rules.pex import rules as pex_rules
-from pants.backend.tools.yamllint.rules import PartitionMetadata, YamllintRequest
+from pants.backend.tools.yamllint.rules import PartitionInfo, YamllintRequest
 from pants.backend.tools.yamllint.rules import rules as yamllint_rules
 from pants.backend.tools.yamllint.target_types import YamlSourcesGeneratorTarget, YamlSourceTarget
 from pants.core.goals.lint import LintResult, Partitions
 from pants.core.util_rules import config_files, external_tool, source_files
-from pants.testutil.rule_runner import QueryRule, RuleRunner
 from pants.engine.fs import PathGlobs
 from pants.engine.internals.native_engine import Snapshot
+from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
 @pytest.fixture
@@ -68,13 +69,17 @@ is it?
 """
 
 
-def run_yamllint(rule_runner: RuleRunner, *, extra_args: list[str] | None = None) -> List[LintResult]:
+def run_yamllint(
+    rule_runner: RuleRunner, *, extra_args: list[str] | None = None
+) -> List[LintResult]:
     rule_runner.set_options(
         ["--backend-packages=pants.backend.tools.yamllint", *(extra_args or ())],
         env_inherit={"PATH", "PYENV_ROOT"},
     )
     snapshot = rule_runner.request(Snapshot, [PathGlobs(["*"])])
-    partitions = rule_runner.request(Partitions[Any, PartitionMetadata], [YamllintRequest.PartitionRequest(snapshot.files)])
+    partitions = rule_runner.request(
+        Partitions[Any, PartitionInfo], [YamllintRequest.PartitionRequest(snapshot.files)]
+    )
     results = []
     for partition in partitions:
         result = rule_runner.request(
@@ -85,9 +90,7 @@ def run_yamllint(rule_runner: RuleRunner, *, extra_args: list[str] | None = None
     return results
 
 
-def assert_success(
-    rule_runner: RuleRunner, *, extra_args: list[str] | None = None
-) -> None:
+def assert_success(rule_runner: RuleRunner, *, extra_args: list[str] | None = None) -> None:
     result = run_yamllint(rule_runner, extra_args=extra_args)
     assert len(result) == 1
     assert result[0].exit_code == 0
