@@ -6,6 +6,7 @@ from __future__ import annotations
 import ast
 import builtins
 import itertools
+import logging
 import os.path
 import sys
 from dataclasses import dataclass
@@ -37,7 +38,7 @@ from pants.engine.internals.synthetic_targets import (
     SyntheticAddressMapsRequest,
 )
 from pants.engine.internals.target_adaptor import TargetAdaptor, TargetAdaptorRequest
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.rules import Get, MultiGet, collect_rules, rule, rule_helper
 from pants.engine.target import (
     DependenciesRuleApplication,
     DependenciesRuleApplicationRequest,
@@ -48,6 +49,8 @@ from pants.init.bootstrap_scheduler import BootstrapStatus
 from pants.option.global_options import GlobalOptions
 from pants.util.frozendict import FrozenDict
 from pants.util.strutil import softwrap
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -173,19 +176,15 @@ async def ensure_address_family(request: OptionalAddressFamily) -> AddressFamily
     return request.ensure()
 
 
-@dataclass(frozen=True)
-class BUILDFileEnvironmentVariablesRequest:
-    file_content: FileContent
-
-
 class BUILDFileEnvVarExtractor(ast.NodeVisitor):
-    def __init__(self):
+    def __init__(self, filename: str):
         super().__init__()
         self.env_vars: set[str] = set()
+        self.filename = filename
 
     @classmethod
     def get_env_vars(cls, file_content: FileContent) -> Sequence[str]:
-        obj = cls()
+        obj = cls(file_content.path)
         obj.visit(ast.parse(file_content.content, file_content.path))
         return tuple(obj.env_vars)
 
@@ -207,23 +206,28 @@ class BUILDFileEnvVarExtractor(ast.NodeVisitor):
                 # Found env name in this call, we're done here.
                 self.env_vars.add(value)
                 return
+            else:
+                logging.warning(
+                    f"{self.filename}:{arg.lineno}: Only constant string values as variable name to "
+                    f"`env()` is currently supported. This `env()` call will always result in "
+                    "the default value only."
+                )
 
         for kwarg in node.keywords:
             self.visit(kwarg)
 
 
-@rule
-async def extract_env_vars(
-    request: BUILDFileEnvironmentVariablesRequest,
-    session_values: SessionValues,
+@rule_helper
+async def _extract_env_vars(
+    file_content: FileContent, env: CompleteEnvironmentVars
 ) -> EnvironmentVars:
     """For BUILD file env vars, we only ever consult the local systems env."""
-    env_vars = BUILDFileEnvVarExtractor.get_env_vars(request.file_content)
+    env_vars = BUILDFileEnvVarExtractor.get_env_vars(file_content)
     return await Get(
         EnvironmentVars,
         {
             EnvironmentVarsRequest(env_vars): EnvironmentVarsRequest,
-            session_values[CompleteEnvironmentVars]: CompleteEnvironmentVars,
+            env: CompleteEnvironmentVars,
         },
     )
 
@@ -237,6 +241,7 @@ async def parse_address_family(
     registered_target_types: RegisteredTargetTypes,
     union_membership: UnionMembership,
     maybe_build_file_dependency_rules_implementation: MaybeBuildFileDependencyRulesImplementation,
+    session_values: SessionValues,
 ) -> OptionalAddressFamily:
     """Given an AddressMapper and a directory, return an AddressFamily.
 
@@ -294,9 +299,10 @@ async def parse_address_family(
         dependents_rules_parser_state = None
         dependencies_rules_parser_state = None
 
-    all_env_vars = await MultiGet(
-        Get(EnvironmentVars, BUILDFileEnvironmentVariablesRequest(fc)) for fc in digest_contents
-    )
+    all_env_vars = [
+        await _extract_env_vars(fc, session_values[CompleteEnvironmentVars])
+        for fc in digest_contents
+    ]
 
     address_maps = [
         AddressMap.parse(

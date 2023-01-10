@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import logging
 import re
 from textwrap import dedent
 from typing import cast
@@ -13,11 +14,10 @@ from pants.build_graph.address import BuildFileAddressRequest, MaybeAddress, Res
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.core.target_types import GenericTarget
 from pants.engine.addresses import Address, AddressInput, BuildFileAddress
-from pants.engine.env_vars import EnvironmentVars
+from pants.engine.env_vars import CompleteEnvironmentVars, EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.fs import DigestContents, FileContent, PathGlobs
 from pants.engine.internals.build_files import (
     AddressFamilyDir,
-    BUILDFileEnvironmentVariablesRequest,
     BuildFileOptions,
     OptionalAddressFamily,
     evaluate_preludes,
@@ -29,6 +29,7 @@ from pants.engine.internals.mapper import AddressFamily
 from pants.engine.internals.parametrize import Parametrize
 from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser
 from pants.engine.internals.scheduler import ExecutionError
+from pants.engine.internals.session import SessionValues
 from pants.engine.internals.synthetic_targets import (
     SyntheticAddressMaps,
     SyntheticAddressMapsRequest,
@@ -43,6 +44,7 @@ from pants.engine.target import (
     Target,
 )
 from pants.engine.unions import UnionMembership
+from pants.testutil.pytest_util import assert_logged
 from pants.testutil.rule_runner import (
     MockGet,
     QueryRule,
@@ -51,6 +53,7 @@ from pants.testutil.rule_runner import (
     run_rule_with_mocks,
 )
 from pants.util.frozendict import FrozenDict
+from pants.util.strutil import softwrap
 
 
 def test_parse_address_family_empty() -> None:
@@ -71,6 +74,7 @@ def test_parse_address_family_empty() -> None:
             RegisteredTargetTypes({}),
             UnionMembership({}),
             MaybeBuildFileDependencyRulesImplementation(None),
+            SessionValues({CompleteEnvironmentVars: CompleteEnvironmentVars({})}),
         ],
         mock_gets=[
             MockGet(
@@ -90,8 +94,8 @@ def test_parse_address_family_empty() -> None:
             ),
             MockGet(
                 output_type=EnvironmentVars,
-                input_types=(BUILDFileEnvironmentVariablesRequest,),
-                mock=lambda _: EnvironmentVars({}),
+                input_types=(EnvironmentVarsRequest, CompleteEnvironmentVars),
+                mock=lambda _1, _2: EnvironmentVars({}),
             ),
         ],
     )
@@ -553,3 +557,42 @@ def test_build_file_env_vars(target_adaptor_rule_runner: RuleRunner) -> None:
     )
     assert target_adaptor.kwargs["description"] == "from env"
     assert target_adaptor.kwargs["tags"] == ["default", "tag"]
+
+
+def test_invalid_build_file_env_vars(caplog, target_adaptor_rule_runner: RuleRunner) -> None:
+    target_adaptor_rule_runner.write_files(
+        {
+            "src/bad/BUILD": dedent(
+                """
+                DOES_NOT_WORK = "var_name1"
+                DO_THIS_INSTEAD = env("var_name2")
+
+                mock_tgt(description=env(DOES_NOT_WORK), tags=[DO_THIS_INSTEAD])
+                """
+            ),
+        },
+    )
+    target_adaptor_rule_runner.set_options(
+        [], env={"var_name1": "desc from env", "var_name2": "tag-from-env"}
+    )
+    target_adaptor = target_adaptor_rule_runner.request(
+        TargetAdaptor,
+        [TargetAdaptorRequest(Address("src/bad"), description_of_origin="tests")],
+    )
+    assert target_adaptor.kwargs["description"] is None
+    assert target_adaptor.kwargs["tags"] == ["tag-from-env"]
+    assert_logged(
+        caplog,
+        [
+            (
+                logging.WARNING,
+                softwrap(
+                    """
+                    src/bad/BUILD:5: Only constant string values as variable name to `env()` is
+                    currently supported. This `env()` call will always result in the default value
+                    only.
+                    """
+                ),
+            ),
+        ],
+    )
