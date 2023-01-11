@@ -36,7 +36,7 @@ from pants.backend.go.util_rules.go_mod import (
     OwningGoMod,
     OwningGoModRequest,
 )
-from pants.backend.go.util_rules.import_analysis import GoStdLibImports, GoStdLibImportsRequest
+from pants.backend.go.util_rules.import_analysis import GoStdLibPackages, GoStdLibPackagesRequest
 from pants.backend.go.util_rules.third_party_pkg import (
     AllThirdPartyPackages,
     AllThirdPartyPackagesRequest,
@@ -230,8 +230,8 @@ async def infer_go_dependencies(
             FallibleFirstPartyPkgAnalysis, FirstPartyPkgAnalysisRequest(addr, build_opts=build_opts)
         ),
         Get(
-            GoStdLibImports,
-            GoStdLibImportsRequest(with_race_detector=build_opts.with_race_detector),
+            GoStdLibPackages,
+            GoStdLibPackagesRequest(with_race_detector=build_opts.with_race_detector),
         ),
     )
 
@@ -317,8 +317,8 @@ async def infer_go_third_party_package_dependencies(
             ),
         ),
         Get(
-            GoStdLibImports,
-            GoStdLibImportsRequest(with_race_detector=build_opts.with_race_detector),
+            GoStdLibPackages,
+            GoStdLibPackagesRequest(with_race_detector=build_opts.with_race_detector),
         ),
     )
 
