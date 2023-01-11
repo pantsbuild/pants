@@ -60,7 +60,7 @@ class ParserScript:
 
 @rule
 async def parser_script() -> ParserScript:
-    script = read_resource(__name__, "scripts/dependency_parser_py")
+    script = read_resource(__name__, "scripts/dependency_parser.py")
     assert script is not None
     return ParserScript(
         await Get(Digest, CreateDigest([FileContent("__parse_python_dependencies.py", script)]))

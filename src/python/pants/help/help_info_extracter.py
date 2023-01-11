@@ -96,6 +96,7 @@ class OptionHelpInfo:
     removal_version: If deprecated: The version at which this option is to be removed.
     removal_hint: If deprecated: The removal hint message registered for this option.
     choices: If this option has a constrained set of choices, a tuple of the stringified choices.
+    fromfile: Supports reading the option value from a file when using `@filepath`.
     """
 
     display_args: tuple[str, ...]
@@ -115,6 +116,7 @@ class OptionHelpInfo:
     choices: tuple[str, ...] | None
     comma_separated_choices: str | None
     value_history: OptionValueHistory | None
+    fromfile: bool
 
 
 @dataclass(frozen=True)
@@ -973,6 +975,7 @@ class HelpInfoExtracter:
 
         target_field_name = f"{self._scope_prefix}_{option_field_name_for(args)}".replace("-", "_")
         environment_aware = kwargs.get("environment_aware") is True
+        fromfile = kwargs.get("fromfile", False)
 
         ret = OptionHelpInfo(
             display_args=tuple(display_args),
@@ -992,5 +995,6 @@ class HelpInfoExtracter:
             choices=choices,
             comma_separated_choices=None if choices is None else ", ".join(choices),
             value_history=None,
+            fromfile=fromfile,
         )
         return ret

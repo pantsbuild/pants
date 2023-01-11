@@ -22,11 +22,8 @@ from pants.backend.python.dependency_inference.rules import (
     InferInitDependencies,
     InferPythonImportDependencies,
     InitDependenciesInferenceFieldSet,
-    InitFilesInference,
     PythonImportDependenciesInferenceFieldSet,
-    PythonInferSubsystem,
     UnownedDependencyError,
-    UnownedDependencyUsage,
     UnownedImportsPossibleOwners,
     UnownedImportsPossibleOwnersRequest,
     _find_other_owners_for_unowned_imports,
@@ -34,6 +31,11 @@ from pants.backend.python.dependency_inference.rules import (
     import_rules,
     infer_python_conftest_dependencies,
     infer_python_init_dependencies,
+)
+from pants.backend.python.dependency_inference.subsystem import (
+    InitFilesInference,
+    PythonInferSubsystem,
+    UnownedDependencyUsage,
 )
 from pants.backend.python.macros import python_requirements
 from pants.backend.python.macros.python_requirements import PythonRequirementsTargetGenerator

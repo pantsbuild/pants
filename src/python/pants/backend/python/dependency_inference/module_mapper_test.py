@@ -666,6 +666,58 @@ def test_map_module_to_address(rule_runner: RuleRunner) -> None:
     )
 
 
+def test_resolving_ambiguity_by_filesystem_proximity(rule_runner: RuleRunner) -> None:
+    rule_runner.set_options(
+        [
+            "--source-root-patterns=['root1', 'root2', 'root3']",
+            "--python-infer-ambiguity-resolution=by_source_root",
+        ]
+    )
+    rule_runner.write_files(
+        {
+            "root1/aa/bb/BUILD": "python_sources()",
+            "root1/aa/bb/foo.py": "",
+            "root1/aa/cc/BUILD": "python_sources()",
+            "root1/aa/cc/bar.py": "from aa.bb import foo",
+            "root2/aa/bb/BUILD": "python_sources()",
+            "root2/aa/bb/foo.py": "",
+            "root2/aa/dd/baz.py": "from aa.bb import foo",
+            "root3/aa/ee/BUILD": "python_sources()",
+            "root3/aa/ee/foo.py": "from aa.bb import foo",
+        }
+    )
+
+    owners = rule_runner.request(
+        PythonModuleOwners, [PythonModuleOwnersRequest("aa.bb.foo", None, locality=None)]
+    )
+    assert list(owners.unambiguous) == []
+    assert list(owners.ambiguous) == [
+        Address("root1/aa/bb", relative_file_path="foo.py"),
+        Address("root2/aa/bb", relative_file_path="foo.py"),
+    ]
+
+    owners = rule_runner.request(
+        PythonModuleOwners, [PythonModuleOwnersRequest("aa.bb.foo", None, locality="root1/")]
+    )
+    assert list(owners.unambiguous) == [Address("root1/aa/bb", relative_file_path="foo.py")]
+    assert list(owners.ambiguous) == []
+
+    owners = rule_runner.request(
+        PythonModuleOwners, [PythonModuleOwnersRequest("aa.bb.foo", None, locality="root2/")]
+    )
+    assert list(owners.unambiguous) == [Address("root2/aa/bb", relative_file_path="foo.py")]
+    assert list(owners.ambiguous) == []
+
+    owners = rule_runner.request(
+        PythonModuleOwners, [PythonModuleOwnersRequest("aa.bb.foo", None, locality="root3/")]
+    )
+    assert list(owners.unambiguous) == []
+    assert list(owners.ambiguous) == [
+        Address("root1/aa/bb", relative_file_path="foo.py"),
+        Address("root2/aa/bb", relative_file_path="foo.py"),
+    ]
+
+
 def test_map_module_considers_resolves(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -702,7 +754,7 @@ def test_map_module_considers_resolves(rule_runner: RuleRunner) -> None:
 
 
 def test_issue_15111(rule_runner: RuleRunner) -> None:
-    """Ensure we can handle when a single address implement multiple modules.
+    """Ensure we can handle when a single address provides multiple modules.
 
     This is currently only possible with third-party targets.
     """

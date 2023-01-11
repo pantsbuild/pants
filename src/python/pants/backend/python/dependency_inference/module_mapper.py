@@ -6,6 +6,7 @@ from __future__ import annotations
 import enum
 import itertools
 import logging
+import os
 from collections import defaultdict
 from dataclasses import dataclass
 from functools import total_ordering
@@ -410,6 +411,9 @@ class PythonModuleOwners:
 class PythonModuleOwnersRequest:
     module: str
     resolve: str | None
+    # If specified, resolve ambiguity by choosing the symbol provider with the
+    # closest common ancestor to this path. Must be a path relative to the build root.
+    locality: str | None = None
 
 
 @rule
@@ -423,10 +427,11 @@ async def map_module_to_address(
         *first_party_mapping.providers_for_module(request.module, resolve=request.resolve),
     )
 
-    # We attempt to disambiguate conflicting providers by taking - for each provider type -
-    # the providers for the closest ancestors to the requested modules. This prevents
-    # issues with namespace packages that are split between first-party and third-party
-    # (e.g., https://github.com/pantsbuild/pants/discussions/17286).
+    # We first attempt to disambiguate conflicting providers by taking - for each provider type -
+    # the providers of the closest ancestors to the requested modules.
+    # E.g., if we have a provider for foo.bar and for foo.bar.baz, prefer the latter.
+    # This prevents issues with namespace packages that are split between first-party and
+    # third-party (e.g., https://github.com/pantsbuild/pants/discussions/17286).
 
     # Map from provider type to mutable pair of
     # [closest ancestry, list of provider of that type at that ancestry level].
@@ -441,12 +446,31 @@ async def map_module_to_address(
         if possible_provider.ancestry == val[0]:
             val[1].append(possible_provider.provider)
 
-    closest_providers: list[ModuleProvider] = list(
+    if request.locality:
+        # For each provider type, if we have more than one provider left, prefer
+        # the one with the closest common ancestor to the requester.
+        for val in type_to_closest_providers.values():
+            providers = val[1]
+            if len(providers) < 2:
+                continue
+            providers_with_closest_common_ancestor: list[ModuleProvider] = []
+            closest_common_ancestor_len = 0
+            for provider in providers:
+                common_ancestor_len = len(
+                    os.path.commonpath([request.locality, provider.addr.spec_path])
+                )
+                if common_ancestor_len > closest_common_ancestor_len:
+                    closest_common_ancestor_len = common_ancestor_len
+                    providers_with_closest_common_ancestor = []
+                if common_ancestor_len == closest_common_ancestor_len:
+                    providers_with_closest_common_ancestor.append(provider)
+            providers[:] = providers_with_closest_common_ancestor
+
+    remaining_providers: list[ModuleProvider] = list(
         itertools.chain(*[val[1] for val in type_to_closest_providers.values()])
     )
-    addresses = tuple(provider.addr for provider in closest_providers)
-
-    # Check that we have at most one closest provider for each provider type.
+    addresses = tuple(provider.addr for provider in remaining_providers)
+    # Check that we have at most one remaining provider for each provider type.
     # If we have more than one, signal ambiguity.
     if any(len(val[1]) > 1 for val in type_to_closest_providers.values()):
         return PythonModuleOwners((), ambiguous=addresses)
