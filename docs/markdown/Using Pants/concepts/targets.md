@@ -45,6 +45,22 @@ All target types have a `name` field, which is used to identify the target. Targ
 
 You can autoformat `BUILD` files by enabling a `BUILD` file formatter by adding it to `[GLOBAL].backend_packages` in `pants.toml` (such as `pants.backend.build_files.fmt.black` [or others](doc:enabling-backends)). Then to format, run `./pants fmt '**/BUILD'` or `./pants fmt ::` (formats everything).
 
+Environment variables
+---------------------
+
+BUILD files are very hermetic in nature with no support for using `import` or other I/O operations. In order to have dynamic data in BUILD files, you may inject values from the local environment using the `env()` function. It takes the variable name and optional default value as arguments.
+
+```python helloworld/pkg/BUILD
+python_distribution(
+  name="helloworld-dist",
+  description=env("DIST_DESC", "Set the `DIST_DESC` env variable to override this value."),
+  provides=python_artifact(
+    name="helloworld",
+    version=env("HELLO_WORLD_VERSION"),
+  ),
+)
+```
+
 Target addresses
 ================
 

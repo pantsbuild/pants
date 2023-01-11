@@ -3,12 +3,15 @@
 
 from __future__ import annotations
 
+import ast
 import builtins
 import itertools
+import logging
 import os.path
+import sys
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Any, cast
+from typing import Any, Sequence, cast
 
 from pants.build_graph.address import (
     Address,
@@ -19,7 +22,8 @@ from pants.build_graph.address import (
     ResolveError,
 )
 from pants.engine.engine_aware import EngineAwareParameter
-from pants.engine.fs import DigestContents, GlobMatchErrorBehavior, PathGlobs, Paths
+from pants.engine.env_vars import CompleteEnvironmentVars, EnvironmentVars, EnvironmentVarsRequest
+from pants.engine.fs import DigestContents, FileContent, GlobMatchErrorBehavior, PathGlobs, Paths
 from pants.engine.internals.defaults import BuildFileDefaults, BuildFileDefaultsParserState
 from pants.engine.internals.dep_rules import (
     BuildFileDependencyRules,
@@ -28,12 +32,13 @@ from pants.engine.internals.dep_rules import (
 )
 from pants.engine.internals.mapper import AddressFamily, AddressMap
 from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser, error_on_imports
+from pants.engine.internals.session import SessionValues
 from pants.engine.internals.synthetic_targets import (
     SyntheticAddressMaps,
     SyntheticAddressMapsRequest,
 )
 from pants.engine.internals.target_adaptor import TargetAdaptor, TargetAdaptorRequest
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.rules import Get, MultiGet, collect_rules, rule, rule_helper
 from pants.engine.target import (
     DependenciesRuleApplication,
     DependenciesRuleApplicationRequest,
@@ -44,6 +49,8 @@ from pants.init.bootstrap_scheduler import BootstrapStatus
 from pants.option.global_options import GlobalOptions
 from pants.util.frozendict import FrozenDict
 from pants.util.strutil import softwrap
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -169,6 +176,62 @@ async def ensure_address_family(request: OptionalAddressFamily) -> AddressFamily
     return request.ensure()
 
 
+class BUILDFileEnvVarExtractor(ast.NodeVisitor):
+    def __init__(self, filename: str):
+        super().__init__()
+        self.env_vars: set[str] = set()
+        self.filename = filename
+
+    @classmethod
+    def get_env_vars(cls, file_content: FileContent) -> Sequence[str]:
+        obj = cls(file_content.path)
+        obj.visit(ast.parse(file_content.content, file_content.path))
+        return tuple(obj.env_vars)
+
+    def visit_Call(self, node: ast.Call):
+        is_env = isinstance(node.func, ast.Name) and node.func.id == "env"
+        for arg in node.args:
+            if not is_env:
+                self.visit(arg)
+                continue
+
+            # Only first arg may be checked as env name
+            is_env = False
+
+            if sys.version_info[0:2] < (3, 8):
+                value = arg.s if isinstance(arg, ast.Str) else None
+            else:
+                value = arg.value if isinstance(arg, ast.Constant) else None
+            if value:
+                # Found env name in this call, we're done here.
+                self.env_vars.add(value)
+                return
+            else:
+                logging.warning(
+                    f"{self.filename}:{arg.lineno}: Only constant string values as variable name to "
+                    f"`env()` is currently supported. This `env()` call will always result in "
+                    "the default value only."
+                )
+
+        for kwarg in node.keywords:
+            self.visit(kwarg)
+
+
+@rule_helper
+async def _extract_env_vars(
+    file_content: FileContent, env: CompleteEnvironmentVars
+) -> EnvironmentVars:
+    """For BUILD file env vars, we only ever consult the local systems env."""
+    env_vars = BUILDFileEnvVarExtractor.get_env_vars(file_content)
+    return await Get(
+        EnvironmentVars,
+        {
+            EnvironmentVarsRequest(env_vars): EnvironmentVarsRequest,
+            env: CompleteEnvironmentVars,
+        },
+    )
+
+
 @rule(desc="Search for addresses in BUILD files")
 async def parse_address_family(
     parser: Parser,
@@ -178,6 +241,7 @@ async def parse_address_family(
     registered_target_types: RegisteredTargetTypes,
     union_membership: UnionMembership,
     maybe_build_file_dependency_rules_implementation: MaybeBuildFileDependencyRulesImplementation,
+    session_values: SessionValues,
 ) -> OptionalAddressFamily:
     """Given an AddressMapper and a directory, return an AddressFamily.
 
@@ -235,17 +299,23 @@ async def parse_address_family(
         dependents_rules_parser_state = None
         dependencies_rules_parser_state = None
 
+    all_env_vars = [
+        await _extract_env_vars(fc, session_values[CompleteEnvironmentVars])
+        for fc in digest_contents
+    ]
+
     address_maps = [
         AddressMap.parse(
             fc.path,
             fc.content.decode(),
             parser,
             prelude_symbols,
+            env_vars,
             defaults_parser_state,
             dependents_rules_parser_state,
             dependencies_rules_parser_state,
         )
-        for fc in digest_contents
+        for fc, env_vars in zip(digest_contents, all_env_vars)
     ]
 
     # Freeze defaults and dependency rules
