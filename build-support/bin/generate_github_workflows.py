@@ -701,9 +701,7 @@ def build_wheels_job(platform: Platform, python_versions: list[str]) -> Jobs:
     # the code, install rustup and expose Pythons.
     # TODO: Apply rust caching here.
     if platform == Platform.LINUX_X86_64:
-        container = {
-            "image": "registry.hub.docker.com/pantsbuild/wheel_build_x86_64:v1-568cfc69e"
-        }
+        container = {"image": "registry.hub.docker.com/pantsbuild/wheel_build_x86_64:v1-568cfc69e"}
     elif platform == Platform.LINUX_ARM64:
         # Unfortunately Equinix do not support the CentOS 7 image on the hardware we've been
         # generously given by the Runs on ARM program. Se we have to build in this image.
