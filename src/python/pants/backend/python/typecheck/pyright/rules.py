@@ -17,6 +17,7 @@ from pants.backend.python.target_types import (
     PythonResolveField,
     PythonSourceField,
 )
+from pants.backend.python.typecheck.pyright.skip_field import SkipPyrightField
 from pants.backend.python.typecheck.pyright.subsystem import Pyright
 from pants.backend.python.util_rules import pex_from_targets
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
@@ -40,7 +41,7 @@ from pants.engine.internals.native_engine import Digest, MergeDigests
 from pants.engine.internals.selectors import MultiGet
 from pants.engine.process import FallibleProcessResult, Process
 from pants.engine.rules import Get, Rule, collect_rules, rule, rule_helper
-from pants.engine.target import CoarsenedTargets, CoarsenedTargetsRequest, FieldSet
+from pants.engine.target import CoarsenedTargets, CoarsenedTargetsRequest, FieldSet, Target
 from pants.engine.unions import UnionRule
 from pants.source.source_root import SourceRootsRequest, SourceRootsResult
 from pants.util.logging import LogLevel
@@ -57,6 +58,10 @@ class PyrightFieldSet(FieldSet):
     sources: PythonSourceField
     resolve: PythonResolveField
     interpreter_constraints: InterpreterConstraintsField
+
+    @classmethod
+    def opt_out(cls, tgt: Target) -> bool:
+        return tgt.get(SkipPyrightField).value
 
 
 class PyrightRequest(CheckRequest):
