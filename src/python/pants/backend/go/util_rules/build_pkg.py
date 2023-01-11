@@ -5,6 +5,7 @@ from __future__ import annotations
 import dataclasses
 import hashlib
 import os.path
+from collections import deque
 from dataclasses import dataclass
 from pathlib import PurePath
 from typing import Iterable
@@ -426,6 +427,37 @@ async def _maybe_copy_headers_to_platform_independent_names(
         return None
 
 
+# Gather transitive prebuilt object files for Cgo. Traverse the provided dependencies and lifts `.syso`
+# object files into a single `Digest`.
+@rule_helper
+async def _gather_transitive_prebuilt_object_files(
+    build_request: BuildGoPackageRequest,
+) -> tuple[Digest, frozenset[str]]:
+    prebuilt_objects: list[tuple[Digest, list[str]]] = []
+
+    queue: deque[BuildGoPackageRequest] = deque([build_request])
+    while queue:
+        pkg = queue.popleft()
+        queue.extend(pkg.direct_dependencies)
+        if pkg.prebuilt_object_files:
+            prebuilt_objects.append(
+                (
+                    pkg.digest,
+                    [
+                        os.path.join(pkg.dir_path, obj_file)
+                        for obj_file in pkg.prebuilt_object_files
+                    ],
+                )
+            )
+
+    object_digest = await Get(Digest, MergeDigests([digest for digest, _ in prebuilt_objects]))
+    object_files = set()
+    for _, files in prebuilt_objects:
+        object_files.update(files)
+
+    return object_digest, frozenset(object_files)
+
+
 # NB: We must have a description for the streaming of this rule to work properly
 # (triggered by `FallibleBuiltGoPackage` subclassing `EngineAwareReturnType`).
 @rule(desc="Compile with Go", level=LogLevel.DEBUG)
@@ -501,7 +533,7 @@ async def build_go_package(
     # Add any prebuilt object files (".syso" extension) to the list of objects to link into the package.
     if request.prebuilt_object_files:
         objects.extend(
-            (f"./{request.dir_path}/{prebuilt_object_file}", request.digest)
+            (os.path.join(request.dir_path, prebuilt_object_file), request.digest)
             for prebuilt_object_file in request.prebuilt_object_files
         )
 
@@ -516,6 +548,11 @@ async def build_go_package(
             raise ValueError(
                 f"Package {request.import_path} is a cgo package but contains Go assembly files."
             )
+
+        # Gather all prebuilt object files transitively and pass them to the Cgo rule for linking into the
+        # Cgo object output. This is necessary to avoid linking errors.
+        # See https://github.com/golang/go/blob/6ad27161f8d1b9c5e03fb3415977e1d3c3b11323/src/cmd/go/internal/work/exec.go#L3291-L3311.
+        transitive_prebuilt_object_files = await _gather_transitive_prebuilt_object_files(request)
 
         assert request.cgo_flags is not None
         cgo_compile_result = await Get(
@@ -533,6 +570,7 @@ async def build_go_package(
                 cxx_files=request.cxx_files,
                 objc_files=request.objc_files,
                 fortran_files=request.fortran_files,
+                transitive_prebuilt_object_files=transitive_prebuilt_object_files,
             ),
         )
         assert cgo_compile_result is not None
@@ -543,7 +581,6 @@ async def build_go_package(
                 for obj_file in cgo_compile_result.output_obj_files
             ]
         )
-        s_files = []  # Clear s_files since assembly has already been handled in cgo rules.
 
     # Copy header files with platform-specific values in their name to platform independent names.
     # For example, defs_linux_amd64.h becomes defs_GOOS_GOARCH.h.
