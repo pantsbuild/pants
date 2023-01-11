@@ -37,7 +37,7 @@ use itertools::Itertools;
 use lazy_static::lazy_static;
 use parking_lot::Mutex;
 use tokio::runtime::{Builder, Handle, Runtime};
-use tokio::task::{Id, JoinSet};
+use tokio::task::{Id, JoinError, JoinHandle, JoinSet};
 
 lazy_static! {
     // Lazily initialized in Executor::global.
@@ -143,7 +143,8 @@ impl Executor {
   ///
   /// Run a Future on a tokio Runtime as a new Task, and return a Future handle to it.
   ///
-  /// Unlike tokio::spawn, if the background Task panics, the returned Future will too.
+  /// If the background Task exits abnormally, the given closure will be called to recover: usually
+  /// it should convert the resulting Error to a relevant error type.
   ///
   /// If the returned Future is dropped, the computation will still continue to completion: see
   /// <https://docs.rs/tokio/0.2.20/tokio/task/struct.JoinHandle.html>
@@ -151,11 +152,22 @@ impl Executor {
   pub fn spawn<O: Send + 'static, F: Future<Output = O> + Send + 'static>(
     &self,
     future: F,
+    rescue_join_error: impl FnOnce(JoinError) -> O,
   ) -> impl Future<Output = O> {
-    self
-      .handle
-      .spawn(future_with_correct_context(future))
-      .map(|r| r.expect("Background task exited unsafely."))
+    self.native_spawn(future).map(|res| match res {
+      Ok(o) => o,
+      Err(e) => rescue_join_error(e),
+    })
+  }
+
+  ///
+  /// Run a Future on a tokio Runtime as a new Task, and return a JoinHandle.
+  ///
+  pub fn native_spawn<O: Send + 'static, F: Future<Output = O> + Send + 'static>(
+    &self,
+    future: F,
+  ) -> JoinHandle<O> {
+    self.handle.spawn(future_with_correct_context(future))
   }
 
   ///
@@ -178,8 +190,8 @@ impl Executor {
   /// Spawn a Future on a threadpool specifically reserved for I/O tasks which are allowed to be
   /// long-running.
   ///
-  /// Unlike tokio::task::spawn_blocking, If the background Task panics, the returned Future will
-  /// too.
+  /// If the background Task exits abnormally, the given closure will be called to recover: usually
+  /// it should convert the resulting Error to a relevant error type.
   ///
   /// If the returned Future is dropped, the computation will still continue to completion: see
   /// <https://docs.rs/tokio/0.2.20/tokio/task/struct.JoinHandle.html>
@@ -187,19 +199,31 @@ impl Executor {
   pub fn spawn_blocking<F: FnOnce() -> R + Send + 'static, R: Send + 'static>(
     &self,
     f: F,
+    rescue_join_error: impl FnOnce(JoinError) -> R,
   ) -> impl Future<Output = R> {
+    self.native_spawn_blocking(f).map(|res| match res {
+      Ok(o) => o,
+      Err(e) => rescue_join_error(e),
+    })
+  }
+
+  ///
+  /// Spawn a Future on threads specifically reserved for I/O tasks which are allowed to be
+  /// long-running and return a JoinHandle
+  ///
+  pub fn native_spawn_blocking<F: FnOnce() -> R + Send + 'static, R: Send + 'static>(
+    &self,
+    f: F,
+  ) -> JoinHandle<R> {
     let stdio_destination = stdio::get_destination();
     let workunit_store_handle = workunit_store::get_workunit_store_handle();
     // NB: We unwrap here because the only thing that should cause an error in a spawned task is a
     // panic, in which case we want to propagate that.
-    self
-      .handle
-      .spawn_blocking(move || {
-        stdio::set_thread_destination(stdio_destination);
-        workunit_store::set_thread_workunit_store_handle(workunit_store_handle);
-        f()
-      })
-      .map(|r| r.expect("Background task exited unsafely."))
+    self.handle.spawn_blocking(move || {
+      stdio::set_thread_destination(stdio_destination);
+      workunit_store::set_thread_workunit_store_handle(workunit_store_handle);
+      f()
+    })
   }
 
   /// Return a reference to this executor's runtime handle.

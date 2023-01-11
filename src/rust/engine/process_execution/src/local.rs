@@ -734,56 +734,59 @@ pub async fn prepare_workdir(
   let output_dir_paths = req.output_directories.clone();
   let maybe_jdk_home = req.jdk_home.clone();
   let exclusive_spawn = executor
-    .spawn_blocking(move || {
-      if let Some(jdk_home) = maybe_jdk_home {
-        symlink(jdk_home, workdir_path2.join(".jdk"))
-          .map_err(|err| format!("Error making JDK symlink for local execution: {:?}", err))?
-      }
+    .spawn_blocking(
+      move || {
+        if let Some(jdk_home) = maybe_jdk_home {
+          symlink(jdk_home, workdir_path2.join(".jdk"))
+            .map_err(|err| format!("Error making JDK symlink for local execution: {:?}", err))?
+        }
 
-      // The bazel remote execution API specifies that the parent directories for output files and
-      // output directories should be created before execution completes: see the method doc.
-      let parent_paths_to_create: HashSet<_> = output_file_paths
-        .iter()
-        .chain(output_dir_paths.iter())
-        .map(|relative_path| relative_path.as_ref())
-        .chain(workdir_symlinks.iter().map(|s| s.src.as_path()))
-        .filter_map(|rel_path| rel_path.parent())
-        .map(|parent_relpath| workdir_path2.join(parent_relpath))
-        .collect();
-      for path in parent_paths_to_create {
-        create_dir_all(path.clone()).map_err(|err| {
-          format!(
-            "Error making parent directory {:?} for local execution: {:?}",
-            path, err
-          )
-        })?;
-      }
+        // The bazel remote execution API specifies that the parent directories for output files and
+        // output directories should be created before execution completes: see the method doc.
+        let parent_paths_to_create: HashSet<_> = output_file_paths
+          .iter()
+          .chain(output_dir_paths.iter())
+          .map(|relative_path| relative_path.as_ref())
+          .chain(workdir_symlinks.iter().map(|s| s.src.as_path()))
+          .filter_map(|rel_path| rel_path.parent())
+          .map(|parent_relpath| workdir_path2.join(parent_relpath))
+          .collect();
+        for path in parent_paths_to_create {
+          create_dir_all(path.clone()).map_err(|err| {
+            format!(
+              "Error making parent directory {:?} for local execution: {:?}",
+              path, err
+            )
+          })?;
+        }
 
-      for workdir_symlink in workdir_symlinks {
-        let src = workdir_path2.join(&workdir_symlink.src);
-        symlink(&workdir_symlink.dst, &src).map_err(|err| {
-          format!(
-            "Error linking {} -> {} for local execution: {:?}",
-            src.display(),
-            workdir_symlink.dst.display(),
-            err
-          )
-        })?;
-      }
+        for workdir_symlink in workdir_symlinks {
+          let src = workdir_path2.join(&workdir_symlink.src);
+          symlink(&workdir_symlink.dst, &src).map_err(|err| {
+            format!(
+              "Error linking {} -> {} for local execution: {:?}",
+              src.display(),
+              workdir_symlink.dst.display(),
+              err
+            )
+          })?;
+        }
 
-      let exe_was_materialized = maybe_executable_path
-        .as_ref()
-        .map_or(false, |p| workdir_path2.join(p).exists());
-      if exe_was_materialized {
-        debug!(
-          "Obtaining exclusive spawn lock for process since \
+        let exe_was_materialized = maybe_executable_path
+          .as_ref()
+          .map_or(false, |p| workdir_path2.join(p).exists());
+        if exe_was_materialized {
+          debug!(
+            "Obtaining exclusive spawn lock for process since \
                we materialized its executable {:?}.",
-          maybe_executable_path
-        );
-      }
-      let res: Result<_, String> = Ok(exe_was_materialized);
-      res
-    })
+            maybe_executable_path
+          );
+        }
+        let res: Result<_, String> = Ok(exe_was_materialized);
+        res
+      },
+      |e| Err(format!("Directory materialization task failed: {e}")),
+    )
     .await?;
   Ok(exclusive_spawn)
 }
@@ -846,7 +849,7 @@ impl AsyncDropSandbox {
 impl Drop for AsyncDropSandbox {
   fn drop(&mut self) {
     if let Some(sandbox) = self.2.take() {
-      let _background_cleanup = self.0.spawn_blocking(|| std::mem::drop(sandbox));
+      let _background_cleanup = self.0.native_spawn_blocking(|| std::mem::drop(sandbox));
     }
   }
 }
