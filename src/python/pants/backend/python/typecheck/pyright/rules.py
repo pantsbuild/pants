@@ -9,12 +9,13 @@ from typing import Iterable
 
 from pants.backend.javascript.subsystems.nodejs import NpxProcess
 from pants.backend.python.target_types import PythonSourceField
+from pants.backend.python.typecheck.pyright.skip_field import SkipPyrightField
 from pants.backend.python.typecheck.pyright.subsystem import Pyright
 from pants.core.goals.check import CheckRequest, CheckResult, CheckResults
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.process import FallibleProcessResult, Process
 from pants.engine.rules import Get, Rule, collect_rules, rule
-from pants.engine.target import FieldSet
+from pants.engine.target import FieldSet, Target
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
@@ -27,6 +28,10 @@ class PyrightFieldSet(FieldSet):
     required_fields = (PythonSourceField,)
 
     sources: PythonSourceField
+
+    @classmethod
+    def opt_out(cls, tgt: Target) -> bool:
+        return tgt.get(SkipPyrightField).value
 
 
 class PyrightRequest(CheckRequest):
