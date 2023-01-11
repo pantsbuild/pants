@@ -475,3 +475,35 @@ class GoOwningGoModAddressField(StringField):
         for that single `go_mod` target.
         """
     )
+
+
+# -----------------------------------------------------------------------------------------------
+# `go_sdk` and `go_sdk_package` target types
+# -----------------------------------------------------------------------------------------------
+
+
+class GoSdkPackageDependenciesField(Dependencies):
+    pass
+
+
+class GoSdkImportPathField(GoImportPathField):
+    pass
+
+
+class GoSdkPackageTarget(Target):
+    alias = "_go_sdk_package"
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        GoSdkImportPathField,
+        GoSdkPackageDependenciesField,
+    )
+    help = "Internal-only target: Represents a Go SDK package."
+
+
+class GoSdkTarget(TargetGenerator):
+    alias = "_go_sdk"
+    generated_target_cls = GoSdkPackageTarget
+    core_fields = (*COMMON_TARGET_FIELDS,)
+    help = "Internal-only: Go SDK generator target"
+    copied_fields = COMMON_TARGET_FIELDS
+    moved_fields = ()

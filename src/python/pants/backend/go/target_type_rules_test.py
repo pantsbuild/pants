@@ -15,6 +15,8 @@ from pants.backend.go.target_types import (
     GoModTarget,
     GoPackageSourcesField,
     GoPackageTarget,
+    GoSdkPackageTarget,
+    GoSdkTarget,
     GoThirdPartyPackageTarget,
 )
 from pants.backend.go.util_rules import (
@@ -72,7 +74,14 @@ def rule_runner() -> RuleRunner:
             QueryRule(GoBinaryMainPackage, [GoBinaryMainPackageRequest]),
             QueryRule(InferredDependencies, [InferGoBinaryMainDependencyRequest]),
         ],
-        target_types=[GoModTarget, GoPackageTarget, GoBinaryTarget, GenericTarget],
+        target_types=[
+            GoModTarget,
+            GoPackageTarget,
+            GoBinaryTarget,
+            GoSdkTarget,
+            GoSdkPackageTarget,
+            GenericTarget,
+        ],
     )
     rule_runner.set_options([], env_inherit={"PATH"})
     return rule_runner
@@ -310,3 +319,17 @@ def test_determine_main_pkg_for_go_binary(rule_runner: RuleRunner) -> None:
         get_main(Address("ambiguous"))
     with engine_error(InvalidFieldException, contains="must point to a `go_package` target"):
         get_main(Address("explicit_wrong_type"))
+
+
+# -----------------------------------------------------------------------------------------------
+# `_go_sdk` and `_go_sdk_package` target types
+# -----------------------------------------------------------------------------------------------
+
+
+def test_go_sdk_target_exists(rule_runner: RuleRunner) -> None:
+    _ = rule_runner.get_target(Address("", target_name="default_go_sdk"))
+    fmt_pkg_tgt = rule_runner.get_target(
+        Address("", target_name="default_go_sdk", generated_name="fmt")
+    )
+    addrs = rule_runner.request(Addresses, [DependenciesRequest(fmt_pkg_tgt[Dependencies])])
+    assert len(addrs) > 0, "no dependencies were inferred for `fmt` _go_sdk_package target type"

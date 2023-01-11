@@ -12,7 +12,13 @@ from pants.backend.go.goals.tailor import (
     has_package_main,
 )
 from pants.backend.go.goals.tailor import rules as go_tailor_rules
-from pants.backend.go.target_types import GoBinaryTarget, GoModTarget, GoPackageTarget
+from pants.backend.go.target_types import (
+    GoBinaryTarget,
+    GoModTarget,
+    GoPackageTarget,
+    GoSdkPackageTarget,
+    GoSdkTarget,
+)
 from pants.backend.go.util_rules import (
     assembly,
     build_pkg,
@@ -46,7 +52,13 @@ def rule_runner() -> RuleRunner:
             *link.rules(),
             QueryRule(PutativeTargets, [PutativeGoTargetsRequest, AllOwnedSources]),
         ],
-        target_types=[GoModTarget, GoBinaryTarget, GoPackageTarget],
+        target_types=[
+            GoModTarget,
+            GoBinaryTarget,
+            GoPackageTarget,
+            GoSdkTarget,
+            GoSdkPackageTarget,
+        ],
     )
     rule_runner.set_options([], env_inherit={"PATH"})
     return rule_runner
