@@ -64,6 +64,7 @@ class CGoCompileRequest(EngineAwareParameter):
     objc_files: tuple[str, ...] = ()
     fortran_files: tuple[str, ...] = ()
     s_files: tuple[str, ...] = ()
+    is_stdlib: bool = False
     transitive_prebuilt_object_files: tuple[Digest, frozenset[str]] | None = None
 
     def debug_hint(self) -> str | None:
@@ -755,8 +756,17 @@ async def cgo_compile_request(
         go_files.append(os.path.join(dir_path, f"{stem}.cgo1.go"))
         gcc_files.append(os.path.join(dir_path, f"{stem}.cgo2.c"))
 
-    # Note: If Pants ever supports building the Go stdlib, then certain options would need to be inserted here
-    # for building certain `runtime` modules.
+    # When building certain parts of the standard library, disable certain imports in generated code.
+    maybe_disable_imports_flags: list[str] = []
+    if request.is_stdlib and request.import_path == "runtime/cgo":
+        maybe_disable_imports_flags.append("-import_runtime_cgo=false")
+    if request.is_stdlib and request.import_path in (
+        "runtime/race",
+        "runtime/msan",
+        "runtime/cgo",
+        "runtime/asan",
+    ):
+        maybe_disable_imports_flags.append("-import_syscall=false")
 
     # Update CGO_LDFLAGS with the configured linker flags.
     #
@@ -795,6 +805,7 @@ async def cgo_compile_request(
                 dir_path,
                 "-importpath",
                 request.import_path,
+                *maybe_disable_imports_flags,
                 # TODO(#16835): Add -trimpath option to remove sandbox paths from source paths embedded in files.
                 # This means using `__PANTS_SANDBOX_ROOT__` support of `GoSdkProcess`.
                 "--",
