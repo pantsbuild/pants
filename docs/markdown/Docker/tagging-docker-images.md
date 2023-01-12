@@ -21,7 +21,7 @@ docker_image(
 )
 ```
 
-When publising this image, it will be pushed to these registries by default.
+When publishing this image, it will be pushed to these registries by default.
 
 In order to provide registry specific configuration, add them to the Pants configuration under
 `[docker.registries.<alias>]` and refer to them by their alias from the `docker_image` targets,
