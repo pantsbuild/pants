@@ -709,7 +709,10 @@ async def build_go_package(
     # about the Go code that can be used by assembly files.
     asm_header_path: str | None = None
     if s_files:
-        asm_header_path = os.path.join(request.dir_path, "go_asm.h")
+        if os.path.isabs(request.dir_path):
+            asm_header_path = "go_asm.h"
+        else:
+            asm_header_path = os.path.join(request.dir_path, "go_asm.h")
         compile_args.extend(["-asmhdr", asm_header_path])
 
     if embedcfg.digest != EMPTY_DIGEST:
@@ -755,11 +758,12 @@ async def build_go_package(
     if compiling_runtime:
         compile_args = [arg for arg in compile_args if arg != "-N"]
 
-    relativized_sources = (
-        f"./{request.dir_path}/{name}" if request.dir_path else f"./{name}" for name in go_files
+    go_file_paths = (
+        str(PurePath(request.dir_path, go_file)) if request.dir_path else f"./{go_file}"
+        for go_file in go_files
     )
     generated_cgo_file_paths = cgo_compile_result.output_go_files if cgo_compile_result else ()
-    compile_args.extend(["--", *relativized_sources, *generated_cgo_file_paths])
+    compile_args.extend(["--", *go_file_paths, *generated_cgo_file_paths])
     compile_result = await Get(
         FallibleProcessResult,
         GoSdkProcess(
