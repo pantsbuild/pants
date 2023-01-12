@@ -68,14 +68,6 @@ class FallibleAssembleGoAssemblyFilesResult:
     stderr: str | None = None
 
 
-def _is_runtime_package_import_path(import_path: str) -> bool:
-    """Returns True if the import path is from one of the Go runtime packages in stdlib which needs
-    special handling."""
-    if import_path in ("runtime", "reflect", "syscall", "internal/bytealg"):
-        return True
-    return import_path.startswith("runtime/internal")
-
-
 # Adapted from https://github.com/golang/go/blob/cb07765045aed5104a3df31507564ac99e6ddce8/src/cmd/go/internal/work/gc.go#L358-L410
 #
 # Note: Architecture-specific flags have not been adapted nor the flags added when compiling Go SDK packages
@@ -90,9 +82,16 @@ def _asm_args(
         ["-p", import_path] if goroot.is_compatible_version("1.19") else []
     )
 
-    maybe_compiling_runtime_in_stdlib_args: list[str] = []
-    if _is_runtime_package_import_path(import_path):
-        maybe_compiling_runtime_in_stdlib_args = ["-compiling-runtime"]
+    # Add special argument if assembling files in certain packages in the standard library.
+    # See:
+    # - https://github.com/golang/go/blob/245e95dfabd77f337373bf2d6bb47cd353ad8d74/src/cmd/go/internal/work/gc.go#L370-L372
+    # - https://github.com/golang/go/blob/245e95dfabd77f337373bf2d6bb47cd353ad8d74/src/cmd/internal/objabi/path.go#L43-L67
+    maybe_assembling_stdlib_runtime_args = (
+        ["-compiling-runtime"]
+        if import_path in ("runtime", "reflect", "syscall", "internal/bytealg")
+        or import_path.startswith("runtime/internal")
+        else []
+    )
 
     return (
         *maybe_package_import_path_args,
@@ -107,7 +106,7 @@ def _asm_args(
         f"GOOS_{goroot.goos}",
         "-D",
         f"GOARCH_{goroot.goarch}",
-        *maybe_compiling_runtime_in_stdlib_args,
+        *maybe_assembling_stdlib_runtime_args,
         *extra_flags,
     )
 
