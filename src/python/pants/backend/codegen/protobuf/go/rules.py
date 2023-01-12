@@ -47,6 +47,7 @@ from pants.backend.go.util_rules.build_pkg_target import (
 )
 from pants.backend.go.util_rules.first_party_pkg import FallibleFirstPartyPkgAnalysis
 from pants.backend.go.util_rules.go_mod import OwningGoMod, OwningGoModRequest
+from pants.backend.go.util_rules.import_analysis import GoStdLibPackages, GoStdLibPackagesRequest
 from pants.backend.go.util_rules.pkg_analyzer import PackageAnalyzerSetup
 from pants.backend.go.util_rules.sdk import GoSdkProcess
 from pants.backend.python.util_rules import pex
@@ -352,10 +353,20 @@ async def setup_full_package_build_request(
         )
     analysis = fallible_analysis.analysis
 
+    stdlib_packages = await Get(
+        GoStdLibPackages,
+        GoStdLibPackagesRequest(with_race_detector=request.build_opts.with_race_detector),
+    )
+
     # Obtain build requests for third-party dependencies.
     # TODO: Consider how to merge this code with existing dependency inference code.
     dep_build_request_addrs: list[Address] = []
     for dep_import_path in (*analysis.imports, *analysis.test_imports, *analysis.xtest_imports):
+        # Skip inference for stdlib packages.
+        # TODO: This check is deprecated and will be removed once support for building SDK packages lands.
+        if dep_import_path in stdlib_packages:
+            continue
+
         # Infer dependencies on other Go packages.
         candidate_addresses = package_mapping.mapping.get(dep_import_path)
         if candidate_addresses:
