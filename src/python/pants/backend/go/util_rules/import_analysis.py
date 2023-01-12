@@ -16,6 +16,7 @@ from pants.backend.go.dependency_inference import (
     GoModuleImportPathsMappings,
     GoModuleImportPathsMappingsHook,
 )
+from pants.backend.go.target_types import DEFAULT_GO_SDK_ADDR
 from pants.backend.go.util_rules import go_mod
 from pants.backend.go.util_rules.build_opts import GoBuildOptions
 from pants.backend.go.util_rules.cgo import CGoCompilerFlags
@@ -177,14 +178,12 @@ async def go_map_import_paths_by_module(
         GoStdLibPackagesRequest(with_race_detector=False),
     )
 
-    sdk_addr = Address("", target_name="default_go_sdk")
-
     # Replicate the Go SDK imports path to all Go modules.
     # TODO: This will need to change eventually for multiple Go SDK support.
     for import_path in stdlib_packages.keys():
         for go_mod_tgt in all_go_mod_targets:
             import_paths_by_module[go_mod_tgt.address][import_path].add(
-                sdk_addr.create_generated(import_path)
+                DEFAULT_GO_SDK_ADDR.create_generated(import_path)
             )
 
     return GoModuleImportPathsMappings(

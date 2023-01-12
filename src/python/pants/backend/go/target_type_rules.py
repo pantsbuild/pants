@@ -15,6 +15,7 @@ from pants.backend.go.dependency_inference import (
     GoModuleImportPathsMappingsHook,
 )
 from pants.backend.go.target_types import (
+    DEFAULT_GO_SDK_ADDR,
     GoImportPathField,
     GoModSourcesField,
     GoModTarget,
@@ -57,11 +58,7 @@ from pants.core.target_types import (
 from pants.engine.addresses import Address
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import Digest, Snapshot
-from pants.engine.internals.synthetic_targets import (
-    SyntheticAddressMap,
-    SyntheticAddressMaps,
-    SyntheticTargetsRequest,
-)
+from pants.engine.internals.synthetic_targets import SyntheticAddressMaps, SyntheticTargetsRequest
 from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
@@ -445,12 +442,14 @@ class GoSdkSyntheticTargetsRequest(SyntheticTargetsRequest):
 async def generate_go_sdk_synthetic_targets(
     request: GoSdkSyntheticTargetsRequest,
 ) -> SyntheticAddressMaps:
-    return SyntheticAddressMaps(
+    return SyntheticAddressMaps.for_targets_request(
+        request,
         [
-            SyntheticAddressMap.create(
-                "BUILD._go_sdk", [TargetAdaptor(GoSdkTarget.alias, name="default_go_sdk")]
+            (
+                "BUILD._go_sdk",
+                [TargetAdaptor(GoSdkTarget.alias, name=DEFAULT_GO_SDK_ADDR.target_name)],
             )
-        ]
+        ],
     )
 
 

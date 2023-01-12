@@ -9,6 +9,7 @@ import pytest
 
 from pants.backend.go import target_type_rules
 from pants.backend.go.target_types import (
+    DEFAULT_GO_SDK_ADDR,
     GoBinaryMainPackageField,
     GoBinaryTarget,
     GoImportPathField,
@@ -325,9 +326,7 @@ def test_determine_main_pkg_for_go_binary(rule_runner: RuleRunner) -> None:
 
 
 def test_go_sdk_target_exists(rule_runner: RuleRunner) -> None:
-    _ = rule_runner.get_target(Address("", target_name="default_go_sdk"))
-    fmt_pkg_tgt = rule_runner.get_target(
-        Address("", target_name="default_go_sdk", generated_name="fmt")
-    )
+    _ = rule_runner.get_target(DEFAULT_GO_SDK_ADDR)
+    fmt_pkg_tgt = rule_runner.get_target(DEFAULT_GO_SDK_ADDR.create_generated("fmt"))
     addrs = rule_runner.request(Addresses, [DependenciesRequest(fmt_pkg_tgt[Dependencies])])
     assert len(addrs) > 0, "no dependencies were inferred for `fmt` _go_sdk_package target type"

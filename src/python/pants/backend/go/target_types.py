@@ -482,6 +482,9 @@ class GoOwningGoModAddressField(StringField):
 # -----------------------------------------------------------------------------------------------
 
 
+DEFAULT_GO_SDK_ADDR = Address("", target_name="default_go_sdk")
+
+
 class GoSdkPackageDependenciesField(Dependencies):
     pass
 
