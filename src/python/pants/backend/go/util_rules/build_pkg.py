@@ -77,6 +77,7 @@ class BuildGoPackageRequest(EngineAwareParameter):
         prebuilt_object_files: tuple[str, ...] = (),
         pkg_specific_compiler_flags: tuple[str, ...] = (),
         pkg_specific_assembler_flags: tuple[str, ...] = (),
+        is_stdlib: bool = False,
     ) -> None:
         """Build a package and its dependencies as `__pkg__.a` files.
 
@@ -111,6 +112,7 @@ class BuildGoPackageRequest(EngineAwareParameter):
         self.prebuilt_object_files = prebuilt_object_files
         self.pkg_specific_compiler_flags = pkg_specific_compiler_flags
         self.pkg_specific_assembler_flags = pkg_specific_assembler_flags
+        self.is_stdlib = is_stdlib
         self._hashcode = hash(
             (
                 self.import_path,
@@ -135,6 +137,7 @@ class BuildGoPackageRequest(EngineAwareParameter):
                 self.prebuilt_object_files,
                 self.pkg_specific_compiler_flags,
                 self.pkg_specific_assembler_flags,
+                self.is_stdlib,
             )
         )
 
@@ -164,7 +167,8 @@ class BuildGoPackageRequest(EngineAwareParameter):
             f"fortran_files={self.fortran_files}, "
             f"prebuilt_object_files={self.prebuilt_object_files}, "
             f"pkg_specific_compiler_flags={self.pkg_specific_compiler_flags}, "
-            f"pkg_specific_assembler_flags={self.pkg_specific_assembler_flags}"
+            f"pkg_specific_assembler_flags={self.pkg_specific_assembler_flags}, "
+            f"is_stdlib={self.is_stdlib}"
             ")"
         )
 
@@ -197,6 +201,7 @@ class BuildGoPackageRequest(EngineAwareParameter):
             and self.prebuilt_object_files == other.prebuilt_object_files
             and self.pkg_specific_compiler_flags == other.pkg_specific_compiler_flags
             and self.pkg_specific_assembler_flags == other.pkg_specific_assembler_flags
+            and self.is_stdlib == other.is_stdlib
             # TODO: Use a recursive memoized __eq__ if this ever shows up in profiles.
             and self.direct_dependencies == other.direct_dependencies
         )
@@ -542,12 +547,27 @@ async def build_go_package(
     if cgo_files:
         # Check if any assembly files contain gcc assembly, and not Go assembly. Raise an exception if any are
         # likely in Go format since in cgo packages, assembly files are passed to gcc and must be in gcc format.
-        if s_files and await _any_file_is_golang_assembly(
-            request.digest, request.dir_path, s_files
-        ):
-            raise ValueError(
-                f"Package {request.import_path} is a cgo package but contains Go assembly files."
-            )
+        #
+        # Exception: When building runtime/cgo itself, only send `gcc_*.s` assembly files to GCC as
+        # runtime/cgo has both types of files.
+        if request.is_stdlib and request.import_path == "runtime/cgo":
+            gcc_s_files = []
+            new_s_files = []
+            for s_file in s_files:
+                if s_file.startswith("gcc_"):
+                    gcc_s_files.append(s_file)
+                else:
+                    new_s_files.append(s_file)
+            s_files = new_s_files
+        else:
+            if s_files and await _any_file_is_golang_assembly(
+                request.digest, request.dir_path, s_files
+            ):
+                raise ValueError(
+                    f"Package {request.import_path} is a cgo package but contains Go assembly files."
+                )
+            gcc_s_files = s_files
+            s_files = []  # Clear s_files since assembly has already been handled in cgo rules.
 
         # Gather all prebuilt object files transitively and pass them to the Cgo rule for linking into the
         # Cgo object output. This is necessary to avoid linking errors.
@@ -566,10 +586,11 @@ async def build_go_package(
                 cgo_files=cgo_files,
                 cgo_flags=request.cgo_flags,
                 c_files=request.c_files,
-                s_files=tuple(s_files),
+                s_files=tuple(gcc_s_files),
                 cxx_files=request.cxx_files,
                 objc_files=request.objc_files,
                 fortran_files=request.fortran_files,
+                is_stdlib=request.is_stdlib,
                 transitive_prebuilt_object_files=transitive_prebuilt_object_files,
             ),
         )
@@ -655,6 +676,32 @@ async def build_go_package(
     if go_root.is_compatible_version(go_version):
         compile_args.append(f"-lang=go{go_version}")
 
+    if request.is_stdlib:
+        compile_args.append("-std")
+
+    compiling_runtime = request.is_stdlib and request.import_path in (
+        "internal/abi",
+        "internal/bytealg",
+        "internal/coverage/rtcov",
+        "internal/cpu",
+        "internal/goarch",
+        "internal/goos",
+        "runtime",
+        "runtime/internal/atomic",
+        "runtime/internal/math",
+        "runtime/internal/sys",
+        "runtime/internal/syscall",
+    )
+
+    # From Go sources:
+    # runtime compiles with a special gc flag to check for
+    # memory allocations that are invalid in the runtime package,
+    # and to implement some special compiler pragmas.
+    #
+    # See https://github.com/golang/go/blob/245e95dfabd77f337373bf2d6bb47cd353ad8d74/src/cmd/go/internal/work/gc.go#L107-L112
+    if compiling_runtime:
+        compile_args.append("-+")
+
     if symabis_path:
         compile_args.extend(["-symabis", symabis_path])
 
@@ -680,13 +727,33 @@ async def build_go_package(
     # If there are no loose object files to add to the package archive later or assembly files to assemble,
     # then pass -complete flag which tells the compiler that the provided Go files constitute the entire package.
     if not objects and not s_files:
-        compile_args.append("-complete")
+        # Exceptions: a few standard packages have forward declarations for
+        # pieces supplied behind-the-scenes by package runtime.
+        if request.import_path not in (
+            "bytes",
+            "internal/poll",
+            "net",
+            "os",
+            "runtime/metrics",
+            "runtime/pprof",
+            "runtime/trace",
+            "sync",
+            "syscall",
+            "time",
+        ):
+            compile_args.append("-complete")
 
     # Add any extra compiler flags after the ones added automatically by this rule.
     if request.build_opts.compiler_flags:
         compile_args.extend(request.build_opts.compiler_flags)
     if request.pkg_specific_compiler_flags:
         compile_args.extend(request.pkg_specific_compiler_flags)
+
+    # Remove -N if compiling runtime:
+    #  It is not possible to build the runtime with no optimizations,
+    #  because the compiler cannot eliminate enough write barriers.
+    if compiling_runtime:
+        compile_args = [arg for arg in compile_args if arg != "-N"]
 
     relativized_sources = (
         f"./{request.dir_path}/{name}" if request.dir_path else f"./{name}" for name in go_files
