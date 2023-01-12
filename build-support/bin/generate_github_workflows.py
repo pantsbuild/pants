@@ -754,6 +754,7 @@ def build_wheels_job(platform: Platform, python_versions: list[str]) -> Jobs:
             "steps": initial_steps
             + [
                 setup_toolchain_auth(),
+                install_go(),
                 *helper.build_wheels(python_versions),
                 helper.upload_log_artifacts(name="wheels"),
                 deploy_to_s3(),
