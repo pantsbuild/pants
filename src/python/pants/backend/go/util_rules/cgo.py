@@ -64,6 +64,7 @@ class CGoCompileRequest(EngineAwareParameter):
     objc_files: tuple[str, ...] = ()
     fortran_files: tuple[str, ...] = ()
     s_files: tuple[str, ...] = ()
+    transitive_prebuilt_object_files: tuple[Digest, frozenset[str]] | None = None
 
     def debug_hint(self) -> str | None:
         return self.import_path
@@ -455,6 +456,8 @@ async def _dynimport(
     import_go_path: str,
     golang_env_aware: GolangSubsystem.EnvironmentAware,
     use_cxx_linker: bool,
+    transitive_prebuilt_objects_digest: Digest,
+    transitive_prebuilt_objects: frozenset[str],
 ) -> _DynImportResult:
     cgo_main_compile_process = await _cc(
         binary_name=golang_env_aware.cgo_gcc_binary_name,
@@ -468,11 +471,15 @@ async def _dynimport(
     )
     cgo_main_compile_result = await Get(ProcessResult, Process, cgo_main_compile_process)
     obj_digest = await Get(
-        Digest, MergeDigests([input_digest, cgo_main_compile_result.output_digest])
+        Digest,
+        MergeDigests(
+            [
+                input_digest,
+                cgo_main_compile_result.output_digest,
+                transitive_prebuilt_objects_digest,
+            ]
+        ),
     )
-
-    # TODO(#16827): Gather .syso files from this package and all (transitive) dependencies. Cgo support requires
-    # linking all object files with `.syso` extension into the package archive.
 
     dynobj = os.path.join(dir_path, "_cgo_.o")
     ldflags = list(ldflags)
@@ -498,7 +505,11 @@ async def _dynimport(
         dir_path=dir_path,
         outfile=dynobj,
         flags=ldflags,
-        objs=[*obj_files, os.path.join(dir_path, "_cgo_main.o")],
+        objs=[
+            *obj_files,
+            os.path.join(dir_path, "_cgo_main.o"),
+            *sorted(transitive_prebuilt_objects),
+        ],
         description=f"Link _cgo_.o ({import_path})",
     )
     if cgo_binary_link_result.exit_code != 0:
@@ -897,6 +908,12 @@ async def cgo_compile_request(
             ]
         ),
     )
+    transitive_prebuilt_objects_digest: Digest = EMPTY_DIGEST
+    transitive_prebuilt_objects: frozenset[str] = frozenset()
+    if request.transitive_prebuilt_object_files:
+        transitive_prebuilt_objects_digest = request.transitive_prebuilt_object_files[0]
+        transitive_prebuilt_objects = request.transitive_prebuilt_object_files[1]
+
     dynimport_result = await _dynimport(
         import_path=request.import_path,
         input_digest=dynimport_input_digest,
@@ -909,6 +926,8 @@ async def cgo_compile_request(
         import_go_path=os.path.join(dir_path, "_cgo_import.go"),
         golang_env_aware=golang_env_aware,
         use_cxx_linker=bool(request.cxx_files),
+        transitive_prebuilt_objects_digest=transitive_prebuilt_objects_digest,
+        transitive_prebuilt_objects=transitive_prebuilt_objects,
     )
     if dynimport_result.dyn_out_go:
         go_files.append(dynimport_result.dyn_out_go)
