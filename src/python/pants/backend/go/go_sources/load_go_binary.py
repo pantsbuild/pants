@@ -44,6 +44,8 @@ class NaiveBuildGoPackageRequestForStdlibPackageRequest:
     import_path: str
 
 
+# This rule is necessary because the rules in this file are used to build internal binaries including the
+# package analyzer.
 @rule
 async def naive_build_go_package_request_for_stdlib(
     request: NaiveBuildGoPackageRequestForStdlibPackageRequest,
