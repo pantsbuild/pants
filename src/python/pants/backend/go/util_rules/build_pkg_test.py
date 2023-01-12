@@ -214,6 +214,5 @@ def test_build_invalid_pkg(rule_runner: RuleRunner) -> None:
     assert invalid_dep_result.output is None
     assert invalid_dep_result.exit_code == 1
     assert (
-        invalid_dep_result.stdout
-        == "dep/f.go:1:1: syntax error: package statement must be first\n"
+        invalid_dep_result.stdout == "dep/f.go:1:1: syntax error: package statement must be first\n"
     )
