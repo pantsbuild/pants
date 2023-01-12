@@ -25,7 +25,6 @@ from pants.backend.go.goals.test import GoTestFieldSet, GoTestRequest
 from pants.backend.go.target_types import (
     GoModTarget,
     GoPackageTarget,
-    GoSdkPackageTarget,
     GoSdkTarget,
 )
 from pants.backend.go.util_rules import (
@@ -85,7 +84,6 @@ def rule_runner() -> RuleRunner:
             GoModTarget,
             GoPackageTarget,
             GoSdkTarget,
-            GoSdkPackageTarget,
             ProtobufSourceTarget,
             ProtobufSourcesGeneratorTarget,
         ],

@@ -15,7 +15,6 @@ from pants.backend.go.target_types import (
     GoModTarget,
     GoPackageSourcesField,
     GoPackageTarget,
-    GoSdkPackageTarget,
     GoSdkTarget,
     GoThirdPartyPackageTarget,
 )
@@ -79,7 +78,6 @@ def rule_runner() -> RuleRunner:
             GoPackageTarget,
             GoBinaryTarget,
             GoSdkTarget,
-            GoSdkPackageTarget,
             GenericTarget,
         ],
     )

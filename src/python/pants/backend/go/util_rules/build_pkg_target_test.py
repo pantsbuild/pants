@@ -20,7 +20,6 @@ from pants.backend.go.target_types import (
     GoModTarget,
     GoOwningGoModAddressField,
     GoPackageTarget,
-    GoSdkPackageTarget,
     GoSdkTarget,
 )
 from pants.backend.go.util_rules import (
@@ -186,7 +185,6 @@ def rule_runner() -> RuleRunner:
             GoPackageTarget,
             FilesGeneratorTarget,
             GoSdkTarget,
-            GoSdkPackageTarget,
         ],
     )
     rule_runner.set_options([], env_inherit={"PATH"})

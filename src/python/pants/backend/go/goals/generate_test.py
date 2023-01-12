@@ -11,12 +11,7 @@ import pytest
 from pants.backend.go import target_type_rules
 from pants.backend.go.goals import generate
 from pants.backend.go.goals.generate import GoGenerateGoal, OverwriteMergeDigests, _expand_env
-from pants.backend.go.target_types import (
-    GoModTarget,
-    GoPackageTarget,
-    GoSdkPackageTarget,
-    GoSdkTarget,
-)
+from pants.backend.go.target_types import GoModTarget, GoPackageTarget, GoSdkTarget
 from pants.backend.go.util_rules import (
     assembly,
     build_pkg,
@@ -55,7 +50,7 @@ def rule_runner() -> RuleRunner:
             get_filtered_environment,
             QueryRule(DigestContents, (OverwriteMergeDigests,)),
         ],
-        target_types=[GoModTarget, GoPackageTarget, GoSdkTarget, GoSdkPackageTarget],
+        target_types=[GoModTarget, GoPackageTarget, GoSdkTarget],
         preserve_tmpdirs=True,
     )
     rule_runner.set_options([], env_inherit=PYTHON_BOOTSTRAP_ENV)
