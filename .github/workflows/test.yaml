@@ -401,7 +401,7 @@ jobs:
     timeout-minutes: 90
   build_wheels_linux_x86_64:
     container:
-      image: registry.hub.docker.com/pantsbuild/wheel_build_x86_64:v1-568cfc69e
+      image: quay.io/pypa/manylinux2014_x86_64:latest
     env:
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
