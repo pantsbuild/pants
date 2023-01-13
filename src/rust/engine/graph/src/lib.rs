@@ -402,7 +402,7 @@ impl<N: Node> Graph<N> {
       nodes: HashMap::default(),
       pg: DiGraph::new(),
     }));
-    let _join = executor.spawn(Self::cycle_check_task(Arc::downgrade(&inner)));
+    let _join = executor.native_spawn(Self::cycle_check_task(Arc::downgrade(&inner)));
 
     Graph {
       inner,

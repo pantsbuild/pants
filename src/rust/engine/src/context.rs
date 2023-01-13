@@ -882,6 +882,6 @@ impl NodeContext for Context {
   where
     F: Future<Output = ()> + Send + 'static,
   {
-    let _join = self.core.executor.spawn(future);
+    let _join = self.core.executor.native_spawn(future);
   }
 }
