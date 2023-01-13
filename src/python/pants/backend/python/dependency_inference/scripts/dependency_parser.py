@@ -56,9 +56,7 @@ class AstVisitor(ast.NodeVisitor):
             # Since Unix allows basically anything for filenames, we require some "sane" subset of
             #  possibilities namely, word-character filenames and a mandatory extension.
             self._asset_regex = re.compile(
-                r"^([\w-]*\/){"
-                + os.environ["ASSETS_MIN_SLASHES"]
-                + r",}[\w-]*(\.[^\/\.\n]+)+$",
+                r"^([\w-]*\/){" + os.environ["ASSETS_MIN_SLASHES"] + r",}[\w-]*(\.[^\/\.\n]+)+$",
                 re.UNICODE,
             )
         else:
