@@ -68,3 +68,9 @@ System-specific notes
 > - Install a recent Linux distribution under WSL 2 (we have tested with Ubuntu 20.04 LTS).
 > - Run `sudo apt install unzip python3-dev python3-distutils python3-venv gcc` in the distribution.
 > - You can then run Pants commands in a Linux shell, or in a Windows shell by prefixing with `wsl `.
+
+> 🚧 Using WSL on Windows
+> 
+> Pants must currently be executed from within the Linux virtual machine folder structure itself.
+> 
+> Navigating the Linux shell to a folder on your main Windows install via `/mnt/C:/<path to my code>` or executing from a Windows shell via the `wsl` from a location not in the virtual machine is not yet supported. 
