@@ -3,7 +3,38 @@
 import json
 from unittest.mock import Mock, patch
 
-from generate_json_schema import GENERATED_JSON_SCHEMA_FILENAME, main
+import pytest
+from generate_json_schema import GENERATED_JSON_SCHEMA_FILENAME, main, simplify_option_description
+
+
+@pytest.mark.parametrize(
+    "description,output",
+    [
+        ("Sentence starts here and ends here.", "Sentence starts here and ends here"),
+        (
+            "We run `./pants goal` and stop here, then continue.",
+            "We run `./pants goal` and stop here, then continue",
+        ),
+        (
+            "We run `./pants goal` and stop here. After that, we continue.",
+            "We run `./pants goal` and stop here",
+        ),
+        (
+            "We run `./pants goal` and then e.g. finish.",
+            "We run `./pants goal` and then e.g. finish",
+        ),
+        (
+            "We run `./pants goal` and then stop here.With a missing whitespace after dot, a new sentence starts here.",
+            "We run `./pants goal` and then stop here.With a missing whitespace after dot, a new sentence starts here",
+        ),
+        (
+            "Sentence starts here and ends here.\n\nA new sentence goes on in a new paragraph.",
+            "Sentence starts here and ends here.\n\nA new sentence goes on in a new paragraph",
+        ),
+    ],
+)
+def test_simplify_option_description(description: str, output: str) -> None:
+    assert simplify_option_description(description) == output
 
 
 def test_main():
@@ -21,10 +52,28 @@ def test_main():
 
     assert all((schema["$schema"], schema["description"]))
     collected_properties = schema["properties"]["GLOBAL"]["properties"].keys()
+
+    # all options should be included
     assert all(
         [
             key in collected_properties
             for key in ["log_show_rust_3rdparty", "ignore_warnings", "level"]
         ]
     )
-    assert "process_cleanup" not in collected_properties  # deprecated fields shouldn't be included
+    # deprecated fields shouldn't be included
+    assert "process_cleanup" not in collected_properties
+
+    # an option description should be a single sentence with a URL to the option docs section
+    assert schema["properties"]["GLOBAL"]["properties"]["level"]["description"] == (
+        "Set the logging level\nhttps://www.pantsbuild.org/v2.14/docs/reference-GLOBAL#level"
+    )
+
+    # options should be part of the enum
+    # TODO(alte): ensure enum is sorted once implemented
+    assert set(schema["properties"]["GLOBAL"]["properties"]["level"]["enum"]) == {
+        "trace",
+        "debug",
+        "info",
+        "warn",
+        "error",
+    }

@@ -19,7 +19,10 @@ python_tests(
     overrides={
         "reversion_test.py": {"timeout": 90, "dependencies": ["3rdparty/python#pex"]},
         "generate_json_schema_test.py": {
-            "dependencies": ["build-support/bin/json_schema_testdata:json_schema_samples"]
+            "dependencies": [
+                "build-support/bin/json_schema_testdata:json_schema_samples",
+                "3rdparty/python#types-setuptools",
+            ]
         },
     },
 )

@@ -13,11 +13,16 @@ Live run:
 import argparse
 import itertools
 import json
+import re
 from typing import Any, Dict, Iterable
+
+from packaging.version import Version
 
 from pants.version import VERSION
 
 GENERATED_JSON_SCHEMA_FILENAME = f"pantsbuild-{VERSION}.json"
+DOCS_URL = "https://www.pantsbuild.org"
+VERSION_MAJOR_MINOR = f"v{Version(VERSION).major}.{Version(VERSION).minor}"
 
 PYTHON_TO_JSON_TYPE_MAPPING = {
     "str": "string",
@@ -27,6 +32,23 @@ PYTHON_TO_JSON_TYPE_MAPPING = {
     "float": "number",
     "dict": "object",
 }
+
+
+def simplify_option_description(description: str) -> str:
+    """Take only a first sentence out of a multi-sentence description without a final full stop.
+
+    There is an assumption that there are no newlines.
+    """
+    return re.split(r"(?<=[^A-Z].[.?]) +(?=[A-Z])", description)[0].rpartition(".")[0]
+
+
+def get_description(option: dict, section: str) -> str:
+    """Get a shortened description with a URL to the online docs of the given option."""
+    option_help: str = option["help"].split("\n")[0]
+    option_name: str = option["config_key"]
+    simplified_option_help = simplify_option_description(option_help)
+    url = f"{DOCS_URL}/{VERSION_MAJOR_MINOR}/docs/reference-{section}#{option_name}"
+    return f"{simplified_option_help}\n{url}"
 
 
 def build_scope_properties(ruleset: dict, options: Iterable[dict], scope: str) -> dict:
@@ -42,10 +64,11 @@ def build_scope_properties(ruleset: dict, options: Iterable[dict], scope: str) -
         properties = ruleset[scope]["properties"]
 
         properties[option["config_key"]] = {
-            "description": option["help"],
+            "description": get_description(option, scope),
             "default": option["default"],
         }
         if option["choices"]:
+            # TODO(alte): find a safe way to sort choices
             properties[option["config_key"]]["enum"] = option["choices"]
         else:
             typ = PYTHON_TO_JSON_TYPE_MAPPING.get(option["typ"])
@@ -56,6 +79,9 @@ def build_scope_properties(ruleset: dict, options: Iterable[dict], scope: str) -
                 else:
                     properties[option["config_key"]]["type"] = typ
 
+                # TODO(alte): see if one safely codify in the schema the fact that we support `.add` and `.remove`
+                #  semantics on arrays; e.g. `extra_requirements.add` can either be an array or an object
+                #  {add|remove: array}
     return ruleset
 
 
