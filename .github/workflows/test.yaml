@@ -330,7 +330,7 @@ jobs:
     timeout-minutes: 60
   build_wheels_linux_arm64:
     container:
-      image: registry.hub.docker.com/pantsbuild/wheel_build_aarch64:v1-568cfc69e
+      image: registry.hub.docker.com/pantsbuild/wheel_build_aarch64:v2-2e4d40b8b5
       options: --user 1000:1000
     env:
       PANTS_REMOTE_CACHE_READ: 'false'
