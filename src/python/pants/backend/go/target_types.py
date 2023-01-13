@@ -202,6 +202,10 @@ class GoLinkerFlagsField(StringSequenceField):
     )
 
 
+class GoDependenciesField(Dependencies):
+    pass
+
+
 # -----------------------------------------------------------------------------------------------
 # `go_third_party_package` target
 # -----------------------------------------------------------------------------------------------
@@ -220,7 +224,7 @@ class GoImportPathField(StringField):
     value: str
 
 
-class GoThirdPartyPackageDependenciesField(Dependencies):
+class GoThirdPartyPackageDependenciesField(GoDependenciesField):
     pass
 
 
@@ -290,7 +294,7 @@ class GoModSourcesField(MultipleSourcesField):
 
 
 # TODO: This field probably shouldn't be registered.
-class GoModDependenciesField(Dependencies):
+class GoModDependenciesField(GoDependenciesField):
     alias = "_dependencies"
 
 
@@ -369,7 +373,7 @@ class GoPackageSourcesField(MultipleSourcesField):
         return value_or_default
 
 
-class GoPackageDependenciesField(Dependencies):
+class GoPackageDependenciesField(GoDependenciesField):
     pass
 
 
@@ -431,7 +435,7 @@ class GoBinaryMainPackageField(StringField, AsyncFieldMixin):
     value: str
 
 
-class GoBinaryDependenciesField(Dependencies):
+class GoBinaryDependenciesField(GoDependenciesField):
     # This is only used to inject a dependency from the `GoBinaryMainPackageField`. Users should
     # add any explicit dependencies to the `go_package`.
     alias = "_dependencies"
@@ -485,7 +489,7 @@ class GoOwningGoModAddressField(StringField):
 DEFAULT_GO_SDK_ADDR = Address("", target_name="default_go_sdk")
 
 
-class GoSdkPackageDependenciesField(Dependencies):
+class GoSdkPackageDependenciesField(GoDependenciesField):
     pass
 
 

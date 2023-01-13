@@ -24,7 +24,7 @@ from pants.backend.go.target_types import (
     GoSdkPackageTarget,
     GoSdkTarget,
     GoThirdPartyPackageDependenciesField,
-    GoThirdPartyPackageTarget,
+    GoThirdPartyPackageTarget, GoDependenciesField,
 )
 from pants.backend.go.util_rules import build_opts, first_party_pkg, import_analysis
 from pants.backend.go.util_rules.build_opts import GoBuildOptions, GoBuildOptionsFromTargetRequest
@@ -441,16 +441,23 @@ class GoSdkSyntheticTargetsRequest(SyntheticTargetsRequest):
 @rule
 async def generate_go_sdk_synthetic_targets(
     request: GoSdkSyntheticTargetsRequest,
+    all_targets: AllTargets,
 ) -> SyntheticAddressMaps:
-    return SyntheticAddressMaps.for_targets_request(
-        request,
-        [
-            (
-                "BUILD._go_sdk",
-                [TargetAdaptor(GoSdkTarget.alias, name=DEFAULT_GO_SDK_ADDR.target_name)],
-            )
-        ],
-    )
+    def is_go_target(tgt):
+        return tgt.has_field(GoDependenciesField)
+
+    if any([tgt for tgt in all_targets if is_go_target(tgt)]):
+        return SyntheticAddressMaps.for_targets_request(
+            request,
+            [
+                (
+                    "BUILD._go_sdk",
+                    [TargetAdaptor(GoSdkTarget.alias, name=DEFAULT_GO_SDK_ADDR.target_name)],
+                )
+            ],
+        )
+
+    return SyntheticAddressMaps()
 
 
 class GenerateTargetsFromGoSdkRequest(GenerateTargetsRequest):
