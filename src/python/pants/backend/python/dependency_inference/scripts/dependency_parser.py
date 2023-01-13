@@ -43,7 +43,7 @@ class AstVisitor(ast.NodeVisitor):
             #  `importlib.import_module("example.subdir.Foo")`.
             self._string_import_regex = re.compile(
                 r"^([a-z_][a-z_\d]*\.){"
-                + os.environ.get("STRING_IMPORTS_MIN_DOTS", "2")
+                + os.environ["STRING_IMPORTS_MIN_DOTS"]
                 + r",}[a-zA-Z_]\w*$",
                 re.UNICODE,
             )
@@ -57,7 +57,7 @@ class AstVisitor(ast.NodeVisitor):
             #  possibilities namely, word-character filenames and a mandatory extension.
             self._asset_regex = re.compile(
                 r"^([\w-]*\/){"
-                + os.environ.get("ASSETS_MIN_SLASHES", "1")
+                + os.environ["ASSETS_MIN_SLASHES"]
                 + r",}[\w-]*(\.[^\/\.\n]+)+$",
                 re.UNICODE,
             )
