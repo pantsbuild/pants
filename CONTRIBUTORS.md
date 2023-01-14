@@ -164,6 +164,7 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Luc Cary
 + Luca Clementi
 + Lukasz Jastrzebski
++ Mahesh Vashishtha
 + Marc Abramowitz
 + Marcelo Trylesinski
 + Marcin Podolski
