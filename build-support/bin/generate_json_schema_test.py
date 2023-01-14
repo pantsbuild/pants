@@ -15,6 +15,10 @@ from generate_json_schema import (
 @pytest.mark.parametrize(
     "description,output",
     [
+        (
+            "Sentence starts here and ends without a full stop",
+            "Sentence starts here and ends without a full stop",
+        ),
         ("Sentence starts here and ends here.", "Sentence starts here and ends here"),
         (
             "We run `./pants goal` and stop here, then continue.",
@@ -35,6 +39,14 @@ from generate_json_schema import (
         (
             "Sentence starts here and ends here.\n\nA new sentence goes on in a new paragraph.",
             "Sentence starts here and ends here.\n\nA new sentence goes on in a new paragraph",
+        ),
+        (
+            "Path to a .pypirc config. (https://packaging.python.org/specifications/pypirc/). Set this.",
+            "Path to a .pypirc config. (https://packaging.python.org/specifications/pypirc/)",
+        ),
+        (
+            "Use this (4-space indentation). ('AOSP' is the Android Open Source Project.)",
+            "Use this (4-space indentation). ('AOSP' is the Android Open Source Project.)",
         ),
     ],
 )

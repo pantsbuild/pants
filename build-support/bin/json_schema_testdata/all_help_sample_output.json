@@ -147,7 +147,7 @@
           ],
           "env_var": "PANTS_PROCESS_CLEANUP",
           "fromfile": false,
-          "help": "If false, Pants will not clean up local directories used as chroots for running processes. Pants will log their location so that you can inspect the chroot, and run the `__run.sh` script to recreate the process using the same argv and environment variables used by Pants. This option is useful for debugging.",
+          "help": "\nIf false, Pants will not clean up local directories used as chroots for running processes. Pants will log their location so that you can inspect the chroot, and run the `__run.sh` script to recreate the process using the same argv and environment variables used by Pants. This option is useful for debugging.",
           "removal_hint": "Use the `keep_sandboxes` option instead.",
           "removal_version": "3.0.0.dev0",
           "scoped_cmd_line_args": [

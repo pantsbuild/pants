@@ -21,11 +21,23 @@ def main() -> None:
     with open(args.schema) as fh:
         json_data = json.load(fh)
 
-    # certain options' default values may be a result of variable expansion
-    assert getpass.getuser() not in raw_data
-
     # there should be some options
     assert json_data["properties"]["GLOBAL"]["properties"]["pants_version"]
+
+    # certain options' default values may be a result of variable expansion
+    username = getpass.getuser()
+    if username in raw_data:
+        raise ValueError(f"{username} is in the schema file.")
+
+    for section_name, section_data in json_data["properties"].items():
+        for option_name, option_data in section_data["properties"].items():
+            # every property description should contain some text before the URL
+            if option_data["description"].startswith("\nhttp"):
+                raise ValueError(f"{option_name} has an incomplete description.")
+
+            # every option's description should contain a URL
+            if "https://www.pantsbuild.org/v" not in option_data["description"]:
+                raise ValueError(f"{option_name} should have a URL in description.")
 
 
 def create_parser() -> argparse.ArgumentParser:

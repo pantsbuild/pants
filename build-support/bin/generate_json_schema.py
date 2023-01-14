@@ -50,12 +50,12 @@ def simplify_option_description(description: str) -> str:
 
     There is an assumption that there are no newlines.
     """
-    return re.split(r"(?<=[^A-Z].[.?]) +(?=[A-Z])", description)[0].rpartition(".")[0]
+    return re.split(r"(?<=[^A-Z].[.?]) +(?=[A-Z])", description)[0].rstrip(".")
 
 
 def get_description(option: dict, section: str) -> str:
     """Get a shortened description with a URL to the online docs of the given option."""
-    option_help: str = option["help"].split("\n")[0]
+    option_help: str = option["help"].lstrip("\n").split("\n")[0]
     option_name: str = option["config_key"]
     simplified_option_help = simplify_option_description(option_help)
     url = f"{DOCS_URL}/v{VERSION_MAJOR_MINOR}/docs/reference-{section.lower()}#{option_name}"
@@ -93,6 +93,9 @@ def build_scope_properties(ruleset: dict, options: Iterable[dict], scope: str) -
             properties[option["config_key"]]["enum"] = option["choices"]
         else:
             typ = PYTHON_TO_JSON_TYPE_MAPPING.get(option["typ"])
+            # TODO(alte): do we want to maintain a mapping between special options?
+            #  `process_total_child_memory_usage` ("typ": "memory_size") -> "int"
+            #  `engine_visualize_to` ("typ": "dir_option") -> "str"
             if typ:
                 # options may allow providing value inline or loading from a filepath string
                 if option.get("fromfile"):
