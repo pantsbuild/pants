@@ -71,6 +71,6 @@ System-specific notes
 
 > 🚧 Using WSL on Windows
 > 
-> Projects using pants must be contained within the Linux virtual machine. 
+> Projects using Pants must be contained within the Linux virtual machine. 
 > 
-> Navigating a Linux shell to a Windows directory via the `/mnt` directory, or using the `wsl` prefix with a Windows shell in a Windows directory, and executing pants may result in unexpected behavior.
+> Navigating a Linux shell to a Windows directory via the `/mnt` directory, or using the `wsl` prefix with a Windows shell in a Windows directory, and executing Pants may result in unexpected behavior.
