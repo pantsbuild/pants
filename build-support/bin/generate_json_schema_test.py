@@ -65,7 +65,7 @@ def test_main():
 
     # an option description should be a single sentence with a URL to the option docs section
     assert schema["properties"]["GLOBAL"]["properties"]["level"]["description"] == (
-        "Set the logging level\nhttps://www.pantsbuild.org/v2.14/docs/reference-GLOBAL#level"
+        "Set the logging level\nhttps://www.pantsbuild.org/v2.14/docs/reference-global#level"
     )
 
     # options should be part of the enum

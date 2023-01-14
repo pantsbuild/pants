@@ -33,6 +33,17 @@ PYTHON_TO_JSON_TYPE_MAPPING = {
     "dict": "object",
 }
 
+# Certain default values will be expanded using local runtime environment which is undesirable.
+# This list may need to be extended as more options with environment specific default values are added.
+ENV_SPECIFIC_OPTION_DEFAULTS = {
+    "pants_config_files": ["<buildroot>/pants.toml"],
+    "pants_subprocessdir": "<buildroot>/.pids",
+    "pants_distdir": "<buildroot>/dist",
+    "pants_workdir": "<buildroot>/.pants.d",
+    "local_store_dir": "$XDG_CACHE_HOME/lmdb_store",
+    "named_caches_dir": "$XDG_CACHE_HOME/named_caches",
+}
+
 
 def simplify_option_description(description: str) -> str:
     """Take only a first sentence out of a multi-sentence description without a final full stop.
@@ -47,8 +58,18 @@ def get_description(option: dict, section: str) -> str:
     option_help: str = option["help"].split("\n")[0]
     option_name: str = option["config_key"]
     simplified_option_help = simplify_option_description(option_help)
-    url = f"{DOCS_URL}/{VERSION_MAJOR_MINOR}/docs/reference-{section}#{option_name}"
+    url = f"{DOCS_URL}/{VERSION_MAJOR_MINOR}/docs/reference-{section.lower()}#{option_name}"
     return f"{simplified_option_help}\n{url}"
+
+
+def get_default(option: dict) -> Any:
+    """Get default value for an option.
+
+    Ensure options that depend on any machine specific environment are properly handled. E.g.
+    `"default": "<buildroot>/.pants.d"` will be expanded to the `"default": "/home/your-user.name/code/pants/.pants.d"`
+    which is not what we want to have in a public schema.
+    """
+    return ENV_SPECIFIC_OPTION_DEFAULTS.get(option["config_key"], option["default"])
 
 
 def build_scope_properties(ruleset: dict, options: Iterable[dict], scope: str) -> dict:
@@ -65,7 +86,7 @@ def build_scope_properties(ruleset: dict, options: Iterable[dict], scope: str) -
 
         properties[option["config_key"]] = {
             "description": get_description(option, scope),
-            "default": option["default"],
+            "default": get_default(option),
         }
         if option["choices"]:
             # TODO(alte): find a safe way to sort choices
@@ -118,7 +139,7 @@ def main() -> None:
     schema["type"] = "object"
 
     with open(GENERATED_JSON_SCHEMA_FILENAME, "w") as fh:
-        fh.write(json.dumps(schema, indent=4, sort_keys=True))
+        fh.write(json.dumps(schema, indent=2, sort_keys=True))
 
 
 def create_parser() -> argparse.ArgumentParser:
