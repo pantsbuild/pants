@@ -22,7 +22,7 @@ from pants.version import VERSION
 
 GENERATED_JSON_SCHEMA_FILENAME = f"pantsbuild-{VERSION}.json"
 DOCS_URL = "https://www.pantsbuild.org"
-VERSION_MAJOR_MINOR = f"v{Version(VERSION).major}.{Version(VERSION).minor}"
+VERSION_MAJOR_MINOR = f"{Version(VERSION).major}.{Version(VERSION).minor}"
 
 PYTHON_TO_JSON_TYPE_MAPPING = {
     "str": "string",
@@ -58,7 +58,7 @@ def get_description(option: dict, section: str) -> str:
     option_help: str = option["help"].split("\n")[0]
     option_name: str = option["config_key"]
     simplified_option_help = simplify_option_description(option_help)
-    url = f"{DOCS_URL}/{VERSION_MAJOR_MINOR}/docs/reference-{section.lower()}#{option_name}"
+    url = f"{DOCS_URL}/v{VERSION_MAJOR_MINOR}/docs/reference-{section.lower()}#{option_name}"
     return f"{simplified_option_help}\n{url}"
 
 

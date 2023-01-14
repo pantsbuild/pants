@@ -4,7 +4,12 @@ import json
 from unittest.mock import Mock, patch
 
 import pytest
-from generate_json_schema import GENERATED_JSON_SCHEMA_FILENAME, main, simplify_option_description
+from generate_json_schema import (
+    GENERATED_JSON_SCHEMA_FILENAME,
+    VERSION_MAJOR_MINOR,
+    main,
+    simplify_option_description,
+)
 
 
 @pytest.mark.parametrize(
@@ -65,7 +70,7 @@ def test_main():
 
     # an option description should be a single sentence with a URL to the option docs section
     assert schema["properties"]["GLOBAL"]["properties"]["level"]["description"] == (
-        "Set the logging level\nhttps://www.pantsbuild.org/v2.14/docs/reference-global#level"
+        f"Set the logging level\nhttps://www.pantsbuild.org/v{VERSION_MAJOR_MINOR}/docs/reference-global#level"
     )
 
     # options should be part of the enum
