@@ -171,7 +171,7 @@ class CheckSubsystem(GoalSubsystem):
     def activated(cls, union_membership: UnionMembership) -> bool:
         return CheckRequest in union_membership
 
-    only = OnlyOption("checker", "mypy", "javac")
+    only = OnlyOption("checkers", "mypy", "javac")
 
 
 class Check(Goal):

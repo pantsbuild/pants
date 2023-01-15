@@ -103,13 +103,13 @@ class CompletePlatforms(DeduplicatedCollection[str]):
 
 
 @rule
-async def digest_complete_platform_addresses(
-    addresses: UnparsedAddressInputs,
+async def digest_complete_platforms(
+    complete_platforms: PexCompletePlatformsField,
 ) -> CompletePlatforms:
     original_file_targets = await Get(
         Targets,
         UnparsedAddressInputs,
-        addresses,
+        complete_platforms.to_unparsed_address_inputs(),
     )
     original_files_sources = await MultiGet(
         Get(
@@ -122,15 +122,6 @@ async def digest_complete_platform_addresses(
         Snapshot, MergeDigests(sources.snapshot.digest for sources in original_files_sources)
     )
     return CompletePlatforms.from_snapshot(snapshot)
-
-
-@rule
-async def digest_complete_platforms(
-    complete_platforms: PexCompletePlatformsField,
-) -> CompletePlatforms:
-    return await Get(
-        CompletePlatforms, UnparsedAddressInputs, complete_platforms.to_unparsed_address_inputs()
-    )
 
 
 @frozen_after_init

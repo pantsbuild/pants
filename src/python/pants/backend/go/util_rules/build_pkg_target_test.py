@@ -16,12 +16,7 @@ from pants.backend.go.dependency_inference import (
     GoModuleImportPathsMappings,
     GoModuleImportPathsMappingsHook,
 )
-from pants.backend.go.target_types import (
-    GoModTarget,
-    GoOwningGoModAddressField,
-    GoPackageTarget,
-    GoSdkTarget,
-)
+from pants.backend.go.target_types import GoModTarget, GoOwningGoModAddressField, GoPackageTarget
 from pants.backend.go.util_rules import (
     assembly,
     build_pkg,
@@ -180,12 +175,7 @@ def rule_runner() -> RuleRunner:
             FileTarget.register_plugin_field(GoOwningGoModAddressField),
             FilesGeneratorTarget.register_plugin_field(GoOwningGoModAddressField),
         ],
-        target_types=[
-            GoModTarget,
-            GoPackageTarget,
-            FilesGeneratorTarget,
-            GoSdkTarget,
-        ],
+        target_types=[GoModTarget, GoPackageTarget, FilesGeneratorTarget],
     )
     rule_runner.set_options([], env_inherit={"PATH"})
     return rule_runner

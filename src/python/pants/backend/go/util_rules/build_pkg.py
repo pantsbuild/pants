@@ -5,7 +5,6 @@ from __future__ import annotations
 import dataclasses
 import hashlib
 import os.path
-from collections import deque
 from dataclasses import dataclass
 from pathlib import PurePath
 from typing import Iterable
@@ -77,7 +76,6 @@ class BuildGoPackageRequest(EngineAwareParameter):
         prebuilt_object_files: tuple[str, ...] = (),
         pkg_specific_compiler_flags: tuple[str, ...] = (),
         pkg_specific_assembler_flags: tuple[str, ...] = (),
-        is_stdlib: bool = False,
     ) -> None:
         """Build a package and its dependencies as `__pkg__.a` files.
 
@@ -112,7 +110,6 @@ class BuildGoPackageRequest(EngineAwareParameter):
         self.prebuilt_object_files = prebuilt_object_files
         self.pkg_specific_compiler_flags = pkg_specific_compiler_flags
         self.pkg_specific_assembler_flags = pkg_specific_assembler_flags
-        self.is_stdlib = is_stdlib
         self._hashcode = hash(
             (
                 self.import_path,
@@ -137,7 +134,6 @@ class BuildGoPackageRequest(EngineAwareParameter):
                 self.prebuilt_object_files,
                 self.pkg_specific_compiler_flags,
                 self.pkg_specific_assembler_flags,
-                self.is_stdlib,
             )
         )
 
@@ -167,8 +163,7 @@ class BuildGoPackageRequest(EngineAwareParameter):
             f"fortran_files={self.fortran_files}, "
             f"prebuilt_object_files={self.prebuilt_object_files}, "
             f"pkg_specific_compiler_flags={self.pkg_specific_compiler_flags}, "
-            f"pkg_specific_assembler_flags={self.pkg_specific_assembler_flags}, "
-            f"is_stdlib={self.is_stdlib}"
+            f"pkg_specific_assembler_flags={self.pkg_specific_assembler_flags}"
             ")"
         )
 
@@ -201,7 +196,6 @@ class BuildGoPackageRequest(EngineAwareParameter):
             and self.prebuilt_object_files == other.prebuilt_object_files
             and self.pkg_specific_compiler_flags == other.pkg_specific_compiler_flags
             and self.pkg_specific_assembler_flags == other.pkg_specific_assembler_flags
-            and self.is_stdlib == other.is_stdlib
             # TODO: Use a recursive memoized __eq__ if this ever shows up in profiles.
             and self.direct_dependencies == other.direct_dependencies
         )
@@ -432,37 +426,6 @@ async def _maybe_copy_headers_to_platform_independent_names(
         return None
 
 
-# Gather transitive prebuilt object files for Cgo. Traverse the provided dependencies and lifts `.syso`
-# object files into a single `Digest`.
-@rule_helper
-async def _gather_transitive_prebuilt_object_files(
-    build_request: BuildGoPackageRequest,
-) -> tuple[Digest, frozenset[str]]:
-    prebuilt_objects: list[tuple[Digest, list[str]]] = []
-
-    queue: deque[BuildGoPackageRequest] = deque([build_request])
-    while queue:
-        pkg = queue.popleft()
-        queue.extend(pkg.direct_dependencies)
-        if pkg.prebuilt_object_files:
-            prebuilt_objects.append(
-                (
-                    pkg.digest,
-                    [
-                        os.path.join(pkg.dir_path, obj_file)
-                        for obj_file in pkg.prebuilt_object_files
-                    ],
-                )
-            )
-
-    object_digest = await Get(Digest, MergeDigests([digest for digest, _ in prebuilt_objects]))
-    object_files = set()
-    for _, files in prebuilt_objects:
-        object_files.update(files)
-
-    return object_digest, frozenset(object_files)
-
-
 # NB: We must have a description for the streaming of this rule to work properly
 # (triggered by `FallibleBuiltGoPackage` subclassing `EngineAwareReturnType`).
 @rule(desc="Compile with Go", level=LogLevel.DEBUG)
@@ -538,7 +501,7 @@ async def build_go_package(
     # Add any prebuilt object files (".syso" extension) to the list of objects to link into the package.
     if request.prebuilt_object_files:
         objects.extend(
-            (os.path.join(request.dir_path, prebuilt_object_file), request.digest)
+            (f"./{request.dir_path}/{prebuilt_object_file}", request.digest)
             for prebuilt_object_file in request.prebuilt_object_files
         )
 
@@ -547,32 +510,12 @@ async def build_go_package(
     if cgo_files:
         # Check if any assembly files contain gcc assembly, and not Go assembly. Raise an exception if any are
         # likely in Go format since in cgo packages, assembly files are passed to gcc and must be in gcc format.
-        #
-        # Exception: When building runtime/cgo itself, only send `gcc_*.s` assembly files to GCC as
-        # runtime/cgo has both types of files.
-        if request.is_stdlib and request.import_path == "runtime/cgo":
-            gcc_s_files = []
-            new_s_files = []
-            for s_file in s_files:
-                if s_file.startswith("gcc_"):
-                    gcc_s_files.append(s_file)
-                else:
-                    new_s_files.append(s_file)
-            s_files = new_s_files
-        else:
-            if s_files and await _any_file_is_golang_assembly(
-                request.digest, request.dir_path, s_files
-            ):
-                raise ValueError(
-                    f"Package {request.import_path} is a cgo package but contains Go assembly files."
-                )
-            gcc_s_files = s_files
-            s_files = []  # Clear s_files since assembly has already been handled in cgo rules.
-
-        # Gather all prebuilt object files transitively and pass them to the Cgo rule for linking into the
-        # Cgo object output. This is necessary to avoid linking errors.
-        # See https://github.com/golang/go/blob/6ad27161f8d1b9c5e03fb3415977e1d3c3b11323/src/cmd/go/internal/work/exec.go#L3291-L3311.
-        transitive_prebuilt_object_files = await _gather_transitive_prebuilt_object_files(request)
+        if s_files and await _any_file_is_golang_assembly(
+            request.digest, request.dir_path, s_files
+        ):
+            raise ValueError(
+                f"Package {request.import_path} is a cgo package but contains Go assembly files."
+            )
 
         assert request.cgo_flags is not None
         cgo_compile_result = await Get(
@@ -586,12 +529,10 @@ async def build_go_package(
                 cgo_files=cgo_files,
                 cgo_flags=request.cgo_flags,
                 c_files=request.c_files,
-                s_files=tuple(gcc_s_files),
+                s_files=tuple(s_files),
                 cxx_files=request.cxx_files,
                 objc_files=request.objc_files,
                 fortran_files=request.fortran_files,
-                is_stdlib=request.is_stdlib,
-                transitive_prebuilt_object_files=transitive_prebuilt_object_files,
             ),
         )
         assert cgo_compile_result is not None
@@ -602,6 +543,7 @@ async def build_go_package(
                 for obj_file in cgo_compile_result.output_obj_files
             ]
         )
+        s_files = []  # Clear s_files since assembly has already been handled in cgo rules.
 
     # Copy header files with platform-specific values in their name to platform independent names.
     # For example, defs_linux_amd64.h becomes defs_GOOS_GOARCH.h.
@@ -676,32 +618,6 @@ async def build_go_package(
     if go_root.is_compatible_version(go_version):
         compile_args.append(f"-lang=go{go_version}")
 
-    if request.is_stdlib:
-        compile_args.append("-std")
-
-    compiling_runtime = request.is_stdlib and request.import_path in (
-        "internal/abi",
-        "internal/bytealg",
-        "internal/coverage/rtcov",
-        "internal/cpu",
-        "internal/goarch",
-        "internal/goos",
-        "runtime",
-        "runtime/internal/atomic",
-        "runtime/internal/math",
-        "runtime/internal/sys",
-        "runtime/internal/syscall",
-    )
-
-    # From Go sources:
-    # runtime compiles with a special gc flag to check for
-    # memory allocations that are invalid in the runtime package,
-    # and to implement some special compiler pragmas.
-    #
-    # See https://github.com/golang/go/blob/245e95dfabd77f337373bf2d6bb47cd353ad8d74/src/cmd/go/internal/work/gc.go#L107-L112
-    if compiling_runtime:
-        compile_args.append("-+")
-
     if symabis_path:
         compile_args.extend(["-symabis", symabis_path])
 
@@ -709,10 +625,7 @@ async def build_go_package(
     # about the Go code that can be used by assembly files.
     asm_header_path: str | None = None
     if s_files:
-        if os.path.isabs(request.dir_path):
-            asm_header_path = "go_asm.h"
-        else:
-            asm_header_path = os.path.join(request.dir_path, "go_asm.h")
+        asm_header_path = os.path.join(request.dir_path, "go_asm.h")
         compile_args.extend(["-asmhdr", asm_header_path])
 
     if embedcfg.digest != EMPTY_DIGEST:
@@ -730,21 +643,7 @@ async def build_go_package(
     # If there are no loose object files to add to the package archive later or assembly files to assemble,
     # then pass -complete flag which tells the compiler that the provided Go files constitute the entire package.
     if not objects and not s_files:
-        # Exceptions: a few standard packages have forward declarations for
-        # pieces supplied behind-the-scenes by package runtime.
-        if request.import_path not in (
-            "bytes",
-            "internal/poll",
-            "net",
-            "os",
-            "runtime/metrics",
-            "runtime/pprof",
-            "runtime/trace",
-            "sync",
-            "syscall",
-            "time",
-        ):
-            compile_args.append("-complete")
+        compile_args.append("-complete")
 
     # Add any extra compiler flags after the ones added automatically by this rule.
     if request.build_opts.compiler_flags:
@@ -752,18 +651,11 @@ async def build_go_package(
     if request.pkg_specific_compiler_flags:
         compile_args.extend(request.pkg_specific_compiler_flags)
 
-    # Remove -N if compiling runtime:
-    #  It is not possible to build the runtime with no optimizations,
-    #  because the compiler cannot eliminate enough write barriers.
-    if compiling_runtime:
-        compile_args = [arg for arg in compile_args if arg != "-N"]
-
-    go_file_paths = (
-        str(PurePath(request.dir_path, go_file)) if request.dir_path else f"./{go_file}"
-        for go_file in go_files
+    relativized_sources = (
+        f"./{request.dir_path}/{name}" if request.dir_path else f"./{name}" for name in go_files
     )
     generated_cgo_file_paths = cgo_compile_result.output_go_files if cgo_compile_result else ()
-    compile_args.extend(["--", *go_file_paths, *generated_cgo_file_paths])
+    compile_args.extend(["--", *relativized_sources, *generated_cgo_file_paths])
     compile_result = await Get(
         FallibleProcessResult,
         GoSdkProcess(

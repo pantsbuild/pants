@@ -157,8 +157,6 @@ async def setup_build_go_package_target_request(
         return codegen_result
 
     embed_config: EmbedConfig | None = None
-    is_stdlib = False
-
     if target.has_field(GoPackageSourcesField):
         _maybe_first_party_pkg_analysis, _maybe_first_party_pkg_digest = await MultiGet(
             Get(
@@ -413,7 +411,6 @@ async def setup_build_go_package_target_request(
         with_coverage=with_coverage,
         pkg_specific_compiler_flags=tuple(pkg_specific_compiler_flags),
         pkg_specific_assembler_flags=tuple(pkg_specific_assembler_flags),
-        is_stdlib=is_stdlib,
     )
     return FallibleBuildGoPackageRequest(result, import_path)
 

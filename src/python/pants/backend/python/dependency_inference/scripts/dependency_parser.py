@@ -4,7 +4,7 @@
 
 # NB: This must be compatible with Python 2.7 and 3.5+.
 # NB: If you're needing to debug this, an easy way is to just invoke it on a file.
-#   E.g. `STRING_IMPORTS=y ... python3 src/python/pants/backend/python/dependency_inference/scripts/dependency_parser_py FILENAME`
+#   E.g. `STRING_IMPORTS=y ... python3 src/python/pants/backend/python/dependency_inference/scripts/import_parser.py FILENAME`
 
 from __future__ import print_function, unicode_literals
 
@@ -16,13 +16,6 @@ import re
 import sys
 import tokenize
 from io import open
-
-
-def _maybe_str(node):
-    if sys.version_info[0:2] < (3, 8):
-        return node.s if isinstance(node, ast.Str) else None
-    else:
-        return node.value if isinstance(node, ast.Constant) else None
 
 
 class AstVisitor(ast.NodeVisitor):
@@ -38,7 +31,7 @@ class AstVisitor(ast.NodeVisitor):
         self.weak_imports = {}
         self.assets = set()
         self._weaken_strong_imports = False
-        if os.environ.get("STRING_IMPORTS", "n") == "y":
+        if os.environ["STRING_IMPORTS"] == "y":
             # This regex is used to infer imports from strings, e.g .
             #  `importlib.import_module("example.subdir.Foo")`.
             self._string_import_regex = re.compile(
@@ -50,7 +43,7 @@ class AstVisitor(ast.NodeVisitor):
         else:
             self._string_import_regex = None
 
-        if os.environ.get("ASSETS", "n") == "y":
+        if os.environ["ASSETS"] == "y":
             # This regex is used to infer asset names from strings, e.g.
             #  `load_resource("data/db1.json")
             # Since Unix allows basically anything for filenames, we require some "sane" subset of
@@ -64,18 +57,13 @@ class AstVisitor(ast.NodeVisitor):
 
     def maybe_add_string_dependency(self, node, s):
         if self._string_import_regex and self._string_import_regex.match(s):
-            self.add_weak_import(s, node.lineno)
+            self.weak_imports.setdefault(s, node.lineno)
         if self._asset_regex and self._asset_regex.match(s):
             self.assets.add(s)
 
     def add_strong_import(self, name, lineno):
-        if not self._is_pragma_ignored(lineno - 1):
-            imports = self.weak_imports if self._weaken_strong_imports else self.strong_imports
-            imports.setdefault(name, lineno)
-
-    def add_weak_import(self, name, lineno):
-        if not self._is_pragma_ignored(lineno - 1):
-            self.weak_imports.setdefault(name, lineno)
+        imports = self.weak_imports if self._weaken_strong_imports else self.strong_imports
+        imports.setdefault(name, lineno)
 
     def _is_pragma_ignored(self, line_index):
         """Return if the line at `line_index` (0-based) is pragma ignored."""
@@ -106,7 +94,9 @@ class AstVisitor(ast.NodeVisitor):
         for alias in node.names:
             token = find_token(alias.name.split(".")[-1])
             lineno = token[3][0] + node.lineno - 1
-            self.add_strong_import(import_prefix + alias.name, lineno)
+
+            if not self._is_pragma_ignored(lineno - 1):
+                self.add_strong_import(import_prefix + alias.name, lineno)
             if alias.asname and token[1] != alias.asname:
                 find_token(alias.asname)
 
@@ -161,9 +151,15 @@ class AstVisitor(ast.NodeVisitor):
         # to explicitly mark namespace packages.  Note that we don't handle more complex
         # uses, such as those that set `level`.
         if isinstance(node.func, ast.Name) and node.func.id == "__import__" and len(node.args) == 1:
-            name = _maybe_str(node.args[0])
+            if sys.version_info[0:2] < (3, 8):
+                name = node.args[0].s if isinstance(node.args[0], ast.Str) else None
+            else:
+                name = node.args[0].value if isinstance(node.args[0], ast.Constant) else None
+
             if name is not None:
-                self.add_strong_import(name, node.args[0].lineno)
+                lineno = node.args[0].lineno
+                if not self._is_pragma_ignored(lineno - 1):
+                    self.add_strong_import(name, lineno)
                 return
 
         self.generic_visit(node)

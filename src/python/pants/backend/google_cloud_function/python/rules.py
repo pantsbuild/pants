@@ -7,7 +7,6 @@ import logging
 from dataclasses import dataclass
 
 from pants.backend.google_cloud_function.python.target_types import (
-    PythonGoogleCloudFunctionCompletePlatforms,
     PythonGoogleCloudFunctionHandlerField,
     PythonGoogleCloudFunctionRuntime,
     PythonGoogleCloudFunctionType,
@@ -15,6 +14,7 @@ from pants.backend.google_cloud_function.python.target_types import (
     ResolvePythonGoogleHandlerRequest,
 )
 from pants.backend.python.subsystems.lambdex import Lambdex
+from pants.backend.python.target_types import PexCompletePlatformsField
 from pants.backend.python.util_rules import pex_from_targets
 from pants.backend.python.util_rules.pex import (
     CompletePlatforms,
@@ -32,7 +32,6 @@ from pants.core.goals.package import (
     PackageFieldSet,
 )
 from pants.core.target_types import FileSourceField
-from pants.engine.addresses import UnparsedAddressInputs
 from pants.engine.platform import Platform
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
@@ -54,18 +53,9 @@ class PythonGoogleCloudFunctionFieldSet(PackageFieldSet):
 
     handler: PythonGoogleCloudFunctionHandlerField
     runtime: PythonGoogleCloudFunctionRuntime
-    complete_platforms: PythonGoogleCloudFunctionCompletePlatforms
+    complete_platforms: PexCompletePlatformsField
     type: PythonGoogleCloudFunctionType
     output_path: OutputPathField
-
-
-@rule
-async def digest_complete_platforms(
-    complete_platforms: PythonGoogleCloudFunctionCompletePlatforms,
-) -> CompletePlatforms:
-    return await Get(
-        CompletePlatforms, UnparsedAddressInputs, complete_platforms.to_unparsed_address_inputs()
-    )
 
 
 @rule(desc="Create Python Google Cloud Function", level=LogLevel.DEBUG)
@@ -112,7 +102,7 @@ async def package_python_google_cloud_function(
     )
 
     complete_platforms = await Get(
-        CompletePlatforms, PythonGoogleCloudFunctionCompletePlatforms, field_set.complete_platforms
+        CompletePlatforms, PexCompletePlatformsField, field_set.complete_platforms
     )
 
     pex_request = PexFromTargetsRequest(

@@ -36,7 +36,7 @@ jobs:
       uses: actions/cache@v3
       with:
         key: Linux-ARM64-rustup-${{ hashFiles('rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.66.1-*
+        path: '~/.rustup/toolchains/1.66.0-*
 
           ~/.rustup/update-hashes
 
@@ -139,7 +139,7 @@ jobs:
       uses: actions/cache@v3
       with:
         key: Linux-x86_64-rustup-${{ hashFiles('rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.66.1-*
+        path: '~/.rustup/toolchains/1.66.0-*
 
           ~/.rustup/update-hashes
 
@@ -256,7 +256,7 @@ jobs:
       uses: actions/cache@v3
       with:
         key: macOS11-x86_64-rustup-${{ hashFiles('rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.66.1-*
+        path: '~/.rustup/toolchains/1.66.0-*
 
           ~/.rustup/update-hashes
 
@@ -330,7 +330,7 @@ jobs:
     timeout-minutes: 60
   build_wheels_linux_arm64:
     container:
-      image: registry.hub.docker.com/pantsbuild/wheel_build_aarch64:v2-2e4d40b8b5
+      image: registry.hub.docker.com/pantsbuild/wheel_build_aarch64:v1-568cfc69e
       options: --user 1000:1000
     env:
       PANTS_REMOTE_CACHE_READ: 'false'
@@ -440,10 +440,6 @@ jobs:
       run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
 
         '
-    - name: Install Go
-      uses: actions/setup-go@v3
-      with:
-        go-version: 1.17.1
     - env: {}
       name: Build wheels
       run: '[[ "${GITHUB_EVENT_NAME}" == "pull_request" ]] && export MODE=debug
@@ -492,7 +488,7 @@ jobs:
       uses: actions/cache@v3
       with:
         key: macOS10-15-x86_64-rustup-${{ hashFiles('rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.66.1-*
+        path: '~/.rustup/toolchains/1.66.0-*
 
           ~/.rustup/update-hashes
 
@@ -510,10 +506,6 @@ jobs:
       run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
 
         '
-    - name: Install Go
-      uses: actions/setup-go@v3
-      with:
-        go-version: 1.17.1
     - env:
         ARCHFLAGS: -arch x86_64
       name: Build wheels
@@ -563,7 +555,7 @@ jobs:
       uses: actions/cache@v3
       with:
         key: macOS11-ARM64-rustup-${{ hashFiles('rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.66.1-*
+        path: '~/.rustup/toolchains/1.66.0-*
 
           ~/.rustup/update-hashes
 
@@ -581,10 +573,6 @@ jobs:
       run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
 
         '
-    - name: Install Go
-      uses: actions/setup-go@v3
-      with:
-        go-version: 1.17.1
     - env:
         ARCHFLAGS: -arch arm64
       name: Build wheels
@@ -631,7 +619,7 @@ jobs:
       uses: actions/cache@v3
       with:
         key: macOS11-x86_64-rustup-${{ hashFiles('rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.66.1-*
+        path: '~/.rustup/toolchains/1.66.0-*
 
           ~/.rustup/update-hashes
 
@@ -649,10 +637,6 @@ jobs:
       run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
 
         '
-    - name: Install Go
-      uses: actions/setup-go@v3
-      with:
-        go-version: 1.17.1
     - env:
         ARCHFLAGS: -arch x86_64
       name: Build wheels

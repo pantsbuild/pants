@@ -4,5 +4,5 @@
 python_sources()
 python_tests(
     name="tests",
-    overrides={"test_test.py": {"timeout": 320}},
+    overrides={"test_test.py": {"timeout": 120}},
 )
