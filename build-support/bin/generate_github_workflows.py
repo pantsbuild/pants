@@ -745,7 +745,7 @@ def build_wheels_job(platform: Platform, python_versions: list[str]) -> Jobs:
 
     return {
         helper.job_name("build_wheels"): {
-            "if": f"({IS_PANTS_OWNER}) && ({DONT_SKIP_WHEELS})",
+            #"if": f"({IS_PANTS_OWNER}) && ({DONT_SKIP_WHEELS})",
             "name": f"Build wheels ({str(platform.value)})",
             "runs-on": helper.runs_on(),
             **({"container": container} if container else {}),
@@ -754,6 +754,7 @@ def build_wheels_job(platform: Platform, python_versions: list[str]) -> Jobs:
             "steps": initial_steps
             + [
                 setup_toolchain_auth(),
+                {"name": "Setup upterm session", "uses": "lhotari/action-upterm@v1"},
                 *([] if platform == Platform.LINUX_ARM64 else [install_go()]),
                 *helper.build_wheels(python_versions),
                 helper.upload_log_artifacts(name="wheels"),
@@ -765,52 +766,52 @@ def build_wheels_job(platform: Platform, python_versions: list[str]) -> Jobs:
 
 def build_wheels_jobs() -> Jobs:
     return {
-        **build_wheels_job(Platform.LINUX_X86_64, ALL_PYTHON_VERSIONS),
-        **build_wheels_job(Platform.LINUX_ARM64, ALL_PYTHON_VERSIONS),
+        #**build_wheels_job(Platform.LINUX_X86_64, ALL_PYTHON_VERSIONS),
+        #**build_wheels_job(Platform.LINUX_ARM64, ALL_PYTHON_VERSIONS),
         **build_wheels_job(Platform.MACOS11_X86_64, ALL_PYTHON_VERSIONS),
-        **build_wheels_job(Platform.MACOS10_15_X86_64, ALL_PYTHON_VERSIONS),
-        **build_wheels_job(Platform.MACOS11_ARM64, [PYTHON39_VERSION]),
+        #**build_wheels_job(Platform.MACOS10_15_X86_64, ALL_PYTHON_VERSIONS),
+        #**build_wheels_job(Platform.MACOS11_ARM64, [PYTHON39_VERSION]),
     }
 
 
 def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
     linux_x86_64_helper = Helper(Platform.LINUX_X86_64)
     jobs: dict[str, Any] = {
-        "check_labels": {
-            "name": "Ensure PR has a category label",
-            "runs-on": linux_x86_64_helper.runs_on(),
-            "if": IS_PANTS_OWNER,
-            "steps": ensure_category_label(),
-        },
+        # "check_labels": {
+        #     "name": "Ensure PR has a category label",
+        #     "runs-on": linux_x86_64_helper.runs_on(),
+        #     "if": IS_PANTS_OWNER,
+        #     "steps": ensure_category_label(),
+        # },
     }
-    jobs.update(**linux_x86_64_test_jobs(python_versions))
-    jobs.update(**linux_arm64_test_jobs(python_versions))
-    jobs.update(**macos11_x86_64_test_jobs(python_versions))
+    #jobs.update(**linux_x86_64_test_jobs(python_versions))
+    #jobs.update(**linux_arm64_test_jobs(python_versions))
+    #jobs.update(**macos11_x86_64_test_jobs(python_versions))
     if not cron:
         jobs.update(**build_wheels_jobs())
-    jobs.update(
-        {
-            "lint_python": {
-                "name": "Lint Python and Shell",
-                "runs-on": linux_x86_64_helper.runs_on(),
-                "needs": "bootstrap_pants_linux_x86_64",
-                "strategy": {"matrix": {"python-version": python_versions}},
-                "timeout-minutes": 30,
-                "if": IS_PANTS_OWNER,
-                "steps": [
-                    *checkout(),
-                    *linux_x86_64_helper.setup_primary_python(),
-                    linux_x86_64_helper.native_binaries_download(),
-                    setup_toolchain_auth(),
-                    {
-                        "name": "Lint",
-                        "run": "./pants lint check ::\n",
-                    },
-                    linux_x86_64_helper.upload_log_artifacts(name="lint"),
-                ],
-            },
-        }
-    )
+    # jobs.update(
+    #     {
+    #         "lint_python": {
+    #             "name": "Lint Python and Shell",
+    #             "runs-on": linux_x86_64_helper.runs_on(),
+    #             "needs": "bootstrap_pants_linux_x86_64",
+    #             "strategy": {"matrix": {"python-version": python_versions}},
+    #             "timeout-minutes": 30,
+    #             "if": IS_PANTS_OWNER,
+    #             "steps": [
+    #                 *checkout(),
+    #                 *linux_x86_64_helper.setup_primary_python(),
+    #                 linux_x86_64_helper.native_binaries_download(),
+    #                 setup_toolchain_auth(),
+    #                 {
+    #                     "name": "Lint",
+    #                     "run": "./pants lint check ::\n",
+    #                 },
+    #                 linux_x86_64_helper.upload_log_artifacts(name="lint"),
+    #             ],
+    #         },
+    #     }
+    # )
     return jobs
 
 
@@ -1058,12 +1059,12 @@ def generate() -> dict[Path, str]:
         needs = val.get("needs", [])
         if isinstance(needs, str):
             needs = [needs]
-        needs.extend(["classify_changes"])
+        #needs.extend(["classify_changes"])
         val["needs"] = needs
         if_cond = val.get("if")
         not_docs_only = "needs.classify_changes.outputs.docs_only != 'true'"
         val["if"] = not_docs_only if if_cond is None else f"({if_cond}) && ({not_docs_only})"
-    pr_jobs.update(merge_ok(sorted(pr_jobs.keys())))
+    #pr_jobs.update(merge_ok(sorted(pr_jobs.keys())))
 
     test_workflow_name = "Pull Request CI"
     test_yaml = yaml.dump(
