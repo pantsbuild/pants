@@ -246,6 +246,11 @@ class PythonAwsLambdaRuntime(StringField):
         """
         The identifier of the AWS Lambda runtime to target (pythonX.Y).
         See https://docs.aws.amazon.com/lambda/latest/dg/lambda-python.html.
+
+        In general you'll want to define either a `runtime` or one `complete_platforms` but not
+        both. Specifying a `runtime` is simpler, but less accurate. If you have issues either
+        packaging the AWS Lambda PEX or running it as a deployed AWS Lambda function, you should try
+        using `complete_platforms` instead.
         """
     )
 
@@ -273,6 +278,18 @@ class PythonAwsLambdaRuntime(StringField):
         return int(mo.group("major")), int(mo.group("minor"))
 
 
+class PythonAwsLambdaCompletePlatforms(PexCompletePlatformsField):
+    help = softwrap(
+        f"""
+        {PexCompletePlatformsField.help}
+
+        N.B.: If specifying `complete_platforms` to work around packaging failures encountered when
+        using the `runtime` field, ensure you delete the `runtime` field from your
+        `python_awslambda` target.
+        """
+    )
+
+
 class PythonAWSLambda(Target):
     alias = "python_awslambda"
     core_fields = (
@@ -282,7 +299,7 @@ class PythonAWSLambda(Target):
         PythonAwsLambdaHandlerField,
         PythonAwsLambdaIncludeRequirements,
         PythonAwsLambdaRuntime,
-        PexCompletePlatformsField,
+        PythonAwsLambdaCompletePlatforms,
         PythonResolveField,
     )
     help = softwrap(

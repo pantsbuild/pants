@@ -7,6 +7,7 @@ import logging
 from dataclasses import dataclass
 
 from pants.backend.awslambda.python.target_types import (
+    PythonAwsLambdaCompletePlatforms,
     PythonAwsLambdaHandlerField,
     PythonAwsLambdaIncludeRequirements,
     PythonAwsLambdaRuntime,
@@ -14,7 +15,6 @@ from pants.backend.awslambda.python.target_types import (
     ResolvePythonAwsHandlerRequest,
 )
 from pants.backend.python.subsystems.lambdex import Lambdex
-from pants.backend.python.target_types import PexCompletePlatformsField
 from pants.backend.python.util_rules import pex_from_targets
 from pants.backend.python.util_rules.pex import (
     CompletePlatforms,
@@ -32,6 +32,7 @@ from pants.core.goals.package import (
     PackageFieldSet,
 )
 from pants.core.target_types import FileSourceField
+from pants.engine.addresses import UnparsedAddressInputs
 from pants.engine.platform import Platform
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
@@ -55,8 +56,17 @@ class PythonAwsLambdaFieldSet(PackageFieldSet):
     handler: PythonAwsLambdaHandlerField
     include_requirements: PythonAwsLambdaIncludeRequirements
     runtime: PythonAwsLambdaRuntime
-    complete_platforms: PexCompletePlatformsField
+    complete_platforms: PythonAwsLambdaCompletePlatforms
     output_path: OutputPathField
+
+
+@rule
+async def digest_complete_platforms(
+    complete_platforms: PythonAwsLambdaCompletePlatforms,
+) -> CompletePlatforms:
+    return await Get(
+        CompletePlatforms, UnparsedAddressInputs, complete_platforms.to_unparsed_address_inputs()
+    )
 
 
 @rule(desc="Create Python AWS Lambda", level=LogLevel.DEBUG)
@@ -110,7 +120,7 @@ async def package_python_awslambda(
     )
 
     complete_platforms = await Get(
-        CompletePlatforms, PexCompletePlatformsField, field_set.complete_platforms
+        CompletePlatforms, PythonAwsLambdaCompletePlatforms, field_set.complete_platforms
     )
 
     pex_request = PexFromTargetsRequest(
