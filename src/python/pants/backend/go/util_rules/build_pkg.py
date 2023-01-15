@@ -31,7 +31,6 @@ from pants.backend.go.util_rules.import_analysis import ImportConfig, ImportConf
 from pants.backend.go.util_rules.sdk import GoSdkProcess, GoSdkToolIDRequest, GoSdkToolIDResult
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.core.util_rules import system_binaries
-from pants.core.util_rules.system_binaries import PythonBinary
 from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
 from pants.engine.fs import (
     EMPTY_DIGEST,
@@ -341,31 +340,36 @@ async def _add_objects_to_archive(
 
 
 @dataclass(frozen=True)
-class SetupAsmCheckScript:
+class SetupAsmCheckBinary:
     digest: Digest
     path: str
 
 
+# Due to the bootstrap problem, the asm check binary cannot use the `LoadedGoBinaryRequest` rules since
+# those rules call back into this `build_pkg` package. Instead, just invoke `go build` directly which is fine
+# since the asm check binary only uses the standard library.
 @rule
-async def setup_golang_asm_check_script() -> SetupAsmCheckScript:
-    script = read_resource("pants.backend.go.util_rules", "asm_check.py")
-    assert (
-        script is not None
-    ), "Unable to extract resource asm_check.py from pants.backend.go.util_rules"
+async def setup_golang_asm_check_binary() -> SetupAsmCheckBinary:
+    src_file = "asm_check.go"
+    content = read_resource("pants.backend.go.go_sources.asm_check", src_file)
+    if not content:
+        raise AssertionError(f"Unable to find resource for `{src_file}`.")
 
-    digest = await Get(
-        Digest,
-        CreateDigest(
-            [
-                FileContent(
-                    path="__asm_check__.py",
-                    content=script,
-                    is_executable=True,
-                )
-            ]
+    sources_digest = await Get(Digest, CreateDigest([FileContent(src_file, content)]))
+
+    binary_name = "__go_asm_check__"
+    compile_result = await Get(
+        ProcessResult,
+        GoSdkProcess(
+            command=("build", "-o", binary_name, src_file),
+            input_digest=sources_digest,
+            output_files=(binary_name,),
+            env={"CGO_ENABLED": "0"},
+            description="Build Go assembly check binary",
         ),
     )
-    return SetupAsmCheckScript(digest, "./__asm_check__.py")
+
+    return SetupAsmCheckBinary(compile_result.output_digest, f"./{binary_name}")
 
 
 # Check whether the given files looks like they could be Golang-format assembly language files.
@@ -384,8 +388,7 @@ class CheckForGolangAssemblyResult:
 @rule
 async def check_for_golang_assembly(
     request: CheckForGolangAssemblyRequest,
-    python: PythonBinary,
-    asm_check_setup: SetupAsmCheckScript,
+    asm_check_setup: SetupAsmCheckBinary,
 ) -> CheckForGolangAssemblyResult:
     """Return true if any of the given `s_files` look like it could be a Golang-format assembly
     language file.
@@ -398,7 +401,6 @@ async def check_for_golang_assembly(
         ProcessResult,
         Process(
             argv=(
-                python.path,
                 asm_check_setup.path,
                 *(os.path.join(request.dir_path, s_file) for s_file in request.s_files),
             ),
