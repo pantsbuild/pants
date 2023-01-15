@@ -30,7 +30,6 @@ from pants.backend.go.util_rules.goroot import GoRoot
 from pants.backend.go.util_rules.import_analysis import ImportConfig, ImportConfigRequest
 from pants.backend.go.util_rules.sdk import GoSdkProcess, GoSdkToolIDRequest, GoSdkToolIDResult
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
-from pants.core.util_rules import system_binaries
 from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
 from pants.engine.fs import (
     EMPTY_DIGEST,
@@ -983,5 +982,4 @@ def rules():
         *collect_rules(),
         *cgo.rules(),
         *coverage.rules(),
-        *system_binaries.rules(),
     )
