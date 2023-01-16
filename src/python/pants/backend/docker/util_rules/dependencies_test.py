@@ -164,7 +164,10 @@ def test_does_not_infer_dependency_when_docker_build_arg_overwrites(
     )
 
     tgt = rule_runner.get_target(Address("src/downstream", target_name="image"))
-    rule_runner.set_options(["--docker-build-args=BASE_IMAGE=alpine:3.17.0"])
+    rule_runner.set_options(
+        ["--docker-build-args=BASE_IMAGE=alpine:3.17.0"],
+        env_inherit={"PATH", "PYENV_ROOT", "HOME"},
+    )
     inferred = rule_runner.request(
         InferredDependencies,
         [InferDockerDependencies(tgt[DockerImageDependenciesField])],
