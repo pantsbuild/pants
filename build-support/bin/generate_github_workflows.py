@@ -653,7 +653,6 @@ def build_wheels_job(platform: Platform, python_versions: list[str]) -> Jobs:
 def build_wheels_jobs() -> Jobs:
     return {
         **build_wheels_job(Platform.LINUX_X86_64, ALL_PYTHON_VERSIONS),
-        **build_wheels_job(Platform.MACOS11_X86_64, ALL_PYTHON_VERSIONS),
         **build_wheels_job(Platform.MACOS10_15_X86_64, ALL_PYTHON_VERSIONS),
         **build_wheels_job(Platform.MACOS11_ARM64, [PYTHON39_VERSION]),
     }
