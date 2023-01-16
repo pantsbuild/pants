@@ -56,7 +56,8 @@ class BufSubsystem(TemplatedExternalTool):
         help=lambda cls: softwrap(
             f"""
             If true, Pants will include any relevant root config files during runs
-            (`buf.yaml`, `buf.lock`, `buf.gen.yaml` and `buf.work.yaml`).
+            (`buf.yaml`). If the json format is preferred, the path to the `buf.json`
+            file should be provided in the config option.
 
             Use `[{cls.options_scope}].config` instead if your config is in a non-standard location.
             """
@@ -70,7 +71,7 @@ class BufSubsystem(TemplatedExternalTool):
             specified=self.config,
             specified_option_name=f"{self.options_scope}.config",
             discovery=self.config_discovery,
-            check_existence=["buf.yaml", "buf.lock", "buf.gen.yaml", "buf.work.yaml"],
+            check_existence=("buf.yaml",),
             check_content={},
         )
 
