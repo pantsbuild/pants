@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import logging
 import re
 from dataclasses import asdict
 from typing import Iterable, Iterator, List, Optional
@@ -12,12 +13,14 @@ from strawberry.types import Info
 
 from pants.backend.project_info.peek import TargetData, TargetDatas
 from pants.base.specs_parser import SpecsParser
+from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.target import AllUnexpandedTargets, UnexpandedTargets
 from pants.explorer.server.graphql.context import GraphQLContext
 from pants.explorer.server.graphql.field_types import JSONScalar
 from pants.help.help_info_extracter import TargetTypeHelpInfo
 from pants.util.strutil import softwrap
 
+logger = logging.getLogger(__name__)
 specs_parser = SpecsParser()
 
 
@@ -172,7 +175,11 @@ class QueryTargetsMixin:
             else None
         )
         if specs:
-            targets = req(UnexpandedTargets, (specs,))
+            try:
+                targets = req(UnexpandedTargets, (specs,))
+            except ExecutionError as e:
+                logger.debug(f"Failed to get targets for specs query: {specs}.\nError: {e}")
+                targets = UnexpandedTargets([])
         else:
             targets = UnexpandedTargets(req(AllUnexpandedTargets))
         all_data = req(TargetDatas, (targets,))
