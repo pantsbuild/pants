@@ -130,7 +130,7 @@ class CoverageSubsystem(PythonToolBase):
         help=softwrap(
             """
             A list of Python modules or filesystem paths to use in the coverage report, e.g.
-            `['helloworld_test', 'helloworld/util/dirutil'].
+            `['helloworld_test', 'helloworld/util/dirutil']`.
 
             Both modules and directory paths are recursive: any submodules or child paths,
             respectively, will be included.
