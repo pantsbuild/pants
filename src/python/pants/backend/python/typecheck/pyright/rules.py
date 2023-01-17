@@ -43,7 +43,6 @@ from pants.engine.process import FallibleProcessResult, Process
 from pants.engine.rules import Get, Rule, collect_rules, rule, rule_helper
 from pants.engine.target import CoarsenedTargets, CoarsenedTargetsRequest, FieldSet, Target
 from pants.engine.unions import UnionRule
-from pants.source.source_root import SourceRootsRequest, SourceRootsResult
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 from pants.util.strutil import pluralize
@@ -156,8 +155,8 @@ async def pyright_typecheck_partition(
         SourceFilesRequest(fs.sources for fs in partition.field_sets),
     )
 
-    # Grab the inferred and supporting files for the root source files to be typechecked
-    coarsened_sources_get = Get(
+    # Grab the closure of the root source files to be typechecked
+    transitive_sources_get = Get(
         PythonSourceFiles, PythonSourceFilesRequest(partition.root_targets.closure())
     )
 
@@ -170,21 +169,22 @@ async def pyright_typecheck_partition(
         ),
     )
 
-    # Look for any/all of the Pyright configuration files (the config is modified below for the `venv` workaround)
+    # Look for any/all of the Pyright configuration files (the config is modified below
+    # for the `venv` workaround)
     config_files_get = Get(
         ConfigFiles,
         ConfigFilesRequest,
         pyright.config_request(),
     )
 
-    root_sources, coarsened_sources, requirements_pex, config_files = await MultiGet(
+    root_sources, transitive_sources, requirements_pex, config_files = await MultiGet(
         root_sources_get,
-        coarsened_sources_get,
+        transitive_sources_get,
         requirements_pex_get,
         config_files_get,
     )
 
-    requirements_venv_pex_get = Get(
+    requirements_venv_pex = await Get(
         VenvPex,
         PexRequest(
             output_filename="requirements_venv.pex",
@@ -194,31 +194,17 @@ async def pyright_typecheck_partition(
         ),
     )
 
-    source_roots_get = Get(
-        SourceRootsResult,
-        SourceRootsRequest,
-        SourceRootsRequest.for_files(root_sources.snapshot.files),
-    )
-
-    requirements_venv_pex, source_roots = await MultiGet(
-        requirements_venv_pex_get,
-        source_roots_get,
-    )
-
     # Patch the config file to use the venv directory from the requirements pex,
     # and add source roots to the `extraPaths` key in the config file.
-    unique_source_roots = FrozenOrderedSet(
-        [root.path for root in source_roots.path_to_root.values()]
-    )
     patched_config_digest = await _patch_config_file(
-        config_files, requirements_venv_pex.venv_rel_dir, unique_source_roots
+        config_files, requirements_venv_pex.venv_rel_dir, transitive_sources.source_roots
     )
 
     input_digest = await Get(
         Digest,
         MergeDigests(
             [
-                coarsened_sources.source_files.snapshot.digest,
+                transitive_sources.source_files.snapshot.digest,
                 requirements_venv_pex.digest,
                 patched_config_digest,
             ]
