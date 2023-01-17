@@ -763,6 +763,9 @@ def build_wheels_job(platform: Platform, python_versions: list[str]) -> Jobs:
 
 
 def build_wheels_jobs() -> Jobs:
+    # N.B.: When altering the number of total wheels built (currently 10), please edit the expected
+    # total in the _release_helper script. Currently here:
+    # https://github.com/pantsbuild/pants/blob/8c83e4db33d5fe577918ce073f6d89957cb6eef1/build-support/bin/_release_helper.py#L1182-L1192
     return {
         **build_wheels_job(Platform.LINUX_X86_64, ALL_PYTHON_VERSIONS),
         **build_wheels_job(Platform.LINUX_ARM64, ALL_PYTHON_VERSIONS),
