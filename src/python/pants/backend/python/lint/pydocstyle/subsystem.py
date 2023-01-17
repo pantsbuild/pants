@@ -22,7 +22,7 @@ from pants.engine.rules import collect_rules, rule
 from pants.engine.target import FieldSet, Target
 from pants.engine.unions import UnionRule
 from pants.option.option_types import ArgsListOption, BoolOption, FileOption, SkipOption
-from pants.util.docutil import git_url
+from pants.util.docutil import bin_name, git_url
 from pants.util.logging import LogLevel
 from pants.util.strutil import softwrap
 
@@ -71,8 +71,11 @@ class Pydocstyle(PythonToolBase):
             (`setup.cfg`, `tox.ini`, `.pydocstyle`, `.pydocstyle.ini`, `.pydocstylerc`, `.pydocstylerc.ini`,
             and `pyproject.toml`) searching for the configuration file in this particular order.
 
-            Use `[{cls.options_scope}].config` instead if your config is in a
-            non-standard location.
+            Please note that even though `pydocstyle` keeps looking for a configuration file up the
+            directory tree until one is found, Pants will only search for the config files in the
+            repository root (from where you would normally run the `{bin_name}` command).
+
+            Use `[{cls.options_scope}].config` instead if your config is in a non-standard location.
             """
         ),
     )
