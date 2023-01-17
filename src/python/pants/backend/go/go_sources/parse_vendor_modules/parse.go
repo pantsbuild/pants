@@ -59,7 +59,7 @@ func parseVendoredModuleList(path string) ([]Module, error) {
 			if len(f) < 3 {
 				continue
 			}
-			if IsValid(f[2]) {
+			if IsValidSemver(f[2]) {
 				// A module, but we don't yet know whether it is in the build list or
 				// only included to indicate a replacement.
 				if mod.ModVersion.Path != "" {
@@ -85,7 +85,7 @@ func parseVendoredModuleList(path string) ([]Module, error) {
 				if len(f) == 2 {
 					// File replacement.
 					mod.Replacement = Version{Path: f[1]}
-				} else if len(f) == 3 && IsValid(f[2]) {
+				} else if len(f) == 3 && IsValidSemver(f[2]) {
 					// Path and version replacement.
 					mod.Replacement = Version{Path: f[1], Version: f[2]}
 				} else {
