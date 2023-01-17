@@ -1,7 +1,25 @@
 # Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-from pants.backend.tools.yamllint.rules import rules as yamllint_rules
+
+"""A configurable linter for YAML files.
+
+See https://yamllint.readthedocs.io/ for details.
+"""
+
+from __future__ import annotations
+
+from typing import Iterable
+
+from pants.engine.rules import Rule
+from pants.engine.unions import UnionRule
+from pants.backend.tools.yamllint import rules as yamllint_rules
+from pants.backend.tools.yamllint import subsystem as subsystem
+from pants.backend.python.goals import lockfile as python_lockfile
 
 
-def rules():
-    return [*yamllint_rules()]
+def rules() -> Iterable[Rule | UnionRule]:
+    return (
+        *yamllint_rules.rules(),
+        *subsystem.rules(),
+        *python_lockfile.rules(),
+    )
