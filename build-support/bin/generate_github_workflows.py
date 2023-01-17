@@ -462,14 +462,11 @@ class Helper:
 
     def build_wheels(self, python_versions: list[str]) -> list[Step]:
         cmd = dedent(
-            # We use MODE=debug on PR builds to speed things up, given that those are
-            # only smoke tests of our release process.
             # Note that the build-local-pex run is just for smoke-testing that pex
             # builds work, and it must come *before* the build-wheels runs, since
             # it cleans out `dist/deploy`, which the build-wheels runs populate for
             # later attention by deploy_to_s3.py.
             """\
-            [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]] && export MODE=debug
             USE_PY39=true ./build-support/bin/release.sh build-local-pex
             """
         )

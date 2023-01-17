@@ -375,9 +375,7 @@ jobs:
     - env:
         PANTS_CONFIG_FILES: +['pants.ci.toml','pants.ci.aarch64.toml']
       name: Build wheels
-      run: '[[ "${GITHUB_EVENT_NAME}" == "pull_request" ]] && export MODE=debug
-
-        USE_PY39=true ./build-support/bin/release.sh build-local-pex
+      run: 'USE_PY39=true ./build-support/bin/release.sh build-local-pex
 
 
         ./build-support/bin/release.sh build-wheels
@@ -446,9 +444,7 @@ jobs:
         go-version: 1.17.1
     - env: {}
       name: Build wheels
-      run: '[[ "${GITHUB_EVENT_NAME}" == "pull_request" ]] && export MODE=debug
-
-        USE_PY39=true ./build-support/bin/release.sh build-local-pex
+      run: 'USE_PY39=true ./build-support/bin/release.sh build-local-pex
 
 
         ./build-support/bin/release.sh build-wheels
@@ -517,9 +513,7 @@ jobs:
     - env:
         ARCHFLAGS: -arch x86_64
       name: Build wheels
-      run: '[[ "${GITHUB_EVENT_NAME}" == "pull_request" ]] && export MODE=debug
-
-        USE_PY39=true ./build-support/bin/release.sh build-local-pex
+      run: 'USE_PY39=true ./build-support/bin/release.sh build-local-pex
 
 
         ./build-support/bin/release.sh build-wheels
@@ -588,9 +582,7 @@ jobs:
     - env:
         ARCHFLAGS: -arch arm64
       name: Build wheels
-      run: '[[ "${GITHUB_EVENT_NAME}" == "pull_request" ]] && export MODE=debug
-
-        USE_PY39=true ./build-support/bin/release.sh build-local-pex
+      run: 'USE_PY39=true ./build-support/bin/release.sh build-local-pex
 
 
         USE_PY39=true ./build-support/bin/release.sh build-wheels'
