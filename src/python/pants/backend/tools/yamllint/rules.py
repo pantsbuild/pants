@@ -59,6 +59,7 @@ def find_nearest_ancestor_file(files: set[str], dir: str, config_file: str) -> s
         dir = os.path.dirname(dir)
 
 
+# @TODO: This logic is very similar, but not identical to the one for scalafmt. It should be generalized and shared.
 @rule
 async def gather_config_files(
     request: YamllintConfigFilesRequest, yamllint: Yamllint
