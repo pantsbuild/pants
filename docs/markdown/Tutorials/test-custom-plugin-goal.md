@@ -1,16 +1,16 @@
 # Introduction
 
-In this tutorial, we'll learn how to test the custom plugin we wrote earlier. Pants documentation provides comprehensive coverage of the [plugin testing](https://www.pantsbuild.org/docs/rules-api-testing) and this tutorial should you to get started writing own tests.
+In this tutorial, we'll learn how to test the custom plugin we wrote earlier. Pants documentation provides comprehensive coverage of the [plugin testing](doc:rules-api-testing) and this tutorial should help you get started writing own tests.
 
 Most of the plugin code that needs to be tested is in the following files:
 * `rules.py` where we implemented how a `VERSION` file needs to be read and how to use a `version_file` BUILD target
 * `tailor.py` where we taught the `tailor` goal about the `VERSION` files and generation of `version_file` targets
 
-To get started writing tests, it may make sense to write a very high level integration test first to confirm our code does what we expect. You can think of this as of [integration tests for Pants](https://www.pantsbuild.org/docs/rules-api-testing#approach-4-run_pants-integration-tests-for-pants). Let's run our goal from a test!
+To author a test suite, it may make sense to write a very high level test first to confirm our code does what we expect. Let's write some [integration tests for Pants](doc:rules-api-testing#approach-4-run_pants-integration-tests-for-pants) so that we could run our goal from a test!
 
 ## Testing with a complete Pants process
 
-Pants provides a convenient way to run a full Pants process as it would run on the command line. Writing such a test would be equal to having, say, a Shell script to confirm that the output of the `./pants project-version myapp:` command is `{"path": "myapp/VERSION", "version": "0.0.1"}`. Keep in mind that running custom scripts with this type of tests would require having a Pants repository set up (including the `pants.toml` configuration), creating `BUILD` metadata files and so on. When writing custom acceptance tests using `pants.testutil` package, in contrast, you don't have to worry about that and can focus on testing your plugin logic in the very minimalistic environment containing only what's absolutely necessary to run your plugin code. 
+Pants provides a convenient way to run a full Pants process as it would run on the command line. Writing such a test would be equal to having, say, a Shell script to confirm that the output of the `./pants project-version myapp:` command is `{"path": "myapp/VERSION", "version": "0.0.1"}`. Keep in mind that running custom scripts with this type of tests would require having a Pants repository set up (including the `pants.toml` configuration), creating `BUILD` metadata files and so on. When writing custom acceptance tests using `pants.testutil` package, you, in contrast, don't have to worry about that and can focus on testing your plugin logic in the very minimalistic environment containing only what's absolutely necessary to run your plugin code. 
 
 In the following code snippet, we define a set of files to be created (in a temporary directory that Pants manages for us), the backends to be used (Python and our custom plugin), and a Pants command to be run. By reading the `stdout` of a process, we can confirm the plugin works as expected (conveniently ignoring any unrelated warnings that Pants may have produced).
 
@@ -55,7 +55,7 @@ These tests do not need any special bootstrapping and can be run just like any o
 
 ## Testing goal rules
 
-You can exercise the goal rule by using [`rule_runner.run_goal_rule()`](https://www.pantsbuild.org/docs/rules-api-testing#testing-goal_rules) which runs very fast and does not start a full Pants process. In the test below, we register all rules from the `project_version` plugin with the `RuleRunner` so that the engine can find them when a test is run. These tests scale nicely and if your plugins are fairly simple, they may suffice.
+You can exercise the goal rule by using [`rule_runner.run_goal_rule()`](doc:rules-api-testing#testing-goal_rules) which runs very fast and does not start a full Pants process. In the test below, we register all rules from the `project_version` plugin with the `RuleRunner` so that the engine can find them when a test is run. These tests scale nicely and if your plugins are fairly simple, they may suffice.
 
 ```python
 import pytest
@@ -137,9 +137,9 @@ def test_get_project_version_file_view(rule_runner: RuleRunner) -> None:
     assert result == ProjectVersionFileView(path="project/VERSION", version="10.6.1")
 ```
 
-Since we have extended the `tailor` goal to generate `version_file` targets in the directories containing `VERSION` files, let's write a test to confirm the goal does what we want. For this, we can continue using the [`RuleRunner`](https://www.pantsbuild.org/docs/rules-api-testing#running-your-rules). Let's create a temporary build root, write necessary files, and then ask Pants to get a list of targets that it would have created for us.
+Since we have extended the `tailor` goal to generate `version_file` targets in the directories containing `VERSION` files, let's write a test to confirm the goal does what we want. For this, we can continue using the [`RuleRunner`](doc:rules-api-testing#running-your-rules). Let's create a temporary build root, write necessary files, and then ask Pants to get a list of targets that it would have created for us.
 
-It's often very difficult to know how testing of particular functionality is done, so it's worth taking a look at the Pants codebase. For instance, this `tailor` test has been adopted from this [test suite](https://github.com/pantsbuild/pants/blob/8cb558592d00b228182e6bbcb667705dad73bb95/src/python/pants/backend/cc/goals/tailor_test.py#L1-L0).
+It's often very difficult to know how testing of a particular functionality is done, so it's worth taking a look at the Pants codebase. For instance, this `tailor` test has been adopted from this [test suite](https://github.com/pantsbuild/pants/blob/8cb558592d00b228182e6bbcb667705dad73bb95/src/python/pants/backend/cc/goals/tailor_test.py#L1-L0).
 
 ```python
 from pathlib import Path
@@ -214,7 +214,7 @@ def test_find_putative_avnpkg_files_targets(rule_runner: RuleRunner) -> None:
 
 ## Unit testing for rules
 
-Finally, if your plugin is very complex and would benefit from a more rigorous testing, you may consider writing [unit tests for the rules](https://www.pantsbuild.org/docs/rules-api-testing#approach-2-run_rule_with_mocks-unit-tests-for-rules) where some parts of the rules are going to be patched with mocks. For instance, there's `get_git_repo_version` rule which calls Git (in a subprocess) to describe the repository. We could mock the `Process` call to make sure the inline logic of the rule is correct instead.
+Finally, if your plugin is very complex and would benefit from a more rigorous testing, you may consider writing [unit tests for the rules](doc:rules-api-testing#approach-2-run_rule_with_mocks-unit-tests-for-rules) where some parts of the rules are going to be patched with mocks. For instance, there's `get_git_repo_version` rule which calls Git (in a subprocess) to describe the repository status. We could mock the `Process` call to make sure the inline logic of the rule is correct instead.
 
 ```python
 from unittest.mock import Mock
@@ -270,6 +270,8 @@ MockGet(
 ```
 
 however if you have many `Get` requests that are being mocked, because `lambda`'s syntax does not support type annotations, it can make your tests slightly harder to read. For instance, in the example above, the type of the `request` argument is unknown.
+
+---
 
 This concludes the series of tutorials that should help you get started writing own plugins with Pants. We have by now done quite a lot of work! You have learned:
 * how to create an own goal, custom options and custom targets
