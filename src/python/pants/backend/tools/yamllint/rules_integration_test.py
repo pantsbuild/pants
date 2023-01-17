@@ -108,7 +108,7 @@ def run_yamllint(
         default_partitions = tuple(p for p in partitions if p.metadata.config_snapshot is None)
         if expected_default_partition:
             assert len(default_partitions) == 1
-            assert set(default_partitions[0].elements) == set(expected_default_partition)
+            assert default_partitions[0].elements == expected_default_partition
         else:
             assert len(default_partitions) == 0
 
@@ -120,7 +120,7 @@ def run_yamllint(
             config_file = partition.metadata.config_snapshot.files[0]
 
             assert config_file in expected_config_partitions
-            assert set(partition.elements) == set(expected_config_partitions[config_file])
+            assert partition.elements == expected_config_partitions[config_file]
     else:
         assert len(partitions) == 1
 
