@@ -10,12 +10,12 @@ from typing import Any, cast
 from pants.backend.python.util_rules.pex import Pex, PexProcess, PexRequest
 from pants.backend.tools.yamllint.subsystem import Yamllint
 from pants.core.goals.lint import LintFilesRequest, LintResult
-from pants.core.goals.tailor import group_by_dir
 from pants.core.util_rules.partitions import Partition, Partitions
 from pants.engine.fs import Digest, DigestSubset, MergeDigests, PathGlobs
 from pants.engine.internals.native_engine import FilespecMatcher, Snapshot
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.util.dirutil import group_by_dir
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
