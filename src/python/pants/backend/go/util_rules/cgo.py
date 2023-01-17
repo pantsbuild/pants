@@ -762,7 +762,7 @@ async def cgo_compile_request(
         pkg_config=flags.pkg_config,
     )
 
-    go_files: list[str] = [os.path.join(dir_path, "_cgo_gotypes.go")]
+    go_files: list[str] = [os.path.join(obj_dir_path, "_cgo_gotypes.go")]
     gcc_files: list[str] = [
         os.path.join(obj_dir_path, "_cgo_export.c"),
         *(os.path.join(dir_path, c_file) for c_file in request.c_files),
@@ -953,7 +953,7 @@ async def cgo_compile_request(
         ldflags=request.cgo_flags.ldflags,
         pkg_name=request.pkg_name,
         goroot=goroot,
-        import_go_path=os.path.join(dir_path, "_cgo_import.go"),
+        import_go_path=os.path.join(obj_dir_path, "_cgo_import.go"),
         golang_env_aware=golang_env_aware,
         use_cxx_linker=bool(request.cxx_files),
         transitive_prebuilt_objects_digest=transitive_prebuilt_objects_digest,
