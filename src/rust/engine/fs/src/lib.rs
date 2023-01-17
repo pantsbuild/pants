@@ -474,7 +474,15 @@ impl PosixFS {
     let vfs = self.clone();
     self
       .executor
-      .spawn_blocking(move || vfs.scandir_sync(&dir_relative_to_root))
+      .spawn_blocking(
+        move || vfs.scandir_sync(&dir_relative_to_root),
+        |e| {
+          Err(io::Error::new(
+            io::ErrorKind::Other,
+            format!("Synchronous scandir failed: {e}"),
+          ))
+        },
+      )
       .await
   }
 

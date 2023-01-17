@@ -967,12 +967,12 @@ def check_roles() -> None:
 
 
 def reversion_prebuilt_wheels() -> None:
-    # First, rewrite to manylinux. See https://www.python.org/dev/peps/pep-0599/. We build on
-    # Centos7, so use manylinux2014.
-    source_platform = "linux_x86_64"
-    dest_platform = "manylinux2014_x86_64"
+    # First, rewrite to manylinux. See https://www.python.org/dev/peps/pep-0599/. We use
+    # manylinux2014 images.
+    source_platform = "linux_"
+    dest_platform = "manylinux2014_"
     unstable_wheel_dir = CONSTANTS.deploy_pants_wheel_dir / CONSTANTS.pants_unstable_version
-    for whl in unstable_wheel_dir.glob(f"*{source_platform}.whl"):
+    for whl in unstable_wheel_dir.glob(f"*{source_platform}*.whl"):
         whl.rename(str(whl).replace(source_platform, dest_platform))
 
     # Now, reversion to use the STABLE_VERSION.

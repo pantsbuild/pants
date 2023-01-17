@@ -265,12 +265,10 @@ async def prepare_go_test_binary(
         GenerateTestMainRequest(
             digest=pkg_digest.digest,
             test_paths=FrozenOrderedSet(
-                os.path.join(".", pkg_analysis.dir_path, name)
-                for name in pkg_analysis.test_go_files
+                os.path.join(pkg_analysis.dir_path, name) for name in pkg_analysis.test_go_files
             ),
             xtest_paths=FrozenOrderedSet(
-                os.path.join(".", pkg_analysis.dir_path, name)
-                for name in pkg_analysis.xtest_go_files
+                os.path.join(pkg_analysis.dir_path, name) for name in pkg_analysis.xtest_go_files
             ),
             import_path=import_path,
             register_cover=with_coverage,

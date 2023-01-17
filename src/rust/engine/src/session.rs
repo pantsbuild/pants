@@ -12,13 +12,14 @@ use crate::nodes::{NodeKey, Select};
 use crate::python::{Failure, Value};
 
 use async_latch::AsyncLatch;
-use futures::future::{self, AbortHandle, Abortable, FutureExt};
+use futures::future::{self, FutureExt};
 use graph::LastObserved;
 use log::warn;
 use parking_lot::Mutex;
 use pyo3::prelude::*;
 use task_executor::{Executor, TailTasks};
 use tokio::signal::unix::{signal, SignalKind};
+use tokio::task::JoinHandle;
 use ui::ConsoleUI;
 use workunit_store::{format_workunit_duration_ms, RunId, WorkunitStore};
 
@@ -392,7 +393,7 @@ pub struct Sessions {
   /// Core/Scheduler are being shut down.
   sessions: Arc<Mutex<Option<Vec<Weak<SessionHandle>>>>>,
   /// Handle to kill the signal monitoring task when this object is killed.
-  signal_task_abort_handle: AbortHandle,
+  signal_task_handle: JoinHandle<()>,
   /// A generator for RunId values. Although this is monotonic, there is no meaning assigned to
   /// ordering: only equality is relevant.
   run_id_generator: AtomicU32,
@@ -404,40 +405,34 @@ impl Sessions {
       Arc::new(Mutex::new(Some(Vec::new())));
     // A task that watches for keyboard interrupts arriving at this process, and cancels all
     // non-isolated Sessions.
-    let signal_task_abort_handle = {
+    let signal_task_handle = {
       let mut signal_stream = signal(SignalKind::interrupt())
         .map_err(|err| format!("Failed to install interrupt handler: {}", err))?;
-      let (abort_handle, abort_registration) = AbortHandle::new_pair();
       let sessions = sessions.clone();
-      #[allow(clippy::let_underscore_lock)]
-      let _ = executor.spawn(Abortable::new(
-        async move {
-          loop {
-            let _ = signal_stream.recv().await;
-            let cancellable_sessions = {
-              let sessions = sessions.lock();
-              if let Some(ref sessions) = *sessions {
-                sessions
-                  .iter()
-                  .flat_map(|session| session.upgrade())
-                  .filter(|session| !session.isolated)
-                  .collect::<Vec<_>>()
-              } else {
-                vec![]
-              }
-            };
-            for session in cancellable_sessions {
-              session.cancel();
+      executor.native_spawn(async move {
+        loop {
+          let _ = signal_stream.recv().await;
+          let cancellable_sessions = {
+            let sessions = sessions.lock();
+            if let Some(ref sessions) = *sessions {
+              sessions
+                .iter()
+                .flat_map(|session| session.upgrade())
+                .filter(|session| !session.isolated)
+                .collect::<Vec<_>>()
+            } else {
+              vec![]
             }
+          };
+          for session in cancellable_sessions {
+            session.cancel();
           }
-        },
-        abort_registration,
-      ));
-      abort_handle
+        }
+      })
     };
     Ok(Sessions {
       sessions,
-      signal_task_abort_handle,
+      signal_task_handle,
       run_id_generator: AtomicU32::new(0),
     })
   }
@@ -494,6 +489,6 @@ impl Sessions {
 
 impl Drop for Sessions {
   fn drop(&mut self) {
-    self.signal_task_abort_handle.abort();
+    self.signal_task_handle.abort();
   }
 }

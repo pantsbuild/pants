@@ -231,6 +231,11 @@ class PythonGoogleCloudFunctionRuntime(StringField):
         """
         The identifier of the Google Cloud Function runtime to target (pythonXY). See
         https://cloud.google.com/functions/docs/concepts/python-runtime.
+
+        In general you'll want to define either a `runtime` or one `complete_platforms` but not
+        both. Specifying a `runtime` is simpler, but less accurate. If you have issues either
+        packaging the Google Cloud Function PEX or running it as a deployed Google Cloud Function,
+        you should try using `complete_platforms` instead.
         """
     )
 
@@ -252,6 +257,18 @@ class PythonGoogleCloudFunctionRuntime(StringField):
             return None
         mo = cast(Match, re.match(self.PYTHON_RUNTIME_REGEX, self.value))
         return int(mo.group("major")), int(mo.group("minor"))
+
+
+class PythonGoogleCloudFunctionCompletePlatforms(PexCompletePlatformsField):
+    help = softwrap(
+        f"""
+        {PexCompletePlatformsField.help}
+
+        N.B.: If specifying `complete_platforms` to work around packaging failures encountered when
+        using the `runtime` field, ensure you delete the `runtime` field from your
+        `python_google_cloud_function` target.
+        """
+    )
 
 
 class GoogleCloudFunctionTypes(Enum):
@@ -281,7 +298,7 @@ class PythonGoogleCloudFunction(Target):
         PythonGoogleCloudFunctionDependencies,
         PythonGoogleCloudFunctionHandlerField,
         PythonGoogleCloudFunctionRuntime,
-        PexCompletePlatformsField,
+        PythonGoogleCloudFunctionCompletePlatforms,
         PythonGoogleCloudFunctionType,
         PythonResolveField,
     )

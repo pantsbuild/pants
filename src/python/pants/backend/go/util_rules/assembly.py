@@ -82,6 +82,17 @@ def _asm_args(
         ["-p", import_path] if goroot.is_compatible_version("1.19") else []
     )
 
+    # Add special argument if assembling files in certain packages in the standard library.
+    # See:
+    # - https://github.com/golang/go/blob/245e95dfabd77f337373bf2d6bb47cd353ad8d74/src/cmd/go/internal/work/gc.go#L370-L372
+    # - https://github.com/golang/go/blob/245e95dfabd77f337373bf2d6bb47cd353ad8d74/src/cmd/internal/objabi/path.go#L43-L67
+    maybe_assembling_stdlib_runtime_args = (
+        ["-compiling-runtime"]
+        if import_path in ("runtime", "reflect", "syscall", "internal/bytealg")
+        or import_path.startswith("runtime/internal")
+        else []
+    )
+
     return (
         *maybe_package_import_path_args,
         "-trimpath",
@@ -95,6 +106,7 @@ def _asm_args(
         f"GOOS_{goroot.goos}",
         "-D",
         f"GOARCH_{goroot.goarch}",
+        *maybe_assembling_stdlib_runtime_args,
         *extra_flags,
     )
 
@@ -110,7 +122,10 @@ async def generate_go_assembly_symabisfile(
     #   that we don't need the actual definitions that would appear in go_asm.h.
     #
     # See https://go-review.googlesource.com/c/go/+/146999/8/src/cmd/go/internal/work/gc.go
-    symabis_path = os.path.join(request.dir_path, "symabis")
+    if os.path.isabs(request.dir_path):
+        symabis_path = "symabis"
+    else:
+        symabis_path = os.path.join(request.dir_path, "symabis")
     go_asm_h_digest, asm_tool_id = await MultiGet(
         Get(Digest, CreateDigest([FileContent("go_asm.h", b"")])),
         Get(GoSdkToolIDResult, GoSdkToolIDRequest("asm")),
@@ -135,7 +150,7 @@ async def generate_go_assembly_symabisfile(
                 "-o",
                 symabis_path,
                 "--",
-                *(str(PurePath(".", request.dir_path, s_file)) for s_file in request.s_files),
+                *(str(PurePath(request.dir_path, s_file)) for s_file in request.s_files),
             ),
             env={
                 "__PANTS_GO_ASM_TOOL_ID": asm_tool_id.tool_id,
@@ -166,7 +181,10 @@ async def assemble_go_assembly_files(
     asm_tool_id = await Get(GoSdkToolIDResult, GoSdkToolIDRequest("asm"))
 
     def obj_output_path(s_file: str) -> str:
-        return str(request.dir_path / PurePath(s_file).with_suffix(".o"))
+        if os.path.isabs(request.dir_path):
+            return str(PurePath(s_file).with_suffix(".o"))
+        else:
+            return str(request.dir_path / PurePath(s_file).with_suffix(".o"))
 
     assembly_results = await MultiGet(
         Get(
@@ -184,7 +202,7 @@ async def assemble_go_assembly_files(
                     ),
                     "-o",
                     obj_output_path(s_file),
-                    str(os.path.normpath(PurePath(".", request.dir_path, s_file))),
+                    str(os.path.normpath(PurePath(request.dir_path, s_file))),
                 ),
                 env={
                     "__PANTS_GO_ASM_TOOL_ID": asm_tool_id.tool_id,

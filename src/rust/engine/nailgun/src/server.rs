@@ -59,7 +59,7 @@ impl Server {
     let (exited_sender, exited_receiver) = oneshot::channel();
     let (exit_sender, exit_receiver) = oneshot::channel();
 
-    let _join = executor.spawn(Self::serve(
+    let _join = executor.native_spawn(Self::serve(
       executor.clone(),
       config,
       nail,
@@ -125,7 +125,7 @@ impl Server {
       // acquired it. Unfortunately we cannot acquire the lock in this thread and then send the
       // guard to the other thread due to its lifetime bounds.
       let connection_started = Arc::new(Notify::new());
-      let _join = executor.spawn({
+      let _join = executor.native_spawn({
         let config = config.clone();
         let nail = nail.clone();
         let connection_started = connection_started.clone();
@@ -211,7 +211,7 @@ impl Nail for RawFdNail {
     let maybe_stdin_write = if let Some(mut stdin_sink) = stdin_sink {
       let (stdin_write, stdin_read) = child_channel::<ChildInput>();
       // Spawn a task that will propagate the input stream.
-      let _join = self.executor.spawn(async move {
+      let _join = self.executor.native_spawn(async move {
         let mut input_stream = stdin_read.map(|child_input| match child_input {
           ChildInput::Stdin(bytes) => Ok(bytes),
         });
@@ -243,16 +243,22 @@ impl Nail for RawFdNail {
     let nail = self.clone();
     let exit_code = self
       .executor
-      .spawn_blocking(move || {
-        // NB: This closure captures the stdio handles, and will drop/close them when it completes.
-        (nail.runner)(RawFdExecution {
-          cmd,
-          cancelled,
-          stdin_fd: stdin_handle.as_raw_fd(),
-          stdout_fd: stdout_handle.as_raw_fd(),
-          stderr_fd: stderr_handle.as_raw_fd(),
-        })
-      })
+      .spawn_blocking(
+        move || {
+          // NB: This closure captures the stdio handles, and will drop/close them when it completes.
+          (nail.runner)(RawFdExecution {
+            cmd,
+            cancelled,
+            stdin_fd: stdin_handle.as_raw_fd(),
+            stdout_fd: stdout_handle.as_raw_fd(),
+            stderr_fd: stderr_handle.as_raw_fd(),
+          })
+        },
+        |e| {
+          log::warn!("Server exited uncleanly: {e}");
+          ExitCode(1)
+        },
+      )
       .boxed();
 
     // Select a single stdout/stderr stream.

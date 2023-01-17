@@ -1312,13 +1312,16 @@ impl Store {
       store
         .local
         .executor()
-        .spawn_blocking(move || {
-          if is_root {
-            fs::safe_create_dir_all(&destination2)
-          } else {
-            fs::safe_create_dir(&destination2)
-          }
-        })
+        .spawn_blocking(
+          move || {
+            if is_root {
+              fs::safe_create_dir_all(&destination2)
+            } else {
+              fs::safe_create_dir(&destination2)
+            }
+          },
+          |e| Err(format!("Directory creation task failed: {e}")),
+        )
         .map_err(|e| {
           format!(
             "Failed to create directory {}: {}",
