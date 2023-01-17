@@ -208,7 +208,7 @@ def test_multi_config(rule_runner: RuleRunner) -> None:
         expected_partitions=(
             ("test.yaml",),
             {
-                "subdir1/.yamllint": ("subdir1/subdir.yaml", "subdir1/nested/subdir.yaml"),
+                "subdir1/.yamllint": ("subdir1/nested/subdir.yaml", "subdir1/subdir.yaml"),
                 "subdir2/.yamllint": ("subdir2/subdir.yaml",),
             },
         ),

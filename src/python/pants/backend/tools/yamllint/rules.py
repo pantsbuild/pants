@@ -103,7 +103,7 @@ async def partition_inputs(
     ).matches(request.files)
 
     config_files = await Get(
-        YamllintConfigFiles, YamllintConfigFilesRequest(filepaths=tuple(matching_filepaths))
+        YamllintConfigFiles, YamllintConfigFilesRequest(filepaths=tuple(sorted(matching_filepaths)))
     )
 
     default_source_files: set[str] = set()
@@ -124,13 +124,17 @@ async def partition_inputs(
     return Partitions(
         (
             *(
-                Partition(tuple(files), PartitionInfo(config_snapshot=config_snapshot))
+                Partition(tuple(sorted(files)), PartitionInfo(config_snapshot=config_snapshot))
                 for files, config_snapshot in zip(
                     source_files_by_config_file.values(), config_file_snapshots
                 )
             ),
             *(
-                (Partition(tuple(default_source_files), PartitionInfo(config_snapshot=None)),)
+                (
+                    Partition(
+                        tuple(sorted(default_source_files)), PartitionInfo(config_snapshot=None)
+                    ),
+                )
                 if default_source_files
                 else ()
             ),
