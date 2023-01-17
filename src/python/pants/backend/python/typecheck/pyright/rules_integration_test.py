@@ -62,6 +62,27 @@ BAD_FILE = dedent(
     result = add(2.0, 3.0)
     """
 )
+# This will fail if `reportUndefinedVariable` is enabled (default).
+UNDEFINED_VARIABLE_FILE = dedent(
+    """\
+    print(foo)
+    """
+)
+
+UNDEFINED_VARIABLE_JSON_CONFIG = dedent(
+    """\
+    {
+        "reportUndefinedVariable": false
+    }
+    """
+)
+
+UNDEFINED_VARIABLE_TOML_CONFIG = dedent(
+    """\
+    [tool.pyright]
+    reportUndefinedVariable = false
+    """
+)
 
 
 def run_pyright(
@@ -114,6 +135,59 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
     assert f"{PACKAGE}/bad.py:4" in result[0].stdout
     assert "Found 2 source files" in result[0].stdout
     assert result[0].report == EMPTY_DIGEST
+
+
+@pytest.mark.parametrize(
+    "config_filename,config_file,exit_code",
+    (
+        ("pyrightconfig.json", UNDEFINED_VARIABLE_JSON_CONFIG, 0),
+        ("pyproject.toml", UNDEFINED_VARIABLE_TOML_CONFIG, 0),
+        ("noconfig", "", 1),
+    ),
+)
+def test_config_file(
+    rule_runner: RuleRunner, config_filename: str, config_file: str, exit_code: int
+) -> None:
+    rule_runner.write_files(
+        {
+            f"{PACKAGE}/f.py": UNDEFINED_VARIABLE_FILE,
+            f"{PACKAGE}/BUILD": "python_sources()",
+            f"{config_filename}": config_file,
+        }
+    )
+    tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))
+    result = run_pyright(rule_runner, [tgt])
+    assert len(result) == 1
+    assert result[0].exit_code == exit_code
+
+
+def test_additional_source_roots(rule_runner: RuleRunner) -> None:
+    LIB_1_PACKAGE = f"{PACKAGE}/lib1"
+    LIB_2_PACKAGE = f"{PACKAGE}/lib2"
+    rule_runner.write_files(
+        {
+            f"{LIB_1_PACKAGE}/core/a.py": GOOD_FILE,
+            f"{LIB_1_PACKAGE}/core/BUILD": "python_sources()",
+            f"{LIB_2_PACKAGE}/core/b.py": "from core.a import add",
+            f"{LIB_2_PACKAGE}/core/BUILD": "python_sources()",
+        }
+    )
+    tgts = [
+        rule_runner.get_target(Address(f"{LIB_1_PACKAGE}/core", relative_file_path="a.py")),
+        rule_runner.get_target(Address(f"{LIB_2_PACKAGE}/core", relative_file_path="b.py")),
+    ]
+    result = run_pyright(rule_runner, tgts)
+    assert len(result) == 1
+    assert result[0].exit_code == 1
+    assert "reportMissingImports" in result[0].stdout
+
+    result = run_pyright(
+        rule_runner,
+        tgts,
+        extra_args=[f"--source-root-patterns=['{LIB_1_PACKAGE}', '{LIB_2_PACKAGE}']"],
+    )
+    assert len(result) == 1
+    assert result[0].exit_code == 0
 
 
 def test_skip(rule_runner: RuleRunner) -> None:
