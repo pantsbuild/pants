@@ -145,6 +145,7 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Joshua Cohen
 + Joshua Humphries
 + Justin Trobec
++ KadenAgrey
 + Karin Lundberg
 + Kaushik Srenevasan
 + Ken Howard
@@ -164,6 +165,7 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Luc Cary
 + Luca Clementi
 + Lukasz Jastrzebski
++ Mahesh Vashishtha
 + Marc Abramowitz
 + Marcelo Trylesinski
 + Marcin Podolski
@@ -280,6 +282,7 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + billybecker
 + eugene yokota
 + hephex
++ philipp-sontag-by
 + twunderlich-grapl
 + wimax-grapl
 + Ólafur Páll Geirsson
