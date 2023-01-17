@@ -143,7 +143,9 @@ async def partition_inputs(
 
 
 @rule(desc="Lint using yamllint", level=LogLevel.DEBUG)
-async def run_yamllint(request: YamllintRequest.Batch[Any, Any], yamllint: Yamllint) -> LintResult:
+async def run_yamllint(
+    request: YamllintRequest.Batch[str, PartitionInfo], yamllint: Yamllint
+) -> LintResult:
     yamllint_bin = await Get(Pex, PexRequest, yamllint.to_pex_request())
 
     partition_info = cast(PartitionInfo, request.partition_metadata)
