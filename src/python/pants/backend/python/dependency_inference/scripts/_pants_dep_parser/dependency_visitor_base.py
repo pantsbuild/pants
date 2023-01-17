@@ -23,6 +23,8 @@ class FoundDependencies:
 
 
 class DependencyVisitorBase(ast.NodeVisitor):
+    """Base class for code that extracts dependencies from the AST."""
+
     @staticmethod
     def maybe_str(node):
         if sys.version_info[0:2] < (3, 8):

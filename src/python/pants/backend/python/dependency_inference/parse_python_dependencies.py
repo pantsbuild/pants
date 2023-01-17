@@ -19,6 +19,7 @@ from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.resources import read_resource
+from pants.util.strutil import softwrap
 
 
 @dataclass(frozen=True)
@@ -60,9 +61,11 @@ class PythonDependencyVisitorRequest:
 
 @dataclass(frozen=True)
 class PythonDependencyVisitor:
-    digest: Digest
-    classname: str
-    env: FrozenDict[str, str]
+    """Wraps a subclass of _pants_dep_parser.DependencyVisitorBase."""
+
+    digest: Digest  # The content of the subclass
+    classname: str  # The full classname, e.g., _my_custom_dep_parser.MyCustomVisitor
+    env: FrozenDict[str, str]  # Set these env vars when invoking the visitor
 
 
 @dataclass(frozen=True)
@@ -106,8 +109,12 @@ async def get_parser_script(union_membership: UnionMembership) -> ParserScript:
             if k in env:
                 existing_v = env[k]
                 raise ValueError(
-                    f"Environment variable {k} was set to value {existing_v} by a "
-                    f"PythonDependencyVisitor implementation, cannot reset it to {v}."
+                    softwrap(
+                        f"""
+                        Environment variable {k} was set to value {existing_v} by a "
+                        PythonDependencyVisitor implementation, cannot reset it to {v}."
+                    """
+                    )
                 )
             env[k] = v
     return ParserScript(digest, FrozenDict(env))
