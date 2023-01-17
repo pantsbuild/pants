@@ -475,12 +475,14 @@ class Helper:
             env_setting = f"{env_var}=true " if env_var else ""
             return f"\n{env_setting}./build-support/bin/release.sh build-wheels"
 
+        # We've already built the engine for 39 just above, so do 39 1st here to avoid re-build
+        # thrash time wasted.
+        if PYTHON39_VERSION in python_versions:
+            cmd += build_wheels_for("USE_PY39")
         if PYTHON37_VERSION in python_versions:
             cmd += build_wheels_for("")
         if PYTHON38_VERSION in python_versions:
             cmd += build_wheels_for("USE_PY38")
-        if PYTHON39_VERSION in python_versions:
-            cmd += build_wheels_for("USE_PY39")
 
         return [
             {
