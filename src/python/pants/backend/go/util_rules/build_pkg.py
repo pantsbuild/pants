@@ -36,7 +36,6 @@ from pants.engine.fs import (
     AddPrefix,
     CreateDigest,
     Digest,
-    DigestContents,
     DigestEntries,
     DigestSubset,
     FileContent,
@@ -44,10 +43,11 @@ from pants.engine.fs import (
     MergeDigests,
     PathGlobs,
 )
-from pants.engine.process import FallibleProcessResult, ProcessResult
+from pants.engine.process import FallibleProcessResult, Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule, rule_helper
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
+from pants.util.resources import read_resource
 from pants.util.strutil import path_safe
 
 
@@ -338,49 +338,77 @@ async def _add_objects_to_archive(
     return pack_result
 
 
-def _maybe_is_golang_assembly(data: bytes) -> bool:
-    """Return true if `data` looks like it could be a Golang-format assembly language file.
+@dataclass(frozen=True)
+class SetupAsmCheckBinary:
+    digest: Digest
+    path: str
 
-    This is used by the cgo rules as a heuristic to determine if the user is passing Golang assembly
-    format instead of gcc assembly format.
-    """
-    return (
-        data.startswith(b"TEXT")
-        or b"\nTEXT" in data
-        or data.startswith(b"DATA")
-        or b"\nDATA" in data
-        or data.startswith(b"GLOBL")
-        or b"\nGLOBL" in data
+
+# Due to the bootstrap problem, the asm check binary cannot use the `LoadedGoBinaryRequest` rules since
+# those rules call back into this `build_pkg` package. Instead, just invoke `go build` directly which is fine
+# since the asm check binary only uses the standard library.
+@rule
+async def setup_golang_asm_check_binary() -> SetupAsmCheckBinary:
+    src_file = "asm_check.go"
+    content = read_resource("pants.backend.go.go_sources.asm_check", src_file)
+    if not content:
+        raise AssertionError(f"Unable to find resource for `{src_file}`.")
+
+    sources_digest = await Get(Digest, CreateDigest([FileContent(src_file, content)]))
+
+    binary_name = "__go_asm_check__"
+    compile_result = await Get(
+        ProcessResult,
+        GoSdkProcess(
+            command=("build", "-o", binary_name, src_file),
+            input_digest=sources_digest,
+            output_files=(binary_name,),
+            env={"CGO_ENABLED": "0"},
+            description="Build Go assembly check binary",
+        ),
     )
 
+    return SetupAsmCheckBinary(compile_result.output_digest, f"./{binary_name}")
 
-@rule_helper
-async def _any_file_is_golang_assembly(
-    digest: Digest, dir_path: str, s_files: Iterable[str]
-) -> bool:
+
+# Check whether the given files looks like they could be Golang-format assembly language files.
+@dataclass(frozen=True)
+class CheckForGolangAssemblyRequest:
+    digest: Digest
+    dir_path: str
+    s_files: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class CheckForGolangAssemblyResult:
+    maybe_golang_assembly: bool
+
+
+@rule
+async def check_for_golang_assembly(
+    request: CheckForGolangAssemblyRequest,
+    asm_check_setup: SetupAsmCheckBinary,
+) -> CheckForGolangAssemblyResult:
     """Return true if any of the given `s_files` look like it could be a Golang-format assembly
     language file.
 
     This is used by the cgo rules as a heuristic to determine if the user is passing Golang assembly
     format instead of gcc assembly format.
     """
-    digest_contents = await Get(
-        DigestContents,
-        DigestSubset(
-            digest,
-            PathGlobs(
-                globs=[os.path.join(dir_path, s_file) for s_file in s_files],
-                glob_match_error_behavior=GlobMatchErrorBehavior.error,
-                description_of_origin="golang cgo rules",
+    input_digest = await Get(Digest, MergeDigests([request.digest, asm_check_setup.digest]))
+    result = await Get(
+        ProcessResult,
+        Process(
+            argv=(
+                asm_check_setup.path,
+                *(os.path.join(request.dir_path, s_file) for s_file in request.s_files),
             ),
+            input_digest=input_digest,
+            level=LogLevel.DEBUG,
+            description="Check whether assembly language sources are in Go format",
         ),
     )
-    for s_file in s_files:
-        for entry in digest_contents:
-            if entry.path == os.path.join(dir_path, s_file):
-                if _maybe_is_golang_assembly(entry.content):
-                    return True
-    return False
+    return CheckForGolangAssemblyResult(len(result.stdout) > 0)
 
 
 # Copy header files to names which use platform independent names. For example, defs_linux_amd64.h
@@ -560,9 +588,15 @@ async def build_go_package(
                     new_s_files.append(s_file)
             s_files = new_s_files
         else:
-            if s_files and await _any_file_is_golang_assembly(
-                request.digest, request.dir_path, s_files
-            ):
+            asm_check_result = await Get(
+                CheckForGolangAssemblyResult,
+                CheckForGolangAssemblyRequest(
+                    digest=request.digest,
+                    dir_path=request.dir_path,
+                    s_files=tuple(s_files),
+                ),
+            )
+            if asm_check_result.maybe_golang_assembly:
                 raise ValueError(
                     f"Package {request.import_path} is a cgo package but contains Go assembly files."
                 )
