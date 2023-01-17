@@ -4,18 +4,19 @@
 from __future__ import annotations
 
 from typing import Iterable
-from pants.backend.python.subsystems.python_tool_base import ExportToolOption, PythonToolBase
-from pants.backend.python.target_types import ConsoleScript
-from pants.option.option_types import ArgsListOption, SkipOption, StrListOption, StrOption
-from pants.util.strutil import softwrap
-from pants.util.docutil import git_url
-from pants.backend.python.util_rules.pex_requirements import GeneratePythonToolLockfileSentinel
+
+from pants.backend.python.goals import lockfile
 from pants.backend.python.goals.export import ExportPythonTool, ExportPythonToolSentinel
 from pants.backend.python.goals.lockfile import GeneratePythonLockfile
-from pants.engine.rules import Rule, rule, collect_rules
-from pants.backend.python.goals import lockfile
+from pants.backend.python.subsystems.python_tool_base import ExportToolOption, PythonToolBase
+from pants.backend.python.target_types import ConsoleScript
+from pants.backend.python.util_rules.pex_requirements import GeneratePythonToolLockfileSentinel
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
+from pants.engine.rules import Rule, collect_rules, rule
 from pants.engine.unions import UnionRule
+from pants.option.option_types import ArgsListOption, SkipOption, StrListOption, StrOption
+from pants.util.docutil import git_url
+from pants.util.strutil import softwrap
 
 
 class Yamllint(PythonToolBase):

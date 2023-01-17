@@ -15,7 +15,7 @@ from pants.engine.fs import Digest, DigestSubset, MergeDigests, PathGlobs
 from pants.engine.internals.native_engine import FilespecMatcher, Snapshot
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.util.dirutil import group_by_dir
+from pants.util.dirutil import find_nearest_ancestor_file, group_by_dir
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
@@ -46,17 +46,6 @@ class YamllintConfigFilesRequest:
 class YamllintConfigFiles:
     snapshot: Snapshot
     source_dir_to_config_files: FrozenDict[str, str]
-
-
-def find_nearest_ancestor_file(files: set[str], dir: str, config_file: str) -> str | None:
-    while True:
-        candidate_config_file_path = os.path.join(dir, config_file)
-        if candidate_config_file_path in files:
-            return candidate_config_file_path
-
-        if dir == "":
-            return None
-        dir = os.path.dirname(dir)
 
 
 # @TODO: This logic is very similar, but not identical to the one for scalafmt. It should be generalized and shared.
