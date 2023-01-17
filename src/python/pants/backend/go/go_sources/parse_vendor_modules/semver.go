@@ -2,6 +2,10 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+//
+// Copied from https://github.com/golang/go/blob/d45df06663c88984b75052fd0631974916b1bddb/src/cmd/vendor/golang.org/x/mod/semver/semver.go
+//
+
 // Package semver implements comparison of semantic version strings.
 // In this package, semantic version strings must begin with a leading "v",
 // as in "v1.0.0".
@@ -20,6 +24,7 @@
 // with two exceptions. First, it requires the "v" prefix. Second, it recognizes
 // vMAJOR and vMAJOR.MINOR (with no prerelease or build suffixes)
 // as shorthands for vMAJOR.0.0 and vMAJOR.MINOR.0.
+
 package main
 
 import (

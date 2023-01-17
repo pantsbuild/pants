@@ -1,10 +1,16 @@
 /* Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
  * Licensed under the Apache License, Version 2.0 (see LICENSE).
- *
- * Parts adapted from Go SDK and Bazel rules_go, both under BSD-compatible licenses.
  */
 
 package main
+
+/*
+ * Adapted from https://github.com/golang/go/blob/d45df06663c88984b75052fd0631974916b1bddb/src/cmd/go/internal/modload/vendor.go
+ * Original License:
+ *  // Copyright 2020 The Go Authors. All rights reserved.
+ *  // Use of this source code is governed by a BSD-style
+ *  // license that can be found in the LICENSE file.
+ */
 
 import (
 	"encoding/json"
