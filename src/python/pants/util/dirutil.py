@@ -14,7 +14,7 @@ import uuid
 from collections import defaultdict
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Callable, DefaultDict, Iterator, Sequence, overload
+from typing import Any, Callable, DefaultDict, Iterable, Iterator, Sequence, overload
 
 from typing_extensions import Literal
 
@@ -438,3 +438,12 @@ def rm_rf(name: str) -> None:
         elif e.errno != errno.ENOENT:
             # Pass on 'No such file or directory', otherwise re-raise OSError to surface perm issues etc.
             raise
+
+
+def group_by_dir(paths: Iterable[str]) -> dict[str, set[str]]:
+    """For a list of file paths, returns a dict of directory path -> files in that dir."""
+    ret = defaultdict(set)
+    for path in paths:
+        dirname, filename = os.path.split(path)
+        ret[dirname].add(filename)
+    return ret
