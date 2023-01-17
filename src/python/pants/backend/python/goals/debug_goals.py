@@ -26,7 +26,6 @@ from pants.backend.python.dependency_inference.rules import (
     _find_other_owners_for_unowned_imports,
     import_rules,
 )
-from pants.backend.python.dependency_inference.subsystem import PythonInferSubsystem
 from pants.backend.python.goals.run_python_source import PythonSourceFieldSet
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.build_graph.address import Address
@@ -82,12 +81,11 @@ class PythonSourceAnalysis:
 @rule
 async def dump_python_source_analysis_single(
     fs: PythonImportDependenciesInferenceFieldSet,
-    python_infer_subsystem: PythonInferSubsystem,
     python_setup: PythonSetup,
 ) -> PythonSourceAnalysis:
     """Infer the dependencies for a single python fieldset, keeping all the intermediate results."""
 
-    parsed_dependencies = await _exec_parse_deps(fs, python_infer_subsystem, python_setup)
+    parsed_dependencies = await _exec_parse_deps(fs, python_setup)
 
     resolve = fs.resolve.normalized_value(python_setup)
 
