@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Any, cast
+from typing import Any
 
 from pants.backend.python.util_rules.pex import Pex, PexProcess, PexRequest
 from pants.backend.tools.yamllint.subsystem import Yamllint
@@ -137,7 +137,7 @@ async def run_yamllint(
 ) -> LintResult:
     yamllint_bin = await Get(Pex, PexRequest, yamllint.to_pex_request())
 
-    partition_info = cast(PartitionInfo, request.partition_metadata)
+    partition_info = request.partition_metadata
 
     snapshot = await Get(Snapshot, PathGlobs(request.elements))
 

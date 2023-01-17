@@ -16,7 +16,6 @@ from pants.backend.scala.lint.scalafmt.rules import (
     ScalafmtConfigFiles,
     ScalafmtFieldSet,
     ScalafmtRequest,
-    find_nearest_ancestor_file,
 )
 from pants.backend.scala.lint.scalafmt.rules import rules as scalafmt_rules
 from pants.backend.scala.target_types import ScalaSourcesGeneratorTarget, ScalaSourceTarget
@@ -34,6 +33,7 @@ from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.jvm.strip_jar import strip_jar
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, RuleRunner
+from pants.util.dirutil import find_nearest_ancestor_file
 
 
 @pytest.fixture
