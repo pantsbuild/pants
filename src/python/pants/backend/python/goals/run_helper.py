@@ -99,7 +99,12 @@ async def _create_python_source_run_request(
         pex_request, pex_path=(*pex_request.pex_path, local_dists.pex, *pex_path)
     )
 
-    complete_pex_environment = pex_env.in_workspace()
+    if run_in_sandbox:
+        # Note that a RunRequest always expects to run directly in the sandbox/workspace
+        # root, hence working_directory=None.
+        complete_pex_environment = pex_env.in_sandbox(working_directory=None)
+    else:
+        complete_pex_environment = pex_env.in_workspace()
     venv_pex = await Get(VenvPex, VenvPexRequest(pex_request, complete_pex_environment))
     input_digests = [
         venv_pex.digest,
@@ -129,6 +134,7 @@ async def _create_python_source_run_request(
         digest=merged_digest,
         args=[_in_chroot(venv_pex.pex.argv0)],
         extra_env=extra_env,
+        append_only_caches=complete_pex_environment.append_only_caches,
     )
 
 
@@ -198,4 +204,9 @@ async def _create_python_source_run_dap_request(
         *debugpy.get_args(debug_adapter),
     ]
 
-    return RunDebugAdapterRequest(digest=merged_digest, args=args, extra_env=extra_env)
+    return RunDebugAdapterRequest(
+        digest=merged_digest,
+        args=args,
+        extra_env=extra_env,
+        append_only_caches=regular_run_request.append_only_caches,
+    )
