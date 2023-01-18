@@ -24,12 +24,12 @@ from pants.core.goals.tailor import (
     PutativeTarget,
     PutativeTargets,
     PutativeTargetsRequest,
-    group_by_dir,
 )
 from pants.engine.fs import DigestContents, PathGlobs, Paths
 from pants.engine.rules import Get, MultiGet, collect_rules, rule, rule_helper
 from pants.engine.target import UnexpandedTargets
 from pants.engine.unions import UnionRule
+from pants.util.dirutil import group_by_dir
 from pants.util.logging import LogLevel
 
 
