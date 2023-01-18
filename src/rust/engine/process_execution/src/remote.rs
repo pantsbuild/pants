@@ -1036,7 +1036,8 @@ fn maybe_add_workunit(
   metadata: WorkunitMetadata,
 ) {
   if !result_cached && workunit_store.max_level() >= level {
-    let start_time: SystemTime = SystemTime::UNIX_EPOCH + std::time::Duration::from(time_span.start);
+    let start_time: SystemTime =
+      SystemTime::UNIX_EPOCH + std::time::Duration::from(time_span.start);
     let end_time: SystemTime = start_time + std::time::Duration::from(time_span.duration);
     workunit_store.add_completed_workunit(name, level, start_time, end_time, parent_id, metadata);
   }

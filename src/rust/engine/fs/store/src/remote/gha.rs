@@ -23,7 +23,10 @@ impl ByteStore {
           .version(GHA_STORE_VERSION)
           .root(cache_key)
           .build()
-          .map_err(|e| e.to_string())?,
+          .map_err(|e| {
+            log::error!("byte store initialisation error: {}", e);
+            e.to_string()
+          })?,
       ),
     })
   }
