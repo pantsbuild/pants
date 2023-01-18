@@ -49,7 +49,7 @@ impl fmt::Debug for ByteStore {
 
 /// Represents an error from accessing a remote bytestore.
 #[derive(Debug)]
-pub enum ByteStoreError {
+enum ByteStoreError {
   /// gRPC error
   Grpc(Status),
 
