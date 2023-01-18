@@ -10,7 +10,11 @@ from pants.backend.python.dependency_inference.module_mapper import (
     PythonModuleOwners,
     PythonModuleOwnersRequest,
 )
-from pants.backend.python.dependency_inference.rules import PythonInferSubsystem, import_rules
+from pants.backend.python.dependency_inference.rules import import_rules
+from pants.backend.python.dependency_inference.subsystem import (
+    AmbiguityResolution,
+    PythonInferSubsystem,
+)
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import PexCompletePlatformsField, PythonResolveField
 from pants.core.goals.package import OutputPathField
@@ -177,10 +181,23 @@ async def infer_lambda_handler_dependency(
         ),
     )
     module, _, _func = handler.val.partition(":")
+
+    # Only set locality if needed, to avoid unnecessary rule graph memoization misses.
+    # When set, use the source root, which is useful in practice, but incurs fewer memoization
+    # misses than using the full spec_path.
+    locality = None
+    if python_infer_subsystem.ambiguity_resolution == AmbiguityResolution.by_source_root:
+        source_root = await Get(
+            SourceRoot, SourceRootRequest, SourceRootRequest.for_address(request.field_set.address)
+        )
+        locality = source_root.path
+
     owners = await Get(
         PythonModuleOwners,
         PythonModuleOwnersRequest(
-            module, resolve=request.field_set.resolve.normalized_value(python_setup)
+            module,
+            resolve=request.field_set.resolve.normalized_value(python_setup),
+            locality=locality,
         ),
     )
     address = request.field_set.address
@@ -229,6 +246,11 @@ class PythonAwsLambdaRuntime(StringField):
         """
         The identifier of the AWS Lambda runtime to target (pythonX.Y).
         See https://docs.aws.amazon.com/lambda/latest/dg/lambda-python.html.
+
+        In general you'll want to define either a `runtime` or one `complete_platforms` but not
+        both. Specifying a `runtime` is simpler, but less accurate. If you have issues either
+        packaging the AWS Lambda PEX or running it as a deployed AWS Lambda function, you should try
+        using `complete_platforms` instead.
         """
     )
 
@@ -256,6 +278,18 @@ class PythonAwsLambdaRuntime(StringField):
         return int(mo.group("major")), int(mo.group("minor"))
 
 
+class PythonAwsLambdaCompletePlatforms(PexCompletePlatformsField):
+    help = softwrap(
+        f"""
+        {PexCompletePlatformsField.help}
+
+        N.B.: If specifying `complete_platforms` to work around packaging failures encountered when
+        using the `runtime` field, ensure you delete the `runtime` field from your
+        `python_awslambda` target.
+        """
+    )
+
+
 class PythonAWSLambda(Target):
     alias = "python_awslambda"
     core_fields = (
@@ -265,7 +299,7 @@ class PythonAWSLambda(Target):
         PythonAwsLambdaHandlerField,
         PythonAwsLambdaIncludeRequirements,
         PythonAwsLambdaRuntime,
-        PexCompletePlatformsField,
+        PythonAwsLambdaCompletePlatforms,
         PythonResolveField,
     )
     help = softwrap(

@@ -348,6 +348,8 @@ lockfile = "3rdparty/pytest_lockfile.txt"
 
 You can also run `./pants generate-lockfiles --resolve=tool`, e.g. `--resolve=flake8`, to only generate that tool's lockfile rather than generating all lockfiles.
 
+Some tools, such as Flake8 and Bandit, need to run on an interpreter compatible with the code they operate on. In this case the tool may not have its own `interpreter_constraints` option, and its lockfile must be compatible with your code's interpreter constraints.
+
 To disable lockfiles entirely for a tool, set `[tool].lockfile = "<none>"` for that tool. Although we do not recommend this!
 
 ### Manually generating lockfiles

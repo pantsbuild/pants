@@ -119,7 +119,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
             from datetime import datetime
             from pants.option.global_options import AuthPluginState, AuthPluginResult
 
-            def auth_func(
+            def remote_auth(
                 initial_execution_headers, initial_store_headers, options, env, prior_result
             ):
                 # If the first run, don't change the headers, but use the `expiration` as a
@@ -163,13 +163,13 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
                 plugin_dir = Path(ctx.workdir).parent.parent / "auth_plugin"
                 plugin_dir.mkdir(parents=True, exist_ok=True)
                 (plugin_dir / "__init__.py").touch()
-                (plugin_dir / "auth.py").write_text(plugin)
+                (plugin_dir / "register.py").write_text(plugin)
                 sys.path.append(str(plugin_dir))
                 try:
                     result = ctx.runner(
                         [
                             "--pythonpath=auth_plugin",
-                            "--remote-auth-plugin=auth_plugin.auth:auth_func",
+                            "--backend-packages=auth_plugin",
                             "--remote-cache-read",
                             "--remote-store-address=grpc://fake",
                             "help",

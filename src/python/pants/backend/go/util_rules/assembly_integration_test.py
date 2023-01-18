@@ -14,7 +14,7 @@ import pytest
 from pants.backend.go import target_type_rules
 from pants.backend.go.goals import package_binary
 from pants.backend.go.goals.package_binary import GoBinaryFieldSet
-from pants.backend.go.target_types import GoBinaryTarget, GoModTarget, GoPackageTarget
+from pants.backend.go.target_types import GoBinaryTarget, GoModTarget, GoPackageTarget, GoSdkTarget
 from pants.backend.go.util_rules import (
     assembly,
     build_pkg,
@@ -54,7 +54,12 @@ def rule_runner() -> RuleRunner:
             QueryRule(BuiltPackage, (GoBinaryFieldSet,)),
             QueryRule(FallibleBuiltGoPackage, (BuildGoPackageRequest,)),
         ],
-        target_types=[GoBinaryTarget, GoModTarget, GoPackageTarget],
+        target_types=[
+            GoBinaryTarget,
+            GoModTarget,
+            GoPackageTarget,
+            GoSdkTarget,
+        ],
     )
     rule_runner.set_options([], env_inherit={"PATH"})
     return rule_runner
@@ -308,6 +313,84 @@ def test_build_package_using_api_metdata(rule_runner: RuleRunner) -> None:
                 """\
                 go_mod(name="mod")
                 go_package(name="pkg", sources=["*.go", "*.s"])
+                go_binary(name="bin")
+                """
+            ),
+        }
+    )
+
+    binary_tgt = rule_runner.get_target(Address("", target_name="bin"))
+    built_package = build_package(rule_runner, binary_tgt)
+    assert len(built_package.artifacts) == 1
+    assert built_package.artifacts[0].relpath == "bin"
+
+    result = subprocess.run([os.path.join(rule_runner.build_root, "bin")], stdout=subprocess.PIPE)
+    assert result.returncode == 0
+    assert result.stdout == b"52\n"  # should be 10 + the 42 "magic" value
+
+
+def test_build_package_with_copied_header(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "go.mod": dedent(
+                """\
+                module example.com/assembly
+                go 1.17
+                """
+            ),
+            "constant_linux.h": dedent(
+                """
+                #define MAGIC_VALUE 42
+                """
+            ),
+            "constant_darwin.h": dedent(
+                """
+                #define MAGIC_VALUE 42
+                """
+            ),
+            "main.go": dedent(
+                """\
+                package main
+
+                import "fmt"
+
+                func main() {
+                    fmt.Println(add_magic(10))
+                }
+                """
+            ),
+            "add_amd64.go": "package main\nfunc add_magic(x int64) int64",
+            "add_arm64.go": "package main\nfunc add_magic(x int64) int64",
+            "add_amd64.s": dedent(
+                """\
+                #include "textflag.h"  // for NOSPLIT
+                #include "constant_GOOS.h"  // for MAGIC_VALUE
+                TEXT ·add_magic(SB),NOSPLIT,$0
+                    MOVQ  x+0(FP), BX
+                    MOVQ  $MAGIC_VALUE, BP
+
+                    ADDQ  BP, BX
+                    MOVQ  BX, ret+8(FP)
+                    RET
+                """
+            ),
+            "add_arm64.s": dedent(
+                """\
+                #include "textflag.h"  // for NOSPLIT
+                #include "constant_GOOS.h"  // for MAGIC_VALUE
+                TEXT ·add_magic(SB),NOSPLIT,$0
+                    MOVD  x+0(FP), R0
+                    MOVD  $MAGIC_VALUE, R1
+
+                    ADD   R1, R0, R0
+                    MOVD  R0, ret+8(FP)
+                    RET
+                """
+            ),
+            "BUILD": dedent(
+                """\
+                go_mod(name="mod")
+                go_package(name="pkg", sources=["*.go", "*.s", "*.h"])
                 go_binary(name="bin")
                 """
             ),

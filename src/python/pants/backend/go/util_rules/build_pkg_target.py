@@ -157,6 +157,8 @@ async def setup_build_go_package_target_request(
         return codegen_result
 
     embed_config: EmbedConfig | None = None
+    is_stdlib = False
+
     if target.has_field(GoPackageSourcesField):
         _maybe_first_party_pkg_analysis, _maybe_first_party_pkg_digest = await MultiGet(
             Get(
@@ -212,6 +214,7 @@ async def setup_build_go_package_target_request(
         cgo_files = _first_party_pkg_analysis.cgo_files
         cgo_flags = _first_party_pkg_analysis.cgo_flags
         c_files = _first_party_pkg_analysis.c_files
+        h_files = _first_party_pkg_analysis.h_files
         cxx_files = _first_party_pkg_analysis.cxx_files
         objc_files = _first_party_pkg_analysis.m_files
         fortran_files = _first_party_pkg_analysis.f_files
@@ -234,6 +237,7 @@ async def setup_build_go_package_target_request(
                 pkg_config=(),
             )
             c_files = ()
+            h_files = ()
             cxx_files = ()
             objc_files = ()
             fortran_files = ()
@@ -249,6 +253,7 @@ async def setup_build_go_package_target_request(
             ThirdPartyPkgAnalysis,
             ThirdPartyPkgAnalysisRequest(
                 import_path,
+                _go_mod_address,
                 _go_mod_info.digest,
                 _go_mod_info.mod_path,
                 build_opts=request.build_opts,
@@ -271,6 +276,7 @@ async def setup_build_go_package_target_request(
         cgo_files = _third_party_pkg_info.cgo_files
         cgo_flags = _third_party_pkg_info.cgo_flags
         c_files = _third_party_pkg_info.c_files
+        h_files = _third_party_pkg_info.h_files
         cxx_files = _third_party_pkg_info.cxx_files
         objc_files = _third_party_pkg_info.m_files
         fortran_files = _third_party_pkg_info.f_files
@@ -395,6 +401,7 @@ async def setup_build_go_package_target_request(
         cgo_files=cgo_files,
         cgo_flags=cgo_flags,
         c_files=c_files,
+        header_files=h_files,
         cxx_files=cxx_files,
         objc_files=objc_files,
         fortran_files=fortran_files,
@@ -406,6 +413,7 @@ async def setup_build_go_package_target_request(
         with_coverage=with_coverage,
         pkg_specific_compiler_flags=tuple(pkg_specific_compiler_flags),
         pkg_specific_assembler_flags=tuple(pkg_specific_assembler_flags),
+        is_stdlib=is_stdlib,
     )
     return FallibleBuildGoPackageRequest(result, import_path)
 

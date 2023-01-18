@@ -355,7 +355,7 @@ class DockerImageBuildPullOptionField(DockerBuildOptionFieldValueMixin, BoolFiel
         """
         If true, then docker will always attempt to pull a newer version of the image.
 
-        NOTE: This option cannot be used on images that build off of "transient" base images
+        NOTE: This option cannot be used on images that build off of "transitive" base images
         referenced by address (i.e. `FROM path/to/your/base/Dockerfile`).
         """
     )

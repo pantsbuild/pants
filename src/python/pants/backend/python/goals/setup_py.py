@@ -23,6 +23,7 @@ from pants.backend.python.target_types import (
     GenerateSetupField,
     LongDescriptionPathField,
     PythonDistributionEntryPointsField,
+    PythonDistributionOutputPathField,
     PythonGeneratingSourcesBase,
     PythonProvidesField,
     PythonRequirementsField,
@@ -501,6 +502,10 @@ async def package_python_dist(
     working_directory = os.path.join(chroot_prefix, chroot.working_directory)
     prefixed_input = await Get(Digest, AddPrefix(input_digest, chroot_prefix))
     build_system = await Get(BuildSystem, BuildSystemRequest(prefixed_input, working_directory))
+    output_path = dist_tgt.get(PythonDistributionOutputPathField).value
+    assert (
+        output_path is not None
+    ), "output_path should take a default string value if the user has not provided it."
 
     setup_py_result = await Get(
         DistBuildResult,
@@ -517,6 +522,7 @@ async def package_python_dist(
             sdist_config_settings=sdist_config_settings,
             extra_build_time_requirements=extra_build_time_requirements,
             extra_build_time_env=extra_build_time_env,
+            output_path=output_path,
         ),
     )
     dist_snapshot = await Get(Snapshot, Digest, setup_py_result.output)

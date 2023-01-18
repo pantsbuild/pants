@@ -52,6 +52,20 @@ def parse_ruleset(rules: Any, build_file: str = "test/path/BUILD") -> Visibility
     return VisibilityRuleSet.parse(build_file, rules)
 
 
+def test_dead_ruleset() -> None:
+    err = softwrap(
+        """\
+        The rule set will never apply to anything, for the rules: \\('src/\\*', '!\\*'\\)
+        """
+    )
+    with pytest.raises(BuildFileVisibilityRulesError, match=err):
+        # These rules will never apply.
+        parse_ruleset(("", "src/*", "!*"))
+
+    # Ignore match-none selectors if there are others that do match on something.
+    parse_ruleset((("", "foo"), "src/*", "!*"))
+
+
 @pytest.mark.parametrize(
     "expected, xs",
     [

@@ -13,6 +13,7 @@ import threading
 import uuid
 from collections import defaultdict
 from contextlib import contextmanager
+from pathlib import Path
 from typing import Any, Callable, DefaultDict, Iterator, Sequence, overload
 
 from typing_extensions import Literal
@@ -62,7 +63,7 @@ def fast_relpath_optional(path: str, start: str) -> str | None:
     return None
 
 
-def safe_mkdir(directory: str, clean: bool = False) -> None:
+def safe_mkdir(directory: str | Path, clean: bool = False) -> None:
     """Ensure a directory is present.
 
     If it's not there, create it.  If it is, no-op. If clean is True, ensure the dir is empty.
@@ -78,7 +79,7 @@ def safe_mkdir(directory: str, clean: bool = False) -> None:
             raise
 
 
-def safe_mkdir_for(path: str, clean: bool = False) -> None:
+def safe_mkdir_for(path: str | Path, clean: bool = False) -> None:
     """Ensure that the parent directory for a file is present.
 
     If it's not there, create it. If it is, no-op.
@@ -236,7 +237,7 @@ def register_rmtree(directory: str, cleaner: _MkdtempCleanerType = _mkdtemp_atex
     return directory
 
 
-def safe_rmtree(directory: str) -> None:
+def safe_rmtree(directory: str | Path) -> None:
     """Delete a directory if it's present. If it's not present, no-op.
 
     Note that if the directory argument is a symlink, only the symlink will
@@ -259,7 +260,7 @@ def safe_open(filename, *args, **kwargs):
     return open(filename, *args, **kwargs)
 
 
-def safe_delete(filename: str) -> None:
+def safe_delete(filename: str | Path) -> None:
     """Delete a file safely.
 
     If it's not present, no-op.

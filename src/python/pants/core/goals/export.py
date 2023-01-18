@@ -148,7 +148,9 @@ async def export(
         Get(Digest, AddPrefix(result.digest, result.reldir)) for result in flattened_results
     )
     output_dir = os.path.join(str(dist_dir.relpath), "export")
-    safe_rmtree(output_dir)
+    for result in flattened_results:
+        digest_root = os.path.join(build_root.path, output_dir, result.reldir)
+        safe_rmtree(digest_root)
     merged_digest = await Get(Digest, MergeDigests(prefixed_digests))
     dist_digest = await Get(Digest, AddPrefix(merged_digest, output_dir))
     workspace.write_digest(dist_digest)

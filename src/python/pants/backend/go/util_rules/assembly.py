@@ -6,10 +6,11 @@ from __future__ import annotations
 import os.path
 from dataclasses import dataclass
 from pathlib import PurePath
+from typing import Iterable
 
 from pants.backend.go.util_rules.goroot import GoRoot
 from pants.backend.go.util_rules.sdk import GoSdkProcess, GoSdkToolIDRequest, GoSdkToolIDResult
-from pants.engine.fs import CreateDigest, Digest, Directory, FileContent, MergeDigests
+from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 
@@ -24,7 +25,9 @@ class GenerateAssemblySymabisRequest:
 
     compilation_input: Digest
     s_files: tuple[str, ...]
+    import_path: str
     dir_path: str
+    extra_assembler_flags: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -48,7 +51,6 @@ class AssembleGoAssemblyFilesRequest:
     input_digest: Digest
     s_files: tuple[str, ...]
     dir_path: str
-    asm_header_path: str | None
     import_path: str
     extra_assembler_flags: tuple[str, ...]
 
@@ -66,6 +68,49 @@ class FallibleAssembleGoAssemblyFilesResult:
     stderr: str | None = None
 
 
+# Adapted from https://github.com/golang/go/blob/cb07765045aed5104a3df31507564ac99e6ddce8/src/cmd/go/internal/work/gc.go#L358-L410
+#
+# Note: Architecture-specific flags have not been adapted nor the flags added when compiling Go SDK packages
+# themselves.
+def _asm_args(
+    import_path: str, dir_path: str, goroot: GoRoot, extra_flags: Iterable[str]
+) -> tuple[str, ...]:
+    # On Go 1.19+, the import path must be supplied via the `-p` option to `go tool asm`.
+    # See https://go.dev/doc/go1.19#assembler and
+    # https://github.com/bazelbuild/rules_go/commit/cde7d7bc27a34547c014369790ddaa95b932d08d (Bazel rules_go).
+    maybe_package_import_path_args = (
+        ["-p", import_path] if goroot.is_compatible_version("1.19") else []
+    )
+
+    # Add special argument if assembling files in certain packages in the standard library.
+    # See:
+    # - https://github.com/golang/go/blob/245e95dfabd77f337373bf2d6bb47cd353ad8d74/src/cmd/go/internal/work/gc.go#L370-L372
+    # - https://github.com/golang/go/blob/245e95dfabd77f337373bf2d6bb47cd353ad8d74/src/cmd/internal/objabi/path.go#L43-L67
+    maybe_assembling_stdlib_runtime_args = (
+        ["-compiling-runtime"]
+        if import_path in ("runtime", "reflect", "syscall", "internal/bytealg")
+        or import_path.startswith("runtime/internal")
+        else []
+    )
+
+    return (
+        *maybe_package_import_path_args,
+        "-trimpath",
+        "__PANTS_SANDBOX_ROOT__",
+        "-I",
+        f"__PANTS_SANDBOX_ROOT__/{dir_path}",
+        # Add -I pkg/GOOS_GOARCH so #include "textflag.h" works in .s files.
+        "-I",
+        os.path.join(goroot.path, "pkg", "include"),
+        "-D",
+        f"GOOS_{goroot.goos}",
+        "-D",
+        f"GOARCH_{goroot.goarch}",
+        *maybe_assembling_stdlib_runtime_args,
+        *extra_flags,
+    )
+
+
 @rule
 async def generate_go_assembly_symabisfile(
     request: GenerateAssemblySymabisRequest,
@@ -77,15 +122,16 @@ async def generate_go_assembly_symabisfile(
     #   that we don't need the actual definitions that would appear in go_asm.h.
     #
     # See https://go-review.googlesource.com/c/go/+/146999/8/src/cmd/go/internal/work/gc.go
-    obj_dir_path = PurePath(".", request.dir_path, "__obj__")
-    symabis_path = str(obj_dir_path / "symabis")
-    go_asm_h_digest, asm_tool_id, obj_dir_digest = await MultiGet(
+    if os.path.isabs(request.dir_path):
+        symabis_path = "symabis"
+    else:
+        symabis_path = os.path.join(request.dir_path, "symabis")
+    go_asm_h_digest, asm_tool_id = await MultiGet(
         Get(Digest, CreateDigest([FileContent("go_asm.h", b"")])),
         Get(GoSdkToolIDResult, GoSdkToolIDRequest("asm")),
-        Get(Digest, CreateDigest([Directory(str(obj_dir_path))])),
     )
     symabis_input_digest = await Get(
-        Digest, MergeDigests([request.compilation_input, go_asm_h_digest, obj_dir_digest])
+        Digest, MergeDigests([request.compilation_input, go_asm_h_digest])
     )
     symabis_result = await Get(
         FallibleProcessResult,
@@ -94,19 +140,24 @@ async def generate_go_assembly_symabisfile(
             command=(
                 "tool",
                 "asm",
-                "-I",
-                os.path.join(goroot.path, "pkg", "include"),
+                *_asm_args(
+                    import_path=request.import_path,
+                    dir_path=request.dir_path,
+                    goroot=goroot,
+                    extra_flags=request.extra_assembler_flags,
+                ),
                 "-gensymabis",
                 "-o",
                 symabis_path,
                 "--",
-                *(str(PurePath(".", request.dir_path, s_file)) for s_file in request.s_files),
+                *(str(PurePath(request.dir_path, s_file)) for s_file in request.s_files),
             ),
             env={
                 "__PANTS_GO_ASM_TOOL_ID": asm_tool_id.tool_id,
             },
             description=f"Generate symabis metadata for assembly files for {request.dir_path}",
             output_files=(symabis_path,),
+            replace_sandbox_root_in_args=True,
         ),
     )
     if symabis_result.exit_code != 0:
@@ -127,50 +178,38 @@ async def assemble_go_assembly_files(
     request: AssembleGoAssemblyFilesRequest,
     goroot: GoRoot,
 ) -> FallibleAssembleGoAssemblyFilesResult:
-    # On Go 1.19+, the import path must be supplied via the `-p` option to `go tool asm`.
-    # See https://go.dev/doc/go1.19#assembler and
-    # https://github.com/bazelbuild/rules_go/commit/cde7d7bc27a34547c014369790ddaa95b932d08d (Bazel rules_go).
-    maybe_package_import_path_args = (
-        ["-p", request.import_path] if goroot.is_compatible_version("1.19") else []
-    )
-
-    obj_dir_path = PurePath(".", request.dir_path, "__obj__")
-    asm_tool_id, obj_dir_digest = await MultiGet(
-        Get(GoSdkToolIDResult, GoSdkToolIDRequest("asm")),
-        Get(Digest, CreateDigest([Directory(str(obj_dir_path))])),
-    )
-
-    input_digest = await Get(Digest, MergeDigests([request.input_digest, obj_dir_digest]))
-
-    maybe_asm_header_path_args = (
-        ["-I", str(PurePath(request.asm_header_path).parent)] if request.asm_header_path else []
-    )
+    asm_tool_id = await Get(GoSdkToolIDResult, GoSdkToolIDRequest("asm"))
 
     def obj_output_path(s_file: str) -> str:
-        return str(obj_dir_path / PurePath(s_file).with_suffix(".o"))
+        if os.path.isabs(request.dir_path):
+            return str(PurePath(s_file).with_suffix(".o"))
+        else:
+            return str(request.dir_path / PurePath(s_file).with_suffix(".o"))
 
     assembly_results = await MultiGet(
         Get(
             FallibleProcessResult,
             GoSdkProcess(
-                input_digest=input_digest,
+                input_digest=request.input_digest,
                 command=(
                     "tool",
                     "asm",
-                    "-I",
-                    os.path.join(goroot.path, "pkg", "include"),
-                    *maybe_asm_header_path_args,
-                    *maybe_package_import_path_args,
-                    *request.extra_assembler_flags,
+                    *_asm_args(
+                        import_path=request.import_path,
+                        dir_path=request.dir_path,
+                        goroot=goroot,
+                        extra_flags=request.extra_assembler_flags,
+                    ),
                     "-o",
                     obj_output_path(s_file),
-                    str(os.path.normpath(PurePath(".", request.dir_path, s_file))),
+                    str(os.path.normpath(PurePath(request.dir_path, s_file))),
                 ),
                 env={
                     "__PANTS_GO_ASM_TOOL_ID": asm_tool_id.tool_id,
                 },
                 description=f"Assemble {s_file} with Go",
                 output_files=(obj_output_path(s_file),),
+                replace_sandbox_root_in_args=True,
             ),
         )
         for s_file in request.s_files

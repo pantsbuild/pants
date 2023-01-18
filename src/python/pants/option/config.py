@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import getpass
 import logging
 import os
 import re
@@ -17,6 +16,7 @@ from typing_extensions import Protocol
 from pants.base.build_environment import get_buildroot
 from pants.option.errors import ConfigError, ConfigValidationError, InterpolationMissingOptionError
 from pants.option.ranked_value import Value
+from pants.util.osutil import getuser
 
 logger = logging.getLogger(__name__)
 
@@ -122,8 +122,10 @@ class Config:
 
         all_seed_values: dict[str, Any] = {
             "buildroot": buildroot,
+            # Note that expanduser will return the root dir when running with a uid
+            # not associated with a user.
             "homedir": os.path.expanduser("~"),
-            "user": getpass.getuser(),
+            "user": getuser(),
         }
         if env:
             all_seed_values["env"] = SimpleNamespace(**env)

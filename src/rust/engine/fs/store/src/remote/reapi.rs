@@ -141,6 +141,7 @@ impl ByteStore {
       requests: vec![remexec::batch_update_blobs_request::Request {
         digest: Some(digest.into()),
         data: bytes(0..digest.size_bytes),
+        compressor: remexec::compressor::Value::Identity as i32,
       }],
     };
 

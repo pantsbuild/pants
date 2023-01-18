@@ -8,6 +8,7 @@ import os
 import uuid
 from collections import defaultdict
 from dataclasses import dataclass
+from enum import Enum
 from typing import Any, DefaultDict, Iterable, cast
 
 from pants.backend.python.subsystems.setup import PythonSetup
@@ -37,7 +38,7 @@ from pants.engine.process import ProcessResult
 from pants.engine.rules import collect_rules, rule, rule_helper
 from pants.engine.target import Target
 from pants.engine.unions import UnionMembership, UnionRule, union
-from pants.option.option_types import BoolOption
+from pants.option.option_types import BoolOption, EnumOption
 from pants.util.docutil import bin_name
 from pants.util.strutil import path_safe, softwrap
 
@@ -89,12 +90,36 @@ class ExportPythonTool(EngineAwareParameter):
         return self.resolve_name
 
 
+class PythonResolveExportFormat(Enum):
+    """How to export Python resolves."""
+
+    mutable_virtualenv = "mutable_virtualenv"
+    symlinked_immutable_virtualenv = "symlinked_immutable_virtualenv"
+
+
 class ExportPluginOptions:
+    py_resolve_format = EnumOption(
+        default=PythonResolveExportFormat.mutable_virtualenv,
+        help=softwrap(
+            """\
+            Export Python resolves using this format. Options are:
+              - mutable_virtualenv: Export a standalone mutable virtualenv that you can
+                further modify.
+              - symlinked_immutable_virtualenv: Export a symlink into a cached Python virtualenv.
+                This virtualenv will have no pip binary, and will be immutable. Any attempt to
+                modify it will corrupt the cache!  It may, however, take significantly less time
+                to export than a standalone, mutable virtualenv.
+            """
+        ),
+    )
+
     symlink_python_virtualenv = BoolOption(
         default=False,
         help="Export a symlink into a cached Python virtualenv.  This virtualenv will have no pip binary, "
         "and will be immutable. Any attempt to modify it will corrupt the cache!  It may, however, "
         "take significantly less time to export than a standalone, mutable virtualenv will.",
+        removal_version="2.20.0.dev0",
+        removal_hint="Set the `[export].py_resolve_format` option to 'symlinked_immutable_virtualenv'",
     )
 
 
@@ -136,19 +161,28 @@ async def do_export(
 ) -> ExportResult:
     if not req.pex_request.internal_only:
         raise ExportError(f"The PEX to be exported for {req.resolve_name} must be internal_only.")
-    dest = (
+    dest_prefix = (
         os.path.join(req.dest_prefix, path_safe(req.resolve_name))
         if req.resolve_name
         else req.dest_prefix
     )
+    # digest_root is the absolute path to build_root/dest_prefix/py_version
+    # (py_version may be left off in some cases)
+    output_path = "{digest_root}"
 
     complete_pex_env = pex_env.in_workspace()
+
     if export_subsys.options.symlink_python_virtualenv:
+        export_format = PythonResolveExportFormat.symlinked_immutable_virtualenv
+    else:
+        export_format = export_subsys.options.py_resolve_format
+
+    if export_format == PythonResolveExportFormat.symlinked_immutable_virtualenv:
         requirements_venv_pex = await Get(VenvPex, PexRequest, req.pex_request)
         py_version = await _get_full_python_version(requirements_venv_pex)
         # Note that for symlinking we ignore qualify_path_with_python_version and always qualify, since
         # we need some name for the symlink anyway.
-        output_path = f"{{digest_root}}/{py_version}"
+        dest = f"{dest_prefix}/{py_version}"
         description = (
             f"symlink to immutable virtualenv for {req.resolve_name or 'requirements'} "
             f"(using Python {py_version})"
@@ -157,18 +191,24 @@ async def do_export(
         return ExportResult(
             description,
             dest,
-            post_processing_cmds=[PostProcessingCommand(["ln", "-s", venv_abspath, output_path])],
+            post_processing_cmds=[
+                # export creates an empty directory for us when the digest gets written.
+                # We have to remove that before creating the symlink in its place.
+                PostProcessingCommand(["rmdir", output_path]),
+                PostProcessingCommand(["ln", "-s", venv_abspath, output_path]),
+            ],
             resolve=req.resolve_name or None,
         )
-    else:
+    elif export_format == PythonResolveExportFormat.mutable_virtualenv:
         # Note that an internal-only pex will always have the `python` field set.
         # See the build_pex() rule and _determine_pex_python_and_platforms() helper in pex.py.
         requirements_pex = await Get(Pex, PexRequest, req.pex_request)
         assert requirements_pex.python is not None
         py_version = await _get_full_python_version(requirements_pex)
-        output_path = (
-            f"{{digest_root}}/{py_version if req.qualify_path_with_python_version else ''}"
-        )
+        if req.qualify_path_with_python_version:
+            dest = f"{dest_prefix}/{py_version}"
+        else:
+            dest = dest_prefix
         description = (
             f"mutable virtualenv for {req.resolve_name or 'requirements'} "
             f"(using Python {py_version})"
@@ -206,6 +246,8 @@ async def do_export(
             ],
             resolve=req.resolve_name or None,
         )
+    else:
+        raise ExportError("Unsupported value for [export].py_resolve_format")
 
 
 @dataclass(frozen=True)

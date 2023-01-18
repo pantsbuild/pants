@@ -21,7 +21,7 @@ from pants.core.goals.package import (
     OutputPathField,
     PackageFieldSet,
 )
-from pants.core.goals.run import RunFieldSet
+from pants.core.goals.run import RunFieldSet, RunInSandboxBehavior
 from pants.engine.fs import AddPrefix, Digest, MergeDigests
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import collect_rules, rule
@@ -32,6 +32,7 @@ from pants.util.logging import LogLevel
 @dataclass(frozen=True)
 class GoBinaryFieldSet(PackageFieldSet, RunFieldSet):
     required_fields = (GoBinaryMainPackageField,)
+    run_in_sandbox_behavior = RunInSandboxBehavior.RUN_REQUEST_HERMETIC
 
     main: GoBinaryMainPackageField
     output_path: OutputPathField

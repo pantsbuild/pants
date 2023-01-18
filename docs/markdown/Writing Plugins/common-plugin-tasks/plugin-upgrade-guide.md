@@ -6,6 +6,39 @@ hidden: false
 createdAt: "2020-10-12T16:19:01.543Z"
 updatedAt: "2022-07-25T20:02:17.695Z"
 ---
+
+2.16
+----
+
+### `RunFieldSet` and `TestRequest` now have a `.rules()` method
+
+These methods should be used to register your run/test plugins:
+
+```python
+
+def rules():
+    return [
+        *MyRunFieldSetSubclass.rules(),
+        *MyTestRequestSubclass.rules(),
+    ]
+```
+
+Additionally, these types now by-default register the implementations for the rules used for `--debug`/`--debug-adapter`. If your plugin doesn't support these flags, simply remove the rules you've declared and let the default ones handle erroring. If your plugin does support these, set the class property(s) `supports_debug = True`/`supports_debug_adapter = True`, respectively.
+
+### `RunFieldSet` can be used to run targets in the sandbox as part of a build rule
+
+With the new `experimental_run_in_sandbox` target type, targets that implement `RunFieldSet` can be run as a build rule for their side-effects.
+
+Many rules that create `RunRequest`s can be used verbatim, but others may make assumptions that they will not be run hermetically. You will need set `run_in_sandbox_behavior` to one of the following values to generate a rule that allows your targets to be run in the sandbox:
+
+* `RunInSandboxBehavior.RUN_REQUEST_HERMETIC`: Use the existing `RunRequest`-generating rule, and enable cacheing. Use this if you are confident the behaviour of the rule relies only on state that is captured by pants (e.g. binary paths are found using `EnvironmentVarsRequest`), and that the rule only refers to files in the sandbox.
+* `RunInSandboxBehavior.RUN_REQUEST_NOT_HERMETIC`: Use the existing `RunRequest`-generating rule, and do not enable cacheing. Use this if your existing rule is mostly suitable for use in the sandbox, but you cannot guarantee reproducible behavior.
+* `RunInSandboxBehavior.CUSTOM`: Opt to write your own rule that returns `RunInSandboxRequest`.
+* `RunInSandboxBehavior.NOT_SUPPORTED`: Opt out of being usable in `experimental_run_in_sandbox`. Attempting to use such a target will result in a runtime exception.
+
+We expect to deprecate `RUN_REQUEST_NOT_HERMETIC` and `NOT_SUPPORTED` in a few versions time: these options are provided to give you some time to make your existing rules match the semantics of `RUN_REQUEST_HERMETIC`, or to add a `CUSTOM` rule.
+
+
 2.15
 ----
 

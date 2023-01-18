@@ -546,7 +546,7 @@ pub struct Process {
   /// execution.
   ///
   /// This is some technical debt we should clean up;
-  /// see https://github.com/pantsbuild/pants/issues/6416.
+  /// see <https://github.com/pantsbuild/pants/issues/6416>.
   ///
   pub jdk_home: Option<PathBuf>,
 

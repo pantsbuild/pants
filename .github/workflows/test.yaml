@@ -7,6 +7,107 @@ env:
   PANTS_CONFIG_FILES: +['pants.ci.toml']
   RUST_BACKTRACE: all
 jobs:
+  bootstrap_pants_linux_arm64:
+    env:
+      PANTS_REMOTE_CACHE_READ: 'false'
+      PANTS_REMOTE_CACHE_WRITE: 'false'
+    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only
+      != 'true')
+    name: Bootstrap Pants, test Rust (Linux-ARM64)
+    needs:
+    - classify_changes
+    runs-on:
+    - self-hosted
+    - Linux
+    - ARM64
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 10
+    - name: Tell Pants to use Python ${{ matrix.python-version }}
+      run: 'echo "PY=python${{ matrix.python-version }}" >> $GITHUB_ENV
+
+        echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version
+        }}.*'']" >> $GITHUB_ENV
+
+        '
+    - name: Cache Rust toolchain
+      uses: actions/cache@v3
+      with:
+        key: Linux-ARM64-rustup-${{ hashFiles('rust-toolchain') }}-v2
+        path: '~/.rustup/toolchains/1.66.1-*
+
+          ~/.rustup/update-hashes
+
+          ~/.rustup/settings.toml
+
+          '
+    - name: Cache Cargo
+      uses: benjyw/rust-cache@461b9f8eee66b575bce78977bf649b8b7a8d53f1
+      with:
+        cache-bin: 'false'
+        shared-key: engine
+        workspaces: src/rust/engine
+    - id: get-engine-hash
+      name: Get native engine hash
+      run: echo "hash=$(./build-support/bin/rust/print_engine_hash.sh)" >> $GITHUB_OUTPUT
+      shell: bash
+    - name: Cache native engine
+      uses: actions/cache@v3
+      with:
+        key: Linux-ARM64-engine-${{ steps.get-engine-hash.outputs.hash }}-v1
+        path: '.pants
+
+          src/python/pants/engine/internals/native_engine.so
+
+          src/python/pants/engine/internals/native_engine.so.metadata'
+    - if: github.event_name != 'pull_request'
+      name: Setup toolchain auth
+      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
+
+        '
+    - name: Bootstrap Pants
+      run: ./pants version > ${{ runner.temp }}/_pants_version.stdout && [[ -s ${{
+        runner.temp }}/_pants_version.stdout ]]
+    - name: Run smoke tests
+      run: './pants list ::
+
+        ./pants roots
+
+        ./pants help goals
+
+        ./pants help targets
+
+        ./pants help subsystems
+
+        '
+    - continue-on-error: true
+      if: always()
+      name: Upload pants.log
+      uses: actions/upload-artifact@v3
+      with:
+        name: pants-log-bootstrap-Linux-ARM64
+        path: .pants.d/pants.log
+    - name: Upload native binaries
+      uses: actions/upload-artifact@v3
+      with:
+        name: native_binaries.${{ matrix.python-version }}.Linux-ARM64
+        path: '.pants
+
+          src/python/pants/engine/internals/native_engine.so
+
+          src/python/pants/engine/internals/native_engine.so.metadata'
+    - env:
+        TMPDIR: ${{ runner.temp }}
+      if: needs.classify_changes.outputs.rust == 'true'
+      name: Test Rust
+      run: ./cargo test --tests -- --nocapture
+    strategy:
+      matrix:
+        python-version:
+        - '3.7'
+    timeout-minutes: 60
   bootstrap_pants_linux_x86_64:
     env:
       PANTS_REMOTE_CACHE_READ: 'false'
@@ -38,7 +139,7 @@ jobs:
       uses: actions/cache@v3
       with:
         key: Linux-x86_64-rustup-${{ hashFiles('rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.65.0-*
+        path: '~/.rustup/toolchains/1.66.1-*
 
           ~/.rustup/update-hashes
 
@@ -104,7 +205,9 @@ jobs:
       run: './pants run build-support/bin/generate_github_workflows.py -- --check
 
         '
-    - if: needs.classify_changes.outputs.rust == 'true'
+    - env:
+        TMPDIR: ${{ runner.temp }}
+      if: needs.classify_changes.outputs.rust == 'true'
       name: Test and lint Rust
       run: 'sudo apt-get install -y pkg-config fuse libfuse-dev
 
@@ -114,12 +217,14 @@ jobs:
 
         ./cargo check --benches
 
+        ./cargo doc
+
         '
     strategy:
       matrix:
         python-version:
         - '3.7'
-    timeout-minutes: 40
+    timeout-minutes: 60
   bootstrap_pants_macos11_x86_64:
     env:
       PANTS_REMOTE_CACHE_READ: 'false'
@@ -151,7 +256,7 @@ jobs:
       uses: actions/cache@v3
       with:
         key: macOS11-x86_64-rustup-${{ hashFiles('rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.65.0-*
+        path: '~/.rustup/toolchains/1.66.1-*
 
           ~/.rustup/update-hashes
 
@@ -223,8 +328,78 @@ jobs:
         python-version:
         - '3.7'
     timeout-minutes: 60
+  build_wheels_linux_arm64:
+    container:
+      image: registry.hub.docker.com/pantsbuild/wheel_build_aarch64:v2-2e4d40b8b5
+      options: --user 1000:1000
+    env:
+      PANTS_REMOTE_CACHE_READ: 'false'
+      PANTS_REMOTE_CACHE_WRITE: 'false'
+    if: ((github.repository_owner == 'pantsbuild') && (github.event_name == 'push'
+      || needs.classify_changes.outputs.release == 'true')) && (needs.classify_changes.outputs.docs_only
+      != 'true')
+    name: Build wheels (Linux-ARM64)
+    needs:
+    - classify_changes
+    runs-on:
+    - self-hosted
+    - Linux
+    - ARM64
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 10
+    - name: Configure Git
+      run: git config --global safe.directory "$GITHUB_WORKSPACE"
+    - name: Install rustup
+      run: 'curl --proto ''=https'' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s --
+        -v -y --default-toolchain none
+
+        echo "${HOME}/.cargo/bin" >> $GITHUB_PATH
+
+        '
+    - name: Expose Pythons
+      run: 'echo "/opt/python/cp37-cp37m/bin" >> $GITHUB_PATH
+
+        echo "/opt/python/cp38-cp38/bin" >> $GITHUB_PATH
+
+        echo "/opt/python/cp39-cp39/bin" >> $GITHUB_PATH
+
+        '
+    - if: github.event_name != 'pull_request'
+      name: Setup toolchain auth
+      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
+
+        '
+    - env:
+        PANTS_CONFIG_FILES: +['pants.ci.toml','pants.ci.aarch64.toml']
+      name: Build wheels
+      run: 'USE_PY39=true ./build-support/bin/release.sh build-local-pex
+
+
+        USE_PY39=true ./build-support/bin/release.sh build-wheels
+
+        ./build-support/bin/release.sh build-wheels
+
+        USE_PY38=true ./build-support/bin/release.sh build-wheels'
+    - continue-on-error: true
+      if: always()
+      name: Upload pants.log
+      uses: actions/upload-artifact@v3
+      with:
+        name: pants-log-wheels-Linux-ARM64
+        path: .pants.d/pants.log
+    - env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      if: github.event_name == 'push'
+      name: Deploy to S3
+      run: ./build-support/bin/deploy_to_s3.py
+    timeout-minutes: 90
   build_wheels_linux_x86_64:
-    container: quay.io/pypa/manylinux2014_x86_64:latest
+    container:
+      image: quay.io/pypa/manylinux2014_x86_64:latest
     env:
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
@@ -247,29 +422,36 @@ jobs:
       run: 'curl --proto ''=https'' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s --
         -v -y --default-toolchain none
 
-        echo "PATH=${PATH}:${HOME}/.cargo/bin" >> $GITHUB_ENV
+        echo "${HOME}/.cargo/bin" >> $GITHUB_PATH
 
         '
     - name: Expose Pythons
-      run: echo "PATH=${PATH}:/opt/python/cp37-cp37m/bin:/opt/python/cp38-cp38/bin:/opt/python/cp39-cp39/bin"
-        >> $GITHUB_ENV
+      run: 'echo "/opt/python/cp37-cp37m/bin" >> $GITHUB_PATH
+
+        echo "/opt/python/cp38-cp38/bin" >> $GITHUB_PATH
+
+        echo "/opt/python/cp39-cp39/bin" >> $GITHUB_PATH
+
+        '
     - if: github.event_name != 'pull_request'
       name: Setup toolchain auth
       run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
 
         '
+    - name: Install Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: 1.17.1
     - env: {}
       name: Build wheels
-      run: '[[ "${GITHUB_EVENT_NAME}" == "pull_request" ]] && export MODE=debug
+      run: 'USE_PY39=true ./build-support/bin/release.sh build-local-pex
 
-        USE_PY39=true ./build-support/bin/release.sh build-local-pex
 
+        USE_PY39=true ./build-support/bin/release.sh build-wheels
 
         ./build-support/bin/release.sh build-wheels
 
-        USE_PY38=true ./build-support/bin/release.sh build-wheels
-
-        USE_PY39=true ./build-support/bin/release.sh build-wheels'
+        USE_PY38=true ./build-support/bin/release.sh build-wheels'
     - continue-on-error: true
       if: always()
       name: Upload pants.log
@@ -295,6 +477,7 @@ jobs:
     needs:
     - classify_changes
     runs-on:
+    - self-hosted
     - macOS-10.15-X64
     steps:
     - name: Check out code
@@ -305,7 +488,7 @@ jobs:
       uses: actions/cache@v3
       with:
         key: macOS10-15-x86_64-rustup-${{ hashFiles('rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.65.0-*
+        path: '~/.rustup/toolchains/1.66.1-*
 
           ~/.rustup/update-hashes
 
@@ -323,19 +506,21 @@ jobs:
       run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
 
         '
+    - name: Install Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: 1.17.1
     - env:
         ARCHFLAGS: -arch x86_64
       name: Build wheels
-      run: '[[ "${GITHUB_EVENT_NAME}" == "pull_request" ]] && export MODE=debug
+      run: 'USE_PY39=true ./build-support/bin/release.sh build-local-pex
 
-        USE_PY39=true ./build-support/bin/release.sh build-local-pex
 
+        USE_PY39=true ./build-support/bin/release.sh build-wheels
 
         ./build-support/bin/release.sh build-wheels
 
-        USE_PY38=true ./build-support/bin/release.sh build-wheels
-
-        USE_PY39=true ./build-support/bin/release.sh build-wheels'
+        USE_PY38=true ./build-support/bin/release.sh build-wheels'
     - continue-on-error: true
       if: always()
       name: Upload pants.log
@@ -361,6 +546,7 @@ jobs:
     needs:
     - classify_changes
     runs-on:
+    - self-hosted
     - macOS-11-ARM64
     steps:
     - name: Check out code
@@ -371,7 +557,7 @@ jobs:
       uses: actions/cache@v3
       with:
         key: macOS11-ARM64-rustup-${{ hashFiles('rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.65.0-*
+        path: '~/.rustup/toolchains/1.66.1-*
 
           ~/.rustup/update-hashes
 
@@ -389,12 +575,14 @@ jobs:
       run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
 
         '
+    - name: Install Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: 1.17.1
     - env:
         ARCHFLAGS: -arch arm64
       name: Build wheels
-      run: '[[ "${GITHUB_EVENT_NAME}" == "pull_request" ]] && export MODE=debug
-
-        USE_PY39=true ./build-support/bin/release.sh build-local-pex
+      run: 'USE_PY39=true ./build-support/bin/release.sh build-local-pex
 
 
         USE_PY39=true ./build-support/bin/release.sh build-wheels'
@@ -404,74 +592,6 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: pants-log-wheels-macOS11-ARM64
-        path: .pants.d/pants.log
-    - env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      if: github.event_name == 'push'
-      name: Deploy to S3
-      run: ./build-support/bin/deploy_to_s3.py
-    timeout-minutes: 90
-  build_wheels_macos11_x86_64:
-    env:
-      PANTS_REMOTE_CACHE_READ: 'false'
-      PANTS_REMOTE_CACHE_WRITE: 'false'
-    if: ((github.repository_owner == 'pantsbuild') && (github.event_name == 'push'
-      || needs.classify_changes.outputs.release == 'true')) && (needs.classify_changes.outputs.docs_only
-      != 'true')
-    name: Build wheels (macOS11-x86_64)
-    needs:
-    - classify_changes
-    runs-on:
-    - macos-11
-    steps:
-    - name: Check out code
-      uses: actions/checkout@v3
-      with:
-        fetch-depth: 10
-    - name: Expose Pythons
-      uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
-    - name: Cache Rust toolchain
-      uses: actions/cache@v3
-      with:
-        key: macOS11-x86_64-rustup-${{ hashFiles('rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.65.0-*
-
-          ~/.rustup/update-hashes
-
-          ~/.rustup/settings.toml
-
-          '
-    - name: Cache Cargo
-      uses: benjyw/rust-cache@461b9f8eee66b575bce78977bf649b8b7a8d53f1
-      with:
-        cache-bin: 'false'
-        shared-key: engine
-        workspaces: src/rust/engine
-    - if: github.event_name != 'pull_request'
-      name: Setup toolchain auth
-      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
-
-        '
-    - env:
-        ARCHFLAGS: -arch x86_64
-      name: Build wheels
-      run: '[[ "${GITHUB_EVENT_NAME}" == "pull_request" ]] && export MODE=debug
-
-        USE_PY39=true ./build-support/bin/release.sh build-local-pex
-
-
-        ./build-support/bin/release.sh build-wheels
-
-        USE_PY38=true ./build-support/bin/release.sh build-wheels
-
-        USE_PY39=true ./build-support/bin/release.sh build-wheels'
-    - continue-on-error: true
-      if: always()
-      name: Upload pants.log
-      uses: actions/upload-artifact@v3
-      with:
-        name: pants-log-wheels-macOS11-x86_64
         path: .pants.d/pants.log
     - env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -512,7 +632,7 @@ jobs:
     - name: Check out code
       uses: actions/checkout@v3
       with:
-        fetch-depth: 10
+        fetch-depth: 2
     - id: files
       name: Get changed files
       uses: tj-actions/changed-files@v32
@@ -593,15 +713,17 @@ jobs:
     needs:
     - classify_changes
     - check_labels
+    - bootstrap_pants_linux_arm64
     - bootstrap_pants_linux_x86_64
     - bootstrap_pants_macos11_x86_64
+    - build_wheels_linux_arm64
     - build_wheels_linux_x86_64
     - build_wheels_macos10_15_x86_64
     - build_wheels_macos11_arm64
-    - build_wheels_macos11_x86_64
     - check_labels
     - classify_changes
     - lint_python
+    - test_python_linux_arm64
     - test_python_linux_x86_64_0
     - test_python_linux_x86_64_1
     - test_python_linux_x86_64_2
@@ -613,7 +735,63 @@ jobs:
     steps:
     - id: set_merge_ok
       run: echo 'merge_ok=true' >> ${GITHUB_OUTPUT}
+  test_python_linux_arm64:
+    env:
+      PANTS_CONFIG_FILES: +['pants.ci.toml','pants.ci.aarch64.toml']
+    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only
+      != 'true')
+    name: Test Python (Linux-ARM64)
+    needs:
+    - bootstrap_pants_linux_arm64
+    - classify_changes
+    runs-on:
+    - self-hosted
+    - Linux
+    - ARM64
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 10
+    - name: Install AdoptJDK
+      uses: actions/setup-java@v3
+      with:
+        distribution: adopt
+        java-version: '11'
+    - name: Tell Pants to use Python ${{ matrix.python-version }}
+      run: 'echo "PY=python${{ matrix.python-version }}" >> $GITHUB_ENV
+
+        echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version
+        }}.*'']" >> $GITHUB_ENV
+
+        '
+    - name: Download native binaries
+      uses: actions/download-artifact@v3
+      with:
+        name: native_binaries.${{ matrix.python-version }}.Linux-ARM64
+    - if: github.event_name != 'pull_request'
+      name: Setup toolchain auth
+      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
+
+        '
+    - name: Run Python tests
+      run: './pants --tag=+platform_specific_behavior test :: -- -m platform_specific_behavior
+
+        '
+    - continue-on-error: true
+      if: always()
+      name: Upload pants.log
+      uses: actions/upload-artifact@v3
+      with:
+        name: pants-log-python-test-Linux-ARM64
+        path: .pants.d/pants.log
+    strategy:
+      matrix:
+        python-version:
+        - '3.7'
+    timeout-minutes: 90
   test_python_linux_x86_64_0:
+    env: {}
     if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only
       != 'true')
     name: Test Python (Linux-x86_64) Shard 0/3
@@ -638,14 +816,14 @@ jobs:
         go-version: 1.17.1
     - if: runner.os == 'Linux'
       name: Download Apache `thrift` binary (Linux)
-      run: 'mkdir -p "$HOME/.thrift"
+      run: 'mkdir -p "${HOME}/.thrift"
 
         curl --fail -L https://binaries.pantsbuild.org/bin/thrift/linux/x86_64/0.15.0/thrift
-        -o "$HOME/.thrift/thrift"
+        -o "${HOME}/.thrift/thrift"
 
-        chmod +x "$HOME/.thrift/thrift"
+        chmod +x "${HOME}/.thrift/thrift"
 
-        echo "PATH=${PATH}:${HOME}/.thrift" >> $GITHUB_ENV
+        echo "${HOME}/.thrift" >> $GITHUB_PATH
 
         '
     - name: Set up Python ${{ matrix.python-version }}
@@ -687,6 +865,7 @@ jobs:
         - '3.7'
     timeout-minutes: 90
   test_python_linux_x86_64_1:
+    env: {}
     if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only
       != 'true')
     name: Test Python (Linux-x86_64) Shard 1/3
@@ -711,14 +890,14 @@ jobs:
         go-version: 1.17.1
     - if: runner.os == 'Linux'
       name: Download Apache `thrift` binary (Linux)
-      run: 'mkdir -p "$HOME/.thrift"
+      run: 'mkdir -p "${HOME}/.thrift"
 
         curl --fail -L https://binaries.pantsbuild.org/bin/thrift/linux/x86_64/0.15.0/thrift
-        -o "$HOME/.thrift/thrift"
+        -o "${HOME}/.thrift/thrift"
 
-        chmod +x "$HOME/.thrift/thrift"
+        chmod +x "${HOME}/.thrift/thrift"
 
-        echo "PATH=${PATH}:${HOME}/.thrift" >> $GITHUB_ENV
+        echo "${HOME}/.thrift" >> $GITHUB_PATH
 
         '
     - name: Set up Python ${{ matrix.python-version }}
@@ -760,6 +939,7 @@ jobs:
         - '3.7'
     timeout-minutes: 90
   test_python_linux_x86_64_2:
+    env: {}
     if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only
       != 'true')
     name: Test Python (Linux-x86_64) Shard 2/3
@@ -784,14 +964,14 @@ jobs:
         go-version: 1.17.1
     - if: runner.os == 'Linux'
       name: Download Apache `thrift` binary (Linux)
-      run: 'mkdir -p "$HOME/.thrift"
+      run: 'mkdir -p "${HOME}/.thrift"
 
         curl --fail -L https://binaries.pantsbuild.org/bin/thrift/linux/x86_64/0.15.0/thrift
-        -o "$HOME/.thrift/thrift"
+        -o "${HOME}/.thrift/thrift"
 
-        chmod +x "$HOME/.thrift/thrift"
+        chmod +x "${HOME}/.thrift/thrift"
 
-        echo "PATH=${PATH}:${HOME}/.thrift" >> $GITHUB_ENV
+        echo "${HOME}/.thrift" >> $GITHUB_PATH
 
         '
     - name: Set up Python ${{ matrix.python-version }}
@@ -876,7 +1056,9 @@ jobs:
 
         '
     - name: Run Python tests
-      run: './pants --tag=+platform_specific_behavior test :: -- -m platform_specific_behavior'
+      run: './pants --tag=+platform_specific_behavior test :: -- -m platform_specific_behavior
+
+        '
     - continue-on-error: true
       if: always()
       name: Upload pants.log
@@ -888,7 +1070,7 @@ jobs:
       matrix:
         python-version:
         - '3.7'
-    timeout-minutes: 60
+    timeout-minutes: 90
 name: Pull Request CI
 'on':
   pull_request: {}

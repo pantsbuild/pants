@@ -110,12 +110,22 @@ def test_warn_files_targets(rule_runner: RuleRunner, caplog) -> None:
 def test_layout(rule_runner: RuleRunner, layout: PexLayout) -> None:
     rule_runner.write_files(
         {
-            "src/py/project/app.py": "print('hello')",
+            "src/py/project/app.py": dedent(
+                """\
+                import os
+                import sys
+                print(f"FOO={os.environ.get('FOO')}")
+                print(f"BAR={os.environ.get('BAR')}")
+                print(f"ARGV={sys.argv[1:]}")
+                """
+            ),
             "src/py/project/BUILD": dedent(
                 f"""\
                 python_sources(name="lib")
                 pex_binary(
                     entry_point="app.py",
+                    args=['123', 'abc'],
+                    env={{'FOO': 'xxx', 'BAR': 'yyy'}},
                     layout="{layout.value}",
                 )
                 """
@@ -136,7 +146,14 @@ def test_layout(rule_runner: RuleRunner, layout: PexLayout) -> None:
         if PexLayout.ZIPAPP is layout
         else os.path.join(expected_pex_relpath, "__main__.py"),
     )
-    assert b"hello\n" == subprocess.run([executable], check=True, stdout=subprocess.PIPE).stdout
+    stdout = dedent(
+        """\
+        FOO=xxx
+        BAR=yyy
+        ARGV=['123', 'abc']
+        """
+    ).encode()
+    assert stdout == subprocess.run([executable], check=True, stdout=subprocess.PIPE).stdout
 
 
 @pytest.fixture

@@ -32,8 +32,10 @@ from pants.jvm.target_types import (
     JunitTestSourceField,
     JunitTestTimeoutField,
     JvmJdkField,
+    JvmMainClassNameField,
     JvmProvidesTypesField,
     JvmResolveField,
+    JvmRunnableSourceFieldSet,
 )
 from pants.util.strutil import softwrap
 
@@ -82,7 +84,7 @@ class ScalaConsumedPluginNamesField(StringSequenceField):
 
 
 @dataclass(frozen=True)
-class ScalaFieldSet(FieldSet):
+class ScalaFieldSet(JvmRunnableSourceFieldSet):
     required_fields = (ScalaSourceField,)
 
     sources: ScalaSourceField
@@ -258,6 +260,7 @@ class ScalaSourceTarget(Target):
         JvmResolveField,
         JvmProvidesTypesField,
         JvmJdkField,
+        JvmMainClassNameField,
     )
     help = "A single Scala source file containing application or library code."
 
@@ -305,6 +308,7 @@ class ScalaSourcesGeneratorTarget(TargetFilesGenerator):
         ScalaConsumedPluginNamesField,
         JvmResolveField,
         JvmJdkField,
+        JvmMainClassNameField,
         JvmProvidesTypesField,
     )
     settings_request_cls = ScalaSettingsRequest
@@ -359,5 +363,6 @@ def rules():
     return (
         *collect_rules(),
         *jvm_target_types.rules(),
+        *ScalaFieldSet.jvm_rules(),
         UnionRule(TargetFilesGeneratorSettingsRequest, ScalaSettingsRequest),
     )

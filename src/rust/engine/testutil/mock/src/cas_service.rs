@@ -196,7 +196,7 @@ impl StubCASResponder {
     match maybe_bytes {
       Some(bytes) => Ok(
         bytes
-          .chunks(self.chunk_size_bytes as usize)
+          .chunks(self.chunk_size_bytes)
           .map(|b| ReadResponse {
             data: bytes.slice_ref(b),
           })
@@ -506,6 +506,7 @@ impl ContentAddressableStorage for StubCASResponder {
           message: status.message().to_string(),
           ..protos::gen::google::rpc::Status::default()
         }),
+        compressor: remexec::compressor::Value::Identity as i32,
       });
     }
 
@@ -533,7 +534,7 @@ impl Capabilities for StubCASResponder {
 
     let response = ServerCapabilities {
       cache_capabilities: Some(CacheCapabilities {
-        digest_function: vec![remexec::digest_function::Value::Sha256 as i32],
+        digest_functions: vec![remexec::digest_function::Value::Sha256 as i32],
         max_batch_total_size_bytes: 0,
         ..CacheCapabilities::default()
       }),

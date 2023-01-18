@@ -497,7 +497,7 @@ impl Capabilities for MockResponder {
   ) -> Result<Response<ServerCapabilities>, Status> {
     let response = ServerCapabilities {
       cache_capabilities: Some(CacheCapabilities {
-        digest_function: vec![remexec::digest_function::Value::Sha256 as i32],
+        digest_functions: vec![remexec::digest_function::Value::Sha256 as i32],
         max_batch_total_size_bytes: 0,
         ..CacheCapabilities::default()
       }),

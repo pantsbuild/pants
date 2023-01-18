@@ -18,6 +18,7 @@ from pants.core.goals.package import (
     PackageFieldSet,
 )
 from pants.core.util_rules.archive import ArchiveFormat, CreateArchive
+from pants.core.util_rules.archive import rules as archive_rules
 from pants.engine.addresses import Address, UnparsedAddressInputs
 from pants.engine.fs import (
     AddPrefix,
@@ -896,6 +897,7 @@ class LockfilesGeneratorTarget(TargetFilesGenerator):
 def rules():
     return (
         *collect_rules(),
+        *archive_rules(),
         UnionRule(GenerateSourcesRequest, GenerateResourceSourceRequest),
         UnionRule(GenerateSourcesRequest, GenerateFileSourceRequest),
         UnionRule(GenerateSourcesRequest, RelocateFilesViaCodegenRequest),

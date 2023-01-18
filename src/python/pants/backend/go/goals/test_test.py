@@ -11,7 +11,7 @@ from pants.backend.go import target_type_rules
 from pants.backend.go.goals.test import GoTestFieldSet, GoTestRequest
 from pants.backend.go.goals.test import rules as test_rules
 from pants.backend.go.goals.test import transform_test_args
-from pants.backend.go.target_types import GoModTarget, GoPackageTarget
+from pants.backend.go.target_types import GoModTarget, GoPackageTarget, GoSdkTarget
 from pants.backend.go.util_rules import (
     assembly,
     build_pkg,
@@ -52,7 +52,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(TestResult, [GoTestRequest.Batch]),
             QueryRule(ProcessResult, [GoSdkProcess]),
         ],
-        target_types=[GoModTarget, GoPackageTarget, FileTarget],
+        target_types=[GoModTarget, GoPackageTarget, GoSdkTarget, FileTarget],
     )
     rule_runner.set_options(["--go-test-args=-v -bench=."], env_inherit={"PATH"})
     return rule_runner
@@ -761,3 +761,59 @@ def test_file_dependencies(rule_runner: RuleRunner) -> None:
         TestResult, [GoTestRequest.Batch("", (GoTestFieldSet.create(tgt),), None)]
     )
     assert result.exit_code == 0
+
+
+def test_profile_options_write_results(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "foo/BUILD": "go_mod(name='mod')\ngo_package()",
+            "foo/go.mod": "module foo",
+            "foo/add.go": textwrap.dedent(
+                """
+                package foo
+                func add(x, y int) int {
+                  return x + y
+                }
+                """
+            ),
+            "foo/add_test.go": textwrap.dedent(
+                """
+                package foo
+                import "testing"
+                func TestAdd(t *testing.T) {
+                  if add(2, 3) != 5 {
+                    t.Fail()
+                  }
+                }
+                """
+            ),
+        }
+    )
+    rule_runner.set_options(
+        [
+            "--go-test-args=-v -bench=.",
+            "--go-test-block-profile",
+            "--go-test-cpu-profile",
+            "--go-test-mem-profile",
+            "--go-test-mutex-profile",
+            "--go-test-trace",
+        ],
+        env_inherit={"PATH"},
+    )
+    tgt = rule_runner.get_target(Address("foo"))
+    result = rule_runner.request(
+        TestResult, [GoTestRequest.Batch("", (GoTestFieldSet.create(tgt),), None)]
+    )
+    assert result.exit_code == 0
+    assert "PASS: TestAdd" in result.stdout
+
+    extra_output = result.extra_output
+    assert extra_output is not None
+    assert sorted(extra_output.files) == [
+        "block.out",
+        "cpu.out",
+        "mem.out",
+        "mutex.out",
+        "test_runner",
+        "trace.out",
+    ]

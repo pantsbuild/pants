@@ -35,7 +35,7 @@ use tokio::sync::watch;
 /// waiting for it.
 ///
 /// Should be roughly equivalent to Java's CountDownLatch with a count of 1, or Python's Event
-/// type (https://docs.python.org/2/library/threading.html#event-objects) without the ability to
+/// type (<https://docs.python.org/2/library/threading.html#event-objects>) without the ability to
 /// "clear" the condition once it has been triggered.
 ///
 #[derive(Clone)]

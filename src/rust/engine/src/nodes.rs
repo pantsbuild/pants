@@ -17,7 +17,7 @@ use futures::future::{self, BoxFuture, FutureExt, TryFutureExt};
 use grpc_util::prost::MessageExt;
 use internment::Intern;
 use protos::gen::pants::cache::{CacheKey, CacheKeyType, ObservedUrl};
-use pyo3::prelude::{Py, PyAny, Python};
+use pyo3::prelude::{Py, PyAny, PyErr, Python};
 use pyo3::IntoPy;
 use url::Url;
 
@@ -969,6 +969,7 @@ impl DownloadedFile {
     &self,
     core: Arc<Core>,
     url: Url,
+    auth_headers: BTreeMap<String, String>,
     digest: hashing::Digest,
   ) -> Result<store::Snapshot, String> {
     let file_name = url
@@ -986,6 +987,7 @@ impl DownloadedFile {
     // See if we have observed this URL and Digest before: if so, see whether we already have the
     // Digest fetched. The extra layer of indirection through the PersistentCache is to sanity
     // check that a Digest has ever been observed at the given URL.
+    // NB: The auth_headers are not part of the key.
     let url_key = Self::url_key(&url, digest);
     let have_observed_url = core.local_cache.load(&url_key).await?.is_some();
 
@@ -999,7 +1001,7 @@ impl DownloadedFile {
         .is_ok());
 
     if !usable_in_store {
-      downloads::download(core.clone(), url, file_name, digest).await?;
+      downloads::download(core.clone(), url, auth_headers, file_name, digest).await?;
       // The value was successfully fetched and matched the digest: record in the ObservedUrls
       // cache.
       core.local_cache.store(&url_key, Bytes::from("")).await?;
@@ -1008,19 +1010,21 @@ impl DownloadedFile {
   }
 
   async fn run_node(self, context: Context) -> NodeResult<store::Snapshot> {
-    let (url_str, expected_digest) = Python::with_gil(|py| {
+    let (url_str, expected_digest, auth_headers) = Python::with_gil(|py| {
       let py_download_file_val = self.0.to_value();
       let py_download_file = (*py_download_file_val).as_ref(py);
       let url_str: String = externs::getattr(py_download_file, "url").unwrap();
+      let auth_headers = externs::getattr_from_str_frozendict(py_download_file, "auth_headers");
       let py_file_digest: PyFileDigest =
         externs::getattr(py_download_file, "expected_digest").unwrap();
-      let res: NodeResult<(String, Digest)> = Ok((url_str, py_file_digest.0));
+      let res: NodeResult<(String, Digest, BTreeMap<String, String>)> =
+        Ok((url_str, py_file_digest.0, auth_headers));
       res
     })?;
     let url = Url::parse(&url_str)
       .map_err(|err| throw(format!("Error parsing URL {}: {}", url_str, err)))?;
     self
-      .load_or_download(context.core, url, expected_digest)
+      .load_or_download(context.core, url, auth_headers, expected_digest)
       .await
       .map_err(throw)
   }
@@ -1127,7 +1131,7 @@ impl Task {
 
   ///
   /// Given a python generator Value, loop to request the generator's dependencies until
-  /// it completes with a result Value.
+  /// it completes with a result Value or fails with an error.
   ///
   async fn generate(
     context: &Context,
@@ -1137,22 +1141,40 @@ impl Task {
     generator: Value,
   ) -> NodeResult<(Value, TypeId)> {
     let mut input: Option<Value> = None;
+    let mut err: Option<PyErr> = None;
     loop {
       let context = context.clone();
       let params = params.clone();
-      let response = Python::with_gil(|py| {
-        let input = input.unwrap_or_else(|| Value::from(py.None()));
-        externs::generator_send(py, &generator, &input)
-      })?;
+      let response = Python::with_gil(|py| externs::generator_send(py, &generator, input, err))?;
       match response {
         externs::GeneratorResponse::Get(get) => {
-          let values = Self::gen_get(&context, workunit, &params, entry, vec![get]).await?;
-          input = Some(values.into_iter().next().unwrap());
+          let result = Self::gen_get(&context, workunit, &params, entry, vec![get]).await;
+          match result {
+            Ok(values) => {
+              input = Some(values.into_iter().next().unwrap());
+              err = None;
+            }
+            Err(throw @ Failure::Throw { .. }) => {
+              input = None;
+              err = Some(PyErr::from(throw));
+            }
+            Err(failure) => break Err(failure),
+          }
         }
         externs::GeneratorResponse::GetMulti(gets) => {
-          let values = Self::gen_get(&context, workunit, &params, entry, gets).await?;
-          let gil = Python::acquire_gil();
-          input = Some(externs::store_tuple(gil.python(), values));
+          let result = Self::gen_get(&context, workunit, &params, entry, gets).await;
+          match result {
+            Ok(values) => {
+              let gil = Python::acquire_gil();
+              input = Some(externs::store_tuple(gil.python(), values));
+              err = None;
+            }
+            Err(throw @ Failure::Throw { .. }) => {
+              input = None;
+              err = Some(PyErr::from(throw));
+            }
+            Err(failure) => break Err(failure),
+          }
         }
         externs::GeneratorResponse::Break(val, type_id) => {
           break Ok((val, type_id));
@@ -1197,7 +1219,7 @@ impl Task {
               let val = Value::new(res.into_py(py));
               (val, type_id)
             })
-            .map_err(Failure::from_py_err)
+            .map_err(Failure::from)
         })
       })
       .await?;
@@ -1214,10 +1236,13 @@ impl Task {
     }
 
     if result_type != self.task.product {
-      return Err(throw(format!(
-        "{:?} returned a result value that did not satisfy its constraints: {:?}",
-        self.task.func, result_val
-      )));
+      return Err(
+        externs::IncorrectProductError::new_err(format!(
+          "{:?} returned a result value that did not satisfy its constraints: {:?}",
+          self.task.func, result_val
+        ))
+        .into(),
+      );
     }
 
     if self.task.engine_aware_return_type {

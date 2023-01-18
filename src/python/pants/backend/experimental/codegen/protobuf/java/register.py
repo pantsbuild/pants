@@ -1,6 +1,5 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-from pants.backend.codegen import export_codegen_goal
 from pants.backend.codegen.protobuf import protobuf_dependency_inference
 from pants.backend.codegen.protobuf import tailor as protobuf_tailor
 from pants.backend.codegen.protobuf import target_types as protobuf_target_types
@@ -21,5 +20,4 @@ def rules():
         *protobuf_target_types.rules(),
         *protobuf_dependency_inference.rules(),
         *protobuf_tailor.rules(),
-        *export_codegen_goal.rules(),
     ]

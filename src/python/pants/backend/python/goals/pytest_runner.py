@@ -34,7 +34,6 @@ from pants.core.goals.test import (
     TestDebugAdapterRequest,
     TestDebugRequest,
     TestExtraEnv,
-    TestFieldSet,
     TestRequest,
     TestResult,
     TestSubsystem,
@@ -430,6 +429,8 @@ class PyTestRequest(TestRequest):
     tool_subsystem = PyTest
     field_set_type = PythonTestFieldSet
     partitioner_type = PartitionerType.CUSTOM
+    supports_debug = True
+    supports_debug_adapter = True
 
 
 @rule(desc="Partition Pytest", level=LogLevel.DEBUG)
@@ -595,7 +596,6 @@ def rules():
     return [
         *collect_rules(),
         *pytest.rules(),
-        UnionRule(TestFieldSet, PythonTestFieldSet),
         UnionRule(PytestPluginSetupRequest, RuntimePackagesPluginRequest),
         *PyTestRequest.rules(),
     ]

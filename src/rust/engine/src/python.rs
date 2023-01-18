@@ -9,7 +9,7 @@ use std::{fmt, hash};
 use deepsize::{known_deep_size, DeepSizeOf};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyType};
-use pyo3::{FromPyObject, ToPyObject};
+use pyo3::{FromPyObject, IntoPy, ToPyObject};
 use smallvec::SmallVec;
 
 use hashing::Digest;
@@ -377,6 +377,20 @@ impl From<PyObject> for Value {
   }
 }
 
+impl From<PyErr> for Value {
+  fn from(py_err: PyErr) -> Self {
+    let gil = Python::acquire_gil();
+    let py = gil.python();
+    Value::new(py_err.into_py(py))
+  }
+}
+
+impl IntoPy<PyErr> for &Value {
+  fn into_py(self, py: Python) -> PyErr {
+    PyErr::from_value((*self.0).as_ref(py))
+  }
+}
+
 ///
 /// A short required name, and optional human readable description for a single frame of a Failure.
 ///
@@ -436,25 +450,37 @@ impl Failure {
       }
     }
   }
-}
-
-impl Failure {
-  pub fn from_py_err(py_err: PyErr) -> Failure {
-    let gil = Python::acquire_gil();
-    let py = gil.python();
-    Failure::from_py_err_with_gil(py, py_err)
-  }
 
   pub fn from_py_err_with_gil(py: Python, py_err: PyErr) -> Failure {
     // If this is a wrapped Failure, return it immediately.
-    if let Ok(n_e_failure) = py_err.value(py).downcast::<externs::NativeEngineFailure>() {
-      let failure = n_e_failure
-        .getattr("failure")
-        .unwrap()
-        .extract::<externs::PyFailure>()
-        .unwrap();
-      return failure.0;
+    if let Some(failure) = Failure::from_wrapped_failure(py, &py_err) {
+      return failure;
     }
+
+    // Propagate the tracebacks from the causing error, if any.
+    let (previous_ptraceback, engine_traceback) = if let Some(cause) = py_err.cause(py) {
+      match Failure::from_wrapped_failure(py, &cause) {
+        Some(Failure::Throw {
+          val,
+          engine_traceback,
+          python_traceback,
+        }) => {
+          // Preserve tracebacks (both engine and python) from upstream error by using any existing
+          // engine traceback and restoring the original python exception cause.
+          py_err.set_cause(py, Some(PyErr::from_value((*val.0).as_ref(py))));
+          (
+            format!(
+              "{}\nDuring handling of the above exception, another exception occurred:\n\n",
+              python_traceback
+            ),
+            engine_traceback,
+          )
+        }
+        _ => ("".to_string(), Vec::new()),
+      }
+    } else {
+      ("".to_string(), Vec::new())
+    };
 
     let maybe_ptraceback = py_err
       .traceback(py)
@@ -480,8 +506,8 @@ impl Failure {
     };
     Failure::Throw {
       val,
-      python_traceback,
-      engine_traceback: Vec::new(),
+      python_traceback: previous_ptraceback + &python_traceback,
+      engine_traceback,
     }
   }
 
@@ -490,6 +516,22 @@ impl Failure {
       "Traceback (no traceback):\n  <pants native internals>\nException: {}",
       msg
     )
+  }
+}
+
+impl Failure {
+  fn from_wrapped_failure(py: Python, py_err: &PyErr) -> Option<Failure> {
+    match py_err.value(py).downcast::<externs::NativeEngineFailure>() {
+      Ok(n_e_failure) => {
+        let failure = n_e_failure
+          .getattr("failure")
+          .unwrap()
+          .extract::<externs::PyFailure>()
+          .unwrap();
+        Some(failure.0)
+      }
+      _ => None,
+    }
   }
 }
 
@@ -538,6 +580,14 @@ impl From<Failure> for PyErr {
 impl From<String> for Failure {
   fn from(err: String) -> Self {
     throw(err)
+  }
+}
+
+impl From<PyErr> for Failure {
+  fn from(py_err: PyErr) -> Self {
+    let gil = Python::acquire_gil();
+    let py = gil.python();
+    Failure::from_py_err_with_gil(py, py_err)
   }
 }
 

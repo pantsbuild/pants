@@ -241,6 +241,21 @@ junit_tests(
 )
 ```
 
+Protobuf
+--------
+
+There's support for [ScalaPB](https://scalapb.github.io/) and [protoc Java generated code](https://developers.google.com/protocol-buffers/docs/reference/java-generated), currently in beta stage. To enable them, activate the relevant backends in `pants.toml`:
+
+```toml
+[GLOBAL]
+backend_packages = [
+    "pants.backend.experimental.codegen.protobuf.scala",
+    "pants.backend.experimental.codegen.protobuf.java",
+]
+```
+
+This adds the new `protobuf_source` target, which you can confirm by running `./pants help protobuf_source`. 
+
 Lint and Format
 ---------------
 

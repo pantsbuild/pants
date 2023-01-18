@@ -234,7 +234,7 @@ impl Log for PantsLogger {
           Err(e) => {
             // If we've failed to write to stdio, but also to our log file, our only recourse is to
             // try to write to a different file.
-            debug_log!("fatal.log", "Failed to write to log file {:?}: {}", file, e);
+            fatal_log!("Failed to write to log file {:?}: {}", file, e);
           }
         }
       }

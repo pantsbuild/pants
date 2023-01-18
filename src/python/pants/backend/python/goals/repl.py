@@ -118,6 +118,7 @@ async def create_python_repl_request(
         **complete_pex_env.environment_dict(python_configured=requirements_pex.python is not None),
         "PEX_EXTRA_SYS_PATH": ":".join(chrooted_source_roots),
         "PEX_PATH": request.in_chroot(local_dists.pex.name),
+        "PEX_INTERPRETER_HISTORY": "1" if python_setup.repl_history else "0",
     }
 
     return ReplRequest(digest=merged_digest, args=args, extra_env=extra_env)

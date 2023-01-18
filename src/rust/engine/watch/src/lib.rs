@@ -37,7 +37,7 @@ use std::time::Duration;
 use crossbeam_channel::{self, Receiver, RecvTimeoutError, TryRecvError};
 use fs::GitignoreStyleExcludes;
 use log::{debug, trace, warn};
-use notify::event::{Flag, ModifyKind};
+use notify::event::{Flag, MetadataKind, ModifyKind};
 use notify::{Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use parking_lot::Mutex;
 use task_executor::Executor;
@@ -197,6 +197,18 @@ impl InvalidationWatcher {
     canonical_build_root: &Path,
     ev: Event,
   ) {
+    if matches!(ev.kind, EventKind::Modify(ModifyKind::Metadata(mk)) if mk != MetadataKind::Permissions)
+    {
+      // (Other than permissions, which include the executable bit) if only the metadata
+      // (AccessTime, WriteTime, Perms, Link Count, etc...) was changed, it doesn't change anything
+      // Pants particularly cares about.
+      //
+      // One could argue if the ownership changed Pants would care, but until the
+      // name/data changes (which would be a separate event) the substance of the file in Pants'
+      // eyes is the same.
+      return;
+    }
+
     let is_data_only_event = matches!(ev.kind, EventKind::Modify(ModifyKind::Data(_)));
     let flag = ev.flag();
 
@@ -299,13 +311,16 @@ impl InvalidationWatcher {
 
     let watcher = self.clone();
     executor
-      .spawn_blocking(move || {
-        let mut inner = watcher.0.lock();
-        inner
-          .watcher
-          .watch(&path, RecursiveMode::NonRecursive)
-          .map_err(|e| maybe_enrich_notify_error(&path, e))
-      })
+      .spawn_blocking(
+        move || {
+          let mut inner = watcher.0.lock();
+          inner
+            .watcher
+            .watch(&path, RecursiveMode::NonRecursive)
+            .map_err(|e| maybe_enrich_notify_error(&path, e))
+        },
+        |e| Err(format!("Watch attempt failed: {e}")),
+      )
       .await
   }
 }

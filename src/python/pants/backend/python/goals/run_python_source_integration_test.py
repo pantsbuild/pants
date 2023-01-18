@@ -37,6 +37,7 @@ from pants.core.goals.run import RunDebugAdapterRequest, RunRequest
 from pants.engine.process import InteractiveProcess
 from pants.engine.rules import QueryRule
 from pants.engine.target import Target
+from pants.testutil.debug_adapter_util import debugadapter_port_for_testing
 from pants.testutil.pants_integration_test import run_pants
 from pants.testutil.rule_runner import RuleRunner, mock_console
 
@@ -186,6 +187,7 @@ def test_run_sample_script(
         "--backend-packages=pants.backend.python",
         "--backend-packages=pants.backend.codegen.protobuf.python",
         "--source-root-patterns=['src_root1', 'src_root2']",
+        f"--debug-adapter-port={debugadapter_port_for_testing()}",
         *(
             (
                 "--python-default-run-goal-use-sandbox"

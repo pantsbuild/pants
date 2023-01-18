@@ -152,7 +152,7 @@ class TargetGlob:
             else ""
         )
         path = f"[{self.path}]" if self.path is not None else ""
-        return f"{self.type_ or ''}{tags}{path}" or "*"
+        return f"{self.type_ or ''}{tags}{path}" or "!*"
 
     @memoized_classmethod
     def create(  # type: ignore[misc]
@@ -242,6 +242,10 @@ class TargetGlob:
             return address.spec_path
 
     def match(self, address: Address, adaptor: TargetAdaptor, base: str) -> bool:
+        if not (self.type_ or self.path or self.tags):
+            # Nothing rules this target in.
+            return False
+
         # target type
         if self.type_ and not fnmatchcase(adaptor.type_alias, self.type_):
             return False
@@ -259,5 +263,6 @@ class TargetGlob:
                 any(fnmatchcase(str(tag), pattern) for tag in target_tags) for pattern in self.tags
             ):
                 return False
-        # Nothing rules this target out
+
+        # Nothing rules this target out.
         return True

@@ -132,7 +132,7 @@ This subclass mechanism is key to how the Target API behaves:
 Synthetic Targets API
 ---------------------
 
-Normally targets are declared in BUILD files to provide meta data about the project's sources and artifacts etc. Occassionally there may be instances of project meta data that is not served well by being declared explicitly in a BUILD file, for instance if the meta data itself is inferred from other sources of information. For these cases, there is a Target API for declaring synthetic targets, that is targets that are not declared in a BUILD file on disk but instead come from a Plugin's rule.
+Normally targets are declared in BUILD files to provide metadata about the project's sources and artifacts etc. Occassionally there may be instances of project metadata that is not served well by being declared explicitly in a BUILD file, for instance if the metadata itself is inferred from other sources of information. For these cases, there is a Target API for declaring synthetic targets, that is targets that are not declared in a BUILD file on disk but instead come from a Plugin's rule.
 
 ### Example
 

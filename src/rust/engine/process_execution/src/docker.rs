@@ -469,7 +469,7 @@ impl<'a> CapturedWorkdir for CommandRunner<'a> {
 
     let working_dir = req
       .working_directory
-      .map(|relpath| Path::new(&sandbox_path_in_container).join(&relpath))
+      .map(|relpath| Path::new(&sandbox_path_in_container).join(relpath))
       .unwrap_or_else(|| Path::new(&sandbox_path_in_container).to_path_buf())
       .into_os_string()
       .into_string()

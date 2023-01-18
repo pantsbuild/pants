@@ -6,7 +6,7 @@ from __future__ import annotations
 import dataclasses
 import logging
 from dataclasses import dataclass
-from typing import Iterable
+from typing import Iterable, Mapping
 
 from packaging.utils import canonicalize_name as canonicalize_project_name
 
@@ -50,6 +50,7 @@ from pants.engine.fs import Digest, DigestContents, GlobMatchErrorBehavior, Merg
 from pants.engine.rules import Get, MultiGet, collect_rules, rule, rule_helper
 from pants.engine.target import Target, TransitiveTargets, TransitiveTargetsRequest
 from pants.util.docutil import doc_url
+from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
 from pants.util.strutil import path_safe, softwrap
@@ -65,6 +66,8 @@ class PexFromTargetsRequest:
     internal_only: bool
     layout: PexLayout | None
     main: MainSpecification | None
+    inject_args: tuple[str, ...]
+    inject_env: FrozenDict[str, str]
     platforms: PexPlatforms
     complete_platforms: CompletePlatforms
     additional_args: tuple[str, ...]
@@ -87,6 +90,8 @@ class PexFromTargetsRequest:
         internal_only: bool,
         layout: PexLayout | None = None,
         main: MainSpecification | None = None,
+        inject_args: Iterable[str] = (),
+        inject_env: Mapping[str, str] = FrozenDict(),
         platforms: PexPlatforms = PexPlatforms(),
         complete_platforms: CompletePlatforms = CompletePlatforms(),
         additional_args: Iterable[str] = (),
@@ -112,6 +117,8 @@ class PexFromTargetsRequest:
         :param layout: The filesystem layout to create the PEX with.
         :param main: The main for the built Pex, equivalent to Pex's `-e` or `-c` flag. If
             left off, the Pex will open up as a REPL.
+        :param inject_args: Command line arguments to freeze in to the PEX.
+        :param inject_env: Environment variables to freeze in to the PEX.
         :param platforms: Which platforms should be supported. Setting this value will cause
             interpreter constraints to not be used because platforms already constrain the valid
             Python versions, e.g. by including `cp36m` in the platform string.
@@ -139,6 +146,8 @@ class PexFromTargetsRequest:
         self.internal_only = internal_only
         self.layout = layout
         self.main = main
+        self.inject_args = tuple(inject_args)
+        self.inject_env = FrozenDict(inject_env)
         self.platforms = platforms
         self.complete_platforms = complete_platforms
         self.additional_args = tuple(additional_args)
@@ -515,6 +524,8 @@ async def create_pex_from_targets(
         platforms=request.platforms,
         complete_platforms=request.complete_platforms,
         main=request.main,
+        inject_args=request.inject_args,
+        inject_env=request.inject_env,
         sources=merged_sources_digest,
         additional_inputs=additional_inputs,
         additional_args=additional_args,

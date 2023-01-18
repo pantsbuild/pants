@@ -49,7 +49,6 @@ def test_warns_on_remote_cache_errors() -> None:
                 "check",
                 "testprojects/src/jvm/org/pantsbuild/example/lib/ExampleLib.java",
             ],
-            use_pantsd=False,
         )
         pants_run.assert_success()
         return pants_run.stderr
@@ -78,7 +77,6 @@ def test_warns_on_remote_cache_errors() -> None:
             "--no-local-cache",
             "generate-lockfiles",
         ],
-        use_pantsd=False,
     )
     pants_run.assert_success()
 

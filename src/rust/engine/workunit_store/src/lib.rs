@@ -77,7 +77,7 @@ impl SpanId {
 
 impl std::fmt::Display for SpanId {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    write!(f, "{:016.x}", self.0)
+    write!(f, "{:016x}", self.0)
   }
 }
 

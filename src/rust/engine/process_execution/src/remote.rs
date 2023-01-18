@@ -90,7 +90,7 @@ pub enum ExecutionError {
 }
 
 /// Implementation of CommandRunner that runs a command via the Bazel Remote Execution API
-/// (https://docs.google.com/document/d/1AaGk7fOPByEvpAbqeXIyE8HX_A3_axxNnvroblTZ_6s/edit).
+/// (<https://docs.google.com/document/d/1AaGk7fOPByEvpAbqeXIyE8HX_A3_axxNnvroblTZ_6s/edit>).
 ///
 /// Results are streamed from the output stream of the Execute function (and possibly the
 /// WaitExecution function if `CommandRunner` needs to reconnect).
@@ -167,7 +167,7 @@ impl Drop for RunningOperation {
     if let Some(operation_name) = self.name.take() {
       debug!("Canceling remote operation {operation_name}");
       let mut operations_client = self.operations_client.as_ref().clone();
-      let _ = self.executor.spawn(async move {
+      let _ = self.executor.native_spawn(async move {
         operations_client
           .cancel_operation(CancelOperationRequest {
             name: operation_name,
@@ -1036,8 +1036,8 @@ fn maybe_add_workunit(
   metadata: WorkunitMetadata,
 ) {
   if !result_cached && workunit_store.max_level() >= level {
-    let start_time: SystemTime = SystemTime::UNIX_EPOCH + time_span.start.into();
-    let end_time: SystemTime = start_time + time_span.duration.into();
+    let start_time: SystemTime = SystemTime::UNIX_EPOCH + std::time::Duration::from(time_span.start);
+    let end_time: SystemTime = start_time + std::time::Duration::from(time_span.duration);
     workunit_store.add_completed_workunit(name, level, start_time, end_time, parent_id, metadata);
   }
 }
@@ -1470,7 +1470,7 @@ pub fn extract_output_files(
   // method.
   if treat_tree_digest_as_final_directory_hack {
     match &action_result.output_directories[..] {
-      &[ref directory] => {
+      [directory] => {
         match require_digest(directory.tree_digest.as_ref()) {
           Ok(digest) => {
             return future::ready::<Result<_, StoreError>>(Ok(

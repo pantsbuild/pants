@@ -28,6 +28,7 @@ from pants.backend.python.lint.black.subsystem import Black
 from pants.backend.python.lint.docformatter.subsystem import Docformatter
 from pants.backend.python.lint.flake8.subsystem import Flake8
 from pants.backend.python.lint.isort.subsystem import Isort
+from pants.backend.python.lint.pydocstyle.subsystem import Pydocstyle
 from pants.backend.python.lint.pylint.subsystem import Pylint
 from pants.backend.python.lint.pyupgrade.subsystem import PyUpgrade
 from pants.backend.python.lint.yapf.subsystem import Yapf
@@ -115,6 +116,7 @@ AllTools = (
     DefaultTool.python(Isort),
     DefaultTool.python(Lambdex, backend="pants.backend.awslambda.python"),
     DefaultTool.python(MyPy, source_plugins=True),
+    DefaultTool.python(Pydocstyle, backend="pants.backend.python.lint.pydocstyle"),
     DefaultTool.python(PyTest),
     DefaultTool.python(PyUpgrade, backend="pants.backend.experimental.python.lint.pyupgrade"),
     DefaultTool.python(Pylint, backend="pants.backend.python.lint.pylint", source_plugins=True),

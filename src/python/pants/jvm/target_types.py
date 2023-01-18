@@ -6,22 +6,22 @@ from __future__ import annotations
 import dataclasses
 from abc import ABC, ABCMeta, abstractmethod
 from dataclasses import dataclass
-from typing import ClassVar, Iterable, Optional, Tuple, Type
+from typing import ClassVar, Iterable, Optional, Tuple, Type, Union
 
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.core.goals.generate_lockfiles import UnrecognizedResolveNamesError
 from pants.core.goals.package import OutputPathField
-from pants.core.goals.run import RestartableField
+from pants.core.goals.run import RestartableField, RunFieldSet, RunInSandboxBehavior, RunRequest
 from pants.core.goals.test import TestExtraEnvVarsField, TestTimeoutField
 from pants.engine.addresses import Address
-from pants.engine.rules import collect_rules, rule
+from pants.engine.internals.selectors import Get
+from pants.engine.rules import Rule, collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     AsyncFieldMixin,
     Dependencies,
     FieldDefaultFactoryRequest,
     FieldDefaultFactoryResult,
-    FieldSet,
     InvalidFieldException,
     InvalidTargetException,
     OptionalSingleSourceField,
@@ -35,6 +35,8 @@ from pants.engine.target import (
 from pants.engine.unions import UnionRule
 from pants.jvm.subsystems import JvmSubsystem
 from pants.util.docutil import git_url
+from pants.util.logging import LogLevel
+from pants.util.memo import memoized
 from pants.util.strutil import bullet_list, pluralize, softwrap
 
 # -----------------------------------------------------------------------------------------------
@@ -87,6 +89,46 @@ class PrefixedJvmJdkField(JvmJdkField):
 
 class PrefixedJvmResolveField(JvmResolveField):
     alias = "jvm_resolve"
+
+
+# -----------------------------------------------------------------------------------------------
+# Targets that can be called with `./pants run` or `experimental_run_in_sandbox`
+# -----------------------------------------------------------------------------------------------
+NO_MAIN_CLASS = "org.pantsbuild.meta.no.main.class"
+
+
+class JvmMainClassNameField(StringField):
+    alias = "main"
+    required = False
+    default = None
+    help = softwrap(
+        """
+        `.`-separated name of the JVM class containing the `main()` method to be called when
+        executing this target. If not supplied, this will be calculated automatically, either by
+        inspecting the existing manifest (for 3rd-party JARs), or by inspecting the classes inside
+        the JAR, looking for a valid `main` method.  If a value cannot be calculated automatically,
+        you must supply a value for `run` to succeed.
+        """
+    )
+
+
+@dataclass(frozen=True)
+class JvmRunnableSourceFieldSet(RunFieldSet):
+    run_in_sandbox_behavior = RunInSandboxBehavior.RUN_REQUEST_HERMETIC
+    jdk_version: JvmJdkField
+    main_class: JvmMainClassNameField
+
+    @classmethod
+    def jvm_rules(cls) -> Iterable[Union[Rule, UnionRule]]:
+        yield from _jvm_source_run_request_rule(cls)
+        yield from cls.rules()
+
+
+@dataclass(frozen=True)
+class GenericJvmRunRequest:
+    """Allows the use of a generic rule to return a `RunRequest` based on the field set."""
+
+    field_set: JvmRunnableSourceFieldSet
 
 
 # -----------------------------------------------------------------------------------------------
@@ -260,7 +302,8 @@ class JvmArtifactResolveField(JvmResolveField):
 
 
 @dataclass(frozen=True)
-class JvmArtifactFieldSet(FieldSet):
+class JvmArtifactFieldSet(JvmRunnableSourceFieldSet):
+
     group: JvmArtifactGroupField
     artifact: JvmArtifactArtifactField
     version: JvmArtifactVersionField
@@ -284,6 +327,8 @@ class JvmArtifactTarget(Target):
         JvmArtifactJarSourceField,
         JvmArtifactResolveField,
         JvmArtifactExcludeDependenciesField,
+        JvmJdkField,
+        JvmMainClassNameField,
     )
     help = softwrap(
         """
@@ -327,9 +372,9 @@ class JunitTestExtraEnvVarsField(TestExtraEnvVarsField):
 # -----------------------------------------------------------------------------------------------
 
 
-class JvmMainClassNameField(StringField):
-    alias = "main"
+class JvmRequiredMainClassNameField(JvmMainClassNameField):
     required = True
+    default = None
     help = softwrap(
         """
         `.`-separated name of the JVM class containing the `main()` method to be called when
@@ -637,7 +682,7 @@ class DeployJarTarget(Target):
         RestartableField,
         OutputPathField,
         JvmDependenciesField,
-        JvmMainClassNameField,
+        JvmRequiredMainClassNameField,
         JvmJdkField,
         JvmResolveField,
         DeployJarDuplicatePolicyField,
@@ -720,10 +765,22 @@ def jvm_resolve_field_default_factory(
     return FieldDefaultFactoryResult(lambda f: f.normalized_value(jvm))
 
 
+@memoized
+def _jvm_source_run_request_rule(cls: type[JvmRunnableSourceFieldSet]) -> Iterable[Rule]:
+    from pants.jvm.run import rules as run_rules
+
+    @rule(_param_type_overrides={"request": cls}, level=LogLevel.DEBUG)
+    async def jvm_source_run_request(request: JvmRunnableSourceFieldSet) -> RunRequest:
+        return await Get(RunRequest, GenericJvmRunRequest(request))
+
+    return [*run_rules(), *collect_rules(locals())]
+
+
 def rules():
     return [
         *collect_rules(),
         UnionRule(FieldDefaultFactoryRequest, JvmResolveFieldDefaultFactoryRequest),
+        *JvmArtifactFieldSet.jvm_rules(),
     ]
 
 

@@ -75,19 +75,49 @@ class GolangSubsystem(Subsystem):
         cgo_gcc_binary_name = StrOption(
             default="gcc",
             advanced=True,
-            help="Name of the tool to use to compile C code included via CGo in a Go package.",
+            help=softwrap(
+                """
+                Name of the tool to use to compile C code included via CGo in a Go package.
+                Pants will search for the tool using the paths specified by the
+                `[golang].cgo_tool_search_paths` option.
+                """
+            ),
         )
 
         cgo_gxx_binary_name = StrOption(
             default="g++",
             advanced=True,
-            help="Name of the tool to use to compile C++ code included via CGo in a Go package.",
+            help=softwrap(
+                """
+                Name of the tool to use to compile C++ code included via CGo in a Go package.
+                Pants will search for the tool using the paths specified by the
+                `[golang].cgo_tool_search_paths` option.
+                """
+            ),
         )
 
         cgo_fortran_binary_name = StrOption(
             default="gfortran",
             advanced=True,
-            help="Name of the tool to use to compile fortran code included via CGo in a Go package.",
+            help=softwrap(
+                """
+                Name of the tool to use to compile fortran code included via CGo in a Go package.
+                Pants will search for the tool using the paths specified by the
+                `[golang].cgo_tool_search_paths` option.
+                """
+            ),
+        )
+
+        external_linker_binary_name = StrOption(
+            default="gcc",
+            advanced=True,
+            help=softwrap(
+                """
+                Name of the tool to use as the "external linker" when invoking `go tool link`.
+                Pants will search for the tool using the paths specified by the
+                `[golang].cgo_tool_search_paths` option.
+                """
+            ),
         )
 
         cgo_c_flags = StrListOption(

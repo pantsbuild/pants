@@ -32,6 +32,7 @@ from pants.pantsd.service.store_gc_service import StoreGCService
 from pants.util.contextutil import argv_as, hermetic_environment_as
 from pants.util.dirutil import safe_open
 from pants.util.strutil import ensure_text
+from pants.version import VERSION
 
 
 class PantsDaemon(PantsDaemonProcessManager):
@@ -145,7 +146,7 @@ class PantsDaemon(PantsDaemonProcessManager):
             fd.close()
 
             # Open the new.
-            temp_fd = safe_open(log_path, "w") if writable else open(os.devnull)
+            temp_fd = safe_open(log_path, "a") if writable else open(os.devnull)
             os.dup2(temp_fd.fileno(), fileno)
             setattr(sys, attr, os.fdopen(fileno, mode=("w" if writable else "r")))
         sys.__stdin__, sys.__stdout__, sys.__stderr__ = sys.stdin, sys.stdout, sys.stderr  # type: ignore[assignment]
@@ -162,7 +163,7 @@ class PantsDaemon(PantsDaemonProcessManager):
         self.write_pid()
         self.write_process_name()
         self.write_fingerprint(ensure_text(self.options_fingerprint))
-        self._logger.debug(f"pantsd running with PID: {self.pid}")
+        self._logger.info(f"pantsd {VERSION} running with PID: {self.pid}")
         self.write_socket(self._server.port())
 
     def run_sync(self):

@@ -73,12 +73,7 @@ class PythonProtobufMypyPlugin(PythonToolRequirementsBase):
     options_scope = "mypy-protobuf"
     help = "Configuration of the mypy-protobuf type stub generation plugin."
 
-    default_version = "mypy-protobuf==2.10"
-
-    # Since Pants doesn't plumb --constraints, use a requirement to constrain the
-    # `Requires-Dist: protobuf (>=3.17.3)` requirement in mypy-protobuf 2.10 which now picks up
-    # protobuf 4.x which is incompatible in practice.
-    default_extra_requirements = ["protobuf<3.21"]
+    default_version = "mypy-protobuf==3.4.0"
 
     register_interpreter_constraints = True
     default_interpreter_constraints = ["CPython>=3.7,<4"]

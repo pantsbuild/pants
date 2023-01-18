@@ -6,10 +6,12 @@ from dataclasses import dataclass
 from typing import Tuple
 
 from pants.backend.python.target_types import (
+    PexArgsField,
     PexBinaryDefaults,
     PexCompletePlatformsField,
     PexEmitWarningsField,
     PexEntryPointField,
+    PexEnvField,
     PexExecutionMode,
     PexExecutionModeField,
     PexIgnoreErrorsField,
@@ -36,7 +38,7 @@ from pants.core.goals.package import (
     OutputPathField,
     PackageFieldSet,
 )
-from pants.core.goals.run import RunFieldSet
+from pants.core.goals.run import RunFieldSet, RunInSandboxBehavior
 from pants.core.target_types import FileSourceField
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
@@ -46,6 +48,7 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.util.docutil import doc_url
+from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.strutil import softwrap
 
@@ -54,10 +57,14 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
+    run_in_sandbox_behavior = RunInSandboxBehavior.RUN_REQUEST_HERMETIC
+
     required_fields = (PexEntryPointField,)
 
     entry_point: PexEntryPointField
     script: PexScriptField
+    args: PexArgsField
+    env: PexEnvField
 
     output_path: OutputPathField
     emit_warnings: PexEmitWarningsField
@@ -148,6 +155,8 @@ async def package_pex_binary(
             addresses=[field_set.address],
             internal_only=False,
             main=resolved_entry_point.val or field_set.script.value,
+            inject_args=field_set.args.value or [],
+            inject_env=field_set.env.value or FrozenDict[str, str](),
             platforms=PexPlatforms.create_from_platforms_field(field_set.platforms),
             complete_platforms=complete_platforms,
             output_filename=output_filename,

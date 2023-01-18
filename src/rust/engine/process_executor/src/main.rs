@@ -77,7 +77,7 @@ struct CommandSpec {
   /// Symlink a JDK from .jdk in the working directory.
   /// For local execution, symlinks to the value of this flag.
   /// For remote execution, just requests that some JDK is symlinked if this flag has any value.
-  /// https://github.com/pantsbuild/pants/issues/6416 will make this less weird in the future.
+  /// <https://github.com/pantsbuild/pants/issues/6416> will make this less weird in the future.
   #[structopt(long)]
   jdk: Option<PathBuf>,
 
