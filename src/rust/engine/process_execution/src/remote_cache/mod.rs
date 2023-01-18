@@ -104,11 +104,7 @@ impl CommandRunner {
     append_only_caches_base_path: Option<String>,
   ) -> Result<Self, String> {
     let provider = Arc::new(byte_store::RemoteCache::new(Arc::new(
-      remote::gha::ByteStore::new(
-        &std::env::var("PANTS_REMOTE_GHA_CACHE_URL").expect("url env var not set"),
-        &std::env::var("PANTS_REMOTE_GHA_RUNTIME_TOKEN").expect("token env var not set"),
-        "pants-remote-action-v2",
-      )?,
+      remote::gha::ByteStore::new("pants-remote-action-v2")?,
     )));
     // let provider = Arc::new(reapi::RemoteCache::new(
     //   instance_name.clone(),

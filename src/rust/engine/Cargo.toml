@@ -169,7 +169,3 @@ env_logger = "0.9.0"
 
 [build-dependencies]
 pyo3-build-config = "0.17"
-
-[patch.crates-io]
-# TODO: https://github.com/dekellum/hyperx/pull/40
-hyperx = { git = "https://github.com/nitsky/hyperx.git", rev = "0447c343698c4c8ff69e730bc1cf9f1db1677e15" }

@@ -15,7 +15,6 @@ async-oncecell = "0.2"
 deepsize = { git = "https://github.com/stuhood/deepsize.git", rev = "5c8bee5443fcafe4aaa9274490d354412d0955c1" }
 fs = { path = ".." }
 futures = "0.3"
-gha-toolkit = "0.3.1"
 glob = "0.3.0"
 grpc_util = { path = "../../grpc_util" }
 hashing = { path = "../../hashing" }
@@ -27,6 +26,7 @@ lmdb-rkv = { git = "https://github.com/pantsbuild/lmdb-rs.git", rev = "6ae7a552a
 log = "0.4"
 madvise = "0.1"
 memmap = "0.7"
+opendal = "0.24.6"
 parking_lot = "0.12"
 prost = "0.9"
 prost-types = "0.9"

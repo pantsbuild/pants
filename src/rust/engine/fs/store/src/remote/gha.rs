@@ -3,28 +3,29 @@
 
 use async_trait::async_trait;
 use bytes::Bytes;
-use gha_toolkit::cache::{ArtifactCacheEntry, CacheClient};
 use hashing::Digest;
+use opendal::services::ghac;
+use opendal::{ErrorKind, Operator};
 
 use crate::remote::{ByteSource, ByteStoreProvider};
 
 pub struct ByteStore {
-  client: CacheClient,
+  operator: Operator,
 }
 
-impl ByteStore {
-  pub fn new(base_url: &str, token: &str, cache_key: &str) -> Result<ByteStore, String> {
-    Ok(ByteStore {
-      client: CacheClient::builder(base_url, token)
-        .cache_to(cache_key)
-        .cache_from([cache_key].iter().copied())
-        .build()
-        .map_err(|err| err.to_string())?,
-    })
-  }
+const GHA_STORE_VERSION: &str = "pants-gha-1";
 
-  fn version_for_digest(&self, digest: &Digest) -> String {
-    digest.hash.to_hex()
+impl ByteStore {
+  pub fn new(cache_key: &str) -> Result<ByteStore, String> {
+    Ok(ByteStore {
+      operator: Operator::new(
+        ghac::Builder::default()
+          .version(GHA_STORE_VERSION)
+          .root(cache_key)
+          .build()
+          .map_err(|e| e.to_string())?,
+      ),
+    })
   }
 }
 
@@ -38,53 +39,29 @@ impl ByteStoreProvider for ByteStore {
   }
 
   async fn store_bytes(&self, digest: Digest, bytes: ByteSource) -> Result<(), String> {
-    log::debug!(
-      "storing {} ({} bytes) via {}",
-      digest.hash,
-      digest.size_bytes,
-      self.client.base_url()
-    );
+    log::debug!("storing {} ({} bytes)", digest.hash, digest.size_bytes,);
     let slice = if digest.size_bytes == 0 {
       Bytes::from(EMPTY_BYTES)
     } else {
+      // FIXME: it'd be better to have this implement Read directly
       bytes(0..digest.size_bytes)
     };
 
-    self
-      .client
-      .put(
-        &self.version_for_digest(&digest),
-        std::io::Cursor::new(slice),
-      )
+    let object = self.operator.object(&digest.hash.to_string());
+    object
+      .write_from(digest.size_bytes as u64, futures::io::Cursor::new(slice))
       .await
-      .map_err(|err| err.to_string())?;
+      .map_err(|e| e.to_string())?;
     Ok(())
   }
   async fn load_bytes(&self, digest: Digest) -> Result<Option<Bytes>, String> {
-    log::debug!(
-      "loading {} ({} bytes) via {}",
-      digest.hash,
-      digest.size_bytes,
-      self.client.base_url()
-    );
-    let entry = self
-      .client
-      .entry(&self.version_for_digest(&digest))
-      .await
-      .map_err(|err| err.to_string())?;
-    if let Some(ArtifactCacheEntry {
-      archive_location: Some(url),
-      ..
-    }) = entry
-    {
-      let data = self.client.get(&url).await.map_err(|err| err.to_string())?;
-      Ok(Some(if digest.size_bytes == 0 && data == EMPTY_BYTES {
-        Bytes::new()
-      } else {
-        Bytes::from(data)
-      }))
-    } else {
-      Ok(None)
+    log::debug!("loading {} ({} bytes)", digest.hash, digest.size_bytes,);
+    let object = self.operator.object(&digest.hash.to_string());
+    match object.read().await {
+      Ok(data) if digest.size_bytes == 0 && data == EMPTY_BYTES => Ok(Some(Bytes::new())),
+      Ok(data) => Ok(Some(Bytes::from(data))),
+      Err(err) if err.kind() == ErrorKind::ObjectNotFound => Ok(None),
+      Err(err) => Err(err.to_string()),
     }
   }
 }
