@@ -49,13 +49,14 @@ impl ByteStoreProvider for ByteStore {
       // FIXME: it'd be better to have this implement Read directly
       bytes(0..digest.size_bytes)
     };
+    let cursor = futures::io::Cursor::new(slice);
 
     let object = self.operator.object(&digest.hash.to_string());
-    object
-      .write_from(digest.size_bytes as u64, futures::io::Cursor::new(slice))
-      .await
-      .map_err(|e| e.to_string())?;
-    Ok(())
+    match object.write_from(digest.size_bytes as u64, cursor).await {
+      Ok(()) => Ok(()),
+      Err(err) if err.kind() == ErrorKind::ObjectAlreadyExists => Ok(()),
+      Err(err) => Err(err.to_string()),
+    }
   }
   async fn load_bytes(&self, digest: Digest) -> Result<Option<Bytes>, String> {
     log::debug!("loading {} ({} bytes)", digest.hash, digest.size_bytes,);
