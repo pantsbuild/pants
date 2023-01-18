@@ -7,7 +7,7 @@ use std::fmt::{Debug, Display};
 use std::iter::Iterator;
 
 use async_trait::async_trait;
-use bytes::{Bytes, BytesMut};
+use bytes::BytesMut;
 use fs::{
   directory, DigestTrie, DirectoryDigest, GlobMatching, PreparedPathGlobs, RelativePath,
   SymlinkBehavior, EMPTY_DIRECTORY_DIGEST,
@@ -178,7 +178,7 @@ pub trait SnapshotOps: Clone + Send + Sync + 'static {
 
   async fn load_file_bytes_with<
     T: Send + 'static,
-    F: Fn(Bytes) -> T + Clone + Send + Sync + 'static,
+    F: Fn(&[u8]) -> T + Clone + Send + Sync + 'static,
   >(
     &self,
     digest: Digest,

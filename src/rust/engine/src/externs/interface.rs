@@ -1602,7 +1602,7 @@ fn single_file_digests_to_bytes<'py>(
           .load_file_bytes_with(py_file_digest.0, |bytes| {
             let gil = Python::acquire_gil();
             let py = gil.python();
-            externs::store_bytes(py, &bytes)
+            externs::store_bytes(py, bytes)
           })
           .await
       }

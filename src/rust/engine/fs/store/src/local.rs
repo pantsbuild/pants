@@ -382,33 +382,39 @@ impl ByteStore {
   /// blocking, this accepts a function that views a slice rather than returning a clone of the
   /// data. The upshot is that the database is able to provide slices directly into shared memory.
   ///
-  pub async fn load_bytes(
+  pub async fn load_bytes_with<T: Send + 'static, F: FnMut(&[u8]) -> T + Send + Sync + 'static>(
     &self,
     entry_type: EntryType,
     digest: Digest,
-  ) -> Result<Option<Bytes>, String> {
+    mut f: F,
+  ) -> Result<Option<T>, String> {
     let start = Instant::now();
     if digest == EMPTY_DIGEST {
       // Avoid I/O for this case. This allows some client-provided operations (like merging
       // snapshots) to work without needing to first store the empty snapshot.
-      return Ok(Some(Bytes::new()));
+      return Ok(Some(f(&[])));
     }
 
     let dbs = match entry_type {
       EntryType::Directory => self.inner.directory_dbs.clone(),
       EntryType::File => self.inner.file_dbs.clone(),
     }?;
-    let res = match dbs.load_bytes(digest.hash).await {
-      Ok(Some(bytes)) if bytes.len() != digest.size_bytes => Err(format!(
-        "Got hash collision reading from store - digest {:?} was requested, but retrieved \
+    let res = dbs
+      .load_bytes_with(digest.hash, move |bytes| {
+        if bytes.len() == digest.size_bytes {
+          Ok(f(bytes))
+        } else {
+          Err(format!(
+            "Got hash collision reading from store - digest {:?} was requested, but retrieved \
                 bytes with that fingerprint had length {}. Congratulations, you may have broken \
                 sha256! Underlying bytes: {:?}",
-        digest,
-        bytes.len(),
-        bytes
-      )),
-      other => other,
-    };
+            digest,
+            bytes.len(),
+            bytes
+          ))
+        }
+      })
+      .await;
 
     if let Some(workunit_store_handle) = workunit_store::get_workunit_store_handle() {
       workunit_store_handle.store.record_observation(

@@ -32,6 +32,7 @@ use std::process::exit;
 use std::sync::Arc;
 use std::time::Duration;
 
+use bytes::Bytes;
 use clap::{Arg, Command};
 use fs::{
   DirectoryDigest, GlobExpansionConjunction, GlobMatching, Permissions, PreparedPathGlobs,
@@ -470,7 +471,7 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
           let digest = Digest::new(fingerprint, size_bytes);
           Ok(
             store
-              .load_file_bytes_with(digest, |bytes| io::stdout().write_all(&bytes).unwrap())
+              .load_file_bytes_with(digest, |bytes| io::stdout().write_all(bytes).unwrap())
               .await?,
           )
         }
@@ -684,7 +685,10 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
         .parse::<usize>()
         .expect("size_bytes must be a non-negative number");
       let digest = Digest::new(fingerprint, size_bytes);
-      let bytes = match store.load_file_bytes_with(digest, |b| b).await {
+      let bytes = match store
+        .load_file_bytes_with(digest, Bytes::copy_from_slice)
+        .await
+      {
         Err(StoreError::MissingDigest { .. }) => store.load_directory(digest).await?.to_bytes(),
         Err(e) => return Err(e.into()),
         Ok(bytes) => bytes,

@@ -182,10 +182,10 @@ fn process_request_to_process_result(
     let store = context.core.store();
     let (stdout_bytes, stderr_bytes) = try_join!(
       store
-        .load_file_bytes_with(result.stdout_digest, |b| b)
+        .load_file_bytes_with(result.stdout_digest, |bytes: &[u8]| bytes.to_owned())
         .map_err(|e| e.enrich("Bytes from stdout")),
       store
-        .load_file_bytes_with(result.stderr_digest, |b| b)
+        .load_file_bytes_with(result.stderr_digest, |bytes: &[u8]| bytes.to_owned())
         .map_err(|e| e.enrich("Bytes from stderr"))
     )?;
 

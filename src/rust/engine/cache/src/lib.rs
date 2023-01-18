@@ -84,6 +84,9 @@ impl PersistentCache {
 
   pub async fn load(&self, key: &CacheKey) -> Result<Option<Bytes>, String> {
     let fingerprint = Digest::of_bytes(&key.to_bytes()).hash;
-    self.store.load_bytes(fingerprint).await
+    self
+      .store
+      .load_bytes_with(fingerprint, move |bytes| Ok(Bytes::copy_from_slice(bytes)))
+      .await
   }
 }

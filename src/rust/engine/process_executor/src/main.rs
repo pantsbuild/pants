@@ -373,18 +373,18 @@ async fn main() {
       .unwrap();
   }
 
-  let stdout = store
-    .load_file_bytes_with(result.stdout_digest, |b| b)
+  let stdout: Vec<u8> = store
+    .load_file_bytes_with(result.stdout_digest, |bytes| bytes.to_vec())
     .await
     .unwrap();
 
-  let stderr = store
-    .load_file_bytes_with(result.stderr_digest, |b| b)
+  let stderr: Vec<u8> = store
+    .load_file_bytes_with(result.stderr_digest, |bytes| bytes.to_vec())
     .await
     .unwrap();
 
-  print!("{}", std::str::from_utf8(&stdout).unwrap());
-  eprint!("{}", std::str::from_utf8(&stderr).unwrap());
+  print!("{}", String::from_utf8(stdout).unwrap());
+  eprint!("{}", String::from_utf8(stderr).unwrap());
   exit(result.exit_code);
 }
 

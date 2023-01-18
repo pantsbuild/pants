@@ -125,10 +125,10 @@ impl ByteStore {
   pub async fn store_buffered<WriteToBuffer, WriteResult>(
     &self,
     digest: Digest,
-    write_to_buffer: WriteToBuffer,
+    mut write_to_buffer: WriteToBuffer,
   ) -> Result<(), StoreError>
   where
-    WriteToBuffer: FnOnce(std::fs::File) -> WriteResult,
+    WriteToBuffer: FnMut(std::fs::File) -> WriteResult,
     WriteResult: Future<Output = Result<(), StoreError>>,
   {
     let write_buffer = tempfile::tempfile().map_err(|e| {

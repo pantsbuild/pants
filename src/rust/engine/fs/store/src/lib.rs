@@ -503,7 +503,7 @@ impl Store {
   ///
   pub async fn load_file_bytes_with<
     T: Send + 'static,
-    F: Fn(Bytes) -> T + Clone + Send + Sync + 'static,
+    F: Fn(&[u8]) -> T + Clone + Send + Sync + 'static,
   >(
     &self,
     digest: Digest,
@@ -514,7 +514,7 @@ impl Store {
       .load_bytes_with(
         EntryType::File,
         digest,
-        move |v: Bytes| Ok(f(v)),
+        move |v: &[u8]| Ok(f(v)),
         |_: Bytes| Ok(()),
       )
       .await
@@ -677,7 +677,7 @@ impl Store {
         digest,
         // Trust that locally stored values were canonical when they were written into the CAS
         // and only verify in debug mode, as it's slightly expensive.
-        move |bytes: Bytes| {
+        move |bytes: &[u8]| {
           let directory = remexec::Directory::decode(bytes).map_err(|e| {
             format!(
               "LMDB corruption: Directory bytes for {:?} were not valid: {:?}",
@@ -727,7 +727,7 @@ impl Store {
   ///
   async fn load_bytes_with<
     T: Send + 'static,
-    FLocal: Fn(Bytes) -> Result<T, String> + Clone + Send + Sync + 'static,
+    FLocal: Fn(&[u8]) -> Result<T, String> + Clone + Send + Sync + 'static,
     FRemote: Fn(Bytes) -> Result<(), String> + Send + Sync + 'static,
   >(
     &self,
@@ -736,8 +736,12 @@ impl Store {
     f_local: FLocal,
     f_remote: FRemote,
   ) -> Result<T, StoreError> {
-    if let Some(bytes_res) = self.local.load_bytes(entry_type, digest).await? {
-      return Ok(f_local(bytes_res)?);
+    if let Some(bytes_res) = self
+      .local
+      .load_bytes_with(entry_type, digest, f_local.clone())
+      .await?
+    {
+      return Ok(bytes_res?);
     }
 
     let remote = self.remote.clone().ok_or_else(|| {
@@ -747,12 +751,15 @@ impl Store {
       .download_digest_to_local(self.local.clone(), digest, entry_type, f_remote)
       .await?;
 
-    match self.local.load_bytes(entry_type, digest).await? {
-      Some(bytes_res) => Ok(f_local(bytes_res)?),
-      None => Err(format!(
-        "After downloading {digest:?}, the local store claimed that it was not present."
-      ))?,
-    }
+    Ok(
+      self
+        .local
+        .load_bytes_with(entry_type, digest, f_local)
+        .await?
+        .ok_or_else(|| {
+          format!("After downloading {digest:?}, the local store claimed that it was not present.")
+        })??,
+    )
   }
 
   ///
@@ -861,7 +868,11 @@ impl Store {
     //
     // See https://github.com/pantsbuild/pants/pull/9793 for an earlier implementation
     // that used `Executor.block_on`, which avoided the clone but was blocking.
-    let maybe_bytes = local.load_bytes(entry_type, digest).await?;
+    let maybe_bytes = local
+      .load_bytes_with(entry_type, digest, move |bytes| {
+        Bytes::copy_from_slice(bytes)
+      })
+      .await?;
     match maybe_bytes {
       Some(bytes) => Ok(remote.store_bytes(bytes).await?),
       None => Err(StoreError::MissingDigest(
@@ -881,8 +892,19 @@ impl Store {
     digest: Digest,
   ) -> Result<(), StoreError> {
     remote
-      .store_buffered(digest, |mut buffer| async move {
-        let result = local.load_bytes(entry_type, digest).await?;
+      .store_buffered(digest, |mut buffer| async {
+        let result = local
+          .load_bytes_with(entry_type, digest, move |bytes| {
+            buffer.write_all(bytes).map_err(|e| {
+              format!(
+                "Failed to write {entry_type:?} {digest:?} to temporary buffer: {err}",
+                entry_type = entry_type,
+                digest = digest,
+                err = e
+              )
+            })
+          })
+          .await?;
         match result {
           None => Err(StoreError::MissingDigest(
             format!(
@@ -891,15 +913,8 @@ impl Store {
             ),
             digest,
           )),
-          Some(bytes) => buffer.write_all(&bytes).map_err(|e| {
-            format!(
-              "Failed to write {entry_type:?} {digest:?} to temporary buffer: {err}",
-              entry_type = entry_type,
-              digest = digest,
-              err = e
-            )
-            .into()
-          }),
+          Some(Err(err)) => Err(err.into()),
+          Some(Ok(())) => Ok(()),
         }
       })
       .await
@@ -1385,7 +1400,7 @@ impl Store {
               e
             )
           })?;
-        f.write_all(&bytes)
+        f.write_all(bytes)
           .map_err(|e| format!("Error writing file {}: {:?}", destination.display(), e))?;
         Ok(())
       })
@@ -1431,7 +1446,7 @@ impl Store {
       let store = self.clone();
       async move {
         let content = store
-          .load_file_bytes_with(digest, |b| b)
+          .load_file_bytes_with(digest, Bytes::copy_from_slice)
           .await
           .map_err(|e| e.enrich(&format!("Couldn't find file contents for {:?}", path)))?;
         Ok(FileContent {
@@ -1580,7 +1595,7 @@ impl SnapshotOps for Store {
 
   async fn load_file_bytes_with<
     T: Send + 'static,
-    F: Fn(Bytes) -> T + Clone + Send + Sync + 'static,
+    F: Fn(&[u8]) -> T + Clone + Send + Sync + 'static,
   >(
     &self,
     digest: Digest,

@@ -639,7 +639,14 @@ impl ShardedLmdb {
     (now_since_epoch + self.lease_time).as_secs()
   }
 
-  pub async fn load_bytes(&self, fingerprint: Fingerprint) -> Result<Option<Bytes>, String> {
+  pub async fn load_bytes_with<
+    T: Send + 'static,
+    F: FnMut(&[u8]) -> Result<T, String> + Send + Sync + 'static,
+  >(
+    &self,
+    fingerprint: Fingerprint,
+    mut f: F,
+  ) -> Result<Option<T>, String> {
     let store = self.clone();
     let effective_key = VersionedFingerprint::new(fingerprint, ShardedLmdb::SCHEMA_VERSION);
     self
@@ -650,7 +657,7 @@ impl ShardedLmdb {
           .begin_ro_txn()
           .map_err(|err| format!("Failed to begin read transaction: {}", err))?;
         match ro_txn.get(db, &effective_key) {
-          Ok(bytes) => Ok(Some(Bytes::copy_from_slice(bytes))),
+          Ok(bytes) => f(bytes).map(Some),
           Err(lmdb::Error::NotFound) => Ok(None),
           Err(err) => Err(format!(
             "Error loading versioned key {:?}: {}",
