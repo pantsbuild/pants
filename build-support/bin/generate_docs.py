@@ -269,6 +269,7 @@ def run_pants_help_all() -> dict[str, Any]:
         "pants.backend.python.lint.docformatter",
         "pants.backend.python.lint.flake8",
         "pants.backend.python.lint.isort",
+        "pants.backend.python.lint.pydocstyle",
         "pants.backend.python.lint.pylint",
         "pants.backend.python.lint.yapf",
         "pants.backend.python.mixed_interpreter_constraints",
