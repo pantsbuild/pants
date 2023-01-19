@@ -69,8 +69,8 @@ class Target:
     )
 
     @classmethod
-    def from_data(cls, data: TargetData) -> Target:
-        json = data.to_dict()
+    def from_data(cls, data: TargetData, exclude_defaults: bool) -> Target:
+        json = data.to_dict(exclude_defaults=exclude_defaults)
         address = json.pop("address")
         target_type = json.pop("target_type")
         fields = json
@@ -121,12 +121,15 @@ class TargetsQuery:
     target_type: Optional[str] = strawberry.field(
         default=None, description="Select targets of a certain type only."
     )
+    exclude_defaults: Optional[bool] = strawberry.field(
+        default=None, description="Will omit default field values from the result."
+    )
     limit: Optional[int] = strawberry.field(
         default=None, description="Limit the number of entries returned."
     )
 
     def __bool__(self) -> bool:
-        # The `specs` field is not used in the `filter` method.
+        # The `specs` and `exclude_defaults` fields are not used in the `filter` method.
         return not (self.target_type is None and self.limit is None)
 
     @staticmethod
@@ -183,4 +186,7 @@ class QueryTargetsMixin:
         else:
             targets = UnexpandedTargets(req(AllUnexpandedTargets))
         all_data = req(TargetDatas, (targets,))
-        return [Target.from_data(data) for data in TargetsQuery.filter(query, all_data)]
+        return [
+            Target.from_data(data, query and query.exclude_defaults or False)
+            for data in TargetsQuery.filter(query, all_data)
+        ]
