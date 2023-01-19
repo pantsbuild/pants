@@ -1183,8 +1183,8 @@ class OptionsTest(unittest.TestCase):
                 args=["./pants", "test", "fmt", "target", "--", "bar", "--baz"],
             )
         assert (
-            "Specifying multiple goals (in this case: ['test', 'fmt']) along with passthrough args "
-            "(args after `--`) is ambiguous."
+            "Specifying multiple goals (in this case: ['test', 'fmt']) along with passthrough args"
+            + " (args after `--`) is ambiguous."
         ) in str(exc.value)
 
     def test_passthru_args_not_interpreted(self):
@@ -1264,8 +1264,8 @@ class OptionsTest(unittest.TestCase):
             options.for_scope("enum-opt")
 
         assert (
-            "Invalid choice 'invalid-value'. "
-            "Choose from: a-value, another-value, yet-another, one-more"
+            "Invalid choice 'invalid-value'."
+            + "Choose from: a-value, another-value, yet-another, one-more"
         ) in str(exc.value)
 
     def test_non_enum_option_type_parse_error(self) -> None:
@@ -1378,9 +1378,9 @@ class OptionsTest(unittest.TestCase):
 
     def test_fingerprintable(self) -> None:
         options = self._parse(
-            flags="--implicitly-fingerprinted=shall_be_fingerprinted "
-            "--explicitly-fingerprinted=also_shall_be_fingerprinted "
-            "--explicitly-not-fingerprinted=shant_be_fingerprinted"
+            flags="--implicitly-fingerprinted=shall_be_fingerprinted"
+            + " --explicitly-fingerprinted=also_shall_be_fingerprinted"
+            + " --explicitly-not-fingerprinted=shant_be_fingerprinted"
         )
         pairs = options.get_fingerprintable_for_scope(GLOBAL_SCOPE)
         assert (str, "shall_be_fingerprinted") in pairs
@@ -1389,9 +1389,9 @@ class OptionsTest(unittest.TestCase):
 
     def test_fingerprintable_daemon_only(self) -> None:
         options = self._parse(
-            flags="--explicitly-daemoned=shall_be_fingerprinted "
-            "--explicitly-not-daemoned=shant_be_fingerprinted "
-            "--implicitly-not-daemoned=also_shant_be_fingerprinted"
+            flags="--explicitly-daemoned=shall_be_fingerprinted"
+            + " --explicitly-not-daemoned=shant_be_fingerprinted"
+            + " --implicitly-not-daemoned=also_shant_be_fingerprinted"
         )
         pairs = options.get_fingerprintable_for_scope(GLOBAL_SCOPE, daemon_only=True)
         assert (str, "shall_be_fingerprinted") in pairs

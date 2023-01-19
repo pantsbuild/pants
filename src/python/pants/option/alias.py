@@ -68,9 +68,13 @@ class CliAlias:
         for alias in self.definitions.keys():
             if not re.match(valid_alias_re, alias):
                 raise CliAliasInvalidError(
-                    f"Invalid alias in `[cli].alias` option: {alias!r}. May only contain alpha "
-                    "numerical letters and the separators `-` and `_`, and may not begin/end "
-                    "with a `-`."
+                    softwrap(
+                        f"""
+                        Invalid alias in `[cli].alias` option: {alias!r}. May only contain alpha
+                        numerical letters and the separators `-` and `_`, and may not begin/end
+                        with a `-`.
+                        """
+                    )
                 )
 
     @classmethod
@@ -86,7 +90,7 @@ class CliAlias:
                 else:
                     if arg in trail:
                         raise CliAliasCycleError(
-                            "CLI alias cycle detected in `[cli].alias` option: "
+                            "CLI alias cycle detected in `[cli].alias` option:\n"
                             + " -> ".join([arg, *trail])
                         )
                     yield from expand(definitions[arg], arg, *trail)
@@ -105,8 +109,13 @@ class CliAlias:
             scope = known_scopes.get(alias)
             if scope:
                 raise CliAliasInvalidError(
-                    f"Invalid alias in `[cli].alias` option: {alias!r}. This is already a "
-                    "registered " + ("goal." if scope.is_goal else "subsystem.")
+                    softwrap(
+                        f"""
+                        Invalid alias in `[cli].alias` option: {alias!r}. This is already a
+                        registered
+                        """
+                    )
+                    + (" goal." if scope.is_goal else " subsystem.")
                 )
 
     def expand_args(self, args: tuple[str, ...]) -> tuple[str, ...]:

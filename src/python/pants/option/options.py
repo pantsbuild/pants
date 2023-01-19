@@ -18,6 +18,7 @@ from pants.option.parser import Parser
 from pants.option.scope import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION, ScopeInfo
 from pants.util.memo import memoized_method
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
+from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -84,8 +85,12 @@ class Options:
         for si in sorted(scope_infos, key=lambda _si: _si.scope):
             if si.scope in original_scopes:
                 raise cls.DuplicateScopeError(
-                    f"Scope `{si.scope}` claimed by {si}, was also claimed "
-                    f"by {original_scopes[si.scope]}."
+                    softwrap(
+                        f"""
+                        Scope `{si.scope}` claimed by {si}, was also claimed
+                        by {original_scopes[si.scope]}.
+                        """
+                    )
                 )
             original_scopes[si.scope] = si
             ret.add(si)
@@ -122,10 +127,15 @@ class Options:
 
         if split_args.passthru and len(split_args.goals) > 1:
             raise cls.AmbiguousPassthroughError(
-                f"Specifying multiple goals (in this case: {split_args.goals}) "
-                "along with passthrough args (args after `--`) is ambiguous.\n"
-                "Try either specifying only a single goal, or passing the passthrough args "
-                "directly to the relevant consumer via its associated flags."
+                softwrap(
+                    f"""
+                    Specifying multiple goals (in this case: {split_args.goals})
+                    along with passthrough args (args after `--`) is ambiguous.
+
+                    Try either specifying only a single goal, or passing the passthrough args
+                    directly to the relevant consumer via its associated flags.
+                    """
+                )
             )
 
         if bootstrap_option_values:

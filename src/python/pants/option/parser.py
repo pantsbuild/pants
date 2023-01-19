@@ -54,6 +54,7 @@ from pants.option.option_value_container import OptionValueContainer, OptionValu
 from pants.option.ranked_value import Rank, RankedValue
 from pants.option.scope import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION, ScopeInfo
 from pants.util.meta import frozen_after_init
+from pants.util.strutil import softwrap
 
 
 @dataclass(frozen=True)
@@ -256,8 +257,14 @@ class Parser:
                 # BooleanConversionError), hence we reference the original exception type as type(e).
                 args_str = ", ".join(args)
                 raise type(e)(
-                    f"Error computing value for {args_str} in {self._scope_str()} (may also be "
-                    f"from PANTS_* environment variables).\nCaused by:\n{e}"
+                    softwrap(
+                        f"""
+                        Error computing value for {args_str} in {self._scope_str()} (may also be
+                        from PANTS_* environment variables). Caused by:
+
+                        {e}
+                        """
+                    )
                 )
 
             # If the option is explicitly given, check deprecation and mutual exclusion.
@@ -268,9 +275,13 @@ class Parser:
                 mutex_map[mutex_map_key].append(dest)
                 if len(mutex_map[mutex_map_key]) > 1:
                     raise MutuallyExclusiveOptionError(
-                        "Can only provide one of these mutually exclusive options in "
-                        f"{self._scope_str()}, but multiple given: "
-                        f"{', '.join(mutex_map[mutex_map_key])}"
+                        softwrap(
+                            f"""
+                            Can only provide one of these mutually exclusive options in
+                            {self._scope_str()}, but multiple given:
+                            {', '.join(mutex_map[mutex_map_key])}
+                            """
+                        )
                     )
 
             setattr(namespace, dest, val)
@@ -690,8 +701,12 @@ class Parser:
                     choices = list(type_arg)
             if choices is not None and val not in choices:
                 raise ParseError(
-                    f"`{val}` is not an allowed value for option {dest} in {self._scope_str()}. "
-                    f"Must be one of: {choices}"
+                    softwrap(
+                        f"""
+                        `{val}` is not an allowed value for option {dest} in {self._scope_str()}.
+                        Must be one of: {choices}
+                        """
+                    )
                 )
             elif type_arg == file_option:
                 check_file_exists(val)
