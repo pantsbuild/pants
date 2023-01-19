@@ -63,7 +63,7 @@ class PythonDependencyVisitorRequest:
 class PythonDependencyVisitor:
     """Wraps a subclass of _pants_dep_parser.DependencyVisitorBase."""
 
-    digest: Digest  # The content of the subclass
+    digest: Digest  # The file contents for the visitor
     classname: str  # The full classname, e.g., _my_custom_dep_parser.MyCustomVisitor
     env: FrozenDict[str, str]  # Set these env vars when invoking the visitor
 
