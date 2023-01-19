@@ -112,10 +112,9 @@ class CliAlias:
                     softwrap(
                         f"""
                         Invalid alias in `[cli].alias` option: {alias!r}. This is already a
-                        registered
+                        registered {"goal" if scope.is_goal else "subsystem"}.
                         """
                     )
-                    + (" goal." if scope.is_goal else " subsystem.")
                 )
 
     def expand_args(self, args: tuple[str, ...]) -> tuple[str, ...]:
