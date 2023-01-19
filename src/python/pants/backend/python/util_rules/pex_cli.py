@@ -29,7 +29,7 @@ from pants.engine.rules import Get, collect_rules, rule
 from pants.option.global_options import GlobalOptions, ca_certs_path_to_file_content
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
-from pants.util.meta import classproperty, frozen_after_init
+from pants.util.meta import classproperty
 from pants.util.strutil import create_path_env_var
 
 
@@ -57,8 +57,7 @@ class PexCli(TemplatedExternalTool):
         ]
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class PexCliProcess:
     subcommand: tuple[str, ...]
     extra_args: tuple[str, ...]
@@ -89,19 +88,20 @@ class PexCliProcess:
         concurrency_available: int = 0,
         cache_scope: ProcessCacheScope = ProcessCacheScope.SUCCESSFUL,
     ) -> None:
-        self.subcommand = tuple(subcommand)
-        self.extra_args = tuple(extra_args)
-        self.set_resolve_args = set_resolve_args
-        self.description = description
-        self.additional_input_digest = additional_input_digest
-        self.extra_env = FrozenDict(extra_env) if extra_env else None
-        self.output_files = tuple(output_files) if output_files else None
-        self.output_directories = tuple(output_directories) if output_directories else None
-        self.python = python
-        self.level = level
-        self.concurrency_available = concurrency_available
-        self.cache_scope = cache_scope
-        self.__post_init__()
+        object.__setattr__(self, "subcommand", tuple(subcommand))
+        object.__setattr__(self, "extra_args", tuple(extra_args))
+        object.__setattr__(self, "set_resolve_args", set_resolve_args)
+        object.__setattr__(self, "description", description)
+        object.__setattr__(self, "additional_input_digest", additional_input_digest)
+        object.__setattr__(self, "extra_env", FrozenDict(extra_env) if extra_env else None)
+        object.__setattr__(self, "output_files", tuple(output_files) if output_files else None)
+        object.__setattr__(
+            self, "output_directories", tuple(output_directories) if output_directories else None
+        )
+        object.__setattr__(self, "python", python)
+        object.__setattr__(self, "level", level)
+        object.__setattr__(self, "concurrency_available", concurrency_available)
+        object.__setattr__(self, "cache_scope", cache_scope)
 
     def __post_init__(self) -> None:
         if "--pex-root-path" in self.extra_args:
