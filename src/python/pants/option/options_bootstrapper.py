@@ -24,7 +24,7 @@ from pants.option.subsystem import Subsystem
 from pants.util.dirutil import read_file
 from pants.util.memo import memoized_method, memoized_property
 from pants.util.ordered_set import FrozenOrderedSet
-from pants.util.strutil import ensure_text
+from pants.util.strutil import ensure_text, softwrap
 
 if TYPE_CHECKING:
     from pants.build_graph.build_configuration import BuildConfiguration
@@ -285,8 +285,12 @@ class OptionsBootstrapper:
         global_bootstrap_options = self.get_bootstrap_options().for_global_scope()
         if global_bootstrap_options.pants_version != pants_version():
             raise BuildConfigurationError(
-                f"Version mismatch: Requested version was {global_bootstrap_options.pants_version}, "
-                f"our version is {pants_version()}."
+                softwrap(
+                    f"""
+                    Version mismatch: Requested version was {global_bootstrap_options.pants_version},
+                    our version is {pants_version()}.
+                    """
+                )
             )
 
         # Parse and register options.

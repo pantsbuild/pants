@@ -58,8 +58,6 @@ use fs::{
 };
 use futures::future::{self, BoxFuture, Either, FutureExt, TryFutureExt};
 use grpc_util::prost::MessageExt;
-use grpc_util::retry::{retry_call, status_is_retryable};
-use grpc_util::status_to_str;
 use hashing::Digest;
 use parking_lot::Mutex;
 use prost::Message;
@@ -70,8 +68,6 @@ use serde_derive::Serialize;
 use sharded_lmdb::DEFAULT_LEASE_TIME;
 use tryfuture::try_future;
 use workunit_store::{in_workunit, Level, Metric};
-
-use crate::remote::ByteStoreError;
 
 const KILOBYTES: usize = 1024;
 const MEGABYTES: usize = 1024 * KILOBYTES;
@@ -254,23 +250,7 @@ impl RemoteStore {
     let remote_store = self.store.clone();
     self
       .maybe_download(digest, async move {
-        // TODO(#17065): Now that we always copy from the remote store to the local store before
-        // executing the caller's logic against the local store,
-        // `remote::ByteStore::load_bytes_with` no longer needs to accept a function.
-        let bytes = retry_call(
-          remote_store,
-          |remote_store| async move { remote_store.load_bytes_with(digest, Ok).await },
-          |err| match err {
-            ByteStoreError::Grpc(status) => status_is_retryable(status),
-            _ => false,
-          },
-        )
-        .await
-        .map_err(|err| match err {
-          ByteStoreError::Grpc(status) => status_to_str(status),
-          ByteStoreError::Other(msg) => msg,
-        })?
-        .ok_or_else(|| {
+        let bytes = remote_store.load_bytes(digest).await?.ok_or_else(|| {
           StoreError::MissingDigest(
             "Was not present in either the local or remote store".to_owned(),
             digest,
@@ -1076,35 +1056,14 @@ impl Store {
       return Err("Cannot load Trees from a remote without a remote".to_owned());
     };
 
-    let tree_opt = retry_call(
-      remote,
-      |remote| async move {
-        remote
-          .store
-          .load_bytes_with(tree_digest, |b| {
-            let tree = Tree::decode(b).map_err(|e| format!("protobuf decode error: {:?}", e))?;
-            Ok(tree)
-          })
-          .await
-      },
-      |err| match err {
-        ByteStoreError::Grpc(status) => status_is_retryable(status),
-        _ => false,
-      },
-    )
-    .await
-    .map_err(|err| match err {
-      ByteStoreError::Grpc(status) => status_to_str(status),
-      ByteStoreError::Other(msg) => msg,
-    })?;
-
-    let tree = match tree_opt {
-      Some(t) => t,
-      None => return Ok(None),
-    };
-
-    let trie = DigestTrie::try_from(tree)?;
-    Ok(Some(trie.into()))
+    match remote.store.load_bytes(tree_digest).await? {
+      Some(b) => {
+        let tree = Tree::decode(b).map_err(|e| format!("protobuf decode error: {:?}", e))?;
+        let trie = DigestTrie::try_from(tree)?;
+        Ok(Some(trie.into()))
+      }
+      None => Ok(None),
+    }
   }
 
   pub async fn lease_all_recursively<'a, Ds: Iterator<Item = &'a Digest>>(

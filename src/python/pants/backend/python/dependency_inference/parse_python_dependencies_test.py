@@ -56,7 +56,15 @@ def assert_deps_parsed(
     assets: bool = True,
     assets_min_slashes: int = 1,
 ) -> None:
-    rule_runner.set_options([], env_inherit={"PATH", "PYENV_ROOT", "HOME"})
+    rule_runner.set_options(
+        [
+            f"--python-infer-string-imports={string_imports}",
+            f"--python-infer-string-imports-min-dots={string_imports_min_dots}",
+            f"--python-infer-assets={assets}",
+            f"--python-infer-assets-min-slashes={assets_min_slashes}",
+        ],
+        env_inherit={"PATH", "PYENV_ROOT", "HOME"},
+    )
     rule_runner.write_files(
         {
             "BUILD": f"python_source(name='t', source={repr(filename)})",
@@ -70,10 +78,6 @@ def assert_deps_parsed(
             ParsePythonDependenciesRequest(
                 tgt[PythonSourceField],
                 InterpreterConstraints([constraints]),
-                string_imports=string_imports,
-                string_imports_min_dots=string_imports_min_dots,
-                assets=assets,
-                assets_min_slashes=assets_min_slashes,
             )
         ],
     )

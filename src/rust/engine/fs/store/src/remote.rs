@@ -49,7 +49,7 @@ impl fmt::Debug for ByteStore {
 
 /// Represents an error from accessing a remote bytestore.
 #[derive(Debug)]
-pub enum ByteStoreError {
+enum ByteStoreError {
   /// gRPC error
   Grpc(Status),
 
@@ -337,14 +337,7 @@ impl ByteStore {
     .await
   }
 
-  pub async fn load_bytes_with<
-    T: Send + 'static,
-    F: Fn(Bytes) -> Result<T, String> + Send + Sync + Clone + 'static,
-  >(
-    &self,
-    digest: Digest,
-    f: F,
-  ) -> Result<Option<T>, ByteStoreError> {
+  pub async fn load_bytes(&self, digest: Digest) -> Result<Option<Bytes>, String> {
     let start = Instant::now();
     let store = self.clone();
     let instance_name = store.instance_name.clone().unwrap_or_default();
@@ -356,80 +349,71 @@ impl ByteStore {
       digest.size_bytes
     );
     let workunit_desc = format!("Loading bytes at: {resource_name}");
-    let f = f.clone();
 
-    let mut client = self.byte_stream_client.as_ref().clone();
+    let request = protos::gen::google::bytestream::ReadRequest {
+      resource_name,
+      read_offset: 0,
+      // 0 means no limit.
+      read_limit: 0,
+    };
+    let client = self.byte_stream_client.as_ref().clone();
 
-    let result_future = async move {
-      let mut start_opt = Some(Instant::now());
+    let result_future = retry_call(
+      (client, request),
+      move |(mut client, request)| async move {
+        let mut start_opt = Some(Instant::now());
+        let stream_result = client.read(request).await;
 
-      let stream_result = client
-        .read({
-          protos::gen::google::bytestream::ReadRequest {
-            resource_name,
-            read_offset: 0,
-            // 0 means no limit.
-            read_limit: 0,
-          }
-        })
-        .await;
-
-      let mut stream = match stream_result {
-        Ok(response) => response.into_inner(),
-        Err(status) => {
-          return match status.code() {
-            Code::NotFound => Ok(None),
-            _ => Err(ByteStoreError::Grpc(status)),
-          }
-        }
-      };
-
-      let read_result_closure = async {
-        let mut buf = BytesMut::with_capacity(digest.size_bytes);
-        while let Some(response) = stream.next().await {
-          // Record the observed time to receive the first response for this read.
-          if let Some(start) = start_opt.take() {
-            if let Some(workunit_store_handle) = workunit_store::get_workunit_store_handle() {
-              let timing: Result<u64, _> =
-                Instant::now().duration_since(start).as_micros().try_into();
-              if let Ok(obs) = timing {
-                workunit_store_handle
-                  .store
-                  .record_observation(ObservationMetric::RemoteStoreTimeToFirstByteMicros, obs);
-              }
+        let mut stream = match stream_result {
+          Ok(response) => response.into_inner(),
+          Err(status) => {
+            return match status.code() {
+              Code::NotFound => Ok(None),
+              _ => Err(status),
             }
           }
+        };
 
-          buf.extend_from_slice(&(response?).data);
-        }
-        Ok(buf.freeze())
-      };
+        let read_result_closure = async {
+          let mut buf = BytesMut::with_capacity(digest.size_bytes);
+          while let Some(response) = stream.next().await {
+            // Record the observed time to receive the first response for this read.
+            if let Some(start) = start_opt.take() {
+              if let Some(workunit_store_handle) = workunit_store::get_workunit_store_handle() {
+                let timing: Result<u64, _> =
+                  Instant::now().duration_since(start).as_micros().try_into();
+                if let Ok(obs) = timing {
+                  workunit_store_handle
+                    .store
+                    .record_observation(ObservationMetric::RemoteStoreTimeToFirstByteMicros, obs);
+                }
+              }
+            }
 
-      let read_result: Result<Bytes, tonic::Status> = read_result_closure.await;
-
-      let maybe_bytes = match read_result {
-        Ok(bytes) => Some(bytes),
-        Err(status) => {
-          if status.code() == tonic::Code::NotFound {
-            None
-          } else {
-            return Err(ByteStoreError::Grpc(status));
+            buf.extend_from_slice(&(response?).data);
           }
-        }
-      };
+          Ok(buf.freeze())
+        };
 
-      match maybe_bytes {
-        Some(b) => f(b).map(Some).map_err(ByteStoreError::Other),
-        None => Ok(None),
-      }
-    };
+        let read_result: Result<Bytes, tonic::Status> = read_result_closure.await;
+
+        match read_result {
+          Ok(bytes) => Ok(Some(bytes)),
+          Err(status) => match status.code() {
+            Code::NotFound => Ok(None),
+            _ => Err(status),
+          },
+        }
+      },
+      status_is_retryable,
+    );
 
     in_workunit!(
-      "load_bytes_with",
+      "load_bytes",
       Level::Trace,
       desc = Some(workunit_desc),
       |workunit| async move {
-        let result = result_future.await;
+        let result = result_future.await.map_err(status_to_str);
         workunit.record_observation(
           ObservationMetric::RemoteStoreReadBlobTimeMicros,
           start.elapsed().as_micros() as u64,

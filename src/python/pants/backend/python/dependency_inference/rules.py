@@ -333,7 +333,6 @@ async def _handle_unowned_imports(
 @rule_helper
 async def _exec_parse_deps(
     field_set: PythonImportDependenciesInferenceFieldSet,
-    python_infer_subsystem: PythonInferSubsystem,
     python_setup: PythonSetup,
 ) -> ParsedPythonDependencies:
     interpreter_constraints = InterpreterConstraints.create_from_compatibility_fields(
@@ -344,10 +343,6 @@ async def _exec_parse_deps(
         ParsePythonDependenciesRequest(
             field_set.source,
             interpreter_constraints,
-            string_imports=python_infer_subsystem.string_imports,
-            string_imports_min_dots=python_infer_subsystem.string_imports_min_dots,
-            assets=python_infer_subsystem.assets,
-            assets_min_slashes=python_infer_subsystem.assets_min_slashes,
         ),
     )
     return resp
@@ -439,9 +434,7 @@ async def infer_python_dependencies_via_source(
     if not python_infer_subsystem.imports and not python_infer_subsystem.assets:
         return InferredDependencies([])
 
-    parsed_dependencies = await _exec_parse_deps(
-        request.field_set, python_infer_subsystem, python_setup
-    )
+    parsed_dependencies = await _exec_parse_deps(request.field_set, python_setup)
 
     resolve = request.field_set.resolve.normalized_value(python_setup)
 

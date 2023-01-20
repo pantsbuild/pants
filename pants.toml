@@ -37,7 +37,7 @@ backend_packages.add = [
 ]
 plugins = [
   "hdrhistogram",  # For use with `--stats-log`.
-  "toolchain.pants.plugin==0.25.0",
+  "toolchain.pants.plugin==0.26.0",
 ]
 
 # The invalidation globs cover the PYTHONPATH by default, but we exclude some files that are on the
@@ -91,6 +91,7 @@ root_patterns = [
   "test/*",
   "tests/*",
   "3rdparty/*",
+  "src/python/pants/backend/python/dependency_inference/scripts",
   "/build-support/bin",
   "/build-support/flake8",
   "/build-support/migration-support",

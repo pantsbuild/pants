@@ -52,7 +52,6 @@ from pants.backend.go.util_rules.pkg_analyzer import PackageAnalyzerSetup
 from pants.backend.go.util_rules.sdk import GoSdkProcess
 from pants.backend.python.util_rules import pex
 from pants.build_graph.address import Address
-from pants.core.goals.tailor import group_by_dir
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
@@ -89,6 +88,7 @@ from pants.source.source_root import (
     SourceRootsRequest,
     SourceRootsResult,
 )
+from pants.util.dirutil import group_by_dir
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.strutil import softwrap
