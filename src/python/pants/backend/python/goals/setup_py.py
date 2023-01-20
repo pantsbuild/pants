@@ -91,7 +91,6 @@ from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_property
-from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 from pants.util.strutil import softwrap
 
@@ -213,8 +212,7 @@ class DistBuildChrootRequest:
     interpreter_constraints: InterpreterConstraints
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class SetupKwargs:
     """The keyword arguments to the `setup()` function in the generated `setup.py`."""
 
@@ -256,7 +254,11 @@ class SetupKwargs:
         # would require that all values are immutable, and we may have lists and dictionaries as
         # values. It's too difficult/clunky to convert those all, then to convert them back out of
         # `FrozenDict`. We don't use JSON because it does not preserve data types like `tuple`.
-        self._pickled_bytes = pickle.dumps({k: v for k, v in sorted(kwargs.items())}, protocol=4)
+        object.__setattr__(
+            self,
+            "_pickled_bytes",
+            pickle.dumps({k: v for k, v in sorted(kwargs.items())}, protocol=4),
+        )
 
     @memoized_property
     def kwargs(self) -> dict[str, Any]:

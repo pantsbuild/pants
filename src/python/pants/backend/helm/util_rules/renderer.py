@@ -42,7 +42,6 @@ from pants.engine.internals.native_engine import FileDigest
 from pants.engine.process import InteractiveProcess, Process, ProcessCacheScope, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule, rule_helper
 from pants.util.logging import LogLevel
-from pants.util.meta import frozen_after_init
 from pants.util.strutil import pluralize, softwrap
 from pants.util.value_interpolation import InterpolationContext, InterpolationValue
 
@@ -56,8 +55,7 @@ class HelmDeploymentCmd(Enum):
     RENDER = "template"
 
 
-@dataclass(unsafe_hash=True)
-@frozen_after_init
+@dataclass(frozen=True)
 class HelmDeploymentRequest(EngineAwareParameter):
     field_set: HelmDeploymentFieldSet
 
@@ -75,11 +73,11 @@ class HelmDeploymentRequest(EngineAwareParameter):
         extra_argv: Iterable[str] | None = None,
         post_renderer: HelmPostRenderer | None = None,
     ) -> None:
-        self.field_set = field_set
-        self.cmd = cmd
-        self.description = description
-        self.extra_argv = tuple(extra_argv or ())
-        self.post_renderer = post_renderer
+        object.__setattr__(self, "field_set", field_set)
+        object.__setattr__(self, "cmd", cmd)
+        object.__setattr__(self, "description", description)
+        object.__setattr__(self, "extra_argv", tuple(extra_argv or ()))
+        object.__setattr__(self, "post_renderer", post_renderer)
 
     def debug_hint(self) -> str | None:
         return self.field_set.address.spec
