@@ -103,6 +103,8 @@ class PexCliProcess:
         object.__setattr__(self, "concurrency_available", concurrency_available)
         object.__setattr__(self, "cache_scope", cache_scope)
 
+        self.__post_init__()
+
     def __post_init__(self) -> None:
         if "--pex-root-path" in self.extra_args:
             raise ValueError("`--pex-root` flag not allowed. We set its value for you.")

@@ -267,6 +267,8 @@ class PexRequirements:
         )
         object.__setattr__(self, "from_superset", from_superset)
 
+        self.__post_init__()
+
     def __post_init__(self):
         if isinstance(self.from_superset, LoadedLockfile) and not self.from_superset.is_pex_native:
             raise ValueError(

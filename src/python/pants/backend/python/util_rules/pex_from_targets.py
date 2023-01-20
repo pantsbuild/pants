@@ -160,6 +160,8 @@ class PexFromTargetsRequest:
         )
         object.__setattr__(self, "description", description)
 
+        self.__post_init__()
+
     def __post_init__(self):
         if self.internal_only and (self.platforms or self.complete_platforms):
             raise AssertionError(
