@@ -7,6 +7,7 @@ from dataclasses import FrozenInstanceError, dataclass
 import pytest
 
 from pants.util.meta import SingletonMetaclass, classproperty, frozen_after_init
+from pants.util.strutil import softwrap
 
 
 def test_singleton() -> None:
@@ -183,10 +184,12 @@ def test_abstract_classproperty():
 
     with pytest.raises(TypeError) as exc:
         Abstract.f
-    assert str(exc.value) == (
-        "The classproperty 'f' in type 'Abstract' was an abstractproperty, meaning that type "
-        "Abstract must override it by setting it as a variable in the class body or defining a "
-        "method with an @classproperty decorator."
+    assert str(exc.value) == softwrap(
+        """
+        The classproperty 'f' in type 'Abstract' was an abstractproperty, meaning that type
+        Abstract must override it by setting it as a variable in the class body or defining a
+        method with an @classproperty decorator.
+        """
     )
 
     class WithoutOverriding(Abstract):
@@ -194,10 +197,12 @@ def test_abstract_classproperty():
 
     with pytest.raises(TypeError) as exc:
         WithoutOverriding.f
-    assert str(exc.value) == (
-        "The classproperty 'f' in type 'WithoutOverriding' was an abstractproperty, meaning that "
-        "type WithoutOverriding must override it by setting it as a variable in the class body or "
-        "defining a method with an @classproperty decorator."
+    assert str(exc.value) == softwrap(
+        """
+        The classproperty 'f' in type 'WithoutOverriding' was an abstractproperty, meaning that
+        type WithoutOverriding must override it by setting it as a variable in the class body or
+        defining a method with an @classproperty decorator.
+        """
     )
 
     class Concrete(Abstract):

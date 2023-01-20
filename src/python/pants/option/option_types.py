@@ -695,8 +695,12 @@ class EnumListOption(_ListOptionBase[_OptT], Generic[_OptT]):
         if enum_type is None:
             if not default:
                 raise ValueError(
-                    "`enum_type` must be provided to the constructor if `default` isn't provided "
-                    "or is empty."
+                    softwrap(
+                        """
+                        `enum_type` must be provided to the constructor if `default` isn't provided
+                        or is empty.
+                        """
+                    )
                 )
             return type(default[0])
         return enum_type
