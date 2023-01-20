@@ -23,6 +23,7 @@ from pants.engine.internals.selectors import (
 )
 from pants.util.backport import get_annotations
 from pants.util.memo import memoized
+from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -154,13 +155,16 @@ class _AwaitableCollector(ast.NodeVisitor):
 
     def _check_constraint_arg_type(self, resolved: Any, node: ast.AST) -> type:
         if resolved is None:
+            mod = self.types.root.__name__
             raise RuleTypeError(
                 self._format(
                     node,
-                    (
-                        f"Could not resolve type for `{_node_str(node)}` in module "
-                        f"{self.types.root.__name__}.\n"
-                        "This may be a limitation of the Pants rule type inference."
+                    softwrap(
+                        f"""
+                        Could not resolve type for `{_node_str(node)}` in module {mod}.
+
+                        This may be a limitation of the Pants rule type inference.
+                        """
                     ),
                 )
             )
@@ -284,9 +288,13 @@ class _AwaitableCollector(ast.NodeVisitor):
                 logger.debug(
                     self._format(
                         node,
-                        (
-                            "Rule visitor failed to inspect assignment expression for "
-                            f"{names} - {values}: {e}"
+                        softwrap(
+                            f"""
+                            Rule visitor failed to inspect assignment expression for
+                            {names} - {values}:
+
+                            {e}
+                            """
                         ),
                     )
                 )

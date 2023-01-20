@@ -1,11 +1,14 @@
 # Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+#
+# Copyright exception for `get_annotations()` which is in the public domain.  No warranties.
+# Copied from https://github.com/python/cpython/blob/951303fd855838d47765dcd05471e14311dc9fdd/Lib/inspect.py
+
 import functools
 import sys
 import types
 
 
-# Copied from https://github.com/python/cpython/blob/951303fd855838d47765dcd05471e14311dc9fdd/Lib/inspect.py
 def get_annotations(obj, *, globals=None, locals=None, eval_str=False):
     """Compute the annotations dict for an object. obj may be a callable, class, or module. Passing
     in an object of any other type raises TypeError. Returns a dict.  get_annotations() returns a
