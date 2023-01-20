@@ -235,7 +235,8 @@ async def mypy_typecheck_partition(
     py_version = config_file.python_version_to_autoset(
         partition.interpreter_constraints, python_setup.interpreter_versions_universe
     )
-    named_cache_dir = f".cache/mypy_cache/{sha256(build_root.path.encode()).hexdigest()}"
+    named_cache_dir = ".cache/mypy_cache"
+    mypy_cache_dir = f"{named_cache_dir}/{sha256(build_root.path.encode()).hexdigest()}"
     run_cache_dir = ".tmp_cache/mypy_cache"
     argv = await _generate_argv(
         mypy,
@@ -284,14 +285,14 @@ async def mypy_typecheck_partition(
                             # Lastly, we expect that since this is run through Pants which attempts
                             # to partition MyPy runs by python version (which the DB is independent
                             # for different versions) and uses a one-process-at-a-time daemon by default,
-                            # multuple MyPy processes operating on a single db cache should be rare.
+                            # multiple MyPy processes operating on a single db cache should be rare.
 
                             {mkdir.path} -p {run_cache_dir}/{py_version} > /dev/null 2>&1 || true
-                            {cp.path} {named_cache_dir}/{py_version}/cache.db {run_cache_dir}/{py_version}/cache.db > /dev/null 2>&1 || true
+                            {cp.path} {mypy_cache_dir}/{py_version}/cache.db {run_cache_dir}/{py_version}/cache.db > /dev/null 2>&1 || true
                             {' '.join((shell_quote(arg) for arg in argv))}
                             EXIT_CODE=$?
-                            {mkdir.path} -p {named_cache_dir}/{py_version} > /dev/null 2>&1 || true
-                            {mv.path} {run_cache_dir}/{py_version}/cache.db {named_cache_dir}/{py_version}/cache.db > /dev/null 2>&1 || true
+                            {mkdir.path} -p {mypy_cache_dir}/{py_version} > /dev/null 2>&1 || true
+                            {mv.path} {run_cache_dir}/{py_version}/cache.db {mypy_cache_dir}/{py_version}/cache.db > /dev/null 2>&1 || true
                             exit $EXIT_CODE
                         """
                     ).encode(),
