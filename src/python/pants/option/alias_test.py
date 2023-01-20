@@ -105,7 +105,7 @@ def test_no_expand_when_no_aliases() -> None:
             pytest.raises(
                 CliAliasCycleError,
                 match=(
-                    r"CLI alias cycle detected in `\[cli\]\.alias` option:"
+                    r"CLI alias cycle detected in `\[cli\]\.alias` option:\n"
                     + r"other-alias -> cycle -> other-alias"
                 ),
             ),
