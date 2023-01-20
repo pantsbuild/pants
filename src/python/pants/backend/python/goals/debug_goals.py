@@ -17,7 +17,6 @@ from pants.backend.python.dependency_inference.parse_python_dependencies import 
 from pants.backend.python.dependency_inference.rules import (
     ImportResolveResult,
     PythonImportDependenciesInferenceFieldSet,
-    PythonInferSubsystem,
     ResolvedParsedPythonDependencies,
     ResolvedParsedPythonDependenciesRequest,
     UnownedImportsPossibleOwners,
@@ -82,12 +81,11 @@ class PythonSourceAnalysis:
 @rule
 async def dump_python_source_analysis_single(
     fs: PythonImportDependenciesInferenceFieldSet,
-    python_infer_subsystem: PythonInferSubsystem,
     python_setup: PythonSetup,
 ) -> PythonSourceAnalysis:
     """Infer the dependencies for a single python fieldset, keeping all the intermediate results."""
 
-    parsed_dependencies = await _exec_parse_deps(fs, python_infer_subsystem, python_setup)
+    parsed_dependencies = await _exec_parse_deps(fs, python_setup)
 
     resolve = fs.resolve.normalized_value(python_setup)
 

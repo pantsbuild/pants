@@ -70,6 +70,7 @@ async def complete_environment_vars(
             ["env", "-0"],
             description=f"Extract environment variables from {description_of_env_source}",
             level=LogLevel.DEBUG,
+            cache_scope=env_tgt.executable_search_path_cache_scope(),
         ),
     )
     result = {}

@@ -17,6 +17,7 @@ def test_synthesized_python_is_included_in_package() -> None:
                 command='echo print\\\\(\\\\"Hello, World!\\\\"\\\\) > hello_world.py',
                 execution_dependencies=(),
                 output_files=["hello_world.py",],
+                workdir=".",
             )
 
             experimental_wrap_as_python_sources(

@@ -167,7 +167,7 @@ impl Drop for RunningOperation {
     if let Some(operation_name) = self.name.take() {
       debug!("Canceling remote operation {operation_name}");
       let mut operations_client = self.operations_client.as_ref().clone();
-      let _ = self.executor.spawn(async move {
+      let _ = self.executor.native_spawn(async move {
         operations_client
           .cancel_operation(CancelOperationRequest {
             name: operation_name,

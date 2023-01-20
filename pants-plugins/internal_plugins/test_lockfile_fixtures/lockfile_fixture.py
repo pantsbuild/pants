@@ -13,11 +13,9 @@ from pants.jvm.resolve.common import ArtifactRequirement, ArtifactRequirements, 
 from pants.jvm.resolve.coursier_fetch import CoursierResolvedLockfile
 from pants.jvm.resolve.lockfile_metadata import LockfileContext
 from pants.util.docutil import bin_name
-from pants.util.meta import frozen_after_init
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class JVMLockfileFixtureDefinition:
     lockfile_rel_path: Path
     requirements: tuple[Coordinate, ...]
@@ -25,10 +23,6 @@ class JVMLockfileFixtureDefinition:
     def __init__(
         self, lockfile_rel_path: Path | str, requirements: Iterable[Coordinate | str]
     ) -> None:
-        self.lockfile_rel_path = (
-            lockfile_rel_path if isinstance(lockfile_rel_path, Path) else Path(lockfile_rel_path)
-        )
-
         coordinates: list[Coordinate] = []
         for requirement in requirements:
             if isinstance(requirement, Coordinate):
@@ -40,7 +34,13 @@ class JVMLockfileFixtureDefinition:
                 raise TypeError(
                     f"Unsupported type `{type(requirement)}` for JVM coordinate. Expected `Coordinate` or `str`."
                 )
-        self.requirements = tuple(coordinates)
+
+        object.__setattr__(
+            self,
+            "lockfile_rel_path",
+            lockfile_rel_path if isinstance(lockfile_rel_path, Path) else Path(lockfile_rel_path),
+        )
+        object.__setattr__(self, "requirements", tuple(coordinates))
 
     @classmethod
     def from_json_dict(cls, kwargs) -> JVMLockfileFixtureDefinition:

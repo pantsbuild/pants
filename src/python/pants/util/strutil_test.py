@@ -190,13 +190,13 @@ def test_softwrap_multiline() -> None:
             """
         )
         == (
-            "Do you believe in UFOs, astral projections, mental telepathy, ESP, clairvoyance, "
-            "spirit photography, telekinetic movement, full trance mediums, the Loch Ness monster "
-            "and the theory of Atlantis?"
-            "\n\n"
-            "Ah, if there's a steady paycheck in it, I'll believe anything you say."
-            "\n\n"
-            "[From Ghostbusters (1984)]"
+            "Do you believe in UFOs, astral projections, mental telepathy, ESP, clairvoyance,"
+            + " spirit photography, telekinetic movement, full trance mediums, the Loch Ness monster"
+            + " and the theory of Atlantis?"
+            + "\n\n"
+            + "Ah, if there's a steady paycheck in it, I'll believe anything you say."
+            + "\n\n"
+            + "[From Ghostbusters (1984)]"
         )
     )
     # Test without leading backslash
@@ -215,13 +215,13 @@ def test_softwrap_multiline() -> None:
             """
         )
         == (
-            "Do you believe in UFOs, astral projections, mental telepathy, ESP, clairvoyance, "
-            "spirit photography, telekinetic movement, full trance mediums, the Loch Ness monster "
-            "and the theory of Atlantis?"
-            "\n\n"
-            "Ah, if there's a steady paycheck in it, I'll believe anything you say."
-            "\n\n"
-            "[From Ghostbusters (1984)]"
+            "Do you believe in UFOs, astral projections, mental telepathy, ESP, clairvoyance,"
+            + " spirit photography, telekinetic movement, full trance mediums, the Loch Ness monster"
+            + " and the theory of Atlantis?"
+            + "\n\n"
+            + "Ah, if there's a steady paycheck in it, I'll believe anything you say."
+            + "\n\n"
+            + "[From Ghostbusters (1984)]"
         )
     )
     assert (
@@ -241,13 +241,13 @@ def test_softwrap_multiline() -> None:
         )
         == (
             "Do you believe in:"
-            "\n\n"
-            "    UFOs\n"
-            "    astral projections\n"
-            "    mental telepathy\n"
-            "    ...\n"
-            "\n"
-            "Ah, if there's a steady paycheck in it, I'll believe anything you say."
+            + "\n\n"
+            + "    UFOs\n"
+            + "    astral projections\n"
+            + "    mental telepathy\n"
+            + "    ...\n"
+            + "\n"
+            + "Ah, if there's a steady paycheck in it, I'll believe anything you say."
         )
     )
     assert (
@@ -262,11 +262,11 @@ def test_softwrap_multiline() -> None:
         )
         == (
             "Do you believe in:"
-            "\n"
-            "    UFOs\n"
-            "    astral projections\n"
-            "    mental telepathy\n"
-            "    ..."
+            + "\n"
+            + "    UFOs\n"
+            + "    astral projections\n"
+            + "    mental telepathy\n"
+            + "    ..."
         )
     )
     assert (
@@ -291,18 +291,18 @@ def test_softwrap_multiline() -> None:
         )
         == (
             "Roll Call:\n\n"
-            "    ```\n"
-            "        - Dr. Peter Venkman\n"
-            "        - Dr. Egon Spengler\n"
-            "        - Dr. Raymond Stantz\n"
-            "        - Winston Zeddemore\n"
-            "\n"
-            "        And not really a ghostbuster, but we need to test wrapped indentation\n"
+            + "    ```\n"
+            + "        - Dr. Peter Venkman\n"
+            + "        - Dr. Egon Spengler\n"
+            + "        - Dr. Raymond Stantz\n"
+            + "        - Winston Zeddemore\n"
+            + "\n"
+            + "        And not really a ghostbuster, but we need to test wrapped indentation\n"
             # No \n at the end of this one
-            "        - Louis (Vinz, Vinz Clortho, Keymaster of Gozer. Volguus Zildrohar, Lord of "
-            "the Sebouillia)\n"
-            "    ```\n"
-            "\nAll here."
+            + "        - Louis (Vinz, Vinz Clortho, Keymaster of Gozer. Volguus Zildrohar, Lord of"
+            + " the Sebouillia)\n"
+            + "    ```\n"
+            + "\nAll here."
         )
     )
     assert (
@@ -317,10 +317,10 @@ def test_softwrap_multiline() -> None:
         )
         == (
             "Roll Call:\n\n"
-            "  * Dr. Peter Venkman\n"
-            "  * Dr. Egon Spengler\n"
-            "  * Dr. Raymond Stantz\n"
-            "\nAll here."
+            + "  * Dr. Peter Venkman\n"
+            + "  * Dr. Egon Spengler\n"
+            + "  * Dr. Raymond Stantz\n"
+            + "\nAll here."
         )
     )
     assert softwrap("A\n\n\nB") == "A\n\nB"
@@ -334,10 +334,10 @@ def test_softwrap_multiline() -> None:
         )
         == (
             "Roll Call:\n"
-            "  * Dr. Peter Venkman\n"
-            "  * Dr. Egon Spengler\n"
-            "  * Dr. Raymond Stantz\n"
-            "All here."
+            + "  * Dr. Peter Venkman\n"
+            + "  * Dr. Egon Spengler\n"
+            + "  * Dr. Raymond Stantz\n"
+            + "All here."
         )
     )
     # This models when we output stdout/stderr. The canonical way to do that is to indent every line
@@ -353,10 +353,10 @@ def test_softwrap_multiline() -> None:
         )
         == (
             "Roll Call:\n"
-            "  * Dr. Peter Venkman\n"
-            "  * Dr. Egon Spengler\n"
-            "  * Dr. Raymond Stantz\n"
-            "All here."
+            + "  * Dr. Peter Venkman\n"
+            + "  * Dr. Egon Spengler\n"
+            + "  * Dr. Raymond Stantz\n"
+            + "All here."
         )
     )
 

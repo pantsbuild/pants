@@ -35,7 +35,6 @@ from pants.engine.fs import (
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.unions import UnionMembership
 from pants.util.docutil import bin_name, doc_url
-from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import softwrap
 
@@ -239,8 +238,7 @@ class EntireLockfile:
     complete_req_strings: tuple[str, ...] | None = None
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class PexRequirements:
     """A request to resolve a series of requirements (optionally from a "superset" resolve)."""
 
@@ -263,18 +261,24 @@ class PexRequirements:
         :param constraints_strings: Constraints strings to apply during the resolve.
         :param from_superset: An optional superset PEX or lockfile to resolve the req strings from.
         """
-        self.req_strings = FrozenOrderedSet(sorted(req_strings))
-        self.constraints_strings = FrozenOrderedSet(sorted(constraints_strings))
-        if isinstance(from_superset, LoadedLockfile) and not from_superset.is_pex_native:
+        object.__setattr__(self, "req_strings", FrozenOrderedSet(sorted(req_strings)))
+        object.__setattr__(
+            self, "constraints_strings", FrozenOrderedSet(sorted(constraints_strings))
+        )
+        object.__setattr__(self, "from_superset", from_superset)
+
+        self.__post_init__()
+
+    def __post_init__(self):
+        if isinstance(self.from_superset, LoadedLockfile) and not self.from_superset.is_pex_native:
             raise ValueError(
                 softwrap(
                     f"""
-                    The lockfile {from_superset.original_lockfile} was not in PEX's
+                    The lockfile {self.from_superset.original_lockfile} was not in PEX's
                     native format, and so cannot be directly used as a superset.
                     """
                 )
             )
-        self.from_superset = from_superset
 
     @classmethod
     def create_from_requirement_fields(

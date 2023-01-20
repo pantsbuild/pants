@@ -37,7 +37,7 @@ backend_packages.add = [
 ]
 plugins = [
   "hdrhistogram",  # For use with `--stats-log`.
-  "toolchain.pants.plugin==0.25.0",
+  "toolchain.pants.plugin==0.26.0",
 ]
 
 # The invalidation globs cover the PYTHONPATH by default, but we exclude some files that are on the
@@ -91,6 +91,7 @@ root_patterns = [
   "test/*",
   "tests/*",
   "3rdparty/*",
+  "src/python/pants/backend/python/dependency_inference/scripts",
   "/build-support/bin",
   "/build-support/flake8",
   "/build-support/migration-support",
@@ -140,6 +141,11 @@ enable_resolves = true
 python-default = "3rdparty/python/user_reqs.lock"
 helm-post-renderer = "src/python/pants/backend/helm/subsystems/post_renderer.lock"
 helm-k8s-parser = "src/python/pants/backend/helm/subsystems/k8s_parser.lock"
+
+[python.resolves_to_interpreter_constraints]
+# Without setting this explicitly, the 'python-default' resolve uses the Pants default
+# ">=3.7,<4" IC, which is incorrect and can lead to a failed lock for systems with >=3.10.
+python-default = [">=3.7,<3.10"]
 
 [python-infer]
 assets = true

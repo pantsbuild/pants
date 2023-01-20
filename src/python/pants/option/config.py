@@ -17,6 +17,7 @@ from pants.base.build_environment import get_buildroot
 from pants.option.errors import ConfigError, ConfigValidationError, InterpolationMissingOptionError
 from pants.option.ranked_value import Value
 from pants.util.osutil import getuser
+from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -102,8 +103,14 @@ class Config:
             for error in error_log:
                 logger.error(error)
             raise ConfigValidationError(
-                "Invalid config entries detected. See log for details on which entries to update "
-                "or remove.\n(Specify --no-verify-config to disable this check.)"
+                softwrap(
+                    """
+                    Invalid config entries detected. See log for details on which entries to update
+                    or remove.
+
+                    (Specify --no-verify-config to disable this check.)
+                    """
+                )
             )
 
     @staticmethod

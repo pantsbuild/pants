@@ -52,14 +52,12 @@ from pants.engine.target import Target, TransitiveTargets, TransitiveTargetsRequ
 from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
-from pants.util.meta import frozen_after_init
 from pants.util.strutil import path_safe, softwrap
 
 logger = logging.getLogger(__name__)
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class PexFromTargetsRequest:
     addresses: Addresses
     output_filename: str
@@ -141,25 +139,30 @@ class PexFromTargetsRequest:
         :param description: A human-readable description to render in the dynamic UI when building
             the Pex.
         """
-        self.addresses = Addresses(addresses)
-        self.output_filename = output_filename
-        self.internal_only = internal_only
-        self.layout = layout
-        self.main = main
-        self.inject_args = tuple(inject_args)
-        self.inject_env = FrozenDict(inject_env)
-        self.platforms = platforms
-        self.complete_platforms = complete_platforms
-        self.additional_args = tuple(additional_args)
-        self.additional_lockfile_args = tuple(additional_lockfile_args)
-        self.include_source_files = include_source_files
-        self.include_requirements = include_requirements
-        self.include_local_dists = include_local_dists
-        self.additional_sources = additional_sources
-        self.additional_inputs = additional_inputs
-        self.hardcoded_interpreter_constraints = hardcoded_interpreter_constraints
-        self.description = description
+        object.__setattr__(self, "addresses", Addresses(addresses))
+        object.__setattr__(self, "output_filename", output_filename)
+        object.__setattr__(self, "internal_only", internal_only)
+        object.__setattr__(self, "layout", layout)
+        object.__setattr__(self, "main", main)
+        object.__setattr__(self, "inject_args", tuple(inject_args))
+        object.__setattr__(self, "inject_env", FrozenDict(inject_env))
+        object.__setattr__(self, "platforms", platforms)
+        object.__setattr__(self, "complete_platforms", complete_platforms)
+        object.__setattr__(self, "additional_args", tuple(additional_args))
+        object.__setattr__(self, "additional_lockfile_args", tuple(additional_lockfile_args))
+        object.__setattr__(self, "include_source_files", include_source_files)
+        object.__setattr__(self, "include_requirements", include_requirements)
+        object.__setattr__(self, "include_local_dists", include_local_dists)
+        object.__setattr__(self, "additional_sources", additional_sources)
+        object.__setattr__(self, "additional_inputs", additional_inputs)
+        object.__setattr__(
+            self, "hardcoded_interpreter_constraints", hardcoded_interpreter_constraints
+        )
+        object.__setattr__(self, "description", description)
 
+        self.__post_init__()
+
+    def __post_init__(self):
         if self.internal_only and (self.platforms or self.complete_platforms):
             raise AssertionError(
                 softwrap(
@@ -178,8 +181,7 @@ class PexFromTargetsRequest:
         )
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class InterpreterConstraintsRequest:
     addresses: Addresses
     hardcoded_interpreter_constraints: InterpreterConstraints | None
@@ -190,8 +192,10 @@ class InterpreterConstraintsRequest:
         *,
         hardcoded_interpreter_constraints: InterpreterConstraints | None = None,
     ) -> None:
-        self.addresses = Addresses(addresses)
-        self.hardcoded_interpreter_constraints = hardcoded_interpreter_constraints
+        object.__setattr__(self, "addresses", Addresses(addresses))
+        object.__setattr__(
+            self, "hardcoded_interpreter_constraints", hardcoded_interpreter_constraints
+        )
 
 
 @rule
@@ -340,8 +344,7 @@ async def determine_requirement_strings_in_closure(
     )
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class _RepositoryPexRequest:
     addresses: Addresses
     hardcoded_interpreter_constraints: InterpreterConstraints | None
@@ -360,12 +363,14 @@ class _RepositoryPexRequest:
         complete_platforms: CompletePlatforms = CompletePlatforms(),
         additional_lockfile_args: tuple[str, ...] = (),
     ) -> None:
-        self.addresses = Addresses(addresses)
-        self.internal_only = internal_only
-        self.hardcoded_interpreter_constraints = hardcoded_interpreter_constraints
-        self.platforms = platforms
-        self.complete_platforms = complete_platforms
-        self.additional_lockfile_args = additional_lockfile_args
+        object.__setattr__(self, "addresses", Addresses(addresses))
+        object.__setattr__(self, "internal_only", internal_only)
+        object.__setattr__(
+            self, "hardcoded_interpreter_constraints", hardcoded_interpreter_constraints
+        )
+        object.__setattr__(self, "platforms", platforms)
+        object.__setattr__(self, "complete_platforms", complete_platforms)
+        object.__setattr__(self, "additional_lockfile_args", additional_lockfile_args)
 
     def to_interpreter_constraints_request(self) -> InterpreterConstraintsRequest:
         return InterpreterConstraintsRequest(
@@ -668,8 +673,7 @@ async def _setup_constraints_repository_pex(
     return OptionalPexRequest(repository_pex)
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class RequirementsPexRequest:
     """Requests a PEX containing only thirdparty requirements for internal/non-portable use.
 
@@ -686,8 +690,10 @@ class RequirementsPexRequest:
         *,
         hardcoded_interpreter_constraints: InterpreterConstraints | None = None,
     ) -> None:
-        self.addresses = Addresses(addresses)
-        self.hardcoded_interpreter_constraints = hardcoded_interpreter_constraints
+        object.__setattr__(self, "addresses", Addresses(addresses))
+        object.__setattr__(
+            self, "hardcoded_interpreter_constraints", hardcoded_interpreter_constraints
+        )
 
 
 @rule

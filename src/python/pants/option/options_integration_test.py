@@ -83,8 +83,8 @@ def test_deprecation_and_ignore_warnings(use_pantsd: bool) -> None:
         result.assert_success()
         assert unmatched_glob_warning in result.stderr
         assert (
-            "DEPRECATED: option 'deprecated' in scope 'mock-options' is scheduled to be removed in version "
-            "999.99.9.dev0."
+            "DEPRECATED: option 'deprecated' in scope 'mock-options' is scheduled to be removed in version"
+            + " 999.99.9.dev0."
         ) in result.stderr
 
         config["GLOBAL"]["ignore_warnings"] = [  # type: ignore[index]

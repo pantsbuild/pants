@@ -166,9 +166,14 @@ class AuthPluginResult:
             if addr and not any(addr.startswith(scheme) for scheme in valid_schemes):
                 name = self.plugin_name or ""
                 raise ValueError(
-                    f"Invalid `{field_name}` in `AuthPluginResult` returned from "
-                    f"`[GLOBAL].remote_auth_plugin` {name}. Must start with `grpc://` or `grpcs://`, but was "
-                    f"{addr}."
+                    softwrap(
+                        f"""
+                        Invalid `{field_name}` in `AuthPluginResult` returned from
+                        `[GLOBAL].remote_auth_plugin` {name}.
+
+                        Must start with `grpc://` or `grpcs://`, but was {addr}.
+                        """
+                    )
                 )
 
         assert_valid_address(self.store_address, "store_address")
@@ -201,13 +206,21 @@ class DynamicRemoteOptions:
             return
         if self.cache_read:
             raise OptionsError(
-                "The `[GLOBAL].remote_cache_read` option requires also setting the"
-                "`[GLOBAL].remote_store_address` option in order to work properly."
+                softwrap(
+                    """
+                    The `[GLOBAL].remote_cache_read` option requires also setting the
+                    `[GLOBAL].remote_store_address` option in order to work properly.
+                    """
+                )
             )
         if self.cache_write:
             raise OptionsError(
-                "The `[GLOBAL].remote_cache_write` option requires also setting the "
-                "`[GLOBAL].remote_store_address` option in order to work properly."
+                softwrap(
+                    """
+                    The `[GLOBAL].remote_cache_write` option requires also setting the
+                    `[GLOBAL].remote_store_address` option in order to work properly.
+                    """
+                )
             )
 
     def _validate_exec_addr(self) -> None:
@@ -215,13 +228,21 @@ class DynamicRemoteOptions:
             return
         if not self.execution_address:
             raise OptionsError(
-                "The `[GLOBAL].remote_execution` option requires also setting the "
-                "`[GLOBAL].remote_execution_address` option in order to work properly."
+                softwrap(
+                    """
+                    The `[GLOBAL].remote_execution` option requires also setting the
+                    `[GLOBAL].remote_execution_address` option in order to work properly.
+                    """
+                )
             )
         if not self.store_address:
             raise OptionsError(
-                "The `[GLOBAL].remote_execution_address` option requires also setting the "
-                "`[GLOBAL].remote_store_address` option. Often these have the same value."
+                softwrap(
+                    """
+                    The `[GLOBAL].remote_execution_address` option requires also setting the
+                    `[GLOBAL].remote_store_address` option. Often these have the same value.
+                    """
+                )
             )
 
     def __post_init__(self) -> None:
@@ -252,8 +273,12 @@ class DynamicRemoteOptions:
         )
         if set(oauth_token).intersection({"\n", "\r"}):
             raise OptionsError(
-                f"OAuth bearer token path {bootstrap_options.remote_oauth_bearer_token_path} "
-                "must not contain multiple lines."
+                softwrap(
+                    f"""
+                    OAuth bearer token path {bootstrap_options.remote_oauth_bearer_token_path}
+                    must not contain multiple lines.
+                    """
+                )
             )
 
         token_header = {"authorization": f"Bearer {oauth_token}"}
@@ -303,8 +328,12 @@ class DynamicRemoteOptions:
             return cls.disabled(), None
         if remote_auth_plugin_func and bootstrap_options.remote_oauth_bearer_token_path:
             raise OptionsError(
-                f"Both `{remote_auth_plugin_func}` and `[GLOBAL].remote_oauth_bearer_token_path` are set. "
-                "This is not supported. Only one of those should be set in order to provide auth information."
+                softwrap(
+                    f"""
+                    Both `{remote_auth_plugin_func}` and `[GLOBAL].remote_oauth_bearer_token_path` are set.
+                    This is not supported. Only one of those should be set in order to provide auth information.
+                    """
+                )
             )
         if bootstrap_options.remote_oauth_bearer_token_path:
             return cls._use_oauth_token(bootstrap_options), None
@@ -748,8 +777,12 @@ class BootstrapOptions:
     pants_bin_name = StrOption(
         advanced=True,
         default="./pants",  # noqa: PANTSBIN
-        help="The name of the script or binary used to invoke Pants. "
-        "Useful when printing help messages.",
+        help=softwrap(
+            """
+            The name of the script or binary used to invoke Pants.
+            Useful when printing help messages.
+            """
+        ),
     )
     pants_workdir = StrOption(
         advanced=True,
@@ -1700,8 +1733,12 @@ class GlobalOptions(BootstrapOptions, Subsystem):
             # TODO: This is a defense against deadlocks due to #11329: we only run one `@goal_rule`
             # at a time, and a `@goal_rule` will only block one thread.
             raise OptionsError(
-                "--rule-threads-core values less than 2 are not supported, but it was set to "
-                f"{opts.rule_threads_core}."
+                softwrap(
+                    f"""
+                    --rule-threads-core values less than 2 are not supported, but it was set to
+                    {opts.rule_threads_core}.
+                    """
+                )
             )
 
         if (
@@ -1723,8 +1760,12 @@ class GlobalOptions(BootstrapOptions, Subsystem):
 
         if not opts.watch_filesystem and (opts.pantsd or opts.loop):
             raise OptionsError(
-                "The `--no-watch-filesystem` option may not be set if "
-                "`--pantsd` or `--loop` is set."
+                softwrap(
+                    """
+                    The `--no-watch-filesystem` option may not be set if
+                    `--pantsd` or `--loop` is set.
+                    """
+                )
             )
 
         def validate_remote_address(opt_name: str) -> None:
@@ -1732,8 +1773,12 @@ class GlobalOptions(BootstrapOptions, Subsystem):
             address = getattr(opts, opt_name)
             if address and not any(address.startswith(scheme) for scheme in valid_schemes):
                 raise OptionsError(
-                    f"The `{opt_name}` option must begin with one of {valid_schemes}, but "
-                    f"was {address}."
+                    softwrap(
+                        f"""
+                        The `{opt_name}` option must begin with one of {valid_schemes}, but
+                        was {address}.
+                        """
+                    )
                 )
 
         validate_remote_address("remote_execution_address")
@@ -1745,13 +1790,21 @@ class GlobalOptions(BootstrapOptions, Subsystem):
             for k, v in getattr(opts, opt_name).items():
                 if not k.isascii():
                     raise OptionsError(
-                        f"All values in `{command_line_opt_name}` must be ASCII, but the key "
-                        f"in `{k}: {v}` has non-ASCII characters."
+                        softwrap(
+                            f"""
+                            All values in `{command_line_opt_name}` must be ASCII, but the key
+                            in `{k}: {v}` has non-ASCII characters.
+                            """
+                        )
                     )
                 if not v.isascii():
                     raise OptionsError(
-                        f"All values in `{command_line_opt_name}` must be ASCII, but the value in "
-                        f"`{k}: {v}` has non-ASCII characters."
+                        softwrap(
+                            f"""
+                            All values in `{command_line_opt_name}` must be ASCII, but the value in
+                            `{k}: {v}` has non-ASCII characters.
+                            """
+                        )
                     )
 
         validate_remote_headers("remote_execution_headers")
@@ -1760,8 +1813,12 @@ class GlobalOptions(BootstrapOptions, Subsystem):
         illegal_build_ignores = [i for i in opts.build_ignore if i.startswith("!")]
         if illegal_build_ignores:
             raise OptionsError(
-                "The `--build-ignore` option does not support negated globs, but was "
-                f"given: {illegal_build_ignores}."
+                softwrap(
+                    f"""
+                    The `--build-ignore` option does not support negated globs, but was
+                    given: {illegal_build_ignores}.
+                    """
+                )
             )
 
     @staticmethod

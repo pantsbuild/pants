@@ -7,6 +7,105 @@ env:
   PANTS_CONFIG_FILES: +['pants.ci.toml']
   RUST_BACKTRACE: all
 jobs:
+  bootstrap_pants_linux_arm64:
+    env:
+      PANTS_REMOTE_CACHE_READ: 'false'
+      PANTS_REMOTE_CACHE_WRITE: 'false'
+    if: github.repository_owner == 'pantsbuild'
+    name: Bootstrap Pants, test Rust (Linux-ARM64)
+    runs-on:
+    - self-hosted
+    - Linux
+    - ARM64
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 10
+    - name: Tell Pants to use Python ${{ matrix.python-version }}
+      run: 'echo "PY=python${{ matrix.python-version }}" >> $GITHUB_ENV
+
+        echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version
+        }}.*'']" >> $GITHUB_ENV
+
+        '
+    - name: Cache Rust toolchain
+      uses: actions/cache@v3
+      with:
+        key: Linux-ARM64-rustup-${{ hashFiles('rust-toolchain') }}-v2
+        path: '~/.rustup/toolchains/1.66.1-*
+
+          ~/.rustup/update-hashes
+
+          ~/.rustup/settings.toml
+
+          '
+    - name: Cache Cargo
+      uses: benjyw/rust-cache@461b9f8eee66b575bce78977bf649b8b7a8d53f1
+      with:
+        cache-bin: 'false'
+        shared-key: engine
+        workspaces: src/rust/engine
+    - id: get-engine-hash
+      name: Get native engine hash
+      run: echo "hash=$(./build-support/bin/rust/print_engine_hash.sh)" >> $GITHUB_OUTPUT
+      shell: bash
+    - name: Cache native engine
+      uses: actions/cache@v3
+      with:
+        key: Linux-ARM64-engine-${{ steps.get-engine-hash.outputs.hash }}-v1
+        path: '.pants
+
+          src/python/pants/engine/internals/native_engine.so
+
+          src/python/pants/engine/internals/native_engine.so.metadata'
+    - if: github.event_name != 'pull_request'
+      name: Setup toolchain auth
+      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
+
+        '
+    - name: Bootstrap Pants
+      run: ./pants version > ${{ runner.temp }}/_pants_version.stdout && [[ -s ${{
+        runner.temp }}/_pants_version.stdout ]]
+    - name: Run smoke tests
+      run: './pants list ::
+
+        ./pants roots
+
+        ./pants help goals
+
+        ./pants help targets
+
+        ./pants help subsystems
+
+        '
+    - continue-on-error: true
+      if: always()
+      name: Upload pants.log
+      uses: actions/upload-artifact@v3
+      with:
+        name: pants-log-bootstrap-Linux-ARM64
+        path: .pants.d/pants.log
+    - name: Upload native binaries
+      uses: actions/upload-artifact@v3
+      with:
+        name: native_binaries.${{ matrix.python-version }}.Linux-ARM64
+        path: '.pants
+
+          src/python/pants/engine/internals/native_engine.so
+
+          src/python/pants/engine/internals/native_engine.so.metadata'
+    - env:
+        TMPDIR: ${{ runner.temp }}
+      if: needs.classify_changes.outputs.rust == 'true'
+      name: Test Rust
+      run: ./cargo test --tests -- --nocapture
+    strategy:
+      matrix:
+        python-version:
+        - '3.8'
+        - '3.9'
+    timeout-minutes: 60
   bootstrap_pants_linux_x86_64:
     env:
       PANTS_REMOTE_CACHE_READ: 'false'
@@ -35,7 +134,7 @@ jobs:
       uses: actions/cache@v3
       with:
         key: Linux-x86_64-rustup-${{ hashFiles('rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.66.0-*
+        path: '~/.rustup/toolchains/1.66.1-*
 
           ~/.rustup/update-hashes
 
@@ -150,7 +249,7 @@ jobs:
       uses: actions/cache@v3
       with:
         key: macOS11-x86_64-rustup-${{ hashFiles('rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.66.0-*
+        path: '~/.rustup/toolchains/1.66.1-*
 
           ~/.rustup/update-hashes
 
@@ -287,6 +386,59 @@ jobs:
         - '3.8'
         - '3.9'
     timeout-minutes: 30
+  test_python_linux_arm64:
+    env:
+      PANTS_CONFIG_FILES: +['pants.ci.toml','pants.ci.aarch64.toml']
+    if: github.repository_owner == 'pantsbuild'
+    name: Test Python (Linux-ARM64)
+    needs: bootstrap_pants_linux_arm64
+    runs-on:
+    - self-hosted
+    - Linux
+    - ARM64
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 10
+    - name: Install AdoptJDK
+      uses: actions/setup-java@v3
+      with:
+        distribution: adopt
+        java-version: '11'
+    - name: Tell Pants to use Python ${{ matrix.python-version }}
+      run: 'echo "PY=python${{ matrix.python-version }}" >> $GITHUB_ENV
+
+        echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version
+        }}.*'']" >> $GITHUB_ENV
+
+        '
+    - name: Download native binaries
+      uses: actions/download-artifact@v3
+      with:
+        name: native_binaries.${{ matrix.python-version }}.Linux-ARM64
+    - if: github.event_name != 'pull_request'
+      name: Setup toolchain auth
+      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
+
+        '
+    - name: Run Python tests
+      run: './pants --tag=+platform_specific_behavior test :: -- -m platform_specific_behavior
+
+        '
+    - continue-on-error: true
+      if: always()
+      name: Upload pants.log
+      uses: actions/upload-artifact@v3
+      with:
+        name: pants-log-python-test-Linux-ARM64
+        path: .pants.d/pants.log
+    strategy:
+      matrix:
+        python-version:
+        - '3.8'
+        - '3.9'
+    timeout-minutes: 90
   test_python_linux_x86_64_0:
     env: {}
     if: github.repository_owner == 'pantsbuild'

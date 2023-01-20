@@ -46,6 +46,8 @@ Pants open source project has had many team members in over a decade. The curren
 | **NAME**                | **PROUDEST CONTRIBUTION**                                                                                |
 |-------------------------|----------------------------------------------------------------------------------------------------------|
 | **Chris Williams**      |                                                                                                          |
+| **Daniel Goldman**      | "Pants metaprogramming"                                                                                                         |
+| **Darcy Shen**      | "Exploring the best Pants practice for Data and ML Engineering in Python and Scala"                                                                                                         |
 | **Doron Somech**        | "Improving Scala dependency inference to support our codebase"                                           |
 | **Jacob Floyd**         | Gave the idea for `skip_flake8` et al, which grew into a flagship feature: incremental adoption          |
 | **Jonas Stendahl**      | "Adding formatting and linting support for Protobuf"                                                     |

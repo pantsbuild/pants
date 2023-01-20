@@ -189,6 +189,15 @@ def test_additional_source_roots(rule_runner: RuleRunner) -> None:
     assert len(result) == 1
     assert result[0].exit_code == 0
 
+    # When we run on just one target, Pyright should find its dependency in the other source root.
+    result = run_pyright(
+        rule_runner,
+        tgts[1:],
+        extra_args=[f"--source-root-patterns=['{LIB_1_PACKAGE}', '{LIB_2_PACKAGE}']"],
+    )
+    assert len(result) == 1
+    assert result[0].exit_code == 0
+
 
 def test_skip(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({f"{PACKAGE}/f.py": BAD_FILE, f"{PACKAGE}/BUILD": "python_sources()"})
