@@ -8,13 +8,11 @@ from typing import Any, Callable
 
 from pants.base.parse_context import ParseContext
 from pants.util.frozendict import FrozenDict
-from pants.util.meta import frozen_after_init
 
 ContextAwareObjectFactory = Callable[[ParseContext], Callable[..., None]]
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class BuildFileAliases:
     """A structure containing sets of symbols to be exposed in BUILD files.
 
@@ -80,10 +78,10 @@ class BuildFileAliases:
         """
         :API: public
         """
-        self._objects = self._validate_objects(objects)
-        self._context_aware_object_factories = self._validate_context_aware_object_factories(
+        object.__setattr__(self, "_objects",  self._validate_objects(objects))
+        object.__setattr__(self, "_context_aware_object_factories",  self._validate_context_aware_object_factories(
             context_aware_object_factories
-        )
+        ))
 
     @property
     def objects(self) -> FrozenDict[str, Any]:
