@@ -1265,7 +1265,7 @@ class OptionsTest(unittest.TestCase):
 
         assert (
             "Invalid choice 'invalid-value'."
-            + "Choose from: a-value, another-value, yet-another, one-more"
+            + " Choose from: a-value, another-value, yet-another, one-more"
         ) in str(exc.value)
 
     def test_non_enum_option_type_parse_error(self) -> None:

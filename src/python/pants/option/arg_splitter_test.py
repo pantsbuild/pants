@@ -240,8 +240,8 @@ def test_passthru_args(splitter: ArgSplitter) -> None:
     assert_valid_split(
         splitter,
         "./pants -lerror --fff=arg check --gg-gg=arg-arg test --iii"
-        + "--check-long-flag src/java/org/pantsbuild/foo src/java/org/pantsbuild/bar:baz --"
-        + "passthru1 passthru2 -linfo",
+        + " --check-long-flag src/java/org/pantsbuild/foo src/java/org/pantsbuild/bar:baz --"
+        + " passthru1 passthru2 -linfo",
         expected_goals=["check", "test"],
         expected_scope_to_flags={
             "": ["-lerror", "--fff=arg"],
