@@ -624,7 +624,7 @@ class Parser:
 
         # Get value from cmd-line flags.
         flag_vals = list(flag_val_strs)
-        if kwargs.get("passthrough"):
+        if kwargs.get("passthrough") and passthru_arg_strs:
             # NB: Passthrough arguments are either of type `str` or `shell_str`
             # (see self._validate): the former never need interpretation, and the latter do not
             # need interpretation when they have been provided directly via `sys.argv` as the
