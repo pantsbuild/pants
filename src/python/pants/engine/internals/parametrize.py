@@ -14,7 +14,6 @@ from pants.engine.collection import Collection
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.target import Field, FieldDefaults, Target, TargetTypesToGenerateTargetsRequests
 from pants.util.frozendict import FrozenDict
-from pants.util.meta import frozen_after_init
 from pants.util.strutil import bullet_list, softwrap
 
 
@@ -25,8 +24,7 @@ def _named_args_explanation(arg: str) -> str:
     )
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class Parametrize:
     """A builtin function/dataclass that can be used to parametrize Targets.
 
@@ -38,8 +36,8 @@ class Parametrize:
     kwargs: dict[str, Any]
 
     def __init__(self, *args: str, **kwargs: Any) -> None:
-        self.args = args
-        self.kwargs = kwargs
+        object.__setattr__(self, "args", args)
+        object.__setattr__(self, "kwargs", kwargs)
 
     def to_parameters(self) -> dict[str, Any]:
         """Validates and returns a mapping from aliases to parameter values.

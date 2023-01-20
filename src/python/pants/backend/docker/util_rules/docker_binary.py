@@ -25,8 +25,7 @@ from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 
 
-# The base class is decorated with `frozen_after_init`.
-@dataclass
+@dataclass(frozen=True)
 class DockerBinary(BinaryPath):
     """The `docker` binary."""
 

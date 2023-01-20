@@ -27,7 +27,6 @@ from pants.engine.internals.native_engine import (
     PyGeneratorResponseGet,
     PyGeneratorResponseGetMulti,
 )
-from pants.util.meta import frozen_after_init
 from pants.util.strutil import softwrap
 
 _Output = TypeVar("_Output")
@@ -60,8 +59,7 @@ class GetParseError(ValueError):
         )
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class AwaitableConstraints:
     output_type: type
     input_types: tuple[type, ...]
@@ -579,8 +577,7 @@ async def MultiGet(  # noqa: F811
     )
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class Params:
     """A set of values with distinct types.
 
@@ -590,7 +587,7 @@ class Params:
     params: tuple[Any, ...]
 
     def __init__(self, *args: Any) -> None:
-        self.params = tuple(args)
+        object.__setattr__(self, "params", tuple(args))
 
 
 # A specification for how the native engine interacts with @rule coroutines:
