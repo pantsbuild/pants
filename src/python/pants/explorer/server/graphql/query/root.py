@@ -6,11 +6,18 @@ from __future__ import annotations
 import strawberry
 
 from pants.explorer.server.graphql.query.api_types import QueryPluginApiTypesMixin
+from pants.explorer.server.graphql.query.backends import QueryBackendsMixin
 from pants.explorer.server.graphql.query.rules import QueryRulesMixin
 from pants.explorer.server.graphql.query.subsystems import QuerySubsystemsMixin
 from pants.explorer.server.graphql.query.targets import QueryTargetsMixin
 
 
 @strawberry.type
-class Query(QueryPluginApiTypesMixin, QueryRulesMixin, QuerySubsystemsMixin, QueryTargetsMixin):
+class Query(
+    QueryBackendsMixin,
+    QueryPluginApiTypesMixin,
+    QueryRulesMixin,
+    QuerySubsystemsMixin,
+    QueryTargetsMixin,
+):
     """Access to Pantsbuild data."""
