@@ -12,6 +12,8 @@ To install the `pants` binary use:
 /bin/bash -c "$(curl -fsSL https://static.pantsbuild.org/setup/pantsup.sh)" 
 ```
 
+This will install `pants` into `~/bin`, which must be on your PATH. The installer script will warn you if it is not.
+
 `pants` is a launcher binary that delegates to the underlying version of Pants in each repo. This allows you to have multiple repos, each using an independent version of Pants.
 
 - If you run `pants` in a repo that is already configured to use Pants, it will read the repo's Pants version from the `pants.toml` config file, install that version if necessary, and then run it.
