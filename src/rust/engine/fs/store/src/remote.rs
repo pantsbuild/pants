@@ -13,7 +13,9 @@ use bytes::{Bytes, BytesMut};
 use futures::Future;
 use futures::StreamExt;
 use grpc_util::retry::{retry_call, status_is_retryable};
-use grpc_util::{headers_to_http_header_map, layered_service, status_to_str, LayeredService};
+use grpc_util::{
+  headers_to_http_header_map, layered_service, status_ref_to_str, status_to_str, LayeredService,
+};
 use hashing::Digest;
 use log::Level;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
@@ -57,10 +59,31 @@ enum ByteStoreError {
   Other(String),
 }
 
+impl ByteStoreError {
+  fn retryable(&self) -> bool {
+    match self {
+      ByteStoreError::Grpc(status) => status_is_retryable(status),
+      ByteStoreError::Other(_) => false,
+    }
+  }
+}
+
+impl From<Status> for ByteStoreError {
+  fn from(status: Status) -> ByteStoreError {
+    ByteStoreError::Grpc(status)
+  }
+}
+
+impl From<String> for ByteStoreError {
+  fn from(string: String) -> ByteStoreError {
+    ByteStoreError::Other(string)
+  }
+}
+
 impl fmt::Display for ByteStoreError {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     match self {
-      ByteStoreError::Grpc(status) => fmt::Display::fmt(status, f),
+      ByteStoreError::Grpc(status) => fmt::Display::fmt(&status_ref_to_str(status), f),
       ByteStoreError::Other(msg) => fmt::Display::fmt(msg, f),
     }
   }
@@ -177,16 +200,10 @@ impl ByteStore {
     retry_call(
       mmap,
       |mmap| self.store_bytes_source(digest, move |range| Bytes::copy_from_slice(&mmap[range])),
-      |err| match err {
-        ByteStoreError::Grpc(status) => status_is_retryable(status),
-        _ => false,
-      },
+      ByteStoreError::retryable,
     )
     .await
-    .map_err(|err| match err {
-      ByteStoreError::Grpc(status) => status_to_str(status).into(),
-      ByteStoreError::Other(msg) => msg.into(),
-    })
+    .map_err(|e| e.to_string().into())
   }
 
   pub async fn store_bytes(&self, bytes: Bytes) -> Result<(), String> {
@@ -194,16 +211,10 @@ impl ByteStore {
     retry_call(
       bytes,
       |bytes| self.store_bytes_source(digest, move |range| bytes.slice(range)),
-      |err| match err {
-        ByteStoreError::Grpc(status) => status_is_retryable(status),
-        _ => false,
-      },
+      ByteStoreError::retryable,
     )
     .await
-    .map_err(|err| match err {
-      ByteStoreError::Grpc(status) => status_to_str(status),
-      ByteStoreError::Other(msg) => msg,
-    })
+    .map_err(|e| e.to_string())
   }
 
   async fn store_bytes_source<ByteSource>(

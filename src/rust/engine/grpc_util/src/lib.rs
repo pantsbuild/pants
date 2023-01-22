@@ -148,8 +148,12 @@ pub fn headers_to_http_header_map(headers: &BTreeMap<String, String>) -> Result<
   Ok(HeaderMap::from_iter(http_headers))
 }
 
-pub fn status_to_str(status: tonic::Status) -> String {
+pub fn status_ref_to_str(status: &tonic::Status) -> String {
   format!("{:?}: {:?}", status.code(), status.message())
+}
+
+pub fn status_to_str(status: tonic::Status) -> String {
+  status_ref_to_str(&status)
 }
 
 #[derive(Clone)]
