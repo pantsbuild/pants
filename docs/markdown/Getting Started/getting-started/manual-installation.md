@@ -12,7 +12,7 @@ updatedAt: "2022-07-12T00:00:00.000Z"
 Manual installation
 -------------------
 
-This installation method requires Python 3.7, 3.8, or 3.9 discoverable on your `PATH`. On Mac M1s, it must be Python 3.9. 
+This installation method requires Python 3.7, 3.8, or 3.9 discoverable on your `PATH`. On macOS on Apple Silicon (M1/M2), it must be Python 3.9. 
 
 Pants is invoked via a launch script named `./pants` , saved at the root of the repository. This script will install Pants and handle upgrades.
 
