@@ -369,3 +369,48 @@ def test_default_coverage_issues_12390() -> None:
         )
         in result.stderr
     ), result.stderr
+
+
+def test_global_coverage() -> None:
+    files = {
+        "minimalcov/minimalcov/src/foo.py": 'print("In the foo module!")',
+        "minimalcov/minimalcov/src/foo_not_covered.py": 'print("No test coverage!")',
+        "minimalcov/minimalcov/src/BUILD": "python_sources()",
+        "minimalcov/minimalcov/tests/test_foo.py": dedent(
+            """\
+            import minimalcov.src.foo
+
+            def test_1():
+                assert True
+            """
+        ),
+        "minimalcov/minimalcov/tests/BUILD": "python_tests()",
+    }
+
+    # global coverage should include even those files for which there are no tests
+    with setup_tmpdir(files) as tmpdir:
+        command = [
+            "--backend-packages=pants.backend.python",
+            "test",
+            "--use-coverage",
+            "::",
+            f"--source-root-patterns=['/{tmpdir}/minimalcov']",
+            "--coverage-py-report=raw",
+            "--coverage-py-global-report",
+        ]
+        result = run_pants(command)
+        result.assert_success()
+    assert (
+        dedent(
+            f"""\
+            Name                                                  Stmts   Miss  Cover
+            -------------------------------------------------------------------------
+            {tmpdir}/minimalcov/minimalcov/src/foo.py              1      0   100%
+            {tmpdir}/minimalcov/minimalcov/src/foo_not_covered.py  1      1   0%
+            {tmpdir}/minimalcov/minimalcov/tests/test_foo.py       3      0   100%
+            -------------------------------------------------------------------------
+            TOTAL                                                     5      1   80%
+            """
+        )
+        in result.stderr
+    ), result.stderr
