@@ -53,10 +53,11 @@ def _node_str(node: Any) -> str:
 
 
 class _TypeStack:
-    def __init__(self, module_name: str) -> None:
-        self.root = sys.modules[module_name]
+    def __init__(self, func: Callable) -> None:
         self._stack: list[dict[str, Any]] = []
+        self.root = sys.modules[func.__module__]
         self.push(self.root)
+        self.__push_function_closures(func)
 
     def __repr__(self) -> str:
         from pprint import pformat
@@ -71,6 +72,15 @@ class _TypeStack:
 
     def __setitem__(self, name: str, value: Any) -> None:
         self._stack[-1][name] = value
+
+    def __push_function_closures(self, func: Callable) -> None:
+        try:
+            closurevars = [c for c in inspect.getclosurevars(func) if isinstance(c, dict)]
+        except ValueError:
+            return
+
+        for closures in closurevars:
+            self.push(closures)
 
     def push(self, frame: object) -> None:
         ns = dict(frame if isinstance(frame, dict) else frame.__dict__)
@@ -97,13 +107,19 @@ def _lookup_annotation(obj: Any, attr: str) -> Any:
             return None
 
 
-def _lookup_return_type(func: Callable) -> Any:
+def _lookup_return_type(func: Callable, check: bool = False) -> Any:
     ret = _lookup_annotation(func, "return")
     typ = typing_extensions.get_origin(ret)
     if isinstance(typ, type):
         args = typing_extensions.get_args(ret)
         if issubclass(typ, (list, set, tuple)):
             return tuple(args)
+    if check and ret is None:
+        func_file = inspect.getsourcefile(func)
+        func_line = func.__code__.co_firstlineno
+        raise TypeError(
+            f"Return type annotation required for `{func.__name__}` in {func_file}:{func_line}"
+        )
     return ret
 
 
@@ -126,7 +142,7 @@ class _AwaitableCollector(ast.NodeVisitor):
 
         self.source_file = inspect.getsourcefile(func)
 
-        self.types = _TypeStack(func.__module__)
+        self.types = _TypeStack(func)
         self.awaitables: List[AwaitableConstraints] = []
         self.visit(ast.parse(source))
 
@@ -153,19 +169,24 @@ class _AwaitableCollector(ast.NodeVisitor):
             result = _lookup_annotation(result, names.pop())
         return result
 
+    def _missing_type_error(self, node: ast.AST, context: str) -> str:
+        mod = self.types.root.__name__
+        return self._format(
+            node,
+            softwrap(
+                f"""
+                Could not resolve type for `{_node_str(node)}` in module {mod}.
+
+                {context}
+                """
+            ),
+        )
+
     def _check_constraint_arg_type(self, resolved: Any, node: ast.AST) -> type:
         if resolved is None:
-            mod = self.types.root.__name__
             raise RuleTypeError(
-                self._format(
-                    node,
-                    softwrap(
-                        f"""
-                        Could not resolve type for `{_node_str(node)}` in module {mod}.
-
-                        This may be a limitation of the Pants rule type inference.
-                        """
-                    ),
+                self._missing_type_error(
+                    node, context="This may be a limitation of the Pants rule type inference."
                 )
             )
         elif not isinstance(resolved, type):
@@ -198,8 +219,17 @@ class _AwaitableCollector(ast.NodeVisitor):
         if len(input_nodes) == 1:
             input_constructor = input_nodes[0]
             if isinstance(input_constructor, ast.Call):
+                cls_or_func = self._lookup(input_constructor.func)
+                try:
+                    type_ = (
+                        _lookup_return_type(cls_or_func, check=True)
+                        if not isinstance(cls_or_func, type)
+                        else cls_or_func
+                    )
+                except TypeError as e:
+                    raise RuleTypeError(self._missing_type_error(input_constructor, str(e))) from e
                 input_nodes = [input_constructor.func]
-                input_types = [self._lookup(input_constructor.func)]
+                input_types = [type_]
             elif isinstance(input_constructor, ast.Dict):
                 input_nodes = input_constructor.values
                 input_types = [self._lookup(v) for v in input_constructor.values]

@@ -12,6 +12,7 @@ from pants.base.exceptions import RuleTypeError
 from pants.engine.internals.rule_visitor import collect_awaitables
 from pants.engine.internals.selectors import Get, GetParseError, MultiGet
 from pants.engine.rules import rule_helper
+from pants.util.strutil import softwrap
 
 # The visitor inspects the module for definitions.
 STR = str
@@ -235,6 +236,9 @@ class Request:
     def create_get() -> Get:
         return Get(Request, int)
 
+    def bad_meth(self):
+        return Request("uh", 4.2)
+
 
 def test_deep_infer_types() -> None:
     async def rule(request: Request):
@@ -257,6 +261,8 @@ def test_deep_infer_types() -> None:
         c = Request.create_get()
         # 8 -- the `c` is already accounted for, make sure it's not duplicated.
         await MultiGet([c, Get(str, dict)])
+        # 9
+        Get(float, request._helped())
 
     assert_awaitables(
         rule,
@@ -269,5 +275,32 @@ def test_deep_infer_types() -> None:
             (dict, tuple),  # 6
             (Request, int),  # 7
             (str, dict),  # 8
+            (float, Request),  # 9
         ],
     )
+
+
+def test_missing_type_annotation() -> None:
+    async def myrule(request: Request):
+        Get(str, request.bad_meth())
+
+    err = softwrap(
+        r"""
+        /.*/rule_visitor_test\.py:\d+: Could not resolve type for `request\.bad_meth`
+        in module pants\.engine\.internals\.rule_visitor_test\.
+
+        Return type annotation required for `bad_meth` in /.*/rule_visitor_test\.py:\d+
+        """
+    )
+    with pytest.raises(RuleTypeError, match=err):
+        collect_awaitables(myrule)
+
+
+def test_closure() -> None:
+    def closure_func() -> int:
+        return 44
+
+    async def myrule(request: Request):
+        Get(str, closure_func())
+
+    assert_awaitables(myrule, [(str, int)])
