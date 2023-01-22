@@ -4,10 +4,12 @@ use std::collections::{BTreeMap, HashSet};
 use std::time::Duration;
 
 use bytes::Bytes;
+use futures::future::Either;
 use grpc_util::tls;
 use hashing::Digest;
 use mock::StubCAS;
 use testutil::data::{TestData, TestDirectory};
+use tokio::io::AsyncReadExt;
 use workunit_store::WorkunitStore;
 
 use crate::remote::ByteStore;
@@ -25,6 +27,32 @@ async fn loads_file() {
       .unwrap(),
     Some(testdata.bytes())
   );
+}
+
+#[tokio::test]
+async fn loads_huge_file_via_temp_file() {
+  // 5MB of data
+  let testdata = TestData::new(&"12345".repeat(MEGABYTES));
+
+  let _ = WorkunitStore::setup_for_tests();
+  let cas = StubCAS::builder()
+    .chunk_size_bytes(MEGABYTES)
+    .file(&testdata)
+    .build();
+
+  let response = new_byte_store(&cas)
+    .load(testdata.digest(), false)
+    .await
+    .unwrap()
+    .unwrap();
+
+  let Either::Right(mut file) = response else { panic!("unexpected Bytes") };
+
+  let mut buf = String::new();
+  file.read_to_string(&mut buf).await.unwrap();
+  assert_eq!(buf.len(), testdata.len());
+  // (assert_eq! means failures unhelpfully print a 5MB string)
+  assert!(buf == testdata.string());
 }
 
 #[tokio::test]
@@ -336,5 +364,9 @@ pub async fn load_directory_proto_bytes(
 }
 
 async fn load_bytes(store: &ByteStore, digest: Digest) -> Result<Option<Bytes>, String> {
-  store.load_bytes(digest).await
+  match store.load(digest, true).await? {
+    Some(Either::Left(b)) => Ok(Some(b)),
+    Some(Either::Right(_)) => panic!("unexpectedly got file output"),
+    None => Ok(None),
+  }
 }

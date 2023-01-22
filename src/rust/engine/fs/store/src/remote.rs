@@ -10,8 +10,9 @@ use std::time::{Duration, Instant};
 
 use async_oncecell::OnceCell;
 use bytes::{Bytes, BytesMut};
-use futures::Future;
+use futures::future::Either;
 use futures::StreamExt;
+use futures::{Future, FutureExt};
 use grpc_util::retry::{retry_call, status_is_retryable};
 use grpc_util::{
   headers_to_http_header_map, layered_service, status_ref_to_str, status_to_str, LayeredService,
@@ -25,10 +26,15 @@ use remexec::{
   content_addressable_storage_client::ContentAddressableStorageClient, BatchUpdateBlobsRequest,
   ServerCapabilities,
 };
+use tokio::io::{AsyncSeekExt, AsyncWriteExt};
+use tokio::task;
 use tonic::{Code, Request, Status};
 use workunit_store::{in_workunit, ObservationMetric};
 
-use crate::StoreError;
+use crate::{StoreError, MEGABYTES};
+
+// TODO: semi-arbitrary limit prompted by default values for some settings
+const LOAD_IN_MEMORY_SIZE_LIMIT: usize = 4 * MEGABYTES;
 
 #[derive(Clone)]
 pub struct ByteStore {
@@ -77,6 +83,11 @@ impl From<Status> for ByteStoreError {
 impl From<String> for ByteStoreError {
   fn from(string: String) -> ByteStoreError {
     ByteStoreError::Other(string)
+  }
+}
+impl From<std::io::Error> for ByteStoreError {
+  fn from(err: std::io::Error) -> ByteStoreError {
+    ByteStoreError::Other(err.to_string())
   }
 }
 
@@ -348,7 +359,11 @@ impl ByteStore {
     .await
   }
 
-  pub async fn load_bytes(&self, digest: Digest) -> Result<Option<Bytes>, String> {
+  pub async fn load(
+    &self,
+    digest: Digest,
+    force_in_memory: bool,
+  ) -> Result<Option<Either<Bytes, tokio::fs::File>>, String> {
     let start = Instant::now();
     let store = self.clone();
     let instance_name = store.instance_name.clone().unwrap_or_default();
@@ -371,23 +386,12 @@ impl ByteStore {
 
     let result_future = retry_call(
       (client, request),
-      move |(mut client, request)| async move {
-        let mut start_opt = Some(Instant::now());
-        let stream_result = client.read(request).await;
+      move |(mut client, request)| {
+        async move {
+          let mut start_opt = Some(Instant::now());
+          let response = client.read(request).await?;
 
-        let mut stream = match stream_result {
-          Ok(response) => response.into_inner(),
-          Err(status) => {
-            return match status.code() {
-              Code::NotFound => Ok(None),
-              _ => Err(status),
-            }
-          }
-        };
-
-        let read_result_closure = async {
-          let mut buf = BytesMut::with_capacity(digest.size_bytes);
-          while let Some(response) = stream.next().await {
+          let mut stream = response.into_inner().inspect(|_| {
             // Record the observed time to receive the first response for this read.
             if let Some(start) = start_opt.take() {
               if let Some(workunit_store_handle) = workunit_store::get_workunit_store_handle() {
@@ -400,31 +404,48 @@ impl ByteStore {
                 }
               }
             }
+          });
 
-            buf.extend_from_slice(&(response?).data);
+          if digest.size_bytes <= LOAD_IN_MEMORY_SIZE_LIMIT || force_in_memory {
+            let mut buf = BytesMut::with_capacity(digest.size_bytes);
+
+            while let Some(response) = stream.next().await {
+              buf.extend_from_slice(&(response?).data);
+            }
+
+            Ok(Either::Left(buf.freeze()))
+          } else {
+            // This digest is 'huge' (and the caller isn't going to be immediately loading it into
+            // memory), so we can just plop it onto disk.
+            // TODO: it'd be good to be verifying the digest as we write, instead of needing to do a
+            // separate pass
+            let file = task::spawn_blocking(tempfile::tempfile)
+              .await
+              .map_err(|e| e.to_string())??;
+
+            let mut file = tokio::fs::File::from_std(file);
+            while let Some(response) = stream.next().await {
+              file.write_all(&(response?).data).await?;
+            }
+            file.rewind().await?;
+            Ok(Either::Right(file))
           }
-          Ok(buf.freeze())
-        };
-
-        let read_result: Result<Bytes, tonic::Status> = read_result_closure.await;
-
-        match read_result {
-          Ok(bytes) => Ok(Some(bytes)),
-          Err(status) => match status.code() {
-            Code::NotFound => Ok(None),
-            _ => Err(status),
-          },
         }
+        .map(|read_result| match read_result {
+          Ok(result) => Ok(Some(result)),
+          Err(ByteStoreError::Grpc(status)) if status.code() == Code::NotFound => Ok(None),
+          Err(err) => Err(err),
+        })
       },
-      status_is_retryable,
+      ByteStoreError::retryable,
     );
 
     in_workunit!(
-      "load_bytes",
+      "load",
       Level::Trace,
       desc = Some(workunit_desc),
       |workunit| async move {
-        let result = result_future.await.map_err(status_to_str);
+        let result = result_future.await.map_err(|e| e.to_string());
         workunit.record_observation(
           ObservationMetric::RemoteStoreReadBlobTimeMicros,
           start.elapsed().as_micros() as u64,
