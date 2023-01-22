@@ -449,6 +449,8 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
             top_match
               .value_of_t::<usize>("batch-api-size-limit")
               .expect("Bad batch-api-size-limit flag"),
+            // TODO: add parameter
+            4 * 1024 * 1024,
           ),
           true,
         )

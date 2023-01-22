@@ -38,6 +38,7 @@ const OVERALL_DEADLINE_SECS: Duration = Duration::from_secs(10 * 60);
 const RETRY_INTERVAL: Duration = Duration::from_micros(0);
 const STORE_CONCURRENCY_LIMIT: usize = 256;
 const STORE_BATCH_API_SIZE_LIMIT: usize = 4 * 1024 * 1024;
+const STORE_LOAD_IN_MEMORY_SIZE_LIMIT: usize = 4 * 1024 * 1024;
 const EXEC_CONCURRENCY_LIMIT: usize = 256;
 
 #[derive(Debug, PartialEq)]
@@ -1295,6 +1296,7 @@ async fn sends_headers() {
       STORE_CONCURRENCY_LIMIT,
       None,
       STORE_BATCH_API_SIZE_LIMIT,
+      STORE_LOAD_IN_MEMORY_SIZE_LIMIT,
     )
     .unwrap();
 
@@ -1495,6 +1497,7 @@ async fn ensure_inline_stdio_is_stored() {
       STORE_CONCURRENCY_LIMIT,
       None,
       STORE_BATCH_API_SIZE_LIMIT,
+      STORE_LOAD_IN_MEMORY_SIZE_LIMIT,
     )
     .unwrap();
 
@@ -1879,6 +1882,7 @@ async fn execute_missing_file_uploads_if_known() {
       STORE_CONCURRENCY_LIMIT,
       None,
       STORE_BATCH_API_SIZE_LIMIT,
+      STORE_LOAD_IN_MEMORY_SIZE_LIMIT,
     )
     .unwrap();
 
@@ -2003,6 +2007,7 @@ async fn execute_missing_file_errors_if_unknown() {
       STORE_CONCURRENCY_LIMIT,
       None,
       STORE_BATCH_API_SIZE_LIMIT,
+      STORE_LOAD_IN_MEMORY_SIZE_LIMIT,
     )
     .unwrap();
 
@@ -2778,6 +2783,7 @@ fn make_store(store_dir: &Path, cas: &mock::StubCAS, executor: task_executor::Ex
       STORE_CONCURRENCY_LIMIT,
       None,
       STORE_BATCH_API_SIZE_LIMIT,
+      STORE_LOAD_IN_MEMORY_SIZE_LIMIT,
     )
     .unwrap()
 }

@@ -31,10 +31,7 @@ use tokio::task;
 use tonic::{Code, Request, Status};
 use workunit_store::{in_workunit, ObservationMetric};
 
-use crate::{StoreError, MEGABYTES};
-
-// TODO: semi-arbitrary limit prompted by default values for some settings
-const LOAD_IN_MEMORY_SIZE_LIMIT: usize = 4 * MEGABYTES;
+use crate::StoreError;
 
 #[derive(Clone)]
 pub struct ByteStore {
@@ -47,6 +44,7 @@ pub struct ByteStore {
   capabilities_cell: Arc<OnceCell<ServerCapabilities>>,
   capabilities_client: Arc<CapabilitiesClient<LayeredService>>,
   batch_api_size_limit: usize,
+  load_in_memory_size_limit: usize,
 }
 
 impl fmt::Debug for ByteStore {
@@ -116,6 +114,7 @@ impl ByteStore {
     rpc_concurrency_limit: usize,
     capabilities_cell_opt: Option<Arc<OnceCell<ServerCapabilities>>>,
     batch_api_size_limit: usize,
+    load_in_memory_size_limit: usize,
   ) -> Result<ByteStore, String> {
     let tls_client_config = if cas_address.starts_with("https://") {
       Some(tls_config.try_into()?)
@@ -149,6 +148,7 @@ impl ByteStore {
       capabilities_cell: capabilities_cell_opt.unwrap_or_else(|| Arc::new(OnceCell::new())),
       capabilities_client,
       batch_api_size_limit,
+      load_in_memory_size_limit,
     })
   }
 
@@ -406,7 +406,7 @@ impl ByteStore {
             }
           });
 
-          if digest.size_bytes <= LOAD_IN_MEMORY_SIZE_LIMIT || force_in_memory {
+          if digest.size_bytes <= self.load_in_memory_size_limit || force_in_memory {
             let mut buf = BytesMut::with_capacity(digest.size_bytes);
 
             while let Some(response) = stream.next().await {
