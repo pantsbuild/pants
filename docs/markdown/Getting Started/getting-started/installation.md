@@ -61,7 +61,7 @@ The `pants` binary's implementation
 
 You don't need to know this to use `pants`, but it may be of interest:
 
-The `pants` launcher binary is also known as [scie-pants](https://github.com/pantsbuild/scie-pants) (pronounced "ski pants"), It's implemented using [scie](https://github.com/a-scie/jump), a Self Contained Interpreted Executable launcher. scie is what allows `pants` to embed its own Python interpreter, instead of relying on a specific interpreter being available on your PATH. 
+The `pants` launcher binary is also known as [scie-pants](https://github.com/pantsbuild/scie-pants) (pronounced "ski pants"), It's implemented using [scie](https://github.com/a-scie/jump), a Self Contained Interpreted Executable launcher. scie is what allows `pants` to embed its own Python interpreter, instead of relying on a specific interpreter being available on your PATH.
 
 In fact, instead of literally embedding an interpreter in the `pants` binary, which would inflate its size, the binary is "hollowed out": Instead of the interpreter itself it contains metadata on how to download a platform-specific [standalone interpreter executable](https://gregoryszorc.com/docs/python-build-standalone/main/). The scie mechanism then downloads that interpreter file on first use, and caches it for future use. So if you update the `pants` launcher binary, you don't have to re-download the interpreter.
 
