@@ -262,13 +262,15 @@ class AsyncFieldMixin(Field):
         sources2 = await Get(HydratedSources, HydrateSourcesRequest(custom_tgt.get(CustomSources)))
     """
 
+    address: Address
+
     @final  # type: ignore[misc]
     def __init__(self, raw_value: Optional[Any], address: Address) -> None:
-        super().__init__(raw_value, address)
         # N.B.: We store the address here and not in the Field base class, because the memory usage
         # of storing this value in every field was shown to be excessive / lead to performance
         # issues.
         object.__setattr__(self, "address", address)
+        super().__init__(raw_value, address)
 
     def __repr__(self) -> str:
         return (
