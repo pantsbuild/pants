@@ -252,8 +252,8 @@ async def _find_what_to_run(
             *_partition(
                 field_sets,
                 lambda field_set: not any(
-                    isinstance(field, SecondaryOwnerMixin)
-                    for field in dataclasses.astuple(field_set)
+                    isinstance(getattr(field_set, field.name), SecondaryOwnerMixin)
+                    for field in dataclasses.fields(field_set)
                 ),
             )
         )
