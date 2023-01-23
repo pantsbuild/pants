@@ -64,7 +64,7 @@ async def generate_testmain(request: GenerateTestMainRequest) -> GeneratedTestMa
             env=env,
             description=f"Analyze Go test sources for {request.address}",
             level=LogLevel.DEBUG,
-            output_files=("_testmain.go",),
+            output_files=(GeneratedTestMain.TEST_MAIN_FILE,),
         ),
     )
 

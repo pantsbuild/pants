@@ -15,10 +15,14 @@ from pants.backend.go.dependency_inference import (
     GoModuleImportPathsMappingsHook,
 )
 from pants.backend.go.target_types import (
+    DEFAULT_GO_SDK_ADDR,
     GoImportPathField,
     GoModSourcesField,
     GoModTarget,
     GoPackageSourcesField,
+    GoSdkImportPathField,
+    GoSdkPackageTarget,
+    GoSdkTarget,
     GoThirdPartyPackageDependenciesField,
     GoThirdPartyPackageTarget,
 )
@@ -36,7 +40,11 @@ from pants.backend.go.util_rules.go_mod import (
     OwningGoMod,
     OwningGoModRequest,
 )
-from pants.backend.go.util_rules.import_analysis import GoStdLibImports, GoStdLibImportsRequest
+from pants.backend.go.util_rules.import_analysis import (
+    GoStdLibPackage,
+    GoStdLibPackages,
+    GoStdLibPackagesRequest,
+)
 from pants.backend.go.util_rules.third_party_pkg import (
     AllThirdPartyPackages,
     AllThirdPartyPackagesRequest,
@@ -50,6 +58,8 @@ from pants.core.target_types import (
 from pants.engine.addresses import Address
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import Digest, Snapshot
+from pants.engine.internals.synthetic_targets import SyntheticAddressMaps, SyntheticTargetsRequest
+from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     AllTargets,
@@ -91,7 +101,8 @@ async def go_map_import_paths_by_module(
     candidate_go_source_targets = [
         tgt
         for tgt in all_targets
-        if tgt.has_field(GoImportPathField) or tgt.has_field(GoPackageSourcesField)
+        if (tgt.has_field(GoImportPathField) or tgt.has_field(GoPackageSourcesField))
+        and not tgt.has_field(GoSdkImportPathField)
     ]
 
     owning_go_mod_targets = await MultiGet(
@@ -225,13 +236,13 @@ async def infer_go_dependencies(
     )
 
     addr = request.field_set.address
-    maybe_pkg_analysis, std_lib_imports = await MultiGet(
+    maybe_pkg_analysis, stdlib_packages = await MultiGet(
         Get(
             FallibleFirstPartyPkgAnalysis, FirstPartyPkgAnalysisRequest(addr, build_opts=build_opts)
         ),
         Get(
-            GoStdLibImports,
-            GoStdLibImportsRequest(with_race_detector=build_opts.with_race_detector),
+            GoStdLibPackages,
+            GoStdLibPackagesRequest(with_race_detector=build_opts.with_race_detector),
         ),
     )
 
@@ -249,7 +260,9 @@ async def infer_go_dependencies(
         *pkg_analysis.test_imports,
         *pkg_analysis.xtest_imports,
     ):
-        if import_path in std_lib_imports:
+        # Skip inference for stdlib packages.
+        # TODO: This check is deprecated and will be removed once support for building SDK packages lands.
+        if import_path in stdlib_packages:
             continue
         # Avoid a dependency cycle caused by external test imports of this package (i.e., "xtest").
         if import_path == pkg_analysis.import_path:
@@ -305,7 +318,7 @@ async def infer_go_third_party_package_dependencies(
         Get(GoBuildOptions, GoBuildOptionsFromTargetRequest(go_mod_address)),
     )
 
-    pkg_info, std_lib_imports = await MultiGet(
+    pkg_info, stdlib_packages = await MultiGet(
         Get(
             ThirdPartyPkgAnalysis,
             ThirdPartyPkgAnalysisRequest(
@@ -317,16 +330,17 @@ async def infer_go_third_party_package_dependencies(
             ),
         ),
         Get(
-            GoStdLibImports,
-            GoStdLibImportsRequest(with_race_detector=build_opts.with_race_detector),
+            GoStdLibPackages,
+            GoStdLibPackagesRequest(with_race_detector=build_opts.with_race_detector),
         ),
     )
 
     inferred_dependencies: list[Address] = []
     for import_path in pkg_info.imports:
-        if import_path in std_lib_imports:
+        # Skip inference for stdlib packages.
+        # TODO: This check is deprecated and will be removed once support for building SDK packages lands.
+        if import_path in stdlib_packages:
             continue
-
         candidate_packages = package_mapping.mapping.get(import_path, ())
         if candidate_packages:
             if candidate_packages.infer_all:
@@ -414,6 +428,76 @@ async def generate_targets_from_go_mod(
     return GeneratedTargets(request.generator, result)
 
 
+# -----------------------------------------------------------------------------------------------
+# `go_sdk` and `go_sdk_package` target types
+# -----------------------------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class GoSdkSyntheticTargetsRequest(SyntheticTargetsRequest):
+    path: str = SyntheticTargetsRequest.SINGLE_REQUEST_FOR_ALL_TARGETS
+
+
+@rule
+async def generate_go_sdk_synthetic_targets(
+    request: GoSdkSyntheticTargetsRequest,
+) -> SyntheticAddressMaps:
+    return SyntheticAddressMaps.for_targets_request(
+        request,
+        [
+            (
+                "BUILD._go_sdk",
+                [TargetAdaptor(GoSdkTarget.alias, name=DEFAULT_GO_SDK_ADDR.target_name)],
+            )
+        ],
+    )
+
+
+class GenerateTargetsFromGoSdkRequest(GenerateTargetsRequest):
+    generate_from = GoSdkTarget
+
+
+@rule(desc="Generate `_go_sdk_package` targets from `_go_sdk` target", level=LogLevel.DEBUG)
+async def generate_targets_from_go_sdk(
+    request: GenerateTargetsFromGoSdkRequest,
+    union_membership: UnionMembership,
+) -> GeneratedTargets:
+    generator_addr = request.generator.address
+
+    stdlib_packages, stdlib_packages_race = await MultiGet(
+        Get(
+            GoStdLibPackages,
+            GoStdLibPackagesRequest(with_race_detector=False),
+        ),
+        Get(
+            GoStdLibPackages,
+            GoStdLibPackagesRequest(with_race_detector=True),
+        ),
+    )
+
+    def create_tgt(pkg: GoStdLibPackage) -> GoSdkPackageTarget:
+        dep_import_paths = sorted(
+            {*pkg.imports, *stdlib_packages_race[pkg.import_path].imports} - {"C", "unsafe"}
+        )
+        return GoSdkPackageTarget(
+            {
+                **request.template,
+                GoSdkImportPathField.alias: pkg.import_path,
+                Dependencies.alias: [
+                    generator_addr.create_generated(dep_import_path).spec
+                    for dep_import_path in dep_import_paths
+                ],
+            },
+            # E.g. `//:default_go_sdk#net/http`.
+            generator_addr.create_generated(pkg.import_path),
+            union_membership,
+            residence_dir=generator_addr.spec_path,
+        )
+
+    result = tuple(create_tgt(pkg_info) for pkg_info in stdlib_packages.values())
+    return GeneratedTargets(request.generator, result)
+
+
 def rules():
     return (
         *collect_rules(),
@@ -423,5 +507,7 @@ def rules():
         UnionRule(InferDependenciesRequest, InferGoPackageDependenciesRequest),
         UnionRule(InferDependenciesRequest, InferGoThirdPartyPackageDependenciesRequest),
         UnionRule(GenerateTargetsRequest, GenerateTargetsFromGoModRequest),
+        UnionRule(GenerateTargetsRequest, GenerateTargetsFromGoSdkRequest),
         UnionRule(GoModuleImportPathsMappingsHook, FirstPartyGoModuleImportPathsMappingsHook),
+        UnionRule(SyntheticTargetsRequest, GoSdkSyntheticTargetsRequest),
     )

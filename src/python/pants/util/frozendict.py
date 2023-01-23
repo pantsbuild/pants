@@ -6,6 +6,7 @@ from __future__ import annotations
 from typing import Any, Callable, Iterable, Iterator, Mapping, TypeVar, cast, overload
 
 from pants.util.memo import memoized_method
+from pants.util.strutil import softwrap
 
 K = TypeVar("K")
 V = TypeVar("V")
@@ -90,11 +91,18 @@ class FrozenDict(Mapping[K, V]):
             return hash(tuple(self._data.items()))
         except TypeError as e:
             raise TypeError(
-                f"Even though you are using a `{type(self).__name__}`, the underlying values are "
-                "not hashable. Please use hashable (and preferably immutable) types for the "
-                "underlying values, e.g. use tuples instead of lists and use FrozenOrderedSet "
-                "instead of set().\n\n"
-                f"Original error message: {e}\n\nValue: {self}"
+                softwrap(
+                    f"""
+                    Even though you are using a `{type(self).__name__}`, the underlying values are
+                    not hashable. Please use hashable (and preferably immutable) types for the
+                    underlying values, e.g. use tuples instead of lists and use FrozenOrderedSet
+                    instead of set().
+
+                    Original error message: {e}
+
+                    Value: {self}
+                    """
+                )
             )
 
     def __hash__(self) -> int:

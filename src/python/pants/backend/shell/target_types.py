@@ -277,9 +277,13 @@ class ShellCommandOutputsField(StringSequenceField):
     alias = "outputs"
     help = softwrap(
         """
-        Specify the shell command output files and directories.
+        Specify the shell command output files and directories, relative to the `BUILD` file's
+        directory.
 
         Use a trailing slash on directory names, i.e. `my_dir/`.
+
+        Relative paths (including `..`) may be used, as long as the path does not ascend further
+        than the build root.
         """
     )
     removal_hint = "To fix, use `output_files` and `output_directories` instead."
@@ -292,10 +296,14 @@ class ShellCommandOutputFilesField(StringSequenceField):
     default = ()
     help = softwrap(
         """
-        Specify the shell command's output files to capture.
+        Specify the shell command's output files to capture, relative to the `BUILD` file's
+        directory.
 
         For directories, use `output_directories`. At least one of `output_files` and
         `output_directories` must be specified.
+
+        Relative paths (including `..`) may be used, as long as the path does not ascend further
+        than the build root.
         """
     )
 
@@ -307,10 +315,13 @@ class ShellCommandOutputDirectoriesField(StringSequenceField):
     help = softwrap(
         """
         Specify full directories (including recursive descendants) of output to capture from the
-        shell command.
+        shell command, relative to the `BUILD` file's directory.
 
-        For files, use `output_files`. At least one of `output_files` and
+        For individual files, use `output_files`. At least one of `output_files` and
         `output_directories` must be specified.
+
+        Relative paths (including `..`) may be used, as long as the path does not ascend further
+        than the build root.
         """
     )
 
@@ -366,6 +377,13 @@ class RunInSandboxSourcesField(MultipleSourcesField):
     expected_num_files = 0
 
 
+class ShellCommandIsInteractiveField(MultipleSourcesField):
+    # We use this to determine whether this is an interactive process.
+    alias = "_is_interactive"
+    uses_source_roots = False
+    expected_num_files = 0
+
+
 class RunInSandboxArgumentsField(StringSequenceField):
     alias = "args"
     default = ()
@@ -410,10 +428,16 @@ class ShellCommandLogOutputField(BoolField):
     help = "Set to true if you want the output from the command logged to the console."
 
 
-class ShellCommandRunWorkdirField(StringField):
+class ShellCommandWorkdirField(StringField):
     alias = "workdir"
-    default = "."
-    help = "Sets the current working directory of the command, relative to the project root."
+    default = None
+    help = softwrap(
+        "Sets the current working directory of the command, relative to the project root. If not "
+        "set, use the project root.\n\n"
+        "To specify the location of the `BUILD` file, use `.`. Values beginning with `.` are "
+        "relative to the location of the `BUILD` file.\n\n"
+        "To specify the project/build root, use `/` or the empty string."
+    )
 
 
 class ShellCommandTestDependenciesField(ShellCommandExecutionDependenciesField):
@@ -441,6 +465,7 @@ class ShellCommandTarget(Target):
         ShellCommandTimeoutField,
         ShellCommandToolsField,
         ShellCommandExtraEnvVarsField,
+        ShellCommandWorkdirField,
         EnvironmentField,
     )
     help = softwrap(
@@ -483,6 +508,7 @@ class ShellRunInSandboxTarget(Target):
         ShellCommandTimeoutField,
         ShellCommandToolsField,
         ShellCommandExtraEnvVarsField,
+        ShellCommandWorkdirField,
         EnvironmentField,
     )
     help = softwrap(
@@ -510,7 +536,8 @@ class ShellCommandRunTarget(Target):
         *COMMON_TARGET_FIELDS,
         ShellCommandExecutionDependenciesField,
         ShellCommandCommandField,
-        ShellCommandRunWorkdirField,
+        ShellCommandWorkdirField,
+        ShellCommandIsInteractiveField,
     )
     help = softwrap(
         """
@@ -547,6 +574,7 @@ class ShellCommandTestTarget(Target):
         ShellCommandExtraEnvVarsField,
         EnvironmentField,
         SkipShellCommandTestsField,
+        ShellCommandWorkdirField,
     )
     help = softwrap(
         """

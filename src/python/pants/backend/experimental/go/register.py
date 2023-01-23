@@ -9,7 +9,10 @@ from pants.backend.go.lint.gofmt.rules import rules as gofmt_rules
 from pants.backend.go.target_types import (
     GoBinaryTarget,
     GoModTarget,
+    GoPackageSourcesField,
     GoPackageTarget,
+    GoSdkPackageTarget,
+    GoSdkTarget,
     GoThirdPartyPackageTarget,
 )
 from pants.backend.go.util_rules import (
@@ -32,10 +35,21 @@ from pants.backend.go.util_rules import (
     tests_analysis,
     third_party_pkg,
 )
+from pants.core.util_rules.wrap_source import wrap_source_rule_and_target
+
+wrap_golang = wrap_source_rule_and_target(GoPackageSourcesField, "go_package_sources")
 
 
 def target_types():
-    return [GoPackageTarget, GoModTarget, GoThirdPartyPackageTarget, GoBinaryTarget]
+    return [
+        GoPackageTarget,
+        GoModTarget,
+        GoThirdPartyPackageTarget,
+        GoBinaryTarget,
+        *wrap_golang.target_types,
+        GoSdkTarget,
+        GoSdkPackageTarget,
+    ]
 
 
 def rules():
@@ -69,4 +83,5 @@ def rules():
         # Gofmt
         *gofmt_rules(),
         *gofmt_skip_field.rules(),
+        *wrap_golang.rules,
     ]

@@ -3,35 +3,22 @@
 # -*- coding: utf-8 -*-
 
 # NB: This must be compatible with Python 2.7 and 3.5+.
-# NB: If you're needing to debug this, an easy way is to just invoke it on a file.
-#   E.g. `STRING_IMPORTS=y ... python3 src/python/pants/backend/python/dependency_inference/scripts/import_parser.py FILENAME`
-
 from __future__ import print_function, unicode_literals
 
 import ast
 import itertools
-import json
 import os
 import re
-import sys
 import tokenize
-from io import open
+
+from _pants_dep_parser.dependency_visitor_base import DependencyVisitorBase
 
 
-class AstVisitor(ast.NodeVisitor):
-    def __init__(self, package_parts, contents):
-        self._package_parts = package_parts
-        self._contents_lines = contents.decode(errors="ignore").splitlines()
+class GeneralDependencyVisitor(DependencyVisitorBase):
+    def __init__(self, *args, **kwargs):
+        super(GeneralDependencyVisitor, self).__init__(*args, **kwargs)
 
-        # Each of these maps module_name to first lineno of occurance
-        # N.B. use `setdefault` when adding imports
-        # (See `ParsedPythonImportInfo` in ../parse_python_imports.py for the delineation of
-        #   weak/strong)
-        self.strong_imports = {}
-        self.weak_imports = {}
-        self.assets = set()
-        self._weaken_strong_imports = False
-        if os.environ["STRING_IMPORTS"] == "y":
+        if os.environ.get("STRING_IMPORTS", "n") == "y":
             # This regex is used to infer imports from strings, e.g .
             #  `importlib.import_module("example.subdir.Foo")`.
             self._string_import_regex = re.compile(
@@ -43,7 +30,7 @@ class AstVisitor(ast.NodeVisitor):
         else:
             self._string_import_regex = None
 
-        if os.environ["ASSETS"] == "y":
+        if os.environ.get("ASSETS", "n") == "y":
             # This regex is used to infer asset names from strings, e.g.
             #  `load_resource("data/db1.json")
             # Since Unix allows basically anything for filenames, we require some "sane" subset of
@@ -57,21 +44,9 @@ class AstVisitor(ast.NodeVisitor):
 
     def maybe_add_string_dependency(self, node, s):
         if self._string_import_regex and self._string_import_regex.match(s):
-            self.weak_imports.setdefault(s, node.lineno)
+            self.add_weak_import(s, node.lineno)
         if self._asset_regex and self._asset_regex.match(s):
-            self.assets.add(s)
-
-    def add_strong_import(self, name, lineno):
-        imports = self.weak_imports if self._weaken_strong_imports else self.strong_imports
-        imports.setdefault(name, lineno)
-
-    def _is_pragma_ignored(self, line_index):
-        """Return if the line at `line_index` (0-based) is pragma ignored."""
-        line_iter = itertools.dropwhile(
-            lambda line: line.endswith("\\"),
-            itertools.islice(self._contents_lines, line_index, None),
-        )
-        return "# pants: no-infer-dep" in next(line_iter)
+            self.add_asset(s, node.lineno)
 
     def _visit_import_stmt(self, node, import_prefix):
         # N.B. We only add imports whose line doesn't contain "# pants: no-infer-dep"
@@ -94,9 +69,7 @@ class AstVisitor(ast.NodeVisitor):
         for alias in node.names:
             token = find_token(alias.name.split(".")[-1])
             lineno = token[3][0] + node.lineno - 1
-
-            if not self._is_pragma_ignored(lineno - 1):
-                self.add_strong_import(import_prefix + alias.name, lineno)
+            self.add_strong_import(import_prefix + alias.name, lineno)
             if alias.asname and token[1] != alias.asname:
                 find_token(alias.asname)
 
@@ -127,13 +100,13 @@ class AstVisitor(ast.NodeVisitor):
                 continue
 
             if any(isinstance(expr, ast.Name) and expr.id == "ImportError" for expr in exprs):
-                self._weaken_strong_imports = True
+                self.weaken_strong_imports = True
                 break
 
         for stmt in node.body:
             self.visit(stmt)
 
-        self._weaken_strong_imports = False
+        self.weaken_strong_imports = False
 
         for handler in node.handlers:
             self.visit(handler)
@@ -151,15 +124,9 @@ class AstVisitor(ast.NodeVisitor):
         # to explicitly mark namespace packages.  Note that we don't handle more complex
         # uses, such as those that set `level`.
         if isinstance(node.func, ast.Name) and node.func.id == "__import__" and len(node.args) == 1:
-            if sys.version_info[0:2] < (3, 8):
-                name = node.args[0].s if isinstance(node.args[0], ast.Str) else None
-            else:
-                name = node.args[0].value if isinstance(node.args[0], ast.Constant) else None
-
+            name = self.maybe_str(node.args[0])
             if name is not None:
-                lineno = node.args[0].lineno
-                if not self._is_pragma_ignored(lineno - 1):
-                    self.add_strong_import(name, lineno)
+                self.add_strong_import(name, node.args[0].lineno)
                 return
 
         self.generic_visit(node)
@@ -176,45 +143,3 @@ class AstVisitor(ast.NodeVisitor):
     def visit_Constant(self, node):
         if isinstance(node.value, str):
             self.maybe_add_string_dependency(node, node.value)
-
-
-def main(filename):
-    with open(filename, "rb") as f:
-        content = f.read()
-    try:
-        tree = ast.parse(content, filename=filename)
-    except SyntaxError:
-        return
-
-    package_parts = os.path.dirname(filename).split(os.path.sep)
-    visitor = AstVisitor(package_parts, content)
-    visitor.visit(tree)
-
-    # We have to be careful to set the encoding explicitly and write raw bytes ourselves.
-    # See below for where we explicitly decode.
-    buffer = sys.stdout if sys.version_info[0:2] == (2, 7) else sys.stdout.buffer
-
-    # N.B. Start with weak and `update` with definitive so definite "wins"
-    imports_result = {
-        module_name: {"lineno": lineno, "weak": True}
-        for module_name, lineno in visitor.weak_imports.items()
-    }
-    imports_result.update(
-        {
-            module_name: {"lineno": lineno, "weak": False}
-            for module_name, lineno in visitor.strong_imports.items()
-        }
-    )
-
-    buffer.write(
-        json.dumps(
-            {
-                "imports": imports_result,
-                "assets": sorted(visitor.assets),
-            }
-        ).encode("utf8")
-    )
-
-
-if __name__ == "__main__":
-    main(sys.argv[1])

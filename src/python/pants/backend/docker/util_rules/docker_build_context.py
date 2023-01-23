@@ -331,11 +331,12 @@ async def create_docker_build_context(request: DockerBuildContextRequest) -> Doc
     if request.build_upstream_images:
         # Update build arg values for FROM image build args.
 
-        # Get the FROM image build args with defined values in the Dockerfile.
-        dockerfile_build_args = {
-            k: v for k, v in dockerfile_info.from_image_build_args.to_dict().items() if v
+        # Get the FROM image build args with defined values in the Dockerfile & build args.
+        merged_from_build_args = {
+            k: build_args.to_dict().get(k, v)
+            for k, v in dockerfile_info.from_image_build_args.to_dict().items()
         }
-
+        dockerfile_build_args = {k: v for k, v in merged_from_build_args.items() if v}
         # Parse the build args values into Address instances.
         from_image_addresses = await Get(
             Addresses,

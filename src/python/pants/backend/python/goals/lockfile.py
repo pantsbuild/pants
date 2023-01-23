@@ -53,15 +53,12 @@ from pants.util.ordered_set import FrozenOrderedSet
 class GeneratePythonLockfile(GenerateLockfile):
     requirements: FrozenOrderedSet[str]
     interpreter_constraints: InterpreterConstraints
-    use_pex: bool | None = None
 
     @classmethod
     def from_tool(
         cls,
         subsystem: PythonToolRequirementsBase,
         interpreter_constraints: InterpreterConstraints | None = None,
-        *,
-        use_pex: bool | None = None,
         extra_requirements: Iterable[str] = (),
     ) -> GeneratePythonLockfile:
         """Create a request for a dedicated lockfile for the tool.

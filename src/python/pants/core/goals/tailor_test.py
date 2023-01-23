@@ -23,7 +23,6 @@ from pants.core.goals.tailor import (
     TailorSubsystem,
     UniquelyNamedPutativeTargets,
     default_sources_for_target_type,
-    group_by_dir,
     make_content_str,
 )
 from pants.core.util_rules import source_files
@@ -36,6 +35,7 @@ from pants.source.filespec import FilespecMatcher
 from pants.testutil.option_util import create_goal_subsystem
 from pants.testutil.pytest_util import no_exception
 from pants.testutil.rule_runner import RuleRunner
+from pants.util.dirutil import group_by_dir
 from pants.util.strutil import softwrap
 
 

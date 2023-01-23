@@ -1,6 +1,8 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import dataclasses
+
 import pytest
 
 
@@ -36,3 +38,37 @@ def dedicated_target_fields():
                     raise ValueError(
                         f"{cls.__name__} should have a dedicated field type for the dependencies field."
                     )
+
+
+def _check_frozen_dataclass_attributes() -> None:
+    """Ensures that calls to `object.__setattr__` in a frozen dataclass' `__init__` are valid."""
+
+    actual_dataclass_decorator = dataclasses.dataclass
+
+    def new_dataclass_decorator(*args, **kwargs):
+        if not kwargs.get("frozen", False):
+            return actual_dataclass_decorator(*args, **kwargs)
+
+        def wrapper(cls):
+            dataclass_cls = actual_dataclass_decorator(*args, **kwargs)(cls)
+
+            if dataclass_cls.__init__ is cls.__init__:
+                old__init__ = getattr(dataclass_cls, "__init__")
+
+                def new__init__(self, *args, **kwargs):
+                    old__init__(self, *args, **kwargs)
+                    assert sorted(field.name for field in dataclasses.fields(self)) == sorted(
+                        self.__dict__
+                    )
+
+                setattr(dataclass_cls, "__init__", new__init__)
+
+            return dataclass_cls
+
+        return wrapper
+
+    dataclasses.dataclass = new_dataclass_decorator
+
+
+def pytest_configure() -> None:
+    _check_frozen_dataclass_attributes()

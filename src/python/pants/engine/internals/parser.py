@@ -16,6 +16,7 @@ from pants.base.deprecated import warn_or_error
 from pants.base.exceptions import MappingError
 from pants.base.parse_context import ParseContext
 from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.engine.env_vars import EnvironmentVars
 from pants.engine.internals.defaults import BuildFileDefaultsParserState, SetDefaultsT
 from pants.engine.internals.dep_rules import BuildFileDependencyRulesParserState
 from pants.engine.internals.target_adaptor import TargetAdaptor
@@ -213,6 +214,7 @@ class Parser:
         filepath: str,
         build_file_content: str,
         extra_symbols: BuildFilePreludeSymbols,
+        env_vars: EnvironmentVars,
         defaults: BuildFileDefaultsParserState,
         dependents_rules: BuildFileDependencyRulesParserState | None,
         dependencies_rules: BuildFileDependencyRulesParserState | None,
@@ -224,14 +226,26 @@ class Parser:
             dependencies_rules=dependencies_rules,
         )
 
-        global_symbols = {**self._symbols, **extra_symbols.symbols}
+        global_symbols: dict[str, Any] = {
+            "env": env_vars.get,
+            **self._symbols,
+            **extra_symbols.symbols,
+        }
 
         if self.ignore_unrecognized_symbols:
+            defined_symbols = set()
             while True:
                 try:
                     exec(build_file_content, global_symbols)
                 except NameError as e:
                     bad_symbol = _extract_symbol_from_name_error(e)
+                    if bad_symbol in defined_symbols:
+                        # We have previously attempted to define this symbol, but have received
+                        # another error for it. This can indicate that the symbol is being used
+                        # from code which has already been compiled, such as builtin functions.
+                        raise
+                    defined_symbols.add(bad_symbol)
+
                     global_symbols[bad_symbol] = _unrecognized_symbol_func
                     self._parse_state.reset(
                         filepath=filepath,
@@ -288,9 +302,9 @@ def error_on_imports(build_file_content: str, filepath: str) -> None:
             continue
         raise ParseError(
             f"Import used in {filepath} at line {lineno}. Import statements are banned in "
-            "BUILD files because they can easily break Pants caching and lead to stale results. "
-            f"\n\nInstead, consider writing a macro ({doc_url('macros')}) or "
-            f"writing a plugin ({doc_url('plugins-overview')}."
+            "BUILD files and macros (that act like a normal BUILD file) because they can easily "
+            "break Pants caching and lead to stale results. "
+            f"\n\nInstead, consider writing a plugin ({doc_url('plugins-overview')})."
         )
 
 

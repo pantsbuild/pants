@@ -395,15 +395,6 @@ class TailorGoal(Goal):
     environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY
 
 
-def group_by_dir(paths: Iterable[str]) -> dict[str, set[str]]:
-    """For a list of file paths, returns a dict of directory path -> files in that dir."""
-    ret = defaultdict(set)
-    for path in paths:
-        dirname, filename = os.path.split(path)
-        ret[dirname].add(filename)
-    return ret
-
-
 def group_by_build_file(
     build_file_name: str, ptgts: Iterable[PutativeTarget]
 ) -> dict[str, list[PutativeTarget]]:

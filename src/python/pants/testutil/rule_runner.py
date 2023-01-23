@@ -72,6 +72,7 @@ from pants.util.dirutil import (
 )
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import OrderedSet
+from pants.util.strutil import softwrap
 
 
 def logging(original_function=None, *, level: LogLevel = LogLevel.INFO):
@@ -139,17 +140,28 @@ def engine_error(
         if not len(exec_error.wrapped_exceptions) == 1:
             formatted_errors = "\n\n".join(repr(e) for e in exec_error.wrapped_exceptions)
             raise ValueError(
-                "Multiple underlying exceptions, but this helper function expected only one. "
-                "Use `with pytest.raises(ExecutionError) as exc` directly and inspect "
-                "`exc.value.wrapped_exceptions`.\n\n"
-                f"Errors: {formatted_errors}"
+                softwrap(
+                    f"""
+                    Multiple underlying exceptions, but this helper function expected only one.
+                    Use `with pytest.raises(ExecutionError) as exc` directly and inspect
+                    `exc.value.wrapped_exceptions`.
+
+                    Errors: {formatted_errors}
+                    """
+                )
             )
         underlying = exec_error.wrapped_exceptions[0]
         if not isinstance(underlying, expected_underlying_exception):
             raise AssertionError(
-                "ExecutionError occurred as expected, but the underlying exception had type "
-                f"{type(underlying)} rather than the expected type "
-                f"{expected_underlying_exception}:\n\n{underlying}"
+                softwrap(
+                    f"""
+                    ExecutionError occurred as expected, but the underlying exception had type
+                    {type(underlying)} rather than the expected type
+                    {expected_underlying_exception}:
+
+                    {underlying}
+                    """
+                )
             )
         if contains is not None:
             if normalize_tracebacks:
@@ -158,14 +170,24 @@ def engine_error(
                 errmsg = str(underlying)
             if contains not in errmsg:
                 raise AssertionError(
-                    "Expected value not found in exception.\n"
-                    f"=> Expected: {contains}\n\n"
-                    f"=> Actual: {errmsg}"
+                    softwrap(
+                        f"""
+                        Expected value not found in exception.
+
+                        => Expected: {contains}
+
+                        => Actual: {errmsg}
+                        """
+                    )
                 )
     else:
         raise AssertionError(
-            "DID NOT RAISE ExecutionError with underlying exception type "
-            f"{expected_underlying_exception}."
+            softwrap(
+                f"""
+                DID NOT RAISE ExecutionError with underlying exception type
+                {expected_underlying_exception}.
+                """
+            )
         )
 
 
@@ -234,6 +256,7 @@ class RuleRunner:
         extra_session_values: dict[Any, Any] | None = None,
         max_workunit_verbosity: LogLevel = LogLevel.DEBUG,
         inherent_environment: EnvironmentName | None = EnvironmentName(None),
+        is_bootstrap: bool = False,
     ) -> None:
 
         bootstrap_args = [*bootstrap_args]
@@ -323,6 +346,7 @@ class RuleRunner:
                 ),
                 ca_certs_path=ca_certs_path,
                 engine_visualize_to=None,
+                is_bootstrap=is_bootstrap,
             ).scheduler
         )
 

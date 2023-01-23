@@ -34,3 +34,12 @@ If you had difficulty installing Pants, see our [getting help](doc:getting-help)
 > 
 > The `./pants` script will automatically install and use the Pants version specified in `pants.toml`, so upgrading Pants is as simple as editing `pants_version` in that file.
 
+
+Updating the `pants` launch script
+----------------------------------
+
+To update to the latest `pants` launch script in an existing repo, run:
+
+```
+curl -L -O https://static.pantsbuild.org/setup/pants && chmod +x ./pants
+```

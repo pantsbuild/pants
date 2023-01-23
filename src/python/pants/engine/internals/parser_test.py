@@ -7,6 +7,7 @@ import pytest
 
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.core.target_types import GenericTarget
+from pants.engine.env_vars import EnvironmentVars
 from pants.engine.internals.defaults import BuildFileDefaults, BuildFileDefaultsParserState
 from pants.engine.internals.parser import (
     BuildFilePreludeSymbols,
@@ -41,6 +42,7 @@ def test_imports_banned(defaults_parser_state: BuildFileDefaultsParserState) -> 
             "dir/BUILD",
             "\nx = 'hello'\n\nimport os\n",
             BuildFilePreludeSymbols(FrozenDict()),
+            EnvironmentVars({}),
             defaults_parser_state,
             dependents_rules=None,
             dependencies_rules=None,
@@ -71,6 +73,7 @@ def test_unrecognized_symbol(defaults_parser_state: BuildFileDefaultsParserState
                 "dir/BUILD",
                 "fake",
                 prelude_symbols,
+                EnvironmentVars({}),
                 defaults_parser_state,
                 dependents_rules=None,
                 dependencies_rules=None,
@@ -81,7 +84,7 @@ def test_unrecognized_symbol(defaults_parser_state: BuildFileDefaultsParserState
             f" refer to {doc_url('enabling-backends')} for all available"
             " backends to activate.\n\n"
             "All registered symbols: ['__defaults__', '__dependencies_rules__', "
-            f"'__dependents_rules__', 'build_file_dir', 'caof', {fmt_extra_sym}"
+            f"'__dependents_rules__', 'build_file_dir', 'caof', 'env', {fmt_extra_sym}"
             "'obj', 'prelude', 'tgt']"
         )
 
@@ -99,6 +102,7 @@ def test_unrecognized_symbol(defaults_parser_state: BuildFileDefaultsParserState
                 "dir/BUILD",
                 "fake",
                 prelude_symbols,
+                EnvironmentVars({}),
                 defaults_parser_state,
                 dependents_rules=None,
                 dependencies_rules=None,

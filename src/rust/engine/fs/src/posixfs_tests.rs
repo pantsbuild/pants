@@ -8,8 +8,8 @@ use testutil::make_file;
 
 use crate::{
   DigestTrie, Dir, DirectoryListing, File, GitignoreStyleExcludes, GlobExpansionConjunction,
-  GlobMatching, Link, PathGlobs, PathStat, PathStatGetter, PosixFS, Stat, StrictGlobMatching,
-  SymlinkBehavior, TypedPath, Vfs,
+  GlobMatching, Link, PathGlobs, PathStat, PosixFS, Stat, StrictGlobMatching, SymlinkBehavior,
+  TypedPath, Vfs,
 };
 
 #[tokio::test]
@@ -245,7 +245,7 @@ async fn scandir_missing() {
 }
 
 #[tokio::test]
-async fn path_stats_for_paths() {
+async fn stats_for_paths() {
   let dir = tempfile::TempDir::new().unwrap();
   let root_path = dir.path();
 
@@ -271,57 +271,45 @@ async fn path_stats_for_paths() {
   std::os::unix::fs::symlink("doesnotexist", &root_path.join("symlink_to_nothing")).unwrap();
 
   let posix_fs = Arc::new(new_posixfs(&root_path));
-  let path_stats = posix_fs
-    .path_stats(vec![
-      PathBuf::from("executable_file"),
-      PathBuf::from("regular_file"),
-      PathBuf::from("dir"),
-      PathBuf::from("symlink"),
-      PathBuf::from("dir").join("recursive_symlink"),
-      PathBuf::from("dir_symlink"),
-      PathBuf::from("symlink_to_nothing"),
-      PathBuf::from("doesnotexist"),
-    ])
-    .await
-    .unwrap();
-  let v: Vec<Option<PathStat>> = vec![
-    Some(PathStat::file(
-      PathBuf::from("executable_file"),
-      File {
-        path: PathBuf::from("executable_file"),
-        is_executable: true,
-      },
-    )),
-    Some(PathStat::file(
-      PathBuf::from("regular_file"),
-      File {
-        path: PathBuf::from("regular_file"),
-        is_executable: false,
-      },
-    )),
-    Some(PathStat::dir(
-      PathBuf::from("dir"),
-      Dir(PathBuf::from("dir")),
-    )),
-    Some(PathStat::file(
-      PathBuf::from("symlink"),
-      File {
-        path: PathBuf::from("executable_file"),
-        is_executable: true,
-      },
-    )),
-    Some(PathStat::file(
-      PathBuf::from("dir").join("recursive_symlink"),
-      File {
-        path: PathBuf::from("executable_file"),
-        is_executable: true,
-      },
-    )),
-    Some(PathStat::dir(
-      PathBuf::from("dir_symlink"),
-      Dir(PathBuf::from("dir")),
-    )),
-    None,
+  let path_stats = vec![
+    PathBuf::from("executable_file"),
+    PathBuf::from("regular_file"),
+    PathBuf::from("dir"),
+    PathBuf::from("symlink"),
+    PathBuf::from("dir").join("recursive_symlink"),
+    PathBuf::from("dir_symlink"),
+    PathBuf::from("symlink_to_nothing"),
+    PathBuf::from("doesnotexist"),
+  ]
+  .into_iter()
+  .map(|p| posix_fs.stat_sync(p).unwrap())
+  .collect::<Vec<_>>();
+  let v: Vec<Option<Stat>> = vec![
+    Some(Stat::File(File {
+      path: PathBuf::from("executable_file"),
+      is_executable: true,
+    })),
+    Some(Stat::File(File {
+      path: PathBuf::from("regular_file"),
+      is_executable: false,
+    })),
+    Some(Stat::Dir(Dir(PathBuf::from("dir")))),
+    Some(Stat::Link(Link {
+      path: PathBuf::from("symlink"),
+      target: PathBuf::from("executable_file"),
+    })),
+    Some(Stat::Link(Link {
+      path: PathBuf::from("dir/recursive_symlink"),
+      target: PathBuf::from("../symlink"),
+    })),
+    Some(Stat::Link(Link {
+      path: PathBuf::from("dir_symlink"),
+      target: PathBuf::from("dir"),
+    })),
+    Some(Stat::Link(Link {
+      path: PathBuf::from("symlink_to_nothing"),
+      target: PathBuf::from("doesnotexist"),
+    })),
     None,
   ];
   assert_eq!(v, path_stats);
@@ -407,17 +395,9 @@ fn new_posixfs_symlink_oblivious<P: AsRef<Path>>(dir: P) -> PosixFS {
 }
 
 async fn read_mock_files(input: Vec<PathBuf>, posix_fs: &Arc<PosixFS>) -> Vec<Stat> {
-  let path_stats = posix_fs.path_stats(input).await.unwrap();
-  path_stats
+  input
     .into_iter()
-    .map(|item| {
-      let path_stat: PathStat = item.unwrap();
-      match path_stat {
-        PathStat::Dir { stat, .. } => Stat::Dir(stat),
-        PathStat::Link { stat, .. } => Stat::Link(stat),
-        PathStat::File { stat, .. } => Stat::File(stat),
-      }
-    })
+    .map(|p| posix_fs.stat_sync(p).unwrap().unwrap())
     .collect()
 }
 

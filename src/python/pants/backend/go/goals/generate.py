@@ -22,7 +22,6 @@ from pants.backend.go.util_rules.first_party_pkg import (
 )
 from pants.backend.go.util_rules.goroot import GoRoot
 from pants.build_graph.address import Address
-from pants.core.goals.tailor import group_by_dir
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.fs import (
     CreateDigest,
@@ -46,6 +45,7 @@ from pants.engine.rules import collect_rules, goal_rule, rule, rule_helper
 from pants.engine.target import Targets
 from pants.option.option_types import StrListOption
 from pants.option.subsystem import Subsystem
+from pants.util.dirutil import group_by_dir
 from pants.util.strutil import softwrap
 
 # Adapted from Go toolchain.
