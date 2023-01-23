@@ -78,10 +78,12 @@ class BuildFileAliases:
         """
         :API: public
         """
-        object.__setattr__(self, "_objects",  self._validate_objects(objects))
-        object.__setattr__(self, "_context_aware_object_factories",  self._validate_context_aware_object_factories(
-            context_aware_object_factories
-        ))
+        object.__setattr__(self, "_objects", self._validate_objects(objects))
+        object.__setattr__(
+            self,
+            "_context_aware_object_factories",
+            self._validate_context_aware_object_factories(context_aware_object_factories),
+        )
 
     @property
     def objects(self) -> FrozenDict[str, Any]:
