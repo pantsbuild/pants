@@ -6,13 +6,19 @@ createdAt: "2020-02-21T17:44:53.022Z"
 updatedAt: "2022-07-12T00:00:00.000Z"
 ---
 
-To install the `pants` binary use:
+To install the `pants` binary you can use:
 
 ```
 /bin/bash -c "$(curl -fsSL https://static.pantsbuild.org/setup/pantsup.sh)" 
 ```
 
 This will install `pants` into `~/bin`, which must be on your PATH. The installer script will warn you if it is not.
+
+Alternatively, on macOS you can also use homebrew to install `pants`:
+
+```
+brew install pantsbuild/tap/pants
+```
 
 `pants` is a launcher binary that delegates to the underlying version of Pants in each repo. This allows you to have multiple repos, each using an independent version of Pants.
 
