@@ -1,10 +1,18 @@
+---
+title: "Advanced plugin concepts"
+slug: "advanced plugin concepts"
+excerpt: "Advanced concepts"
+hidden: true
+createdAt: "2022-02-07T05:44:28.620Z"
+updatedAt: "2022-02-07T05:44:28.620Z"
+---
 # Introduction
 
 In this tutorial, we continue from where we've left in the [previous tutorial](doc:create-a-new-goal). Having now a complete goal with a custom target, we are ready to make certain improvements and learn more advanced concepts that you would likely find useful when working on your own plugins.
 
 ## Adding a custom `source` field
 
-In the first tutorial, to keep things simple, we've used the default `SingleSourceField` class for our `source` field where we provided path to the `VERSION` file. We could have added [a custom field](https://www.pantsbuild.org/docs/target-api-new-fields) to provide a file path, however, when using the `source` field, you get a few features for free such as setting the `default` value and `expected_file_extensions`. Furthermore, with the `source` field, thanks to the [`unmatched_build_file_globs`](https://www.pantsbuild.org/docs/reference-global#unmatched_build_file_globs) option, you won't need to provide custom logic to handle errors when path globs do not expand to any files in your repository.
+In the first tutorial, to keep things simple, we used the default `SingleSourceField` class for our `source` field where we provided the path to the `VERSION` file. We could have added [a custom field](https://www.pantsbuild.org/docs/target-api-new-fields) to provide a file path, however, when using the `source` field, you get a few features for free such as setting the `default` value and `expected_file_extensions`. Furthermore, with the `source` field, thanks to the [`unmatched_build_file_globs`](https://www.pantsbuild.org/docs/reference-global#unmatched_build_file_globs) option, you won't need to provide custom logic to handle errors when path globs do not expand to any files in your repository.
 
 Let's modify our `myapp/BUILD` file:
 
@@ -387,7 +395,7 @@ $ ./pants project-version --as-json myapp:
   ProjectVersionGitTagMismatch: Project version string '0.0.3' from 'myapp/VERSION' doesn't match latest Git tag '0.0.1'
 ```
 
-This happens because of how Pants cache works. Modifying our repository tags doesn't qualify for the changes that should invalidate the cache. It is not safe to [cache the `Process` runs](https://www.pantsbuild.org/docs/rules-api-process) since we know that Git will access the repository (that is outside the sandbox), we should change its cacheability using the `ProcessCacheScope` parameter so that our Git call would run once per run of Pants.
+This happens because of how the Pants cache works. Modifying our repository tags doesn't qualify for the changes that should invalidate the cache. It is not safe to [cache the `Process` runs](https://www.pantsbuild.org/docs/rules-api-process) since we know that Git will access the repository (that is outside the sandbox), we should change its cacheability using the `ProcessCacheScope` parameter so that our Git call would run once per run of Pants.
 
 ```python
 git_describe = await Get(
@@ -662,4 +670,4 @@ class ProjectVersionTarget(Target):
     help = "A project version target representing the VERSION file."
 ```
 
-There are a few more things left to do, for example, we haven't written any tests yet. This is what we'll do in the next tutorials!
+There are a few more things left to do, for example, we haven't written any tests yet. This is what we'll do in the next tutorial!
