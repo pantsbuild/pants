@@ -25,6 +25,7 @@ from pants.backend.shell.target_types import (
 from pants.core.goals.package import BuiltPackage, PackageFieldSet
 from pants.core.goals.run import RunDebugAdapterRequest, RunFieldSet, RunRequest
 from pants.core.target_types import FileSourceField
+from pants.core.util_rules.environments import EnvironmentNameRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.core.util_rules.system_binaries import (
     BashBinary,
@@ -33,6 +34,7 @@ from pants.core.util_rules.system_binaries import (
     BinaryPaths,
 )
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
+from pants.engine.environment import EnvironmentName
 from pants.engine.fs import (
     EMPTY_DIGEST,
     AddPrefix,
@@ -84,7 +86,16 @@ async def run_shell_command(
     request: GenerateFilesFromShellCommandRequest,
 ) -> GeneratedSources:
     shell_command = request.protocol_target
-    result = await Get(ProcessResult, ShellCommandProcessRequest(shell_command))
+    environment_name = await Get(
+        EnvironmentName, EnvironmentNameRequest, EnvironmentNameRequest.from_target(shell_command)
+    )
+    result = await Get(
+        ProcessResult,
+        {
+            environment_name: EnvironmentName,
+            ShellCommandProcessRequest(shell_command): ShellCommandProcessRequest,
+        },
+    )
 
     if shell_command[ShellCommandLogOutputField].value:
         if result.stdout:
