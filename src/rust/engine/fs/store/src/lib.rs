@@ -395,7 +395,6 @@ impl Store {
     rpc_concurrency_limit: usize,
     capabilities_cell_opt: Option<Arc<OnceCell<ServerCapabilities>>>,
     batch_api_size_limit: usize,
-    load_in_memory_size_limit: usize,
   ) -> Result<Store, String> {
     Ok(Store {
       local: self.local,
@@ -410,7 +409,6 @@ impl Store {
         rpc_concurrency_limit,
         capabilities_cell_opt,
         batch_api_size_limit,
-        load_in_memory_size_limit,
       )?)),
       immutable_inputs_base: self.immutable_inputs_base,
     })

@@ -262,8 +262,6 @@ async fn main() {
         args.store_rpc_concurrency,
         None,
         args.store_batch_api_size_limit,
-        // TODO: add parameter
-        4 * 1024 * 1024,
       )
     }
     (None, None) => Ok(local_only_store),

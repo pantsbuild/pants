@@ -172,8 +172,6 @@ impl Core {
         remoting_opts.store_rpc_concurrency,
         capabilities_cell_opt,
         remoting_opts.store_batch_api_size_limit,
-        // TODO: add parameter
-        4 * 1024 * 1024,
       )
     } else {
       Ok(local_only)

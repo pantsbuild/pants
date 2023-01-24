@@ -31,13 +31,12 @@ async fn loads_file() {
 
 #[tokio::test]
 async fn loads_huge_file_via_temp_file() {
-  // 20KB of data
-  let testdata = TestData::new(&"12345678901234567890".repeat(1024));
+  // 5MB of data
+  let testdata = TestData::new(&"12345".repeat(MEGABYTES));
 
   let _ = WorkunitStore::setup_for_tests();
-  // awkward chunk size so that the file doesn't fit into the chunks evenly
   let cas = StubCAS::builder()
-    .chunk_size_bytes(1001)
+    .chunk_size_bytes(MEGABYTES)
     .file(&testdata)
     .build();
 
@@ -52,7 +51,7 @@ async fn loads_huge_file_via_temp_file() {
   let mut buf = String::new();
   file.read_to_string(&mut buf).await.unwrap();
   assert_eq!(buf.len(), testdata.len());
-  // (assert_eq! means failures unhelpfully print a 20KB string)
+  // (assert_eq! means failures unhelpfully print a 5MB string)
   assert!(buf == testdata.string());
 }
 
@@ -199,7 +198,6 @@ async fn write_file_multiple_chunks() {
     256,
     None,
     0, // disable batch API, force streaming API
-    crate::tests::STORE_LOAD_IN_MEMORY_SIZE_LIMIT,
   )
   .unwrap();
 
@@ -274,7 +272,6 @@ async fn write_connection_error() {
     256,
     None,
     super::tests::STORE_BATCH_API_SIZE_LIMIT,
-    super::tests::STORE_LOAD_IN_MEMORY_SIZE_LIMIT,
   )
   .unwrap();
   let error = store
@@ -351,7 +348,6 @@ fn new_byte_store(cas: &StubCAS) -> ByteStore {
     256,
     None,
     super::tests::STORE_BATCH_API_SIZE_LIMIT,
-    super::tests::STORE_LOAD_IN_MEMORY_SIZE_LIMIT,
   )
   .unwrap()
 }

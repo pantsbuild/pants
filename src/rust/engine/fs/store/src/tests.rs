@@ -27,7 +27,6 @@ use crate::{
 };
 
 pub(crate) const STORE_BATCH_API_SIZE_LIMIT: usize = 4 * 1024 * 1024;
-pub(crate) const STORE_LOAD_IN_MEMORY_SIZE_LIMIT: usize = 10 * 1024;
 
 pub fn big_file_fingerprint() -> Fingerprint {
   Fingerprint::from_hex_string("8dfba0adc29389c63062a68d76b2309b9a2486f1ab610c4720beabbdc273301f")
@@ -111,7 +110,6 @@ fn new_store<P: AsRef<Path>>(dir: P, cas_address: &str) -> Store {
       256,
       None,
       STORE_BATCH_API_SIZE_LIMIT,
-      STORE_LOAD_IN_MEMORY_SIZE_LIMIT,
     )
     .unwrap()
 }
@@ -185,11 +183,14 @@ async fn load_file_falls_back_and_backfills() {
 async fn load_file_falls_back_and_backfills_for_huge_file() {
   let dir = TempDir::new().unwrap();
 
-  // 20KB of data
-  let testdata = TestData::new(&"12345678901234567890".repeat(1024));
+  // 5MB of data
+  let testdata = TestData::new(&"12345".repeat(MEGABYTES));
 
   let _ = WorkunitStore::setup_for_tests();
-  let cas = StubCAS::builder().file(&testdata).build();
+  let cas = StubCAS::builder()
+    .chunk_size_bytes(MEGABYTES)
+    .file(&testdata)
+    .build();
 
   assert!(
     load_file_bytes(&new_store(dir.path(), &cas.address()), testdata.digest()).await
@@ -944,7 +945,6 @@ async fn instance_name_upload() {
       256,
       None,
       STORE_BATCH_API_SIZE_LIMIT,
-      STORE_LOAD_IN_MEMORY_SIZE_LIMIT,
     )
     .unwrap();
 
@@ -976,7 +976,6 @@ async fn instance_name_download() {
       256,
       None,
       STORE_BATCH_API_SIZE_LIMIT,
-      STORE_LOAD_IN_MEMORY_SIZE_LIMIT,
     )
     .unwrap();
 
@@ -1028,7 +1027,6 @@ async fn auth_upload() {
       256,
       None,
       STORE_BATCH_API_SIZE_LIMIT,
-      STORE_LOAD_IN_MEMORY_SIZE_LIMIT,
     )
     .unwrap();
 
@@ -1062,7 +1060,6 @@ async fn auth_download() {
       256,
       None,
       STORE_BATCH_API_SIZE_LIMIT,
-      STORE_LOAD_IN_MEMORY_SIZE_LIMIT,
     )
     .unwrap();
 

@@ -106,7 +106,6 @@ impl StoreSetup {
         256,
         None,
         4 * 1024 * 1024,
-        4 * 1024 * 1024,
       )
       .unwrap();
     Self {
