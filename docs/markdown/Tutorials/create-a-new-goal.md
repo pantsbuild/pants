@@ -1,7 +1,7 @@
 ---
 title: "Create a new goal"
 slug: "create-a-new-goal"
-excerpt: "Getting started writing plugins for Pants by creating a new goal."
+excerpt: "Getting started writing plugins for Pants by creating a new goal"
 hidden: false
 createdAt: "2022-02-07T05:44:28.620Z"
 updatedAt: "2022-02-07T05:44:28.620Z"

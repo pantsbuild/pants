@@ -1,8 +1,8 @@
 ---
 title: "Advanced plugin concepts"
-slug: "advanced plugin concepts"
+slug: "advanced-plugin-concepts"
 excerpt: "Advanced concepts"
-hidden: true
+hidden: false
 createdAt: "2022-02-07T05:44:28.620Z"
 updatedAt: "2022-02-07T05:44:28.620Z"
 ---
