@@ -10,7 +10,7 @@ import os
 from dataclasses import dataclass
 from typing import Any
 
-import ijson
+import ijson.backends.python as ijson
 
 from pants.backend.go.go_sources.load_go_binary import LoadedGoBinary, LoadedGoBinaryRequest
 from pants.backend.go.subsystems.golang import GolangSubsystem
