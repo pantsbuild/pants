@@ -46,6 +46,7 @@ from pants.backend.python.typecheck.mypy.subsystem import MyPy
 from pants.backend.scala.lint.scalafmt.subsystem import ScalafmtSubsystem
 from pants.backend.scala.subsystems.scalatest import Scalatest
 from pants.backend.terraform.dependency_inference import TerraformHcl2Parser
+from pants.backend.tools.yamllint.subsystem import Yamllint
 from pants.jvm.resolve.jvm_tool import JvmToolBase
 from pants.util.strutil import softwrap
 
@@ -126,6 +127,7 @@ AllTools = (
     DefaultTool.python(SetuptoolsSCM),
     DefaultTool.python(TerraformHcl2Parser, backend="pants.backend.experimental.terraform"),
     DefaultTool.python(TwineSubsystem),
+    DefaultTool.python(Yamllint, backend="pants.backend.experimental.tools.yamllint"),
     DefaultTool.python(Yapf, backend="pants.backend.python.lint.yapf"),
     # JVM
     DefaultTool.jvm(AvroSubsystem, backend="pants.backend.experimental.codegen.avro.java"),
