@@ -22,7 +22,6 @@ from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_method
-from pants.util.meta import frozen_after_init
 from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
@@ -149,8 +148,7 @@ class SourceRootConfig(Subsystem):
         return SourceRootPatternMatcher(self.root_patterns)
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class SourceRootsRequest:
     """Find the source roots for the given files and/or dirs."""
 
@@ -158,8 +156,9 @@ class SourceRootsRequest:
     dirs: tuple[PurePath, ...]
 
     def __init__(self, files: Iterable[PurePath], dirs: Iterable[PurePath]) -> None:
-        self.files = tuple(sorted(files))
-        self.dirs = tuple(sorted(dirs))
+        object.__setattr__(self, "files", tuple(sorted(files)))
+        object.__setattr__(self, "dirs", tuple(sorted(dirs)))
+
         self.__post_init__()
 
     def __post_init__(self) -> None:

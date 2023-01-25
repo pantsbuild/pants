@@ -36,7 +36,6 @@ from pants.option.option_types import BoolOption
 from pants.util.collections import partition_sequentially
 from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
-from pants.util.meta import frozen_after_init
 from pants.util.strutil import softwrap, strip_v2_chroot_path
 
 logger = logging.getLogger(__name__)
@@ -122,8 +121,7 @@ class FixRequest(LintRequest):
     is_fixer = True
 
     @distinct_union_type_per_subclass(in_scope_types=[EnvironmentName])
-    @frozen_after_init
-    @dataclass(unsafe_hash=True)
+    @dataclass(frozen=True)
     class Batch(LintRequest.Batch):
         snapshot: Snapshot
 

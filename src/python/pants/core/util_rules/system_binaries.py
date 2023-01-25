@@ -25,7 +25,6 @@ from pants.engine.platform import Platform
 from pants.engine.process import FallibleProcessResult, Process, ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.util.logging import LogLevel
-from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import OrderedSet
 from pants.util.strutil import create_path_env_var, pluralize, softwrap
 
@@ -39,15 +38,16 @@ logger = logging.getLogger(__name__)
 SEARCH_PATHS = ("/usr/bin", "/bin", "/usr/local/bin", "/opt/homebrew/bin")
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class BinaryPath:
     path: str
     fingerprint: str
 
     def __init__(self, path: str, fingerprint: str | None = None) -> None:
-        self.path = path
-        self.fingerprint = self._fingerprint() if fingerprint is None else fingerprint
+        object.__setattr__(self, "path", path)
+        object.__setattr__(
+            self, "fingerprint", self._fingerprint() if fingerprint is None else fingerprint
+        )
 
     @staticmethod
     def _fingerprint(content: bytes | bytearray | memoryview | None = None) -> str:
@@ -61,22 +61,20 @@ class BinaryPath:
         return cls(path, fingerprint=cls._fingerprint(representative_content))
 
 
-@frozen_after_init
 @dataclass(unsafe_hash=True)
 class BinaryPathTest:
     args: tuple[str, ...]
     fingerprint_stdout: bool
 
     def __init__(self, args: Iterable[str], fingerprint_stdout: bool = True) -> None:
-        self.args = tuple(args)
-        self.fingerprint_stdout = fingerprint_stdout
+        object.__setattr__(self, "args", tuple(args))
+        object.__setattr__(self, "fingerprint_stdout", fingerprint_stdout)
 
 
 class SearchPath(DeduplicatedCollection[str]):
     """The search path for binaries; i.e.: the $PATH."""
 
 
-@frozen_after_init
 @dataclass(unsafe_hash=True)
 class BinaryPathRequest:
     """Request to find a binary of a given name.
@@ -106,21 +104,20 @@ class BinaryPathRequest:
         check_file_entries: bool = False,
         test: BinaryPathTest | None = None,
     ) -> None:
-        self.search_path = SearchPath(search_path)
-        self.binary_name = binary_name
-        self.check_file_entries = check_file_entries
-        self.test = test
+        object.__setattr__(self, "search_path", SearchPath(search_path))
+        object.__setattr__(self, "binary_name", binary_name)
+        object.__setattr__(self, "check_file_entries", check_file_entries)
+        object.__setattr__(self, "test", test)
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class BinaryPaths(EngineAwareReturnType):
     binary_name: str
     paths: tuple[BinaryPath, ...]
 
     def __init__(self, binary_name: str, paths: Iterable[BinaryPath] | None = None):
-        self.binary_name = binary_name
-        self.paths = tuple(OrderedSet(paths) if paths else ())
+        object.__setattr__(self, "binary_name", binary_name)
+        object.__setattr__(self, "paths", tuple(OrderedSet(paths) if paths else ()))
 
     def message(self) -> str:
         if not self.paths:
@@ -296,8 +293,7 @@ class GunzipBinary:
         return (self.python.path, "-c", script)
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class TarBinary(BinaryPath):
     platform: Platform
 
