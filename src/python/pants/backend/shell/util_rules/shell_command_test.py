@@ -573,8 +573,11 @@ def test_run_shell_command_request(rule_runner: RuleRunner) -> None:
         assert args[0] in request.args[0]
         assert request.args[1:] == args[1:]
 
-    assert_run_args("test", ("bash", "-c", "some cmd string"))
-    assert_run_args("cd-test", ("bash", "-c", "cd 'src/with space'\"'\"'n quote'; some cmd string"))
+    assert_run_args("test", ("bash", "-c", "some cmd string", "src.test"))
+    assert_run_args(
+        "cd-test",
+        ("bash", "-c", "cd 'src/with space'\"'\"'n quote'; some cmd string", "src.cd-test"),
+    )
 
 
 def test_shell_command_boot_script(rule_runner: RuleRunner) -> None:
@@ -608,6 +611,7 @@ def test_shell_command_boot_script(rule_runner: RuleRunner) -> None:
             'export PATH="$PWD/.bin";'
             "./command.script"
         )
+        + " src.boot-script-test"
     )
 
     tools = sorted({"python3_8", "mkdir", "ln"})
@@ -645,6 +649,7 @@ def test_shell_command_boot_script_in_build_root(rule_runner: RuleRunner) -> Non
             'export PATH="$PWD/.bin";'
             "./command.script"
         )
+        + " .boot-script-test"
     )
 
 
