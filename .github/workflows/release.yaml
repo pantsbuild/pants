@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - env:
-        TAG: ${{ github.event.inputs.tag }}
+        TAG: "release_2.15.0rc2"
       id: determine-tag
       name: Determine Release Tag
       run: "if [[ -n \"$TAG\" ]]; then\n    tag=\"$TAG\"\nelse\n    tag=\"${GITHUB_REF#refs/tags/}\"\
@@ -20,6 +20,8 @@ jobs:
       uses: actions/checkout@v3
       with:
         ref: ${{ steps.determine-tag.outputs.release-tag }}
+    - name: Setup upterm session
+      uses: lhotari/action-upterm@v1
     - name: Create Release -> Commit Mapping
       run: 'tag="${{ steps.determine-tag.outputs.release-tag }}"
 
@@ -41,11 +43,4 @@ jobs:
       run: ./build-support/bin/deploy_to_s3.py --scope tags/pantsbuild.pants
 name: Record Release Commit
 'on':
-  push:
-    tags:
-    - release_*
-  workflow_dispatch:
-    inputs:
-      tag:
-        required: true
-        type: string
+  pull_request: {}
