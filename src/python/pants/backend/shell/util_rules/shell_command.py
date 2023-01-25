@@ -126,7 +126,7 @@ async def _prepare_process_request_from_target(shell_command: Target) -> ShellCo
 
     return ShellCommandProcessRequest(
         description=description,
-        shell_name=shell_command.address.path_safe_spec,
+        shell_name=shell_command.address.spec,
         interactive=interactive,
         working_directory=working_directory,
         command=command,
@@ -351,7 +351,7 @@ async def run_in_sandbox_request(
 
     process_request = ShellCommandProcessRequest(
         description=description,
-        shell_name=shell_command.address.path_safe_spec,
+        shell_name=shell_command.address.spec,
         interactive=False,
         working_directory=working_directory,
         command=" ".join(shlex.quote(arg) for arg in (run_request.args + extra_args)),
