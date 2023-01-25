@@ -58,10 +58,9 @@ def _check_frozen_dataclass_attributes() -> None:
                 def new__init__(self, *args, **kwargs):
                     old__init__(self, *args, **kwargs)
                     assert sorted(field.name for field in dataclasses.fields(self)) == sorted(
-                        self.__dict__
+                        attrname for attrname in dir(self) if not attrname.startswith("__")
                     )
-
-                setattr(dataclass_cls, "__init__", new__init__)
+                    setattr(dataclass_cls, "__init__", new__init__)
 
             return dataclass_cls
 
