@@ -207,11 +207,6 @@ class Field:
     def __hash__(self) -> int:
         return hash((self.__class__, self.value))
 
-    def __eq__(self, other: Union[Any, Field]) -> bool:
-        if not isinstance(other, Field):
-            return NotImplemented
-        return (self.__class__, self.value) == (other.__class__, other.value)
-
 
 # NB: By subclassing `Field`, MyPy understands our type hints, and it means it doesn't matter which
 # order you use for inheriting the field template vs. the mixin.
@@ -280,15 +275,6 @@ class AsyncFieldMixin(Field):
 
     def __hash__(self) -> int:
         return hash((self.__class__, self.value, self.address))
-
-    def __eq__(self, other: Union[Any, AsyncFieldMixin]) -> bool:
-        if not isinstance(other, AsyncFieldMixin):
-            return NotImplemented
-        return (self.__class__, self.value, self.address) == (
-            other.__class__,
-            other.value,
-            other.address,
-        )
 
 
 @union
@@ -1638,7 +1624,7 @@ class UnrecognizedTargetTypeException(Exception):
 T = TypeVar("T")
 
 
-class ScalarField(Generic[T], Field):
+class ScalarField(Field, Generic[T]):
     """A field with a scalar value (vs. a compound value like a sequence or dict).
 
     Subclasses must define the class properties `expected_type` and `expected_type_description`.
