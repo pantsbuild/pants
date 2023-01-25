@@ -52,7 +52,6 @@ from pants.engine.unions import UnionMembership
 from pants.option.global_options import UnmatchedBuildFileGlobs
 from pants.testutil.pytest_util import no_exception
 from pants.util.frozendict import FrozenDict
-from pants.util.meta import FrozenInstanceError
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
 # -----------------------------------------------------------------------------------------------
