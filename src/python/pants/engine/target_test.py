@@ -3,7 +3,7 @@
 
 import string
 from collections import namedtuple
-from dataclasses import dataclass
+from dataclasses import FrozenInstanceError, dataclass
 from enum import Enum
 from typing import Any, ClassVar, Dict, Iterable, List, Optional, Sequence, Set, Tuple, cast
 
@@ -115,6 +115,10 @@ def test_field_and_target_eq() -> None:
     assert field == other
     assert hash(field) == hash(other)
 
+    # Ensure the field is frozen.
+    with pytest.raises(FrozenInstanceError):
+        field.value = "foo"
+
     tgt = FortranTarget({"version": "dev0"}, addr)
     assert tgt.address == addr
 
@@ -129,6 +133,10 @@ def test_field_and_target_eq() -> None:
     other_tgt = FortranTarget({"version": "dev0"}, Address("", target_name="other"))
     assert tgt != other_tgt
     assert hash(tgt) != hash(other_tgt)
+
+    # Ensure the target is frozen.
+    with pytest.raises(FrozenInstanceError):
+        tgt.address = addr  # type: ignore[misc]
 
     # Ensure that subclasses are not equal.
     class SubclassField(FortranVersion):
@@ -435,6 +443,10 @@ def test_async_field_mixin() -> None:
     other = ExampleField(None, Address("", target_name="other"))
     assert field != other
     assert hash(field) != hash(other)
+
+    # Ensure it's still frozen.
+    with pytest.raises(FrozenInstanceError):
+        field.value = 11
 
     # Ensure that subclasses are not equal.
     class Subclass(ExampleField):

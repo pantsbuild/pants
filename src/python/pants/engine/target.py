@@ -1624,7 +1624,7 @@ class UnrecognizedTargetTypeException(Exception):
 T = TypeVar("T")
 
 
-class ScalarField(Field, Generic[T]):
+class ScalarField(Generic[T], Field):
     """A field with a scalar value (vs. a compound value like a sequence or dict).
 
     Subclasses must define the class properties `expected_type` and `expected_type_description`.
