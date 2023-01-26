@@ -26,15 +26,17 @@ func maybeGolangAssembly(filename string) (bool, error) {
 }
 
 func main() {
-	for _, arg := range os.Args {
-		found, err := maybeGolangAssembly(arg)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "ERROR: %v\n", err)
-			os.Exit(1)
-		}
+	if len(os.Args) >= 2 {
+		for _, arg := range os.Args[1:] {
+			found, err := maybeGolangAssembly(arg)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "ERROR: %v\n", err)
+				os.Exit(1)
+			}
 
-		if found {
-			fmt.Printf("%s\n", arg)
+			if found {
+				fmt.Printf("%s\n", arg)
+			}
 		}
 	}
 }
