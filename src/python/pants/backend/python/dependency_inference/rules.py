@@ -206,6 +206,33 @@ def _collect_imports_info(
     )
 
 
+def _filter_unowned_imports(
+    unowned_imports: frozenset[str], ignored_paths: tuple[str, ...]
+) -> frozenset[str]:
+    """Filter unowned imports given a list of paths to ignore.
+
+    E.g. having
+    ```
+    import foo.bar
+    from foo.bar import baz
+    import foo.barley
+    ```
+
+    and passing `ignored-paths=["foo.bar"]`, only `foo.bar` and `foo.bar.baz` will be ignored.
+    """
+    if not ignored_paths:
+        return unowned_imports
+
+    unowned_imports_filtered = set()
+    for unowned_import in unowned_imports:
+        if not any(
+            unowned_import == ignored_path or unowned_import.startswith(f"{ignored_path}.")
+            for ignored_path in ignored_paths
+        ):
+            unowned_imports_filtered.add(unowned_import)
+    return frozenset(unowned_imports_filtered)
+
+
 @dataclass(frozen=True)
 class UnownedImportsPossibleOwnersRequest:
     """A request to find possible owners for several imports originating in a resolve."""
@@ -443,6 +470,9 @@ async def infer_python_dependencies_via_source(
         ResolvedParsedPythonDependenciesRequest(request.field_set, parsed_dependencies, resolve),
     )
     import_deps, unowned_imports = _collect_imports_info(resolved_dependencies.resolve_results)
+    unowned_imports = _filter_unowned_imports(
+        unowned_imports, python_infer_subsystem.ignore_unowned_imports
+    )
 
     asset_deps, unowned_assets = _collect_imports_info(resolved_dependencies.assets)
 
