@@ -6,7 +6,7 @@ from __future__ import annotations
 import itertools
 import logging
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import Enum
 from typing import Callable, ClassVar, Iterable, Iterator, Mapping, Sequence, Tuple, cast
 
@@ -33,12 +33,16 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class GenerateLockfileResult:
-    """The result of generating a lockfile for a particular resolve."""
+    """The result of generating a lockfile for a particular resolve.
+
+    If `GenerateLockfile.diff==True` then provide a `LockfileGenerateDiffResult` if able, otherwise
+    leave as `None` as it will not be used.
+    """
 
     digest: Digest
     resolve_name: str
     path: str
-    generate_diff_cls: type[LockfileGenerateDiff] | None = None
+    diff: LockfileGenerateDiffResult | None = None
 
 
 @union(in_scope_types=[EnvironmentName])
@@ -52,10 +56,15 @@ class GenerateLockfile:
 
     Subclasses will usually want to add additional properties, such as what requirements to
     install and Python interpreter constraints.
+
+    Always set `diff=False` when creating instances, it will be mutated to `True` in case lockfile
+    diff'ing should be done. The only reason it does not default to `False` is to allow subclasses
+    to have required fields.
     """
 
     resolve_name: str
     lockfile_dest: str
+    diff: bool
 
 
 @dataclass(frozen=True)
@@ -131,12 +140,6 @@ class RequestedUserResolveNames(Collection[str]):
     """
 
 
-@union
-@dataclass(frozen=True)
-class LockfileGenerateDiff:
-    lockfile: GenerateLockfileResult
-
-
 class RequirementVersion(Protocol):
     """Protocol for backend specific implementations, to support language ecosystem specific version
     formats and sort rules.
@@ -161,6 +164,11 @@ class RequirementVersion(Protocol):
 RequirementName = str
 LockfileRequirements = FrozenDict[RequirementName, RequirementVersion]
 ChangedRequirements = FrozenDict[RequirementName, Tuple[RequirementVersion, RequirementVersion]]
+
+
+@dataclass(frozen=True)
+class LockfileGenerateDiff:
+    lockfile: GenerateLockfileResult
 
 
 @dataclass(frozen=True)
@@ -591,7 +599,12 @@ async def generate_lockfiles_goal(
     # Currently, since resolves specify a single filename for output, we pick a resonable
     # environment to execute the request in. Currently we warn if multiple environments are
     # specified.
-    all_requests = itertools.chain(*all_specified_user_requests, applicable_tool_requests)
+    all_requests: Iterator[GenerateLockfile] = itertools.chain(
+        *all_specified_user_requests, applicable_tool_requests
+    )
+    if generate_lockfiles_subsystem.should_print_diff:
+        all_requests = (replace(req, diff=True) for req in all_requests)
+
     results = await MultiGet(
         Get(
             GenerateLockfileResult,
@@ -603,17 +616,6 @@ async def generate_lockfiles_goal(
         for req in all_requests
     )
 
-    # Generate diffs before writing the new files to the workspace while the previous version is
-    # still untouched.
-    if generate_lockfiles_subsystem.should_print_diff:
-        diffs = await MultiGet(
-            Get(LockfileGenerateDiffResult, LockfileGenerateDiff, result.generate_diff_cls(result))
-            for result in results
-            if result.generate_diff_cls is not None
-        )
-    else:
-        diffs = ()
-
     # Lockfiles are actually written here. This would be an acceptable place to handle conflict
     # resolution behaviour if we start executing requests in multiple environments.
     merged_digest = await Get(Digest, MergeDigests(res.digest for res in results))
@@ -622,13 +624,13 @@ async def generate_lockfiles_goal(
     for result in results:
         logger.info(f"Wrote lockfile for the resolve `{result.resolve_name}` to {result.path}")
 
-    if diffs:
+    if generate_lockfiles_subsystem.should_print_diff:
         diff_formatter = LockfileDiffPrinter(
             console=console,
             color=global_options.colors,
             include_unchanged=generate_lockfiles_subsystem.diff_include_unchanged,
         )
-        for diff in diffs:
+        for diff in (res.diff for res in results if res.diff is not None):
             diff_formatter.print(diff)
         console.print_stderr("\n")
 

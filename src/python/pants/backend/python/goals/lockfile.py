@@ -6,7 +6,7 @@ from __future__ import annotations
 import itertools
 import os.path
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from operator import itemgetter
 from typing import Iterable
 
@@ -32,6 +32,7 @@ from pants.core.goals.generate_lockfiles import (
     GenerateLockfilesSubsystem,
     KnownUserResolveNames,
     KnownUserResolveNamesRequest,
+    LockfileGenerateDiffResult,
     RequestedUserResolveNames,
     UserGenerateLockfiles,
     WrappedGenerateLockfile,
@@ -73,6 +74,7 @@ class GeneratePythonLockfile(GenerateLockfile):
                 interpreter_constraints=InterpreterConstraints(),
                 resolve_name=subsystem.options_scope,
                 lockfile_dest=subsystem.lockfile,
+                diff=False,
             )
         return cls(
             requirements=FrozenOrderedSet((*subsystem.all_requirements, *extra_requirements)),
@@ -83,6 +85,7 @@ class GeneratePythonLockfile(GenerateLockfile):
             ),
             resolve_name=subsystem.options_scope,
             lockfile_dest=subsystem.lockfile,
+            diff=False,
         )
 
     @property
@@ -219,9 +222,16 @@ async def generate_lockfile(
     final_lockfile_digest = await Get(
         Digest, CreateDigest([FileContent(req.lockfile_dest, lockfile_with_header)])
     )
-    return GenerateLockfileResult(
-        final_lockfile_digest, req.resolve_name, req.lockfile_dest, PythonLockfileGenerateDiff
+
+    lockfile = GenerateLockfileResult(
+        final_lockfile_digest,
+        req.resolve_name,
+        req.lockfile_dest,
     )
+    if req.diff:
+        diff = await Get(LockfileGenerateDiffResult, PythonLockfileGenerateDiff(lockfile))
+        lockfile = replace(lockfile, diff=diff)
+    return lockfile
 
 
 class RequestedPythonUserResolveNames(RequestedUserResolveNames):
@@ -269,6 +279,7 @@ async def setup_user_lockfile_requests(
             ),
             resolve_name=resolve,
             lockfile_dest=python_setup.resolves[resolve],
+            diff=False,
         )
         for resolve in requested
     )

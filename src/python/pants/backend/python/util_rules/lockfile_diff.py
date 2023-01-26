@@ -30,7 +30,6 @@ from pants.core.goals.generate_lockfiles import (
 )
 from pants.engine.fs import Digest, DigestContents
 from pants.engine.rules import Get, collect_rules, rule
-from pants.engine.unions import UnionRule
 
 logger = logging.getLogger(__name__)
 
@@ -122,7 +121,4 @@ async def generate_python_lockfile_diff(
 
 
 def rules():
-    return (
-        *collect_rules(),
-        UnionRule(LockfileGenerateDiff, PythonLockfileGenerateDiff),
-    )
+    return collect_rules()

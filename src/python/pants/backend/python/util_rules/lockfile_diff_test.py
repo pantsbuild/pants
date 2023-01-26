@@ -33,7 +33,7 @@ def test_load_lockfile(rule_runner: RuleRunner) -> None:
         digest=snapshot.digest,
         resolve_name="testing",
         path="reqs/test.lock",
-        generate_diff_cls=PythonLockfileGenerateDiff,
+        diff=None,
     )
     diff = rule_runner.request(LockfileGenerateDiffResult, [PythonLockfileGenerateDiff(lockfile)])
     assert diff.path == "reqs/test.lock"

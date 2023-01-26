@@ -138,7 +138,9 @@ def test_determine_tool_sentinels_to_generate() -> None:
 
 def test_filter_tool_lockfile_requests() -> None:
     def create_request(name: str, lockfile_dest: str | None = None) -> GenerateLockfile:
-        return GenerateLockfile(resolve_name=name, lockfile_dest=lockfile_dest or f"{name}.txt")
+        return GenerateLockfile(
+            resolve_name=name, lockfile_dest=lockfile_dest or f"{name}.txt", diff=False
+        )
 
     tool1 = create_request("tool1")
     tool2 = create_request("tool2")
@@ -305,10 +307,12 @@ def test_preferred_environment(
     resolve_name = "boop"
     resolve_dest = "beep"
     if not env_names:
-        request = GenerateLockfile(resolve_name, resolve_dest)
+        request = GenerateLockfile(resolve_name, resolve_dest, diff=False)
     else:
         envs = tuple(EnvironmentName(name) for name in env_names)
-        request = GenerateLockfileWithEnvironments(resolve_name, resolve_dest, envs)
+        request = GenerateLockfileWithEnvironments(
+            resolve_name, resolve_dest, environments=envs, diff=False
+        )
 
     default = EnvironmentName(_default)
 

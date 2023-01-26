@@ -126,6 +126,7 @@ async def validate_jvm_artifacts_for_resolve(
         artifacts=request.artifacts,
         resolve_name=request.resolve_name,
         lockfile_dest=jvm_subsystem.resolves[request.resolve_name],
+        diff=False,
     )
 
 
