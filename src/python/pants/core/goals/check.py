@@ -30,7 +30,6 @@ from pants.engine.target import FieldSet, FilteredTargets
 from pants.engine.unions import UnionMembership, union
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_property
-from pants.util.meta import frozen_after_init
 from pants.util.strutil import strip_v2_chroot_path
 
 logger = logging.getLogger(__name__)
@@ -72,8 +71,7 @@ class CheckResult:
         return {"partition": self.partition_description}
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class CheckResults(EngineAwareReturnType):
     """Zero or more CheckResult objects for a single type checker.
 
@@ -86,8 +84,8 @@ class CheckResults(EngineAwareReturnType):
     checker_name: str
 
     def __init__(self, results: Iterable[CheckResult], *, checker_name: str) -> None:
-        self.results = tuple(results)
-        self.checker_name = checker_name
+        object.__setattr__(self, "results", tuple(results))
+        object.__setattr__(self, "checker_name", checker_name)
 
     @property
     def skipped(self) -> bool:
@@ -139,8 +137,7 @@ class CheckResults(EngineAwareReturnType):
         return False
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 @union(in_scope_types=[EnvironmentName])
 class CheckRequest(Generic[_FS], EngineAwareParameter):
     """A union for targets that should be checked.
@@ -154,7 +151,7 @@ class CheckRequest(Generic[_FS], EngineAwareParameter):
     field_sets: Collection[_FS]
 
     def __init__(self, field_sets: Iterable[_FS]) -> None:
-        self.field_sets = Collection[_FS](field_sets)
+        object.__setattr__(self, "field_sets", Collection[_FS](field_sets))
 
     def debug_hint(self) -> str:
         return self.tool_name

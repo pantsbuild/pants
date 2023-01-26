@@ -36,7 +36,6 @@ from pants.engine.unions import UnionRule
 from pants.option.subsystem import Subsystem
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized
-from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 from pants.util.strutil import softwrap
 
@@ -499,8 +498,7 @@ class TaskRule:
         )
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class QueryRule:
     """A QueryRule declares that a given set of Params will be used to request an output type.
 
@@ -508,16 +506,12 @@ class QueryRule:
     that the relevant portions of the RuleGraph are generated.
     """
 
-    _output_type: Type
+    output_type: Type
     input_types: Tuple[Type, ...]
 
     def __init__(self, output_type: Type, input_types: Iterable[Type]) -> None:
-        self._output_type = output_type
-        self.input_types = tuple(input_types)
-
-    @property
-    def output_type(self):
-        return self._output_type
+        object.__setattr__(self, "output_type", output_type)
+        object.__setattr__(self, "input_types", tuple(input_types))
 
 
 @dataclass(frozen=True)

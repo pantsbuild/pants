@@ -84,6 +84,7 @@ class GenerateFilesFromRunInSandboxRequest(GenerateSourcesRequest):
 @dataclass(frozen=True)
 class ShellCommandProcessRequest:
     description: str
+    shell_name: str
     interactive: bool
     working_directory: str | None
     command: str
@@ -125,6 +126,7 @@ async def _prepare_process_request_from_target(shell_command: Target) -> ShellCo
 
     return ShellCommandProcessRequest(
         description=description,
+        shell_name=shell_command.address.spec,
         interactive=interactive,
         working_directory=working_directory,
         command=command,
@@ -349,6 +351,7 @@ async def run_in_sandbox_request(
 
     process_request = ShellCommandProcessRequest(
         description=description,
+        shell_name=shell_command.address.spec,
         interactive=False,
         working_directory=working_directory,
         command=" ".join(shlex.quote(arg) for arg in (run_request.args + extra_args)),
@@ -426,6 +429,7 @@ async def prepare_shell_command_process(
 ) -> Process:
 
     description = shell_command.description
+    shell_name = shell_command.shell_name
     interactive = shell_command.interactive
     working_directory = shell_command.working_directory
     command = shell_command.command
@@ -485,7 +489,7 @@ async def prepare_shell_command_process(
         )
 
     proc = Process(
-        argv=(bash.path, "-c", boot_script + command),
+        argv=(bash.path, "-c", boot_script + command, shell_name),
         description=f"Running {description}",
         env=command_env,
         input_digest=input_digest,

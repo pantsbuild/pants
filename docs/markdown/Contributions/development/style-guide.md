@@ -275,21 +275,18 @@ class Example:
             )
 ```
 
-If you need a custom constructor, such as to transform the parameters, use `@frozen_after_init` and `unsafe_hash=True` instead of `frozen=True`.
+If you need a custom constructor, such as to transform the parameters, the Python docs say to use `object.__setattr__` to set the attributes.
 
 ```python
 from dataclasses import dataclass
 from typing import Iterable, Tuple
 
-from pants.util.meta import frozen_after_init
-
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class Example:
     values: Tuple[str, ...]
 
     def __init__(self, values: Iterable[str]) -> None:
-        self.values = tuple(values)
+        object.__setattr__(self, "values", tuple(values))
 ```
 
 Type hints

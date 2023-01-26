@@ -24,3 +24,15 @@ def test_frozen_dataclass_checking() -> None:
 
     with pytest.raises(AssertionError):
         TooMuchInitialized()
+
+    # Also make sure it works with slots
+    @dataclass(frozen=True)
+    class MissingInitializationWithSlots:
+        __slots__ = ("x",)
+        x: str
+
+        def __init__(self):
+            pass
+
+    with pytest.raises(AttributeError):
+        MissingInitializationWithSlots()

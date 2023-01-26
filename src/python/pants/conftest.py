@@ -57,9 +57,14 @@ def _check_frozen_dataclass_attributes() -> None:
 
                 def new__init__(self, *args, **kwargs):
                     old__init__(self, *args, **kwargs)
-                    assert sorted(field.name for field in dataclasses.fields(self)) == sorted(
-                        self.__dict__
-                    )
+                    expected = sorted(field.name for field in dataclasses.fields(self))
+                    if hasattr(self, "__dict__"):
+                        actual = sorted(self.__dict__)
+                        assert expected == actual
+                    else:
+                        for attrname in self.__slots__:
+                            # Only way to validate it was initialized is to trigger the descriptor
+                            getattr(self, attrname)
 
                 setattr(dataclass_cls, "__init__", new__init__)
 

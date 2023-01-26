@@ -231,9 +231,7 @@ async def demo(name: Name) -> Foo:
 > 
 > Sometimes, you may want to have a custom `__init__()` constructor. For example, you may want your dataclass to store a `tuple[str, ...]`, but for your constructor to take the more flexible `Iterable[str]` which you then convert to an immutable tuple sequence.
 > 
-> Normally, `@dataclass(frozen=True)` will not allow you to have a custom `__init__()`. But, if you do not set `frozen=True`, then your dataclass would be mutable, which is dangerous with the engine.  
-> 
-> Instead, we added a decorator called `@frozen_after_init`, which can be combined with `@dataclass(unsafe_hash=True)`.
+> The Python docs suggest using `object.__setattr__` to set attributes in your `__init__` for frozen dataclasses.
 > 
 > ```python
 > from __future__ import annotations
@@ -241,15 +239,12 @@ async def demo(name: Name) -> Foo:
 > from dataclasses import dataclass
 > from typing import Iterable
 > 
-> from pants.util.meta import frozen_after_init
-> 
-> @frozen_after_init
-> @dataclass(unsafe_hash=True)
+> @dataclass(frozen=True)
 > class Example:
 >     args: tuple[str, ...]
 > 
 >     def __init__(self, args: Iterable[str]) -> None:
->         self.args = tuple(args)
+>         object.__setattr__(self, "args", tuple(args))
 > ```
 
 ### `Collection`: a newtype for `tuple`

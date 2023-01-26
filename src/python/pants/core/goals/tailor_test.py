@@ -410,26 +410,6 @@ def test_build_file_lacks_leading_whitespace(rule_runner: RuleRunner, header: st
         assert content.lstrip() == content
 
 
-def test_group_by_dir() -> None:
-    paths = {
-        "foo/bar/baz1.ext",
-        "foo/bar/baz1_test.ext",
-        "foo/bar/qux/quux1.ext",
-        "foo/__init__.ext",
-        "foo/bar/__init__.ext",
-        "foo/bar/baz2.ext",
-        "foo/bar1.ext",
-        "foo1.ext",
-        "__init__.ext",
-    }
-    assert {
-        "": {"__init__.ext", "foo1.ext"},
-        "foo": {"__init__.ext", "bar1.ext"},
-        "foo/bar": {"__init__.ext", "baz1.ext", "baz1_test.ext", "baz2.ext"},
-        "foo/bar/qux": {"quux1.ext"},
-    } == group_by_dir(paths)
-
-
 def test_tailor_rule_write_mode(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
