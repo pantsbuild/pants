@@ -1,8 +1,8 @@
 ---
 title: "Advanced plugin concepts"
-slug: "advanced plugin concepts"
-excerpt: "Advanced concepts"
-hidden: true
+slug: "advanced-plugin-concepts"
+excerpt: "Learning advanced concepts for writing plugins."
+hidden: false
 createdAt: "2022-02-07T05:44:28.620Z"
 updatedAt: "2022-02-07T05:44:28.620Z"
 ---
