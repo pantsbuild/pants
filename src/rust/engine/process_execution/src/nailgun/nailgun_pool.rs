@@ -537,7 +537,8 @@ async fn clear_workdir(
   future::try_join_all(moves).await?;
 
   // And drop it in the background.
-  let _ = executor.native_spawn_blocking(move || std::mem::drop(garbage_dir));
+  let fut = executor.native_spawn_blocking(move || std::mem::drop(garbage_dir));
+  drop(fut);
 
   Ok(())
 }
