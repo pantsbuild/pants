@@ -115,3 +115,7 @@ async def demo(shellcheck: Shellcheck) -> LintResults:
     config_discovery = shellcheck.config_discovery
     ...
 ```
+
+> 📘 Name clashing
+>
+> When adding custom options, make sure their name does not start with an existing goal name. For instance, passing a boolean option named `check_foobar` as `--check-foobar` in the command line would fail since Pants would think you are trying to pass the `--foobar` flag in the built-in `check` goal scope.

@@ -201,3 +201,7 @@ async def hello_world(console: Console, specs_paths: SpecsPaths) -> HelloWorld:
 `SpecsPaths.files` will list all files matched by the specs, e.g. `::` will match every file in the project (regardless of if targets own the files).
 
 To convert `SpecsPaths` into a [`Digest`](doc:rules-api-file-system), use `await Get(Digest, PathGlobs(globs=specs_paths.files))`.
+
+> 📘 Name clashing
+>
+> It is very unlikely, but is still possible that adding a custom goal with an unfortunate name may cause issues when certain existing Pants options are passed in the command line. For instance, executing a goal named `local` with a particular option (in this case, the global `local_cache` option), e.g. `./pants --no-local-cache local ...` would fail since there's no `--no-cache` flag defined for the `local` goal. 
