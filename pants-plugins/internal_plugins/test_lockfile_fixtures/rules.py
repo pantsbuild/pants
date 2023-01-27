@@ -19,7 +19,6 @@ from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
     PythonSourceFilesRequest,
 )
-from pants.core.goals.tailor import group_by_dir
 from pants.core.goals.test import TestExtraEnv
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.engine.collection import DeduplicatedCollection
@@ -34,6 +33,7 @@ from pants.engine.target import Targets, TransitiveTargets, TransitiveTargetsReq
 from pants.jvm.resolve.common import ArtifactRequirement, ArtifactRequirements
 from pants.jvm.resolve.coursier_fetch import CoursierResolvedLockfile
 from pants.jvm.resolve.lockfile_metadata import JVMLockfileMetadata
+from pants.util.dirutil import group_by_dir
 from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
 

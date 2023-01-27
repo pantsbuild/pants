@@ -204,7 +204,7 @@ impl AsyncSemaphore {
     // Spawn a task which will periodically balance Tasks.
     let _balancer_task = {
       let state = Arc::downgrade(&state);
-      executor.spawn(async move {
+      executor.native_spawn(async move {
         loop {
           sleep(preemptible_duration / 4).await;
           if let Some(state) = state.upgrade() {

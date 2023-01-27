@@ -28,6 +28,7 @@ from pants.backend.python.lint.black.subsystem import Black
 from pants.backend.python.lint.docformatter.subsystem import Docformatter
 from pants.backend.python.lint.flake8.subsystem import Flake8
 from pants.backend.python.lint.isort.subsystem import Isort
+from pants.backend.python.lint.pydocstyle.subsystem import Pydocstyle
 from pants.backend.python.lint.pylint.subsystem import Pylint
 from pants.backend.python.lint.pyupgrade.subsystem import PyUpgrade
 from pants.backend.python.lint.yapf.subsystem import Yapf
@@ -45,6 +46,7 @@ from pants.backend.python.typecheck.mypy.subsystem import MyPy
 from pants.backend.scala.lint.scalafmt.subsystem import ScalafmtSubsystem
 from pants.backend.scala.subsystems.scalatest import Scalatest
 from pants.backend.terraform.dependency_inference import TerraformHcl2Parser
+from pants.backend.tools.yamllint.subsystem import Yamllint
 from pants.jvm.resolve.jvm_tool import JvmToolBase
 from pants.util.strutil import softwrap
 
@@ -115,6 +117,7 @@ AllTools = (
     DefaultTool.python(Isort),
     DefaultTool.python(Lambdex, backend="pants.backend.awslambda.python"),
     DefaultTool.python(MyPy, source_plugins=True),
+    DefaultTool.python(Pydocstyle, backend="pants.backend.python.lint.pydocstyle"),
     DefaultTool.python(PyTest),
     DefaultTool.python(PyUpgrade, backend="pants.backend.experimental.python.lint.pyupgrade"),
     DefaultTool.python(Pylint, backend="pants.backend.python.lint.pylint", source_plugins=True),
@@ -124,6 +127,7 @@ AllTools = (
     DefaultTool.python(SetuptoolsSCM),
     DefaultTool.python(TerraformHcl2Parser, backend="pants.backend.experimental.terraform"),
     DefaultTool.python(TwineSubsystem),
+    DefaultTool.python(Yamllint, backend="pants.backend.experimental.tools.yamllint"),
     DefaultTool.python(Yapf, backend="pants.backend.python.lint.yapf"),
     # JVM
     DefaultTool.jvm(AvroSubsystem, backend="pants.backend.experimental.codegen.avro.java"),

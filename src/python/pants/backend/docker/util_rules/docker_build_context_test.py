@@ -256,6 +256,48 @@ def test_from_image_build_arg_dependency(rule_runner: RuleRunner) -> None:
     )
 
 
+def test_from_image_build_arg_dependency_overwritten(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/upstream/BUILD": dedent(
+                """\
+                docker_image(
+                  name="image",
+                  repository="upstream/{name}",
+                  image_tags=["1.0"],
+                  instructions=["FROM alpine:3.16.1"],
+                )
+                """
+            ),
+            "src/downstream/BUILD": "docker_image(name='image')",
+            "src/downstream/Dockerfile": dedent(
+                """\
+                ARG BASE_IMAGE=src/upstream:image
+                FROM $BASE_IMAGE
+                """
+            ),
+        }
+    )
+
+    assert_build_context(
+        rule_runner,
+        Address("src/downstream", target_name="image"),
+        expected_files=["src/downstream/Dockerfile"],
+        build_upstream_images=True,
+        expected_interpolation_context={
+            "tags": {
+                "baseimage": "3.10-slim",
+                "stage0": "3.10-slim",
+            },
+            "build_args": {
+                "BASE_IMAGE": "python:3.10-slim",
+            },
+        },
+        expected_num_upstream_images=0,
+        pants_args=["--docker-build-args=BASE_IMAGE=python:3.10-slim"],
+    )
+
+
 def test_from_image_build_arg_not_in_repo_issue_15585(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {

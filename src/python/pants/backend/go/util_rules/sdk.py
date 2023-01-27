@@ -18,11 +18,9 @@ from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
-from pants.util.meta import frozen_after_init
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class GoSdkProcess:
     command: tuple[str, ...]
     description: str
@@ -46,18 +44,22 @@ class GoSdkProcess:
         allow_downloads: bool = False,
         replace_sandbox_root_in_args: bool = False,
     ) -> None:
-        self.command = tuple(command)
-        self.description = description
-        self.env = (
-            FrozenDict(env or {})
-            if allow_downloads
-            else FrozenDict({**(env or {}), "GOPROXY": "off"})
+        object.__setattr__(self, "command", tuple(command))
+        object.__setattr__(self, "description", description)
+        object.__setattr__(
+            self,
+            "env",
+            (
+                FrozenDict(env or {})
+                if allow_downloads
+                else FrozenDict({**(env or {}), "GOPROXY": "off"})
+            ),
         )
-        self.input_digest = input_digest
-        self.working_dir = working_dir
-        self.output_files = tuple(output_files)
-        self.output_directories = tuple(output_directories)
-        self.replace_sandbox_root_in_args = replace_sandbox_root_in_args
+        object.__setattr__(self, "input_digest", input_digest)
+        object.__setattr__(self, "working_dir", working_dir)
+        object.__setattr__(self, "output_files", tuple(output_files))
+        object.__setattr__(self, "output_directories", tuple(output_directories))
+        object.__setattr__(self, "replace_sandbox_root_in_args", replace_sandbox_root_in_args)
 
 
 @dataclass(frozen=True)

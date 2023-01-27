@@ -8,15 +8,10 @@ updatedAt: "2022-04-11T21:13:21.965Z"
 To run Pants, you need:
 
 - One of: 
-  - Linux (x86_64)
+  - Linux (x86_64 or ARM64)
   - macOS (Intel or Apple Silicon, 10.15 Catalina or newer)
   - Microsoft Windows 10 with WSL 2
-- Python 3.7, 3.8, or 3.9 discoverable on your `PATH`
 - Internet access (so that Pants can fully bootstrap itself)
-
-> 📘 Python 2 and 3.10+ compatibility
-> 
-> Pants requires Python 3.7, 3.8, or 3.9 to run itself, but it can build your Python 2 and Python 3.6 or earlier code, along with 3.10+.
 
 > 📘 Restricted Internet access?
 > 
@@ -38,25 +33,19 @@ System-specific notes
 > 
 > If you need to run Pants on Alpine, [let us know](doc:community), so we can prioritize this work. Meanwhile, you can try [building Pants yourself](doc:manual-installation#building-pants-from-sources) on Alpine.
 
-> 🚧 Linux on ARM is not yet supported
+> 🚧 Linux on ARM will be supported from Pants 2.16
 > 
-> Pants for Linux is currently only distributed as an x86_64 wheel.
+> Pants 2.16 will be distributed for Linux x86_64 and ARM64. Earlier versions are only distributed for Linux x86_64.
 > 
-> If you need to run Pants on ARM, please [upvote or comment on this issue](https://github.com/pantsbuild/pants/issues/12183) so we can prioritize this work. Meanwhile, you can try [building Pants yourself](doc:manual-installation#building-pants-from-sources) on ARM.
+> If you need to run an earlier version of Pants on ARM, you can try [building Pants yourself](doc:manual-installation#building-pants-from-sources) on that platform.
 
 ### macOS
 
-> 📘 Apple Silicon (M1) support
-> 
-> We publish a macOS `arm64` wheel for Python 3.9. Make sure you have Python 3.9 discoverable on your `$PATH`, e.g. via Homebrew or Pyenv, and an updated version of the `./pants` runner script.
-> 
-> Given the lack of CI infrastructure for Apple Silicon, this support is best-effort and there may a delay in publishing this wheel compared to our normal releases.
-> 
-> If you have Python code, you may need to [set your interpreter constraints](doc:python-interpreter-compatibility) to Python 3.9+, as many tools like Black will not install correctly when using earlier Python versions.
-> 
-> Some users have also had success with earlier versions using Rosetta by running `arch -x86_64 pants`.
-> 
-> When using Docker from your M1, you will need to use `--no-watch-filesystem --no-pantsd`. (Although we don't recommend permanently setting this, as these options are crucial for performance when iterating.)
+> 📘 Apple Silicon (M1/M2) support
+>
+> If you have Python code, you may need to [set your interpreter constraints](doc:python-interpreter-compatibility) to Python 3.9+, as many tools, such as Black, will not install correctly when using earlier Python versions.
+>
+> When running in Docker you will need to set `--no-watch-filesystem --no-pantsd`. (Although we don't recommend permanently setting this, as these options are crucial for performance when iterating.)
 
 ### Microsoft Windows
 
@@ -68,3 +57,7 @@ System-specific notes
 > - Install a recent Linux distribution under WSL 2 (we have tested with Ubuntu 20.04 LTS).
 > - Run `sudo apt install unzip python3-dev python3-distutils python3-venv gcc` in the distribution.
 > - You can then run Pants commands in a Linux shell, or in a Windows shell by prefixing with `wsl `.
+> 
+> Projects using Pants must be contained within the Linux virtual machine:
+> 
+> - Navigating a Linux shell to a Windows directory via the `/mnt` directory, or using the `wsl` prefix with a Windows shell in a Windows directory, and executing Pants may result in unexpected behavior.

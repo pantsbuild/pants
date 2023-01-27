@@ -14,6 +14,7 @@ The `lint` goal runs both dedicated linters and any formatters in check-only mod
 - Docformatter
 - Flake8
 - isort
+- Pydocstyle
 - Pylint
 - Pyupgrade
 - yapf

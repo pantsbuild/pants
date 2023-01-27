@@ -16,7 +16,7 @@ humbug==0.2.7
 importlib_resources==5.0.*
 ijson==3.1.4
 packaging==21.3
-pex==2.1.116
+pex==2.1.121
 psutil==5.9.0
 # This should be compatible with pytest.py, although it can be looser so that we don't
 # over-constrain pantsbuild.pants.testutil

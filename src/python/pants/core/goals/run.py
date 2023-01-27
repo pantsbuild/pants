@@ -58,7 +58,6 @@ from pants.option.global_options import GlobalOptions
 from pants.option.option_types import ArgsListOption, BoolOption
 from pants.util.frozendict import FrozenDict
 from pants.util.memo import memoized
-from pants.util.meta import frozen_after_init
 from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
@@ -120,8 +119,7 @@ class RestartableField(BoolField):
     )
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class RunRequest:
     digest: Digest
     # Values in args and in env can contain the format specifier "{chroot}", which will
@@ -140,11 +138,11 @@ class RunRequest:
         immutable_input_digests: Mapping[str, Digest] | None = None,
         append_only_caches: Mapping[str, str] | None = None,
     ) -> None:
-        self.digest = digest
-        self.args = tuple(args)
-        self.extra_env = FrozenDict(extra_env or {})
-        self.immutable_input_digests = immutable_input_digests
-        self.append_only_caches = append_only_caches
+        object.__setattr__(self, "digest", digest)
+        object.__setattr__(self, "args", tuple(args))
+        object.__setattr__(self, "extra_env", FrozenDict(extra_env or {}))
+        object.__setattr__(self, "immutable_input_digests", immutable_input_digests)
+        object.__setattr__(self, "append_only_caches", append_only_caches)
 
     def to_run_in_sandbox_request(self) -> RunInSandboxRequest:
         return RunInSandboxRequest(
@@ -254,8 +252,8 @@ async def _find_what_to_run(
             *_partition(
                 field_sets,
                 lambda field_set: not any(
-                    isinstance(field, SecondaryOwnerMixin)
-                    for field in dataclasses.astuple(field_set)
+                    isinstance(getattr(field_set, field.name), SecondaryOwnerMixin)
+                    for field in dataclasses.fields(field_set)
                 ),
             )
         )

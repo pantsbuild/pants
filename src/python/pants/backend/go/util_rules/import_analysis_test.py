@@ -11,8 +11,8 @@ import pytest
 from pants.backend.go.util_rules import import_analysis, sdk
 from pants.backend.go.util_rules.build_opts import GoBuildOptions
 from pants.backend.go.util_rules.import_analysis import (
-    GoStdLibImports,
-    GoStdLibImportsRequest,
+    GoStdLibPackages,
+    GoStdLibPackagesRequest,
     ImportConfig,
     ImportConfigRequest,
 )
@@ -28,7 +28,7 @@ def rule_runner() -> RuleRunner:
         rules=[
             *sdk.rules(),
             *import_analysis.rules(),
-            QueryRule(GoStdLibImports, (GoStdLibImportsRequest,)),
+            QueryRule(GoStdLibPackages, (GoStdLibPackagesRequest,)),
             QueryRule(ImportConfig, (ImportConfigRequest,)),
         ],
     )
@@ -39,7 +39,7 @@ def rule_runner() -> RuleRunner:
 @pytest.mark.parametrize("with_race_detector", (False, True))
 def test_stdlib_package_resolution(rule_runner: RuleRunner, with_race_detector: bool) -> None:
     std_lib_imports = rule_runner.request(
-        GoStdLibImports, [GoStdLibImportsRequest(with_race_detector=with_race_detector)]
+        GoStdLibPackages, [GoStdLibPackagesRequest(with_race_detector=with_race_detector)]
     )
     assert "fmt" in std_lib_imports
 

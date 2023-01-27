@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import shlex
 from textwrap import dedent
 
@@ -130,6 +131,7 @@ def test_sources_and_files(rule_runner: RuleRunner) -> None:
                   output_files=["message.txt"],
                   output_directories=["res"],
                   command="./script.sh",
+                  workdir=".",
                 )
 
                 files(
@@ -182,7 +184,7 @@ def test_quotes_command(rule_runner: RuleRunner) -> None:
     assert_shell_command_result(
         rule_runner,
         Address("src", target_name="quotes"),
-        expected_contents={"src/out.log": "foo bar\n"},
+        expected_contents={"out.log": "foo bar\n"},
     )
 
 
@@ -205,8 +207,50 @@ def test_chained_shell_commands(rule_runner: RuleRunner) -> None:
                   name="msg",
                   tools=["cp", "echo"],
                   output_files=["msg"],
+                  command="echo 'shell_command:b' >> msg",
+                  execution_dependencies=["src/a:msg"],
+                )
+                """
+            ),
+        }
+    )
+
+    assert_shell_command_result(
+        rule_runner,
+        Address("src/a", target_name="msg"),
+        expected_contents={"msg": "shell_command:a\n"},
+    )
+
+    assert_shell_command_result(
+        rule_runner,
+        Address("src/b", target_name="msg"),
+        expected_contents={"msg": "shell_command:a\nshell_command:b\n"},
+    )
+
+
+def test_chained_shell_commands_with_workdir(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/a/BUILD": dedent(
+                """\
+                experimental_shell_command(
+                  name="msg",
+                  tools=["echo"],
+                  output_files=["msg"],
+                  command="echo 'shell_command:a' > msg",
+                  workdir=".",
+                )
+                """
+            ),
+            "src/b/BUILD": dedent(
+                """\
+                experimental_shell_command(
+                  name="msg",
+                  tools=["cp", "echo"],
+                  output_files=["msg"],
                   command="cp ../a/msg . ; echo 'shell_command:b' >> msg",
                   execution_dependencies=["src/a:msg"],
+                  workdir=".",
                 )
                 """
             ),
@@ -310,14 +354,14 @@ def test_shell_command_masquerade_as_a_files_target(rule_runner: RuleRunner) -> 
         ],
     )
 
-    assert sources.files == ("src/contents.txt",)
+    assert sources.files == ("contents.txt",)
     assert sources.unrooted_files == sources.files
 
     contents = rule_runner.request(DigestContents, [sources.snapshot.digest])
     assert len(contents) == 1
 
     fc = contents[0]
-    assert fc.path == "src/contents.txt"
+    assert fc.path == "contents.txt"
     assert fc.content == b"contents\n"
 
 
@@ -344,7 +388,7 @@ def test_package_dependencies(caplog, rule_runner: RuleRunner) -> None:
 
                 experimental_shell_command(
                   name="test",
-                  command="ls .",
+                  command="ls src",
                   tools=["ls"],
                   log_output=True,
                   execution_dependencies=[":msg-archive"],
@@ -452,12 +496,12 @@ def test_execution_dependencies(caplog, rule_runner: RuleRunner) -> None:
     assert_shell_command_result(
         rule_runner,
         Address("src", target_name="expect_success_1"),
-        expected_contents={"src/output.txt": "message\nmessage\n"},
+        expected_contents={"output.txt": "message\nmessage\n"},
     )
     assert_shell_command_result(
         rule_runner,
         Address("src", target_name="expect_success_2"),
-        expected_contents={"src/output.txt": "message\nmessage\n"},
+        expected_contents={"output.txt": "message\nmessage\n"},
     )
 
 
@@ -498,7 +542,7 @@ def test_old_style_dependencies(caplog, rule_runner: RuleRunner) -> None:
     assert_shell_command_result(
         rule_runner,
         Address("src", target_name="expect_success"),
-        expected_contents={"src/output.txt": "message\nmessage\n"},
+        expected_contents={"output.txt": "message\nmessage\n"},
     )
 
 
@@ -529,8 +573,11 @@ def test_run_shell_command_request(rule_runner: RuleRunner) -> None:
         assert args[0] in request.args[0]
         assert request.args[1:] == args[1:]
 
-    assert_run_args("test", ("bash", "-c", "some cmd string"))
-    assert_run_args("cd-test", ("bash", "-c", "cd 'src/with space'\"'\"'n quote'; some cmd string"))
+    assert_run_args("test", ("bash", "-c", "some cmd string", "src:test"))
+    assert_run_args(
+        "cd-test",
+        ("bash", "-c", "cd 'src/with space'\"'\"'n quote'; some cmd string", "src:cd-test"),
+    )
 
 
 def test_shell_command_boot_script(rule_runner: RuleRunner) -> None:
@@ -544,6 +591,7 @@ def test_shell_command_boot_script(rule_runner: RuleRunner) -> None:
                     "python3.8",
                   ],
                   command="./command.script",
+                  workdir=".",
                 )
                 """
             ),
@@ -563,6 +611,7 @@ def test_shell_command_boot_script(rule_runner: RuleRunner) -> None:
             'export PATH="$PWD/.bin";'
             "./command.script"
         )
+        + " src:boot-script-test"
     )
 
     tools = sorted({"python3_8", "mkdir", "ln"})
@@ -600,6 +649,7 @@ def test_shell_command_boot_script_in_build_root(rule_runner: RuleRunner) -> Non
             'export PATH="$PWD/.bin";'
             "./command.script"
         )
+        + " //:boot-script-test"
     )
 
 
@@ -662,6 +712,41 @@ def test_run_runnable_in_sandbox(rule_runner: RuleRunner) -> None:
     assert_run_in_sandbox_result(
         rule_runner,
         Address("src", target_name="run_fruitcake"),
+        expected_contents={"fruitcake.txt": "fruitcake\n"},
+    )
+
+
+def test_run_runnable_in_sandbox_with_workdir(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/fruitcake.py": dedent(
+                """\
+                f = open("fruitcake.txt", "w")
+                f.write("fruitcake\\n")
+                f.close()
+                """
+            ),
+            "src/BUILD": dedent(
+                """\
+                python_source(
+                    source="fruitcake.py",
+                    name="fruitcake",
+                )
+
+                experimental_run_in_sandbox(
+                  name="run_fruitcake",
+                  runnable=":fruitcake",
+                  output_files=["fruitcake.txt"],
+                  workdir=".",
+                )
+                """
+            ),
+        }
+    )
+
+    assert_run_in_sandbox_result(
+        rule_runner,
+        Address("src", target_name="run_fruitcake"),
         expected_contents={"src/fruitcake.txt": "fruitcake\n"},
     )
 
@@ -676,6 +761,7 @@ def test_relative_directories(rule_runner: RuleRunner) -> None:
                   tools=["echo"],
                   command='echo foosh > ../foosh.txt',
                   output_files=["../foosh.txt"],
+                  workdir=".",
                 )
                 """
             ),
@@ -699,6 +785,7 @@ def test_relative_directories_2(rule_runner: RuleRunner) -> None:
                   tools=["echo"],
                   command='echo foosh > ../newdir/foosh.txt',
                   output_files=["../newdir/foosh.txt"],
+                  workdir=".",
                 )
                 """
             ),
@@ -722,6 +809,7 @@ def test_cannot_escape_build_root(rule_runner: RuleRunner) -> None:
                   tools=["echo"],
                   command='echo foosh > ../../invalid.txt',
                   output_files=["../../invalid.txt"],
+                  workdir=".",
                 )
                 """
             ),
@@ -734,3 +822,51 @@ def test_cannot_escape_build_root(rule_runner: RuleRunner) -> None:
             Address("src", target_name="quotes"),
             expected_contents={"../../invalid.txt": "foosh\n"},
         )
+
+
+@pytest.mark.parametrize(
+    ("workdir", "file_location"),
+    (
+        ("src", "src"),
+        (".", "src"),
+        ("./", "src"),
+        ("/", ""),
+        ("", ""),
+        ("/src", "src"),
+    ),
+)
+def test_working_directory_special_values(
+    rule_runner: RuleRunner, workdir: str, file_location: str
+) -> None:
+    rule_runner.write_files(
+        {
+            "src/fruitcake.py": dedent(
+                """\
+                f = open("fruitcake.txt", "w")
+                f.write("fruitcake\\n")
+                f.close()
+                """
+            ),
+            "src/BUILD": dedent(
+                f"""\
+                python_source(
+                    source="fruitcake.py",
+                    name="fruitcake",
+                )
+
+                experimental_run_in_sandbox(
+                  name="run_fruitcake",
+                  runnable=":fruitcake",
+                  output_files=["fruitcake.txt"],
+                  workdir="{workdir}",
+                )
+                """
+            ),
+        }
+    )
+
+    assert_run_in_sandbox_result(
+        rule_runner,
+        Address("src", target_name="run_fruitcake"),
+        expected_contents={os.path.join(file_location, "fruitcake.txt"): "fruitcake\n"},
+    )

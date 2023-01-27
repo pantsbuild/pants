@@ -511,6 +511,10 @@ class PythonSetup(Subsystem):
         ),
         advanced=True,
     )
+    repl_history = BoolOption(
+        default=True,
+        help="Whether to use the standard Python command history file when running a repl.",
+    )
 
     @property
     def enable_synthetic_lockfiles(self) -> bool:

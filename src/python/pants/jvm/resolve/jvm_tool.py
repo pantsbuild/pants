@@ -127,9 +127,13 @@ async def gather_coordinates_for_jvm_lockfile(
 
     if bad_artifact_inputs:
         raise ValueError(
-            "The following values could not be parsed as an address nor as a JVM coordinate string. "
-            f"The problematic inputs supplied to the `{request.option_name}` option were: "
-            f"{', '.join(bad_artifact_inputs)}."
+            softwrap(
+                f"""
+                The following values could not be parsed as an address nor as a JVM coordinate string.
+                The problematic inputs supplied to the `{request.option_name}` option were:
+                {', '.join(bad_artifact_inputs)}.
+                """
+            )
         )
 
     # Gather coordinates from the provided addresses.

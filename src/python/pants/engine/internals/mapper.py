@@ -10,6 +10,7 @@ from typing import Iterable, Mapping, TypeVar
 from pants.backend.project_info.filter_targets import FilterSubsystem
 from pants.base.exceptions import MappingError
 from pants.build_graph.address import Address, BuildFileAddress
+from pants.engine.env_vars import EnvironmentVars
 from pants.engine.internals.defaults import BuildFileDefaults, BuildFileDefaultsParserState
 from pants.engine.internals.dep_rules import (
     BuildFileDependencyRules,
@@ -43,6 +44,7 @@ class AddressMap:
         build_file_content: str,
         parser: Parser,
         extra_symbols: BuildFilePreludeSymbols,
+        env_vars: EnvironmentVars,
         defaults: BuildFileDefaultsParserState,
         dependents_rules: BuildFileDependencyRulesParserState | None,
         dependencies_rules: BuildFileDependencyRulesParserState | None,
@@ -57,6 +59,7 @@ class AddressMap:
                 filepath,
                 build_file_content,
                 extra_symbols,
+                env_vars,
                 defaults,
                 dependents_rules,
                 dependencies_rules,
