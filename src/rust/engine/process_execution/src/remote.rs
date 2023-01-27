@@ -524,7 +524,7 @@ impl CommandRunner {
     for violation in &precondition_failure.violations {
       if violation.r#type != "MISSING" {
         return ExecutionError::Fatal(
-          format!("Unknown PreconditionFailure violation: {:?}", violation).into(),
+          format!("Unknown PreconditionFailure violation: {violation:?}").into(),
         );
       }
 
@@ -602,7 +602,7 @@ impl CommandRunner {
         let execute_response = match operation.result {
           Some(OperationResult::Response(response_any)) => {
             remexec::ExecuteResponse::decode(&response_any.value[..]).map_err(|e| {
-              ExecutionError::Fatal(format!("Invalid ExecuteResponse: {:?}", e).into())
+              ExecutionError::Fatal(format!("Invalid ExecuteResponse: {e:?}").into())
             })?
           }
           Some(OperationResult::Error(rpc_status)) => {
@@ -698,7 +698,7 @@ impl CommandRunner {
         let precondition_failure = PreconditionFailure::decode(Cursor::new(&details.value))
           .map_err(|e| {
             ExecutionError::Fatal(
-              format!("Error deserializing PreconditionFailure proto: {:?}", e).into(),
+              format!("Error deserializing PreconditionFailure proto: {e:?}").into(),
             )
           })?;
 
@@ -868,9 +868,7 @@ impl CommandRunner {
             trace!("retryable error: {}", e);
             if num_retries >= MAX_RETRIES {
               workunit.increment_counter(Metric::RemoteExecutionRPCErrors, 1);
-              return Err(
-                format!("Too many failures from server. The last error was: {}", e).into(),
-              );
+              return Err(format!("Too many failures from server. The last error was: {e}").into());
             } else {
               // Increment the retry counter and allow loop to retry.
               num_retries += 1;
@@ -1004,8 +1002,7 @@ impl crate::CommandRunner for CommandRunner {
               Some((
                 WorkunitMetadata {
                   desc: Some(format!(
-                    "remote execution timed out after {:?}",
-                    deadline_duration
+                    "remote execution timed out after {deadline_duration:?}"
                   )),
                   ..initial
                 },
@@ -1013,7 +1010,7 @@ impl crate::CommandRunner for CommandRunner {
               ))
             });
             workunit.increment_counter(Metric::RemoteExecutionTimeouts, 1);
-            Err(format!("remote execution timed out after {:?}", deadline_duration).into())
+            Err(format!("remote execution timed out after {deadline_duration:?}").into())
           }
         }
       },
@@ -1159,8 +1156,7 @@ pub async fn make_execute_request(
       || name == CACHE_KEY_SALT_ENV_VAR_NAME
     {
       return Err(format!(
-        "Cannot set env var with name {} as that is reserved for internal use by pants",
-        name
+        "Cannot set env var with name {name} as that is reserved for internal use by pants"
       ));
     }
 
@@ -1222,7 +1218,7 @@ pub async fn make_execute_request(
     .map(|p| {
       p.to_str()
         .map(str::to_owned)
-        .ok_or_else(|| format!("Non-UTF8 output file path: {:?}", p))
+        .ok_or_else(|| format!("Non-UTF8 output file path: {p:?}"))
     })
     .collect::<Result<Vec<String>, String>>()?;
   output_files.sort();
@@ -1234,7 +1230,7 @@ pub async fn make_execute_request(
     .map(|p| {
       p.to_str()
         .map(str::to_owned)
-        .ok_or_else(|| format!("Non-UTF8 output directory path: {:?}", p))
+        .ok_or_else(|| format!("Non-UTF8 output directory path: {p:?}"))
     })
     .collect::<Result<Vec<String>, String>>()?;
   output_directories.sort();
@@ -1247,7 +1243,7 @@ pub async fn make_execute_request(
       command.working_directory = working_directory
         .to_str()
         .map(str::to_owned)
-        .unwrap_or_else(|| panic!("Non-UTF8 working directory path: {:?}", working_directory));
+        .unwrap_or_else(|| panic!("Non-UTF8 working directory path: {working_directory:?}"));
     }
   }
 
@@ -1351,11 +1347,11 @@ async fn populate_fallible_execution_result_for_timeout(
   platform: Platform,
 ) -> Result<FallibleProcessResultWithPlatform, String> {
   let timeout_msg = if let Some(timeout) = timeout {
-    format!("user timeout of {:?} after {:?}", timeout, elapsed)
+    format!("user timeout of {timeout:?} after {elapsed:?}")
   } else {
-    format!("server timeout after {:?}", elapsed)
+    format!("server timeout after {elapsed:?}")
   };
-  let stdout = Bytes::from(format!("Exceeded {} for {}", timeout_msg, description));
+  let stdout = Bytes::from(format!("Exceeded {timeout_msg} for {description}"));
   let stdout_digest = store.store_file_bytes(stdout, true).await?;
 
   Ok(FallibleProcessResultWithPlatform {
@@ -1420,13 +1416,13 @@ fn extract_stdout<'a>(
     if let Some(digest_proto) = &action_result.stdout_digest {
       let stdout_digest_result: Result<Digest, String> = digest_proto.try_into();
       let stdout_digest =
-        stdout_digest_result.map_err(|err| format!("Error extracting stdout: {}", err))?;
+        stdout_digest_result.map_err(|err| format!("Error extracting stdout: {err}"))?;
       Ok(stdout_digest)
     } else {
       let stdout_raw = Bytes::copy_from_slice(&action_result.stdout_raw);
       let digest = store
         .store_file_bytes(stdout_raw, true)
-        .map_err(move |error| format!("Error storing raw stdout: {:?}", error))
+        .map_err(move |error| format!("Error storing raw stdout: {error:?}"))
         .await?;
       Ok(digest)
     }
@@ -1443,13 +1439,13 @@ fn extract_stderr<'a>(
     if let Some(digest_proto) = &action_result.stderr_digest {
       let stderr_digest_result: Result<Digest, String> = digest_proto.try_into();
       let stderr_digest =
-        stderr_digest_result.map_err(|err| format!("Error extracting stderr: {}", err))?;
+        stderr_digest_result.map_err(|err| format!("Error extracting stderr: {err}"))?;
       Ok(stderr_digest)
     } else {
       let stderr_raw = Bytes::copy_from_slice(&action_result.stderr_raw);
       let digest = store
         .store_file_bytes(stderr_raw, true)
-        .map_err(move |error| format!("Error storing raw stderr: {:?}", error))
+        .map_err(move |error| format!("Error storing raw stderr: {error:?}"))
         .await?;
       Ok(digest)
     }
@@ -1513,18 +1509,13 @@ pub fn extract_output_files(
         let directory_digest = store
           .load_tree_from_remote(tree_digest)
           .await?
-          .ok_or_else(|| format!("Tree with digest {:?} was not in remote", tree_digest))?;
+          .ok_or_else(|| format!("Tree with digest {tree_digest:?} was not in remote"))?;
 
         store
           .add_prefix(directory_digest, &RelativePath::new(dir.path)?)
           .await
       })
-      .map_err(|err| {
-        format!(
-          "Error saving remote output directory to local cache: {}",
-          err
-        )
-      }),
+      .map_err(|err| format!("Error saving remote output directory to local cache: {err}")),
     );
   }
 
@@ -1579,10 +1570,7 @@ pub fn extract_output_files(
     let files_snapshot =
       Snapshot::from_path_stats(StoreOneOffRemoteDigest::new(path_map), path_stats).map_err(
         move |error| {
-          format!(
-            "Error when storing the output file directory info in the remote CAS: {:?}",
-            error
-          )
+          format!("Error when storing the output file directory info in the remote CAS: {error:?}")
         },
       );
 
@@ -1626,7 +1614,7 @@ pub async fn store_proto_locally<P: prost::Message>(
   store
     .store_file_bytes(proto.to_bytes(), true)
     .await
-    .map_err(|e| format!("Error saving proto to local store: {:?}", e))
+    .map_err(|e| format!("Error saving proto to local store: {e:?}"))
 }
 
 pub async fn ensure_action_stored_locally(
@@ -1656,7 +1644,7 @@ pub async fn ensure_action_uploaded(
   in_workunit!(
     "ensure_action_uploaded",
     Level::Trace,
-    desc = Some(format!("ensure action uploaded for {:?}", action_digest)),
+    desc = Some(format!("ensure action uploaded for {action_digest:?}")),
     |_workunit| async move {
       let mut digests = vec![command_digest, action_digest];
       if let Some(input_files) = input_files {
@@ -1677,7 +1665,7 @@ pub fn format_error(error: &StatusProto) -> String {
   let error_code_enum = Code::from_i32(error.code);
   let error_code = match error_code_enum {
     Code::Unknown => format!("{:?}", error.code),
-    x => format!("{:?}", x),
+    x => format!("{x:?}"),
   };
   format!("{}: {}", error_code, error.message)
 }

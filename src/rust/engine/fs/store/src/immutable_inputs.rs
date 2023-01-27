@@ -39,12 +39,7 @@ impl ImmutableInputs {
     let workdir = tempfile::Builder::new()
       .prefix("immutable_inputs")
       .tempdir_in(base)
-      .map_err(|e| {
-        format!(
-          "Failed to create temporary directory for immutable inputs: {}",
-          e
-        )
-      })?;
+      .map_err(|e| format!("Failed to create temporary directory for immutable inputs: {e}"))?;
     Ok(Self(Arc::new(Inner {
       store,
       workdir,
@@ -98,8 +93,7 @@ impl ImmutableInputs {
         let chroot = TempDir::new_in(self.0.workdir.path()).map_err(|e| {
           format!(
             "Failed to create a temporary directory for materialization of immutable input \
-          digest {:?}: {}",
-            digest, e
+          digest {digest:?}: {e}"
           )
         })?;
 
@@ -162,8 +156,7 @@ impl ImmutableInputs {
         let chroot = TempDir::new_in(self.0.workdir.path()).map_err(|e| {
           format!(
             "Failed to create a temporary directory for materialization of immutable input \
-            digest {:?}: {}",
-            digest, e
+            digest {digest:?}: {e}"
           )
         })?;
 

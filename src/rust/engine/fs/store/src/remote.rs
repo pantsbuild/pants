@@ -132,18 +132,10 @@ impl ByteStore {
     WriteResult: Future<Output = Result<(), StoreError>>,
   {
     let write_buffer = tempfile::tempfile().map_err(|e| {
-      format!(
-        "Failed to create a temporary blob upload buffer for {digest:?}: {err}",
-        digest = digest,
-        err = e
-      )
+      format!("Failed to create a temporary blob upload buffer for {digest:?}: {e}")
     })?;
     let read_buffer = write_buffer.try_clone().map_err(|e| {
-      format!(
-        "Failed to create a read handle for the temporary upload buffer for {digest:?}: {err}",
-        digest = digest,
-        err = e
-      )
+      format!("Failed to create a read handle for the temporary upload buffer for {digest:?}: {e}")
     })?;
     write_to_buffer(write_buffer).await?;
 
@@ -153,11 +145,7 @@ impl ByteStore {
     // the code just above.
     let mmap = Arc::new(unsafe {
       let mapping = memmap::Mmap::map(&read_buffer).map_err(|e| {
-        format!(
-          "Failed to memory map the temporary file buffer for {digest:?}: {err}",
-          digest = digest,
-          err = e
-        )
+        format!("Failed to memory map the temporary file buffer for {digest:?}: {e}")
       })?;
       if let Err(err) = madvise::madvise(
         mapping.as_ptr(),

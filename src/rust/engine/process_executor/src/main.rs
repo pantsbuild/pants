@@ -469,7 +469,7 @@ async fn make_request_from_flat_args(
     .clone()
     .map(|path| {
       RelativePath::new(path)
-        .map_err(|err| format!("working-directory must be a relative path: {:?}", err))
+        .map_err(|err| format!("working-directory must be a relative path: {err:?}"))
     })
     .transpose()?;
 
@@ -481,7 +481,7 @@ async fn make_request_from_flat_args(
     BTreeSet::default(),
   )
   .await
-  .map_err(|e| format!("Could not create input digest for process: {:?}", e))?;
+  .map_err(|e| format!("Could not create input digest for process: {e:?}"))?;
 
   let process = process_execution::Process {
     argv: args.command.argv.clone(),
@@ -522,15 +522,10 @@ async fn extract_request_from_action_digest(
     .load_file_bytes_with(action_digest, |bytes| Action::decode(bytes))
     .await
     .map_err(|e| e.enrich("Could not load action proto from CAS").to_string())?
-    .map_err(|err| {
-      format!(
-        "Error deserializing action proto {:?}: {:?}",
-        action_digest, err
-      )
-    })?;
+    .map_err(|err| format!("Error deserializing action proto {action_digest:?}: {err:?}"))?;
 
-  let command_digest = require_digest(&action.command_digest)
-    .map_err(|err| format!("Bad Command digest: {:?}", err))?;
+  let command_digest =
+    require_digest(&action.command_digest).map_err(|err| format!("Bad Command digest: {err:?}"))?;
   let command = store
     .load_file_bytes_with(command_digest, |bytes| Command::decode(bytes))
     .await
@@ -538,24 +533,19 @@ async fn extract_request_from_action_digest(
       e.enrich("Could not load command proto from CAS")
         .to_string()
     })?
-    .map_err(|err| {
-      format!(
-        "Error deserializing command proto {:?}: {:?}",
-        command_digest, err
-      )
-    })?;
+    .map_err(|err| format!("Error deserializing command proto {command_digest:?}: {err:?}"))?;
   let working_directory = if command.working_directory.is_empty() {
     None
   } else {
     Some(
       RelativePath::new(command.working_directory)
-        .map_err(|err| format!("working-directory must be a relative path: {:?}", err))?,
+        .map_err(|err| format!("working-directory must be a relative path: {err:?}"))?,
     )
   };
 
   let input_digests = InputDigests::with_input_files(DirectoryDigest::from_persisted_digest(
     require_digest(&action.input_root_digest)
-      .map_err(|err| format!("Bad input root digest: {:?}", err))?,
+      .map_err(|err| format!("Bad input root digest: {err:?}"))?,
   ));
 
   // In case the local Store doesn't have the input root Directory,
@@ -632,16 +622,13 @@ async fn extract_request_from_buildbarn_url(
       let action_fingerprint = Fingerprint::from_hex_string(interesting_parts[2])?;
       let action_digest_length: usize = interesting_parts[3]
         .parse()
-        .map_err(|err| format!("Couldn't parse action digest length as a number: {:?}", err))?;
+        .map_err(|err| format!("Couldn't parse action digest length as a number: {err:?}"))?;
       Digest::new(action_fingerprint, action_digest_length)
     }
     "uncached_action_result" => {
       let action_result_fingerprint = Fingerprint::from_hex_string(interesting_parts[2])?;
       let action_result_digest_length: usize = interesting_parts[3].parse().map_err(|err| {
-        format!(
-          "Couldn't parse uncached action digest result length as a number: {:?}",
-          err
-        )
+        format!("Couldn't parse uncached action digest result length as a number: {err:?}")
       })?;
       let action_result_digest =
         Digest::new(action_result_fingerprint, action_result_digest_length);
@@ -652,14 +639,13 @@ async fn extract_request_from_buildbarn_url(
         })
         .await
         .map_err(|e| e.enrich("Could not load action result proto").to_string())?
-        .map_err(|err| format!("Error deserializing action result proto: {:?}", err))?;
+        .map_err(|err| format!("Error deserializing action result proto: {err:?}"))?;
 
       require_digest(&action_result.action_digest)?
     }
     _ => {
       return Err(format!(
-        "Wrong kind in buildbarn URL; wanted action or uncached_action_result, got {}",
-        kind
+        "Wrong kind in buildbarn URL; wanted action or uncached_action_result, got {kind}"
       ));
     }
   };

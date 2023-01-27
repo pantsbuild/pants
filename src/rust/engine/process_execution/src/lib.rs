@@ -182,8 +182,7 @@ impl Platform {
         ref machine,
         ..
       } => Err(format!(
-        "Found unknown system/arch name pair {} {}",
-        sysname, machine
+        "Found unknown system/arch name pair {sysname} {machine}"
       )),
     }
   }
@@ -208,10 +207,7 @@ impl TryFrom<String> for Platform {
       "macos_x86_64" => Ok(Platform::Macos_x86_64),
       "linux_x86_64" => Ok(Platform::Linux_x86_64),
       "linux_arm64" => Ok(Platform::Linux_arm64),
-      other => Err(format!(
-        "Unknown platform {:?} encountered in parsing",
-        other
-      )),
+      other => Err(format!("Unknown platform {other:?} encountered in parsing")),
     }
   }
 }
@@ -242,7 +238,7 @@ impl TryFrom<String> for ProcessCacheScope {
       "per_restart_always" => Ok(ProcessCacheScope::PerRestartAlways),
       "per_restart_successful" => Ok(ProcessCacheScope::PerRestartSuccessful),
       "per_session" => Ok(ProcessCacheScope::PerSession),
-      other => Err(format!("Unknown Process cache scope: {:?}", other)),
+      other => Err(format!("Unknown Process cache scope: {other:?}")),
     }
   }
 }

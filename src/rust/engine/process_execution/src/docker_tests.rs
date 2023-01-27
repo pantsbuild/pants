@@ -26,10 +26,10 @@ use crate::{
 };
 
 /// Docker image to use for most tests in this file.
-const IMAGE: &'static str = "busybox:1.34.1";
+const IMAGE: &str = "busybox:1.34.1";
 
 /// Path to `sh` within the image.
-const SH_PATH: &'static str = "/bin/sh";
+const SH_PATH: &str = "/bin/sh";
 
 #[derive(PartialEq, Debug)]
 struct LocalTestResult {
@@ -94,7 +94,7 @@ async fn runner_errors_if_docker_image_not_set() {
   if let ProcessError::Unclassified(msg) = err {
     assert!(msg.contains("Failed to pull Docker image"));
   } else {
-    panic!("unexpected value: {:?}", err)
+    panic!("unexpected value: {err:?}")
   }
 
   // Otherwise, if docker_image is not set, use the local runner.
@@ -106,7 +106,7 @@ async fn runner_errors_if_docker_image_not_set() {
       msg.contains("The Docker execution strategy was not set on the Process, but the Docker CommandRunner was used")
     );
   } else {
-    panic!("unexpected value: {:?}", err)
+    panic!("unexpected value: {err:?}")
   }
 }
 
@@ -176,9 +176,9 @@ fn extract_env(
   let content =
     String::from_utf8(content).map_err(|_| "Invalid UTF-8 in env output".to_string())?;
   let result = content
-    .split("\n")
+    .split('\n')
     .filter(|line| !line.is_empty())
-    .map(|line| line.splitn(2, "="))
+    .map(|line| line.splitn(2, '='))
     .map(|mut parts| {
       (
         parts.next().unwrap().to_string(),
@@ -445,7 +445,7 @@ async fn append_only_cache_created() {
   let name = "geo";
   let dest_base = ".cache";
   let cache_name = CacheName::new(name.to_owned()).unwrap();
-  let cache_dest = RelativePath::new(format!("{}/{}", dest_base, name)).unwrap();
+  let cache_dest = RelativePath::new(format!("{dest_base}/{name}")).unwrap();
   let result = run_command_via_docker(
     Process::new(owned_string_vec(&["/bin/ls", dest_base]))
       .append_only_caches(vec![(cache_name, cache_dest)].into_iter().collect())
@@ -454,7 +454,7 @@ async fn append_only_cache_created() {
   .await
   .unwrap();
 
-  assert_eq!(result.stdout_bytes, format!("{}\n", name).as_bytes());
+  assert_eq!(result.stdout_bytes, format!("{name}\n").as_bytes());
   assert_eq!(result.stderr_bytes, "".as_bytes());
   assert_eq!(result.original.exit_code, 0);
   assert_eq!(result.original.output_directory, *EMPTY_DIRECTORY_DIGEST);
@@ -503,7 +503,7 @@ async fn test_chroot_placeholder() {
   .unwrap();
 
   let got_env = extract_env(result.stdout_bytes, &[]).unwrap();
-  let path = format!("/usr/bin:{}", SANDBOX_BASE_PATH_IN_CONTAINER);
+  let path = format!("/usr/bin:{SANDBOX_BASE_PATH_IN_CONTAINER}");
   assert!(got_env.get(&"PATH".to_string()).unwrap().starts_with(&path));
   assert!(got_env.get(&"PATH".to_string()).unwrap().ends_with("/bin"));
 }
@@ -727,10 +727,10 @@ async fn run_command_via_docker_in_dir(
   store: Option<Store>,
   executor: Option<task_executor::Executor>,
 ) -> Result<LocalTestResult, ProcessError> {
-  req.platform = platform_for_tests().map_err(|err| ProcessError::Unclassified(err))?;
+  req.platform = platform_for_tests().map_err(ProcessError::Unclassified)?;
 
   let store_dir = TempDir::new().unwrap();
-  let executor = executor.unwrap_or_else(|| task_executor::Executor::new());
+  let executor = executor.unwrap_or_else(task_executor::Executor::new);
   let store =
     store.unwrap_or_else(|| Store::local_only(executor.clone(), store_dir.path()).unwrap());
   let (_caches_dir, named_caches, immutable_inputs) =
@@ -748,7 +748,7 @@ async fn run_command_via_docker_in_dir(
     cleanup,
   )?;
   let result: Result<_, ProcessError> = async {
-    let original = runner.run(Context::default(), workunit, req.into()).await?;
+    let original = runner.run(Context::default(), workunit, req).await?;
     let stdout_bytes = store
       .load_file_bytes_with(original.stdout_digest, |bytes| bytes.to_vec())
       .await?;

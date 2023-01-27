@@ -365,7 +365,7 @@ impl CommandRunner {
         initial.map(|(initial, _)| {
           (
             WorkunitMetadata {
-              desc: initial.desc.as_ref().map(|desc| format!("Hit: {}", desc)),
+              desc: initial.desc.as_ref().map(|desc| format!("Hit: {desc}")),
               ..initial
             },
             Level::Debug,
@@ -445,10 +445,8 @@ impl CommandRunner {
       CacheErrorType::ReadError => "read from",
       CacheErrorType::WriteError => "write to",
     };
-    let log_msg = format!(
-      "Failed to {} remote cache ({} occurrences so far): {}",
-      failure_desc, err_count, err
-    );
+    let log_msg =
+      format!("Failed to {failure_desc} remote cache ({err_count} occurrences so far): {err}");
     let log_at_warn = match self.warnings_behavior {
       RemoteCacheWarningsBehavior::Ignore => false,
       RemoteCacheWarningsBehavior::FirstOnly => err_count == 1,
@@ -553,7 +551,7 @@ impl crate::CommandRunner for CommandRunner {
       }
       // NB: We must box the future to avoid a stack overflow.
       .boxed());
-      let task_name = format!("remote cache write {:?}", action_digest);
+      let task_name = format!("remote cache write {action_digest:?}");
       context
         .tail_tasks
         .spawn_on(&task_name, self.executor.handle(), write_fut.boxed());
@@ -587,7 +585,7 @@ async fn check_action_cache(
   in_workunit!(
     "check_action_cache",
     Level::Debug,
-    desc = Some(format!("Remote cache lookup for: {}", command_description)),
+    desc = Some(format!("Remote cache lookup for: {command_description}")),
     |workunit| async move {
       workunit.increment_counter(Metric::RemoteCacheRequests, 1);
 

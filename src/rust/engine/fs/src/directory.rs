@@ -1198,7 +1198,7 @@ fn first_path_component_to_name(path: &Path) -> Result<Name, String> {
   let name = first_path_component
     .as_os_str()
     .to_str()
-    .ok_or_else(|| format!("{:?} is not representable in UTF8", first_path_component))?;
+    .ok_or_else(|| format!("{first_path_component:?} is not representable in UTF8"))?;
   Ok(Name(Intern::from(name)))
 }
 

@@ -181,11 +181,11 @@ impl StubCASResponder {
 
   fn read_internal(&self, req: &ReadRequest) -> Result<Vec<ReadResponse>, Status> {
     let parsed_resource_name = parse_read_resource_name(&req.resource_name)
-      .map_err(|err| Status::invalid_argument(format!("Failed to parse resource name: {}", err)))?;
+      .map_err(|err| Status::invalid_argument(format!("Failed to parse resource name: {err}")))?;
 
     let digest = parsed_resource_name.hash;
     let fingerprint = Fingerprint::from_hex_string(digest)
-      .map_err(|e| Status::invalid_argument(format!("Bad digest {}: {}", digest, e)))?;
+      .map_err(|e| Status::invalid_argument(format!("Bad digest {digest}: {e}")))?;
     if self.always_errors {
       return Err(Status::internal(
         "StubCAS is configured to always fail".to_owned(),
@@ -203,8 +203,7 @@ impl StubCASResponder {
           .collect(),
       ),
       None => Err(Status::not_found(format!(
-        "Did not find digest {}",
-        fingerprint
+        "Did not find digest {fingerprint}"
       ))),
     }
   }
@@ -254,8 +253,7 @@ impl ByteStream for StubCASResponder {
         Ok(r) => r,
         Err(e) => {
           return Err(Status::invalid_argument(format!(
-            "Client sent an error: {}",
-            e
+            "Client sent an error: {e}"
           )))
         }
       };

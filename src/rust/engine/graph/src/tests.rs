@@ -229,10 +229,7 @@ async fn invalidate_randomly() {
         // Some amount of concurrent invalidation is expected: retry.
         continue;
       }
-      Err(e) => panic!(
-        "Did not expect any errors other than Invalidation. Got: {:?}",
-        e
-      ),
+      Err(e) => panic!("Did not expect any errors other than Invalidation. Got: {e:?}"),
     };
     max_distinct_context_values = cmp::max(
       max_distinct_context_values,
@@ -240,7 +237,7 @@ async fn invalidate_randomly() {
     );
 
     // Poll the channel to see whether the background thread has exited.
-    if let Ok(_) = recv.try_recv() {
+    if recv.try_recv().is_ok() {
       break;
     }
     iterations += 1;
@@ -248,9 +245,7 @@ async fn invalidate_randomly() {
 
   assert!(
     max_distinct_context_values > 1,
-    "In {} iterations, observed a maximum of {} distinct context values.",
-    iterations,
-    max_distinct_context_values
+    "In {iterations} iterations, observed a maximum of {max_distinct_context_values} distinct context values."
   );
 }
 
@@ -279,7 +274,7 @@ async fn poll_cacheable() {
   let request = graph.poll(TNode::new(2), Some(token2), None, &context);
   match timeout(Duration::from_millis(1000), request).await {
     Err(Elapsed { .. }) => (),
-    e => panic!("Should have timed out, instead got: {:?}", e),
+    e => panic!("Should have timed out, instead got: {e:?}"),
   }
 
   // Invalidating something and re-polling should re-compute.
@@ -313,7 +308,7 @@ async fn poll_uncacheable() {
   let request = graph.poll(TNode::new(2), Some(token1), None, &context);
   match timeout(Duration::from_millis(1000), request).await {
     Err(Elapsed { .. }) => (),
-    e => panic!("Should have timed out, instead got: {:?}", e),
+    e => panic!("Should have timed out, instead got: {e:?}"),
   }
 
   // Invalidating something and re-polling should re-compute.
@@ -797,7 +792,7 @@ impl Node for TNode {
 
 impl std::fmt::Display for TNode {
   fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
-    write!(f, "{:?}", self)
+    write!(f, "{self:?}")
   }
 }
 
@@ -829,8 +824,7 @@ impl TNode {
     for node_id in node_ids {
       if previous + 1 != node_id {
         return Err(format!(
-          "Node ids in {:?} were not monotonically ordered.",
-          output
+          "Node ids in {output:?} were not monotonically ordered."
         ));
       }
       previous = node_id;
@@ -839,7 +833,7 @@ impl TNode {
     let mut previous: usize = 0;
     for &context_id in &context_ids {
       if previous > context_id {
-        return Err(format!("Context ids in {:?} were not ordered.", output));
+        return Err(format!("Context ids in {output:?} were not ordered."));
       }
       previous = context_id;
     }
