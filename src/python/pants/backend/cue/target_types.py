@@ -2,8 +2,11 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
+    FieldSet,
     MultipleSourcesField,
     Target,
     generate_multiple_sources_field_help_message,
@@ -34,3 +37,10 @@ class CuePackageTarget(Target):
         CUE docs: https://cuelang.org/docs/concepts/packages/
         """
     )
+
+
+@dataclass(frozen=True)
+class CueFieldSet(FieldSet):
+    required_fields = (CuePackageSourcesField,)
+
+    sources: CuePackageSourcesField
