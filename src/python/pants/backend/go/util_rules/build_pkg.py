@@ -797,7 +797,18 @@ async def build_go_package(
         for go_file in go_files
     )
     generated_cgo_file_paths = cgo_compile_result.output_go_files if cgo_compile_result else ()
-    compile_args.extend(["--", *go_file_paths, *generated_cgo_file_paths])
+
+    # Put the source file paths into a file and pass that to `go tool compile` via a config file using the
+    # `@CONFIG_FILE` syntax. This is necessary to avoid command-line argument limits on macOS. The arguments
+    # may end up to exceed those limits when compiling standard library packages where we append a very long GOROOT
+    # path to each file name or in packages with larges numbers of files.
+    go_source_file_paths_config = "\n".join([*go_file_paths, *generated_cgo_file_paths])
+    go_sources_file_paths_digest = await Get(
+        Digest, CreateDigest([FileContent("__sources__.txt", go_source_file_paths_config.encode())])
+    )
+    input_digest = await Get(Digest, MergeDigests([input_digest, go_sources_file_paths_digest]))
+    compile_args.append("@__sources__.txt")
+
     compile_result = await Get(
         FallibleProcessResult,
         GoSdkProcess(
