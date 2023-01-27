@@ -459,7 +459,7 @@ jobs:
     - name: Install Go
       uses: actions/setup-go@v3
       with:
-        go-version: 1.17.1
+        go-version: 1.19.5
     - if: runner.os == 'Linux'
       name: Download Apache `thrift` binary (Linux)
       run: 'mkdir -p "${HOME}/.thrift"
@@ -531,7 +531,7 @@ jobs:
     - name: Install Go
       uses: actions/setup-go@v3
       with:
-        go-version: 1.17.1
+        go-version: 1.19.5
     - if: runner.os == 'Linux'
       name: Download Apache `thrift` binary (Linux)
       run: 'mkdir -p "${HOME}/.thrift"
@@ -603,7 +603,7 @@ jobs:
     - name: Install Go
       uses: actions/setup-go@v3
       with:
-        go-version: 1.17.1
+        go-version: 1.19.5
     - if: runner.os == 'Linux'
       name: Download Apache `thrift` binary (Linux)
       run: 'mkdir -p "${HOME}/.thrift"
