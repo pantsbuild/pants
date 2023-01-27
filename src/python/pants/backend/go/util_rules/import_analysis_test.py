@@ -56,7 +56,14 @@ def test_import_config_creation(rule_runner: RuleRunner) -> None:
     def create_config(stdlib: bool) -> str:
         config = rule_runner.request(
             ImportConfig,
-            [ImportConfigRequest(mapping, build_opts=GoBuildOptions(), include_stdlib=stdlib)],
+            [
+                ImportConfigRequest(
+                    mapping,
+                    build_opts=GoBuildOptions(),
+                    import_map=FrozenDict({"foo": "bar"}),
+                    include_stdlib=stdlib,
+                )
+            ],
         )
         digest_contents = rule_runner.request(DigestContents, [config.digest])
         assert len(digest_contents) == 1
@@ -67,8 +74,9 @@ def test_import_config_creation(rule_runner: RuleRunner) -> None:
     assert create_config(stdlib=False) == dedent(
         """\
         # import config
-        packagefile some/import-path=__pkgs__/some_import-path/__pkg__.a
         packagefile another/import-path/pkg1=__pkgs__/another_import-path_pkg1/__pkg__.a
-        packagefile another/import-path/pkg2=__pkgs__/another_import-path_pkg2/__pkg__.a"""
+        packagefile another/import-path/pkg2=__pkgs__/another_import-path_pkg2/__pkg__.a
+        packagefile some/import-path=__pkgs__/some_import-path/__pkg__.a
+        importmap foo=bar"""
     )
     assert "packagefile fmt=" in create_config(stdlib=True)
