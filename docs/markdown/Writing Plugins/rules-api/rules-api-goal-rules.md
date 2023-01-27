@@ -8,7 +8,7 @@ updatedAt: "2022-07-25T14:45:07.539Z"
 ---
 For many [plugin tasks](doc:common-plugin-tasks), you will be extending existing goals, such as adding a new linter to the `lint` goal. However, you may instead want to create a new goal, such as a `publish` goal. This page explains how to create a new goal.
 
-As explained in [Concepts](doc:rules-api-concepts), `@goal_rule`s are the entry-point into the rule graph. When a user runs `./pants my-goal`, the Pants engine will look for the respective `@goal_rule`. That `@goal_rule` will usually request other types, either as parameters in the `@goal_rule` signature or through `await Get`. But unlike a `@rule`, a `@goal_rule` may also trigger side-effects (such as running interactive processes, writing to the filesystem, etc) via `await Effect`.
+As explained in [Concepts](doc:rules-api-concepts), `@goal_rule`s are the entry-point into the rule graph. When a user runs `./pants my-goal`, the Pants engine will look for the respective `@goal_rule`. That `@goal_rule` will usually request other types, either as parameters in the `@goal_rule` signature or through `await Get`. But unlike a `@rule`, a `@goal_rule` may also trigger side effects (such as running interactive processes, writing to the filesystem, etc) via `await Effect`.
 
 Often, you can keep all of your logic inline in the `@goal_rule`. As your `@goal_rule` gets more complex, you may end up factoring out helper `@rule`s, but you do not need to start with writing helper `@rule`s.
 
@@ -91,7 +91,7 @@ If your goal's purpose is to emit output, it may be helpful to use the mixin `Ou
 from pants.engine.goal import Goal, GoalSubsystem, Outputting
 from pants.engine.rules import goal_rule
 
-class HelloWorldSubsystem(Outputting, GoalSubystem):
+class HelloWorldSubsystem(Outputting, GoalSubsystem):
     name = "hello-world"
     help = "An example goal."
 
@@ -108,13 +108,13 @@ async def hello_world(
 
 ### `LineOriented` mixin (optional)
 
-If your goal's purpose is to emit output—and that output is naturally split by new lines—it may be helpful to use the mixin `LineOriented`. This subclasses `Outputting`, so will register both the options `--output-file` and `--sep`, which allows the user to change the separator to not be `\n`.
+If your goal's purpose is to emit output -- and that output is naturally split by new lines -- it may be helpful to use the mixin `LineOriented`. This subclasses `Outputting`, so will register both the options `--output-file` and `--sep`, which allows the user to change the separator to not be `\n`.
 
 ```python
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
 from pants.engine.rules import goal_rule
 
-class HelloWorldSubsystem(LineOriented, GoalSubystem):
+class HelloWorldSubsystem(LineOriented, GoalSubsystem):
     name = "hello-world"
     help = "An example goal."""
 
@@ -168,9 +168,9 @@ See [Rules and the Target API](doc:rules-api-and-target-api)  for detailed infor
 > 
 > This will not work because the engine has no path in the rule graph to resolve a `PythonDistribution` type given the initial input types to the rule graph (the "roots").
 > 
-> Instead, request `Targets`, which will give you all of the targets that the user specified on the command line. The engine knows how to resolve this type because it can go from `Specs` -> `Addresses` -> `Targets`.
+> Instead, request `Targets`, which will give you all the targets that the user specified on the command line. The engine knows how to resolve this type because it can go from `Specs` -> `Addresses` -> `Targets`.
 > 
-> From here, filter out the relevant targets you want using the Target API (see [Rules and the Target API](doc:rules-api-and-target-api).
+> From here, filter out the relevant targets you want using the Target API (see [Rules and the Target API](doc:rules-api-and-target-api)).
 > 
 > ```python
 > from pants.engine.target import Targets
