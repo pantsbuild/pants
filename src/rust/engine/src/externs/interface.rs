@@ -1254,7 +1254,7 @@ fn session_new_run_id(py_session: &PySession) {
 }
 
 #[pyfunction]
-fn session_get_metrics<'py>(py: Python<'py>, py_session: &PySession) -> HashMap<&'static str, u64> {
+fn session_get_metrics(py: Python<'_>, py_session: &PySession) -> HashMap<&'static str, u64> {
   py.allow_threads(|| py_session.0.workunit_store().get_metrics())
 }
 
