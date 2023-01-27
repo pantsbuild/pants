@@ -24,4 +24,13 @@ class CuePackageTarget(Target):
         *COMMON_TARGET_FIELDS,
         CuePackageSourcesField,
     )
-    help = softwrap("cue package help")
+    help = softwrap(
+        """
+        The `cue_package` target defines a CUE package. Within a module, CUE organizes files grouped
+        by package. A package can be defined within the module or externally. Definitions and
+        constraints can be split across files within a package, and even organized across
+        directories.
+
+        CUE docs: https://cuelang.org/docs/concepts/packages/
+        """
+    )
