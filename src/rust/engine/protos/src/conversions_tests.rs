@@ -2,8 +2,6 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 use std::convert::TryInto;
 
-use hashing;
-
 use crate::gen::build::bazel::remote::execution::v2 as remexec;
 
 #[test]
@@ -50,7 +48,6 @@ fn from_bad_bazel_digest() {
   let err = converted.expect_err("Want Err converting bad digest");
   assert!(
     err.starts_with("Bad fingerprint in Digest \"0\":"),
-    "Bad error message: {}",
-    err
+    "Bad error message: {err}"
   );
 }
