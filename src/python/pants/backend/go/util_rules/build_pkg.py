@@ -8,7 +8,7 @@ import os.path
 from collections import deque
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Iterable
+from typing import Iterable, Mapping
 
 from pants.backend.go.util_rules import cgo, coverage
 from pants.backend.go.util_rules.assembly import (
@@ -63,6 +63,7 @@ class BuildGoPackageRequest(EngineAwareParameter):
         go_files: tuple[str, ...],
         s_files: tuple[str, ...],
         direct_dependencies: tuple[BuildGoPackageRequest, ...],
+        import_map: Mapping[str, str] | None = None,
         minimum_go_version: str | None,
         for_tests: bool = False,
         embed_config: EmbedConfig | None = None,
@@ -98,6 +99,7 @@ class BuildGoPackageRequest(EngineAwareParameter):
         self.go_files = go_files
         self.s_files = s_files
         self.direct_dependencies = direct_dependencies
+        self.import_map = FrozenDict(import_map or {})
         self.minimum_go_version = minimum_go_version
         self.for_tests = for_tests
         self.embed_config = embed_config
@@ -123,6 +125,7 @@ class BuildGoPackageRequest(EngineAwareParameter):
                 self.go_files,
                 self.s_files,
                 self.direct_dependencies,
+                self.import_map,
                 self.minimum_go_version,
                 self.for_tests,
                 self.embed_config,
@@ -154,6 +157,7 @@ class BuildGoPackageRequest(EngineAwareParameter):
             f"go_files={self.go_files}, "
             f"s_files={self.s_files}, "
             f"direct_dependencies={[dep.import_path for dep in self.direct_dependencies]}, "
+            f"import_map={self.import_map}, "
             f"minimum_go_version={self.minimum_go_version}, "
             f"for_tests={self.for_tests}, "
             f"embed_config={self.embed_config}, "
@@ -185,6 +189,7 @@ class BuildGoPackageRequest(EngineAwareParameter):
             and self.digest == other.digest
             and self.dir_path == other.dir_path
             and self.build_opts == other.build_opts
+            and self.import_map == other.import_map
             and self.go_files == other.go_files
             and self.s_files == other.s_files
             and self.minimum_go_version == other.minimum_go_version
@@ -518,7 +523,9 @@ async def build_go_package(
         Get(
             ImportConfig,
             ImportConfigRequest(
-                FrozenDict(import_paths_to_pkg_a_files), build_opts=request.build_opts
+                FrozenDict(import_paths_to_pkg_a_files),
+                build_opts=request.build_opts,
+                import_map=request.import_map,
             ),
         ),
         Get(RenderedEmbedConfig, RenderEmbedConfigRequest(request.embed_config)),
