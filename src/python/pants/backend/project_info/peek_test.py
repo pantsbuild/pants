@@ -7,6 +7,7 @@ import pytest
 
 from pants.backend.project_info import peek
 from pants.backend.project_info.peek import Peek, TargetData, TargetDatas
+from pants.backend.visibility.rules import rules as visibility_rules
 from pants.base.specs import RawSpecs, RecursiveGlobSpec
 from pants.core.target_types import ArchiveTarget, FilesGeneratorTarget, FileTarget, GenericTarget
 from pants.engine.addresses import Address
@@ -15,10 +16,11 @@ from pants.testutil.rule_runner import RuleRunner
 
 
 @pytest.mark.parametrize(
-    "expanded_target_infos, exclude_defaults, expected_output",
+    "expanded_target_infos, exclude_defaults, include_dep_rules, expected_output",
     [
         pytest.param(
             [],
+            False,
             False,
             "[]\n",
             id="null-case",
@@ -40,6 +42,7 @@ from pants.testutil.rule_runner import RuleRunner
                 )
             ],
             True,
+            False,
             dedent(
                 """\
                 [
@@ -77,6 +80,7 @@ from pants.testutil.rule_runner import RuleRunner
                     tuple(),
                 )
             ],
+            False,
             False,
             dedent(
                 """\
@@ -124,6 +128,7 @@ from pants.testutil.rule_runner import RuleRunner
                 ),
             ],
             True,
+            False,
             dedent(
                 """\
                 [
@@ -157,10 +162,60 @@ from pants.testutil.rule_runner import RuleRunner
             ),
             id="single-files-target/exclude-defaults",
         ),
+        pytest.param(
+            [
+                TargetData(
+                    FilesGeneratorTarget({"sources": ["*.txt"]}, Address("foo", target_name="baz")),
+                    ("foo/a.txt",),
+                    ("foo/a.txt:baz",),
+                    dependencies_rules=("does", "apply", "*"),
+                    dependents_rules=("fall-through", "*"),
+                    effective_dep_rules=(
+                        "foo/BUILD[*] -> foo/BUILD[*] : ALLOW\nfiles foo:baz -> files foo/a.txt:baz",
+                    ),
+                ),
+            ],
+            True,
+            True,
+            dedent(
+                """\
+                [
+                  {
+                    "address": "foo:baz",
+                    "target_type": "files",
+                    "_dependencies_rules": [
+                      "does",
+                      "apply",
+                      "*"
+                    ],
+                    "_dependents_rules": [
+                      "fall-through",
+                      "*"
+                    ],
+                    "_effective_dep_rules": [
+                      "foo/BUILD[*] -> foo/BUILD[*] : ALLOW\\nfiles foo:baz -> files foo/a.txt:baz"
+                    ],
+                    "dependencies": [
+                      "foo/a.txt:baz"
+                    ],
+                    "sources": [
+                      "foo/a.txt"
+                    ],
+                    "sources_raw": [
+                      "*.txt"
+                    ]
+                  }
+                ]
+                """
+            ),
+            id="include-dep-rules",
+        ),
     ],
 )
-def test_render_targets_as_json(expanded_target_infos, exclude_defaults, expected_output):
-    actual_output = peek.render_json(expanded_target_infos, exclude_defaults)
+def test_render_targets_as_json(
+    expanded_target_infos, exclude_defaults, include_dep_rules, expected_output
+):
+    actual_output = peek.render_json(expanded_target_infos, exclude_defaults, include_dep_rules)
     assert actual_output == expected_output
 
 
@@ -169,6 +224,7 @@ def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             *peek.rules(),
+            *visibility_rules(),
             QueryRule(TargetDatas, [RawSpecs]),
         ],
         target_types=[FilesGeneratorTarget, GenericTarget],
@@ -223,5 +279,54 @@ def test_get_target_data(rule_runner: RuleRunner) -> None:
             ),
             ("foo/b.txt",),
             (),
+        ),
+    ]
+
+
+def test_get_target_data_with_dep_rules(rule_runner: RuleRunner) -> None:
+    rule_runner.set_options(["--peek-include-dep-rules"])
+    rule_runner.write_files(
+        {
+            "foo/BUILD": dedent(
+                """\
+                files(name="baz", sources=["*.txt"])
+                __dependencies_rules__(
+                  ("target", "does", "not", "apply", "*"),
+                  ("files", "does", "apply", "*"),
+                )
+                __dependents_rules__(
+                  ("[b.txt]", "!skip", "this", "*"),
+                  ("file", "take", "the", "first", "*"),
+                  ("*", "fall-through", "*"),
+                )
+                """
+            ),
+            "foo/a.txt": "",
+        }
+    )
+    tds = rule_runner.request(
+        TargetDatas,
+        [RawSpecs(recursive_globs=(RecursiveGlobSpec("foo"),), description_of_origin="tests")],
+    )
+    assert list(tds) == [
+        TargetData(
+            FilesGeneratorTarget({"sources": ["*.txt"]}, Address("foo", target_name="baz")),
+            ("foo/a.txt",),
+            ("foo/a.txt:baz",),
+            dependencies_rules=("does", "apply", "*"),
+            dependents_rules=("fall-through", "*"),
+            effective_dep_rules=(
+                "foo/BUILD[*] -> foo/BUILD[*] : ALLOW\nfiles foo:baz -> files foo/a.txt:baz",
+            ),
+        ),
+        TargetData(
+            FileTarget(
+                {"source": "a.txt"}, Address("foo", relative_file_path="a.txt", target_name="baz")
+            ),
+            ("foo/a.txt",),
+            (),
+            dependencies_rules=("does", "apply", "*"),
+            dependents_rules=("fall-through", "*"),
+            effective_dep_rules=(),
         ),
     ]
