@@ -31,6 +31,7 @@ from pants.backend.python.lint.isort.subsystem import Isort
 from pants.backend.python.lint.pydocstyle.subsystem import Pydocstyle
 from pants.backend.python.lint.pylint.subsystem import Pylint
 from pants.backend.python.lint.pyupgrade.subsystem import PyUpgrade
+from pants.backend.python.lint.ruff.subsystem import Ruff
 from pants.backend.python.lint.yapf.subsystem import Yapf
 from pants.backend.python.packaging.pyoxidizer.subsystem import PyOxidizer
 from pants.backend.python.subsystems.debugpy import DebugPy
@@ -129,6 +130,7 @@ AllTools = (
     DefaultTool.python(TwineSubsystem),
     DefaultTool.python(Yamllint, backend="pants.backend.experimental.tools.yamllint"),
     DefaultTool.python(Yapf, backend="pants.backend.python.lint.yapf"),
+    DefaultTool.python(Ruff, backend="pants.backend.experimental.python.lint.ruff"),
     # JVM
     DefaultTool.jvm(AvroSubsystem, backend="pants.backend.experimental.codegen.avro.java"),
     DefaultTool.jvm(GoogleJavaFormatSubsystem),
