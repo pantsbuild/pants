@@ -22,20 +22,11 @@ from pants.backend.python.util_rules.pex_requirements import (
     LockfileContent,
 )
 from pants.base.exceptions import EngineError
-from pants.core.goals.generate_lockfiles import (
-    LockfileGenerateDiff,
-    LockfileGenerateDiffResult,
-    LockfileRequirements,
-    RequirementName,
-)
+from pants.core.goals.generate_lockfiles import LockfileDiff, LockfilePackages, PackageName
 from pants.engine.fs import Digest, DigestContents
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.rules import Get, rule_helper
 
 logger = logging.getLogger(__name__)
-
-
-class PythonLockfileGenerateDiff(LockfileGenerateDiff):
-    pass
 
 
 @dataclass(frozen=True, order=True)
@@ -53,14 +44,14 @@ class PythonRequirementVersion:
         return getattr(self._parsed, key)
 
 
-def _pex_lockfile_requirements(lockfile_data: Mapping[str, Any] | None) -> LockfileRequirements:
+def _pex_lockfile_requirements(lockfile_data: Mapping[str, Any] | None) -> LockfilePackages:
     if not lockfile_data:
-        return LockfileRequirements({})
+        return LockfilePackages({})
 
     # Setup generators
     locked_resolves = (
         (
-            (RequirementName(r["project_name"]), PythonRequirementVersion.parse(r["version"]))
+            (PackageName(r["project_name"]), PythonRequirementVersion.parse(r["version"]))
             for r in resolve["locked_requirements"]
         )
         for resolve in lockfile_data["locked_resolves"]
@@ -74,24 +65,23 @@ def _pex_lockfile_requirements(lockfile_data: Mapping[str, Any] | None) -> Lockf
         logger.debug(f"Failed to parse PEX lockfile: {e}\n{pformat(lockfile_data)}")
         requirements = {}
 
-    return LockfileRequirements(requirements)
+    return LockfilePackages(requirements)
 
 
-@rule
-async def generate_python_lockfile_diff(
-    request: PythonLockfileGenerateDiff,
-) -> LockfileGenerateDiffResult:
-    lockfile = request.lockfile
-    new_content = await Get(DigestContents, Digest, lockfile.digest)
+@rule_helper
+async def _generate_python_lockfile_diff(
+    digest: Digest, resolve_name: str, path: str
+) -> LockfileDiff:
+    new_content = await Get(DigestContents, Digest, digest)
     try:
         # May fail in case this file doesn't exist yet.
         old = await Get(
             LoadedLockfile,
             LoadedLockfileRequest(
                 Lockfile(
-                    file_path=lockfile.path,
+                    file_path=path,
                     file_path_description_of_origin="generated lockfile",
-                    resolve_name=lockfile.resolve_name,
+                    resolve_name=resolve_name,
                 ),
                 parse_lockfile=True,
             ),
@@ -103,22 +93,18 @@ async def generate_python_lockfile_diff(
         LoadedLockfile,
         LoadedLockfileRequest(
             LockfileContent(
-                file_content=next(c for c in new_content if c.path == lockfile.path),
-                resolve_name=lockfile.resolve_name,
+                file_content=next(c for c in new_content if c.path == path),
+                resolve_name=resolve_name,
             ),
             parse_lockfile=True,
         ),
     )
 
-    return LockfileGenerateDiffResult.create(
-        path=lockfile.path,
-        resolve_name=lockfile.resolve_name,
+    return LockfileDiff.create(
+        path=path,
+        resolve_name=resolve_name,
         old=_pex_lockfile_requirements(
             old.lockfile_data if isinstance(old, LoadedLockfile) else None
         ),
         new=_pex_lockfile_requirements(new.lockfile_data),
     )
-
-
-def rules():
-    return collect_rules()

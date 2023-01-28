@@ -28,9 +28,9 @@ from pants.core.goals.generate_lockfiles import (
     GenerateLockfileWithEnvironments,
     GenerateToolLockfileSentinel,
     KnownUserResolveNames,
+    LockfileDiff,
     LockfileDiffPrinter,
-    LockfileGenerateDiffResult,
-    LockfileRequirements,
+    LockfilePackages,
     NoCompatibleResolveException,
     RequestedUserResolveNames,
     UnrecognizedResolveNamesError,
@@ -351,11 +351,11 @@ def test_preferred_environment(
 def test_diff(
     old_reqs: Mapping[str, str], new_reqs: Mapping[str, str], expect_diff: Mapping[str, Any]
 ) -> None:
-    diff = LockfileGenerateDiffResult.create(
+    diff = LockfileDiff.create(
         "reqs/test.lock",
         "testing",
-        LockfileRequirements(old_reqs),
-        LockfileRequirements(new_reqs),
+        LockfilePackages(old_reqs),
+        LockfilePackages(new_reqs),
     )
     assert {k: dict(v) for k, v in asdict(diff).items() if v and isinstance(v, Mapping)} == {
         k: v for k, v in expect_diff.items() if v
@@ -401,11 +401,11 @@ def test_diff_printer(
 ) -> None:
     console = Mock(spec_set=Console)
     diff_formatter = LockfileDiffPrinter(console=console, color=False, include_unchanged=True)
-    diff = LockfileGenerateDiffResult.create(
+    diff = LockfileDiff.create(
         "reqs/test.lock",
         "testing",
-        LockfileRequirements(old_reqs),
-        LockfileRequirements(new_reqs),
+        LockfilePackages(old_reqs),
+        LockfilePackages(new_reqs),
     )
     diff_formatter.print(diff)
     call = console.print_stderr.mock_calls[0]

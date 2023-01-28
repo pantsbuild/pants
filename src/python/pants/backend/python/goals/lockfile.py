@@ -6,7 +6,7 @@ from __future__ import annotations
 import itertools
 import os.path
 from collections import defaultdict
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from operator import itemgetter
 from typing import Iterable
 
@@ -15,7 +15,7 @@ from pants.backend.python.subsystems.python_tool_base import PythonToolRequireme
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import PythonRequirementResolveField, PythonRequirementsField
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.lockfile_diff import PythonLockfileGenerateDiff
+from pants.backend.python.util_rules.lockfile_diff import _generate_python_lockfile_diff
 from pants.backend.python.util_rules.lockfile_metadata import PythonLockfileMetadata
 from pants.backend.python.util_rules.pex_cli import PexCliProcess
 from pants.backend.python.util_rules.pex_requirements import (  # noqa: F401
@@ -32,7 +32,6 @@ from pants.core.goals.generate_lockfiles import (
     GenerateLockfilesSubsystem,
     KnownUserResolveNames,
     KnownUserResolveNamesRequest,
-    LockfileGenerateDiffResult,
     RequestedUserResolveNames,
     UserGenerateLockfiles,
     WrappedGenerateLockfile,
@@ -223,15 +222,14 @@ async def generate_lockfile(
         Digest, CreateDigest([FileContent(req.lockfile_dest, lockfile_with_header)])
     )
 
-    lockfile = GenerateLockfileResult(
-        final_lockfile_digest,
-        req.resolve_name,
-        req.lockfile_dest,
-    )
     if req.diff:
-        diff = await Get(LockfileGenerateDiffResult, PythonLockfileGenerateDiff(lockfile))
-        lockfile = replace(lockfile, diff=diff)
-    return lockfile
+        diff = await _generate_python_lockfile_diff(
+            final_lockfile_digest, req.resolve_name, req.lockfile_dest
+        )
+    else:
+        diff = None
+
+    return GenerateLockfileResult(final_lockfile_digest, req.resolve_name, req.lockfile_dest, diff)
 
 
 class RequestedPythonUserResolveNames(RequestedUserResolveNames):

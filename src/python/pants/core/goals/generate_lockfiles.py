@@ -33,16 +33,12 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class GenerateLockfileResult:
-    """The result of generating a lockfile for a particular resolve.
-
-    If `GenerateLockfile.diff==True` then provide a `LockfileGenerateDiffResult` if able, otherwise
-    leave as `None` as it will not be used.
-    """
+    """The result of generating a lockfile for a particular resolve."""
 
     digest: Digest
     resolve_name: str
     path: str
-    diff: LockfileGenerateDiffResult | None = None
+    diff: LockfileDiff | None = None
 
 
 @union(in_scope_types=[EnvironmentName])
@@ -56,10 +52,6 @@ class GenerateLockfile:
 
     Subclasses will usually want to add additional properties, such as what requirements to
     install and Python interpreter constraints.
-
-    Always set `diff=False` when creating instances, it will be mutated to `True` in case lockfile
-    diff'ing should be done. The only reason it does not default to `False` is to allow subclasses
-    to have required fields.
     """
 
     resolve_name: str
@@ -140,7 +132,7 @@ class RequestedUserResolveNames(Collection[str]):
     """
 
 
-class RequirementVersion(Protocol):
+class PackageVersion(Protocol):
     """Protocol for backend specific implementations, to support language ecosystem specific version
     formats and sort rules.
 
@@ -161,30 +153,25 @@ class RequirementVersion(Protocol):
         ...
 
 
-RequirementName = str
-LockfileRequirements = FrozenDict[RequirementName, RequirementVersion]
-ChangedRequirements = FrozenDict[RequirementName, Tuple[RequirementVersion, RequirementVersion]]
+PackageName = str
+LockfilePackages = FrozenDict[PackageName, PackageVersion]
+ChangedPackages = FrozenDict[PackageName, Tuple[PackageVersion, PackageVersion]]
 
 
 @dataclass(frozen=True)
-class LockfileGenerateDiff:
-    lockfile: GenerateLockfileResult
-
-
-@dataclass(frozen=True)
-class LockfileGenerateDiffResult:
+class LockfileDiff:
     path: str
     resolve_name: str
-    added: LockfileRequirements
-    downgraded: ChangedRequirements
-    removed: LockfileRequirements
-    unchanged: LockfileRequirements
-    upgraded: ChangedRequirements
+    added: LockfilePackages
+    downgraded: ChangedPackages
+    removed: LockfilePackages
+    unchanged: LockfilePackages
+    upgraded: ChangedPackages
 
     @classmethod
     def create(
-        cls, path: str, resolve_name: str, old: LockfileRequirements, new: LockfileRequirements
-    ) -> LockfileGenerateDiffResult:
+        cls, path: str, resolve_name: str, old: LockfilePackages, new: LockfilePackages
+    ) -> LockfileDiff:
         diff = {
             name: (old[name], new[name])
             for name in sorted({*old.keys(), *new.keys()})
@@ -193,29 +180,29 @@ class LockfileGenerateDiffResult:
         return cls(
             path=path,
             resolve_name=resolve_name,
-            added=cls.__get_lockfile_requirements(new, old),
-            downgraded=cls.__get_changed_requirements(diff, lambda prev, curr: prev > curr),
-            removed=cls.__get_lockfile_requirements(old, new),
-            unchanged=LockfileRequirements(
+            added=cls.__get_lockfile_packages(new, old),
+            downgraded=cls.__get_changed_packages(diff, lambda prev, curr: prev > curr),
+            removed=cls.__get_lockfile_packages(old, new),
+            unchanged=LockfilePackages(
                 {name: curr for name, (prev, curr) in diff.items() if prev == curr}
             ),
-            upgraded=cls.__get_changed_requirements(diff, lambda prev, curr: prev < curr),
+            upgraded=cls.__get_changed_packages(diff, lambda prev, curr: prev < curr),
         )
 
     @staticmethod
-    def __get_lockfile_requirements(
-        src: Mapping[str, RequirementVersion], exclude: Iterable[str]
-    ) -> LockfileRequirements:
-        return LockfileRequirements(
+    def __get_lockfile_packages(
+        src: Mapping[str, PackageVersion], exclude: Iterable[str]
+    ) -> LockfilePackages:
+        return LockfilePackages(
             {name: version for name, version in src.items() if name not in exclude}
         )
 
     @staticmethod
-    def __get_changed_requirements(
-        src: Mapping[str, tuple[RequirementVersion, RequirementVersion]],
-        predicate: Callable[[RequirementVersion, RequirementVersion], bool],
-    ) -> ChangedRequirements:
-        return ChangedRequirements(
+    def __get_changed_packages(
+        src: Mapping[str, tuple[PackageVersion, PackageVersion]],
+        predicate: Callable[[PackageVersion, PackageVersion], bool],
+    ) -> ChangedPackages:
+        return ChangedPackages(
             {name: prev_curr for name, prev_curr in src.items() if predicate(*prev_curr)}
         )
 
@@ -226,7 +213,7 @@ class LockfileDiffPrinter(MaybeColor):
         self.console = console
         self.include_unchanged = include_unchanged
 
-    def print(self, diff: LockfileGenerateDiffResult) -> None:
+    def print(self, diff: LockfileDiff) -> None:
         output = "\n".join(self.output_sections(diff))
         if not output:
             return
@@ -236,7 +223,7 @@ class LockfileDiffPrinter(MaybeColor):
             + output
         )
 
-    def output_sections(self, diff: LockfileGenerateDiffResult) -> Iterator[str]:
+    def output_sections(self, diff: LockfileDiff) -> Iterator[str]:
         if self.include_unchanged:
             yield from self.output_reqs("Unchanged dependencies", diff.unchanged, fg="blue")
         yield from self.output_changed("Upgraded dependencies", diff.upgraded)
@@ -251,7 +238,7 @@ class LockfileDiffPrinter(MaybeColor):
         heading = f"== {text:^60} =="
         return self.style("\n".join((" " * len(heading), heading, "")), style="underline")
 
-    def output_reqs(self, heading: str, reqs: LockfileRequirements, **kwargs) -> Iterator[str]:
+    def output_reqs(self, heading: str, reqs: LockfilePackages, **kwargs) -> Iterator[str]:
         if not reqs:
             return
 
@@ -261,7 +248,7 @@ class LockfileDiffPrinter(MaybeColor):
             version_s = self.style(str(version), **kwargs)
             yield f"  {name_s} {version_s}"
 
-    def output_changed(self, title: str, reqs: ChangedRequirements) -> Iterator[str]:
+    def output_changed(self, title: str, reqs: ChangedPackages) -> Iterator[str]:
         if not reqs:
             return
 
@@ -283,7 +270,7 @@ class LockfileDiffPrinter(MaybeColor):
         (None, dict(fg="magenta")),
     )
 
-    def get_bump_attrs(self, prev: RequirementVersion, curr: RequirementVersion) -> dict[str, str]:
+    def get_bump_attrs(self, prev: PackageVersion, curr: PackageVersion) -> dict[str, str]:
         for key, attrs in self._BUMPS:
             if key and getattr(prev, key, None) != getattr(curr, key, None):
                 break
@@ -546,7 +533,7 @@ class GenerateLockfilesSubsystem(GoalSubsystem):
     )
 
     @property
-    def should_print_diff(self) -> bool:
+    def request_diffs(self) -> bool:
         return self.diff or self.diff_include_unchanged
 
 
@@ -602,7 +589,7 @@ async def generate_lockfiles_goal(
     all_requests: Iterator[GenerateLockfile] = itertools.chain(
         *all_specified_user_requests, applicable_tool_requests
     )
-    if generate_lockfiles_subsystem.should_print_diff:
+    if generate_lockfiles_subsystem.request_diffs:
         all_requests = (replace(req, diff=True) for req in all_requests)
 
     results = await MultiGet(
@@ -621,16 +608,19 @@ async def generate_lockfiles_goal(
     merged_digest = await Get(Digest, MergeDigests(res.digest for res in results))
     workspace.write_digest(merged_digest)
 
+    diffs: list[LockfileDiff] = []
     for result in results:
         logger.info(f"Wrote lockfile for the resolve `{result.resolve_name}` to {result.path}")
+        if result.diff is not None:
+            diffs.append(result.diff)
 
-    if generate_lockfiles_subsystem.should_print_diff:
+    if diffs:
         diff_formatter = LockfileDiffPrinter(
             console=console,
             color=global_options.colors,
             include_unchanged=generate_lockfiles_subsystem.diff_include_unchanged,
         )
-        for diff in (res.diff for res in results if res.diff is not None):
+        for diff in diffs:
             diff_formatter.print(diff)
         console.print_stderr("\n")
 

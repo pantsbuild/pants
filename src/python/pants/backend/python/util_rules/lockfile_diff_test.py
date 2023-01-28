@@ -7,19 +7,25 @@ from textwrap import dedent
 
 import pytest
 
-from pants.backend.python.util_rules import lockfile_diff, pex
-from pants.backend.python.util_rules.lockfile_diff import PythonLockfileGenerateDiff
-from pants.core.goals.generate_lockfiles import GenerateLockfileResult, LockfileGenerateDiffResult
+from pants.backend.python.util_rules import pex
+from pants.backend.python.util_rules.lockfile_diff import _generate_python_lockfile_diff
+from pants.core.goals.generate_lockfiles import GenerateLockfileResult, LockfileDiff
+from pants.engine.rules import rule
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner
+
+
+@rule
+async def helper_fixture(result: GenerateLockfileResult) -> LockfileDiff:
+    return await _generate_python_lockfile_diff(result.digest, result.resolve_name, result.path)
 
 
 @pytest.fixture
 def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
         rules=[
-            *lockfile_diff.rules(),
+            helper_fixture,
             *pex.rules(),
-            QueryRule(LockfileGenerateDiffResult, [PythonLockfileGenerateDiff]),
+            QueryRule(LockfileDiff, [GenerateLockfileResult]),
         ]
     )
     rule_runner.set_options([], env_inherit=PYTHON_BOOTSTRAP_ENV)
@@ -35,7 +41,7 @@ def test_load_lockfile(rule_runner: RuleRunner) -> None:
         path="reqs/test.lock",
         diff=None,
     )
-    diff = rule_runner.request(LockfileGenerateDiffResult, [PythonLockfileGenerateDiff(lockfile)])
+    diff = rule_runner.request(LockfileDiff, [lockfile])
     assert diff.path == "reqs/test.lock"
     assert diff.resolve_name == "testing"
     assert {req: tuple(map(str, vers)) for req, vers in diff.upgraded.items()} == dict(
