@@ -1,6 +1,8 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 from pathlib import PurePath
 
@@ -13,7 +15,6 @@ from pants.backend.go.util_rules.first_party_pkg import (
     FallibleFirstPartyPkgAnalysis,
     FirstPartyPkgAnalysisRequest,
 )
-from pants.backend.go.util_rules.import_analysis import ImportConfig, ImportConfigRequest
 from pants.backend.go.util_rules.link import LinkedGoBinary, LinkGoBinaryRequest
 from pants.core.goals.package import (
     BuiltPackage,
@@ -22,10 +23,11 @@ from pants.core.goals.package import (
     PackageFieldSet,
 )
 from pants.core.goals.run import RunFieldSet, RunInSandboxBehavior
-from pants.engine.fs import AddPrefix, Digest, MergeDigests
+from pants.engine.fs import AddPrefix, Digest
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
+from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 
 
@@ -65,20 +67,15 @@ async def package_go_binary(field_set: GoBinaryFieldSet) -> BuiltPackage:
         BuildGoPackageTargetRequest(main_pkg.address, is_main=True, build_opts=build_opts),
     )
     main_pkg_a_file_path = built_package.import_paths_to_pkg_a_files["main"]
-    import_config = await Get(
-        ImportConfig,
-        ImportConfigRequest(built_package.import_paths_to_pkg_a_files, build_opts=build_opts),
-    )
-    input_digest = await Get(Digest, MergeDigests([built_package.digest, import_config.digest]))
 
     output_filename = PurePath(field_set.output_path.value_or_default(file_ending=None))
     binary = await Get(
         LinkedGoBinary,
         LinkGoBinaryRequest(
-            input_digest=input_digest,
+            input_digest=built_package.digest,
             archives=(main_pkg_a_file_path,),
             build_opts=build_opts,
-            import_config_path=import_config.CONFIG_PATH,
+            import_paths_to_pkg_a_files=FrozenDict(built_package.import_paths_to_pkg_a_files),
             output_filename=f"./{output_filename.name}",
             description=f"Link Go binary for {field_set.address}",
         ),
