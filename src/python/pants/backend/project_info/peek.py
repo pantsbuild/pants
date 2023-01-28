@@ -10,6 +10,7 @@ from typing import Any, Iterable, Mapping
 
 from typing_extensions import Protocol, runtime_checkable
 
+from pants.engine.addresses import Addresses
 from pants.engine.collection import Collection
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem, Outputting
@@ -17,6 +18,8 @@ from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
 from pants.engine.target import (
     Dependencies,
     DependenciesRequest,
+    DependenciesRuleApplication,
+    DependenciesRuleApplicationRequest,
     Field,
     HydratedSources,
     HydrateSourcesRequest,
@@ -26,6 +29,7 @@ from pants.engine.target import (
     UnexpandedTargets,
 )
 from pants.option.option_types import BoolOption
+from pants.util.strutil import softwrap
 
 
 @runtime_checkable
@@ -47,6 +51,16 @@ class PeekSubsystem(Outputting, GoalSubsystem):
         help="Whether to leave off values that match the target-defined default values.",
     )
 
+    include_dep_rules = BoolOption(
+        default=False,
+        help=softwrap(
+            """
+            Whether to include `_dependencies_rules`, `_dependents_rules` and `_effective_dep_rules`
+            that apply to the target and its dependencies.
+            """
+        ),
+    )
+
 
 class Peek(Goal):
     subsystem_cls = PeekSubsystem
@@ -66,7 +80,11 @@ class TargetData:
     expanded_sources: tuple[str, ...] | None
     expanded_dependencies: tuple[str, ...]
 
-    def to_dict(self, exclude_defaults: bool = False) -> dict:
+    dependencies_rules: tuple[str, ...] | None = None
+    dependents_rules: tuple[str, ...] | None = None
+    effective_dep_rules: tuple[str, ...] | None = None
+
+    def to_dict(self, exclude_defaults: bool = False, include_dep_rules: bool = False) -> dict:
         nothing = object()
         fields = {
             (
@@ -80,6 +98,11 @@ class TargetData:
         if self.expanded_sources is not None:
             fields["sources"] = self.expanded_sources
 
+        if include_dep_rules:
+            fields["_dependencies_rules"] = self.dependencies_rules
+            fields["_dependents_rules"] = self.dependents_rules
+            fields["_effective_dep_rules"] = self.effective_dep_rules
+
         return {
             "address": self.target.address.spec,
             "target_type": self.target.alias,
@@ -91,8 +114,10 @@ class TargetDatas(Collection[TargetData]):
     pass
 
 
-def render_json(tds: Iterable[TargetData], exclude_defaults: bool = False) -> str:
-    return f"{json.dumps([td.to_dict(exclude_defaults) for td in tds], indent=2, cls=_PeekJsonEncoder)}\n"
+def render_json(
+    tds: Iterable[TargetData], exclude_defaults: bool = False, include_dep_rules: bool = False
+) -> str:
+    return f"{json.dumps([td.to_dict(exclude_defaults, include_dep_rules) for td in tds], indent=2, cls=_PeekJsonEncoder)}\n"
 
 
 class _PeekJsonEncoder(json.JSONEncoder):
@@ -128,6 +153,7 @@ class _PeekJsonEncoder(json.JSONEncoder):
 async def get_target_data(
     # NB: We must preserve target generators, not replace with their generated targets.
     targets: UnexpandedTargets,
+    subsys: PeekSubsystem,
 ) -> TargetDatas:
     sorted_targets = sorted(targets, key=lambda tgt: tgt.address)
 
@@ -159,11 +185,33 @@ async def get_target_data(
         for tgt, hs in zip(targets_with_sources, hydrated_sources_per_target)
     }
 
+    if not subsys.include_dep_rules:
+        effective_dep_rules_map = {}
+    else:
+        all_effective_dep_rules = await MultiGet(
+            Get(
+                DependenciesRuleApplication,
+                DependenciesRuleApplicationRequest(
+                    tgt.address,
+                    Addresses(dep.address for dep in deps),
+                    description_of_origin="`peek` goal",
+                ),
+            )
+            for tgt, deps in zip(sorted_targets, dependencies_per_target)
+        )
+        effective_dep_rules_map = {
+            application.address: tuple(str(rule) for rule in application.dependencies_rule.values())
+            for application in all_effective_dep_rules
+        }
+
     return TargetDatas(
         TargetData(
             tgt,
             expanded_dependencies=expanded_deps,
             expanded_sources=expanded_sources_map.get(tgt.address),
+            dependencies_rules=None,
+            dependents_rules=None,
+            effective_dep_rules=effective_dep_rules_map.get(tgt.address),
         )
         for tgt, expanded_deps in zip(sorted_targets, expanded_dependencies)
     )
@@ -176,7 +224,7 @@ async def peek(
     targets: UnexpandedTargets,
 ) -> Peek:
     tds = await Get(TargetDatas, UnexpandedTargets, targets)
-    output = render_json(tds, subsys.exclude_defaults)
+    output = render_json(tds, subsys.exclude_defaults, subsys.include_dep_rules)
     with subsys.output(console) as write_stdout:
         write_stdout(output)
     return Peek(exit_code=0)

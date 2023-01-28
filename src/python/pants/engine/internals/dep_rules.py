@@ -67,10 +67,13 @@ class DependencyRuleApplication:
         if err is None:
             return None
         else:
-            return (
-                f"{self.rule_description} : {self.action.name}\n{self.origin_type} "
-                f"{self.origin_address} -> {self.dependency_type} {self.dependency_address}"
-            )
+            return str(self)
+
+    def __str__(self) -> str:
+        return (
+            f"{self.rule_description} : {self.action.name}\n{self.origin_type} "
+            f"{self.origin_address} -> {self.dependency_type} {self.dependency_address}"
+        )
 
 
 class BuildFileDependencyRules(ABC):
