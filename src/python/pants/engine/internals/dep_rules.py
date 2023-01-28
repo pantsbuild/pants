@@ -7,6 +7,8 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
 
+from typing_extensions import Protocol
+
 from pants.engine.addresses import Address
 from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.engine.rules import Get, collect_rules, rule
@@ -76,6 +78,11 @@ class DependencyRuleApplication:
         )
 
 
+class DependencyRuleSet(Protocol):
+    def peek(self) -> tuple[str, ...]:
+        """Return a list of all rules in rule set."""
+
+
 class BuildFileDependencyRules(ABC):
     @staticmethod
     @abstractmethod
@@ -103,6 +110,10 @@ class BuildFileDependencyRules(ABC):
         Return dependency rule application describing the resulting action to take: ALLOW, DENY or
         WARN. WARN is effectively the same as ALLOW, but with a logged warning.
         """
+
+    @abstractmethod
+    def get_ruleset(self, address: Address, target: TargetAdaptor) -> DependencyRuleSet | None:
+        ...
 
 
 class BuildFileDependencyRulesParserState(ABC):
