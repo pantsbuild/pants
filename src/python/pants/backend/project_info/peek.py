@@ -14,6 +14,8 @@ from pants.engine.addresses import Addresses
 from pants.engine.collection import Collection
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem, Outputting
+from pants.engine.internals.build_files import _get_target_family_and_adaptor_for_dep_rules
+from pants.engine.internals.dep_rules import DependencyRuleSet
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
 from pants.engine.target import (
     Dependencies,
@@ -149,6 +151,12 @@ class _PeekJsonEncoder(json.JSONEncoder):
             return str(o)
 
 
+def describe_ruleset(ruleset: DependencyRuleSet | None) -> tuple[str, ...] | None:
+    if ruleset is None:
+        return None
+    return ruleset.peek()
+
+
 @rule
 async def get_target_data(
     # NB: We must preserve target generators, not replace with their generated targets.
@@ -186,8 +194,26 @@ async def get_target_data(
     }
 
     if not subsys.include_dep_rules:
+        dependencies_rules_map = {}
+        dependents_rules_map = {}
         effective_dep_rules_map = {}
     else:
+        family_adaptors = await _get_target_family_and_adaptor_for_dep_rules(
+            *(tgt.address for tgt in sorted_targets),
+            description_of_origin="`peek` goal",
+        )
+        dependencies_rules_map = {
+            tgt.address: describe_ruleset(
+                family.dependencies_rules.get_ruleset(tgt.address, adaptor)
+            )
+            for tgt, (family, adaptor) in zip(sorted_targets, family_adaptors)
+            if family.dependencies_rules is not None
+        }
+        dependents_rules_map = {
+            tgt.address: describe_ruleset(family.dependents_rules.get_ruleset(tgt.address, adaptor))
+            for tgt, (family, adaptor) in zip(sorted_targets, family_adaptors)
+            if family.dependents_rules is not None
+        }
         all_effective_dep_rules = await MultiGet(
             Get(
                 DependenciesRuleApplication,
@@ -209,8 +235,8 @@ async def get_target_data(
             tgt,
             expanded_dependencies=expanded_deps,
             expanded_sources=expanded_sources_map.get(tgt.address),
-            dependencies_rules=None,
-            dependents_rules=None,
+            dependencies_rules=dependencies_rules_map.get(tgt.address),
+            dependents_rules=dependents_rules_map.get(tgt.address),
             effective_dep_rules=effective_dep_rules_map.get(tgt.address),
         )
         for tgt, expanded_deps in zip(sorted_targets, expanded_dependencies)
