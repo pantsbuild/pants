@@ -100,13 +100,13 @@ pub fn create_endpoint(
   headers: &mut BTreeMap<String, String>,
 ) -> Result<Endpoint, String> {
   let uri =
-    tonic::transport::Uri::try_from(addr).map_err(|err| format!("invalid address: {}", err))?;
+    tonic::transport::Uri::try_from(addr).map_err(|err| format!("invalid address: {err}"))?;
   let endpoint = Channel::builder(uri);
 
   let endpoint = if let Some(tls_config) = tls_config_opt {
     endpoint
       .tls_config(ClientTlsConfig::new().rustls_client_config(tls_config.clone()))
-      .map_err(|e| format!("TLS setup error: {}", e))?
+      .map_err(|e| format!("TLS setup error: {e}"))?
   } else {
     endpoint
   };
@@ -116,7 +116,7 @@ pub fn create_endpoint(
       let (_, user_agent) = e.remove_entry();
       endpoint
         .user_agent(user_agent)
-        .map_err(|e| format!("Unable to convert user-agent header: {}", e))?
+        .map_err(|e| format!("Unable to convert user-agent header: {e}"))?
     }
     Entry::Vacant(_) => endpoint,
   };
@@ -129,10 +129,10 @@ pub fn headers_to_http_header_map(headers: &BTreeMap<String, String>) -> Result<
     .iter()
     .map(|(key, value)| {
       let header_name =
-        HeaderName::from_str(key).map_err(|err| format!("Invalid header name {}: {}", key, err))?;
+        HeaderName::from_str(key).map_err(|err| format!("Invalid header name {key}: {err}"))?;
 
       let header_value = HeaderValue::from_str(value)
-        .map_err(|err| format!("Invalid header value {}: {}", value, err))?;
+        .map_err(|err| format!("Invalid header value {value}: {err}"))?;
 
       Ok((header_name, header_value))
     })
@@ -218,16 +218,14 @@ mod tests {
           Some(user_agent_value) => {
             let user_agent = user_agent_value.to_str().map_err(|err| {
               Status::invalid_argument(format!(
-                "Unable to convert user-agent header to string: {}",
-                err
+                "Unable to convert user-agent header to string: {err}"
               ))
             })?;
             if user_agent.contains(EXPECTED_USER_AGENT) {
               Ok(Response::new(gen::Output {}))
             } else {
               Err(Status::invalid_argument(format!(
-                "user-agent header did not contain expected value: actual={}",
-                user_agent
+                "user-agent header did not contain expected value: actual={user_agent}"
               )))
             }
           }

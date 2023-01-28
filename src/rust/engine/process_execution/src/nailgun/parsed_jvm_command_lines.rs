@@ -81,10 +81,7 @@ impl ParsedJVMCommandLines {
       .ok_or_else(|| "No classpath value found!".to_string())
       .and_then(|elem| {
         if ParsedJVMCommandLines::is_flag(elem) {
-          Err(format!(
-            "Classpath value has incorrect formatting {}.",
-            elem
-          ))
+          Err(format!("Classpath value has incorrect formatting {elem}."))
         } else {
           Ok(elem)
         }

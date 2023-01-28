@@ -121,7 +121,7 @@ impl Executor {
 
     let runtime = runtime_builder
       .build()
-      .map_err(|e| format!("Failed to start the runtime: {}", e))?;
+      .map_err(|e| format!("Failed to start the runtime: {e}"))?;
 
     // Attempt to swap, then recurse to retry.
     GLOBAL_EXECUTOR.compare_and_swap(global, Some(Arc::new(runtime)));

@@ -65,7 +65,7 @@ impl PersistentCache {
       lease_time,
       shard_count,
     )
-    .map_err(|err| format!("Could not initialize store for cache: {:?}", err))?;
+    .map_err(|err| format!("Could not initialize store for cache: {err:?}"))?;
 
     Ok(Self { store })
   }

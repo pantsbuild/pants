@@ -223,7 +223,7 @@ impl Scheduler {
     Ok((
       result
         .try_into()
-        .unwrap_or_else(|e| panic!("A Node implementation was ambiguous: {:?}", e)),
+        .unwrap_or_else(|e| panic!("A Node implementation was ambiguous: {e:?}")),
       last_observed,
     ))
   }

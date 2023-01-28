@@ -11,7 +11,7 @@ use std::time::Duration;
 
 use crossbeam_channel::{self, RecvTimeoutError};
 use fs::GitignoreStyleExcludes;
-use notify;
+
 use parking_lot::Mutex;
 use task_executor::Executor;
 use testutil::{append_to_existing_file, make_file};

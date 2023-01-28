@@ -79,7 +79,7 @@ impl InvalidationWatcher {
     // wouldn't have the build_root as a prefix, and so we would miss invalidating certain nodes.
     // We canonicalize the build_root once so this isn't a problem.
     let canonical_build_root =
-      std::fs::canonicalize(build_root.as_path()).map_err(|e| format!("{:?}", e))?;
+      std::fs::canonicalize(build_root.as_path()).map_err(|e| format!("{e:?}"))?;
     let (watch_sender, watch_receiver) = crossbeam_channel::unbounded();
     let mut watcher: RecommendedWatcher = notify::recommended_watcher(move |ev| {
       if watch_sender.send(ev).is_err() {
@@ -94,7 +94,7 @@ impl InvalidationWatcher {
       let _ = watcher.configure(notify::Config::PreciseEvents(true))?;
       Ok(watcher)
     })
-    .map_err(|e| format!("Failed to begin watching the filesystem: {}", e))?;
+    .map_err(|e| format!("Failed to begin watching the filesystem: {e}"))?;
 
     let (liveness_sender, liveness_receiver) = crossbeam_channel::unbounded();
 
@@ -105,12 +105,7 @@ impl InvalidationWatcher {
     if cfg!(target_os = "macos") {
       watcher
         .watch(&canonical_build_root, RecursiveMode::Recursive)
-        .map_err(|e| {
-          format!(
-            "Failed to begin recursively watching files in the build root: {}",
-            e
-          )
-        })?
+        .map_err(|e| format!("Failed to begin recursively watching files in the build root: {e}"))?
     }
 
     Ok(Arc::new(InvalidationWatcher(Mutex::new(Inner {
@@ -169,7 +164,7 @@ impl InvalidationWatcher {
               warn!("Path(s) did not exist: {:?}", err.paths);
               continue;
             } else {
-              break format!("Watch error: {}", err);
+              break format!("Watch error: {err}");
             }
           }
           Err(RecvTimeoutError::Timeout) => continue,
@@ -345,9 +340,9 @@ fn maybe_enrich_notify_error(path: &Path, e: notify::Error) -> String {
           "unable to read limit value".to_string()
         };
       format!("\n\nOn Linux, this can be caused by a `max_user_watches` setting that is lower \
-              than the number of files and directories in your repository ({}). Please see \
+              than the number of files and directories in your repository ({limit_value}). Please see \
               https://www.pantsbuild.org/docs/troubleshooting#no-space-left-on-device-error-while-watching-files \
-              for more information.", limit_value)
+              for more information.")
     }
     _ => "".to_string(),
   };

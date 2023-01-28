@@ -407,7 +407,7 @@ impl Sessions {
     // non-isolated Sessions.
     let signal_task_handle = {
       let mut signal_stream = signal(SignalKind::interrupt())
-        .map_err(|err| format!("Failed to install interrupt handler: {}", err))?;
+        .map_err(|err| format!("Failed to install interrupt handler: {err}"))?;
       let sessions = sessions.clone();
       executor.native_spawn(async move {
         loop {
@@ -480,7 +480,7 @@ impl Sessions {
         log::info!("Waiting for shutdown of: {:?}", build_ids);
         tokio::time::timeout(timeout, future::join_all(cancellation_latches))
           .await
-          .map_err(|_| format!("Some Sessions did not shutdown within {:?}.", timeout))?;
+          .map_err(|_| format!("Some Sessions did not shutdown within {timeout:?}."))?;
       }
     }
     Ok(())

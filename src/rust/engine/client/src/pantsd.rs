@@ -16,7 +16,7 @@ pub(crate) struct Metadata {
 
 impl Metadata {
   pub(crate) fn mount<P: AsRef<Path>>(directory: P) -> Result<Metadata, String> {
-    let info = uname::uname().map_err(|e| format!("{}", e))?;
+    let info = uname::uname().map_err(|e| format!("{e}"))?;
     let host_hash = Sha256::new()
       .chain(&info.sysname)
       .chain(&info.nodename)
@@ -28,7 +28,7 @@ impl Metadata {
     const HOST_FINGERPRINT_LENGTH: usize = 12;
     let mut hex_digest = String::with_capacity(HOST_FINGERPRINT_LENGTH);
     for byte in host_hash {
-      fmt::Write::write_fmt(&mut hex_digest, format_args!("{:02x}", byte)).unwrap();
+      fmt::Write::write_fmt(&mut hex_digest, format_args!("{byte:02x}")).unwrap();
       if hex_digest.len() >= HOST_FINGERPRINT_LENGTH {
         break;
       }
@@ -140,7 +140,7 @@ pub fn probe(working_dir: &Path, metadata_dir: &Path) -> Result<u16, String> {
       // wrapped).
       if std::mem::discriminant(&ProcessStatus::Zombie) == std::mem::discriminant(&process.status())
       {
-        return Err(format!("The pantsd at pid {pid} is a zombie.", pid = pid));
+        return Err(format!("The pantsd at pid {pid} is a zombie."));
       }
       let expected_process_name_prefix = pantsd_metadata.process_name()?;
       let actual_argv0 = {
@@ -158,11 +158,8 @@ pub fn probe(working_dir: &Path, metadata_dir: &Path) -> Result<u16, String> {
         Err(format!(
           "\
           The process with pid {pid} is not pantsd. Expected a process name matching \
-          {expected_name} but is {actual_name}.\
-          ",
-          pid = pid,
-          expected_name = expected_process_name_prefix,
-          actual_name = actual_argv0
+          {expected_process_name_prefix} but is {actual_argv0}.\
+          "
         ))
       }
     }

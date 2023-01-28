@@ -73,7 +73,7 @@ impl Fingerprint {
   pub fn from_hex_string(hex_string: &str) -> Result<Fingerprint, String> {
     <[u8; FINGERPRINT_SIZE] as hex::FromHex>::from_hex(hex_string)
       .map(Fingerprint)
-      .map_err(|e| format!("{:?}", e))
+      .map_err(|e| format!("{e:?}"))
   }
 
   pub fn as_bytes(&self) -> &[u8; FINGERPRINT_SIZE] {
@@ -84,7 +84,7 @@ impl Fingerprint {
   pub fn to_hex(&self) -> String {
     let mut s = String::new();
     for &byte in &self.0 {
-      fmt::Write::write_fmt(&mut s, format_args!("{:02x}", byte)).unwrap();
+      fmt::Write::write_fmt(&mut s, format_args!("{byte:02x}")).unwrap();
     }
     s
   }
@@ -145,8 +145,8 @@ impl<'de> Deserialize<'de> for Fingerprint {
       {
         Fingerprint::from_hex_string(v).map_err(|err| {
           serde::de::Error::invalid_value(
-            serde::de::Unexpected::Str(&format!("{:?}: {}", v, err)),
-            &format!("A hex representation of a {} byte value", FINGERPRINT_SIZE).as_str(),
+            serde::de::Unexpected::Str(&format!("{v:?}: {err}")),
+            &format!("A hex representation of a {FINGERPRINT_SIZE} byte value").as_str(),
           )
         })
       }

@@ -73,7 +73,7 @@ impl PyDigest {
   #[new]
   fn __new__(fingerprint: &str, serialized_bytes_length: usize) -> PyResult<Self> {
     let fingerprint = Fingerprint::from_hex_string(fingerprint)
-      .map_err(|e| PyValueError::new_err(format!("Invalid digest hex: {}", e)))?;
+      .map_err(|e| PyValueError::new_err(format!("Invalid digest hex: {e}")))?;
     Ok(Self(DirectoryDigest::from_persisted_digest(Digest::new(
       fingerprint,
       serialized_bytes_length,
@@ -85,7 +85,7 @@ impl PyDigest {
   }
 
   fn __repr__(&self) -> String {
-    format!("{}", self)
+    format!("{self}")
   }
 
   fn __richcmp__(&self, other: &PyDigest, op: CompareOp, py: Python) -> PyObject {
@@ -116,7 +116,7 @@ impl PyFileDigest {
   #[new]
   fn __new__(fingerprint: &str, serialized_bytes_length: usize) -> PyResult<Self> {
     let fingerprint = Fingerprint::from_hex_string(fingerprint)
-      .map_err(|e| PyValueError::new_err(format!("Invalid file digest hex: {}", e)))?;
+      .map_err(|e| PyValueError::new_err(format!("Invalid file digest hex: {e}")))?;
     Ok(Self(Digest::new(fingerprint, serialized_bytes_length)))
   }
 
@@ -287,7 +287,7 @@ impl PyMergeDigests {
       .iter()
       .map(|d| format!("{}", PyDigest(d.clone())))
       .join(", ");
-    format!("MergeDigests([{}])", digests)
+    format!("MergeDigests([{digests}])")
   }
 
   fn __richcmp__(&self, other: &PyMergeDigests, op: CompareOp, py: Python) -> PyObject {
@@ -489,8 +489,7 @@ fn default_cache_path() -> PyResult<String> {
     .into_string()
     .map_err(|s| {
       PyTypeError::new_err(format!(
-        "Default cache path {:?} could not be converted to a string.",
-        s
+        "Default cache path {s:?} could not be converted to a string."
       ))
     })
 }

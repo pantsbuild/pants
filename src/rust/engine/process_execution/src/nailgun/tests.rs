@@ -34,7 +34,7 @@ async fn run(pool: &(NailgunPool, NamedCaches, ImmutableInputs), port: u16) -> P
       Process::new(owned_string_vec(&[
         "/bin/bash",
         "-c",
-        &format!("echo Mock port {}.; sleep 10", port),
+        &format!("echo Mock port {port}.; sleep 10"),
       ])),
       &pool.1,
       &pool.2,
