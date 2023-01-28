@@ -167,7 +167,7 @@ class PythonInferSubsystem(Subsystem):
         ),
     )
 
-    ignore_unowned_imports = StrListOption(
+    ignored_unowned_imports = StrListOption(
         default=[],
         help=softwrap(
             """Unowned imports that should be ignored.
@@ -186,7 +186,7 @@ class PythonInferSubsystem(Subsystem):
                 from src.generated.client import connect
                 ```
 
-            by setting `ignore-unowned-imports=["src.generated.app", "src.generated.client.connect"]`.
+            by setting `ignored-unowned-imports=["src.generated.app", "src.generated.client.connect"]`.
         """
         ),
     )

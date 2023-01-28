@@ -206,10 +206,10 @@ def _collect_imports_info(
     )
 
 
-def _filter_unowned_imports(
+def _remove_ignored_imports(
     unowned_imports: frozenset[str], ignored_paths: tuple[str, ...]
 ) -> frozenset[str]:
-    """Filter unowned imports given a list of paths to ignore.
+    """Remove unowned imports given a list of paths to ignore.
 
     E.g. having
     ```
@@ -470,8 +470,8 @@ async def infer_python_dependencies_via_source(
         ResolvedParsedPythonDependenciesRequest(request.field_set, parsed_dependencies, resolve),
     )
     import_deps, unowned_imports = _collect_imports_info(resolved_dependencies.resolve_results)
-    unowned_imports = _filter_unowned_imports(
-        unowned_imports, python_infer_subsystem.ignore_unowned_imports
+    unowned_imports = _remove_ignored_imports(
+        unowned_imports, python_infer_subsystem.ignored_unowned_imports
     )
 
     asset_deps, unowned_assets = _collect_imports_info(resolved_dependencies.assets)
