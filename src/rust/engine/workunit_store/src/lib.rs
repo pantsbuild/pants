@@ -298,16 +298,13 @@ impl Workunit {
     let effective_identifier = if identifier.len() > max_len {
       let truncated_identifier: String = identifier.chars().take(max_len).collect();
       let trunc = identifier.len() - max_len;
-      format!(
-        "{}... ({} characters truncated)",
-        truncated_identifier, trunc
-      )
+      format!("{truncated_identifier}... ({trunc} characters truncated)")
     } else {
       identifier.to_string()
     };
 
     let message = if let Some(ref s) = metadata.message {
-      format!(" - {}", s)
+      format!(" - {s}")
     } else {
       "".to_string()
     };

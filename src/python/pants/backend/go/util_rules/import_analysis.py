@@ -6,6 +6,7 @@ from __future__ import annotations
 import logging
 from collections import defaultdict
 from dataclasses import dataclass
+from operator import itemgetter
 from typing import ClassVar
 
 import ijson.backends.python as ijson
@@ -41,6 +42,7 @@ class GoStdLibPackage:
     pkg_source_path: str
     pkg_target: str  # Note: This will be removed once PRs land to support building the Go SDK.
     imports: tuple[str, ...]
+    import_map: FrozenDict[str, str]
 
     # Analysis for when Pants is able to compile the SDK directly.
     go_files: tuple[str, ...]
@@ -93,6 +95,7 @@ async def analyze_go_stdlib_packages(request: GoStdLibPackagesRequest) -> GoStdL
             pkg_source_path=pkg_source_path,
             pkg_target=pkg_target,
             imports=tuple(pkg_json.get("Imports", ())),
+            import_map=FrozenDict(pkg_json.get("ImportMap", {})),
             go_files=tuple(pkg_json.get("GoFiles", ())),
             cgo_files=tuple(pkg_json.get("CgoFiles", ())),
             c_files=tuple(pkg_json.get("CFiles", ())),
@@ -130,6 +133,7 @@ class ImportConfigRequest:
 
     import_paths_to_pkg_a_files: FrozenDict[str, str]
     build_opts: GoBuildOptions
+    import_map: FrozenDict[str, str] | None = None
     include_stdlib: bool = True
 
     @classmethod
@@ -139,12 +143,13 @@ class ImportConfigRequest:
 
 @rule
 async def generate_import_config(request: ImportConfigRequest) -> ImportConfig:
+    key_fn = itemgetter(0)
+    packages = sorted(request.import_paths_to_pkg_a_files.items(), key=key_fn)
+    import_map = sorted((request.import_map or {}).items(), key=key_fn)
     lines = [
         "# import config",
-        *(
-            f"packagefile {import_path}={pkg_a_path}"
-            for import_path, pkg_a_path in request.import_paths_to_pkg_a_files.items()
-        ),
+        *(f"packagefile {import_path}={pkg_a_path}" for import_path, pkg_a_path in packages),
+        *(f"importmap {old}={new}" for old, new in import_map),
     ]
     if request.include_stdlib:
         std_lib_packages = await Get(

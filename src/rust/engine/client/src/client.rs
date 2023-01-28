@@ -34,7 +34,7 @@ pub async fn execute_command(
     "PANTSD_RUNTRACKER_CLIENT_START_TIME".to_owned(),
     start
       .duration_since(SystemTime::UNIX_EPOCH)
-      .map_err(|e| format!("Failed to determine current time: {err}", err = e))?
+      .map_err(|e| format!("Failed to determine current time: {e}"))?
       .as_secs_f64()
       .to_string(),
   ));
@@ -62,7 +62,7 @@ pub async fn execute_command(
     if connection_settings.dynamic_ui {
       if let Ok(path) = nix::unistd::ttyname(*raw_fd) {
         env.push((
-          format!("NAILGUN_TTY_PATH_{fd}", fd = raw_fd),
+          format!("NAILGUN_TTY_PATH_{raw_fd}"),
           path.display().to_string(),
         ));
       }

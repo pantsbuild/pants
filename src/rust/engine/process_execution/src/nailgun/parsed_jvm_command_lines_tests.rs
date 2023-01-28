@@ -97,7 +97,7 @@ impl CLIBuilder {
   }
 
   pub fn render_to_parsed_args(&self) -> ParsedJVMCommandLines {
-    let mut nailgun_args: Vec<String> = self.jdk.iter().map(|e| e.clone()).collect();
+    let mut nailgun_args: Vec<String> = self.jdk.iter().cloned().collect();
     nailgun_args.extend(self.args_before_classpath.clone());
     nailgun_args.extend(self.classpath_flag.clone());
     nailgun_args.extend(self.classpath_value.clone());

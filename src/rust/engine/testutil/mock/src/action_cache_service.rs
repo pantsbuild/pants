@@ -95,8 +95,7 @@ impl ActionCache for ActionCacheResponder {
       Some(ar) => ar.clone(),
       None => {
         return Err(Status::not_found(format!(
-          "ActionResult for Action {:?} does not exist",
-          action_digest
+          "ActionResult for Action {action_digest:?} does not exist"
         )));
       }
     };

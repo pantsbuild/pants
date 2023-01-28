@@ -301,7 +301,7 @@ fn in_scope_computed() {
 
   // Valid when the `in_scope` param can be computed or is a singleton.
   let queries = indexset![Query::new("a", vec![])];
-  let graph = RuleGraph::new(rules.clone(), queries).unwrap();
+  let graph = RuleGraph::new(rules, queries).unwrap();
   graph.validate_reachability().unwrap();
   graph.find_root_edges(vec![], "a").unwrap();
 }
@@ -326,7 +326,7 @@ fn in_scope_provided() {
 
   // Valid when the `in_scope` param can be computed or is a singleton.
   let queries = indexset![Query::new("a", vec![])];
-  let graph = RuleGraph::new(rules.clone(), queries).unwrap();
+  let graph = RuleGraph::new(rules, queries).unwrap();
   graph.validate_reachability().unwrap();
   graph.find_root_edges(vec![], "a").unwrap();
 }
