@@ -18,6 +18,7 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Bardur Arantsson
 + Bastian Wegge
 + Benjy Weinberger
++ Berkay Öztürk
 + Bill Farner
 + Billy "Hyun Joon" Seol
 + Borja Lorente
@@ -258,6 +259,7 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Tim Treptow
 + Timur Abishev
 + Tina Huang
++ Tobias Nilsson
 + Todd Stumpf
 + Tom Dimiduk
 + Tom Dyas
@@ -269,6 +271,7 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Troy Howard
 + Tushar Singh
 + Ugo Di Girolamo
++ Viktor Kleen
 + Walter Scheper
 + Wei An
 + Wilhelmina Drengwitz
