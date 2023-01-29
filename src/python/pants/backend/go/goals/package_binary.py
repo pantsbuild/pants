@@ -23,6 +23,7 @@ from pants.core.goals.package import (
     PackageFieldSet,
 )
 from pants.core.goals.run import RunFieldSet, RunInSandboxBehavior
+from pants.core.util_rules.environments import EnvironmentField
 from pants.engine.fs import AddPrefix, Digest
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import collect_rules, rule
@@ -38,6 +39,7 @@ class GoBinaryFieldSet(PackageFieldSet, RunFieldSet):
 
     main: GoBinaryMainPackageField
     output_path: OutputPathField
+    environment: EnvironmentField
 
 
 @rule(desc="Package Go binary", level=LogLevel.DEBUG)
