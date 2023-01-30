@@ -57,10 +57,10 @@ def target_types() -> Iterable[type[Target]]:
     return [ProjectVersionTarget]
 ```
 
-You can now run `./pants help version_file` to learn more about the target:
+You can now run `pants help version_file` to learn more about the target:
 
 ```
-❯ ./pants help version_file  
+❯ pants help version_file  
 
 `version_file` target
 ---------------------
@@ -94,7 +94,7 @@ version_file(
 Since you have registered the target, Pants will be able to "understand" it:
 
 ```text
-$ ./pants peek myapp:main-project-version
+$ pants peek myapp:main-project-version
 [
   {
     "address": "myapp:main-project-version",
@@ -154,9 +154,9 @@ def rules():
     return [*project_version_rules.rules()]
 ```
 
-You can now run `./pants project-version` to confirm the command exits with the exit code `0`.
+You can now run `pants project-version` to confirm the command exits with the exit code `0`.
 
-At this point, we are ready to do something useful with the new target of ours. Goals generally run on targets, so they need to be passed as an argument in the command line. For instance, to format the `myproject` directory targets, you would run `./pants fmt myproject`. To get the version of a project in your repository, it makes sense to pass to the `project-version` goal a project directory containing the `version_file` definition.
+At this point, we are ready to do something useful with the new target of ours. Goals generally run on targets, so they need to be passed as an argument in the command line. For instance, to format the `myproject` directory targets, you would run `pants fmt myproject`. To get the version of a project in your repository, it makes sense to pass to the `project-version` goal a project directory containing the `version_file` definition.
 
 To make a target passed as an argument accessible in the goal rule, we pass the [`Targets`](https://www.pantsbuild.org/docs/rules-api-goal-rules#how-to-operate-on-targets) as input arguments of the function along with the [`Console`](https://www.pantsbuild.org/docs/rules-api-goal-rules#console-output-to-stdoutstderr) object so that we can print the details of our target in the user terminal:
 
@@ -182,7 +182,7 @@ myapp
 we are ready to inspect our new target:
 
 ```text
-$ ./pants project-version myapp
+$ pants project-version myapp
 {'address': 'myapp:main-project-version'}
 ```
 
@@ -264,7 +264,7 @@ async def get_project_version_file_view(target: ProjectVersionTarget) -> Project
 The `project-version` Pants goal now shows some useful information -- the target path along with a dummy version. This means our `@rule` was run!
 
 ```
-$ ./pants project-version myapp
+$ pants project-version myapp
 ProjectVersionFileView(path='myapp:main-project-version', version='1.2.3')
 ```
 

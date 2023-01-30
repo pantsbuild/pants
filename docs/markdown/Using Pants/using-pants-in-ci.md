@@ -91,13 +91,13 @@ Because Pants understands the dependencies of your code, you can use Pants to sp
 We recommend running these commands in CI:
 
 ```shell
-❯ ./pants --version  # Bootstrap Pants.
-❯ ./pants \
+❯ pants --version  # Bootstrap Pants.
+❯ pants \
   --changed-since=origin/main \
   tailor --check \
   update-build-files --check \
   lint
-❯ ./pants \
+❯ pants \
   --changed-since=origin/main \
   --changed-dependees=transitive \
   check test
@@ -142,8 +142,8 @@ See [Advanced target selection](doc:advanced-target-selection) for more informat
 Alternatively, you can simply run over all your code. Pants's caching means that you will not need to rerun on changed files.
 
 ```bash
-❯ ./pants --version  # Bootstrap Pants.
-❯ ./pants \
+❯ pants --version  # Bootstrap Pants.
+❯ pants \
    tailor --check \
    update-build-files --check \
    lint check test ::

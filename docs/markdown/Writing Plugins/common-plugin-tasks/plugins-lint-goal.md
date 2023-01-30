@@ -235,7 +235,7 @@ def rules():
     return [*shellcheck.rules()]
 ```
 
-Now, when you run `./pants lint ::`, your new linter should run.
+Now, when you run `pants lint ::`, your new linter should run.
 
 # 4. Add tests (optional)
 

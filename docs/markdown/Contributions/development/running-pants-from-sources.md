@@ -8,7 +8,7 @@ updatedAt: "2022-04-27T00:04:50.041Z"
 Running Pants from sources in its own repo
 ------------------------------------------
 
-In most repos, the `./pants` runner script invokes a pre-built release of Pants. However in the Pants repo itself, the [`./pants`](https://github.com/pantsbuild/pants/blob/main/pants) runner script is different - it invokes Pants directly from the sources in that repo. 
+In most repos, you invoke a pre-built release of Pants, either via the `pants` launcher binary, or a `./pants` runner script in the repo root. However in the Pants repo itself, the [`./pants`](https://github.com/pantsbuild/pants/blob/main/pants) runner script is different - it invokes Pants directly from the sources in that repo.
 
 This allows you to iterate rapidly when working in the Pants repo: You can edit Rust and Python source files, and immediately run `./pants` to try out your changes. The script will ensure that any Rust changes are compiled and linked, and then run Pants using your modified sources.
 

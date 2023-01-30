@@ -40,7 +40,7 @@ Options for `registries` in `pants.toml`:
  * `repository` - Format the repository part of the image name for this image. See [Setting a
    repository name](doc:tagging-docker-images#setting-a-repository-name) for details of this option.
 
- * `skip_push` - Do not push images to this registry during `./pants publish`.
+ * `skip_push` - Do not push images to this registry during `pants publish`.
 
 Example:
 
@@ -92,7 +92,7 @@ docker_image(
 )
 ```
 ```shell
-$ ./pants package src/example:demo
+$ pants package src/example:demo
 # Will build the image: example/demo:latest
 ```
 
@@ -214,7 +214,7 @@ docker_image(name="demo", image_tags=["1.2-{build_args.GIT_COMMIT}"])
 Then, if you run Pants with the data set in an environment variable of the same name:
 
 ```
-$ GIT_COMMIT=$(git rev-parse HEAD) ./pants package src/example:demo
+$ GIT_COMMIT=$(git rev-parse HEAD) pants package src/example:demo
 ```
 
 the value from the environment will be used. 

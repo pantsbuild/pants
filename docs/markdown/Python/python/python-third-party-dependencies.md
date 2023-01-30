@@ -11,10 +11,10 @@ Pants handles dependencies with more precision than traditional Python workflows
 Instead, Pants understands exactly which dependencies every file in your project needs, and efficiently uses just that subset of dependencies needed for the task.
 
 ```
-❯ ./pants dependencies src/py/util.py
+❯ pants dependencies src/py/util.py
 3rdparty/py#requests
 
-❯ ./pants dependencies --transitive src/py/app.py
+❯ pants dependencies --transitive src/py/app.py
 3rdparty/py#flask
 3rdparty/py#requests
 ```
@@ -133,7 +133,7 @@ Note that Pants does not consume your `poetry.lock` file. Instead, see the [sect
 How dependencies are chosen
 ---------------------------
 
-Once Pants knows about your "universe"(s) of dependencies, it determines which subset should be used through [dependency inference](https://blog.pantsbuild.org/dependency-inference/). Pants will read your import statements, like `import django`, and map it back to the relevant `python_requirement` target. Run [`./pants dependencies path/to/file.py`](doc:project-introspection) or `./pants dependencies path/to:target` to confirm this works.
+Once Pants knows about your "universe"(s) of dependencies, it determines which subset should be used through [dependency inference](https://blog.pantsbuild.org/dependency-inference/). Pants will read your import statements, like `import django`, and map it back to the relevant `python_requirement` target. Run [`pants dependencies path/to/file.py`](doc:project-introspection) or `pants dependencies path/to:target` to confirm this works.
 
 If dependency inference does not work—such as because it's a runtime dependency you do not import—you can explicitly add the `python_requirement` target to the `dependencies` field, like this:
 
@@ -216,10 +216,10 @@ enable_resolves = true
 python-default = "lockfile_path.lock" 
 ```
 
-Then, use `./pants generate-lockfiles` to generate the lockfile.
+Then, use `pants generate-lockfiles` to generate the lockfile.
 
 ```
-❯ ./pants generate-lockfiles
+❯ pants generate-lockfiles
 19:00:39.26 [INFO] Completed: Generate lockfile for python-default
 19:00:39.29 [INFO] Wrote lockfile for the resolve `python-default` to 3rdparty/python/default.lock
 ```
@@ -297,7 +297,7 @@ poetry_requirements(
 )
 ```
 
-Then, run `./pants generate-lockfiles` to generate the lockfiles. If the results aren't what you'd expect, adjust the prior step.
+Then, run `pants generate-lockfiles` to generate the lockfiles. If the results aren't what you'd expect, adjust the prior step.
 
 Finally, update your first-party targets like `python_source` / `python_sources`, `python_test` / `python_tests`, and `pex_binary` to set their `resolve` field. As before, the `resolve` field defaults to `[python].default_resolve`.
 
@@ -326,7 +326,7 @@ All transitive dependencies of a target must use the same resolve. Pants's depen
 
 ### Tool lockfiles
 
-Pants distributes a lockfile with each tool by default. However, if you change the tool's `version` and `extra_requirements`—or you change its interpreter constraints to not be compatible with our default lockfile—you will need to use a custom lockfile. Set the `lockfile` option in `pants.toml` for that tool, and then run `./pants generate-lockfiles`.
+Pants distributes a lockfile with each tool by default. However, if you change the tool's `version` and `extra_requirements`—or you change its interpreter constraints to not be compatible with our default lockfile—you will need to use a custom lockfile. Set the `lockfile` option in `pants.toml` for that tool, and then run `pants generate-lockfiles`.
 
 ```toml
 [flake8]
@@ -339,14 +339,14 @@ lockfile = "3rdparty/pytest_lockfile.txt"
 ```
 
 ```
-❯  ./pants generate-lockfiles
+❯  pants generate-lockfiles
 19:00:39.26 [INFO] Completed: Generate lockfile for flake8
 19:00:39.27 [INFO] Completed: Generate lockfile for pytest
 19:00:39.29 [INFO] Wrote lockfile for the resolve `flake8` to 3rdparty/flake8_lockfile.txt
 19:00:39.30 [INFO] Wrote lockfile for the resolve `pytest` to 3rdparty/pytest_lockfile.txt
 ```
 
-You can also run `./pants generate-lockfiles --resolve=tool`, e.g. `--resolve=flake8`, to only generate that tool's lockfile rather than generating all lockfiles.
+You can also run `pants generate-lockfiles --resolve=tool`, e.g. `--resolve=flake8`, to only generate that tool's lockfile rather than generating all lockfiles.
 
 To disable lockfiles entirely for a tool, set `[tool].lockfile = "<none>"` for that tool. Although we do not recommend this!
 
@@ -572,7 +572,7 @@ find_links = ["file:///Users/pantsbuild/prebuilt_wheels"]
 path_mappings = ["WHEELS_DIR|/Users/pantsbuild/prebuilt_wheels"]
 ```
 
-After initially setting up `[python-repos].path_mappings` and `[python-repos].find_links`, run `./pants generate-lockfiles` or `./pants generate-lockfiles --resolve=<resolve-name>`. You should see the `path_mappings` key set in the lockfile's JSON.
+After initially setting up `[python-repos].path_mappings` and `[python-repos].find_links`, run `pants generate-lockfiles` or `pants generate-lockfiles --resolve=<resolve-name>`. You should see the `path_mappings` key set in the lockfile's JSON.
 
 ### Constraints files
 
@@ -612,7 +612,7 @@ mypy_extra_type_stubs = ["django-stubs"]
 
 You can also set the key `__default__` to apply the same value to every resolve by default.
 
-Tip: use `./pants export` to create a virtual environment for IDEs
+Tip: use `pants export` to create a virtual environment for IDEs
 ------------------------------------------------------------------
 
-See [Setting up an IDE](doc:setting-up-an-ide) for more information on `./pants export`. This will create a virtual environment for your user code for compatibility with the rest of the Python ecosystem, e.g. IDEs like Pycharm.
+See [Setting up an IDE](doc:setting-up-an-ide) for more information on `pants export`. This will create a virtual environment for your user code for compatibility with the rest of the Python ecosystem, e.g. IDEs like Pycharm.

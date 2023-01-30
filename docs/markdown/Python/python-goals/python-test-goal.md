@@ -12,23 +12,23 @@ Pants uses the [Pytest](https://docs.pytest.org/en/latest/) test runner to run P
 >
 > Each file gets run as a separate process, which gives you fine-grained caching and better parallelism. Given enough cores, Pants will be able to run all your tests at the same time.
 >
-> This also gives you fine-grained invalidation. If you run `./pants test ::`, and then you only change one file, then only tests that depended on that changed file will need to rerun.
+> This also gives you fine-grained invalidation. If you run `pants test ::`, and then you only change one file, then only tests that depended on that changed file will need to rerun.
 
 Examples
 --------
 
 ```bash
  # Run all tests in the repository.
-❯ ./pants test ::
+❯ pants test ::
 
 # Run all the tests in this directory.
-❯ ./pants test helloworld/util:
+❯ pants test helloworld/util:
 
 # Run just the tests in this file.
-❯ ./pants test helloworld/util/lang_test.py
+❯ pants test helloworld/util/lang_test.py
 
  # Run just one test.
-❯ ./pants test helloworld/util/lang_test.py -- -k test_language_translator
+❯ pants test helloworld/util/lang_test.py -- -k test_language_translator
 ```
 
 Pytest version and plugins
@@ -70,7 +70,7 @@ python_tests(
 Controlling output
 ------------------
 
-By default, Pants only shows output for failed tests. You can change this by setting `--test-output` to one of `all`, `failed`, or `never`, e.g. `./pants test --output=all ::`.
+By default, Pants only shows output for failed tests. You can change this by setting `--test-output` to one of `all`, `failed`, or `never`, e.g. `pants test --output=all ::`.
 
 You can permanently set the output format in your `pants.toml` like this:
 
@@ -86,7 +86,7 @@ output = "all"
 > For example:
 >
 > ```bash
-> ❯ ./pants test project/app_test.py -- -q
+> ❯ pants test project/app_test.py -- -q
 > ```
 >
 > You may want to permanently set the Pytest option `--no-header` to avoid printing the Pytest version for each test run:
@@ -102,7 +102,7 @@ Passing arguments to Pytest
 To pass arguments to Pytest, put them at the end after `--`, like this:
 
 ```bash
-❯ ./pants test project/app_test.py -- -k test_function1 -vv -s
+❯ pants test project/app_test.py -- -k test_function1 -vv -s
 ```
 
 You can also use the `args` option in the `[pytest]` scope, like this:
@@ -122,7 +122,7 @@ args = ["-vv"]
 
 > 🚧 How to use Pytest's `--pdb` option
 >
-> You must run `./pants test --debug` for this to work properly. See the section "Debugging Tests" for more information.
+> You must run `pants test --debug` for this to work properly. See the section "Debugging Tests" for more information.
 
 Config files
 ------------
@@ -134,26 +134,26 @@ Pants will automatically include any relevant config files in the process's sand
 
 Pytest uses [`conftest.py` files](https://docs.pytest.org/en/stable/fixture.html#conftest-py-sharing-fixture-functions) to share fixtures and config across multiple distinct test files.
 
-The default `sources` value for the `python_test_utils` target includes `conftest.py`. You can run [`./pants tailor ::`](doc:initial-configuration#5-generate-build-files) to automatically add this target:
+The default `sources` value for the `python_test_utils` target includes `conftest.py`. You can run [`pants tailor ::`](doc:initial-configuration#5-generate-build-files) to automatically add this target:
 
 ```
-./pants tailor ::
+pants tailor ::
 Created project/BUILD:
   - Add python_sources target project
   - Add python_tests target tests
   - Add python_test_utils target test_utils
 ```
 
-Pants will also infer dependencies on any `confest.py` files in the current directory _and_ any ancestor directories, which mirrors how Pytest behaves. This requires that each `conftest.py` has a target referring to it. You can verify this is working correctly by running `./pants dependencies path/to/my_test.py` and confirming that each `conftest.py` file shows up. (You can turn off this feature by setting `conftests = false` in the `[python-infer]` scope.)
+Pants will also infer dependencies on any `confest.py` files in the current directory _and_ any ancestor directories, which mirrors how Pytest behaves. This requires that each `conftest.py` has a target referring to it. You can verify this is working correctly by running `pants dependencies path/to/my_test.py` and confirming that each `conftest.py` file shows up. (You can turn off this feature by setting `conftests = false` in the `[python-infer]` scope.)
 
 Setting environment variables
 -----------------------------
 
-Test runs are _hermetic_, meaning that they are stripped of the parent `./pants` process's environment variables. This is important for reproducibility, and it also increases cache hits.
+Test runs are _hermetic_, meaning that they are stripped of the parent `pants` process's environment variables. This is important for reproducibility, and it also increases cache hits.
 
 To add any arbitrary environment variable back to the process, you can either add the environment variable to the specific tests with the `extra_env_vars` field on `python_test` / `python_tests` targets or to all your tests with the `[test].extra_env_vars` option. Generally, prefer the field `extra_env_vars` field so that more of your tests are hermetic.
 
-With both `[test].extra_env_vars` and the `extra_env_vars` field, you can either hardcode a value or leave off a value to "allowlist" it and read from the parent `./pants` process's environment.
+With both `[test].extra_env_vars` and the `extra_env_vars` field, you can either hardcode a value or leave off a value to "allowlist" it and read from the parent `pants` process's environment.
 
 ```toml pants.toml
 [test]
@@ -221,7 +221,7 @@ Compatible tests that _do_ end up in the same batch will run in a single `pytest
 > It can sometimes be difficult to locate test failures in the logging output of a large `pytest` batch. You can pass the `-r` flag to `pytest` to make this investigation easier:
 >
 > ```bash
-> ❯ ./pants test :: -- -r
+> ❯ pants test :: -- -r
 > ```
 >
 > This will cause `pytest` to print a "summary report" at the end of its output, including the names of all failed tests. See the `pytest` docs [here](https://docs.pytest.org/en/6.2.x/usage.html#detailed-summary-report) for more information.
@@ -272,14 +272,14 @@ When `pytest-xdist` is in use, the `PYTEST_XDIST_WORKER` and `PYTEST_XDIST_WORKE
 Force reruns with `--force`
 ---------------------------
 
-To force your tests to run again, rather than reading from the cache, run `./pants test --force path/to/test.py`.
+To force your tests to run again, rather than reading from the cache, run `pants test --force path/to/test.py`.
 
 Debugging Tests
 ---------------
 
 Because Pants runs multiple test targets in parallel, you will not see your test results appear on the screen until the test has completely finished. This means that you cannot use debuggers normally; the breakpoint will never show up on your screen and the test will hang indefinitely (or timeout, if timeouts are enabled).
 
-Instead, if you want to run a test interactively—such as to use a debugger like `pdb`—run your tests with `./pants test --debug`. For example:
+Instead, if you want to run a test interactively—such as to use a debugger like `pdb`—run your tests with `pants test --debug`. For example:
 
 ```python test_debug_example.py
 def test_debug():
@@ -287,7 +287,7 @@ def test_debug():
     assert 1 + 1 == 2
 ```
 ```text Shell
-❯ ./pants test --debug test_debug_example.py
+❯ pants test --debug test_debug_example.py
 
 ===================================================== test session starts =====================================================
 platform darwin -- Python 3.6.10, pytest-5.3.5, py-1.8.1, pluggy-0.13.1
@@ -321,17 +321,17 @@ If you use multiple files with `test --debug`, they will run sequentially rather
 > To run the tests you will need to add `-- -s` to the test call since ipdb will need stdin and pytest will capture it.
 >
 > ```bash
-> ❯ ./pants test --debug  <target>   -- -s
+> ❯ pants test --debug  <target>   -- -s
 > ```
 
 > 📘 Tip: using the VS Code (or any [DAP](https://microsoft.github.io/debug-adapter-protocol/)-compliant editor) remote debugger in tests
 >
 >
 > 1. In your editor, set your breakpoints and any other debug settings (like break-on-exception).
-> 2. Run your test with `./pants test --debug-adapter`.
+> 2. Run your test with `pants test --debug-adapter`.
 > 3. Connect your editor to the server. The server host and port are logged by Pants when executing `test --debug-adaptor`. (They can also be configured using the `[debug-adapter]` subsystem).
 
-> Run your test with `./pants test --debug` as usual.
+> Run your test with `pants test --debug` as usual.
 
 > 📘 Tip: using the IntelliJ/PyCharm remote debugger in tests
 >
@@ -352,7 +352,7 @@ If you use multiple files with `test --debug`, they will run sequentially rather
 > pydevd_pycharm.settrace('localhost', port=5000, stdoutToServer=True, stderrToServer=True)
 > ```
 >
-> Run your test with `./pants test --debug` as usual.
+> Run your test with `pants test --debug` as usual.
 
 Timeouts
 --------
@@ -392,7 +392,7 @@ If a target sets its `timeout` higher than `[test].timeout_maximum`, Pants will 
 > When debugging locally, such as with `pdb`, you might want to temporarily disable timeouts. To do this, set `--no-test-timeouts`:
 >
 > ```bash
-> $ ./pants test project/app_test.py --no-test-timeouts
+> $ pants test project/app_test.py --no-test-timeouts
 > ```
 
 Test utilities and resources
@@ -402,7 +402,7 @@ Test utilities and resources
 
 Use the target type `python_source` for test utilities, rather than `python_test`.
 
-To reduce boilerplate, you can use either the [`python_sources`](doc:reference-python_sources) or [`python_test_utils`](doc:reference-python_test_utils) targets to generate `python_source` targets. These behave the same, except that `python_test_utils` has a different default `sources` to include `conftest.py` and type stubs for tests (like `test_foo.pyi`). Use [`./pants tailor ::`](doc:initial-configuration#5-generate-build-files) to generate both these targets automatically.
+To reduce boilerplate, you can use either the [`python_sources`](doc:reference-python_sources) or [`python_test_utils`](doc:reference-python_test_utils) targets to generate `python_source` targets. These behave the same, except that `python_test_utils` has a different default `sources` to include `conftest.py` and type stubs for tests (like `test_foo.pyi`). Use [`pants tailor ::`](doc:initial-configuration#5-generate-build-files) to generate both these targets automatically.
 
 For example:
 
@@ -441,11 +441,11 @@ It's often most convenient to use  `file` / `files` and `relocated_files` target
 Testing your packaging pipeline
 -------------------------------
 
-You can include the result of `./pants package` in your test through the `runtime_package_dependencies` field. Pants will run the equivalent of `./pants package` beforehand and copy the built artifact into the test's chroot, allowing you to test things like that the artifact has the correct files present and that it's executable.
+You can include the result of `pants package` in your test through the `runtime_package_dependencies` field. Pants will run the equivalent of `pants package` beforehand and copy the built artifact into the test's chroot, allowing you to test things like that the artifact has the correct files present and that it's executable.
 
-This allows you to test your packaging pipeline by simply running `./pants test ::`, without needing custom integration test scripts.
+This allows you to test your packaging pipeline by simply running `pants test ::`, without needing custom integration test scripts.
 
-To depend on a built package, use the `runtime_package_dependencies` field on the `python_test` / `python_tests` target, which is a list of addresses to targets that can be built with `./pants package`, such as `pex_binary`, `python_awslambda`, and `archive` targets. Pants will build the package before running your test, and insert the file into the test's chroot. It will use the same name it would normally use with `./pants package`, except without the `dist/` prefix (set by the `output_path` field).
+To depend on a built package, use the `runtime_package_dependencies` field on the `python_test` / `python_tests` target, which is a list of addresses to targets that can be built with `pants package`, such as `pex_binary`, `python_awslambda`, and `archive` targets. Pants will build the package before running your test, and insert the file into the test's chroot. It will use the same name it would normally use with `pants package`, except without the `dist/` prefix (set by the `output_path` field).
 
 For example:
 
@@ -479,7 +479,7 @@ Coverage
 To report coverage using [`Coverage.py`](https://coverage.readthedocs.io/en/coverage-5.1/), set the option `--test-use-coverage`:
 
 ```bash
-❯ ./pants test --use-coverage helloworld/util/lang_test.py
+❯ pants test --use-coverage helloworld/util/lang_test.py
 ```
 
 Or to permanently use coverage, set in your config file:
@@ -516,8 +516,8 @@ use_coverage = true
 Coverage will report data on any files encountered during the tests. You can filter down the results by using the option `--coverage-py-filter` and passing the name(s) of modules you want coverage data for. Each module name is recursive, meaning submodules will be included. For example:
 
 ```bash
-❯ ./pants test --use-coverage helloworld/util/lang_test.py --coverage-py-filter=helloworld.util
-❯ ./pants test --use-coverage helloworld/util/lang_test.py --coverage-py-filter='["helloworld.util.lang", "helloworld.util.lang_test"]'
+❯ pants test --use-coverage helloworld/util/lang_test.py --coverage-py-filter=helloworld.util
+❯ pants test --use-coverage helloworld/util/lang_test.py --coverage-py-filter='["helloworld.util.lang", "helloworld.util.lang_test"]'
 ```
 
 > 📘 Set `global_report` to include un-encountered files
@@ -571,4 +571,4 @@ To save JUnit XML result files, set the option `[test].report`, like this:
 report = true
 ```
 
-This will default to writing test reports to `dist/test/reports`. You may also want to set the option `[pytest].junit_family` to change the format. Run `./pants help-advanced pytest` for more information.
+This will default to writing test reports to `dist/test/reports`. You may also want to set the option `[pytest].junit_family` to change the format. Run `pants help-advanced pytest` for more information.
