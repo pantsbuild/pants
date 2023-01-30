@@ -8,7 +8,7 @@ updatedAt: "2021-02-25T15:44:51.130Z"
 Some highlights:
 
 * Improved performance when running Python subprocesses like Pytest, Flake8, and MyPy, thanks to Pex's new `venv` mode. This shaved off around 1 second for test runs in benchmarks!
-* `./pants tailor` goal, which will auto-generate BUILD files for you. See [Adopting Pants in existing repositories](doc:existing-repositories).
+* `pants tailor` goal, which will auto-generate BUILD files for you. See [Adopting Pants in existing repositories](doc:existing-repositories).
 * Support for specifying `file://` URLs [for downloaded tools](https://github.com/pantsbuild/pants/pull/11499) like Pex and Protoc.
 * More robust remote caching support. The client should be more stable and should avoid performance slowdowns thanks to some new optimizations. See [Remote Execution](doc:remote-execution).
 

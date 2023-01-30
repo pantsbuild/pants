@@ -60,7 +60,7 @@ python_distribution(
 )
 ```
 
-Running `./pants package example/dists:mydist` will cause Pants to inspect the `[build-system]` table in `pyproject.toml`, install the requirements specified in that table's `requires` key, and then execute the entry point specified in the `build-backend` key to build an sdist and a wheel, just as PEP 517 requires.
+Running `pants package example/dists:mydist` will cause Pants to inspect the `[build-system]` table in `pyproject.toml`, install the requirements specified in that table's `requires` key, and then execute the entry point specified in the `build-backend` key to build an sdist and a wheel, just as PEP 517 requires.
 
 If you want to build just a wheel or just an sdist, you can set `sdist=False` or `wheel=False` on the `python_distribution` target.
 
@@ -82,11 +82,11 @@ python_distribution(
 )
 ```
 
-Running `./pants package example/dists:mydist` will cause Pants to run Setuptools, which will in turn run the `setup.py` script in the `python_distribution` target's directory. If no such script exists, Pants can generate one for you (see below).
+Running `pants package example/dists:mydist` will cause Pants to run Setuptools, which will in turn run the `setup.py` script in the `python_distribution` target's directory. If no such script exists, Pants can generate one for you (see below).
 
 > 📘 See `package` for other package formats
 > 
-> This page focuses on building sdists and wheels with the `./pants package` goal. See [package](doc:python-package-goal) for information on other formats that can be built with `./pants package`, such as PEX binaries and zip/tar archives.
+> This page focuses on building sdists and wheels with the `pants package` goal. See [package](doc:python-package-goal) for information on other formats that can be built with `pants package`, such as PEX binaries and zip/tar archives.
 
 setup.py
 --------
@@ -148,7 +148,7 @@ However, you cannot use `data_files`, `install_requires`, `namespace_packages`, 
 > )
 > ```
 > 
-> Pants will infer dependencies on each entry point, which you can confirm by running `./pants dependencies path/to:python_dist`.
+> Pants will infer dependencies on each entry point, which you can confirm by running `pants dependencies path/to:python_dist`.
 > 
 > In addition to using the format `path.to.module:func`, you can use an [address](doc:targets) to a `pex_binary` target, like `src/py/project:pex_binary` or `:sibling_pex_binary`. Pants will use the `entry_point` already specified by the `pex_binary`, and it will infer a dependency on the `pex_binary` target. This allows you to better DRY your project's entry points.
 

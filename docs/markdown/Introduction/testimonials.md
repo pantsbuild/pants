@@ -49,7 +49,7 @@ We have rolled out Pants across the organization now replacing Conda based workf
 <p>I handed over the project today and this is essentially how it went:
 <p><i>Me: "Okay, so to deploy, we have to generate the protobufs, cythonize our core libs, embed the protobufs and core libs in some of our sub-repos, Dockerize the API gateway and microservices, package our system services, and then deploy all of that to our server and then run e2e testing."</i>
 <p><i>Client: "Alright, this sounds painful, how do we do it?"</i>
-<p><i>Me: "<code>./pants deploy :myproject</code>"  [drops keyboard and walks away]</i>
+<p><i>Me: "<code>pants deploy :myproject</code>"  [drops keyboard and walks away]</i>
 </blockquote>
 </figure>
 
