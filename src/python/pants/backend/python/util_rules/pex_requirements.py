@@ -3,10 +3,9 @@
 
 from __future__ import annotations
 
-import json
 import logging
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Iterable, Iterator
+from typing import TYPE_CHECKING, Iterable, Iterator
 
 from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.subsystems.repos import PythonRepos
@@ -36,7 +35,6 @@ from pants.engine.fs import (
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.unions import UnionMembership
 from pants.util.docutil import bin_name, doc_url
-from pants.util.frozendict import FrozenDict
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import softwrap
 
@@ -87,9 +85,6 @@ class LoadedLockfile:
     # The original file or file content (which may not have identical content to the output
     # `lockfile_digest`).
     original_lockfile: Lockfile | LockfileContent
-    # The parsed contents of the lockfile, if requested else None.
-    # N.B. the structure of this data is ~opaque to Pants, so use with care.
-    lockfile_data: FrozenDict[str, Any] | None = None
 
 
 @dataclass(frozen=True)
@@ -97,7 +92,6 @@ class LoadedLockfileRequest:
     """A request to load and validate the content of the given lockfile."""
 
     lockfile: Lockfile | LockfileContent
-    parse_lockfile: bool = False
 
 
 def _strip_comments_from_pex_json_lockfile(lockfile_bytes: bytes) -> bytes:
@@ -168,7 +162,6 @@ async def load_lockfile(
     python_setup: PythonSetup,
 ) -> LoadedLockfile:
     lockfile = request.lockfile
-    lockfile_data = None
     if isinstance(lockfile, Lockfile):
         synthetic_lock = False
         lockfile_path = lockfile.file_path
@@ -198,12 +191,6 @@ async def load_lockfile(
         )
         requirement_estimate = _pex_lockfile_requirement_count(lock_bytes)
         constraints_strings = None
-        if request.parse_lockfile:
-            try:
-                parsed_lockfile = json.loads(stripped_lock_bytes)
-                lockfile_data = FrozenDict.deep_freeze(parsed_lockfile)
-            except json.JSONDecodeError as e:
-                logger.debug(f"{lockfile_path}: Failed to parse lockfile contents: {e}")
     else:
         header_delimiter = "#"
         lock_string = lock_bytes.decode()
@@ -230,7 +217,6 @@ async def load_lockfile(
         is_pex_native,
         constraints_strings,
         original_lockfile=lockfile,
-        lockfile_data=lockfile_data,
     )
 
 
