@@ -44,25 +44,29 @@ class PythonRequirementVersion:
         return getattr(self._parsed, key)
 
 
-def _pex_lockfile_requirements(lockfile_data: Mapping[str, Any] | None) -> LockfilePackages:
+def _pex_lockfile_requirements(
+    lockfile_data: Mapping[str, Any] | None, path: str | None = None
+) -> LockfilePackages:
     if not lockfile_data:
         return LockfilePackages({})
 
-    # Setup generators
-    locked_resolves = (
-        (
-            (PackageName(r["project_name"]), PythonRequirementVersion.parse(r["version"]))
-            for r in resolve["locked_requirements"]
-        )
-        for resolve in lockfile_data["locked_resolves"]
-    )
-
     try:
+        # Setup generators
+        locked_resolves = (
+            (
+                (PackageName(r["project_name"]), PythonRequirementVersion.parse(r["version"]))
+                for r in resolve["locked_requirements"]
+            )
+            for resolve in lockfile_data["locked_resolves"]
+        )
         requirements = dict(itertools.chain.from_iterable(locked_resolves))
     except KeyError as e:
         from pprint import pformat
 
-        logger.debug(f"Failed to parse PEX lockfile: {e}\n{pformat(lockfile_data)}")
+        logger.debug(f"{path}: Failed to parse lockfile: {e}\n{pformat(lockfile_data)}")
+        if path:
+            logger.warning(f"Failed to parse lockfile: {path}")
+
         requirements = {}
 
     return LockfilePackages(requirements)
@@ -106,5 +110,5 @@ async def _generate_python_lockfile_diff(
         old=_pex_lockfile_requirements(
             old.lockfile_data if isinstance(old, LoadedLockfile) else None
         ),
-        new=_pex_lockfile_requirements(new.lockfile_data),
+        new=_pex_lockfile_requirements(new.lockfile_data, path),
     )
