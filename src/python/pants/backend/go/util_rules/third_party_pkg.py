@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import dataclasses
+import difflib
 import json
 import logging
 import os
@@ -14,17 +15,20 @@ import ijson.backends.python as ijson
 
 from pants.backend.go.go_sources.load_go_binary import LoadedGoBinary, LoadedGoBinaryRequest
 from pants.backend.go.subsystems.golang import GolangSubsystem
+from pants.backend.go.target_types import GoModTarget
 from pants.backend.go.util_rules import pkg_analyzer
 from pants.backend.go.util_rules.cgo import CGoCompilerFlags
 from pants.backend.go.util_rules.embedcfg import EmbedConfig
 from pants.backend.go.util_rules.pkg_analyzer import PackageAnalyzerSetup
 from pants.backend.go.util_rules.sdk import GoSdkProcess
+from pants.build_graph.address import Address
 from pants.core.goals.tailor import group_by_dir
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import (
     EMPTY_DIGEST,
     CreateDigest,
     Digest,
+    DigestContents,
     DigestSubset,
     FileContent,
     GlobExpansionConjunction,
@@ -34,7 +38,7 @@ from pants.engine.fs import (
     Snapshot,
 )
 from pants.engine.process import FallibleProcessResult, Process, ProcessResult
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.rules import Get, MultiGet, collect_rules, rule, rule_helper
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
@@ -94,6 +98,7 @@ class ThirdPartyPkgAnalysisRequest(EngineAwareParameter):
     """
 
     import_path: str
+    go_mod_address: Address
     go_mod_digest: Digest
     go_mod_path: str
 
@@ -116,6 +121,7 @@ class AllThirdPartyPackages(FrozenDict[str, ThirdPartyPkgAnalysis]):
 
 @dataclass(frozen=True)
 class AllThirdPartyPackagesRequest:
+    go_mod_address: Address
     go_mod_digest: Digest
     go_mod_path: str
 
@@ -143,6 +149,7 @@ class ModuleDescriptors:
 
 @dataclass(frozen=True)
 class AnalyzeThirdPartyModuleRequest:
+    go_mod_address: Address
     go_mod_digest: Digest
     go_mod_path: str
     import_path: str
@@ -273,6 +280,49 @@ def _freeze_json_dict(d: dict[Any, Any]) -> FrozenDict[str, Any]:
     return FrozenDict(result)
 
 
+@rule_helper
+async def _check_go_sum_has_not_changed(
+    input_digest: Digest,
+    output_digest: Digest,
+    dir_path: str,
+    import_path: str,
+    go_mod_address: Address,
+) -> None:
+    input_entries, output_entries = await MultiGet(
+        Get(DigestContents, Digest, input_digest),
+        Get(DigestContents, Digest, output_digest),
+    )
+
+    go_sum_path = os.path.join(dir_path, "go.sum")
+
+    input_go_sum_entry: bytes | None = None
+    for entry in input_entries:
+        if entry.path == go_sum_path:
+            input_go_sum_entry = entry.content
+
+    output_go_sum_entry: bytes | None = None
+    for entry in output_entries:
+        if entry.path == go_sum_path:
+            output_go_sum_entry = entry.content
+
+    if input_go_sum_entry is not None or output_go_sum_entry is not None:
+        if input_go_sum_entry != output_go_sum_entry:
+            go_sum_diff = list(
+                difflib.unified_diff(
+                    (input_go_sum_entry or b"").decode().splitlines(),
+                    (output_go_sum_entry or b"").decode().splitlines(),
+                )
+            )
+            go_sum_diff_rendered = "\n".join(line.rstrip() for line in go_sum_diff)
+            raise ValueError(
+                f"For `{GoModTarget.alias}` target `{go_mod_address}`, the go.sum file is incomplete "
+                f"because it was updated while processing third-party dependency `{import_path}`. "
+                "Please re-generate the go.sum file by running `go mod download all` in the module directory. "
+                "(Pants does not currently have support for updating the go.sum checksum database itself.)\n\n"
+                f"Diff:\n{go_sum_diff_rendered}"
+            )
+
+
 @rule
 async def analyze_go_third_party_module(
     request: AnalyzeThirdPartyModuleRequest,
@@ -285,10 +335,11 @@ async def analyze_go_third_party_module(
         GoSdkProcess(
             ("mod", "download", "-json", f"{request.name}@{request.version}"),
             input_digest=request.go_mod_digest,  # for go.sum
-            working_dir=os.path.dirname(request.go_mod_path) if request.go_mod_path else None,
+            working_dir=os.path.dirname(request.go_mod_path),
             # Allow downloads of the module sources.
             allow_downloads=True,
             output_directories=("gopath",),
+            output_files=(os.path.join(os.path.dirname(request.go_mod_path), "go.sum"),),
             description=f"Download Go module {request.name}@{request.version}.",
         ),
     )
@@ -297,6 +348,15 @@ async def analyze_go_third_party_module(
         raise AssertionError(
             f"Expected output from `go mod download` for {request.name}@{request.version}."
         )
+
+    # Make sure go.sum has not changed.
+    await _check_go_sum_has_not_changed(
+        input_digest=request.go_mod_digest,
+        output_digest=download_result.output_digest,
+        dir_path=os.path.dirname(request.go_mod_path),
+        import_path=request.import_path,
+        go_mod_address=request.go_mod_address,
+    )
 
     module_metadata = json.loads(download_result.stdout)
     module_sources_relpath = strip_sandbox_prefix(module_metadata["Dir"], "gopath/")
@@ -538,6 +598,7 @@ async def download_and_analyze_third_party_packages(
         Get(
             AnalyzedThirdPartyModule,
             AnalyzeThirdPartyModuleRequest(
+                go_mod_address=request.go_mod_address,
                 go_mod_digest=go_mod_digest,
                 go_mod_path=request.go_mod_path,
                 import_path=mod.name,
@@ -562,7 +623,11 @@ async def download_and_analyze_third_party_packages(
 async def extract_package_info(request: ThirdPartyPkgAnalysisRequest) -> ThirdPartyPkgAnalysis:
     all_packages = await Get(
         AllThirdPartyPackages,
-        AllThirdPartyPackagesRequest(request.go_mod_digest, request.go_mod_path),
+        AllThirdPartyPackagesRequest(
+            request.go_mod_address,
+            request.go_mod_digest,
+            request.go_mod_path,
+        ),
     )
     pkg_info = all_packages.import_paths_to_pkg_info.get(request.import_path)
     if pkg_info:

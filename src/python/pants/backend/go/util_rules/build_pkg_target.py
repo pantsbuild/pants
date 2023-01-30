@@ -231,7 +231,12 @@ async def setup_build_go_package_target_request(
         _go_mod_info = await Get(GoModInfo, GoModInfoRequest(_go_mod_address))
         _third_party_pkg_info = await Get(
             ThirdPartyPkgAnalysis,
-            ThirdPartyPkgAnalysisRequest(import_path, _go_mod_info.digest, _go_mod_info.mod_path),
+            ThirdPartyPkgAnalysisRequest(
+                import_path,
+                _go_mod_address,
+                _go_mod_info.digest,
+                _go_mod_info.mod_path,
+            ),
         )
 
         # We error if trying to _build_ a package with issues (vs. only generating the target and
