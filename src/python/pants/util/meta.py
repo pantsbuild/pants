@@ -153,7 +153,7 @@ def frozen_after_init(cls: C) -> C:
         removal_version="2.17.0.dev0",
         hint=softwrap(
             """
-            Use `frozen=True` and remove `unsafe_has=True` in your dataclass decorator,
+            Use `frozen=True` and remove `unsafe_hash=True` in your dataclass decorator,
             and `object.__setattr__(self, "attrname", <value>)` in your `__init__`.
             """
         )
