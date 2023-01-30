@@ -67,7 +67,7 @@ async def pyupgrade_fix(request: PyUpgradeRequest.Batch, pyupgrade: PyUpgrade) -
         logger.error(
             softwrap(
                 """
-                Ran Pyupgrade continuously on the code 10 times and it changed all 10.
+                Pants ran Pyupgrade continuously on the code 10 times and it changed all 10.
 
                 Pyupgrade is not idempotent, but should eventually converge. This is either a bug in
                 Pyupgrade, or Pyupgrade is still trying to converge on fixed code.
