@@ -12,7 +12,7 @@ Reminder: running the autoformatters and linters
 Most of Pants' style is enforced via Black, isort, Docformatter, Flake8, and MyPy. You may find it helpful to run these commands before pushing a PR:
 
 ```bash
-$ ./pants --changed-since=HEAD fmt
+$ pants --changed-since=HEAD fmt
 $ build-support/githooks/pre-commit
 ```
 
@@ -22,7 +22,7 @@ $ build-support/githooks/pre-commit
 > 
 > ```python
 > StrOption(
->     default="./pants",
+>     default="pants",
 >     help="The name of the script or binary used to invoke pants. "
 >     "Useful when printing help messages.",
 > )
@@ -32,7 +32,7 @@ $ build-support/githooks/pre-commit
 > 
 > ```python
 > StrOption(
->     default="./pants",
+>     default="pants",
 >     help=(
 >         "The name of the script or binary used to invoke pants. "
 >         "Useful when printing help messages."
@@ -87,7 +87,7 @@ Good:
 ```
 def __hash__(self):
     # By overriding __hash__ here, rather than using the default implementation, 
-    # we get a 10% speedup to `./pants list ::` (1000 targets) thanks to more
+    # we get a 10% speedup to `pants list ::` (1000 targets) thanks to more
     # cache hits. This is safe to do because ...
     ...
 

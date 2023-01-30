@@ -47,12 +47,12 @@ backend_packages = [
 
 ## Setting up targets
 
-Run [`./pants tailor ::`](doc:initial-configuration#5-generate-build-files) to generate BUILD files. This will
+Run [`pants tailor ::`](doc:initial-configuration#5-generate-build-files) to generate BUILD files. This will
 create `kotlin_sources` targets in every directory containing library code, as well as `kotlin_junit_tests` targets
 for filenames that look like tests.
 
 ```
-❯ ./pants tailor ::
+❯ pants tailor ::
 Created src/jvm/org/pantsbuild/example/app/BUILD:
   - Add kotlin_sources target app
 Created src/jvm/org/pantsbuild/example/json/BUILD:
@@ -61,10 +61,10 @@ Created src/jvm/org/pantsbuild/example/lib/BUILD:
   - Add java_sources target lib
 ```
 
-You can run `./pants list ::` to see all targets in your project:
+You can run `pants list ::` to see all targets in your project:
 
 ```
-❯ ./pants list ::
+❯ pants list ::
 ...
 src/jvm/org/pantsbuild/example/app:app
 src/jvm/org/pantsbuild/example/app/ExampleApp.kt
@@ -143,7 +143,7 @@ jvm_artifact(
 ```
 
 Pants requires use of a lockfile for third-party dependencies. After adding or editing `jvm_artifact` targets, you
-will need to update affected lockfiles by running `./pants generate-lockfiles`. The default lockfile is located at
+will need to update affected lockfiles by running `pants generate-lockfiles`. The default lockfile is located at
 `3rdparty/jvm/default.lock`, but it can be relocated (as well as additional resolves declared) via the
 [`[jvm].resolves` option](doc:reference-jvm#section-resolves).
 
@@ -196,43 +196,43 @@ Hello world!
 
 ## Compile code
 
-To manually check that sources compile, use `./pants check`:
+To manually check that sources compile, use `pants check`:
 
 ```
 # Check a single file
-❯ ./pants check src/jvm/org/pantsbuild/example/lib/ExampleLib.kt
+❯ pants check src/jvm/org/pantsbuild/example/lib/ExampleLib.kt
 
 # Check files located recursively under a directory
-❯ ./pants check src/jvm::
+❯ pants check src/jvm::
 
 # Check the whole repository
-❯ ./pants check ::
+❯ pants check ::
 ```
 
 ## Run tests
 
-To run tests, use `./pants test`:
+To run tests, use `pants test`:
 
 ```
 # Run a single test file
-❯ ./pants test tests/jvm/org/pantsbuild/example/lib/ExampleLibTest.kt
+❯ pants test tests/jvm/org/pantsbuild/example/lib/ExampleLibTest.kt
 
 # Test all files in and under a directory
-❯ ./pants test tests/jvm::
+❯ pants test tests/jvm::
 
 # Test the whole repository
-❯ ./pants test ::
+❯ pants test ::
 ```
 
 The Kotlin backend currently supports JUnit tests specified using the `kotlin_junit_tests` target type.
 
 ### Setting environment variables
 
-Test runs are _hermetic_, meaning that they are stripped of the parent `./pants` process's environment variables. This is important for reproducibility, and it also increases cache hits.
+Test runs are _hermetic_, meaning that they are stripped of the parent `pants` process's environment variables. This is important for reproducibility, and it also increases cache hits.
 
 To add any arbitrary environment variable back to the process, you can either add the environment variable to the specific tests with the `extra_env_vars` field on `kotlin_junit_test` / `kotlin_junit_tests` targets or to all your tests with the `[test].extra_env_vars` option. Generally, prefer the field `extra_env_vars` field so that more of your tests are hermetic.
 
-With both `[test].extra_env_vars` and the `extra_env_vars` field, you can either hardcode a value or leave off a value to "allowlist" it and read from the parent `./pants` process's environment.
+With both `[test].extra_env_vars` and the `extra_env_vars` field, you can either hardcode a value or leave off a value to "allowlist" it and read from the parent `pants` process's environment.
 
 ```toml pants.toml
 [test]
@@ -261,13 +261,13 @@ Once enabled, `lint` and `fmt` will check and automatically reformat your code:
 
 ```
 # Format this directory and all subdirectories
-❯ ./pants fmt src/jvm::
+❯ pants fmt src/jvm::
 
 # Check that the whole project is formatted
-❯ ./pants lint ::
+❯ pants lint ::
 
 # Format all changed files
-❯ ./pants --changed-since=HEAD fmt
+❯ pants --changed-since=HEAD fmt
 ```
 
 # Caveats

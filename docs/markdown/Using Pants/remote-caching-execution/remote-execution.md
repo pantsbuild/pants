@@ -97,6 +97,6 @@ remote_ca_certs_path = "/etc/ssl/certs/ca-certificates.crt"
 Reference
 =========
 
-For global options, run `./pants help-advanced global` or refer to [Global options](doc:reference-global). Most remote execution and caching options begin with the prefix `--remote`.
+For global options, run `pants help-advanced global` or refer to [Global options](doc:reference-global). Most remote execution and caching options begin with the prefix `--remote`.
 
-For environment-specific options, see `./pants help-advanced remote_environment` or the [`remote_environment` target](doc:reference-remote_environment).
+For environment-specific options, see `pants help-advanced remote_environment` or the [`remote_environment` target](doc:reference-remote_environment).

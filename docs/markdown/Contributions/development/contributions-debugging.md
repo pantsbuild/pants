@@ -16,8 +16,8 @@ When benchmarking, you must decide if you care about cold cache performance vs. 
 For example:
 
 ```
-❯ hyperfine --warmup=1 --runs=5 './pants list ::`
-❯ hyperfine --runs=5 './pants --no-pantsd --no-local-cache lint ::'
+❯ hyperfine --warmup=1 --runs=5 'pants list ::`
+❯ hyperfine --runs=5 'pants --no-pantsd --no-local-cache lint ::'
 ```
 
 Profiling with py-spy
