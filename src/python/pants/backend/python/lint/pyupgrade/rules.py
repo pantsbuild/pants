@@ -43,8 +43,9 @@ async def pyupgrade_fix(request: PyUpgradeRequest.Batch, pyupgrade: PyUpgrade) -
     # changing code. See https://github.com/asottile/pyupgrade/issues/703
     # (Technically we could not do this. It doesn't break Pants since the next run on the CLI would
     # use the new file with the new digest. However that isn't the UX we want for our users.)
+    num_changes_left = 10  # Give the loop an upper bound to guard against inifite runs
     input_digest = request.snapshot.digest
-    while True:
+    while num_changes_left:
         result = await Get(
             FallibleProcessResult,
             VenvPexProcess(
@@ -58,8 +59,11 @@ async def pyupgrade_fix(request: PyUpgradeRequest.Batch, pyupgrade: PyUpgrade) -
         )
         if input_digest == result.output_digest:
             # Nothing changed, either due to failure or because it is fixed
-            return await FixResult.create(request, result)
+            break
         input_digest = result.output_digest
+        num_changes_left -= 1
+
+    return await FixResult.create(request, result)
 
 
 def rules():
