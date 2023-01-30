@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 
 from pants.backend.python.lint.pyupgrade.skip_field import SkipPyUpgradeField
@@ -15,7 +16,9 @@ from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import FieldSet, Target
 from pants.util.logging import LogLevel
-from pants.util.strutil import pluralize
+from pants.util.strutil import pluralize, softwrap
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -43,9 +46,8 @@ async def pyupgrade_fix(request: PyUpgradeRequest.Batch, pyupgrade: PyUpgrade) -
     # changing code. See https://github.com/asottile/pyupgrade/issues/703
     # (Technically we could not do this. It doesn't break Pants since the next run on the CLI would
     # use the new file with the new digest. However that isn't the UX we want for our users.)
-    num_changes_left = 10  # Give the loop an upper bound to guard against inifite runs
     input_digest = request.snapshot.digest
-    while num_changes_left:
+    for _ in range(10):  # Give the loop an upper bound to guard against inifite runs
         result = await Get(
             FallibleProcessResult,
             VenvPexProcess(
@@ -61,7 +63,17 @@ async def pyupgrade_fix(request: PyUpgradeRequest.Batch, pyupgrade: PyUpgrade) -
             # Nothing changed, either due to failure or because it is fixed
             break
         input_digest = result.output_digest
-        num_changes_left -= 1
+    else:
+        logger.error(
+            softwrap(
+                """
+                Ran Pyupgrade continuously on the code 10 times and it changed all 10.
+
+                Pyupgrade is not idempotent, but should eventually converge. This is either a bug in
+                Pyupgrade, or Pyupgrade is still trying to converge on fixed code.
+                """
+            )
+        )
 
     return await FixResult.create(request, result)
 
