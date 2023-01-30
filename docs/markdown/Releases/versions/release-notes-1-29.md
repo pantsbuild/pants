@@ -7,7 +7,7 @@ updatedAt: "2020-07-15T19:26:39.918Z"
 ---
 Some highlights:
 
-- The `run`, `test`, and `setup-py` goals support passing arguments via `--`, e.g. `./pants test test_app.py -- -vv -k test_demo`.
+- The `run`, `test`, and `setup-py` goals support passing arguments via `--`, e.g. `pants test test_app.py -- -vv -k test_demo`.
 - Python linters can now run on both Python 2 and Python 3 targets in the same run. See [lint](doc:python-lint-goal).
 - Added support for Pylint source plugins. See [Linters and formatters](doc:python-linters-and-formatters).
 - Added the `filter` goal. See [Project introspection](doc:project-introspection).

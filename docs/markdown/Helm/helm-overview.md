@@ -56,10 +56,10 @@ version: 0.1.0
 > 
 > You can use the `helm create` command to create an initial skeleton for your chart but be sure you have properly configured your source root patterns (as shown in the previous section) since the `helm create` command will create a folder name with the name of your chart and place the sources inside.
 
-Then run [`./pants tailor ::`](doc:initial-configuration#5-generate-build-files) to generate `BUILD` files. This will scan your source repository in search of `Chart.yaml` or `Chart.yml` files and create a `helm_chart` target for each of them.
+Then run [`pants tailor ::`](doc:initial-configuration#5-generate-build-files) to generate `BUILD` files. This will scan your source repository in search of `Chart.yaml` or `Chart.yml` files and create a `helm_chart` target for each of them.
 
 ```
-❯ ./pants tailor ::
+❯ pants tailor ::
 Created src/helm/example/BUILD:
   - Add helm_chart target example
 ```
@@ -74,7 +74,7 @@ The given setup is enough to now do some common operations on our Helm chart sou
 The Helm backend has an implementation of the Pants' `lint` goal which hooks it with the `helm lint` command:
 
 ```
-./pants lint ::
+pants lint ::
 ==> Linting example
 [INFO] Chart.yaml: icon is recommended
 
@@ -95,7 +95,7 @@ lint_strict = true
 helm_chart(lint_strict=True)
 ```
 
-Likewise, in a similar way you could enable strict linting globally and then choose to disable it in a per-target basis. Run `./pants help helm` or `./pants help helm_chart` for more information.
+Likewise, in a similar way you could enable strict linting globally and then choose to disable it in a per-target basis. Run `pants help helm` or `pants help helm_chart` for more information.
 
 You can set the field `skip_lint=True` on each `helm_chart` target to avoid linting it.
 
@@ -104,13 +104,13 @@ You can set the field `skip_lint=True` on each `helm_chart` target to avoid lint
 Packing helm charts is supported out of the box via the Pants' `package` goal. The final package will be saved as a `.tgz` file under the `dist` folder at your source root.
 
 ```
-./pants package ::
+pants package ::
 10:23:15.24 [INFO] Completed: Packaging Helm chart: testprojects/src/helm/example
 10:23:15.24 [INFO] Wrote dist/testprojects.src.helm.example/example/example-0.2.0.tgz
 Built Helm chart artifact: testprojects.src.helm.example/example/example-0.2.0.tgz
 ```
 
-The final output folder can customised using the `output_path` field in the `helm_chart` target. Run `./pants help helm_chart` for more information.
+The final output folder can customised using the `output_path` field in the `helm_chart` target. Run `pants help helm_chart` for more information.
 
 Helm Unit tests
 ===============
@@ -149,10 +149,10 @@ tests:
           value: "var2Value"
 ```
 
-With the test files in places, you can now run `./pants test ::` and Pants will execute each of your tests individually:
+With the test files in places, you can now run `pants test ::` and Pants will execute each of your tests individually:
 
 ```
-./pants test ::
+pants test ::
 10:50:12.45 [INFO] Completed: Running Helm unittest on: testprojects/src/helm/example/tests/env-configmap_test.yaml
 10:50:12.46 [INFO] Completed: Run Helm Unittest - testprojects/src/helm/example/tests/env-configmap_test.yaml succeeded.
 
@@ -191,7 +191,7 @@ timeout_maximum = 600
 
 If a target sets its `timeout` higher than `[test].timeout_maximum`, Pants will use the value in `[test].timeout_maximum`.
 
-Use the option `./pants test --no-timeouts` to temporarily disable timeouts, e.g. when debugging.
+Use the option `pants test --no-timeouts` to temporarily disable timeouts, e.g. when debugging.
 
 Publishing Helm charts
 ======================
@@ -306,10 +306,10 @@ dependencies:
 helm_chart()
 ```
 
-Then, running `./pants dependencies`on `bar` will list  `foo` as a dependency:
+Then, running `pants dependencies`on `bar` will list  `foo` as a dependency:
 
 ```
-./pants dependencies src/helm/bar
+pants dependencies src/helm/bar
 src/helm/foo
 ```
 
@@ -337,7 +337,7 @@ version: 0.1.0
 helm_chart(dependencies=["//src/helm/foo"])
 ```
 
-In this case, the `./pants dependencies` command will show the same result and, in addition, Pants will modify its copy of `bar`'s `Chart.yaml` before using it, so that it includes `foo` in its dependency list. Note that Pants will not modify the original copy in your source tree, only the copy it uses in the sandboxed execution environment.
+In this case, the `pants dependencies` command will show the same result and, in addition, Pants will modify its copy of `bar`'s `Chart.yaml` before using it, so that it includes `foo` in its dependency list. Note that Pants will not modify the original copy in your source tree, only the copy it uses in the sandboxed execution environment.
 
 Third party chart artifacts
 ---------------------------

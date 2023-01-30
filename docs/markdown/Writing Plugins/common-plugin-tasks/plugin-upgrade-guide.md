@@ -396,7 +396,7 @@ You can also now specify multiple globs, e.g. `req.path_globs("*.py", "*.pyi")`.
 
 You must now use a long option name when [defining options](doc:rules-api-subsystems). You can also now only specify a single option name per option.
 
-(These changes allowed us to introduce ignore specs, like `./pants list :: -ignore_me::`.)
+(These changes allowed us to introduce ignore specs, like `pants list :: -ignore_me::`.)
 
 2.12
 ----
@@ -661,7 +661,7 @@ Async fields now access the raw value with the property `.value`, rather than `.
 
 ### Set the property `help` with Subsystems, Targets, and Fields (2.2.0.dev3)
 
-Previously, you were supposed to set the class's docstring for the `./pants help` message. Instead, now set a class property `help`, like this:
+Previously, you were supposed to set the class's docstring for the `pants help` message. Instead, now set a class property `help`, like this:
 
 ```python
 class MyField(StringField):
@@ -669,7 +669,7 @@ class MyField(StringField):
     help = "A summary.\n\nOptional extra information."
 ```
 
-Pants will now properly wrap strings and preserve newlines. You may want to run `./pants help ${target/subsystem}` to verify things render properly.
+Pants will now properly wrap strings and preserve newlines. You may want to run `pants help ${target/subsystem}` to verify things render properly.
 
 2.1
 ---
@@ -703,7 +703,7 @@ This is tracked by <https://github.com/pantsbuild/pants/issues/10917>.
 
 If you have any custom fields that act like the dependencies field, but do not subclass `Dependencies`, there are two new mechanisms for better support.
 
-1. Instead of subclassing `StringSequenceField`, subclass `SpecialCasedDependencies` from `pants.engine.target`. This will ensure that the dependencies show up with `./pants dependencies` and `./pants dependents`.
+1. Instead of subclassing `StringSequenceField`, subclass `SpecialCasedDependencies` from `pants.engine.target`. This will ensure that the dependencies show up with `pants dependencies` and `pants dependents`.
 2. You can use `UnparsedAddressInputs` from `pants.engine.addresses` to resolve the addresses:
 
 ```python
@@ -723,11 +723,11 @@ targets = await Get(
 
 If you defined a subclass of `SpecialCasedDependencies`, you can use `await Get(Addresses | Targets, UnparsedAddressInputs, my_tgt[MyField].to_unparsed_address_inputs())`.
 
-(Why would you ever do this? If you have dependencies that you don't treat like normal—e.g. that you will call the equivalent of `./pants package` on those deps—it's often helpful to call out this magic through a dedicated field. For example, Pants's [archive](https://github.com/pantsbuild/pants/blob/969c8dcba6eda0c939918b3bc5157ca45099b4d1/src/python/pants/core/target_types.py#L231-L257) target type has the fields `files` and `packages`, rather than `dependencies`.)
+(Why would you ever do this? If you have dependencies that you don't treat like normal—e.g. that you will call the equivalent of `pants package` on those deps—it's often helpful to call out this magic through a dedicated field. For example, Pants's [archive](https://github.com/pantsbuild/pants/blob/969c8dcba6eda0c939918b3bc5157ca45099b4d1/src/python/pants/core/target_types.py#L231-L257) target type has the fields `files` and `packages`, rather than `dependencies`.)
 
 ### `package` implementations may want to add the field `output_path` (2.0.0rc0)
 
-All of Pants's target types that can be built via `./pants package` now have an `output_path` field, which allows the user to override the path used for the created asset.
+All of Pants's target types that can be built via `pants package` now have an `output_path` field, which allows the user to override the path used for the created asset.
 
 You optionally may want to add this `output_path` field to your custom target type for consistency:
 
