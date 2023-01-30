@@ -461,8 +461,7 @@ impl<N: Node> Entry<N> {
         );
         assert!(
           !result.is_clean(context),
-          "A clean Node should not reach this point: {:?}",
-          result
+          "A clean Node should not reach this point: {result:?}"
         );
         // The Node has already completed but needs to re-run. If the Node is dirty, we are the
         // first caller to request it since it was marked dirty. We attempt to clean it (which
@@ -843,7 +842,7 @@ impl<N: Node> Entry<N> {
   pub(crate) fn format(&self, context: &N::Context) -> String {
     let state = match self.peek(context) {
       Some(ref nr) => {
-        let item = format!("{:?}", nr);
+        let item = format!("{nr:?}");
         if item.len() <= 1024 {
           item
         } else {

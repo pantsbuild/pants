@@ -42,10 +42,10 @@ impl Server {
   ) -> Result<Server, String> {
     let listener = TcpListener::bind((Ipv4Addr::new(127, 0, 0, 1), port_requested))
       .await
-      .map_err(|e| format!("Could not bind to port {}: {:?}", port_requested, e))?;
+      .map_err(|e| format!("Could not bind to port {port_requested}: {e:?}"))?;
     let port_actual = listener
       .local_addr()
-      .map_err(|e| format!("No local address for listener: {:?}", e))?
+      .map_err(|e| format!("No local address for listener: {e:?}"))?
       .port();
 
     // NB: The C client requires noisy_stdin (see the `nails` crate for more info), but neither
@@ -110,7 +110,7 @@ impl Server {
           tcp_stream
         }
         future::Either::Left((Err(e), _)) => {
-          break Err(format!("Server failed to accept connections: {}", e));
+          break Err(format!("Server failed to accept connections: {e}"));
         }
         future::Either::Right((_, _)) => {
           break Ok(());
@@ -352,7 +352,7 @@ impl RawFdNail {
   ///
   fn ttypath_from_env(env: &HashMap<String, String>, fd_number: usize) -> Option<PathBuf> {
     env
-      .get(&format!("NAILGUN_TTY_PATH_{}", fd_number))
+      .get(&format!("NAILGUN_TTY_PATH_{fd_number}"))
       .map(PathBuf::from)
   }
 }

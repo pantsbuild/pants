@@ -53,7 +53,7 @@ fn construct_nailgun_server_request(
     output_files: BTreeSet::new(),
     output_directories: BTreeSet::new(),
     timeout: None,
-    description: format!("nailgun server for {}", nailgun_name),
+    description: format!("nailgun server for {nailgun_name}"),
     level: log::Level::Info,
     execution_slot_variable: None,
     env: client_request.env,
@@ -119,7 +119,7 @@ impl CommandRunner {
   }
 
   fn calculate_nailgun_name(main_class: &str) -> String {
-    format!("nailgun_server_{}", main_class)
+    format!("nailgun_server_{main_class}")
   }
 }
 
@@ -261,7 +261,7 @@ impl CapturedWorkdir for CommandRunner {
             stdin_read
           })
         })
-        .map_err(|e| format!("Error communicating with nailgun server: {}", e))
+        .map_err(|e| format!("Error communicating with nailgun server: {e}"))
         .await?
     };
 
@@ -276,7 +276,7 @@ impl CapturedWorkdir for CommandRunner {
     let exit_code = child
       .wait()
       .map_ok(ChildOutput::Exit)
-      .map_err(|e| format!("Error communicating with nailgun server: {}", e));
+      .map_err(|e| format!("Error communicating with nailgun server: {e}"));
 
     Ok(futures::stream::select(output_stream, exit_code.into_stream()).boxed())
   }

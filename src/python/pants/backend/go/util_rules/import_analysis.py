@@ -6,7 +6,6 @@ from __future__ import annotations
 import logging
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import ClassVar
 
 import ijson.backends.python as ijson
 
@@ -18,12 +17,10 @@ from pants.backend.go.dependency_inference import (
 )
 from pants.backend.go.target_types import DEFAULT_GO_SDK_ADDR
 from pants.backend.go.util_rules import go_mod
-from pants.backend.go.util_rules.build_opts import GoBuildOptions
 from pants.backend.go.util_rules.cgo import CGoCompilerFlags
 from pants.backend.go.util_rules.go_mod import AllGoModTargets
 from pants.backend.go.util_rules.sdk import GoSdkProcess
 from pants.build_graph.address import Address
-from pants.engine.fs import CreateDigest, Digest, FileContent
 from pants.engine.internals.selectors import Get
 from pants.engine.process import ProcessResult
 from pants.engine.rules import collect_rules, rule
@@ -41,6 +38,7 @@ class GoStdLibPackage:
     pkg_source_path: str
     pkg_target: str  # Note: This will be removed once PRs land to support building the Go SDK.
     imports: tuple[str, ...]
+    import_map: FrozenDict[str, str]
 
     # Analysis for when Pants is able to compile the SDK directly.
     go_files: tuple[str, ...]
@@ -93,6 +91,7 @@ async def analyze_go_stdlib_packages(request: GoStdLibPackagesRequest) -> GoStdL
             pkg_source_path=pkg_source_path,
             pkg_target=pkg_target,
             imports=tuple(pkg_json.get("Imports", ())),
+            import_map=FrozenDict(pkg_json.get("ImportMap", {})),
             go_files=tuple(pkg_json.get("GoFiles", ())),
             cgo_files=tuple(pkg_json.get("CgoFiles", ())),
             c_files=tuple(pkg_json.get("CFiles", ())),
@@ -113,51 +112,6 @@ async def analyze_go_stdlib_packages(request: GoStdLibPackagesRequest) -> GoStdL
         )
 
     return GoStdLibPackages(stdlib_packages)
-
-
-@dataclass(frozen=True)
-class ImportConfig:
-    """An `importcfg` file associating import paths to their `__pkg__.a` files."""
-
-    digest: Digest
-
-    CONFIG_PATH: ClassVar[str] = "./importcfg"
-
-
-@dataclass(frozen=True)
-class ImportConfigRequest:
-    """Create an `importcfg` file associating import paths to their `__pkg__.a` files."""
-
-    import_paths_to_pkg_a_files: FrozenDict[str, str]
-    build_opts: GoBuildOptions
-    include_stdlib: bool = True
-
-    @classmethod
-    def stdlib_only(cls, build_opts: GoBuildOptions) -> ImportConfigRequest:
-        return cls(FrozenDict(), build_opts=build_opts, include_stdlib=True)
-
-
-@rule
-async def generate_import_config(request: ImportConfigRequest) -> ImportConfig:
-    lines = [
-        "# import config",
-        *(
-            f"packagefile {import_path}={pkg_a_path}"
-            for import_path, pkg_a_path in request.import_paths_to_pkg_a_files.items()
-        ),
-    ]
-    if request.include_stdlib:
-        std_lib_packages = await Get(
-            GoStdLibPackages,
-            GoStdLibPackagesRequest(with_race_detector=request.build_opts.with_race_detector),
-        )
-        lines.extend(
-            f"packagefile {import_path}={pkg.pkg_target}"
-            for import_path, pkg in std_lib_packages.items()
-        )
-    content = "\n".join(lines).encode("utf-8")
-    result = await Get(Digest, CreateDigest([FileContent(ImportConfig.CONFIG_PATH, content)]))
-    return ImportConfig(result)
 
 
 class GoSdkImportPathsMappingsHook(GoModuleImportPathsMappingsHook):

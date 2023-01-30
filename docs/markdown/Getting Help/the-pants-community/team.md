@@ -25,7 +25,7 @@ Pants open source project has had many team members in over a decade. The curren
 | **Benjy Weinberger**       | "The options system — unifying our flags, config and env vars into a coherent, extensible framework." |
 | **Carina C. Zona**         | "Developing the #welcome channel on Pants community chat"                                             |
 | **Christopher Neugebauer** | Adding multi-architecture Mac support for Apple Silicon (M1s)                                         |
-| **Dan Moran**            | "Enabling batched `pytest` execution in `./pants test`"                                          |
+| **Dan Moran**            | "Enabling batched `pytest` execution in `pants test`"                                          |
 | **Daniel Wagner-Hall**     | Laid the foundation for remote execution                                                              |
 | **Danny McClanahan**       | Implemented bounded runtime polymorphism with union rules and improved plugin UX with async/await     |
 | **Eric Arellano**          | "Migrating Pants to Python 3 for my internship project"                                               |

@@ -89,7 +89,7 @@ impl VersionedFingerprint {
   pub fn to_hex(&self) -> String {
     let mut s = String::new();
     for byte in 0..VERSIONED_FINGERPRINT_SIZE {
-      fmt::Write::write_fmt(&mut s, format_args!("{:02x}", byte)).unwrap();
+      fmt::Write::write_fmt(&mut s, format_args!("{byte:02x}")).unwrap();
     }
     s
   }
@@ -142,8 +142,7 @@ impl ShardedLmdb {
   ) -> Result<ShardedLmdb, String> {
     if shard_count.count_ones() != 1 {
       return Err(format!(
-        "The shard_count must be a power of two: got {}.",
-        shard_count
+        "The shard_count must be a power of two: got {shard_count}."
       ));
     }
 
@@ -170,21 +169,11 @@ impl ShardedLmdb {
     {
       let content_database = env
         .create_db(Some("content-versioned"), DatabaseFlags::empty())
-        .map_err(|e| {
-          format!(
-            "Error creating/opening content database at {:?}: {}",
-            dir, e
-          )
-        })?;
+        .map_err(|e| format!("Error creating/opening content database at {dir:?}: {e}"))?;
 
       let lease_database = env
         .create_db(Some("leases-versioned"), DatabaseFlags::empty())
-        .map_err(|e| {
-          format!(
-            "Error creating/opening content database at {:?}: {}",
-            dir, e
-          )
-        })?;
+        .map_err(|e| format!("Error creating/opening content database at {dir:?}: {e}"))?;
 
       lmdbs.insert(
         environment_id,
@@ -228,9 +217,9 @@ impl ShardedLmdb {
 
     let mut envs = Vec::with_capacity(shard_count as usize);
     for b in 0..shard_count {
-      let dir = root_path.join(format!("{:x}", b));
+      let dir = root_path.join(format!("{b:x}"));
       fs::safe_create_dir_all(&dir)
-        .map_err(|err| format!("Error making directory for store at {:?}: {:?}", dir, err))?;
+        .map_err(|err| format!("Error making directory for store at {dir:?}: {err:?}"))?;
       let fingerprint_prefix = b.rotate_left(shard_shift as u32);
       envs.push((
         ShardedLmdb::make_env(&dir, max_size_per_shard)?,
@@ -278,7 +267,7 @@ impl ShardedLmdb {
       .set_max_dbs(2)
       .set_map_size(max_size_per_shard)
       .open(dir)
-      .map_err(|e| format!("Error making env for store at {:?}: {}", dir, e))
+      .map_err(|e| format!("Error making env for store at {dir:?}: {e}"))
   }
 
   // First Database is content, second is leases.
@@ -520,10 +509,10 @@ impl ShardedLmdb {
           loop {
             // First pass: compute the Digest.
             let digest = {
-              let mut read = data_provider().map_err(|e| format!("Failed to read: {}", e))?;
+              let mut read = data_provider().map_err(|e| format!("Failed to read: {e}"))?;
               let mut hasher = WriterHasher::new(io::sink());
               let _ = io::copy(&mut read, &mut hasher)
-                .map_err(|e| format!("Failed to read from {:?}: {}", read, e))?;
+                .map_err(|e| format!("Failed to read from {read:?}: {e}"))?;
               hasher.finish().0
             };
 
@@ -542,14 +531,11 @@ impl ShardedLmdb {
                     WriteFlags::NO_OVERWRITE,
                   )?
                   .writer();
-                let mut read = data_provider().map_err(|e| format!("Failed to read: {}", e))?;
+                let mut read = data_provider().map_err(|e| format!("Failed to read: {e}"))?;
                 let should_retry = if data_is_immutable {
                   // Trust that the data hasn't changed, and only validate its length.
                   let copied = io::copy(&mut read, &mut writer).map_err(|e| {
-                    format!(
-                      "Failed to copy from {:?} or store in {:?}: {:?}",
-                      read, env, e
-                    )
+                    format!("Failed to copy from {read:?} or store in {env:?}: {e:?}")
                   })?;
 
                   // Should retry if the file got shorter between reads.
@@ -558,10 +544,7 @@ impl ShardedLmdb {
                   // Confirm that the data hasn't changed.
                   let mut hasher = WriterHasher::new(writer);
                   let _ = io::copy(&mut read, &mut hasher).map_err(|e| {
-                    format!(
-                      "Failed to copy from {:?} or store in {:?}: {:?}",
-                      read, env, e
-                    )
+                    format!("Failed to copy from {read:?} or store in {env:?}: {e:?}")
                   })?;
 
                   // Should retry if the Digest changed between reads.
@@ -569,7 +552,7 @@ impl ShardedLmdb {
                 };
 
                 if should_retry {
-                  let msg = format!("Input {:?} changed while reading.", read);
+                  let msg = format!("Input {read:?} changed while reading.");
                   log::debug!("{}", msg);
                   return Err(StoreError::Retry(msg));
                 }
@@ -598,12 +581,8 @@ impl ShardedLmdb {
                 }
               }
               Err(StoreError::Lmdb(lmdb::Error::KeyExist)) => return Ok(digest),
-              Err(StoreError::Lmdb(err)) => {
-                return Err(format!("Error storing {:?}: {}", digest, err))
-              }
-              Err(StoreError::Io(err)) => {
-                return Err(format!("Error storing {:?}: {}", digest, err))
-              }
+              Err(StoreError::Lmdb(err)) => return Err(format!("Error storing {digest:?}: {err}")),
+              Err(StoreError::Io(err)) => return Err(format!("Error storing {digest:?}: {err}")),
             };
           }
         },
@@ -677,7 +656,7 @@ impl ShardedLmdb {
           let (env, db, _) = store.get(&fingerprint);
           let ro_txn = env
             .begin_ro_txn()
-            .map_err(|err| format!("Failed to begin read transaction: {}", err))?;
+            .map_err(|err| format!("Failed to begin read transaction: {err}"))?;
           match ro_txn.get(db, &effective_key) {
             Ok(bytes) => f(bytes).map(Some),
             Err(lmdb::Error::NotFound) => Ok(None),
@@ -710,7 +689,7 @@ impl ShardedLmdb {
           )
         })?;
       std::fs::remove_dir_all(&old_dir)
-        .map_err(|e| format!("Error removing old store at {:?}: {}", old_dir, e))?;
+        .map_err(|e| format!("Error removing old store at {old_dir:?}: {e}"))?;
       std::fs::rename(new_dir.path(), &old_dir).map_err(|e| {
         format!(
           "Error replacing {:?} with {:?}: {}",

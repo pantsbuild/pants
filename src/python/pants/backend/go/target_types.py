@@ -9,6 +9,7 @@ from typing import Iterable, Optional, Sequence, Tuple
 from pants.core.goals.package import OutputPathField
 from pants.core.goals.run import RestartableField
 from pants.core.goals.test import TestExtraEnvVarsField, TestTimeoutField
+from pants.core.util_rules.environments import EnvironmentField
 from pants.engine.addresses import Address
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
@@ -452,6 +453,7 @@ class GoBinaryTarget(Target):
         GoCompilerFlagsField,
         GoLinkerFlagsField,
         RestartableField,
+        EnvironmentField,
     )
     help = "A Go binary."
 

@@ -79,8 +79,8 @@ async fn execute(start: SystemTime) -> Result<i32, String> {
   })?;
   env_logger::init_from_env(env_logger::Env::new().filter_or("__PANTS_LEVEL__", level.as_ref()));
 
-  let working_dir = env::current_dir()
-    .map_err(|e| format!("Could not detect current working directory: {err}", err = e))?;
+  let working_dir =
+    env::current_dir().map_err(|e| format!("Could not detect current working directory: {e}"))?;
   let pantsd_settings = find_pantsd(&working_dir, &options_parser)?;
   let env = env::vars().collect::<Vec<(_, _)>>();
   let argv = env::args().collect::<Vec<_>>();
@@ -147,7 +147,7 @@ async fn main() {
   let start = SystemTime::now();
   match execute(start).await {
     Err(err) => {
-      eprintln!("{}", err);
+      eprintln!("{err}");
       // We use this exit code to indicate an error running pants via the nailgun protocol to
       // differentiate from a successful nailgun protocol session.
       std::process::exit(EX_TEMPFAIL);

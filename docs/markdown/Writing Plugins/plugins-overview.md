@@ -166,7 +166,7 @@ python-default = "3rdparty/python/default_lock.txt"
 pants-plugins = [">=3.7,<3.10"]
 ```
 
-Then, update your `pants_requirements` target generator with `resolve="pants-plugins"`, and run `./pants generate-lockfiles`. You will also need to update the relevant `python_source` / `python_sources` and `python_test` / `python_tests` targets to set `resolve="pants-plugins"` (along with possibly the `interpreter_constraints` field).
+Then, update your `pants_requirements` target generator with `resolve="pants-plugins"`, and run `pants generate-lockfiles`. You will also need to update the relevant `python_source` / `python_sources` and `python_test` / `python_tests` targets to set `resolve="pants-plugins"` (along with possibly the `interpreter_constraints` field).
 
 Publishing a plugin
 -------------------

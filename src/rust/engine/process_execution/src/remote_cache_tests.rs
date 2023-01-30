@@ -190,7 +190,7 @@ async fn cache_read_success() {
 
   assert_eq!(local_runner_call_counter.load(Ordering::SeqCst), 0);
   let remote_result = cache_runner
-    .run(Context::default(), &mut workunit, process.into())
+    .run(Context::default(), &mut workunit, process)
     .await
     .unwrap();
   assert_eq!(remote_result.exit_code, 0);
@@ -223,7 +223,7 @@ async fn cache_read_skipped_on_action_cache_errors() {
   );
   assert_eq!(local_runner_call_counter.load(Ordering::SeqCst), 0);
   let remote_result = cache_runner
-    .run(Context::default(), &mut workunit, process.into())
+    .run(Context::default(), &mut workunit, process)
     .await
     .unwrap();
   assert_eq!(remote_result.exit_code, 1);
@@ -260,7 +260,7 @@ async fn cache_read_skipped_on_missing_digest() {
   );
   assert_eq!(local_runner_call_counter.load(Ordering::SeqCst), 0);
   let remote_result = cache_runner
-    .run(Context::default(), &mut workunit, process.into())
+    .run(Context::default(), &mut workunit, process)
     .await
     .unwrap();
   assert_eq!(remote_result.exit_code, 1);
@@ -298,7 +298,7 @@ async fn cache_read_eager_fetch() {
 
     assert_eq!(local_runner_call_counter.load(Ordering::SeqCst), 0);
     let remote_result = cache_runner
-      .run(Context::default(), workunit, process.into())
+      .run(Context::default(), workunit, process)
       .await
       .unwrap();
 
@@ -355,7 +355,7 @@ async fn cache_read_speculation() {
 
     assert_eq!(local_runner_call_counter.load(Ordering::SeqCst), 0);
     let result = cache_runner
-      .run(Context::default(), workunit, process.into())
+      .run(Context::default(), workunit, process)
       .await
       .unwrap();
 
@@ -481,7 +481,7 @@ async fn cache_write_success() {
 
   let context = Context::default();
   let local_result = cache_runner
-    .run(context.clone(), &mut workunit, process.clone().into())
+    .run(context.clone(), &mut workunit, process.clone())
     .await
     .unwrap();
   context.tail_tasks.wait(Duration::from_secs(2)).await;
@@ -514,7 +514,7 @@ async fn cache_write_not_for_failures() {
   assert!(store_setup.cas.action_cache.action_map.lock().is_empty());
 
   let local_result = cache_runner
-    .run(Context::default(), &mut workunit, process.clone().into())
+    .run(Context::default(), &mut workunit, process.clone())
     .await
     .unwrap();
   assert_eq!(local_result.exit_code, 1);
@@ -543,7 +543,7 @@ async fn cache_write_does_not_block() {
 
   let context = Context::default();
   let local_result = cache_runner
-    .run(context.clone(), &mut workunit, process.clone().into())
+    .run(context.clone(), &mut workunit, process.clone())
     .await
     .unwrap();
   assert_eq!(local_result.exit_code, 0);

@@ -221,7 +221,7 @@ impl NailgunPool {
     let status = process
       .handle
       .try_wait()
-      .map_err(|e| format!("Error getting the process status from nailgun: {}", e))?;
+      .map_err(|e| format!("Error getting the process status from nailgun: {e}"))?;
     match status {
       None => {
         // Process hasn't exited yet.
@@ -315,7 +315,7 @@ fn spawn_and_read_port(
         .next()
         .ok_or_else(|| "There is no line ready in the child's output".to_string())
     })
-    .and_then(|res| res.map_err(|e| format!("Failed to read stdout from nailgun: {}", e)));
+    .and_then(|res| res.map_err(|e| format!("Failed to read stdout from nailgun: {e}")));
 
   // If we failed to read a port line and the child has exited, report that.
   if port_line.is_err() {
@@ -328,8 +328,7 @@ fn spawn_and_read_port(
         .read_to_string(&mut stderr)
         .map_err(|e| e.to_string())?;
       return Err(format!(
-        "Nailgun failed to start: exited with {}, stderr:\n{}",
-        exit_status, stderr
+        "Nailgun failed to start: exited with {exit_status}, stderr:\n{stderr}"
       ));
     }
   }
@@ -338,10 +337,10 @@ fn spawn_and_read_port(
   let port_str = &NAILGUN_PORT_REGEX
     .captures_iter(&port_line)
     .next()
-    .ok_or_else(|| format!("Output for nailgun server was unexpected:\n{:?}", port_line))?[1];
+    .ok_or_else(|| format!("Output for nailgun server was unexpected:\n{port_line:?}"))?[1];
   let port = port_str
     .parse::<Port>()
-    .map_err(|e| format!("Error parsing nailgun port {}: {}", port_str, e))?;
+    .map_err(|e| format!("Error parsing nailgun port {port_str}: {e}"))?;
 
   Ok((child, port))
 }
@@ -360,7 +359,7 @@ impl NailgunProcess {
     let workdir = tempfile::Builder::new()
       .prefix("pants-sandbox-")
       .tempdir_in(workdir_base)
-      .map_err(|err| format!("Error making tempdir for nailgun server: {:?}", err))?;
+      .map_err(|err| format!("Error making tempdir for nailgun server: {err:?}"))?;
 
     // Prepare the workdir, and then list it to identify the base set of names which should be
     // preserved across runs. TODO: This is less efficient than computing the set of names
@@ -518,12 +517,7 @@ async fn clear_workdir(
   let garbage_dir = tempfile::Builder::new()
     .prefix("pants-sandbox-")
     .tempdir_in(workdir.parent().unwrap())
-    .map_err(|err| {
-      format!(
-        "Error making garbage directory for nailgun cleanup: {:?}",
-        err
-      )
-    })?;
+    .map_err(|err| format!("Error making garbage directory for nailgun cleanup: {err:?}"))?;
   let moves = list_workdir(workdir)
     .await?
     .into_iter()
@@ -543,7 +537,8 @@ async fn clear_workdir(
   future::try_join_all(moves).await?;
 
   // And drop it in the background.
-  let _ = executor.native_spawn_blocking(move || std::mem::drop(garbage_dir));
+  let fut = executor.native_spawn_blocking(move || std::mem::drop(garbage_dir));
+  drop(fut);
 
   Ok(())
 }
@@ -551,12 +546,12 @@ async fn clear_workdir(
 async fn list_workdir(workdir: &Path) -> Result<HashSet<OsString>, String> {
   let mut dir_entries = tokio::fs::read_dir(workdir)
     .await
-    .map_err(|e| format!("Failed to read nailgun process directory: {}", e))?;
+    .map_err(|e| format!("Failed to read nailgun process directory: {e}"))?;
   let mut names = HashSet::new();
   while let Some(dir_entry) = dir_entries
     .next_entry()
     .await
-    .map_err(|e| format!("Failed to read entry in nailgun process directory: {}", e))?
+    .map_err(|e| format!("Failed to read entry in nailgun process directory: {e}"))?
   {
     names.insert(dir_entry.file_name());
   }

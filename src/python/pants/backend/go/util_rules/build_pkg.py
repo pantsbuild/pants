@@ -8,7 +8,7 @@ import os.path
 from collections import deque
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Iterable
+from typing import Iterable, Mapping
 
 from pants.backend.go.util_rules import cgo, coverage
 from pants.backend.go.util_rules.assembly import (
@@ -27,7 +27,7 @@ from pants.backend.go.util_rules.coverage import (
 )
 from pants.backend.go.util_rules.embedcfg import EmbedConfig
 from pants.backend.go.util_rules.goroot import GoRoot
-from pants.backend.go.util_rules.import_analysis import ImportConfig, ImportConfigRequest
+from pants.backend.go.util_rules.import_config import ImportConfig, ImportConfigRequest
 from pants.backend.go.util_rules.sdk import GoSdkProcess, GoSdkToolIDRequest, GoSdkToolIDResult
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
@@ -63,6 +63,7 @@ class BuildGoPackageRequest(EngineAwareParameter):
         go_files: tuple[str, ...],
         s_files: tuple[str, ...],
         direct_dependencies: tuple[BuildGoPackageRequest, ...],
+        import_map: Mapping[str, str] | None = None,
         minimum_go_version: str | None,
         for_tests: bool = False,
         embed_config: EmbedConfig | None = None,
@@ -98,6 +99,7 @@ class BuildGoPackageRequest(EngineAwareParameter):
         self.go_files = go_files
         self.s_files = s_files
         self.direct_dependencies = direct_dependencies
+        self.import_map = FrozenDict(import_map or {})
         self.minimum_go_version = minimum_go_version
         self.for_tests = for_tests
         self.embed_config = embed_config
@@ -123,6 +125,7 @@ class BuildGoPackageRequest(EngineAwareParameter):
                 self.go_files,
                 self.s_files,
                 self.direct_dependencies,
+                self.import_map,
                 self.minimum_go_version,
                 self.for_tests,
                 self.embed_config,
@@ -154,6 +157,7 @@ class BuildGoPackageRequest(EngineAwareParameter):
             f"go_files={self.go_files}, "
             f"s_files={self.s_files}, "
             f"direct_dependencies={[dep.import_path for dep in self.direct_dependencies]}, "
+            f"import_map={self.import_map}, "
             f"minimum_go_version={self.minimum_go_version}, "
             f"for_tests={self.for_tests}, "
             f"embed_config={self.embed_config}, "
@@ -185,6 +189,7 @@ class BuildGoPackageRequest(EngineAwareParameter):
             and self.digest == other.digest
             and self.dir_path == other.dir_path
             and self.build_opts == other.build_opts
+            and self.import_map == other.import_map
             and self.go_files == other.go_files
             and self.s_files == other.s_files
             and self.minimum_go_version == other.minimum_go_version
@@ -510,15 +515,19 @@ async def build_go_package(
                 maybe_dep, import_path=request.import_path, dependency_failed=True
             )
         dep = maybe_dep.output
-        import_paths_to_pkg_a_files.update(dep.import_paths_to_pkg_a_files)
-        dep_digests.append(dep.digest)
+        for dep_import_path, pkg_archive_path in dep.import_paths_to_pkg_a_files.items():
+            if dep_import_path not in import_paths_to_pkg_a_files:
+                import_paths_to_pkg_a_files[dep_import_path] = pkg_archive_path
+                dep_digests.append(dep.digest)
 
     merged_deps_digest, import_config, embedcfg, action_id_result = await MultiGet(
         Get(Digest, MergeDigests(dep_digests)),
         Get(
             ImportConfig,
             ImportConfigRequest(
-                FrozenDict(import_paths_to_pkg_a_files), build_opts=request.build_opts
+                FrozenDict(import_paths_to_pkg_a_files),
+                build_opts=request.build_opts,
+                import_map=request.import_map,
             ),
         ),
         Get(RenderedEmbedConfig, RenderEmbedConfigRequest(request.embed_config)),
@@ -708,7 +717,7 @@ async def build_go_package(
     # for where this logic comes from.
     go_version = request.minimum_go_version or "1.16"
     if go_root.is_compatible_version(go_version):
-        compile_args.append(f"-lang=go{go_version}")
+        compile_args.extend(["-lang", f"go{go_version}"])
 
     if request.is_stdlib:
         compile_args.append("-std")
@@ -797,7 +806,18 @@ async def build_go_package(
         for go_file in go_files
     )
     generated_cgo_file_paths = cgo_compile_result.output_go_files if cgo_compile_result else ()
-    compile_args.extend(["--", *go_file_paths, *generated_cgo_file_paths])
+
+    # Put the source file paths into a file and pass that to `go tool compile` via a config file using the
+    # `@CONFIG_FILE` syntax. This is necessary to avoid command-line argument limits on macOS. The arguments
+    # may end up to exceed those limits when compiling standard library packages where we append a very long GOROOT
+    # path to each file name or in packages with large numbers of files.
+    go_source_file_paths_config = "\n".join([*go_file_paths, *generated_cgo_file_paths])
+    go_sources_file_paths_digest = await Get(
+        Digest, CreateDigest([FileContent("__sources__.txt", go_source_file_paths_config.encode())])
+    )
+    input_digest = await Get(Digest, MergeDigests([input_digest, go_sources_file_paths_digest]))
+    compile_args.append("@__sources__.txt")
+
     compile_result = await Get(
         FallibleProcessResult,
         GoSdkProcess(

@@ -21,8 +21,7 @@ impl CacheName {
       Ok(CacheName(name))
     } else {
       Err(format!(
-        "Cache names may only contain lowercase alphanumeric characters or underscores: got {:?}",
-        name
+        "Cache names may only contain lowercase alphanumeric characters or underscores: got {name:?}"
       ))
     }
   }

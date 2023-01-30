@@ -25,8 +25,7 @@ from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 
 
-# The base class is decorated with `frozen_after_init`.
-@dataclass
+@dataclass(frozen=True)
 class DockerBinary(BinaryPath):
     """The `docker` binary."""
 
@@ -40,8 +39,8 @@ class DockerBinary(BinaryPath):
         extra_env: Mapping[str, str] | None = None,
         extra_input_digests: Mapping[str, Digest] | None = None,
     ) -> None:
-        self.extra_env = {} if extra_env is None else extra_env
-        self.extra_input_digests = extra_input_digests
+        object.__setattr__(self, "extra_env", {} if extra_env is None else extra_env)
+        object.__setattr__(self, "extra_input_digests", extra_input_digests)
         super().__init__(path, fingerprint)
 
     def _get_process_environment(self, env: Mapping[str, str]) -> Mapping[str, str]:

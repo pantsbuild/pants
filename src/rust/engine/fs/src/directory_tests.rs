@@ -13,7 +13,7 @@ fn make_tree(path_stats: Vec<TypedPath>) -> DigestTrie {
   file_digests.extend(
     path_stats
       .iter()
-      .map(|path| (PathBuf::from(path.to_path_buf()), EMPTY_DIGEST)),
+      .map(|path| (path.to_path_buf(), EMPTY_DIGEST)),
   );
 
   DigestTrie::from_unique_paths(path_stats, &file_digests).unwrap()
@@ -278,14 +278,14 @@ fn assert_walk(tree: &DigestTrie, expected_filenames: Vec<String>, expected_dirn
     filenames,
     expected_filenames
       .iter()
-      .map(|s| PathBuf::from(s))
+      .map(PathBuf::from)
       .collect::<Vec<_>>()
   );
   assert_eq!(
     dirnames,
     expected_dirnames
       .iter()
-      .map(|s| PathBuf::from(s))
+      .map(PathBuf::from)
       .collect::<Vec<_>>()
   );
 }
