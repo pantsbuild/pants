@@ -12,7 +12,8 @@ from pants.core.util_rules.external_tool import (
     TemplatedExternalTool,
 )
 from pants.core.util_rules.external_tool import rules as external_tool_rules
-from pants.engine.fs import EMPTY_DIGEST, Digest, MergeDigests
+from pants.engine.fs import EMPTY_DIGEST, Digest
+from pants.engine.internals.native_engine import MergeDigests
 from pants.engine.platform import Platform
 from pants.engine.process import Process
 from pants.engine.rules import Get, Rule, collect_rules, rule
@@ -54,20 +55,54 @@ class NodeJS(TemplatedExternalTool):
 
 
 @dataclass(frozen=True)
-class NpxProcess:
-    """A request to invoke the npx cli (via NodeJS)"""
+class NodeJSToolProcess:
+    """A request for a tool installed with NodeJs."""
 
-    npm_package: str
     args: tuple[str, ...]
     description: str
     level: LogLevel = LogLevel.INFO
     input_digest: Digest = EMPTY_DIGEST
     output_files: tuple[str, ...] = ()
 
+    @classmethod
+    def npm(
+        cls,
+        args: Iterable[str],
+        description: str,
+        level: LogLevel = LogLevel.INFO,
+        input_digest: Digest = EMPTY_DIGEST,
+        output_files: tuple[str, ...] = (),
+    ) -> NodeJSToolProcess:
+        return cls(
+            args=("npm", *args),
+            description=description,
+            level=level,
+            input_digest=input_digest,
+            output_files=output_files,
+        )
+
+    @classmethod
+    def npx(
+        cls,
+        args: Iterable[str],
+        npm_package: str,
+        description: str,
+        level: LogLevel = LogLevel.INFO,
+        input_digest: Digest = EMPTY_DIGEST,
+        output_files: tuple[str, ...] = (),
+    ) -> NodeJSToolProcess:
+        return cls(
+            args=("npx", "--yes", npm_package, *args),
+            description=description,
+            level=level,
+            input_digest=input_digest,
+            output_files=output_files,
+        )
+
 
 @rule(level=LogLevel.DEBUG)
-async def setup_npx_process(
-    request: NpxProcess,
+async def setup_node_tool_process(
+    request: NodeJSToolProcess,
     nodejs: NodeJS,
     named_caches_dir: NamedCachesDirOption,
     platform: Platform,
@@ -79,25 +114,13 @@ async def setup_npx_process(
 
     input_digest = await Get(Digest, MergeDigests((request.input_digest, downloaded_nodejs.digest)))
 
-    # Get reference to npx
+    # Get reference to tool
     assert nodejs.default_url_platform_mapping is not None
     plat_str = nodejs.default_url_platform_mapping[platform.value]
     nodejs_dir = f"node-{nodejs.version}-{plat_str}"
-    # TODO: Investigate if ./{nodejs_dir}/bin/npx can work - as that will be more stable in the long-term
-    npx_exe = (
-        downloaded_nodejs.exe,
-        f"./{nodejs_dir}/lib/node_modules/npm/bin/npx-cli.js",
-        "--yes",
-    )
 
-    argv = (
-        *npx_exe,
-        request.npm_package,
-        *request.args,
-    )
-    # Argv represents NPX executable + NPM package name/version + NPM package args
     return Process(
-        argv=filter(None, argv),
+        argv=filter(None, request.args),
         input_digest=input_digest,
         output_files=request.output_files,
         description=request.description,

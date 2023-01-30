@@ -21,7 +21,7 @@ def rule_runner() -> RuleRunner:
             *source_files.rules(),
             *config_files.rules(),
             *target_types_rules.rules(),
-            QueryRule(ProcessResult, [nodejs.NpxProcess]),
+            QueryRule(ProcessResult, [nodejs.NodeJSToolProcess]),
         ],
         target_types=[JSSourcesGeneratorTarget],
     )
@@ -31,10 +31,24 @@ def test_npx_process(rule_runner: RuleRunner):
     result = rule_runner.request(
         ProcessResult,
         [
-            nodejs.NpxProcess(
+            nodejs.NodeJSToolProcess.npx(
                 npm_package="",
                 args=("--version",),
                 description="Testing NpxProcess",
+            )
+        ],
+    )
+
+    assert result.stdout.strip() == b"8.5.5"
+
+
+def test_npm_process(rule_runner: RuleRunner):
+    result = rule_runner.request(
+        ProcessResult,
+        [
+            nodejs.NodeJSToolProcess.npm(
+                args=("--version",),
+                description="Testing NpmProcess",
             )
         ],
     )
