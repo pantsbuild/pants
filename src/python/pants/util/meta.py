@@ -156,7 +156,7 @@ def frozen_after_init(cls: C) -> C:
             Use `frozen=True` and remove `unsafe_hash=True` in your dataclass decorator,
             and `object.__setattr__(self, "attrname", <value>)` in your `__init__`.
             """
-        )
+        ),
     )
     def frozen_after_init(cls: C) -> C:
         prev_init = cls.__init__
