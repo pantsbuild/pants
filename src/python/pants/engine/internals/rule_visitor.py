@@ -57,7 +57,7 @@ class _TypeStack:
         self._stack: list[dict[str, Any]] = []
         self.root = sys.modules[func.__module__]
         self.push(self.root)
-        self.__push_function_closures(func)
+        self._push_function_closures(func)
 
     def __repr__(self) -> str:
         from pprint import pformat
@@ -73,7 +73,7 @@ class _TypeStack:
     def __setitem__(self, name: str, value: Any) -> None:
         self._stack[-1][name] = value
 
-    def __push_function_closures(self, func: Callable) -> None:
+    def _push_function_closures(self, func: Callable) -> None:
         try:
             closurevars = [c for c in inspect.getclosurevars(func) if isinstance(c, dict)]
         except ValueError:
