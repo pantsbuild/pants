@@ -7,6 +7,8 @@ from dataclasses import FrozenInstanceError as FrozenInstanceError
 from functools import wraps
 from typing import Any, Callable, Iterator, Optional, Type, TypeVar, Union
 
+from pants.util.strutil import softwrap
+
 T = TypeVar("T")
 C = TypeVar("C", bound=Type)
 
@@ -149,7 +151,12 @@ def frozen_after_init(cls: C) -> C:
 
     @deprecated(
         removal_version="2.17.0.dev0",
-        hint='Use `frozen=True` in your decorator and `object.__setattr__(self, "attrname", <value>)` in `__init__`.',
+        hint=softwrap(
+            """
+            Use `frozen=True` and remove `unsafe_has=True` in your dataclass decorator,
+            and `object.__setattr__(self, "attrname", <value>)` in your `__init__`.
+            """
+        )
     )
     def frozen_after_init(cls: C) -> C:
         prev_init = cls.__init__
