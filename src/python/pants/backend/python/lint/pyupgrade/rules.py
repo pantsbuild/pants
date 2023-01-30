@@ -39,18 +39,27 @@ class PyUpgradeRequest(FixTargetsRequest):
 async def pyupgrade_fix(request: PyUpgradeRequest.Batch, pyupgrade: PyUpgrade) -> FixResult:
     pyupgrade_pex = await Get(VenvPex, PexRequest, pyupgrade.to_pex_request())
 
-    result = await Get(
-        FallibleProcessResult,
-        VenvPexProcess(
-            pyupgrade_pex,
-            argv=(*pyupgrade.args, *request.files),
-            input_digest=request.snapshot.digest,
-            output_files=request.files,
-            description=f"Run pyupgrade on {pluralize(len(request.files), 'file')}.",
-            level=LogLevel.DEBUG,
-        ),
-    )
-    return await FixResult.create(request, result)
+    # NB: Pyupgrade isn't idempotent, but eventually converges. So keep running until it stops
+    # changing code. See https://github.com/asottile/pyupgrade/issues/703
+    # (Technically we could not do this. It doesn't break Pants since the next run on the CLI would
+    # use the new file with the new digest. However that isn't the UX we want for our users.)
+    input_digest = request.snapshot.digest
+    while True:
+        result = await Get(
+            FallibleProcessResult,
+            VenvPexProcess(
+                pyupgrade_pex,
+                argv=(*pyupgrade.args, *request.files),
+                input_digest=input_digest,
+                output_files=request.files,
+                description=f"Run pyupgrade on {pluralize(len(request.files), 'file')}.",
+                level=LogLevel.DEBUG,
+            ),
+        )
+        if input_digest == result.output_digest:
+            # Nothing changed, either due to failure or because it is fixed
+            return await FixResult.create(request, result)
+        input_digest = result.output_digest
 
 
 def rules():
