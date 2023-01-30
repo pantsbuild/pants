@@ -32,7 +32,7 @@ Add `dependency_inference = true` to your `pants.toml`, like this:
   ]
 }
 [/block]
-To test that it is working, find a sample target, then delete the `dependencies` field from its BUILD file and run `pants dependencies path/to:target`.
+To test that it is working, find a sample target, then delete the `dependencies` field from its BUILD file and run `./pants dependencies path/to:target`.
 
 ### Teach Pants about your third party dependencies (recommended)
 Pants will assume that each of your dependencies exposes a module with the same name; for example, the requirement `Django>=2.0` would expose the module `"django"`. However, sometimes the module is different, like `setuptools` exposing `pkg_resources`.
@@ -71,7 +71,7 @@ We have not yet closely tuned the performance. The performance should be accepta
 
 #### May find cycles in your code
 
-Dependency inference sometimes reveals cycles between your targets that you did not know about. Run `pants dependencies --transitive ::` to see if you have any.
+Dependency inference sometimes reveals cycles between your targets that you did not know about. Run `./pants dependencies --transitive ::` to see if you have any.
 
 If you have cycles, you will need to manually fix these cycles by either creating new targets or moving around code
 
