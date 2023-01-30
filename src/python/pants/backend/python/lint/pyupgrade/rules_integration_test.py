@@ -107,6 +107,18 @@ def test_passing(rule_runner: RuleRunner, major_minor_interpreter: str) -> None:
     assert fix_result.did_change is False
 
 
+def test_convergance(rule_runner: RuleRunner) -> None:
+    # NB: Testing the fact that we re-run pyupgrade until it converges
+    percent_s_string_formatting = '"%s %s" % (foo, bar)\n'
+    rule_runner.write_files(
+        {"f.py": percent_s_string_formatting, "BUILD": "python_sources(name='t')"}
+    )
+    tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
+    fix_result = run_pyupgrade(rule_runner, [tgt], extra_args=["--pyupgrade-args=--py36-plus"])
+    assert fix_result.output == get_snapshot(rule_runner, {"f.py": 'f"{foo} {bar}"\n'})
+    assert fix_result.did_change is True
+
+
 def test_failing(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({"f.py": PY_36_BAD_FILE, "BUILD": "python_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))

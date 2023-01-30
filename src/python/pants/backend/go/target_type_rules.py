@@ -260,10 +260,6 @@ async def infer_go_dependencies(
         *pkg_analysis.test_imports,
         *pkg_analysis.xtest_imports,
     ):
-        # Skip inference for stdlib packages.
-        # TODO: This check is deprecated and will be removed once support for building SDK packages lands.
-        if import_path in stdlib_packages:
-            continue
         # Avoid a dependency cycle caused by external test imports of this package (i.e., "xtest").
         if import_path == pkg_analysis.import_path:
             continue
@@ -337,10 +333,6 @@ async def infer_go_third_party_package_dependencies(
 
     inferred_dependencies: list[Address] = []
     for import_path in pkg_info.imports:
-        # Skip inference for stdlib packages.
-        # TODO: This check is deprecated and will be removed once support for building SDK packages lands.
-        if import_path in stdlib_packages:
-            continue
         candidate_packages = package_mapping.mapping.get(import_path, ())
         if candidate_packages:
             if candidate_packages.infer_all:

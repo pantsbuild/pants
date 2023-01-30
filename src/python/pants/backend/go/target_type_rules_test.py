@@ -146,13 +146,18 @@ def test_go_package_dependency_inference(rule_runner: RuleRunner) -> None:
 
     go_mod_file_tgts = {Address("foo", relative_file_path=fp) for fp in ("go.mod", "go.sum")}
 
-    assert get_deps(Address("foo/cmd")) == {Address("foo/pkg")}
+    assert get_deps(Address("foo/cmd")) == {
+        Address("", target_name="default_go_sdk", generated_name="fmt"),
+        Address("foo/pkg"),
+    }
     assert get_deps(Address("foo/pkg")) == {Address("foo", generated_name="rsc.io/quote")}
     assert get_deps(Address("foo", generated_name="rsc.io/quote")) == {
         Address("foo", generated_name="rsc.io/sampler"),
         *go_mod_file_tgts,
     }
     assert get_deps(Address("foo", generated_name="rsc.io/sampler")) == {
+        Address("", target_name="default_go_sdk", generated_name="os"),
+        Address("", target_name="default_go_sdk", generated_name="strings"),
         Address("foo", generated_name="golang.org/x/text/language"),
         *go_mod_file_tgts,
     }

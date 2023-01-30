@@ -10,10 +10,12 @@ from typing import ClassVar, Type, cast
 from pants.backend.go.dependency_inference import GoModuleImportPathsMapping
 from pants.backend.go.target_type_rules import GoImportPathMappingRequest
 from pants.backend.go.target_types import (
+    DEFAULT_GO_SDK_ADDR,
     GoAssemblerFlagsField,
     GoCompilerFlagsField,
     GoImportPathField,
     GoPackageSourcesField,
+    GoSdkPackageDependenciesField,
     GoThirdPartyPackageDependenciesField,
 )
 from pants.backend.go.util_rules import build_opts
@@ -38,15 +40,19 @@ from pants.backend.go.util_rules.go_mod import (
     OwningGoMod,
     OwningGoModRequest,
 )
+from pants.backend.go.util_rules.goroot import GoRoot
+from pants.backend.go.util_rules.import_analysis import GoStdLibPackages, GoStdLibPackagesRequest
 from pants.backend.go.util_rules.pkg_pattern import match_simple_pattern
 from pants.backend.go.util_rules.third_party_pkg import (
     ThirdPartyPkgAnalysis,
     ThirdPartyPkgAnalysisRequest,
 )
 from pants.build_graph.address import Address
+from pants.engine.addresses import Addresses
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.environment import EnvironmentName
 from pants.engine.internals.graph import AmbiguousCodegenImplementationsException
+from pants.engine.internals.native_engine import EMPTY_DIGEST
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
@@ -59,6 +65,7 @@ from pants.engine.target import (
     WrappedTargetRequest,
 )
 from pants.engine.unions import UnionMembership, union
+from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import bullet_list
@@ -77,6 +84,9 @@ class BuildGoPackageTargetRequest(EngineAwareParameter):
 
     # If True, then force coverage instead of applying import path patterns from `build_opts.coverage_config`.
     with_coverage: bool = False
+
+    # Extra dependencies to force on the target. Useful for implicit linker dependencies.
+    extra_dependencies: tuple[Address, ...] = ()
 
     def debug_hint(self) -> str:
         return str(self.address)
@@ -142,6 +152,7 @@ def maybe_get_codegen_request_type(
 async def setup_build_go_package_target_request(
     request: BuildGoPackageTargetRequest,
     union_membership: UnionMembership,
+    goroot: GoRoot,
 ) -> FallibleBuildGoPackageRequest:
     wrapped_target = await Get(
         WrappedTarget,
@@ -158,6 +169,7 @@ async def setup_build_go_package_target_request(
 
     embed_config: EmbedConfig | None = None
     is_stdlib = False
+    import_map: FrozenDict[str, str] = FrozenDict({})
 
     if target.has_field(GoPackageSourcesField):
         _maybe_first_party_pkg_analysis, _maybe_first_party_pkg_digest = await MultiGet(
@@ -281,12 +293,51 @@ async def setup_build_go_package_target_request(
         objc_files = _third_party_pkg_info.m_files
         fortran_files = _third_party_pkg_info.f_files
         prebuilt_object_files = _third_party_pkg_info.syso_files
+
+    elif target.has_field(GoSdkPackageDependenciesField):
+        import_path = target[GoImportPathField].value
+
+        stdlib_packages = await Get(
+            GoStdLibPackages,
+            GoStdLibPackagesRequest(
+                with_race_detector=request.build_opts.with_race_detector,
+                cgo_enabled=request.build_opts.cgo_enabled,
+            ),
+        )
+
+        pkg_info = stdlib_packages[import_path]
+
+        imports = set(pkg_info.imports)
+        import_map = pkg_info.import_map
+        dir_path = pkg_info.pkg_source_path
+        pkg_name = pkg_info.name
+        digest = EMPTY_DIGEST
+        minimum_go_version = goroot.version
+        go_file_names = pkg_info.go_files
+        s_files = pkg_info.s_files
+        embed_config = None  # TODO: Eventually needs to be filled in.
+        cgo_files = pkg_info.cgo_files
+        cgo_flags = pkg_info.cgo_flags
+        c_files = pkg_info.c_files
+        h_files = pkg_info.h_files
+        cxx_files = pkg_info.cxx_files
+        objc_files = pkg_info.m_files
+        fortran_files = pkg_info.f_files
+        prebuilt_object_files = pkg_info.syso_files
+        is_stdlib = True
+
     else:
         raise AssertionError(
             f"Unknown how to build `{target.alias}` target at address {request.address} with Go. "
             "Please open a bug at https://github.com/pantsbuild/pants/issues/new/choose with this "
             "message!"
         )
+
+    assert import_path not in (
+        "C",
+        "builtin",
+        "unsafe",
+    ), f"Internal error: Attempting to build marker/intrinsic package `{import_path}`."
 
     pkg_specific_compiler_flags: tuple[str, ...] = ()
     if target.has_field(GoCompilerFlagsField):
@@ -300,16 +351,34 @@ async def setup_build_go_package_target_request(
         if assembler_flags_field and assembler_flags_field.value:
             pkg_specific_assembler_flags = assembler_flags_field.value
 
-    all_direct_dependencies = await Get(Targets, DependenciesRequest(target[Dependencies]))
+    def make_stdlib_dep(import_path: str) -> Address:
+        return DEFAULT_GO_SDK_ADDR.create_generated(import_path)
+
+    extra_dependencies_addrs = []
+    if cgo_files and (not is_stdlib or import_path != "runtime/cgo"):
+        extra_dependencies_addrs.append(make_stdlib_dep("runtime/cgo"))
+    if cgo_files and (
+        not is_stdlib
+        or import_path not in ("runtime/cgo", "runtime/race", "runtime/msan", "runtime/asan")
+    ):
+        extra_dependencies_addrs.append(make_stdlib_dep("syscall"))
+
+    direct_dependencies, extra_dependencies = await MultiGet(
+        Get(Targets, DependenciesRequest(target[Dependencies])),
+        Get(Targets, Addresses([*request.extra_dependencies, *extra_dependencies_addrs])),
+    )
 
     first_party_dep_import_path_targets = []
-    third_party_dep_import_path_targets = []
+    third_party_or_stdlib_dep_import_path_targets = []
     codegen_dep_import_path_targets = []
-    for dep in all_direct_dependencies:
+    for dep in direct_dependencies:
         if dep.has_field(GoPackageSourcesField):
             first_party_dep_import_path_targets.append(dep)
-        elif dep.has_field(GoThirdPartyPackageDependenciesField):
-            third_party_dep_import_path_targets.append(dep)
+        elif dep.has_field(GoImportPathField):
+            # Ensure marker packages C and unsafe do not show up as dependencies.
+            dep_import_path = dep[GoImportPathField].value
+            if dep_import_path not in {"builtin", "C", "unsafe"}:
+                third_party_or_stdlib_dep_import_path_targets.append(dep)
         elif bool(maybe_get_codegen_request_type(dep, request.build_opts, union_membership)):
             codegen_dep_import_path_targets.append(dep)
 
@@ -324,14 +393,15 @@ async def setup_build_go_package_target_request(
         )
     }
 
-    pkg_dependency_addresses_set = {
+    pkg_dependency_addresses_set = {tgt.address for tgt in extra_dependencies}
+    pkg_dependency_addresses_set.update(
         address
         for dep_import_path, address in first_party_dep_import_paths.items()
         if dep_import_path in imports
-    }
+    )
     pkg_dependency_addresses_set.update(
         dep_tgt.address
-        for dep_tgt in third_party_dep_import_path_targets
+        for dep_tgt in third_party_or_stdlib_dep_import_path_targets
         if dep_tgt[GoImportPathField].value in imports
     )
     if codegen_dep_import_path_targets:
@@ -408,6 +478,7 @@ async def setup_build_go_package_target_request(
         prebuilt_object_files=prebuilt_object_files,
         minimum_go_version=minimum_go_version,
         direct_dependencies=tuple(pkg_direct_dependencies),
+        import_map=import_map,
         for_tests=request.for_tests,
         embed_config=embed_config,
         with_coverage=with_coverage,

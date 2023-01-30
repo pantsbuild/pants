@@ -29,4 +29,4 @@ See [here](doc:python-linters-and-formatters) for how to opt in to specific form
 > 
 > Bandit, Flake8, and Pylint depend on which Python interpreter the tool is run with. Normally, if your project has some Python 2-only files and some Python 3-only files, you would not be able to run the linter in a single command because it would fail to parse your code.
 > 
-> Instead, Pants will do the right thing when you run `./pants lint ::`. Pants will group your targets based on their [interpreter constraints](doc:python-interpreter-compatibility), and run all the Python 2 targets together and all the Python 3 targets together.
+> Instead, Pants will do the right thing when you run `pants lint ::`. Pants will group your targets based on their [interpreter constraints](doc:python-interpreter-compatibility), and run all the Python 2 targets together and all the Python 3 targets together.

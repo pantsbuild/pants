@@ -22,8 +22,8 @@ backend_packages.add = [
 This will register a new `check` goal:
 
 ```bash
-$ ./pants check helloworld/util/lang.py
-$ ./pants check ::
+$ pants check helloworld/util/lang.py
+$ pants check ::
 ```
 
 > 👍 Benefit of Pants: typecheck Python 2-only and Python 3-only code at the same time
@@ -77,7 +77,7 @@ python_sources(
 )
 ```
 
-When you run `./pants check ::`, Pants will skip any files belonging to skipped targets.
+When you run `pants check ::`, Pants will skip any files belonging to skipped targets.
 
 > 🚧 MyPy may still try to check the skipped files!
 >
@@ -89,7 +89,7 @@ When you run `./pants check ::`, Pants will skip any files belonging to skipped 
 
 You can use [`.pyi` files](https://mypy.readthedocs.io/en/stable/stubs.html) for both first-party and third-party code. Include the `.pyi` files in the `sources` field for `python_source` / `python_sources` and `python_test` / `python_tests` targets. MyPy will use these stubs rather than looking at the implementation.
 
-Pants's dependency inference knows to infer a dependency both on the implementation and the type stub. You can verify this by running `./pants dependencies path/to/file.py`.
+Pants's dependency inference knows to infer a dependency both on the implementation and the type stub. You can verify this by running `pants dependencies path/to/file.py`.
 
 When writing stubs for third-party libraries, you may need the set up the `[source].root_patterns` option so that [source roots](doc:source-roots) are properly stripped. For example:
 
@@ -121,7 +121,7 @@ python_sources(name="lib")
 
 ### Third-party type stubs
 
-You can install third-party type stubs (e.g. `types-requests`) like [normal Python requirements](doc:python-third-party-dependencies). Pants will infer a dependency on both the type stub and the actual dependency, e.g. both `types-requests` and `requests`, which you can confirm by running `./pants dependencies path/to/f.py`.
+You can install third-party type stubs (e.g. `types-requests`) like [normal Python requirements](doc:python-third-party-dependencies). Pants will infer a dependency on both the type stub and the actual dependency, e.g. both `types-requests` and `requests`, which you can confirm by running `pants dependencies path/to/f.py`.
 
 You can also install the type stub via the option `[mypy].extra_type_stubs`, which ensures
 the stubs are only used when running MyPy and are not included when, for example,
@@ -131,7 +131,7 @@ the stubs are only used when running MyPy and are not included when, for example
 ```toml pants.toml
 [mypy]
 extra_type_stubs = ["types-requests==2.25.12"]
-# Set this to a path, then run `./pants generate-lockfiles --resolve=mypy-extra-type-stubs`. 
+# Set this to a path, then run `pants generate-lockfiles --resolve=mypy-extra-type-stubs`. 
 extra_type_stubs_lockfile = "3rdparty/python/mypy_extra_type_stubs.lock
 ```
 
@@ -271,7 +271,7 @@ Tip: only run over changed files and their dependents
 When changing type hints code, you not only need to run over the changed files, but also any code that depends on the changed files:
 
 ```bash
-$ ./pants --changed-since=HEAD --changed-dependents=transitive check
+$ pants --changed-since=HEAD --changed-dependents=transitive check
 ```
 
 See [Advanced target selection](doc:advanced-target-selection) for more information.

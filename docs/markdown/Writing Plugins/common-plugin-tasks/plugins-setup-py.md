@@ -135,7 +135,7 @@ def rules():
    return custom_python_artifact.rules()
 ```
 
-Then, run `./pants package path/to:python_distribution` and inspect the generated `setup.py`to confirm that your plugin worked correctly.
+Then, run `pants package path/to:python_distribution` and inspect the generated `setup.py`to confirm that your plugin worked correctly.
 
 Often, you will want to read from a file in your project to set kwargs like `version` or `long_description`. Use `await Get(DigestContents, PathGlobs)` to do this (see [File system](doc:rules-api-file-system)):
 

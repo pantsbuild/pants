@@ -126,6 +126,6 @@ async def hello_world() -> HelloWorld:
 
 You may either set the parameter `input_digest: Digest`, or you may set `run_in_workspace=True`. When running in the workspace, you will have access to any file in the build root. If the process can safely be restarted, set the `restartable=True` flag, which will allow the engine to interrupt and restart the process if its inputs have changed.
 
-To set environment variables, use the parameter `env: Mapping[str, str]`, like you would with `Process`. You can also set `hermetic_env=False` to inherit the environment variables from the parent `./pants` process.
+To set environment variables, use the parameter `env: Mapping[str, str]`, like you would with `Process`. You can also set `hermetic_env=False` to inherit the environment variables from the parent `pants` process.
 
 The `Effect` will return an `InteractiveProcessResult`, which has a single field `exit_code: int`.
