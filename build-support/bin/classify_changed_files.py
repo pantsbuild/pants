@@ -20,7 +20,7 @@ class Affected(enum.Enum):
     other = "other"
 
 
-_docs_globs = ["docs/*", "build-support/bin/generate_user_list.py"]
+_docs_globs = ["README.md", "**/README.md", "docs/*", "build-support/bin/generate_user_list.py"]
 _rust_globs = ["src/rust/engine/*", "rust-toolchain", "build-support/bin/rust/*"]
 _release_globs = [
     "pants.toml",
