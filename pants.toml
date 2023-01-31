@@ -212,6 +212,7 @@ template_by_globs = "@build-support/preambles/config.yaml"
 
 [generate-lockfiles]
 custom_command = "build-support/bin/generate_all_lockfiles.sh"
+diff = true
 
 [jvm]
 default_resolve = "jvm_testprojects"

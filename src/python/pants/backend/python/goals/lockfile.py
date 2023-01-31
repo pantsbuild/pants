@@ -15,6 +15,7 @@ from pants.backend.python.subsystems.python_tool_base import PythonToolRequireme
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import PythonRequirementResolveField, PythonRequirementsField
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
+from pants.backend.python.util_rules.lockfile_diff import _generate_python_lockfile_diff
 from pants.backend.python.util_rules.lockfile_metadata import PythonLockfileMetadata
 from pants.backend.python.util_rules.pex_cli import PexCliProcess
 from pants.backend.python.util_rules.pex_requirements import (  # noqa: F401
@@ -72,6 +73,7 @@ class GeneratePythonLockfile(GenerateLockfile):
                 interpreter_constraints=InterpreterConstraints(),
                 resolve_name=subsystem.options_scope,
                 lockfile_dest=subsystem.lockfile,
+                diff=False,
             )
         return cls(
             requirements=FrozenOrderedSet((*subsystem.all_requirements, *extra_requirements)),
@@ -82,6 +84,7 @@ class GeneratePythonLockfile(GenerateLockfile):
             ),
             resolve_name=subsystem.options_scope,
             lockfile_dest=subsystem.lockfile,
+            diff=False,
         )
 
     @property
@@ -218,7 +221,15 @@ async def generate_lockfile(
     final_lockfile_digest = await Get(
         Digest, CreateDigest([FileContent(req.lockfile_dest, lockfile_with_header)])
     )
-    return GenerateLockfileResult(final_lockfile_digest, req.resolve_name, req.lockfile_dest)
+
+    if req.diff:
+        diff = await _generate_python_lockfile_diff(
+            final_lockfile_digest, req.resolve_name, req.lockfile_dest
+        )
+    else:
+        diff = None
+
+    return GenerateLockfileResult(final_lockfile_digest, req.resolve_name, req.lockfile_dest, diff)
 
 
 class RequestedPythonUserResolveNames(RequestedUserResolveNames):
@@ -266,6 +277,7 @@ async def setup_user_lockfile_requests(
             ),
             resolve_name=resolve,
             lockfile_dest=python_setup.resolves[resolve],
+            diff=False,
         )
         for resolve in requested
     )
