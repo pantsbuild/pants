@@ -9,26 +9,23 @@ from typing import Mapping
 
 from pants.backend.python.framework.stevedore.target_types import (
     AllStevedoreExtensionTargets,
-    StevedoreEntryPointsField,
-    StevedoreNamespaceField,
+    StevedoreNamespace,
     StevedoreNamespacesField,
 )
 from pants.backend.python.target_types import (
-    PythonDistributionDependenciesField,
+    PythonDistributionEntryPointsField,
     PythonTestsDependenciesField,
     PythonTestsGeneratorTarget,
     PythonTestTarget,
 )
-from pants.base.specs import DirGlobSpec, RawSpecs
 from pants.engine.addresses import Address
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
     AllTargets,
     FieldSet,
     InferDependenciesRequest,
     InferredDependencies,
     Target,
-    Targets,
 )
 from pants.engine.unions import UnionRule
 from pants.util.frozendict import FrozenDict
@@ -36,16 +33,23 @@ from pants.util.logging import LogLevel
 from pants.util.ordered_set import OrderedSet
 
 # -----------------------------------------------------------------------------------------------
-# Utility rules to analyze all `StevedoreExtension` targets
+# Utility rules to analyze all StevedoreNamespace entry_points
 # -----------------------------------------------------------------------------------------------
 
 
 @rule(desc="Find all StevedoreExtension targets in project", level=LogLevel.DEBUG)
-def find_all_stevedore_extension_targets(
+def find_all_python_distributions_with_stevedore_entry_points_targets(
     targets: AllTargets,
 ) -> AllStevedoreExtensionTargets:
     return AllStevedoreExtensionTargets(
-        tgt for tgt in targets if tgt.has_field(StevedoreEntryPointsField)
+        tgt
+        for tgt in targets
+        if tgt.has_field(PythonDistributionEntryPointsField)
+        and any(
+            # namespace aka category aka group
+            isinstance(namespace, StevedoreNamespace)
+            for namespace in (tgt[PythonDistributionEntryPointsField].value or {}).keys()
+        )
     )
 
 
@@ -67,8 +71,13 @@ async def map_stevedore_extensions(
     stevedore_extensions: AllStevedoreExtensionTargets,
 ) -> StevedoreExtensions:
     mapping: Mapping[str, list[Target]] = defaultdict(list)
-    for extension in stevedore_extensions:
-        mapping[str(extension[StevedoreNamespaceField].value)].append(extension)
+    for tgt in stevedore_extensions:
+        # namespace aka category aka group
+        for namespace, entry_points in (
+            tgt[PythonDistributionEntryPointsField].value or {}
+        ).items():
+            if isinstance(namespace, StevedoreNamespace):
+                mapping[str(namespace)].append(tgt)
     return StevedoreExtensions(FrozenDict((k, tuple(v)) for k, v in sorted(mapping.items())))
 
 
@@ -89,7 +98,7 @@ class InferStevedoreNamespaceDependencies(InferDependenciesRequest):
 
 
 @rule(
-    desc="Infer stevedore_extension target dependencies based on namespace list.",
+    desc="Infer python_distribution target dependencies based on namespace list.",
     level=LogLevel.DEBUG,
 )
 async def infer_stevedore_namespace_dependencies(
@@ -105,46 +114,8 @@ async def infer_stevedore_namespace_dependencies(
         extensions = stevedore_extensions.mapping.get(namespace, ())
         addresses.extend(extension.address for extension in extensions)
 
-    result: OrderedSet[Address] = OrderedSet(addresses)
-    return InferredDependencies(sorted(result))
-
-
-# -----------------------------------------------------------------------------------------------
-# Dependencies for `python_distribution` targets
-# -----------------------------------------------------------------------------------------------
-
-
-@dataclass(frozen=True)
-class PythonDistributionStevedoreNamespaceInferenceFieldSet(FieldSet):
-    required_fields = (PythonDistributionDependenciesField,)
-
-
-class InferSiblingStevedoreExtensionDependencies(InferDependenciesRequest):
-    infer_from = PythonDistributionStevedoreNamespaceInferenceFieldSet
-
-
-@rule(
-    desc="Infer sibling stevedore_extension target dependencies for python_distributions.",
-    level=LogLevel.DEBUG,
-)
-async def infer_sibling_stevedore_extension_dependencies(
-    request: InferSiblingStevedoreExtensionDependencies,
-) -> InferredDependencies:
-    sibling_targets = await Get(
-        Targets,
-        RawSpecs(
-            dir_globs=(DirGlobSpec(request.field_set.address.spec_path),),
-            description_of_origin="infer_sibling_stevedore_extension_dependencies",
-        ),
-    )
-    stevedore_targets: list[Target] = [
-        tgt for tgt in sibling_targets if tgt.has_field(StevedoreEntryPointsField)
-    ]
-
-    if not stevedore_targets:
-        return InferredDependencies(())
-
-    addresses = [extension_tgt.address for extension_tgt in stevedore_targets]
+    # TODO: this infers deps on the python_distribution, but it should only infer deps
+    #       on the entry_points for the requested namespaces, not all of them.
     result: OrderedSet[Address] = OrderedSet(addresses)
     return InferredDependencies(sorted(result))
 
@@ -155,5 +126,4 @@ def rules():
         PythonTestsGeneratorTarget.register_plugin_field(StevedoreNamespacesField),
         PythonTestTarget.register_plugin_field(StevedoreNamespacesField),
         UnionRule(InferDependenciesRequest, InferStevedoreNamespaceDependencies),
-        UnionRule(InferDependenciesRequest, InferSiblingStevedoreExtensionDependencies),
     ]

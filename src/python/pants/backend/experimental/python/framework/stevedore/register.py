@@ -8,20 +8,16 @@ See https://github.com/openstack/stevedore for details.
 
 from pants.backend.python.framework.stevedore import python_target_dependencies
 from pants.backend.python.framework.stevedore import rules as stevedore_rules
-from pants.backend.python.framework.stevedore import setup_py_kwargs, target_types_rules
-from pants.backend.python.framework.stevedore.target_types import StevedoreExtension
+from pants.backend.python.framework.stevedore.target_types import StevedoreNamespace
+from pants.build_graph.build_file_aliases import BuildFileAliases
 
-# TODO: add stevedore_namespaces field to python_sources?
+
+def build_file_aliases():
+    return BuildFileAliases(objects={"stevedore_namespace": StevedoreNamespace})
 
 
 def rules():
     return [
-        *target_types_rules.rules(),
         *stevedore_rules.rules(),
         *python_target_dependencies.rules(),
-        *setup_py_kwargs.rules(),
     ]
-
-
-def target_types():
-    return [StevedoreExtension]

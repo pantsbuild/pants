@@ -8,9 +8,7 @@ from textwrap import dedent
 import pytest
 
 from pants.backend.python.framework.stevedore.python_target_dependencies import (
-    InferSiblingStevedoreExtensionDependencies,
     InferStevedoreNamespaceDependencies,
-    PythonDistributionStevedoreNamespaceInferenceFieldSet,
     PythonTestsStevedoreNamespaceInferenceFieldSet,
     StevedoreExtensions,
 )
@@ -19,7 +17,7 @@ from pants.backend.python.framework.stevedore.python_target_dependencies import 
 )
 from pants.backend.python.framework.stevedore.target_types import (
     AllStevedoreExtensionTargets,
-    StevedoreExtension,
+    StevedoreNamespace,
 )
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.target_types import (
@@ -45,18 +43,17 @@ def write_test_files(rule_runner: RuleRunner, extra_build_contents: str = ""):
             {
                 f"runners/{runner}_runner/BUILD": dedent(
                     f"""\
-                    stevedore_extension(
-                        name="runner",
-                        namespace="st2common.runners.runner",
+                    python_distribution(
+                        provides=python_artifact(
+                            name="stackstorm-runner-{runner}",
+                        ),
                         entry_points={{
-                            "{runner}": "{runner}_runner.{runner}_runner",
-                        }},
-                    )
-                    stevedore_extension(
-                        name="thing",
-                        namespace="some.thing.else",
-                        entry_points={{
-                            "{runner}": "{runner}_runner.thing",
+                            stevedore_namespace("st2common.runners.runner"): {{
+                                "{runner}": "{runner}_runner.{runner}_runner",
+                            }},
+                            stevedore_namespace("some.thing.else"): {{
+                                "{runner}": "{runner}_runner.thing",
+                            }},
                         }},
                     )
                     """
@@ -81,12 +78,16 @@ def rule_runner() -> RuleRunner:
             QueryRule(InferredDependencies, (InferStevedoreNamespaceDependencies,)),
         ],
         target_types=[
+            PythonDistribution,
             PythonSourceTarget,
             PythonSourcesGeneratorTarget,
             PythonTestTarget,
             PythonTestsGeneratorTarget,
-            StevedoreExtension,
         ],
+        objects={
+            "python_artifact": PythonArtifact,
+            "stevedore_namespace": StevedoreNamespace,
+        },
     )
     write_test_files(rule_runner)
     args = [
@@ -103,9 +104,8 @@ def rule_runner() -> RuleRunner:
 
 def test_find_all_stevedore_extension_targets(rule_runner: RuleRunner) -> None:
     assert rule_runner.request(AllStevedoreExtensionTargets, []) == AllStevedoreExtensionTargets(
-        rule_runner.get_target(Address(f"runners/{runner}_runner", target_name=target_name))
+        rule_runner.get_target(Address(f"runners/{runner}_runner"))
         for runner in sorted(st2_runners)
-        for target_name in ["runner", "thing"]
     )
 
 
@@ -114,13 +114,11 @@ def test_map_stevedore_extensions(rule_runner: RuleRunner) -> None:
         FrozenDict(
             {
                 "some.thing.else": tuple(
-                    rule_runner.get_target(Address(f"runners/{runner}_runner", target_name="thing"))
+                    rule_runner.get_target(Address(f"runners/{runner}_runner"))
                     for runner in sorted(st2_runners)
                 ),
                 "st2common.runners.runner": tuple(
-                    rule_runner.get_target(
-                        Address(f"runners/{runner}_runner", target_name="runner")
-                    )
+                    rule_runner.get_target(Address(f"runners/{runner}_runner"))
                     for runner in sorted(st2_runners)
                 ),
             }
@@ -129,7 +127,7 @@ def test_map_stevedore_extensions(rule_runner: RuleRunner) -> None:
 
 
 # -----------------------------------------------------------------------------------------------
-# Tests for dependency inference of python targets (python_tests, python_distribution, etc)
+# Tests for dependency inference of python targets (python_tests)
 # -----------------------------------------------------------------------------------------------
 
 
@@ -159,75 +157,13 @@ def test_infer_stevedore_namespace_dependencies(rule_runner: RuleRunner) -> None
             ],
         )
 
-    # this asserts that only the st2common.runners.runner namespace gets selected.
     assert run_dep_inference(
         Address("src/foobar", target_name="tests", relative_file_path="test_something.py"),
     ) == InferredDependencies(
         [
             Address(
                 f"runners/{runner}_runner",
-                target_name="runner",
             )
             for runner in st2_runners
         ],
     )
-
-
-def test_infer_sibling_stevedore_extension_dependencies() -> None:
-    rule_runner = RuleRunner(
-        rules=[
-            *python_target_types_rules(),
-            *stevedore_dep_rules(),
-            QueryRule(InferredDependencies, (InferSiblingStevedoreExtensionDependencies,)),
-        ],
-        target_types=[
-            PythonDistribution,
-            PythonSourceTarget,
-            PythonSourcesGeneratorTarget,
-            StevedoreExtension,
-        ],
-        objects={"python_artifact": PythonArtifact},
-    )
-    write_test_files(
-        rule_runner,
-        extra_build_contents=dedent(
-            # this gets added to runners/{runner}_runner/BUILD
-            """\
-            python_distribution(
-                provides=python_artifact(
-                    name="stackstorm-runner-{runner}",
-                ),
-                dependencies=["./{runner}_runner"],
-            )
-            """
-        ),
-    )
-    args = [
-        "--source-root-patterns=runners/*_runner",
-    ]
-    rule_runner.set_options(args, env_inherit={"PATH", "PYENV_ROOT", "HOME"})
-
-    def run_dep_inference(address: Address) -> InferredDependencies:
-        target = rule_runner.get_target(address)
-        return rule_runner.request(
-            InferredDependencies,
-            [
-                InferSiblingStevedoreExtensionDependencies(
-                    PythonDistributionStevedoreNamespaceInferenceFieldSet.create(target)
-                )
-            ],
-        )
-
-    for runner in st2_runners:
-        assert run_dep_inference(Address(f"runners/{runner}_runner")) == InferredDependencies(
-            [
-                Address(
-                    f"runners/{runner}_runner",
-                    target_name="runner",
-                ),
-                Address(
-                    f"runners/{runner}_runner",
-                    target_name="thing",
-                ),
-            ],
-        )

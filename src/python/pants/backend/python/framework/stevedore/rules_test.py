@@ -14,12 +14,11 @@ from pants.backend.python.framework.stevedore.rules import (
     GenerateEntryPointsTxtFromStevedoreExtensionRequest,
 )
 from pants.backend.python.framework.stevedore.rules import rules as stevedore_rules
-from pants.backend.python.framework.stevedore.target_types import StevedoreExtension
-from pants.backend.python.framework.stevedore.target_types_rules import (
-    rules as stevedore_target_types_rules,
-)
+from pants.backend.python.framework.stevedore.target_types import StevedoreNamespace
 from pants.backend.python.goals.pytest_runner import PytestPluginSetup
+from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.target_types import (
+    PythonDistribution,
     PythonSourcesGeneratorTarget,
     PythonSourceTarget,
     PythonTestsGeneratorTarget,
@@ -40,7 +39,6 @@ def rule_runner() -> RuleRunner:
         rules=[
             *python_target_types_rules(),
             *stevedore_dep_rules(),
-            *stevedore_target_types_rules(),
             *stevedore_rules(),
             QueryRule(
                 PytestPluginSetup,
@@ -52,8 +50,12 @@ def rule_runner() -> RuleRunner:
             PythonSourcesGeneratorTarget,
             PythonTestTarget,
             PythonTestsGeneratorTarget,
-            StevedoreExtension,
+            PythonDistribution,
         ],
+        objects={
+            "python_artifact": PythonArtifact,
+            "stevedore_namespace": StevedoreNamespace,
+        },
     )
 
 
@@ -107,19 +109,18 @@ def test_generate_entry_points_txt_from_stevedore_extension(
                     # to test consistent sorting, reverse sort by namespace
                     # and then reverse sort entry_points by key.
                     f"""\
-                    stevedore_extension(
-                        name="runner",
-                        namespace="st2common.runners.runner",
+                    python_distribution(
+                        provides=python_artifact(
+                            name="stackstorm-runner-{runner}",
+                        ),
                         entry_points={{
-                            "{runner}": "{runner}_runner.{runner}_runner",
-                        }},
-                    )
-                    stevedore_extension(
-                        name="thing",
-                        namespace="some.thing.else",
-                        entry_points={{
-                            "{runner}2": "{runner}_runner.thing2",
-                            "{runner}1": "{runner}_runner.thing1",
+                            stevedore_namespace("st2common.runners.runner"): {{
+                                "{runner}": "{runner}_runner.{runner}_runner",
+                            }},
+                            stevedore_namespace("some.thing.else"): {{
+                                "{runner}2": "{runner}_runner.thing2",
+                                "{runner}1": "{runner}_runner.thing1",
+                            }},
                         }},
                     )
                     """
