@@ -294,7 +294,7 @@ May 13, 2020
 
 ### Pants Build project's official channel
 
-Home: <https://www.youtube.com/channel/UCCcfCbDqtqlCkFEuENsHlbQ>  
+Home: <https://www.youtube.com/@pantsbuild>  
 Pants Build 2 Tour: <https://www.youtube.com/playlist?list=PLwPRXwjURiOzXjgqydxZE9RVjZqaB6OXb>
 
 ## Repositories
