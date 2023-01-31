@@ -41,7 +41,11 @@ from pants.backend.go.util_rules.go_mod import (
     OwningGoModRequest,
 )
 from pants.backend.go.util_rules.goroot import GoRoot
-from pants.backend.go.util_rules.import_analysis import GoStdLibPackages, GoStdLibPackagesRequest
+from pants.backend.go.util_rules.import_analysis import (
+    INTRINSIC_SDK_PACKAGES,
+    GoStdLibPackages,
+    GoStdLibPackagesRequest,
+)
 from pants.backend.go.util_rules.pkg_pattern import match_simple_pattern
 from pants.backend.go.util_rules.third_party_pkg import (
     ThirdPartyPkgAnalysis,
@@ -170,6 +174,7 @@ async def setup_build_go_package_target_request(
     embed_config: EmbedConfig | None = None
     is_stdlib = False
     import_map: FrozenDict[str, str] = FrozenDict({})
+    override_direct_dependencies: Targets | None = None
 
     if target.has_field(GoPackageSourcesField):
         _maybe_first_party_pkg_analysis, _maybe_first_party_pkg_digest = await MultiGet(
@@ -307,6 +312,22 @@ async def setup_build_go_package_target_request(
 
         pkg_info = stdlib_packages[import_path]
 
+        # Go SDK packages can only import from the Go SDK. Gather the addresses for those imports now since the
+        # environment is known now and any conditional compilation will be in effect. We cannot do this when
+        # generating the synthetic target `//:default_go_sdk` because only the local environment is available then.
+        #
+        # Note: If the _go_sdk target type is ever exposed to the user, then consider just using dependency
+        # inference then (which should have the environment available). We cannot use dependency inference yet
+        # because that causes a rule graph cycle with how we are using the synthetic target.
+        sdk_direct_dependency_addrs = {
+            DEFAULT_GO_SDK_ADDR.create_generated(dep_import_path)
+            for dep_import_path in pkg_info.imports
+            if dep_import_path not in {"builtin", "C", "unsafe"}
+        }
+        override_direct_dependencies = await Get(
+            Targets, Addresses(sorted(sdk_direct_dependency_addrs))
+        )
+
         imports = set(pkg_info.imports)
         import_map = pkg_info.import_map
         dir_path = pkg_info.pkg_source_path
@@ -367,6 +388,9 @@ async def setup_build_go_package_target_request(
         Get(Targets, DependenciesRequest(target[Dependencies])),
         Get(Targets, Addresses([*request.extra_dependencies, *extra_dependencies_addrs])),
     )
+
+    if override_direct_dependencies is not None:
+        direct_dependencies = override_direct_dependencies
 
     first_party_dep_import_path_targets = []
     third_party_or_stdlib_dep_import_path_targets = []

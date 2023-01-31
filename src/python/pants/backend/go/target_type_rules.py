@@ -40,11 +40,7 @@ from pants.backend.go.util_rules.go_mod import (
     OwningGoMod,
     OwningGoModRequest,
 )
-from pants.backend.go.util_rules.import_analysis import (
-    GoStdLibPackage,
-    GoStdLibPackages,
-    GoStdLibPackagesRequest,
-)
+from pants.backend.go.util_rules.import_analysis import GoStdLibPackages, GoStdLibPackagesRequest
 from pants.backend.go.util_rules.third_party_pkg import (
     AllThirdPartyPackages,
     AllThirdPartyPackagesRequest,
@@ -467,26 +463,27 @@ async def generate_targets_from_go_sdk(
         ),
     )
 
-    def create_tgt(pkg: GoStdLibPackage) -> GoSdkPackageTarget:
-        dep_import_paths = sorted(
-            {*pkg.imports, *stdlib_packages_race[pkg.import_path].imports} - {"C", "unsafe"}
-        )
+    def create_tgt(import_path: str) -> GoSdkPackageTarget:
+        # Note: We do not set any dependencies for the target because the target's dependencies
+        # could vary based on the environment due to conditional compilation for environment
+        # attributes like the OS or architecture.
+        #
+        # The dependencies for the `_go_sdk_package target` will be evaluated by the build rules where the
+        # environment is actually known. (If `_go_sdk` were made into a user-visible target type, then
+        # dependency inference might also work at that point to supply dependencies.)
         return GoSdkPackageTarget(
             {
                 **request.template,
-                GoSdkImportPathField.alias: pkg.import_path,
-                Dependencies.alias: [
-                    generator_addr.create_generated(dep_import_path).spec
-                    for dep_import_path in dep_import_paths
-                ],
+                GoSdkImportPathField.alias: import_path,
             },
             # E.g. `//:default_go_sdk#net/http`.
-            generator_addr.create_generated(pkg.import_path),
+            generator_addr.create_generated(import_path),
             union_membership,
             residence_dir=generator_addr.spec_path,
         )
 
-    result = tuple(create_tgt(pkg_info) for pkg_info in stdlib_packages.values())
+    import_paths = {*stdlib_packages.keys(), *stdlib_packages_race.keys()}
+    result = tuple(create_tgt(import_path) for import_path in sorted(import_paths))
     return GeneratedTargets(request.generator, result)
 
 
