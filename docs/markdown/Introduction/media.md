@@ -117,7 +117,6 @@ Episode 72: Pants Makes Developers Happier and More Productive, with Benjy Weinb
 December 16, 2022
 <https://anchor.fm/happypathprogramming/episodes/72-Pants-Makes-Developers-Happier--More-Productive-with-Benjy-Weinberger-e1sc1uj>
 
-
 ### Humans of Devops
 
 Season 3, Episode 69: The Curse of Knowledge  
@@ -166,6 +165,11 @@ November 23, 2020
 
 
 ## Posts & Articles
+
+### Inside Doctrine
+November 25, 2022
+"Industrialized python code with Pylint plugins in Pants"
+<https://medium.com/doctrine/industrialized-python-code-with-pylint-plugins-in-pants-321d9cbad07a>
 
 ### Dev.to
 
