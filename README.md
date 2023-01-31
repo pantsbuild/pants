@@ -16,14 +16,9 @@ Some noteworthy features include:
 
 Documentation: [www.pantsbuild.org](https://www.pantsbuild.org/).
 
-# Requirements
+# Getting started
 
-To run Pants, you need:
-
-* Linux or macOS.
-* Python 3.7+ discoverable on your `PATH`.
-* A C compiler, system headers and Python headers (to compile native Python modules).
-* Internet access (so that Pants can fully bootstrap itself).
+See the [getting started](https://www.pantsbuild.org/docs/getting-started) documentation.
 
 # Credits
 
