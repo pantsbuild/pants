@@ -9,12 +9,12 @@ updatedAt: "2022-07-12T00:00:00.000Z"
 You can download an installer script that will install the Pants binary with this command:
 
 ```
-curl --proto '=https' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/pantsup.sh
+curl --proto '=https' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh
 ```
 
 This script will install `pants` into `~/bin`, which must be on your PATH. The installer script will warn you if it is not.
 
-For security reasons, we don't recommend frequently curling this script directly to `bash`, e.g., on every CI run. If the script were compromised during some time window, you'd be more likely to download it during that window and be impacted. Instead, for regular use, we recommend checking this script into your repo and pointing users and CI machines to that checked-in version. The script is very simple and need not be updated very often.
+For security reasons, we don't recommend frequently curling this script directly to `bash`, e.g., on every CI run. If the script were compromised during some time window, you'd be more likely to download it during that window and be impacted. Instead, for regular use, we recommend checking this script into the root of your repo and pointing users and CI machines to that checked-in version. The script is very simple and need not be updated very often.
 
 Alternatively, on macOS you can also use homebrew to install `pants`:
 
