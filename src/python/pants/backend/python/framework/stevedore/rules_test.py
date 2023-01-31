@@ -7,15 +7,15 @@ from textwrap import dedent
 
 import pytest
 
-from pants.backend.python.frameworks.stevedore.python_target_dependencies import (
+from pants.backend.python.framework.stevedore.python_target_dependencies import (
     rules as stevedore_dep_rules,
 )
-from pants.backend.python.frameworks.stevedore.rules import (
+from pants.backend.python.framework.stevedore.rules import (
     GenerateEntryPointsTxtFromStevedoreExtensionRequest,
 )
-from pants.backend.python.frameworks.stevedore.rules import rules as stevedore_rules
-from pants.backend.python.frameworks.stevedore.target_types import StevedoreExtension
-from pants.backend.python.frameworks.stevedore.target_types_rules import (
+from pants.backend.python.framework.stevedore.rules import rules as stevedore_rules
+from pants.backend.python.framework.stevedore.target_types import StevedoreExtension
+from pants.backend.python.framework.stevedore.target_types_rules import (
     rules as stevedore_target_types_rules,
 )
 from pants.backend.python.goals.pytest_runner import PytestPluginSetup

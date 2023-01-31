@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 
-from pants.backend.python.frameworks.stevedore.target_types import (
+from pants.backend.python.framework.stevedore.target_types import (
     ResolvedStevedoreEntryPoints,
     ResolveStevedoreEntryPointsRequest,
     StevedoreEntryPoints,

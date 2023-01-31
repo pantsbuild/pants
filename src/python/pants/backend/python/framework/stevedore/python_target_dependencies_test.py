@@ -7,17 +7,17 @@ from textwrap import dedent
 
 import pytest
 
-from pants.backend.python.frameworks.stevedore.python_target_dependencies import (
+from pants.backend.python.framework.stevedore.python_target_dependencies import (
     InferSiblingStevedoreExtensionDependencies,
     InferStevedoreNamespaceDependencies,
     PythonDistributionStevedoreNamespaceInferenceFieldSet,
     PythonTestsStevedoreNamespaceInferenceFieldSet,
     StevedoreExtensions,
 )
-from pants.backend.python.frameworks.stevedore.python_target_dependencies import (
+from pants.backend.python.framework.stevedore.python_target_dependencies import (
     rules as stevedore_dep_rules,
 )
-from pants.backend.python.frameworks.stevedore.target_types import (
+from pants.backend.python.framework.stevedore.target_types import (
     AllStevedoreExtensionTargets,
     StevedoreExtension,
 )

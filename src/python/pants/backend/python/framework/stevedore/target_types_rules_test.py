@@ -7,21 +7,21 @@ from textwrap import dedent
 
 import pytest
 
-from pants.backend.python.frameworks.stevedore.target_types import (
+from pants.backend.python.framework.stevedore.target_types import (
     StevedoreEntryPointsField,  # on stevedore_extension target
 )
-from pants.backend.python.frameworks.stevedore.target_types import (
+from pants.backend.python.framework.stevedore.target_types import (
     ResolvedStevedoreEntryPoints,
     ResolveStevedoreEntryPointsRequest,
     StevedoreEntryPoint,
     StevedoreExtension,
 )
-from pants.backend.python.frameworks.stevedore.target_types_rules import (
+from pants.backend.python.framework.stevedore.target_types_rules import (
     InferStevedoreExtensionDependencies,
     StevedoreEntryPointsInferenceFieldSet,
     resolve_stevedore_entry_points,
 )
-from pants.backend.python.frameworks.stevedore.target_types_rules import (
+from pants.backend.python.framework.stevedore.target_types_rules import (
     rules as stevedore_target_types_rules,
 )
 from pants.backend.python.target_types import (

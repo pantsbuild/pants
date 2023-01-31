@@ -12,7 +12,7 @@ from pants.backend.python.dependency_inference.module_mapper import (
     PythonModuleOwnersRequest,
 )
 from pants.backend.python.dependency_inference.rules import import_rules
-from pants.backend.python.frameworks.stevedore.target_types import (
+from pants.backend.python.framework.stevedore.target_types import (
     ResolvedStevedoreEntryPoints,
     ResolveStevedoreEntryPointsRequest,
     StevedoreEntryPoints,

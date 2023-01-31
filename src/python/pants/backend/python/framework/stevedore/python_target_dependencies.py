@@ -7,7 +7,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Mapping
 
-from pants.backend.python.frameworks.stevedore.target_types import (
+from pants.backend.python.framework.stevedore.target_types import (
     AllStevedoreExtensionTargets,
     StevedoreEntryPointsField,
     StevedoreNamespaceField,

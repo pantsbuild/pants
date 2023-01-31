@@ -6,10 +6,10 @@
 See https://github.com/openstack/stevedore for details.
 """
 
-from pants.backend.python.frameworks.stevedore import python_target_dependencies
-from pants.backend.python.frameworks.stevedore import rules as stevedore_rules
-from pants.backend.python.frameworks.stevedore import setup_py_kwargs, target_types_rules
-from pants.backend.python.frameworks.stevedore.target_types import StevedoreExtension
+from pants.backend.python.framework.stevedore import python_target_dependencies
+from pants.backend.python.framework.stevedore import rules as stevedore_rules
+from pants.backend.python.framework.stevedore import setup_py_kwargs, target_types_rules
+from pants.backend.python.framework.stevedore.target_types import StevedoreExtension
 
 # TODO: add stevedore_namespaces field to python_sources?
 
