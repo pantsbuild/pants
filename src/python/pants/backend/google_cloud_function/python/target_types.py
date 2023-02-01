@@ -15,6 +15,7 @@ from pants.backend.python.dependency_inference.rules import PythonInferSubsystem
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import PexCompletePlatformsField, PythonResolveField
 from pants.core.goals.package import OutputPathField
+from pants.core.util_rules.environments import EnvironmentField
 from pants.engine.addresses import Address
 from pants.engine.fs import GlobMatchErrorBehavior, PathGlobs, Paths
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
@@ -267,6 +268,7 @@ class PythonGoogleCloudFunction(Target):
         PexCompletePlatformsField,
         PythonGoogleCloudFunctionType,
         PythonResolveField,
+        EnvironmentField,
     )
     help = softwrap(
         f"""

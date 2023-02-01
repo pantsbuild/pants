@@ -25,6 +25,7 @@ from pants.backend.python.target_types import GenerateSetupField, WheelField
 from pants.backend.python.util_rules.pex import Pex, PexProcess, PexRequest
 from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact, PackageFieldSet
 from pants.core.goals.run import RunDebugAdapterRequest, RunFieldSet, RunRequest
+from pants.core.util_rules.environments import EnvironmentField
 from pants.core.util_rules.system_binaries import BashBinary
 from pants.engine.fs import (
     AddPrefix,
@@ -65,6 +66,7 @@ class PyOxidizerFieldSet(PackageFieldSet):
     unclassified_resources: PyOxidizerUnclassifiedResources
     template: PyOxidizerConfigSourceField
     output_path: PyOxidizerOutputPathField
+    environment: EnvironmentField
 
 
 @dataclass(frozen=True)
