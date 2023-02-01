@@ -25,7 +25,6 @@ class GoStdLibPackage:
     name: str
     import_path: str
     pkg_source_path: str
-    pkg_target: str  # Note: This will be removed once PRs land to support building the Go SDK.
     imports: tuple[str, ...]
     import_map: FrozenDict[str, str]
 
@@ -69,16 +68,14 @@ async def analyze_go_stdlib_packages(request: GoStdLibPackagesRequest) -> GoStdL
     for pkg_json in ijson.items(list_result.stdout, "", multiple_values=True):
         import_path = pkg_json.get("ImportPath")
         pkg_source_path = pkg_json.get("Dir")
-        pkg_target = pkg_json.get("Target")
 
-        if not import_path or not pkg_source_path or not pkg_target:
+        if not import_path or not pkg_source_path:
             continue
 
         stdlib_packages[import_path] = GoStdLibPackage(
             name=pkg_json.get("Name"),
             import_path=import_path,
             pkg_source_path=pkg_source_path,
-            pkg_target=pkg_target,
             imports=tuple(pkg_json.get("Imports", ())),
             import_map=FrozenDict(pkg_json.get("ImportMap", {})),
             go_files=tuple(pkg_json.get("GoFiles", ())),
