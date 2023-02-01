@@ -71,6 +71,12 @@ class PackageJson:
     def root_dir(self) -> str:
         return os.path.dirname(self.file)
 
+    @property
+    def workspace_digests(self) -> Iterable[Digest]:
+        yield self.digest
+        for workspace in self.workspaces:
+            yield from workspace.workspace_digests
+
 
 class AllPackageJsonTargets(Targets):
     pass

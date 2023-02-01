@@ -18,7 +18,7 @@ from pants.core.goals.generate_lockfiles import (
     RequestedUserResolveNames,
     UserGenerateLockfiles,
 )
-from pants.engine.internals.native_engine import AddPrefix, Digest, RemovePrefix
+from pants.engine.internals.native_engine import AddPrefix, Digest, MergeDigests, RemovePrefix
 from pants.engine.internals.selectors import Get
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Rule, collect_rules, rule
@@ -42,8 +42,12 @@ class RequestedPackageJsonUserResolveNames(RequestedUserResolveNames):
 async def determine_package_json_user_resolves(
     _: KnownPackageJsonUserResolveNamesRequest, pkg_jsons: AllPackageJson
 ) -> KnownUserResolveNames:
+    def is_part_of_workspace(pkg: PackageJson) -> bool:
+        return any(pkg in other.workspaces for other in pkg_jsons)
+
+    root_packages = {pkg for pkg in pkg_jsons if not is_part_of_workspace(pkg)}
     return KnownUserResolveNames(
-        names=tuple(pkg.name for pkg in pkg_jsons),
+        names=tuple(pkg.name for pkg in root_packages),
         option_name="<generated>",
         requested_resolve_names_cls=RequestedPackageJsonUserResolveNames,
     )
@@ -69,9 +73,8 @@ async def setup_user_lockfile_requests(
 async def generate_lockfile_from_package_jsons(
     request: GeneratePackageLockJsonFile,
 ) -> GenerateLockfileResult:
-    input_digest = await Get(
-        Digest, RemovePrefix(request.pkg_json.digest, request.pkg_json.root_dir)
-    )
+    workspace_digest = await Get(Digest, MergeDigests(request.pkg_json.workspace_digests))
+    input_digest = await Get(Digest, RemovePrefix(workspace_digest, request.pkg_json.root_dir))
     result = await Get(
         ProcessResult,
         NodeJSToolProcess,

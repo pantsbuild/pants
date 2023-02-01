@@ -43,6 +43,10 @@ def given_package_with_name(name: str) -> str:
     return json.dumps({"name": name, "version": "0.0.1"})
 
 
+def given_package_with_workspaces(name: str, version: str, *workspaces: str) -> str:
+    return json.dumps({"name": name, "version": version, "workspaces": list(workspaces)})
+
+
 def test_resolves_are_package_names(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -91,4 +95,46 @@ def test_generates_lockfile_for_package_json(rule_runner: RuleRunner) -> None:
         "lockfileVersion": 2,
         "requires": True,
         "packages": {"": {"name": "ham", "version": "0.0.1"}},
+    }
+
+
+def test_generates_lockfile_for_package_json_workspace(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/js/BUILD": "package_json()",
+            "src/js/package.json": given_package_with_workspaces("ham", "1.0.0", "a"),
+            "src/js/a/BUILD": "package_json()",
+            "src/js/a/package.json": given_package_with_workspaces("spam", "0.1.0"),
+        }
+    )
+    tgt = rule_runner.get_target(Address("src/js"))
+    pkg_json = rule_runner.request(
+        PackageJson, [ReadPackageJsonRequest(tgt[PackageJsonSourceField])]
+    )
+
+    lockfile = rule_runner.request(
+        GenerateLockfileResult,
+        (
+            GeneratePackageLockJsonFile(
+                resolve_name="ham",
+                lockfile_dest="src/js/package-lock.json",
+                pkg_json=pkg_json,
+                diff=False,
+            ),
+        ),
+    )
+
+    digest_contents = rule_runner.request(DigestContents, [lockfile.digest])
+
+    assert json.loads(digest_contents[0].content) == {
+        "name": "ham",
+        "version": "1.0.0",
+        "lockfileVersion": 2,
+        "requires": True,
+        "dependencies": {"spam": {"version": "file:a"}},
+        "packages": {
+            "": {"name": "ham", "version": "1.0.0", "workspaces": ["a"]},
+            "a": {"name": "spam", "version": "0.1.0"},
+            "node_modules/spam": {"link": True, "resolved": "a"},
+        },
     }
