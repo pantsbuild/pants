@@ -5,18 +5,21 @@ from __future__ import annotations
 
 from collections import defaultdict
 
-from pants.backend.python.framework.stevedore.target_types import StevedoreNamespacesField
+from pants.backend.python.framework.stevedore.target_types import (
+    StevedoreExtensionTargets,
+    StevedoreNamespacesField,
+    StevedoreNamespacesProviderTargetsRequest,
+)
 from pants.backend.python.goals.pytest_runner import PytestPluginSetup, PytestPluginSetupRequest
 from pants.backend.python.target_types import (
     PythonDistributionEntryPoint,
     PythonDistributionEntryPointsField,
-    PythonTestsDependenciesField,
     ResolvedPythonDistributionEntryPoints,
     ResolvePythonDistributionEntryPointsRequest,
 )
 from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, FileContent, PathGlobs, Paths
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import DependenciesRequest, Target, Targets
+from pants.engine.target import Target
 from pants.engine.unions import UnionRule
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
@@ -39,22 +42,16 @@ class GenerateEntryPointsTxtFromStevedoreExtensionRequest(PytestPluginSetupReque
 async def generate_entry_points_txt_from_stevedore_extension(
     request: GenerateEntryPointsTxtFromStevedoreExtensionRequest,
 ) -> PytestPluginSetup:
-    requested_namespaces = request.target[StevedoreNamespacesField].value
-    if not requested_namespaces:
+    requested_namespaces = request.target[StevedoreNamespacesField]
+    if not requested_namespaces.value:
         return PytestPluginSetup(EMPTY_DIGEST)
 
-    # get all injected dependencies that are StevedoreExtension targets
-    dependencies = await Get(
-        Targets, DependenciesRequest(request.target.get(PythonTestsDependenciesField))
+    stevedore_targets = await Get(
+        StevedoreExtensionTargets,
+        StevedoreNamespacesProviderTargetsRequest(requested_namespaces),
     )
-    stevedore_targets = [
-        tgt
-        for tgt in dependencies
-        if tgt.has_field(PythonDistributionEntryPointsField)
-        and tgt.get(PythonDistributionEntryPointsField).value is not None
-    ]
 
-    resolved_entry_points = await MultiGet(
+    all_resolved_entry_points = await MultiGet(
         Get(
             ResolvedPythonDistributionEntryPoints,
             ResolvePythonDistributionEntryPointsRequest(tgt[PythonDistributionEntryPointsField]),
@@ -68,7 +65,7 @@ async def generate_entry_points_txt_from_stevedore_extension(
             for _, entry_points in (resolved_eps.val or {}).items()
             for ep in entry_points.values()
         }
-        for tgt, resolved_eps in zip(stevedore_targets, resolved_entry_points)
+        for tgt, resolved_eps in zip(stevedore_targets, all_resolved_entry_points)
     ]
     resolved_paths = await MultiGet(
         Get(Paths, PathGlobs(module_candidate_paths)) for module_candidate_paths in possible_paths
@@ -78,7 +75,7 @@ async def generate_entry_points_txt_from_stevedore_extension(
     stevedore_extensions_by_path: dict[
         str, list[ResolvedPythonDistributionEntryPoints]
     ] = defaultdict(list)
-    for resolved_ep, paths in zip(resolved_entry_points, resolved_paths):
+    for resolved_ep, paths in zip(all_resolved_entry_points, resolved_paths):
         path = paths.dirs[0]  # just take the first match
         stevedore_extensions_by_path[path].append(resolved_ep)
 
@@ -90,7 +87,7 @@ async def generate_entry_points_txt_from_stevedore_extension(
             namespace: str
             entry_points: FrozenDict[str, PythonDistributionEntryPoint]
             for namespace, entry_points in resolved_ep.val.items():
-                if not entry_points or namespace not in requested_namespaces:
+                if not entry_points or namespace not in requested_namespaces.value:
                     continue
 
                 entry_points_txt_section = f"[{namespace}]\n"

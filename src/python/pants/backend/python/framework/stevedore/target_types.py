@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from pants.engine.target import StringSequenceField, Targets
 from pants.util.strutil import softwrap
 
@@ -38,4 +40,13 @@ class StevedoreNamespacesField(StringSequenceField):
 
 
 class AllStevedoreExtensionTargets(Targets):
+    pass
+
+
+@dataclass(frozen=True)
+class StevedoreNamespacesProviderTargetsRequest:
+    stevedore_namespaces: StevedoreNamespacesField
+
+
+class StevedoreExtensionTargets(Targets):
     pass

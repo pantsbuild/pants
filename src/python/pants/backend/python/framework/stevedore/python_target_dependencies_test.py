@@ -8,7 +8,7 @@ from textwrap import dedent
 import pytest
 
 from pants.backend.python.framework.stevedore.python_target_dependencies import (
-    InferStevedoreNamespaceDependencies,
+    InferStevedoreNamespacesDependencies,
     PythonTestsStevedoreNamespaceInferenceFieldSet,
     StevedoreExtensions,
 )
@@ -75,7 +75,7 @@ def rule_runner() -> RuleRunner:
             *stevedore_dep_rules(),
             QueryRule(AllStevedoreExtensionTargets, ()),
             QueryRule(StevedoreExtensions, ()),
-            QueryRule(InferredDependencies, (InferStevedoreNamespaceDependencies,)),
+            QueryRule(InferredDependencies, (InferStevedoreNamespacesDependencies,)),
         ],
         target_types=[
             PythonDistribution,
@@ -151,18 +151,21 @@ def test_infer_stevedore_namespace_dependencies(rule_runner: RuleRunner) -> None
         return rule_runner.request(
             InferredDependencies,
             [
-                InferStevedoreNamespaceDependencies(
+                InferStevedoreNamespacesDependencies(
                     PythonTestsStevedoreNamespaceInferenceFieldSet.create(target)
                 )
             ],
         )
 
+    # this asserts that only the st2common.runners.runner namespace gets selected.
+    # and there is NOT a dep on the python_distribution: Address(f"runners/{runner}_runner")
     assert run_dep_inference(
         Address("src/foobar", target_name="tests", relative_file_path="test_something.py"),
     ) == InferredDependencies(
         [
             Address(
-                f"runners/{runner}_runner",
+                f"runners/{runner}_runner/{runner}_runner",
+                relative_file_path=f"{runner}_runner.py",
             )
             for runner in st2_runners
         ],
