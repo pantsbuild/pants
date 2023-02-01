@@ -16,7 +16,6 @@ from pants.backend.shell.util_rules.adhoc_process_support import (
     ShellCommandProcessRequest,
     _execution_environment_from_dependencies,
     _parse_outputs_from_command,
-    _parse_working_directory,
 )
 from pants.backend.shell.util_rules.adhoc_process_support import (
     rules as adhoc_process_support_rules,
@@ -82,9 +81,7 @@ async def run_in_sandbox_request(
     )
     run_field_set: RunFieldSet = field_sets.field_sets[0]
 
-    working_directory = _parse_working_directory(
-        shell_command[ShellCommandWorkdirField].value or "", shell_command.address
-    )
+    working_directory = shell_command[ShellCommandWorkdirField].value or ""
 
     # Must be run in target environment so that the binaries/envvars match the execution
     # environment when we actually run the process.
@@ -102,6 +99,7 @@ async def run_in_sandbox_request(
 
     process_request = ShellCommandProcessRequest(
         description=description,
+        address=shell_command.address,
         shell_name=shell_command.address.spec,
         interactive=False,
         working_directory=working_directory,

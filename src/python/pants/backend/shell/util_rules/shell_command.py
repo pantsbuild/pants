@@ -20,7 +20,6 @@ from pants.backend.shell.util_rules.adhoc_process_support import (
     ShellCommandProcessRequest,
     _execution_environment_from_dependencies,
     _parse_outputs_from_command,
-    _parse_working_directory,
 )
 from pants.backend.shell.util_rules.adhoc_process_support import (
     rules as adhoc_process_support_rules,
@@ -60,9 +59,7 @@ async def _prepare_process_request_from_target(shell_command: Target) -> ShellCo
     description = f"the `{shell_command.alias}` at `{shell_command.address}`"
 
     interactive = shell_command.has_field(ShellCommandIsInteractiveField)
-    working_directory = _parse_working_directory(
-        shell_command[ShellCommandWorkdirField].value or "", shell_command.address
-    )
+    working_directory = shell_command[ShellCommandWorkdirField].value
 
     if interactive and not working_directory:
         working_directory = "."
@@ -77,6 +74,7 @@ async def _prepare_process_request_from_target(shell_command: Target) -> ShellCo
 
     return ShellCommandProcessRequest(
         description=description,
+        address=shell_command.address,
         shell_name=shell_command.address.spec,
         interactive=interactive,
         working_directory=working_directory,

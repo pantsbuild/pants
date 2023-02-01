@@ -52,6 +52,7 @@ logger = logging.getLogger(__name__)
 @dataclass(frozen=True)
 class ShellCommandProcessRequest:
     description: str
+    address: Address
     shell_name: str
     interactive: bool
     working_directory: str | None
@@ -206,9 +207,15 @@ async def prepare_shell_command_process(
 ) -> Process:
 
     description = shell_command.description
+    address = shell_command.address
     shell_name = shell_command.shell_name
     interactive = shell_command.interactive
-    working_directory = shell_command.working_directory
+    if not interactive:
+        working_directory = _parse_working_directory(shell_command.working_directory or "", address)
+    elif shell_command.working_directory is not None:
+        working_directory = shell_command.working_directory
+    else:
+        raise ValueError("Working directory must be not be `None` for interactive processes.")
     command = shell_command.command
     timeout: int | None = shell_command.timeout
     tools = shell_command.tools
