@@ -19,12 +19,13 @@ from pants.backend.shell.target_types import (
     ShellRunInSandboxTarget,
     ShellSourcesGeneratorTarget,
 )
+from pants.backend.shell.util_rules.adhoc_process_support import ShellCommandProcessRequest
+from pants.backend.shell.util_rules.run_in_sandbox import GenerateFilesFromRunInSandboxRequest
+from pants.backend.shell.util_rules.run_in_sandbox import rules as run_in_sandbox_rules
 from pants.backend.shell.util_rules.shell_command import (
-    GenerateFilesFromRunInSandboxRequest,
     GenerateFilesFromShellCommandRequest,
     RunShellCommand,
     ShellCommandProcessFromTargetRequest,
-    ShellCommandProcessRequest,
 )
 from pants.backend.shell.util_rules.shell_command import rules as shell_command_rules
 from pants.core.goals.run import RunRequest
@@ -53,6 +54,7 @@ def rule_runner() -> RuleRunner:
         rules=[
             *archive.rules(),
             *shell_command_rules(),
+            *run_in_sandbox_rules(),
             *source_files.rules(),
             *core_target_type_rules(),
             *run_python_source_rules(),
