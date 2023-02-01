@@ -7,6 +7,7 @@ from typing import Iterable
 
 from pants.backend.javascript import package_json
 from pants.backend.javascript.package_json import (
+    AllPackageJson,
     AllPackageJsonTargets,
     PackageJson,
     PackageJsonDependenciesField,
@@ -35,11 +36,11 @@ class InferPackageJsonDependenciesRequest(InferDependenciesRequest):
 async def infer_package_json_dependencies(
     request: InferPackageJsonDependenciesRequest, all_tgts: AllPackageJsonTargets
 ) -> InferredDependencies:
+    all_pkg_json = await Get(AllPackageJson, AllPackageJsonTargets, all_tgts)
     pkg_json = await Get(PackageJson, ReadPackageJsonRequest(request.field_set.source))
-    workspace_files = {pkg.file for pkg in pkg_json.workspaces}
-    addresses = (
-        tgt.address for tgt in all_tgts if tgt[PackageJsonSourceField].file_path in workspace_files
-    )
+    addresses = {
+        tgt.address for pkg, tgt in zip(all_pkg_json, all_tgts) if pkg_json in pkg.workspaces
+    }
     return InferredDependencies(addresses)
 
 

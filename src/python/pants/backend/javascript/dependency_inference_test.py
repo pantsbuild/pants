@@ -91,6 +91,6 @@ def test_infers_nested_workspace_dependencies(rule_runner: RuleRunner) -> None:
     inferred_from_child = get_inferred_package_jsons_address(rule_runner, child_tgt)
     inferred_from_grandchild = get_inferred_package_jsons_address(rule_runner, grandchild_tgt)
 
-    assert set(inferred_from_root) == {Address("src/js/bar")}
-    assert set(inferred_from_child) == {Address("src/js/bar/baz")}
-    assert not inferred_from_grandchild
+    assert not inferred_from_root
+    assert set(inferred_from_child) == {Address("src/js")}
+    assert set(inferred_from_grandchild) == {Address("src/js/bar")}
