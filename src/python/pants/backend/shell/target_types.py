@@ -430,15 +430,21 @@ class ShellCommandLogOutputField(BoolField):
 
 class ShellCommandWorkdirField(StringField):
     alias = "workdir"
-    default = None
+    default = "."
     help = softwrap(
-        "Sets the current working directory of the command, relative to the project root. If not "
-        "set, use the project root.\n\n"
+        "Sets the current working directory of the command. "
         "To specify the location of the `BUILD` file, use `.`. Values beginning with `.` are "
         "relative to the location of the `BUILD` file.\n\n"
-        "To specify the project/build root, use `/` or the empty string."
+        "To specify the build root, use `/` or the empty string.\n\n"
+        "Values that do not begin with `.` or `/` are relative to the build root."
     )
 
+class RunShellCommandWorkdirField(ShellCommandWorkdirField):
+    default = None
+    help = softwrap(
+        "Sets the current working directory of the command that is `run`. If `None`, run the "
+        "command from the current working directory."
+    )
 
 class ShellCommandTestDependenciesField(ShellCommandExecutionDependenciesField):
     pass
@@ -536,7 +542,7 @@ class ShellCommandRunTarget(Target):
         *COMMON_TARGET_FIELDS,
         ShellCommandExecutionDependenciesField,
         ShellCommandCommandField,
-        ShellCommandWorkdirField,
+        RunShellCommandWorkdirField,
         ShellCommandIsInteractiveField,
     )
     help = softwrap(
