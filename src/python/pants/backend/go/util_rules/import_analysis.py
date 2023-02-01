@@ -24,7 +24,8 @@ from pants.build_graph.address import Address
 from pants.engine.internals.selectors import Get
 from pants.engine.process import ProcessResult
 from pants.engine.rules import collect_rules, rule
-from pants.engine.unions import UnionRule
+
+# from pants.engine.unions import UnionRule
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 
@@ -170,5 +171,5 @@ def rules():
     return (
         *collect_rules(),
         *go_mod.rules(),
-        UnionRule(GoModuleImportPathsMappingsHook, GoSdkImportPathsMappingsHook),
+        # UnionRule(GoModuleImportPathsMappingsHook, GoSdkImportPathsMappingsHook),
     )
