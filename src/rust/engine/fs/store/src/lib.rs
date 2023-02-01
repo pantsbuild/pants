@@ -42,7 +42,7 @@ use std::fmt::{self, Debug, Display};
 use std::fs::hard_link;
 use std::fs::OpenOptions;
 use std::future::Future;
-use std::io::{self, Read, Write};
+use std::io::{self, Write};
 use std::os::unix::fs::{symlink, OpenOptionsExt, PermissionsExt};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Weak};
@@ -440,15 +440,12 @@ impl Store {
   ///
   /// Store a file locally by streaming its contents.
   ///
-  pub async fn store_file<F, R>(
+  pub async fn store_file(
     &self,
     initial_lease: bool,
     data_is_immutable: bool,
-    data_provider: F,
+    src: PathBuf,
   ) -> Result<Digest, String>
-  where
-    R: Read + Debug,
-    F: Fn() -> Result<R, io::Error> + Send + 'static,
   {
     self
       .local
@@ -456,7 +453,7 @@ impl Store {
         EntryType::File,
         initial_lease,
         data_is_immutable,
-        data_provider,
+        src,
       )
       .await
   }

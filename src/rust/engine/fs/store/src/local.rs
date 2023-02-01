@@ -4,14 +4,14 @@ use super::{EntryType, ShrinkBehavior};
 
 use std::collections::{BinaryHeap, HashSet};
 use std::fmt::Debug;
-use std::io::{self, Read};
-use std::path::Path;
+use std::io;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{self, Duration, Instant};
 
 use bytes::Bytes;
 use futures::future;
-use hashing::{Digest, Fingerprint, EMPTY_DIGEST};
+use hashing::{Digest, Fingerprint, EMPTY_DIGEST, WriterHasher};
 use lmdb::Error::NotFound;
 use lmdb::{self, Cursor, Transaction};
 use sharded_lmdb::{ShardedLmdb, VersionedFingerprint};
@@ -29,6 +29,7 @@ struct InnerStore {
   //  2. It's nice to know whether we should be able to parse something as a proto.
   file_dbs: Result<Arc<ShardedLmdb>, String>,
   directory_dbs: Result<Arc<ShardedLmdb>, String>,
+  large_files_root: PathBuf,
   executor: task_executor::Executor,
 }
 
@@ -48,6 +49,11 @@ impl ByteStore {
     let root = path.as_ref();
     let files_root = root.join("files");
     let directories_root = root.join("directories");
+    let large_files_root = root.join("josh");
+    if !large_files_root.exists() {
+      std::fs::create_dir(large_files_root.clone()).map_err(|e| format!("Failed to create large files root: {e}"))?;
+    }
+
     Ok(ByteStore {
       inner: Arc::new(InnerStore {
         file_dbs: ShardedLmdb::new(
@@ -66,6 +72,7 @@ impl ByteStore {
           options.shard_count,
         )
         .map(Arc::new),
+        large_files_root,
         executor,
       }),
     })
@@ -320,24 +327,47 @@ impl ByteStore {
   /// Store data in two passes, without buffering it entirely into memory. Prefer
   /// `Self::store_bytes` for small values which fit comfortably in memory.
   ///
-  pub async fn store<F, R>(
+  pub async fn store(
     &self,
     entry_type: EntryType,
     initial_lease: bool,
     data_is_immutable: bool,
-    data_provider: F,
+    src: PathBuf,
   ) -> Result<Digest, String>
-  where
-    R: Read + Debug,
-    F: Fn() -> Result<R, io::Error> + Send + 'static,
   {
+    let src2 = src.clone();
+    let data_provider = move || std::fs::File::open(&src);
+
+    let digest = {
+      let mut read = data_provider().map_err(|e| format!("Failed to read: {e}"))?;
+      let mut hasher = WriterHasher::new(io::sink());
+      let _ = io::copy(&mut read, &mut hasher)
+        .map_err(|e| format!("Failed to read from {read:?}: {e}"))?;
+      hasher.finish().0
+    };
+
+    if data_is_immutable && digest.size_bytes > (512 * 1024) {
+      // We should probably lock in case of copy
+      log::warn!("Trying to move {src2:?}");
+      let rename_result = std::fs::rename(src2, self.inner.large_files_root.join(digest.hash.to_hex()));
+      if rename_result.is_err() {
+        let rename_err = rename_result.unwrap_err();
+        if rename_err.raw_os_error().unwrap_or(0) == 18 {
+          // I'm supposed to copy now
+        } else {
+          return Err(format!("Womp womp {rename_err}"));
+        }
+      };
+    }
+
     let dbs = match entry_type {
       EntryType::Directory => self.inner.directory_dbs.clone(),
       EntryType::File => self.inner.file_dbs.clone(),
     };
-    dbs?
-      .store(initial_lease, data_is_immutable, data_provider)
-      .await
+    let _ = dbs?
+      .store(initial_lease, data_is_immutable, digest, data_provider)
+      .await;
+    Ok(digest)
   }
 
   ///

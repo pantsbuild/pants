@@ -483,9 +483,8 @@ impl ShardedLmdb {
   }
 
   ///
-  /// Stores the given Read instance under its computed digest. This method performs two passes
-  /// over the source to 1) hash it, 2) store it. If !data_is_immutable, the second pass will
-  /// re-hash the data to confirm that it hasn't changed.
+  /// Stores the given Read instance under its computed digest. If !data_is_immutable,
+  /// we will re-hash the data to confirm that it hasn't changed.
   ///
   /// If the Read instance gets longer between Reads, we will not detect that here, but any
   /// captured data will still be valid.
@@ -494,8 +493,9 @@ impl ShardedLmdb {
     &self,
     initial_lease: bool,
     data_is_immutable: bool,
+    expected_digest: Digest,
     data_provider: F,
-  ) -> Result<Digest, String>
+  ) -> Result<(), String>
   where
     R: Read + Debug,
     F: Fn() -> Result<R, io::Error> + Send + 'static,
@@ -507,17 +507,8 @@ impl ShardedLmdb {
         move || {
           let mut attempts = 0;
           loop {
-            // First pass: compute the Digest.
-            let digest = {
-              let mut read = data_provider().map_err(|e| format!("Failed to read: {e}"))?;
-              let mut hasher = WriterHasher::new(io::sink());
-              let _ = io::copy(&mut read, &mut hasher)
-                .map_err(|e| format!("Failed to read from {read:?}: {e}"))?;
-              hasher.finish().0
-            };
-
-            let effective_key = VersionedFingerprint::new(digest.hash, ShardedLmdb::SCHEMA_VERSION);
-            let (env, db, lease_database) = store.get(&digest.hash);
+            let effective_key = VersionedFingerprint::new(expected_digest.hash, ShardedLmdb::SCHEMA_VERSION);
+            let (env, db, lease_database) = store.get(&expected_digest.hash);
             let put_res: Result<(), StoreError> = env
               .begin_rw_txn()
               .map_err(StoreError::Lmdb)
@@ -527,7 +518,7 @@ impl ShardedLmdb {
                   .reserve(
                     db,
                     &effective_key,
-                    digest.size_bytes,
+                    expected_digest.size_bytes,
                     WriteFlags::NO_OVERWRITE,
                   )?
                   .writer();
@@ -539,7 +530,7 @@ impl ShardedLmdb {
                   })?;
 
                   // Should retry if the file got shorter between reads.
-                  copied as usize != digest.size_bytes
+                  copied as usize != expected_digest.size_bytes
                 } else {
                   // Confirm that the data hasn't changed.
                   let mut hasher = WriterHasher::new(writer);
@@ -548,7 +539,7 @@ impl ShardedLmdb {
                   })?;
 
                   // Should retry if the Digest changed between reads.
-                  digest != hasher.finish().0
+                  expected_digest != hasher.finish().0
                 };
 
                 if should_retry {
@@ -570,7 +561,7 @@ impl ShardedLmdb {
               });
 
             match put_res {
-              Ok(()) => return Ok(digest),
+              Ok(()) => return Ok(()),
               Err(StoreError::Retry(msg)) => {
                 // Input changed during reading: maybe retry.
                 if attempts > 10 {
@@ -580,9 +571,9 @@ impl ShardedLmdb {
                   continue;
                 }
               }
-              Err(StoreError::Lmdb(lmdb::Error::KeyExist)) => return Ok(digest),
-              Err(StoreError::Lmdb(err)) => return Err(format!("Error storing {digest:?}: {err}")),
-              Err(StoreError::Io(err)) => return Err(format!("Error storing {digest:?}: {err}")),
+              Err(StoreError::Lmdb(lmdb::Error::KeyExist)) => return Ok(()),
+              Err(StoreError::Lmdb(err)) => return Err(format!("Error storing {expected_digest:?}: {err}")),
+              Err(StoreError::Io(err)) => return Err(format!("Error storing {expected_digest:?}: {err}")),
             };
           }
         },

@@ -583,7 +583,7 @@ impl DigestFile {
     context
       .core
       .store()
-      .store_file(true, false, move || std::fs::File::open(&path))
+      .store_file(true, false, path)
       .map_err(throw)
       .await
   }
