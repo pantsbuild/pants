@@ -407,11 +407,8 @@ async def setup_build_go_package_target_request(
             continue
 
         if remaining_import not in stdlib_packages:
-            raise ValueError(
-                f"While building `{request.address}`, the dependency import path `{remaining_import}` "
-                "was not provided by any first party package, third party dependnecy, nor the standard "
-                "library. Please check whether the correct import path was used."
-            )
+            continue
+
         stdlib_build_request_gets.append(
             Get(
                 FallibleBuildGoPackageRequest,
