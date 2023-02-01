@@ -13,7 +13,7 @@ from pants.build_graph.build_file_aliases import BuildFileAliases
 
 
 def build_file_aliases():
-    return BuildFileAliases(objects={"stevedore_namespace": StevedoreNamespace})
+    return BuildFileAliases(objects={StevedoreNamespace.alias: StevedoreNamespace})
 
 
 def rules():
