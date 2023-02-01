@@ -27,7 +27,10 @@ from pants.backend.go.util_rules.build_pkg import (
     FallibleBuildGoPackageRequest,
     FallibleBuiltGoPackage,
 )
-from pants.backend.go.util_rules.build_pkg_target import BuildGoPackageTargetRequest
+from pants.backend.go.util_rules.build_pkg_target import (
+    BuildGoPackageRequestForStdlibRequest,
+    BuildGoPackageTargetRequest,
+)
 from pants.backend.go.util_rules.coverage import (
     GenerateCoverageSetupCodeRequest,
     GenerateCoverageSetupCodeResult,
@@ -45,6 +48,7 @@ from pants.backend.go.util_rules.first_party_pkg import (
 )
 from pants.backend.go.util_rules.go_mod import OwningGoMod, OwningGoModRequest
 from pants.backend.go.util_rules.goroot import GoRoot
+from pants.backend.go.util_rules.import_analysis import GoStdLibPackages, GoStdLibPackagesRequest
 from pants.backend.go.util_rules.link import LinkedGoBinary, LinkGoBinaryRequest
 from pants.backend.go.util_rules.pkg_analyzer import PackageAnalyzerSetup
 from pants.backend.go.util_rules.tests_analysis import GeneratedTestMain, GenerateTestMainRequest
@@ -316,10 +320,31 @@ async def prepare_go_test_binary(
     )
     testmain_analysis_json = json.loads(testmain_analysis.stdout.decode())
 
+    stdlib_packages = await Get(
+        GoStdLibPackages,
+        GoStdLibPackagesRequest(
+            with_race_detector=build_opts.with_race_detector,
+            cgo_enabled=build_opts.cgo_enabled,
+        ),
+    )
+
     inferred_dependencies: set[Address] = set()
+    stdlib_build_request_gets = []
     for dep_import_path in testmain_analysis_json.get("Imports", []):
         if dep_import_path == import_path:
-            continue  # test pkg dep added manally later
+            continue  # test pkg dep added manually later
+
+        if dep_import_path in stdlib_packages:
+            stdlib_build_request_gets.append(
+                Get(
+                    FallibleBuildGoPackageRequest,
+                    BuildGoPackageRequestForStdlibRequest(
+                        import_path=dep_import_path,
+                        build_opts=build_opts,
+                    ),
+                )
+            )
+            continue
 
         candidate_packages = package_mapping.mapping.get(dep_import_path)
         if candidate_packages:
@@ -359,6 +384,11 @@ async def prepare_go_test_binary(
     for build_request in fallible_testmain_import_build_requests:
         if build_request.request is None:
             return compilation_failure(build_request.exit_code, None, build_request.stderr)
+        testmain_import_build_requests.append(build_request.request)
+
+    stdlib_build_requests = await MultiGet(stdlib_build_request_gets)
+    for build_request in stdlib_build_requests:
+        assert build_request.request is not None
         testmain_import_build_requests.append(build_request.request)
 
     # Construct the build request for the package under test.
