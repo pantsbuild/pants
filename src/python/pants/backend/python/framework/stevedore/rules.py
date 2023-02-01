@@ -12,6 +12,7 @@ from pants.backend.python.framework.stevedore.target_types import (
 )
 from pants.backend.python.goals.pytest_runner import PytestPluginSetup, PytestPluginSetupRequest
 from pants.backend.python.target_types import (
+    PythonDistribution,
     PythonDistributionEntryPoint,
     PythonDistributionEntryPointsField,
     ResolvedPythonDistributionEntryPoints,
@@ -36,7 +37,7 @@ class GenerateEntryPointsTxtFromStevedoreExtensionRequest(PytestPluginSetupReque
 
 
 @rule(
-    desc="Generate entry_points.txt from stevedore_extension target metadata",
+    desc=f"Generate entry_points.txt to imitate `{PythonDistribution.alias}` installation.",
     level=LogLevel.DEBUG,
 )
 async def generate_entry_points_txt_from_stevedore_extension(

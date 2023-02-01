@@ -19,6 +19,7 @@ from pants.backend.python.framework.stevedore.target_types import (
     StevedoreNamespacesProviderTargetsRequest,
 )
 from pants.backend.python.target_types import (
+    PythonDistribution,
     PythonDistributionDependenciesField,
     PythonDistributionEntryPointsField,
     PythonTestsDependenciesField,
@@ -50,7 +51,7 @@ from pants.util.strutil import softwrap
 
 
 @rule(
-    desc="Find all `python_distribution` targets with `stevedore_namespace` entry_points",
+    desc=f"Find all `{PythonDistribution.alias}` targets with `{StevedoreNamespace.alias}` entry_points",
     level=LogLevel.DEBUG,
 )
 def find_all_python_distributions_with_any_stevedore_entry_points(
@@ -79,7 +80,7 @@ class StevedoreExtensions:
 
 
 @rule(
-    desc="Create map of `stevedore_namespace` to `python_distribution` targets",
+    desc=f"Create map of `{StevedoreNamespace.alias}` to `{PythonDistribution.alias}` targets",
     level=LogLevel.DEBUG,
 )
 async def map_stevedore_extensions(
@@ -97,7 +98,7 @@ async def map_stevedore_extensions(
 
 
 @rule(
-    desc="Find `python_distribution` targets with entry_points in selected `stevedore_namespace`s",
+    desc=f"Find `{PythonDistribution.alias}` targets with entry_points in selected `{StevedoreNamespace.alias}`s",
     level=LogLevel.DEBUG,
 )
 def find_python_distributions_with_entry_points_in_stevedore_namespaces(
@@ -136,7 +137,7 @@ class InferStevedoreNamespacesDependencies(InferDependenciesRequest):
 
 
 @rule(
-    desc="Infer dependencies based on `stevedore_namespaces` field.",
+    desc=f"Infer dependencies based on `{StevedoreNamespacesField.alias}` field.",
     level=LogLevel.DEBUG,
 )
 async def infer_stevedore_namespaces_dependencies(

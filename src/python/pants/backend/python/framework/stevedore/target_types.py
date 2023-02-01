@@ -23,6 +23,8 @@ class StevedoreNamespace(str):
         )
     """
 
+    alias = "stevedore_namespace"
+
 
 # This is a lot like a SpecialCasedDependencies field, but it doesn't list targets directly.
 class StevedoreNamespacesField(StringSequenceField):
@@ -31,8 +33,10 @@ class StevedoreNamespacesField(StringSequenceField):
         """
         List the stevedore namespaces required by this target.
 
-        All stevedore_extension targets with these namespaces will be added as
-        dependencies so that they are available on PYTHONPATH during tests.
+        Code for all entry_points on python_distribution targets with these
+        namespaces will be added as dependencies so that they are available on
+        PYTHONPATH during tests. Plus, an entry_points.txt file will be generated
+        in the sandbox so that the distribution appears to be "installed".
         The stevedore namespace format (my.stevedore.extension) is similar
         to a python namespace.
         """

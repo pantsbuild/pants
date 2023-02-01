@@ -157,8 +157,10 @@ def test_infer_stevedore_namespace_dependencies(rule_runner: RuleRunner) -> None
             ],
         )
 
-    # this asserts that only the st2common.runners.runner namespace gets selected.
-    # and there is NOT a dep on the python_distribution: Address(f"runners/{runner}_runner")
+    # This asserts that these should NOT be inferred dependencies:
+    #   - stevedore_namespace(some.thing.else) -> {runner}_runner.thing
+    #   - the python_distribution itself at Address(f"runners/{runner}_runner")
+    # It should only infer the stevedore_namespace(st2common.runners.runner) deps.
     assert run_dep_inference(
         Address("src/foobar", target_name="tests", relative_file_path="test_something.py"),
     ) == InferredDependencies(
