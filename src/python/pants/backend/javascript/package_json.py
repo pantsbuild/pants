@@ -107,7 +107,7 @@ async def _read_workspaces_for(
             OwnersNotFoundBehavior.error,
         ),
     )
-    workspace_tgts = await Get(UnexpandedTargets, Addresses, Addresses(tuple(workspace_addresses)))
+    workspace_tgts = await Get(UnexpandedTargets, Addresses(tuple(workspace_addresses)))
     return await MultiGet(
         Get(PackageJson, ReadPackageJsonRequest(tgt[PackageJsonSourceField]))
         for tgt in workspace_tgts
