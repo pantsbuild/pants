@@ -177,11 +177,9 @@ async def infer_stevedore_namespaces_dependencies(
         for namespace, entry_points in distribution_entry_points.explicit_modules.items()
         for name, entry_point in entry_points.items()
     ]
-    all_module_owners = iter(
-        await MultiGet(
-            Get(PythonModuleOwners, PythonModuleOwnersRequest(entry_point.module, resolve=None))
-            for _, _, _, entry_point, _ in all_module_entry_points
-        )
+    all_module_owners = await MultiGet(
+        Get(PythonModuleOwners, PythonModuleOwnersRequest(entry_point.module, resolve=None))
+        for _, _, _, entry_point, _ in all_module_entry_points
     )
     module_owners: OrderedSet[Address] = OrderedSet()
     for (address, namespace, name, entry_point, explicitly_provided_deps), owners in zip(
