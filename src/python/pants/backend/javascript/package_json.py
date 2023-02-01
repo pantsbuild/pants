@@ -10,12 +10,14 @@ from typing import Any, Iterable
 from pants.backend.project_info import dependencies
 from pants.core.util_rules import stripped_source_files
 from pants.engine import fs
+from pants.engine.addresses import Addresses
 from pants.engine.collection import Collection
 from pants.engine.fs import DigestContents, PathGlobs
 from pants.engine.internals import graph
+from pants.engine.internals.graph import Owners, OwnersRequest
 from pants.engine.internals.native_engine import Digest, Snapshot
 from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.rules import Rule, collect_rules, rule
+from pants.engine.rules import Rule, collect_rules, rule, rule_helper
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     AllUnexpandedTargets,
@@ -24,9 +26,10 @@ from pants.engine.target import (
     Target,
     TargetGenerator,
     Targets,
+    UnexpandedTargets,
 )
 from pants.engine.unions import UnionRule
-from pants.option.global_options import UnmatchedBuildFileGlobs
+from pants.option.global_options import OwnersNotFoundBehavior, UnmatchedBuildFileGlobs
 from pants.util.frozendict import FrozenDict
 
 
@@ -54,6 +57,7 @@ class PackageJson:
     name: str
     version: str
     snapshot: Snapshot
+    workspaces: tuple[PackageJson, ...] = ()
 
     @property
     def digest(self) -> Digest:
@@ -81,6 +85,30 @@ class ReadPackageJsonRequest:
     source: PackageJsonSourceField
 
 
+@rule_helper
+async def _read_workspaces_for(
+    root_dir: str, parsed_package_json: dict[str, Any]
+) -> tuple[PackageJson, ...]:
+    self_reference = f".{os.path.sep}"
+    workspace_addresses = await Get(
+        Owners,
+        OwnersRequest(
+            tuple(
+                os.path.join(root_dir, workspace_dir, PackageJsonSourceField.default)
+                for workspace_dir in parsed_package_json.get("workspaces", ())
+                if workspace_dir != self_reference
+            ),
+            OwnersNotFoundBehavior.error,
+        ),
+    )
+    workspace_tgts = await Get(UnexpandedTargets, Addresses, Addresses(tuple(workspace_addresses)))
+    return await MultiGet(
+        Get(PackageJson, ReadPackageJsonRequest(tgt[PackageJsonSourceField]))
+        for tgt in workspace_tgts
+        if tgt.has_field(PackageJsonSourceField)
+    )
+
+
 @rule
 async def read_package_json(request: ReadPackageJsonRequest) -> PackageJson:
     snapshot = await Get(
@@ -88,13 +116,17 @@ async def read_package_json(request: ReadPackageJsonRequest) -> PackageJson:
     )
 
     digest_content = await Get(DigestContents, Digest, snapshot.digest)
-    package_json = json.loads(digest_content[0].content)
+    parsed_package_json = json.loads(digest_content[0].content)
+    root_dir = os.path.dirname(snapshot.files[0])
+
+    workspace_pkg_jsons = await _read_workspaces_for(root_dir, parsed_package_json)
 
     return PackageJson(
-        content=FrozenDict.deep_freeze(package_json),
-        name=package_json["name"],
-        version=package_json["version"],
+        content=FrozenDict.deep_freeze(parsed_package_json),
+        name=parsed_package_json["name"],
+        version=parsed_package_json["version"],
         snapshot=snapshot,
+        workspaces=workspace_pkg_jsons,
     )
 
 
