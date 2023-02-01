@@ -96,16 +96,16 @@ async def _read_workspaces_for(
     root_dir: str, parsed_package_json: dict[str, Any]
 ) -> tuple[PackageJson, ...]:
     self_reference = f".{os.path.sep}"
-    workspace_addresses = await Get(
-        Owners,
-        OwnersRequest(
-            tuple(
-                os.path.join(root_dir, workspace_dir, PackageJsonSourceField.default)
-                for workspace_dir in parsed_package_json.get("workspaces", ())
-                if workspace_dir != self_reference
-            ),
-            OwnersNotFoundBehavior.error,
+    snapshot = await Get(
+        Snapshot,
+        PathGlobs(
+            os.path.join(root_dir, workspace_dir, PackageJsonSourceField.default)
+            for workspace_dir in parsed_package_json.get("workspaces", ())
+            if workspace_dir != self_reference
         ),
+    )
+    workspace_addresses = await Get(
+        Owners, OwnersRequest(snapshot.files, OwnersNotFoundBehavior.error)
     )
     workspace_tgts = await Get(UnexpandedTargets, Addresses(tuple(workspace_addresses)))
     return await MultiGet(

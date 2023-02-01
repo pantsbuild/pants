@@ -177,3 +177,50 @@ def test_nested_workspaces(rule_runner: RuleRunner) -> None:
         a_package,
         b_package,
     }
+
+
+def test_parses_simple_workspace_with_globbing(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/js/BUILD": "package_json()",
+            "src/js/package.json": given_package_with_workspaces("ham", "0.0.1", "./packages/*"),
+            "src/js/packages/foo/BUILD": "package_json()",
+            "src/js/packages/foo/package.json": given_package("egg", "2.0.0"),
+            "src/js/packages/bar/BUILD": "package_json()",
+            "src/js/packages/bar/package.json": given_package("spam", "0.0.2"),
+        }
+    )
+    [root_package_snapshot, bar_package_snapshot, foo_package_snapshot] = get_snapshots_for_package(
+        rule_runner,
+        "src/js/package.json",
+        "src/js/packages/bar/package.json",
+        "src/js/packages/foo/package.json",
+    )
+
+    pkg_jsons = rule_runner.request(AllPackageJson, [])
+
+    bar_package = PackageJson(
+        content=FrozenDict.deep_freeze(json.loads(given_package("spam", "0.0.2"))),
+        name="spam",
+        version="0.0.2",
+        snapshot=bar_package_snapshot,
+    )
+    foo_package = PackageJson(
+        content=FrozenDict.deep_freeze(json.loads(given_package("egg", "2.0.0"))),
+        name="egg",
+        version="2.0.0",
+        snapshot=foo_package_snapshot,
+    )
+    assert set(pkg_jsons) == {
+        PackageJson(
+            content=FrozenDict.deep_freeze(
+                json.loads(given_package_with_workspaces("ham", "0.0.1", "./packages/*"))
+            ),
+            name="ham",
+            version="0.0.1",
+            snapshot=root_package_snapshot,
+            workspaces=(bar_package, foo_package),
+        ),
+        foo_package,
+        bar_package,
+    }
