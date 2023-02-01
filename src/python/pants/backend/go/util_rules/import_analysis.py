@@ -4,28 +4,16 @@
 from __future__ import annotations
 
 import logging
-from collections import defaultdict
 from dataclasses import dataclass
 
 import ijson.backends.python as ijson
 
-from pants.backend.go.dependency_inference import (
-    GoImportPathsMappingAddressSet,
-    GoModuleImportPathsMapping,
-    GoModuleImportPathsMappings,
-    GoModuleImportPathsMappingsHook,
-)
-from pants.backend.go.target_types import DEFAULT_GO_SDK_ADDR
 from pants.backend.go.util_rules import go_mod
 from pants.backend.go.util_rules.cgo import CGoCompilerFlags
-from pants.backend.go.util_rules.go_mod import AllGoModTargets
 from pants.backend.go.util_rules.sdk import GoSdkProcess
-from pants.build_graph.address import Address
 from pants.engine.internals.selectors import Get
 from pants.engine.process import ProcessResult
 from pants.engine.rules import collect_rules, rule
-
-# from pants.engine.unions import UnionRule
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 
@@ -115,61 +103,8 @@ async def analyze_go_stdlib_packages(request: GoStdLibPackagesRequest) -> GoStdL
     return GoStdLibPackages(stdlib_packages)
 
 
-class GoSdkImportPathsMappingsHook(GoModuleImportPathsMappingsHook):
-    pass
-
-
-@rule(desc="Analyze and map Go import paths for the Go SDK.", level=LogLevel.DEBUG)
-async def go_map_import_paths_by_module(
-    _request: GoSdkImportPathsMappingsHook,
-    all_go_mod_targets: AllGoModTargets,
-) -> GoModuleImportPathsMappings:
-    import_paths_by_module: dict[Address, dict[str, set[Address]]] = defaultdict(
-        lambda: defaultdict(set)
-    )
-
-    stdlib_packages = await Get(
-        GoStdLibPackages,
-        GoStdLibPackagesRequest(with_race_detector=False),
-    )
-
-    # Replicate the Go SDK imports path to all Go modules.
-    # TODO: This will need to change eventually for multiple Go SDK support.
-    for import_path in stdlib_packages.keys():
-        for go_mod_tgt in all_go_mod_targets:
-            import_paths_by_module[go_mod_tgt.address][import_path].add(
-                DEFAULT_GO_SDK_ADDR.create_generated(import_path)
-            )
-
-    return GoModuleImportPathsMappings(
-        FrozenDict(
-            {
-                go_mod_addr: GoModuleImportPathsMapping(
-                    mapping=FrozenDict(
-                        {
-                            import_path: GoImportPathsMappingAddressSet(
-                                addresses=tuple(sorted(addresses)), infer_all=False
-                            )
-                            for import_path, addresses in import_path_mapping.items()
-                        }
-                    ),
-                    address_to_import_path=FrozenDict(
-                        {
-                            address: import_path
-                            for import_path, addresses in import_path_mapping.items()
-                            for address in addresses
-                        }
-                    ),
-                )
-                for go_mod_addr, import_path_mapping in import_paths_by_module.items()
-            }
-        )
-    )
-
-
 def rules():
     return (
         *collect_rules(),
         *go_mod.rules(),
-        # UnionRule(GoModuleImportPathsMappingsHook, GoSdkImportPathsMappingsHook),
     )

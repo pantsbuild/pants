@@ -9,7 +9,7 @@ import pytest
 from pants.backend.go import target_type_rules
 from pants.backend.go.goals.test import GoTestFieldSet, GoTestRequest
 from pants.backend.go.goals.test import rules as test_rules
-from pants.backend.go.target_types import GoBinaryTarget, GoModTarget, GoPackageTarget, GoSdkTarget
+from pants.backend.go.target_types import GoBinaryTarget, GoModTarget, GoPackageTarget
 from pants.backend.go.util_rules import (
     assembly,
     build_pkg,
@@ -52,7 +52,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(TestResult, (GoTestRequest.Batch,)),
             QueryRule(ProcessResult, (GoSdkProcess,)),
         ],
-        target_types=[GoModTarget, GoPackageTarget, GoBinaryTarget, GoSdkTarget],
+        target_types=[GoModTarget, GoPackageTarget, GoBinaryTarget],
     )
     rule_runner.set_options(["--go-test-args=-v"], env_inherit={"PATH"})
     return rule_runner

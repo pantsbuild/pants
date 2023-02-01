@@ -9,14 +9,12 @@ import pytest
 
 from pants.backend.go import target_type_rules
 from pants.backend.go.target_types import (
-    DEFAULT_GO_SDK_ADDR,
     GoBinaryMainPackageField,
     GoBinaryTarget,
     GoImportPathField,
     GoModTarget,
     GoPackageSourcesField,
     GoPackageTarget,
-    GoSdkTarget,
     GoThirdPartyPackageTarget,
 )
 from pants.backend.go.util_rules import (
@@ -78,7 +76,6 @@ def rule_runner() -> RuleRunner:
             GoModTarget,
             GoPackageTarget,
             GoBinaryTarget,
-            GoSdkTarget,
             GenericTarget,
         ],
     )
@@ -147,7 +144,6 @@ def test_go_package_dependency_inference(rule_runner: RuleRunner) -> None:
     go_mod_file_tgts = {Address("foo", relative_file_path=fp) for fp in ("go.mod", "go.sum")}
 
     assert get_deps(Address("foo/cmd")) == {
-        Address("", target_name="default_go_sdk", generated_name="fmt"),
         Address("foo/pkg"),
     }
     assert get_deps(Address("foo/pkg")) == {Address("foo", generated_name="rsc.io/quote")}
@@ -156,8 +152,6 @@ def test_go_package_dependency_inference(rule_runner: RuleRunner) -> None:
         *go_mod_file_tgts,
     }
     assert get_deps(Address("foo", generated_name="rsc.io/sampler")) == {
-        Address("", target_name="default_go_sdk", generated_name="os"),
-        Address("", target_name="default_go_sdk", generated_name="strings"),
         Address("foo", generated_name="golang.org/x/text/language"),
         *go_mod_file_tgts,
     }
@@ -323,15 +317,3 @@ def test_determine_main_pkg_for_go_binary(rule_runner: RuleRunner) -> None:
         get_main(Address("ambiguous"))
     with engine_error(InvalidFieldException, contains="must point to a `go_package` target"):
         get_main(Address("explicit_wrong_type"))
-
-
-# -----------------------------------------------------------------------------------------------
-# `_go_sdk` and `_go_sdk_package` target types
-# -----------------------------------------------------------------------------------------------
-
-
-def test_go_sdk_target_exists(rule_runner: RuleRunner) -> None:
-    _ = rule_runner.get_target(DEFAULT_GO_SDK_ADDR)
-    fmt_pkg_tgt = rule_runner.get_target(DEFAULT_GO_SDK_ADDR.create_generated("fmt"))
-    addrs = rule_runner.request(Addresses, [DependenciesRequest(fmt_pkg_tgt[Dependencies])])
-    assert len(addrs) > 0, "no dependencies were inferred for `fmt` _go_sdk_package target type"
