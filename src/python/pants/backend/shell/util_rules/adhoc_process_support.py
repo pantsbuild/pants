@@ -10,6 +10,7 @@ import re
 import shlex
 from dataclasses import dataclass
 from textwrap import dedent  # noqa: PNT20
+from typing import Union
 
 from pants.backend.shell.subsystems.shell_setup import ShellSetup
 from pants.backend.shell.target_types import (
@@ -34,6 +35,7 @@ from pants.core.util_rules.system_binaries import (
 from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, Directory, MergeDigests, Snapshot
+from pants.engine.internals.native_engine import RemovePrefix
 from pants.engine.process import Process
 from pants.engine.rules import Get, MultiGet, collect_rules, rule, rule_helper
 from pants.engine.target import (
@@ -160,6 +162,20 @@ def _parse_outputs_from_command(
         output_files = tuple(f for f in outputs if not f.endswith("/"))
         output_directories = tuple(d for d in outputs if d.endswith("/"))
     return output_files, output_directories
+
+
+@rule_helper
+async def _adjust_root_output_directory(
+    digest: Digest, address: Address, working_directory: str, root_output_directory: str
+) -> Digest:
+
+    working_directory = _parse_working_directory(working_directory, address)
+    new_root = _parse_working_directory(root_output_directory, working_directory)
+
+    if new_root == "":
+        return digest
+    else:
+        return await Get(Digest, RemovePrefix(digest, new_root))
 
 
 def _shell_tool_safe_env_name(tool_name: str) -> str:
@@ -315,10 +331,13 @@ def _output_at_build_root(process: Process, bash: BashBinary) -> Process:
     )
 
 
-def _parse_working_directory(workdir_in: str, address: Address) -> str:
+def _parse_working_directory(workdir_in: str, relative_to: Union[Address, str]) -> str:
     """Convert the `workdir` field into something that can be understood by `Process`."""
 
-    reldir = address.spec_path
+    if isinstance(relative_to, Address):
+        reldir = relative_to.spec_path
+    else:
+        reldir = relative_to
 
     if workdir_in == ".":
         return reldir

@@ -11,6 +11,7 @@ from pants.backend.shell.target_types import (
     ShellCommandExtraEnvVarsField,
     ShellCommandIsInteractiveField,
     ShellCommandLogOutputField,
+    ShellCommandOutputRootDirField,
     ShellCommandSourcesField,
     ShellCommandTimeoutField,
     ShellCommandToolsField,
@@ -18,6 +19,7 @@ from pants.backend.shell.target_types import (
 )
 from pants.backend.shell.util_rules.adhoc_process_support import (
     ShellCommandProcessRequest,
+    _adjust_root_output_directory,
     _execution_environment_from_dependencies,
     _parse_outputs_from_command,
 )
@@ -149,7 +151,12 @@ async def run_shell_command(
         if result.stderr:
             logger.warning(result.stderr.decode())
 
-    output = await Get(Snapshot, Digest, result.output_digest)
+    working_directory = shell_command[ShellCommandWorkdirField].value or ""
+    root_output_directory = shell_command[ShellCommandOutputRootDirField].value or ""
+    adjusted = await _adjust_root_output_directory(
+        result.output_digest, shell_command.address, root_output_directory, working_directory
+    )
+    output = await Get(Snapshot, Digest, adjusted)
     return GeneratedSources(output)
 
 

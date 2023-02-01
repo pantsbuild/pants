@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import re
 from enum import Enum
+from typing import ClassVar, Optional
 
 from pants.backend.shell.subsystems.shell_setup import ShellSetup
 from pants.core.goals.test import RuntimePackageDependenciesField, TestTimeoutField
@@ -430,7 +431,7 @@ class ShellCommandLogOutputField(BoolField):
 
 class ShellCommandWorkdirField(StringField):
     alias = "workdir"
-    default = "."
+    default: ClassVar[Optional[str]] = "."
     help = softwrap(
         "Sets the current working directory of the command. "
         "To specify the location of the `BUILD` file, use `.`. Values beginning with `.` are "
@@ -439,12 +440,27 @@ class ShellCommandWorkdirField(StringField):
         "Values that do not begin with `.` or `/` are relative to the build root."
     )
 
+
 class RunShellCommandWorkdirField(ShellCommandWorkdirField):
     default = None
     help = softwrap(
         "Sets the current working directory of the command that is `run`. If `None`, run the "
         "command from the current working directory."
     )
+
+
+class ShellCommandOutputRootDirField(StringField):
+    alias = "root_output_directory"
+    default = "."
+    help = softwrap(
+        "Adjusts the location of files output by this command, when consumed as a dependency.\n\n"
+        "`.` or values beginning with `./` are relative to the location of the `BUILD` file.\n\n"
+        "`.` or values beginning with `./` are relative to the value of `workdir`.\n\n"
+        "To specify the build root, use `/` or the empty string.\n\n"
+        "Values that do not begin with `.` or `/` are relative to the build root.\n\n"
+        "All files output by "
+    )
+
 
 class ShellCommandTestDependenciesField(ShellCommandExecutionDependenciesField):
     pass
@@ -472,6 +488,7 @@ class ShellCommandTarget(Target):
         ShellCommandToolsField,
         ShellCommandExtraEnvVarsField,
         ShellCommandWorkdirField,
+        ShellCommandOutputRootDirField,
         EnvironmentField,
     )
     help = softwrap(
@@ -515,6 +532,7 @@ class ShellRunInSandboxTarget(Target):
         ShellCommandToolsField,
         ShellCommandExtraEnvVarsField,
         ShellCommandWorkdirField,
+        ShellCommandOutputRootDirField,
         EnvironmentField,
     )
     help = softwrap(
