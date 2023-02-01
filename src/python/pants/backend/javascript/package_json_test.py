@@ -5,11 +5,7 @@ import json
 import pytest
 
 from pants.backend.javascript import package_json
-from pants.backend.javascript.package_json import (
-    AllPackageJson,
-    PackageJson,
-    PackageJsonTarget,
-)
+from pants.backend.javascript.package_json import AllPackageJson, PackageJson, PackageJsonTarget
 from pants.engine.fs import PathGlobs
 from pants.engine.internals.native_engine import Snapshot
 from pants.engine.rules import QueryRule
@@ -20,10 +16,7 @@ from pants.util.frozendict import FrozenDict
 @pytest.fixture
 def rule_runner() -> RuleRunner:
     return RuleRunner(
-        rules=[
-            *package_json.rules(),
-            QueryRule(AllPackageJson, ())
-        ],
+        rules=[*package_json.rules(), QueryRule(AllPackageJson, ())],
         target_types=[PackageJsonTarget],
     )
 
@@ -56,5 +49,5 @@ def test_parses_package_jsons(rule_runner: RuleRunner) -> None:
             name="spam",
             version="0.0.2",
             snapshot=bar_package_snapshot,
-        )
+        ),
     }
