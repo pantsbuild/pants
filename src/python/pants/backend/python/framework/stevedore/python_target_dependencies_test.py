@@ -147,19 +147,24 @@ def test_find_python_distributions_with_entry_points_in_stevedore_namespaces(
         }
     )
 
-    assert rule_runner.request(
-        StevedoreExtensionTargets,
-        [
-            StevedoreNamespacesProviderTargetsRequest(
-                rule_runner.get_target(Address("src/foobar", target_name="tests")).get(
-                    StevedoreNamespacesField
-                )
-            ),
-        ],
-    ) == StevedoreExtensionTargets(
-        (
-            rule_runner.get_target(Address(f"runners/{runner}_runner"))
-            for runner in sorted(st2_runners)
+    # use set as the order of targets is not consistent and is not easily sorted
+    assert set(
+        rule_runner.request(
+            StevedoreExtensionTargets,
+            [
+                StevedoreNamespacesProviderTargetsRequest(
+                    rule_runner.get_target(Address("src/foobar", target_name="tests")).get(
+                        StevedoreNamespacesField
+                    )
+                ),
+            ],
+        )
+    ) == set(
+        StevedoreExtensionTargets(
+            (
+                rule_runner.get_target(Address(f"runners/{runner}_runner"))
+                for runner in sorted(st2_runners)
+            )
         )
     )
 
