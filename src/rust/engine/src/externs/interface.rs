@@ -1644,7 +1644,6 @@ fn write_digest(
           destination.clone(),
           lifted_digest,
           &BTreeSet::new(),
-          None,
           fs::Permissions::Writable,
         )
         .await

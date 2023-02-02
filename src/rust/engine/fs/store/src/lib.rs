@@ -59,6 +59,7 @@ use fs::{
 use futures::future::{self, BoxFuture, Either, FutureExt, TryFutureExt};
 use grpc_util::prost::MessageExt;
 use hashing::Digest;
+use local::ByteStore;
 use parking_lot::Mutex;
 use prost::Message;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
@@ -72,12 +73,6 @@ use workunit_store::{in_workunit, Level, Metric};
 const KILOBYTES: usize = 1024;
 const MEGABYTES: usize = 1024 * KILOBYTES;
 const GIGABYTES: usize = 1024 * MEGABYTES;
-
-/// How big a file must be to become an immutable input symlink.
-// NB: These numbers were chosen after micro-benchmarking the code on one machine at the time of
-// writing. They were chosen using a rough equation from the microbenchmarks that are optimized
-// for somewhere between 2 and 3 uses of the corresponding entry to "break even".
-const IMMUTABLE_FILE_SIZE_LIMIT: usize = 512 * KILOBYTES;
 
 mod local;
 #[cfg(test)]
@@ -445,16 +440,10 @@ impl Store {
     initial_lease: bool,
     data_is_immutable: bool,
     src: PathBuf,
-  ) -> Result<Digest, String>
-  {
+  ) -> Result<Digest, String> {
     self
       .local
-      .store(
-        EntryType::File,
-        initial_lease,
-        data_is_immutable,
-        src,
-      )
+      .store(EntryType::File, initial_lease, data_is_immutable, src)
       .await
   }
 
@@ -1200,7 +1189,6 @@ impl Store {
     destination: PathBuf,
     digest: DirectoryDigest,
     mutable_paths: &BTreeSet<RelativePath>,
-    immutable_inputs: Option<&ImmutableInputs>,
     perms: Permissions,
   ) -> Result<(), StoreError> {
     // Load the DigestTrie for the digest, and convert it into a mapping between a fully qualified
@@ -1228,7 +1216,6 @@ impl Store {
         false,
         &parent_to_child,
         &mutable_path_ancestors,
-        immutable_inputs,
         perms,
       )
       .await
@@ -1241,7 +1228,6 @@ impl Store {
     force_mutable: bool,
     parent_to_child: &'a HashMap<PathBuf, Vec<directory::Entry>>,
     mutable_paths: &'a BTreeSet<PathBuf>,
-    immutable_inputs: Option<&'a ImmutableInputs>,
     perms: Permissions,
   ) -> BoxFuture<'a, Result<(), StoreError>> {
     let store = self.clone();
@@ -1275,19 +1261,17 @@ impl Store {
           let path = destination.join(child.name().as_ref());
           let store = store.clone();
           child_futures.push(async move {
-            let can_be_immutable =
-              immutable_inputs.is_some() && !mutable_paths.contains(&path) && !force_mutable;
+            let can_be_immutable = !mutable_paths.contains(&path) && !force_mutable;
 
             match child {
               directory::Entry::File(f) => {
                 store
-                  .materialize_file_maybe_hardlink(
+                  .materialize_file_maybe_symlink(
                     path,
                     f.digest(),
                     perms,
                     f.is_executable(),
                     can_be_immutable,
-                    immutable_inputs,
                   )
                   .await
               }
@@ -1304,7 +1288,6 @@ impl Store {
                     mutable_paths.contains(&path),
                     parent_to_child,
                     mutable_paths,
-                    immutable_inputs,
                     perms,
                   )
                   .await
@@ -1331,22 +1314,25 @@ impl Store {
     .boxed()
   }
 
-  async fn materialize_file_maybe_hardlink(
+  async fn materialize_file_maybe_symlink(
     &self,
     destination: PathBuf,
     digest: Digest,
     perms: Permissions,
     is_executable: bool,
     can_be_immutable: bool,
-    immutable_inputs: Option<&ImmutableInputs>,
   ) -> Result<(), StoreError> {
-    if can_be_immutable && digest.size_bytes > IMMUTABLE_FILE_SIZE_LIMIT {
-      let dest_path = immutable_inputs
-        .unwrap()
-        .path_for_file(digest, is_executable)
-        .await?;
+    if can_be_immutable && ByteStore::uses_large_file_store(digest.size_bytes) {
       self
-        .materialize_hardlink(destination, dest_path.to_str().unwrap().to_string())
+        .materialize_symlink(
+          destination,
+          self
+            .local
+            .large_file_path(digest)
+            .to_str()
+            .unwrap()
+            .to_string(),
+        )
         .await
     } else {
       self

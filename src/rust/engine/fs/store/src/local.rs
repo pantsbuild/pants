@@ -4,18 +4,26 @@ use super::{EntryType, ShrinkBehavior};
 
 use std::collections::{BinaryHeap, HashSet};
 use std::fmt::Debug;
-use std::io;
+use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{self, Duration, Instant};
 
 use bytes::Bytes;
 use futures::future;
-use hashing::{Digest, Fingerprint, EMPTY_DIGEST, WriterHasher};
+use hashing::{Digest, Fingerprint, WriterHasher, EMPTY_DIGEST};
 use lmdb::Error::NotFound;
 use lmdb::{self, Cursor, Transaction};
 use sharded_lmdb::{ShardedLmdb, VersionedFingerprint};
+use std::os::unix::fs::PermissionsExt;
+use tempfile::NamedTempFile;
 use workunit_store::ObservationMetric;
+
+/// How big a file must be to be stored as a file on disk.
+// NB: These numbers were chosen after micro-benchmarking the code on one machine at the time of
+// writing. They were chosen using a rough equation from the microbenchmarks that are optimized
+// for somewhere between 2 and 3 uses of the corresponding entry to "break even".
+const LARGE_FILE_SIZE_LIMIT: usize = 512 * 1024;
 
 #[derive(Debug, Clone)]
 pub struct ByteStore {
@@ -50,9 +58,6 @@ impl ByteStore {
     let files_root = root.join("files");
     let directories_root = root.join("directories");
     let large_files_root = root.join("josh");
-    if !large_files_root.exists() {
-      std::fs::create_dir(large_files_root.clone()).map_err(|e| format!("Failed to create large files root: {e}"))?;
-    }
 
     Ok(ByteStore {
       inner: Arc::new(InnerStore {
@@ -269,16 +274,20 @@ impl ByteStore {
     bytes: Bytes,
     initial_lease: bool,
   ) -> Result<Digest, String> {
-    let dbs = match entry_type {
-      EntryType::Directory => self.inner.directory_dbs.clone(),
-      EntryType::File => self.inner.file_dbs.clone(),
-    };
     let len = bytes.len();
-    let fingerprint = dbs?
-      .store_bytes(digest.map(|d| d.hash), bytes, initial_lease)
-      .await?;
+    if matches!(entry_type, EntryType::File) && ByteStore::uses_large_file_store(len) {
+      Ok(self.store_large_bytes(bytes, digest).await?)
+    } else {
+      let dbs = match entry_type {
+        EntryType::Directory => self.inner.directory_dbs.clone(),
+        EntryType::File => self.inner.file_dbs.clone(),
+      };
+      let fingerprint = dbs?
+        .store_bytes(digest.map(|d| d.hash), bytes, initial_lease)
+        .await?;
 
-    Ok(Digest::new(fingerprint, len))
+      Ok(Digest::new(fingerprint, len))
+    }
   }
 
   ///
@@ -293,6 +302,16 @@ impl ByteStore {
     items: Vec<(Option<Digest>, Bytes)>,
     initial_lease: bool,
   ) -> Result<Vec<Digest>, String> {
+    let mut small_items = vec![];
+    let mut result = vec![];
+    for (digest, bytes) in items {
+      if matches!(entry_type, EntryType::File) && ByteStore::uses_large_file_store(bytes.len()) {
+        result.push(self.store_large_bytes(bytes, digest).await?);
+      } else {
+        small_items.push((digest, bytes));
+      }
+    }
+
     let dbs = match entry_type {
       EntryType::Directory => self.inner.directory_dbs.clone(),
       EntryType::File => self.inner.file_dbs.clone(),
@@ -300,13 +319,13 @@ impl ByteStore {
     // NB: False positive: we do actually need to create the Vec here, since `items` will move
     // before we use `lens`.
     #[allow(clippy::needless_collect)]
-    let lens = items
+    let lens = small_items
       .iter()
       .map(|(_, bytes)| bytes.len())
       .collect::<Vec<_>>();
     let fingerprints = dbs?
       .store_bytes_batch(
-        items
+        small_items
           .into_iter()
           .map(|(d, bytes)| (d.map(|d| d.hash), bytes))
           .collect(),
@@ -314,14 +333,131 @@ impl ByteStore {
       )
       .await?;
 
-    Ok(
+    result.extend(
       fingerprints
         .into_iter()
         .zip(lens.into_iter())
-        .map(|(f, len)| Digest::new(f, len))
-        .collect(),
-    )
+        .map(|(f, len)| Digest::new(f, len)),
+    );
+
+    Ok(result)
   }
+
+  /// Returns whether this file digest should/does use the "large file store" instead of the LMDB.
+  pub fn uses_large_file_store(len: usize) -> bool {
+    len > LARGE_FILE_SIZE_LIMIT
+  }
+
+  /// Assuming uses_large_file_store(digest) is true, return the path inside the store.
+  pub fn large_file_path(&self, digest: Digest) -> PathBuf {
+    assert!(ByteStore::uses_large_file_store(digest.size_bytes));
+    let digest_hash = digest.hash.to_hex();
+    // We use 2-character directories to help shard the files so there isn't a plethora in one single dir.
+    self
+      .inner
+      .large_files_root
+      .join(digest_hash.get(0..2).unwrap())
+      .join(digest_hash)
+  }
+
+  async fn store_large_bytes(
+    &self,
+    src: Bytes,
+    mut digest: Option<Digest>,
+  ) -> Result<Digest, String> {
+    if digest.is_none() {
+      digest = {
+        let mut hasher = WriterHasher::new(io::sink());
+        hasher
+          .write_all(&src)
+          .map_err(|e| format!("Failed to bytes: {e}"))?;
+        Some(hasher.finish().0)
+      };
+    }
+
+    let dest = self.large_file_path(digest.unwrap());
+    if !dest.parent().unwrap().exists() {
+      // Throway the result as a way of not worrying about race conditions. If there was an error
+      // we'll fail to copy the file below.
+      let _ = tokio::fs::create_dir_all(dest.parent().unwrap()).await;
+    }
+    let temp_dest = NamedTempFile::new_in(self.inner.large_files_root.clone())
+      .map_err(|e| format!("Failed to create temporary file for large file: {e}"))?;
+    tokio::fs::write(temp_dest.path(), src.clone())
+      .await
+      .map_err(|e| format!("Failed to copy from {src:?} or store in {dest:?}: {e:?}"))?;
+    tokio::fs::rename(temp_dest.path(), dest.clone())
+      .await
+      .map_err(|e| format!("Error while renaming: {e}."))?;
+    tokio::fs::set_permissions(&dest, std::fs::Permissions::from_mode(0o555))
+      .await
+      .map_err(|e| format!("Failed to set permissions for {dest:?}: {e}"))?;
+    Ok(digest.unwrap())
+  }
+
+  async fn store_large_file(
+    &self,
+    src: PathBuf,
+    digest: Digest,
+    data_is_immutable: bool,
+  ) -> Result<(), String> {
+    let dest = self.large_file_path(digest);
+    if !dest.parent().unwrap().exists() {
+      // Throway the result as a way of not worrying about race conditions. If there was an error
+      // we'll fail to copy the file below.
+      let _ = tokio::fs::create_dir_all(dest.parent().unwrap()).await;
+    }
+
+    let temp_dest = NamedTempFile::new_in(self.inner.large_files_root.clone())
+      .map_err(|e| format!("Failed to create temporary file for large file: {e}"))?;
+
+    // @TODO: This is mostly duplicated with `sharded_lmdb/src/lib.rs`'s `store`.
+
+    let mut attempts = 0;
+    loop {
+      let should_retry = if data_is_immutable {
+        // Trust that the data hasn't changed, and only validate its length.
+        let copied = tokio::fs::copy(src.clone(), temp_dest.path())
+          .await
+          .map_err(|e| format!("Failed to copy from {src:?} or store in {dest:?}: {e:?}"))?;
+
+        // Should retry if the file got shorter between reads.
+        copied as usize != digest.size_bytes
+      } else {
+        // Confirm that the data hasn't changed.
+        let mut src_file = std::fs::File::open(&src).map_err(|e| format!("Failed to read: {e}"))?;
+        let temp_dest_file =
+          std::fs::File::open(&temp_dest).map_err(|e| format!("Failed to read: {e}"))?;
+        let mut hasher = WriterHasher::new(temp_dest_file);
+        let _ = io::copy(&mut src_file, &mut hasher)
+          .map_err(|e| format!("Failed to copy from {src:?} or store in {temp_dest:?}: {e:?}"))?;
+
+        // Should retry if the Digest changed between reads.
+        digest != hasher.finish().0
+      };
+
+      if should_retry {
+        attempts += 1;
+        let msg = format!("Input {src:?} changed while reading.");
+        log::debug!("{}", msg);
+        if attempts > 10 {
+          return Err(format!("Failed to store {src:?}."));
+        }
+      } else {
+        break;
+      }
+    }
+
+    tokio::fs::rename(temp_dest.path(), dest.clone())
+      .await
+      .map_err(|e| format!("Error while renaming: {e}."))?;
+    tokio::fs::set_permissions(&dest, std::fs::Permissions::from_mode(0o555))
+      .await
+      .map_err(|e| format!("Failed to set permissions for {dest:?}: {e}"))?;
+    Ok(())
+  }
+
+  // @TODO: Make digesting from a reader ina  helper
 
   ///
   /// Store data in two passes, without buffering it entirely into memory. Prefer
@@ -333,40 +469,31 @@ impl ByteStore {
     initial_lease: bool,
     data_is_immutable: bool,
     src: PathBuf,
-  ) -> Result<Digest, String>
-  {
-    let src2 = src.clone();
-    let data_provider = move || std::fs::File::open(&src);
-
+  ) -> Result<Digest, String> {
     let digest = {
-      let mut read = data_provider().map_err(|e| format!("Failed to read: {e}"))?;
+      let mut read = std::fs::File::open(&src).map_err(|e| format!("Failed to read: {e}"))?;
       let mut hasher = WriterHasher::new(io::sink());
       let _ = io::copy(&mut read, &mut hasher)
         .map_err(|e| format!("Failed to read from {read:?}: {e}"))?;
       hasher.finish().0
     };
 
-    if data_is_immutable && digest.size_bytes > (512 * 1024) {
-      // We should probably lock in case of copy
-      log::warn!("Trying to move {src2:?}");
-      let rename_result = std::fs::rename(src2, self.inner.large_files_root.join(digest.hash.to_hex()));
-      if rename_result.is_err() {
-        let rename_err = rename_result.unwrap_err();
-        if rename_err.raw_os_error().unwrap_or(0) == 18 {
-          // I'm supposed to copy now
-        } else {
-          return Err(format!("Womp womp {rename_err}"));
-        }
+    if ByteStore::uses_large_file_store(digest.size_bytes) {
+      self
+        .store_large_file(src.clone(), digest, data_is_immutable)
+        .await?;
+    } else {
+      let dbs = match entry_type {
+        EntryType::Directory => self.inner.directory_dbs.clone(),
+        EntryType::File => self.inner.file_dbs.clone(),
       };
+      let _ = dbs?
+        .store(initial_lease, data_is_immutable, digest, move || {
+          std::fs::File::open(&src)
+        })
+        .await;
     }
 
-    let dbs = match entry_type {
-      EntryType::Directory => self.inner.directory_dbs.clone(),
-      EntryType::File => self.inner.file_dbs.clone(),
-    };
-    let _ = dbs?
-      .store(initial_lease, data_is_immutable, digest, data_provider)
-      .await;
     Ok(digest)
   }
 
@@ -408,9 +535,10 @@ impl ByteStore {
   }
 
   ///
-  /// Loads bytes from the underlying LMDB store using the given function. Because the database is
-  /// blocking, this accepts a function that views a slice rather than returning a clone of the
-  /// data. The upshot is that the database is able to provide slices directly into shared memory.
+  /// Loads bytes from the underlying store using the given function.
+  /// In the case of the LMDB store, because the database is blocking, this accepts a function that
+  /// views a slice rather than returning a clone of the data.
+  /// The upshot is that the database is able to provide slices directly into shared memory.
   ///
   pub async fn load_bytes_with<T: Send + 'static, F: FnMut(&[u8]) -> T + Send + Sync + 'static>(
     &self,
@@ -425,26 +553,36 @@ impl ByteStore {
       return Ok(Some(f(&[])));
     }
 
-    let dbs = match entry_type {
-      EntryType::Directory => self.inner.directory_dbs.clone(),
-      EntryType::File => self.inner.file_dbs.clone(),
-    }?;
-    let res = dbs
-      .load_bytes_with(digest.hash, move |bytes| {
-        if bytes.len() == digest.size_bytes {
-          Ok(f(bytes))
-        } else {
-          Err(format!(
-            "Got hash collision reading from store - digest {:?} was requested, but retrieved \
-                bytes with that fingerprint had length {}. Congratulations, you may have broken \
-                sha256! Underlying bytes: {:?}",
-            digest,
-            bytes.len(),
-            bytes
-          ))
-        }
-      })
-      .await;
+    let res = if ByteStore::uses_large_file_store(digest.size_bytes) {
+      let src = &self.large_file_path(digest);
+      let mut reader = std::fs::File::open(src)
+        .map_err(|e| format!("Failed to read {src:?} for digest {digest:?}: {e}"))?;
+      let mut writer: Vec<u8> = vec![];
+      io::copy(&mut reader, &mut writer)
+        .map_err(|e| format!("Failed to load large file into memory: {e}"))?;
+      Ok(Some(f(&writer[..])))
+    } else {
+      let dbs = match entry_type {
+        EntryType::Directory => self.inner.directory_dbs.clone(),
+        EntryType::File => self.inner.file_dbs.clone(),
+      }?;
+      dbs
+        .load_bytes_with(digest.hash, move |bytes| {
+          if bytes.len() == digest.size_bytes {
+            Ok(f(bytes))
+          } else {
+            Err(format!(
+              "Got hash collision reading from store - digest {:?} was requested, but retrieved \
+                  bytes with that fingerprint had length {}. Congratulations, you may have broken \
+                  sha256! Underlying bytes: {:?}",
+              digest,
+              bytes.len(),
+              bytes
+            ))
+          }
+        })
+        .await
+    };
 
     if let Some(workunit_store_handle) = workunit_store::get_workunit_store_handle() {
       workunit_store_handle.store.record_observation(

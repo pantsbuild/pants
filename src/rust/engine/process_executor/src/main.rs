@@ -366,7 +366,6 @@ async fn main() {
         output,
         result.output_directory,
         &BTreeSet::new(),
-        None,
         Permissions::Writable,
       )
       .await

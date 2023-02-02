@@ -507,7 +507,8 @@ impl ShardedLmdb {
         move || {
           let mut attempts = 0;
           loop {
-            let effective_key = VersionedFingerprint::new(expected_digest.hash, ShardedLmdb::SCHEMA_VERSION);
+            let effective_key =
+              VersionedFingerprint::new(expected_digest.hash, ShardedLmdb::SCHEMA_VERSION);
             let (env, db, lease_database) = store.get(&expected_digest.hash);
             let put_res: Result<(), StoreError> = env
               .begin_rw_txn()
@@ -572,8 +573,12 @@ impl ShardedLmdb {
                 }
               }
               Err(StoreError::Lmdb(lmdb::Error::KeyExist)) => return Ok(()),
-              Err(StoreError::Lmdb(err)) => return Err(format!("Error storing {expected_digest:?}: {err}")),
-              Err(StoreError::Io(err)) => return Err(format!("Error storing {expected_digest:?}: {err}")),
+              Err(StoreError::Lmdb(err)) => {
+                return Err(format!("Error storing {expected_digest:?}: {err}"))
+              }
+              Err(StoreError::Io(err)) => {
+                return Err(format!("Error storing {expected_digest:?}: {err}"))
+              }
             };
           }
         },

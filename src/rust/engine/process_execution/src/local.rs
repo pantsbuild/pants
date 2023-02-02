@@ -718,7 +718,6 @@ pub async fn prepare_workdir(
         workdir_path_2,
         materialized_input_digest,
         &mutable_paths,
-        Some(immutable_inputs),
         Permissions::Writable,
       )
       .await
