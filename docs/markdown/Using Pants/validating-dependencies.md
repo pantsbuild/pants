@@ -236,7 +236,8 @@ __dependents_rules__(
 There are some syntactic sugar for selectors so they may be declared in a more concise text form rather than as a dictionary (this is also the form on which they are presented in messages from Pants, when possible). The syntax is `<type>(tags, ...)[path]`. Empty parts are optional and can be left out, and if only `path` is provided the enclosing square brackets are optional. Providing all the selectors from the previous example code block in string form for reference:
 
 ```python
-"<python_sources>"  # {"type": python_sources}
+python_sources  # {"type": python_sources}  -- target types works as strings when used bare
+"<python_sources>"  # {"type": "python_sources"}
 "<python_*>(any-python)"  # {"type": "python_*", "tags":["any-python"]}
 "<*>(libs)"  # {"type": "*", "tags":["libs"]}
 "[special-cased.py]"  # {"path": "special-cased.py"}
