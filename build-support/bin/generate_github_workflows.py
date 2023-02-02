@@ -411,6 +411,9 @@ class Helper:
                     f"""\
                     echo "PY=python{gha_expr('matrix.python-version')}" >> $GITHUB_ENV
                     echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=['=={gha_expr('matrix.python-version')}.*']" >> $GITHUB_ENV
+                    ulimit -c
+                    ulimit -c unlimited
+                    ulimit -c
                     """
                 ),
             }
@@ -596,7 +599,7 @@ def test_jobs(
     human_readable_job_name = f"Test Python ({helper.platform_name()})"
     human_readable_step_name = "Run Python tests"
     log_name = "python-test"
-    pants_args = ["test"]
+    pants_args = ["test", "--force"]
     if shard:
         human_readable_job_name += f" Shard {shard}"
         human_readable_step_name = f"Run Python test shard {shard}"
@@ -639,6 +642,14 @@ def test_jobs(
                 "run": pants_args_str,
             },
             helper.upload_log_artifacts(name=log_name),
+            {
+                "name": "Open SSH Access",
+                "uses": "lhotari/action-upterm@v1",
+                "if": "failure()",
+                "with": {
+                    "limit-access-to-actor": True,
+                },
+            },
         ],
     }
 

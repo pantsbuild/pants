@@ -31,6 +31,12 @@ jobs:
         echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version
         }}.*'']" >> $GITHUB_ENV
 
+        ulimit -c
+
+        ulimit -c unlimited
+
+        ulimit -c
+
         '
     - name: Cache Rust toolchain
       uses: actions/cache@v3
@@ -133,6 +139,12 @@ jobs:
 
         echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version
         }}.*'']" >> $GITHUB_ENV
+
+        ulimit -c
+
+        ulimit -c unlimited
+
+        ulimit -c
 
         '
     - name: Cache Rust toolchain
@@ -250,6 +262,12 @@ jobs:
 
         echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version
         }}.*'']" >> $GITHUB_ENV
+
+        ulimit -c
+
+        ulimit -c unlimited
+
+        ulimit -c
 
         '
     - name: Cache Rust toolchain
@@ -669,6 +687,12 @@ jobs:
         echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version
         }}.*'']" >> $GITHUB_ENV
 
+        ulimit -c
+
+        ulimit -c unlimited
+
+        ulimit -c
+
         '
     - name: Download native binaries
       uses: actions/download-artifact@v3
@@ -764,6 +788,12 @@ jobs:
         echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version
         }}.*'']" >> $GITHUB_ENV
 
+        ulimit -c
+
+        ulimit -c unlimited
+
+        ulimit -c
+
         '
     - name: Download native binaries
       uses: actions/download-artifact@v3
@@ -775,7 +805,7 @@ jobs:
 
         '
     - name: Run Python tests
-      run: './pants --tag=+platform_specific_behavior test :: -- -m platform_specific_behavior
+      run: './pants --tag=+platform_specific_behavior test --force :: -- -m platform_specific_behavior
 
         '
     - continue-on-error: true
@@ -785,6 +815,11 @@ jobs:
       with:
         name: pants-log-python-test-Linux-ARM64
         path: .pants.d/pants.log
+    - if: failure()
+      name: Open SSH Access
+      uses: lhotari/action-upterm@v1
+      with:
+        limit-access-to-actor: true
     strategy:
       matrix:
         python-version:
@@ -836,6 +871,12 @@ jobs:
         echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version
         }}.*'']" >> $GITHUB_ENV
 
+        ulimit -c
+
+        ulimit -c unlimited
+
+        ulimit -c
+
         '
     - name: Expose Pythons
       uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
@@ -849,7 +890,7 @@ jobs:
 
         '
     - name: Run Python test shard 0/3
-      run: './pants test --shard=0/3 ::
+      run: './pants test --force --shard=0/3 ::
 
         '
     - continue-on-error: true
@@ -859,6 +900,11 @@ jobs:
       with:
         name: pants-log-python-test-0_3-Linux-x86_64
         path: .pants.d/pants.log
+    - if: failure()
+      name: Open SSH Access
+      uses: lhotari/action-upterm@v1
+      with:
+        limit-access-to-actor: true
     strategy:
       matrix:
         python-version:
@@ -910,6 +956,12 @@ jobs:
         echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version
         }}.*'']" >> $GITHUB_ENV
 
+        ulimit -c
+
+        ulimit -c unlimited
+
+        ulimit -c
+
         '
     - name: Expose Pythons
       uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
@@ -923,7 +975,7 @@ jobs:
 
         '
     - name: Run Python test shard 1/3
-      run: './pants test --shard=1/3 ::
+      run: './pants test --force --shard=1/3 ::
 
         '
     - continue-on-error: true
@@ -933,6 +985,11 @@ jobs:
       with:
         name: pants-log-python-test-1_3-Linux-x86_64
         path: .pants.d/pants.log
+    - if: failure()
+      name: Open SSH Access
+      uses: lhotari/action-upterm@v1
+      with:
+        limit-access-to-actor: true
     strategy:
       matrix:
         python-version:
@@ -984,6 +1041,12 @@ jobs:
         echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version
         }}.*'']" >> $GITHUB_ENV
 
+        ulimit -c
+
+        ulimit -c unlimited
+
+        ulimit -c
+
         '
     - name: Expose Pythons
       uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
@@ -997,7 +1060,7 @@ jobs:
 
         '
     - name: Run Python test shard 2/3
-      run: './pants test --shard=2/3 ::
+      run: './pants test --force --shard=2/3 ::
 
         '
     - continue-on-error: true
@@ -1007,6 +1070,11 @@ jobs:
       with:
         name: pants-log-python-test-2_3-Linux-x86_64
         path: .pants.d/pants.log
+    - if: failure()
+      name: Open SSH Access
+      uses: lhotari/action-upterm@v1
+      with:
+        limit-access-to-actor: true
     strategy:
       matrix:
         python-version:
@@ -1043,6 +1111,12 @@ jobs:
         echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version
         }}.*'']" >> $GITHUB_ENV
 
+        ulimit -c
+
+        ulimit -c unlimited
+
+        ulimit -c
+
         '
     - name: Expose Pythons
       uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
@@ -1056,7 +1130,7 @@ jobs:
 
         '
     - name: Run Python tests
-      run: './pants --tag=+platform_specific_behavior test :: -- -m platform_specific_behavior
+      run: './pants --tag=+platform_specific_behavior test --force :: -- -m platform_specific_behavior
 
         '
     - continue-on-error: true
@@ -1066,6 +1140,11 @@ jobs:
       with:
         name: pants-log-python-test-macOS11-x86_64
         path: .pants.d/pants.log
+    - if: failure()
+      name: Open SSH Access
+      uses: lhotari/action-upterm@v1
+      with:
+        limit-access-to-actor: true
     strategy:
       matrix:
         python-version:
