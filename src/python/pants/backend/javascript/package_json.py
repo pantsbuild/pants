@@ -7,6 +7,8 @@ import os.path
 from dataclasses import dataclass
 from typing import Any, Iterable
 
+from typing_extensions import Literal
+
 from pants.backend.project_info import dependencies
 from pants.core.util_rules import stripped_source_files
 from pants.engine import fs
@@ -58,6 +60,13 @@ class PackageJson:
     version: str
     snapshot: Snapshot
     workspaces: tuple[PackageJson, ...] = ()
+    module: Literal["commonjs", "module"] | None = None
+
+    def __post_init__(self) -> None:
+        if self.module not in (None, "commonjs", "module"):
+            raise ValueError(
+                f'package.json "type" can only be one of "commonjs", "module", but was "{self.module}".'
+            )
 
     @property
     def digest(self) -> Digest:
@@ -115,7 +124,7 @@ async def _read_workspaces_for(
     )
 
 
-@rule
+@rule(desc="Parsing package.json")
 async def read_package_json(request: ReadPackageJsonRequest) -> PackageJson:
     snapshot = await Get(
         Snapshot, PathGlobs, request.source.path_globs(UnmatchedBuildFileGlobs.error)
@@ -133,6 +142,7 @@ async def read_package_json(request: ReadPackageJsonRequest) -> PackageJson:
         version=parsed_package_json["version"],
         snapshot=snapshot,
         workspaces=workspace_pkg_jsons,
+        module=parsed_package_json.get("type"),
     )
 
 

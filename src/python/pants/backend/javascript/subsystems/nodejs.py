@@ -63,6 +63,7 @@ class NodeJSToolProcess:
     level: LogLevel = LogLevel.INFO
     input_digest: Digest = EMPTY_DIGEST
     output_files: tuple[str, ...] = ()
+    output_directories: tuple[str, ...] = ()
 
     @classmethod
     def npm(
@@ -72,6 +73,7 @@ class NodeJSToolProcess:
         level: LogLevel = LogLevel.INFO,
         input_digest: Digest = EMPTY_DIGEST,
         output_files: tuple[str, ...] = (),
+        output_directories: tuple[str, ...] = (),
     ) -> NodeJSToolProcess:
         return cls(
             args=("npm", *args),
@@ -79,6 +81,7 @@ class NodeJSToolProcess:
             level=level,
             input_digest=input_digest,
             output_files=output_files,
+            output_directories=output_directories,
         )
 
     @classmethod
@@ -123,6 +126,7 @@ async def setup_node_tool_process(
         argv=filter(None, request.args),
         input_digest=input_digest,
         output_files=request.output_files,
+        output_directories=request.output_directories,
         description=request.description,
         level=request.level,
         env={
