@@ -186,9 +186,7 @@ The selector has three properties: `type`, `tags` and `path`. From the above exa
 
 The values of a selector supports wildcard patterns (or globs) in order to have a single selector match multiple different targets. The `path` property uses the same [glob syntax](doc:targets#glob-syntax) as the rules, while `type` and `tags` use a simpler one described below. When listing multiple values for the `tags` property, the target must have all of them in order to match. Spread the tags over multiple selectors in order to switch from AND to OR as required. The target `type` to match against will be that of the type used in the BUILD file, as the path (and target address) may refer to a generated target it is the target generators type that will be used during the selector matching process.
 
-The simpler glob syntax used by the `type` and `tags` selector values supports `*` as a match anything and is otherwise case sensitive. (implementation detail: it relies on the `fnmatch` python library so there is a bit more syntax available, but if you find yourself using more than `*` please let us know in case we switch to something else).
-
-### NOTE/TODO: maybe drop the use of `fnmatch` entirely, as supporting just `*` is real easy.
+The simpler glob syntax used by the `type` and `tags` selector values only supports `*` as a match anything and is otherwise case sensitive.
 
 The selectors are matched against the target in the order they are defined in the BUILD file, and the first rule set with a selector that is a match will be selected. The rules from the selected rule set is then matched in order against the path of the **target on the other end** of the dependency link. This is worth reading again; Using the above example again, the rules defined in `src/a/BUILD` will be matched against `src/b/lib.py` while the `path` selector will be matched against `src/a/main.py`.
 
@@ -235,13 +233,15 @@ __dependents_rules__(
 )
 ```
 
-There are some syntactic sugar for selectors so they may be declared in a more concise text form rather than as a dictionary (this is also the form on which they are presented in messages from Pants, when possible). The syntax is `<type>(<tags>, ...)[<path>]`. With all parts optional, so `""` is a valid catch-all selector. Providing all the selectors from the previous example code block in string form for reference:
+There are some syntactic sugar for selectors so they may be declared in a more concise text form rather than as a dictionary (this is also the form on which they are presented in messages from Pants, when possible). The syntax is `<type>(tags, ...)[path]`. Empty parts are optional and can be left out, and if only `path` is provided the enclosing square brackets are optional. Providing all the selectors from the previous example code block in string form for reference:
 
 ```python
-python_sources  # {"type": python_sources}  -- target types works as strings when used bare
-"python_*(any-python)"  # {"type": "python_*", "tags":["any-python"]}
-"*(libs)"  # {"type": "*", "tags":["libs"]}
+"<python_sources>"  # {"type": python_sources}
+"<python_*>(any-python)"  # {"type": "python_*", "tags":["any-python"]}
+"<*>(libs)"  # {"type": "*", "tags":["libs"]}
 "[special-cased.py]"  # {"path": "special-cased.py"}
+# May omit square brackets when only providing a path:
+"special-cased.py"  # {"path": "special-cased.py"}
 ```
 
 The previous example, using this alternative syntax for the selectors, would look like:
@@ -249,9 +249,9 @@ The previous example, using this alternative syntax for the selectors, would loo
 ```python
   (
     (  # Using multiple selectors
-      "python_*(any-python)",
-      "*(libs)",
-      "[special-cased.py]",
+      "<python_*>(any-python)",
+      "<*>(libs)",
+      "special-cased.py",
     ),
     ...
   )
@@ -324,10 +324,10 @@ __dependents_rules__(
     (
       # List libraries this rule set applies to,
       # here using various anchor modes and patterns for illustration purposes.
-      "[//example/reqs#click"],
-      "[/reqs#ansicolors]",
-      "[#requests]",
-      "[setuptools]",
+      "//example/reqs#click",
+      "/reqs#ansicolors",
+      "#requests",
+      "setuptools",
       ...
     ),
     "src/cli/**",
