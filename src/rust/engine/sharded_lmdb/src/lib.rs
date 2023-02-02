@@ -34,7 +34,7 @@ use std::sync::Arc;
 use std::time::{self, Duration};
 
 use bytes::{BufMut, Bytes};
-use hashing::{Digest, Fingerprint, WriterHasher, FINGERPRINT_SIZE};
+use hashing::{verified_copy, Digest, Fingerprint, FINGERPRINT_SIZE};
 use lmdb::{
   self, Database, DatabaseFlags, Environment, EnvironmentCopyFlags, EnvironmentFlags,
   RwTransaction, Transaction, WriteFlags,
@@ -524,24 +524,11 @@ impl ShardedLmdb {
                   )?
                   .writer();
                 let mut read = data_provider().map_err(|e| format!("Failed to read: {e}"))?;
-                let should_retry = if data_is_immutable {
-                  // Trust that the data hasn't changed, and only validate its length.
-                  let copied = io::copy(&mut read, &mut writer).map_err(|e| {
-                    format!("Failed to copy from {read:?} or store in {env:?}: {e:?}")
-                  })?;
-
-                  // Should retry if the file got shorter between reads.
-                  copied as usize != expected_digest.size_bytes
-                } else {
-                  // Confirm that the data hasn't changed.
-                  let mut hasher = WriterHasher::new(writer);
-                  let _ = io::copy(&mut read, &mut hasher).map_err(|e| {
-                    format!("Failed to copy from {read:?} or store in {env:?}: {e:?}")
-                  })?;
-
-                  // Should retry if the Digest changed between reads.
-                  expected_digest != hasher.finish().0
-                };
+                let should_retry =
+                  !verified_copy(expected_digest, data_is_immutable, &mut read, &mut writer)
+                    .map_err(|e| {
+                      format!("Failed to copy from {read:?} or store in {env:?}: {e:?}")
+                    })?;
 
                 if should_retry {
                   let msg = format!("Input {read:?} changed while reading.");
