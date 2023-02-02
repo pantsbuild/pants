@@ -154,7 +154,7 @@ async def run_shell_command(
     working_directory = shell_command[ShellCommandWorkdirField].value or ""
     root_output_directory = shell_command[ShellCommandOutputRootDirField].value or ""
     adjusted = await _adjust_root_output_directory(
-        result.output_digest, shell_command.address, root_output_directory, working_directory
+        result.output_digest, shell_command.address, working_directory, root_output_directory
     )
     output = await Get(Snapshot, Digest, adjusted)
     return GeneratedSources(output)

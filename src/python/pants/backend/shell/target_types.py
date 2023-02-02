@@ -278,8 +278,7 @@ class ShellCommandOutputsField(StringSequenceField):
     alias = "outputs"
     help = softwrap(
         """
-        Specify the shell command output files and directories, relative to the `BUILD` file's
-        directory.
+        Specify the shell command output files and directories, relative to the value of `workdir`.
 
         Use a trailing slash on directory names, i.e. `my_dir/`.
 
@@ -297,8 +296,7 @@ class ShellCommandOutputFilesField(StringSequenceField):
     default = ()
     help = softwrap(
         """
-        Specify the shell command's output files to capture, relative to the `BUILD` file's
-        directory.
+        Specify the shell command's output files to capture, relative to the value of `workdir`.
 
         For directories, use `output_directories`. At least one of `output_files` and
         `output_directories` must be specified.
@@ -316,7 +314,7 @@ class ShellCommandOutputDirectoriesField(StringSequenceField):
     help = softwrap(
         """
         Specify full directories (including recursive descendants) of output to capture from the
-        shell command, relative to the `BUILD` file's directory.
+        shell command, relative to the value of `workdir`.
 
         For individual files, use `output_files`. At least one of `output_files` and
         `output_directories` must be specified.

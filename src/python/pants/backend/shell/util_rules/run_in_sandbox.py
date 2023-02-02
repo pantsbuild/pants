@@ -133,7 +133,10 @@ async def run_in_sandbox_request(
             logger.warning(result.stderr.decode())
 
     adjusted = await _adjust_root_output_directory(
-        result.output_digest, shell_command.address, root_output_directory, working_directory
+        result.output_digest,
+        shell_command.address,
+        working_directory,
+        root_output_directory,
     )
     output = await Get(Snapshot, Digest, adjusted)
 
