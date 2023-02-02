@@ -58,6 +58,19 @@ from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import softwrap
 
 
+def assert_owners_not_found_error(
+    target: str, error_message: str, not_found: Iterable[str] = (), found: Iterable[str] = ()
+) -> None:
+    """Assert that owners for certain imports were not found for a given target, and they are
+    reported in the output error message."""
+    assert f"cannot infer owners for the following imports in the target {target}:" in error_message
+    for item in not_found:
+        assert item in error_message
+
+    for item in found:
+        assert item not in error_message
+
+
 def test_infer_python_imports(caplog) -> None:
     rule_runner = RuleRunner(
         rules=[
@@ -499,6 +512,83 @@ def mk_imports_rule_runner(more_rules: Iterable) -> RuleRunner:
     )
 
 
+def test_infer_python_ignore_unowned_imports(imports_rule_runner: RuleRunner, caplog) -> None:
+    """Test handling unowned imports that are set explicitly to be ignored."""
+    imports_rule_runner.write_files(
+        {
+            "src/python/cheesey.py": dedent(
+                """\
+                    import unknown_python_requirement
+                    import project.application.generated
+                    import project.application.generated.loader
+                    from project.application.generated import starter
+                    import project.application.develop.client
+                    import project.application.development
+                """
+            ),
+            "src/python/BUILD": "python_sources()",
+        }
+    )
+
+    def run_dep_inference(
+        unowned_dependency_behavior: str, ignored_paths: tuple[str, ...] = tuple()
+    ) -> InferredDependencies:
+        imports_rule_runner.set_options(
+            [
+                f"--python-infer-unowned-dependency-behavior={unowned_dependency_behavior}",
+                f"--python-infer-ignored-unowned-imports={str(list(ignored_paths))}",
+            ],
+            env_inherit=PYTHON_BOOTSTRAP_ENV,
+        )
+        target = imports_rule_runner.get_target(
+            Address("src/python", relative_file_path="cheesey.py")
+        )
+        return imports_rule_runner.request(
+            InferredDependencies,
+            [
+                InferPythonImportDependencies(
+                    PythonImportDependenciesInferenceFieldSet.create(target)
+                )
+            ],
+        )
+
+    run_dep_inference("warning")
+    assert len(caplog.records) == 1
+    assert_owners_not_found_error(
+        target="src/python/cheesey.py",
+        not_found=[
+            "unknown_python_requirement",
+            "project.application.generated.starter",
+            "project.application.generated.loader",
+            "project.application.develop.client",
+            "project.application.development",
+        ],
+        error_message=caplog.text,
+    )
+
+    # no error raised because unowned imports are explicitly ignored in the configuration
+    run_dep_inference(
+        "error",
+        ignored_paths=(
+            "unknown_python_requirement",
+            "project.application.generated",
+            "project.application.develop",
+            "project.application.development",
+        ),
+    )
+
+    # error raised because "project.application.development" is not ignored
+    with engine_error(UnownedDependencyError, contains="src/python/cheesey.py"):
+        run_dep_inference(
+            "error",
+            ignored_paths=(
+                "unknown_python_requirement",
+                "project.application.generated",
+                "project.application.develop",
+            ),
+        )
+
+
 def test_infer_python_strict(imports_rule_runner: RuleRunner, caplog) -> None:
     imports_rule_runner.write_files(
         {
@@ -534,12 +624,16 @@ def test_infer_python_strict(imports_rule_runner: RuleRunner, caplog) -> None:
 
     run_dep_inference("warning")
     assert len(caplog.records) == 1
-    assert (
-        "cannot infer owners for the following imports in the target src/python/cheesey.py:"
-        in caplog.text
+    assert_owners_not_found_error(
+        target="src/python/cheesey.py",
+        not_found=[
+            "  * venezuelan_beaver_cheese (line: 1)",
+        ],
+        found=[
+            "japanese.sage.derby",
+        ],
+        error_message=caplog.text,
     )
-    assert "  * venezuelan_beaver_cheese (line: 1)" in caplog.text
-    assert "japanese.sage.derby" not in caplog.text
 
     with engine_error(UnownedDependencyError, contains="src/python/cheesey.py"):
         run_dep_inference("error")
@@ -565,7 +659,7 @@ def test_infer_python_strict(imports_rule_runner: RuleRunner, caplog) -> None:
         run_dep_inference(mode.value)
         assert not caplog.records
 
-    # All modes should be fine if the module is implictly found via requirements.txt
+    # All modes should be fine if the module is implicitly found via requirements.txt
     imports_rule_runner.write_files(
         {
             "src/python/requirements.txt": "venezuelan_beaver_cheese==1.0.0",
