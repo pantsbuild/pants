@@ -611,9 +611,12 @@ def test_jobs(
         pants_args.append(f"--shard={shard}")
     pants_args.extend(
         [
+            # The relevant tests.
             "src/python/pants/core/util_rules/partitions_test.py:tests",
             "src/python/pants/backend/python/lint/flake8/subsystem_test.py:tests",
             "src/python/pants/backend/python/lint/pylint/subsystem_test.py:tests",
+            # And a few more, in case this is load related.
+            "src/python/pants/backend/codegen/::",
         ]
     )
     if platform_specific:

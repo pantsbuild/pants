@@ -495,7 +495,7 @@ jobs:
     - name: Run Python tests
       run: './pants --tag=+platform_specific_behavior test --force src/python/pants/core/util_rules/partitions_test.py:tests
         src/python/pants/backend/python/lint/flake8/subsystem_test.py:tests src/python/pants/backend/python/lint/pylint/subsystem_test.py:tests
-        -- -m platform_specific_behavior
+        src/python/pants/backend/codegen/:: -- -m platform_specific_behavior
 
         '
     - continue-on-error: true
@@ -588,6 +588,7 @@ jobs:
     - name: Run Python tests
       run: './pants test --force src/python/pants/core/util_rules/partitions_test.py:tests
         src/python/pants/backend/python/lint/flake8/subsystem_test.py:tests src/python/pants/backend/python/lint/pylint/subsystem_test.py:tests
+        src/python/pants/backend/codegen/::
 
         '
     - continue-on-error: true
@@ -665,7 +666,7 @@ jobs:
     - name: Run Python tests
       run: './pants --tag=+platform_specific_behavior test --force src/python/pants/core/util_rules/partitions_test.py:tests
         src/python/pants/backend/python/lint/flake8/subsystem_test.py:tests src/python/pants/backend/python/lint/pylint/subsystem_test.py:tests
-        -- -m platform_specific_behavior
+        src/python/pants/backend/codegen/:: -- -m platform_specific_behavior
 
         '
     - continue-on-error: true
