@@ -57,6 +57,10 @@ from pants.util.strutil import softwrap
 def find_all_python_distributions_with_any_stevedore_entry_points(
     targets: AllTargets,
 ) -> AllStevedoreExtensionTargets:
+    # This only supports specifying stevedore_namespace entry points in the
+    # `entry_points` field of a `python_distribution`, not the `provides` field.
+    # Use this: `python_distribution(entry_points={...})`
+    # NOT this: `python_distribution(provides=python_artifact(entry_points={...}))`
     return AllStevedoreExtensionTargets(
         tgt
         for tgt in targets
@@ -76,7 +80,7 @@ class StevedoreExtensions:
     Effectively, the targets are StevedoreExtension targets.
     """
 
-    mapping: FrozenDict[str, tuple[Target, ...]]
+    mapping: FrozenDict[StevedoreNamespace, tuple[Target, ...]]
 
 
 @rule(
@@ -86,14 +90,12 @@ class StevedoreExtensions:
 async def map_stevedore_extensions(
     stevedore_extensions: AllStevedoreExtensionTargets,
 ) -> StevedoreExtensions:
-    mapping: Mapping[str, list[Target]] = defaultdict(list)
+    mapping: Mapping[StevedoreNamespace, list[Target]] = defaultdict(list)
     for tgt in stevedore_extensions:
         # namespace aka category aka group
-        for namespace, entry_points in (
-            tgt[PythonDistributionEntryPointsField].value or {}
-        ).items():
+        for namespace in (tgt[PythonDistributionEntryPointsField].value or {}).keys():
             if isinstance(namespace, StevedoreNamespace):
-                mapping[str(namespace)].append(tgt)
+                mapping[namespace].append(tgt)
     return StevedoreExtensions(FrozenDict((k, tuple(v)) for k, v in sorted(mapping.items())))
 
 
@@ -113,9 +115,7 @@ def find_python_distributions_with_entry_points_in_stevedore_namespaces(
         {
             tgt
             for namespace in namespaces.value
-            for tgt in stevedore_extensions.mapping.get(namespace, ())
-            # We only allow defining the stevedore namespaces in the entry_points field.
-            if tgt[PythonDistributionEntryPointsField].value
+            for tgt in stevedore_extensions.mapping.get(StevedoreNamespace(namespace), ())
         }
     )
 

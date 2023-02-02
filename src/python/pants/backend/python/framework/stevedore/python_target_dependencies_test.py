@@ -113,11 +113,11 @@ def test_map_stevedore_extensions(rule_runner: RuleRunner) -> None:
     assert rule_runner.request(StevedoreExtensions, []) == StevedoreExtensions(
         FrozenDict(
             {
-                "some.thing.else": tuple(
+                StevedoreNamespace("some.thing.else"): tuple(
                     rule_runner.get_target(Address(f"runners/{runner}_runner"))
                     for runner in sorted(st2_runners)
                 ),
-                "st2common.runners.runner": tuple(
+                StevedoreNamespace("st2common.runners.runner"): tuple(
                     rule_runner.get_target(Address(f"runners/{runner}_runner"))
                     for runner in sorted(st2_runners)
                 ),
