@@ -1384,15 +1384,6 @@ impl Store {
     Ok(())
   }
 
-  pub async fn materialize_hardlink(
-    &self,
-    destination: PathBuf,
-    target: String,
-  ) -> Result<(), StoreError> {
-    hard_link(target, destination)?;
-    Ok(())
-  }
-
   ///
   /// Returns files sorted by their path.
   ///
