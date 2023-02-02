@@ -11,14 +11,11 @@ from pants.backend.javascript.goals.lockfile import (
 )
 from pants.backend.javascript.package_json import (
     AllPackageJson,
-    PackageJson,
-    PackageJsonSourceField,
+    PackageJsonForGlobs,
     PackageJsonTarget,
-    ReadPackageJsonRequest,
 )
-from pants.build_graph.address import Address
 from pants.core.goals.generate_lockfiles import GenerateLockfileResult, KnownUserResolveNames
-from pants.engine.fs import DigestContents
+from pants.engine.fs import DigestContents, PathGlobs
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
 
@@ -32,8 +29,8 @@ def rule_runner() -> RuleRunner:
                 KnownUserResolveNames, (KnownPackageJsonUserResolveNamesRequest, AllPackageJson)
             ),
             QueryRule(AllPackageJson, ()),
+            QueryRule(PackageJsonForGlobs, (PathGlobs,)),
             QueryRule(GenerateLockfileResult, (GeneratePackageLockJsonFile,)),
-            QueryRule(PackageJson, (ReadPackageJsonRequest,)),
         ],
         target_types=[PackageJsonTarget],
     )
@@ -70,10 +67,7 @@ def test_generates_lockfile_for_package_json(rule_runner: RuleRunner) -> None:
             "src/js/package.json": given_package_with_name("ham"),
         }
     )
-    tgt = rule_runner.get_target(Address("src/js"))
-    pkg_json = rule_runner.request(
-        PackageJson, [ReadPackageJsonRequest(tgt[PackageJsonSourceField])]
-    )
+    [pkg_json] = rule_runner.request(PackageJsonForGlobs, [PathGlobs(["src/js/package.json"])])
 
     lockfile = rule_runner.request(
         GenerateLockfileResult,
@@ -107,10 +101,7 @@ def test_generates_lockfile_for_package_json_workspace(rule_runner: RuleRunner) 
             "src/js/a/package.json": given_package_with_workspaces("spam", "0.1.0"),
         }
     )
-    tgt = rule_runner.get_target(Address("src/js"))
-    pkg_json = rule_runner.request(
-        PackageJson, [ReadPackageJsonRequest(tgt[PackageJsonSourceField])]
-    )
+    [pkg_json] = rule_runner.request(PackageJsonForGlobs, [PathGlobs(["src/js/package.json"])])
 
     lockfile = rule_runner.request(
         GenerateLockfileResult,

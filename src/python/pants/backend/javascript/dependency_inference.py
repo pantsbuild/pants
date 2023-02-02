@@ -8,39 +8,43 @@ from typing import Iterable
 from pants.backend.javascript import package_json
 from pants.backend.javascript.package_json import (
     AllPackageJson,
-    AllPackageJsonTargets,
-    PackageJson,
-    PackageJsonDependenciesField,
+    NodePackageDependenciesField,
+    PackageJsonForGlobs,
     PackageJsonSourceField,
-    ReadPackageJsonRequest,
 )
+from pants.engine.fs import PathGlobs
+from pants.engine.internals.graph import Owners, OwnersRequest
 from pants.engine.internals.selectors import Get
 from pants.engine.rules import Rule, collect_rules, rule
 from pants.engine.target import FieldSet, InferDependenciesRequest, InferredDependencies
 from pants.engine.unions import UnionRule
+from pants.option.global_options import UnmatchedBuildFileGlobs
 
 
 @dataclass(frozen=True)
-class PackageJsonInferenceFieldSet(FieldSet):
-    required_fields = (PackageJsonSourceField, PackageJsonDependenciesField)
+class NodePackageInferenceFieldSet(FieldSet):
+    required_fields = (PackageJsonSourceField, NodePackageDependenciesField)
 
     source: PackageJsonSourceField
-    dependencies: PackageJsonDependenciesField
+    dependencies: NodePackageDependenciesField
 
 
-class InferPackageJsonDependenciesRequest(InferDependenciesRequest):
-    infer_from = PackageJsonInferenceFieldSet
+class InferNodePackageDependenciesRequest(InferDependenciesRequest):
+    infer_from = NodePackageInferenceFieldSet
 
 
 @rule
-async def infer_package_json_dependencies(
-    request: InferPackageJsonDependenciesRequest, all_tgts: AllPackageJsonTargets
+async def infer_node_package_dependencies(
+    request: InferNodePackageDependenciesRequest, all_pkg_json: AllPackageJson
 ) -> InferredDependencies:
-    all_pkg_json = await Get(AllPackageJson, AllPackageJsonTargets, all_tgts)
-    pkg_json = await Get(PackageJson, ReadPackageJsonRequest(request.field_set.source))
-    addresses = {
-        tgt.address for pkg, tgt in zip(all_pkg_json, all_tgts) if pkg_json in pkg.workspaces
-    }
+    source: PackageJsonSourceField = request.field_set.source
+    [pkg_json] = await Get(
+        PackageJsonForGlobs, PathGlobs, source.path_globs(UnmatchedBuildFileGlobs.error)
+    )
+    addresses = await Get(
+        Owners,
+        OwnersRequest(tuple(pkg.file for pkg in all_pkg_json if pkg_json in pkg.workspaces)),
+    )
     return InferredDependencies(addresses)
 
 
@@ -48,5 +52,5 @@ def rules() -> Iterable[Rule | UnionRule]:
     return [
         *collect_rules(),
         *package_json.rules(),
-        UnionRule(InferDependenciesRequest, InferPackageJsonDependenciesRequest),
+        UnionRule(InferDependenciesRequest, InferNodePackageDependenciesRequest),
     ]

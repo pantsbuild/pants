@@ -8,14 +8,17 @@ import pytest
 from pants.backend.javascript import package_json
 from pants.backend.javascript.package_json import (
     AllPackageJson,
+    NodeThirdPartyPackageTarget,
     PackageJson,
     PackageJsonTarget,
-    ReadPackageJsonRequest,
 )
+from pants.build_graph.address import Address
+from pants.core.target_types import TargetGeneratorSourcesHelperTarget
 from pants.engine.fs import PathGlobs
 from pants.engine.internals.graph import Owners, OwnersRequest
 from pants.engine.internals.native_engine import Snapshot
 from pants.engine.rules import QueryRule
+from pants.engine.target import AllTargets
 from pants.testutil.rule_runner import RuleRunner
 from pants.util.frozendict import FrozenDict
 
@@ -27,9 +30,12 @@ def rule_runner() -> RuleRunner:
             *package_json.rules(),
             QueryRule(AllPackageJson, ()),
             QueryRule(Owners, (OwnersRequest,)),
-            QueryRule(PackageJson, (ReadPackageJsonRequest,)),
         ],
-        target_types=[PackageJsonTarget],
+        target_types=[
+            PackageJsonTarget,
+            NodeThirdPartyPackageTarget,
+            TargetGeneratorSourcesHelperTarget,
+        ],
     )
 
 
@@ -224,3 +230,35 @@ def test_parses_simple_workspace_with_globbing(rule_runner: RuleRunner) -> None:
         foo_package,
         bar_package,
     }
+
+
+def test_generates_third_party_node_package_targets(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/js/BUILD": "package_json()",
+            "src/js/package.json": json.dumps(
+                {"name": "ham", "version": "0.0.1", "dependencies": {"chalk": "^5.2.0"}}
+            ),
+        }
+    )
+    assert rule_runner.get_target(Address("src/js", generated_name="chalk"))
+
+
+def test_does_not_generate_third_party_node_package_target_for_first_party_package_name(
+    rule_runner: RuleRunner,
+) -> None:
+    rule_runner.write_files(
+        {
+            "src/js/a/BUILD": "package_json()",
+            "src/js/a/package.json": json.dumps(
+                {"name": "ham", "version": "0.0.1", "dependencies": {"chalk": "^5.2.0"}}
+            ),
+            "src/js/b/BUILD": "package_json()",
+            "src/js/b/package.json": json.dumps(
+                {"name": "spam", "version": "0.0.1", "dependencies": {"ham": "0.0.1"}}
+            ),
+        }
+    )
+    addresses = sorted(str(tgt.address) for tgt in rule_runner.request(AllTargets, ()))
+    assert "src/js/b#ham" not in addresses
+    assert addresses == ["src/js/a#chalk", "src/js/a#ham", "src/js/b#spam"]
