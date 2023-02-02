@@ -414,6 +414,10 @@ class Helper:
                     ulimit -c
                     ulimit -c unlimited
                     ulimit -c
+                    mkdir -p ~/.config/apport
+                    printf '[main]
+                    unpackaged=true
+                    ' >> ~/.config/apport/settings
                     """
                 ),
             }

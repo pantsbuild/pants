@@ -37,6 +37,14 @@ jobs:
 
         ulimit -c
 
+        mkdir -p ~/.config/apport
+
+        printf ''[main]
+
+        unpackaged=true
+
+        '' >> ~/.config/apport/settings
+
         '
     - name: Cache Rust toolchain
       uses: actions/cache@v3
@@ -145,6 +153,14 @@ jobs:
         ulimit -c unlimited
 
         ulimit -c
+
+        mkdir -p ~/.config/apport
+
+        printf ''[main]
+
+        unpackaged=true
+
+        '' >> ~/.config/apport/settings
 
         '
     - name: Cache Rust toolchain
@@ -268,6 +284,14 @@ jobs:
         ulimit -c unlimited
 
         ulimit -c
+
+        mkdir -p ~/.config/apport
+
+        printf ''[main]
+
+        unpackaged=true
+
+        '' >> ~/.config/apport/settings
 
         '
     - name: Cache Rust toolchain
@@ -693,6 +717,14 @@ jobs:
 
         ulimit -c
 
+        mkdir -p ~/.config/apport
+
+        printf ''[main]
+
+        unpackaged=true
+
+        '' >> ~/.config/apport/settings
+
         '
     - name: Download native binaries
       uses: actions/download-artifact@v3
@@ -792,6 +824,14 @@ jobs:
 
         ulimit -c
 
+        mkdir -p ~/.config/apport
+
+        printf ''[main]
+
+        unpackaged=true
+
+        '' >> ~/.config/apport/settings
+
         '
     - name: Download native binaries
       uses: actions/download-artifact@v3
@@ -877,6 +917,14 @@ jobs:
 
         ulimit -c
 
+        mkdir -p ~/.config/apport
+
+        printf ''[main]
+
+        unpackaged=true
+
+        '' >> ~/.config/apport/settings
+
         '
     - name: Expose Pythons
       uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
@@ -947,6 +995,14 @@ jobs:
         ulimit -c unlimited
 
         ulimit -c
+
+        mkdir -p ~/.config/apport
+
+        printf ''[main]
+
+        unpackaged=true
+
+        '' >> ~/.config/apport/settings
 
         '
     - name: Expose Pythons
