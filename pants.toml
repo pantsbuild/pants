@@ -75,6 +75,10 @@ unmatched_build_file_globs = "error"
 #   https://github.com/pantsbuild/pants/issues/16096.
 cache_content_behavior = "fetch"
 
+[DEFAULT]
+# Tell `scie-pants` to use our `./pants` bootstrap script.
+delegate_bootstrap = true
+
 [anonymous-telemetry]
 enabled = true
 repo_id = "7775F8D5-FC58-4DBC-9302-D00AE4A1505F"
