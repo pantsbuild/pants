@@ -32,6 +32,7 @@ from pants.core.goals.package import (
     PackageFieldSet,
 )
 from pants.core.target_types import FileSourceField
+from pants.core.util_rules.environments import EnvironmentField
 from pants.engine.platform import Platform
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
@@ -56,6 +57,7 @@ class PythonGoogleCloudFunctionFieldSet(PackageFieldSet):
     complete_platforms: PexCompletePlatformsField
     type: PythonGoogleCloudFunctionType
     output_path: OutputPathField
+    environment: EnvironmentField
 
 
 @rule(desc="Create Python Google Cloud Function", level=LogLevel.DEBUG)
