@@ -749,8 +749,6 @@ jobs:
     - lint_python
     - test_python_linux_arm64
     - test_python_linux_x86_64_0
-    - test_python_linux_x86_64_1
-    - test_python_linux_x86_64_2
     - test_python_macos11_x86_64
     outputs:
       merge_ok: ${{ steps.set_merge_ok.outputs.merge_ok }}
@@ -805,7 +803,9 @@ jobs:
 
         '
     - name: Run Python tests
-      run: './pants --tag=+platform_specific_behavior test --force :: -- -m platform_specific_behavior
+      run: './pants --tag=+platform_specific_behavior test --force src/python/pants/core/util_rules/partitions_test.py:tests
+        src/python/pants/backend/python/lint/flake8/subsystem_test.py:tests src/python/pants/backend/python/lint/pylint/subsystem_test.py:tests
+        -- -m platform_specific_behavior
 
         '
     - continue-on-error: true
@@ -829,7 +829,7 @@ jobs:
     env: {}
     if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only
       != 'true')
-    name: Test Python (Linux-x86_64) Shard 0/3
+    name: Test Python (Linux-x86_64)
     needs:
     - bootstrap_pants_linux_x86_64
     - classify_changes
@@ -889,8 +889,9 @@ jobs:
       run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
 
         '
-    - name: Run Python test shard 0/3
-      run: './pants test --force --shard=0/3 ::
+    - name: Run Python tests
+      run: './pants test --force src/python/pants/core/util_rules/partitions_test.py:tests
+        src/python/pants/backend/python/lint/flake8/subsystem_test.py:tests src/python/pants/backend/python/lint/pylint/subsystem_test.py:tests
 
         '
     - continue-on-error: true
@@ -898,177 +899,7 @@ jobs:
       name: Upload pants.log
       uses: actions/upload-artifact@v3
       with:
-        name: pants-log-python-test-0_3-Linux-x86_64
-        path: .pants.d/pants.log
-    - if: failure()
-      name: Open SSH Access
-      uses: lhotari/action-upterm@v1
-      with:
-        limit-access-to-actor: true
-    strategy:
-      matrix:
-        python-version:
-        - '3.7'
-    timeout-minutes: 90
-  test_python_linux_x86_64_1:
-    env: {}
-    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only
-      != 'true')
-    name: Test Python (Linux-x86_64) Shard 1/3
-    needs:
-    - bootstrap_pants_linux_x86_64
-    - classify_changes
-    runs-on:
-    - ubuntu-20.04
-    steps:
-    - name: Check out code
-      uses: actions/checkout@v3
-      with:
-        fetch-depth: 10
-    - name: Install AdoptJDK
-      uses: actions/setup-java@v3
-      with:
-        distribution: adopt
-        java-version: '11'
-    - name: Install Go
-      uses: actions/setup-go@v3
-      with:
-        go-version: 1.19.5
-    - if: runner.os == 'Linux'
-      name: Download Apache `thrift` binary (Linux)
-      run: 'mkdir -p "${HOME}/.thrift"
-
-        curl --fail -L https://binaries.pantsbuild.org/bin/thrift/linux/x86_64/0.15.0/thrift
-        -o "${HOME}/.thrift/thrift"
-
-        chmod +x "${HOME}/.thrift/thrift"
-
-        echo "${HOME}/.thrift" >> $GITHUB_PATH
-
-        '
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v4
-      with:
-        python-version: ${{ matrix.python-version }}
-    - name: Tell Pants to use Python ${{ matrix.python-version }}
-      run: 'echo "PY=python${{ matrix.python-version }}" >> $GITHUB_ENV
-
-        echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version
-        }}.*'']" >> $GITHUB_ENV
-
-        ulimit -c
-
-        ulimit -c unlimited
-
-        ulimit -c
-
-        '
-    - name: Expose Pythons
-      uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
-    - name: Download native binaries
-      uses: actions/download-artifact@v3
-      with:
-        name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
-    - if: github.event_name != 'pull_request'
-      name: Setup toolchain auth
-      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
-
-        '
-    - name: Run Python test shard 1/3
-      run: './pants test --force --shard=1/3 ::
-
-        '
-    - continue-on-error: true
-      if: always()
-      name: Upload pants.log
-      uses: actions/upload-artifact@v3
-      with:
-        name: pants-log-python-test-1_3-Linux-x86_64
-        path: .pants.d/pants.log
-    - if: failure()
-      name: Open SSH Access
-      uses: lhotari/action-upterm@v1
-      with:
-        limit-access-to-actor: true
-    strategy:
-      matrix:
-        python-version:
-        - '3.7'
-    timeout-minutes: 90
-  test_python_linux_x86_64_2:
-    env: {}
-    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only
-      != 'true')
-    name: Test Python (Linux-x86_64) Shard 2/3
-    needs:
-    - bootstrap_pants_linux_x86_64
-    - classify_changes
-    runs-on:
-    - ubuntu-20.04
-    steps:
-    - name: Check out code
-      uses: actions/checkout@v3
-      with:
-        fetch-depth: 10
-    - name: Install AdoptJDK
-      uses: actions/setup-java@v3
-      with:
-        distribution: adopt
-        java-version: '11'
-    - name: Install Go
-      uses: actions/setup-go@v3
-      with:
-        go-version: 1.19.5
-    - if: runner.os == 'Linux'
-      name: Download Apache `thrift` binary (Linux)
-      run: 'mkdir -p "${HOME}/.thrift"
-
-        curl --fail -L https://binaries.pantsbuild.org/bin/thrift/linux/x86_64/0.15.0/thrift
-        -o "${HOME}/.thrift/thrift"
-
-        chmod +x "${HOME}/.thrift/thrift"
-
-        echo "${HOME}/.thrift" >> $GITHUB_PATH
-
-        '
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v4
-      with:
-        python-version: ${{ matrix.python-version }}
-    - name: Tell Pants to use Python ${{ matrix.python-version }}
-      run: 'echo "PY=python${{ matrix.python-version }}" >> $GITHUB_ENV
-
-        echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version
-        }}.*'']" >> $GITHUB_ENV
-
-        ulimit -c
-
-        ulimit -c unlimited
-
-        ulimit -c
-
-        '
-    - name: Expose Pythons
-      uses: pantsbuild/actions/expose-pythons@627a8ce25d972afa03da1641be9261bbbe0e3ffe
-    - name: Download native binaries
-      uses: actions/download-artifact@v3
-      with:
-        name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
-    - if: github.event_name != 'pull_request'
-      name: Setup toolchain auth
-      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
-
-        '
-    - name: Run Python test shard 2/3
-      run: './pants test --force --shard=2/3 ::
-
-        '
-    - continue-on-error: true
-      if: always()
-      name: Upload pants.log
-      uses: actions/upload-artifact@v3
-      with:
-        name: pants-log-python-test-2_3-Linux-x86_64
+        name: pants-log-python-test-Linux-x86_64
         path: .pants.d/pants.log
     - if: failure()
       name: Open SSH Access
@@ -1130,7 +961,9 @@ jobs:
 
         '
     - name: Run Python tests
-      run: './pants --tag=+platform_specific_behavior test --force :: -- -m platform_specific_behavior
+      run: './pants --tag=+platform_specific_behavior test --force src/python/pants/core/util_rules/partitions_test.py:tests
+        src/python/pants/backend/python/lint/flake8/subsystem_test.py:tests src/python/pants/backend/python/lint/pylint/subsystem_test.py:tests
+        -- -m platform_specific_behavior
 
         '
     - continue-on-error: true

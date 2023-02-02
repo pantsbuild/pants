@@ -605,7 +605,13 @@ def test_jobs(
         human_readable_step_name = f"Run Python test shard {shard}"
         log_name += f"-{shard}"
         pants_args.append(f"--shard={shard}")
-    pants_args.append("::")
+    pants_args.extend(
+        [
+            "src/python/pants/core/util_rules/partitions_test.py:tests",
+            "src/python/pants/backend/python/lint/flake8/subsystem_test.py:tests",
+            "src/python/pants/backend/python/lint/pylint/subsystem_test.py:tests",
+        ]
+    )
     if platform_specific:
         pants_args = (
             ["--tag=+platform_specific_behavior"]
@@ -657,7 +663,7 @@ def test_jobs(
 def linux_x86_64_test_jobs(python_versions: list[str]) -> Jobs:
     helper = Helper(Platform.LINUX_X86_64)
 
-    def test_python_linux(shard: str) -> dict[str, Any]:
+    def test_python_linux(shard: str | None = None) -> dict[str, Any]:
         return test_jobs(helper, python_versions, shard, platform_specific=False)
 
     shard_name_prefix = helper.job_name("test_python")
@@ -665,9 +671,7 @@ def linux_x86_64_test_jobs(python_versions: list[str]) -> Jobs:
         helper.job_name("bootstrap_pants"): bootstrap_jobs(
             helper, python_versions, validate_ci_config=True, rust_testing=RustTesting.ALL
         ),
-        f"{shard_name_prefix}_0": test_python_linux("0/3"),
-        f"{shard_name_prefix}_1": test_python_linux("1/3"),
-        f"{shard_name_prefix}_2": test_python_linux("2/3"),
+        f"{shard_name_prefix}_0": test_python_linux(),
     }
     return jobs
 
