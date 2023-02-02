@@ -57,7 +57,7 @@ impl ByteStore {
     let root = path.as_ref();
     let files_root = root.join("files");
     let directories_root = root.join("directories");
-    let large_files_root = root.join("josh");
+    let large_files_root = root.join("immutable");
 
     Ok(ByteStore {
       inner: Arc::new(InnerStore {
