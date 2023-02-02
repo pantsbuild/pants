@@ -3,12 +3,13 @@
 use crate::local::ByteStore;
 use crate::{EntryType, LocalOptions, ShrinkBehavior};
 
+use std::io;
 use std::path::Path;
 use std::time::Duration;
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use hashing::{Digest, Fingerprint};
-use tempfile::TempDir;
+use tempfile::{NamedTempFile, TempDir};
 use testutil::data::{TestData, TestDirectory};
 use tokio::time::sleep;
 use walkdir::WalkDir;
@@ -24,8 +25,10 @@ async fn assert_store_bytes(
     .store_bytes(entry_type, None, bytes.clone(), false)
     .await
     .unwrap();
+  let mut tmpfile = NamedTempFile::new().unwrap();
+  io::copy(&mut bytes.clone().reader(), tmpfile.as_file_mut()).unwrap();
   let two_pass_digest = store
-    .store(entry_type, false, true, move || Ok(bytes.clone().reader()))
+    .store(entry_type, false, true, tmpfile.path().to_path_buf())
     .await
     .unwrap();
   assert_eq!(expected_digest, one_pass_digest);
@@ -458,9 +461,9 @@ async fn garbage_collect_fail_because_too_many_leases() {
   // Whether the unleased file is present is undefined.
 }
 
-async fn write_one_meg(store: &ByteStore, byte: u8) {
-  let mut bytes = BytesMut::with_capacity(1024 * 1024);
-  for _ in 0..1024 * 1024 {
+async fn write_256kb(store: &ByteStore, byte: u8) {
+  let mut bytes = BytesMut::with_capacity(256 * 1024);
+  for _ in 0..256 * 1024 {
     bytes.put_u8(byte);
   }
   store
@@ -474,9 +477,14 @@ async fn garbage_collect_and_compact() {
   let dir = TempDir::new().unwrap();
   let store = new_store(dir.path());
 
-  write_one_meg(&store, b'0').await;
-
-  write_one_meg(&store, b'1').await;
+  write_256kb(&store, b'0').await;
+  write_256kb(&store, b'1').await;
+  write_256kb(&store, b'2').await;
+  write_256kb(&store, b'3').await;
+  write_256kb(&store, b'4').await;
+  write_256kb(&store, b'5').await;
+  write_256kb(&store, b'6').await;
+  write_256kb(&store, b'7').await;
 
   let size = get_directory_size(dir.path());
   assert!(

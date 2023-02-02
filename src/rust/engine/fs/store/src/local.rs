@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{self, Duration, Instant};
 
-use bytes::Bytes;
+use bytes::{Buf, Bytes};
 use futures::future;
 use hashing::{hash, hash_path, verified_copy, Digest, Fingerprint, EMPTY_DIGEST};
 use lmdb::Error::NotFound;
@@ -551,10 +551,8 @@ impl ByteStore {
     mut digest: Option<Digest>,
   ) -> Result<Digest, String> {
     if digest.is_none() {
-      digest = Some(
-        hash(&mut io::Cursor::new(src.clone()))
-          .map_err(|e| format!("Failed to hash bytes: {e}"))?,
-      );
+      digest =
+        Some(hash(&mut src.clone().reader()).map_err(|e| format!("Failed to hash bytes: {e}"))?);
     }
     let temp_dest = self.make_temp_dest(digest.unwrap()).await?;
     tokio::fs::write(temp_dest.path(), src.clone())
