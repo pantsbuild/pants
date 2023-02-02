@@ -17,7 +17,10 @@ from pants.backend.python.framework.stevedore.python_target_dependencies import 
 )
 from pants.backend.python.framework.stevedore.target_types import (
     AllStevedoreExtensionTargets,
+    StevedoreExtensionTargets,
     StevedoreNamespace,
+    StevedoreNamespacesField,
+    StevedoreNamespacesProviderTargetsRequest,
 )
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.target_types import (
@@ -75,6 +78,7 @@ def rule_runner() -> RuleRunner:
             *stevedore_dep_rules(),
             QueryRule(AllStevedoreExtensionTargets, ()),
             QueryRule(StevedoreExtensions, ()),
+            QueryRule(StevedoreExtensionTargets, (StevedoreNamespacesProviderTargetsRequest,)),
             QueryRule(InferredDependencies, (InferStevedoreNamespacesDependencies,)),
         ],
         target_types=[
@@ -122,6 +126,40 @@ def test_map_stevedore_extensions(rule_runner: RuleRunner) -> None:
                     for runner in sorted(st2_runners)
                 ),
             }
+        )
+    )
+
+
+def test_find_python_distributions_with_entry_points_in_stevedore_namespaces(
+    rule_runner: RuleRunner,
+) -> None:
+    rule_runner.write_files(
+        {
+            "src/foobar/BUILD": dedent(
+                """\
+                python_tests(
+                    name="tests",
+                    stevedore_namespaces=["some.thing.else"],
+                )
+                """
+            ),
+            "src/foobar/test_something.py": "",
+        }
+    )
+
+    assert rule_runner.request(
+        StevedoreExtensionTargets,
+        [
+            StevedoreNamespacesProviderTargetsRequest(
+                rule_runner.get_target(Address("src/foobar", target_name="tests")).get(
+                    StevedoreNamespacesField
+                )
+            ),
+        ],
+    ) == StevedoreExtensionTargets(
+        (
+            rule_runner.get_target(Address(f"runners/{runner}_runner"))
+            for runner in sorted(st2_runners)
         )
     )
 
