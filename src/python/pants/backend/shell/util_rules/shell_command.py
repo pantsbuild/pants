@@ -18,6 +18,8 @@ from pants.backend.shell.target_types import (
     ShellCommandWorkdirField,
 )
 from pants.backend.shell.util_rules.adhoc_process_support import (
+    BashTools,
+    BashToolsRequest,
     ShellCommandProcessRequest,
     _adjust_root_output_directory,
     _execution_environment_from_dependencies,
@@ -41,6 +43,7 @@ from pants.engine.target import (
     WrappedTargetRequest,
 )
 from pants.engine.unions import UnionRule
+from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
@@ -74,6 +77,12 @@ async def _prepare_process_request_from_target(shell_command: Target) -> ShellCo
 
     output_files, output_directories = _parse_outputs_from_command(shell_command, description)
 
+    # Resolve the `tools` field into a digest
+    tools = shell_command.get(ShellCommandToolsField, default_raw_value=()).value or ()
+    resolved_tools = await Get(BashTools, BashToolsRequest(tools, f"execute {description}"))
+    immutable_input_digests = {resolved_tools.cache_name: resolved_tools.digest}
+    supplied_env_var_values = {"PATH": f"{{chroot}}/{resolved_tools.cache_name}"}
+
     return ShellCommandProcessRequest(
         description=description,
         address=shell_command.address,
@@ -82,14 +91,13 @@ async def _prepare_process_request_from_target(shell_command: Target) -> ShellCo
         working_directory=working_directory,
         command=command,
         timeout=shell_command.get(ShellCommandTimeoutField).value,
-        tools=shell_command.get(ShellCommandToolsField, default_raw_value=()).value or (),
         input_digest=dependencies_digest,
         output_files=output_files,
         output_directories=output_directories,
         fetch_env_vars=shell_command.get(ShellCommandExtraEnvVarsField).value or (),
         append_only_caches=None,
-        supplied_env_var_values=None,
-        immutable_input_digests=None,
+        supplied_env_var_values=FrozenDict(supplied_env_var_values),
+        immutable_input_digests=FrozenDict(immutable_input_digests),
     )
 
 

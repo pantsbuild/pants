@@ -68,7 +68,6 @@ class ShellCommandProcessRequest:
     working_directory: str | None
     command: str
     timeout: int | None
-    tools: tuple[str, ...]
     input_digest: Digest
     immutable_input_digests: FrozenDict[str, Digest] | None
     append_only_caches: FrozenDict[str, str] | None
@@ -282,25 +281,19 @@ async def prepare_shell_command_process(
         raise ValueError("Working directory must be not be `None` for interactive processes.")
     command = shell_command.command
     timeout: int | None = shell_command.timeout
-    tools = shell_command.tools
     output_files = shell_command.output_files
     output_directories = shell_command.output_directories
     fetch_env_vars = shell_command.fetch_env_vars
     supplied_env_vars = shell_command.supplied_env_var_values or FrozenDict()
     append_only_caches = shell_command.append_only_caches or FrozenDict()
-    immutable_input_digests = dict(shell_command.immutable_input_digests or FrozenDict())
+    immutable_input_digests = shell_command.immutable_input_digests or FrozenDict()
 
     if interactive:
         command_env = {
             "CHROOT": "{chroot}",
         }
-        added_tools_digest = {}
     else:
-        resolved_tools = await Get(BashTools, BashToolsRequest(tools, f"execute {description}"))
-        added_tools_digest = {resolved_tools.cache_name: resolved_tools.digest}
-        command_env = {"PATH": f"{{chroot}}/{resolved_tools.cache_name}"}
-
-    immutable_input_digests.update(added_tools_digest)
+        command_env = {}
 
     extra_env = await Get(EnvironmentVars, EnvironmentVarsRequest(fetch_env_vars))
     command_env.update(extra_env)
@@ -323,7 +316,13 @@ async def prepare_shell_command_process(
         relpath = os.path.relpath(
             _working_directory, start="/" if os.path.isabs(_working_directory) else "."
         )
-        boot_script = f"cd {shlex.quote(relpath)}; " if relpath != "." else ""
+        new_path = None
+        if "PATH" in command_env:
+            new_path = command_env["PATH"]
+            del command_env["PATH"]
+        boot_script = (f"cd {shlex.quote(relpath)}; " if relpath != "." else "") + (
+            f"export PATH={shlex.quote(new_path)}:$PATH; " if new_path else ""
+        )
     else:
         boot_script = ""
 
