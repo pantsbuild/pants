@@ -1,5 +1,7 @@
 # Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+from __future__ import annotations
+
 import json
 from textwrap import dedent
 
@@ -31,13 +33,14 @@ def rule_runner() -> RuleRunner:
             QueryRule(AllPackageJson, ()),
             QueryRule(Owners, (OwnersRequest,)),
             QueryRule(InferredDependencies, (InferNodePackageDependenciesRequest,)),
+            QueryRule(InferredDependencies, (InferJSDependenciesRequest,)),
         ],
         target_types=[*package_json.target_types(), JSSourceTarget, JSSourcesGeneratorTarget],
     )
 
 
-def given_package(name: str, version: str) -> str:
-    return json.dumps({"name": name, "version": version})
+def given_package(name: str, version: str, **kwargs: str | dict[str, str]) -> str:
+    return json.dumps({"name": name, "version": version, **kwargs})
 
 
 def given_package_with_workspaces(name: str, version: str, *workspaces: str) -> str:
@@ -163,3 +166,133 @@ def test_infers_commonjs_js_dependencies_from_ancestor_files(rule_runner: RuleRu
     ).include
 
     assert set(addresses) == {Address("src/js", relative_file_path="xes.cjs")}
+
+
+def test_infers_main_package_json_field_js_source_dependency(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/js/BUILD": "package_json()",
+            "src/js/package.json": given_package("ham", "0.0.1", main="lib/index.js"),
+            "src/js/lib/BUILD": "javascript_sources()",
+            "src/js/lib/index.js": "",
+        }
+    )
+
+    pkg_tgt = rule_runner.get_target(Address("src/js"))
+    addresses = rule_runner.request(
+        InferredDependencies,
+        [InferNodePackageDependenciesRequest(NodePackageInferenceFieldSet.create(pkg_tgt))],
+    ).include
+
+    assert set(addresses) == {Address("src/js/lib", relative_file_path="index.js")}
+
+
+def test_infers_browser_package_json_field_js_source_dependency(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/js/BUILD": "package_json()",
+            "src/js/package.json": given_package("ham", "0.0.1", browser="lib/index.js"),
+            "src/js/lib/BUILD": "javascript_sources()",
+            "src/js/lib/index.js": "",
+        }
+    )
+
+    pkg_tgt = rule_runner.get_target(Address("src/js"))
+    addresses = rule_runner.request(
+        InferredDependencies,
+        [InferNodePackageDependenciesRequest(NodePackageInferenceFieldSet.create(pkg_tgt))],
+    ).include
+
+    assert set(addresses) == {Address("src/js/lib", relative_file_path="index.js")}
+
+
+def test_infers_bin_package_json_field_js_source_dependency(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/js/BUILD": "package_json()",
+            "src/js/package.json": given_package("ham", "0.0.1", bin="bin/index.js"),
+            "src/js/bin/BUILD": "javascript_sources()",
+            "src/js/bin/index.js": "",
+        }
+    )
+
+    pkg_tgt = rule_runner.get_target(Address("src/js"))
+    addresses = rule_runner.request(
+        InferredDependencies,
+        [InferNodePackageDependenciesRequest(NodePackageInferenceFieldSet.create(pkg_tgt))],
+    ).include
+
+    assert set(addresses) == {Address("src/js/bin", relative_file_path="index.js")}
+
+
+@pytest.mark.parametrize(
+    "exports", ("lib/index.js", {".": "lib/index.js"}, {"lib": "lib/index.js"})
+)
+def test_infers_exports_package_json_field_js_source_dependency(
+    rule_runner: RuleRunner, exports: str | dict[str, str]
+) -> None:
+    rule_runner.write_files(
+        {
+            "src/js/BUILD": "package_json()",
+            "src/js/package.json": given_package("ham", "0.0.1", exports=exports),
+            "src/js/lib/BUILD": "javascript_sources()",
+            "src/js/lib/index.js": "",
+        }
+    )
+
+    pkg_tgt = rule_runner.get_target(Address("src/js"))
+    addresses = rule_runner.request(
+        InferredDependencies,
+        [InferNodePackageDependenciesRequest(NodePackageInferenceFieldSet.create(pkg_tgt))],
+    ).include
+
+    assert set(addresses) == {Address("src/js/lib", relative_file_path="index.js")}
+
+
+@pytest.mark.parametrize("exports", ("lib/*.js", {".": "lib/*.js"}, {"lib": "lib/*.js"}))
+def test_infers_exports_package_json_field_js_source_dependency_with_stars(
+    rule_runner: RuleRunner, exports: str | dict[str, str]
+) -> None:
+    rule_runner.write_files(
+        {
+            "src/js/BUILD": "package_json()",
+            "src/js/package.json": given_package("ham", "0.0.1", exports=exports),
+            "src/js/lib/BUILD": "javascript_sources()",
+            "src/js/lib/index.js": "",
+        }
+    )
+
+    pkg_tgt = rule_runner.get_target(Address("src/js"))
+    addresses = rule_runner.request(
+        InferredDependencies,
+        [InferNodePackageDependenciesRequest(NodePackageInferenceFieldSet.create(pkg_tgt))],
+    ).include
+
+    assert set(addresses) == {Address("src/js/lib", relative_file_path="index.js")}
+
+
+@pytest.mark.parametrize("exports", ("lib/*.js", {".": "lib/*.js"}, {"lib": "lib/*"}))
+def test_infers_exports_package_json_field_js_source_dependency_with_stars_interpreted_as_recursive(
+    rule_runner: RuleRunner, exports: str | dict[str, str]
+) -> None:
+    rule_runner.write_files(
+        {
+            "src/js/BUILD": "package_json()",
+            "src/js/package.json": given_package("ham", "0.0.1", exports=exports),
+            "src/js/lib/BUILD": "javascript_sources()",
+            "src/js/lib/index.js": "",
+            "src/js/lib/subdir/BUILD": "javascript_sources()",
+            "src/js/lib/subdir/index.js": "",
+        }
+    )
+
+    pkg_tgt = rule_runner.get_target(Address("src/js"))
+    addresses = rule_runner.request(
+        InferredDependencies,
+        [InferNodePackageDependenciesRequest(NodePackageInferenceFieldSet.create(pkg_tgt))],
+    ).include
+
+    assert set(addresses) == {
+        Address("src/js/lib/subdir", relative_file_path="index.js"),
+        Address("src/js/lib", relative_file_path="index.js"),
+    }

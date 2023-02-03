@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
+import itertools
 import os.path
 from dataclasses import dataclass
 from typing import Iterable
@@ -12,6 +13,7 @@ from pants.backend.javascript.import_parser.rules import rules as import_parser_
 from pants.backend.javascript.package_json import (
     AllPackageJson,
     NodePackageDependenciesField,
+    PackageJsonEntryPoints,
     PackageJsonForGlobs,
     PackageJsonSourceField,
 )
@@ -19,7 +21,7 @@ from pants.backend.javascript.target_types import JSDependenciesField, JSSourceF
 from pants.engine.addresses import Addresses
 from pants.engine.fs import PathGlobs
 from pants.engine.internals.graph import Owners, OwnersRequest
-from pants.engine.internals.selectors import Get
+from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import Rule, collect_rules, rule
 from pants.engine.target import FieldSet, InferDependenciesRequest, InferredDependencies, Targets
 from pants.engine.unions import UnionRule
@@ -58,11 +60,24 @@ async def infer_node_package_dependencies(
     [pkg_json] = await Get(
         PackageJsonForGlobs, PathGlobs, source.path_globs(UnmatchedBuildFileGlobs.error)
     )
-    addresses = await Get(
-        Owners,
-        OwnersRequest(tuple(pkg.file for pkg in all_pkg_json if pkg_json in pkg.workspaces)),
+    entry_points = PackageJsonEntryPoints.from_package_json(pkg_json)
+
+    candidate_js_files, candidate_pkg_files = await MultiGet(
+        Get(Owners, OwnersRequest(tuple(entry_points.globs_relative_to(pkg_json)))),
+        Get(
+            Owners,
+            OwnersRequest(tuple(pkg.file for pkg in all_pkg_json if pkg_json in pkg.workspaces)),
+        ),
     )
-    return InferredDependencies(addresses)
+    js_targets, pkg_targets = await MultiGet(
+        Get(Targets, Addresses(candidate_js_files)), Get(Targets, Addresses(candidate_pkg_files))
+    )
+    return InferredDependencies(
+        itertools.chain(
+            (tgt.address for tgt in pkg_targets if tgt.has_field(PackageJsonSourceField)),
+            (tgt.address for tgt in js_targets if tgt.has_field(JSSourceField)),
+        )
+    )
 
 
 @rule
@@ -77,7 +92,7 @@ async def infer_js_source_dependencies(request: InferJSDependenciesRequest) -> I
             )
 
     owners = await Get(Owners, OwnersRequest(tuple(path_strings)))
-    owning_targets = await Get(Targets, Addresses, Addresses(owners))
+    owning_targets = await Get(Targets, Addresses(owners))
 
     return InferredDependencies(
         [tgt.address for tgt in owning_targets if tgt.has_field(JSSourceField)]

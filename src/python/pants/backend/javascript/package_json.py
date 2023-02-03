@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import os.path
 from dataclasses import dataclass, field
-from typing import Any, Iterable
+from typing import Any, Iterable, Mapping
 
 from typing_extensions import Literal
 
@@ -116,6 +116,59 @@ class NodePackageTarget(Target):
         NodePackageNameField,
         NodePackageDependenciesField,
     )
+
+
+@dataclass(frozen=True)
+class PackageJsonEntryPoints:
+    """See https://nodejs.org/api/packages.html#package-entry-points and
+    https://docs.npmjs.com/cli/v9/configuring-npm/package-json#browser."""
+
+    exports: FrozenDict[str, str]
+    bin: FrozenDict[str, str]
+
+    @property
+    def globs(self) -> Iterable[str]:
+        for export in self.exports.values():
+            yield export.replace("*", "**/*")
+        yield from self.bin.values()
+
+    def globs_relative_to(self, pkg_json: PackageJson) -> Iterable[str]:
+        for path in self.globs:
+            yield os.path.normpath(os.path.join(pkg_json.root_dir, path))
+
+    @classmethod
+    def from_package_json(cls, pkg_json: PackageJson) -> PackageJsonEntryPoints:
+        return cls(
+            exports=cls._exports_form_package_json(pkg_json),
+            bin=cls._binaries_from_package_json(pkg_json),
+        )
+
+    @staticmethod
+    def _exports_form_package_json(pkg_json: PackageJson) -> FrozenDict[str, str]:
+        content = pkg_json.content
+        exports: str | Mapping[str, str] | None = content.get("exports")
+        main: str | None = content.get("main")
+        browser: str | None = content.get("browser")
+        if exports:
+            if isinstance(exports, str):
+                return FrozenDict({".": exports})
+            else:
+                return FrozenDict(exports)
+        elif browser:
+            return FrozenDict({".": browser})
+        elif main:
+            return FrozenDict({".": main})
+        return FrozenDict()
+
+    @staticmethod
+    def _binaries_from_package_json(pkg_json: PackageJson) -> FrozenDict[str, str]:
+        binaries: str | Mapping[str, str] | None = pkg_json.content.get("bin")
+        if binaries:
+            if isinstance(binaries, str):
+                return FrozenDict({pkg_json.name: binaries})
+            else:
+                return FrozenDict(binaries)
+        return FrozenDict()
 
 
 @dataclass(frozen=True)
