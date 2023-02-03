@@ -10,10 +10,12 @@ from pants.backend.shell.target_types import (
     RunInSandboxRunnableField,
     RunInSandboxSourcesField,
     ShellCommandLogOutputField,
+    ShellCommandOutputRootDirField,
     ShellCommandWorkdirField,
 )
 from pants.backend.shell.util_rules.adhoc_process_support import (
     ShellCommandProcessRequest,
+    _adjust_root_output_directory,
     _execution_environment_from_dependencies,
     _parse_outputs_from_command,
 )
@@ -82,6 +84,7 @@ async def run_in_sandbox_request(
     run_field_set: RunFieldSet = field_sets.field_sets[0]
 
     working_directory = shell_command[ShellCommandWorkdirField].value or ""
+    root_output_directory = shell_command[ShellCommandOutputRootDirField].value or ""
 
     # Must be run in target environment so that the binaries/envvars match the execution
     # environment when we actually run the process.
@@ -129,7 +132,14 @@ async def run_in_sandbox_request(
         if result.stderr:
             logger.warning(result.stderr.decode())
 
-    output = await Get(Snapshot, Digest, result.output_digest)
+    adjusted = await _adjust_root_output_directory(
+        result.output_digest,
+        shell_command.address,
+        working_directory,
+        root_output_directory,
+    )
+    output = await Get(Snapshot, Digest, adjusted)
+
     return GeneratedSources(output)
 
 
