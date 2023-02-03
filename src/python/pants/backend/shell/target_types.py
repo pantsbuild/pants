@@ -431,11 +431,12 @@ class ShellCommandWorkdirField(StringField):
     alias = "workdir"
     default: ClassVar[Optional[str]] = "."
     help = softwrap(
-        "Sets the current working directory of the command. "
-        "To specify the location of the `BUILD` file, use `.`. Values beginning with `.` are "
-        "relative to the location of the `BUILD` file.\n\n"
-        "To specify the build root, use `/` or the empty string.\n\n"
-        "Values that do not begin with `.` or `/` are relative to the build root."
+        "Sets the current working directory of the command. \n\n"
+        "Values are relative to the build root, except in the following cases:\n\n"
+        "* `.` specifies the location of the `BUILD` file.\n"
+        "* Values beginning with `./` are relative to the location of the `BUILD` file.\n"
+        "* `/` or the empty string specifies the build root.\n"
+        "* Values beginning with `/` are also relative to the build root."
     )
 
 
@@ -443,7 +444,7 @@ class RunShellCommandWorkdirField(ShellCommandWorkdirField):
     default = None
     help = softwrap(
         "Sets the current working directory of the command that is `run`. If `None`, run the "
-        "command from the current working directory."
+        "command from the directory you are invoking Pants from."
     )
 
 
