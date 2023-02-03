@@ -764,6 +764,44 @@ def test_run_runnable_in_sandbox_with_workdir(rule_runner: RuleRunner) -> None:
     )
 
 
+def test_run_in_sandbox_capture_stdout_err(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/fruitcake.py": dedent(
+                """\
+                import sys
+                print("fruitcake")
+                print("inconceivable", file=sys.stderr)
+                """
+            ),
+            "src/BUILD": dedent(
+                """\
+                python_source(
+                    source="fruitcake.py",
+                    name="fruitcake",
+                )
+
+                experimental_run_in_sandbox(
+                  name="run_fruitcake",
+                  runnable=":fruitcake",
+                  stdout="stdout",
+                  stderr="stderr",
+                )
+                """
+            ),
+        }
+    )
+
+    assert_run_in_sandbox_result(
+        rule_runner,
+        Address("src", target_name="run_fruitcake"),
+        expected_contents={
+            "stderr": "inconceivable\n",
+            "stdout": "fruitcake\n",
+        },
+    )
+
+
 def test_relative_directories(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
