@@ -261,4 +261,10 @@ def test_does_not_generate_third_party_node_package_target_for_first_party_packa
     )
     addresses = sorted(str(tgt.address) for tgt in rule_runner.request(AllTargets, ()))
     assert "src/js/b#ham" not in addresses
-    assert addresses == ["src/js/a#chalk", "src/js/a#ham", "src/js/b#spam"]
+    assert addresses == [
+        "src/js/a#chalk",
+        "src/js/a#ham",
+        "src/js/a#src/js/a/package.json",
+        "src/js/b#spam",
+        "src/js/b#src/js/b/package.json",
+    ]

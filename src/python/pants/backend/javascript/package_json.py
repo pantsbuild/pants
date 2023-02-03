@@ -84,6 +84,10 @@ class NodePackageNameField(StringField):
     value: str
 
 
+class NodeThirdPartyPackageNameField(NodePackageNameField):
+    pass
+
+
 class NodeThirdPartyPackageDependenciesField(Dependencies):
     pass
 
@@ -95,7 +99,7 @@ class NodeThirdPartyPackageTarget(Target):
 
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        NodePackageNameField,
+        NodeThirdPartyPackageNameField,
         NodePackageVersionField,
         NodeThirdPartyPackageDependenciesField,
     )
@@ -235,28 +239,15 @@ async def generate_node_package_targets(
         request.generator[PackageJsonSourceField].path_globs(UnmatchedBuildFileGlobs.error),
     )
 
-    package_target = NodePackageTarget(
-        {
-            **request.template,
-            NodePackageNameField.alias: pkg_json.name,
-            NodePackageDependenciesField.alias: [
-                file_tgt.address.spec,
-                *request.template.get("dependencies", []),
-            ],
-        },
-        request.generator.address.create_generated(pkg_json.name),
-        union_membership,
-    )
-    if not pkg_json.dependencies:
-        return GeneratedTargets(request.generator, [package_target])
-
-    request.template.pop(PackageJsonSourceField.alias, None)
-
     first_party_names = {pkg.name for pkg in all_pkg_jsons}
     third_party_tgts = [
         NodeThirdPartyPackageTarget(
             {
-                **request.template,
+                **{
+                    key: value
+                    for key, value in request.template.items()
+                    if key != PackageJsonSourceField.alias
+                },
                 NodePackageNameField.alias: name,
                 NodePackageVersionField.alias: version,
                 NodeThirdPartyPackageDependenciesField.alias: [file_tgt.address.spec],
@@ -268,7 +259,21 @@ async def generate_node_package_targets(
         if name not in first_party_names
     ]
 
-    return GeneratedTargets(request.generator, [package_target, *third_party_tgts])
+    package_target = NodePackageTarget(
+        {
+            **request.template,
+            NodePackageNameField.alias: pkg_json.name,
+            NodePackageDependenciesField.alias: [
+                file_tgt.address.spec,
+                *(tgt.address.spec for tgt in third_party_tgts),
+                *request.template.get("dependencies", []),
+            ],
+        },
+        request.generator.address.create_generated(pkg_json.name),
+        union_membership,
+    )
+
+    return GeneratedTargets(request.generator, [package_target, file_tgt, *third_party_tgts])
 
 
 def target_types() -> Iterable[type[Target]]:
