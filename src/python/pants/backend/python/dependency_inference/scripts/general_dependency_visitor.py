@@ -11,7 +11,9 @@ import os
 import re
 import tokenize
 
-from _pants_dep_parser.dependency_visitor_base import DependencyVisitorBase
+from pants.backend.python.dependency_inference.scripts.dependency_visitor_base import (
+    DependencyVisitorBase,
+)
 
 
 class GeneralDependencyVisitor(DependencyVisitorBase):

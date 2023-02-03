@@ -91,7 +91,6 @@ root_patterns = [
   "test/*",
   "tests/*",
   "3rdparty/*",
-  "src/python/pants/backend/python/dependency_inference/scripts",
   "/build-support/bin",
   "/build-support/flake8",
   "/build-support/migration-support",
