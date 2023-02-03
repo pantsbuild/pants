@@ -43,7 +43,7 @@ from pants.engine.fs import (
     MergeDigests,
     Snapshot,
 )
-from pants.engine.internals.native_engine import AddPrefix, RemovePrefix
+from pants.engine.internals.native_engine import RemovePrefix
 from pants.engine.process import Process
 from pants.engine.rules import Get, MultiGet, collect_rules, rule, rule_helper
 from pants.engine.target import (
@@ -207,12 +207,13 @@ def _shell_tool_safe_env_name(tool_name: str) -> str:
 @dataclass(frozen=True)
 class BashToolsRequest:
     tools: tuple[str, ...]
+    rationale: str
 
 
 @dataclass(frozen=True)
 class BashTools:
     digest: Digest
-    path: str
+    cache_name: str
 
 
 @rule
@@ -222,11 +223,23 @@ async def resolve_bash_tools(
 
     search_path = shell_setup.executable_search_path
 
-    paths = await MultiGet(
-        Get(BinaryPaths, BinaryPathRequest(binary_name=tool, search_path=search_path))
+    requests = [
+        BinaryPathRequest(binary_name=tool, search_path=search_path)
         for tool in request.tools
         if tool not in BASH_BUILTIN_COMMANDS
+    ]
+
+    paths = await MultiGet(Get(BinaryPaths, BinaryPathRequest, request) for request in requests)
+
+    fail = next(
+        ((path_req, path) for path_req, path in zip(requests, paths) if not path.first_path), None
     )
+    if fail:
+        path_req, _ = fail
+        raise BinaryNotFoundError.from_request(
+            path_req,
+            rationale=request.rationale,
+        )
 
     def script(bash_path: str, binary_path: str) -> bytes:
         return dedent(
@@ -245,48 +258,14 @@ async def resolve_bash_tools(
         if path.first_path
     ]
 
-    digest_1 = await Get(Digest, CreateDigest(scripts))
-    script_dir = f".bash_tools_{hash(request)}"
-    digest_2 = await Get(Digest, AddPrefix(digest_1, script_dir))
+    digest = await Get(Digest, CreateDigest(scripts))
+    cache_name = f"_bash_tools_{digest.fingerprint}"
 
-    return BashTools(digest_2, f"{{chroot}}/{script_dir}")
-
-
-@rule_helper
-async def _shell_command_tools(
-    shell_setup: ShellSetup.EnvironmentAware, tools: tuple[str, ...], rationale: str
-) -> dict[str, str]:
-
-    search_path = shell_setup.executable_search_path
-    tool_requests = [
-        BinaryPathRequest(
-            binary_name=tool,
-            search_path=search_path,
-        )
-        for tool in sorted({*tools, *["mkdir", "ln"]})
-        if tool not in BASH_BUILTIN_COMMANDS
-    ]
-    tool_paths = await MultiGet(
-        Get(BinaryPaths, BinaryPathRequest, request) for request in tool_requests
-    )
-
-    paths: dict[str, str] = {}
-
-    for binary, tool_request in zip(tool_paths, tool_requests):
-        if binary.first_path:
-            paths[_shell_tool_safe_env_name(tool_request.binary_name)] = binary.first_path.path
-        else:
-            raise BinaryNotFoundError.from_request(
-                tool_request,
-                rationale=rationale,
-            )
-
-    return paths
+    return BashTools(digest, cache_name)
 
 
 @rule
 async def prepare_shell_command_process(
-    shell_setup: ShellSetup.EnvironmentAware,
     shell_command: ShellCommandProcessRequest,
     bash: BashBinary,
 ) -> Process:
@@ -309,17 +288,19 @@ async def prepare_shell_command_process(
     fetch_env_vars = shell_command.fetch_env_vars
     supplied_env_vars = shell_command.supplied_env_var_values or FrozenDict()
     append_only_caches = shell_command.append_only_caches or FrozenDict()
-    immutable_input_digests = shell_command.immutable_input_digests
+    immutable_input_digests = dict(shell_command.immutable_input_digests or FrozenDict())
 
     if interactive:
         command_env = {
             "CHROOT": "{chroot}",
         }
+        added_tools_digest = {}
     else:
-        resolved_tools = await _shell_command_tools(shell_setup, tools, f"execute {description}")
-        tools = tuple(tool for tool in sorted(resolved_tools))
+        resolved_tools = await Get(BashTools, BashToolsRequest(tools, f"execute {description}"))
+        added_tools_digest = {resolved_tools.cache_name: resolved_tools.digest}
+        command_env = {"PATH": f"{{chroot}}/{resolved_tools.cache_name}"}
 
-        command_env = {"TOOLS": " ".join(tools), **resolved_tools}
+    immutable_input_digests.update(added_tools_digest)
 
     extra_env = await Get(EnvironmentVars, EnvironmentVarsRequest(fetch_env_vars))
     command_env.update(extra_env)
@@ -340,22 +321,11 @@ async def prepare_shell_command_process(
     if interactive:
         _working_directory = working_directory or "."
         relpath = os.path.relpath(
-            _working_directory or ".", start="/" if os.path.isabs(_working_directory) else "."
+            _working_directory, start="/" if os.path.isabs(_working_directory) else "."
         )
         boot_script = f"cd {shlex.quote(relpath)}; " if relpath != "." else ""
     else:
-        # Setup bin_relpath dir with symlinks to all requested tools, so that we can use PATH, force
-        # symlinks to avoid issues with repeat runs using the __run.sh script in the sandbox.
-        bin_relpath = ".bin"
-        boot_script = ";".join(
-            dedent(
-                f"""\
-                $mkdir -p {bin_relpath}
-                for tool in $TOOLS; do $ln -sf ${{!tool}} {bin_relpath}; done
-                export PATH="$PWD/{bin_relpath}"
-                """
-            ).split("\n")
-        )
+        boot_script = ""
 
     proc = Process(
         argv=(bash.path, "-c", boot_script + command, shell_name),
