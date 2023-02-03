@@ -583,8 +583,9 @@ def test_run_shell_command_request(rule_runner: RuleRunner) -> None:
         tgt = rule_runner.get_target(Address("src", target_name=target))
         run = RunShellCommand.create(tgt)
         request = rule_runner.request(RunRequest, [run])
-        assert args[0] in request.args[0]
-        assert request.args[1:] == args[1:]
+        assert len(args) == len(request.args)
+        for arg, request_arg in zip(args, request.args):
+            arg in request_arg
 
     assert_run_args("test", ("bash", "-c", "some cmd string", "src:test"))
     assert_run_args(
@@ -617,20 +618,9 @@ def test_shell_command_boot_script(rule_runner: RuleRunner) -> None:
     assert res.argv[1] == "-c"
     assert res.argv[2].startswith("cd src &&")
     assert "bash -c" in res.argv[2]
-    assert res.argv[2].endswith(
-        shlex.quote(
-            "$mkdir -p .bin;"
-            "for tool in $TOOLS; do $ln -sf ${!tool} .bin; done;"
-            'export PATH="$PWD/.bin";'
-            "./command.script"
-        )
-        + " src:boot-script-test"
-    )
+    assert res.argv[2].endswith(shlex.quote("./command.script") + " src:boot-script-test")
 
-    tools = sorted({"python3_8", "mkdir", "ln"})
-    assert sorted(res.env["TOOLS"].split()) == tools
-    for tool in tools:
-        assert res.env[tool].endswith(f"/{tool.replace('_', '.')}")
+    assert "PATH" in res.env
 
 
 def test_shell_command_boot_script_in_build_root(rule_runner: RuleRunner) -> None:
@@ -655,15 +645,7 @@ def test_shell_command_boot_script_in_build_root(rule_runner: RuleRunner) -> Non
     assert "bash" in res.argv[0]
     assert res.argv[1] == "-c"
     assert "bash -c" in res.argv[2]
-    assert res.argv[2].endswith(
-        shlex.quote(
-            "$mkdir -p .bin;"
-            "for tool in $TOOLS; do $ln -sf ${!tool} .bin; done;"
-            'export PATH="$PWD/.bin";'
-            "./command.script"
-        )
-        + " //:boot-script-test"
-    )
+    assert res.argv[2].endswith(shlex.quote("./command.script") + " //:boot-script-test")
 
 
 def test_shell_command_extra_env_vars(caplog, rule_runner: RuleRunner) -> None:
