@@ -9,6 +9,8 @@ from pants.backend.shell.target_types import (
     RunInSandboxArgumentsField,
     RunInSandboxRunnableField,
     RunInSandboxSourcesField,
+    RunInSandboxStderrFilenameField,
+    RunInSandboxStdoutFilenameField,
     ShellCommandLogOutputField,
     ShellCommandOutputRootDirField,
     ShellCommandWorkdirField,
@@ -132,11 +134,18 @@ async def run_in_sandbox_request(
         if result.stderr:
             logger.warning(result.stderr.decode())
 
+    extras = (
+        (shell_command[RunInSandboxStdoutFilenameField].value, result.stdout),
+        (shell_command[RunInSandboxStderrFilenameField].value, result.stderr),
+    )
+    extra_contents = {i: j for i, j in extras if i}
+
     adjusted = await _adjust_root_output_directory(
         result.output_digest,
         shell_command.address,
         working_directory,
         root_output_directory,
+        extra_files=extra_contents,
     )
     output = await Get(Snapshot, Digest, adjusted)
 
