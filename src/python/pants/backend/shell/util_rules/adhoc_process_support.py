@@ -43,7 +43,7 @@ from pants.engine.fs import (
     MergeDigests,
     Snapshot,
 )
-from pants.engine.internals.native_engine import RemovePrefix
+from pants.engine.internals.native_engine import AddPrefix, RemovePrefix
 from pants.engine.process import Process
 from pants.engine.rules import Get, MultiGet, collect_rules, rule, rule_helper
 from pants.engine.target import (
@@ -202,6 +202,54 @@ async def _adjust_root_output_directory(
 def _shell_tool_safe_env_name(tool_name: str) -> str:
     """Replace any characters not suitable in an environment variable name with `_`."""
     return re.sub(r"\W", "_", tool_name)
+
+
+@dataclass(frozen=True)
+class BashToolsRequest:
+    tools: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class BashTools:
+    digest: Digest
+    path: str
+
+
+@rule
+async def resolve_bash_tools(
+    bash_binary: BashBinary, shell_setup: ShellSetup.EnvironmentAware, request: BashToolsRequest
+) -> BashTools:
+
+    search_path = shell_setup.executable_search_path
+
+    paths = await MultiGet(
+        Get(BinaryPaths, BinaryPathRequest(binary_name=tool, search_path=search_path))
+        for tool in request.tools
+        if tool not in BASH_BUILTIN_COMMANDS
+    )
+
+    def script(bash_path: str, binary_path: str) -> bytes:
+        return dedent(
+            f"""\
+            #!{bash_path}
+
+            {binary_path} $@
+            """
+        ).encode()
+
+    scripts = [
+        FileContent(
+            path.binary_name, script(bash_binary.path, path.first_path.path), is_executable=True
+        )
+        for path in paths
+        if path.first_path
+    ]
+
+    digest_1 = await Get(Digest, CreateDigest(scripts))
+    script_dir = f".bash_tools_{hash(request)}"
+    digest_2 = await Get(Digest, AddPrefix(digest_1, script_dir))
+
+    return BashTools(digest_2, f"{{chroot}}/{script_dir}")
 
 
 @rule_helper
