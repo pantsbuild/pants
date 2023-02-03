@@ -204,9 +204,6 @@ class LocalPantsRunner:
             poll_delay=(0.1 if poll else None),
         )
 
-    def _finish_run(self, code: ExitCode) -> None:
-        """Cleans up the run tracker."""
-
     def _get_workunits_callbacks(self) -> tuple[WorkunitsCallback, ...]:
         # Load WorkunitsCallbacks by requesting WorkunitsCallbackFactories, and then constructing
         # a per-run instance of each WorkunitsCallback.

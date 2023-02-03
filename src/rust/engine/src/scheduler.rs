@@ -342,5 +342,8 @@ impl Drop for Scheduler {
     // Because Nodes may hold references to the Core in their closure, this is intended to
     // break cycles between Nodes and the Core.
     self.core.graph.clear();
+    // Shutdown the Core's Executor. This is a noop if the Executor is borrowed, as is the case in
+    // `pantsd`.
+    self.core.executor.shutdown(Duration::from_secs(5));
   }
 }

@@ -639,8 +639,8 @@ impl Core {
       .iter()
       .map(|runner| runner.shutdown().boxed());
     let shutdown_results = futures::future::join_all(shutdown_futures).await;
-    for shutfdown_result in shutdown_results {
-      if let Err(err) = shutfdown_result {
+    for shutdown_result in shutdown_results {
+      if let Err(err) = shutdown_result {
         log::warn!("Command runner failed to shutdown cleanly: {err}");
       }
     }
