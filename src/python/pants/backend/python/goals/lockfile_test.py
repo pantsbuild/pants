@@ -54,6 +54,7 @@ def _generate(
                 interpreter_constraints=InterpreterConstraints(),
                 resolve_name="test",
                 lockfile_dest="test.lock",
+                diff=False,
             )
         ],
     )
@@ -240,11 +241,13 @@ def test_multiple_resolves() -> None:
             ),
             resolve_name="a",
             lockfile_dest="a.lock",
+            diff=False,
         ),
         GeneratePythonLockfile(
             requirements=FrozenOrderedSet(["b"]),
             interpreter_constraints=InterpreterConstraints(["==3.7.*"]),
             resolve_name="b",
             lockfile_dest="b.lock",
+            diff=False,
         ),
     }

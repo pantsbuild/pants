@@ -13,7 +13,7 @@ from pants.backend.go.lint.vet import skip_field
 from pants.backend.go.lint.vet.rules import GoVetFieldSet, GoVetRequest
 from pants.backend.go.lint.vet.rules import rules as go_vet_rules
 from pants.backend.go.lint.vet.subsystem import GoVetSubsystem
-from pants.backend.go.target_types import GoModTarget, GoPackageTarget, GoSdkTarget
+from pants.backend.go.target_types import GoModTarget, GoPackageTarget
 from pants.backend.go.util_rules import (
     assembly,
     build_pkg,
@@ -36,7 +36,7 @@ from pants.testutil.rule_runner import QueryRule, RuleRunner
 @pytest.fixture()
 def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
-        target_types=[GoModTarget, GoPackageTarget, GoSdkTarget],
+        target_types=[GoModTarget, GoPackageTarget],
         rules=[
             *skip_field.rules(),
             *go_vet_rules(),

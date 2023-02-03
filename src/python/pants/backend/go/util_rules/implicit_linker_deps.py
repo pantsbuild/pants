@@ -3,14 +3,12 @@
 
 from __future__ import annotations
 
-from pants.backend.go.target_types import DEFAULT_GO_SDK_ADDR
 from pants.backend.go.util_rules.build_pkg import BuiltGoPackage
-from pants.backend.go.util_rules.build_pkg_target import BuildGoPackageTargetRequest
+from pants.backend.go.util_rules.build_pkg_target import BuildGoPackageRequestForStdlibRequest
 from pants.backend.go.util_rules.link_defs import (
     ImplicitLinkerDependencies,
     ImplicitLinkerDependenciesHook,
 )
-from pants.build_graph.address import Address
 from pants.engine.internals.native_engine import Digest, MergeDigests
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import collect_rules, rule
@@ -26,28 +24,25 @@ class SdkImplicitLinkerDependenciesHook(ImplicitLinkerDependenciesHook):
 async def provide_sdk_implicit_linker_dependencies(
     request: SdkImplicitLinkerDependenciesHook,
 ) -> ImplicitLinkerDependencies:
-    def make_stdlib_dep(import_path: str) -> Address:
-        return DEFAULT_GO_SDK_ADDR.create_generated(import_path)
-
     # Build implicit linker deps.
     # All binaries link to `runtime`.
-    implicit_deps_addrs: set[Address] = {make_stdlib_dep("runtime")}
+    implicit_deps_import_paths: set[str] = {"runtime"}
     # TODO: External linking mode forces an import of runtime/cgo.
     # TODO: On ARM with GOARM=5, it forces an import of math, for soft floating point.
     if request.build_opts.with_race_detector:
-        implicit_deps_addrs.add(make_stdlib_dep("runtime/race"))
+        implicit_deps_import_paths.add("runtime/race")
     if request.build_opts.with_msan:
-        implicit_deps_addrs.add(make_stdlib_dep("runtime/msan"))
+        implicit_deps_import_paths.add("runtime/msan")
     if request.build_opts.with_asan:
-        implicit_deps_addrs.add(make_stdlib_dep("runtime/asan"))
+        implicit_deps_import_paths.add("runtime/asan")
     # TODO: Building for coverage in Go 1.20+ forces an import of runtime/coverage.
 
     built_implicit_linker_deps = await MultiGet(
         Get(
             BuiltGoPackage,
-            BuildGoPackageTargetRequest(addr, build_opts=request.build_opts),
+            BuildGoPackageRequestForStdlibRequest(dep_import_path, build_opts=request.build_opts),
         )
-        for addr in implicit_deps_addrs
+        for dep_import_path in implicit_deps_import_paths
     )
 
     implicit_dep_digests = []
