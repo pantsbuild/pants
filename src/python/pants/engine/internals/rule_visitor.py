@@ -59,11 +59,6 @@ class _TypeStack:
         self.push(self.root)
         self._push_function_closures(func)
 
-    def __repr__(self) -> str:
-        from pprint import pformat
-
-        return f"TypeStack<\n{pformat(self._stack)}\n>"
-
     def __getitem__(self, name: str) -> Any:
         for ns in reversed(self._stack):
             if name in ns:
