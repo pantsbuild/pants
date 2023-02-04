@@ -13,7 +13,6 @@ from pants.core.util_rules.external_tool import (
 )
 from pants.core.util_rules.external_tool import rules as external_tool_rules
 from pants.engine.fs import EMPTY_DIGEST, Digest
-from pants.engine.internals.native_engine import MergeDigests
 from pants.engine.platform import Platform
 from pants.engine.process import Process
 from pants.engine.rules import Get, Rule, collect_rules, rule
@@ -115,17 +114,18 @@ async def setup_node_tool_process(
         DownloadedExternalTool, ExternalToolRequest, nodejs.get_request(platform)
     )
 
-    input_digest = await Get(Digest, MergeDigests((request.input_digest, downloaded_nodejs.digest)))
-
     # Get reference to tool
     assert nodejs.default_url_platform_mapping is not None
     plat_str = nodejs.default_url_platform_mapping[platform.value]
-    nodejs_dir = f"node-{nodejs.version}-{plat_str}"
+    nodejs_dir = f"__node/node-{nodejs.version}-{plat_str}"
+
+    immutable_input_digests = {"__node": downloaded_nodejs.digest}
 
     return Process(
         argv=filter(None, request.args),
-        input_digest=input_digest,
+        input_digest=request.input_digest,
         output_files=request.output_files,
+        immutable_input_digests=immutable_input_digests,
         output_directories=request.output_directories,
         description=request.description,
         level=request.level,
