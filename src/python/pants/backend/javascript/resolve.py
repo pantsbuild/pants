@@ -15,7 +15,7 @@ from pants.backend.javascript.package_json import (
 )
 from pants.build_graph.address import Address
 from pants.engine.internals.selectors import Get
-from pants.engine.rules import Rule, collect_rules, rule
+from pants.engine.rules import Rule, collect_rules, rule, rule_helper
 from pants.engine.target import WrappedTarget, WrappedTargetRequest
 from pants.engine.unions import UnionRule
 from pants.util.strutil import softwrap
@@ -32,30 +32,33 @@ class ChosenNodeResolve:
     file_path: str
 
 
-@rule
-async def resolve_for_package(
-    req: RequestNodeResolve, all_pkgs: AllPackageJson
-) -> ChosenNodeResolve:
+@rule_helper
+async def _get_node_package_name(req: RequestNodeResolve) -> str:
     wrapped = await Get(
         WrappedTarget,
         WrappedTargetRequest(req.address, description_of_origin="the `ChosenNodeResolve` rule"),
     )
     if wrapped.target.has_field(NodePackageNameField):
-        name = wrapped.target[NodePackageNameField].value
-    else:
-        owning_pkg = await Get(OwningNodePackage, OwningNodePackageRequest(req.address))
-        if owning_pkg.target:
-            name = owning_pkg.target[NodePackageNameField].value
-        else:
-            raise ValueError(
-                softwrap(
-                    f"""
-                    No node resolve was could be determined for {req.address}.
+        return wrapped.target[NodePackageNameField].value
+    owning_pkg = await Get(OwningNodePackage, OwningNodePackageRequest(wrapped.target.address))
+    if owning_pkg.target:
+        return owning_pkg.target[NodePackageNameField].value
+    raise ValueError(
+        softwrap(
+            f"""
+            No node resolve was could be determined for {req.address}.
 
-                    This probably means that there is no `package.json` in any parent directory of this target.
-                    """
-                )
-            )
+            This probably means that there is no `package.json` in any parent directory of this target.
+            """
+        )
+    )
+
+
+@rule
+async def resolve_for_package(
+    req: RequestNodeResolve, all_pkgs: AllPackageJson
+) -> ChosenNodeResolve:
+    name = await _get_node_package_name(req)
     root_pkg_json = all_pkgs.root_pkg_json(name)
     return ChosenNodeResolve(
         resolve_name=root_pkg_json.name,
