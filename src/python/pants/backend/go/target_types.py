@@ -252,6 +252,69 @@ class GoThirdPartyPackageTarget(Target):
 
 
 # -----------------------------------------------------------------------------------------------
+# `go_vendor_package` target generator
+# -----------------------------------------------------------------------------------------------
+
+
+class GoVendoredPackageDependenciesField(Dependencies):
+    pass
+
+
+class GoVendoredModuleImportPathField(StringField):
+    alias = "_module_import_path"
+    help = ""
+
+
+class GoVendoredModuleDirPath(StringField):
+    alias = "_module_dir_path"
+    help = ""
+
+
+class GoVendoredPackageDirPath(StringField):
+    alias = "_pkg_dir_path"
+    help = ""
+
+
+class GoVendoredPackageDigestField(StringField):
+    alias = "_pkg_digest"
+    help = softwrap(
+        """
+        The digest for the vendored package. It will include all of the sources for the vendored module.
+        """
+    )
+
+
+class GoVendoredPackageTarget(Target):
+    alias = "_go_vendored_package"
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        GoVendoredPackageDependenciesField,
+        GoImportPathField,
+        GoVendoredModuleImportPathField,
+    )
+
+    help = softwrap(
+        """
+        A package from a vendored third-party Go module.
+
+        You should not explicitly create this target in BUILD files. Instead, add a `go_mod`
+        target where you have your vendored packages, which will generate
+        `_go_vendored_package` targets for you.
+        """
+    )
+
+    def validate(self) -> None:
+        if not self.address.is_generated_target:
+            raise InvalidTargetException(
+                f"The `{self.alias}` target type should not be manually created in BUILD "
+                f"files, but it was created for {self.address}.\n\n"
+                "Instead, add a `go_mod` target where you have your `go.mod` file, which will "
+                f"generate `{self.alias}` targets for you based on the `require` directives in "
+                f"your `go.mod`."
+            )
+
+
+# -----------------------------------------------------------------------------------------------
 # `go_mod` target generator
 # -----------------------------------------------------------------------------------------------
 

@@ -7,14 +7,15 @@ import logging
 from dataclasses import dataclass
 from typing import Iterable
 
-from pants.backend.go.go_sources import load_go_binary
-from pants.backend.go.go_sources.load_go_binary import LoadedGoBinary, LoadedGoBinaryRequest
+from pants.backend.go.util_rules.sdk import GoSdkProcess
 from pants.engine.engine_aware import EngineAwareParameter
+from pants.engine.fs import CreateDigest, FileContent
 from pants.engine.internals.native_engine import Digest, MergeDigests
 from pants.engine.internals.selectors import Get
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Rule, collect_rules, rule
 from pants.util.logging import LogLevel
+from pants.util.resources import read_resource
 
 logger = logging.getLogger(__name__)
 
@@ -60,15 +61,50 @@ class VendorModulesParserSetup:
     path: str
 
 
+# @rule
+# async def setup_vendor_modules_txt_parser() -> VendorModulesParserSetup:
+#     output_name = "__go_parse_vendor__"
+#     binary = await Get(
+#         LoadedGoBinary,
+#         LoadedGoBinaryRequest("parse_vendor_modules", ("parse.go", "semver.go"), output_name),
+#     )
+#     return VendorModulesParserSetup(
+#         digest=binary.digest,
+#         path=f"./{output_name}",
+#     )
+
+
 @rule
 async def setup_vendor_modules_txt_parser() -> VendorModulesParserSetup:
+    src_files = ("parse.go", "semver.go")
+
+    sources_digest = await Get(
+        Digest,
+        CreateDigest(
+            [
+                FileContent(
+                    src_file,
+                    read_resource("pants.backend.go.go_sources.parse_vendor_modules", src_file)
+                    or b"",
+                )
+                for src_file in src_files
+            ]
+        ),
+    )
+
     output_name = "__go_parse_vendor__"
-    binary = await Get(
-        LoadedGoBinary,
-        LoadedGoBinaryRequest("parse_vendor_modules", ("parse.go", "semver.go"), output_name),
+    compile_result = await Get(
+        ProcessResult,
+        GoSdkProcess(
+            command=("build", "-o", output_name, *src_files),
+            input_digest=sources_digest,
+            output_files=(output_name,),
+            env={"CGO_ENABLED": "0"},
+            description="Build Go assembly check binary",
+        ),
     )
     return VendorModulesParserSetup(
-        digest=binary.digest,
+        digest=compile_result.output_digest,
         path=f"./{output_name}",
     )
 
@@ -98,7 +134,4 @@ async def parse_vendor_modules_metadata(
 
 
 def rules() -> Iterable[Rule]:
-    return (
-        *collect_rules(),
-        *load_go_binary.rules(),
-    )
+    return (*collect_rules(),)

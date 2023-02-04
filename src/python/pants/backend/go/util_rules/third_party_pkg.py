@@ -110,6 +110,16 @@ class ThirdPartyPkgAnalysisRequest(EngineAwareParameter):
 
 
 @dataclass(frozen=True)
+class VendoredPkgAnalysisRequest(EngineAwareParameter):
+    digest: Digest
+    module_import_path: str
+    pkg_import_path: str
+    module_dir_path: str
+    pkg_dir_path: str
+    build_opts: GoBuildOptions
+
+
+@dataclass(frozen=True)
 class AllThirdPartyPackages(FrozenDict[str, ThirdPartyPkgAnalysis]):
     """All the packages downloaded from a go.mod, along with a digest of the downloaded files.
 
@@ -568,6 +578,43 @@ async def analyze_go_third_party_package(
         exit_code=0,
         stderr=None,
     )
+
+
+@rule(desc="Analyze a vendored third party package.", level=LogLevel.DEBUG)
+async def analyze_vendored_third_party_package(
+    request: VendoredPkgAnalysisRequest,
+    analyzer: PackageAnalyzerSetup,
+) -> FallibleThirdPartyPkgAnalysis:
+    # Analyze all of the packages in this module.
+    analyzer_relpath = "__analyzer"
+    analysis_result = await Get(
+        ProcessResult,
+        Process(
+            [os.path.join(analyzer_relpath, analyzer.path), request.pkg_dir_path],
+            input_digest=request.digest,
+            immutable_input_digests={
+                analyzer_relpath: analyzer.digest,
+            },
+            description=f"Analyze metadata for Go vendored third-party module: {request.pkg_import_path}",
+            level=LogLevel.DEBUG,
+            env={"CGO_ENABLED": "1" if request.build_opts.cgo_enabled else "0"},
+        ),
+    )
+
+    pkg_json = json.loads(analysis_result.stdout.decode())
+
+    pkg_analysis = await Get(
+        FallibleThirdPartyPkgAnalysis,
+        AnalyzeThirdPartyPackageRequest(
+            pkg_json=_freeze_json_dict(pkg_json),
+            module_sources_digest=request.digest,
+            module_sources_path=request.module_dir_path,
+            module_import_path=request.module_import_path,
+            package_path=request.pkg_dir_path,
+            minimum_go_version=None,  # TODO: Thread this argument through.
+        ),
+    )
+    return pkg_analysis
 
 
 @rule(desc="Download and analyze all third-party Go packages", level=LogLevel.DEBUG)

@@ -19,6 +19,7 @@ from pants.backend.go.target_types import (
 from pants.backend.go.util_rules import binary
 from pants.backend.go.util_rules.binary import GoBinaryMainPackage, GoBinaryMainPackageRequest
 from pants.backend.go.util_rules.sdk import GoSdkProcess
+from pants.backend.go.util_rules.vendor import VendoredModuleMetadata
 from pants.base.specs import AncestorGlobSpec, RawSpecs
 from pants.build_graph.address import Address, AddressInput
 from pants.engine.engine_aware import EngineAwareParameter
@@ -217,6 +218,7 @@ class GoModInfo:
     digest: Digest
     mod_path: str
     minimum_go_version: str | None
+    vendor_modules: tuple[VendoredModuleMetadata, ...]
 
 
 @dataclass(frozen=True)
@@ -264,6 +266,7 @@ async def determine_go_mod_info(
         digest=sources_digest,
         mod_path=go_mod_path,
         minimum_go_version=module_metadata.get("Go"),
+        vendor_modules=(),
     )
 
 

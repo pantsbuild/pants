@@ -3,9 +3,12 @@
 
 from __future__ import annotations
 
+import dataclasses
 import logging
 from collections import defaultdict
 from dataclasses import dataclass
+from pathlib import PurePath
+from typing import Any
 
 from pants.backend.go.dependency_inference import (
     AllGoModuleImportPathsMappings,
@@ -21,8 +24,13 @@ from pants.backend.go.target_types import (
     GoPackageSourcesField,
     GoThirdPartyPackageDependenciesField,
     GoThirdPartyPackageTarget,
+    GoVendoredModuleDirPath,
+    GoVendoredModuleImportPathField,
+    GoVendoredPackageDigestField,
+    GoVendoredPackageDirPath,
+    GoVendoredPackageTarget,
 )
-from pants.backend.go.util_rules import build_opts, first_party_pkg, import_analysis
+from pants.backend.go.util_rules import build_opts, first_party_pkg, import_analysis, vendor
 from pants.backend.go.util_rules.build_opts import GoBuildOptions, GoBuildOptionsFromTargetRequest
 from pants.backend.go.util_rules.first_party_pkg import (
     FallibleFirstPartyPkgAnalysis,
@@ -43,13 +51,19 @@ from pants.backend.go.util_rules.third_party_pkg import (
     ThirdPartyPkgAnalysis,
     ThirdPartyPkgAnalysisRequest,
 )
+from pants.backend.go.util_rules.vendor import (
+    ParseVendorModulesMetadataRequest,
+    ParseVendorModulesMetadataResult,
+    VendoredModuleMetadata,
+)
+from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.core.target_types import (
     TargetGeneratorSourcesHelperSourcesField,
     TargetGeneratorSourcesHelperTarget,
 )
 from pants.engine.addresses import Address
 from pants.engine.engine_aware import EngineAwareParameter
-from pants.engine.fs import Digest, Snapshot
+from pants.engine.fs import Digest, PathGlobs, Snapshot
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     AllTargets,
@@ -59,6 +73,7 @@ from pants.engine.target import (
     GenerateTargetsRequest,
     InferDependenciesRequest,
     InferredDependencies,
+    Target,
 )
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.util.frozendict import FrozenDict
@@ -102,7 +117,7 @@ async def go_map_import_paths_by_module(
     first_party_gets = []
 
     for tgt, owning_go_mod in zip(candidate_go_source_targets, owning_go_mod_targets):
-        if tgt.has_field(GoImportPathField):
+        if tgt.has_field(GoImportPathField) and tgt[GoImportPathField].value is not None:
             import_path = tgt[GoImportPathField].value
             import_paths_by_module[owning_go_mod.address][import_path].add(tgt.address)
         elif tgt.has_field(GoPackageSourcesField):
@@ -357,6 +372,62 @@ class GenerateTargetsFromGoModRequest(GenerateTargetsRequest):
     generate_from = GoModTarget
 
 
+@dataclass(frozen=True)
+class _GenerateVendoredModuleTargetRequest(EngineAwareParameter):
+    vendor_path: PurePath
+    module: VendoredModuleMetadata
+    generator_addr: Address
+    template: dict[str, Any] = dataclasses.field(hash=False)
+
+    def debug_hint(self) -> str | None:
+        return f"{self.vendor_path}: {self.module.module_import_path}"
+
+
+@dataclass(frozen=True)
+class _GenerateVendoredModuleTargetsResult:
+    targets: tuple[Target, ...]
+
+
+@rule(desc="Generate `_go_vendored_package` target for vendored package", level=LogLevel.DEBUG)
+async def generate_go_vendored_package_target(
+    request: _GenerateVendoredModuleTargetRequest,
+    union_membership: UnionMembership,
+) -> _GenerateVendoredModuleTargetsResult:
+    # Capture the digest for the module. This digest includes all of the sources of the module and is made available
+    # to all packages within the vendored module.
+    module_dir_path = request.vendor_path.joinpath(request.module.module_import_path)
+    module_digest = await Get(
+        Digest,
+        PathGlobs(
+            [str(module_dir_path)],
+            glob_match_error_behavior=GlobMatchErrorBehavior.error,
+            description_of_origin=f"the vendored module `{request.module.module_import_path}` under `{request.vendor_path}`",
+        ),
+    )
+    module_digest_str = f"{module_digest.fingerprint}/{module_digest.serialized_bytes_length}"
+
+    def generate_target(pkg_import_path: str) -> GoVendoredPackageTarget:
+        return GoVendoredPackageTarget(
+            {
+                **request.template,
+                GoImportPathField.alias: pkg_import_path,
+                GoVendoredModuleImportPathField.alias: request.module.module_import_path,
+                GoVendoredPackageDigestField.alias: module_digest_str,  # TODO: Can this be `Digest` directly?
+                GoVendoredModuleDirPath.alias: str(module_dir_path),
+                GoVendoredPackageDirPath.alias: str(request.vendor_path.joinpath(pkg_import_path)),
+            },
+            # E.g. `src/go:mod#github.com/google/uuid`.
+            request.generator_addr.create_generated(pkg_import_path),
+            union_membership,
+            residence_dir=request.generator_addr.spec_path,
+        )
+
+    targets = tuple(
+        generate_target(pkg_import_path) for pkg_import_path in request.module.package_import_paths
+    )
+    return _GenerateVendoredModuleTargetsResult(targets)
+
+
 @rule(desc="Generate `go_third_party_package` targets from `go_mod` target", level=LogLevel.DEBUG)
 async def generate_targets_from_go_mod(
     request: GenerateTargetsFromGoModRequest,
@@ -366,18 +437,48 @@ async def generate_targets_from_go_mod(
     go_mod_sources = request.generator[GoModSourcesField]
     go_mod_info = await Get(GoModInfo, GoModInfoRequest(go_mod_sources))
     go_mod_snapshot = await Get(Snapshot, Digest, go_mod_info.digest)
-    all_packages = await Get(
-        AllThirdPartyPackages,
-        AllThirdPartyPackagesRequest(
-            generator_addr,
-            go_mod_info.digest,
-            go_mod_info.mod_path,
-            # TODO: There is a rule graph cycle in this rule if this rule tries to use GoBuildOptionsFromTargetRequest.
-            # For now, just use a default set of options to facilitate analyzing third-party dependencies and
-            # generating targets.
-            build_opts=GoBuildOptions(),
+    vendor_module_config_path = PurePath(go_mod_info.mod_path, "vendor", "modules.txt")
+    all_packages, vendor_module_config_snapshot = await MultiGet(
+        Get(
+            AllThirdPartyPackages,
+            AllThirdPartyPackagesRequest(
+                generator_addr,
+                go_mod_info.digest,
+                go_mod_info.mod_path,
+                # TODO: There is a rule graph cycle in this rule if this rule tries to use GoBuildOptionsFromTargetRequest.
+                # For now, just use a default set of options to facilitate analyzing third-party dependencies and
+                # generating targets.
+                build_opts=GoBuildOptions(),
+            ),
         ),
+        Get(Snapshot, PathGlobs([str(vendor_module_config_path)])),
     )
+
+    vendor_module_targets: tuple[Target, ...] = ()
+    if vendor_module_config_snapshot.files:
+        vendor_module_config = await Get(
+            ParseVendorModulesMetadataResult,
+            ParseVendorModulesMetadataRequest(
+                digest=vendor_module_config_snapshot.digest,
+                path=str(vendor_module_config_path),
+            ),
+        )
+        vendor_modules = await MultiGet(
+            Get(
+                _GenerateVendoredModuleTargetsResult,
+                _GenerateVendoredModuleTargetRequest(
+                    vendor_path=vendor_module_config_path.parent,
+                    module=module_config,
+                    generator_addr=request.generator.address,
+                    template=request.template,
+                ),
+            )
+            for module_config in vendor_module_config.modules
+        )
+        tgts: list[Target] = []
+        for m in vendor_modules:
+            tgts.extend(m.targets)
+        vendor_module_targets = tuple(tgts)
 
     def gen_file_tgt(fp: str) -> TargetGeneratorSourcesHelperTarget:
         return TargetGeneratorSourcesHelperTarget(
@@ -390,7 +491,7 @@ async def generate_targets_from_go_mod(
     if go_mod_sources.go_sum_path in go_mod_snapshot.files:
         file_tgts.append(gen_file_tgt("go.sum"))
 
-    def create_tgt(pkg_info: ThirdPartyPkgAnalysis) -> GoThirdPartyPackageTarget:
+    def create_third_party_target(pkg_info: ThirdPartyPkgAnalysis) -> GoThirdPartyPackageTarget:
         return GoThirdPartyPackageTarget(
             {
                 **request.template,
@@ -403,9 +504,12 @@ async def generate_targets_from_go_mod(
             residence_dir=generator_addr.spec_path,
         )
 
-    result = tuple(
-        create_tgt(pkg_info) for pkg_info in all_packages.import_paths_to_pkg_info.values()
-    ) + tuple(file_tgts)
+    third_party_targets = tuple(
+        create_third_party_target(pkg_info)
+        for pkg_info in all_packages.import_paths_to_pkg_info.values()
+    )
+
+    result = third_party_targets + tuple(file_tgts) + vendor_module_targets
     return GeneratedTargets(request.generator, result)
 
 
@@ -415,6 +519,7 @@ def rules():
         *build_opts.rules(),
         *first_party_pkg.rules(),
         *import_analysis.rules(),
+        *vendor.rules(),
         UnionRule(InferDependenciesRequest, InferGoPackageDependenciesRequest),
         UnionRule(InferDependenciesRequest, InferGoThirdPartyPackageDependenciesRequest),
         UnionRule(GenerateTargetsRequest, GenerateTargetsFromGoModRequest),
