@@ -46,7 +46,7 @@ async def _get_node_package_name(req: RequestNodeResolve) -> str:
     raise ValueError(
         softwrap(
             f"""
-            No node resolve was could be determined for {req.address}.
+            No node resolve could be determined for {req.address}.
 
             This probably means that there is no `package.json` in any parent directory of this target.
             """

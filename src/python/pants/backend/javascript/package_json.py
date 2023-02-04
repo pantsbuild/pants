@@ -303,7 +303,7 @@ async def read_package_jsons(globs: PathGlobs) -> PackageJsonForGlobs:
     for digest_content in digest_contents:
         parsed_package_json = FrozenDict.deep_freeze(json.loads(digest_content.content))
 
-        self_reference = "./"
+        self_reference = f"{os.path.curdir}{os.sep}"
         workspaces = await Get(
             PackageJsonForGlobs,
             PathGlobs(
