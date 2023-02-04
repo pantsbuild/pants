@@ -23,6 +23,7 @@ from pants.backend.go.util_rules.build_pkg import (
     FallibleBuildGoPackageRequest,
 )
 from pants.backend.go.util_rules.cgo import CGoCompilerFlags
+from pants.backend.go.util_rules.coverage import GoCoverMode
 from pants.backend.go.util_rules.embedcfg import EmbedConfig
 from pants.backend.go.util_rules.first_party_pkg import (
     FallibleFirstPartyPkgAnalysis,
@@ -505,6 +506,33 @@ def required_build_go_package_request(
     )
 
 
+# Return True if coverage should be enabled for a standard library package.
+# See https://github.com/golang/go/blob/1e9ff255a130200fcc4ec5e911d28181fce947d5/src/cmd/go/internal/test/test.go#L839-L853
+# for the exceptions.
+def _is_coverage_enabled_for_stdlib_package(import_path: str, build_opts: GoBuildOptions) -> bool:
+    coverage_config = build_opts.coverage_config
+    if not coverage_config:
+        return False
+
+    # Silently ignore attempts to run coverage on sync/atomic when using atomic coverage mode.
+    # Atomic coverage mode uses sync/atomic, so we can't also do coverage on it.
+    if coverage_config.cover_mode == GoCoverMode.ATOMIC and import_path == "sync/atomic":
+        return False
+
+    # If using the race detector, silently ignore attempts to run coverage on the runtime packages.
+    # It will cause the race detector to be invoked before it has been initialized.
+    if build_opts.with_race_detector and (
+        import_path == "runtime" or import_path.startswith("runtime/internal")
+    ):
+        return False
+
+    for pattern in coverage_config.import_path_include_patterns:
+        if match_simple_pattern(pattern)(import_path):
+            return True
+
+    return False
+
+
 @rule
 async def setup_build_go_package_target_request_for_stdlib(
     request: BuildGoPackageRequestForStdlibRequest,
@@ -550,6 +578,8 @@ async def setup_build_go_package_target_request_for_stdlib(
         direct_dependencies.append(dep.request)
     direct_dependencies.sort(key=lambda p: p.import_path)
 
+    with_coverage = _is_coverage_enabled_for_stdlib_package(request.import_path, request.build_opts)
+
     return FallibleBuildGoPackageRequest(
         request=BuildGoPackageRequest(
             import_path=pkg_info.import_path,
@@ -570,6 +600,7 @@ async def setup_build_go_package_target_request_for_stdlib(
             fortran_files=pkg_info.f_files,
             prebuilt_object_files=pkg_info.syso_files,
             cgo_flags=pkg_info.cgo_flags,
+            with_coverage=with_coverage,
             is_stdlib=True,
         ),
         import_path=request.import_path,
