@@ -47,7 +47,7 @@ class BuildRoot(metaclass=SingletonMetaclass):
         """Returns the build root for the current workspace."""
         if self._root_dir is None:
             # Do not remove/change this env var without coordinating with `pantsbuild/scie-pants` as
-            # it is being used when running Pants from sources on a repo.
+            # it is being used when bootstrapping Pants.
             override_buildroot = os.environ.get("PANTS_BUILDROOT_OVERRIDE", None)
             if override_buildroot:
                 self._root_dir = override_buildroot
