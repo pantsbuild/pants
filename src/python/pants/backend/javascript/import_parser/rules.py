@@ -12,13 +12,13 @@ from pants.backend.javascript.subsystems.nodejs import NodeJSToolProcess
 from pants.backend.javascript.target_types import JSSourceField
 from pants.core.util_rules import source_files
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.collection import Collection
 from pants.engine.fs import CreateDigest, FileContent
 from pants.engine.internals.native_engine import Digest, MergeDigests
 from pants.engine.internals.selectors import Get
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Rule, collect_rules, rule
 from pants.engine.unions import UnionRule
+from pants.util.ordered_set import FrozenOrderedSet
 
 
 @dataclass(frozen=True)
@@ -58,7 +58,7 @@ async def install_javascript_parser() -> InstalledJavascriptImportParser:
     return InstalledJavascriptImportParser(output_digest)
 
 
-class JSImportStrings(Collection[str]):
+class JSImportStrings(FrozenOrderedSet[str]):
     pass
 
 

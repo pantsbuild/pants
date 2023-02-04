@@ -296,3 +296,59 @@ def test_infers_exports_package_json_field_js_source_dependency_with_stars_inter
         Address("src/js/lib/subdir", relative_file_path="index.js"),
         Address("src/js/lib", relative_file_path="index.js"),
     }
+
+
+def test_infers_third_party_package_json_field_js_source_dependency(
+    rule_runner: RuleRunner,
+) -> None:
+    rule_runner.write_files(
+        {
+            "src/js/BUILD": "package_json()",
+            "src/js/package.json": given_package(
+                "ham", "0.0.1", main="lib/index.js", dependencies={"chalk": "5.0.2"}
+            ),
+            "src/js/lib/BUILD": "javascript_sources()",
+            "src/js/lib/index.js": dedent(
+                """\
+                import chalk from "chalk";
+                """
+            ),
+        }
+    )
+
+    pkg_tgt = rule_runner.get_target(Address("src/js/lib", relative_file_path="index.js"))
+    addresses = rule_runner.request(
+        InferredDependencies,
+        [InferJSDependenciesRequest(JSSourceInferenceFieldSet.create(pkg_tgt))],
+    ).include
+
+    assert set(addresses) == {Address("src/js", generated_name="chalk")}
+
+
+def test_infers_first_party_package_json_field_js_source_dependency(
+    rule_runner: RuleRunner,
+) -> None:
+    rule_runner.write_files(
+        {
+            "src/js/a/BUILD": "package_json()",
+            "src/js/a/package.json": given_package("ham", "0.0.1"),
+            "src/js/a/lib/BUILD": "javascript_sources()",
+            "src/js/a/lib/index.js": dedent(
+                """\
+                import { x } from "spam";
+                """
+            ),
+            "src/js/b/BUILD": "package_json()",
+            "src/js/b/package.json": given_package("spam", "0.0.1"),
+            "src/js/b/lib/BUILD": "javascript_sources()",
+            "src/js/b/lib/index.js": "const x = 2;",
+        }
+    )
+
+    pkg_tgt = rule_runner.get_target(Address("src/js/a/lib", relative_file_path="index.js"))
+    addresses = rule_runner.request(
+        InferredDependencies,
+        [InferJSDependenciesRequest(JSSourceInferenceFieldSet.create(pkg_tgt))],
+    ).include
+
+    assert set(addresses) == {Address("src/js/b", generated_name="spam")}

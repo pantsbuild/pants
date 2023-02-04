@@ -10,6 +10,8 @@ from typing import Any, Iterable, Mapping
 from typing_extensions import Literal
 
 from pants.backend.project_info import dependencies
+from pants.base.specs import AncestorGlobSpec, RawSpecs
+from pants.build_graph.address import Address
 from pants.core.target_types import (
     TargetGeneratorSourcesHelperSourcesField,
     TargetGeneratorSourcesHelperTarget,
@@ -24,8 +26,9 @@ from pants.engine.internals.selectors import Get
 from pants.engine.rules import Rule, collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
-    AllUnexpandedTargets,
+    AllTargets,
     Dependencies,
+    DependenciesRequest,
     GeneratedTargets,
     GenerateTargetsRequest,
     SingleSourceField,
@@ -206,7 +209,7 @@ class PackageJson:
             yield from workspace.workspace_digests
 
 
-class AllPackageJsonTargets(Targets):
+class FirstPartyNodePackageTargets(Targets):
     pass
 
 
@@ -219,8 +222,48 @@ class PackageJsonForGlobs(Collection[PackageJson]):
 
 
 @rule
-async def all_package_json_targets(targets: AllUnexpandedTargets) -> AllPackageJsonTargets:
-    return AllPackageJsonTargets(tgt for tgt in targets if tgt.has_field(PackageJsonSourceField))
+async def all_first_party_node_package_targets(targets: AllTargets) -> FirstPartyNodePackageTargets:
+    return FirstPartyNodePackageTargets(
+        tgt for tgt in targets if tgt.has_fields((PackageJsonSourceField, NodePackageNameField))
+    )
+
+
+@dataclass(frozen=True)
+class OwningNodePackageRequest:
+    address: Address
+
+
+@dataclass(frozen=True)
+class OwningNodePackage:
+    target: Target | None = None
+    third_party: tuple[Target, ...] = ()
+
+    @classmethod
+    def no_owner(cls) -> OwningNodePackage:
+        return cls()
+
+
+@rule
+async def find_owning_package(request: OwningNodePackageRequest) -> OwningNodePackage:
+    candidate_targets = await Get(
+        Targets,
+        RawSpecs(
+            ancestor_globs=(AncestorGlobSpec(request.address.spec_path),),
+            description_of_origin="the `OwningNodePackage` rule",
+        ),
+    )
+    package_json_tgts = sorted(
+        (tgt for tgt in candidate_targets if tgt.has_field(PackageJsonSourceField)),
+        key=lambda tgt: tgt.address.spec_path,
+        reverse=True,
+    )
+    tgt = package_json_tgts[0] if package_json_tgts else None
+    if tgt:
+        deps = await Get(Targets, DependenciesRequest(tgt[Dependencies]))
+        return OwningNodePackage(
+            tgt, tuple(dep for dep in deps if dep.has_field(NodeThirdPartyPackageNameField))
+        )
+    return OwningNodePackage()
 
 
 @rule
@@ -301,7 +344,7 @@ async def generate_node_package_targets(
                     for key, value in request.template.items()
                     if key != PackageJsonSourceField.alias
                 },
-                NodePackageNameField.alias: name,
+                NodeThirdPartyPackageNameField.alias: name,
                 NodePackageVersionField.alias: version,
                 NodeThirdPartyPackageDependenciesField.alias: [file_tgt.address.spec],
             },

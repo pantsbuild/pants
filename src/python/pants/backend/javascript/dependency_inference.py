@@ -12,12 +12,17 @@ from pants.backend.javascript.import_parser.rules import JSImportStrings, ParseJ
 from pants.backend.javascript.import_parser.rules import rules as import_parser_rules
 from pants.backend.javascript.package_json import (
     AllPackageJson,
+    FirstPartyNodePackageTargets,
     NodePackageDependenciesField,
+    NodePackageNameField,
+    OwningNodePackage,
+    OwningNodePackageRequest,
     PackageJsonEntryPoints,
     PackageJsonForGlobs,
     PackageJsonSourceField,
 )
 from pants.backend.javascript.target_types import JSDependenciesField, JSSourceField
+from pants.build_graph.address import Address
 from pants.engine.addresses import Addresses
 from pants.engine.fs import PathGlobs
 from pants.engine.internals.graph import Owners, OwnersRequest
@@ -26,6 +31,8 @@ from pants.engine.rules import Rule, collect_rules, rule
 from pants.engine.target import FieldSet, InferDependenciesRequest, InferredDependencies, Targets
 from pants.engine.unions import UnionRule
 from pants.option.global_options import UnmatchedBuildFileGlobs
+from pants.util.frozendict import FrozenDict
+from pants.util.ordered_set import FrozenOrderedSet
 
 
 @dataclass(frozen=True)
@@ -80,22 +87,59 @@ async def infer_node_package_dependencies(
     )
 
 
+class NodePackageCandidateMap(FrozenDict[str, Address]):
+    pass
+
+
+@dataclass(frozen=True)
+class RequestNodePackagesCandidateMap:
+    address: Address
+
+
 @rule
-async def infer_js_source_dependencies(request: InferJSDependenciesRequest) -> InferredDependencies:
+async def map_candidate_node_packages(
+    req: RequestNodePackagesCandidateMap, first_party: FirstPartyNodePackageTargets
+) -> NodePackageCandidateMap:
+    owning_pkg = await Get(OwningNodePackage, OwningNodePackageRequest(req.address))
+    candidate_tgts = itertools.chain(
+        first_party, owning_pkg.third_party if owning_pkg != OwningNodePackage.no_owner() else ()
+    )
+    return NodePackageCandidateMap(
+        (tgt[NodePackageNameField].value, tgt.address) for tgt in candidate_tgts
+    )
+
+
+@rule
+async def infer_js_source_dependencies(
+    request: InferJSDependenciesRequest,
+) -> InferredDependencies:
     source: JSSourceField = request.field_set.source
     import_strings = await Get(JSImportStrings, ParseJsImportStrings(source))
-    path_strings = []
-    for import_string in import_strings:
-        if import_string.startswith((os.path.curdir, os.path.pardir)):
-            path_strings.append(
-                os.path.normpath(os.path.join(os.path.dirname(source.file_path), import_string))
-            )
+    path_strings = FrozenOrderedSet(
+        os.path.normpath(os.path.join(os.path.dirname(source.file_path), import_string))
+        for import_string in import_strings
+        if import_string.startswith((os.path.curdir, os.path.pardir))
+    )
 
     owners = await Get(Owners, OwnersRequest(tuple(path_strings)))
     owning_targets = await Get(Targets, Addresses(owners))
 
+    non_path_string_bases = FrozenOrderedSet(
+        os.path.basename(non_path_string) for non_path_string in import_strings - path_strings
+    )
+    candidate_pkgs = await Get(
+        NodePackageCandidateMap, RequestNodePackagesCandidateMap(request.field_set.address)
+    )
+
+    pkg_addresses = (
+        candidate_pkgs[pkg_name] for pkg_name in non_path_string_bases if pkg_name in candidate_pkgs
+    )
+
     return InferredDependencies(
-        [tgt.address for tgt in owning_targets if tgt.has_field(JSSourceField)]
+        itertools.chain(
+            pkg_addresses,
+            (tgt.address for tgt in owning_targets if tgt.has_field(JSSourceField)),
+        )
     )
 
 
