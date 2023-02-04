@@ -40,6 +40,7 @@ from pants.engine.target import (
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.option.global_options import UnmatchedBuildFileGlobs
 from pants.util.frozendict import FrozenDict
+from pants.util.ordered_set import OrderedSet
 from pants.util.strutil import softwrap
 
 
@@ -62,6 +63,19 @@ class PackageJsonTarget(TargetGenerator):
 
 
 class NodePackageVersionField(StringField):
+    alias = "version"
+    help = softwrap(
+        """
+        Version of the Node package, as specified in the package.json.
+
+        This field should not be overridden; use the value from target generation.
+        """
+    )
+    required = True
+    value: str
+
+
+class NodeThirdPartyPackageVersionField(NodePackageVersionField):
     alias = "version"
     help = softwrap(
         """
@@ -103,7 +117,7 @@ class NodeThirdPartyPackageTarget(Target):
     core_fields = (
         *COMMON_TARGET_FIELDS,
         NodeThirdPartyPackageNameField,
-        NodePackageVersionField,
+        NodeThirdPartyPackageVersionField,
         NodeThirdPartyPackageDependenciesField,
     )
 
@@ -117,6 +131,7 @@ class NodePackageTarget(Target):
         *COMMON_TARGET_FIELDS,
         PackageJsonSourceField,
         NodePackageNameField,
+        NodePackageVersionField,
         NodePackageDependenciesField,
     )
 
@@ -214,7 +229,20 @@ class FirstPartyNodePackageTargets(Targets):
 
 
 class AllPackageJson(Collection[PackageJson]):
-    pass
+    def root_pkg_json(self, name: str) -> PackageJson:
+        """Find the root package.json in a workspace for an in-repo package name.
+
+        If the package is not part of a workspace, or is the root, its own `PackageJson` is
+        returned.
+        """
+        pkgs_by_name = {pkg.name: pkg for pkg in self}
+        workspace_pkgs = OrderedSet(pkg for pkg in pkgs_by_name.values() if pkg.workspaces)
+        current_root = pkgs_by_name[name]
+        while workspace_pkgs:
+            pkg = workspace_pkgs.pop()
+            if current_root in pkg.workspaces:
+                current_root = pkg
+        return current_root
 
 
 class PackageJsonForGlobs(Collection[PackageJson]):
@@ -249,7 +277,7 @@ async def find_owning_package(request: OwningNodePackageRequest) -> OwningNodePa
         Targets,
         RawSpecs(
             ancestor_globs=(AncestorGlobSpec(request.address.spec_path),),
-            description_of_origin="the `OwningNodePackage` rule",
+            description_of_origin=f"the `{OwningNodePackage.__name__}` rule",
         ),
     )
     package_json_tgts = sorted(
@@ -345,7 +373,7 @@ async def generate_node_package_targets(
                     if key != PackageJsonSourceField.alias
                 },
                 NodeThirdPartyPackageNameField.alias: name,
-                NodePackageVersionField.alias: version,
+                NodeThirdPartyPackageVersionField.alias: version,
                 NodeThirdPartyPackageDependenciesField.alias: [file_tgt.address.spec],
             },
             request.generator.address.create_generated(name),
@@ -359,6 +387,7 @@ async def generate_node_package_targets(
         {
             **request.template,
             NodePackageNameField.alias: pkg_json.name,
+            NodePackageVersionField.alias: pkg_json.version,
             NodePackageDependenciesField.alias: [
                 file_tgt.address.spec,
                 *(tgt.address.spec for tgt in third_party_tgts),
