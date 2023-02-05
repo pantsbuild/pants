@@ -15,6 +15,7 @@ from pants.backend.go.target_types import (
     GoOwningGoModAddressField,
     GoPackageSourcesField,
     GoThirdPartyPackageDependenciesField,
+    GoVendoredPackageDependenciesField,
 )
 from pants.backend.go.util_rules import binary
 from pants.backend.go.util_rules.binary import GoBinaryMainPackage, GoBinaryMainPackageRequest
@@ -182,8 +183,11 @@ async def find_owning_go_mod(
         )
         return OwningGoMod(nearest_go_mod_result.address)
 
-    if target.has_field(GoThirdPartyPackageDependenciesField):
-        # For `go_third_party_package` targets, use the generator which is the owning `go_mod` target.
+    if target.has_field(GoThirdPartyPackageDependenciesField) or target.has_field(
+        GoVendoredPackageDependenciesField
+    ):
+        # For `go_third_party_package` and `_go_vendored_package` targets, use the generator which is the
+        # owning `go_mod` target.
         generator_address = target.address.maybe_convert_to_target_generator()
         return OwningGoMod(generator_address)
 

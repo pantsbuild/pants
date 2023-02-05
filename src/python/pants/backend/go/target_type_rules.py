@@ -21,10 +21,6 @@ from pants.backend.go.target_types import (
     GoPackageSourcesField,
     GoThirdPartyPackageDependenciesField,
     GoThirdPartyPackageTarget,
-    GoVendoredModuleDirPath,
-    GoVendoredModuleImportPathField,
-    GoVendoredPackageDigestField,
-    GoVendoredPackageDirPath,
     GoVendoredPackageTarget,
 )
 from pants.backend.go.util_rules import build_opts, first_party_pkg, import_analysis, vendor
@@ -387,20 +383,11 @@ async def generate_targets_from_go_mod(
 
     def generate_vendored_target(
         pkg_import_path: str,
-        module_import_path: str,
-        module_digest: Digest,
-        module_dir_path: str,
-        pkg_dir_path: str,
     ) -> GoVendoredPackageTarget:
-        module_digest_str = f"{module_digest.fingerprint}/{module_digest.serialized_bytes_length}"
         return GoVendoredPackageTarget(
             {
                 **request.template,
                 GoImportPathField.alias: pkg_import_path,
-                GoVendoredModuleImportPathField.alias: module_import_path,
-                GoVendoredPackageDigestField.alias: module_digest_str,  # TODO: Can this be `Digest` directly?
-                GoVendoredModuleDirPath.alias: str(module_dir_path),
-                GoVendoredPackageDirPath.alias: str(pkg_import_path),
             },
             # E.g. `src/go:mod#github.com/google/uuid`.
             generator_addr.create_generated(pkg_import_path),
@@ -413,10 +400,6 @@ async def generate_targets_from_go_mod(
         vendor_module_targets.append(
             generate_vendored_target(
                 pkg_import_path=pkg_analysis_info.analysis.import_path,
-                module_import_path=pkg_analysis_info.module_import_path,
-                module_digest=pkg_analysis_info.analysis.digest,
-                module_dir_path=pkg_analysis_info.module_dir_path,
-                pkg_dir_path=pkg_analysis_info.analysis.dir_path,
             )
         )
 

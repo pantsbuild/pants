@@ -260,37 +260,12 @@ class GoVendoredPackageDependenciesField(Dependencies):
     pass
 
 
-class GoVendoredModuleImportPathField(StringField):
-    alias = "_module_import_path"
-    help = ""
-
-
-class GoVendoredModuleDirPath(StringField):
-    alias = "_module_dir_path"
-    help = ""
-
-
-class GoVendoredPackageDirPath(StringField):
-    alias = "_pkg_dir_path"
-    help = ""
-
-
-class GoVendoredPackageDigestField(StringField):
-    alias = "_pkg_digest"
-    help = softwrap(
-        """
-        The digest for the vendored package. It will include all of the sources for the vendored module.
-        """
-    )
-
-
 class GoVendoredPackageTarget(Target):
     alias = "_go_vendored_package"
     core_fields = (
         *COMMON_TARGET_FIELDS,
         GoVendoredPackageDependenciesField,
         GoImportPathField,
-        GoVendoredModuleImportPathField,
     )
 
     help = softwrap(

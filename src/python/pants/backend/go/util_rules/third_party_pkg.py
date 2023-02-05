@@ -657,7 +657,7 @@ async def analyze_vendored_third_party_module(
     module_digest = await Get(
         Digest,
         PathGlobs(
-            [str(module_dir_path)],
+            [f"{module_dir_path}/**"],
             glob_match_error_behavior=GlobMatchErrorBehavior.error,
             description_of_origin=f"the vendored module `{request.module.module_import_path}` under `{request.vendor_path}`",
         ),
@@ -679,6 +679,7 @@ async def analyze_vendored_third_party_module(
     )
 
     analysis_by_pkg_import_path: dict[str, _AnalyzeVendoredModulePackage] = {}
+    logger.info(f"analyzed_packages = {analyzed_packages}")
     for analyzed_package in analyzed_packages:
         assert analyzed_package.analysis is not None
         analysis_by_pkg_import_path[analyzed_package.import_path] = _AnalyzeVendoredModulePackage(
@@ -696,7 +697,10 @@ async def analyze_vendored_third_party_module(
 async def download_and_analyze_third_party_packages(
     request: AllThirdPartyPackagesRequest,
 ) -> AllThirdPartyPackages:
-    vendor_module_config_path = PurePath(request.go_mod_path, "vendor", "modules.txt")
+    vendor_module_config_path = PurePath(request.go_mod_path).parent.joinpath(
+        "vendor", "modules.txt"
+    )
+    logger.info(f"vendor_module_config_path = {vendor_module_config_path}")
 
     module_analysis, vendor_module_config_snapshot = await MultiGet(
         Get(
@@ -709,9 +713,12 @@ async def download_and_analyze_third_party_packages(
         Get(Snapshot, PathGlobs([str(vendor_module_config_path)])),
     )
 
+    logger.info(f"vendor_module_config_snapshot = {vendor_module_config_snapshot}")
+
     vendored_module_metadatas: dict[str, VendoredModuleMetadata] = {}
     vendored_packages_by_import_path: dict[str, _AnalyzeVendoredModulePackage] = {}
     if vendor_module_config_snapshot.files:
+        logger.info(f"Found vendor module config: {vendor_module_config_path}")
         vendored_module_metadatas_result = await Get(
             ParseVendorModulesMetadataResult,
             ParseVendorModulesMetadataRequest(
@@ -719,6 +726,7 @@ async def download_and_analyze_third_party_packages(
                 path=str(vendor_module_config_path),
             ),
         )
+        logger.info(f"vendored_module_metadatas_result={vendored_module_metadatas_result}")
         analyzed_vendored_modules_result = await MultiGet(
             Get(
                 _AnalyzeVendoredModuleResult,

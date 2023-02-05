@@ -34,7 +34,7 @@ from pants.build_graph.address import Address
 from pants.core.goals.package import BuiltPackage
 from pants.engine.rules import QueryRule
 from pants.engine.target import Target
-from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, RuleRunner
+from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, RuleRunner, logging
 
 
 @pytest.fixture
@@ -63,7 +63,7 @@ def rule_runner() -> RuleRunner:
             GoVendoredPackageTarget,
         ],
     )
-    rule_runner.set_options([], env_inherit=PYTHON_BOOTSTRAP_ENV)
+    rule_runner.set_options(["-ldebug"], env_inherit=PYTHON_BOOTSTRAP_ENV)
     return rule_runner
 
 
@@ -74,6 +74,7 @@ def build_package(rule_runner: RuleRunner, binary_target: Target) -> BuiltPackag
     return result
 
 
+@logging
 def test_basic_vendored_package(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -101,11 +102,11 @@ def test_basic_vendored_package(rule_runner: RuleRunner) -> None:
             func main() {
               x := os.Args[1]
               y := os.Args[2]
-              fmt.Printf("%s\n", concat.Join(x, y))
+              fmt.Printf("%s\\n", concat.Join(x, y))
             }
             """
             ),
-            "foo/vendor/module.txt": dedent(
+            "foo/vendor/modules.txt": dedent(
                 """\
             # lib.pantsbuild.org/concat v0.0.1
             ## explicit; go 1.17
@@ -126,10 +127,11 @@ def test_basic_vendored_package(rule_runner: RuleRunner) -> None:
     binary_tgt = rule_runner.get_target(Address("foo", target_name="bin"))
     built_package = build_package(rule_runner, binary_tgt)
     assert len(built_package.artifacts) == 1
-    assert built_package.artifacts[0].relpath == "bin"
+    assert built_package.artifacts[0].relpath == "foo/bin"
 
     result = subprocess.run(
-        [os.path.join(rule_runner.build_root, "bin"), "Hello ", " world!"], stdout=subprocess.PIPE
+        [os.path.join(rule_runner.build_root, "foo", "bin"), "Hello", " world!"],
+        stdout=subprocess.PIPE,
     )
     assert result.returncode == 0
     assert result.stdout == b"Hello world!\n"
