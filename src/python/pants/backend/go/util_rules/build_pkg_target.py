@@ -17,11 +17,7 @@ from pants.backend.go.target_types import (
     GoImportPathField,
     GoPackageSourcesField,
     GoThirdPartyPackageDependenciesField,
-    GoVendoredModuleDirPath,
-    GoVendoredModuleImportPathField,
     GoVendoredPackageDependenciesField,
-    GoVendoredPackageDigestField,
-    GoVendoredPackageDirPath,
 )
 from pants.backend.go.util_rules import build_opts
 from pants.backend.go.util_rules.build_opts import GoBuildOptions
@@ -54,10 +50,8 @@ from pants.backend.go.util_rules.import_analysis import (
 )
 from pants.backend.go.util_rules.pkg_pattern import match_simple_pattern
 from pants.backend.go.util_rules.third_party_pkg import (
-    FallibleThirdPartyPkgAnalysis,
     ThirdPartyPkgAnalysis,
     ThirdPartyPkgAnalysisRequest,
-    VendoredPkgAnalysisRequest,
 )
 from pants.build_graph.address import Address
 from pants.engine.engine_aware import EngineAwareParameter
@@ -273,7 +267,9 @@ async def setup_build_go_package_target_request(
             fortran_files = ()
             embed_config = _first_party_pkg_digest.xtest_embed_config
 
-    elif target.has_field(GoThirdPartyPackageDependenciesField):
+    elif target.has_field(GoThirdPartyPackageDependenciesField) or target.has_field(
+        GoVendoredPackageDependenciesField
+    ):
         import_path = target[GoImportPathField].value
         base_import_path = import_path
 
@@ -311,57 +307,6 @@ async def setup_build_go_package_target_request(
         objc_files = _third_party_pkg_info.m_files
         fortran_files = _third_party_pkg_info.f_files
         prebuilt_object_files = _third_party_pkg_info.syso_files
-
-    elif target.has_field(GoVendoredPackageDependenciesField):
-        module_import_path = target[GoVendoredModuleImportPathField].value
-        assert module_import_path is not None
-        pkg_import_path = target[GoImportPathField].value
-        module_dir_path = target[GoVendoredModuleDirPath].value
-        assert module_dir_path is not None
-        pkg_dir_path = target[GoVendoredPackageDirPath].value
-        assert pkg_dir_path is not None
-
-        pkg_digest_fields_str = target[GoVendoredPackageDigestField].value
-        assert pkg_digest_fields_str is not None
-        pkg_digest_fields = pkg_digest_fields_str.split("/", 2)
-        pkg_digest = Digest(pkg_digest_fields[0], int(pkg_digest_fields[1]))
-
-        _maybe_vendored_pkg_info = await Get(
-            FallibleThirdPartyPkgAnalysis,
-            VendoredPkgAnalysisRequest(
-                digest=pkg_digest,
-                module_import_path=module_import_path,
-                pkg_import_path=pkg_import_path,
-                module_dir_path=module_dir_path,
-                pkg_dir_path=pkg_dir_path,
-                build_opts=request.build_opts,
-            ),
-        )
-        if _maybe_vendored_pkg_info.analysis is None:
-            return FallibleBuildGoPackageRequest(
-                None,
-                _maybe_vendored_pkg_info.import_path,
-                exit_code=_maybe_vendored_pkg_info.exit_code,
-                stderr=_maybe_vendored_pkg_info.stderr,
-            )
-        _vendored_pkg_info = _maybe_vendored_pkg_info.analysis
-
-        imports = set(_vendored_pkg_info.imports)
-        dir_path = _vendored_pkg_info.dir_path
-        pkg_name = _vendored_pkg_info.name
-        digest = _vendored_pkg_info.digest
-        minimum_go_version = _vendored_pkg_info.minimum_go_version
-        go_file_names = _vendored_pkg_info.go_files
-        s_files = _vendored_pkg_info.s_files
-        embed_config = _vendored_pkg_info.embed_config
-        cgo_files = _vendored_pkg_info.cgo_files
-        cgo_flags = _vendored_pkg_info.cgo_flags
-        c_files = _vendored_pkg_info.c_files
-        h_files = _vendored_pkg_info.h_files
-        cxx_files = _vendored_pkg_info.cxx_files
-        objc_files = _vendored_pkg_info.m_files
-        fortran_files = _vendored_pkg_info.f_files
-        prebuilt_object_files = _vendored_pkg_info.syso_files
 
     else:
         raise AssertionError(

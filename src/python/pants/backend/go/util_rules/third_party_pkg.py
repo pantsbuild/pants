@@ -9,6 +9,7 @@ import json
 import logging
 import os
 from dataclasses import dataclass
+from pathlib import PurePath
 from typing import Any
 
 import ijson.backends.python as ijson
@@ -21,6 +22,11 @@ from pants.backend.go.util_rules.cgo import CGoCompilerFlags
 from pants.backend.go.util_rules.embedcfg import EmbedConfig
 from pants.backend.go.util_rules.pkg_analyzer import PackageAnalyzerSetup
 from pants.backend.go.util_rules.sdk import GoSdkProcess
+from pants.backend.go.util_rules.vendor import (
+    ParseVendorModulesMetadataRequest,
+    ParseVendorModulesMetadataResult,
+    VendoredModuleMetadata,
+)
 from pants.build_graph.address import Address
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import (
@@ -130,6 +136,7 @@ class AllThirdPartyPackages(FrozenDict[str, ThirdPartyPkgAnalysis]):
 
     digest: Digest
     import_paths_to_pkg_info: FrozenDict[str, ThirdPartyPkgAnalysis]
+    vendored_import_paths: FrozenDict[str, _AnalyzeVendoredModulePackage]
 
 
 @dataclass(frozen=True)
@@ -617,17 +624,119 @@ async def analyze_vendored_third_party_package(
     return pkg_analysis
 
 
+@dataclass(frozen=True)
+class _AnalyzeVendoredModuleRequest(EngineAwareParameter):
+    vendor_path: PurePath
+    module: VendoredModuleMetadata
+    build_opts: GoBuildOptions
+
+    def debug_hint(self) -> str | None:
+        return f"{self.vendor_path}: {self.module.module_import_path}"
+
+
+@dataclass(frozen=True)
+class _AnalyzeVendoredModulePackage:
+    module_import_path: str
+    module_dir_path: str
+    analysis: ThirdPartyPkgAnalysis
+
+
+@dataclass(frozen=True)
+class _AnalyzeVendoredModuleResult:
+    module: VendoredModuleMetadata
+    packages_by_import_path: FrozenDict[str, _AnalyzeVendoredModulePackage]
+
+
+@rule(desc="Analyze Go vendored module", level=LogLevel.DEBUG)
+async def analyze_vendored_third_party_module(
+    request: _AnalyzeVendoredModuleRequest,
+) -> _AnalyzeVendoredModuleResult:
+    # Capture the digest for the module. This digest includes all of the sources of the module and is made available
+    # to all packages within the vendored module.
+    module_dir_path = request.vendor_path.joinpath(request.module.module_import_path)
+    module_digest = await Get(
+        Digest,
+        PathGlobs(
+            [str(module_dir_path)],
+            glob_match_error_behavior=GlobMatchErrorBehavior.error,
+            description_of_origin=f"the vendored module `{request.module.module_import_path}` under `{request.vendor_path}`",
+        ),
+    )
+
+    analyzed_packages = await MultiGet(
+        Get(
+            FallibleThirdPartyPkgAnalysis,
+            VendoredPkgAnalysisRequest(
+                digest=module_digest,
+                module_import_path=request.module.module_import_path,
+                pkg_import_path=pkg_import_path,
+                module_dir_path=str(module_dir_path),
+                pkg_dir_path=str(request.vendor_path.joinpath(pkg_import_path)),
+                build_opts=request.build_opts,
+            ),
+        )
+        for pkg_import_path in request.module.package_import_paths
+    )
+
+    analysis_by_pkg_import_path: dict[str, _AnalyzeVendoredModulePackage] = {}
+    for analyzed_package in analyzed_packages:
+        assert analyzed_package.analysis is not None
+        analysis_by_pkg_import_path[analyzed_package.import_path] = _AnalyzeVendoredModulePackage(
+            module_import_path=request.module.module_import_path,
+            module_dir_path=str(module_dir_path),
+            analysis=analyzed_package.analysis,
+        )
+
+    return _AnalyzeVendoredModuleResult(
+        module=request.module, packages_by_import_path=FrozenDict(analysis_by_pkg_import_path)
+    )
+
+
 @rule(desc="Download and analyze all third-party Go packages", level=LogLevel.DEBUG)
 async def download_and_analyze_third_party_packages(
     request: AllThirdPartyPackagesRequest,
 ) -> AllThirdPartyPackages:
-    module_analysis = await Get(
-        ModuleDescriptors,
-        ModuleDescriptorsRequest(
-            digest=request.go_mod_digest,
-            path=os.path.dirname(request.go_mod_path),
+    vendor_module_config_path = PurePath(request.go_mod_path, "vendor", "modules.txt")
+
+    module_analysis, vendor_module_config_snapshot = await MultiGet(
+        Get(
+            ModuleDescriptors,
+            ModuleDescriptorsRequest(
+                digest=request.go_mod_digest,
+                path=os.path.dirname(request.go_mod_path),
+            ),
         ),
+        Get(Snapshot, PathGlobs([str(vendor_module_config_path)])),
     )
+
+    vendored_module_metadatas: dict[str, VendoredModuleMetadata] = {}
+    vendored_packages_by_import_path: dict[str, _AnalyzeVendoredModulePackage] = {}
+    if vendor_module_config_snapshot.files:
+        vendored_module_metadatas_result = await Get(
+            ParseVendorModulesMetadataResult,
+            ParseVendorModulesMetadataRequest(
+                digest=vendor_module_config_snapshot.digest,
+                path=str(vendor_module_config_path),
+            ),
+        )
+        analyzed_vendored_modules_result = await MultiGet(
+            Get(
+                _AnalyzeVendoredModuleResult,
+                _AnalyzeVendoredModuleRequest(
+                    vendor_path=vendor_module_config_path.parent,
+                    module=module_metadata,
+                    build_opts=request.build_opts,
+                ),
+            )
+            for module_metadata in vendored_module_metadatas_result.modules
+        )
+        for analyzed_vendored_module in analyzed_vendored_modules_result:
+            vendored_module_metadatas[
+                analyzed_vendored_module.module.module_import_path
+            ] = analyzed_vendored_module.module
+            vendored_packages_by_import_path.update(
+                analyzed_vendored_module.packages_by_import_path
+            )
 
     go_mod_digest = await Get(
         Digest, MergeDigests([request.go_mod_digest, module_analysis.go_mods_digest])
@@ -648,15 +757,24 @@ async def download_and_analyze_third_party_packages(
             ),
         )
         for mod in module_analysis.modules
+        if mod.import_path not in vendored_module_metadatas
     )
 
-    import_path_to_info = {
+    import_path_to_info: dict[str, ThirdPartyPkgAnalysis] = {
         pkg.import_path: pkg
         for analyzed_module in analyzed_modules
         for pkg in analyzed_module.packages
     }
 
-    return AllThirdPartyPackages(EMPTY_DIGEST, FrozenDict(import_path_to_info))
+    for pkg_import_path, pkg_info in vendored_packages_by_import_path.items():
+        assert pkg_info.analysis is not None
+        import_path_to_info[pkg_import_path] = pkg_info.analysis
+
+    return AllThirdPartyPackages(
+        digest=EMPTY_DIGEST,
+        import_paths_to_pkg_info=FrozenDict(import_path_to_info),
+        vendored_import_paths=FrozenDict(vendored_packages_by_import_path),
+    )
 
 
 @rule
