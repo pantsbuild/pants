@@ -1,6 +1,7 @@
 # Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 import json
+from textwrap import dedent
 from typing import Iterable
 
 import pytest
@@ -36,6 +37,7 @@ def rule_runner() -> RuleRunner:
             NodeThirdPartyPackageTarget,
             TargetGeneratorSourcesHelperTarget,
         ],
+        objects=dict(package_json.build_file_aliases().objects),
     )
 
 
@@ -268,3 +270,26 @@ def test_does_not_generate_third_party_node_package_target_for_first_party_packa
         "src/js/b#spam",
         "src/js/b#src/js/b/package.json",
     ]
+
+
+def test_generates_build_script_targets(
+    rule_runner: RuleRunner,
+) -> None:
+    rule_runner.write_files(
+        {
+            "src/js/BUILD": dedent(
+                """\
+                package_json(
+                    scripts=[
+                        node_build_script(entry_point="build", outputs=["www/**"])
+                    ]
+                )
+                """
+            ),
+            "src/js/package.json": json.dumps(
+                {"name": "ham", "version": "0.0.1", "scripts": {"build": "parcel"}}
+            ),
+        }
+    )
+    addresses = sorted(str(tgt.address) for tgt in rule_runner.request(AllTargets, ()))
+    assert addresses == ["src/js#build", "src/js#ham", "src/js#src/js/package.json"]

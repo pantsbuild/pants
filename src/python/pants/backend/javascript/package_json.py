@@ -12,7 +12,9 @@ from typing_extensions import Literal
 from pants.backend.project_info import dependencies
 from pants.base.specs import AncestorGlobSpec, RawSpecs
 from pants.build_graph.address import Address
+from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.core.target_types import (
+    ResourceTarget,
     TargetGeneratorSourcesHelperSourcesField,
     TargetGeneratorSourcesHelperTarget,
 )
@@ -31,8 +33,10 @@ from pants.engine.target import (
     DependenciesRequest,
     GeneratedTargets,
     GenerateTargetsRequest,
+    SequenceField,
     SingleSourceField,
     StringField,
+    StringSequenceField,
     Target,
     TargetGenerator,
     Targets,
@@ -53,9 +57,42 @@ class PackageJsonSourceField(SingleSourceField):
     required = False
 
 
+@dataclass(frozen=True)
+class NodeBuildScript:
+    entry_point: str
+    outputs: tuple[str, ...]
+
+    def __init__(self, entry_point: str, outputs: Iterable[str]) -> None:
+        object.__setattr__(self, "entry_point", entry_point)
+        object.__setattr__(self, "outputs", tuple(outputs))
+
+
+class NodePackageScriptsField(SequenceField[NodeBuildScript]):
+    alias = "scripts"
+    expected_element_type = NodeBuildScript
+
+    help = softwrap(
+        """
+        Custom node package manager scripts that should be known
+        and ran as part of relevant goals.
+
+        Maps the package.json#scripts section to a cache:able pants invocation.
+        """
+    )
+    expected_type_description = (
+        '[node_build_script(entry_point="build", outputs=["./dist/**"], ...])'
+    )
+    default = ()
+
+
 class PackageJsonTarget(TargetGenerator):
     alias = "package_json"
-    core_fields = (*COMMON_TARGET_FIELDS, PackageJsonSourceField, NodePackageDependenciesField)
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        PackageJsonSourceField,
+        NodePackageScriptsField,
+        NodePackageDependenciesField,
+    )
     help = "A package.json file."
 
     copied_fields = COMMON_TARGET_FIELDS
@@ -136,6 +173,42 @@ class NodePackageTarget(Target):
     )
 
 
+class NodeBuildScriptEntryPointField(StringField):
+    alias = "entry_point"
+
+
+class NodeBuildScriptOutputsField(StringSequenceField):
+    alias = "outputs"
+    required = True
+    default = ("dist/*",)
+    help = softwrap(
+        f"""
+        Specify globs to match in the build script output.
+        The globs will be treated as relative to the `package.json`.
+
+        Matching files will become `{ResourceTarget.alias}` targets.
+        """
+    )
+
+
+class NodeBuildScriptTarget(Target):
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        NodeBuildScriptEntryPointField,
+        NodeBuildScriptOutputsField,
+        NodePackageDependenciesField,
+    )
+
+    alias = "_node_build_script"
+
+    help = softwrap(
+        """
+        A package.json script that is invoked by the configured package manager
+        to produce `resource` targets.
+        """
+    )
+
+
 @dataclass(frozen=True)
 class PackageJsonEntryPoints:
     """See https://nodejs.org/api/packages.html#package-entry-points and
@@ -187,6 +260,15 @@ class PackageJsonEntryPoints:
             else:
                 return FrozenDict(binaries)
         return FrozenDict()
+
+
+@dataclass(frozen=True)
+class PackageJsonScripts:
+    scripts: FrozenDict[str, str]
+
+    @classmethod
+    def from_package_json(cls, pkg_json: PackageJson) -> PackageJsonScripts:
+        return cls(FrozenDict.deep_freeze(pkg_json.content.get("scripts", {})))
 
 
 @dataclass(frozen=True)
@@ -397,8 +479,41 @@ async def generate_node_package_targets(
         request.generator.address.create_generated(pkg_json.name),
         union_membership,
     )
+    scripts = PackageJsonScripts.from_package_json(pkg_json).scripts
+    build_script_tgts = []
+    for build_script in request.generator[NodePackageScriptsField].value:
+        if build_script.entry_point in scripts:
+            build_script_tgts.append(
+                NodeBuildScriptTarget(
+                    {
+                        **request.template,
+                        NodeBuildScriptEntryPointField.alias: build_script.entry_point,
+                        NodeBuildScriptOutputsField.alias: build_script.outputs,
+                        NodePackageDependenciesField.alias: [
+                            file_tgt.address.spec,
+                            *(tgt.address.spec for tgt in third_party_tgts),
+                            *request.template.get("dependencies", []),
+                        ],
+                    },
+                    request.generator.address.create_generated(build_script.entry_point),
+                    union_membership,
+                )
+            )
+        else:
+            raise ValueError(
+                softwrap(
+                    f"""
+                    {build_script.entry_point} was not found in package.json#scripts section
+                    of the `{PackageJsonTarget.alias}` target with address {request.generator.address}.
 
-    return GeneratedTargets(request.generator, [package_target, file_tgt, *third_party_tgts])
+                    Available scripts are: {', '.join(scripts)}.
+                    """
+                )
+            )
+
+    return GeneratedTargets(
+        request.generator, [package_target, file_tgt, *third_party_tgts, *build_script_tgts]
+    )
 
 
 def target_types() -> Iterable[type[Target]]:
@@ -414,3 +529,7 @@ def rules() -> Iterable[Rule | UnionRule]:
         *collect_rules(),
         UnionRule(GenerateTargetsRequest, GenerateNodePackageTargets),
     ]
+
+
+def build_file_aliases() -> BuildFileAliases:
+    return BuildFileAliases(objects={"node_build_script": NodeBuildScript})
