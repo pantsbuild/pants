@@ -482,6 +482,15 @@ class PythonSetup(Subsystem):
         ),
         advanced=True,
     )
+    tailor_py_typed_targets = BoolOption(
+        default=False,
+        help=softwrap(
+            """
+            If true, add `resource` targets for marker files named `py.typed` with the `tailor` goal.
+            """
+        ),
+        advanced=True,
+    )
     macos_big_sur_compatibility = BoolOption(
         default=False,
         help=softwrap(
