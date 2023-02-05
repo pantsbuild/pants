@@ -175,6 +175,7 @@ class NodePackageTarget(Target):
 
 class NodeBuildScriptEntryPointField(StringField):
     alias = "entry_point"
+    required = True
 
 
 class NodeBuildScriptOutputsField(StringSequenceField):
@@ -458,7 +459,7 @@ async def generate_node_package_targets(
                 NodeThirdPartyPackageVersionField.alias: version,
                 NodeThirdPartyPackageDependenciesField.alias: [file_tgt.address.spec],
             },
-            request.generator.address.create_generated(name),
+            request.generator.address.create_generated(name.replace("@", "__")),
             union_membership,
         )
         for name, version in pkg_json.dependencies.items()
@@ -468,7 +469,7 @@ async def generate_node_package_targets(
     package_target = NodePackageTarget(
         {
             **request.template,
-            NodePackageNameField.alias: pkg_json.name,
+            NodePackageNameField.alias: pkg_json.name.replace("@", "__"),
             NodePackageVersionField.alias: pkg_json.version,
             NodePackageDependenciesField.alias: [
                 file_tgt.address.spec,

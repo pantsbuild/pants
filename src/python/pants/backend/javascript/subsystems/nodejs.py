@@ -3,8 +3,9 @@
 
 from __future__ import annotations
 
+import os.path
 from dataclasses import dataclass
-from typing import Iterable
+from typing import Iterable, ClassVar
 
 from pants.core.util_rules.external_tool import (
     DownloadedExternalTool,
@@ -102,24 +103,50 @@ class NodeJSToolProcess:
         )
 
 
+@dataclass(frozen=True)
+class NodeJSProcessEnvironment:
+    binary_directory: str
+    npm_config_cache: str
+
+    base_bin_dir: ClassVar[str] = "__node"
+
+    def to_env_dict(self) -> dict[str, str]:
+        return {
+            "PATH": os.path.pathsep.join((os.path.join(os.path.sep, "bin"), self.binary_directory)),
+            "npm_config_cache": self.npm_config_cache,  # Normally stored at ~/.npm
+        }
+
+
+@rule(level=LogLevel.DEBUG)
+async def node_process_environment(
+    nodejs: NodeJS, platform: Platform, named_caches_dir: NamedCachesDirOption
+) -> NodeJSProcessEnvironment:
+    # Get reference to tool
+    assert nodejs.default_url_platform_mapping is not None
+    plat_str = nodejs.default_url_platform_mapping[platform.value]
+    nodejs_bin_dir = os.path.join(
+        "{chroot}", NodeJSProcessEnvironment.base_bin_dir, f"node-{nodejs.version}-{plat_str}", "bin"
+    )
+
+    return NodeJSProcessEnvironment(
+        binary_directory=nodejs_bin_dir,
+        npm_config_cache=str(named_caches_dir.val / "npm")
+    )
+
+
 @rule(level=LogLevel.DEBUG)
 async def setup_node_tool_process(
     request: NodeJSToolProcess,
     nodejs: NodeJS,
-    named_caches_dir: NamedCachesDirOption,
     platform: Platform,
+    environment: NodeJSProcessEnvironment,
 ) -> Process:
     # Ensure nodejs is installed
     downloaded_nodejs = await Get(
         DownloadedExternalTool, ExternalToolRequest, nodejs.get_request(platform)
     )
 
-    # Get reference to tool
-    assert nodejs.default_url_platform_mapping is not None
-    plat_str = nodejs.default_url_platform_mapping[platform.value]
-    nodejs_dir = f"__node/node-{nodejs.version}-{plat_str}"
-
-    immutable_input_digests = {"__node": downloaded_nodejs.digest}
+    immutable_input_digests = {NodeJSProcessEnvironment.base_bin_dir: downloaded_nodejs.digest}
 
     return Process(
         argv=filter(None, request.args),
@@ -129,10 +156,7 @@ async def setup_node_tool_process(
         output_directories=request.output_directories,
         description=request.description,
         level=request.level,
-        env={
-            "PATH": f"/bin:./{nodejs_dir}/bin",
-            "npm_config_cache": str(named_caches_dir.val / "npm"),  # Normally stored at ~/.npm
-        },
+        env=environment.to_env_dict(),
     )
 
 
