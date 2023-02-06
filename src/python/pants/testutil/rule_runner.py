@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import atexit
 import dataclasses
 import functools
 import os
@@ -208,6 +209,18 @@ _I = TypeVar("_I")
 _O = TypeVar("_O")
 
 
+# A global executor for Schedulers created in unit tests, which is shutdown using `atexit`. This
+# allows for reusing threads, and avoids waiting for straggling tasks during teardown of each test.
+_EXECUTOR = PyExecutor(
+    # Use the ~minimum possible parallelism since integration tests using RuleRunner will already
+    # be run by Pants using an appropriate Parallelism. We must set max_threads > core_threads; so
+    # 2 is the minimum, but, via trial and error, 3 minimizes test times on average.
+    core_threads=1,
+    max_threads=3,
+)
+atexit.register(lambda: _EXECUTOR.shutdown(5))
+
+
 # Environment variable names required for locating Python interpreters, for use with RuleRunner's
 # env_inherit arguments.
 # TODO: This is verbose and redundant: see https://github.com/pantsbuild/pants/issues/13350.
@@ -323,22 +336,6 @@ class RuleRunner:
         local_execution_root_dir = global_options.local_execution_root_dir
         named_caches_dir = global_options.named_caches_dir
 
-        # To ensure that Executors are torn down as part of orderly shutdown of test processes (see
-        # #18135), we do not use `borrow()`ed Executors shared between Schedulers, and instead give
-        # each Scheduler its own Executor, which it will tear down in `impl Drop for Scheduler`.
-        #
-        # An alternative to this would be to add explicit teardown of `Executors` using pytest
-        # fixtures.
-        #
-        executor = PyExecutor(
-            # Use the ~minimum possible parallelism since integration tests using RuleRunner will
-            # already be run by Pants using an appropriate Parallelism. We must set
-            # `max_threads > core_threads`; so 2 is the minimum, but, via trial and error, 3
-            # minimizes test times on average.
-            core_threads=1,
-            max_threads=3,
-        )
-
         self._set_new_session(
             EngineInitializer.setup_graph_extended(
                 pants_ignore_patterns=GlobalOptions.compute_pants_ignore(
@@ -350,7 +347,8 @@ class RuleRunner:
                 named_caches_dir=named_caches_dir,
                 build_root=self.build_root,
                 build_configuration=self.build_config,
-                executor=executor,
+                # Each Scheduler that is created borrows the global executor, which is shut down `atexit`.
+                executor=_EXECUTOR.to_borrowed(),
                 execution_options=ExecutionOptions.from_options(
                     global_options, dynamic_remote_options
                 ),
