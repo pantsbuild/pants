@@ -180,7 +180,6 @@ class BinaryNotFoundError(EnvironmentError):
 class BinaryShimsRequest:
     """Request to create shims for one or more system binaries."""
 
-    output_directory: str
     rationale: str = dataclasses.field(compare=False)
 
     # Create shims for provided binary paths
@@ -191,7 +190,7 @@ class BinaryShimsRequest:
 
     @classmethod
     def for_binaries(
-        cls, *names: str, rationale: str, output_directory: str, search_path: Sequence[str]
+        cls, *names: str, rationale: str, search_path: Sequence[str]
     ) -> BinaryShimsRequest:
         return cls(
             requests=tuple(
@@ -199,31 +198,22 @@ class BinaryShimsRequest:
                 for binary_name in names
             ),
             rationale=rationale,
-            output_directory=output_directory,
         )
 
     @classmethod
     def for_paths(
-        cls, *paths: BinaryPath, rationale: str, output_directory: str
+        cls,
+        *paths: BinaryPath,
+        rationale: str,
     ) -> BinaryShimsRequest:
-        return cls(paths=paths, rationale=rationale, output_directory=output_directory)
-
-
-@dataclass(frozen=True)
-class UnprefixedBinaryShimsRequest:
-    """Underlying request for `UnprefixedBinaryShims`."""
-
-    paths: tuple[BinaryPath, ...]
-    rationale: str
+        return cls(
+            paths=paths,
+            rationale=rationale,
+        )
 
 
 @dataclass(frozen=True)
 class BinaryShims:
-    pass
-
-
-@dataclass(frozen=True)
-class UnprefixedBinaryShims:
     """The shims created for a BinaryShimsRequest is placed in `bin_directory` of the `digest`.
 
     The purpose of these shims is so that a Process may be executed with `immutable_input_digests`
@@ -432,7 +422,8 @@ class GitBinary(BinaryPath):
 @rule
 async def create_binary_shims(
     binary_shims_request: BinaryShimsRequest,
-) -> UnprefixedBinaryShims:
+    bash: BashBinary,
+) -> BinaryShims:
     """Creates a bin directory with shims for all requested binaries.
 
     This can be provided to a `Process` as an `immutable_input_digest`, or can be merged into the
@@ -451,22 +442,6 @@ async def create_binary_shims(
         )
         paths += first_paths
 
-    return await Get(
-        UnprefixedBinaryShims, UnprefixedBinaryShimsRequest(paths, binary_shims_request.rationale)
-    )
-
-
-@rule
-async def create_unprefixed_binary_shims(
-    binary_shims_request: UnprefixedBinaryShimsRequest,
-    bash: BashBinary,
-) -> UnprefixedBinaryShims:
-    """Creates a digest with shims for all requested binaries.
-
-    Also adds a `cache_name`, which can be provided to both `$PATH` and `immutable_input_digests`.
-    """
-    paths = binary_shims_request.paths
-
     scripts = [
         FileContent(
             os.path.basename(path.path), _create_shim(bash.path, path.path), is_executable=True
@@ -477,7 +452,7 @@ async def create_unprefixed_binary_shims(
     digest = await Get(Digest, CreateDigest(scripts))
     cache_name = f"_binary_shims{digest.fingerprint}"
 
-    return UnprefixedBinaryShims(digest, cache_name)
+    return BinaryShims(digest, cache_name)
 
 
 def _create_shim(bash: str, binary: str) -> bytes:

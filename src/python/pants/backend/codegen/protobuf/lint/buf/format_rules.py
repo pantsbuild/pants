@@ -11,10 +11,10 @@ from pants.backend.codegen.protobuf.target_types import (
 from pants.core.goals.fmt import FmtResult, FmtTargetsRequest, Partitions
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.core.util_rules.system_binaries import (
+    BinaryShims,
     BinaryShimsRequest,
     DiffBinary,
     DiffBinaryRequest,
-    UnprefixedBinaryShims,
 )
 from pants.engine.fs import Digest, MergeDigests
 from pants.engine.platform import Platform
@@ -67,12 +67,11 @@ async def run_buf_format(
     diff_binary = await Get(DiffBinary, DiffBinaryRequest())
     download_buf_get = Get(DownloadedExternalTool, ExternalToolRequest, buf.get_request(platform))
     binary_shims_get = Get(
-        UnprefixedBinaryShims,
+        BinaryShims,
         BinaryShimsRequest,
         BinaryShimsRequest.for_paths(
             diff_binary,
             rationale="run `buf format`",
-            output_directory=".bin",
         ),
     )
     downloaded_buf, binary_shims = await MultiGet(download_buf_get, binary_shims_get)

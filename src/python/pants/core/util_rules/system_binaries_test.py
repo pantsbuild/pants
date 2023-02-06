@@ -17,10 +17,9 @@ from pants.core.util_rules.system_binaries import (
     BinaryPath,
     BinaryPathRequest,
     BinaryPaths,
+    BinaryShims,
     BinaryShimsRequest,
     PythonBinary,
-    UnprefixedBinaryShims,
-    UnprefixedBinaryShimsRequest,
 )
 from pants.engine.fs import Digest, DigestContents
 from pants.engine.internals.selectors import Get
@@ -54,8 +53,7 @@ def rule_runner() -> RuleRunner:
             python_binary_version,
             QueryRule(PythonBinaryVersion, []),
             QueryRule(BinaryPaths, [BinaryPathRequest]),
-            QueryRule(UnprefixedBinaryShims, [BinaryShimsRequest]),
-            QueryRule(UnprefixedBinaryShims, [UnprefixedBinaryShimsRequest]),
+            QueryRule(BinaryShims, [BinaryShimsRequest]),
             QueryRule(DigestContents, [Digest]),
         ]
     )
@@ -170,12 +168,11 @@ def test_python_interpreter_search_path_file_entries() -> None:
 
 def test_binary_shims_request(rule_runner: RuleRunner) -> None:
     result = rule_runner.request(
-        UnprefixedBinaryShims,
+        BinaryShims,
         [
             BinaryShimsRequest.for_binaries(
                 "ls",
                 rationale="test the binary shims feature",
-                output_directory=".bin",
                 search_path=("/usr/bin", "/bin"),
             )
         ],
@@ -201,12 +198,11 @@ def test_binary_shims_request(rule_runner: RuleRunner) -> None:
 def test_binary_shims_paths(rule_runner: RuleRunner, tmp_path: Path) -> None:
     binary_path_abs = str(tmp_path / "bin" / "mybin")
     result = rule_runner.request(
-        UnprefixedBinaryShims,
+        BinaryShims,
         [
             BinaryShimsRequest.for_paths(
                 BinaryPath(binary_path_abs),
                 rationale="test the binary shims feature",
-                output_directory=".bin",
             )
         ],
     )
