@@ -450,7 +450,7 @@ async def create_binary_shims(
     ]
 
     digest = await Get(Digest, CreateDigest(scripts))
-    cache_name = f"_binary_shims{digest.fingerprint}"
+    cache_name = f"_binary_shims_{digest.fingerprint}"
 
     return BinaryShims(digest, cache_name)
 
