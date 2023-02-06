@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import os.path
 from dataclasses import dataclass
-from typing import Iterable, ClassVar
+from typing import ClassVar, Iterable
 
 from pants.core.util_rules.external_tool import (
     DownloadedExternalTool,
@@ -125,12 +125,14 @@ async def node_process_environment(
     assert nodejs.default_url_platform_mapping is not None
     plat_str = nodejs.default_url_platform_mapping[platform.value]
     nodejs_bin_dir = os.path.join(
-        "{chroot}", NodeJSProcessEnvironment.base_bin_dir, f"node-{nodejs.version}-{plat_str}", "bin"
+        "{chroot}",
+        NodeJSProcessEnvironment.base_bin_dir,
+        f"node-{nodejs.version}-{plat_str}",
+        "bin",
     )
 
     return NodeJSProcessEnvironment(
-        binary_directory=nodejs_bin_dir,
-        npm_config_cache=str(named_caches_dir.val / "npm")
+        binary_directory=nodejs_bin_dir, npm_config_cache=str(named_caches_dir.val / "npm")
     )
 
 

@@ -10,7 +10,7 @@ import pytest
 from pants.backend.javascript import package_json
 from pants.backend.javascript.run.rules import RunNodeBuildScriptFieldSet
 from pants.backend.javascript.run.rules import rules as run_rules
-from pants.backend.javascript.target_types import JSSourceTarget, JSSourcesGeneratorTarget
+from pants.backend.javascript.target_types import JSSourcesGeneratorTarget, JSSourceTarget
 from pants.build_graph.address import Address
 from pants.core.goals.run import RunRequest
 from pants.engine.rules import QueryRule
@@ -29,7 +29,7 @@ def rule_runner() -> RuleRunner:
             JSSourceTarget,
             JSSourcesGeneratorTarget,
         ],
-        objects=dict(package_json.build_file_aliases().objects)
+        objects=dict(package_json.build_file_aliases().objects),
     )
 
 
@@ -55,8 +55,8 @@ def test_creates_run_requests_package_json_scripts(rule_runner: RuleRunner) -> N
                     "scripts": {
                         "build": "swc ./lib -d dist",
                         "transpile": "babel ./lib -d dist",
-                        "compile": "tsc ./lib --emit -d bin"
-                    }
+                        "compile": "tsc ./lib --emit -d bin",
+                    },
                 }
             ),
             "src/js/package-lock.json": json.dumps({}),

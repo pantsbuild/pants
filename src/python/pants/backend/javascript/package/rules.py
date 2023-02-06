@@ -6,7 +6,10 @@ from dataclasses import dataclass
 from typing import Iterable
 
 from pants.backend.javascript import install_node_package
-from pants.backend.javascript.install_node_package import InstalledNodePackage, InstalledNodePackageRequest
+from pants.backend.javascript.install_node_package import (
+    InstalledNodePackageRequest,
+    InstalledNodePackageWithSource,
+)
 from pants.backend.javascript.package_json import (
     NodePackageNameField,
     NodePackageVersionField,
@@ -31,9 +34,11 @@ class NodePackageTarFieldSet(PackageFieldSet):
 
 @rule
 async def pack_node_package_into_tgz_for_publication(
-    field_set: NodePackageTarFieldSet
+    field_set: NodePackageTarFieldSet,
 ) -> BuiltPackage:
-    installation = await Get(InstalledNodePackage, InstalledNodePackageRequest(field_set.address))
+    installation = await Get(
+        InstalledNodePackageWithSource, InstalledNodePackageRequest(field_set.address)
+    )
     archive_file = f"{field_set.name.value}-{field_set.version.value}.tgz"
     result = await Get(
         ProcessResult,

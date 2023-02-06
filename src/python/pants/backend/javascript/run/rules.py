@@ -1,13 +1,21 @@
+# Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Iterable
 
 from pants.backend.javascript import install_node_package
-from pants.backend.javascript.install_node_package import InstalledNodePackage, InstalledNodePackageRequest
-from pants.backend.javascript.package_json import NodeBuildScriptEntryPointField, NodePackageDependenciesField, \
-    NodeBuildScriptOutputsField
-from pants.backend.javascript.subsystems.nodejs import NodeJSProcessEnvironment, NodeJS
+from pants.backend.javascript.install_node_package import (
+    InstalledNodePackageRequest,
+    InstalledNodePackageWithSource,
+)
+from pants.backend.javascript.package_json import (
+    NodeBuildScriptEntryPointField,
+    NodeBuildScriptOutputsField,
+    NodePackageDependenciesField,
+)
+from pants.backend.javascript.subsystems.nodejs import NodeJS, NodeJSProcessEnvironment
 from pants.core.goals.run import RunFieldSet, RunInSandboxBehavior, RunRequest
 from pants.core.util_rules.environments import EnvironmentField
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
@@ -34,7 +42,9 @@ async def run_node_build_script(
     nodejs_environment: NodeJSProcessEnvironment,
     platform: Platform,
 ) -> RunRequest:
-    installed = await Get(InstalledNodePackage, InstalledNodePackageRequest(field_set.address))
+    installed = await Get(
+        InstalledNodePackageWithSource, InstalledNodePackageRequest(field_set.address)
+    )
     downloaded_nodejs = await Get(
         DownloadedExternalTool, ExternalToolRequest, nodejs.get_request(platform)
     )
@@ -49,8 +59,4 @@ async def run_node_build_script(
 
 
 def rules() -> Iterable[Rule | UnionRule]:
-    return [
-        *collect_rules(),
-        *install_node_package.rules(),
-        *RunNodeBuildScriptFieldSet.rules()
-    ]
+    return [*collect_rules(), *install_node_package.rules(), *RunNodeBuildScriptFieldSet.rules()]
