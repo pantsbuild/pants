@@ -9,10 +9,8 @@ import os
 import re
 import shlex
 from dataclasses import dataclass
-from textwrap import dedent  # noqa: PNT20
 from typing import Mapping, Union
 
-from pants.backend.shell.subsystems.shell_setup import ShellSetup
 from pants.backend.shell.target_types import (
     ShellCommandExecutionDependenciesField,
     ShellCommandOutputDependenciesField,
@@ -20,18 +18,12 @@ from pants.backend.shell.target_types import (
     ShellCommandOutputFilesField,
     ShellCommandOutputsField,
 )
-from pants.backend.shell.util_rules.builtin import BASH_BUILTIN_COMMANDS
 from pants.base.deprecated import warn_or_error
 from pants.build_graph.address import Address
 from pants.core.goals.package import BuiltPackage, PackageFieldSet
 from pants.core.target_types import FileSourceField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.core.util_rules.system_binaries import (
-    BashBinary,
-    BinaryNotFoundError,
-    BinaryPathRequest,
-    BinaryPaths,
-)
+from pants.core.util_rules.system_binaries import BashBinary
 from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.fs import (
@@ -201,66 +193,6 @@ async def _adjust_root_output_directory(
 def _shell_tool_safe_env_name(tool_name: str) -> str:
     """Replace any characters not suitable in an environment variable name with `_`."""
     return re.sub(r"\W", "_", tool_name)
-
-
-@dataclass(frozen=True)
-class BashToolsRequest:
-    tools: tuple[str, ...]
-    rationale: str
-
-
-@dataclass(frozen=True)
-class BashTools:
-    digest: Digest
-    cache_name: str
-
-
-@rule
-async def resolve_bash_tools(
-    bash_binary: BashBinary, shell_setup: ShellSetup.EnvironmentAware, request: BashToolsRequest
-) -> BashTools:
-
-    search_path = shell_setup.executable_search_path
-
-    requests = [
-        BinaryPathRequest(binary_name=tool, search_path=search_path)
-        for tool in request.tools
-        if tool not in BASH_BUILTIN_COMMANDS
-    ]
-
-    paths = await MultiGet(Get(BinaryPaths, BinaryPathRequest, request) for request in requests)
-
-    fail = next(
-        ((path_req, path) for path_req, path in zip(requests, paths) if not path.first_path), None
-    )
-    if fail:
-        path_req, _ = fail
-        raise BinaryNotFoundError.from_request(
-            path_req,
-            rationale=request.rationale,
-        )
-
-    def script(bash_path: str, binary_path: str) -> bytes:
-        return dedent(
-            f"""\
-            #!{bash_path}
-
-            {binary_path} $@
-            """
-        ).encode()
-
-    scripts = [
-        FileContent(
-            path.binary_name, script(bash_binary.path, path.first_path.path), is_executable=True
-        )
-        for path in paths
-        if path.first_path
-    ]
-
-    digest = await Get(Digest, CreateDigest(scripts))
-    cache_name = f"_bash_tools_{digest.fingerprint}"
-
-    return BashTools(digest, cache_name)
 
 
 @rule
