@@ -17,7 +17,7 @@ from pants.backend.python.dependency_inference.parse_python_dependencies import 
 from pants.backend.python.dependency_inference.parse_python_dependencies import (
     ParsePythonDependenciesRequest,
 )
-from pants.backend.python.framework.django import rules as django_rules
+from pants.backend.python.framework.django import dependency_inference, detect_apps
 from pants.backend.python.target_types import PythonSourceField, PythonSourceTarget
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
@@ -30,6 +30,7 @@ from pants.testutil.python_interpreter_selection import (
     skip_unless_python39_present,
 )
 from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.util.strutil import softwrap
 
 
 @pytest.fixture
@@ -39,8 +40,8 @@ def rule_runner() -> RuleRunner:
             *parse_python_dependencies.rules(),
             *stripped_source_files.rules(),
             *pex.rules(),
-            *django_rules.rules(),
-            QueryRule(ParsedPythonDependencies, [ParsePythonDependenciesRequest]),
+            *dependency_inference.rules(),
+            *detect_apps.rules(),
             QueryRule(ParsedPythonDependencies, [ParsePythonDependenciesRequest]),
         ],
         target_types=[PythonSourceTarget],
@@ -51,10 +52,10 @@ def assert_deps_parsed(
     rule_runner: RuleRunner,
     content: str,
     *,
+    constraints: str,
     expected_imports: dict[str, ImpInfo] | None = None,
     expected_assets: list[str] | None = None,
-    filename: str = "app0/migrations/0001_initial.py",
-    constraints: str = ">=3.6",
+    filename: str = "path/to/app0/migrations/0001_initial.py",
 ) -> None:
     expected_imports = expected_imports or {}
     expected_assets = expected_assets or []
@@ -68,6 +69,36 @@ def assert_deps_parsed(
     rule_runner.write_files(
         {
             "BUILD": f"python_source(name='t', source={repr(filename)})",
+            "path/to/app1/BUILD": softwrap(
+                f"""\
+                python_source(
+                  source="apps.py",
+                  interpreter_constraints=['{constraints}'],
+                )
+                """
+            ),
+            "path/to/app1/apps.py": softwrap(
+                """\
+                class App1AppConfig(AppConfig):
+                    name = "path.to.app1"
+                    label = "app1"
+                """
+            ),
+            "another/path/app2/BUILD": softwrap(
+                f"""\
+                python_source(
+                  source="apps.py",
+                  interpreter_constraints=['{constraints}'],
+                )
+                """
+            ),
+            "another/path/app2/apps.py": softwrap(
+                """\
+                class App2AppConfig(AppConfig):
+                    name = "another.path.app2"
+                    label = "app2_label"
+                """
+            ),
             filename: content,
         }
     )
@@ -89,7 +120,10 @@ def do_test_migration_dependencies(rule_runner: RuleRunner, constraints: str) ->
     content = dedent(
         """\
         class Migration(migrations.Migration):
-            dependencies = [("app1", "0012_some_migration"), ("app2", "0042_some_other_migration")]
+            dependencies = [
+              ("app1", "0012_some_migration"),
+              ("app2_label", "0042_another_migration"),
+            ]
 
             operations = []
         """
@@ -97,11 +131,11 @@ def do_test_migration_dependencies(rule_runner: RuleRunner, constraints: str) ->
     assert_deps_parsed(
         rule_runner,
         content,
-        expected_imports={
-            "app1.migrations.0012_some_migration": ImpInfo(lineno=2, weak=True),
-            "app2.migrations.0042_some_other_migration": ImpInfo(lineno=2, weak=True),
-        },
         constraints=constraints,
+        expected_imports={
+            "path.to.app1.migrations.0012_some_migration": ImpInfo(lineno=3, weak=True),
+            "another.path.app2.migrations.0042_another_migration": ImpInfo(lineno=4, weak=True),
+        },
     )
 
 
