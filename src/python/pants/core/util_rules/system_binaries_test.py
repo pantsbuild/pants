@@ -17,9 +17,10 @@ from pants.core.util_rules.system_binaries import (
     BinaryPath,
     BinaryPathRequest,
     BinaryPaths,
-    BinaryShims,
     BinaryShimsRequest,
     PythonBinary,
+    UnprefixedBinaryShims,
+    UnprefixedBinaryShimsRequest,
 )
 from pants.engine.fs import Digest, DigestContents
 from pants.engine.internals.selectors import Get
@@ -53,7 +54,8 @@ def rule_runner() -> RuleRunner:
             python_binary_version,
             QueryRule(PythonBinaryVersion, []),
             QueryRule(BinaryPaths, [BinaryPathRequest]),
-            QueryRule(BinaryShims, [BinaryShimsRequest]),
+            QueryRule(UnprefixedBinaryShims, [BinaryShimsRequest]),
+            QueryRule(UnprefixedBinaryShims, [UnprefixedBinaryShimsRequest]),
             QueryRule(DigestContents, [Digest]),
         ]
     )
@@ -168,7 +170,7 @@ def test_python_interpreter_search_path_file_entries() -> None:
 
 def test_binary_shims_request(rule_runner: RuleRunner) -> None:
     result = rule_runner.request(
-        BinaryShims,
+        UnprefixedBinaryShims,
         [
             BinaryShimsRequest.for_binaries(
                 "ls",
@@ -179,13 +181,11 @@ def test_binary_shims_request(rule_runner: RuleRunner) -> None:
         ],
     )
 
-    assert result.bin_directory == ".bin"
-
     contents = rule_runner.request(DigestContents, [result.digest])
     assert len(contents) == 1
 
     binary_shim = contents[0]
-    assert binary_shim.path == ".bin/ls"
+    assert binary_shim.path == "ls"
     assert binary_shim.is_executable
     assert re.match(
         dedent(
@@ -201,7 +201,7 @@ def test_binary_shims_request(rule_runner: RuleRunner) -> None:
 def test_binary_shims_paths(rule_runner: RuleRunner, tmp_path: Path) -> None:
     binary_path_abs = str(tmp_path / "bin" / "mybin")
     result = rule_runner.request(
-        BinaryShims,
+        UnprefixedBinaryShims,
         [
             BinaryShimsRequest.for_paths(
                 BinaryPath(binary_path_abs),
@@ -211,13 +211,11 @@ def test_binary_shims_paths(rule_runner: RuleRunner, tmp_path: Path) -> None:
         ],
     )
 
-    assert result.bin_directory == ".bin"
-
     contents = rule_runner.request(DigestContents, [result.digest])
     assert len(contents) == 1
 
     binary_shim = contents[0]
-    assert binary_shim.path == ".bin/mybin"
+    assert binary_shim.path == "mybin"
     assert binary_shim.is_executable
     assert re.match(
         dedent(

@@ -11,7 +11,7 @@ import subprocess
 from dataclasses import dataclass
 from enum import Enum
 from textwrap import dedent  # noqa: PNT20
-from typing import Iterable, Sequence
+from typing import Iterable, Mapping, Sequence
 
 from pants.core.subsystems import python_bootstrap
 from pants.core.subsystems.python_bootstrap import PythonBootstrap
@@ -19,11 +19,12 @@ from pants.core.util_rules.environments import EnvironmentTarget
 from pants.engine.collection import DeduplicatedCollection
 from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.fs import CreateDigest, FileContent
-from pants.engine.internals.native_engine import AddPrefix, Digest
+from pants.engine.internals.native_engine import Digest
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.platform import Platform
 from pants.engine.process import FallibleProcessResult, Process, ProcessResult
 from pants.engine.rules import collect_rules, rule
+from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import OrderedSet
 from pants.util.strutil import create_path_env_var, pluralize, softwrap
@@ -218,27 +219,31 @@ class UnprefixedBinaryShimsRequest:
 
 @dataclass(frozen=True)
 class BinaryShims:
+    pass
+
+
+@dataclass(frozen=True)
+class UnprefixedBinaryShims:
     """The shims created for a BinaryShimsRequest is placed in `bin_directory` of the `digest`.
 
-    The purpose of these shims is so that a Process may be executed with `bin_directory` added to
-    PATH so that the binaries are available for execution.
+    The purpose of these shims is so that a Process may be executed with `immutable_input_digests`
+    provided to the `Process`, and `path_component` included in its `PATH` environment variable.
 
     The alternative is to add the directories hosting the binaries directly, but that opens up for
     many more unrelated binaries to also be executable from PATH, leaking into the sandbox
     unnecessarily.
     """
 
-    bin_directory: str
-    digest: Digest
-
-
-@dataclass(frozen=True)
-class UnprefixedBinaryShims:
-    """A version of `BinaryShims` that can be made available in the sandbox as an
-    `immutable_input_digest`."""
-
     digest: Digest
     cache_name: str
+
+    @property
+    def immutable_input_digests(self) -> Mapping[str, Digest]:
+        return FrozenDict({self.cache_name: self.digest})
+
+    @property
+    def path_component(self) -> str:
+        return os.path.join("{chroot}", self.cache_name)
 
 
 # -------------------------------------------------------------------------------------------
@@ -427,10 +432,11 @@ class GitBinary(BinaryPath):
 @rule
 async def create_binary_shims(
     binary_shims_request: BinaryShimsRequest,
-) -> BinaryShims:
+) -> UnprefixedBinaryShims:
     """Creates a bin directory with shims for all requested binaries.
 
-    Useful as input digest for a Process to setup a `bin` directory for PATH.
+    This can be provided to a `Process` as an `immutable_input_digest`, or can be merged into the
+    input digest.
     """
 
     paths = binary_shims_request.paths
@@ -445,13 +451,9 @@ async def create_binary_shims(
         )
         paths += first_paths
 
-    ubs = await Get(
+    return await Get(
         UnprefixedBinaryShims, UnprefixedBinaryShimsRequest(paths, binary_shims_request.rationale)
     )
-    bin_relpath = binary_shims_request.output_directory
-    new_digest = await Get(Digest, AddPrefix(ubs.digest, bin_relpath))
-
-    return BinaryShims(bin_relpath, new_digest)
 
 
 @rule

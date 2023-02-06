@@ -14,8 +14,8 @@ from pants.core.util_rules.system_binaries import (
     BinaryPathRequest,
     BinaryPaths,
     BinaryPathTest,
-    BinaryShims,
     BinaryShimsRequest,
+    UnprefixedBinaryShims,
 )
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.fs import Digest
@@ -143,7 +143,7 @@ async def find_docker(
         return DockerBinary(first_path.path, first_path.fingerprint)
 
     tools = await Get(
-        BinaryShims,
+        UnprefixedBinaryShims,
         BinaryShimsRequest,
         BinaryShimsRequest.for_binaries(
             *docker_options.tools,
@@ -152,9 +152,8 @@ async def find_docker(
             search_path=search_path,
         ),
     )
-    tools_path = ".shims"
-    extra_env = {"PATH": os.path.join("{chroot}", tools_path, tools.bin_directory)}
-    extra_input_digests = {tools_path: tools.digest}
+    extra_env = {"PATH": tools.path_component}
+    extra_input_digests = tools.immutable_input_digests
 
     return DockerBinary(
         first_path.path,

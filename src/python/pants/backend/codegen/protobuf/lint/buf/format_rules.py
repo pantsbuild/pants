@@ -1,6 +1,5 @@
 # Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-import os
 from dataclasses import dataclass
 
 from pants.backend.codegen.protobuf.lint.buf.skip_field import SkipBufFormatField
@@ -12,10 +11,10 @@ from pants.backend.codegen.protobuf.target_types import (
 from pants.core.goals.fmt import FmtResult, FmtTargetsRequest, Partitions
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.core.util_rules.system_binaries import (
-    BinaryShims,
     BinaryShimsRequest,
     DiffBinary,
     DiffBinaryRequest,
+    UnprefixedBinaryShims,
 )
 from pants.engine.fs import Digest, MergeDigests
 from pants.engine.platform import Platform
@@ -68,7 +67,7 @@ async def run_buf_format(
     diff_binary = await Get(DiffBinary, DiffBinaryRequest())
     download_buf_get = Get(DownloadedExternalTool, ExternalToolRequest, buf.get_request(platform))
     binary_shims_get = Get(
-        BinaryShims,
+        UnprefixedBinaryShims,
         BinaryShimsRequest,
         BinaryShimsRequest.for_paths(
             diff_binary,
@@ -80,7 +79,7 @@ async def run_buf_format(
 
     input_digest = await Get(
         Digest,
-        MergeDigests((request.snapshot.digest, downloaded_buf.digest, binary_shims.digest)),
+        MergeDigests((request.snapshot.digest, downloaded_buf.digest)),
     )
 
     argv = [
@@ -99,7 +98,8 @@ async def run_buf_format(
             output_files=request.files,
             description=f"Run buf format on {pluralize(len(request.files), 'file')}.",
             level=LogLevel.DEBUG,
-            env={"PATH": os.path.join("{chroot}", binary_shims.bin_directory)},
+            env={"PATH": binary_shims.path_component},
+            immutable_input_digests=binary_shims.immutable_input_digests,
         ),
     )
     return await FmtResult.create(request, result)
