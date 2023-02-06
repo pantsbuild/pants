@@ -11,7 +11,7 @@ import subprocess
 from dataclasses import dataclass
 from enum import Enum
 from textwrap import dedent  # noqa: PNT20
-from typing import Iterable, Sequence
+from typing import Iterable, Mapping, Sequence
 
 from pants.core.subsystems import python_bootstrap
 from pants.core.subsystems.python_bootstrap import PythonBootstrap
@@ -24,6 +24,7 @@ from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.platform import Platform
 from pants.engine.process import FallibleProcessResult, Process, ProcessResult
 from pants.engine.rules import collect_rules, rule
+from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import OrderedSet
 from pants.util.strutil import create_path_env_var, pluralize, softwrap
@@ -179,7 +180,6 @@ class BinaryNotFoundError(EnvironmentError):
 class BinaryShimsRequest:
     """Request to create shims for one or more system binaries."""
 
-    output_directory: str
     rationale: str = dataclasses.field(compare=False)
 
     # Create shims for provided binary paths
@@ -190,7 +190,7 @@ class BinaryShimsRequest:
 
     @classmethod
     def for_binaries(
-        cls, *names: str, rationale: str, output_directory: str, search_path: Sequence[str]
+        cls, *names: str, rationale: str, search_path: Sequence[str]
     ) -> BinaryShimsRequest:
         return cls(
             requests=tuple(
@@ -198,30 +198,42 @@ class BinaryShimsRequest:
                 for binary_name in names
             ),
             rationale=rationale,
-            output_directory=output_directory,
         )
 
     @classmethod
     def for_paths(
-        cls, *paths: BinaryPath, rationale: str, output_directory: str
+        cls,
+        *paths: BinaryPath,
+        rationale: str,
     ) -> BinaryShimsRequest:
-        return cls(paths=paths, rationale=rationale, output_directory=output_directory)
+        return cls(
+            paths=paths,
+            rationale=rationale,
+        )
 
 
 @dataclass(frozen=True)
 class BinaryShims:
     """The shims created for a BinaryShimsRequest is placed in `bin_directory` of the `digest`.
 
-    The purpose of these shims is so that a Process may be executed with `bin_directory` added to
-    PATH so that the binaries are available for execution.
+    The purpose of these shims is so that a Process may be executed with `immutable_input_digests`
+    provided to the `Process`, and `path_component` included in its `PATH` environment variable.
 
     The alternative is to add the directories hosting the binaries directly, but that opens up for
     many more unrelated binaries to also be executable from PATH, leaking into the sandbox
     unnecessarily.
     """
 
-    bin_directory: str
     digest: Digest
+    cache_name: str
+
+    @property
+    def immutable_input_digests(self) -> Mapping[str, Digest]:
+        return FrozenDict({self.cache_name: self.digest})
+
+    @property
+    def path_component(self) -> str:
+        return os.path.join("{chroot}", self.cache_name)
 
 
 # -------------------------------------------------------------------------------------------
@@ -411,13 +423,13 @@ class GitBinary(BinaryPath):
 async def create_binary_shims(
     binary_shims_request: BinaryShimsRequest,
     bash: BashBinary,
-    mkdir: MkdirBinary,
-    chmod: ChmodBinary,
 ) -> BinaryShims:
     """Creates a bin directory with shims for all requested binaries.
 
-    Useful as input digest for a Process to setup a `bin` directory for PATH.
+    This can be provided to a `Process` as an `immutable_input_digest`, or can be merged into the
+    input digest.
     """
+
     paths = binary_shims_request.paths
     requests = binary_shims_request.requests
     if requests:
@@ -430,43 +442,27 @@ async def create_binary_shims(
         )
         paths += first_paths
 
-    all_paths = (binary.path for binary in paths)
-    bin_relpath = binary_shims_request.output_directory
-    script = ";".join(
-        (
-            f"{mkdir.path} -p {bin_relpath}",
-            *(
-                " && ".join(
-                    [
-                        # The `printf` cmd is a bash builtin, so always available.
-                        f"printf '{_create_shim(bash.path, binary_path)}' > '{bin_relpath}/{os.path.basename(binary_path)}'",
-                        f"{chmod.path} +x '{bin_relpath}/{os.path.basename(binary_path)}'",
-                    ]
-                )
-                for binary_path in all_paths
-            ),
+    scripts = [
+        FileContent(
+            os.path.basename(path.path), _create_shim(bash.path, path.path), is_executable=True
         )
-    )
-    result = await Get(
-        ProcessResult,
-        Process(
-            argv=(bash.path, "-c", script),
-            description=f"Setup binary shims so that Pants can {binary_shims_request.rationale}.",
-            output_directories=(bin_relpath,),
-            level=LogLevel.DEBUG,
-        ),
-    )
-    return BinaryShims(bin_relpath, result.output_digest)
+        for path in paths
+    ]
+
+    digest = await Get(Digest, CreateDigest(scripts))
+    cache_name = f"_binary_shims_{digest.fingerprint}"
+
+    return BinaryShims(digest, cache_name)
 
 
-def _create_shim(bash: str, binary: str) -> str:
+def _create_shim(bash: str, binary: str) -> bytes:
     """The binary shim script to be placed in the output directory for the digest."""
     return dedent(
         f"""\
         #!{bash}
         exec "{binary}" "$@"
         """
-    )
+    ).encode()
 
 
 @rule(desc="Finding the `bash` binary", level=LogLevel.DEBUG)

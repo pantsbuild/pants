@@ -148,13 +148,11 @@ async def find_docker(
         BinaryShimsRequest.for_binaries(
             *docker_options.tools,
             rationale="use docker",
-            output_directory="bin",
             search_path=search_path,
         ),
     )
-    tools_path = ".shims"
-    extra_env = {"PATH": os.path.join("{chroot}", tools_path, tools.bin_directory)}
-    extra_input_digests = {tools_path: tools.digest}
+    extra_env = {"PATH": tools.path_component}
+    extra_input_digests = tools.immutable_input_digests
 
     return DockerBinary(
         first_path.path,
