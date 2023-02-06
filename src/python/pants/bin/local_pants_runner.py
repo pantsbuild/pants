@@ -193,20 +193,6 @@ class LocalPantsRunner:
             poll_delay=(0.1 if poll else None),
         )
 
-    def _finish_run(self, code: ExitCode) -> None:
-        session = self.graph_session.scheduler_session
-
-        session.wait_for_tail_tasks(self.session_end_tasks_timeout)
-        if not self.is_pantsd_run:
-            # Tear down the scheduler.
-            session.scheduler.shutdown(3)
-            # And executor.
-            self.executor.shutdown(3)
-
-        metrics = session.metrics()
-        self.run_tracker.set_pantsd_scheduler_metrics(metrics)
-        self.run_tracker.end_run(code)
-
     def _get_workunits_callbacks(self) -> tuple[WorkunitsCallback, ...]:
         # Load WorkunitsCallbacks by requesting WorkunitsCallbackFactories, and then constructing
         # a per-run instance of each WorkunitsCallback.
@@ -272,11 +258,21 @@ class LocalPantsRunner:
             ),
             max_workunit_verbosity=global_options.streaming_workunits_level,
         )
-        with streaming_reporter:
-            engine_result = PANTS_FAILED_EXIT_CODE
-            try:
-                engine_result = self._run_inner()
-            finally:
-                self._finish_run(engine_result)
+        try:
+            with streaming_reporter:
+                engine_result = PANTS_FAILED_EXIT_CODE
+                try:
+                    engine_result = self._run_inner()
+                finally:
+                    self.graph_session.scheduler_session.wait_for_tail_tasks(
+                        self.session_end_tasks_timeout
+                    )
+                    metrics = self.graph_session.scheduler_session.metrics()
+                    self.run_tracker.set_pantsd_scheduler_metrics(metrics)
+                    self.run_tracker.end_run(engine_result)
 
-            return engine_result
+                return engine_result
+        finally:
+            if not self.is_pantsd_run:
+                # Tear down the executor. See #16105.
+                self.executor.shutdown(3)

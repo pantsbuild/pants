@@ -105,7 +105,7 @@ impl Executor {
     on_thread_start: F,
   ) -> Result<Executor, String>
   where
-    F: Fn() + Send + Sync + Clone + 'static,
+    F: Fn() + Send + Sync + 'static,
   {
     let mut runtime_builder = Builder::new_multi_thread();
 
@@ -115,7 +115,7 @@ impl Executor {
       .enable_all();
 
     if env::var("PANTS_DEBUG").is_ok() {
-      runtime_builder.on_thread_start(on_thread_start.clone());
+      runtime_builder.on_thread_start(on_thread_start);
     };
 
     let runtime = runtime_builder
