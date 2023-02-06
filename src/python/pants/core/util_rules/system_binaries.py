@@ -19,7 +19,7 @@ from pants.core.util_rules.environments import EnvironmentTarget
 from pants.engine.collection import DeduplicatedCollection
 from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.fs import CreateDigest, FileContent
-from pants.engine.internals.native_engine import Digest
+from pants.engine.internals.native_engine import AddPrefix, Digest
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.platform import Platform
 from pants.engine.process import FallibleProcessResult, Process, ProcessResult
@@ -209,6 +209,14 @@ class BinaryShimsRequest:
 
 
 @dataclass(frozen=True)
+class UnprefixedBinaryShimsRequest:
+    """Underlying request for `UnprefixedBinaryShims`."""
+
+    paths: tuple[BinaryPath, ...]
+    rationale: str
+
+
+@dataclass(frozen=True)
 class BinaryShims:
     """The shims created for a BinaryShimsRequest is placed in `bin_directory` of the `digest`.
 
@@ -222,6 +230,15 @@ class BinaryShims:
 
     bin_directory: str
     digest: Digest
+
+
+@dataclass(frozen=True)
+class UnprefixedBinaryShims:
+    """A version of `BinaryShims` that can be made available in the sandbox as an
+    `immutable_input_digest`."""
+
+    digest: Digest
+    cache_name: str
 
 
 # -------------------------------------------------------------------------------------------
@@ -410,14 +427,12 @@ class GitBinary(BinaryPath):
 @rule
 async def create_binary_shims(
     binary_shims_request: BinaryShimsRequest,
-    bash: BashBinary,
-    mkdir: MkdirBinary,
-    chmod: ChmodBinary,
 ) -> BinaryShims:
     """Creates a bin directory with shims for all requested binaries.
 
     Useful as input digest for a Process to setup a `bin` directory for PATH.
     """
+
     paths = binary_shims_request.paths
     requests = binary_shims_request.requests
     if requests:
@@ -430,43 +445,47 @@ async def create_binary_shims(
         )
         paths += first_paths
 
-    all_paths = (binary.path for binary in paths)
+    ubs = await Get(
+        UnprefixedBinaryShims, UnprefixedBinaryShimsRequest(paths, binary_shims_request.rationale)
+    )
     bin_relpath = binary_shims_request.output_directory
-    script = ";".join(
-        (
-            f"{mkdir.path} -p {bin_relpath}",
-            *(
-                " && ".join(
-                    [
-                        # The `printf` cmd is a bash builtin, so always available.
-                        f"printf '{_create_shim(bash.path, binary_path)}' > '{bin_relpath}/{os.path.basename(binary_path)}'",
-                        f"{chmod.path} +x '{bin_relpath}/{os.path.basename(binary_path)}'",
-                    ]
-                )
-                for binary_path in all_paths
-            ),
+    new_digest = await Get(Digest, AddPrefix(ubs.digest, bin_relpath))
+
+    return BinaryShims(bin_relpath, new_digest)
+
+
+@rule
+async def create_unprefixed_binary_shims(
+    binary_shims_request: UnprefixedBinaryShimsRequest,
+    bash: BashBinary,
+) -> UnprefixedBinaryShims:
+    """Creates a digest with shims for all requested binaries.
+
+    Also adds a `cache_name`, which can be provided to both `$PATH` and `immutable_input_digests`.
+    """
+    paths = binary_shims_request.paths
+
+    scripts = [
+        FileContent(
+            os.path.basename(path.path), _create_shim(bash.path, path.path), is_executable=True
         )
-    )
-    result = await Get(
-        ProcessResult,
-        Process(
-            argv=(bash.path, "-c", script),
-            description=f"Setup binary shims so that Pants can {binary_shims_request.rationale}.",
-            output_directories=(bin_relpath,),
-            level=LogLevel.DEBUG,
-        ),
-    )
-    return BinaryShims(bin_relpath, result.output_digest)
+        for path in paths
+    ]
+
+    digest = await Get(Digest, CreateDigest(scripts))
+    cache_name = f"_binary_shims{digest.fingerprint}"
+
+    return UnprefixedBinaryShims(digest, cache_name)
 
 
-def _create_shim(bash: str, binary: str) -> str:
+def _create_shim(bash: str, binary: str) -> bytes:
     """The binary shim script to be placed in the output directory for the digest."""
     return dedent(
         f"""\
         #!{bash}
         exec "{binary}" "$@"
         """
-    )
+    ).encode()
 
 
 @rule(desc="Finding the `bash` binary", level=LogLevel.DEBUG)
