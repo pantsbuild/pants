@@ -211,14 +211,14 @@ _O = TypeVar("_O")
 
 # A global executor for Schedulers created in unit tests, which is shutdown using `atexit`. This
 # allows for reusing threads, and avoids waiting for straggling tasks during teardown of each test.
-_EXECUTOR = PyExecutor(
+EXECUTOR = PyExecutor(
     # Use the ~minimum possible parallelism since integration tests using RuleRunner will already
     # be run by Pants using an appropriate Parallelism. We must set max_threads > core_threads; so
     # 2 is the minimum, but, via trial and error, 3 minimizes test times on average.
     core_threads=1,
     max_threads=3,
 )
-atexit.register(lambda: _EXECUTOR.shutdown(5))
+atexit.register(lambda: EXECUTOR.shutdown(5))
 
 
 # Environment variable names required for locating Python interpreters, for use with RuleRunner's
@@ -348,7 +348,7 @@ class RuleRunner:
                 build_root=self.build_root,
                 build_configuration=self.build_config,
                 # Each Scheduler that is created borrows the global executor, which is shut down `atexit`.
-                executor=_EXECUTOR.to_borrowed(),
+                executor=EXECUTOR.to_borrowed(),
                 execution_options=ExecutionOptions.from_options(
                     global_options, dynamic_remote_options
                 ),
