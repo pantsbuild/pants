@@ -1,6 +1,5 @@
 # Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-import os
 from dataclasses import dataclass
 
 from pants.backend.codegen.protobuf.lint.buf.skip_field import SkipBufFormatField
@@ -73,14 +72,13 @@ async def run_buf_format(
         BinaryShimsRequest.for_paths(
             diff_binary,
             rationale="run `buf format`",
-            output_directory=".bin",
         ),
     )
     downloaded_buf, binary_shims = await MultiGet(download_buf_get, binary_shims_get)
 
     input_digest = await Get(
         Digest,
-        MergeDigests((request.snapshot.digest, downloaded_buf.digest, binary_shims.digest)),
+        MergeDigests((request.snapshot.digest, downloaded_buf.digest)),
     )
 
     argv = [
@@ -99,7 +97,8 @@ async def run_buf_format(
             output_files=request.files,
             description=f"Run buf format on {pluralize(len(request.files), 'file')}.",
             level=LogLevel.DEBUG,
-            env={"PATH": os.path.join("{chroot}", binary_shims.bin_directory)},
+            env={"PATH": binary_shims.path_component},
+            immutable_input_digests=binary_shims.immutable_input_digests,
         ),
     )
     return await FmtResult.create(request, result)

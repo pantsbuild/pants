@@ -389,6 +389,18 @@ class RunInSandboxArgumentsField(StringSequenceField):
     help = f"Extra arguments to pass into the `{RunInSandboxRunnableField.alias}` field."
 
 
+class RunInSandboxStdoutFilenameField(StringField):
+    alias = "stdout"
+    default = None
+    help = "A filename to capture the contents of `stdout` to, relative to the value of `workdir`."
+
+
+class RunInSandboxStderrFilenameField(StringField):
+    alias = "stderr"
+    default = None
+    help = "A filename to capture the contents of `stdout` to, relative to the value of `workdir`."
+
+
 class ShellCommandTimeoutField(IntField):
     alias = "timeout"
     default = 30
@@ -532,6 +544,8 @@ class ShellRunInSandboxTarget(Target):
         ShellCommandExtraEnvVarsField,
         ShellCommandWorkdirField,
         ShellCommandOutputRootDirField,
+        RunInSandboxStdoutFilenameField,
+        RunInSandboxStderrFilenameField,
         EnvironmentField,
     )
     help = softwrap(

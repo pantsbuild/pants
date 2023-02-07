@@ -3349,10 +3349,8 @@ checksum = "d7fa7e55043acb85fca6b3c01485a2eeb6b69c5d21002e273c79e465f43b7ac1"
 name = "task_executor"
 version = "0.0.1"
 dependencies = [
- "arc-swap",
  "futures",
  "itertools",
- "lazy_static",
  "log",
  "parking_lot 0.12.1",
  "stdio",

@@ -10,7 +10,7 @@ import re
 import shlex
 from dataclasses import dataclass
 from textwrap import dedent  # noqa: PNT20
-from typing import Union
+from typing import Mapping, Union
 
 from pants.backend.shell.subsystems.shell_setup import ShellSetup
 from pants.backend.shell.target_types import (
@@ -34,7 +34,15 @@ from pants.core.util_rules.system_binaries import (
 )
 from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
-from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, Directory, MergeDigests, Snapshot
+from pants.engine.fs import (
+    EMPTY_DIGEST,
+    CreateDigest,
+    Digest,
+    Directory,
+    FileContent,
+    MergeDigests,
+    Snapshot,
+)
 from pants.engine.internals.native_engine import RemovePrefix
 from pants.engine.process import Process
 from pants.engine.rules import Get, MultiGet, collect_rules, rule, rule_helper
@@ -166,7 +174,11 @@ def _parse_outputs_from_command(
 
 @rule_helper
 async def _adjust_root_output_directory(
-    digest: Digest, address: Address, working_directory: str, root_output_directory: str
+    digest: Digest,
+    address: Address,
+    working_directory: str,
+    root_output_directory: str,
+    extra_files: Mapping[str, bytes] = FrozenDict(),
 ) -> Digest:
 
     working_directory = _parse_working_directory(working_directory, address)
@@ -174,8 +186,17 @@ async def _adjust_root_output_directory(
 
     if new_root == "":
         return digest
-    else:
-        return await Get(Digest, RemovePrefix(digest, new_root))
+
+    if extra_files:
+        extra_digest = await Get(
+            Digest,
+            CreateDigest(
+                FileContent(f"{new_root}/{name}", content) for name, content in extra_files.items()
+            ),
+        )
+        digest = await Get(Digest, MergeDigests((digest, extra_digest)))
+
+    return await Get(Digest, RemovePrefix(digest, new_root))
 
 
 def _shell_tool_safe_env_name(tool_name: str) -> str:
