@@ -110,7 +110,6 @@ async def run_in_sandbox_request(
         working_directory=working_directory,
         command=" ".join(shlex.quote(arg) for arg in (run_request.args + extra_args)),
         timeout=None,
-        tools=(),
         input_digest=input_digest,
         immutable_input_digests=FrozenDict(run_request.immutable_input_digests or {}),
         append_only_caches=FrozenDict(run_request.append_only_caches or {}),
