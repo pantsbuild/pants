@@ -46,7 +46,7 @@ use tempfile::TempDir;
 use store::{OneOffStoreFileByDigest, Snapshot, SnapshotOps, Store, SubsetParams};
 
 fn executor() -> Executor {
-  Executor::global(num_cpus::get(), num_cpus::get() * 4, || ()).unwrap()
+  Executor::new_owned(num_cpus::get(), num_cpus::get() * 4, || ()).unwrap()
 }
 
 pub fn criterion_benchmark_materialize(c: &mut Criterion) {
