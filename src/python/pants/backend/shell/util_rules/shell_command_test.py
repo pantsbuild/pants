@@ -134,6 +134,7 @@ def test_sources_and_files(rule_runner: RuleRunner) -> None:
                   output_files=["message.txt"],
                   output_directories=["res"],
                   command="./script.sh",
+                  root_output_directory=".",
                 )
 
                 files(
@@ -177,6 +178,7 @@ def test_quotes_command(rule_runner: RuleRunner) -> None:
                   tools=["echo", "tee"],
                   command='echo "foo bar" | tee out.log',
                   output_files=["out.log"],
+                  root_output_directory=".",
                 )
                 """
             ),
@@ -200,7 +202,6 @@ def test_chained_shell_commands(rule_runner: RuleRunner) -> None:
                   tools=["echo"],
                   output_files=["../msg"],
                   command="echo 'shell_command:a' > ../msg",
-                  root_output_directory="/",
                 )
                 """
             ),
@@ -212,7 +213,6 @@ def test_chained_shell_commands(rule_runner: RuleRunner) -> None:
                   output_files=["../msg"],
                   command="echo 'shell_command:b' >> ../msg",
                   execution_dependencies=["src/a:msg"],
-                  root_output_directory="/",
                 )
                 """
             ),
@@ -339,7 +339,8 @@ def test_shell_command_masquerade_as_a_files_target(rule_runner: RuleRunner) -> 
                   name="content-gen",
                   command="echo contents > contents.txt",
                   tools=["echo"],
-                  output_files=["contents.txt"]
+                  output_files=["contents.txt"],
+                  root_output_directory=".",
                 )
                 """
             ),
@@ -744,6 +745,7 @@ def test_run_runnable_in_sandbox(rule_runner: RuleRunner) -> None:
                   name="run_fruitcake",
                   runnable=":fruitcake",
                   output_files=["fruitcake.txt"],
+                  root_output_directory=".",
                 )
                 """
             ),
@@ -814,6 +816,7 @@ def test_run_in_sandbox_capture_stdout_err(rule_runner: RuleRunner) -> None:
                   runnable=":fruitcake",
                   stdout="stdout",
                   stderr="stderr",
+                  root_output_directory=".",
                 )
                 """
             ),
@@ -840,7 +843,6 @@ def test_relative_directories(rule_runner: RuleRunner) -> None:
                   tools=["echo"],
                   command='echo foosh > ../foosh.txt',
                   output_files=["../foosh.txt"],
-                  root_output_directory="/",
                 )
                 """
             ),
@@ -864,7 +866,6 @@ def test_relative_directories_2(rule_runner: RuleRunner) -> None:
                   tools=["echo"],
                   command='echo foosh > ../newdir/foosh.txt',
                   output_files=["../newdir/foosh.txt"],
-                  root_output_directory="/",
                 )
                 """
             ),
@@ -888,7 +889,6 @@ def test_cannot_escape_build_root(rule_runner: RuleRunner) -> None:
                   tools=["echo"],
                   command='echo foosh > ../../invalid.txt',
                   output_files=["../../invalid.txt"],
-                  root_output_directory="/",
                 )
                 """
             ),
@@ -938,7 +938,6 @@ def test_working_directory_special_values(
                   runnable=":fruitcake",
                   output_files=["fruitcake.txt"],
                   workdir="{workdir}",
-                  root_output_directory="/",
                 )
                 """
             ),
