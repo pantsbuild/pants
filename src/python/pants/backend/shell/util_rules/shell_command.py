@@ -27,6 +27,7 @@ from pants.backend.shell.util_rules.adhoc_process_support import (
 from pants.backend.shell.util_rules.adhoc_process_support import (
     rules as adhoc_process_support_rules,
 )
+from pants.backend.shell.util_rules.builtin import BASH_BUILTIN_COMMANDS
 from pants.core.goals.run import RunFieldSet, RunInSandboxBehavior, RunRequest
 from pants.core.target_types import FileSourceField
 from pants.core.util_rules.environments import EnvironmentNameRequest
@@ -81,6 +82,7 @@ async def _prepare_process_request_from_target(
 
     # Resolve the `tools` field into a digest
     tools = shell_command.get(ShellCommandToolsField, default_raw_value=()).value or ()
+    tools = tuple(tool for tool in tools if tool not in BASH_BUILTIN_COMMANDS)
 
     resolved_tools = await Get(
         BinaryShims,

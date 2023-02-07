@@ -37,6 +37,7 @@ from pants.engine.addresses import Address
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import EMPTY_SNAPSHOT, DigestContents
 from pants.engine.internals.native_engine import IntrinsicError
+from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.process import Process, ProcessExecutionFailure
 from pants.engine.target import (
     GeneratedSources,
@@ -594,17 +595,27 @@ def test_run_shell_command_request(rule_runner: RuleRunner) -> None:
     )
 
 
-def test_path_populated_with_tools(caplog, rule_runner: RuleRunner) -> None:
+@pytest.mark.parametrize(
+    ("tool_name", "should_succeed"),
+    (
+        ("python3.8", True),
+        ("cd", False),
+        ("floop", False),
+    ),
+)
+def test_path_populated_with_tools(
+    caplog, rule_runner: RuleRunner, tool_name: str, should_succeed: bool
+) -> None:
     caplog.set_level(logging.INFO)
     caplog.clear()
     rule_runner.write_files(
         {
             "src/BUILD": dedent(
-                """\
+                f"""\
                 experimental_shell_command(
                   name="tools-populated",
-                  tools=["which", "python3.8"],
-                  command='which python3.8',
+                  tools=["which", "{tool_name}"],
+                  command='which {tool_name}',
                   log_output=True,
                 )
                 """
@@ -612,13 +623,21 @@ def test_path_populated_with_tools(caplog, rule_runner: RuleRunner) -> None:
         }
     )
 
-    assert_shell_command_result(
-        rule_runner,
-        Address("src", target_name="tools-populated"),
-        expected_contents={},
-    )
+    try:
+        assert_shell_command_result(
+            rule_runner,
+            Address("src", target_name="tools-populated"),
+            expected_contents={},
+        )
+    except ExecutionError as exerr:
+        if should_succeed:
+            raise exerr
 
-    assert caplog.records[0].msg.strip().endswith("python3.8")
+    if should_succeed:
+        assert caplog.records[0].msg.strip().endswith("python3.8")
+    else:
+        # `which` is silent in `bash` when nothing is found
+        assert not caplog.records
 
 
 def test_shell_command_boot_script(rule_runner: RuleRunner) -> None:
