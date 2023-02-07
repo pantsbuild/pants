@@ -1,5 +1,7 @@
 # Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+from __future__ import annotations
+
 import json
 from collections import defaultdict
 from dataclasses import dataclass
@@ -60,7 +62,7 @@ async def detect_django_apps(
     # complicated: we wouldn't know which settings.py to use, or whether it's safe to run Django
     # against that settings.py. Instead, we do this statically via parsing the apps.py file.
     #
-    # NB: Legacy Django apps may not have an app.py, in which case the label is assumed to be
+    # NB: Legacy Django apps may not have an apps.py, in which case the label is assumed to be
     #  the name of the app dir, but the recommendation for many years has been to have it, and
     #  the Django startapp tool creates it for you. If an app does not have such an apps.py,
     #  then we won't be able to infer deps on that app unless we find other ways of detecting it.
