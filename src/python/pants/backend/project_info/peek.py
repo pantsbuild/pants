@@ -31,7 +31,6 @@ from pants.engine.target import (
     UnexpandedTargets,
 )
 from pants.option.option_types import BoolOption
-from pants.util.strutil import softwrap
 
 
 @runtime_checkable
@@ -51,16 +50,6 @@ class PeekSubsystem(Outputting, GoalSubsystem):
     exclude_defaults = BoolOption(
         default=False,
         help="Whether to leave off values that match the target-defined default values.",
-    )
-
-    include_dep_rules = BoolOption(
-        default=False,
-        help=softwrap(
-            """
-            Whether to include `_dependencies_rules`, `_dependents_rules` and `_effective_dep_rules`
-            that apply to the target and its dependencies.
-            """
-        ),
     )
 
 
@@ -86,7 +75,7 @@ class TargetData:
     dependents_rules: tuple[str, ...] | None = None
     effective_dep_rules: tuple[str, ...] | None = None
 
-    def to_dict(self, exclude_defaults: bool = False, include_dep_rules: bool = False) -> dict:
+    def to_dict(self, exclude_defaults: bool = False) -> dict:
         nothing = object()
         fields = {
             (
@@ -100,10 +89,9 @@ class TargetData:
         if self.expanded_sources is not None:
             fields["sources"] = self.expanded_sources
 
-        if include_dep_rules:
-            fields["_dependencies_rules"] = self.dependencies_rules
-            fields["_dependents_rules"] = self.dependents_rules
-            fields["_effective_dep_rules"] = self.effective_dep_rules
+        fields["_dependencies_rules"] = self.dependencies_rules
+        fields["_dependents_rules"] = self.dependents_rules
+        fields["_effective_dep_rules"] = self.effective_dep_rules
 
         return {
             "address": self.target.address.spec,
@@ -116,10 +104,8 @@ class TargetDatas(Collection[TargetData]):
     pass
 
 
-def render_json(
-    tds: Iterable[TargetData], exclude_defaults: bool = False, include_dep_rules: bool = False
-) -> str:
-    return f"{json.dumps([td.to_dict(exclude_defaults, include_dep_rules) for td in tds], indent=2, cls=_PeekJsonEncoder)}\n"
+def render_json(tds: Iterable[TargetData], exclude_defaults: bool = False) -> str:
+    return f"{json.dumps([td.to_dict(exclude_defaults) for td in tds], indent=2, cls=_PeekJsonEncoder)}\n"
 
 
 class _PeekJsonEncoder(json.JSONEncoder):
@@ -193,42 +179,35 @@ async def get_target_data(
         for tgt, hs in zip(targets_with_sources, hydrated_sources_per_target)
     }
 
-    if not subsys.include_dep_rules:
-        dependencies_rules_map = {}
-        dependents_rules_map = {}
-        effective_dep_rules_map = {}
-    else:
-        family_adaptors = await _get_target_family_and_adaptor_for_dep_rules(
-            *(tgt.address for tgt in sorted_targets),
-            description_of_origin="`peek` goal",
+    family_adaptors = await _get_target_family_and_adaptor_for_dep_rules(
+        *(tgt.address for tgt in sorted_targets),
+        description_of_origin="`peek` goal",
+    )
+    dependencies_rules_map = {
+        tgt.address: describe_ruleset(family.dependencies_rules.get_ruleset(tgt.address, adaptor))
+        for tgt, (family, adaptor) in zip(sorted_targets, family_adaptors)
+        if family.dependencies_rules is not None
+    }
+    dependents_rules_map = {
+        tgt.address: describe_ruleset(family.dependents_rules.get_ruleset(tgt.address, adaptor))
+        for tgt, (family, adaptor) in zip(sorted_targets, family_adaptors)
+        if family.dependents_rules is not None
+    }
+    all_effective_dep_rules = await MultiGet(
+        Get(
+            DependenciesRuleApplication,
+            DependenciesRuleApplicationRequest(
+                tgt.address,
+                Addresses(dep.address for dep in deps),
+                description_of_origin="`peek` goal",
+            ),
         )
-        dependencies_rules_map = {
-            tgt.address: describe_ruleset(
-                family.dependencies_rules.get_ruleset(tgt.address, adaptor)
-            )
-            for tgt, (family, adaptor) in zip(sorted_targets, family_adaptors)
-            if family.dependencies_rules is not None
-        }
-        dependents_rules_map = {
-            tgt.address: describe_ruleset(family.dependents_rules.get_ruleset(tgt.address, adaptor))
-            for tgt, (family, adaptor) in zip(sorted_targets, family_adaptors)
-            if family.dependents_rules is not None
-        }
-        all_effective_dep_rules = await MultiGet(
-            Get(
-                DependenciesRuleApplication,
-                DependenciesRuleApplicationRequest(
-                    tgt.address,
-                    Addresses(dep.address for dep in deps),
-                    description_of_origin="`peek` goal",
-                ),
-            )
-            for tgt, deps in zip(sorted_targets, dependencies_per_target)
-        )
-        effective_dep_rules_map = {
-            application.address: tuple(str(rule) for rule in application.dependencies_rule.values())
-            for application in all_effective_dep_rules
-        }
+        for tgt, deps in zip(sorted_targets, dependencies_per_target)
+    )
+    effective_dep_rules_map = {
+        application.address: tuple(str(rule) for rule in application.dependencies_rule.values())
+        for application in all_effective_dep_rules
+    }
 
     return TargetDatas(
         TargetData(
@@ -250,7 +229,7 @@ async def peek(
     targets: UnexpandedTargets,
 ) -> Peek:
     tds = await Get(TargetDatas, UnexpandedTargets, targets)
-    output = render_json(tds, subsys.exclude_defaults, subsys.include_dep_rules)
+    output = render_json(tds, subsys.exclude_defaults)
     with subsys.output(console) as write_stdout:
         write_stdout(output)
     return Peek(exit_code=0)
