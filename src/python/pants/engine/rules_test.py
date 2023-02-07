@@ -33,8 +33,6 @@ from pants.testutil.rule_runner import MockGet, run_rule_with_mocks
 from pants.util.enums import match
 from pants.util.logging import LogLevel
 
-_EXECUTOR = PyExecutor(core_threads=2, max_threads=4)
-
 
 def create_scheduler(rules, validate=True):
     """Create a Scheduler."""
@@ -47,7 +45,7 @@ def create_scheduler(rules, validate=True):
         ca_certs_path=None,
         rules=rules,
         union_membership=UnionMembership({}),
-        executor=_EXECUTOR,
+        executor=PyExecutor(core_threads=2, max_threads=4),
         execution_options=DEFAULT_EXECUTION_OPTIONS,
         local_store_options=DEFAULT_LOCAL_STORE_OPTIONS,
         validate_reachability=validate,

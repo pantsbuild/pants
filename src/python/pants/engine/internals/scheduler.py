@@ -212,6 +212,7 @@ class Scheduler:
             graceful_shutdown_timeout=execution_options.process_execution_graceful_shutdown_timeout,
         )
 
+        self._py_executor = executor
         self._py_scheduler = native_engine.scheduler_create(
             executor,
             tasks,
@@ -239,6 +240,10 @@ class Scheduler:
     @property
     def py_scheduler(self) -> PyScheduler:
         return self._py_scheduler
+
+    @property
+    def py_executor(self) -> PyExecutor:
+        return self._py_executor
 
     def _to_params_list(self, subject_or_params: Any | Params) -> Sequence[Any]:
         if isinstance(subject_or_params, Params):
