@@ -25,21 +25,21 @@ First, see if Pants can automatically fix any safe deprecations for you:
 
 ```bash
 # To avoid unrelated formatting changes, you may want to use `--no-fmt`.
-❯ ./pants update-build-files --no-fmt ::
+❯ pants update-build-files --no-fmt ::
 ```
 
 You can add `update-build-files` to your [continuous integration](doc:using-pants-in-ci) so that developers don't accidentally use removed features:
 
 ```bash
-❯ ./pants update-build-files --check ::
+❯ pants update-build-files --check ::
 ```
 
 Then, see if there are any remaining deprecation warnings:
 
 ```bash
-❯ ./pants
-❯ ./pants list :: > /dev/null
-❯ ./pants filedeps :: > /dev/null
+❯ pants
+❯ pants list :: > /dev/null
+❯ pants filedeps :: > /dev/null
 ```
 
 It is also helpful to spot-check that your main commands like `lint`, `package`, and `test` still work by running on a single target.
@@ -65,10 +65,10 @@ ignore_warnings = [
 ]
 ```
 
-Check for updates to the `./pants` script
+Check for updates to the `pants` script
 -----------------------------------------
 
-Run `curl -L -o ./pants https://pantsbuild.github.io/setup/pants` to check if there have been any changes, e.g. adding support for running Pants with new Python interpreters.
+Run `curl -L -o pants https://pantsbuild.github.io/setup/pants` to check if there have been any changes, e.g. adding support for running Pants with new Python interpreters.
 
 Find any bugs or issues?
 ------------------------

@@ -27,7 +27,7 @@ from pants.backend.go.util_rules.coverage import (
 )
 from pants.backend.go.util_rules.embedcfg import EmbedConfig
 from pants.backend.go.util_rules.goroot import GoRoot
-from pants.backend.go.util_rules.import_analysis import ImportConfig, ImportConfigRequest
+from pants.backend.go.util_rules.import_config import ImportConfig, ImportConfigRequest
 from pants.backend.go.util_rules.sdk import GoSdkProcess, GoSdkToolIDRequest, GoSdkToolIDResult
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
@@ -515,8 +515,10 @@ async def build_go_package(
                 maybe_dep, import_path=request.import_path, dependency_failed=True
             )
         dep = maybe_dep.output
-        import_paths_to_pkg_a_files.update(dep.import_paths_to_pkg_a_files)
-        dep_digests.append(dep.digest)
+        for dep_import_path, pkg_archive_path in dep.import_paths_to_pkg_a_files.items():
+            if dep_import_path not in import_paths_to_pkg_a_files:
+                import_paths_to_pkg_a_files[dep_import_path] = pkg_archive_path
+                dep_digests.append(dep.digest)
 
     merged_deps_digest, import_config, embedcfg, action_id_result = await MultiGet(
         Get(Digest, MergeDigests(dep_digests)),
@@ -715,7 +717,7 @@ async def build_go_package(
     # for where this logic comes from.
     go_version = request.minimum_go_version or "1.16"
     if go_root.is_compatible_version(go_version):
-        compile_args.append(f"-lang=go{go_version}")
+        compile_args.extend(["-lang", f"go{go_version}"])
 
     if request.is_stdlib:
         compile_args.append("-std")

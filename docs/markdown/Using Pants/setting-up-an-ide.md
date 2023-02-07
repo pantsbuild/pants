@@ -13,7 +13,7 @@ First-party sources
 To get your editor to understand the repo's first-party sources, you will probably need to tell it about the repo's [source roots](doc:source-roots). You can list those with:
 
 ```shell
-$ ./pants roots
+$ pants roots
 ```
 
 and then apply the corresponding IDE concept. 
@@ -25,7 +25,7 @@ In VSCode, the Python extension will look for a file named `.env` in the current
 For Python, to generate the `.env` file containing all the source roots, you can use something like this:
 
 ```shell
-$ ROOTS=$(./pants roots --roots-sep=' ')
+$ ROOTS=$(pants roots --roots-sep=' ')
 $ python3 -c "print('PYTHONPATH=\"./' + ':./'.join(\"${ROOTS}\".split()) + ':\$PYTHONPATH\"')" > .env
 ```
 
@@ -41,7 +41,7 @@ Assuming you are using the ["resolves" feature for Python lockfiles](doc:python-
 To use the `export` goal to create a virtualenv:
 
 ```
-❯ ./pants export --py-resolve-format=symlinked_immutable_virtualenv --resolve=python-default
+❯ pants export --py-resolve-format=symlinked_immutable_virtualenv --resolve=python-default
 Wrote symlink to immutable virtualenv for python-default (using Python 3.9.13) to dist/export/python/virtualenvs/python-default
 ```
 
@@ -51,7 +51,7 @@ The `--py-resolve-format=symlinked_immutable_virtualenv` option symlinks to an i
 
 ### Tool virtualenvs
 
-`./pants export` can also create a virtualenv for each of the Python tools you use via Pants, such as `black`, `isort`, `pytest`, `mypy`, `flake8` and so on (you can run `/pants help tools` to get a list of the tools Pants uses). Use the tool name as the resolve name argument to the `--resolve` flag. This allows you to configure your editor to use the same version of the tool as Pants does for workflows like formatting on save.
+`pants export` can also create a virtualenv for each of the Python tools you use via Pants, such as `black`, `isort`, `pytest`, `mypy`, `flake8` and so on (you can run `/pants help tools` to get a list of the tools Pants uses). Use the tool name as the resolve name argument to the `--resolve` flag. This allows you to configure your editor to use the same version of the tool as Pants does for workflows like formatting on save.
 
 
 Generated code
@@ -62,7 +62,7 @@ If you're using [Protobuf and gRPC](doc:protobuf), you may want your editor to b
 Normally Pants treats generated code as an internal byproduct, and doesn't expose it. But you can run the `export-codegen` goal to generate code to a well-known output location for consumption:
 
 ```shell
-$ ./pants export-codegen ::
+$ pants export-codegen ::
 ```
 
 The generated code will be written to `dist/codegen`, and you can now add them as sources in the IDE. For example, in PyCharm you would mark `dist/codegen` as a "Sources" folder. 

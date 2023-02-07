@@ -56,7 +56,7 @@ async def list_targets(
 
 ![](https://files.readme.io/7d5163f-Rule_graph_example-2.png)
 
-At the top of the graph will always be the goals that Pants runs, such as `list` and `test`. These goals are the entry-point into the graph. When a user runs `./pants list`, the engine looks for a special type of rule, called a `@goal_rule`, that implements the respective goal. From there, the `@goal_rule` might request certain types like `Console` and `Addresses`, which will cause other helper `@rule`s to be used. To view the graph for a goal, see: [Visualize the rule graph](doc:rules-api-tips#debugging-visualize-the-rule-graph).
+At the top of the graph will always be the goals that Pants runs, such as `list` and `test`. These goals are the entry-point into the graph. When a user runs `pants list`, the engine looks for a special type of rule, called a `@goal_rule`, that implements the respective goal. From there, the `@goal_rule` might request certain types like `Console` and `Addresses`, which will cause other helper `@rule`s to be used. To view the graph for a goal, see: [Visualize the rule graph](doc:rules-api-tips#debugging-visualize-the-rule-graph).
 
 The graph also has several "roots", such as `Console`, `Specs`, and `OptionsBootstrapper` in this example. Those roots are injected into the graph as the initial input, whereas all other types are derived from those roots.
 

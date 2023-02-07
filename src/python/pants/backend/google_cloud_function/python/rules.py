@@ -32,6 +32,7 @@ from pants.core.goals.package import (
     PackageFieldSet,
 )
 from pants.core.target_types import FileSourceField
+from pants.core.util_rules.environments import EnvironmentField
 from pants.engine.addresses import UnparsedAddressInputs
 from pants.engine.platform import Platform
 from pants.engine.process import ProcessResult
@@ -57,6 +58,7 @@ class PythonGoogleCloudFunctionFieldSet(PackageFieldSet):
     complete_platforms: PythonGoogleCloudFunctionCompletePlatforms
     type: PythonGoogleCloudFunctionType
     output_path: OutputPathField
+    environment: EnvironmentField
 
 
 @rule

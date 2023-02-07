@@ -48,6 +48,7 @@ target(
         "src/python/pants/backend/experimental/openapi",
         "src/python/pants/backend/experimental/openapi/lint/spectral",
         "src/python/pants/backend/experimental/python",
+        "src/python/pants/backend/experimental/python/framework/stevedore",
         "src/python/pants/backend/experimental/python/lint/add_trailing_comma",
         "src/python/pants/backend/experimental/python/lint/autoflake",
         "src/python/pants/backend/experimental/python/lint/pyupgrade",

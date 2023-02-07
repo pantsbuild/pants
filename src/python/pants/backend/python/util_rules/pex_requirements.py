@@ -184,11 +184,10 @@ async def load_lockfile(
     is_pex_native = is_probably_pex_json_lockfile(lock_bytes)
     if is_pex_native:
         header_delimiter = "//"
+        stripped_lock_bytes = _strip_comments_from_pex_json_lockfile(lock_bytes)
         lockfile_digest = await Get(
             Digest,
-            CreateDigest(
-                [FileContent(lockfile_path, _strip_comments_from_pex_json_lockfile(lock_bytes))]
-            ),
+            CreateDigest([FileContent(lockfile_path, stripped_lock_bytes)]),
         )
         requirement_estimate = _pex_lockfile_requirement_count(lock_bytes)
         constraints_strings = None

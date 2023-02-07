@@ -402,6 +402,7 @@ async def setup_mypy_extra_type_stubs_lockfile(
             interpreter_constraints=InterpreterConstraints(),
             resolve_name=request.resolve_name,
             lockfile_dest=mypy.extra_type_stubs_lockfile,
+            diff=False,
         )
 
     # While MyPy will run in partitions, we need a set of constraints that works with every
@@ -427,6 +428,7 @@ async def setup_mypy_extra_type_stubs_lockfile(
         interpreter_constraints=interpreter_constraints,
         resolve_name=request.resolve_name,
         lockfile_dest=mypy.extra_type_stubs_lockfile,
+        diff=False,
     )
 
 

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import re
 from enum import Enum
+from typing import ClassVar, Optional
 
 from pants.backend.shell.subsystems.shell_setup import ShellSetup
 from pants.core.goals.test import RuntimePackageDependenciesField, TestTimeoutField
@@ -277,8 +278,7 @@ class ShellCommandOutputsField(StringSequenceField):
     alias = "outputs"
     help = softwrap(
         """
-        Specify the shell command output files and directories, relative to the `BUILD` file's
-        directory.
+        Specify the shell command output files and directories, relative to the value of `workdir`.
 
         Use a trailing slash on directory names, i.e. `my_dir/`.
 
@@ -296,8 +296,7 @@ class ShellCommandOutputFilesField(StringSequenceField):
     default = ()
     help = softwrap(
         """
-        Specify the shell command's output files to capture, relative to the `BUILD` file's
-        directory.
+        Specify the shell command's output files to capture, relative to the value of `workdir`.
 
         For directories, use `output_directories`. At least one of `output_files` and
         `output_directories` must be specified.
@@ -315,7 +314,7 @@ class ShellCommandOutputDirectoriesField(StringSequenceField):
     help = softwrap(
         """
         Specify full directories (including recursive descendants) of output to capture from the
-        shell command, relative to the `BUILD` file's directory.
+        shell command, relative to the value of `workdir`.
 
         For individual files, use `output_files`. At least one of `output_files` and
         `output_directories` must be specified.
@@ -390,6 +389,18 @@ class RunInSandboxArgumentsField(StringSequenceField):
     help = f"Extra arguments to pass into the `{RunInSandboxRunnableField.alias}` field."
 
 
+class RunInSandboxStdoutFilenameField(StringField):
+    alias = "stdout"
+    default = None
+    help = "A filename to capture the contents of `stdout` to, relative to the value of `workdir`."
+
+
+class RunInSandboxStderrFilenameField(StringField):
+    alias = "stderr"
+    default = None
+    help = "A filename to capture the contents of `stdout` to, relative to the value of `workdir`."
+
+
 class ShellCommandTimeoutField(IntField):
     alias = "timeout"
     default = 30
@@ -430,13 +441,35 @@ class ShellCommandLogOutputField(BoolField):
 
 class ShellCommandWorkdirField(StringField):
     alias = "workdir"
+    default: ClassVar[Optional[str]] = "."
+    help = softwrap(
+        "Sets the current working directory of the command. \n\n"
+        "Values are relative to the build root, except in the following cases:\n\n"
+        "* `.` specifies the location of the `BUILD` file.\n"
+        "* Values beginning with `./` are relative to the location of the `BUILD` file.\n"
+        "* `/` or the empty string specifies the build root.\n"
+        "* Values beginning with `/` are also relative to the build root."
+    )
+
+
+class RunShellCommandWorkdirField(ShellCommandWorkdirField):
     default = None
     help = softwrap(
-        "Sets the current working directory of the command, relative to the project root. If not "
-        "set, use the project root.\n\n"
-        "To specify the location of the `BUILD` file, use `.`. Values beginning with `.` are "
-        "relative to the location of the `BUILD` file.\n\n"
-        "To specify the project/build root, use `/` or the empty string."
+        "Sets the current working directory of the command that is `run`. If `None`, run the "
+        "command from the directory you are invoking Pants from."
+    )
+
+
+class ShellCommandOutputRootDirField(StringField):
+    alias = "root_output_directory"
+    default = "."
+    help = softwrap(
+        "Adjusts the location of files output by this command, when consumed as a dependency.\n\n"
+        "`.` or values beginning with `./` are relative to the location of the `BUILD` file.\n\n"
+        "`.` or values beginning with `./` are relative to the value of `workdir`.\n\n"
+        "To specify the build root, use `/` or the empty string.\n\n"
+        "Values that do not begin with `.` or `/` are relative to the build root.\n\n"
+        "All files output by "
     )
 
 
@@ -466,6 +499,7 @@ class ShellCommandTarget(Target):
         ShellCommandToolsField,
         ShellCommandExtraEnvVarsField,
         ShellCommandWorkdirField,
+        ShellCommandOutputRootDirField,
         EnvironmentField,
     )
     help = softwrap(
@@ -509,6 +543,9 @@ class ShellRunInSandboxTarget(Target):
         ShellCommandToolsField,
         ShellCommandExtraEnvVarsField,
         ShellCommandWorkdirField,
+        ShellCommandOutputRootDirField,
+        RunInSandboxStdoutFilenameField,
+        RunInSandboxStderrFilenameField,
         EnvironmentField,
     )
     help = softwrap(
@@ -536,7 +573,7 @@ class ShellCommandRunTarget(Target):
         *COMMON_TARGET_FIELDS,
         ShellCommandExecutionDependenciesField,
         ShellCommandCommandField,
-        ShellCommandWorkdirField,
+        RunShellCommandWorkdirField,
         ShellCommandIsInteractiveField,
     )
     help = softwrap(
