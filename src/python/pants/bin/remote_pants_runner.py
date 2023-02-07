@@ -120,6 +120,8 @@ class RemotePantsRunner:
         self, pantsd_handle: PantsDaemonClient.Handle, start_time: float
     ) -> ExitCode:
         global_options = self._bootstrap_options.for_global_scope()
+        # We do not explicitly shut this PyExecutor down, because the client should not run any long lived
+        # tasks which we would want to wait for (in particular: it runs no Python code). See #16105.
         executor = GlobalOptions.create_py_executor(global_options)
 
         # Merge the nailgun TTY capability environment variables with the passed environment dict.
