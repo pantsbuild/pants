@@ -13,6 +13,7 @@ python_test_utils(name="test_utils")
 docker_environment(
     name="docker_env",
     image="python:3.9",
+    python_bootstrap_search_path=["<PATH>"],
 )
 
 # See `build-support/reapi-sample-server/README.md` for information on how to use this environment

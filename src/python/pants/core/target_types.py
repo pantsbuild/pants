@@ -14,6 +14,7 @@ from typing import Generic, Optional, Sequence, TypeVar, Union, cast
 from pants.core.goals.package import (
     BuiltPackage,
     BuiltPackageArtifact,
+    EnvironmentAwarePackageRequest,
     OutputPathField,
     PackageFieldSet,
 )
@@ -814,7 +815,7 @@ async def package_archive_target(field_set: ArchiveFieldSet) -> BuiltPackage:
         FieldSetsPerTarget, FieldSetsPerTargetRequest(PackageFieldSet, package_targets)
     )
     packages = await MultiGet(
-        Get(BuiltPackage, PackageFieldSet, field_set)
+        Get(BuiltPackage, EnvironmentAwarePackageRequest(field_set))
         for field_set in package_field_sets_per_target.field_sets
     )
 

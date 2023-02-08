@@ -20,7 +20,7 @@ from pants.backend.shell.target_types import (
 )
 from pants.base.deprecated import warn_or_error
 from pants.build_graph.address import Address
-from pants.core.goals.package import BuiltPackage, PackageFieldSet
+from pants.core.goals.package import BuiltPackage, EnvironmentAwarePackageRequest, PackageFieldSet
 from pants.core.target_types import FileSourceField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.core.util_rules.system_binaries import BashBinary
@@ -135,7 +135,8 @@ async def _execution_environment_from_dependencies(shell_command: Target) -> Dig
     )
 
     packages = await MultiGet(
-        Get(BuiltPackage, PackageFieldSet, field_set) for field_set in pkgs_per_target.field_sets
+        Get(BuiltPackage, EnvironmentAwarePackageRequest(field_set))
+        for field_set in pkgs_per_target.field_sets
     )
 
     dependencies_digest = await Get(
