@@ -16,6 +16,7 @@ from pants.backend.shell.target_types import (
     ShellSourcesGeneratorTarget,
 )
 from pants.build_graph.address import Address
+from pants.core.goals import package
 from pants.core.goals.test import TestResult, get_filtered_environment
 from pants.core.util_rules import archive, source_files
 from pants.engine.rules import QueryRule
@@ -30,6 +31,7 @@ def rule_runner() -> RuleRunner:
             *test.rules(),
             *source_files.rules(),
             *archive.rules(),
+            *package.rules(),
             get_filtered_environment,
             QueryRule(TestResult, (ShellTestRequest.Batch,)),
         ],
