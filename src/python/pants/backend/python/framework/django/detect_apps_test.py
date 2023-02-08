@@ -93,6 +93,21 @@ def assert_apps_detected(
                     label = "app2_label"
                 """
             ),
+            "some/app3/BUILD": softwrap(
+                f"""\
+                python_source(
+                  source="apps.py",
+                  interpreter_constraints=['{constraints1}'],
+                )
+                """
+            ),
+            "some/app3/apps.py": softwrap(
+                """\
+                class App3AppConfig(AppConfig):
+                    name = "some.app3"
+                    # No explicit label, should default to app3.
+                """
+            ),
         }
     )
     result = rule_runner.request(
@@ -100,7 +115,7 @@ def assert_apps_detected(
         [DjangoAppsRequest()],
     )
     assert result == DjangoApps(
-        FrozenDict({"app1": "path.to.app1", "app2_label": "another.path.app2"})
+        FrozenDict({"app1": "path.to.app1", "app2_label": "another.path.app2", "app3": "some.app3"})
     )
 
 
