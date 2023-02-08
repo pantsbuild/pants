@@ -9,7 +9,7 @@
 //     "CPython<3.10,>=3.7"
 //   ],
 //   "generated_with_requirements": [
-//     "lambdex==0.1.6"
+//     "lambdex==0.1.8"
 //   ],
 //   "manylinux": "manylinux2014",
 //   "requirement_constraints": [],
@@ -31,23 +31,24 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "cb685b106617fbd1afd26d6e9472b2e0c99df8574c6d358aee4e6c13aeef8eb1",
-              "url": "https://files.pythonhosted.org/packages/27/1c/2bdf24103d594d707d1a7dc8173980005074cb1b57558ed8f57b966a9ad5/lambdex-0.1.6-py2.py3-none-any.whl"
+              "hash": "38bb16c0b3322b84e18062468344475c65bc0a79693727477477576c229aeefb",
+              "url": "https://files.pythonhosted.org/packages/ec/aa/e265e9b42db08d85e36b84428b3118a702f8bbc3c6bbde96ac363bf927fa/lambdex-0.1.8-py2.py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "6d1a95c8a31baa703edece8e36a705045b0203c7e886812c27a4dd945aa694e0",
-              "url": "https://files.pythonhosted.org/packages/18/bf/6f6ea14d4cc7f5a94367b2e55ae973a0b6737ed113d7dc9add983d5956de/lambdex-0.1.6.tar.gz"
+              "hash": "f2f542b3e0cea7ac49ff6472dafd8330b7883de6f62438c23e1fc986e9cc4f27",
+              "url": "https://files.pythonhosted.org/packages/ef/81/87dcfe5534096ae67bd92ad5deefa00b761d95e54b21d879fe3624ed74c4/lambdex-0.1.8.tar.gz"
             }
           ],
           "project_name": "lambdex",
           "requires_dists": [
-            "flask<2; extra == \"test-gcp-http\" and python_version < \"3.6\"",
-            "flask~=2.0.0; extra == \"test-gcp-http\" and python_version >= \"3.6\"",
+            "flask==1.1.4; extra == \"test-gcp-http\" and python_version < \"3.6\"",
+            "flask==2.0.3; extra == \"test-gcp-http\" and (python_version >= \"3.6\" and python_version < \"3.7\")",
+            "flask==2.2.2; extra == \"test-gcp-http\" and python_version >= \"3.7\"",
             "pex>=1.1.15"
           ],
-          "requires_python": "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,!=3.5.*,<3.10,>=2.7",
-          "version": "0.1.6"
+          "requires_python": "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,!=3.5.*,<3.12,>=2.7",
+          "version": "0.1.8"
         },
         {
           "artifacts": [
@@ -78,7 +79,7 @@
   "pip_version": "20.3.4-patched",
   "prefer_older_binary": false,
   "requirements": [
-    "lambdex==0.1.6"
+    "lambdex==0.1.8"
   ],
   "requires_python": [
     "<3.10,>=3.7"
