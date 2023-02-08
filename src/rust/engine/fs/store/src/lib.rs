@@ -237,7 +237,8 @@ impl RemoteStore {
   }
 
   /// Download the digest to the local byte store from this remote store. The function `f_remote`
-  /// can be used to validate the bytes.
+  /// can be used to validate the bytes (NB. if provided, the whole value will be buffered into
+  /// memory to provide the `Bytes` argument, and thus `f_remote` should only be used for small digests).
   async fn download_digest_to_local(
     &self,
     local_store: local::ByteStore,
@@ -246,42 +247,33 @@ impl RemoteStore {
     f_remote: Option<&(dyn Fn(Bytes) -> Result<(), String> + Send + Sync + 'static)>,
   ) -> Result<(), StoreError> {
     let remote_store = self.store.clone();
+    let create_missing = || {
+      StoreError::MissingDigest(
+        "Was not present in either the local or remote store".to_owned(),
+        digest,
+      )
+    };
     self
       .maybe_download(digest, async move {
-        // if there's a function to call, always just buffer fully into memory
-        let data = remote_store
-          .load(digest, f_remote.is_some())
-          .await?
-          .ok_or_else(|| {
-            StoreError::MissingDigest(
-              "Was not present in either the local or remote store".to_owned(),
-              digest,
-            )
-          })?;
+        let stored_digest = if digest.size_bytes <= IMMUTABLE_FILE_SIZE_LIMIT || f_remote.is_some() {
+          // (if there's a function to call, always just buffer fully into memory)
+          let bytes = remote_store.load_bytes(digest).await?.ok_or_else(create_missing)?;
+          if let Some(f_remote) = f_remote {
+            f_remote(bytes.clone())?;
+          }
+          local_store.store_bytes(entry_type, None, bytes, true).await?
+        } else {
+          assert!(f_remote.is_none());
 
-        if let Some(f_remote) = f_remote {
-          // if there's a function, just slurp the contents back into memory
-          match data {
-            Either::Left(ref bytes) => f_remote(bytes.clone())?,
-            Either::Right(_) => panic!("unexpectedly got file output when using f_remote"),
-          };
-        }
-        let stored_digest = match data {
-          Either::Left(bytes) => {
-            local_store
-              .store_bytes(entry_type, None, bytes, true)
-              .await?
-          }
-          Either::Right(file) => {
-            let file = file.into_std().await;
-            local_store
-              .store(entry_type, true, true, move || {
-                let mut file = file.try_clone()?;
-                file.rewind()?;
-                Ok(file)
-              })
-              .await?
-          }
+          let file = remote_store.load_file(digest).await?.ok_or_else(create_missing)?;
+          let file = file.into_std().await;
+          local_store
+            .store(entry_type, true, true, move || {
+              let mut file = file.try_clone()?;
+              file.rewind()?;
+              Ok(file)
+            })
+            .await?
         };
         if digest == stored_digest {
           Ok(())

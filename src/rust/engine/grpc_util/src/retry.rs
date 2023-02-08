@@ -21,10 +21,10 @@ pub fn status_is_retryable(status: &Status) -> bool {
 
 /// Retry a gRPC client operation using exponential back-off to delay between attempts.
 #[inline]
-pub async fn retry_call<T, E, C, F, G, Fut>(client: C, f: F, is_retryable: G) -> Result<T, E>
+pub async fn retry_call<T, E, C, F, G, Fut>(client: C, mut f: F, is_retryable: G) -> Result<T, E>
 where
   C: Clone,
-  F: Fn(C) -> Fut,
+  F: FnMut(C) -> Fut,
   G: Fn(&E) -> bool,
   Fut: Future<Output = Result<T, E>>,
 {

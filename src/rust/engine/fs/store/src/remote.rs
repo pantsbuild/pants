@@ -9,8 +9,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use async_oncecell::OnceCell;
-use bytes::{Bytes, BytesMut};
-use futures::future::Either;
+use bytes::Bytes;
 use futures::StreamExt;
 use futures::{Future, FutureExt};
 use grpc_util::retry::{retry_call, status_is_retryable};
@@ -26,15 +25,12 @@ use remexec::{
   content_addressable_storage_client::ContentAddressableStorageClient, BatchUpdateBlobsRequest,
   ServerCapabilities,
 };
-use tokio::io::{AsyncSeekExt, AsyncWriteExt};
+use tokio::io::{AsyncSeekExt, AsyncWrite, AsyncWriteExt};
 use tokio::task;
 use tonic::{Code, Request, Status};
 use workunit_store::{in_workunit, ObservationMetric};
 
-use crate::{StoreError, MEGABYTES};
-
-// TODO: semi-arbitrary limit prompted by default values for some settings
-const LOAD_IN_MEMORY_SIZE_LIMIT: usize = 4 * MEGABYTES;
+use crate::StoreError;
 
 #[derive(Clone)]
 pub struct ByteStore {
@@ -359,11 +355,7 @@ impl ByteStore {
     .await
   }
 
-  pub async fn load(
-    &self,
-    digest: Digest,
-    force_in_memory: bool,
-  ) -> Result<Option<Either<Bytes, tokio::fs::File>>, String> {
+  async fn load<W: AsyncWrite + Send + Unpin>(&self, digest: Digest, mut mk_writer: impl FnMut() -> Result<W, ByteStoreError>) -> Result<Option<W>, String> {
     let start = Instant::now();
     let store = self.clone();
     let instance_name = store.instance_name.clone().unwrap_or_default();
@@ -406,33 +398,15 @@ impl ByteStore {
             }
           });
 
-          if digest.size_bytes <= LOAD_IN_MEMORY_SIZE_LIMIT || force_in_memory {
-            let mut buf = BytesMut::with_capacity(digest.size_bytes);
-
-            while let Some(response) = stream.next().await {
-              buf.extend_from_slice(&(response?).data);
-            }
-
-            Ok(Either::Left(buf.freeze()))
-          } else {
-            // This digest is 'huge' (and the caller isn't going to be immediately loading it into
-            // memory), so we can just plop it onto disk.
-            // TODO: it'd be good to be verifying the digest as we write, instead of needing to do a
-            // separate pass
-            let file = task::spawn_blocking(tempfile::tempfile)
-              .await
-              .map_err(|e| e.to_string())??;
-
-            let mut file = tokio::fs::File::from_std(file);
-            while let Some(response) = stream.next().await {
-              file.write_all(&(response?).data).await?;
-            }
-            file.rewind().await?;
-            Ok(Either::Right(file))
+          let mut writer = mk_writer()?;
+          while let Some(response) = stream.next().await {
+            writer.write(&(response?).data).await?;
           }
+
+          Ok(writer.take().unwrap())
         }
         .map(|read_result| match read_result {
-          Ok(result) => Ok(Some(result)),
+          Ok(writer) => Ok(Some(writer)),
           Err(ByteStoreError::Grpc(status)) if status.code() == Code::NotFound => Ok(None),
           Err(err) => Err(err),
         })
@@ -460,6 +434,22 @@ impl ByteStore {
       },
     )
     .await
+  }
+
+  pub async fn load_bytes(&self, digest: Digest) -> Result<Option<Bytes>, String> {
+    Ok(self.load(digest, || Ok(Vec::new())).await?.map(Bytes::from))
+  }
+  pub async fn load_file(&self, digest: Digest) -> Result<Option<tokio::fs::File>, String> {
+    self.load(digest, || {
+      let file = task::spawn_blocking(tempfile::tempfile)
+        .await
+        .map_err(|e| e.to_string())??;
+
+      Ok(tokio::fs::File::from_std(file))
+    }).await?.map_or(Ok(None), |mut file| {
+      file.rewind().await?;
+      Ok(Some(file))
+    })
   }
 
   ///
