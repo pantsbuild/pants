@@ -462,14 +462,14 @@ class RunShellCommandWorkdirField(ShellCommandWorkdirField):
 
 class ShellCommandOutputRootDirField(StringField):
     alias = "root_output_directory"
-    default = "."
+    default = "/"
     help = softwrap(
         "Adjusts the location of files output by this command, when consumed as a dependency.\n\n"
-        "`.` or values beginning with `./` are relative to the location of the `BUILD` file.\n\n"
-        "`.` or values beginning with `./` are relative to the value of `workdir`.\n\n"
-        "To specify the build root, use `/` or the empty string.\n\n"
-        "Values that do not begin with `.` or `/` are relative to the build root.\n\n"
-        "All files output by "
+        "Values are relative to the build root, except in the following cases:\n\n"
+        "* `.` specifies the location of the `BUILD` file.\n"
+        "* Values beginning with `./` are relative to the location of the `BUILD` file.\n"
+        "* `/` or the empty string specifies the build root.\n"
+        "* Values beginning with `/` are also relative to the build root."
     )
 
 
