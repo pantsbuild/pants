@@ -117,19 +117,20 @@ async def setup_go_sdk_process(
             EnvironmentVarsRequest(golang_env_aware.env_vars_to_pass_to_subprocesses),
         ),
     )
-    maybe_replace_sandbox_root_env = (
-        {GoSdkRunSetup.SANDBOX_ROOT_ENV: "1"} if request.replace_sandbox_root_in_args else {}
-    )
+
+    env = {
+        **env_vars,
+        **request.env,
+        GoSdkRunSetup.CHDIR_ENV: request.working_dir or "",
+        # TODO: Maybe could just use MAJOR.MINOR for version part here?
+        "__PANTS_GO_SDK_CACHE_KEY": f"{goroot.version}/{goroot.goos}/{goroot.goarch}",
+    }
+    if request.replace_sandbox_root_in_args:
+        env[GoSdkRunSetup.SANDBOX_ROOT_ENV] = "1"
+
     return Process(
         argv=[bash.path, go_sdk_run.script.path, *request.command],
-        env={
-            **env_vars,
-            **request.env,
-            GoSdkRunSetup.CHDIR_ENV: request.working_dir or "",
-            **maybe_replace_sandbox_root_env,
-            # TODO: Maybe could just use MAJOR.MINOR for version part here?
-            "__PANTS_GO_SDK_CACHE_KEY": f"{goroot.version}/{goroot.goos}/{goroot.goarch}",
-        },
+        env=env,
         input_digest=input_digest,
         description=request.description,
         output_files=request.output_files,
