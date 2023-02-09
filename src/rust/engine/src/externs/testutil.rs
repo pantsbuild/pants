@@ -41,7 +41,7 @@ impl PyStubCASBuilder {
     Ok(PyStubCASBuilder(self.0.clone()))
   }
 
-  fn build(&mut self, py_executor: PyExecutor) -> PyResult<PyStubCAS> {
+  fn build(&mut self, py_executor: &PyExecutor) -> PyResult<PyStubCAS> {
     let mut builder_opt = self.0.lock();
     let builder = builder_opt
       .take()
