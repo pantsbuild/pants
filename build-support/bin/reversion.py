@@ -10,6 +10,8 @@ import glob
 import hashlib
 import os
 import re
+import subprocess
+import tempfile
 import zipfile
 
 from pants.util.contextutil import open_zip, temporary_dir
@@ -52,14 +54,16 @@ def locate_dist_info_dir(workspace):
 
 
 def fingerprint_file(workspace, filename):
-    """Given a relative filename located in a workspace, fingerprint the file.
+    """Given a relative filename located in a workspace, fingerprint the file for a RECORD entry.
 
     Returns a tuple of fingerprint string and size string.
     """
+    # See the spec here:
+    # https://packaging.python.org/en/latest/specifications/recording-installed-packages/#the-record-file
     content = read_file(os.path.join(workspace, filename), binary_mode=True)
     fingerprint = hashlib.sha256(content)
-    b64_encoded = base64.b64encode(fingerprint.digest())
-    return f"sha256={b64_encoded.decode()}", str(len(content))
+    record_encoded = base64.urlsafe_b64encode(fingerprint.digest()).rstrip(b"=")
+    return f"sha256={record_encoded.decode()}", str(len(content))
 
 
 def rewrite_record_file(workspace, src_record_file, mutated_file_tuples):
@@ -146,10 +150,15 @@ def reversion(
         # Create a new output whl in the destination.
         dst_whl_filename = os.path.basename(whl_file).replace(input_version, target_version)
         dst_whl_file = os.path.join(dest_dir, dst_whl_filename)
-        with open_zip(dst_whl_file, "w", zipfile.ZIP_DEFLATED) as whl:
-            for dst_filename in dst_filenames:
-                whl.write(os.path.join(workspace, dst_filename), dst_filename)
-
+        with tempfile.TemporaryDirectory() as chroot:
+            tmp_whl_file = os.path.join(chroot, dst_whl_filename)
+            with open_zip(tmp_whl_file, "w", zipfile.ZIP_DEFLATED) as whl:
+                for dst_filename in dst_filenames:
+                    whl.write(os.path.join(workspace, dst_filename), dst_filename)
+            check_dst = os.path.join(chroot, "check-wheel")
+            os.mkdir(check_dst)
+            subprocess.run(args=["wheel", "unpack", "-d", check_dst, tmp_whl_file], check=True)
+            os.rename(tmp_whl_file, dst_whl_file)
         print("Wrote whl with version {} to {}.\n".format(target_version, dst_whl_file))
 
 
