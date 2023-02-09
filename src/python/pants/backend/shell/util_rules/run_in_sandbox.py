@@ -106,7 +106,6 @@ async def run_in_sandbox_request(
         description=description,
         address=shell_command.address,
         shell_name=shell_command.address.spec,
-        interactive=False,
         working_directory=working_directory,
         command=" ".join(shlex.quote(arg) for arg in (run_request.args + extra_args)),
         timeout=None,

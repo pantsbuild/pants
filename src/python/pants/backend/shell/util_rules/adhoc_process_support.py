@@ -56,7 +56,6 @@ class ShellCommandProcessRequest:
     description: str
     address: Address
     shell_name: str
-    interactive: bool
     working_directory: str | None
     command: str
     timeout: int | None
@@ -205,13 +204,7 @@ async def prepare_shell_command_process(
     description = shell_command.description
     address = shell_command.address
     shell_name = shell_command.shell_name
-    interactive = shell_command.interactive
-    if not interactive:
-        working_directory = _parse_working_directory(shell_command.working_directory or "", address)
-    elif shell_command.working_directory is not None:
-        working_directory = shell_command.working_directory
-    else:
-        raise ValueError("Working directory must be not be `None` for interactive processes.")
+    working_directory = _parse_working_directory(shell_command.working_directory or "", address)
     command = shell_command.command
     timeout: int | None = shell_command.timeout
     output_files = shell_command.output_files
@@ -221,12 +214,7 @@ async def prepare_shell_command_process(
     append_only_caches = shell_command.append_only_caches or FrozenDict()
     immutable_input_digests = shell_command.immutable_input_digests or FrozenDict()
 
-    if interactive:
-        command_env = {
-            "CHROOT": "{chroot}",
-        }
-    else:
-        command_env = {}
+    command_env: dict[str, str] = {}
 
     extra_env = await Get(EnvironmentVars, EnvironmentVarsRequest(fetch_env_vars))
     command_env.update(extra_env)
@@ -236,7 +224,7 @@ async def prepare_shell_command_process(
 
     input_snapshot = await Get(Snapshot, Digest, shell_command.input_digest)
 
-    if interactive or not working_directory or working_directory in input_snapshot.dirs:
+    if not working_directory or working_directory in input_snapshot.dirs:
         # Needed to ensure that underlying filesystem does not change during run
         work_dir = EMPTY_DIGEST
     else:
@@ -244,23 +232,8 @@ async def prepare_shell_command_process(
 
     input_digest = await Get(Digest, MergeDigests([shell_command.input_digest, work_dir]))
 
-    if interactive:
-        _working_directory = working_directory or "."
-        relpath = os.path.relpath(
-            _working_directory, start="/" if os.path.isabs(_working_directory) else "."
-        )
-        new_path = None
-        if "PATH" in command_env:
-            new_path = command_env["PATH"]
-            del command_env["PATH"]
-        boot_script = (f"cd {shlex.quote(relpath)}; " if relpath != "." else "") + (
-            f"export PATH={shlex.quote(new_path)}:$PATH; " if new_path else ""
-        )
-    else:
-        boot_script = ""
-
     proc = Process(
-        argv=(bash.path, "-c", boot_script + command, shell_name),
+        argv=(bash.path, "-c", command, shell_name),
         description=f"Running {description}",
         env=command_env,
         input_digest=input_digest,
@@ -272,11 +245,7 @@ async def prepare_shell_command_process(
         immutable_input_digests=immutable_input_digests,
     )
 
-    if not interactive:
-        return _output_at_build_root(proc, bash)
-    else:
-        # `InteractiveProcess`es don't need to be wrapped since files aren't being captured.
-        return proc
+    return _output_at_build_root(proc, bash)
 
 
 def _output_at_build_root(process: Process, bash: BashBinary) -> Process:

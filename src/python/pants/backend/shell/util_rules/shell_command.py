@@ -4,13 +4,15 @@
 from __future__ import annotations
 
 import logging
+import os
+import shlex
 from dataclasses import dataclass
 
 from pants.backend.shell.subsystems.shell_setup import ShellSetup
 from pants.backend.shell.target_types import (
+    RunShellCommandWorkdirField,
     ShellCommandCommandField,
     ShellCommandExtraEnvVarsField,
-    ShellCommandIsInteractiveField,
     ShellCommandLogOutputField,
     ShellCommandOutputRootDirField,
     ShellCommandSourcesField,
@@ -31,7 +33,7 @@ from pants.backend.shell.util_rules.builtin import BASH_BUILTIN_COMMANDS
 from pants.core.goals.run import RunFieldSet, RunInSandboxBehavior, RunRequest
 from pants.core.target_types import FileSourceField
 from pants.core.util_rules.environments import EnvironmentNameRequest
-from pants.core.util_rules.system_binaries import BinaryShims, BinaryShimsRequest
+from pants.core.util_rules.system_binaries import BashBinary, BinaryShims, BinaryShimsRequest
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import Digest, Snapshot
 from pants.engine.process import FallibleProcessResult, Process, ProcessResult, ProductDescription
@@ -66,10 +68,9 @@ async def _prepare_process_request_from_target(
 ) -> ShellCommandProcessRequest:
     description = f"the `{shell_command.alias}` at `{shell_command.address}`"
 
-    interactive = shell_command.has_field(ShellCommandIsInteractiveField)
     working_directory = shell_command[ShellCommandWorkdirField].value
 
-    if interactive and not working_directory:
+    if not working_directory:
         working_directory = "."
 
     command = shell_command[ShellCommandCommandField].value
@@ -100,7 +101,6 @@ async def _prepare_process_request_from_target(
         description=description,
         address=shell_command.address,
         shell_name=shell_command.address.spec,
-        interactive=interactive,
         working_directory=working_directory,
         command=command,
         timeout=shell_command.get(ShellCommandTimeoutField).value,
@@ -132,7 +132,7 @@ class RunShellCommand(RunFieldSet):
 
 
 @rule(desc="Running shell command", level=LogLevel.DEBUG)
-async def run_shell_command(
+async def shell_command_in_sandbox(
     request: GenerateFilesFromShellCommandRequest,
 ) -> GeneratedSources:
     shell_command = request.protocol_target
@@ -182,16 +182,54 @@ async def run_shell_command(
     return GeneratedSources(output)
 
 
+@rule_helper
+async def _interactive_shell_command(
+    shell_command: Target,
+    bash: BashBinary,
+) -> Process:
+
+    description = f"the `{shell_command.alias}` at `{shell_command.address}`"
+    shell_name = shell_command.address.spec
+    working_directory = shell_command[RunShellCommandWorkdirField].value
+
+    logger.warning(f"{shell_command=} {working_directory=}")
+
+    if working_directory is None:
+        raise ValueError("Working directory must be not be `None` for interactive processes.")
+
+    command = shell_command[ShellCommandCommandField].value
+    if not command:
+        raise ValueError(f"Missing `command` line in `{description}.")
+
+    command_env = {
+        "CHROOT": "{chroot}",
+    }
+
+    # Needed to ensure that underlying filesystem does not change during run
+    dependencies_digest = await _execution_environment_from_dependencies(shell_command)
+
+    _working_directory = working_directory or "."
+    relpath = os.path.relpath(
+        _working_directory, start="/" if os.path.isabs(_working_directory) else "."
+    )
+    boot_script = f"cd {shlex.quote(relpath)}; " if relpath != "." else ""
+
+    return Process(
+        argv=(bash.path, "-c", boot_script + command, shell_name),
+        description=f"Running {description}",
+        env=command_env,
+        input_digest=dependencies_digest,
+        working_directory=working_directory,
+    )
+
+
 @rule
-async def run_shell_command_request(shell_command: RunShellCommand) -> RunRequest:
+async def run_shell_command_request(bash: BashBinary, shell_command: RunShellCommand) -> RunRequest:
     wrapped_tgt = await Get(
         WrappedTarget,
         WrappedTargetRequest(shell_command.address, description_of_origin="<infallible>"),
     )
-    process = await Get(
-        Process,
-        ShellCommandProcessFromTargetRequest(wrapped_tgt.target),
-    )
+    process = await _interactive_shell_command(wrapped_tgt.target, bash)
     return RunRequest(
         digest=process.input_digest,
         args=process.argv,
