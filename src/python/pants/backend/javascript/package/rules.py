@@ -12,7 +12,8 @@ from pants.backend.javascript.install_node_package import (
 )
 from pants.backend.javascript.package_json import (
     NodeBuildScriptEntryPointField,
-    NodeBuildScriptOutputsField,
+    NodeBuildScriptOutputDirectoriesField,
+    NodeBuildScriptOutputFilesField,
     NodeBuildScriptSourcesField,
     NodePackageNameField,
     NodePackageVersionField,
@@ -28,6 +29,7 @@ from pants.engine.rules import Rule, collect_rules, rule
 from pants.engine.target import GeneratedSources, GenerateSourcesRequest
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
+from pants.util.strutil import softwrap
 
 
 @dataclass(frozen=True)
@@ -76,6 +78,19 @@ async def run_node_build_script(
     installed = await Get(
         InstalledNodePackageWithSource, InstalledNodePackageRequest(req.protocol_target.address)
     )
+    output_files = req.protocol_target[NodeBuildScriptOutputFilesField]
+    output_dirs = req.protocol_target[NodeBuildScriptOutputDirectoriesField]
+    if not (output_dirs.value or output_files.value):
+        raise ValueError(
+            softwrap(
+                f"""
+                Neither the {output_dirs.alias} nor the {output_files.alias} field was provided.
+
+                One of the fields have to be set, or else the `node_build_script`
+                output will not be captured for further use in the build.
+                """
+            )
+        )
     args = ("run", req.protocol_target[NodeBuildScriptEntryPointField].value)
     result = await Get(
         ProcessResult,
@@ -83,7 +98,8 @@ async def run_node_build_script(
             filter(None, args),
             "Running node build script.",
             input_digest=installed.digest,
-            output_files=req.protocol_target[NodeBuildScriptOutputsField].value or (),
+            output_files=output_files.value or (),
+            output_directories=output_dirs.value or (),
             level=LogLevel.INFO,
         ),
     )

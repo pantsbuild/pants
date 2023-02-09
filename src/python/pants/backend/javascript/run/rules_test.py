@@ -40,9 +40,9 @@ def test_creates_run_requests_package_json_scripts(rule_runner: RuleRunner) -> N
                 """\
                 package_json(
                     scripts=[
-                        node_build_script(entry_point="build", outputs=[]),
-                        node_build_script(entry_point="compile", outputs=[]),
-                        node_build_script(entry_point="transpile", outputs=[]),
+                        node_build_script(entry_point="build", output_directories=["dist"]),
+                        node_build_script(entry_point="compile", output_directories=["dist"]),
+                        node_build_script(entry_point="transpile", output_directories=["dist"]),
                     ]
                 )
                 """

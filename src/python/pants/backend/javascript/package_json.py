@@ -14,7 +14,6 @@ from pants.base.specs import AncestorGlobSpec, RawSpecs
 from pants.build_graph.address import Address
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.core.target_types import (
-    ResourceTarget,
     TargetGeneratorSourcesHelperSourcesField,
     TargetGeneratorSourcesHelperTarget,
 )
@@ -61,11 +60,18 @@ class PackageJsonSourceField(SingleSourceField):
 @dataclass(frozen=True)
 class NodeBuildScript:
     entry_point: str
-    outputs: tuple[str, ...]
+    output_directories: tuple[str, ...] = ()
+    output_files: tuple[str, ...] = ()
 
-    def __init__(self, entry_point: str, outputs: Iterable[str]) -> None:
+    def __init__(
+        self,
+        entry_point: str,
+        output_directories: Iterable[str] = (),
+        output_files: Iterable[str] = (),
+    ) -> None:
         object.__setattr__(self, "entry_point", entry_point)
-        object.__setattr__(self, "outputs", tuple(outputs))
+        object.__setattr__(self, "output_directories", tuple(output_directories))
+        object.__setattr__(self, "output_files", tuple(output_files))
 
 
 class NodePackageScriptsField(SequenceField[NodeBuildScript]):
@@ -81,7 +87,7 @@ class NodePackageScriptsField(SequenceField[NodeBuildScript]):
         """
     )
     expected_type_description = (
-        '[node_build_script(entry_point="build", outputs=["./dist/**"], ...])'
+        '[node_build_script(entry_point="build", output_directories=["./dist/"], ...])'
     )
     default = ()
 
@@ -187,16 +193,37 @@ class NodeBuildScriptSourcesField(SourcesField):
     help = "Marker field for node_build_scripts used in export-codegen."
 
 
-class NodeBuildScriptOutputsField(StringSequenceField):
-    alias = "outputs"
-    required = True
-    default = ("dist/*",)
+class NodeBuildScriptOutputFilesField(StringSequenceField):
+    alias = "output_files"
+    required = False
+    default = ()
     help = softwrap(
-        f"""
-        Specify globs to match in the build script output.
-        The globs will be treated as relative to the `package.json`.
+        """
+        Specify the build script's output files to capture, relative to the package.json.
 
-        Matching files will become `{ResourceTarget.alias}` targets.
+        For directories, use `output_directories`. At least one of `output_files` and
+        `output_directories` must be specified.
+
+        Relative paths (including `..`) may be used, as long as the path does not ascend further
+        than the package.json parent directory.
+        """
+    )
+
+
+class NodeBuildScriptOutputDirectoriesField(StringSequenceField):
+    alias = "output_directories"
+    required = False
+    default = ()
+    help = softwrap(
+        """
+        Specify full directories (including recursive descendants) of output to capture from the
+        build script, relative to the package.json.
+
+        For individual files, use `output_files`. At least one of `output_files` and
+        `output_directories` must be specified.
+
+        Relative paths (including `..`) may be used, as long as the path does not ascend further
+        than the package.json parent directory.
         """
     )
 
@@ -205,7 +232,8 @@ class NodeBuildScriptTarget(Target):
     core_fields = (
         *COMMON_TARGET_FIELDS,
         NodeBuildScriptEntryPointField,
-        NodeBuildScriptOutputsField,
+        NodeBuildScriptOutputDirectoriesField,
+        NodeBuildScriptOutputFilesField,
         NodePackageDependenciesField,
     )
 
@@ -498,7 +526,8 @@ async def generate_node_package_targets(
                     {
                         **request.template,
                         NodeBuildScriptEntryPointField.alias: build_script.entry_point,
-                        NodeBuildScriptOutputsField.alias: build_script.outputs,
+                        NodeBuildScriptOutputDirectoriesField.alias: build_script.output_directories,
+                        NodeBuildScriptOutputFilesField.alias: build_script.output_files,
                         NodePackageDependenciesField.alias: [
                             file_tgt.address.spec,
                             *(tgt.address.spec for tgt in third_party_tgts),

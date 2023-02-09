@@ -93,7 +93,7 @@ def test_packages_files_as_resource(rule_runner: RuleRunner) -> None:
                 """\
                 package_json(
                     scripts=[
-                        node_build_script(entry_point="build", outputs=["dist/index.cjs"])
+                        node_build_script(entry_point="build", output_files=["dist/index.cjs"])
                     ]
                 )
                 """

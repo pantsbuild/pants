@@ -12,7 +12,6 @@ from pants.backend.javascript.install_node_package import (
 )
 from pants.backend.javascript.package_json import (
     NodeBuildScriptEntryPointField,
-    NodeBuildScriptOutputsField,
     NodePackageDependenciesField,
 )
 from pants.backend.javascript.subsystems.nodejs import NodeJS, NodeJSProcessEnvironment
@@ -31,7 +30,6 @@ class RunNodeBuildScriptFieldSet(RunFieldSet):
     run_in_sandbox_behavior = RunInSandboxBehavior.RUN_REQUEST_HERMETIC
 
     entry_point: NodeBuildScriptEntryPointField
-    output_path: NodeBuildScriptOutputsField
     environment: EnvironmentField
 
 

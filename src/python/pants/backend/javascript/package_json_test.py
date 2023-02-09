@@ -281,7 +281,7 @@ def test_generates_build_script_targets(
                 """\
                 package_json(
                     scripts=[
-                        node_build_script(entry_point="build", outputs=["www/**"])
+                        node_build_script(entry_point="build", output_directories=["www/"])
                     ]
                 )
                 """
