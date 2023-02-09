@@ -69,13 +69,15 @@ def test_parses_module_imports(rule_runner: RuleRunner) -> None:
                 import { promises as fs } from 'fs';
                 import * as mod from "@a-special-module/for-me";
                 import { someVar } from "./local";
+
+                const dynamicModule = await import("./maybe.wasm");
                 """
             ),
         }
     )
     tgt = rule_runner.get_target(Address("src", target_name="src", relative_file_path="a.js"))
     imports = rule_runner.request(JSImportStrings, (ParseJsImportStrings(tgt[JSSourceField]),))
-    assert set(imports) == {"fs", "@a-special-module/for-me", "./local"}
+    assert set(imports) == {"fs", "@a-special-module/for-me", "./local", "./maybe.wasm"}
 
 
 def test_parses_modules_from_not_valid_js_files(rule_runner: RuleRunner) -> None:
