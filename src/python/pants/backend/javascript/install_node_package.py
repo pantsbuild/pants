@@ -25,7 +25,7 @@ from pants.engine.fs import PathGlobs
 from pants.engine.internals.native_engine import Digest, MergeDigests, RemovePrefix, Snapshot
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import ProcessResult
-from pants.engine.rules import Rule, collect_rules, rule, rule_helper
+from pants.engine.rules import Rule, collect_rules, rule
 from pants.engine.target import (
     SourcesField,
     TransitiveTargets,
@@ -52,7 +52,6 @@ class InstalledNodePackageWithSource:
     digest: Digest
 
 
-@rule_helper
 async def _get_relevant_source_files(sources: Iterable[SourcesField]) -> SourceFiles:
     return await Get(
         SourceFiles,

@@ -17,7 +17,7 @@ from pants.core.goals.tailor import (
 )
 from pants.engine.fs import PathGlobs, Paths
 from pants.engine.internals.selectors import Get
-from pants.engine.rules import Rule, collect_rules, rule, rule_helper
+from pants.engine.rules import Rule, collect_rules, rule
 from pants.engine.target import Target
 from pants.engine.unions import UnionRule
 from pants.util.dirutil import group_by_dir
@@ -40,7 +40,6 @@ def classify_source_files(paths: Iterable[str]) -> dict[type[Target], set[str]]:
     return {JSSourcesGeneratorTarget: sources_files}
 
 
-@rule_helper
 async def _get_unowned_files_for_globs(
     request: PutativeTargetsRequest,
     all_owned_sources: AllOwnedSources,

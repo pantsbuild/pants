@@ -15,7 +15,7 @@ from pants.backend.javascript.package_json import (
 )
 from pants.build_graph.address import Address
 from pants.engine.internals.selectors import Get
-from pants.engine.rules import Rule, collect_rules, rule, rule_helper
+from pants.engine.rules import Rule, collect_rules, rule
 from pants.engine.target import WrappedTarget, WrappedTargetRequest
 from pants.engine.unions import UnionRule
 from pants.util.strutil import softwrap
@@ -32,7 +32,6 @@ class ChosenNodeResolve:
     file_path: str
 
 
-@rule_helper
 async def _get_node_package_name(req: RequestNodeResolve) -> str:
     wrapped = await Get(
         WrappedTarget,
