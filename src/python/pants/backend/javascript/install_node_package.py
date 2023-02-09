@@ -22,7 +22,13 @@ from pants.build_graph.address import Address
 from pants.core.target_types import FileSourceField, ResourceSourceField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import PathGlobs
-from pants.engine.internals.native_engine import Digest, MergeDigests, RemovePrefix, Snapshot
+from pants.engine.internals.native_engine import (
+    AddPrefix,
+    Digest,
+    MergeDigests,
+    RemovePrefix,
+    Snapshot,
+)
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Rule, collect_rules, rule
@@ -45,11 +51,13 @@ class InstalledNodePackage:
     root_dir: str
     digest: Digest
 
+    def add_root_prefix(self, digest: Digest) -> AddPrefix:
+        return AddPrefix(digest, self.root_dir)
+
 
 @dataclass(frozen=True)
-class InstalledNodePackageWithSource:
-    root_dir: str
-    digest: Digest
+class InstalledNodePackageWithSource(InstalledNodePackage):
+    pass
 
 
 async def _get_relevant_source_files(sources: Iterable[SourcesField]) -> SourceFiles:

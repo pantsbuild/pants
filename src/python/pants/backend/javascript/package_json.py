@@ -35,6 +35,7 @@ from pants.engine.target import (
     GenerateTargetsRequest,
     SequenceField,
     SingleSourceField,
+    SourcesField,
     StringField,
     StringSequenceField,
     Target,
@@ -176,6 +177,14 @@ class NodePackageTarget(Target):
 class NodeBuildScriptEntryPointField(StringField):
     alias = "entry_point"
     required = True
+
+
+class NodeBuildScriptSourcesField(SourcesField):
+    alias = "_sources"
+    required = False
+    default = None
+
+    help = "Marker field for node_build_scripts used in export-codegen."
 
 
 class NodeBuildScriptOutputsField(StringSequenceField):
