@@ -30,7 +30,7 @@ from pants.core.target_types import FileSourceField
 from pants.core.util_rules.environments import EnvironmentNameRequest
 from pants.engine.addresses import Addresses
 from pants.engine.environment import EnvironmentName
-from pants.engine.fs import Digest, MergeDigests, Snapshot
+from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests, Snapshot
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import (
@@ -132,21 +132,27 @@ async def run_in_sandbox_request(
         if result.stderr:
             logger.warning(result.stderr.decode())
 
+    adjusted = await _adjust_root_output_directory(
+        result.output_digest,
+        shell_command.address,
+        working_directory,
+        root_output_directory,
+    )
+
     extras = (
         (shell_command[RunInSandboxStdoutFilenameField].value, result.stdout),
         (shell_command[RunInSandboxStderrFilenameField].value, result.stderr),
     )
     extra_contents = {i: j for i, j in extras if i}
 
-    adjusted = await _adjust_root_output_directory(
-        result.output_digest,
-        shell_command.address,
-        working_directory,
-        root_output_directory,
-        extra_files=extra_contents,
-    )
-    output = await Get(Snapshot, Digest, adjusted)
+    if extra_contents:
+        extra_digest = await Get(
+            Digest,
+            CreateDigest(FileContent(name, content) for name, content in extra_contents.items()),
+        )
+        adjusted = await Get(Digest, MergeDigests((adjusted, extra_digest)))
 
+    output = await Get(Snapshot, Digest, adjusted)
     return GeneratedSources(output)
 
 
