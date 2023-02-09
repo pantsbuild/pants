@@ -479,7 +479,10 @@ def test_munge_bin_name():
             assert munge_bin_name("pantsv2") == "pantsv2"
             assert munge_bin_name("bin/pantsv2") == "bin/pantsv2"
             assert munge_bin_name("./pants") == "./pants"
-            assert munge_bin_name(os.path.join(build_root, "pants")) == "./pants"
-            assert munge_bin_name(os.path.join(build_root, "bin", "pants")) == "./bin/pants"
+            assert munge_bin_name(os.path.abspath(os.path.join(build_root, "pants"))) == "./pants"
+            assert (
+                munge_bin_name(os.path.abspath(os.path.join(build_root, "bin", "pants")))
+                == "./bin/pants"
+            )
             assert munge_bin_name("/foo/pants") == "pants"
             assert munge_bin_name("/foo/bar/pants") == "pants"
