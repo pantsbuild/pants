@@ -313,7 +313,9 @@ def munge_bin_name(pants_bin_name: str) -> str:
     # so we never want to use an abspath.
     if os.path.isabs(pants_bin_name):
         # If it's in the buildroot, use the relpath from there. Otherwise use the basename.
-        pants_bin_relpath = os.path.relpath(pants_bin_name, get_buildroot())
+        pants_bin_relpath = os.path.relpath(
+            os.path.realpath(pants_bin_name), os.path.realpath(get_buildroot())
+        )
         if pants_bin_relpath.startswith(".."):
             pants_bin_name = os.path.basename(pants_bin_name)
         else:

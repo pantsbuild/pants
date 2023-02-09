@@ -472,17 +472,14 @@ class TestOptionsBootstrapper:
 
 def test_munge_bin_name():
     with temporary_dir() as build_root:
-        build_root = os.path.realpath(build_root)
-        touch(os.path.join(build_root, "BUILD_ROOT"))
+        build_root = os.path.realpath(os.path.abspath(build_root))
         with pushd(build_root):
+            touch("BUILD_ROOT")
             assert munge_bin_name("pants") == "pants"
             assert munge_bin_name("pantsv2") == "pantsv2"
             assert munge_bin_name("bin/pantsv2") == "bin/pantsv2"
             assert munge_bin_name("./pants") == "./pants"
-            assert munge_bin_name(os.path.abspath(os.path.join(build_root, "pants"))) == "./pants"
-            assert (
-                munge_bin_name(os.path.abspath(os.path.join(build_root, "bin", "pants")))
-                == "./bin/pants"
-            )
+            assert munge_bin_name(os.path.join(build_root, "pants")) == "./pants"
+            assert munge_bin_name(os.path.join(build_root, "bin", "pants")) == "./bin/pants"
             assert munge_bin_name("/foo/pants") == "pants"
             assert munge_bin_name("/foo/bar/pants") == "pants"
