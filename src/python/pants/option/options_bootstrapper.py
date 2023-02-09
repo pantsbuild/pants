@@ -311,11 +311,7 @@ def munge_bin_name(pants_bin_name: str) -> str:
     # Determine a useful bin name to embed in help strings.
     # The bin name gets embedded in help comments in generated lockfiles,
     # so we never want to use an abspath.
-    print(f"111111 {pants_bin_name}")
     if os.path.isabs(pants_bin_name):
-        buildroot = get_buildroot()
-        print(f"22222222 {pants_bin_name} XXXXXX {buildroot}")
-        print(f"33333333 {os.path.realpath(pants_bin_name)} YYYYY {os.path.realpath(buildroot)}")
         # If it's in the buildroot, use the relpath from there. Otherwise use the basename.
         pants_bin_relpath = os.path.relpath(
             os.path.realpath(pants_bin_name), os.path.realpath(get_buildroot())

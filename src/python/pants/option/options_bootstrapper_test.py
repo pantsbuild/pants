@@ -471,7 +471,7 @@ class TestOptionsBootstrapper:
 
 
 def test_munge_bin_name():
-    with temporary_dir() as build_root:
+    with temporary_dir(root_dir=os.getcwd()) as build_root:
         build_root = os.path.realpath(os.path.abspath(build_root))
         with pushd(build_root):
             touch("BUILD_ROOT")
