@@ -23,7 +23,12 @@ from pants.backend.python.packaging.pyoxidizer.target_types import (
 )
 from pants.backend.python.target_types import GenerateSetupField, WheelField
 from pants.backend.python.util_rules.pex import Pex, PexProcess, PexRequest
-from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact, PackageFieldSet
+from pants.core.goals.package import (
+    BuiltPackage,
+    BuiltPackageArtifact,
+    EnvironmentAwarePackageRequest,
+    PackageFieldSet,
+)
 from pants.core.goals.run import RunDebugAdapterRequest, RunFieldSet, RunRequest
 from pants.core.util_rules.environments import EnvironmentField
 from pants.core.util_rules.system_binaries import BashBinary
@@ -107,7 +112,8 @@ async def package_pyoxidizer_binary(
         FieldSetsPerTarget, FieldSetsPerTargetRequest(PackageFieldSet, direct_deps)
     )
     built_packages = await MultiGet(
-        Get(BuiltPackage, PackageFieldSet, field_set) for field_set in deps_field_sets.field_sets
+        Get(BuiltPackage, EnvironmentAwarePackageRequest(field_set))
+        for field_set in deps_field_sets.field_sets
     )
     wheel_paths = [
         artifact.relpath
