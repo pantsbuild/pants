@@ -119,7 +119,7 @@ class LocalPantsRunner:
             bootstrap_options = options.bootstrap_option_values()
             assert bootstrap_options is not None
             scheduler = EngineInitializer.setup_graph(
-                bootstrap_options, build_config, dynamic_remote_options
+                bootstrap_options, build_config, dynamic_remote_options, executor
             )
         with options_initializer.handle_unknown_flags(options_bootstrapper, env, raise_=True):
             global_options = options.for_global_scope()

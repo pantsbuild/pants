@@ -20,7 +20,7 @@ extern "C" {
 }
 
 #[pyclass]
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct PyExecutor(pub task_executor::Executor);
 
 #[pymethods]
@@ -52,7 +52,17 @@ impl PyExecutor {
 
   /// Shut down this executor, waiting for all tasks to exit. Any tasks which have not exited at
   /// the end of the timeout will be leaked.
-  fn shutdown(&self, duration_secs: f64) {
-    self.0.shutdown(Duration::from_secs_f64(duration_secs))
+  fn shutdown(&self, py: Python, duration_secs: f64) {
+    py.allow_threads(|| self.0.shutdown(Duration::from_secs_f64(duration_secs)))
+  }
+}
+
+impl Drop for PyExecutor {
+  fn drop(&mut self) {
+    if !self.0.is_shutdown() {
+      // This can lead to hangs, since `Drop` will run on an arbitrary thread under arbitrary
+      // locks. See #18211.
+      log::warn!("Executor was not shut down explicitly.");
+    }
   }
 }
