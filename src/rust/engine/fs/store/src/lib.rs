@@ -255,17 +255,33 @@ impl RemoteStore {
     };
     self
       .maybe_download(digest, async move {
-        let stored_digest = if digest.size_bytes <= IMMUTABLE_FILE_SIZE_LIMIT || f_remote.is_some() {
+        let stored_digest = if digest.size_bytes <= IMMUTABLE_FILE_SIZE_LIMIT || f_remote.is_some()
+        {
           // (if there's a function to call, always just buffer fully into memory)
-          let bytes = remote_store.load_bytes(digest).await?.ok_or_else(create_missing)?;
+          let bytes = remote_store
+            .load_bytes(digest)
+            .await?
+            .ok_or_else(create_missing)?;
           if let Some(f_remote) = f_remote {
             f_remote(bytes.clone())?;
           }
-          local_store.store_bytes(entry_type, None, bytes, true).await?
+          local_store
+            .store_bytes(entry_type, None, bytes, true)
+            .await?
         } else {
           assert!(f_remote.is_none());
+          // TODO(#18048): choose a file that can be plopped into the local store directly, when
+          // large files are stored there
+          let file = tokio::task::spawn_blocking(tempfile::tempfile)
+            .await
+            .map_err(|e| e.to_string())??;
+          let file = tokio::fs::File::from_std(file);
 
-          let file = remote_store.load_file(digest).await?.ok_or_else(create_missing)?;
+          let file = remote_store
+            .load_file(digest, file)
+            .await?
+            .ok_or_else(create_missing)?;
+
           let file = file.into_std().await;
           local_store
             .store(entry_type, true, true, move || {
@@ -1064,13 +1080,12 @@ impl Store {
       return Err("Cannot load Trees from a remote without a remote".to_owned());
     };
 
-    match remote.store.load(tree_digest, true).await? {
-      Some(Either::Left(b)) => {
+    match remote.store.load_bytes(tree_digest).await? {
+      Some(b) => {
         let tree = Tree::decode(b).map_err(|e| format!("protobuf decode error: {:?}", e))?;
         let trie = DigestTrie::try_from(tree)?;
         Ok(Some(trie.into()))
       }
-      Some(Either::Right(_)) => panic!("unexpectedly got file output"),
       None => Ok(None),
     }
   }

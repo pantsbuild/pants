@@ -9,6 +9,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use async_oncecell::OnceCell;
+use async_trait::async_trait;
 use bytes::Bytes;
 use futures::StreamExt;
 use futures::{Future, FutureExt};
@@ -26,7 +27,7 @@ use remexec::{
   ServerCapabilities,
 };
 use tokio::io::{AsyncSeekExt, AsyncWrite, AsyncWriteExt};
-use tokio::task;
+use tokio::sync::Mutex;
 use tonic::{Code, Request, Status};
 use workunit_store::{in_workunit, ObservationMetric};
 
@@ -97,6 +98,29 @@ impl fmt::Display for ByteStoreError {
 }
 
 impl std::error::Error for ByteStoreError {}
+
+/// Places that write the result of a remote `load`
+#[async_trait]
+trait LoadDestination: AsyncWrite + Send + Sync + Unpin + 'static {
+  /// Clear out the writer and start again, if there's been previous contents written
+  async fn reset(&mut self) -> std::io::Result<()>;
+}
+
+#[async_trait]
+impl LoadDestination for tokio::fs::File {
+  async fn reset(&mut self) -> std::io::Result<()> {
+    self.rewind().await?;
+    self.set_len(0).await
+  }
+}
+
+#[async_trait]
+impl LoadDestination for Vec<u8> {
+  async fn reset(&mut self) -> std::io::Result<()> {
+    self.clear();
+    Ok(())
+  }
+}
 
 impl ByteStore {
   // TODO: Consider extracting these options to a struct with `impl Default`, similar to
@@ -355,7 +379,11 @@ impl ByteStore {
     .await
   }
 
-  async fn load<W: AsyncWrite + Send + Unpin>(&self, digest: Digest, mut mk_writer: impl FnMut() -> Result<W, ByteStoreError>) -> Result<Option<W>, String> {
+  async fn load_monomorphic(
+    &self,
+    digest: Digest,
+    destination: Arc<Mutex<dyn LoadDestination>>,
+  ) -> Result<bool, String> {
     let start = Instant::now();
     let store = self.clone();
     let instance_name = store.instance_name.clone().unwrap_or_default();
@@ -377,8 +405,8 @@ impl ByteStore {
     let client = self.byte_stream_client.as_ref().clone();
 
     let result_future = retry_call(
-      (client, request),
-      move |(mut client, request)| {
+      (client, request, destination),
+      move |(mut client, request, destination)| {
         async move {
           let mut start_opt = Some(Instant::now());
           let response = client.read(request).await?;
@@ -398,16 +426,17 @@ impl ByteStore {
             }
           });
 
-          let mut writer = mk_writer()?;
+          let mut writer = destination.lock().await;
+          writer.reset().await?;
           while let Some(response) = stream.next().await {
-            writer.write(&(response?).data).await?;
+            writer.write_all(&(response?).data).await?;
           }
 
-          Ok(writer.take().unwrap())
+          Ok(())
         }
         .map(|read_result| match read_result {
-          Ok(writer) => Ok(Some(writer)),
-          Err(ByteStoreError::Grpc(status)) if status.code() == Code::NotFound => Ok(None),
+          Ok(()) => Ok(true),
+          Err(ByteStoreError::Grpc(status)) if status.code() == Code::NotFound => Ok(false),
           Err(err) => Err(err),
         })
       },
@@ -436,20 +465,43 @@ impl ByteStore {
     .await
   }
 
-  pub async fn load_bytes(&self, digest: Digest) -> Result<Option<Bytes>, String> {
-    Ok(self.load(digest, || Ok(Vec::new())).await?.map(Bytes::from))
+  async fn load<W: LoadDestination>(
+    &self,
+    digest: Digest,
+    destination: W,
+  ) -> Result<Option<W>, String> {
+    // TODO: compute the digest as we write, to avoid needing a second pass to validate
+    let destination = Arc::new(Mutex::new(destination));
+    if self.load_monomorphic(digest, destination.clone()).await? {
+      let destination = Arc::try_unwrap(destination)
+        .ok()
+        .expect("should be no other references to `destination`")
+        .into_inner();
+      Ok(Some(destination))
+    } else {
+      Ok(None)
+    }
   }
-  pub async fn load_file(&self, digest: Digest) -> Result<Option<tokio::fs::File>, String> {
-    self.load(digest, || {
-      let file = task::spawn_blocking(tempfile::tempfile)
-        .await
-        .map_err(|e| e.to_string())??;
 
-      Ok(tokio::fs::File::from_std(file))
-    }).await?.map_or(Ok(None), |mut file| {
-      file.rewind().await?;
-      Ok(Some(file))
-    })
+  /// Load the data for `digest` (if it exists in the remote store) into memory.
+  pub async fn load_bytes(&self, digest: Digest) -> Result<Option<Bytes>, String> {
+    let result = self
+      .load(digest, Vec::with_capacity(digest.size_bytes))
+      .await?;
+    Ok(result.map(Bytes::from))
+  }
+
+  /// Write the data for `digest` (if it exists in the remote store) into `file`.
+  pub async fn load_file(
+    &self,
+    digest: Digest,
+    file: tokio::fs::File,
+  ) -> Result<Option<tokio::fs::File>, String> {
+    let mut result = self.load(digest, file).await;
+    if let Ok(Some(ref mut file)) = result {
+      file.rewind().await.map_err(|e| e.to_string())?;
+    }
+    result
   }
 
   ///

@@ -4,7 +4,6 @@ use std::collections::{BTreeMap, HashSet};
 use std::time::Duration;
 
 use bytes::Bytes;
-use futures::future::Either;
 use grpc_util::tls;
 use hashing::Digest;
 use mock::StubCAS;
@@ -40,13 +39,17 @@ async fn loads_huge_file_via_temp_file() {
     .file(&testdata)
     .build();
 
-  let response = new_byte_store(&cas)
-    .load(testdata.digest(), false)
+  let file = tokio::task::spawn_blocking(tempfile::tempfile)
     .await
     .unwrap()
     .unwrap();
+  let file = tokio::fs::File::from_std(file);
 
-  let Either::Right(mut file) = response else { panic!("unexpected Bytes") };
+  let mut file = new_byte_store(&cas)
+    .load_file(testdata.digest(), file)
+    .await
+    .unwrap()
+    .unwrap();
 
   let mut buf = String::new();
   file.read_to_string(&mut buf).await.unwrap();
@@ -364,9 +367,5 @@ pub async fn load_directory_proto_bytes(
 }
 
 async fn load_bytes(store: &ByteStore, digest: Digest) -> Result<Option<Bytes>, String> {
-  match store.load(digest, true).await? {
-    Some(Either::Left(b)) => Ok(Some(b)),
-    Some(Either::Right(_)) => panic!("unexpectedly got file output"),
-    None => Ok(None),
-  }
+  store.load_bytes(digest).await
 }
