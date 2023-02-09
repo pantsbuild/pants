@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
+import itertools
 import os.path
 from dataclasses import dataclass
 from typing import Iterable
@@ -60,17 +61,15 @@ class InstalledNodePackageWithSource(InstalledNodePackage):
     pass
 
 
-async def _get_relevant_source_files(sources: Iterable[SourcesField]) -> SourceFiles:
+async def _get_relevant_source_files(
+    sources: Iterable[SourcesField], with_js: bool = False
+) -> SourceFiles:
     return await Get(
         SourceFiles,
         SourceFilesRequest(
             sources,
-            for_sources_types=(
-                PackageJsonSourceField,
-                JSSourceField,
-                ResourceSourceField,
-                FileSourceField,
-            ),
+            for_sources_types=(PackageJsonSourceField, FileSourceField)
+            + ((ResourceSourceField, JSSourceField) if with_js else ()),
             enable_codegen=True,
         ),
     )
@@ -95,25 +94,29 @@ async def install_node_packages_for_address(
         [PackageJsonSourceField], transitive_tgts.dependencies, union_membership
     )
     assert target not in package_tgts
-
-    dependant_package_tgts = await Get(
-        TransitiveTargets, TransitiveTargetsRequest(tgt.address for tgt in package_tgts)
+    installations = await MultiGet(
+        Get(InstalledNodePackageWithSource, InstalledNodePackageRequest(pkg_tgt.address))
+        for pkg_tgt in package_tgts
     )
 
-    sources = (
-        target[SourcesField],
-        *(
-            tgt[SourcesField]
-            for tgt in dependant_package_tgts.dependencies
-            if tgt.has_field(SourcesField)
-        ),
+    source_files = await _get_relevant_source_files(
+        (tgt[SourcesField] for tgt in transitive_tgts.closure if tgt.has_field(SourcesField)),
+        with_js=False,
     )
-    source_files = await _get_relevant_source_files(sources)
     merged_input_digest = await Get(
         Digest, MergeDigests((lockfile_snapshot.digest, source_files.snapshot.digest))
     )
     root_dir = os.path.dirname(node_resolve.file_path)
-    install_input_digest = await Get(Digest, RemovePrefix(merged_input_digest, root_dir))
+    new_sources_digest = await Get(Digest, RemovePrefix(merged_input_digest, root_dir))
+
+    install_input_digest = await Get(
+        Digest,
+        MergeDigests(
+            itertools.chain(
+                (installation.digest for installation in installations), (new_sources_digest,)
+            )
+        ),
+    )
 
     install_result = await Get(
         ProcessResult,
@@ -141,7 +144,8 @@ async def add_sources_to_installed_node_package(
     transitive_tgts = await Get(TransitiveTargets, TransitiveTargetsRequest([req.address]))
 
     source_files = await _get_relevant_source_files(
-        tgt[SourcesField] for tgt in transitive_tgts.dependencies if tgt.has_field(SourcesField)
+        (tgt[SourcesField] for tgt in transitive_tgts.dependencies if tgt.has_field(SourcesField)),
+        with_js=True,
     )
     digest_relative_root = await Get(
         Digest, RemovePrefix(source_files.snapshot.digest, installation.root_dir)
