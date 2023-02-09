@@ -80,7 +80,6 @@ def default_sources_for_target_type(tgt_type: type[Target]) -> tuple[str, ...]:
     return tuple()
 
 
-@memoized
 def has_source_or_sources_field(tgt_type: type[Target]) -> bool:
     """Tell whether a given target type has a `source` or `sources` field.
 

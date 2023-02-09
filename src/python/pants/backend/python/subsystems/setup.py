@@ -483,7 +483,7 @@ class PythonSetup(Subsystem):
         advanced=True,
     )
     tailor_py_typed_targets = BoolOption(
-        default=False,
+        default=True,
         help=softwrap(
             """
             If true, add `resource` targets for marker files named `py.typed` with the `tailor` goal.

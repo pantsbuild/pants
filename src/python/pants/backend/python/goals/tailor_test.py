@@ -322,7 +322,7 @@ def test_find_putative_targets_for_py_typed_marker_files(rule_runner: RuleRunner
                 PutativeTarget.for_target_type(
                     ResourceTarget,
                     path="src/python/foo",
-                    name="foo",
+                    name="py_typed",
                     triggering_sources=("py.typed",),
                     kwargs={"source": "py.typed"},
                 ),

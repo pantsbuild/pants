@@ -98,20 +98,18 @@ async def _find_resource_py_typed_targets(
     """Find resource targets that may be created after discovering any `py.typed` files."""
     all_py_typed_files = await Get(Paths, PathGlobs, py_typed_files_globs)
     unowned_py_typed_files = set(all_py_typed_files.files) - set(all_owned_sources)
-    classified_unowned_py_typed_files = {ResourceTarget: unowned_py_typed_files}
 
     putative_targets = []
-    for tgt_type, paths in classified_unowned_py_typed_files.items():
-        for dirname, filenames in group_by_dir(paths).items():
-            putative_targets.append(
-                PutativeTarget.for_target_type(
-                    tgt_type,
-                    kwargs={"source": "py.typed"},
-                    path=dirname,
-                    name=None,
-                    triggering_sources=sorted(filenames),
-                )
+    for dirname, filenames in group_by_dir(unowned_py_typed_files).items():
+        putative_targets.append(
+            PutativeTarget.for_target_type(
+                ResourceTarget,
+                kwargs={"source": "py.typed"},
+                path=dirname,
+                name="py_typed",
+                triggering_sources=sorted(filenames),
             )
+        )
     return putative_targets
 
 
