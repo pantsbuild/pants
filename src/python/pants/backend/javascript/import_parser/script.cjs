@@ -2,7 +2,7 @@ const parser = require("@babel/parser");
 const traverse = require("@babel/traverse").default;
 const fs = require("fs").promises;
 
-function printStringArguments(callPath) {
+const printStringArguments = (callPath) => {
     for (const arg of callPath.node.arguments) {
         if (arg.type === "StringLiteral") {
             console.log(arg.value);
@@ -11,31 +11,27 @@ function printStringArguments(callPath) {
 }
 
 const functionImportsVisitor = {
-    CallExpression(callPath) {
+    CallExpression: (callPath) => {
         callPath.traverse({
-            Identifier(identPath) {
+            Identifier: (identPath) => {
                 if (identPath.node.name === "require") {
                     printStringArguments(callPath);
                 }
             },
-            Import(_) {
-                printStringArguments(callPath)
-            }
+            Import: () => printStringArguments(callPath)
         });
     },
 };
 
 const staticImportVisitor = {
-    ImportDeclaration(importPath) {
+    ImportDeclaration: (importPath) => {
         importPath.traverse({
-            StringLiteral(literalPath) {
-                console.log(literalPath.node.value);
-            },
+            StringLiteral: (literalPath) => console.log(literalPath.node.value),
         });
     },
 };
 
-async function main() {
+const main = async () => {
     const [file] = process.argv.slice(2);
 
     const code = await fs.readFile(file, "utf-8");
@@ -45,9 +41,7 @@ async function main() {
         errorRecovery: true,
     });
     traverse(ast, {
-        Program(programPath) {
-            console.error(`Determined SourceType: ${programPath.node.sourceType}.`);
-        },
+        Program: (programPath) => console.error(`Determined SourceType: ${programPath.node.sourceType}.`),
         ...functionImportsVisitor,
         ...staticImportVisitor,
     });
