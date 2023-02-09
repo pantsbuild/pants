@@ -13,8 +13,7 @@ from pants.engine.unions import UnionMembership
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.options_bootstrapper import OptionsBootstrapper, munge_bin_name
 from pants.option.scope import ScopeInfo
-from pants.util.contextutil import pushd, temporary_dir, temporary_file, temporary_file_path
-from pants.util.dirutil import touch
+from pants.util.contextutil import temporary_file, temporary_file_path
 from pants.util.logging import LogLevel
 
 
@@ -471,15 +470,16 @@ class TestOptionsBootstrapper:
 
 
 def test_munge_bin_name():
-    with temporary_dir(root_dir=os.getcwd()) as build_root:
-        build_root = os.path.realpath(os.path.abspath(build_root))
-        with pushd(build_root):
-            touch("BUILD_ROOT")
-            assert munge_bin_name("pants") == "pants"
-            assert munge_bin_name("pantsv2") == "pantsv2"
-            assert munge_bin_name("bin/pantsv2") == "bin/pantsv2"
-            assert munge_bin_name("./pants") == "./pants"
-            assert munge_bin_name(os.path.join(build_root, "pants")) == "./pants"
-            assert munge_bin_name(os.path.join(build_root, "bin", "pants")) == "./bin/pants"
-            assert munge_bin_name("/foo/pants") == "pants"
-            assert munge_bin_name("/foo/bar/pants") == "pants"
+    build_root = "/my/repo"
+
+    def munge(bin_name: str) -> str:
+        return munge_bin_name(bin_name, build_root)
+
+    assert munge("pants") == "pants"
+    assert munge("pantsv2") == "pantsv2"
+    assert munge("bin/pantsv2") == "bin/pantsv2"
+    assert munge("./pants") == "./pants"
+    assert munge(os.path.join(build_root, "pants")) == "./pants"
+    assert munge(os.path.join(build_root, "bin", "pants")) == "./bin/pants"
+    assert munge("/foo/pants") == "pants"
+    assert munge("/foo/bar/pants") == "pants"

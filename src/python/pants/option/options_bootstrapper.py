@@ -178,7 +178,9 @@ class OptionsBootstrapper:
             # avoid needing to lazily import code to avoid chicken-and-egg-problems. This is the
             # earliest place it makes sense to do so and is generically used by both the local and
             # remote pants runners.
-            os.environ["__PANTS_BIN_NAME"] = munge_bin_name(bootstrap_option_values.pants_bin_name)
+            os.environ["__PANTS_BIN_NAME"] = munge_bin_name(
+                bootstrap_option_values.pants_bin_name, get_buildroot()
+            )
 
             env_tuples = tuple(
                 sorted(
@@ -307,15 +309,15 @@ class OptionsBootstrapper:
         return options
 
 
-def munge_bin_name(pants_bin_name: str) -> str:
+def munge_bin_name(pants_bin_name: str, build_root: str) -> str:
     # Determine a useful bin name to embed in help strings.
     # The bin name gets embedded in help comments in generated lockfiles,
     # so we never want to use an abspath.
     if os.path.isabs(pants_bin_name):
+        pants_bin_name = os.path.realpath(pants_bin_name)
+        build_root = os.path.realpath(os.path.abspath(build_root))
         # If it's in the buildroot, use the relpath from there. Otherwise use the basename.
-        pants_bin_relpath = os.path.relpath(
-            os.path.realpath(pants_bin_name), os.path.realpath(get_buildroot())
-        )
+        pants_bin_relpath = os.path.relpath(pants_bin_name, build_root)
         if pants_bin_relpath.startswith(".."):
             pants_bin_name = os.path.basename(pants_bin_name)
         else:
