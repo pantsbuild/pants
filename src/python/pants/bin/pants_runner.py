@@ -79,7 +79,7 @@ class PantsRunner:
             stderr_fileno=stderr_fileno,
         ):
             # N.B. We inline imports to speed up the python thin client run, and avoids importing
-            # engine types until after the runner has had a chance to set PANTS_BIN_NAME.
+            # engine types until after the runner has had a chance to set __PANTS_BIN_NAME.
 
             if self._should_run_with_pantsd(global_bootstrap_options):
                 from pants.bin.remote_pants_runner import RemotePantsRunner

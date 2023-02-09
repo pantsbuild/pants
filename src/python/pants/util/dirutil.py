@@ -84,7 +84,9 @@ def safe_mkdir_for(path: str | Path, clean: bool = False) -> None:
 
     If it's not there, create it. If it is, no-op.
     """
-    safe_mkdir(os.path.dirname(path), clean=clean)
+    dirname = os.path.dirname(path)
+    if dirname:
+        safe_mkdir(dirname, clean=clean)
 
 
 def safe_file_dump(
