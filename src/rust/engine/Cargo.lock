@@ -2514,7 +2514,7 @@ dependencies = [
  "cfg-if 1.0.0",
  "indoc",
  "libc",
- "parking_lot 0.11.2",
+ "parking_lot 0.12.1",
  "pyo3-build-config 0.16.6",
  "pyo3-ffi",
  "pyo3-macros",
@@ -3233,6 +3233,7 @@ dependencies = [
  "serde",
  "serde_derive",
  "sharded_lmdb",
+ "tar",
  "task_executor",
  "tempfile",
  "testutil",
@@ -3337,6 +3338,16 @@ dependencies = [
  "once_cell",
  "rayon",
  "winapi",
+]
+
+[[package]]
+name = "tar"
+version = "0.4.38"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4b55807c0344e1e6c04d7c965f5289c39a8d94ae23ed5c0b57aabac549f871c6"
+dependencies = [
+ "filetime",
+ "libc",
 ]
 
 [[package]]

@@ -175,6 +175,46 @@ async fn snapshot_recursive_directories_including_empty() {
 }
 
 #[tokio::test]
+async fn snapshot_tar_roundtrip() {
+  let (store, dir, posix_fs, digester) = setup();
+
+  let cats = PathBuf::from("cats");
+  let roland = cats.join("roland");
+  std::fs::create_dir_all(dir.path().join(cats)).unwrap();
+  make_file(&dir.path().join(&roland), STR.as_bytes(), 0o600);
+
+  let path_stats = expand_all_sorted(posix_fs).await;
+  let original_snapshot = Snapshot::from_path_stats(digester, path_stats)
+    .await
+    .unwrap();
+
+  // Materialize the Snapshot via tar, and confirm that capturing it results in the same digest.
+  let (_, dir, posix_fs, digester) = setup();
+  let mut tar = std::process::Command::new("tar")
+    .args(["-xf", "-"])
+    .stdin(std::process::Stdio::piped())
+    .current_dir(&dir)
+    .spawn()
+    .unwrap();
+  store
+    .directory_as_tar_file(
+      original_snapshot.tree.clone().into(),
+      tar.stdin.take().unwrap(),
+    )
+    .await
+    .unwrap();
+
+  assert_eq!(0, tar.wait().unwrap().code().unwrap());
+
+  let path_stats = expand_all_sorted(posix_fs).await;
+  let snapshot = Snapshot::from_path_stats(digester, path_stats)
+    .await
+    .unwrap();
+
+  assert_eq!(original_snapshot.digest, snapshot.digest);
+}
+
+#[tokio::test]
 async fn merge_directories_two_files() {
   let (store, _, _, _) = setup();
 

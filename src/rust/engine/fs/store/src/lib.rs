@@ -1569,6 +1569,113 @@ impl Store {
     res.boxed()
   }
 
+  /// Writes the given DirectoryDigest to the given Write destination as a tar file.
+  ///
+  /// The tar file will contain contents that are as close as possible to what would be produced on
+  /// disk by a call to `materialize_directory`.
+  pub async fn directory_as_tar_file(
+    &self,
+    digest: DirectoryDigest,
+    dest: impl std::io::Write + Send + 'static,
+  ) -> Result<(), StoreError> {
+    let entries = self.entries_for_directory(digest).await?;
+    let executor = self.local.executor().clone();
+    let store = self.clone();
+    self
+      .local
+      .executor()
+      .spawn_blocking(
+        move || {
+          let header = |entry_type: tar::EntryType, size: u64, execute_bit: bool| -> tar::Header {
+            // See https://github.com/alexcrichton/tar-rs/blob/f4f439ca0cd3a984d2a66fb8e42f6e2307876afd/src/header.rs#L750-L772
+            // for notes on these values.
+            let mut header = tar::Header::new_gnu();
+            header.set_entry_type(entry_type);
+            header.set_size(size);
+            header.set_mtime(1153704088);
+            header.set_uid(0);
+            header.set_gid(0);
+            header.set_mode(if execute_bit { 0o755 } else { 0o644 });
+            header
+          };
+          let mut appended_directories = HashSet::new();
+          let mut append_directory_all =
+            |tar: &mut tar::Builder<_>, directory: &Path| -> Result<(), std::io::Error> {
+              let mut to_append_stack = Vec::new();
+              // Find which parent directories need to be appended.
+              for ancestor in directory.ancestors() {
+                if ancestor.as_os_str().is_empty() || appended_directories.contains(ancestor) {
+                  break;
+                }
+                appended_directories.insert(ancestor.to_owned());
+                to_append_stack.push(ancestor);
+              }
+
+              // Then append them top to bottom.
+              for to_append in to_append_stack.iter().rev() {
+                tar.append_data(
+                  &mut header(tar::EntryType::Directory, 0, true),
+                  to_append,
+                  &mut std::io::empty(),
+                )?;
+              }
+
+              Ok(())
+            };
+
+          let mut tar = tar::Builder::new(dest);
+          tar.mode(tar::HeaderMode::Deterministic);
+          let tar = Arc::new(Mutex::new(tar));
+          for entry in entries {
+            match entry {
+              DigestEntry::File(f) => {
+                let tar = tar.clone();
+                if let Some(parent) = f.path.parent() {
+                  append_directory_all(&mut tar.lock(), parent)?;
+                }
+                executor.block_on(store.load_file_bytes_with(f.digest, move |bytes| {
+                  tar.lock().append_data(
+                    &mut header(
+                      tar::EntryType::Regular,
+                      f.digest.size_bytes as u64,
+                      f.is_executable,
+                    ),
+                    &f.path,
+                    std::io::Cursor::new(bytes),
+                  )
+                }))??;
+              }
+              DigestEntry::Symlink(s) => {
+                let mut tar = tar.lock();
+                if let Some(parent) = s.path.parent() {
+                  append_directory_all(&mut tar, parent)?;
+                }
+                tar.append_link(
+                  &mut header(tar::EntryType::Symlink, 0, false),
+                  &s.path,
+                  &s.target,
+                )?;
+              }
+              DigestEntry::EmptyDirectory(d) => {
+                append_directory_all(&mut tar.lock(), &d)?;
+              }
+            }
+          }
+
+          tar.lock().finish()?;
+
+          Ok(())
+        },
+        |je| {
+          Err(StoreError::Unclassified(format!(
+            "Tar file writing task failed: {je}"
+          )))
+        },
+      )
+      .await?;
+    Ok(())
+  }
+
   pub fn all_local_digests(&self, entry_type: EntryType) -> Result<Vec<Digest>, String> {
     self.local.all_digests(entry_type)
   }
