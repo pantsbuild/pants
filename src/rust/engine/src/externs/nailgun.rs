@@ -34,10 +34,10 @@ struct PyNailgunClient {
 #[pymethods]
 impl PyNailgunClient {
   #[new]
-  fn __new__(port: u16, py_executor: PyExecutor) -> Self {
+  fn __new__(port: u16, py_executor: &PyExecutor) -> Self {
     Self {
       port,
-      executor: py_executor.0,
+      executor: py_executor.0.clone(),
     }
   }
 

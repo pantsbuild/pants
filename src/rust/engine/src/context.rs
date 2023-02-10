@@ -584,7 +584,7 @@ impl Core {
 
     let watcher = if watch_filesystem {
       let w = InvalidationWatcher::new(executor.clone(), build_root.clone(), ignorer.clone())?;
-      w.start(&graph);
+      w.start(&graph)?;
       Some(w)
     } else {
       None

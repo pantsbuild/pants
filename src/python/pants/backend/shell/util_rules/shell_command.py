@@ -6,6 +6,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 
+from pants.backend.shell.subsystems.shell_setup import ShellSetup
 from pants.backend.shell.target_types import (
     ShellCommandCommandField,
     ShellCommandExtraEnvVarsField,
@@ -26,9 +27,11 @@ from pants.backend.shell.util_rules.adhoc_process_support import (
 from pants.backend.shell.util_rules.adhoc_process_support import (
     rules as adhoc_process_support_rules,
 )
+from pants.backend.shell.util_rules.builtin import BASH_BUILTIN_COMMANDS
 from pants.core.goals.run import RunFieldSet, RunInSandboxBehavior, RunRequest
 from pants.core.target_types import FileSourceField
 from pants.core.util_rules.environments import EnvironmentNameRequest
+from pants.core.util_rules.system_binaries import BinaryShims, BinaryShimsRequest
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import Digest, Snapshot
 from pants.engine.process import FallibleProcessResult, Process, ProcessResult, ProductDescription
@@ -41,6 +44,7 @@ from pants.engine.target import (
     WrappedTargetRequest,
 )
 from pants.engine.unions import UnionRule
+from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
@@ -57,7 +61,9 @@ class ShellCommandProcessFromTargetRequest:
 
 
 @rule_helper
-async def _prepare_process_request_from_target(shell_command: Target) -> ShellCommandProcessRequest:
+async def _prepare_process_request_from_target(
+    shell_command: Target, shell_setup: ShellSetup.EnvironmentAware
+) -> ShellCommandProcessRequest:
     description = f"the `{shell_command.alias}` at `{shell_command.address}`"
 
     interactive = shell_command.has_field(ShellCommandIsInteractiveField)
@@ -74,6 +80,22 @@ async def _prepare_process_request_from_target(shell_command: Target) -> ShellCo
 
     output_files, output_directories = _parse_outputs_from_command(shell_command, description)
 
+    # Resolve the `tools` field into a digest
+    tools = shell_command.get(ShellCommandToolsField, default_raw_value=()).value or ()
+    tools = tuple(tool for tool in tools if tool not in BASH_BUILTIN_COMMANDS)
+
+    resolved_tools = await Get(
+        BinaryShims,
+        BinaryShimsRequest.for_binaries(
+            *tools,
+            rationale=f"execute {description}",
+            search_path=shell_setup.executable_search_path,
+        ),
+    )
+
+    immutable_input_digests = resolved_tools.immutable_input_digests
+    supplied_env_var_values = {"PATH": resolved_tools.path_component}
+
     return ShellCommandProcessRequest(
         description=description,
         address=shell_command.address,
@@ -82,22 +104,22 @@ async def _prepare_process_request_from_target(shell_command: Target) -> ShellCo
         working_directory=working_directory,
         command=command,
         timeout=shell_command.get(ShellCommandTimeoutField).value,
-        tools=shell_command.get(ShellCommandToolsField, default_raw_value=()).value or (),
         input_digest=dependencies_digest,
         output_files=output_files,
         output_directories=output_directories,
         fetch_env_vars=shell_command.get(ShellCommandExtraEnvVarsField).value or (),
         append_only_caches=None,
-        supplied_env_var_values=None,
-        immutable_input_digests=None,
+        supplied_env_var_values=FrozenDict(supplied_env_var_values),
+        immutable_input_digests=FrozenDict(immutable_input_digests),
     )
 
 
 @rule
 async def prepare_process_request_from_target(
     request: ShellCommandProcessFromTargetRequest,
+    shell_setup: ShellSetup.EnvironmentAware,
 ) -> Process:
-    scpr = await _prepare_process_request_from_target(request.target)
+    scpr = await _prepare_process_request_from_target(request.target, shell_setup)
     return await Get(Process, ShellCommandProcessRequest, scpr)
 
 

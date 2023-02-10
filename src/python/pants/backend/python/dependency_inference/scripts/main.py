@@ -3,7 +3,7 @@
 # -*- coding: utf-8 -*-
 
 # NB: This must be compatible with Python 2.7 and 3.5+.
-# NB: If you're needing to debug this, an easy way is to just invoke it on a file.
+# NB: An easy way to debug this is to just invoke it on a file.
 #   E.g.
 #   $ PYTHONPATH=src/python STRING_IMPORTS=y python \
 #     src/python/pants/backend/python/dependency_inference/scripts/main.py FILE

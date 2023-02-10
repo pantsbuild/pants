@@ -124,7 +124,7 @@ impl InvalidationWatcher {
   ///
   /// Starts the background task that monitors watch events. Panics if called more than once.
   ///
-  pub fn start<I: Invalidatable>(&self, invalidatable: &Arc<I>) {
+  pub fn start<I: Invalidatable>(&self, invalidatable: &Arc<I>) -> Result<(), String> {
     let mut inner = self.0.lock();
     let (ignorer, canonical_build_root, liveness_sender, watch_receiver) = inner
       .background_task_inputs
@@ -137,7 +137,9 @@ impl InvalidationWatcher {
       canonical_build_root,
       liveness_sender,
       watch_receiver,
-    );
+    )?;
+
+    Ok(())
   }
 
   // Public for testing purposes.
@@ -147,37 +149,40 @@ impl InvalidationWatcher {
     canonical_build_root: PathBuf,
     liveness_sender: crossbeam_channel::Sender<String>,
     watch_receiver: Receiver<notify::Result<Event>>,
-  ) -> thread::JoinHandle<()> {
-    thread::spawn(move || {
-      let exit_msg = loop {
-        let event_res = watch_receiver.recv_timeout(Duration::from_millis(10));
-        let invalidatable = if let Some(g) = invalidatable.upgrade() {
-          g
-        } else {
-          // The Invalidatable has been dropped: we're done.
-          break "The watcher was shut down.".to_string();
-        };
-        match event_res {
-          Ok(Ok(ev)) => Self::handle_event(&*invalidatable, &ignorer, &canonical_build_root, ev),
-          Ok(Err(err)) => {
-            if let notify::ErrorKind::PathNotFound = err.kind {
-              warn!("Path(s) did not exist: {:?}", err.paths);
-              continue;
-            } else {
-              break format!("Watch error: {err}");
+  ) -> Result<thread::JoinHandle<()>, String> {
+    thread::Builder::new()
+      .name("fs-watcher".to_owned())
+      .spawn(move || {
+        let exit_msg = loop {
+          let event_res = watch_receiver.recv_timeout(Duration::from_millis(10));
+          let invalidatable = if let Some(g) = invalidatable.upgrade() {
+            g
+          } else {
+            // The Invalidatable has been dropped: we're done.
+            break "The watcher was shut down.".to_string();
+          };
+          match event_res {
+            Ok(Ok(ev)) => Self::handle_event(&*invalidatable, &ignorer, &canonical_build_root, ev),
+            Ok(Err(err)) => {
+              if let notify::ErrorKind::PathNotFound = err.kind {
+                warn!("Path(s) did not exist: {:?}", err.paths);
+                continue;
+              } else {
+                break format!("Watch error: {err}");
+              }
             }
-          }
-          Err(RecvTimeoutError::Timeout) => continue,
-          Err(RecvTimeoutError::Disconnected) => {
-            break "The watch provider exited.".to_owned();
-          }
+            Err(RecvTimeoutError::Timeout) => continue,
+            Err(RecvTimeoutError::Disconnected) => {
+              break "The watch provider exited.".to_owned();
+            }
+          };
         };
-      };
 
-      // Log and send the exit code.
-      warn!("File watcher exiting with: {}", exit_msg);
-      let _ = liveness_sender.send(exit_msg);
-    })
+        // Log and send the exit code.
+        warn!("File watcher exiting with: {}", exit_msg);
+        let _ = liveness_sender.send(exit_msg);
+      })
+      .map_err(|e| format!("Failed to start fs-watcher thread: {e}"))
   }
 
   ///

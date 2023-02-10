@@ -105,8 +105,10 @@ def flatten(xs, *types: type) -> Iterator:
         yield xs
     elif isinstance(xs, Iterable):
         yield from itertools.chain.from_iterable(flatten(x, *types) for x in xs)
-    elif type(xs).__name__ == "Registrar" or isinstance(xs, PurePath):
+    elif isinstance(xs, PurePath):
         yield str(xs)
+    elif type(xs).__name__ == "Registrar":
+        yield f"<{xs}>"
     else:
         raise ValueError(f"expected {' or '.join(typ.__name__ for typ in types)} but got: {xs!r}")
 

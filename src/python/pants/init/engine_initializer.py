@@ -189,7 +189,7 @@ class EngineInitializer:
         bootstrap_options: OptionValueContainer,
         build_configuration: BuildConfiguration,
         dynamic_remote_options: DynamicRemoteOptions,
-        executor: PyExecutor | None = None,
+        executor: PyExecutor,
         is_bootstrap: bool = False,
     ) -> GraphScheduler:
         build_root = get_buildroot()

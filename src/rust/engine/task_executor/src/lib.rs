@@ -259,6 +259,12 @@ impl Executor {
       log::warn!("Executor shutdown took unexpectedly long: tasks were likely leaked!");
     }
   }
+
+  /// Returns true if `shutdown` has been called for this Executor. Always returns true for
+  /// borrowed Executors.
+  pub fn is_shutdown(&self) -> bool {
+    self.runtime.lock().is_none()
+  }
 }
 
 /// Store "tail" tasks which are async tasks that can execute concurrently with regular
