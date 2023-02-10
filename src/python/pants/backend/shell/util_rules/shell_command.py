@@ -104,7 +104,7 @@ async def _prepare_process_request_from_target(
         description=description,
         address=shell_command.address,
         working_directory=working_directory,
-        root_output_directory=shell_command[ShellCommandOutputRootDirField].value or "",
+        root_output_directory=shell_command.get(ShellCommandOutputRootDirField).value or "",
         argv=(bash.path, "-c", command, shell_command.address.spec),
         timeout=shell_command.get(ShellCommandTimeoutField).value,
         input_digest=dependencies_digest,
