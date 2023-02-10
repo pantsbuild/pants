@@ -181,8 +181,6 @@ async def _interactive_shell_command(
     shell_name = shell_command.address.spec
     working_directory = shell_command[RunShellCommandWorkdirField].value
 
-    logger.warning(f"{shell_command=} {working_directory=}")
-
     if working_directory is None:
         raise ValueError("Working directory must be not be `None` for interactive processes.")
 
