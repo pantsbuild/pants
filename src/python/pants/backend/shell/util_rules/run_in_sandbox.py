@@ -15,8 +15,8 @@ from pants.backend.shell.target_types import (
     ShellCommandWorkdirField,
 )
 from pants.backend.shell.util_rules.adhoc_process_support import (
+    AdhocProcessRequest,
     AdhocProcessResult,
-    ShellCommandProcessRequest,
     _execution_environment_from_dependencies,
     _parse_outputs_from_command,
 )
@@ -54,13 +54,13 @@ class GenerateFilesFromRunInSandboxRequest(GenerateSourcesRequest):
 async def run_in_sandbox_request(
     request: GenerateFilesFromRunInSandboxRequest,
 ) -> GeneratedSources:
-    shell_command = request.protocol_target
-    description = f"the `{shell_command.alias}` at {shell_command.address}"
+    target = request.protocol_target
+    description = f"the `{target.alias}` at {target.address}"
     environment_name = await Get(
-        EnvironmentName, EnvironmentNameRequest, EnvironmentNameRequest.from_target(shell_command)
+        EnvironmentName, EnvironmentNameRequest, EnvironmentNameRequest.from_target(target)
     )
 
-    runnable_address_str = shell_command[RunInSandboxRunnableField].value
+    runnable_address_str = target[RunInSandboxRunnableField].value
     if not runnable_address_str:
         raise Exception(f"Must supply a value for `runnable` for {description}.")
 
@@ -69,7 +69,7 @@ async def run_in_sandbox_request(
         AddressInput,
         AddressInput.parse(
             runnable_address_str,
-            relative_to=shell_command.address.spec_path,
+            relative_to=target.address.spec_path,
             description_of_origin=f"The `{RunInSandboxRunnableField.alias}` field of {description}",
         ),
     )
@@ -83,8 +83,8 @@ async def run_in_sandbox_request(
     )
     run_field_set: RunFieldSet = field_sets.field_sets[0]
 
-    working_directory = shell_command[ShellCommandWorkdirField].value or ""
-    root_output_directory = shell_command[ShellCommandOutputRootDirField].value or ""
+    working_directory = target[ShellCommandWorkdirField].value or ""
+    root_output_directory = target[ShellCommandOutputRootDirField].value or ""
 
     # Must be run in target environment so that the binaries/envvars match the execution
     # environment when we actually run the process.
@@ -92,17 +92,17 @@ async def run_in_sandbox_request(
         RunInSandboxRequest, {environment_name: EnvironmentName, run_field_set: RunFieldSet}
     )
 
-    dependencies_digest = await _execution_environment_from_dependencies(shell_command)
+    dependencies_digest = await _execution_environment_from_dependencies(target)
 
     input_digest = await Get(Digest, MergeDigests((dependencies_digest, run_request.digest)))
 
-    output_files, output_directories = _parse_outputs_from_command(shell_command, description)
+    output_files, output_directories = _parse_outputs_from_command(target, description)
 
-    extra_args = shell_command.get(RunInSandboxArgumentsField).value or ()
+    extra_args = target.get(RunInSandboxArgumentsField).value or ()
 
-    process_request = ShellCommandProcessRequest(
+    process_request = AdhocProcessRequest(
         description=description,
-        address=shell_command.address,
+        address=target.address,
         working_directory=working_directory,
         root_output_directory=root_output_directory,
         argv=tuple(run_request.args + extra_args),
@@ -115,14 +115,14 @@ async def run_in_sandbox_request(
         fetch_env_vars=(),
         supplied_env_var_values=FrozenDict(**run_request.extra_env),
         log_on_process_errors=None,
-        log_output=shell_command[ShellCommandLogOutputField].value,
+        log_output=target[ShellCommandLogOutputField].value,
     )
 
     adhoc_result = await Get(
         AdhocProcessResult,
         {
             environment_name: EnvironmentName,
-            process_request: ShellCommandProcessRequest,
+            process_request: AdhocProcessRequest,
         },
     )
 
@@ -130,8 +130,8 @@ async def run_in_sandbox_request(
     adjusted = adhoc_result.adjusted_digest
 
     extras = (
-        (shell_command[RunInSandboxStdoutFilenameField].value, result.stdout),
-        (shell_command[RunInSandboxStderrFilenameField].value, result.stderr),
+        (target[RunInSandboxStdoutFilenameField].value, result.stdout),
+        (target[RunInSandboxStderrFilenameField].value, result.stderr),
     )
     extra_contents = {i: j for i, j in extras if i}
 

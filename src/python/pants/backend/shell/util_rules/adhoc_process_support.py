@@ -44,7 +44,7 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
-class ShellCommandProcessRequest:
+class AdhocProcessRequest:
     description: str
     address: Address
     working_directory: str
@@ -69,26 +69,28 @@ class AdhocProcessResult:
 
 
 @rule_helper
-async def _execution_environment_from_dependencies(shell_command: Target) -> Digest:
+async def _execution_environment_from_dependencies(adhoc_process_target: Target) -> Digest:
 
     runtime_dependencies_defined = (
-        shell_command.get(ShellCommandExecutionDependenciesField).value is not None
+        adhoc_process_target.get(ShellCommandExecutionDependenciesField).value is not None
     )
 
     any_dependencies_defined = (
-        shell_command.get(ShellCommandOutputDependenciesField).value is not None
+        adhoc_process_target.get(ShellCommandOutputDependenciesField).value is not None
     )
 
     # If we're specifying the `dependencies` as relevant to the execution environment, then include
     # this command as a root for the transitive dependency search for execution dependencies.
-    maybe_this_target = (shell_command.address,) if not runtime_dependencies_defined else ()
+    maybe_this_target = (adhoc_process_target.address,) if not runtime_dependencies_defined else ()
 
     # Always include the execution dependencies that were specified
     if runtime_dependencies_defined:
         runtime_dependencies = await Get(
             Addresses,
             UnparsedAddressInputs,
-            shell_command.get(ShellCommandExecutionDependenciesField).to_unparsed_address_inputs(),
+            adhoc_process_target.get(
+                ShellCommandExecutionDependenciesField
+            ).to_unparsed_address_inputs(),
         )
     elif any_dependencies_defined:
         runtime_dependencies = Addresses()
@@ -114,7 +116,7 @@ async def _execution_environment_from_dependencies(shell_command: Target) -> Dig
     )
 
     all_dependencies = (
-        *(i for i in transitive.roots if i is not shell_command),
+        *(i for i in transitive.roots if i is not adhoc_process_target),
         *transitive.dependencies,
     )
 
@@ -146,11 +148,11 @@ async def _execution_environment_from_dependencies(shell_command: Target) -> Dig
 
 
 def _parse_outputs_from_command(
-    shell_command: Target, description: str
+    adhoc_process_target: Target, description: str
 ) -> tuple[tuple[str, ...], tuple[str, ...]]:
-    outputs = shell_command.get(ShellCommandOutputsField).value or ()
-    output_files = shell_command.get(ShellCommandOutputFilesField).value or ()
-    output_directories = shell_command.get(ShellCommandOutputDirectoriesField).value or ()
+    outputs = adhoc_process_target.get(ShellCommandOutputsField).value or ()
+    output_files = adhoc_process_target.get(ShellCommandOutputFilesField).value or ()
+    output_directories = adhoc_process_target.get(ShellCommandOutputDirectoriesField).value or ()
     if outputs and (output_files or output_directories):
         raise ValueError(
             "Both new-style `output_files` or `output_directories` and old-style `outputs` were "
@@ -169,10 +171,10 @@ def _shell_tool_safe_env_name(tool_name: str) -> str:
 
 
 @rule
-async def run_shell_command_process(
-    request: ShellCommandProcessRequest,
+async def run_adhoc_process(
+    request: AdhocProcessRequest,
 ) -> AdhocProcessResult:
-    process = await Get(Process, ShellCommandProcessRequest, request)
+    process = await Get(Process, AdhocProcessRequest, request)
 
     fallible_result = await Get(FallibleProcessResult, Process, process)
 
@@ -206,22 +208,23 @@ async def run_shell_command_process(
 
 
 @rule
-async def prepare_shell_command_process(
-    shell_command: ShellCommandProcessRequest,
+async def prepare_adhoc_process(
+    request: AdhocProcessRequest,
     bash: BashBinary,
 ) -> Process:
+    # currently only used directly by `experimental_test_shell_command`
 
-    description = shell_command.description
-    address = shell_command.address
-    working_directory = _parse_working_directory(shell_command.working_directory or "", address)
-    argv = shell_command.argv
-    timeout: int | None = shell_command.timeout
-    output_files = shell_command.output_files
-    output_directories = shell_command.output_directories
-    fetch_env_vars = shell_command.fetch_env_vars
-    supplied_env_vars = shell_command.supplied_env_var_values or FrozenDict()
-    append_only_caches = shell_command.append_only_caches or FrozenDict()
-    immutable_input_digests = shell_command.immutable_input_digests or FrozenDict()
+    description = request.description
+    address = request.address
+    working_directory = _parse_working_directory(request.working_directory or "", address)
+    argv = request.argv
+    timeout: int | None = request.timeout
+    output_files = request.output_files
+    output_directories = request.output_directories
+    fetch_env_vars = request.fetch_env_vars
+    supplied_env_vars = request.supplied_env_var_values or FrozenDict()
+    append_only_caches = request.append_only_caches or FrozenDict()
+    immutable_input_digests = request.immutable_input_digests or FrozenDict()
 
     command_env: dict[str, str] = {}
 
@@ -231,7 +234,7 @@ async def prepare_shell_command_process(
     if supplied_env_vars:
         command_env.update(supplied_env_vars)
 
-    input_snapshot = await Get(Snapshot, Digest, shell_command.input_digest)
+    input_snapshot = await Get(Snapshot, Digest, request.input_digest)
 
     if not working_directory or working_directory in input_snapshot.dirs:
         # Needed to ensure that underlying filesystem does not change during run
@@ -239,7 +242,7 @@ async def prepare_shell_command_process(
     else:
         work_dir = await Get(Digest, CreateDigest([Directory(working_directory)]))
 
-    input_digest = await Get(Digest, MergeDigests([shell_command.input_digest, work_dir]))
+    input_digest = await Get(Digest, MergeDigests([request.input_digest, work_dir]))
 
     proc = Process(
         argv=argv,

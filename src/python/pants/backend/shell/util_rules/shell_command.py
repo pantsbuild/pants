@@ -22,8 +22,8 @@ from pants.backend.shell.target_types import (
     ShellCommandWorkdirField,
 )
 from pants.backend.shell.util_rules.adhoc_process_support import (
+    AdhocProcessRequest,
     AdhocProcessResult,
-    ShellCommandProcessRequest,
     _execution_environment_from_dependencies,
     _parse_outputs_from_command,
 )
@@ -68,7 +68,7 @@ async def _prepare_process_request_from_target(
     shell_command: Target,
     shell_setup: ShellSetup.EnvironmentAware,
     bash: BashBinary,
-) -> ShellCommandProcessRequest:
+) -> AdhocProcessRequest:
     description = f"the `{shell_command.alias}` at `{shell_command.address}`"
 
     working_directory = shell_command[ShellCommandWorkdirField].value
@@ -100,7 +100,7 @@ async def _prepare_process_request_from_target(
     immutable_input_digests = resolved_tools.immutable_input_digests
     supplied_env_var_values = {"PATH": resolved_tools.path_component}
 
-    return ShellCommandProcessRequest(
+    return AdhocProcessRequest(
         description=description,
         address=shell_command.address,
         working_directory=working_directory,
@@ -126,7 +126,7 @@ async def run_adhoc_result_from_target(
     bash: BashBinary,
 ) -> AdhocProcessResult:
     scpr = await _prepare_process_request_from_target(request.target, shell_setup, bash)
-    return await Get(AdhocProcessResult, ShellCommandProcessRequest, scpr)
+    return await Get(AdhocProcessResult, AdhocProcessRequest, scpr)
 
 
 @rule
@@ -137,7 +137,7 @@ async def prepare_process_request_from_target(
 ) -> Process:
     # Needed to support `experimental_test_shell_command`
     scpr = await _prepare_process_request_from_target(request.target, shell_setup, bash)
-    return await Get(Process, ShellCommandProcessRequest, scpr)
+    return await Get(Process, AdhocProcessRequest, scpr)
 
 
 class RunShellCommand(RunFieldSet):
