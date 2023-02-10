@@ -28,7 +28,7 @@ from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, Directory, MergeDigests, Snapshot
 from pants.engine.internals.native_engine import RemovePrefix
-from pants.engine.process import Process
+from pants.engine.process import FallibleProcessResult, Process, ProcessResult, ProductDescription
 from pants.engine.rules import Get, MultiGet, collect_rules, rule, rule_helper
 from pants.engine.target import (
     FieldSetsPerTarget,
@@ -48,7 +48,8 @@ class ShellCommandProcessRequest:
     description: str
     address: Address
     shell_name: str
-    working_directory: str | None
+    working_directory: str
+    root_output_directory: str
     command: str
     timeout: int | None
     input_digest: Digest
@@ -58,6 +59,14 @@ class ShellCommandProcessRequest:
     output_directories: tuple[str, ...]
     fetch_env_vars: tuple[str, ...]
     supplied_env_var_values: FrozenDict[str, str] | None
+    log_on_process_errors: FrozenDict[int, str] | None
+    log_output: bool
+
+
+@dataclass(frozen=True)
+class AdhocProcessResult:
+    process_result: ProcessResult
+    adjusted_digest: Digest
 
 
 @rule_helper
@@ -155,26 +164,46 @@ def _parse_outputs_from_command(
     return output_files, output_directories
 
 
-@rule_helper
-async def _adjust_root_output_directory(
-    digest: Digest,
-    address: Address,
-    working_directory: str,
-    root_output_directory: str,
-) -> Digest:
-
-    working_directory = _parse_working_directory(working_directory, address)
-    new_root = _parse_working_directory(root_output_directory, working_directory)
-
-    if new_root == "":
-        return digest
-
-    return await Get(Digest, RemovePrefix(digest, new_root))
-
-
 def _shell_tool_safe_env_name(tool_name: str) -> str:
     """Replace any characters not suitable in an environment variable name with `_`."""
     return re.sub(r"\W", "_", tool_name)
+
+
+@rule
+async def run_shell_command_process(
+    request: ShellCommandProcessRequest,
+) -> AdhocProcessResult:
+    process = await Get(Process, ShellCommandProcessRequest, request)
+
+    fallible_result = await Get(FallibleProcessResult, Process, process)
+
+    log_on_errors = request.log_on_process_errors or FrozenDict()
+    error_to_log = log_on_errors.get(fallible_result.exit_code, None)
+    if error_to_log:
+        logger.error(error_to_log)
+
+    result = await Get(
+        ProcessResult,
+        {
+            fallible_result: FallibleProcessResult,
+            ProductDescription(request.description): ProductDescription,
+        },
+    )
+
+    if request.log_output:
+        if result.stdout:
+            logger.info(result.stdout.decode())
+        if result.stderr:
+            logger.warning(result.stderr.decode())
+
+    working_directory = _parse_working_directory(request.working_directory, request.address)
+    root_output_directory = _parse_working_directory(
+        request.root_output_directory, working_directory
+    )
+
+    adjusted = await Get(Digest, RemovePrefix(result.output_digest, root_output_directory))
+
+    return AdhocProcessResult(result, adjusted)
 
 
 @rule

@@ -16,8 +16,8 @@ from pants.backend.shell.target_types import (
     ShellCommandWorkdirField,
 )
 from pants.backend.shell.util_rules.adhoc_process_support import (
+    AdhocProcessResult,
     ShellCommandProcessRequest,
-    _adjust_root_output_directory,
     _execution_environment_from_dependencies,
     _parse_outputs_from_command,
 )
@@ -31,7 +31,6 @@ from pants.core.util_rules.environments import EnvironmentNameRequest
 from pants.engine.addresses import Addresses
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests, Snapshot
-from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import (
     FieldSetsPerTarget,
@@ -107,6 +106,7 @@ async def run_in_sandbox_request(
         address=shell_command.address,
         shell_name=shell_command.address.spec,
         working_directory=working_directory,
+        root_output_directory=root_output_directory,
         command=" ".join(shlex.quote(arg) for arg in (run_request.args + extra_args)),
         timeout=None,
         input_digest=input_digest,
@@ -116,28 +116,20 @@ async def run_in_sandbox_request(
         output_directories=output_directories,
         fetch_env_vars=(),
         supplied_env_var_values=FrozenDict(**run_request.extra_env),
+        log_on_process_errors=None,
+        log_output=shell_command[ShellCommandLogOutputField].value,
     )
 
-    result = await Get(
-        ProcessResult,
+    adhoc_result = await Get(
+        AdhocProcessResult,
         {
             environment_name: EnvironmentName,
             process_request: ShellCommandProcessRequest,
         },
     )
 
-    if shell_command[ShellCommandLogOutputField].value:
-        if result.stdout:
-            logger.info(result.stdout.decode())
-        if result.stderr:
-            logger.warning(result.stderr.decode())
-
-    adjusted = await _adjust_root_output_directory(
-        result.output_digest,
-        shell_command.address,
-        working_directory,
-        root_output_directory,
-    )
+    result = adhoc_result.process_result
+    adjusted = adhoc_result.adjusted_digest
 
     extras = (
         (shell_command[RunInSandboxStdoutFilenameField].value, result.stdout),

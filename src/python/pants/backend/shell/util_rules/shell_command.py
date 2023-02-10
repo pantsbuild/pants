@@ -16,13 +16,14 @@ from pants.backend.shell.target_types import (
     ShellCommandLogOutputField,
     ShellCommandOutputRootDirField,
     ShellCommandSourcesField,
+    ShellCommandTarget,
     ShellCommandTimeoutField,
     ShellCommandToolsField,
     ShellCommandWorkdirField,
 )
 from pants.backend.shell.util_rules.adhoc_process_support import (
+    AdhocProcessResult,
     ShellCommandProcessRequest,
-    _adjust_root_output_directory,
     _execution_environment_from_dependencies,
     _parse_outputs_from_command,
 )
@@ -36,7 +37,7 @@ from pants.core.util_rules.environments import EnvironmentNameRequest
 from pants.core.util_rules.system_binaries import BashBinary, BinaryShims, BinaryShimsRequest
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import Digest, Snapshot
-from pants.engine.process import FallibleProcessResult, Process, ProcessResult, ProductDescription
+from pants.engine.process import Process
 from pants.engine.rules import Get, collect_rules, rule, rule_helper
 from pants.engine.target import (
     GeneratedSources,
@@ -102,6 +103,7 @@ async def _prepare_process_request_from_target(
         address=shell_command.address,
         shell_name=shell_command.address.spec,
         working_directory=working_directory,
+        root_output_directory=shell_command[ShellCommandOutputRootDirField].value or "",
         command=command,
         timeout=shell_command.get(ShellCommandTimeoutField).value,
         input_digest=dependencies_digest,
@@ -111,7 +113,18 @@ async def _prepare_process_request_from_target(
         append_only_caches=None,
         supplied_env_var_values=FrozenDict(supplied_env_var_values),
         immutable_input_digests=FrozenDict(immutable_input_digests),
+        log_on_process_errors=_LOG_ON_PROCESS_ERRORS,
+        log_output=shell_command[ShellCommandLogOutputField].value,
     )
+
+
+@rule
+async def run_adhoc_result_from_target(
+    request: ShellCommandProcessFromTargetRequest,
+    shell_setup: ShellSetup.EnvironmentAware,
+) -> AdhocProcessResult:
+    scpr = await _prepare_process_request_from_target(request.target, shell_setup)
+    return await Get(AdhocProcessResult, ShellCommandProcessRequest, scpr)
 
 
 @rule
@@ -119,6 +132,7 @@ async def prepare_process_request_from_target(
     request: ShellCommandProcessFromTargetRequest,
     shell_setup: ShellSetup.EnvironmentAware,
 ) -> Process:
+    # Needed to support `experimental_test_shell_command`
     scpr = await _prepare_process_request_from_target(request.target, shell_setup)
     return await Get(Process, ShellCommandProcessRequest, scpr)
 
@@ -140,8 +154,8 @@ async def shell_command_in_sandbox(
         EnvironmentName, EnvironmentNameRequest, EnvironmentNameRequest.from_target(shell_command)
     )
 
-    fallible_result = await Get(
-        FallibleProcessResult,
+    adhoc_result = await Get(
+        AdhocProcessResult,
         {
             environment_name: EnvironmentName,
             ShellCommandProcessFromTargetRequest(
@@ -150,35 +164,7 @@ async def shell_command_in_sandbox(
         },
     )
 
-    if fallible_result.exit_code == 127:
-        logger.error(
-            f"`{shell_command.alias}` requires the names of any external commands used by this "
-            f"shell command to be specified in the `{ShellCommandToolsField.alias}` field. If "
-            f"`bash` cannot find a tool, add it to the `{ShellCommandToolsField.alias}` field."
-        )
-
-    result = await Get(
-        ProcessResult,
-        {
-            fallible_result: FallibleProcessResult,
-            ProductDescription(
-                f"the `{shell_command.alias}` at `{shell_command.address}`"
-            ): ProductDescription,
-        },
-    )
-
-    if shell_command[ShellCommandLogOutputField].value:
-        if result.stdout:
-            logger.info(result.stdout.decode())
-        if result.stderr:
-            logger.warning(result.stderr.decode())
-
-    working_directory = shell_command[ShellCommandWorkdirField].value or ""
-    root_output_directory = shell_command[ShellCommandOutputRootDirField].value or ""
-    adjusted = await _adjust_root_output_directory(
-        result.output_digest, shell_command.address, working_directory, root_output_directory
-    )
-    output = await Get(Snapshot, Digest, adjusted)
+    output = await Get(Snapshot, Digest, adhoc_result.adjusted_digest)
     return GeneratedSources(output)
 
 
@@ -244,3 +230,14 @@ def rules():
         UnionRule(GenerateSourcesRequest, GenerateFilesFromShellCommandRequest),
         *RunShellCommand.rules(),
     ]
+
+
+_LOG_ON_PROCESS_ERRORS = FrozenDict(
+    {
+        127: (
+            f"`{ShellCommandTarget.alias}` requires the names of any external commands used by this "
+            f"shell command to be specified in the `{ShellCommandToolsField.alias}` field. If "
+            f"`bash` cannot find a tool, add it to the `{ShellCommandToolsField.alias}` field."
+        )
+    }
+)
