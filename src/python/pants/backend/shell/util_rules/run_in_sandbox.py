@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import shlex
 
 from pants.backend.shell.target_types import (
     RunInSandboxArgumentsField,
@@ -104,10 +103,9 @@ async def run_in_sandbox_request(
     process_request = ShellCommandProcessRequest(
         description=description,
         address=shell_command.address,
-        shell_name=shell_command.address.spec,
         working_directory=working_directory,
         root_output_directory=root_output_directory,
-        command=" ".join(shlex.quote(arg) for arg in (run_request.args + extra_args)),
+        argv=tuple(run_request.args + extra_args),
         timeout=None,
         input_digest=input_digest,
         immutable_input_digests=FrozenDict(run_request.immutable_input_digests or {}),

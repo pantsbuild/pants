@@ -65,7 +65,9 @@ class ShellCommandProcessFromTargetRequest:
 
 @rule_helper
 async def _prepare_process_request_from_target(
-    shell_command: Target, shell_setup: ShellSetup.EnvironmentAware
+    shell_command: Target,
+    shell_setup: ShellSetup.EnvironmentAware,
+    bash: BashBinary,
 ) -> ShellCommandProcessRequest:
     description = f"the `{shell_command.alias}` at `{shell_command.address}`"
 
@@ -101,10 +103,9 @@ async def _prepare_process_request_from_target(
     return ShellCommandProcessRequest(
         description=description,
         address=shell_command.address,
-        shell_name=shell_command.address.spec,
         working_directory=working_directory,
         root_output_directory=shell_command[ShellCommandOutputRootDirField].value or "",
-        command=command,
+        argv=(bash.path, "-c", command, shell_command.address.spec),
         timeout=shell_command.get(ShellCommandTimeoutField).value,
         input_digest=dependencies_digest,
         output_files=output_files,
@@ -122,8 +123,9 @@ async def _prepare_process_request_from_target(
 async def run_adhoc_result_from_target(
     request: ShellCommandProcessFromTargetRequest,
     shell_setup: ShellSetup.EnvironmentAware,
+    bash: BashBinary,
 ) -> AdhocProcessResult:
-    scpr = await _prepare_process_request_from_target(request.target, shell_setup)
+    scpr = await _prepare_process_request_from_target(request.target, shell_setup, bash)
     return await Get(AdhocProcessResult, ShellCommandProcessRequest, scpr)
 
 
@@ -131,9 +133,10 @@ async def run_adhoc_result_from_target(
 async def prepare_process_request_from_target(
     request: ShellCommandProcessFromTargetRequest,
     shell_setup: ShellSetup.EnvironmentAware,
+    bash: BashBinary,
 ) -> Process:
     # Needed to support `experimental_test_shell_command`
-    scpr = await _prepare_process_request_from_target(request.target, shell_setup)
+    scpr = await _prepare_process_request_from_target(request.target, shell_setup, bash)
     return await Get(Process, ShellCommandProcessRequest, scpr)
 
 

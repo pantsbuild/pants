@@ -47,10 +47,9 @@ logger = logging.getLogger(__name__)
 class ShellCommandProcessRequest:
     description: str
     address: Address
-    shell_name: str
     working_directory: str
     root_output_directory: str
-    command: str
+    argv: tuple[str, ...]
     timeout: int | None
     input_digest: Digest
     immutable_input_digests: FrozenDict[str, Digest] | None
@@ -214,9 +213,8 @@ async def prepare_shell_command_process(
 
     description = shell_command.description
     address = shell_command.address
-    shell_name = shell_command.shell_name
     working_directory = _parse_working_directory(shell_command.working_directory or "", address)
-    command = shell_command.command
+    argv = shell_command.argv
     timeout: int | None = shell_command.timeout
     output_files = shell_command.output_files
     output_directories = shell_command.output_directories
@@ -244,7 +242,7 @@ async def prepare_shell_command_process(
     input_digest = await Get(Digest, MergeDigests([shell_command.input_digest, work_dir]))
 
     proc = Process(
-        argv=(bash.path, "-c", command, shell_name),
+        argv=argv,
         description=f"Running {description}",
         env=command_env,
         input_digest=input_digest,
