@@ -47,9 +47,9 @@ from pants.testutil.rule_runner import RuleRunner
                   {
                     "address": "example:files_target",
                     "target_type": "files",
+                    "_applicable_dep_rules": null,
                     "_dependencies_rules": null,
                     "_dependents_rules": null,
-                    "_effective_dep_rules": null,
                     "dependencies": [],
                     "overrides": {
                       "('foo.txt',)": {
@@ -88,9 +88,9 @@ from pants.testutil.rule_runner import RuleRunner
                   {
                     "address": "example:files_target",
                     "target_type": "files",
+                    "_applicable_dep_rules": null,
                     "_dependencies_rules": null,
                     "_dependents_rules": null,
-                    "_effective_dep_rules": null,
                     "dependencies": [],
                     "description": null,
                     "overrides": null,
@@ -137,9 +137,9 @@ from pants.testutil.rule_runner import RuleRunner
                   {
                     "address": "example:files_target",
                     "target_type": "files",
+                    "_applicable_dep_rules": null,
                     "_dependencies_rules": null,
                     "_dependents_rules": null,
-                    "_effective_dep_rules": null,
                     "dependencies": [],
                     "sources": [],
                     "sources_raw": [
@@ -152,9 +152,9 @@ from pants.testutil.rule_runner import RuleRunner
                   {
                     "address": "example:archive_target",
                     "target_type": "archive",
+                    "_applicable_dep_rules": null,
                     "_dependencies_rules": null,
                     "_dependents_rules": null,
-                    "_effective_dep_rules": null,
                     "dependencies": [
                       "foo/bar:baz",
                       "qux:quux"
@@ -178,7 +178,7 @@ from pants.testutil.rule_runner import RuleRunner
                     ("foo/a.txt:baz",),
                     dependencies_rules=("does", "apply", "*"),
                     dependents_rules=("fall-through", "*"),
-                    effective_dep_rules=(
+                    applicable_dep_rules=(
                         "foo/BUILD[*] -> foo/BUILD[*] : ALLOW\nfiles foo:baz -> files foo/a.txt:baz",
                     ),
                 ),
@@ -190,6 +190,9 @@ from pants.testutil.rule_runner import RuleRunner
                   {
                     "address": "foo:baz",
                     "target_type": "files",
+                    "_applicable_dep_rules": [
+                      "foo/BUILD[*] -> foo/BUILD[*] : ALLOW\\nfiles foo:baz -> files foo/a.txt:baz"
+                    ],
                     "_dependencies_rules": [
                       "does",
                       "apply",
@@ -198,9 +201,6 @@ from pants.testutil.rule_runner import RuleRunner
                     "_dependents_rules": [
                       "fall-through",
                       "*"
-                    ],
-                    "_effective_dep_rules": [
-                      "foo/BUILD[*] -> foo/BUILD[*] : ALLOW\\nfiles foo:baz -> files foo/a.txt:baz"
                     ],
                     "dependencies": [
                       "foo/a.txt:baz"
@@ -265,7 +265,7 @@ def test_get_target_data(rule_runner: RuleRunner) -> None:
             GenericTarget({"dependencies": [":baz"]}, Address("foo", target_name="bar")),
             None,
             ("foo/a.txt:baz", "foo/b.txt:baz"),
-            effective_dep_rules=(
+            applicable_dep_rules=(
                 "foo -> foo : ALLOW\ntarget foo:bar -> files foo/a.txt:baz",
                 "foo -> foo : ALLOW\ntarget foo:bar -> files foo/b.txt:baz",
             ),
@@ -274,7 +274,7 @@ def test_get_target_data(rule_runner: RuleRunner) -> None:
             FilesGeneratorTarget({"sources": ["*.txt"]}, Address("foo", target_name="baz")),
             ("foo/a.txt", "foo/b.txt"),
             ("foo/a.txt:baz", "foo/b.txt:baz"),
-            effective_dep_rules=(
+            applicable_dep_rules=(
                 "foo -> foo : ALLOW\nfiles foo:baz -> files foo/a.txt:baz",
                 "foo -> foo : ALLOW\nfiles foo:baz -> files foo/b.txt:baz",
             ),
@@ -285,7 +285,7 @@ def test_get_target_data(rule_runner: RuleRunner) -> None:
             ),
             ("foo/a.txt",),
             (),
-            effective_dep_rules=(),
+            applicable_dep_rules=(),
         ),
         TargetData(
             FileTarget(
@@ -293,7 +293,7 @@ def test_get_target_data(rule_runner: RuleRunner) -> None:
             ),
             ("foo/b.txt",),
             (),
-            effective_dep_rules=(),
+            applicable_dep_rules=(),
         ),
     ]
 
@@ -305,12 +305,12 @@ def test_get_target_data_with_dep_rules(rule_runner: RuleRunner) -> None:
                 """\
                 files(name="baz", sources=["*.txt"])
                 __dependencies_rules__(
-                  ("target", "does", "not", "apply", "*"),
-                  ("files", "does", "apply", "*"),
+                  ("<target>", "does", "not", "apply", "*"),
+                  ("<files>", "does", "apply", "*"),
                 )
                 __dependents_rules__(
-                  ("[b.txt]", "!skip", "this", "*"),
-                  ("file", "take", "the", "first", "*"),
+                  ("b.txt", "!skip", "this", "*"),
+                  ("<file>", "take", "the", "first", "*"),
                   ("*", "fall-through", "*"),
                 )
                 """
@@ -329,7 +329,7 @@ def test_get_target_data_with_dep_rules(rule_runner: RuleRunner) -> None:
             ("foo/a.txt:baz",),
             dependencies_rules=("does", "apply", "*"),
             dependents_rules=("fall-through", "*"),
-            effective_dep_rules=(
+            applicable_dep_rules=(
                 "foo/BUILD[*] -> foo/BUILD[*] : ALLOW\nfiles foo:baz -> files foo/a.txt:baz",
             ),
         ),
@@ -341,6 +341,6 @@ def test_get_target_data_with_dep_rules(rule_runner: RuleRunner) -> None:
             (),
             dependencies_rules=("does", "apply", "*"),
             dependents_rules=("fall-through", "*"),
-            effective_dep_rules=(),
+            applicable_dep_rules=(),
         ),
     ]

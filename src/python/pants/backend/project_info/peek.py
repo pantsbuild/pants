@@ -73,7 +73,7 @@ class TargetData:
 
     dependencies_rules: tuple[str, ...] | None = None
     dependents_rules: tuple[str, ...] | None = None
-    effective_dep_rules: tuple[str, ...] | None = None
+    applicable_dep_rules: tuple[str, ...] | None = None
 
     def to_dict(self, exclude_defaults: bool = False) -> dict:
         nothing = object()
@@ -91,7 +91,7 @@ class TargetData:
 
         fields["_dependencies_rules"] = self.dependencies_rules
         fields["_dependents_rules"] = self.dependents_rules
-        fields["_effective_dep_rules"] = self.effective_dep_rules
+        fields["_applicable_dep_rules"] = self.applicable_dep_rules
 
         return {
             "address": self.target.address.spec,
@@ -193,7 +193,7 @@ async def get_target_data(
         for tgt, (family, adaptor) in zip(sorted_targets, family_adaptors)
         if family.dependents_rules is not None
     }
-    all_effective_dep_rules = await MultiGet(
+    all_applicable_dep_rules = await MultiGet(
         Get(
             DependenciesRuleApplication,
             DependenciesRuleApplicationRequest(
@@ -204,9 +204,9 @@ async def get_target_data(
         )
         for tgt, deps in zip(sorted_targets, dependencies_per_target)
     )
-    effective_dep_rules_map = {
+    applicable_dep_rules_map = {
         application.address: tuple(str(rule) for rule in application.dependencies_rule.values())
-        for application in all_effective_dep_rules
+        for application in all_applicable_dep_rules
     }
 
     return TargetDatas(
@@ -216,7 +216,7 @@ async def get_target_data(
             expanded_sources=expanded_sources_map.get(tgt.address),
             dependencies_rules=dependencies_rules_map.get(tgt.address),
             dependents_rules=dependents_rules_map.get(tgt.address),
-            effective_dep_rules=effective_dep_rules_map.get(tgt.address),
+            applicable_dep_rules=applicable_dep_rules_map.get(tgt.address),
         )
         for tgt, expanded_deps in zip(sorted_targets, expanded_dependencies)
     )
