@@ -143,7 +143,7 @@ async def prepare_process_request_from_target(
 class RunShellCommand(RunFieldSet):
     required_fields = (
         ShellCommandCommandField,
-        ShellCommandWorkdirField,
+        RunShellCommandWorkdirField,
     )
     run_in_sandbox_behavior = RunInSandboxBehavior.NOT_SUPPORTED
 
