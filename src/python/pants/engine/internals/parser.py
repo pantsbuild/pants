@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from difflib import get_close_matches
 from io import StringIO
 from pathlib import PurePath
-from typing import Any
+from typing import Any, Callable
 
 from pants.base.deprecated import warn_or_error
 from pants.base.exceptions import MappingError
@@ -99,14 +99,15 @@ class ParseState(threading.local):
 
 
 class RegistrarField:
-    __slots__ = ("_field_type",)
+    __slots__ = ("_field_type", "_default")
 
-    def __init__(self, field_type: type[Field]) -> None:
+    def __init__(self, field_type: type[Field], default: Callable[[], Any]) -> None:
         self._field_type = field_type
+        self._default = default
 
     @property
     def default(self) -> ImmutableValue:
-        return self._field_type.default
+        return self._default()
 
 
 class Parser:
@@ -145,7 +146,9 @@ class Parser:
                 for field_type in registered_target_types.aliases_to_types[
                     type_alias
                 ].class_field_types(union_membership):
-                    registrar_field = RegistrarField(field_type)
+                    registrar_field = RegistrarField(
+                        field_type, self._field_default_factory(field_type)
+                    )
                     setattr(self, field_type.alias, registrar_field)
                     if field_type.deprecated_alias:
 
@@ -187,6 +190,17 @@ class Parser:
                 target_adaptor = TargetAdaptor(self._type_alias, **raw_values)
                 parse_state.add(target_adaptor)
                 return target_adaptor
+
+            def _field_default_factory(self, field_type: type[Field]) -> Callable[[], Any]:
+                def resolve_field_default() -> Any:
+                    target_defaults = parse_state.defaults.get(self._type_alias)
+                    if target_defaults:
+                        for field_alias in (field_type.alias, field_type.deprecated_alias):
+                            if field_alias and field_alias in target_defaults:
+                                return target_defaults[field_alias]
+                    return field_type.default
+
+                return resolve_field_default
 
         symbols: dict[str, Any] = {
             **object_aliases.objects,

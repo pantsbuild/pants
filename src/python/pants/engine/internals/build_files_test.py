@@ -396,11 +396,10 @@ def test_augment_target_field_defaults(target_adaptor_rule_runner: RuleRunner) -
         {
             "BUILD": dedent(
                 """
+                __defaults__(all=dict(tags=["default-tag"]))
                 mock_tgt(
-                  sources=(
-                    "*.added",
-                    *mock_tgt.sources.default,
-                  ),
+                  sources=["*.added", *mock_tgt.sources.default],
+                  tags=["custom-tag", *mock_tgt.tags.default],
                 )
                 """
             ),
@@ -410,7 +409,8 @@ def test_augment_target_field_defaults(target_adaptor_rule_runner: RuleRunner) -
         TargetAdaptor,
         [TargetAdaptorRequest(Address(""), description_of_origin="tests")],
     )
-    assert target_adaptor.kwargs["sources"] == ("*.added", "*.mock")
+    assert target_adaptor.kwargs["sources"] == ["*.added", "*.mock"]
+    assert target_adaptor.kwargs["tags"] == ["custom-tag", "default-tag"]
 
 
 def test_target_adaptor_not_found(target_adaptor_rule_runner: RuleRunner) -> None:
