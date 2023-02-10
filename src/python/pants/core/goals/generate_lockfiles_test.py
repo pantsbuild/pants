@@ -3,7 +3,11 @@
 
 from __future__ import annotations
 
-from typing import Iterable
+import re
+from collections.abc import Mapping
+from dataclasses import asdict
+from typing import Any, Iterable
+from unittest.mock import Mock
 
 import pytest
 
@@ -24,6 +28,9 @@ from pants.core.goals.generate_lockfiles import (
     GenerateLockfileWithEnvironments,
     GenerateToolLockfileSentinel,
     KnownUserResolveNames,
+    LockfileDiff,
+    LockfileDiffPrinter,
+    LockfilePackages,
     NoCompatibleResolveException,
     RequestedUserResolveNames,
     UnrecognizedResolveNamesError,
@@ -32,6 +39,7 @@ from pants.core.goals.generate_lockfiles import (
     determine_resolves_to_generate,
     filter_tool_lockfile_requests,
 )
+from pants.engine.console import Console
 from pants.engine.environment import EnvironmentName
 from pants.engine.target import Dependencies, Target
 from pants.testutil.option_util import create_subsystem
@@ -130,7 +138,9 @@ def test_determine_tool_sentinels_to_generate() -> None:
 
 def test_filter_tool_lockfile_requests() -> None:
     def create_request(name: str, lockfile_dest: str | None = None) -> GenerateLockfile:
-        return GenerateLockfile(resolve_name=name, lockfile_dest=lockfile_dest or f"{name}.txt")
+        return GenerateLockfile(
+            resolve_name=name, lockfile_dest=lockfile_dest or f"{name}.txt", diff=False
+        )
 
     tool1 = create_request("tool1")
     tool2 = create_request("tool2")
@@ -297,10 +307,12 @@ def test_preferred_environment(
     resolve_name = "boop"
     resolve_dest = "beep"
     if not env_names:
-        request = GenerateLockfile(resolve_name, resolve_dest)
+        request = GenerateLockfile(resolve_name, resolve_dest, diff=False)
     else:
         envs = tuple(EnvironmentName(name) for name in env_names)
-        request = GenerateLockfileWithEnvironments(resolve_name, resolve_dest, envs)
+        request = GenerateLockfileWithEnvironments(
+            resolve_name, resolve_dest, environments=envs, diff=False
+        )
 
     default = EnvironmentName(_default)
 
@@ -309,3 +321,97 @@ def test_preferred_environment(
     assert preferred_env.val == expected
     assert in_output is None or in_output in caplog.text
     assert not_in_output is None or not_in_output not in caplog.text
+
+
+@pytest.mark.parametrize(
+    "old_reqs, new_reqs, expect_diff",
+    [
+        ({}, dict(cowsay="5.0"), dict(added=dict(cowsay="5.0"))),
+        (dict(cowsay="5.0"), {}, dict(removed=dict(cowsay="5.0"))),
+        (dict(cowsay="4.0"), dict(cowsay="5.0"), dict(upgraded=dict(cowsay=("4.0", "5.0")))),
+        (
+            dict(cowsay="4.1.2"),
+            dict(cowsay="4.1.1"),
+            dict(downgraded=dict(cowsay=("4.1.2", "4.1.1"))),
+        ),
+        (dict(cowsay="4.1.2"), dict(cowsay="4.1.2"), dict(unchanged=dict(cowsay="4.1.2"))),
+        (
+            dict(prev="1.0", up_to_date="2.2", obsolete="x.y", mistake="2.0"),
+            dict(prev="1.5", up_to_date="2.2", upcoming="y.x", mistake="1.9"),
+            dict(
+                added=dict(upcoming="y.x"),
+                upgraded=dict(prev=("1.0", "1.5")),
+                unchanged=dict(up_to_date="2.2"),
+                removed=dict(obsolete="x.y"),
+                downgraded=dict(mistake=("2.0", "1.9")),
+            ),
+        ),
+    ],
+)
+def test_diff(
+    old_reqs: Mapping[str, str], new_reqs: Mapping[str, str], expect_diff: Mapping[str, Any]
+) -> None:
+    diff = LockfileDiff.create(
+        "reqs/test.lock",
+        "testing",
+        LockfilePackages(old_reqs),
+        LockfilePackages(new_reqs),
+    )
+    assert {k: dict(v) for k, v in asdict(diff).items() if v and isinstance(v, Mapping)} == {
+        k: v for k, v in expect_diff.items() if v
+    }
+
+
+@pytest.mark.parametrize(
+    "old_reqs, new_reqs, expect_output",
+    [
+        (
+            dict(prev="1.0", up_to_date="2.2", obsolete="x.y", mistake="2.0"),
+            dict(prev="1.5", up_to_date="2.2", upcoming="y.x", mistake="1.9"),
+            softwrap(
+                """\
+                Lockfile diff: reqs/test.lock [testing]
+
+                ==                    Unchanged dependencies                    ==
+
+                  up_to_date                     2.2
+
+                ==                    Upgraded dependencies                     ==
+
+                  prev                           1.0          -->   1.5
+
+                ==                !! Downgraded dependencies !!                 ==
+
+                  mistake                        2.0          -->   1.9
+
+                ==                      Added dependencies                      ==
+
+                  upcoming                       y.x
+
+                ==                     Removed dependencies                     ==
+
+                  obsolete                       x.y
+                """
+            ),
+        )
+    ],
+)
+def test_diff_printer(
+    old_reqs: Mapping[str, str], new_reqs: Mapping[str, str], expect_output: str
+) -> None:
+    console = Mock(spec_set=Console)
+    diff_formatter = LockfileDiffPrinter(console=console, color=False, include_unchanged=True)
+    diff = LockfileDiff.create(
+        "reqs/test.lock",
+        "testing",
+        LockfilePackages(old_reqs),
+        LockfilePackages(new_reqs),
+    )
+    diff_formatter.print(diff)
+    call = console.print_stderr.mock_calls[0]
+    args = call[1]  # For py3.7 compat, otherwise `call.args` works.
+    actual_output = softwrap(
+        # Strip all spaces before newlines.
+        re.sub(" +\n", "\n", args[0])
+    )
+    assert actual_output == expect_output

@@ -33,6 +33,7 @@ from pants.backend.python.target_types import (
     PythonTestUtilsGeneratorTarget,
 )
 from pants.backend.python.util_rules import local_dists, pex_from_targets
+from pants.core.goals import package
 from pants.core.goals.test import (
     TestDebugAdapterRequest,
     TestDebugRequest,
@@ -72,6 +73,7 @@ def rule_runner() -> RuleRunner:
             *target_types_rules.rules(),
             *local_dists.rules(),
             *setup_py.rules(),
+            *package.rules(),
             QueryRule(Partitions, (PyTestRequest.PartitionRequest,)),
             QueryRule(TestResult, (PyTestRequest.Batch,)),
             QueryRule(TestDebugRequest, (PyTestRequest.Batch,)),

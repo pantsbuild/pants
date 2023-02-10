@@ -80,10 +80,8 @@ def test_build_pkg(rule_runner: RuleRunner) -> None:
                     """\
                     package transitive
 
-                    import "fmt"
-
                     func Quote(s string) string {
-                        return fmt.Sprintf(">> %s <<", s)
+                        return ">>" + s + "<<"
                     }
                     """
                 )
@@ -131,10 +129,9 @@ def test_build_pkg(rule_runner: RuleRunner) -> None:
                     package foo
 
                     import "example.com/foo/dep"
-                    import "fmt"
 
                     func main() {
-                        fmt.Println(dep.Quote("Hello world!"))
+                        dep.Quote("Hello world!")
                     }
                     """
                 )

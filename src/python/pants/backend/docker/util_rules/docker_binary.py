@@ -25,8 +25,7 @@ from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 
 
-# The base class is decorated with `frozen_after_init`.
-@dataclass
+@dataclass(frozen=True)
 class DockerBinary(BinaryPath):
     """The `docker` binary."""
 
@@ -40,8 +39,8 @@ class DockerBinary(BinaryPath):
         extra_env: Mapping[str, str] | None = None,
         extra_input_digests: Mapping[str, Digest] | None = None,
     ) -> None:
-        self.extra_env = {} if extra_env is None else extra_env
-        self.extra_input_digests = extra_input_digests
+        object.__setattr__(self, "extra_env", {} if extra_env is None else extra_env)
+        object.__setattr__(self, "extra_input_digests", extra_input_digests)
         super().__init__(path, fingerprint)
 
     def _get_process_environment(self, env: Mapping[str, str]) -> Mapping[str, str]:
@@ -149,13 +148,11 @@ async def find_docker(
         BinaryShimsRequest.for_binaries(
             *docker_options.tools,
             rationale="use docker",
-            output_directory="bin",
             search_path=search_path,
         ),
     )
-    tools_path = ".shims"
-    extra_env = {"PATH": os.path.join("{chroot}", tools_path, tools.bin_directory)}
-    extra_input_digests = {tools_path: tools.digest}
+    extra_env = {"PATH": tools.path_component}
+    extra_input_digests = tools.immutable_input_digests
 
     return DockerBinary(
         first_path.path,

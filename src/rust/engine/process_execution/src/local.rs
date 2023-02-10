@@ -116,7 +116,7 @@ impl CommandRunner {
       )
       .map(|s| {
         s.into_string()
-          .map_err(|e| format!("Error stringifying output paths: {:?}", e))
+          .map_err(|e| format!("Error stringifying output paths: {e:?}"))
       })
       .collect::<Result<Vec<_>, _>>()?;
 
@@ -130,7 +130,7 @@ impl CommandRunner {
 
     let path_stats = posix_fs
       .expand_globs(output_globs, SymlinkBehavior::Aware, None)
-      .map_err(|err| format!("Error expanding output globs: {}", err))
+      .map_err(|err| format!("Error expanding output globs: {err}"))
       .await?;
     Snapshot::from_path_stats(
       OneOffStoreFileByDigest::new(store, posix_fs, true),
@@ -257,7 +257,7 @@ impl super::CommandRunner for CommandRunner {
     _workunit: &mut RunningWorkunit,
     req: Process,
   ) -> Result<FallibleProcessResultWithPlatform, ProcessError> {
-    let req_debug_repr = format!("{:#?}", req);
+    let req_debug_repr = format!("{req:#?}");
     in_workunit!(
       "run_local_process",
       req.level,
@@ -312,7 +312,7 @@ impl super::CommandRunner for CommandRunner {
             //
             // Given that this is expected to be rare, we dump the entire process definition in the
             // error.
-            ProcessError::Unclassified(format!("Failed to execute: {}\n\n{}", req_debug_repr, msg))
+            ProcessError::Unclassified(format!("Failed to execute: {req_debug_repr}\n\n{msg}"))
           })
           .await;
 
@@ -408,7 +408,7 @@ impl CapturedWorkdir for CommandRunner {
                   e
                 ));
               } else {
-                break Err(format!("Error launching process: {:?}", e));
+                break Err(format!("Error launching process: {e:?}"));
               }
             }
             Ok(child) => break Ok(child),
@@ -416,7 +416,7 @@ impl CapturedWorkdir for CommandRunner {
         }
       } else {
         let _read_locked = self.spawn_lock.read().await;
-        fork_exec().map_err(|e| format!("Error launching process: {:?}", e))
+        fork_exec().map_err(|e| format!("Error launching process: {e:?}"))
       }
     }?;
 
@@ -449,7 +449,7 @@ impl CapturedWorkdir for CommandRunner {
 
     Ok(
       result_stream
-        .map_err(|e| format!("Failed to consume process outputs: {:?}", e))
+        .map_err(|e| format!("Failed to consume process outputs: {e:?}"))
         .boxed(),
     )
   }
@@ -515,10 +515,7 @@ pub trait CapturedWorkdir {
       let posix_fs = Arc::new(
         fs::PosixFS::new(root, fs::GitignoreStyleExcludes::empty(), executor.clone()).map_err(
           |err| {
-            format!(
-              "Error making posix_fs to fetch local process execution output files: {}",
-              err
-            )
+            format!("Error making posix_fs to fetch local process execution output files: {err}")
           },
         )?,
       );
@@ -675,8 +672,7 @@ pub async fn prepare_workdir(
       .local_paths(&req.append_only_caches)
       .map_err(|err| {
         StoreError::Unclassified(format!(
-          "Failed to make named cache(s) for local execution: {:?}",
-          err
+          "Failed to make named cache(s) for local execution: {err:?}"
         ))
       })?;
     match named_caches_prefix {
@@ -738,7 +734,7 @@ pub async fn prepare_workdir(
       move || {
         if let Some(jdk_home) = maybe_jdk_home {
           symlink(jdk_home, workdir_path2.join(".jdk"))
-            .map_err(|err| format!("Error making JDK symlink for local execution: {:?}", err))?
+            .map_err(|err| format!("Error making JDK symlink for local execution: {err:?}"))?
         }
 
         // The bazel remote execution API specifies that the parent directories for output files and
@@ -753,10 +749,7 @@ pub async fn prepare_workdir(
           .collect();
         for path in parent_paths_to_create {
           create_dir_all(path.clone()).map_err(|err| {
-            format!(
-              "Error making parent directory {:?} for local execution: {:?}",
-              path, err
-            )
+            format!("Error making parent directory {path:?} for local execution: {err:?}")
           })?;
         }
 
@@ -806,12 +799,7 @@ pub fn create_sandbox(
   let workdir = tempfile::Builder::new()
     .prefix("pants-sandbox-")
     .tempdir_in(base_directory)
-    .map_err(|err| {
-      format!(
-        "Error making tempdir for local process execution: {:?}",
-        err
-      )
-    })?;
+    .map_err(|err| format!("Error making tempdir for local process execution: {err:?}"))?;
 
   let mut sandbox = AsyncDropSandbox(executor, workdir.path().to_owned(), Some(workdir));
   if keep_sandboxes == KeepSandboxes::Always {
@@ -866,9 +854,9 @@ pub fn setup_run_sh_script(
   for (key, value) in env.iter() {
     let quoted_arg = bash::escape(value);
     let arg_str = str::from_utf8(&quoted_arg)
-      .map_err(|e| format!("{:?}", e))?
+      .map_err(|e| format!("{e:?}"))?
       .to_string();
-    let formatted_assignment = format!("{}={}", key, arg_str);
+    let formatted_assignment = format!("{key}={arg_str}");
     env_var_strings.push(formatted_assignment);
   }
   let stringified_env_vars: String = env_var_strings.join(" ");
@@ -878,7 +866,7 @@ pub fn setup_run_sh_script(
   for arg in argv.iter() {
     let quoted_arg = bash::escape(arg);
     let arg_str = str::from_utf8(&quoted_arg)
-      .map_err(|e| format!("{:?}", e))?
+      .map_err(|e| format!("{e:?}"))?
       .to_string();
     full_command_line.push(arg_str);
   }
@@ -891,7 +879,7 @@ pub fn setup_run_sh_script(
     };
     let quoted_cwd = bash::escape(cwd);
     str::from_utf8(&quoted_cwd)
-      .map_err(|e| format!("{:?}", e))?
+      .map_err(|e| format!("{e:?}"))?
       .to_string()
   };
 
@@ -899,11 +887,10 @@ pub fn setup_run_sh_script(
   let full_script = format!(
     "#!/bin/bash
 # This command line should execute the same process as pants did internally.
-export {}
-cd {}
-{}
+export {stringified_env_vars}
+cd {stringified_cwd}
+{stringified_command_line}
 ",
-    stringified_env_vars, stringified_cwd, stringified_command_line,
   );
 
   let full_file_path = sandbox_path.join("__run.sh");
@@ -913,7 +900,7 @@ cd {}
     .write(true)
     .mode(USER_EXECUTABLE_MODE) // Executable for user, read-only for others.
     .open(full_file_path)
-    .map_err(|e| format!("{:?}", e))?
+    .map_err(|e| format!("{e:?}"))?
     .write_all(full_script.as_bytes())
-    .map_err(|e| format!("{:?}", e))
+    .map_err(|e| format!("{e:?}"))
 }

@@ -21,7 +21,6 @@ from pants.engine.unions import UnionMembership, union
 from pants.option.option_types import BoolOption, StrOption
 from pants.util.frozendict import FrozenDict
 from pants.util.memo import memoized_property
-from pants.util.meta import frozen_after_init
 from pants.util.strutil import softwrap
 
 
@@ -68,8 +67,7 @@ class Repl(Goal):
     environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class ReplRequest:
     digest: Digest
     args: Tuple[str, ...]
@@ -88,12 +86,14 @@ class ReplRequest:
         append_only_caches: Mapping[str, str] | None = None,
         run_in_workspace: bool = True,
     ) -> None:
-        self.digest = digest
-        self.args = tuple(args)
-        self.extra_env = FrozenDict(extra_env or {})
-        self.immutable_input_digests = FrozenDict(immutable_input_digests or {})
-        self.append_only_caches = FrozenDict(append_only_caches or {})
-        self.run_in_workspace = run_in_workspace
+        object.__setattr__(self, "digest", digest)
+        object.__setattr__(self, "args", tuple(args))
+        object.__setattr__(self, "extra_env", FrozenDict(extra_env or {}))
+        object.__setattr__(
+            self, "immutable_input_digests", FrozenDict(immutable_input_digests or {})
+        )
+        object.__setattr__(self, "append_only_caches", FrozenDict(append_only_caches or {}))
+        object.__setattr__(self, "run_in_workspace", run_in_workspace)
 
 
 @goal_rule

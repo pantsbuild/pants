@@ -1482,7 +1482,7 @@ async fn ensure_inline_stdio_is_stored() {
   let store_dir_path = store_dir.path();
 
   let cas = mock::StubCAS::empty();
-  let store = Store::local_only(runtime.clone(), &store_dir_path)
+  let store = Store::local_only(runtime.clone(), store_dir_path)
     .unwrap()
     .into_with_remote(
       &cas.address(),
@@ -1559,18 +1559,18 @@ async fn ensure_inline_stdio_is_stored() {
   assert_eq!(result.original.platform, Platform::Linux_x86_64);
 
   let local_store =
-    Store::local_only(runtime.clone(), &store_dir_path).expect("Error creating local store");
+    Store::local_only(runtime.clone(), store_dir_path).expect("Error creating local store");
   {
     assert_eq!(
       local_store
-        .load_file_bytes_with(test_stdout.digest(), |v| Bytes::copy_from_slice(v))
+        .load_file_bytes_with(test_stdout.digest(), Bytes::copy_from_slice)
         .await
         .unwrap(),
       test_stdout.bytes()
     );
     assert_eq!(
       local_store
-        .load_file_bytes_with(test_stderr.digest(), |v| Bytes::copy_from_slice(v))
+        .load_file_bytes_with(test_stderr.digest(), Bytes::copy_from_slice)
         .await
         .unwrap(),
       test_stderr.bytes()
@@ -1775,7 +1775,7 @@ async fn fails_after_retry_limit_exceeded() {
           stream_responses: Ok(vec![make_retryable_operation_failure()]),
         },
         ExpectedAPICall::Execute {
-          execute_request: execute_request.clone(),
+          execute_request: execute_request,
           stream_responses: Ok(vec![make_retryable_operation_failure()]),
         },
       ]),
@@ -1819,7 +1819,7 @@ async fn fails_after_retry_limit_exceeded_with_stream_close() {
     mock::execution_server::TestServer::new(
       mock::execution_server::MockExecution::new(vec![
         ExpectedAPICall::Execute {
-          execute_request: execute_request.clone(),
+          execute_request: execute_request,
           stream_responses: Ok(vec![make_incomplete_operation(&op_name)]),
         },
         ExpectedAPICall::WaitExecution {
@@ -2097,7 +2097,7 @@ async fn extract_execute_response_timeout() {
 
   match extract_execute_response(operation, Platform::Linux_x86_64).await {
     Err(ExecutionError::Timeout) => (),
-    other => assert!(false, "Want timeout error, got {:?}", other),
+    other => assert!(false, "Want timeout error, got {other:?}"),
   };
 }
 
@@ -2142,7 +2142,7 @@ async fn extract_execute_response_missing_other_things() {
 
   match extract_execute_response(operation, Platform::Linux_x86_64).await {
     Err(ExecutionError::Fatal(err)) => assert_contains(&err.to_string(), "monkeys"),
-    other => assert!(false, "Want fatal error, got {:?}", other),
+    other => assert!(false, "Want fatal error, got {other:?}"),
   };
 }
 
@@ -2160,7 +2160,7 @@ async fn extract_execute_response_other_failed_precondition() {
 
   match extract_execute_response(operation, Platform::Linux_x86_64).await {
     Err(ExecutionError::Fatal(err)) => assert_contains(&err.to_string(), "OUT_OF_CAPACITY"),
-    other => assert!(false, "Want fatal error, got {:?}", other),
+    other => assert!(false, "Want fatal error, got {other:?}"),
   };
 }
 
@@ -2177,7 +2177,7 @@ async fn extract_execute_response_missing_without_list() {
     Err(ExecutionError::Fatal(err)) => {
       assert_contains(&err.to_string().to_lowercase(), "precondition")
     }
-    other => assert!(false, "Want fatal error, got {:?}", other),
+    other => assert!(false, "Want fatal error, got {other:?}"),
   };
 }
 
@@ -2203,7 +2203,7 @@ async fn extract_execute_response_other_status() {
 
   match extract_execute_response(operation, Platform::Linux_x86_64).await {
     Err(ExecutionError::Fatal(err)) => assert_contains(&err.to_string(), "PermissionDenied"),
-    other => assert!(false, "Want fatal error, got {:?}", other),
+    other => assert!(false, "Want fatal error, got {other:?}"),
   };
 }
 
@@ -2709,7 +2709,7 @@ async fn run_cmd_runner<R: crate::CommandRunner>(
 fn create_command_runner(execution_address: String, cas: &mock::StubCAS) -> (CommandRunner, Store) {
   let runtime = task_executor::Executor::new();
   let store_dir = TempDir::new().unwrap();
-  let store = make_store(store_dir.path(), cas, runtime.clone());
+  let store = make_store(store_dir.path(), cas, runtime);
   let command_runner = CommandRunner::new(
     &execution_address,
     None,
@@ -2847,7 +2847,7 @@ fn make_any_proto<T: Message>(message: &T, prefix: &str) -> prost_types::Any {
     .replace("::", ".");
 
   prost_types::Any {
-    type_url: format!("type.googleapis.com/{}", proto_type_name),
+    type_url: format!("type.googleapis.com/{proto_type_name}"),
     value: message.to_bytes().to_vec(),
   }
 }
@@ -2868,9 +2868,7 @@ fn missing_preconditionfailure_violation(
 fn assert_contains(haystack: &str, needle: &str) {
   assert!(
     haystack.contains(needle),
-    "{:?} should contain {:?}",
-    haystack,
-    needle
+    "{haystack:?} should contain {needle:?}"
   )
 }
 

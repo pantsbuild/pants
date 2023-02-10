@@ -49,7 +49,7 @@ Rather than using a global installation of Cargo, use the `./cargo` script.
 
 ### Compile
 
-To check that the Rust code is valid, use `./cargo check`. To check that it integrates correctly with Pants' Python code, use `MODE=debug ./pants ...` as usual (which will `compile` first, and is slower than `check`).
+To check that the Rust code is valid, use `./cargo check`. To check that it integrates correctly with Pants' Python code, use `MODE=debug pants ...` as usual (which will `compile` first, and is slower than `check`).
 
 > 🚧 Set `MODE=debug` when iterating on Rust
 > 

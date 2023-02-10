@@ -15,7 +15,7 @@ from pants.backend.shell.target_types import (
     Shunit2TestTarget,
 )
 from pants.backend.shell.target_types import rules as target_types_rules
-from pants.backend.shell.util_rules import shell_command
+from pants.backend.shell.util_rules import run_in_sandbox, shell_command
 
 
 def target_types():
@@ -35,6 +35,7 @@ def rules():
     return [
         *dependency_inference.rules(),
         *shell_command.rules(),
+        *run_in_sandbox.rules(),
         *shunit2.rules(),
         *shunit2_test_runner.rules(),
         *tailor.rules(),

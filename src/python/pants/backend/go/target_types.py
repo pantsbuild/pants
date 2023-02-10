@@ -9,6 +9,7 @@ from typing import Iterable, Optional, Sequence, Tuple
 from pants.core.goals.package import OutputPathField
 from pants.core.goals.run import RestartableField
 from pants.core.goals.test import TestExtraEnvVarsField, TestTimeoutField
+from pants.core.util_rules.environments import EnvironmentField
 from pants.engine.addresses import Address
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
@@ -452,6 +453,7 @@ class GoBinaryTarget(Target):
         GoCompilerFlagsField,
         GoLinkerFlagsField,
         RestartableField,
+        EnvironmentField,
     )
     help = "A Go binary."
 
@@ -475,38 +477,3 @@ class GoOwningGoModAddressField(StringField):
         for that single `go_mod` target.
         """
     )
-
-
-# -----------------------------------------------------------------------------------------------
-# `go_sdk` and `go_sdk_package` target types
-# -----------------------------------------------------------------------------------------------
-
-
-DEFAULT_GO_SDK_ADDR = Address("", target_name="default_go_sdk")
-
-
-class GoSdkPackageDependenciesField(Dependencies):
-    pass
-
-
-class GoSdkImportPathField(GoImportPathField):
-    pass
-
-
-class GoSdkPackageTarget(Target):
-    alias = "_go_sdk_package"
-    core_fields = (
-        *COMMON_TARGET_FIELDS,
-        GoSdkImportPathField,
-        GoSdkPackageDependenciesField,
-    )
-    help = "Internal-only target: Represents a Go SDK package."
-
-
-class GoSdkTarget(TargetGenerator):
-    alias = "_go_sdk"
-    generated_target_cls = GoSdkPackageTarget
-    core_fields = (*COMMON_TARGET_FIELDS,)
-    help = "Internal-only: Go SDK generator target"
-    copied_fields = COMMON_TARGET_FIELDS
-    moved_fields = ()

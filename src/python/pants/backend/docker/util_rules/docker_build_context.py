@@ -24,7 +24,7 @@ from pants.backend.docker.util_rules.docker_build_env import (
 from pants.backend.docker.utils import get_hash, suggest_renames
 from pants.backend.docker.value_interpolation import DockerBuildArgsInterpolationValue
 from pants.backend.shell.target_types import ShellSourceField
-from pants.core.goals.package import BuiltPackage, PackageFieldSet
+from pants.core.goals.package import BuiltPackage, EnvironmentAwarePackageRequest, PackageFieldSet
 from pants.core.target_types import FileSourceField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address, Addresses, UnparsedAddressInputs
@@ -290,7 +290,7 @@ async def create_docker_build_context(request: DockerBuildContextRequest) -> Doc
 
     # Package binary dependencies for build context.
     embedded_pkgs = await MultiGet(
-        Get(BuiltPackage, PackageFieldSet, field_set)
+        Get(BuiltPackage, EnvironmentAwarePackageRequest(field_set))
         for field_set in embedded_pkgs_per_target.field_sets
         # Exclude docker images, unless build_upstream_images is true.
         if (
@@ -331,11 +331,12 @@ async def create_docker_build_context(request: DockerBuildContextRequest) -> Doc
     if request.build_upstream_images:
         # Update build arg values for FROM image build args.
 
-        # Get the FROM image build args with defined values in the Dockerfile.
-        dockerfile_build_args = {
-            k: v for k, v in dockerfile_info.from_image_build_args.to_dict().items() if v
+        # Get the FROM image build args with defined values in the Dockerfile & build args.
+        merged_from_build_args = {
+            k: build_args.to_dict().get(k, v)
+            for k, v in dockerfile_info.from_image_build_args.to_dict().items()
         }
-
+        dockerfile_build_args = {k: v for k, v in merged_from_build_args.items() if v}
         # Parse the build args values into Address instances.
         from_image_addresses = await Get(
             Addresses,

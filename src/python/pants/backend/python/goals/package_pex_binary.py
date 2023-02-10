@@ -40,6 +40,7 @@ from pants.core.goals.package import (
 )
 from pants.core.goals.run import RunFieldSet, RunInSandboxBehavior
 from pants.core.target_types import FileSourceField
+from pants.core.util_rules.environments import EnvironmentField
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     TransitiveTargets,
@@ -81,6 +82,7 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
     include_sources: PexIncludeSourcesField
     include_tools: PexIncludeToolsField
     venv_site_packages_copies: PexVenvSitePackagesCopies
+    environment: EnvironmentField
 
     @property
     def _execution_mode(self) -> PexExecutionMode:

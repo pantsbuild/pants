@@ -11,9 +11,11 @@ from dataclasses import dataclass
 from pathlib import PurePath
 from typing import Generic, Optional, Sequence, TypeVar, Union, cast
 
+from pants.core.goals import package
 from pants.core.goals.package import (
     BuiltPackage,
     BuiltPackageArtifact,
+    EnvironmentAwarePackageRequest,
     OutputPathField,
     PackageFieldSet,
 )
@@ -61,7 +63,6 @@ from pants.engine.unions import UnionRule
 from pants.util.docutil import bin_name
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
-from pants.util.meta import frozen_after_init
 from pants.util.strutil import softwrap
 
 # -----------------------------------------------------------------------------------------------
@@ -155,8 +156,7 @@ class per_platform(Generic[_T]):
 # -----------------------------------------------------------------------------------------------
 
 
-@dataclass(unsafe_hash=True)
-@frozen_after_init
+@dataclass(frozen=True)
 class http_source:
     url: str
     len: int
@@ -170,11 +170,16 @@ class http_source:
             if not isinstance(value, getattr(builtins, cast(str, field.type))):
                 raise TypeError(f"`{field.name}` must be a `{field.type}`, got `{type(value)!r}`.")
 
-        self.url = url
-        self.len = len
-        self.sha256 = sha256
-        self.filename = filename or urllib.parse.urlparse(url).path.rsplit("/", 1)[-1]
+        object.__setattr__(self, "url", url)
+        object.__setattr__(self, "len", len)
+        object.__setattr__(self, "sha256", sha256)
+        object.__setattr__(
+            self, "filename", filename or urllib.parse.urlparse(url).path.rsplit("/", 1)[-1]
+        )
 
+        self.__post_init__()
+
+    def __post_init__(self):
         if not self.filename:
             raise ValueError(
                 softwrap(
@@ -811,7 +816,7 @@ async def package_archive_target(field_set: ArchiveFieldSet) -> BuiltPackage:
         FieldSetsPerTarget, FieldSetsPerTargetRequest(PackageFieldSet, package_targets)
     )
     packages = await MultiGet(
-        Get(BuiltPackage, PackageFieldSet, field_set)
+        Get(BuiltPackage, EnvironmentAwarePackageRequest(field_set))
         for field_set in package_field_sets_per_target.field_sets
     )
 
@@ -898,6 +903,7 @@ def rules():
     return (
         *collect_rules(),
         *archive_rules(),
+        *package.rules(),
         UnionRule(GenerateSourcesRequest, GenerateResourceSourceRequest),
         UnionRule(GenerateSourcesRequest, GenerateFileSourceRequest),
         UnionRule(GenerateSourcesRequest, RelocateFilesViaCodegenRequest),

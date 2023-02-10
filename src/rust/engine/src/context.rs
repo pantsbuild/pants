@@ -470,7 +470,7 @@ impl Core {
     let root_ca_certs = if let Some(ref path) = remoting_opts.root_ca_certs_path {
       Some(
         std::fs::read(path)
-          .map_err(|err| format!("Error reading root CA certs file {:?}: {}", path, err))?,
+          .map_err(|err| format!("Error reading root CA certs file {path:?}: {err}"))?,
       )
     } else {
       None
@@ -507,7 +507,7 @@ impl Core {
       &root_ca_certs,
       capabilities_cell_opt.clone(),
     )
-    .map_err(|e| format!("Could not initialize Store: {:?}", e))?;
+    .map_err(|e| format!("Could not initialize Store: {e:?}"))?;
 
     let local_cache = PersistentCache::new(
       &local_store_options.store_dir,
@@ -565,7 +565,7 @@ impl Core {
       });
     let http_client = http_client_builder
       .build()
-      .map_err(|err| format!("Error building HTTP client: {}", err))?;
+      .map_err(|err| format!("Error building HTTP client: {err}"))?;
     let rule_graph = RuleGraph::new(tasks.rules().clone(), tasks.queries().clone())?;
 
     let gitignore_file = if use_gitignore {
@@ -580,11 +580,11 @@ impl Core {
     };
     let ignorer =
       GitignoreStyleExcludes::create_with_gitignore_file(ignore_patterns, gitignore_file)
-        .map_err(|e| format!("Could not parse build ignore patterns: {:?}", e))?;
+        .map_err(|e| format!("Could not parse build ignore patterns: {e:?}"))?;
 
     let watcher = if watch_filesystem {
       let w = InvalidationWatcher::new(executor.clone(), build_root.clone(), ignorer.clone())?;
-      w.start(&graph);
+      w.start(&graph)?;
       Some(w)
     } else {
       None
@@ -604,7 +604,7 @@ impl Core {
       http_client,
       local_cache,
       vfs: PosixFS::new(&build_root, ignorer, executor)
-        .map_err(|e| format!("Could not initialize Vfs: {:?}", e))?,
+        .map_err(|e| format!("Could not initialize Vfs: {e:?}"))?,
       build_root,
       watcher,
       local_parallelism: exec_strategy_opts.local_parallelism,
@@ -639,8 +639,8 @@ impl Core {
       .iter()
       .map(|runner| runner.shutdown().boxed());
     let shutdown_results = futures::future::join_all(shutdown_futures).await;
-    for shutfdown_result in shutdown_results {
-      if let Err(err) = shutfdown_result {
+    for shutdown_result in shutdown_results {
+      if let Err(err) = shutdown_result {
         log::warn!("Command runner failed to shutdown cleanly: {err}");
       }
     }

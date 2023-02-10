@@ -42,10 +42,10 @@ impl Server {
   ) -> Result<Server, String> {
     let listener = TcpListener::bind((Ipv4Addr::new(127, 0, 0, 1), port_requested))
       .await
-      .map_err(|e| format!("Could not bind to port {}: {:?}", port_requested, e))?;
+      .map_err(|e| format!("Could not bind to port {port_requested}: {e:?}"))?;
     let port_actual = listener
       .local_addr()
-      .map_err(|e| format!("No local address for listener: {:?}", e))?
+      .map_err(|e| format!("No local address for listener: {e:?}"))?
       .port();
 
     // NB: The C client requires noisy_stdin (see the `nails` crate for more info), but neither
@@ -110,7 +110,7 @@ impl Server {
           tcp_stream
         }
         future::Either::Left((Err(e), _)) => {
-          break Err(format!("Server failed to accept connections: {}", e));
+          break Err(format!("Server failed to accept connections: {e}"));
         }
         future::Either::Right((_, _)) => {
           break Ok(());
@@ -324,7 +324,7 @@ impl RawFdNail {
       let (pipe_reader, pipe_writer) = os_pipe::pipe()?;
       let read_handle = unsafe { std::fs::File::from_raw_fd(pipe_reader.into_raw_fd()) };
       Ok((
-        blocking_stream_for(read_handle).boxed(),
+        blocking_stream_for(read_handle)?.boxed(),
         Box::new(pipe_writer),
       ))
     }
@@ -352,7 +352,7 @@ impl RawFdNail {
   ///
   fn ttypath_from_env(env: &HashMap<String, String>, fd_number: usize) -> Option<PathBuf> {
     env
-      .get(&format!("NAILGUN_TTY_PATH_{}", fd_number))
+      .get(&format!("NAILGUN_TTY_PATH_{fd_number}"))
       .map(PathBuf::from)
   }
 }
@@ -360,25 +360,27 @@ impl RawFdNail {
 // TODO: See https://github.com/pantsbuild/pants/issues/16969.
 pub fn blocking_stream_for<R: io::Read + Send + Sized + 'static>(
   mut r: R,
-) -> impl futures::Stream<Item = Result<Bytes, io::Error>> {
+) -> io::Result<impl futures::Stream<Item = Result<Bytes, io::Error>>> {
   let (sender, receiver) = mpsc::unbounded_channel();
-  std::thread::spawn(move || {
-    let mut buf = [0; 4096];
-    loop {
-      match r.read(&mut buf) {
-        Ok(0) => break,
-        Ok(n) => {
-          if sender.send(Ok(Bytes::copy_from_slice(&buf[..n]))).is_err() {
+  std::thread::Builder::new()
+    .name("stdio-reader".to_owned())
+    .spawn(move || {
+      let mut buf = [0; 4096];
+      loop {
+        match r.read(&mut buf) {
+          Ok(0) => break,
+          Ok(n) => {
+            if sender.send(Ok(Bytes::copy_from_slice(&buf[..n]))).is_err() {
+              break;
+            }
+          }
+          Err(ref e) if e.kind() == io::ErrorKind::Interrupted => {}
+          Err(e) => {
+            let _ = sender.send(Err(e));
             break;
           }
         }
-        Err(ref e) if e.kind() == io::ErrorKind::Interrupted => {}
-        Err(e) => {
-          let _ = sender.send(Err(e));
-          break;
-        }
       }
-    }
-  });
-  UnboundedReceiverStream::new(receiver)
+    })?;
+  Ok(UnboundedReceiverStream::new(receiver))
 }

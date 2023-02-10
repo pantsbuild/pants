@@ -9,7 +9,6 @@ import sys
 import time
 import warnings
 from pathlib import PurePath
-from typing import Any
 
 from setproctitle import setproctitle as set_process_title
 
@@ -17,6 +16,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exception_sink import ExceptionSink
 from pants.bin.daemon_pants_runner import DaemonPantsRunner
 from pants.engine.internals import native_engine
+from pants.engine.internals.native_engine import PyExecutor, PyNailgunServer
 from pants.init.engine_initializer import GraphScheduler
 from pants.init.logging import initialize_stdio, pants_log_path
 from pants.init.util import init_workdir
@@ -33,6 +33,8 @@ from pants.util.contextutil import argv_as, hermetic_environment_as
 from pants.util.dirutil import safe_open
 from pants.util.strutil import ensure_text
 from pants.version import VERSION
+
+_SHUTDOWN_TIMEOUT_SECS = 3
 
 
 class PantsDaemon(PantsDaemonProcessManager):
@@ -54,8 +56,11 @@ class PantsDaemon(PantsDaemonProcessManager):
             bootstrap_options = options_bootstrapper.bootstrap_options
             bootstrap_options_values = bootstrap_options.for_global_scope()
 
+        # This executor is owned by the PantsDaemon, and borrowed by the Pants runs that are launched by
+        # PantsDaemonCore. Individual runs will call shutdown to tear down the executor, but those calls
+        # have no effect on a borrowed executor.
         executor = GlobalOptions.create_py_executor(bootstrap_options_values)
-        core = PantsDaemonCore(options_bootstrapper, executor, cls._setup_services)
+        core = PantsDaemonCore(options_bootstrapper, executor.to_borrowed(), cls._setup_services)
 
         server = native_engine.nailgun_server_create(
             executor,
@@ -65,6 +70,7 @@ class PantsDaemon(PantsDaemonProcessManager):
 
         return PantsDaemon(
             work_dir=bootstrap_options_values.pants_workdir,
+            executor=executor,
             server=server,
             core=core,
             bootstrap_options=bootstrap_options,
@@ -106,21 +112,18 @@ class PantsDaemon(PantsDaemonProcessManager):
     def __init__(
         self,
         work_dir: str,
-        server: Any,
+        executor: PyExecutor,
+        server: PyNailgunServer,
         core: PantsDaemonCore,
         bootstrap_options: Options,
     ):
         """
         NB: A PantsDaemon instance is generally instantiated via `create`.
-
-        :param work_dir: The pants work directory.
-        :param server: A native PyNailgunServer instance (not currently a nameable type).
-        :param core: A PantsDaemonCore.
-        :param bootstrap_options: The bootstrap options.
         """
         super().__init__(bootstrap_options, daemon_entrypoint=__name__)
         self._build_root = get_buildroot()
         self._work_dir = work_dir
+        self._executor = executor
         self._server = server
         self._core = core
         self._bootstrap_options = bootstrap_options
@@ -197,9 +200,16 @@ class PantsDaemon(PantsDaemonProcessManager):
             self.purge_metadata(force=True)
             self._logger.info("Waiting for ongoing runs to complete before exiting...")
             native_engine.nailgun_server_await_shutdown(self._server)
-            # Then shutdown the PantsDaemonCore, which will shut down any live Scheduler.
+
+            # Shutdown the PantsDaemonCore, which will shut down any live Scheduler.
             self._logger.info("Waiting for Sessions to complete before exiting...")
             self._core.shutdown()
+
+            # Shutdown the executor. The shutdown method will log if that takes an unexpected
+            # amount of time, so we only log at debug here.
+            self._logger.debug("Waiting for tasks to complete before exiting...")
+            self._executor.shutdown(_SHUTDOWN_TIMEOUT_SECS)
+
             self._logger.info("Exiting pantsd")
 
 

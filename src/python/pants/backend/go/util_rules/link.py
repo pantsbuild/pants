@@ -6,15 +6,23 @@ import textwrap
 from dataclasses import dataclass
 
 from pants.backend.go.subsystems.golang import GolangSubsystem
+from pants.backend.go.util_rules import import_config
 from pants.backend.go.util_rules.build_opts import GoBuildOptions
 from pants.backend.go.util_rules.cgo_binaries import CGoBinaryPathRequest
+from pants.backend.go.util_rules.import_config import ImportConfig, ImportConfigRequest
+from pants.backend.go.util_rules.link_defs import (
+    ImplicitLinkerDependencies,
+    ImplicitLinkerDependenciesHook,
+)
 from pants.backend.go.util_rules.sdk import GoSdkProcess, GoSdkToolIDRequest, GoSdkToolIDResult
 from pants.core.util_rules.system_binaries import BashBinary, BinaryPath, BinaryPathTest
 from pants.engine.fs import CreateDigest, Digest, Directory, FileContent
-from pants.engine.internals.native_engine import MergeDigests
+from pants.engine.internals.native_engine import AddPrefix, MergeDigests
 from pants.engine.internals.selectors import MultiGet
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.unions import UnionMembership
+from pants.util.frozendict import FrozenDict
 
 
 @dataclass(frozen=True)
@@ -24,7 +32,7 @@ class LinkGoBinaryRequest:
     input_digest: Digest
     archives: tuple[str, ...]
     build_opts: GoBuildOptions
-    import_config_path: str
+    import_paths_to_pkg_a_files: FrozenDict[str, str]
     output_filename: str
     description: str
 
@@ -80,18 +88,61 @@ async def setup_go_linker(
 async def link_go_binary(
     request: LinkGoBinaryRequest,
     linker_setup: LinkerSetup,
+    union_membership: UnionMembership,
 ) -> LinkedGoBinary:
+    implict_linker_deps_hooks = union_membership.get(ImplicitLinkerDependenciesHook)
+    implicit_linker_deps = await MultiGet(
+        Get(
+            ImplicitLinkerDependencies,
+            ImplicitLinkerDependenciesHook,
+            hook(build_opts=request.build_opts),
+        )
+        for hook in implict_linker_deps_hooks
+    )
+
+    implicit_dep_digests = []
+    import_paths_to_pkg_a_files = dict(request.import_paths_to_pkg_a_files)
+    for implicit_linker_dep in implicit_linker_deps:
+        for (
+            dep_import_path,
+            pkg_archive_path,
+        ) in implicit_linker_dep.import_paths_to_pkg_a_files.items():
+            if dep_import_path not in import_paths_to_pkg_a_files:
+                import_paths_to_pkg_a_files[dep_import_path] = pkg_archive_path
+                implicit_dep_digests.append(implicit_linker_dep.digest)
+
     link_tmp_dir = "link-tmp"
     link_tmp_dir_digest = await Get(Digest, CreateDigest([Directory(link_tmp_dir)]))
 
-    link_tool_id, input_digest = await MultiGet(
+    link_tool_id, import_config = await MultiGet(
         Get(GoSdkToolIDResult, GoSdkToolIDRequest("link")),
-        Get(Digest, MergeDigests([request.input_digest, link_tmp_dir_digest, linker_setup.digest])),
+        Get(
+            ImportConfig,
+            ImportConfigRequest(
+                FrozenDict(import_paths_to_pkg_a_files), build_opts=request.build_opts
+            ),
+        ),
+    )
+
+    import_config_digest = await Get(Digest, AddPrefix(import_config.digest, link_tmp_dir))
+
+    input_digest = await Get(
+        Digest,
+        MergeDigests(
+            [
+                request.input_digest,
+                link_tmp_dir_digest,
+                linker_setup.digest,
+                import_config_digest,
+                *implicit_dep_digests,
+            ]
+        ),
     )
 
     maybe_race_arg = ["-race"] if request.build_opts.with_race_detector else []
     maybe_msan_arg = ["-msan"] if request.build_opts.with_msan else []
     maybe_asan_arg = ["-asan"] if request.build_opts.with_asan else []
+
     result = await Get(
         ProcessResult,
         GoSdkProcess(
@@ -111,7 +162,7 @@ async def link_go_binary(
                 *maybe_msan_arg,
                 *maybe_asan_arg,
                 "-importcfg",
-                request.import_config_path,
+                f"{link_tmp_dir}/{import_config.CONFIG_PATH}",
                 "-o",
                 request.output_filename,
                 "-buildmode=exe",  # seen in `go build -x` output
@@ -131,4 +182,7 @@ async def link_go_binary(
 
 
 def rules():
-    return collect_rules()
+    return (
+        *collect_rules(),
+        *import_config.rules(),
+    )

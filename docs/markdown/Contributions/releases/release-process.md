@@ -124,7 +124,7 @@ Update the release page in `src/python/pants/notes` for this release series, e.g
 
 Run `git fetch --all --tags` to be sure you have the latest release tags available locally.
 
-From the `main` branch, run `./pants run build-support/bin/changelog.py -- --prior 2.9.0.dev0 --new 2.9.0.dev1` with the relevant versions. 
+From the `main` branch, run `pants run build-support/bin/changelog.py -- --prior 2.9.0.dev0 --new 2.9.0.dev1` with the relevant versions. 
 
 This will generate the sections to copy into the release notes. Delete any empty sections. Do not paste the `Internal` section into the notes file. Instead, paste into a comment on the prep PR.
 
@@ -142,7 +142,7 @@ You are encouraged to fix typos and tweak change descriptions for clarity to use
 
 ### 2. Update `CONTRIBUTORS.md`
 
-Run `./pants run build-support/bin/contributors.py`
+Run `pants run build-support/bin/contributors.py`
 
 Take note of any new contributors since the last release so that you can give a shoutout in the announcement email.
 
@@ -196,7 +196,7 @@ Also, update the [Changelog](doc:changelog) page with the new release series at 
 
 ### Regenerate the references
 
-On the relevant release branch, run `./pants run build-support/bin/generate_docs.py -- --sync --api-key <key>` with your key from <https://dash.readme.com/project/pants/v2.8/api-key>.
+On the relevant release branch, run `pants run build-support/bin/generate_docs.py -- --sync --api-key <key>` with your key from <https://dash.readme.com/project/pants/v2.8/api-key>.
 
 ### `stable` releases - Update the default docsite
 
@@ -264,7 +264,7 @@ Announce the release to:
 You can get a contributor list by running the following, where `<tag>` is the tag for the prior release (eg: `release_2.9.0.dev0`):
 
 ```bash
-./pants run ./build-support/bin/contributors.py -- -s <tag>
+pants run ./build-support/bin/contributors.py -- -s <tag>
 ```
 
 > ❗️ Update the links in these templates!
@@ -368,7 +368,7 @@ pushing a file mapping the release tag to the commit it tags out to
 fixed by running the following in an environment where you have both `AWS_ACCESS_KEY_ID` and
 `AWS_SECRET_ACCESS_KEY` of an account that has permissions to push to the Pantsbuild S3 bucket:
 ```
-./pants run build-support/bin/backfill_s3_release_tag_mappings.py -- \
+pants run build-support/bin/backfill_s3_release_tag_mappings.py -- \
    --aws-cli-symlink-path $HOME/bin
 ```
 If this sounds mysterious or new to you, you probably don't have such an account and should ask for

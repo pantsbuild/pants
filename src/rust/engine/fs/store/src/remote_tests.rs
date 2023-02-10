@@ -105,8 +105,7 @@ async fn load_file_grpc_error() {
     .expect_err("Want error");
   assert!(
     error.contains("StubCAS is configured to always fail"),
-    "Bad error message, got: {}",
-    error
+    "Bad error message, got: {error}"
   )
 }
 
@@ -123,8 +122,7 @@ async fn load_directory_grpc_error() {
   .expect_err("Want error");
   assert!(
     error.contains("StubCAS is configured to always fail"),
-    "Bad error message, got: {}",
-    error
+    "Bad error message, got: {error}"
   )
 }
 
@@ -257,8 +255,7 @@ async fn write_file_errors() {
     .expect_err("Want error");
   assert!(
     error.contains("StubCAS is configured to always fail"),
-    "Bad error message, got: {}",
-    error
+    "Bad error message, got: {error}"
   );
 }
 
@@ -283,8 +280,7 @@ async fn write_connection_error() {
     .expect_err("Want error");
   assert!(
     error.contains("Unavailable: \"error trying to connect: dns error"),
-    "Bad error message, got: {}",
-    error
+    "Bad error message, got: {error}"
   );
 }
 
@@ -334,8 +330,7 @@ async fn list_missing_digests_error() {
     .expect_err("Want error");
   assert!(
     error.contains("StubCAS is configured to always fail"),
-    "Bad error message, got: {}",
-    error
+    "Bad error message, got: {error}"
   );
 }
 
@@ -356,14 +351,14 @@ fn new_byte_store(cas: &StubCAS) -> ByteStore {
 }
 
 pub async fn load_file_bytes(store: &ByteStore, digest: Digest) -> Result<Option<Bytes>, String> {
-  load_bytes(&store, digest).await
+  load_bytes(store, digest).await
 }
 
 pub async fn load_directory_proto_bytes(
   store: &ByteStore,
   digest: Digest,
 ) -> Result<Option<Bytes>, String> {
-  load_bytes(&store, digest).await
+  load_bytes(store, digest).await
 }
 
 async fn load_bytes(store: &ByteStore, digest: Digest) -> Result<Option<Bytes>, String> {

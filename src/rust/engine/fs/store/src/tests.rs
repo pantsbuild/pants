@@ -65,7 +65,7 @@ pub fn extra_big_file_bytes() -> Bytes {
 
 pub async fn load_file_bytes(store: &Store, digest: Digest) -> Result<Bytes, StoreError> {
   store
-    .load_file_bytes_with(digest, |bytes| Bytes::copy_from_slice(bytes))
+    .load_file_bytes_with(digest, Bytes::copy_from_slice)
     .await
 }
 
@@ -434,12 +434,11 @@ async fn malformed_remote_directory_is_error() {
 async fn non_canonical_remote_directory_is_error() {
   let mut non_canonical_directory = TestDirectory::containing_roland().directory();
   non_canonical_directory.files.push({
-    let file = remexec::FileNode {
+    remexec::FileNode {
       name: "roland".to_string(),
       digest: Some((&TestData::roland().digest()).into()),
       ..Default::default()
-    };
-    file
+    }
   });
   let non_canonical_directory_bytes = non_canonical_directory.to_bytes();
   let directory_digest = Digest::of_bytes(&non_canonical_directory_bytes);
@@ -450,12 +449,12 @@ async fn non_canonical_remote_directory_is_error() {
   let _ = WorkunitStore::setup_for_tests();
   let cas = StubCAS::builder()
     .unverified_content(
-      non_canonical_directory_fingerprint.clone(),
+      non_canonical_directory_fingerprint,
       non_canonical_directory_bytes,
     )
     .build();
   new_store(dir.path(), &cas.address())
-    .load_directory(directory_digest.clone())
+    .load_directory(directory_digest)
     .await
     .expect_err("Want error");
 
@@ -607,8 +606,7 @@ async fn expand_missing_directory() {
     .expect_err("Want error");
   assert!(
     matches!(error, StoreError::MissingDigest { .. }),
-    "Bad error: {}",
-    error
+    "Bad error: {error}"
   );
 }
 
@@ -629,8 +627,7 @@ async fn expand_directory_missing_subdir() {
     .expect_err("Want error");
   assert!(
     matches!(error, StoreError::MissingDigest { .. }),
-    "Bad error message: {}",
-    error
+    "Bad error message: {error}"
   );
 }
 
@@ -834,8 +831,7 @@ async fn upload_missing_files() {
     .expect_err("Want error");
   assert!(
     matches!(error, StoreError::MissingDigest { .. }),
-    "Bad error: {}",
-    error
+    "Bad error: {error}"
   );
 }
 
@@ -879,8 +875,7 @@ async fn upload_missing_file_in_directory() {
     .expect_err("Want error");
   assert!(
     matches!(error, StoreError::MissingDigest { .. }),
-    "Bad error: {}",
-    error
+    "Bad error: {error}"
   );
 }
 
@@ -981,7 +976,7 @@ async fn instance_name_download() {
 
   assert_eq!(
     store_with_remote
-      .load_file_bytes_with(TestData::roland().digest(), |b| Bytes::copy_from_slice(b))
+      .load_file_bytes_with(TestData::roland().digest(), Bytes::copy_from_slice)
       .await
       .unwrap(),
     TestData::roland().bytes()
@@ -1065,7 +1060,7 @@ async fn auth_download() {
 
   assert_eq!(
     store_with_remote
-      .load_file_bytes_with(TestData::roland().digest(), |b| Bytes::copy_from_slice(b))
+      .load_file_bytes_with(TestData::roland().digest(), Bytes::copy_from_slice)
       .await
       .unwrap(),
     TestData::roland().bytes()
@@ -1198,7 +1193,7 @@ async fn materialize_directory(perms: Permissions, executable_file: bool) {
     is_readonly(&materialize_dir.path().join("cats").join("feed.ext"))
   );
   assert_eq!(readonly, is_readonly(&materialize_dir.path().join("cats")));
-  assert_eq!(readonly, is_readonly(&materialize_dir.path()));
+  assert_eq!(readonly, is_readonly(materialize_dir.path()));
 }
 
 #[tokio::test]
@@ -1286,9 +1281,7 @@ fn assert_same_filecontents(left: Vec<FileContent>, right: Vec<FileContent>) {
   assert_eq!(
     left.len(),
     right.len(),
-    "FileContents did not match, different lengths: left: {:?} right: {:?}",
-    left,
-    right
+    "FileContents did not match, different lengths: left: {left:?} right: {right:?}"
   );
 
   let mut success = true;
@@ -1317,8 +1310,7 @@ fn assert_same_filecontents(left: Vec<FileContent>, right: Vec<FileContent>) {
   }
   assert!(
     success,
-    "FileContents did not match: Left: {:?}, Right: {:?}",
-    left, right
+    "FileContents did not match: Left: {left:?}, Right: {right:?}"
   );
 }
 
@@ -1381,9 +1373,7 @@ fn assert_same_digest_entries(left: Vec<DigestEntry>, right: Vec<DigestEntry>) {
   assert_eq!(
     left.len(),
     right.len(),
-    "DigestEntry vectors did not match, different lengths: left: {:?} right: {:?}",
-    left,
-    right
+    "DigestEntry vectors did not match, different lengths: left: {left:?} right: {right:?}"
   );
 
   let mut success = true;
@@ -1416,21 +1406,19 @@ fn assert_same_digest_entries(left: Vec<DigestEntry>, right: Vec<DigestEntry>) {
         if path_left != path_right {
           success = false;
           eprintln!(
-            "Paths did not match for empty directory at index {}: {:?}, {:?}",
-            index, path_left, path_right
+            "Paths did not match for empty directory at index {index}: {path_left:?}, {path_right:?}"
           );
         }
       }
       (l, r) => {
         success = false;
-        eprintln!("Differing types at index {}: {:?}, {:?}", index, l, r)
+        eprintln!("Differing types at index {index}: {l:?}, {r:?}")
       }
     }
   }
   assert!(
     success,
-    "FileEntry vectors did not match: Left: {:?}, Right: {:?}",
-    left, right
+    "FileEntry vectors did not match: Left: {left:?}, Right: {right:?}"
   );
 }
 
@@ -1628,7 +1616,7 @@ async fn explicitly_overwrites_already_existing_file() {
     .build();
   let store = new_store(tempfile::tempdir().unwrap(), &cas.address());
 
-  let _ = store
+  store
     .materialize_directory(
       dir_to_write_to.path().to_owned(),
       contents_dir.directory_digest(),
@@ -1720,8 +1708,8 @@ async fn big_file_immutable_link() {
     .expect("Error materializing file");
 
   let assert_is_linked = |path: &PathBuf, is_linked: bool| {
-    assert_eq!(file_contents(&path), file_bytes);
-    assert!(is_executable(&path));
+    assert_eq!(file_contents(path), file_bytes);
+    assert!(is_executable(path));
     assert_eq!(path.metadata().unwrap().permissions().readonly(), is_linked);
   };
 

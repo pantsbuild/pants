@@ -342,7 +342,7 @@ impl Instance {
               None => "(Waiting)".to_string(),
               Some(duration) => format_workunit_duration_ms!((duration).as_millis()).to_string(),
             };
-            format!("{} {}", duration_label, label)
+            format!("{duration_label} {label}")
           });
 
           match maybe_label {
