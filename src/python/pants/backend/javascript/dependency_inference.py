@@ -11,7 +11,6 @@ from pants.backend.javascript import package_json
 from pants.backend.javascript.import_parser.rules import JSImportStrings, ParseJsImportStrings
 from pants.backend.javascript.import_parser.rules import rules as import_parser_rules
 from pants.backend.javascript.package_json import (
-    AllPackageJson,
     FirstPartyNodePackageTargets,
     NodePackageDependenciesField,
     NodePackageNameField,
@@ -26,7 +25,7 @@ from pants.build_graph.address import Address
 from pants.engine.addresses import Addresses
 from pants.engine.fs import PathGlobs
 from pants.engine.internals.graph import Owners, OwnersRequest
-from pants.engine.internals.selectors import Get, MultiGet
+from pants.engine.internals.selectors import Get
 from pants.engine.rules import Rule, collect_rules, rule
 from pants.engine.target import FieldSet, InferDependenciesRequest, InferredDependencies, Targets
 from pants.engine.unions import UnionRule
@@ -61,7 +60,7 @@ class InferJSDependenciesRequest(InferDependenciesRequest):
 
 @rule
 async def infer_node_package_dependencies(
-    request: InferNodePackageDependenciesRequest, all_pkg_json: AllPackageJson
+    request: InferNodePackageDependenciesRequest,
 ) -> InferredDependencies:
     source: PackageJsonSourceField = request.field_set.source
     [pkg_json] = await Get(
@@ -69,22 +68,11 @@ async def infer_node_package_dependencies(
     )
     entry_points = PackageJsonEntryPoints.from_package_json(pkg_json)
 
-    candidate_js_files, candidate_pkg_files = await MultiGet(
-        Get(Owners, OwnersRequest(tuple(entry_points.globs_relative_to(pkg_json)))),
-        Get(
-            Owners,
-            OwnersRequest(tuple(pkg.file for pkg in all_pkg_json if pkg_json in pkg.workspaces)),
-        ),
+    candidate_js_files = await Get(
+        Owners, OwnersRequest(tuple(entry_points.globs_relative_to(pkg_json)))
     )
-    js_targets, pkg_targets = await MultiGet(
-        Get(Targets, Addresses(candidate_js_files)), Get(Targets, Addresses(candidate_pkg_files))
-    )
-    return InferredDependencies(
-        itertools.chain(
-            (tgt.address for tgt in pkg_targets if tgt.has_field(PackageJsonSourceField)),
-            (tgt.address for tgt in js_targets if tgt.has_field(JSSourceField)),
-        )
-    )
+    js_targets = await Get(Targets, Addresses(candidate_js_files))
+    return InferredDependencies(tgt.address for tgt in js_targets if tgt.has_field(JSSourceField))
 
 
 class NodePackageCandidateMap(FrozenDict[str, Address]):

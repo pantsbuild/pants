@@ -22,16 +22,26 @@ class NodeJSProject:
     workspaces: FrozenOrderedSet[PackageJson]
 
     def is_parent(self, project: NodeJSProject) -> bool:
-        return self != project and any(
+        return self.root_dir != project.root_dir and any(
             project.root_dir == workspace.root_dir for workspace in self.workspaces
         )
 
     def including_workspaces_from(self, child: NodeJSProject) -> NodeJSProject:
         return replace(self, workspaces=self.workspaces | child.workspaces)
 
+    @property
+    def resolve_name(self) -> str:
+        return self.root_dir.replace(os.path.sep, ".")
+
 
 class AllNodeJSProjects(Collection[NodeJSProject]):
-    pass
+    def project_for_directory(self, directory: str) -> NodeJSProject:
+        for project in self:
+            if directory in (workspace.root_dir for workspace in project.workspaces):
+                return project
+        raise ValueError(
+            f"{directory} is not a package directory that is part of a project. This is likely a bug."
+        )
 
 
 @dataclass(frozen=True)
@@ -49,9 +59,7 @@ class ProjectPaths:
 
 @rule
 async def find_node_js_projects(all_package_json: AllPackageJson) -> AllNodeJSProjects:
-    project_paths = (
-        ProjectPaths(pkg.root_dir, ["", *(pkg.workspaces_ or ())]) for pkg in all_package_json
-    )
+    project_paths = (ProjectPaths(pkg.root_dir, ["", *pkg.workspaces]) for pkg in all_package_json)
 
     node_js_projects = {
         NodeJSProject(
@@ -63,17 +71,17 @@ async def find_node_js_projects(all_package_json: AllPackageJson) -> AllNodeJSPr
 
 
 def _project_to_parents(
-    projects: Iterable[NodeJSProject],
+    projects: set[NodeJSProject],
 ) -> dict[NodeJSProject, list[NodeJSProject]]:
     return {
         project: [
             candidate_parent for candidate_parent in projects if candidate_parent.is_parent(project)
         ]
-        for project in projects
+        for project in sorted(projects, key=lambda p: p.root_dir, reverse=False)
     }
 
 
-def _merge_workspaces(node_js_projects: Iterable[NodeJSProject]) -> Iterable[NodeJSProject]:
+def _merge_workspaces(node_js_projects: set[NodeJSProject]) -> Iterable[NodeJSProject]:
     project_to_parents = _project_to_parents(node_js_projects)
     while any(parents for parents in project_to_parents.values()):
         _ensure_one_parent(project_to_parents)

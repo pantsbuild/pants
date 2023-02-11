@@ -56,47 +56,6 @@ def get_inferred_package_jsons_address(
     ).include
 
 
-def test_infers_workspace_dependency(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files(
-        {
-            "src/js/BUILD": "package_json()",
-            "src/js/package.json": given_package_with_workspaces("ham", "0.0.1", "bar"),
-            "src/js/bar/BUILD": "package_json()",
-            "src/js/bar/package.json": given_package("spam", "0.0.2"),
-        }
-    )
-    tgt = rule_runner.get_target(Address("src/js/bar", generated_name="spam"))
-
-    inferred = get_inferred_package_jsons_address(rule_runner, tgt)
-
-    assert set(inferred) == {Address("src/js", generated_name="ham")}
-
-
-def test_infers_nested_workspace_dependencies(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files(
-        {
-            "src/js/BUILD": "package_json()",
-            "src/js/package.json": given_package_with_workspaces("ham", "0.0.1", "bar"),
-            "src/js/bar/BUILD": "package_json()",
-            "src/js/bar/package.json": given_package_with_workspaces("spam", "0.0.2", "baz"),
-            "src/js/bar/baz/BUILD": "package_json()",
-            "src/js/bar/baz/package.json": given_package("egg", "0.0.3"),
-        }
-    )
-
-    root_tgt = rule_runner.get_target(Address("src/js", generated_name="ham"))
-    child_tgt = rule_runner.get_target(Address("src/js/bar", generated_name="spam"))
-    grandchild_tgt = rule_runner.get_target(Address("src/js/bar/baz", generated_name="egg"))
-
-    inferred_from_root = get_inferred_package_jsons_address(rule_runner, root_tgt)
-    inferred_from_child = get_inferred_package_jsons_address(rule_runner, child_tgt)
-    inferred_from_grandchild = get_inferred_package_jsons_address(rule_runner, grandchild_tgt)
-
-    assert not inferred_from_root
-    assert set(inferred_from_child) == {Address("src/js", generated_name="ham")}
-    assert set(inferred_from_grandchild) == {Address("src/js/bar", generated_name="spam")}
-
-
 def test_infers_esmodule_js_dependencies(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {

@@ -44,7 +44,7 @@ async def determine_package_json_user_resolves(
 ) -> KnownUserResolveNames:
 
     return KnownUserResolveNames(
-        names=tuple(project.root_dir.replace(os.path.sep, ".") for project in all_projects),
+        names=tuple(project.resolve_name for project in all_projects),
         option_name="<generated>",
         requested_resolve_names_cls=RequestedPackageJsonUserResolveNames,
     )
@@ -54,13 +54,11 @@ async def determine_package_json_user_resolves(
 async def setup_user_lockfile_requests(
     requested: RequestedPackageJsonUserResolveNames, all_projects: AllNodeJSProjects
 ) -> UserGenerateLockfiles:
-    projects_by_name = {
-        project.root_dir.replace(os.path.sep, "."): project for project in all_projects
-    }
+    projects_by_name = {project.resolve_name: project for project in all_projects}
     return UserGenerateLockfiles(
         GeneratePackageLockJsonFile(
             resolve_name=name,
-            lockfile_dest=f"{name.replace(os.path.sep, '.')}{os.path.sep}package-lock.json",
+            lockfile_dest=os.path.join(projects_by_name[name].root_dir, "package-lock.json"),
             diff=False,
             project=projects_by_name[name],
         )

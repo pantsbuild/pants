@@ -44,7 +44,6 @@ from pants.engine.target import (
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.option.global_options import UnmatchedBuildFileGlobs
 from pants.util.frozendict import FrozenDict
-from pants.util.ordered_set import OrderedSet
 from pants.util.strutil import softwrap
 
 
@@ -315,8 +314,7 @@ class PackageJson:
     name: str
     version: str
     snapshot: Snapshot
-    workspaces: tuple[PackageJson, ...] = ()
-    workspaces_: tuple[str, ...] | None = None
+    workspaces: tuple[str, ...] = ()
     module: Literal["commonjs", "module"] | None = None
     dependencies: FrozenDict[str, str] = field(default_factory=FrozenDict)
 
@@ -338,32 +336,13 @@ class PackageJson:
     def root_dir(self) -> str:
         return os.path.dirname(self.file)
 
-    @property
-    def workspace_digests(self) -> Iterable[Digest]:
-        yield self.digest
-        for workspace in self.workspaces:
-            yield from workspace.workspace_digests
-
 
 class FirstPartyNodePackageTargets(Targets):
     pass
 
 
 class AllPackageJson(Collection[PackageJson]):
-    def root_pkg_json(self, name: str) -> PackageJson:
-        """Find the root package.json in a workspace for an in-repo package name.
-
-        If the package is not part of a workspace, or is the root, its own `PackageJson` is
-        returned.
-        """
-        pkgs_by_name = {pkg.name: pkg for pkg in self}
-        workspace_pkgs = OrderedSet(pkg for pkg in pkgs_by_name.values() if pkg.workspaces)
-        current_root = pkgs_by_name[name]
-        while workspace_pkgs:
-            pkg = workspace_pkgs.pop()
-            if current_root in pkg.workspaces:
-                current_root = pkg
-        return current_root
+    pass
 
 
 class PackageJsonForGlobs(Collection[PackageJson]):
@@ -423,28 +402,13 @@ async def read_package_jsons(globs: PathGlobs) -> PackageJsonForGlobs:
     pkgs = []
     for digest_content in digest_contents:
         parsed_package_json = FrozenDict.deep_freeze(json.loads(digest_content.content))
-
-        self_reference = f"{os.path.curdir}{os.sep}"
-        workspaces = await Get(
-            PackageJsonForGlobs,
-            PathGlobs(
-                os.path.join(
-                    os.path.dirname(digest_content.path),
-                    workspace_dir,
-                    PackageJsonSourceField.default,
-                )
-                for workspace_dir in parsed_package_json.get("workspaces", ())
-                if workspace_dir != self_reference
-            ),
-        )
         pkg = PackageJson(
             content=parsed_package_json,
             name=parsed_package_json["name"],
             version=parsed_package_json["version"],
             snapshot=await Get(Snapshot, PathGlobs([digest_content.path])),
             module=parsed_package_json.get("type"),
-            workspaces=tuple(workspaces),
-            workspaces_=parsed_package_json.get("workspaces"),
+            workspaces=tuple(parsed_package_json.get("workspaces", ())),
             dependencies=FrozenDict.deep_freeze(
                 {
                     **parsed_package_json.get("dependencies", {}),
