@@ -16,13 +16,14 @@ use testutil::data::{TestData, TestDirectory};
 use testutil::{owned_string_vec, relative_paths};
 use workunit_store::{RunningWorkunit, WorkunitStore};
 
-use super::docker::SANDBOX_BASE_PATH_IN_CONTAINER;
-use crate::docker::{DockerOnceCell, ImagePullCache};
+use crate::docker::{
+  DockerOnceCell, DockerStrategy, ImagePullCache, SANDBOX_BASE_PATH_IN_CONTAINER,
+};
 use crate::local::KeepSandboxes;
 use crate::local_tests::named_caches_and_immutable_inputs;
 use crate::{
-  local, CacheName, CommandRunner, Context, FallibleProcessResultWithPlatform, InputDigests,
-  Platform, Process, ProcessError,
+  CacheName, CommandRunner, Context, FallibleProcessResultWithPlatform, InputDigests, Platform,
+  Process, ProcessError,
 };
 
 /// Docker image to use for most tests in this file.
@@ -30,6 +31,8 @@ const IMAGE: &str = "busybox:1.34.1";
 
 /// Path to `sh` within the image.
 const SH_PATH: &str = "/bin/sh";
+
+const STRATEGIES: [DockerStrategy; 2] = [DockerStrategy::Uncached, DockerStrategy::Cached];
 
 #[derive(PartialEq, Debug)]
 struct LocalTestResult {
@@ -88,6 +91,7 @@ async fn runner_errors_if_docker_image_not_set() {
   let err = run_command_via_docker(
     Process::new(owned_string_vec(&["/bin/echo", "-n", "foo"]))
       .docker("does-not-exist:latest".to_owned()),
+    DockerStrategy::Cached,
   )
   .await
   .unwrap_err();
@@ -98,13 +102,14 @@ async fn runner_errors_if_docker_image_not_set() {
   }
 
   // Otherwise, if docker_image is not set, use the local runner.
-  let err = run_command_via_docker(Process::new(owned_string_vec(&["/bin/echo", "-n", "foo"])))
-    .await
-    .unwrap_err();
+  let err = run_command_via_docker(
+    Process::new(owned_string_vec(&["/bin/echo", "-n", "foo"])),
+    DockerStrategy::Cached,
+  )
+  .await
+  .unwrap_err();
   if let ProcessError::Unclassified(msg) = &err {
-    assert!(
-      msg.contains("The Docker execution strategy was not set on the Process, but the Docker CommandRunner was used")
-    );
+    assert!(msg.ends_with(", but the Docker CommandRunner was used."));
   } else {
     panic!("unexpected value: {err:?}")
   }
@@ -114,37 +119,43 @@ async fn runner_errors_if_docker_image_not_set() {
 #[cfg(unix)]
 async fn stdout() {
   skip_if_no_docker_available_in_macos_ci!();
-  let result = run_command_via_docker(
-    Process::new(owned_string_vec(&["/bin/echo", "-n", "foo"])).docker(IMAGE.to_owned()),
-  )
-  .await
-  .unwrap();
+  for strategy in STRATEGIES {
+    let result = run_command_via_docker(
+      Process::new(owned_string_vec(&["/bin/echo", "-n", "foo"])).docker(IMAGE.to_owned()),
+      strategy,
+    )
+    .await
+    .unwrap();
 
-  assert_eq!(result.stdout_bytes, "foo".as_bytes());
-  assert_eq!(result.stderr_bytes, "".as_bytes());
-  assert_eq!(result.original.exit_code, 0);
-  assert_eq!(result.original.output_directory, *EMPTY_DIRECTORY_DIGEST);
+    assert_eq!(result.stdout_bytes, "foo".as_bytes());
+    assert_eq!(result.stderr_bytes, "".as_bytes());
+    assert_eq!(result.original.exit_code, 0);
+    assert_eq!(result.original.output_directory, *EMPTY_DIRECTORY_DIGEST);
+  }
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 #[cfg(unix)]
 async fn stdout_and_stderr_and_exit_code() {
   skip_if_no_docker_available_in_macos_ci!();
-  let result = run_command_via_docker(
-    Process::new(owned_string_vec(&[
-      SH_PATH,
-      "-c",
-      "echo -n foo ; echo >&2 -n bar ; exit 1",
-    ]))
-    .docker(IMAGE.to_owned()),
-  )
-  .await
-  .unwrap();
+  for strategy in STRATEGIES {
+    let result = run_command_via_docker(
+      Process::new(owned_string_vec(&[
+        SH_PATH,
+        "-c",
+        "echo -n foo ; echo >&2 -n bar ; exit 1",
+      ]))
+      .docker(IMAGE.to_owned()),
+      strategy,
+    )
+    .await
+    .unwrap();
 
-  assert_eq!(result.stdout_bytes, "foo".as_bytes());
-  assert_eq!(result.stderr_bytes, "bar".as_bytes());
-  assert_eq!(result.original.exit_code, 1);
-  assert_eq!(result.original.output_directory, *EMPTY_DIRECTORY_DIGEST);
+    assert_eq!(result.stdout_bytes, "foo".as_bytes());
+    assert_eq!(result.stderr_bytes, "bar".as_bytes());
+    assert_eq!(result.original.exit_code, 1);
+    assert_eq!(result.original.output_directory, *EMPTY_DIRECTORY_DIGEST);
+  }
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
@@ -153,20 +164,23 @@ async fn capture_exit_code_signal() {
   skip_if_no_docker_available_in_macos_ci!();
 
   // Launch a process that kills itself with a signal.
-  let result = run_command_via_docker(
-    Process::new(owned_string_vec(&[SH_PATH, "-c", "kill $$"])).docker(IMAGE.to_owned()),
-  )
-  .await
-  .unwrap();
+  for strategy in STRATEGIES {
+    let result = run_command_via_docker(
+      Process::new(owned_string_vec(&[SH_PATH, "-c", "kill $$"])).docker(IMAGE.to_owned()),
+      strategy,
+    )
+    .await
+    .unwrap();
 
-  assert_eq!(result.stdout_bytes, "".as_bytes());
-  assert_eq!(result.stderr_bytes, "".as_bytes());
-  // DOCKER-TODO: Figure out a way to capture the signal from the container. Docker does not
-  // seem to make that available. The `143` code comes from the init process in the container.
-  // assert_eq!(result.original.exit_code, -15);
-  assert_eq!(result.original.exit_code, 143);
-  assert_eq!(result.original.output_directory, *EMPTY_DIRECTORY_DIGEST);
-  assert_eq!(result.original.platform, platform_for_tests().unwrap());
+    assert_eq!(result.stdout_bytes, "".as_bytes());
+    assert_eq!(result.stderr_bytes, "".as_bytes());
+    // DOCKER-TODO: Figure out a way to capture the signal from the container. Docker does not
+    // seem to make that available. The `143` code comes from the init process in the container.
+    // assert_eq!(result.original.exit_code, -15);
+    assert_eq!(result.original.exit_code, 143);
+    assert_eq!(result.original.output_directory, *EMPTY_DIRECTORY_DIGEST);
+    assert_eq!(result.original.platform, platform_for_tests().unwrap());
+  }
 }
 
 fn extract_env(
@@ -174,7 +188,7 @@ fn extract_env(
   exclude_keys: &[&str],
 ) -> Result<BTreeMap<String, String>, String> {
   let content =
-    String::from_utf8(content).map_err(|_| "Invalid UTF-8 in env output".to_string())?;
+    String::from_utf8(content).map_err(|e| format!("Invalid UTF-8 in env output: {e}"))?;
   let result = content
     .split('\n')
     .filter(|line| !line.is_empty())
@@ -195,21 +209,24 @@ fn extract_env(
 async fn env() {
   skip_if_no_docker_available_in_macos_ci!();
 
-  let mut env: BTreeMap<String, String> = BTreeMap::new();
-  env.insert("FOO".to_string(), "foo".to_string());
-  env.insert("BAR".to_string(), "not foo".to_string());
+  for strategy in STRATEGIES {
+    let mut env: BTreeMap<String, String> = BTreeMap::new();
+    env.insert("FOO".to_string(), "foo".to_string());
+    env.insert("BAR".to_string(), "not foo".to_string());
 
-  let result = run_command_via_docker(
-    Process::new(owned_string_vec(&["/bin/env"]))
-      .env(env.clone())
-      .docker(IMAGE.to_owned()),
-  )
-  .await
-  .unwrap();
+    let result = run_command_via_docker(
+      Process::new(owned_string_vec(&["/bin/env"]))
+        .env(env.clone())
+        .docker(IMAGE.to_owned()),
+      strategy,
+    )
+    .await
+    .unwrap();
 
-  let exclude_keys = &["PATH", "HOME", "HOSTNAME"];
-  let got_env = extract_env(result.stdout_bytes, exclude_keys).unwrap();
-  assert_eq!(env, got_env);
+    let exclude_keys = &["PATH", "HOME", "HOSTNAME"];
+    let got_env = extract_env(result.stdout_bytes, exclude_keys).unwrap();
+    assert_eq!(env, got_env);
+  }
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
@@ -226,13 +243,19 @@ async fn env_is_deterministic() {
       .docker(IMAGE.to_owned())
   }
 
-  let result1 = run_command_via_docker(make_request()).await.unwrap();
-  let result2 = run_command_via_docker(make_request()).await.unwrap();
+  for strategy in STRATEGIES {
+    let result1 = run_command_via_docker(make_request(), strategy)
+      .await
+      .unwrap();
+    let result2 = run_command_via_docker(make_request(), strategy)
+      .await
+      .unwrap();
 
-  let exclude_keys = &["PATH", "HOME", "HOSTNAME"];
-  let env1 = extract_env(result1.stdout_bytes, exclude_keys).unwrap();
-  let env2 = extract_env(result2.stdout_bytes, exclude_keys).unwrap();
-  assert_eq!(env1, env2);
+    let exclude_keys = &["PATH", "HOME", "HOSTNAME"];
+    let env1 = extract_env(result1.stdout_bytes, exclude_keys).unwrap();
+    let env2 = extract_env(result2.stdout_bytes, exclude_keys).unwrap();
+    assert_eq!(env1, env2);
+  }
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
@@ -240,29 +263,44 @@ async fn binary_not_found() {
   skip_if_no_docker_available_in_macos_ci!();
 
   // Use `xyzzy` as a command that should not exist.
-  let result = run_command_via_docker(
-    Process::new(owned_string_vec(&["xyzzy", "-n", "foo"])).docker(IMAGE.to_owned()),
-  )
-  .await
-  .unwrap();
-  let stdout = String::from_utf8(result.stdout_bytes).unwrap();
-  assert!(stdout.contains("exec failed"));
+  for strategy in STRATEGIES {
+    let result = run_command_via_docker(
+      Process::new(owned_string_vec(&["xyzzy", "-n", "foo"])).docker(IMAGE.to_owned()),
+      strategy,
+    )
+    .await
+    .unwrap();
+
+    match strategy {
+      DockerStrategy::Cached => {
+        let stdout = String::from_utf8(result.stdout_bytes).unwrap();
+        assert!(stdout.contains("exec failed"));
+      }
+      DockerStrategy::Uncached => {
+        let stderr = String::from_utf8(result.stderr_bytes).unwrap();
+        assert!(stderr.contains("exec xyzzy failed"));
+      }
+    }
+  }
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 async fn output_files_none() {
   skip_if_no_docker_available_in_macos_ci!();
 
-  let result = run_command_via_docker(
-    Process::new(owned_string_vec(&[SH_PATH, "-c", "exit 0"])).docker(IMAGE.to_owned()),
-  )
-  .await
-  .unwrap();
+  for strategy in STRATEGIES {
+    let result = run_command_via_docker(
+      Process::new(owned_string_vec(&[SH_PATH, "-c", "exit 0"])).docker(IMAGE.to_owned()),
+      strategy,
+    )
+    .await
+    .unwrap();
 
-  assert_eq!(result.stdout_bytes, "".as_bytes());
-  assert_eq!(result.stderr_bytes, "".as_bytes());
-  assert_eq!(result.original.exit_code, 0);
-  assert_eq!(result.original.output_directory, *EMPTY_DIRECTORY_DIGEST);
+    assert_eq!(result.stdout_bytes, "".as_bytes());
+    assert_eq!(result.stderr_bytes, "".as_bytes());
+    assert_eq!(result.original.exit_code, 0);
+    assert_eq!(result.original.output_directory, *EMPTY_DIRECTORY_DIGEST);
+  }
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
@@ -277,6 +315,7 @@ async fn output_files_one() {
     ])
     .output_files(relative_paths(&["roland.ext"]).collect())
     .docker(IMAGE.to_owned()),
+    DockerStrategy::Cached,
   )
   .await
   .unwrap();
@@ -308,6 +347,7 @@ async fn output_dirs() {
     .output_files(relative_paths(&["treats.ext"]).collect())
     .output_directories(relative_paths(&["cats"]).collect())
     .docker(IMAGE.to_owned()),
+    DockerStrategy::Cached,
   )
   .await
   .unwrap();
@@ -338,6 +378,7 @@ async fn output_files_many() {
     ])
     .output_files(relative_paths(&["cats/roland.ext", "treats.ext"]).collect())
     .docker(IMAGE.to_owned()),
+    DockerStrategy::Cached,
   )
   .await
   .unwrap();
@@ -367,6 +408,7 @@ async fn output_files_execution_failure() {
     ])
     .output_files(relative_paths(&["roland.ext"]).collect())
     .docker(IMAGE.to_owned()),
+    DockerStrategy::Cached,
   )
   .await
   .unwrap();
@@ -397,6 +439,7 @@ async fn output_files_partial_output() {
         .collect(),
     )
     .docker(IMAGE.to_owned()),
+    DockerStrategy::Cached,
   )
   .await
   .unwrap();
@@ -424,6 +467,7 @@ async fn output_overlapping_file_and_dir() {
     .output_files(relative_paths(&["cats/roland.ext"]).collect())
     .output_directories(relative_paths(&["cats"]).collect())
     .docker(IMAGE.to_owned()),
+    DockerStrategy::Cached,
   )
   .await
   .unwrap();
@@ -450,6 +494,7 @@ async fn append_only_cache_created() {
     Process::new(owned_string_vec(&["/bin/ls", dest_base]))
       .append_only_caches(vec![(cache_name, cache_dest)].into_iter().collect())
       .docker(IMAGE.to_owned()),
+    DockerStrategy::Cached,
   )
   .await
   .unwrap();
@@ -462,50 +507,36 @@ async fn append_only_cache_created() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
-#[cfg(unix)]
-async fn test_apply_chroot() {
-  let mut env: BTreeMap<String, String> = BTreeMap::new();
-  env.insert("PATH".to_string(), "/usr/bin:{chroot}/bin".to_string());
-
-  let work_dir = TempDir::new().unwrap();
-  let mut req = Process::new(owned_string_vec(&["/usr/bin/env"]))
-    .env(env.clone())
-    .docker(IMAGE.to_owned());
-  local::apply_chroot(work_dir.path().to_str().unwrap(), &mut req);
-
-  let path = format!("/usr/bin:{}/bin", work_dir.path().to_str().unwrap());
-
-  assert_eq!(&path, req.env.get(&"PATH".to_string()).unwrap());
-}
-
-#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 async fn test_chroot_placeholder() {
   skip_if_no_docker_available_in_macos_ci!();
 
-  let (_, mut workunit) = WorkunitStore::setup_for_tests();
-  let mut env: BTreeMap<String, String> = BTreeMap::new();
-  env.insert("PATH".to_string(), "/usr/bin:{chroot}/bin".to_string());
+  for strategy in STRATEGIES {
+    let (_, mut workunit) = WorkunitStore::setup_for_tests();
+    let mut env: BTreeMap<String, String> = BTreeMap::new();
+    env.insert("PATH".to_string(), "/usr/bin:{chroot}/bin".to_string());
 
-  let work_tmpdir = TempDir::new().unwrap();
-  let work_root = work_tmpdir.path().to_owned();
+    let work_tmpdir = TempDir::new().unwrap();
+    let work_root = work_tmpdir.path().to_owned();
 
-  let result = run_command_via_docker_in_dir(
-    Process::new(vec!["/bin/env".to_owned()])
-      .env(env.clone())
-      .docker(IMAGE.to_owned()),
-    work_root.clone(),
-    KeepSandboxes::Always,
-    &mut workunit,
-    None,
-    None,
-  )
-  .await
-  .unwrap();
+    let result = run_command_via_docker_in_dir(
+      Process::new(vec!["/bin/env".to_owned()])
+        .env(env.clone())
+        .docker(IMAGE.to_owned()),
+      work_root.clone(),
+      KeepSandboxes::Always,
+      strategy,
+      &mut workunit,
+      None,
+      None,
+    )
+    .await
+    .unwrap();
 
-  let got_env = extract_env(result.stdout_bytes, &[]).unwrap();
-  let path = format!("/usr/bin:{SANDBOX_BASE_PATH_IN_CONTAINER}");
-  assert!(got_env.get(&"PATH".to_string()).unwrap().starts_with(&path));
-  assert!(got_env.get(&"PATH".to_string()).unwrap().ends_with("/bin"));
+    let got_env = extract_env(result.stdout_bytes, &[]).unwrap();
+    let path = format!("/usr/bin:{SANDBOX_BASE_PATH_IN_CONTAINER}");
+    assert!(got_env.get(&"PATH".to_string()).unwrap().starts_with(&path));
+    assert!(got_env.get(&"PATH".to_string()).unwrap().ends_with("/bin"));
+  }
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
@@ -527,6 +558,7 @@ async fn all_containing_directories_for_outputs_are_created() {
     .output_files(relative_paths(&["cats/roland.ext"]).collect())
     .output_directories(relative_paths(&["birds/falcons"]).collect())
     .docker(IMAGE.to_owned()),
+    DockerStrategy::Cached,
   )
   .await
   .unwrap();
@@ -553,6 +585,7 @@ async fn output_empty_dir() {
     ])
     .output_directories(relative_paths(&["falcons"]).collect())
     .docker(IMAGE.to_owned()),
+    DockerStrategy::Cached,
   )
   .await
   .unwrap();
@@ -571,158 +604,167 @@ async fn output_empty_dir() {
 async fn timeout() {
   skip_if_no_docker_available_in_macos_ci!();
 
-  let argv = vec![
-    SH_PATH.to_string(),
-    "-c".to_owned(),
-    "/bin/echo -n 'Calculating...'; /bin/sleep 5; /bin/echo -n 'European Burmese'".to_string(),
-  ];
+  for strategy in STRATEGIES {
+    let argv = vec![
+      SH_PATH.to_string(),
+      "-c".to_owned(),
+      "/bin/echo -n 'Calculating...'; /bin/sleep 5; /bin/echo -n 'European Burmese'".to_string(),
+    ];
 
-  let mut process = Process::new(argv).docker(IMAGE.to_owned());
-  process.timeout = Some(Duration::from_secs(2));
-  process.description = "sleepy-cat".to_string();
+    let mut process = Process::new(argv).docker(IMAGE.to_owned());
+    process.timeout = Some(Duration::from_secs(2));
+    process.description = "sleepy-cat".to_string();
 
-  let result = run_command_via_docker(process).await.unwrap();
+    let result = run_command_via_docker(process, strategy).await.unwrap();
 
-  assert_eq!(result.original.exit_code, -15);
-  let stdout = String::from_utf8(result.stdout_bytes.to_vec()).unwrap();
-  let stderr = String::from_utf8(result.stderr_bytes.to_vec()).unwrap();
-  assert_that(&stdout).contains("Calculating...");
-  assert_that(&stderr).contains("Exceeded timeout");
-  assert_that(&stderr).contains("sleepy-cat");
+    assert_eq!(result.original.exit_code, -15);
+    let stdout = String::from_utf8(result.stdout_bytes.to_vec()).unwrap();
+    let stderr = String::from_utf8(result.stderr_bytes.to_vec()).unwrap();
+    assert_that(&stdout).contains("Calculating...");
+    assert_that(&stderr).contains("Exceeded timeout");
+    assert_that(&stderr).contains("sleepy-cat");
+  }
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 async fn working_directory() {
   skip_if_no_docker_available_in_macos_ci!();
-  let (_, mut workunit) = WorkunitStore::setup_for_tests();
+  for strategy in STRATEGIES {
+    let (_, mut workunit) = WorkunitStore::setup_for_tests();
 
-  let store_dir = TempDir::new().unwrap();
-  let executor = task_executor::Executor::new();
-  let store = Store::local_only(executor.clone(), store_dir.path()).unwrap();
+    let store_dir = TempDir::new().unwrap();
+    let executor = task_executor::Executor::new();
+    let store = Store::local_only(executor.clone(), store_dir.path()).unwrap();
 
-  // Prepare the store to contain /cats/roland.ext, because the EPR needs to materialize it and
-  // then run from the ./cats directory.
-  store
-    .store_file_bytes(TestData::roland().bytes(), false)
+    // Prepare the store to contain /cats/roland.ext, because the EPR needs to materialize it and
+    // then run from the ./cats directory.
+    store
+      .store_file_bytes(TestData::roland().bytes(), false)
+      .await
+      .expect("Error saving file bytes");
+    store
+      .record_directory(&TestDirectory::containing_roland().directory(), true)
+      .await
+      .expect("Error saving directory");
+    store
+      .record_directory(&TestDirectory::nested().directory(), true)
+      .await
+      .expect("Error saving directory");
+
+    let work_dir = TempDir::new().unwrap();
+
+    let mut process = Process::new(vec![
+      SH_PATH.to_string(),
+      "-c".to_owned(),
+      "/bin/ls".to_string(),
+    ])
+    .docker(IMAGE.to_owned());
+    process.working_directory = Some(RelativePath::new("cats").unwrap());
+    process.output_directories = relative_paths(&["roland.ext"]).collect::<BTreeSet<_>>();
+    process.input_digests =
+      InputDigests::with_input_files(TestDirectory::nested().directory_digest());
+    process.timeout = Some(Duration::from_secs(1));
+    process.description = "confused-cat".to_string();
+
+    let result = run_command_via_docker_in_dir(
+      process,
+      work_dir.path().to_owned(),
+      KeepSandboxes::Never,
+      strategy,
+      &mut workunit,
+      Some(store),
+      Some(executor),
+    )
     .await
-    .expect("Error saving file bytes");
-  store
-    .record_directory(&TestDirectory::containing_roland().directory(), true)
-    .await
-    .expect("Error saving directory");
-  store
-    .record_directory(&TestDirectory::nested().directory(), true)
-    .await
-    .expect("Error saving directory");
+    .unwrap();
 
-  let work_dir = TempDir::new().unwrap();
-
-  let mut process = Process::new(vec![
-    SH_PATH.to_string(),
-    "-c".to_owned(),
-    "/bin/ls".to_string(),
-  ])
-  .docker(IMAGE.to_owned());
-  process.working_directory = Some(RelativePath::new("cats").unwrap());
-  process.output_directories = relative_paths(&["roland.ext"]).collect::<BTreeSet<_>>();
-  process.input_digests =
-    InputDigests::with_input_files(TestDirectory::nested().directory_digest());
-  process.timeout = Some(Duration::from_secs(1));
-  process.description = "confused-cat".to_string();
-
-  let result = run_command_via_docker_in_dir(
-    process,
-    work_dir.path().to_owned(),
-    KeepSandboxes::Never,
-    &mut workunit,
-    Some(store),
-    Some(executor),
-  )
-  .await
-  .unwrap();
-
-  assert_eq!(result.stdout_bytes, "roland.ext\n".as_bytes());
-  assert_eq!(result.stderr_bytes, "".as_bytes());
-  assert_eq!(result.original.exit_code, 0);
-  assert_eq!(
-    result.original.output_directory,
-    TestDirectory::containing_roland().directory_digest()
-  );
-  assert_eq!(result.original.platform, platform_for_tests().unwrap());
+    assert_eq!(result.stdout_bytes, "roland.ext\n".as_bytes());
+    assert_eq!(result.stderr_bytes, "".as_bytes());
+    assert_eq!(result.original.exit_code, 0);
+    assert_eq!(
+      result.original.output_directory,
+      TestDirectory::containing_roland().directory_digest()
+    );
+    assert_eq!(result.original.platform, platform_for_tests().unwrap());
+  }
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 async fn immutable_inputs() {
   skip_if_no_docker_available_in_macos_ci!();
-  let (_, mut workunit) = WorkunitStore::setup_for_tests();
+  for strategy in STRATEGIES {
+    let (_, mut workunit) = WorkunitStore::setup_for_tests();
 
-  let store_dir = TempDir::new().unwrap();
-  let executor = task_executor::Executor::new();
-  let store = Store::local_only(executor.clone(), store_dir.path()).unwrap();
+    let store_dir = TempDir::new().unwrap();
+    let executor = task_executor::Executor::new();
+    let store = Store::local_only(executor.clone(), store_dir.path()).unwrap();
 
-  store
-    .store_file_bytes(TestData::roland().bytes(), false)
+    store
+      .store_file_bytes(TestData::roland().bytes(), false)
+      .await
+      .expect("Error saving file bytes");
+    store
+      .record_directory(&TestDirectory::containing_roland().directory(), true)
+      .await
+      .expect("Error saving directory");
+    store
+      .record_directory(&TestDirectory::containing_falcons_dir().directory(), true)
+      .await
+      .expect("Error saving directory");
+
+    let work_dir = TempDir::new().unwrap();
+
+    let mut process = Process::new(vec![
+      SH_PATH.to_string(),
+      "-c".to_owned(),
+      "/bin/ls".to_string(),
+    ])
+    .docker(IMAGE.to_owned());
+    process.input_digests = InputDigests::new(
+      &store,
+      TestDirectory::containing_falcons_dir().directory_digest(),
+      {
+        let mut map = BTreeMap::new();
+        map.insert(
+          RelativePath::new("cats").unwrap(),
+          TestDirectory::containing_roland().directory_digest(),
+        );
+        map
+      },
+      BTreeSet::default(),
+    )
     .await
-    .expect("Error saving file bytes");
-  store
-    .record_directory(&TestDirectory::containing_roland().directory(), true)
+    .unwrap();
+    process.timeout = Some(Duration::from_secs(1));
+    process.description = "confused-cat".to_string();
+
+    let result = run_command_via_docker_in_dir(
+      process,
+      work_dir.path().to_owned(),
+      KeepSandboxes::Never,
+      strategy,
+      &mut workunit,
+      Some(store),
+      Some(executor),
+    )
     .await
-    .expect("Error saving directory");
-  store
-    .record_directory(&TestDirectory::containing_falcons_dir().directory(), true)
-    .await
-    .expect("Error saving directory");
+    .unwrap();
 
-  let work_dir = TempDir::new().unwrap();
-
-  let mut process = Process::new(vec![
-    SH_PATH.to_string(),
-    "-c".to_owned(),
-    "/bin/ls".to_string(),
-  ])
-  .docker(IMAGE.to_owned());
-  process.input_digests = InputDigests::new(
-    &store,
-    TestDirectory::containing_falcons_dir().directory_digest(),
-    {
-      let mut map = BTreeMap::new();
-      map.insert(
-        RelativePath::new("cats").unwrap(),
-        TestDirectory::containing_roland().directory_digest(),
-      );
-      map
-    },
-    BTreeSet::default(),
-  )
-  .await
-  .unwrap();
-  process.timeout = Some(Duration::from_secs(1));
-  process.description = "confused-cat".to_string();
-
-  let result = run_command_via_docker_in_dir(
-    process,
-    work_dir.path().to_owned(),
-    KeepSandboxes::Never,
-    &mut workunit,
-    Some(store),
-    Some(executor),
-  )
-  .await
-  .unwrap();
-
-  let stdout_lines = std::str::from_utf8(&result.stdout_bytes)
-    .unwrap()
-    .lines()
-    .collect::<HashSet<_>>();
-  assert_eq!(stdout_lines, hashset! {"falcons", "cats"});
-  assert_eq!(result.stderr_bytes, "".as_bytes());
-  assert_eq!(result.original.exit_code, 0);
+    let stdout_lines = std::str::from_utf8(&result.stdout_bytes)
+      .unwrap()
+      .lines()
+      .collect::<HashSet<_>>();
+    assert_eq!(stdout_lines, hashset! {"falcons", "cats"});
+    assert_eq!(result.stderr_bytes, "".as_bytes());
+    assert_eq!(result.original.exit_code, 0);
+  }
 }
 
 async fn run_command_via_docker_in_dir(
   mut req: Process,
   dir: PathBuf,
   cleanup: KeepSandboxes,
+  strategy: DockerStrategy,
   workunit: &mut RunningWorkunit,
   store: Option<Store>,
   executor: Option<task_executor::Executor>,
@@ -746,6 +788,7 @@ async fn run_command_via_docker_in_dir(
     named_caches,
     immutable_inputs,
     cleanup,
+    strategy,
   )?;
   let result: Result<_, ProcessError> = async {
     let original = runner.run(Context::default(), workunit, req).await?;
@@ -767,7 +810,10 @@ async fn run_command_via_docker_in_dir(
   })
 }
 
-async fn run_command_via_docker(req: Process) -> Result<LocalTestResult, ProcessError> {
+async fn run_command_via_docker(
+  req: Process,
+  strategy: DockerStrategy,
+) -> Result<LocalTestResult, ProcessError> {
   let (_, mut workunit) = WorkunitStore::setup_for_tests();
   let work_dir = TempDir::new().unwrap();
   let work_dir_path = work_dir.path().to_owned();
@@ -775,6 +821,7 @@ async fn run_command_via_docker(req: Process) -> Result<LocalTestResult, Process
     req,
     work_dir_path,
     KeepSandboxes::Never,
+    strategy,
     &mut workunit,
     None,
     None,

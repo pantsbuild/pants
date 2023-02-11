@@ -2375,6 +2375,7 @@ dependencies = [
  "nails",
  "nix",
  "once_cell",
+ "os_pipe",
  "parking_lot 0.12.1",
  "prost",
  "prost-types",

@@ -7,9 +7,12 @@ use std::sync::Arc;
 
 use async_oncecell::OnceCell;
 use async_trait::async_trait;
-use bollard::container::{CreateContainerOptions, LogOutput, RemoveContainerOptions};
+use bollard::container::{
+  AttachContainerResults, CreateContainerOptions, LogOutput, RemoveContainerOptions,
+};
 use bollard::exec::StartExecResults;
 use bollard::image::CreateImageOptions;
+use bollard::models::ContainerWaitResponse;
 use bollard::service::CreateImageInfo;
 use bollard::{errors::Error as DockerError, Docker};
 use futures::stream::BoxStream;
@@ -18,6 +21,7 @@ use log::Level;
 use nails::execution::ExitCode;
 use once_cell::sync::Lazy;
 use parking_lot::Mutex;
+
 use store::{ImmutableInputs, Store};
 use task_executor::Executor;
 use workunit_store::{in_workunit, Metric, RunningWorkunit};
@@ -41,6 +45,15 @@ pub static IMAGE_PULL_CACHE: Lazy<ImagePullCache> = Lazy::new(ImagePullCache::ne
 /// Process-wide Docker connection.
 pub static DOCKER: Lazy<DockerOnceCell> = Lazy::new(DockerOnceCell::new);
 
+#[derive(Copy, Clone, Debug, Eq, PartialEq, strum_macros::EnumString)]
+#[strum(serialize_all = "snake_case")]
+pub enum DockerStrategy {
+  // Processes are exec'd inside of existing containers.
+  Cached,
+  // Processes always use new containers.
+  Uncached,
+}
+
 /// `CommandRunner` that executes processes using a local Docker client.
 pub struct CommandRunner<'a> {
   store: Store,
@@ -50,6 +63,7 @@ pub struct CommandRunner<'a> {
   named_caches: NamedCaches,
   immutable_inputs: ImmutableInputs,
   keep_sandboxes: KeepSandboxes,
+  strategy: DockerStrategy,
   container_cache: ContainerCache<'a>,
 }
 
@@ -276,6 +290,11 @@ async fn pull_image(
   Ok(())
 }
 
+type BollardOutputStream =
+  std::pin::Pin<Box<dyn futures::Stream<Item = Result<LogOutput, DockerError>> + Send>>;
+type BollardExitFuture =
+  std::pin::Pin<Box<dyn futures::Future<Output = Result<ExitCode, String>> + Send>>;
+
 impl<'a> CommandRunner<'a> {
   pub fn new(
     store: Store,
@@ -286,6 +305,7 @@ impl<'a> CommandRunner<'a> {
     named_caches: NamedCaches,
     immutable_inputs: ImmutableInputs,
     keep_sandboxes: KeepSandboxes,
+    strategy: DockerStrategy,
   ) -> Result<Self, String> {
     let container_cache = ContainerCache::new(
       docker,
@@ -303,8 +323,198 @@ impl<'a> CommandRunner<'a> {
       named_caches,
       immutable_inputs,
       keep_sandboxes,
+      strategy,
       container_cache,
     })
+  }
+
+  /// Run the given Process in a dedicated container.
+  async fn run_in_dedicated_container(
+    &self,
+    context: &Context,
+    image: &str,
+    platform: &Platform,
+    env: Vec<String>,
+    working_dir: String,
+    argv: Vec<String>,
+  ) -> Result<(String, BollardOutputStream, BollardExitFuture), String> {
+    let docker = self.docker.get().await?;
+
+    // Cache the pulling of the image, but not a container.
+    self
+      .container_cache
+      .image_pull_cache
+      .pull_image(
+        docker,
+        image,
+        platform,
+        ImagePullScope::new(&context.build_id),
+        ImagePullPolicy::OnlyIfLatestOrMissing,
+      )
+      .await?;
+
+    let config = bollard::container::Config {
+      env: Some(env),
+      entrypoint: Some(argv),
+      working_dir: Some(working_dir),
+      host_config: Some(bollard::service::HostConfig {
+        binds: Some(self.container_cache.binds()),
+        // The init process ensures that child processes are properly reaped.
+        init: Some(true),
+        ..bollard::service::HostConfig::default()
+      }),
+      image: Some(image.to_owned()),
+      attach_stdout: Some(true),
+      attach_stderr: Some(true),
+      ..bollard::container::Config::default()
+    };
+
+    log::trace!(
+      "creating new container with config for image `{}`: {:?}",
+      image,
+      &config
+    );
+
+    let create_options = CreateContainerOptions::<&str> {
+      name: "",
+      platform: Some(docker_platform_identifier(platform)),
+    };
+    let container = docker
+      .create_container::<&str, String>(Some(create_options), config)
+      .await
+      .map_err(|err| format!("Failed to create Docker container: {err:?}"))?;
+
+    let AttachContainerResults { output, .. } = docker
+      .attach_container(
+        &container.id,
+        Some(bollard::container::AttachContainerOptions::<String> {
+          stdout: Some(true),
+          stderr: Some(true),
+          logs: Some(true),
+          stream: Some(true),
+          ..bollard::container::AttachContainerOptions::default()
+        }),
+      )
+      .await
+      .map_err(|err| {
+        format!(
+          "Failed to attach to Docker container `{}`: {:?}",
+          &container.id, err
+        )
+      })?;
+
+    docker
+      .start_container::<String>(&container.id, None)
+      .await
+      .map_err(|err| {
+        format!(
+          "Failed to start Docker container `{}` for image `{}`: {:?}",
+          &container.id, image, err
+        )
+      })?;
+
+    let docker = docker.to_owned();
+    let container_id = container.id.to_owned();
+    let exit_future = async move {
+      let (status_code, maybe_error_message) = loop {
+        match docker
+          .wait_container::<&str>(&container_id, None)
+          .next()
+          .await
+        {
+          Some(Ok(ContainerWaitResponse { status_code, error })) => {
+            break (status_code, error.and_then(|e| e.message))
+          }
+          Some(Err(DockerError::DockerContainerWaitError { code, error })) => {
+            break (code, Some(error))
+          }
+          Some(Err(e)) => return Err(format!("Failed to wait for container exit: {e:?}")),
+          None => {
+            log::trace!("Docker wait_container monitoring stream closed early. Reconnecting ...");
+            continue;
+          }
+        };
+      };
+
+      if let Some(error_message) = maybe_error_message {
+        log::error!("Container failed: {error_message}");
+      }
+
+      Ok(ExitCode(status_code as i32))
+    };
+
+    Ok((container.id.to_owned(), output, Box::pin(exit_future)))
+  }
+
+  /// Exec the given Process in a cached container.
+  async fn exec_in_cached_container(
+    &self,
+    context: &Context,
+    image: &str,
+    platform: &Platform,
+    env: Vec<String>,
+    working_dir: String,
+    argv: Vec<String>,
+  ) -> Result<(String, BollardOutputStream, BollardExitFuture), String> {
+    let docker = self.docker.get().await?;
+
+    // Obtain ID of the base container in which to run the execution for this process.
+    let container_id = self
+      .container_cache
+      .container_id_for_image(image, platform, &context.build_id)
+      .await?;
+
+    let config = bollard::exec::CreateExecOptions {
+      env: Some(env),
+      cmd: Some(argv),
+      working_dir: Some(working_dir),
+      attach_stdout: Some(true),
+      attach_stderr: Some(true),
+      ..bollard::exec::CreateExecOptions::default()
+    };
+
+    log::trace!("creating execution with config: {:?}", &config);
+
+    let exec = docker
+      .create_exec::<String>(&container_id, config)
+      .await
+      .map_err(|err| format!("Failed to create Docker execution in container: {err:?}"))?;
+
+    log::trace!("created execution {}", &exec.id);
+
+    let exec_result = docker
+      .start_exec(&exec.id, None)
+      .await
+      .map_err(|err| format!("Failed to start Docker execution `{}`: {:?}", &exec.id, err))?;
+    let output_stream = if let StartExecResults::Attached { output, .. } = exec_result {
+      output.boxed()
+    } else {
+      panic!("Unexpected value returned from start_exec: {exec_result:?}");
+    };
+
+    log::trace!("started execution {}", &exec.id);
+
+    let docker = docker.to_owned();
+    let exec_id = exec.id.to_owned();
+    let exit_future = async move {
+      let exec_metadata = docker.inspect_exec(&exec_id).await.map_err(|err| {
+        format!(
+          "Failed to inspect Docker execution `{}`: {:?}",
+          &exec_id, err
+        )
+      })?;
+
+      let status_code = exec_metadata.exit_code.ok_or_else(|| {
+        format!(
+          "Inspected execution `{}` for exit status but status was missing.",
+          &exec_id
+        )
+      })?;
+
+      Ok(ExitCode(status_code as i32))
+    };
+
+    Ok((exec.id.to_owned(), output_stream, Box::pin(exit_future)))
   }
 }
 
@@ -364,7 +574,7 @@ impl<'a> super::CommandRunner for CommandRunner<'a> {
 
         // Prepare the workdir.
         // DOCKER-NOTE: The input root will be bind mounted into the container.
-        let exclusive_spawn = prepare_workdir(
+        prepare_workdir(
           workdir.path().to_owned(),
           &req,
           req.input_digests.input_files.clone(),
@@ -387,7 +597,8 @@ impl<'a> super::CommandRunner for CommandRunner<'a> {
             self.executor.clone(),
             workdir.path().to_owned(),
             sandbox_path_in_container,
-            exclusive_spawn,
+            // Processes exec'd in Docker never require exclusive spawning.
+            false,
             req.platform,
           )
           .map_err(|msg| {
@@ -445,8 +656,6 @@ impl<'a> CapturedWorkdir for CommandRunner<'a> {
     req: Process,
     _exclusive_spawn: bool,
   ) -> Result<BoxStream<'r, Result<ChildOutput, String>>, String> {
-    let docker = self.docker.get().await?;
-
     let env = req
       .env
       .iter()
@@ -455,6 +664,7 @@ impl<'a> CapturedWorkdir for CommandRunner<'a> {
 
     let working_dir = req
       .working_directory
+      .as_ref()
       .map(|relpath| Path::new(&sandbox_path_in_container).join(relpath))
       .unwrap_or_else(|| Path::new(&sandbox_path_in_container).to_path_buf())
       .into_os_string()
@@ -463,81 +673,50 @@ impl<'a> CapturedWorkdir for CommandRunner<'a> {
         format!("Unable to convert working directory due to non UTF-8 characters: {s:?}")
       })?;
 
-    let image = match req.execution_strategy {
+    let image = match &req.execution_strategy {
       ProcessExecutionStrategy::Docker(image) => Ok(image),
-      _ => Err("The Docker execution strategy was not set on the Process, but the Docker CommandRunner was used.")
+      pes => Err(format!(
+        "The Docker execution strategy was: {pes:?}, but the Docker CommandRunner was used."
+      )),
     }?;
 
-    // Obtain ID of the base container in which to run the execution for this process.
-    let container_id = self
-      .container_cache
-      .container_id_for_image(&image, &req.platform, &context.build_id)
-      .await?;
-
-    let config = bollard::exec::CreateExecOptions {
-      env: Some(env),
-      cmd: Some(req.argv),
-      working_dir: Some(working_dir),
-      attach_stdout: Some(true),
-      attach_stderr: Some(true),
-      ..bollard::exec::CreateExecOptions::default()
+    let (id, mut output_stream, exit_future) = match self.strategy {
+      DockerStrategy::Uncached => {
+        self
+          .run_in_dedicated_container(context, image, &req.platform, env, working_dir, req.argv)
+          .await?
+      }
+      DockerStrategy::Cached => {
+        self
+          .exec_in_cached_container(context, image, &req.platform, env, working_dir, req.argv)
+          .await?
+      }
     };
-
-    log::trace!("creating execution with config: {:?}", &config);
-
-    let exec = docker
-      .create_exec::<String>(&container_id, config)
-      .await
-      .map_err(|err| format!("Failed to create Docker execution in container: {err:?}"))?;
-
-    log::trace!("created execution {}", &exec.id);
-
-    let exec_result = docker
-      .start_exec(&exec.id, None)
-      .await
-      .map_err(|err| format!("Failed to start Docker execution `{}`: {:?}", &exec.id, err))?;
-    let mut output_stream = if let StartExecResults::Attached { output, .. } = exec_result {
-      output.boxed()
-    } else {
-      panic!("Unexpected value returned from start_exec: {exec_result:?}");
-    };
-
-    log::trace!("started execution {}", &exec.id);
-
-    let exec_id = exec.id.to_owned();
-    let docker = docker.to_owned();
 
     let stream = async_stream::try_stream! {
       // Read output from the execution.
       while let Some(output_msg) = output_stream.next().await {
         match output_msg {
             Ok(LogOutput::StdOut { message }) => {
-                log::trace!("execution {} wrote {} bytes to stdout", &exec_id, message.len());
+                log::trace!("execution {id} wrote {} bytes to stdout", message.len());
                 yield ChildOutput::Stdout(message);
             }
             Ok(LogOutput::StdErr { message }) => {
-                log::trace!("execution {} wrote {} bytes to stderr", &exec_id, message.len());
+                log::trace!("execution {id} wrote {} bytes to stderr", message.len());
                 yield ChildOutput::Stderr(message);
             }
             Ok(_) => (),
             Err(err) => {
-                log::trace!("error while capturing output of execution {}: {:?}", &exec_id, err);
+                log::trace!("error while capturing output of execution {id}: {err:?}");
             }
         }
       }
 
-      let exec_metadata = docker
-        .inspect_exec(&exec_id)
-        .await
-        .map_err(|err| format!("Failed to inspect Docker execution `{}`: {:?}", &exec_id, err))?;
+      let exit_code = exit_future.await?;
 
-      let status_code = exec_metadata
-        .exit_code
-        .ok_or_else(|| format!("Inspected execution `{}` for exit status but status was missing.", &exec_id))?;
+      log::trace!("execution {id} exited with status code {exit_code:?}");
 
-      log::trace!("execution {} exited with status code {}", &exec_id, status_code);
-
-      yield ChildOutput::Exit(ExitCode(status_code as i32));
+      yield ChildOutput::Exit(exit_code);
     };
 
     Ok(stream.boxed())
@@ -601,15 +780,25 @@ impl<'a> ContainerCache<'a> {
     })
   }
 
+  fn binds(&self) -> Vec<String> {
+    let work_dir_base = self.work_dir_base.clone();
+    let named_caches_base_dir = self.named_caches_base_dir.clone();
+    let immutable_inputs_base_dir = self.immutable_inputs_base_dir.clone();
+    vec![
+      format!("{work_dir_base}:{SANDBOX_BASE_PATH_IN_CONTAINER}"),
+      format!("{named_caches_base_dir}:{NAMED_CACHES_BASE_PATH_IN_CONTAINER}",),
+      // DOCKER-TODO: Consider making this bind mount read-only.
+      format!("{immutable_inputs_base_dir}:{IMMUTABLE_INPUTS_BASE_PATH_IN_CONTAINER}"),
+    ]
+  }
+
   async fn make_container(
     docker: Docker,
     image: String,
     platform: Platform,
     image_pull_scope: ImagePullScope,
     image_pull_cache: ImagePullCache,
-    work_dir_base: String,
-    named_caches_base_dir: String,
-    immutable_inputs_base_dir: String,
+    binds: Vec<String>,
   ) -> Result<String, String> {
     // Pull the image.
     image_pull_cache
@@ -625,12 +814,7 @@ impl<'a> ContainerCache<'a> {
     let config = bollard::container::Config {
       entrypoint: Some(vec!["/bin/sh".to_string()]),
       host_config: Some(bollard::service::HostConfig {
-        binds: Some(vec![
-          format!("{work_dir_base}:{SANDBOX_BASE_PATH_IN_CONTAINER}"),
-          format!("{named_caches_base_dir}:{NAMED_CACHES_BASE_PATH_IN_CONTAINER}",),
-          // DOCKER-TODO: Consider making this bind mount read-only.
-          format!("{immutable_inputs_base_dir}:{IMMUTABLE_INPUTS_BASE_PATH_IN_CONTAINER}"),
-        ]),
+        binds: Some(binds),
         // The init process ensures that child processes are properly reaped.
         init: Some(true),
         ..bollard::service::HostConfig::default()
@@ -700,9 +884,7 @@ impl<'a> ContainerCache<'a> {
       cell.clone()
     };
 
-    let work_dir_base = self.work_dir_base.clone();
-    let named_caches_base_dir = self.named_caches_base_dir.clone();
-    let immutable_inputs_base_dir = self.immutable_inputs_base_dir.clone();
+    let binds = self.binds();
     let image_pull_scope = ImagePullScope::new(build_generation);
 
     let container_id = container_id_cell
@@ -713,9 +895,7 @@ impl<'a> ContainerCache<'a> {
           *platform,
           image_pull_scope,
           self.image_pull_cache.clone(),
-          work_dir_base,
-          named_caches_base_dir,
-          immutable_inputs_base_dir,
+          binds,
         )
         .await
       })

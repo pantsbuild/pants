@@ -27,6 +27,7 @@ from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.engine.env_vars import CompleteEnvironmentVars
 from pants.engine.fs import FileContent
 from pants.engine.internals.native_engine import PyExecutor
+from pants.engine.platform import Platform
 from pants.option.custom_types import memory_size
 from pants.option.errors import OptionsError
 from pants.option.option_types import (
@@ -128,6 +129,14 @@ class KeepSandboxes(Enum):
     always = "always"
     on_failure = "on_failure"
     never = "never"
+
+
+class DockerStrategy(Enum):
+    """An enum for the global option `docker_strategy`."""
+
+    auto = "auto"
+    cached = "cached"
+    uncached = "uncached"
 
 
 @enum.unique
@@ -491,6 +500,8 @@ class ExecutionOptions:
     process_execution_graceful_shutdown_timeout: int
     cache_content_behavior: CacheContentBehavior
 
+    docker_strategy: DockerStrategy
+
     process_total_child_memory_usage: int | None
     process_per_child_memory_usage: int
 
@@ -535,6 +546,7 @@ class ExecutionOptions:
             process_execution_cache_namespace=bootstrap_options.process_execution_cache_namespace,
             process_execution_graceful_shutdown_timeout=bootstrap_options.process_execution_graceful_shutdown_timeout,
             process_execution_local_enable_nailgun=bootstrap_options.process_execution_local_enable_nailgun,
+            docker_strategy=GlobalOptions.resolve_docker_strategy(bootstrap_options),
             cache_content_behavior=bootstrap_options.cache_content_behavior,
             process_total_child_memory_usage=bootstrap_options.process_total_child_memory_usage,
             process_per_child_memory_usage=bootstrap_options.process_per_child_memory_usage,
@@ -620,6 +632,7 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     keep_sandboxes=KeepSandboxes.never,
     local_cache=True,
     cache_content_behavior=CacheContentBehavior.fetch,
+    docker_strategy=DockerStrategy.auto,
     process_execution_local_enable_nailgun=True,
     process_execution_graceful_shutdown_timeout=3,
     # Remote store setup.
@@ -1182,6 +1195,25 @@ class BootstrapOptions:
             Pants will log their location so that you can inspect the chroot, and run the
             `__run.sh` script to recreate the process using the same argv and environment variables
             used by Pants. This option is useful for debugging.
+            """
+        ),
+    )
+    process_execution_docker_strategy = EnumOption(
+        default=DEFAULT_EXECUTION_OPTIONS.docker_strategy,
+        help=softwrap(
+            """
+            The strategy used to launch Docker containers when the `docker_environment`
+            target is in use.
+
+            The `cached` strategy `exec`s processes in cached Docker containers, while the
+            `uncached` strategy uses a fresh container per process.
+
+            The default value of `auto` will choose the fastest known-safe strategy for the
+            platform that Pants is running on, which currently means using the `uncached` strategy
+            when Docker is implemented via virtualization (on macOS and Windows in particular). This
+            is to avoid filesystem consistency issues which can be observed when files inside a bind mount
+            change on the host machine. See https://github.com/docker/roadmap/issues/7 for more information
+            on macOS filesystem virtualization status.
             """
         ),
     )
@@ -1852,6 +1884,19 @@ class GlobalOptions(BootstrapOptions, Subsystem):
             return resolved_value
         else:
             raise TypeError(f"Unexpected option value for `keep_sandboxes`: {resolved_value}")
+
+    @staticmethod
+    def resolve_docker_strategy(
+        bootstrap_options: OptionValueContainer,
+    ) -> DockerStrategy:
+        strategy = cast(DockerStrategy, bootstrap_options.process_execution_docker_strategy)
+        if strategy == DockerStrategy.auto:
+            return (
+                DockerStrategy.uncached
+                if Platform.create_for_localhost().is_macos
+                else DockerStrategy.cached
+            )
+        return strategy
 
     @staticmethod
     def compute_pants_ignore(buildroot, global_options):
