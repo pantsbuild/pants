@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import itertools
-import os.path
 from dataclasses import dataclass
 from typing import Iterable
 
@@ -90,13 +89,13 @@ async def install_node_packages_for_address(
         Get(TransitiveTargets, TransitiveTargetsRequest([target.address])),
     )
 
-    package_tgts = targets_with_sources_types(
+    pkg_tgts = targets_with_sources_types(
         [PackageJsonSourceField], transitive_tgts.dependencies, union_membership
     )
-    assert target not in package_tgts
+    assert target not in pkg_tgts
     installations = await MultiGet(
         Get(InstalledNodePackageWithSource, InstalledNodePackageRequest(pkg_tgt.address))
-        for pkg_tgt in package_tgts
+        for pkg_tgt in pkg_tgts
     )
 
     source_files = await _get_relevant_source_files(
@@ -104,9 +103,15 @@ async def install_node_packages_for_address(
         with_js=False,
     )
     merged_input_digest = await Get(
-        Digest, MergeDigests((lockfile_snapshot.digest, source_files.snapshot.digest))
+        Digest,
+        MergeDigests(
+            itertools.chain(
+                (lockfile_snapshot.digest, source_files.snapshot.digest),
+                (ws.digest for ws in node_resolve.project.workspaces),
+            )
+        ),
     )
-    root_dir = os.path.dirname(node_resolve.file_path)
+    root_dir = node_resolve.project.root_dir
     new_sources_digest = await Get(Digest, RemovePrefix(merged_input_digest, root_dir))
 
     install_input_digest = await Get(

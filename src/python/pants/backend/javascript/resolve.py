@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from typing import Iterable
 
 from pants.backend.javascript import nodejs_project
-from pants.backend.javascript.nodejs_project import AllNodeJSProjects
+from pants.backend.javascript.nodejs_project import AllNodeJSProjects, NodeJSProject
 from pants.backend.javascript.package_json import (
     OwningNodePackage,
     OwningNodePackageRequest,
@@ -28,8 +28,15 @@ class RequestNodeResolve:
 
 @dataclass(frozen=True)
 class ChosenNodeResolve:
-    resolve_name: str
-    file_path: str
+    project: NodeJSProject
+
+    @property
+    def resolve_name(self) -> str:
+        return self.project.resolve_name
+
+    @property
+    def file_path(self) -> str:
+        return os.path.join(self.project.root_dir, "package-lock.json")
 
 
 async def _get_node_package_json_directory(req: RequestNodeResolve) -> str:
@@ -62,10 +69,7 @@ async def resolve_for_package(
 ) -> ChosenNodeResolve:
     directory = await _get_node_package_json_directory(req)
     project = all_projects.project_for_directory(directory)
-    return ChosenNodeResolve(
-        resolve_name=project.resolve_name,
-        file_path=os.path.join(project.root_dir, "package-lock.json"),
-    )
+    return ChosenNodeResolve(project)
 
 
 def rules() -> Iterable[Rule | UnionRule]:

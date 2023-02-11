@@ -45,12 +45,10 @@ def test_gets_expected_resolve_for_standalone_packages(
     a_result = rule_runner.request(ChosenNodeResolve, [RequestNodeResolve(a_tgt.address)])
     b_result = rule_runner.request(ChosenNodeResolve, [RequestNodeResolve(b_tgt.address)])
 
-    assert a_result == ChosenNodeResolve(
-        resolve_name="src.js.a", file_path="src/js/a/package-lock.json"
-    )
-    assert b_result == ChosenNodeResolve(
-        resolve_name="src.js.b", file_path="src/js/b/package-lock.json"
-    )
+    assert a_result.resolve_name == "src.js.a"
+    assert a_result.file_path == "src/js/a/package-lock.json"
+    assert b_result.resolve_name == "src.js.b"
+    assert b_result.file_path == "src/js/b/package-lock.json"
 
 
 def test_gets_expected_resolve_for_workspace_packages(
@@ -67,14 +65,12 @@ def test_gets_expected_resolve_for_workspace_packages(
         }
     )
 
-    expected_resolve = ChosenNodeResolve(
-        resolve_name="src.js", file_path="src/js/package-lock.json"
-    )
-
     tgt = rule_runner.get_target(Address("src/js", generated_name="ham"))
     result = rule_runner.request(ChosenNodeResolve, [RequestNodeResolve(tgt.address)])
 
     child_tgt = rule_runner.get_target(Address("src/js/child", generated_name="spam"))
     child_result = rule_runner.request(ChosenNodeResolve, [RequestNodeResolve(child_tgt.address)])
 
-    assert child_result == result == expected_resolve
+    assert child_result == result
+    assert child_result.resolve_name == "src.js"
+    assert child_result.file_path == "src/js/package-lock.json"
