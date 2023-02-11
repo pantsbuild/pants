@@ -6,8 +6,8 @@ import os.path
 from dataclasses import dataclass
 from typing import Iterable
 
-from pants.backend.javascript import package_json
-from pants.backend.javascript.package_json import AllPackageJson, PackageJson
+from pants.backend.javascript import nodejs_project, package_json
+from pants.backend.javascript.nodejs_project import AllNodeJSProjects, NodeJSProject
 from pants.backend.javascript.subsystems import nodejs
 from pants.backend.javascript.subsystems.nodejs import NodeJSToolProcess
 from pants.core.goals.generate_lockfiles import (
@@ -27,7 +27,7 @@ from pants.engine.unions import UnionRule
 
 @dataclass(frozen=True)
 class GeneratePackageLockJsonFile(GenerateLockfile):
-    pkg_json: PackageJson
+    project: NodeJSProject
 
 
 class KnownPackageJsonUserResolveNamesRequest(KnownUserResolveNamesRequest):
@@ -40,14 +40,11 @@ class RequestedPackageJsonUserResolveNames(RequestedUserResolveNames):
 
 @rule
 async def determine_package_json_user_resolves(
-    _: KnownPackageJsonUserResolveNamesRequest, pkg_jsons: AllPackageJson
+    _: KnownPackageJsonUserResolveNamesRequest, all_projects: AllNodeJSProjects
 ) -> KnownUserResolveNames:
-    def is_part_of_workspace(pkg: PackageJson) -> bool:
-        return any(pkg in other.workspaces for other in pkg_jsons)
 
-    root_packages = {pkg for pkg in pkg_jsons if not is_part_of_workspace(pkg)}
     return KnownUserResolveNames(
-        names=tuple(pkg.name for pkg in root_packages),
+        names=tuple(project.root_dir.replace(os.path.sep, ".") for project in all_projects),
         option_name="<generated>",
         requested_resolve_names_cls=RequestedPackageJsonUserResolveNames,
     )
@@ -55,17 +52,19 @@ async def determine_package_json_user_resolves(
 
 @rule
 async def setup_user_lockfile_requests(
-    requested: RequestedPackageJsonUserResolveNames, pkg_jsons: AllPackageJson
+    requested: RequestedPackageJsonUserResolveNames, all_projects: AllNodeJSProjects
 ) -> UserGenerateLockfiles:
+    projects_by_name = {
+        project.root_dir.replace(os.path.sep, "."): project for project in all_projects
+    }
     return UserGenerateLockfiles(
         GeneratePackageLockJsonFile(
-            resolve_name=pkg.name,
-            lockfile_dest=f"{pkg.root_dir}{os.path.sep}package-lock.json",
-            pkg_json=pkg,
+            resolve_name=name,
+            lockfile_dest=f"{name.replace(os.path.sep, '.')}{os.path.sep}package-lock.json",
             diff=False,
+            project=projects_by_name[name],
         )
-        for pkg in pkg_jsons
-        if pkg.name in requested
+        for name in requested
     )
 
 
@@ -73,8 +72,10 @@ async def setup_user_lockfile_requests(
 async def generate_lockfile_from_package_jsons(
     request: GeneratePackageLockJsonFile,
 ) -> GenerateLockfileResult:
-    workspace_digest = await Get(Digest, MergeDigests(request.pkg_json.workspace_digests))
-    input_digest = await Get(Digest, RemovePrefix(workspace_digest, request.pkg_json.root_dir))
+    workspace_digest = await Get(
+        Digest, MergeDigests(workspace.digest for workspace in request.project.workspaces)
+    )
+    input_digest = await Get(Digest, RemovePrefix(workspace_digest, request.project.root_dir))
     result = await Get(
         ProcessResult,
         NodeJSToolProcess,
@@ -85,7 +86,7 @@ async def generate_lockfile_from_package_jsons(
             output_files=("package-lock.json",),
         ),
     )
-    output_digest = await Get(Digest, AddPrefix(result.output_digest, request.pkg_json.root_dir))
+    output_digest = await Get(Digest, AddPrefix(result.output_digest, request.project.root_dir))
     return GenerateLockfileResult(output_digest, request.resolve_name, request.lockfile_dest)
 
 
@@ -93,6 +94,7 @@ def rules() -> Iterable[Rule | UnionRule]:
     return (
         *collect_rules(),
         *package_json.rules(),
+        *nodejs_project.rules(),
         *nodejs.rules(),
         UnionRule(GenerateLockfile, GeneratePackageLockJsonFile),
         UnionRule(KnownUserResolveNamesRequest, KnownPackageJsonUserResolveNamesRequest),

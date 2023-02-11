@@ -9,6 +9,7 @@ from pants.backend.javascript.goals.lockfile import (
     GeneratePackageLockJsonFile,
     KnownPackageJsonUserResolveNamesRequest,
 )
+from pants.backend.javascript.nodejs_project import AllNodeJSProjects
 from pants.backend.javascript.package_json import (
     AllPackageJson,
     PackageJsonForGlobs,
@@ -26,10 +27,11 @@ def rule_runner() -> RuleRunner:
         rules=[
             *lockfile.rules(),
             QueryRule(
-                KnownUserResolveNames, (KnownPackageJsonUserResolveNamesRequest, AllPackageJson)
+                KnownUserResolveNames, (KnownPackageJsonUserResolveNamesRequest, AllNodeJSProjects)
             ),
-            QueryRule(AllPackageJson, ()),
+            QueryRule(AllNodeJSProjects, ()),
             QueryRule(PackageJsonForGlobs, (PathGlobs,)),
+            QueryRule(AllPackageJson, (PathGlobs,)),
             QueryRule(GenerateLockfileResult, (GeneratePackageLockJsonFile,)),
         ],
         target_types=[PackageJsonTarget],
@@ -44,7 +46,7 @@ def given_package_with_workspaces(name: str, version: str, *workspaces: str) -> 
     return json.dumps({"name": name, "version": version, "workspaces": list(workspaces)})
 
 
-def test_resolves_are_package_names(rule_runner: RuleRunner) -> None:
+def test_resolves_are_dotted_package_paths(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "src/js/foo/BUILD": "package_json()",
@@ -53,29 +55,29 @@ def test_resolves_are_package_names(rule_runner: RuleRunner) -> None:
             "src/js/bar/package.json": given_package_with_name("spam"),
         }
     )
-    pkg_jsons = rule_runner.request(AllPackageJson, [])
+    projects = rule_runner.request(AllNodeJSProjects, [])
     resolves = rule_runner.request(
-        KnownUserResolveNames, (pkg_jsons, KnownPackageJsonUserResolveNamesRequest())
+        KnownUserResolveNames, (projects, KnownPackageJsonUserResolveNamesRequest())
     )
-    assert set(resolves.names) == {"ham", "spam"}
+    assert set(resolves.names) == {"src.js.foo", "src.js.bar"}
 
 
-def test_generates_lockfile_for_package_json(rule_runner: RuleRunner) -> None:
+def test_generates_lockfile_for_package_json_project(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "src/js/BUILD": "package_json()",
             "src/js/package.json": given_package_with_name("ham"),
         }
     )
-    [pkg_json] = rule_runner.request(PackageJsonForGlobs, [PathGlobs(["src/js/package.json"])])
+    [project] = rule_runner.request(AllNodeJSProjects, [])
 
     lockfile = rule_runner.request(
         GenerateLockfileResult,
         (
             GeneratePackageLockJsonFile(
-                resolve_name="ham",
+                resolve_name="src.js",
                 lockfile_dest="src/js/package-lock.json",
-                pkg_json=pkg_json,
+                project=project,
                 diff=False,
             ),
         ),
@@ -101,15 +103,15 @@ def test_generates_lockfile_for_package_json_workspace(rule_runner: RuleRunner) 
             "src/js/a/package.json": given_package_with_workspaces("spam", "0.1.0"),
         }
     )
-    [pkg_json] = rule_runner.request(PackageJsonForGlobs, [PathGlobs(["src/js/package.json"])])
+    [project] = rule_runner.request(AllNodeJSProjects, [])
 
     lockfile = rule_runner.request(
         GenerateLockfileResult,
         (
             GeneratePackageLockJsonFile(
-                resolve_name="ham",
+                resolve_name="src.js",
                 lockfile_dest="src/js/package-lock.json",
-                pkg_json=pkg_json,
+                project=project,
                 diff=False,
             ),
         ),
