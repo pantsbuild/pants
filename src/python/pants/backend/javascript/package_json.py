@@ -316,6 +316,7 @@ class PackageJson:
     version: str
     snapshot: Snapshot
     workspaces: tuple[PackageJson, ...] = ()
+    workspaces_: tuple[str, ...] | None = None
     module: Literal["commonjs", "module"] | None = None
     dependencies: FrozenDict[str, str] = field(default_factory=FrozenDict)
 
@@ -443,6 +444,7 @@ async def read_package_jsons(globs: PathGlobs) -> PackageJsonForGlobs:
             snapshot=await Get(Snapshot, PathGlobs([digest_content.path])),
             module=parsed_package_json.get("type"),
             workspaces=tuple(workspaces),
+            workspaces_=parsed_package_json.get("workspaces"),
             dependencies=FrozenDict.deep_freeze(
                 {
                     **parsed_package_json.get("dependencies", {}),
