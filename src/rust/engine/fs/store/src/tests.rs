@@ -180,6 +180,36 @@ async fn load_file_falls_back_and_backfills() {
 }
 
 #[tokio::test]
+async fn load_file_falls_back_and_backfills_for_huge_file() {
+  let dir = TempDir::new().unwrap();
+
+  // 5MB of data
+  let testdata = TestData::new(&"12345".repeat(MEGABYTES));
+
+  let _ = WorkunitStore::setup_for_tests();
+  let cas = StubCAS::builder()
+    .chunk_size_bytes(MEGABYTES)
+    .file(&testdata)
+    .build();
+
+  assert!(
+    load_file_bytes(&new_store(dir.path(), &cas.address()), testdata.digest()).await
+      == Ok(testdata.bytes()),
+    "Read from CAS"
+  );
+  assert_eq!(1, cas.read_request_count());
+  assert!(
+    crate::local_tests::load_file_bytes(
+      &crate::local_tests::new_store(dir.path()),
+      testdata.digest(),
+    )
+    .await
+      == Ok(Some(testdata.bytes())),
+    "Read from local cache"
+  );
+}
+
+#[tokio::test]
 async fn load_directory_falls_back_and_backfills() {
   let dir = TempDir::new().unwrap();
 
