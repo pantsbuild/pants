@@ -21,7 +21,7 @@ from pants.backend.go.util_rules.first_party_pkg import (
     FirstPartyPkgAnalysisRequest,
 )
 from pants.backend.go.util_rules.go_mod import GoModInfo, GoModInfoRequest
-from pants.backend.go.util_rules.import_analysis import ImportConfig, ImportConfigRequest
+from pants.backend.go.util_rules.import_config import ImportConfig, ImportConfigRequest
 from pants.backend.go.util_rules.link import LinkedGoBinary, LinkGoBinaryRequest
 from pants.backend.go.util_rules.third_party_pkg import (
     ThirdPartyPkgAnalysis,
