@@ -22,7 +22,7 @@
 //     "importlib_resources==5.0.*",
 //     "mypy-typing-asserts==0.1.1",
 //     "packaging==21.3",
-//     "pex==2.1.121",
+//     "pex==2.1.122",
 //     "psutil==5.9.0",
 //     "pydevd-pycharm==203.5419.8",
 //     "pytest<7.1.0,>=6.2.4",
@@ -1072,13 +1072,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "7e0fe00af54e112d60f0a4274bd7e965043c59d5d931dd4535d5b2cf7ada602e",
-              "url": "https://files.pythonhosted.org/packages/25/8f/8e194be4ef8d3f9a3be6c8cf3599fac8e5dd01b24c5200275d9f2b47e467/pex-2.1.121-py2.py3-none-any.whl"
+              "hash": "fc84a9b1e987fad73c34815efac41dd0103994e1538719118817b7e2d40d1d5e",
+              "url": "https://files.pythonhosted.org/packages/11/4e/55b0dd1a1307e94f78dafaaca1613430bd9fca0528f344910d21e65c2d16/pex-2.1.122-py2.py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "d66c099d48bf2b00d06be01518c834df888c195c3e17a524cf12f83226fa2489",
-              "url": "https://files.pythonhosted.org/packages/41/66/6c81402c74a9f6c701643e4bd1a83211812441fdd3fe2f6053eff40b6727/pex-2.1.121.tar.gz"
+              "hash": "5211e368d85a514d3c84d581322afeb5daa53e5fc778be96bb2ff9d7cb621385",
+              "url": "https://files.pythonhosted.org/packages/60/21/c16cbf08900f1d6836dd6e8aaa11e5fee27868e623991ff5ff13b1545139/pex-2.1.122.tar.gz"
             }
           ],
           "project_name": "pex",
@@ -1086,7 +1086,7 @@
             "subprocess32>=3.2.7; extra == \"subprocess\" and python_version < \"3\""
           ],
           "requires_python": "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,<3.12,>=2.7",
-          "version": "2.1.121"
+          "version": "2.1.122"
         },
         {
           "artifacts": [
@@ -1415,13 +1415,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "1684eb44636dd462b66c3ee016599815514527ad99965de77f43e0944634a7e5",
-              "url": "https://files.pythonhosted.org/packages/2d/10/ff4f2f5b2a420fd09e1331d63cc87cf4367c5745c0a4ce99cea92b1cbacb/python_dotenv-0.21.0-py3-none-any.whl"
+              "hash": "41e12e0318bebc859fcc4d97d4db8d20ad21721a6aa5047dd59f090391cb549a",
+              "url": "https://files.pythonhosted.org/packages/64/62/f19d1e9023aacb47241de3ab5a5d5fedf32c78a71a9e365bb2153378c141/python_dotenv-0.21.1-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "b77d08274639e3d34145dfa6c7008e66df0f04b7be7a75fd0d5292c191d79045",
-              "url": "https://files.pythonhosted.org/packages/87/8d/ab7352188f605e3f663f34692b2ed7457da5985857e9e4c2335cd12fb3c9/python-dotenv-0.21.0.tar.gz"
+              "hash": "1c93de8f636cde3ce377292818d0e440b6e45a82f215c3744979151fa8151c49",
+              "url": "https://files.pythonhosted.org/packages/f5/d7/d548e0d5a68b328a8d69af833a861be415a17cb15ce3d8f0cd850073d2e1/python-dotenv-0.21.1.tar.gz"
             }
           ],
           "project_name": "python-dotenv",
@@ -1429,7 +1429,7 @@
             "click>=5.0; extra == \"cli\""
           ],
           "requires_python": ">=3.7",
-          "version": "0.21.0"
+          "version": "0.21.1"
         },
         {
           "artifacts": [
@@ -2114,19 +2114,19 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "ed6b9e8a8be488796f72306889a06a3fc3cb1aa99af02ab8afb50144d7317e49",
-              "url": "https://files.pythonhosted.org/packages/ab/35/7b813668050bfe0820ad84df0ba668adb6abb41ca2bb0f16ad4deabca279/types_urllib3-1.26.25.4-py3-none-any.whl"
+              "hash": "e8f25c8bb85cde658c72ee931e56e7abd28803c26032441eea9ff4a4df2b0c31",
+              "url": "https://files.pythonhosted.org/packages/81/c3/53da44dfcda48826139526cf9c71c6f0ea88b02c1eb66adcecfd2e488170/types_urllib3-1.26.25.5-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "eec5556428eec862b1ac578fb69aab3877995a99ffec9e5a12cf7fbd0cc9daee",
-              "url": "https://files.pythonhosted.org/packages/37/67/c0751b0f672b0822b11ece210b211bdd1e08d6e21aa62e6d297b054127d7/types-urllib3-1.26.25.4.tar.gz"
+              "hash": "5630e578246d170d91ebe3901788cd28d53c4e044dc2e2488e3b0d55fb6895d8",
+              "url": "https://files.pythonhosted.org/packages/ce/33/b1376411bd1f6642469a9970000481daddc1f5bcc238691b98a26a16e5a1/types-urllib3-1.26.25.5.tar.gz"
             }
           ],
           "project_name": "types-urllib3",
           "requires_dists": [],
           "requires_python": null,
-          "version": "1.26.25.4"
+          "version": "1.26.25.5"
         },
         {
           "artifacts": [
@@ -2735,13 +2735,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "83a28fcb75844b5c0cdaf5aa4003c2d728c77e05f5aeabe8e95e56727005fbaa",
-              "url": "https://files.pythonhosted.org/packages/d8/20/256eb3f3f437c575fb1a2efdce5e801a5ce3162ea8117da96c43e6ee97d8/zipp-3.11.0-py3-none-any.whl"
+              "hash": "e8b2a36ea17df80ffe9e2c4fda3f693c3dad6df1697d3cd3af232db680950b0b",
+              "url": "https://files.pythonhosted.org/packages/95/7b/1608a7344743f54a8c072d64d2a279934fd204d6d015278b0a0ed4ce104b/zipp-3.13.0-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "a7a22e05929290a67401440b39690ae6563279bced5f314609d9d03798f56766",
-              "url": "https://files.pythonhosted.org/packages/8e/b3/8b16a007184714f71157b1a71bbe632c5d66dd43bc8152b3c799b13881e1/zipp-3.11.0.tar.gz"
+              "hash": "23f70e964bc11a34cef175bc90ba2914e1e4545ea1e3e2f67c079671883f9cb6",
+              "url": "https://files.pythonhosted.org/packages/d1/2f/ba544a8a6ad5ad9dcec1b00f536bb9fb078f5f50d1a1408876de18a9151b/zipp-3.13.0.tar.gz"
             }
           ],
           "project_name": "zipp",
@@ -2762,18 +2762,19 @@
             "pytest-mypy>=0.9.1; platform_python_implementation != \"PyPy\" and extra == \"testing\"",
             "pytest>=6; extra == \"testing\"",
             "rst.linker>=1.9; extra == \"docs\"",
+            "sphinx-lint; extra == \"docs\"",
             "sphinx>=3.5; extra == \"docs\""
           ],
           "requires_python": ">=3.7",
-          "version": "3.11.0"
+          "version": "3.13.0"
         }
       ],
       "platform_tag": null
     }
   ],
   "path_mappings": {},
-  "pex_version": "2.1.121",
-  "pip_version": "20.3.4-patched",
+  "pex_version": "2.1.122",
+  "pip_version": "23.0",
   "prefer_older_binary": false,
   "requirements": [
     "PyYAML<7.0,>=6.0",
@@ -2789,7 +2790,7 @@
     "importlib_resources==5.0.*",
     "mypy-typing-asserts==0.1.1",
     "packaging==21.3",
-    "pex==2.1.121",
+    "pex==2.1.122",
     "psutil==5.9.0",
     "pydevd-pycharm==203.5419.8",
     "pytest<7.1.0,>=6.2.4",
