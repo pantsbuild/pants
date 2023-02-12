@@ -21,7 +21,6 @@ from pants.backend.go.util_rules.first_party_pkg import (
     FirstPartyPkgAnalysisRequest,
 )
 from pants.backend.go.util_rules.go_mod import GoModInfo, GoModInfoRequest
-from pants.backend.go.util_rules.import_config import ImportConfig, ImportConfigRequest
 from pants.backend.go.util_rules.link import LinkedGoBinary, LinkGoBinaryRequest
 from pants.backend.go.util_rules.third_party_pkg import (
     ThirdPartyPkgAnalysis,
@@ -70,9 +69,10 @@ async def package_go_binary(field_set: GoBinaryFieldSet) -> BuiltPackage:
             ThirdPartyPkgAnalysis,
             ThirdPartyPkgAnalysisRequest(
                 main_pkg.import_path,
+                go_mod_address,
                 go_mod_info.digest,
                 go_mod_info.mod_path,
-                build_opts,
+                build_opts=build_opts,
             ),
         )
 
