@@ -10,6 +10,7 @@ from typing import Iterable
 from pants.backend.javascript import package_json
 from pants.backend.javascript.package_json import AllPackageJson, PackageJson
 from pants.engine.collection import Collection
+from pants.engine.internals.native_engine import MergeDigests
 from pants.engine.rules import Rule, collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.util.ordered_set import FrozenOrderedSet
@@ -32,6 +33,13 @@ class NodeJSProject:
     @property
     def resolve_name(self) -> str:
         return self.root_dir.replace(os.path.sep, ".")
+
+    def get_project_digest(self) -> MergeDigests:
+        return MergeDigests(ws.digest for ws in self.workspaces)
+
+    @property
+    def single_workspace(self) -> bool:
+        return len(self.workspaces) == 1 and next(iter(self.workspaces)).root_dir == self.root_dir
 
 
 class AllNodeJSProjects(Collection[NodeJSProject]):

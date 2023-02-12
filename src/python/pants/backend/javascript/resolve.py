@@ -14,11 +14,11 @@ from pants.backend.javascript.package_json import (
     PackageJsonSourceField,
 )
 from pants.build_graph.address import Address
+from pants.engine.fs import PathGlobs
 from pants.engine.internals.selectors import Get
 from pants.engine.rules import Rule, collect_rules, rule
 from pants.engine.target import Target, WrappedTarget, WrappedTargetRequest
 from pants.engine.unions import UnionRule
-from pants.util.strutil import softwrap
 
 
 @dataclass(frozen=True)
@@ -38,6 +38,9 @@ class ChosenNodeResolve:
     def file_path(self) -> str:
         return os.path.join(self.project.root_dir, "package-lock.json")
 
+    def get_lockfile_glob(self) -> PathGlobs:
+        return PathGlobs([self.file_path])
+
 
 async def _get_node_package_json_directory(req: RequestNodeResolve) -> str:
     wrapped = await Get(
@@ -49,18 +52,8 @@ async def _get_node_package_json_directory(req: RequestNodeResolve) -> str:
         target = wrapped.target
     else:
         owning_pkg = await Get(OwningNodePackage, OwningNodePackageRequest(wrapped.target.address))
-        target = owning_pkg.target
-    if target:
-        return os.path.dirname(target[PackageJsonSourceField].file_path)
-    raise ValueError(
-        softwrap(
-            f"""
-            No node resolve could be determined for {req.address}.
-
-            This probably means that there is no `package.json` in any parent directory of this target.
-            """
-        )
-    )
+        target = owning_pkg.ensure_owner()
+    return os.path.dirname(target[PackageJsonSourceField].file_path)
 
 
 @rule

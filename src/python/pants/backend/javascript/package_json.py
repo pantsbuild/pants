@@ -233,6 +233,7 @@ class NodeBuildScriptTarget(Target):
         NodeBuildScriptEntryPointField,
         NodeBuildScriptOutputDirectoriesField,
         NodeBuildScriptOutputFilesField,
+        NodeBuildScriptSourcesField,
         NodePackageDependenciesField,
     )
 
@@ -369,6 +370,12 @@ class OwningNodePackage:
     @classmethod
     def no_owner(cls) -> OwningNodePackage:
         return cls()
+
+    def ensure_owner(self) -> Target:
+        if self != OwningNodePackage.no_owner():
+            assert self.target
+            return self.target
+        raise ValueError("No owner could be determined.")
 
 
 @rule

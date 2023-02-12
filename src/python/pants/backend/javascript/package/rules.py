@@ -10,6 +10,7 @@ from pants.backend.javascript.install_node_package import (
     InstalledNodePackageRequest,
     InstalledNodePackageWithSource,
 )
+from pants.backend.javascript.nodejs_project_environment import NodeJsProjectEnvironmentProcess
 from pants.backend.javascript.package_json import (
     NodeBuildScriptEntryPointField,
     NodeBuildScriptOutputDirectoriesField,
@@ -19,7 +20,6 @@ from pants.backend.javascript.package_json import (
     NodePackageVersionField,
     PackageJsonSourceField,
 )
-from pants.backend.javascript.subsystems.nodejs import NodeJSToolProcess
 from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact, PackageFieldSet
 from pants.core.target_types import ResourceSourceField
 from pants.engine.internals.native_engine import AddPrefix, Snapshot
@@ -58,10 +58,10 @@ async def pack_node_package_into_tgz_for_publication(
     archive_file = f"{field_set.name.value}-{field_set.version.value}.tgz"
     result = await Get(
         ProcessResult,
-        NodeJSToolProcess,
-        NodeJSToolProcess.npm(
-            ("pack",),
-            f"Packaging .tgz archive for {field_set.name.value}@{field_set.version.value}",
+        NodeJsProjectEnvironmentProcess(
+            installation.project_env,
+            args=("pack",),
+            description=f"Packaging .tgz archive for {field_set.name.value}@{field_set.version.value}",
             input_digest=installation.digest,
             output_files=(archive_file,),
             level=LogLevel.INFO,
@@ -75,11 +75,12 @@ async def pack_node_package_into_tgz_for_publication(
 async def run_node_build_script(
     req: GenerateResourcesFromNodeBuildScriptRequest,
 ) -> GeneratedSources:
-    installed = await Get(
+    installation = await Get(
         InstalledNodePackageWithSource, InstalledNodePackageRequest(req.protocol_target.address)
     )
     output_files = req.protocol_target[NodeBuildScriptOutputFilesField]
     output_dirs = req.protocol_target[NodeBuildScriptOutputDirectoriesField]
+    script_name = req.protocol_target[NodeBuildScriptEntryPointField].value
     if not (output_dirs.value or output_files.value):
         raise ValueError(
             softwrap(
@@ -91,13 +92,14 @@ async def run_node_build_script(
                 """
             )
         )
-    args = ("run", req.protocol_target[NodeBuildScriptEntryPointField].value)
+    args = ("run", script_name)
     result = await Get(
         ProcessResult,
-        NodeJSToolProcess.npm(
-            filter(None, args),
-            "Running node build script.",
-            input_digest=installed.digest,
+        NodeJsProjectEnvironmentProcess(
+            installation.project_env,
+            args=filter(None, args),
+            description=f"Running node build script '{script_name}'.",
+            input_digest=installation.digest,
             output_files=output_files.value or (),
             output_directories=output_dirs.value or (),
             level=LogLevel.INFO,
@@ -105,7 +107,7 @@ async def run_node_build_script(
     )
 
     return GeneratedSources(
-        await Get(Snapshot, AddPrefix, installed.add_root_prefix(result.output_digest))
+        await Get(Snapshot, AddPrefix(result.output_digest, installation.project_dir))
     )
 
 

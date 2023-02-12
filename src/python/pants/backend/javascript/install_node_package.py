@@ -6,29 +6,23 @@ import itertools
 from dataclasses import dataclass
 from typing import Iterable
 
-from pants.backend.javascript import dependency_inference, resolve
+from pants.backend.javascript import dependency_inference, nodejs_project_environment
+from pants.backend.javascript.nodejs_project_environment import (
+    NodeJsProjectEnvironment,
+    NodeJsProjectEnvironmentProcess,
+    NodeJSProjectEnvironmentRequest,
+)
 from pants.backend.javascript.package_json import (
     NodePackageNameField,
     NodePackageVersionField,
-    OwningNodePackage,
-    OwningNodePackageRequest,
     PackageJsonSourceField,
 )
-from pants.backend.javascript.resolve import ChosenNodeResolve, RequestNodeResolve
 from pants.backend.javascript.subsystems import nodejs
-from pants.backend.javascript.subsystems.nodejs import NodeJSToolProcess
 from pants.backend.javascript.target_types import JSSourceField
 from pants.build_graph.address import Address
 from pants.core.target_types import FileSourceField, ResourceSourceField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.fs import PathGlobs
-from pants.engine.internals.native_engine import (
-    AddPrefix,
-    Digest,
-    MergeDigests,
-    RemovePrefix,
-    Snapshot,
-)
+from pants.engine.internals.native_engine import Digest, MergeDigests
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Rule, collect_rules, rule
@@ -48,11 +42,12 @@ class InstalledNodePackageRequest:
 
 @dataclass(frozen=True)
 class InstalledNodePackage:
-    root_dir: str
+    project_env: NodeJsProjectEnvironment
     digest: Digest
 
-    def add_root_prefix(self, digest: Digest) -> AddPrefix:
-        return AddPrefix(digest, self.root_dir)
+    @property
+    def project_dir(self) -> str:
+        return self.project_env.root_dir
 
 
 @dataclass(frozen=True)
@@ -78,16 +73,9 @@ async def _get_relevant_source_files(
 async def install_node_packages_for_address(
     req: InstalledNodePackageRequest, union_membership: UnionMembership
 ) -> InstalledNodePackage:
-    node_resolve, owning_tgt = await MultiGet(
-        Get(ChosenNodeResolve, RequestNodeResolve(req.address)),
-        Get(OwningNodePackage, OwningNodePackageRequest(req.address)),
-    )
-    assert owning_tgt.target, f"Already ensured to exist by {ChosenNodeResolve.__name__}."
-    target = owning_tgt.target
-    lockfile_snapshot, transitive_tgts = await MultiGet(
-        Get(Snapshot, PathGlobs([node_resolve.file_path])),
-        Get(TransitiveTargets, TransitiveTargetsRequest([target.address])),
-    )
+    project_env = await Get(NodeJsProjectEnvironment, NodeJSProjectEnvironmentRequest(req.address))
+    target = project_env.ensure_target()
+    transitive_tgts = await Get(TransitiveTargets, TransitiveTargetsRequest([target.address]))
 
     pkg_tgts = targets_with_sources_types(
         [PackageJsonSourceField], transitive_tgts.dependencies, union_membership
@@ -102,39 +90,28 @@ async def install_node_packages_for_address(
         (tgt[SourcesField] for tgt in transitive_tgts.closure if tgt.has_field(SourcesField)),
         with_js=False,
     )
-    merged_input_digest = await Get(
-        Digest,
-        MergeDigests(
-            itertools.chain(
-                (lockfile_snapshot.digest, source_files.snapshot.digest),
-                (ws.digest for ws in node_resolve.project.workspaces),
-            )
-        ),
-    )
-    root_dir = node_resolve.project.root_dir
-    new_sources_digest = await Get(Digest, RemovePrefix(merged_input_digest, root_dir))
-
     install_input_digest = await Get(
         Digest,
         MergeDigests(
             itertools.chain(
-                (installation.digest for installation in installations), (new_sources_digest,)
+                (installation.digest for installation in installations),
+                (source_files.snapshot.digest,),
             )
         ),
     )
 
     install_result = await Get(
         ProcessResult,
-        NodeJSToolProcess,
-        NodeJSToolProcess.npm(
+        NodeJsProjectEnvironmentProcess(
+            project_env,
             ("clean-install",),
-            f"Installing {target[NodePackageNameField].value}@{target[NodePackageVersionField].value}.",
+            description=f"Installing {target[NodePackageNameField].value}@{target[NodePackageVersionField].value}.",
             input_digest=install_input_digest,
-            output_directories=("node_modules",),
+            output_directories=tuple(project_env.node_modules_directories),
         ),
     )
     return InstalledNodePackage(
-        root_dir=root_dir,
+        project_env,
         digest=await Get(
             Digest, MergeDigests([install_input_digest, install_result.output_digest])
         ),
@@ -152,12 +129,14 @@ async def add_sources_to_installed_node_package(
         (tgt[SourcesField] for tgt in transitive_tgts.dependencies if tgt.has_field(SourcesField)),
         with_js=True,
     )
-    digest_relative_root = await Get(
-        Digest, RemovePrefix(source_files.snapshot.digest, installation.root_dir)
-    )
-    digest = await Get(Digest, MergeDigests((installation.digest, digest_relative_root)))
-    return InstalledNodePackageWithSource(root_dir=installation.root_dir, digest=digest)
+    digest = await Get(Digest, MergeDigests((installation.digest, source_files.snapshot.digest)))
+    return InstalledNodePackageWithSource(installation.project_env, digest=digest)
 
 
 def rules() -> Iterable[Rule | UnionRule]:
-    return [*nodejs.rules(), *resolve.rules(), *dependency_inference.rules(), *collect_rules()]
+    return [
+        *nodejs.rules(),
+        *nodejs_project_environment.rules(),
+        *dependency_inference.rules(),
+        *collect_rules(),
+    ]

@@ -64,6 +64,7 @@ class NodeJSToolProcess:
     input_digest: Digest = EMPTY_DIGEST
     output_files: tuple[str, ...] = ()
     output_directories: tuple[str, ...] = ()
+    working_directory: str | None = None
 
     @classmethod
     def npm(
@@ -74,6 +75,7 @@ class NodeJSToolProcess:
         input_digest: Digest = EMPTY_DIGEST,
         output_files: tuple[str, ...] = (),
         output_directories: tuple[str, ...] = (),
+        working_directory: str | None = None,
     ) -> NodeJSToolProcess:
         return cls(
             args=("npm", *args),
@@ -82,6 +84,7 @@ class NodeJSToolProcess:
             input_digest=input_digest,
             output_files=output_files,
             output_directories=output_directories,
+            working_directory=working_directory,
         )
 
     @classmethod
@@ -159,6 +162,7 @@ async def setup_node_tool_process(
         description=request.description,
         level=request.level,
         env=environment.to_env_dict(),
+        working_directory=request.working_directory,
     )
 
 

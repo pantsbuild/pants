@@ -6,10 +6,12 @@ import os.path
 from dataclasses import dataclass
 from typing import Iterable
 
-from pants.backend.javascript import nodejs_project, package_json
+from pants.backend.javascript import nodejs_project_environment
 from pants.backend.javascript.nodejs_project import AllNodeJSProjects, NodeJSProject
-from pants.backend.javascript.subsystems import nodejs
-from pants.backend.javascript.subsystems.nodejs import NodeJSToolProcess
+from pants.backend.javascript.nodejs_project_environment import (
+    NodeJsProjectEnvironment,
+    NodeJsProjectEnvironmentProcess,
+)
 from pants.core.goals.generate_lockfiles import (
     GenerateLockfile,
     GenerateLockfileResult,
@@ -18,7 +20,7 @@ from pants.core.goals.generate_lockfiles import (
     RequestedUserResolveNames,
     UserGenerateLockfiles,
 )
-from pants.engine.internals.native_engine import AddPrefix, Digest, MergeDigests, RemovePrefix
+from pants.engine.internals.native_engine import AddPrefix, Digest
 from pants.engine.internals.selectors import Get
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Rule, collect_rules, rule
@@ -70,17 +72,12 @@ async def setup_user_lockfile_requests(
 async def generate_lockfile_from_package_jsons(
     request: GeneratePackageLockJsonFile,
 ) -> GenerateLockfileResult:
-    workspace_digest = await Get(
-        Digest, MergeDigests(workspace.digest for workspace in request.project.workspaces)
-    )
-    input_digest = await Get(Digest, RemovePrefix(workspace_digest, request.project.root_dir))
     result = await Get(
         ProcessResult,
-        NodeJSToolProcess,
-        NodeJSToolProcess.npm(
+        NodeJsProjectEnvironmentProcess(
+            env=NodeJsProjectEnvironment.from_root(request.project),
             args=("install", "--package-lock-only"),
             description=f"generate package-lock.json for '{request.resolve_name}'.",
-            input_digest=input_digest,
             output_files=("package-lock.json",),
         ),
     )
@@ -91,9 +88,7 @@ async def generate_lockfile_from_package_jsons(
 def rules() -> Iterable[Rule | UnionRule]:
     return (
         *collect_rules(),
-        *package_json.rules(),
-        *nodejs_project.rules(),
-        *nodejs.rules(),
+        *nodejs_project_environment.rules(),
         UnionRule(GenerateLockfile, GeneratePackageLockJsonFile),
         UnionRule(KnownUserResolveNamesRequest, KnownPackageJsonUserResolveNamesRequest),
         UnionRule(RequestedUserResolveNames, RequestedPackageJsonUserResolveNames),

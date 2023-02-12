@@ -103,7 +103,7 @@ def test_packages_files_as_resource(rule_runner: RuleRunner) -> None:
                     "name": "ham",
                     "version": "0.0.1",
                     "browser": "lib/index.mjs",
-                    "scripts": {"build": "echo 'blarb' >> dist/index.cjs"},
+                    "scripts": {"build": "mkdir dist && echo 'blarb' >> dist/index.cjs"},
                 }
             ),
             "src/js/package-lock.json": json.dumps({}),
@@ -122,4 +122,59 @@ def test_packages_files_as_resource(rule_runner: RuleRunner) -> None:
     )
     rule_runner.write_digest(result.snapshot.digest)
     with open(os.path.join(rule_runner.build_root, "src/js/dist/index.cjs")) as f:
+        assert f.read() == "blarb\n"
+
+
+def test_packages_files_as_resource_in_workspace(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/js/package-lock.json": json.dumps(
+                {
+                    "name": "spam",
+                    "version": "0.0.1",
+                    "lockfileVersion": 2,
+                    "requires": True,
+                    "dependencies": {"ham": {"version": "file:a"}},
+                    "packages": {
+                        "": {"name": "spam", "version": "0.0.1", "workspaces": ["a"]},
+                        "a": {"name": "ham", "version": "0.0.1"},
+                        "node_modules/ham": {"link": True, "resolved": "a"},
+                    },
+                }
+            ),
+            "src/js/package.json": json.dumps(
+                {"name": "spam", "version": "0.0.1", "workspaces": ["a"]}
+            ),
+            "src/js/a/BUILD": dedent(
+                """\
+                package_json(
+                    scripts=[
+                        node_build_script(entry_point="build", output_files=["dist/index.cjs"])
+                    ]
+                )
+                """
+            ),
+            "src/js/a/package.json": json.dumps(
+                {
+                    "name": "ham",
+                    "version": "0.0.1",
+                    "browser": "lib/index.mjs",
+                    "scripts": {"build": "mkdir dist && echo 'blarb' >> dist/index.cjs"},
+                }
+            ),
+            "src/js/a/lib/BUILD": dedent(
+                """\
+                javascript_sources()
+                """
+            ),
+            "src/js/a/lib/index.mjs": "",
+        }
+    )
+    tgt = rule_runner.get_target(Address("src/js/a", generated_name="build"))
+    snapshot = rule_runner.request(Snapshot, (EMPTY_DIGEST,))
+    result = rule_runner.request(
+        GeneratedSources, [GenerateResourcesFromNodeBuildScriptRequest(snapshot, tgt)]
+    )
+    rule_runner.write_digest(result.snapshot.digest)
+    with open(os.path.join(rule_runner.build_root, "src/js/a/dist/index.cjs")) as f:
         assert f.read() == "blarb\n"
