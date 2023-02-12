@@ -370,7 +370,7 @@ impl ByteStore {
   async fn load_monomorphic(
     &self,
     digest: Digest,
-    destination: Arc<Mutex<dyn LoadDestination>>,
+    destination: &mut dyn LoadDestination,
   ) -> Result<bool, String> {
     let start = Instant::now();
     let store = self.clone();
@@ -391,6 +391,8 @@ impl ByteStore {
       read_limit: 0,
     };
     let client = self.byte_stream_client.as_ref().clone();
+
+    let destination = Arc::new(Mutex::new(destination));
 
     let result_future = retry_call(
       (client, request, destination),
@@ -456,15 +458,10 @@ impl ByteStore {
   async fn load<W: LoadDestination>(
     &self,
     digest: Digest,
-    destination: W,
+    mut destination: W,
   ) -> Result<Option<W>, String> {
-    // TODO: compute the digest as we write, to avoid needing a second pass to validate
-    let destination = Arc::new(Mutex::new(destination));
-    if self.load_monomorphic(digest, destination.clone()).await? {
-      let destination = Arc::try_unwrap(destination)
-        .ok()
-        .expect("should be no other references to `destination`")
-        .into_inner();
+    // TODO(#18231): compute the digest as we write, to avoid needing a second pass to validate
+    if self.load_monomorphic(digest, &mut destination).await? {
       Ok(Some(destination))
     } else {
       Ok(None)
