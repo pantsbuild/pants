@@ -352,7 +352,7 @@ class ShellCommandOutputRootDirField(AdhocToolOutputRootDirField):
     pass
 
 
-class ShellCommandTestDependenciesField(AdhocToolExecutionDependenciesField):
+class ShellCommandTestDependenciesField(ShellCommandExecutionDependenciesField):
     pass
 
 
