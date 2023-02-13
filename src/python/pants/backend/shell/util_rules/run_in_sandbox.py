@@ -10,7 +10,9 @@ from pants.backend.shell.target_types import (
     RunInSandboxSourcesField,
     RunInSandboxStderrFilenameField,
     RunInSandboxStdoutFilenameField,
+    ShellCommandExecutionDependenciesField,
     ShellCommandLogOutputField,
+    ShellCommandOutputDependenciesField,
     ShellCommandOutputDirectoriesField,
     ShellCommandOutputFilesField,
     ShellCommandOutputRootDirField,
@@ -19,7 +21,8 @@ from pants.backend.shell.target_types import (
 from pants.backend.shell.util_rules.adhoc_process_support import (
     AdhocProcessRequest,
     AdhocProcessResult,
-    _execution_environment_from_dependencies,
+    ResolvedExecutionDependencies,
+    ResolveExecutionDependenciesRequest,
 )
 from pants.backend.shell.util_rules.adhoc_process_support import (
     rules as adhoc_process_support_rules,
@@ -93,7 +96,15 @@ async def run_in_sandbox_request(
         RunInSandboxRequest, {environment_name: EnvironmentName, run_field_set: RunFieldSet}
     )
 
-    dependencies_digest = await _execution_environment_from_dependencies(target)
+    execution_environment = await Get(
+        ResolvedExecutionDependencies,
+        ResolveExecutionDependenciesRequest(
+            target.address,
+            target.get(ShellCommandExecutionDependenciesField).value,
+            target.get(ShellCommandOutputDependenciesField).value,
+        ),
+    )
+    dependencies_digest = execution_environment.digest
 
     input_digest = await Get(Digest, MergeDigests((dependencies_digest, run_request.digest)))
 

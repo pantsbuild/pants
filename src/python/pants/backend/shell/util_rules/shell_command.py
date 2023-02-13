@@ -12,8 +12,10 @@ from pants.backend.shell.subsystems.shell_setup import ShellSetup
 from pants.backend.shell.target_types import (
     RunShellCommandWorkdirField,
     ShellCommandCommandField,
+    ShellCommandExecutionDependenciesField,
     ShellCommandExtraEnvVarsField,
     ShellCommandLogOutputField,
+    ShellCommandOutputDependenciesField,
     ShellCommandOutputDirectoriesField,
     ShellCommandOutputFilesField,
     ShellCommandOutputRootDirField,
@@ -27,7 +29,8 @@ from pants.backend.shell.target_types import (
 from pants.backend.shell.util_rules.adhoc_process_support import (
     AdhocProcessRequest,
     AdhocProcessResult,
-    _execution_environment_from_dependencies,
+    ResolvedExecutionDependencies,
+    ResolveExecutionDependenciesRequest,
 )
 from pants.backend.shell.util_rules.adhoc_process_support import (
     rules as adhoc_process_support_rules,
@@ -82,7 +85,15 @@ async def _prepare_process_request_from_target(
     if not command:
         raise ValueError(f"Missing `command` line in `{description}.")
 
-    dependencies_digest = await _execution_environment_from_dependencies(shell_command)
+    execution_environment = await Get(
+        ResolvedExecutionDependencies,
+        ResolveExecutionDependenciesRequest(
+            shell_command.address,
+            shell_command.get(ShellCommandExecutionDependenciesField).value,
+            shell_command.get(ShellCommandOutputDependenciesField).value,
+        ),
+    )
+    dependencies_digest = execution_environment.digest
 
     output_files, output_directories = _parse_outputs_from_command(shell_command, description)
 
@@ -212,8 +223,15 @@ async def _interactive_shell_command(
         "CHROOT": "{chroot}",
     }
 
-    # Needed to ensure that underlying filesystem does not change during run
-    dependencies_digest = await _execution_environment_from_dependencies(shell_command)
+    execution_environment = await Get(
+        ResolvedExecutionDependencies,
+        ResolveExecutionDependenciesRequest(
+            shell_command.address,
+            shell_command.get(ShellCommandExecutionDependenciesField).value,
+            shell_command.get(ShellCommandOutputDependenciesField).value,
+        ),
+    )
+    dependencies_digest = execution_environment.digest
 
     _working_directory = working_directory or "."
     relpath = os.path.relpath(
