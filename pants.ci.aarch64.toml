@@ -6,3 +6,10 @@
 # TODO: Control this externally, on the machine itself?
 rule_threads_core = 8
 process_execution_local_parallelism = 16
+
+[subprocess-environment]
+# The Linux aarch64 job runs steps in a container and uses --user 1000:1000 to ensure the container
+# and host can both access files with the same permissions. The container, however, does not have
+# a 1000:1000 user set up and this can lead to failures in Pip / PEP-517 builder code the tries
+# to find the user home dir. Allowing the HOME env var into Pants processes fixes this.
+env_vars.add = ["HOME"]
