@@ -377,7 +377,7 @@ impl ExecuteProcess {
       .map(PathBuf::from);
 
     let execution_slot_variable =
-      externs::getattr_as_optional_string(value, "execution_slot_variable").unwrap_or(None);
+      externs::getattr_as_optional_string(value, "execution_slot_variable").map_err(|e| format!("Failed to get `execution_slot_variable` for field: {e}"))?;
 
     let concurrency_available: usize = externs::getattr(value, "concurrency_available").unwrap();
 
@@ -777,7 +777,7 @@ impl Snapshot {
   pub fn lift_path_globs(item: &PyAny) -> Result<PathGlobs, String> {
     let globs: Vec<String> = externs::getattr(item, "globs").unwrap();
     let description_of_origin =
-      externs::getattr_as_optional_string(item, "description_of_origin").unwrap_or(None);
+      externs::getattr_as_optional_string(item, "description_of_origin").map_err(|e| format!("Failed to get `description_of_origin` for field: {e}"))?;
 
     let glob_match_error_behavior = externs::getattr(item, "glob_match_error_behavior").unwrap();
     let failure_behavior: String = externs::getattr(glob_match_error_behavior, "value").unwrap();
