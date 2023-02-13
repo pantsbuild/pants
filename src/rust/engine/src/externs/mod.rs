@@ -212,17 +212,9 @@ pub fn getattr_from_str_frozendict<'p, T: FromPyObject<'p>>(
 }
 
 pub fn getattr_as_optional_string(value: &PyAny, field: &str) -> PyResult<Option<String>> {
-  if let Ok(v) = value.getattr(field) {
-    if v.is_none() {
-      return Ok(None);
-    }
-    if let Ok(inner) = v.extract() {
-      return Ok(Some(inner));
-    }
-  }
   // TODO: It's possible to view a python string as a `Cow<str>`, so we could avoid actually
   // cloning in some cases.
-  Ok(None)
+  value.getattr(field)?.extract()
 }
 
 /// Call the equivalent of `str()` on an arbitrary Python object.
