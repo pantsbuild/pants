@@ -10,6 +10,8 @@ from textwrap import dedent
 
 import pytest
 
+from pants.backend.adhoc.adhoc_tool import GenerateFilesFromAdhocToolRequest
+from pants.backend.adhoc.adhoc_tool import rules as adhoc_tool_rules
 from pants.backend.adhoc.target_types import AdhocToolTarget
 from pants.backend.python.goals.run_python_source import rules as run_python_source_rules
 from pants.backend.python.target_types import PythonSourceTarget
@@ -19,8 +21,6 @@ from pants.backend.shell.target_types import (
     ShellCommandTestTarget,
     ShellSourcesGeneratorTarget,
 )
-from pants.backend.shell.util_rules.run_in_sandbox import GenerateFilesFromRunInSandboxRequest
-from pants.backend.shell.util_rules.run_in_sandbox import rules as run_in_sandbox_rules
 from pants.backend.shell.util_rules.shell_command import (
     GenerateFilesFromShellCommandRequest,
     RunShellCommand,
@@ -55,12 +55,12 @@ def rule_runner() -> RuleRunner:
         rules=[
             *archive.rules(),
             *shell_command_rules(),
-            *run_in_sandbox_rules(),
+            *adhoc_tool_rules(),
             *source_files.rules(),
             *core_target_type_rules(),
             *run_python_source_rules(),
             QueryRule(GeneratedSources, [GenerateFilesFromShellCommandRequest]),
-            QueryRule(GeneratedSources, [GenerateFilesFromRunInSandboxRequest]),
+            QueryRule(GeneratedSources, [GenerateFilesFromAdhocToolRequest]),
             QueryRule(Process, [AdhocProcessRequest]),
             QueryRule(Process, [EnvironmentName, ShellCommandProcessFromTargetRequest]),
             QueryRule(RunRequest, [RunShellCommand]),
@@ -100,7 +100,7 @@ def assert_run_in_sandbox_result(
     rule_runner: RuleRunner, address: Address, expected_contents: dict[str, str]
 ) -> None:
     return assert_shell_command_result(
-        rule_runner, address, expected_contents, GenerateFilesFromRunInSandboxRequest
+        rule_runner, address, expected_contents, GenerateFilesFromAdhocToolRequest
     )
 
 

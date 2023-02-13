@@ -213,7 +213,7 @@ class AdhocToolTarget(Target):
 
         Example BUILD file:
 
-            experimental_run_in_sandbox(
+            adhoc_tool(
                 runnable=":python_source",
                 argv=[""],
                 tools=["tar", "curl", "cat", "bash", "env"],

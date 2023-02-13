@@ -47,14 +47,14 @@ from pants.util.logging import LogLevel
 logger = logging.getLogger(__name__)
 
 
-class GenerateFilesFromRunInSandboxRequest(GenerateSourcesRequest):
+class GenerateFilesFromAdhocToolRequest(GenerateSourcesRequest):
     input = AdhocToolSourcesField
     output = FileSourceField
 
 
 @rule(desc="Running run_in_sandbox target", level=LogLevel.DEBUG)
 async def run_in_sandbox_request(
-    request: GenerateFilesFromRunInSandboxRequest,
+    request: GenerateFilesFromAdhocToolRequest,
 ) -> GeneratedSources:
     target = request.protocol_target
     description = f"the `{target.alias}` at {target.address}"
@@ -161,5 +161,5 @@ def rules():
     return [
         *collect_rules(),
         *adhoc_process_support_rules(),
-        UnionRule(GenerateSourcesRequest, GenerateFilesFromRunInSandboxRequest),
+        UnionRule(GenerateSourcesRequest, GenerateFilesFromAdhocToolRequest),
     ]
