@@ -14,7 +14,10 @@ from pants.backend.shell.target_types import (
     ShellCommandCommandField,
     ShellCommandExtraEnvVarsField,
     ShellCommandLogOutputField,
+    ShellCommandOutputDirectoriesField,
+    ShellCommandOutputFilesField,
     ShellCommandOutputRootDirField,
+    ShellCommandOutputsField,
     ShellCommandSourcesField,
     ShellCommandTarget,
     ShellCommandTimeoutField,
@@ -25,7 +28,6 @@ from pants.backend.shell.util_rules.adhoc_process_support import (
     AdhocProcessRequest,
     AdhocProcessResult,
     _execution_environment_from_dependencies,
-    _parse_outputs_from_command,
 )
 from pants.backend.shell.util_rules.adhoc_process_support import (
     rules as adhoc_process_support_rules,
@@ -117,6 +119,24 @@ async def _prepare_process_request_from_target(
         log_on_process_errors=_LOG_ON_PROCESS_ERRORS,
         log_output=shell_command[ShellCommandLogOutputField].value,
     )
+
+
+def _parse_outputs_from_command(
+    adhoc_process_target: Target, description: str
+) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    outputs = adhoc_process_target.get(ShellCommandOutputsField).value or ()
+    output_files = adhoc_process_target.get(ShellCommandOutputFilesField).value or ()
+    output_directories = adhoc_process_target.get(ShellCommandOutputDirectoriesField).value or ()
+    if outputs and (output_files or output_directories):
+        raise ValueError(
+            "Both new-style `output_files` or `output_directories` and old-style `outputs` were "
+            f"specified in {description}. To fix, move all values from `outputs` to "
+            "`output_files` or `output_directories`."
+        )
+    elif outputs:
+        output_files = tuple(f for f in outputs if not f.endswith("/"))
+        output_directories = tuple(d for d in outputs if d.endswith("/"))
+    return output_files, output_directories
 
 
 @rule

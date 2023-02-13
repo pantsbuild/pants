@@ -11,6 +11,8 @@ from pants.backend.shell.target_types import (
     RunInSandboxStderrFilenameField,
     RunInSandboxStdoutFilenameField,
     ShellCommandLogOutputField,
+    ShellCommandOutputDirectoriesField,
+    ShellCommandOutputFilesField,
     ShellCommandOutputRootDirField,
     ShellCommandWorkdirField,
 )
@@ -18,7 +20,6 @@ from pants.backend.shell.util_rules.adhoc_process_support import (
     AdhocProcessRequest,
     AdhocProcessResult,
     _execution_environment_from_dependencies,
-    _parse_outputs_from_command,
 )
 from pants.backend.shell.util_rules.adhoc_process_support import (
     rules as adhoc_process_support_rules,
@@ -96,7 +97,8 @@ async def run_in_sandbox_request(
 
     input_digest = await Get(Digest, MergeDigests((dependencies_digest, run_request.digest)))
 
-    output_files, output_directories = _parse_outputs_from_command(target, description)
+    output_files = target.get(ShellCommandOutputFilesField).value or ()
+    output_directories = target.get(ShellCommandOutputDirectoriesField).value or ()
 
     extra_args = target.get(RunInSandboxArgumentsField).value or ()
 

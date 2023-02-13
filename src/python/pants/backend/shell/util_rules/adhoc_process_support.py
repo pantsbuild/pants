@@ -13,9 +13,6 @@ from typing import Union
 from pants.backend.shell.target_types import (
     ShellCommandExecutionDependenciesField,
     ShellCommandOutputDependenciesField,
-    ShellCommandOutputDirectoriesField,
-    ShellCommandOutputFilesField,
-    ShellCommandOutputsField,
 )
 from pants.base.deprecated import warn_or_error
 from pants.build_graph.address import Address
@@ -144,24 +141,6 @@ async def _execution_environment_from_dependencies(adhoc_process_target: Target)
     )
 
     return dependencies_digest
-
-
-def _parse_outputs_from_command(
-    adhoc_process_target: Target, description: str
-) -> tuple[tuple[str, ...], tuple[str, ...]]:
-    outputs = adhoc_process_target.get(ShellCommandOutputsField).value or ()
-    output_files = adhoc_process_target.get(ShellCommandOutputFilesField).value or ()
-    output_directories = adhoc_process_target.get(ShellCommandOutputDirectoriesField).value or ()
-    if outputs and (output_files or output_directories):
-        raise ValueError(
-            "Both new-style `output_files` or `output_directories` and old-style `outputs` were "
-            f"specified in {description}. To fix, move all values from `outputs` to "
-            "`output_files` or `output_directories`."
-        )
-    elif outputs:
-        output_files = tuple(f for f in outputs if not f.endswith("/"))
-        output_directories = tuple(d for d in outputs if d.endswith("/"))
-    return output_files, output_directories
 
 
 @rule
