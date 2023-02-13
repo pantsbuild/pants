@@ -26,18 +26,16 @@ from pants.backend.shell.target_types import (
     ShellCommandToolsField,
     ShellCommandWorkdirField,
 )
-from pants.backend.shell.util_rules.adhoc_process_support import (
+from pants.backend.shell.util_rules.builtin import BASH_BUILTIN_COMMANDS
+from pants.core.goals.run import RunFieldSet, RunInSandboxBehavior, RunRequest
+from pants.core.target_types import FileSourceField
+from pants.core.util_rules.adhoc_process_support import (
     AdhocProcessRequest,
     AdhocProcessResult,
     ResolvedExecutionDependencies,
     ResolveExecutionDependenciesRequest,
 )
-from pants.backend.shell.util_rules.adhoc_process_support import (
-    rules as adhoc_process_support_rules,
-)
-from pants.backend.shell.util_rules.builtin import BASH_BUILTIN_COMMANDS
-from pants.core.goals.run import RunFieldSet, RunInSandboxBehavior, RunRequest
-from pants.core.target_types import FileSourceField
+from pants.core.util_rules.adhoc_process_support import rules as adhoc_process_support_rules
 from pants.core.util_rules.environments import EnvironmentNameRequest
 from pants.core.util_rules.system_binaries import BashBinary, BinaryShims, BinaryShimsRequest
 from pants.engine.environment import EnvironmentName

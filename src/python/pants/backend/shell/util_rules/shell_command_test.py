@@ -19,7 +19,6 @@ from pants.backend.shell.target_types import (
     ShellRunInSandboxTarget,
     ShellSourcesGeneratorTarget,
 )
-from pants.backend.shell.util_rules.adhoc_process_support import AdhocProcessRequest
 from pants.backend.shell.util_rules.run_in_sandbox import GenerateFilesFromRunInSandboxRequest
 from pants.backend.shell.util_rules.run_in_sandbox import rules as run_in_sandbox_rules
 from pants.backend.shell.util_rules.shell_command import (
@@ -32,6 +31,7 @@ from pants.core.goals.run import RunRequest
 from pants.core.target_types import ArchiveTarget, FilesGeneratorTarget, FileSourceField
 from pants.core.target_types import rules as core_target_type_rules
 from pants.core.util_rules import archive, source_files
+from pants.core.util_rules.adhoc_process_support import AdhocProcessRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
 from pants.engine.environment import EnvironmentName

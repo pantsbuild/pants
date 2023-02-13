@@ -18,18 +18,16 @@ from pants.backend.shell.target_types import (
     ShellCommandOutputRootDirField,
     ShellCommandWorkdirField,
 )
-from pants.backend.shell.util_rules.adhoc_process_support import (
+from pants.build_graph.address import Address, AddressInput
+from pants.core.goals.run import RunFieldSet, RunInSandboxRequest
+from pants.core.target_types import FileSourceField
+from pants.core.util_rules.adhoc_process_support import (
     AdhocProcessRequest,
     AdhocProcessResult,
     ResolvedExecutionDependencies,
     ResolveExecutionDependenciesRequest,
 )
-from pants.backend.shell.util_rules.adhoc_process_support import (
-    rules as adhoc_process_support_rules,
-)
-from pants.build_graph.address import Address, AddressInput
-from pants.core.goals.run import RunFieldSet, RunInSandboxRequest
-from pants.core.target_types import FileSourceField
+from pants.core.util_rules.adhoc_process_support import rules as adhoc_process_support_rules
 from pants.core.util_rules.environments import EnvironmentNameRequest
 from pants.engine.addresses import Addresses
 from pants.engine.environment import EnvironmentName
