@@ -39,11 +39,12 @@ pex_binary(
 )
 ```
 
-Each target type has different _fields_, or individual metadata values. Run `pants help $target` to see which fields a particular target type has, e.g. `pants help file`. Most fields are optional and use sensible defaults.
+Each target type has different _fields_, or individual metadata values. Run `pants help $target` to see which fields a particular target type has, e.g. `pants help file`. Most fields are optional and use sensible defaults. See [Field default values](doc:targets#field-default-values) for how you may override a fields default value.
 
 All target types have a `name` field, which is used to identify the target. Target names must be unique within a directory.
 
 You can autoformat `BUILD` files by enabling a `BUILD` file formatter by adding it to `[GLOBAL].backend_packages` in `pants.toml` (such as `pants.backend.build_files.fmt.black` [or others](doc:enabling-backends)). Then to format, run `pants fmt '**/BUILD'` or `pants fmt ::` (formats everything).
+
 
 Environment variables
 ---------------------
@@ -215,6 +216,23 @@ To reset any modified defaults, simply override with the empty dict:
 ```python src/example/nodefaults/BUILD
     __defaults__(all={})
 ```
+
+
+Extending field defaults
+------------------------
+
+To add to a default value rather than replacing it, the current default value for a target field is available in the BUILD file using `<target>.<field>.default`. This allows you to augment a field's default value with much more precision. As an example, if you want to make the default sources for a `python_sources` target to work recursively you may specify a target augmenting the default sources field:
+
+```python BUILD
+python_sources(
+  name="my-one-top-level-target",
+  sources=[
+    f"{pattern[0] if pattern.startswith("!") else ""}**/{pattern.lstrip("!")}"
+    for pattern in python_sources.sources.default
+  ]
+)
+```
+
 
 Target generation
 =================

@@ -54,7 +54,7 @@ class PyConstraintsSubsystem(Outputting, GoalSubsystem):
     )
 
     summary_use_new_header = BoolOption(
-        default=False,
+        default=True,
         help=softwrap(
             """
             If False, use the legacy, misleading `#Dependees` header name in the summary CSV table.

@@ -47,8 +47,8 @@ def assert_deps_parsed(
     rule_runner: RuleRunner,
     content: str,
     *,
-    expected_imports: dict[str, ImpInfo] = {},
-    expected_assets: list[str] = [],
+    expected_imports: dict[str, ImpInfo] | None = None,
+    expected_assets: list[str] | None = None,
     filename: str = "project/foo.py",
     constraints: str = ">=3.6",
     string_imports: bool = True,
@@ -56,6 +56,8 @@ def assert_deps_parsed(
     assets: bool = True,
     assets_min_slashes: int = 1,
 ) -> None:
+    expected_imports = expected_imports or {}
+    expected_assets = expected_assets or []
     rule_runner.set_options(
         [
             f"--python-infer-string-imports={string_imports}",

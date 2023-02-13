@@ -39,6 +39,26 @@ Many rules that create `RunRequest`s can be used verbatim, but others may make a
 We expect to deprecate `RUN_REQUEST_NOT_HERMETIC` and `NOT_SUPPORTED` in a few versions time: these options are provided to give you some time to make your existing rules match the semantics of `RUN_REQUEST_HERMETIC`, or to add a `CUSTOM` rule.
 
 
+### `BinaryShimsRequest` no longer accepts `output_directory`
+
+`BinaryShims` now produces all of its shim scripts in the root of its `digest`, and provides helper methods for use with `immutable_input_digests` and the `PATH` environment variable. It also produces a unique directory name so that multiple rules can be called to populate `PATH`.
+
+Consider using these helper methods in favor of the old behavior:
+
+```
+process = Process(
+    immutable_input_digests=binary_shims.immutable_input_digests,
+    env={"PATH": binary_shims.path_component},
+)
+```
+
+You can replicate the previous behavior using `AddDigest`:
+
+```
+new_digest = await Get(Digest, AddDigest(binary_shims.digest, output_directory))
+```
+
+
 2.15
 ----
 

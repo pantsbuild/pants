@@ -304,7 +304,7 @@ class Helper:
             raise ValueError(f"Unsupported platform: {self.platform_name()}")
         return ret
 
-    def platform_env(self):
+    def platform_env(self) -> dict[str, str]:
         ret = {}
         if self.platform in {Platform.MACOS10_15_X86_64, Platform.MACOS11_X86_64}:
             # Works around bad `-arch arm64` flag embedded in Xcode 12.x Python interpreters on
@@ -484,12 +484,17 @@ class Helper:
         if PYTHON38_VERSION in python_versions:
             cmd += build_wheels_for("USE_PY38")
 
+        env = self.platform_env()
+        if self.platform == Platform.LINUX_ARM64:
+            # The Linux aarch64 job runs steps in a container and uses --user 1000:1000 to
+            # ensure the container and host can both access files with the same permissions.
+            # The container, however, does not have a 1000:1000 user set up and this can
+            # lead to failures in Pip / PEP-517 builder code the tries to find the user home
+            # dir. Allowing the HOME env var into Pants processes fixes this.
+            env.update(PANTS_SUBPROCESS_ENVIRONMENT_ENV_VARS="HOME")
+
         return [
-            {
-                "name": "Build wheels",
-                "run": cmd,
-                "env": self.platform_env(),
-            },
+            {"name": "Build wheels", "run": cmd, "env": env},
         ]
 
     def upload_log_artifacts(self, name: str) -> Step:

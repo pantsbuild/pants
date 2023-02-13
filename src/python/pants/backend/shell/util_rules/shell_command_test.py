@@ -19,12 +19,13 @@ from pants.backend.shell.target_types import (
     ShellRunInSandboxTarget,
     ShellSourcesGeneratorTarget,
 )
+from pants.backend.shell.util_rules.adhoc_process_support import ShellCommandProcessRequest
+from pants.backend.shell.util_rules.run_in_sandbox import GenerateFilesFromRunInSandboxRequest
+from pants.backend.shell.util_rules.run_in_sandbox import rules as run_in_sandbox_rules
 from pants.backend.shell.util_rules.shell_command import (
-    GenerateFilesFromRunInSandboxRequest,
     GenerateFilesFromShellCommandRequest,
     RunShellCommand,
     ShellCommandProcessFromTargetRequest,
-    ShellCommandProcessRequest,
 )
 from pants.backend.shell.util_rules.shell_command import rules as shell_command_rules
 from pants.core.goals.run import RunRequest
@@ -36,6 +37,7 @@ from pants.engine.addresses import Address
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import EMPTY_SNAPSHOT, DigestContents
 from pants.engine.internals.native_engine import IntrinsicError
+from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.process import Process, ProcessExecutionFailure
 from pants.engine.target import (
     GeneratedSources,
@@ -53,6 +55,7 @@ def rule_runner() -> RuleRunner:
         rules=[
             *archive.rules(),
             *shell_command_rules(),
+            *run_in_sandbox_rules(),
             *source_files.rules(),
             *core_target_type_rules(),
             *run_python_source_rules(),
@@ -131,7 +134,7 @@ def test_sources_and_files(rule_runner: RuleRunner) -> None:
                   output_files=["message.txt"],
                   output_directories=["res"],
                   command="./script.sh",
-                  workdir=".",
+                  root_output_directory=".",
                 )
 
                 files(
@@ -159,8 +162,8 @@ def test_sources_and_files(rule_runner: RuleRunner) -> None:
         rule_runner,
         Address("src", target_name="hello"),
         expected_contents={
-            "src/message.txt": RES,
-            "src/res/log.txt": RES,
+            "message.txt": RES,
+            "res/log.txt": RES,
         },
     )
 
@@ -175,6 +178,7 @@ def test_quotes_command(rule_runner: RuleRunner) -> None:
                   tools=["echo", "tee"],
                   command='echo "foo bar" | tee out.log',
                   output_files=["out.log"],
+                  root_output_directory=".",
                 )
                 """
             ),
@@ -196,8 +200,49 @@ def test_chained_shell_commands(rule_runner: RuleRunner) -> None:
                 experimental_shell_command(
                   name="msg",
                   tools=["echo"],
+                  output_files=["../msg"],
+                  command="echo 'shell_command:a' > ../msg",
+                )
+                """
+            ),
+            "src/b/BUILD": dedent(
+                """\
+                experimental_shell_command(
+                  name="msg",
+                  tools=["cp", "echo"],
+                  output_files=["../msg"],
+                  command="echo 'shell_command:b' >> ../msg",
+                  execution_dependencies=["src/a:msg"],
+                )
+                """
+            ),
+        }
+    )
+
+    assert_shell_command_result(
+        rule_runner,
+        Address("src/a", target_name="msg"),
+        expected_contents={"src/msg": "shell_command:a\n"},
+    )
+
+    assert_shell_command_result(
+        rule_runner,
+        Address("src/b", target_name="msg"),
+        expected_contents={"src/msg": "shell_command:a\nshell_command:b\n"},
+    )
+
+
+def test_chained_shell_commands_with_workdir(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/a/BUILD": dedent(
+                """\
+                experimental_shell_command(
+                  name="msg",
+                  tools=["echo"],
                   output_files=["msg"],
                   command="echo 'shell_command:a' > msg",
+                  workdir="/",
                 )
                 """
             ),
@@ -209,6 +254,7 @@ def test_chained_shell_commands(rule_runner: RuleRunner) -> None:
                   output_files=["msg"],
                   command="echo 'shell_command:b' >> msg",
                   execution_dependencies=["src/a:msg"],
+                  workdir="/",
                 )
                 """
             ),
@@ -225,48 +271,6 @@ def test_chained_shell_commands(rule_runner: RuleRunner) -> None:
         rule_runner,
         Address("src/b", target_name="msg"),
         expected_contents={"msg": "shell_command:a\nshell_command:b\n"},
-    )
-
-
-def test_chained_shell_commands_with_workdir(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files(
-        {
-            "src/a/BUILD": dedent(
-                """\
-                experimental_shell_command(
-                  name="msg",
-                  tools=["echo"],
-                  output_files=["msg"],
-                  command="echo 'shell_command:a' > msg",
-                  workdir=".",
-                )
-                """
-            ),
-            "src/b/BUILD": dedent(
-                """\
-                experimental_shell_command(
-                  name="msg",
-                  tools=["cp", "echo"],
-                  output_files=["msg"],
-                  command="cp ../a/msg . ; echo 'shell_command:b' >> msg",
-                  execution_dependencies=["src/a:msg"],
-                  workdir=".",
-                )
-                """
-            ),
-        }
-    )
-
-    assert_shell_command_result(
-        rule_runner,
-        Address("src/a", target_name="msg"),
-        expected_contents={"src/a/msg": "shell_command:a\n"},
-    )
-
-    assert_shell_command_result(
-        rule_runner,
-        Address("src/b", target_name="msg"),
-        expected_contents={"src/b/msg": "shell_command:a\nshell_command:b\n"},
     )
 
 
@@ -335,7 +339,8 @@ def test_shell_command_masquerade_as_a_files_target(rule_runner: RuleRunner) -> 
                   name="content-gen",
                   command="echo contents > contents.txt",
                   tools=["echo"],
-                  output_files=["contents.txt"]
+                  output_files=["contents.txt"],
+                  root_output_directory=".",
                 )
                 """
             ),
@@ -388,7 +393,7 @@ def test_package_dependencies(caplog, rule_runner: RuleRunner) -> None:
 
                 experimental_shell_command(
                   name="test",
-                  command="ls src",
+                  command="ls",
                   tools=["ls"],
                   log_output=True,
                   execution_dependencies=[":msg-archive"],
@@ -420,7 +425,8 @@ def test_execution_dependencies(caplog, rule_runner: RuleRunner) -> None:
                 experimental_shell_command(
                   name="a1",
                   command="echo message > msg.txt",
-                  outputs=["msg.txt"],
+                  output_files=["msg.txt"],
+                  workdir="/",
                 )
 
                 experimental_shell_command(
@@ -428,7 +434,8 @@ def test_execution_dependencies(caplog, rule_runner: RuleRunner) -> None:
                     tools=["cat"],
                     command="cat msg.txt > msg2.txt",
                     execution_dependencies=[":a1",],
-                    outputs=["msg2.txt",],
+                    output_files=["msg2.txt",],
+                    workdir="/",
                 )
 
                 # Fails because runtime dependencies are not exported
@@ -438,6 +445,7 @@ def test_execution_dependencies(caplog, rule_runner: RuleRunner) -> None:
                     tools=["cat"],
                     command="cat msg.txt",
                     execution_dependencies=[":a2",],
+                    workdir="/",
                 )
 
                 # Fails because `output_dependencies` are not available at runtime
@@ -447,6 +455,7 @@ def test_execution_dependencies(caplog, rule_runner: RuleRunner) -> None:
                     command="cat msg.txt",
                     execution_dependencies=(),
                     output_dependencies=[":a1"],
+                    workdir="/",
                 )
 
                 # Fails because runtime dependencies are not fetched transitively
@@ -456,6 +465,7 @@ def test_execution_dependencies(caplog, rule_runner: RuleRunner) -> None:
                     tools=["cat"],
                     command="cat msg.txt",
                     output_dependencies=[":a2"],
+                    workdir="/",
                 )
 
                 # Succeeds because `a1` and `a2` are requested directly
@@ -464,7 +474,8 @@ def test_execution_dependencies(caplog, rule_runner: RuleRunner) -> None:
                     tools=["cat"],
                     command="cat msg.txt msg2.txt > output.txt",
                     execution_dependencies=[":a1", ":a2",],
-                    outputs=["output.txt"],
+                    output_files=["output.txt"],
+                    workdir="/",
                 )
 
                 # Succeeds becuase `a1` and `a2` are requested directly and `output_dependencies`
@@ -474,7 +485,8 @@ def test_execution_dependencies(caplog, rule_runner: RuleRunner) -> None:
                     tools=["cat"],
                     command="cat msg.txt msg2.txt > output.txt",
                     output_dependencies=[":a1", ":a2",],
-                    outputs=["output.txt"],
+                    output_files=["output.txt"],
+                    workdir="/",
                 )
                 """
             ),
@@ -517,6 +529,7 @@ def test_old_style_dependencies(caplog, rule_runner: RuleRunner) -> None:
                   name="a1",
                   command="echo message > msg.txt",
                   outputs=["msg.txt"],
+                  workdir="/",\
                 )
 
                 experimental_shell_command(
@@ -525,6 +538,7 @@ def test_old_style_dependencies(caplog, rule_runner: RuleRunner) -> None:
                     command="cat msg.txt > msg2.txt",
                     dependencies=[":a1",],
                     outputs=["msg2.txt",],
+                    workdir="/",
                 )
 
                 experimental_shell_command(
@@ -533,6 +547,7 @@ def test_old_style_dependencies(caplog, rule_runner: RuleRunner) -> None:
                     command="cat msg.txt msg2.txt > output.txt",
                     dependencies=[":a1", ":a2",],
                     outputs=["output.txt"],
+                    workdir="/",
                 )
                 """
             ),
@@ -570,14 +585,60 @@ def test_run_shell_command_request(rule_runner: RuleRunner) -> None:
         tgt = rule_runner.get_target(Address("src", target_name=target))
         run = RunShellCommand.create(tgt)
         request = rule_runner.request(RunRequest, [run])
-        assert args[0] in request.args[0]
-        assert request.args[1:] == args[1:]
+        assert len(args) == len(request.args)
+        for arg, request_arg in zip(args, request.args):
+            arg in request_arg
 
     assert_run_args("test", ("bash", "-c", "some cmd string", "src:test"))
     assert_run_args(
         "cd-test",
         ("bash", "-c", "cd 'src/with space'\"'\"'n quote'; some cmd string", "src:cd-test"),
     )
+
+
+@pytest.mark.parametrize(
+    ("tool_name", "should_succeed"),
+    (
+        ("python3.8", True),
+        ("cd", False),
+        ("floop", False),
+    ),
+)
+def test_path_populated_with_tools(
+    caplog, rule_runner: RuleRunner, tool_name: str, should_succeed: bool
+) -> None:
+    caplog.set_level(logging.INFO)
+    caplog.clear()
+    rule_runner.write_files(
+        {
+            "src/BUILD": dedent(
+                f"""\
+                experimental_shell_command(
+                  name="tools-populated",
+                  tools=["which", "{tool_name}"],
+                  command='which {tool_name}',
+                  log_output=True,
+                )
+                """
+            )
+        }
+    )
+
+    try:
+        assert_shell_command_result(
+            rule_runner,
+            Address("src", target_name="tools-populated"),
+            expected_contents={},
+        )
+    except ExecutionError as exerr:
+        if should_succeed:
+            raise exerr
+
+    if should_succeed:
+        assert caplog.records[0].msg.strip().endswith("python3.8")
+    else:
+        # `which` is silent in `bash` when nothing is found
+        assert not caplog.records
 
 
 def test_shell_command_boot_script(rule_runner: RuleRunner) -> None:
@@ -604,20 +665,9 @@ def test_shell_command_boot_script(rule_runner: RuleRunner) -> None:
     assert res.argv[1] == "-c"
     assert res.argv[2].startswith("cd src &&")
     assert "bash -c" in res.argv[2]
-    assert res.argv[2].endswith(
-        shlex.quote(
-            "$mkdir -p .bin;"
-            "for tool in $TOOLS; do $ln -sf ${!tool} .bin; done;"
-            'export PATH="$PWD/.bin";'
-            "./command.script"
-        )
-        + " src:boot-script-test"
-    )
+    assert res.argv[2].endswith(shlex.quote("./command.script") + " src:boot-script-test")
 
-    tools = sorted({"python3_8", "mkdir", "ln"})
-    assert sorted(res.env["TOOLS"].split()) == tools
-    for tool in tools:
-        assert res.env[tool].endswith(f"/{tool.replace('_', '.')}")
+    assert "PATH" in res.env
 
 
 def test_shell_command_boot_script_in_build_root(rule_runner: RuleRunner) -> None:
@@ -642,15 +692,7 @@ def test_shell_command_boot_script_in_build_root(rule_runner: RuleRunner) -> Non
     assert "bash" in res.argv[0]
     assert res.argv[1] == "-c"
     assert "bash -c" in res.argv[2]
-    assert res.argv[2].endswith(
-        shlex.quote(
-            "$mkdir -p .bin;"
-            "for tool in $TOOLS; do $ln -sf ${!tool} .bin; done;"
-            'export PATH="$PWD/.bin";'
-            "./command.script"
-        )
-        + " //:boot-script-test"
-    )
+    assert res.argv[2].endswith(shlex.quote("./command.script") + " //:boot-script-test")
 
 
 def test_shell_command_extra_env_vars(caplog, rule_runner: RuleRunner) -> None:
@@ -703,6 +745,7 @@ def test_run_runnable_in_sandbox(rule_runner: RuleRunner) -> None:
                   name="run_fruitcake",
                   runnable=":fruitcake",
                   output_files=["fruitcake.txt"],
+                  root_output_directory=".",
                 )
                 """
             ),
@@ -721,7 +764,7 @@ def test_run_runnable_in_sandbox_with_workdir(rule_runner: RuleRunner) -> None:
         {
             "src/fruitcake.py": dedent(
                 """\
-                f = open("fruitcake.txt", "w")
+                f = open("src/fruitcake.txt", "w")
                 f.write("fruitcake\\n")
                 f.close()
                 """
@@ -736,8 +779,8 @@ def test_run_runnable_in_sandbox_with_workdir(rule_runner: RuleRunner) -> None:
                 experimental_run_in_sandbox(
                   name="run_fruitcake",
                   runnable=":fruitcake",
-                  output_files=["fruitcake.txt"],
-                  workdir=".",
+                  output_files=["src/fruitcake.txt"],
+                  workdir="/",
                 )
                 """
             ),
@@ -751,6 +794,45 @@ def test_run_runnable_in_sandbox_with_workdir(rule_runner: RuleRunner) -> None:
     )
 
 
+def test_run_in_sandbox_capture_stdout_err(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/fruitcake.py": dedent(
+                """\
+                import sys
+                print("fruitcake")
+                print("inconceivable", file=sys.stderr)
+                """
+            ),
+            "src/BUILD": dedent(
+                """\
+                python_source(
+                    source="fruitcake.py",
+                    name="fruitcake",
+                )
+
+                experimental_run_in_sandbox(
+                  name="run_fruitcake",
+                  runnable=":fruitcake",
+                  stdout="stdout",
+                  stderr="stderr",
+                  root_output_directory=".",
+                )
+                """
+            ),
+        }
+    )
+
+    assert_run_in_sandbox_result(
+        rule_runner,
+        Address("src", target_name="run_fruitcake"),
+        expected_contents={
+            "stderr": "inconceivable\n",
+            "stdout": "fruitcake\n",
+        },
+    )
+
+
 def test_relative_directories(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -761,7 +843,6 @@ def test_relative_directories(rule_runner: RuleRunner) -> None:
                   tools=["echo"],
                   command='echo foosh > ../foosh.txt',
                   output_files=["../foosh.txt"],
-                  workdir=".",
                 )
                 """
             ),
@@ -785,7 +866,6 @@ def test_relative_directories_2(rule_runner: RuleRunner) -> None:
                   tools=["echo"],
                   command='echo foosh > ../newdir/foosh.txt',
                   output_files=["../newdir/foosh.txt"],
-                  workdir=".",
                 )
                 """
             ),
@@ -809,7 +889,6 @@ def test_cannot_escape_build_root(rule_runner: RuleRunner) -> None:
                   tools=["echo"],
                   command='echo foosh > ../../invalid.txt',
                   output_files=["../../invalid.txt"],
-                  workdir=".",
                 )
                 """
             ),

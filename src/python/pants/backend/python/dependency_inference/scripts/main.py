@@ -3,14 +3,13 @@
 # -*- coding: utf-8 -*-
 
 # NB: This must be compatible with Python 2.7 and 3.5+.
-# NB: If you're needing to debug this, an easy way is to just invoke it on a file.
+# NB: An easy way to debug this is to just invoke it on a file.
 #   E.g.
-#   $ export ROOT=src/python/pants/backend/python/dependency_inference/scripts/
-#   $ PYTHONPATH=$ROOT STRING_IMPORTS=y python $ROOT/_pants_dep_parser/main.py FILE
+#   $ PYTHONPATH=src/python STRING_IMPORTS=y python \
+#     src/python/pants/backend/python/dependency_inference/scripts/main.py FILE
 #   Or
 #   $ ./pants --no-python-infer-imports run \
-#     src/python/pants/backend/python/dependency_inference/scripts/_pants_dep_parser/main.py \
-#     -- src/python/pants/base/specs.py
+#     src/python/pants/backend/python/dependency_inference/scripts/main.py -- FILE
 
 from __future__ import print_function, unicode_literals
 
@@ -21,7 +20,9 @@ import os
 import sys
 from io import open
 
-from _pants_dep_parser.dependency_visitor_base import FoundDependencies
+from pants.backend.python.dependency_inference.scripts.dependency_visitor_base import (
+    FoundDependencies,
+)
 
 
 def main(filename):
@@ -35,7 +36,7 @@ def main(filename):
     package_parts = os.path.dirname(filename).split(os.path.sep)
     visitor_classnames = os.environ.get(
         "VISITOR_CLASSNAMES",
-        "_pants_dep_parser.general_dependency_visitor.GeneralDependencyVisitor",
+        "pants.backend.python.dependency_inference.scripts.general_dependency_visitor.GeneralDependencyVisitor",
     ).split("|")
     visitors = []
     found_dependencies = FoundDependencies()

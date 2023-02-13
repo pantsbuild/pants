@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
+import itertools
 import os.path
 import re
 from collections.abc import Mapping, Sequence
@@ -127,6 +128,15 @@ class PathGlob:
         )
 
 
+RULE_REGEXP = "|".join(
+    (
+        r"(?:<(?P<type>[^>]*)>)",
+        r"(?:\[(?P<path>[^]]*)\])",
+        r"(?:\((?P<tags>[^)]*)\))",
+    )
+)
+
+
 @dataclass(frozen=True)
 class TargetGlob:
     type_: str | None
@@ -144,15 +154,16 @@ class TargetGlob:
             )
 
     def __str__(self) -> str:
-        # Note: when there are more selection criteria used than is supported as a single text
-        # value, switch over to a dict based representation.
+        type_ = f"<{self.type_}>" if self.type_ else ""
         tags = (
             f"({', '.join(str(tag) if ',' not in tag else repr(tag) for tag in self.tags)})"
-            if self.tags is not None
+            if self.tags
             else ""
         )
-        path = f"[{self.path}]" if self.path is not None else ""
-        return f"{self.type_ or ''}{tags}{path}" or "!*"
+        path = self.path or ""
+        if path and (type_ or tags):
+            path = f"[{path}]"
+        return f"{type_}{path}{tags}" or "!*"
 
     @memoized_classmethod
     def create(  # type: ignore[misc]
@@ -170,42 +181,30 @@ class TargetGlob:
         elif isinstance(spec, Mapping):
             spec_dict = spec
         else:
-            raise ValueError(f"invalid target spec, expected string or dict but got: {spec!r}")
+            raise ValueError(f"Invalid target spec, expected string or dict but got: {spec!r}")
+
+        if not spec_dict:
+            raise ValueError("Target spec must not be empty.")
 
         return cls.create(  # type: ignore[call-arg]
             type_=spec_dict.get("type"),
-            path=PathGlob.parse(spec_dict["path"], base)
-            if spec_dict.get("path") is not None
-            else None,
+            path=(PathGlob.parse(spec_dict["path"], base) if spec_dict.get("path") else None),
             tags=cls._parse_tags(spec_dict.get("tags")),
         )
 
     @staticmethod
     def _parse_string(spec: str) -> Mapping[str, Any]:
-        match = re.match(
-            r"""
-            (?P<type>[^([]*)
-            (?:
-              \(
-                (?P<tags>[^)]*)
-              \)
-            )?
-            (?:
-              \[
-                (?P<path>[^]]*)
-              \]
-            )?
-            $
-            """,
-            spec,
-            re.VERBOSE,
-        )
-        if not match:
-            raise ValueError(
-                f"invalid target spec string with optional parts of 'target-glob(tag-value, ...)[path-glob]' "
-                f"but got: {spec!r}"
+        if not spec:
+            return {}
+        if spec[0] not in "<[(":
+            return dict(path=spec)
+        return {
+            tag: val
+            for tag, val in itertools.chain.from_iterable(
+                m.groupdict().items() for m in re.finditer(RULE_REGEXP, spec)
             )
-        return match.groupdict()
+            if val is not None
+        }
 
     @staticmethod
     def _parse_tags(tags: str | Sequence[str] | None) -> tuple[Any, ...] | None:

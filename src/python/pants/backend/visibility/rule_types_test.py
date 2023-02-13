@@ -197,27 +197,27 @@ def test_visibility_rule_set_parse(expected: VisibilityRuleSet, arg: Any) -> Non
         (
             True,
             "python_sources",
-            ("python_*", ""),
+            ("<python_*>", ""),
         ),
         (
             False,
             "shell_sources",
-            ("python_*", ""),
+            ("<python_*>", ""),
         ),
         (
             True,
             "files",
-            (("files", "resources"), ""),
+            (("<files>", "<resources>"), ""),
         ),
         (
             True,
             "resources",
-            (("files", "resources"), ""),
+            (("<files>", "<resources>"), ""),
         ),
         (
             False,
             "resource",
-            (("files", "resources"), ""),
+            (("<files>", "<resources>"), ""),
         ),
     ],
 )
@@ -233,7 +233,7 @@ def dependencies_rules() -> BuildFileVisibilityRules:
         "src/BUILD",
         # Rules for outgoing dependency.
         (
-            parse_ruleset(("requirement", "!//3rdparty/req#restrict*", "//3rdparty/**"), "BUILD"),
+            parse_ruleset(("<requirement>", "!//3rdparty/req#restrict*", "//3rdparty/**"), "BUILD"),
             parse_ruleset(("*", ("tgt/ok/*", "?tgt/dubious/*", "!tgt/blocked/*")), "src/BUILD"),
         ),
     )
@@ -245,7 +245,7 @@ def dependents_rules() -> BuildFileVisibilityRules:
         "tgt/BUILD",
         # Rules for incoming dependency.
         (
-            parse_ruleset(("requirement", "*"), "BUILD"),
+            parse_ruleset(("<requirement>", "*"), "BUILD"),
             parse_ruleset(("*", ("src/ok/*", "?src/dubious/*", "!src/blocked/*")), "tgt/BUILD"),
         ),
     )
@@ -537,7 +537,7 @@ def test_dependency_rules(rule_runner: RuleRunner, caplog) -> None:
           (resources, ".", "!*"),
 
           # Anyone may depend on `files` targets.
-          ("files", "*"),
+          ("<files>", "*"),
 
           # Allow all by default, with a warning
           ("*", "?*"),
@@ -581,7 +581,7 @@ def test_dependency_rules(rule_runner: RuleRunner, caplog) -> None:
             "src/b/b2/BUILD": BUILD(
                 dependents=(
                     # Override default, any target in `b` may depend on internal targets
-                    ("resources", "src/b", "src/b/*", "!*"),
+                    ("<resources>", "src/b", "src/b/*", "!*"),
                     # Only `b` may depend on our nested modules.
                     ("*", "src/b/*", "!*"),
                 ),
@@ -687,7 +687,7 @@ def test_missing_rule_error_message(rule_runner: RuleRunner) -> None:
         Consider adding the required catch-all rule at the end of the rules spec. Example adding a
         "deny all" at the end:
 
-          (('resources',), '!nope', '!*')
+          (('<resources>',), '!nope', '!*')
         """
     )
     with engine_error(BuildFileVisibilityRulesError, contains=msg):
@@ -710,7 +710,7 @@ def test_missing_rule_error_message(rule_runner: RuleRunner) -> None:
         Consider adding the required catch-all rule at the end of the rules spec. Example adding a
         "deny all" at the end:
 
-          (('resources',), 'res/*', '!*')
+          (('<resources>',), 'res/*', '!*')
         """
     )
     with engine_error(BuildFileVisibilityRulesError, contains=msg):
@@ -809,7 +809,7 @@ def test_file_specific_rules(rule_runner: RuleRunner) -> None:
                 """
                 __dependents_rules__(
                   # Allow all to depend on files from lib/pub/ except for one file in particular.
-                  ("[/exception.txt]", "//src/lib/**", "!*"),
+                  ("/exception.txt", "//src/lib/**", "!*"),
                   ("*", "*"),
                 )
                 """

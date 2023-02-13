@@ -324,7 +324,7 @@ impl RawFdNail {
       let (pipe_reader, pipe_writer) = os_pipe::pipe()?;
       let read_handle = unsafe { std::fs::File::from_raw_fd(pipe_reader.into_raw_fd()) };
       Ok((
-        blocking_stream_for(read_handle).boxed(),
+        blocking_stream_for(read_handle)?.boxed(),
         Box::new(pipe_writer),
       ))
     }
@@ -360,25 +360,27 @@ impl RawFdNail {
 // TODO: See https://github.com/pantsbuild/pants/issues/16969.
 pub fn blocking_stream_for<R: io::Read + Send + Sized + 'static>(
   mut r: R,
-) -> impl futures::Stream<Item = Result<Bytes, io::Error>> {
+) -> io::Result<impl futures::Stream<Item = Result<Bytes, io::Error>>> {
   let (sender, receiver) = mpsc::unbounded_channel();
-  std::thread::spawn(move || {
-    let mut buf = [0; 4096];
-    loop {
-      match r.read(&mut buf) {
-        Ok(0) => break,
-        Ok(n) => {
-          if sender.send(Ok(Bytes::copy_from_slice(&buf[..n]))).is_err() {
+  std::thread::Builder::new()
+    .name("stdio-reader".to_owned())
+    .spawn(move || {
+      let mut buf = [0; 4096];
+      loop {
+        match r.read(&mut buf) {
+          Ok(0) => break,
+          Ok(n) => {
+            if sender.send(Ok(Bytes::copy_from_slice(&buf[..n]))).is_err() {
+              break;
+            }
+          }
+          Err(ref e) if e.kind() == io::ErrorKind::Interrupted => {}
+          Err(e) => {
+            let _ = sender.send(Err(e));
             break;
           }
         }
-        Err(ref e) if e.kind() == io::ErrorKind::Interrupted => {}
-        Err(e) => {
-          let _ = sender.send(Err(e));
-          break;
-        }
       }
-    }
-  });
-  UnboundedReceiverStream::new(receiver)
+    })?;
+  Ok(UnboundedReceiverStream::new(receiver))
 }

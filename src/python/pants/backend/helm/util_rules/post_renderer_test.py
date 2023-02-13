@@ -34,6 +34,7 @@ from pants.backend.helm.util_rules.renderer_test import _read_file_from_digest
 from pants.backend.helm.util_rules.tool import HelmProcess
 from pants.backend.shell.target_types import ShellCommandRunTarget, ShellSourcesGeneratorTarget
 from pants.backend.shell.util_rules import shell_command
+from pants.core.goals import package
 from pants.core.goals.run import rules as run_rules
 from pants.core.util_rules import source_files
 from pants.engine.addresses import Address
@@ -72,6 +73,7 @@ def rule_runner() -> RuleRunner:
             *post_renderer.rules(),
             *run_rules(),
             *shell_command.rules(),
+            *package.rules(),
             custom_test_image_tags,
             UnionRule(DockerImageTagsRequest, CustomTestImageTagRequest),
             QueryRule(HelmPostRenderer, (HelmDeploymentPostRendererRequest,)),

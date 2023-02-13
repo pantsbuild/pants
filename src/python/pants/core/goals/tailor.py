@@ -80,6 +80,18 @@ def default_sources_for_target_type(tgt_type: type[Target]) -> tuple[str, ...]:
     return tuple()
 
 
+def has_source_or_sources_field(tgt_type: type[Target]) -> bool:
+    """Tell whether a given target type has a `source` or `sources` field.
+
+    This may be useful when determining whether it's possible to tailor a target with the passed
+    source(s) field value if the target doesn't have such a field in the first place.
+    """
+    for field in tgt_type.core_fields:
+        if issubclass(field, (OptionalSingleSourceField, MultipleSourcesField)):
+            return True
+    return False
+
+
 @dataclass(order=True, frozen=True)
 class PutativeTarget:
     """A potential target to add, detected by various heuristics.
@@ -145,8 +157,9 @@ class PutativeTarget:
                 )
             )
 
-        default_sources = default_sources_for_target_type(target_type)
-        if (explicit_sources or triggering_sources) and not default_sources:
+        if (explicit_sources or triggering_sources) and not has_source_or_sources_field(
+            target_type
+        ):
             raise AssertionError(
                 softwrap(
                     f"""
@@ -156,6 +169,7 @@ class PutativeTarget:
                     """
                 )
             )
+        default_sources = default_sources_for_target_type(target_type)
         owned_sources = explicit_sources or default_sources or tuple()
         return cls(
             path,

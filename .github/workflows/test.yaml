@@ -374,6 +374,7 @@ jobs:
         '
     - env:
         PANTS_CONFIG_FILES: +['pants.ci.toml','pants.ci.aarch64.toml']
+        PANTS_SUBPROCESS_ENVIRONMENT_ENV_VARS: HOME
       name: Build wheels
       run: 'USE_PY39=true ./build-support/bin/release.sh build-local-pex
 

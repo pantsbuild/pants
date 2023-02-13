@@ -18,6 +18,7 @@ def test_synthesized_python_is_included_in_package() -> None:
                 execution_dependencies=(),
                 output_files=["hello_world.py",],
                 workdir=".",
+                root_output_directory="/",
             )
 
             experimental_wrap_as_python_sources(
