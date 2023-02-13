@@ -1055,7 +1055,11 @@ class BootstrapOptions:
         help=softwrap(
             """
             The maximum number of threads to use to execute `@rule` logic. Defaults to
-            a small multiple of `--rule-threads-core`.
+            `16 * --rule-threads-core`.
+
+            Note that setting too low a `--rule-threads-max` value can lead to deadlocks: Pants
+            uses blocking operations internally for a few use cases, and if the pool of blocking
+            threads is exhausted, those use cases will wait.
             """
         ),
     )
@@ -1854,10 +1858,22 @@ class GlobalOptions(BootstrapOptions, Subsystem):
 
     @staticmethod
     def create_py_executor(bootstrap_options: OptionValueContainer) -> PyExecutor:
+        # NB: See the `--rule-threads-max` option help for a warning on setting this too low.
+        #
+        # This value is chosen somewhat arbitrarily, but has a few concerns at play:
+        # * When set too low, tasks using `Executor::spawn_blocking` on the Rust side can deadlock
+        #   when too many blocking operations already running.
+        # * Higher thread counts mean less bounded access to the LMDB store (which is the primary user
+        #   of blocking tasks), which is good up to a point, but then begins to increase kernel time
+        #   as many threads are blocked waiting for IO and locks.
+        #
+        # The value 16 was chosen to avoid deadlocks with all current `spawn_blocking` calls, and based
+        # on the observation that performance drops off by 2-3% points (on my machine!) when multiples
+        # of 32 and 64.
         rule_threads_max = (
             bootstrap_options.rule_threads_max
             if bootstrap_options.rule_threads_max
-            else 4 * bootstrap_options.rule_threads_core
+            else 16 * bootstrap_options.rule_threads_core
         )
         return PyExecutor(
             core_threads=bootstrap_options.rule_threads_core, max_threads=rule_threads_max
