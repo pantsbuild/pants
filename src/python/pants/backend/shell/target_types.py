@@ -450,7 +450,7 @@ class RunShellCommandWorkdirField(StringField):
     help = softwrap(
         "Sets the current working directory of the command that is `run`. Values that begin with "
         "`.` are relative to the directory you are running Pants from. Values that begin with `/` "
-        "are from the root of your filesystem."
+        "are from your project root."
     )
 
 
