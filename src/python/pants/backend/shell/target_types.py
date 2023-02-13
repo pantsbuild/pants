@@ -6,6 +6,17 @@ from __future__ import annotations
 import re
 from enum import Enum
 
+from pants.backend.adhoc.target_types import (
+    AdhocToolDependenciesField,
+    AdhocToolExecutionDependenciesField,
+    AdhocToolExtraEnvVarsField,
+    AdhocToolOutputDependenciesField,
+    AdhocToolOutputDirectoriesField,
+    AdhocToolOutputFilesField,
+    AdhocToolOutputRootDirField,
+    AdhocToolTimeoutField,
+    AdhocToolWorkdirField,
+)
 from pants.backend.shell.subsystems.shell_setup import ShellSetup
 from pants.core.goals.test import RuntimePackageDependenciesField, TestTimeoutField
 from pants.core.util_rules.environments import EnvironmentField
@@ -14,19 +25,15 @@ from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     BoolField,
-    Dependencies,
-    IntField,
     MultipleSourcesField,
     OverridesField,
     SingleSourceField,
-    SpecialCasedDependencies,
     StringField,
     StringSequenceField,
     Target,
     TargetFilesGenerator,
     TargetFilesGeneratorSettings,
     TargetFilesGeneratorSettingsRequest,
-    ValidNumbers,
     generate_file_based_overrides_field_help_message,
     generate_multiple_sources_field_help_message,
 )
@@ -35,7 +42,7 @@ from pants.util.enums import match
 from pants.util.strutil import softwrap
 
 
-class ShellDependenciesField(Dependencies):
+class ShellDependenciesField(AdhocToolDependenciesField):
     pass
 
 
@@ -260,19 +267,6 @@ class ShellCommandCommandField(StringField):
     help = "Shell command to execute.\n\nThe command is executed as 'bash -c <command>' by default."
 
 
-class RunInSandboxRunnableField(StringField):
-    alias = "runnable"
-    required = True
-    help = softwrap(
-        """
-        Address to a target that can be invoked by the `run` goal (and does not set
-        `run_in_sandbox_behavior=NOT_SUPPORTED`). This will be executed along with any arguments
-        specified by `argv`, in a sandbox with that target's transitive dependencies, along with
-        the transitive dependencies specified by `execution_dependencies`.
-        """
-    )
-
-
 class ShellCommandOutputsField(StringSequenceField):
     alias = "outputs"
     help = softwrap(
@@ -289,76 +283,20 @@ class ShellCommandOutputsField(StringSequenceField):
     removal_version = "2.17.0.dev0"
 
 
-class ShellCommandOutputFilesField(StringSequenceField):
-    alias = "output_files"
-    required = False
-    default = ()
-    help = softwrap(
-        """
-        Specify the shell command's output files to capture, relative to the value of `workdir`.
-
-        For directories, use `output_directories`. At least one of `output_files` and
-        `output_directories` must be specified.
-
-        Relative paths (including `..`) may be used, as long as the path does not ascend further
-        than the build root.
-        """
-    )
+class ShellCommandOutputFilesField(AdhocToolOutputFilesField):
+    pass
 
 
-class ShellCommandOutputDirectoriesField(StringSequenceField):
-    alias = "output_directories"
-    required = False
-    default = ()
-    help = softwrap(
-        """
-        Specify full directories (including recursive descendants) of output to capture from the
-        shell command, relative to the value of `workdir`.
-
-        For individual files, use `output_files`. At least one of `output_files` and
-        `output_directories` must be specified.
-
-        Relative paths (including `..`) may be used, as long as the path does not ascend further
-        than the build root.
-        """
-    )
+class ShellCommandOutputDirectoriesField(AdhocToolOutputDirectoriesField):
+    pass
 
 
-class ShellCommandOutputDependenciesField(ShellDependenciesField):
-    supports_transitive_excludes = True
-    alias = "output_dependencies"
-    deprecated_alias = "dependencies"
-    deprecated_alias_removal_version = "2.17.0.dev0"
-
-    help = softwrap(
-        """
-        Any dependencies that the output artifacts require in order to be effectively consumed.
-
-        To enable legacy use cases, if `execution_dependencies` is `None`, these dependencies will
-        be materialized in the command execution sandbox. This behavior is deprecated, and will be
-        removed in version 2.17.0.dev0.
-        """
-    )
+class ShellCommandOutputDependenciesField(AdhocToolOutputDependenciesField):
+    pass
 
 
-class ShellCommandExecutionDependenciesField(SpecialCasedDependencies):
-    alias = "execution_dependencies"
-    required = False
-    default = None
-
-    help = softwrap(
-        """
-        The execution dependencies for this shell command.
-
-        Dependencies specified here are those required to make the command complete successfully
-        (e.g. file inputs, binaries compiled from other targets, etc), but NOT required to make
-        the output side-effects useful. Dependencies that are required to use the side-effects
-        produced by this command should be specified using the `output_dependencies` field.
-
-        If this field is specified, dependencies from `output_dependencies` will not be added to
-        the execution sandbox.
-        """
-    )
+class ShellCommandExecutionDependenciesField(AdhocToolExecutionDependenciesField):
+    pass
 
 
 class ShellCommandSourcesField(MultipleSourcesField):
@@ -368,36 +306,8 @@ class ShellCommandSourcesField(MultipleSourcesField):
     expected_num_files = 0
 
 
-class RunInSandboxSourcesField(MultipleSourcesField):
-    # We solely register this field for codegen to work.
-    alias = "_sources"
-    uses_source_roots = False
-    expected_num_files = 0
-
-
-class RunInSandboxArgumentsField(StringSequenceField):
-    alias = "args"
-    default = ()
-    help = f"Extra arguments to pass into the `{RunInSandboxRunnableField.alias}` field."
-
-
-class RunInSandboxStdoutFilenameField(StringField):
-    alias = "stdout"
-    default = None
-    help = "A filename to capture the contents of `stdout` to, relative to the value of `workdir`."
-
-
-class RunInSandboxStderrFilenameField(StringField):
-    alias = "stderr"
-    default = None
-    help = "A filename to capture the contents of `stdout` to, relative to the value of `workdir`."
-
-
-class ShellCommandTimeoutField(IntField):
-    alias = "timeout"
-    default = 30
-    help = "Command execution timeout (in seconds)."
-    valid_numbers = ValidNumbers.positive_only
+class ShellCommandTimeoutField(AdhocToolTimeoutField):
+    pass
 
 
 class ShellCommandToolsField(StringSequenceField):
@@ -414,15 +324,8 @@ class ShellCommandToolsField(StringSequenceField):
     )
 
 
-class ShellCommandExtraEnvVarsField(StringSequenceField):
-    alias = "extra_env_vars"
-    help = softwrap(
-        """
-        Additional environment variables to include in the shell process.
-        Entries are strings in the form `ENV_VAR=value` to use explicitly; or just
-        `ENV_VAR` to copy the value of a variable in Pants's own environment.
-        """
-    )
+class ShellCommandExtraEnvVarsField(AdhocToolExtraEnvVarsField):
+    pass
 
 
 class ShellCommandLogOutputField(BoolField):
@@ -431,17 +334,8 @@ class ShellCommandLogOutputField(BoolField):
     help = "Set to true if you want the output from the command logged to the console."
 
 
-class ShellCommandWorkdirField(StringField):
-    alias = "workdir"
-    default = "."
-    help = softwrap(
-        "Sets the current working directory of the command. \n\n"
-        "Values are relative to the build root, except in the following cases:\n\n"
-        "* `.` specifies the location of the `BUILD` file.\n"
-        "* Values beginning with `./` are relative to the location of the `BUILD` file.\n"
-        "* `/` or the empty string specifies the build root.\n"
-        "* Values beginning with `/` are also relative to the build root."
-    )
+class ShellCommandWorkdirField(AdhocToolWorkdirField):
+    pass
 
 
 class RunShellCommandWorkdirField(StringField):
@@ -454,20 +348,11 @@ class RunShellCommandWorkdirField(StringField):
     )
 
 
-class ShellCommandOutputRootDirField(StringField):
-    alias = "root_output_directory"
-    default = "/"
-    help = softwrap(
-        "Adjusts the location of files output by this command, when consumed as a dependency.\n\n"
-        "Values are relative to the build root, except in the following cases:\n\n"
-        "* `.` specifies the location of the `BUILD` file.\n"
-        "* Values beginning with `./` are relative to the location of the `BUILD` file.\n"
-        "* `/` or the empty string specifies the build root.\n"
-        "* Values beginning with `/` are also relative to the build root."
-    )
+class ShellCommandOutputRootDirField(AdhocToolOutputRootDirField):
+    pass
 
 
-class ShellCommandTestDependenciesField(ShellCommandExecutionDependenciesField):
+class ShellCommandTestDependenciesField(AdhocToolExecutionDependenciesField):
     pass
 
 
@@ -517,46 +402,6 @@ class ShellCommandTarget(Target):
         insert the `outputs` into that consumer's context.
 
         The command may be retried and/or cancelled, so ensure that it is idempotent.
-        """
-    )
-
-
-class ShellRunInSandboxTarget(Target):
-    alias = "experimental_run_in_sandbox"
-    core_fields = (
-        *COMMON_TARGET_FIELDS,
-        RunInSandboxRunnableField,
-        RunInSandboxArgumentsField,
-        ShellCommandExecutionDependenciesField,
-        ShellCommandOutputDependenciesField,
-        ShellCommandLogOutputField,
-        ShellCommandOutputFilesField,
-        ShellCommandOutputDirectoriesField,
-        RunInSandboxSourcesField,
-        ShellCommandTimeoutField,
-        ShellCommandToolsField,
-        ShellCommandExtraEnvVarsField,
-        ShellCommandWorkdirField,
-        ShellCommandOutputRootDirField,
-        RunInSandboxStdoutFilenameField,
-        RunInSandboxStderrFilenameField,
-        EnvironmentField,
-    )
-    help = softwrap(
-        """
-        Execute any runnable target for its side effects.
-
-        Example BUILD file:
-
-            experimental_run_in_sandbox(
-                runnable=":python_source",
-                argv=[""],
-                tools=["tar", "curl", "cat", "bash", "env"],
-                execution_dependencies=[":scripts"],
-                outputs=["results/", "logs/my-script.log"],
-            )
-
-            shell_sources(name="scripts")
         """
     )
 

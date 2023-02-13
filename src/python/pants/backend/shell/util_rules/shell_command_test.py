@@ -10,13 +10,13 @@ from textwrap import dedent
 
 import pytest
 
+from pants.backend.adhoc.target_types import AdhocToolTarget
 from pants.backend.python.goals.run_python_source import rules as run_python_source_rules
 from pants.backend.python.target_types import PythonSourceTarget
 from pants.backend.shell.target_types import (
     ShellCommandRunTarget,
     ShellCommandTarget,
     ShellCommandTestTarget,
-    ShellRunInSandboxTarget,
     ShellSourcesGeneratorTarget,
 )
 from pants.backend.shell.util_rules.run_in_sandbox import GenerateFilesFromRunInSandboxRequest
@@ -72,7 +72,7 @@ def rule_runner() -> RuleRunner:
             ShellCommandRunTarget,
             ShellCommandTestTarget,
             ShellSourcesGeneratorTarget,
-            ShellRunInSandboxTarget,
+            AdhocToolTarget,
             ArchiveTarget,
             FilesGeneratorTarget,
             PythonSourceTarget,
