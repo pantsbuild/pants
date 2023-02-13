@@ -19,7 +19,7 @@ from pants.backend.shell.target_types import (
     ShellRunInSandboxTarget,
     ShellSourcesGeneratorTarget,
 )
-from pants.backend.shell.util_rules.adhoc_process_support import ShellCommandProcessRequest
+from pants.backend.shell.util_rules.adhoc_process_support import AdhocProcessRequest
 from pants.backend.shell.util_rules.run_in_sandbox import GenerateFilesFromRunInSandboxRequest
 from pants.backend.shell.util_rules.run_in_sandbox import rules as run_in_sandbox_rules
 from pants.backend.shell.util_rules.shell_command import (
@@ -61,7 +61,7 @@ def rule_runner() -> RuleRunner:
             *run_python_source_rules(),
             QueryRule(GeneratedSources, [GenerateFilesFromShellCommandRequest]),
             QueryRule(GeneratedSources, [GenerateFilesFromRunInSandboxRequest]),
-            QueryRule(Process, [ShellCommandProcessRequest]),
+            QueryRule(Process, [AdhocProcessRequest]),
             QueryRule(Process, [EnvironmentName, ShellCommandProcessFromTargetRequest]),
             QueryRule(RunRequest, [RunShellCommand]),
             QueryRule(SourceFiles, [SourceFilesRequest]),
@@ -949,3 +949,33 @@ def test_working_directory_special_values(
         Address("src", target_name="run_fruitcake"),
         expected_contents={os.path.join(file_location, "fruitcake.txt"): "fruitcake\n"},
     )
+
+
+def test_missing_tool_called(
+    caplog,
+    rule_runner: RuleRunner,
+) -> None:
+    caplog.set_level(logging.INFO)
+    caplog.clear()
+    rule_runner.write_files(
+        {
+            "src/BUILD": dedent(
+                """\
+                experimental_shell_command(
+                  name="gerald-is-not-here",
+                  command="gerald hello",
+                  log_output=True,
+                )
+                """
+            )
+        }
+    )
+
+    with pytest.raises(ExecutionError):
+        assert_shell_command_result(
+            rule_runner,
+            Address("src", target_name="gerald-is-not-here"),
+            expected_contents={},
+        )
+
+    assert "requires the names of any external commands" in caplog.text

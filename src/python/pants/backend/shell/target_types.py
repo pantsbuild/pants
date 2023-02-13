@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import re
 from enum import Enum
-from typing import ClassVar, Optional
 
 from pants.backend.shell.subsystems.shell_setup import ShellSetup
 from pants.core.goals.test import RuntimePackageDependenciesField, TestTimeoutField
@@ -376,13 +375,6 @@ class RunInSandboxSourcesField(MultipleSourcesField):
     expected_num_files = 0
 
 
-class ShellCommandIsInteractiveField(MultipleSourcesField):
-    # We use this to determine whether this is an interactive process.
-    alias = "_is_interactive"
-    uses_source_roots = False
-    expected_num_files = 0
-
-
 class RunInSandboxArgumentsField(StringSequenceField):
     alias = "args"
     default = ()
@@ -441,7 +433,7 @@ class ShellCommandLogOutputField(BoolField):
 
 class ShellCommandWorkdirField(StringField):
     alias = "workdir"
-    default: ClassVar[Optional[str]] = "."
+    default = "."
     help = softwrap(
         "Sets the current working directory of the command. \n\n"
         "Values are relative to the build root, except in the following cases:\n\n"
@@ -452,11 +444,13 @@ class ShellCommandWorkdirField(StringField):
     )
 
 
-class RunShellCommandWorkdirField(ShellCommandWorkdirField):
-    default = None
+class RunShellCommandWorkdirField(StringField):
+    alias = "workdir"
+    default = "."
     help = softwrap(
-        "Sets the current working directory of the command that is `run`. If `None`, run the "
-        "command from the directory you are invoking Pants from."
+        "Sets the current working directory of the command that is `run`. Values that begin with "
+        "`.` are relative to the directory you are running Pants from. Values that begin with `/` "
+        "are from your project root."
     )
 
 
@@ -574,7 +568,6 @@ class ShellCommandRunTarget(Target):
         ShellCommandExecutionDependenciesField,
         ShellCommandCommandField,
         RunShellCommandWorkdirField,
-        ShellCommandIsInteractiveField,
     )
     help = softwrap(
         """

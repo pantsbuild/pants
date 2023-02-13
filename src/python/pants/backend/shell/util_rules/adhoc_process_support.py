@@ -9,7 +9,7 @@ import os
 import re
 import shlex
 from dataclasses import dataclass
-from typing import Mapping, Union
+from typing import Union
 
 from pants.backend.shell.target_types import (
     ShellCommandExecutionDependenciesField,
@@ -26,17 +26,9 @@ from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.core.util_rules.system_binaries import BashBinary
 from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
-from pants.engine.fs import (
-    EMPTY_DIGEST,
-    CreateDigest,
-    Digest,
-    Directory,
-    FileContent,
-    MergeDigests,
-    Snapshot,
-)
+from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, Directory, MergeDigests, Snapshot
 from pants.engine.internals.native_engine import RemovePrefix
-from pants.engine.process import Process
+from pants.engine.process import FallibleProcessResult, Process, ProcessResult, ProductDescription
 from pants.engine.rules import Get, MultiGet, collect_rules, rule, rule_helper
 from pants.engine.target import (
     FieldSetsPerTarget,
@@ -52,13 +44,12 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
-class ShellCommandProcessRequest:
+class AdhocProcessRequest:
     description: str
     address: Address
-    shell_name: str
-    interactive: bool
-    working_directory: str | None
-    command: str
+    working_directory: str
+    root_output_directory: str
+    argv: tuple[str, ...]
     timeout: int | None
     input_digest: Digest
     immutable_input_digests: FrozenDict[str, Digest] | None
@@ -67,29 +58,39 @@ class ShellCommandProcessRequest:
     output_directories: tuple[str, ...]
     fetch_env_vars: tuple[str, ...]
     supplied_env_var_values: FrozenDict[str, str] | None
+    log_on_process_errors: FrozenDict[int, str] | None
+    log_output: bool
+
+
+@dataclass(frozen=True)
+class AdhocProcessResult:
+    process_result: ProcessResult
+    adjusted_digest: Digest
 
 
 @rule_helper
-async def _execution_environment_from_dependencies(shell_command: Target) -> Digest:
+async def _execution_environment_from_dependencies(adhoc_process_target: Target) -> Digest:
 
     runtime_dependencies_defined = (
-        shell_command.get(ShellCommandExecutionDependenciesField).value is not None
+        adhoc_process_target.get(ShellCommandExecutionDependenciesField).value is not None
     )
 
     any_dependencies_defined = (
-        shell_command.get(ShellCommandOutputDependenciesField).value is not None
+        adhoc_process_target.get(ShellCommandOutputDependenciesField).value is not None
     )
 
     # If we're specifying the `dependencies` as relevant to the execution environment, then include
     # this command as a root for the transitive dependency search for execution dependencies.
-    maybe_this_target = (shell_command.address,) if not runtime_dependencies_defined else ()
+    maybe_this_target = (adhoc_process_target.address,) if not runtime_dependencies_defined else ()
 
     # Always include the execution dependencies that were specified
     if runtime_dependencies_defined:
         runtime_dependencies = await Get(
             Addresses,
             UnparsedAddressInputs,
-            shell_command.get(ShellCommandExecutionDependenciesField).to_unparsed_address_inputs(),
+            adhoc_process_target.get(
+                ShellCommandExecutionDependenciesField
+            ).to_unparsed_address_inputs(),
         )
     elif any_dependencies_defined:
         runtime_dependencies = Addresses()
@@ -115,7 +116,7 @@ async def _execution_environment_from_dependencies(shell_command: Target) -> Dig
     )
 
     all_dependencies = (
-        *(i for i in transitive.roots if i is not shell_command),
+        *(i for i in transitive.roots if i is not adhoc_process_target),
         *transitive.dependencies,
     )
 
@@ -147,11 +148,11 @@ async def _execution_environment_from_dependencies(shell_command: Target) -> Dig
 
 
 def _parse_outputs_from_command(
-    shell_command: Target, description: str
+    adhoc_process_target: Target, description: str
 ) -> tuple[tuple[str, ...], tuple[str, ...]]:
-    outputs = shell_command.get(ShellCommandOutputsField).value or ()
-    output_files = shell_command.get(ShellCommandOutputFilesField).value or ()
-    output_directories = shell_command.get(ShellCommandOutputDirectoriesField).value or ()
+    outputs = adhoc_process_target.get(ShellCommandOutputsField).value or ()
+    output_files = adhoc_process_target.get(ShellCommandOutputFilesField).value or ()
+    output_directories = adhoc_process_target.get(ShellCommandOutputDirectoriesField).value or ()
     if outputs and (output_files or output_directories):
         raise ValueError(
             "Both new-style `output_files` or `output_directories` and old-style `outputs` were "
@@ -164,69 +165,68 @@ def _parse_outputs_from_command(
     return output_files, output_directories
 
 
-@rule_helper
-async def _adjust_root_output_directory(
-    digest: Digest,
-    address: Address,
-    working_directory: str,
-    root_output_directory: str,
-    extra_files: Mapping[str, bytes] = FrozenDict(),
-) -> Digest:
-
-    working_directory = _parse_working_directory(working_directory, address)
-    new_root = _parse_working_directory(root_output_directory, working_directory)
-
-    if new_root == "":
-        return digest
-
-    if extra_files:
-        extra_digest = await Get(
-            Digest,
-            CreateDigest(
-                FileContent(f"{new_root}/{name}", content) for name, content in extra_files.items()
-            ),
-        )
-        digest = await Get(Digest, MergeDigests((digest, extra_digest)))
-
-    return await Get(Digest, RemovePrefix(digest, new_root))
-
-
 def _shell_tool_safe_env_name(tool_name: str) -> str:
     """Replace any characters not suitable in an environment variable name with `_`."""
     return re.sub(r"\W", "_", tool_name)
 
 
 @rule
-async def prepare_shell_command_process(
-    shell_command: ShellCommandProcessRequest,
+async def run_adhoc_process(
+    request: AdhocProcessRequest,
+) -> AdhocProcessResult:
+    process = await Get(Process, AdhocProcessRequest, request)
+
+    fallible_result = await Get(FallibleProcessResult, Process, process)
+
+    log_on_errors = request.log_on_process_errors or FrozenDict()
+    error_to_log = log_on_errors.get(fallible_result.exit_code, None)
+    if error_to_log:
+        logger.error(error_to_log)
+
+    result = await Get(
+        ProcessResult,
+        {
+            fallible_result: FallibleProcessResult,
+            ProductDescription(request.description): ProductDescription,
+        },
+    )
+
+    if request.log_output:
+        if result.stdout:
+            logger.info(result.stdout.decode())
+        if result.stderr:
+            logger.warning(result.stderr.decode())
+
+    working_directory = _parse_working_directory(request.working_directory, request.address)
+    root_output_directory = _parse_working_directory(
+        request.root_output_directory, working_directory
+    )
+
+    adjusted = await Get(Digest, RemovePrefix(result.output_digest, root_output_directory))
+
+    return AdhocProcessResult(result, adjusted)
+
+
+@rule
+async def prepare_adhoc_process(
+    request: AdhocProcessRequest,
     bash: BashBinary,
 ) -> Process:
+    # currently only used directly by `experimental_test_shell_command`
 
-    description = shell_command.description
-    address = shell_command.address
-    shell_name = shell_command.shell_name
-    interactive = shell_command.interactive
-    if not interactive:
-        working_directory = _parse_working_directory(shell_command.working_directory or "", address)
-    elif shell_command.working_directory is not None:
-        working_directory = shell_command.working_directory
-    else:
-        raise ValueError("Working directory must be not be `None` for interactive processes.")
-    command = shell_command.command
-    timeout: int | None = shell_command.timeout
-    output_files = shell_command.output_files
-    output_directories = shell_command.output_directories
-    fetch_env_vars = shell_command.fetch_env_vars
-    supplied_env_vars = shell_command.supplied_env_var_values or FrozenDict()
-    append_only_caches = shell_command.append_only_caches or FrozenDict()
-    immutable_input_digests = shell_command.immutable_input_digests or FrozenDict()
+    description = request.description
+    address = request.address
+    working_directory = _parse_working_directory(request.working_directory or "", address)
+    argv = request.argv
+    timeout: int | None = request.timeout
+    output_files = request.output_files
+    output_directories = request.output_directories
+    fetch_env_vars = request.fetch_env_vars
+    supplied_env_vars = request.supplied_env_var_values or FrozenDict()
+    append_only_caches = request.append_only_caches or FrozenDict()
+    immutable_input_digests = request.immutable_input_digests or FrozenDict()
 
-    if interactive:
-        command_env = {
-            "CHROOT": "{chroot}",
-        }
-    else:
-        command_env = {}
+    command_env: dict[str, str] = {}
 
     extra_env = await Get(EnvironmentVars, EnvironmentVarsRequest(fetch_env_vars))
     command_env.update(extra_env)
@@ -234,33 +234,18 @@ async def prepare_shell_command_process(
     if supplied_env_vars:
         command_env.update(supplied_env_vars)
 
-    input_snapshot = await Get(Snapshot, Digest, shell_command.input_digest)
+    input_snapshot = await Get(Snapshot, Digest, request.input_digest)
 
-    if interactive or not working_directory or working_directory in input_snapshot.dirs:
+    if not working_directory or working_directory in input_snapshot.dirs:
         # Needed to ensure that underlying filesystem does not change during run
         work_dir = EMPTY_DIGEST
     else:
         work_dir = await Get(Digest, CreateDigest([Directory(working_directory)]))
 
-    input_digest = await Get(Digest, MergeDigests([shell_command.input_digest, work_dir]))
-
-    if interactive:
-        _working_directory = working_directory or "."
-        relpath = os.path.relpath(
-            _working_directory, start="/" if os.path.isabs(_working_directory) else "."
-        )
-        new_path = None
-        if "PATH" in command_env:
-            new_path = command_env["PATH"]
-            del command_env["PATH"]
-        boot_script = (f"cd {shlex.quote(relpath)}; " if relpath != "." else "") + (
-            f"export PATH={shlex.quote(new_path)}:$PATH; " if new_path else ""
-        )
-    else:
-        boot_script = ""
+    input_digest = await Get(Digest, MergeDigests([request.input_digest, work_dir]))
 
     proc = Process(
-        argv=(bash.path, "-c", boot_script + command, shell_name),
+        argv=argv,
         description=f"Running {description}",
         env=command_env,
         input_digest=input_digest,
@@ -272,11 +257,7 @@ async def prepare_shell_command_process(
         immutable_input_digests=immutable_input_digests,
     )
 
-    if not interactive:
-        return _output_at_build_root(proc, bash)
-    else:
-        # `InteractiveProcess`es don't need to be wrapped since files aren't being captured.
-        return proc
+    return _output_at_build_root(proc, bash)
 
 
 def _output_at_build_root(process: Process, bash: BashBinary) -> Process:
