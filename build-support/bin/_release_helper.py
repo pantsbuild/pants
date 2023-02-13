@@ -870,7 +870,7 @@ def build_pex(fetch: bool) -> None:
         # We retain PANTS_SUBPROCESS_ENVIRONMENT_ENV_VARS as a special-case hack for Linux aarch64
         # CI where HOME needs to be punched through to make in-container Pants execution of Python
         # dist builds work.
-        if not k.startswith("PANTS_") and k != "PANTS_SUBPROCESS_ENVIRONMENT_ENV_VARS"
+        if k == "PANTS_SUBPROCESS_ENVIRONMENT_ENV_VARS" or not k.startswith("PANTS_")
     }
     env.update(DISABLED_BACKENDS_CONFIG)
     # NB: Set `--concurrent` so that if this script is running under `pantsd`, the validation
