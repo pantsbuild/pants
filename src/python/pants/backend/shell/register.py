@@ -1,8 +1,6 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants.backend.adhoc import adhoc_tool
-from pants.backend.adhoc.target_types import AdhocToolTarget
 from pants.backend.shell import dependency_inference, shunit2_test_runner
 from pants.backend.shell.goals import tailor, test
 from pants.backend.shell.subsystems import shunit2
@@ -22,7 +20,6 @@ from pants.backend.shell.util_rules import shell_command
 def target_types():
     return [
         ShellCommandTarget,
-        AdhocToolTarget,
         ShellCommandRunTarget,
         ShellCommandTestTarget,
         ShellSourcesGeneratorTarget,
@@ -36,7 +33,6 @@ def rules():
     return [
         *dependency_inference.rules(),
         *shell_command.rules(),
-        *adhoc_tool.rules(),
         *shunit2.rules(),
         *shunit2_test_runner.rules(),
         *tailor.rules(),
