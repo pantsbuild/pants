@@ -32,7 +32,7 @@ fn create_local_runner() -> (Box<dyn CommandRunnerTrait>, Store, TempDir) {
     store.clone(),
     runtime,
     base_dir.path().to_owned(),
-    NamedCaches::new(named_cache_dir),
+    NamedCaches::new(named_cache_dir).unwrap(),
     ImmutableInputs::new(store.clone(), base_dir.path()).unwrap(),
     KeepSandboxes::Never,
   ));

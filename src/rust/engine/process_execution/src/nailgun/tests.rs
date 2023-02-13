@@ -22,7 +22,7 @@ fn pool(size: usize) -> (NailgunPool, NamedCaches, ImmutableInputs) {
   let pool = NailgunPool::new(base_dir.clone(), size, store.clone(), executor);
   (
     pool,
-    NamedCaches::new(named_caches_dir.path().to_owned()),
+    NamedCaches::new(named_caches_dir.path().to_owned()).unwrap(),
     ImmutableInputs::new(store, &base_dir).unwrap(),
   )
 }

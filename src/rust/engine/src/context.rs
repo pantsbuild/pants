@@ -535,7 +535,7 @@ impl Core {
     };
 
     let immutable_inputs = ImmutableInputs::new(store.clone(), &local_execution_root_dir)?;
-    let named_caches = NamedCaches::new(named_caches_dir);
+    let named_caches = NamedCaches::new(named_caches_dir)?;
     let command_runners = Self::make_command_runners(
       &full_store,
       &store,

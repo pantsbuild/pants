@@ -442,6 +442,8 @@ async fn output_overlapping_file_and_dir() {
 async fn append_only_cache_created() {
   skip_if_no_docker_available_in_macos_ci!();
 
+  let _logger = env_logger::try_init();
+
   let name = "geo";
   let dest_base = ".cache";
   let cache_name = CacheName::new(name.to_owned()).unwrap();

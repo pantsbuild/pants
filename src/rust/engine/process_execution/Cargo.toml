@@ -55,6 +55,7 @@ tonic = { version = "0.6", features = ["transport", "codegen", "tls", "tls-roots
 tryfuture = { path = "../tryfuture" }
 
 [dev-dependencies]
+env_logger = "0.9.0"
 maplit = "1.0.1"
 mock = { path = "../testutil/mock" }
 parking_lot = "0.12"
