@@ -334,13 +334,11 @@ impl ExecuteProcess {
   ) -> Result<Process, StoreError> {
     let env = externs::getattr_from_str_frozendict(value, "env");
     let working_directory = match externs::getattr_as_optional_string(value, "working_directory") {
-        Ok(dir) => {
-            match dir {
-                Some(d) => { Some(RelativePath::new(d)?) },
-                None => None
-            }
-        },
-        Err(_) => None
+      Ok(dir) => match dir {
+        Some(d) => Some(RelativePath::new(d)?),
+        None => None,
+      },
+      Err(_) => None,
     };
 
     let output_files = externs::getattr::<Vec<String>>(value, "output_files")
@@ -374,7 +372,9 @@ impl ExecuteProcess {
         .collect::<Result<_, String>>()?;
 
     // Returns PyResult<Option<String>
-    let jdk_home = externs::getattr_as_optional_string(value, "jdk_home").unwrap().map(PathBuf::from);
+    let jdk_home = externs::getattr_as_optional_string(value, "jdk_home")
+      .unwrap()
+      .map(PathBuf::from);
 
     let execution_slot_variable =
       externs::getattr_as_optional_string(value, "execution_slot_variable").unwrap_or(None);
@@ -776,7 +776,8 @@ impl Snapshot {
 
   pub fn lift_path_globs(item: &PyAny) -> Result<PathGlobs, String> {
     let globs: Vec<String> = externs::getattr(item, "globs").unwrap();
-    let description_of_origin = externs::getattr_as_optional_string(item, "description_of_origin").unwrap_or(None);
+    let description_of_origin =
+      externs::getattr_as_optional_string(item, "description_of_origin").unwrap_or(None);
 
     let glob_match_error_behavior = externs::getattr(item, "glob_match_error_behavior").unwrap();
     let failure_behavior: String = externs::getattr(glob_match_error_behavior, "value").unwrap();
