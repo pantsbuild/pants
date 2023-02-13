@@ -216,7 +216,6 @@ class FileTarget(Target):
 class GenerateFileSourceRequest(GenerateSourcesRequest):
     input = FileSourceField
     output = FileSourceField
-    exportable = False
 
 
 @rule
@@ -435,7 +434,6 @@ class ResourceTarget(Target):
 class GenerateResourceSourceRequest(GenerateSourcesRequest):
     input = ResourceSourceField
     output = ResourceSourceField
-    exportable = False
 
 
 @rule
