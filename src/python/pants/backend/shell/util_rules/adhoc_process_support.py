@@ -6,7 +6,6 @@ import dataclasses
 import itertools
 import logging
 import os
-import re
 import shlex
 from dataclasses import dataclass
 from typing import Union
@@ -163,11 +162,6 @@ def _parse_outputs_from_command(
         output_files = tuple(f for f in outputs if not f.endswith("/"))
         output_directories = tuple(d for d in outputs if d.endswith("/"))
     return output_files, output_directories
-
-
-def _shell_tool_safe_env_name(tool_name: str) -> str:
-    """Replace any characters not suitable in an environment variable name with `_`."""
-    return re.sub(r"\W", "_", tool_name)
 
 
 @rule
