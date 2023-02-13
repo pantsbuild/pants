@@ -863,7 +863,16 @@ def build_pex(fetch: bool) -> None:
         dest = stable_dest
     green(f"Built {dest}")
 
-    env = DISABLED_BACKENDS_CONFIG
+    # We filter out Pants options like `PANTS_CONFIG_FILES` and disable certain internal backends.
+    env = {
+        k: v
+        for k, v in env.items()
+        # We retain PANTS_SUBPROCESS_ENVIRONMENT_ENV_VARS as a special-case hack for Linux aarch64
+        # CI where HOME needs to be punched through to make in-container Pants execution of Python
+        # dist builds work.
+        if not k.startswith("PANTS_") and k != "PANTS_SUBPROCESS_ENVIRONMENT_ENV_VARS"
+    }
+    env.update(DISABLED_BACKENDS_CONFIG)
     # NB: Set `--concurrent` so that if this script is running under `pantsd`, the validation
     # won't kill it.
     subprocess.run([dest, "--concurrent", "--version"], env=env, check=True)
