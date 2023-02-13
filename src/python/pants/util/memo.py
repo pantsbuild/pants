@@ -253,6 +253,7 @@ def memoized_property(
     )
 
 
+# TODO[13244]: fix type hint issue when using @memoized_classmethod and friends
 def memoized_classmethod(
     func: Optional[F] = None, key_factory=per_instance, cache_factory=dict
 ) -> F:

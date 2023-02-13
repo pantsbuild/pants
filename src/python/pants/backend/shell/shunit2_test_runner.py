@@ -5,8 +5,8 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
-from pants.backend.shell.shell_setup import ShellSetup
-from pants.backend.shell.shunit2 import Shunit2
+from pants.backend.shell.subsystems.shell_setup import ShellSetup
+from pants.backend.shell.subsystems.shunit2 import Shunit2
 from pants.backend.shell.target_types import (
     ShellSourceField,
     Shunit2Shell,
@@ -20,7 +20,6 @@ from pants.core.goals.test import (
     BuildPackageDependenciesRequest,
     BuiltPackageDependencies,
     RuntimePackageDependenciesField,
-    TestDebugAdapterRequest,
     TestDebugRequest,
     TestExtraEnv,
     TestFieldSet,
@@ -48,7 +47,6 @@ from pants.engine.process import (
 )
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import SourcesField, Target, TransitiveTargets, TransitiveTargetsRequest
-from pants.engine.unions import UnionRule
 from pants.option.global_options import GlobalOptions
 from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
@@ -72,6 +70,7 @@ class Shunit2FieldSet(TestFieldSet):
 class Shunit2TestRequest(TestRequest):
     tool_subsystem = Shunit2
     field_set_type = Shunit2FieldSet
+    supports_debug = True
 
 
 @dataclass(frozen=True)
@@ -164,9 +163,10 @@ async def setup_shunit2_for_target(
     test_extra_env: TestExtraEnv,
     global_options: GlobalOptions,
     shunit2: Shunit2,
+    platform: Platform,
 ) -> TestSetup:
     shunit2_script, transitive_targets, built_package_dependencies = await MultiGet(
-        Get(DownloadedExternalTool, ExternalToolRequest, shunit2.get_request(Platform.current)),
+        Get(DownloadedExternalTool, ExternalToolRequest, shunit2.get_request(platform)),
         Get(TransitiveTargets, TransitiveTargetsRequest([request.field_set.address])),
         Get(
             BuiltPackageDependencies,
@@ -267,16 +267,8 @@ async def setup_shunit2_debug_test(
     )
 
 
-@rule
-async def setup_shunit2_debug_adapter_test(
-    _: Shunit2TestRequest.Batch[Shunit2FieldSet, Any]
-) -> TestDebugAdapterRequest:
-    raise NotImplementedError("Debugging Shell using a debug adapter has not yet been implemented.")
-
-
 def rules():
     return [
         *collect_rules(),
-        UnionRule(TestFieldSet, Shunit2FieldSet),
         *Shunit2TestRequest.rules(),
     ]

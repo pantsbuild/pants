@@ -53,7 +53,7 @@ pub fn as_bytes(str: &str) -> Bytes {
 }
 
 pub fn make_file(path: &Path, contents: &[u8], mode: u32) {
-  let mut file = std::fs::File::create(&path).unwrap();
+  let mut file = std::fs::File::create(path).unwrap();
   file.write_all(contents).unwrap();
   let mut permissions = std::fs::metadata(path).unwrap().permissions();
   permissions.set_mode(mode);
@@ -61,6 +61,6 @@ pub fn make_file(path: &Path, contents: &[u8], mode: u32) {
 }
 
 pub fn append_to_existing_file(path: &Path, contents: &[u8]) {
-  let mut file = std::fs::OpenOptions::new().write(true).open(&path).unwrap();
+  let mut file = std::fs::OpenOptions::new().write(true).open(path).unwrap();
   file.write_all(contents).unwrap();
 }

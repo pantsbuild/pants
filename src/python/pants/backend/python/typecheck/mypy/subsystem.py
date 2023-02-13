@@ -32,8 +32,8 @@ from pants.backend.python.util_rules.partition import (
 from pants.backend.python.util_rules.pex import PexRequest
 from pants.backend.python.util_rules.pex_requirements import (
     EntireLockfile,
+    Lockfile,
     PexRequirements,
-    ToolCustomLockfile,
 )
 from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
@@ -105,7 +105,6 @@ class MyPy(PythonToolBase):
     default_lockfile_resource = ("pants.backend.python.typecheck.mypy", "mypy.lock")
     default_lockfile_path = "src/python/pants/backend/python/typecheck/mypy/mypy.lock"
     default_lockfile_url = git_url(default_lockfile_path)
-    uses_requirements_from_source_plugins = True
 
     skip = SkipOption("check")
     args = ArgsListOption(example="--python-version 3.7 --disallow-any-expr")
@@ -221,15 +220,13 @@ class MyPy(PythonToolBase):
         if self.extra_type_stubs_lockfile == NO_TOOL_LOCKFILE:
             requirements = PexRequirements(self.extra_type_stubs)
         else:
-            tool_lockfile = ToolCustomLockfile(
+            tool_lockfile = Lockfile(
                 file_path=self.extra_type_stubs_lockfile,
                 file_path_description_of_origin=(
                     f"the option `[{self.options_scope}].extra_type_stubs_lockfile`"
                 ),
                 lockfile_hex_digest=calculate_invalidation_digest(self.extra_type_stubs),
                 resolve_name=MyPyExtraTypeStubsLockfileSentinel.resolve_name,
-                uses_project_interpreter_constraints=True,
-                uses_source_plugins=False,
             )
             requirements = EntireLockfile(tool_lockfile, complete_req_strings=self.extra_type_stubs)
         return PexRequest(
@@ -409,6 +406,7 @@ async def setup_mypy_extra_type_stubs_lockfile(
             interpreter_constraints=InterpreterConstraints(),
             resolve_name=request.resolve_name,
             lockfile_dest=mypy.extra_type_stubs_lockfile,
+            diff=False,
         )
 
     # While MyPy will run in partitions, we need a set of constraints that works with every
@@ -434,6 +432,7 @@ async def setup_mypy_extra_type_stubs_lockfile(
         interpreter_constraints=interpreter_constraints,
         resolve_name=request.resolve_name,
         lockfile_dest=mypy.extra_type_stubs_lockfile,
+        diff=False,
     )
 
 

@@ -1,8 +1,9 @@
+// Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
+// Licensed under the Apache License, Version 2.0 (see LICENSE).
 use crate::AsyncValue;
 
 use std::time::Duration;
 
-use tokio;
 use tokio::time::sleep;
 
 #[tokio::test]

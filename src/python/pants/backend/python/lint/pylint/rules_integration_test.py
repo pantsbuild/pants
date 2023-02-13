@@ -497,7 +497,7 @@ def test_partition_targets(rule_runner: RuleRunner) -> None:
         **create_folder("resolveB_1", "b", "3.9"),
         **create_folder("resolveB_2", "b", "3.9"),
     }
-    rule_runner.write_files(files)  # type: ignore[arg-type]
+    rule_runner.write_files(files)
     rule_runner.set_options(
         ["--python-resolves={'a': '', 'b': ''}", "--python-enable-resolves"],
         env_inherit={"PATH", "PYENV_ROOT", "HOME"},

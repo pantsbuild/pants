@@ -27,7 +27,7 @@
 #[macro_use]
 extern crate derivative;
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::convert::{TryFrom, TryInto};
 use std::fmt::{self, Debug, Display};
 use std::path::PathBuf;
@@ -64,8 +64,6 @@ pub mod docker;
 #[cfg(test)]
 mod docker_tests;
 
-pub mod immutable_inputs;
-
 pub mod local;
 #[cfg(test)]
 mod local_tests;
@@ -85,7 +83,6 @@ mod remote_cache_tests;
 extern crate uname;
 
 pub use crate::children::ManagedChild;
-pub use crate::immutable_inputs::ImmutableInputs;
 pub use crate::named_caches::{CacheName, NamedCaches};
 pub use crate::remote_cache::RemoteCacheWarningsBehavior;
 
@@ -185,8 +182,7 @@ impl Platform {
         ref machine,
         ..
       } => Err(format!(
-        "Found unknown system/arch name pair {} {}",
-        sysname, machine
+        "Found unknown system/arch name pair {sysname} {machine}"
       )),
     }
   }
@@ -211,10 +207,7 @@ impl TryFrom<String> for Platform {
       "macos_x86_64" => Ok(Platform::Macos_x86_64),
       "linux_x86_64" => Ok(Platform::Linux_x86_64),
       "linux_arm64" => Ok(Platform::Linux_arm64),
-      other => Err(format!(
-        "Unknown platform {:?} encountered in parsing",
-        other
-      )),
+      other => Err(format!("Unknown platform {other:?} encountered in parsing")),
     }
   }
 }
@@ -245,20 +238,13 @@ impl TryFrom<String> for ProcessCacheScope {
       "per_restart_always" => Ok(ProcessCacheScope::PerRestartAlways),
       "per_restart_successful" => Ok(ProcessCacheScope::PerRestartSuccessful),
       "per_session" => Ok(ProcessCacheScope::PerSession),
-      other => Err(format!("Unknown Process cache scope: {:?}", other)),
+      other => Err(format!("Unknown Process cache scope: {other:?}")),
     }
   }
 }
 
 fn serialize_level<S: serde::Serializer>(level: &log::Level, s: S) -> Result<S::Ok, S::Error> {
   s.serialize_str(&level.to_string())
-}
-
-/// A symlink from a relative src to an absolute dst (outside of the workdir).
-#[derive(Debug)]
-pub struct WorkdirSymlink {
-  pub src: RelativePath,
-  pub dst: PathBuf,
 }
 
 /// Input Digests for a process execution.
@@ -556,7 +542,7 @@ pub struct Process {
   /// execution.
   ///
   /// This is some technical debt we should clean up;
-  /// see https://github.com/pantsbuild/pants/issues/6416.
+  /// see <https://github.com/pantsbuild/pants/issues/6416>.
   ///
   pub jdk_home: Option<PathBuf>,
 
@@ -833,20 +819,11 @@ pub(crate) async fn check_cache_content(
   match cache_content_behavior {
     CacheContentBehavior::Fetch => {
       let response = response.clone();
-      let fetch_result = in_workunit!(
-        "eager_fetch_action_cache",
-        Level::Trace,
-        |_workunit| async move {
-          try_join_all(vec![
-            store.ensure_local_has_file(response.stdout_digest).boxed(),
-            store.ensure_local_has_file(response.stderr_digest).boxed(),
-            store
-              .ensure_local_has_recursive_directory(response.output_directory)
-              .boxed(),
-          ])
-          .await
-        }
-      )
+      let fetch_result = in_workunit!("eager_fetch_action_cache", Level::Trace, |_workunit| store
+        .ensure_downloaded(
+          HashSet::from([response.stdout_digest, response.stderr_digest]),
+          HashSet::from([response.output_directory])
+        ))
       .await;
       match fetch_result {
         Err(StoreError::MissingDigest { .. }) => Ok(false),
@@ -962,12 +939,19 @@ pub async fn digest(
   instance_name: Option<String>,
   process_cache_namespace: Option<String>,
   store: &Store,
+  append_only_caches_base_path: Option<&str>,
 ) -> Digest {
   let EntireExecuteRequest {
     execute_request, ..
-  } = remote::make_execute_request(process, instance_name, process_cache_namespace, store)
-    .await
-    .unwrap();
+  } = remote::make_execute_request(
+    process,
+    instance_name,
+    process_cache_namespace,
+    store,
+    append_only_caches_base_path,
+  )
+  .await
+  .unwrap();
   execute_request.action_digest.unwrap().try_into().unwrap()
 }
 

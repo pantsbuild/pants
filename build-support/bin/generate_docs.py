@@ -254,6 +254,7 @@ def run_pants_help_all() -> dict[str, Any]:
         "pants.backend.experimental.openapi",
         "pants.backend.experimental.openapi.lint.spectral",
         "pants.backend.experimental.python",
+        "pants.backend.experimental.python.framework.stevedore",
         "pants.backend.experimental.python.lint.add_trailing_comma",
         "pants.backend.experimental.python.lint.autoflake",
         "pants.backend.experimental.python.lint.pyupgrade",
@@ -269,6 +270,7 @@ def run_pants_help_all() -> dict[str, Any]:
         "pants.backend.python.lint.docformatter",
         "pants.backend.python.lint.flake8",
         "pants.backend.python.lint.isort",
+        "pants.backend.python.lint.pydocstyle",
         "pants.backend.python.lint.pylint",
         "pants.backend.python.lint.yapf",
         "pants.backend.python.mixed_interpreter_constraints",
@@ -276,6 +278,7 @@ def run_pants_help_all() -> dict[str, Any]:
         "pants.backend.shell",
         "pants.backend.shell.lint.shellcheck",
         "pants.backend.shell.lint.shfmt",
+        "pants.backend.tools.preamble",
     ]
     argv = [
         "./pants",
@@ -283,7 +286,6 @@ def run_pants_help_all() -> dict[str, Any]:
         "--plugins=[]",
         f"--backend-packages={repr(backends)}",
         "--no-verify-config",
-        "--remote-auth-plugin= ",
         "help-all",
     ]
     run = subprocess.run(argv, stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding="utf-8")

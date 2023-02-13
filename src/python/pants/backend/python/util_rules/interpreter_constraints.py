@@ -149,13 +149,6 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
             formatted_specs = ",".join(f"{op}{version}" for op, version in merged_specs)
             return parse_constraint(f"{expected_interpreter}{formatted_specs}")
 
-        def cmp_constraints(req1: Requirement, req2: Requirement) -> int:
-            if req1.project_name != req2.project_name:
-                return -1 if req1.project_name < req2.project_name else 1
-            if req1.specs == req2.specs:
-                return 0
-            return -1 if req1.specs < req2.specs else 1
-
         ored_constraints = (
             and_constraints(constraints_product)
             for constraints_product in itertools.product(*parsed_constraint_sets)

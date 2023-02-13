@@ -1,3 +1,5 @@
+// Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
+// Licensed under the Apache License, Version 2.0 (see LICENSE).
 use crate::local::ByteStore;
 use crate::{EntryType, LocalOptions, ShrinkBehavior};
 
@@ -273,8 +275,7 @@ async fn garbage_collect_remove_one_of_two_files_no_leases() {
   assert_eq!(
     1,
     entries.iter().filter(|maybe| maybe.is_some()).count(),
-    "Want one Some but got: {:?}",
-    entries
+    "Want one Some but got: {entries:?}"
   );
 }
 
@@ -308,14 +309,12 @@ async fn garbage_collect_remove_both_files_no_leases() {
   assert_eq!(
     load_bytes(&store, EntryType::File, digest_1).await,
     Ok(None),
-    "Should have garbage collected {:?}",
-    fingerprint_1
+    "Should have garbage collected {fingerprint_1:?}"
   );
   assert_eq!(
     load_bytes(&store, EntryType::File, digest_2).await,
     Ok(None),
-    "Should have garbage collected {:?}",
-    fingerprint_2
+    "Should have garbage collected {fingerprint_2:?}"
   );
 }
 
@@ -352,8 +351,7 @@ async fn garbage_collect_remove_one_of_two_directories_no_leases() {
   assert_eq!(
     1,
     entries.iter().filter(|maybe| maybe.is_some()).count(),
-    "Want one Some but got: {:?}",
-    entries
+    "Want one Some but got: {entries:?}"
   );
 }
 
@@ -483,8 +481,7 @@ async fn garbage_collect_and_compact() {
   let size = get_directory_size(dir.path());
   assert!(
     size >= 2 * 1024 * 1024,
-    "Expect size to be at least 2MB but was {}",
-    size
+    "Expect size to be at least 2MB but was {size}"
   );
 
   store
@@ -494,8 +491,7 @@ async fn garbage_collect_and_compact() {
   let size = get_directory_size(dir.path());
   assert!(
     size < 2 * 1024 * 1024,
-    "Expect size to be less than 2MB but was {}",
-    size
+    "Expect size to be less than 2MB but was {size}"
   );
 }
 
@@ -607,14 +603,14 @@ pub fn new_store_with_lease_time<P: AsRef<Path>>(dir: P, lease_time: Duration) -
 }
 
 pub async fn load_file_bytes(store: &ByteStore, digest: Digest) -> Result<Option<Bytes>, String> {
-  load_bytes(&store, EntryType::File, digest).await
+  load_bytes(store, EntryType::File, digest).await
 }
 
 pub async fn load_directory_proto_bytes(
   store: &ByteStore,
   digest: Digest,
 ) -> Result<Option<Bytes>, String> {
-  load_bytes(&store, EntryType::Directory, digest).await
+  load_bytes(store, EntryType::Directory, digest).await
 }
 
 pub async fn load_bytes(
@@ -623,7 +619,7 @@ pub async fn load_bytes(
   digest: Digest,
 ) -> Result<Option<Bytes>, String> {
   store
-    .load_bytes_with(entry_type, digest, |b| Bytes::copy_from_slice(b))
+    .load_bytes_with(entry_type, digest, Bytes::copy_from_slice)
     .await
 }
 

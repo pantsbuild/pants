@@ -26,6 +26,7 @@ from pants.backend.python.target_types import (
     PythonSourcesGeneratorTarget,
 )
 from pants.backend.python.target_types_rules import rules as python_target_types_rules
+from pants.core.goals import package
 from pants.core.goals.package import BuiltPackage
 from pants.core.target_types import (
     FilesGeneratorTarget,
@@ -50,6 +51,7 @@ def rule_runner() -> RuleRunner:
             *package_pex_binary.rules(),
             *python_target_types_rules(),
             *target_rules(),
+            *package.rules(),
             QueryRule(BuiltPackage, (PythonAwsLambdaFieldSet,)),
         ],
         target_types=[
@@ -95,7 +97,7 @@ def complete_platform(rule_runner: RuleRunner) -> bytes:
         {
             "pex_exe/BUILD": dedent(
                 """\
-                python_requirement(name="req", requirements=["pex==2.1.66"])
+                python_requirement(name="req", requirements=["pex==2.1.112"])
                 pex_binary(dependencies=[":req"], script="pex")
                 """
             ),

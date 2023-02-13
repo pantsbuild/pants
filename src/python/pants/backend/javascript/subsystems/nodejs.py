@@ -11,6 +11,7 @@ from pants.core.util_rules.external_tool import (
     ExternalToolRequest,
     TemplatedExternalTool,
 )
+from pants.core.util_rules.external_tool import rules as external_tool_rules
 from pants.engine.fs import EMPTY_DIGEST, Digest, MergeDigests
 from pants.engine.platform import Platform
 from pants.engine.process import Process
@@ -109,4 +110,7 @@ async def setup_npx_process(
 
 
 def rules() -> Iterable[Rule | UnionRule]:
-    return collect_rules()
+    return (
+        *collect_rules(),
+        *external_tool_rules(),
+    )

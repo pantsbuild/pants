@@ -3,9 +3,11 @@
 
 from __future__ import annotations
 
+import atexit
 import dataclasses
 import functools
 import os
+import re
 import sys
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -26,6 +28,7 @@ from typing import (
     Type,
     TypeVar,
     cast,
+    overload,
 )
 
 from pants.base.build_root import BuildRoot
@@ -60,7 +63,7 @@ from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.source import source_root
 from pants.testutil.option_util import create_options_bootstrapper
 from pants.util.collections import assert_single_element
-from pants.util.contextutil import temporary_dir, temporary_file
+from pants.util.contextutil import pushd, temporary_dir, temporary_file
 from pants.util.dirutil import (
     recursive_dirname,
     safe_file_dump,
@@ -70,6 +73,7 @@ from pants.util.dirutil import (
 )
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import OrderedSet
+from pants.util.strutil import softwrap
 
 
 def logging(original_function=None, *, level: LogLevel = LogLevel.INFO):
@@ -112,7 +116,10 @@ def logging(original_function=None, *, level: LogLevel = LogLevel.INFO):
 
 @contextmanager
 def engine_error(
-    expected_underlying_exception: type[Exception] = Exception, *, contains: str | None = None
+    expected_underlying_exception: type[Exception] = Exception,
+    *,
+    contains: str | None = None,
+    normalize_tracebacks: bool = False,
 ) -> Iterator[None]:
     """A context manager to catch `ExecutionError`s in tests and check that the underlying exception
     is expected.
@@ -123,6 +130,10 @@ def engine_error(
             rule_runner.request(OutputType, [input])
 
     Will raise AssertionError if no ExecutionError occurred.
+
+    Set `normalize_tracebacks=True` to replace file locations and addresses in the error message
+    with fixed values for testability, and check `contains` against the `ExecutionError` message
+    instead of the underlying error only.
     """
     try:
         yield
@@ -130,29 +141,63 @@ def engine_error(
         if not len(exec_error.wrapped_exceptions) == 1:
             formatted_errors = "\n\n".join(repr(e) for e in exec_error.wrapped_exceptions)
             raise ValueError(
-                "Multiple underlying exceptions, but this helper function expected only one. "
-                "Use `with pytest.raises(ExecutionError) as exc` directly and inspect "
-                "`exc.value.wrapped_exceptions`.\n\n"
-                f"Errors: {formatted_errors}"
+                softwrap(
+                    f"""
+                    Multiple underlying exceptions, but this helper function expected only one.
+                    Use `with pytest.raises(ExecutionError) as exc` directly and inspect
+                    `exc.value.wrapped_exceptions`.
+
+                    Errors: {formatted_errors}
+                    """
+                )
             )
         underlying = exec_error.wrapped_exceptions[0]
         if not isinstance(underlying, expected_underlying_exception):
             raise AssertionError(
-                "ExecutionError occurred as expected, but the underlying exception had type "
-                f"{type(underlying)} rather than the expected type "
-                f"{expected_underlying_exception}:\n\n{underlying}"
+                softwrap(
+                    f"""
+                    ExecutionError occurred as expected, but the underlying exception had type
+                    {type(underlying)} rather than the expected type
+                    {expected_underlying_exception}:
+
+                    {underlying}
+                    """
+                )
             )
-        if contains is not None and contains not in str(underlying):
-            raise AssertionError(
-                "Expected value not found in exception.\n"
-                f"expected: {contains}\n\n"
-                f"exception: {underlying}"
-            )
+        if contains is not None:
+            if normalize_tracebacks:
+                errmsg = remove_locations_from_traceback(str(exec_error))
+            else:
+                errmsg = str(underlying)
+            if contains not in errmsg:
+                raise AssertionError(
+                    softwrap(
+                        f"""
+                        Expected value not found in exception.
+
+                        => Expected: {contains}
+
+                        => Actual: {errmsg}
+                        """
+                    )
+                )
     else:
         raise AssertionError(
-            "DID NOT RAISE ExecutionError with underlying exception type "
-            f"{expected_underlying_exception}."
+            softwrap(
+                f"""
+                DID NOT RAISE ExecutionError with underlying exception type
+                {expected_underlying_exception}.
+                """
+            )
         )
+
+
+def remove_locations_from_traceback(trace: str) -> str:
+    location_pattern = re.compile(r'"/.*", line \d+')
+    address_pattern = re.compile(r"0x[0-9a-f]+")
+    new_trace = location_pattern.sub("LOCATION-INFO", trace)
+    new_trace = address_pattern.sub("0xEEEEEEEEE", new_trace)
+    return new_trace
 
 
 # -----------------------------------------------------------------------------------------------
@@ -164,10 +209,16 @@ _I = TypeVar("_I")
 _O = TypeVar("_O")
 
 
-# Use the ~minimum possible parallelism since integration tests using RuleRunner will already be run
-# by Pants using an appropriate Parallelism. We must set max_threads > core_threads; so 2 is the
-# minimum, but, via trial and error, 3 minimizes test times on average.
-_EXECUTOR = PyExecutor(core_threads=1, max_threads=3)
+# A global executor for Schedulers created in unit tests, which is shutdown using `atexit`. This
+# allows for reusing threads, and avoids waiting for straggling tasks during teardown of each test.
+EXECUTOR = PyExecutor(
+    # Use the ~minimum possible parallelism since integration tests using RuleRunner will already
+    # be run by Pants using an appropriate Parallelism. We must set max_threads > core_threads; so
+    # 2 is the minimum, but, via trial and error, 3 minimizes test times on average.
+    core_threads=1,
+    max_threads=3,
+)
+atexit.register(lambda: EXECUTOR.shutdown(5))
 
 
 # Environment variable names required for locating Python interpreters, for use with RuleRunner's
@@ -212,6 +263,7 @@ class RuleRunner:
         extra_session_values: dict[Any, Any] | None = None,
         max_workunit_verbosity: LogLevel = LogLevel.DEBUG,
         inherent_environment: EnvironmentName | None = EnvironmentName(None),
+        is_bootstrap: bool = False,
     ) -> None:
 
         bootstrap_args = [*bootstrap_args]
@@ -295,12 +347,14 @@ class RuleRunner:
                 named_caches_dir=named_caches_dir,
                 build_root=self.build_root,
                 build_configuration=self.build_config,
-                executor=_EXECUTOR,
+                # Each Scheduler that is created borrows the global executor, which is shut down `atexit`.
+                executor=EXECUTOR.to_borrowed(),
                 execution_options=ExecutionOptions.from_options(
                     global_options, dynamic_remote_options
                 ),
                 ca_certs_path=ca_certs_path,
                 engine_visualize_to=None,
+                is_bootstrap=is_bootstrap,
             ).scheduler
         )
 
@@ -462,7 +516,17 @@ class RuleRunner:
         self._invalidate_for(str(relpath))
         return path
 
-    def write_files(self, files: Mapping[str | PurePath, str | bytes]) -> tuple[str, ...]:
+    @overload
+    def write_files(self, files: Mapping[str, str | bytes]) -> tuple[str, ...]:
+        ...
+
+    @overload
+    def write_files(self, files: Mapping[PurePath, str | bytes]) -> tuple[str, ...]:
+        ...
+
+    def write_files(
+        self, files: Mapping[PurePath, str | bytes] | Mapping[str, str | bytes]
+    ) -> tuple[str, ...]:
         """Write the files to the build root.
 
         :API: public
@@ -522,16 +586,17 @@ class RuleRunner:
         )
 
     def run_interactive_process(self, request: InteractiveProcess) -> InteractiveProcessResult:
-        return native_engine.session_run_interactive_process(
-            self.scheduler.py_session,
-            request,
-            ProcessConfigFromEnvironment(
-                platform=Platform.create_for_localhost().value,
-                docker_image=None,
-                remote_execution=False,
-                remote_execution_extra_platform_properties=[],
-            ),
-        )
+        with pushd(self.build_root):
+            return native_engine.session_run_interactive_process(
+                self.scheduler.py_session,
+                request,
+                ProcessConfigFromEnvironment(
+                    platform=Platform.create_for_localhost().value,
+                    docker_image=None,
+                    remote_execution=False,
+                    remote_execution_extra_platform_properties=[],
+                ),
+            )
 
     def do_not_use_mock(self, output_type: Type, input_types: Iterable[type]) -> MockGet:
         """Returns a `MockGet` whose behavior is to run the actual rule using this `RuleRunner`"""
@@ -668,8 +733,7 @@ def run_rule_with_mocks(
             else:
                 return res  # type: ignore[return-value]
         except StopIteration as e:
-            if e.args:
-                return e.value  # type: ignore[no-any-return]
+            return e.value  # type: ignore[no-any-return]
 
 
 @contextmanager

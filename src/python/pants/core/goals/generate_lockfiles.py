@@ -6,11 +6,14 @@ from __future__ import annotations
 import itertools
 import logging
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import Enum
-from typing import Callable, ClassVar, Iterable, Sequence
+from typing import Callable, ClassVar, Iterable, Iterator, Mapping, Sequence, Tuple, cast
+
+from typing_extensions import Protocol
 
 from pants.engine.collection import Collection
+from pants.engine.console import Console
 from pants.engine.environment import ChosenLocalEnvironmentName, EnvironmentName
 from pants.engine.fs import Digest, MergeDigests, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
@@ -18,8 +21,11 @@ from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import collect_rules, goal_rule
 from pants.engine.target import Target
 from pants.engine.unions import UnionMembership, union
-from pants.option.option_types import StrListOption, StrOption
+from pants.help.maybe_color import MaybeColor
+from pants.option.global_options import GlobalOptions
+from pants.option.option_types import BoolOption, StrListOption, StrOption
 from pants.util.docutil import bin_name, doc_url
+from pants.util.frozendict import FrozenDict
 from pants.util.strutil import bullet_list, softwrap
 
 logger = logging.getLogger(__name__)
@@ -32,6 +38,7 @@ class GenerateLockfileResult:
     digest: Digest
     resolve_name: str
     path: str
+    diff: LockfileDiff | None = None
 
 
 @union(in_scope_types=[EnvironmentName])
@@ -49,6 +56,7 @@ class GenerateLockfile:
 
     resolve_name: str
     lockfile_dest: str
+    diff: bool
 
 
 @dataclass(frozen=True)
@@ -122,6 +130,151 @@ class RequestedUserResolveNames(Collection[str]):
     Each language ecosystem should set up a subclass and register it with a UnionRule. Implement a
     rule that goes from the subclass -> UserGenerateLockfiles.
     """
+
+
+class PackageVersion(Protocol):
+    """Protocol for backend specific implementations, to support language ecosystem specific version
+    formats and sort rules.
+
+    May support the `int` properties `major`, `minor` and `micro` to color diff based on semantic
+    step taken.
+    """
+
+    def __eq__(self, other) -> bool:
+        ...
+
+    def __gt__(self, other) -> bool:
+        ...
+
+    def __lt__(self, other) -> bool:
+        ...
+
+    def __str__(self) -> str:
+        ...
+
+
+PackageName = str
+LockfilePackages = FrozenDict[PackageName, PackageVersion]
+ChangedPackages = FrozenDict[PackageName, Tuple[PackageVersion, PackageVersion]]
+
+
+@dataclass(frozen=True)
+class LockfileDiff:
+    path: str
+    resolve_name: str
+    added: LockfilePackages
+    downgraded: ChangedPackages
+    removed: LockfilePackages
+    unchanged: LockfilePackages
+    upgraded: ChangedPackages
+
+    @classmethod
+    def create(
+        cls, path: str, resolve_name: str, old: LockfilePackages, new: LockfilePackages
+    ) -> LockfileDiff:
+        diff = {
+            name: (old[name], new[name])
+            for name in sorted({*old.keys(), *new.keys()})
+            if name in old and name in new
+        }
+        return cls(
+            path=path,
+            resolve_name=resolve_name,
+            added=cls.__get_lockfile_packages(new, old),
+            downgraded=cls.__get_changed_packages(diff, lambda prev, curr: prev > curr),
+            removed=cls.__get_lockfile_packages(old, new),
+            unchanged=LockfilePackages(
+                {name: curr for name, (prev, curr) in diff.items() if prev == curr}
+            ),
+            upgraded=cls.__get_changed_packages(diff, lambda prev, curr: prev < curr),
+        )
+
+    @staticmethod
+    def __get_lockfile_packages(
+        src: Mapping[str, PackageVersion], exclude: Iterable[str]
+    ) -> LockfilePackages:
+        return LockfilePackages(
+            {name: version for name, version in src.items() if name not in exclude}
+        )
+
+    @staticmethod
+    def __get_changed_packages(
+        src: Mapping[str, tuple[PackageVersion, PackageVersion]],
+        predicate: Callable[[PackageVersion, PackageVersion], bool],
+    ) -> ChangedPackages:
+        return ChangedPackages(
+            {name: prev_curr for name, prev_curr in src.items() if predicate(*prev_curr)}
+        )
+
+
+class LockfileDiffPrinter(MaybeColor):
+    def __init__(self, console: Console, color: bool, include_unchanged: bool) -> None:
+        super().__init__(color)
+        self.console = console
+        self.include_unchanged = include_unchanged
+
+    def print(self, diff: LockfileDiff) -> None:
+        output = "\n".join(self.output_sections(diff))
+        if not output:
+            return
+        self.console.print_stderr(
+            self.style(" " * 66, style="underline")
+            + f"\nLockfile diff: {diff.path} [{diff.resolve_name}]\n"
+            + output
+        )
+
+    def output_sections(self, diff: LockfileDiff) -> Iterator[str]:
+        if self.include_unchanged:
+            yield from self.output_reqs("Unchanged dependencies", diff.unchanged, fg="blue")
+        yield from self.output_changed("Upgraded dependencies", diff.upgraded)
+        yield from self.output_changed("!! Downgraded dependencies !!", diff.downgraded)
+        yield from self.output_reqs("Added dependencies", diff.added, fg="green", style="bold")
+        yield from self.output_reqs("Removed dependencies", diff.removed, fg="magenta")
+
+    def style(self, text: str, **kwargs) -> str:
+        return cast(str, self.maybe_color(text, **kwargs))
+
+    def title(self, text: str) -> str:
+        heading = f"== {text:^60} =="
+        return self.style("\n".join((" " * len(heading), heading, "")), style="underline")
+
+    def output_reqs(self, heading: str, reqs: LockfilePackages, **kwargs) -> Iterator[str]:
+        if not reqs:
+            return
+
+        yield self.title(heading)
+        for name, version in reqs.items():
+            name_s = self.style(f"{name:30}", fg="yellow")
+            version_s = self.style(str(version), **kwargs)
+            yield f"  {name_s} {version_s}"
+
+    def output_changed(self, title: str, reqs: ChangedPackages) -> Iterator[str]:
+        if not reqs:
+            return
+
+        yield self.title(title)
+        label = "-->"
+        for name, (prev, curr) in reqs.items():
+            bump_attrs = self.get_bump_attrs(prev, curr)
+            name_s = self.style(f"{name:30}", fg="yellow")
+            prev_s = self.style(f"{str(prev):10}", fg="cyan")
+            bump_s = self.style(f"{label:^7}", **bump_attrs)
+            curr_s = self.style(str(curr), **bump_attrs)
+            yield f"  {name_s} {prev_s} {bump_s} {curr_s}"
+
+    _BUMPS = (
+        ("major", dict(fg="red", style="bold")),
+        ("minor", dict(fg="yellow")),
+        ("micro", dict(fg="green")),
+        # Default style
+        (None, dict(fg="magenta")),
+    )
+
+    def get_bump_attrs(self, prev: PackageVersion, curr: PackageVersion) -> dict[str, str]:
+        for key, attrs in self._BUMPS:
+            if key and getattr(prev, key, None) != getattr(curr, key, None):
+                break
+        return attrs
 
 
 DEFAULT_TOOL_LOCKFILE = "<default>"
@@ -321,7 +474,7 @@ def filter_tool_lockfile_requests(
 
 class GenerateLockfilesSubsystem(GoalSubsystem):
     name = "generate-lockfiles"
-    help = "Generate lockfiles for Python third-party dependencies."
+    help = "Generate lockfiles for third-party dependencies."
 
     @classmethod
     def activated(cls, union_membership: UnionMembership) -> bool:
@@ -337,10 +490,9 @@ class GenerateLockfilesSubsystem(GoalSubsystem):
             Only generate lockfiles for the specified resolve(s).
 
             Resolves are the logical names for the different lockfiles used in your project.
-            For your own code's dependencies, these come from the option
-            `[python].resolves`. For tool lockfiles, resolve
-            names are the options scope for that tool such as `black`, `pytest`, and
-            `mypy-protobuf`.
+            For your own code's dependencies, these come from backend-specific configuration
+            such as `[python].resolves`. For tool lockfiles, resolve names are the options
+            scope for that tool such as `black`, `pytest`, and `mypy-protobuf`.
 
             For example, you can run `{bin_name()} generate-lockfiles --resolve=black
             --resolve=pytest --resolve=data-science` to only generate lockfiles for those
@@ -363,6 +515,26 @@ class GenerateLockfilesSubsystem(GoalSubsystem):
             """
         ),
     )
+    diff = BoolOption(
+        default=False,
+        help=softwrap(
+            """
+            Print a summary of changed distributions after generating the lockfile.
+            """
+        ),
+    )
+    diff_include_unchanged = BoolOption(
+        default=False,
+        help=softwrap(
+            """
+            Include unchanged distributions in the diff summary output. Implies `diff=true`.
+            """
+        ),
+    )
+
+    @property
+    def request_diffs(self) -> bool:
+        return self.diff or self.diff_include_unchanged
 
 
 class GenerateLockfilesGoal(Goal):
@@ -376,6 +548,8 @@ async def generate_lockfiles_goal(
     union_membership: UnionMembership,
     generate_lockfiles_subsystem: GenerateLockfilesSubsystem,
     local_environment: ChosenLocalEnvironmentName,
+    console: Console,
+    global_options: GlobalOptions,
 ) -> GenerateLockfilesGoal:
     known_user_resolve_names = await MultiGet(
         Get(KnownUserResolveNames, KnownUserResolveNamesRequest, request())
@@ -412,7 +586,12 @@ async def generate_lockfiles_goal(
     # Currently, since resolves specify a single filename for output, we pick a resonable
     # environment to execute the request in. Currently we warn if multiple environments are
     # specified.
-    all_requests = itertools.chain(*all_specified_user_requests, applicable_tool_requests)
+    all_requests: Iterator[GenerateLockfile] = itertools.chain(
+        *all_specified_user_requests, applicable_tool_requests
+    )
+    if generate_lockfiles_subsystem.request_diffs:
+        all_requests = (replace(req, diff=True) for req in all_requests)
+
     results = await MultiGet(
         Get(
             GenerateLockfileResult,
@@ -428,8 +607,22 @@ async def generate_lockfiles_goal(
     # resolution behaviour if we start executing requests in multiple environments.
     merged_digest = await Get(Digest, MergeDigests(res.digest for res in results))
     workspace.write_digest(merged_digest)
+
+    diffs: list[LockfileDiff] = []
     for result in results:
         logger.info(f"Wrote lockfile for the resolve `{result.resolve_name}` to {result.path}")
+        if result.diff is not None:
+            diffs.append(result.diff)
+
+    if diffs:
+        diff_formatter = LockfileDiffPrinter(
+            console=console,
+            color=global_options.colors,
+            include_unchanged=generate_lockfiles_subsystem.diff_include_unchanged,
+        )
+        for diff in diffs:
+            diff_formatter.print(diff)
+        console.print_stderr("\n")
 
     return GenerateLockfilesGoal(exit_code=0)
 

@@ -1,11 +1,13 @@
+// Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
+// Licensed under the Apache License, Version 2.0 (see LICENSE).
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use deepsize::DeepSizeOf;
 use serde::Serialize;
 
-use crate::WorkdirSymlink;
 use fs::{default_cache_path, safe_create_dir_all_ioerror, RelativePath};
+use store::WorkdirSymlink;
 
 #[derive(Clone, Debug, DeepSizeOf, Eq, PartialEq, Hash, PartialOrd, Ord, Serialize)]
 pub struct CacheName(String);
@@ -19,10 +21,13 @@ impl CacheName {
       Ok(CacheName(name))
     } else {
       Err(format!(
-        "Cache names may only contain lowercase alphanumeric characters or underscores: got {:?}",
-        name
+        "Cache names may only contain lowercase alphanumeric characters or underscores: got {name:?}"
       ))
     }
+  }
+
+  pub fn name(&self) -> &str {
+    &self.0
   }
 }
 
@@ -81,7 +86,7 @@ impl NamedCaches {
   /// An iterator over platform properties that should be added for the given named caches, and the
   /// given named cache namespace value.
   ///
-  /// See https://docs.google.com/document/d/1n_MVVGjrkTKTPKHqRPlyfFzQyx2QioclMG_Q3DMUgYk/edit#.
+  /// See <https://docs.google.com/document/d/1n_MVVGjrkTKTPKHqRPlyfFzQyx2QioclMG_Q3DMUgYk/edit#>.
   ///
   pub fn platform_properties<'a>(
     caches: &'a BTreeMap<CacheName, RelativePath>,

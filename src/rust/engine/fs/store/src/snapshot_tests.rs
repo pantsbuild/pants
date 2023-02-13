@@ -1,17 +1,18 @@
+// Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
+// Licensed under the Apache License, Version 2.0 (see LICENSE).
 use std::convert::TryInto;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use hashing::{Digest, Fingerprint, EMPTY_DIGEST};
-use task_executor;
-use tempfile;
+
 use testutil::data::TestDirectory;
 use testutil::make_file;
 
 use crate::{OneOffStoreFileByDigest, RelativePath, Snapshot, SnapshotOps, Store, StoreError};
 use fs::{
   Dir, DirectoryDigest, File, GitignoreStyleExcludes, GlobExpansionConjunction, GlobMatching,
-  PathGlobs, PathStat, PosixFS, StrictGlobMatching,
+  PathGlobs, PathStat, PosixFS, StrictGlobMatching, SymlinkBehavior,
 };
 
 pub const STR: &str = "European Burmese";
@@ -61,8 +62,8 @@ async fn snapshot_one_file() {
       80,
     )
   );
-  assert_eq!(snapshot.tree.files(), vec![PathBuf::from("roland")]);
-  assert_eq!(snapshot.tree.directories(), Vec::<PathBuf>::new());
+  assert_eq!(snapshot.files(), vec![PathBuf::from("roland")]);
+  assert_eq!(snapshot.directories(), Vec::<PathBuf>::new());
 }
 
 #[tokio::test]
@@ -71,7 +72,7 @@ async fn snapshot_recursive_directories() {
 
   let cats = PathBuf::from("cats");
   let roland = cats.join("roland");
-  std::fs::create_dir_all(&dir.path().join(cats)).unwrap();
+  std::fs::create_dir_all(dir.path().join(cats)).unwrap();
   make_file(&dir.path().join(&roland), STR.as_bytes(), 0o600);
 
   let path_stats = expand_all_sorted(posix_fs).await;
@@ -88,8 +89,8 @@ async fn snapshot_recursive_directories() {
       78,
     )
   );
-  assert_eq!(snapshot.tree.files(), vec![PathBuf::from("cats/roland")]);
-  assert_eq!(snapshot.tree.directories(), vec![PathBuf::from("cats")]);
+  assert_eq!(snapshot.files(), vec![PathBuf::from("cats/roland")]);
+  assert_eq!(snapshot.directories(), vec![PathBuf::from("cats")]);
 }
 
 #[tokio::test]
@@ -98,7 +99,7 @@ async fn snapshot_from_digest() {
 
   let cats = PathBuf::from("cats");
   let roland = cats.join("roland");
-  std::fs::create_dir_all(&dir.path().join(cats)).unwrap();
+  std::fs::create_dir_all(dir.path().join(cats)).unwrap();
   make_file(&dir.path().join(&roland), STR.as_bytes(), 0o600);
 
   let path_stats = expand_all_sorted(posix_fs).await;
@@ -141,9 +142,9 @@ async fn snapshot_recursive_directories_including_empty() {
   let roland = cats.join("roland");
   let dogs = PathBuf::from("dogs");
   let llamas = PathBuf::from("llamas");
-  std::fs::create_dir_all(&dir.path().join(&cats)).unwrap();
-  std::fs::create_dir_all(&dir.path().join(&dogs)).unwrap();
-  std::fs::create_dir_all(&dir.path().join(&llamas)).unwrap();
+  std::fs::create_dir_all(dir.path().join(&cats)).unwrap();
+  std::fs::create_dir_all(dir.path().join(&dogs)).unwrap();
+  std::fs::create_dir_all(dir.path().join(&llamas)).unwrap();
   make_file(&dir.path().join(&roland), STR.as_bytes(), 0o600);
 
   let sorted_path_stats = expand_all_sorted(posix_fs).await;
@@ -162,9 +163,9 @@ async fn snapshot_recursive_directories_including_empty() {
       232,
     ),
   );
-  assert_eq!(snapshot.tree.files(), vec![PathBuf::from("cats/roland")]);
+  assert_eq!(snapshot.files(), vec![PathBuf::from("cats/roland")]);
   assert_eq!(
-    snapshot.tree.directories(),
+    snapshot.directories(),
     vec![
       PathBuf::from("cats"),
       PathBuf::from("dogs"),
@@ -227,9 +228,8 @@ async fn merge_directories_clashing_files() {
     .expect_err("Want error merging");
 
   assert!(
-    format!("{:?}", err).contains("roland"),
-    "Want error message to contain roland but was: {:?}",
-    err
+    format!("{err:?}").contains("roland"),
+    "Want error message to contain roland but was: {err:?}"
   );
 }
 
@@ -373,15 +373,9 @@ async fn snapshot_merge_colliding() {
 
   match merged_res {
     Err(ref msg)
-      if format!("{:?}", msg).contains("found 2 duplicate entries")
-        && format!("{:?}", msg).contains("roland") =>
-    {
-      ()
-    }
-    x => panic!(
-      "Snapshot::merge should have failed with a useful message; got: {:?}",
-      x
-    ),
+      if format!("{msg:?}").contains("found 2 duplicate entries")
+        && format!("{msg:?}").contains("roland") => {}
+    x => panic!("Snapshot::merge should have failed with a useful message; got: {x:?}"),
   }
 }
 
@@ -559,7 +553,10 @@ pub async fn expand_all_sorted(posix_fs: Arc<PosixFS>) -> Vec<PathStat> {
   )
   .parse()
   .unwrap();
-  let mut v = posix_fs.expand_globs(path_globs, None).await.unwrap();
+  let mut v = posix_fs
+    .expand_globs(path_globs, SymlinkBehavior::Oblivious, None)
+    .await
+    .unwrap();
   v.sort_by(|a, b| a.path().cmp(b.path()));
   v
 }

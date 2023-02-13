@@ -42,10 +42,10 @@ impl Server {
   ) -> Result<Server, String> {
     let listener = TcpListener::bind((Ipv4Addr::new(127, 0, 0, 1), port_requested))
       .await
-      .map_err(|e| format!("Could not bind to port {}: {:?}", port_requested, e))?;
+      .map_err(|e| format!("Could not bind to port {port_requested}: {e:?}"))?;
     let port_actual = listener
       .local_addr()
-      .map_err(|e| format!("No local address for listener: {:?}", e))?
+      .map_err(|e| format!("No local address for listener: {e:?}"))?
       .port();
 
     // NB: The C client requires noisy_stdin (see the `nails` crate for more info), but neither
@@ -59,7 +59,7 @@ impl Server {
     let (exited_sender, exited_receiver) = oneshot::channel();
     let (exit_sender, exit_receiver) = oneshot::channel();
 
-    let _join = executor.spawn(Self::serve(
+    let _join = executor.native_spawn(Self::serve(
       executor.clone(),
       config,
       nail,
@@ -110,7 +110,7 @@ impl Server {
           tcp_stream
         }
         future::Either::Left((Err(e), _)) => {
-          break Err(format!("Server failed to accept connections: {}", e));
+          break Err(format!("Server failed to accept connections: {e}"));
         }
         future::Either::Right((_, _)) => {
           break Ok(());
@@ -125,7 +125,7 @@ impl Server {
       // acquired it. Unfortunately we cannot acquire the lock in this thread and then send the
       // guard to the other thread due to its lifetime bounds.
       let connection_started = Arc::new(Notify::new());
-      let _join = executor.spawn({
+      let _join = executor.native_spawn({
         let config = config.clone();
         let nail = nail.clone();
         let connection_started = connection_started.clone();
@@ -211,7 +211,7 @@ impl Nail for RawFdNail {
     let maybe_stdin_write = if let Some(mut stdin_sink) = stdin_sink {
       let (stdin_write, stdin_read) = child_channel::<ChildInput>();
       // Spawn a task that will propagate the input stream.
-      let _join = self.executor.spawn(async move {
+      let _join = self.executor.native_spawn(async move {
         let mut input_stream = stdin_read.map(|child_input| match child_input {
           ChildInput::Stdin(bytes) => Ok(bytes),
         });
@@ -243,16 +243,22 @@ impl Nail for RawFdNail {
     let nail = self.clone();
     let exit_code = self
       .executor
-      .spawn_blocking(move || {
-        // NB: This closure captures the stdio handles, and will drop/close them when it completes.
-        (nail.runner)(RawFdExecution {
-          cmd,
-          cancelled,
-          stdin_fd: stdin_handle.as_raw_fd(),
-          stdout_fd: stdout_handle.as_raw_fd(),
-          stderr_fd: stderr_handle.as_raw_fd(),
-        })
-      })
+      .spawn_blocking(
+        move || {
+          // NB: This closure captures the stdio handles, and will drop/close them when it completes.
+          (nail.runner)(RawFdExecution {
+            cmd,
+            cancelled,
+            stdin_fd: stdin_handle.as_raw_fd(),
+            stdout_fd: stdout_handle.as_raw_fd(),
+            stderr_fd: stderr_handle.as_raw_fd(),
+          })
+        },
+        |e| {
+          log::warn!("Server exited uncleanly: {e}");
+          ExitCode(1)
+        },
+      )
       .boxed();
 
     // Select a single stdout/stderr stream.
@@ -318,7 +324,7 @@ impl RawFdNail {
       let (pipe_reader, pipe_writer) = os_pipe::pipe()?;
       let read_handle = unsafe { std::fs::File::from_raw_fd(pipe_reader.into_raw_fd()) };
       Ok((
-        blocking_stream_for(read_handle).boxed(),
+        blocking_stream_for(read_handle)?.boxed(),
         Box::new(pipe_writer),
       ))
     }
@@ -346,7 +352,7 @@ impl RawFdNail {
   ///
   fn ttypath_from_env(env: &HashMap<String, String>, fd_number: usize) -> Option<PathBuf> {
     env
-      .get(&format!("NAILGUN_TTY_PATH_{}", fd_number))
+      .get(&format!("NAILGUN_TTY_PATH_{fd_number}"))
       .map(PathBuf::from)
   }
 }
@@ -354,25 +360,27 @@ impl RawFdNail {
 // TODO: See https://github.com/pantsbuild/pants/issues/16969.
 pub fn blocking_stream_for<R: io::Read + Send + Sized + 'static>(
   mut r: R,
-) -> impl futures::Stream<Item = Result<Bytes, io::Error>> {
+) -> io::Result<impl futures::Stream<Item = Result<Bytes, io::Error>>> {
   let (sender, receiver) = mpsc::unbounded_channel();
-  std::thread::spawn(move || {
-    let mut buf = [0; 4096];
-    loop {
-      match r.read(&mut buf) {
-        Ok(0) => break,
-        Ok(n) => {
-          if sender.send(Ok(Bytes::copy_from_slice(&buf[..n]))).is_err() {
+  std::thread::Builder::new()
+    .name("stdio-reader".to_owned())
+    .spawn(move || {
+      let mut buf = [0; 4096];
+      loop {
+        match r.read(&mut buf) {
+          Ok(0) => break,
+          Ok(n) => {
+            if sender.send(Ok(Bytes::copy_from_slice(&buf[..n]))).is_err() {
+              break;
+            }
+          }
+          Err(ref e) if e.kind() == io::ErrorKind::Interrupted => {}
+          Err(e) => {
+            let _ = sender.send(Err(e));
             break;
           }
         }
-        Err(ref e) if e.kind() == io::ErrorKind::Interrupted => {}
-        Err(e) => {
-          let _ = sender.send(Err(e));
-          break;
-        }
       }
-    }
-  });
-  UnboundedReceiverStream::new(receiver)
+    })?;
+  Ok(UnboundedReceiverStream::new(receiver))
 }

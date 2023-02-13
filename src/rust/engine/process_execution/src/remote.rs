@@ -1,9 +1,11 @@
+// Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
+// Licensed under the Apache License, Version 2.0 (see LICENSE).
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, HashMap};
 use std::convert::TryInto;
-use std::fmt::{self, Debug};
+use std::fmt::{self, Debug, Write};
 use std::io::Cursor;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime};
 
@@ -22,9 +24,9 @@ use protos::gen::google::rpc::{PreconditionFailure, Status as StatusProto};
 use protos::require_digest;
 use rand::{thread_rng, Rng};
 use remexec::{
-  capabilities_client::CapabilitiesClient, execution_client::ExecutionClient, Action, Command,
-  ExecuteRequest, ExecuteResponse, ExecutedActionMetadata, ServerCapabilities,
-  WaitExecutionRequest,
+  capabilities_client::CapabilitiesClient, execution_client::ExecutionClient,
+  execution_stage::Value as ExecutionStageValue, Action, Command, ExecuteRequest, ExecuteResponse,
+  ExecutedActionMetadata, ServerCapabilities, WaitExecutionRequest,
 };
 use tonic::metadata::BinaryMetadataValue;
 use tonic::{Code, Request, Status};
@@ -45,8 +47,8 @@ use workunit_store::{
 };
 
 use crate::{
-  Context, FallibleProcessResultWithPlatform, Platform, Process, ProcessCacheScope, ProcessError,
-  ProcessExecutionStrategy, ProcessResultMetadata, ProcessResultSource,
+  CacheName, Context, FallibleProcessResultWithPlatform, Platform, Process, ProcessCacheScope,
+  ProcessError, ProcessExecutionStrategy, ProcessResultMetadata, ProcessResultSource,
 };
 
 // Environment variable which is exclusively used for cache key invalidation.
@@ -88,7 +90,7 @@ pub enum ExecutionError {
 }
 
 /// Implementation of CommandRunner that runs a command via the Bazel Remote Execution API
-/// (https://docs.google.com/document/d/1AaGk7fOPByEvpAbqeXIyE8HX_A3_axxNnvroblTZ_6s/edit).
+/// (<https://docs.google.com/document/d/1AaGk7fOPByEvpAbqeXIyE8HX_A3_axxNnvroblTZ_6s/edit>).
 ///
 /// Results are streamed from the output stream of the Execute function (and possibly the
 /// WaitExecution function if `CommandRunner` needs to reconnect).
@@ -106,6 +108,7 @@ pub enum ExecutionError {
 pub struct CommandRunner {
   instance_name: Option<String>,
   process_cache_namespace: Option<String>,
+  append_only_caches_base_path: Option<String>,
   store: Store,
   executor: Executor,
   execution_client: Arc<ExecutionClient<LayeredService>>,
@@ -121,20 +124,34 @@ enum StreamOutcome {
   StreamClosed,
 }
 
+enum OperationStreamItem {
+  Running(ExecutionStageValue),
+  Outcome(StreamOutcome),
+}
+
 /// A single remote Operation, with a `Drop` implementation to cancel the work if our client goes
 /// away.
 struct RunningOperation {
   name: Option<String>,
   operations_client: Arc<OperationsClient<LayeredService>>,
   executor: Executor,
+  process_level: Level,
+  process_description: String,
 }
 
 impl RunningOperation {
-  fn new(operations_client: Arc<OperationsClient<LayeredService>>, executor: Executor) -> Self {
+  fn new(
+    operations_client: Arc<OperationsClient<LayeredService>>,
+    executor: Executor,
+    process_level: Level,
+    process_description: String,
+  ) -> Self {
     Self {
       name: None,
       operations_client,
       executor,
+      process_level,
+      process_description,
     }
   }
 
@@ -150,13 +167,14 @@ impl Drop for RunningOperation {
     if let Some(operation_name) = self.name.take() {
       debug!("Canceling remote operation {operation_name}");
       let mut operations_client = self.operations_client.as_ref().clone();
-      let _ = self.executor.spawn(async move {
+      let fut = self.executor.native_spawn(async move {
         operations_client
           .cancel_operation(CancelOperationRequest {
             name: operation_name,
           })
           .await
       });
+      drop(fut);
     }
   }
 }
@@ -167,6 +185,7 @@ impl CommandRunner {
     execution_address: &str,
     instance_name: Option<String>,
     process_cache_namespace: Option<String>,
+    append_only_caches_base_path: Option<String>,
     root_ca_certs: Option<Vec<u8>>,
     headers: BTreeMap<String, String>,
     store: Store,
@@ -195,6 +214,7 @@ impl CommandRunner {
       tonic::transport::Channel::balance_list(vec![execution_endpoint].into_iter()),
       execution_concurrency_limit,
       execution_http_headers,
+      None,
     );
     let execution_client = Arc::new(ExecutionClient::new(execution_channel.clone()));
     let operations_client = Arc::new(OperationsClient::new(execution_channel.clone()));
@@ -203,6 +223,7 @@ impl CommandRunner {
     let command_runner = CommandRunner {
       instance_name,
       process_cache_namespace,
+      append_only_caches_base_path,
       execution_client,
       operations_client,
       store,
@@ -239,18 +260,87 @@ impl CommandRunner {
       .await
   }
 
-  // Monitors the operation stream returned by the REv2 Execute and WaitExecution methods.
-  // Outputs progress reported by the server and returns the next actionable operation
-  // or gRPC status back to the main loop (plus the operation name so the main loop can
-  // reconnect).
+  async fn wait_on_operation_stream_item<S>(
+    stream: &mut S,
+    context: &Context,
+    running_operation: &mut RunningOperation,
+    start_time_opt: &mut Option<Instant>,
+  ) -> OperationStreamItem
+  where
+    S: Stream<Item = Result<Operation, Status>> + Unpin,
+  {
+    let item = stream.next().await;
+
+    if let Some(start_time) = start_time_opt.take() {
+      let timing: Result<u64, _> = Instant::now()
+        .duration_since(start_time)
+        .as_micros()
+        .try_into();
+      if let Ok(obs) = timing {
+        context.workunit_store.record_observation(
+          ObservationMetric::RemoteExecutionRPCFirstResponseTimeMicros,
+          obs,
+        );
+      }
+    }
+
+    match item {
+      Some(Ok(operation)) => {
+        trace!(
+          "wait_on_operation_stream (build_id={}): got operation: {:?}",
+          &context.build_id,
+          &operation
+        );
+
+        // Extract the operation name.
+        // Note: protobuf can return empty string for an empty field so convert empty strings
+        // to None.
+        running_operation.name = Some(operation.name.clone()).filter(|s| !s.trim().is_empty());
+
+        if operation.done {
+          // Continue monitoring if the operation is not complete.
+          OperationStreamItem::Outcome(StreamOutcome::Complete(OperationOrStatus::Operation(
+            operation,
+          )))
+        } else {
+          // Otherwise, return to the main loop with the operation as the result.
+          OperationStreamItem::Running(
+            Self::maybe_extract_execution_stage(&operation).unwrap_or(ExecutionStageValue::Unknown),
+          )
+        }
+      }
+
+      Some(Err(err)) => {
+        debug!("wait_on_operation_stream: got error: {:?}", err);
+        let status_proto = StatusProto {
+          code: err.code() as i32,
+          message: err.message().to_string(),
+          ..StatusProto::default()
+        };
+        OperationStreamItem::Outcome(StreamOutcome::Complete(OperationOrStatus::Status(
+          status_proto,
+        )))
+      }
+
+      None => {
+        // Stream disconnected unexpectedly.
+        debug!("wait_on_operation_stream: unexpected disconnect from RE server");
+        OperationStreamItem::Outcome(StreamOutcome::StreamClosed)
+      }
+    }
+  }
+
+  /// Monitors the operation stream returned by the REv2 Execute and WaitExecution methods.
+  /// Outputs progress reported by the server and returns the next actionable operation
+  /// or gRPC status back to the main loop (plus the operation name so the main loop can
+  /// reconnect).
   async fn wait_on_operation_stream<S>(
-    &self,
     mut stream: S,
     context: &Context,
     running_operation: &mut RunningOperation,
   ) -> StreamOutcome
   where
-    S: Stream<Item = Result<Operation, Status>> + Unpin,
+    S: Stream<Item = Result<Operation, Status>> + Unpin + Send,
   {
     let mut start_time_opt = Some(Instant::now());
 
@@ -259,61 +349,73 @@ impl CommandRunner {
       &context.build_id
     );
 
+    // If the server returns an `ExecutionStage` other than `Unknown`, then we assume that it
+    // implements reporting when the operation actually begins `Executing` (as opposed to being
+    // `Queued`, etc), and will wait to create a workunit until we see the `Executing` stage.
+    //
+    // We start by consuming the prefix of the stream before we receive an `Executing` or `Unknown` stage.
     loop {
-      let item = stream.next().await;
-
-      if let Some(start_time) = start_time_opt.take() {
-        let timing: Result<u64, _> = Instant::now()
-          .duration_since(start_time)
-          .as_micros()
-          .try_into();
-        if let Ok(obs) = timing {
-          context.workunit_store.record_observation(
-            ObservationMetric::RemoteExecutionRPCFirstResponseTimeMicros,
-            obs,
-          );
+      match Self::wait_on_operation_stream_item(
+        &mut stream,
+        context,
+        running_operation,
+        &mut start_time_opt,
+      )
+      .await
+      {
+        OperationStreamItem::Running(
+          ExecutionStageValue::Unknown | ExecutionStageValue::Executing,
+        ) => {
+          // Either the server doesn't know how to report the stage, or the operation has
+          // actually begun executing serverside: proceed to the suffix.
+          break;
         }
-      }
-
-      match item {
-        Some(Ok(operation)) => {
-          trace!(
-            "wait_on_operation_stream (build_id={}): got operation: {:?}",
-            &context.build_id,
-            &operation
-          );
-
-          // Extract the operation name.
-          // Note: protobuf can return empty string for an empty field so convert empty strings
-          // to None.
-          running_operation.name = Some(operation.name.clone()).filter(|s| !s.trim().is_empty());
-
-          // Continue monitoring if the operation is not complete.
-          if !operation.done {
-            continue;
-          }
-
-          // Otherwise, return to the main loop with the operation as the result.
-          return StreamOutcome::Complete(OperationOrStatus::Operation(operation));
+        OperationStreamItem::Running(_) => {
+          // The operation has not reached an ExecutionStage that we recognize as
+          // "executing" (likely: it is queued, doing a cache lookup, etc): keep waiting.
+          continue;
         }
-
-        Some(Err(err)) => {
-          debug!("wait_on_operation_stream: got error: {:?}", err);
-          let status_proto = StatusProto {
-            code: err.code() as i32,
-            message: err.message().to_string(),
-            ..StatusProto::default()
-          };
-          return StreamOutcome::Complete(OperationOrStatus::Status(status_proto));
-        }
-
-        None => {
-          // Stream disconnected unexpectedly.
-          debug!("wait_on_operation_stream: unexpected disconnect from RE server");
-          return StreamOutcome::StreamClosed;
-        }
+        OperationStreamItem::Outcome(outcome) => return outcome,
       }
     }
+
+    // Start a workunit to represent the execution of the work, and consume the rest of the stream.
+    in_workunit!(
+      "run_remote_process",
+      // NB: See engine::nodes::NodeKey::workunit_level for more information on why this workunit
+      // renders at the Process's level.
+      running_operation.process_level,
+      desc = Some(running_operation.process_description.clone()),
+      |_workunit| async move {
+        loop {
+          match Self::wait_on_operation_stream_item(
+            &mut stream,
+            context,
+            running_operation,
+            &mut start_time_opt,
+          )
+          .await
+          {
+            OperationStreamItem::Running(
+              ExecutionStageValue::Queued | ExecutionStageValue::CacheCheck,
+            ) => {
+              // The server must have cancelled and requeued the work: although this isn't an error
+              // per-se, it is much easier for us to re-open the stream than to treat this as a
+              // nested loop. In particular:
+              // 1. we can't break/continue out of a workunit
+              // 2. the stream needs to move into the workunit, and can't move back out
+              break StreamOutcome::StreamClosed;
+            }
+            OperationStreamItem::Running(_) => {
+              // The operation is still running.
+              continue;
+            }
+            OperationStreamItem::Outcome(outcome) => break outcome,
+          }
+        }
+      }
+    )
+    .await
   }
 
   // Store the remote timings into the workunit store.
@@ -423,7 +525,7 @@ impl CommandRunner {
     for violation in &precondition_failure.violations {
       if violation.r#type != "MISSING" {
         return ExecutionError::Fatal(
-          format!("Unknown PreconditionFailure violation: {:?}", violation).into(),
+          format!("Unknown PreconditionFailure violation: {violation:?}").into(),
         );
       }
 
@@ -470,6 +572,20 @@ impl CommandRunner {
     ExecutionError::MissingRemoteDigests(missing_digests)
   }
 
+  /// If set, extract `ExecuteOperationMetadata` from the `Operation`.
+  fn maybe_extract_execution_stage(operation: &Operation) -> Option<ExecutionStageValue> {
+    let metadata = operation.metadata.as_ref()?;
+
+    let eom = remexec::ExecuteOperationMetadata::decode(&metadata.value[..])
+      .map(Some)
+      .unwrap_or_else(|e| {
+        log::warn!("Invalid ExecuteOperationMetadata from server: {e:?}");
+        None
+      })?;
+
+    ExecutionStageValue::from_i32(eom.stage)
+  }
+
   // pub(crate) for testing
   pub(crate) async fn extract_execute_response(
     &self,
@@ -487,7 +603,7 @@ impl CommandRunner {
         let execute_response = match operation.result {
           Some(OperationResult::Response(response_any)) => {
             remexec::ExecuteResponse::decode(&response_any.value[..]).map_err(|e| {
-              ExecutionError::Fatal(format!("Invalid ExecuteResponse: {:?}", e).into())
+              ExecutionError::Fatal(format!("Invalid ExecuteResponse: {e:?}").into())
             })?
           }
           Some(OperationResult::Error(rpc_status)) => {
@@ -583,7 +699,7 @@ impl CommandRunner {
         let precondition_failure = PreconditionFailure::decode(Cursor::new(&details.value))
           .map_err(|e| {
             ExecutionError::Fatal(
-              format!("Error deserializing PreconditionFailure proto: {:?}", e).into(),
+              format!("Error deserializing PreconditionFailure proto: {e:?}").into(),
             )
           })?;
 
@@ -624,8 +740,13 @@ impl CommandRunner {
     const MAX_BACKOFF_DURATION: Duration = Duration::from_secs(10);
 
     let start_time = Instant::now();
-    let mut running_operation =
-      RunningOperation::new(self.operations_client.clone(), self.executor.clone());
+
+    let mut running_operation = RunningOperation::new(
+      self.operations_client.clone(),
+      self.executor.clone(),
+      process.level,
+      process.description.clone(),
+    );
     let mut num_retries = 0;
 
     loop {
@@ -678,9 +799,8 @@ impl CommandRunner {
           // Monitor the operation stream until there is an actionable operation
           // or status to interpret.
           let operation_stream = operation_stream_response.into_inner();
-          let stream_outcome = self
-            .wait_on_operation_stream(operation_stream, context, &mut running_operation)
-            .await;
+          let stream_outcome =
+            Self::wait_on_operation_stream(operation_stream, context, &mut running_operation).await;
 
           match stream_outcome {
             StreamOutcome::Complete(status) => {
@@ -749,9 +869,7 @@ impl CommandRunner {
             trace!("retryable error: {}", e);
             if num_retries >= MAX_RETRIES {
               workunit.increment_counter(Metric::RemoteExecutionRPCErrors, 1);
-              return Err(
-                format!("Too many failures from server. The last error was: {}", e).into(),
-              );
+              return Err(format!("Too many failures from server. The last error was: {e}").into());
             } else {
               // Increment the retry counter and allow loop to retry.
               num_retries += 1;
@@ -818,6 +936,10 @@ impl crate::CommandRunner for CommandRunner {
       self.instance_name.clone(),
       self.process_cache_namespace.clone(),
       &self.store,
+      self
+        .append_only_caches_base_path
+        .as_ref()
+        .map(|s| s.as_ref()),
     )
     .await?;
     let build_id = context.build_id.clone();
@@ -849,10 +971,9 @@ impl crate::CommandRunner for CommandRunner {
     let context2 = context.clone();
     in_workunit!(
       "run_execute_request",
-      // NB: See engine::nodes::NodeKey::workunit_level for more information on why this workunit
-      // renders at the Process's level.
-      request.level,
-      desc = Some(request.description.clone()),
+      // NB: The process has not actually started running until the server has notified us that it
+      // has: see `wait_on_operation_stream`.
+      Level::Debug,
       user_metadata = vec![(
         "action_digest".to_owned(),
         UserMetadataItem::String(format!("{action_digest:?}")),
@@ -882,8 +1003,7 @@ impl crate::CommandRunner for CommandRunner {
               Some((
                 WorkunitMetadata {
                   desc: Some(format!(
-                    "remote execution timed out after {:?}",
-                    deadline_duration
+                    "remote execution timed out after {deadline_duration:?}"
                   )),
                   ..initial
                 },
@@ -891,7 +1011,7 @@ impl crate::CommandRunner for CommandRunner {
               ))
             });
             workunit.increment_counter(Metric::RemoteExecutionTimeouts, 1);
-            Err(format!("remote execution timed out after {:?}", deadline_duration).into())
+            Err(format!("remote execution timed out after {deadline_duration:?}").into())
           }
         }
       },
@@ -920,6 +1040,62 @@ fn maybe_add_workunit(
   }
 }
 
+fn make_wrapper_for_append_only_caches(
+  caches: &BTreeMap<CacheName, RelativePath>,
+  base_path: &str,
+  working_directory: Option<&str>,
+) -> Result<String, String> {
+  let mut script = String::new();
+  writeln!(&mut script, "#!/bin/sh").map_err(|err| format!("write! failed: {err:?}"))?;
+
+  // Setup the append-only caches.
+  for (cache_name, path) in caches {
+    writeln!(
+      &mut script,
+      "/bin/mkdir -p '{}/{}'",
+      base_path,
+      cache_name.name()
+    )
+    .map_err(|err| format!("write! failed: {err:?}"))?;
+    if let Some(parent) = path.parent() {
+      writeln!(&mut script, "/bin/mkdir -p '{}'", parent.to_string_lossy())
+        .map_err(|err| format!("write! failed: {err}"))?;
+    }
+    writeln!(
+      &mut script,
+      "/bin/ln -s '{}/{}' '{}'",
+      base_path,
+      cache_name.name(),
+      path.as_path().to_string_lossy()
+    )
+    .map_err(|err| format!("write! failed: {err}"))?;
+  }
+
+  // Change into any working directory.
+  //
+  // Note: When this wrapper script is in effect, Pants will not set the `working_directory`
+  // field on the `ExecuteRequest` so that this wrapper script can operate in the input root
+  // first.
+  if let Some(path) = working_directory {
+    writeln!(
+      &mut script,
+      concat!(
+        "cd '{0}'\n",
+        "if [ \"$?\" != 0 ]; then\n",
+        "  echo \"pants-wrapper: Failed to change working directory to: {0}\" 1>&2\n",
+        "  exit 1\n",
+        "fi\n",
+      ),
+      path
+    )
+    .map_err(|err| format!("write! failed: {err}"))?;
+  }
+
+  // Finally, execute the process.
+  writeln!(&mut script, "exec \"$@\"").map_err(|err| format!("write! failed: {err:?}"))?;
+  Ok(script)
+}
+
 /// Return type for `make_execute_request`. Contains all of the generated REAPI protobufs for
 /// a particular `Process`.
 #[derive(Clone, Debug, PartialEq)]
@@ -934,20 +1110,54 @@ pub async fn make_execute_request(
   req: &Process,
   instance_name: Option<String>,
   cache_key_gen_version: Option<String>,
-  _store: &Store,
+  store: &Store,
+  append_only_caches_base_path: Option<&str>,
 ) -> Result<EntireExecuteRequest, String> {
+  const WRAPPER_SCRIPT: &str = "./__pants_wrapper__";
+
+  // Implement append-only caches by running a wrapper script before the actual program
+  // to be invoked in the remote environment.
+  let wrapper_script_digest_opt = match (append_only_caches_base_path, &req.append_only_caches) {
+    (Some(base_path), caches) if !caches.is_empty() => {
+      let script = make_wrapper_for_append_only_caches(
+        caches,
+        base_path,
+        req.working_directory.as_ref().and_then(|p| p.to_str()),
+      )?;
+      let digest = store
+        .store_file_bytes(Bytes::from(script), false)
+        .await
+        .map_err(|err| format!("Failed to store wrapper script for remote execution: {err}"))?;
+      let path = RelativePath::new(Path::new(WRAPPER_SCRIPT))?;
+      let snapshot = store.snapshot_of_one_file(path, digest, true).await?;
+      let directory_digest = DirectoryDigest::new(snapshot.digest, snapshot.tree);
+      Some(directory_digest)
+    }
+    _ => None,
+  };
+
+  let arguments = match &wrapper_script_digest_opt {
+    Some(_) => {
+      let mut args = Vec::with_capacity(req.argv.len() + 1);
+      args.push(WRAPPER_SCRIPT.to_string());
+      args.extend(req.argv.iter().cloned());
+      args
+    }
+    None => req.argv.clone(),
+  };
+
   let mut command = remexec::Command {
-    arguments: req.argv.clone(),
+    arguments,
     ..remexec::Command::default()
   };
+
   for (name, value) in &req.env {
     if name == CACHE_KEY_GEN_VERSION_ENV_VAR_NAME
       || name == CACHE_KEY_TARGET_PLATFORM_ENV_VAR_NAME
       || name == CACHE_KEY_SALT_ENV_VAR_NAME
     {
       return Err(format!(
-        "Cannot set env var with name {} as that is reserved for internal use by pants",
-        name
+        "Cannot set env var with name {name} as that is reserved for internal use by pants"
       ));
     }
 
@@ -963,15 +1173,6 @@ pub async fn make_execute_request(
     ProcessExecutionStrategy::RemoteExecution(properties) => properties,
     _ => vec![],
   };
-
-  // TODO: Disabling append-only caches in remoting until server support exists due to
-  //       interaction with how servers match platform properties.
-  // if !req.append_only_caches.is_empty() {
-  //   platform_properties.extend(NamedCaches::platform_properties(
-  //     &req.append_only_caches,
-  //     &cache_key_gen_version,
-  //   ));
-  // }
 
   if let Some(cache_key_gen_version) = cache_key_gen_version {
     command
@@ -1018,7 +1219,7 @@ pub async fn make_execute_request(
     .map(|p| {
       p.to_str()
         .map(str::to_owned)
-        .ok_or_else(|| format!("Non-UTF8 output file path: {:?}", p))
+        .ok_or_else(|| format!("Non-UTF8 output file path: {p:?}"))
     })
     .collect::<Result<Vec<String>, String>>()?;
   output_files.sort();
@@ -1030,17 +1231,21 @@ pub async fn make_execute_request(
     .map(|p| {
       p.to_str()
         .map(str::to_owned)
-        .ok_or_else(|| format!("Non-UTF8 output directory path: {:?}", p))
+        .ok_or_else(|| format!("Non-UTF8 output directory path: {p:?}"))
     })
     .collect::<Result<Vec<String>, String>>()?;
   output_directories.sort();
   command.output_directories = output_directories;
 
   if let Some(working_directory) = &req.working_directory {
-    command.working_directory = working_directory
-      .to_str()
-      .map(str::to_owned)
-      .unwrap_or_else(|| panic!("Non-UTF8 working directory path: {:?}", working_directory));
+    // Do not set `working_directory` if a wrapper script is in use because the wrapper script
+    // will change to the working directory itself.
+    if wrapper_script_digest_opt.is_none() {
+      command.working_directory = working_directory
+        .to_str()
+        .map(str::to_owned)
+        .unwrap_or_else(|| panic!("Non-UTF8 working directory path: {working_directory:?}"));
+    }
   }
 
   if req.jdk_home.is_some() {
@@ -1091,7 +1296,19 @@ pub async fn make_execute_request(
     .environment_variables
     .sort_by(|x, y| x.name.cmp(&y.name));
 
-  let input_root_digest = req.input_digests.complete.clone();
+  let input_root_digest: DirectoryDigest = match &wrapper_script_digest_opt {
+    Some(wrapper_digest) => {
+      let digests = vec![
+        req.input_digests.complete.clone(),
+        wrapper_digest.to_owned(),
+      ];
+      store
+        .merge(digests)
+        .await
+        .map_err(|err| format!("store error: {err}"))?
+    }
+    None => req.input_digests.complete.clone(),
+  };
 
   let mut action = remexec::Action {
     command_digest: Some((&digest(&command)?).into()),
@@ -1131,11 +1348,11 @@ async fn populate_fallible_execution_result_for_timeout(
   platform: Platform,
 ) -> Result<FallibleProcessResultWithPlatform, String> {
   let timeout_msg = if let Some(timeout) = timeout {
-    format!("user timeout of {:?} after {:?}", timeout, elapsed)
+    format!("user timeout of {timeout:?} after {elapsed:?}")
   } else {
-    format!("server timeout after {:?}", elapsed)
+    format!("server timeout after {elapsed:?}")
   };
-  let stdout = Bytes::from(format!("Exceeded {} for {}", timeout_msg, description));
+  let stdout = Bytes::from(format!("Exceeded {timeout_msg} for {description}"));
   let stdout_digest = store.store_file_bytes(stdout, true).await?;
 
   Ok(FallibleProcessResultWithPlatform {
@@ -1200,13 +1417,13 @@ fn extract_stdout<'a>(
     if let Some(digest_proto) = &action_result.stdout_digest {
       let stdout_digest_result: Result<Digest, String> = digest_proto.try_into();
       let stdout_digest =
-        stdout_digest_result.map_err(|err| format!("Error extracting stdout: {}", err))?;
+        stdout_digest_result.map_err(|err| format!("Error extracting stdout: {err}"))?;
       Ok(stdout_digest)
     } else {
       let stdout_raw = Bytes::copy_from_slice(&action_result.stdout_raw);
       let digest = store
         .store_file_bytes(stdout_raw, true)
-        .map_err(move |error| format!("Error storing raw stdout: {:?}", error))
+        .map_err(move |error| format!("Error storing raw stdout: {error:?}"))
         .await?;
       Ok(digest)
     }
@@ -1223,13 +1440,13 @@ fn extract_stderr<'a>(
     if let Some(digest_proto) = &action_result.stderr_digest {
       let stderr_digest_result: Result<Digest, String> = digest_proto.try_into();
       let stderr_digest =
-        stderr_digest_result.map_err(|err| format!("Error extracting stderr: {}", err))?;
+        stderr_digest_result.map_err(|err| format!("Error extracting stderr: {err}"))?;
       Ok(stderr_digest)
     } else {
       let stderr_raw = Bytes::copy_from_slice(&action_result.stderr_raw);
       let digest = store
         .store_file_bytes(stderr_raw, true)
-        .map_err(move |error| format!("Error storing raw stderr: {:?}", error))
+        .map_err(move |error| format!("Error storing raw stderr: {error:?}"))
         .await?;
       Ok(digest)
     }
@@ -1250,7 +1467,7 @@ pub fn extract_output_files(
   // method.
   if treat_tree_digest_as_final_directory_hack {
     match &action_result.output_directories[..] {
-      &[ref directory] => {
+      [directory] => {
         match require_digest(directory.tree_digest.as_ref()) {
           Ok(digest) => {
             return future::ready::<Result<_, StoreError>>(Ok(
@@ -1293,18 +1510,13 @@ pub fn extract_output_files(
         let directory_digest = store
           .load_tree_from_remote(tree_digest)
           .await?
-          .ok_or_else(|| format!("Tree with digest {:?} was not in remote", tree_digest))?;
+          .ok_or_else(|| format!("Tree with digest {tree_digest:?} was not in remote"))?;
 
         store
           .add_prefix(directory_digest, &RelativePath::new(dir.path)?)
           .await
       })
-      .map_err(|err| {
-        format!(
-          "Error saving remote output directory to local cache: {}",
-          err
-        )
-      }),
+      .map_err(|err| format!("Error saving remote output directory to local cache: {err}")),
     );
   }
 
@@ -1359,10 +1571,7 @@ pub fn extract_output_files(
     let files_snapshot =
       Snapshot::from_path_stats(StoreOneOffRemoteDigest::new(path_map), path_stats).map_err(
         move |error| {
-          format!(
-            "Error when storing the output file directory info in the remote CAS: {:?}",
-            error
-          )
+          format!("Error when storing the output file directory info in the remote CAS: {error:?}")
         },
       );
 
@@ -1406,7 +1615,7 @@ pub async fn store_proto_locally<P: prost::Message>(
   store
     .store_file_bytes(proto.to_bytes(), true)
     .await
-    .map_err(|e| format!("Error saving proto to local store: {:?}", e))
+    .map_err(|e| format!("Error saving proto to local store: {e:?}"))
 }
 
 pub async fn ensure_action_stored_locally(
@@ -1436,7 +1645,7 @@ pub async fn ensure_action_uploaded(
   in_workunit!(
     "ensure_action_uploaded",
     Level::Trace,
-    desc = Some(format!("ensure action uploaded for {:?}", action_digest)),
+    desc = Some(format!("ensure action uploaded for {action_digest:?}")),
     |_workunit| async move {
       let mut digests = vec![command_digest, action_digest];
       if let Some(input_files) = input_files {
@@ -1457,7 +1666,7 @@ pub fn format_error(error: &StatusProto) -> String {
   let error_code_enum = Code::from_i32(error.code);
   let error_code = match error_code_enum {
     Code::Unknown => format!("{:?}", error.code),
-    x => format!("{:?}", x),
+    x => format!("{x:?}"),
   };
   format!("{}: {}", error_code, error.message)
 }

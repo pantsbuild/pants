@@ -1,13 +1,15 @@
+// Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
+// Licensed under the Apache License, Version 2.0 (see LICENSE).
 use std::path::PathBuf;
 
-use store::Store;
+use store::{ImmutableInputs, Store};
 use task_executor::Executor;
 use tempfile::TempDir;
 use testutil::owned_string_vec;
 use workunit_store::WorkunitStore;
 
 use crate::nailgun::NailgunPool;
-use crate::{ImmutableInputs, NamedCaches, Process};
+use crate::{NamedCaches, Process};
 
 fn pool(size: usize) -> (NailgunPool, NamedCaches, ImmutableInputs) {
   let _ = WorkunitStore::setup_for_tests();
@@ -32,7 +34,7 @@ async fn run(pool: &(NailgunPool, NamedCaches, ImmutableInputs), port: u16) -> P
       Process::new(owned_string_vec(&[
         "/bin/bash",
         "-c",
-        &format!("echo Mock port {}.; sleep 10", port),
+        &format!("echo Mock port {port}.; sleep 10"),
       ])),
       &pool.1,
       &pool.2,

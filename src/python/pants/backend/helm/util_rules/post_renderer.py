@@ -6,8 +6,9 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from itertools import chain
+from typing import Any
 
-from pants.backend.docker.goals.package_image import DockerFieldSet
+from pants.backend.docker.goals.package_image import DockerPackageFieldSet
 from pants.backend.docker.subsystems import dockerfile_parser
 from pants.backend.docker.subsystems.docker_options import DockerOptions
 from pants.backend.docker.target_types import DockerImageTags, DockerImageTagsRequest
@@ -27,7 +28,7 @@ from pants.backend.helm.dependency_inference.deployment import (
     FirstPartyHelmDeploymentMappingRequest,
 )
 from pants.backend.helm.subsystems import post_renderer
-from pants.backend.helm.subsystems.post_renderer import HelmPostRenderer, SetupHelmPostRenderer
+from pants.backend.helm.subsystems.post_renderer import SetupHelmPostRenderer
 from pants.backend.helm.target_types import HelmDeploymentFieldSet
 from pants.engine.addresses import Address, Addresses
 from pants.engine.engine_aware import EngineAwareParameter
@@ -46,6 +47,9 @@ class HelmDeploymentPostRendererRequest(EngineAwareParameter):
 
     def debug_hint(self) -> str | None:
         return self.field_set.address.spec
+
+    def metadata(self) -> dict[str, Any] | None:
+        return {"address": self.field_set.address.spec}
 
 
 @rule_helper
@@ -69,9 +73,9 @@ async def _obtain_custom_image_tags(
 @rule(desc="Prepare Helm deployment post-renderer", level=LogLevel.DEBUG)
 async def prepare_post_renderer_for_helm_deployment(
     request: HelmDeploymentPostRendererRequest,
-    docker_options: DockerOptions,
     union_membership: UnionMembership,
-) -> HelmPostRenderer:
+    docker_options: DockerOptions,
+) -> SetupHelmPostRenderer:
     mapping = await Get(
         FirstPartyHelmDeploymentMapping, FirstPartyHelmDeploymentMappingRequest(request.field_set)
     )
@@ -99,7 +103,7 @@ async def prepare_post_renderer_for_helm_deployment(
     )
 
     docker_targets = await Get(Targets, Addresses(docker_addresses))
-    field_sets = [DockerFieldSet.create(tgt) for tgt in docker_targets]
+    field_sets = [DockerPackageFieldSet.create(tgt) for tgt in docker_targets]
 
     async def resolve_docker_image_ref(address: Address, context: DockerBuildContext) -> str | None:
         docker_field_sets = [fs for fs in field_sets if fs.address == address]
@@ -119,12 +123,14 @@ async def prepare_post_renderer_for_helm_deployment(
         # Choose first non-latest image reference found, or fallback to 'latest'.
         found_ref: str | None = None
         fallback_ref: str | None = None
-        for ref in image_refs:
-            if ref.endswith(":latest"):
-                fallback_ref = ref
-            else:
-                found_ref = ref
-                break
+        for registry in image_refs:
+            for tag in registry.tags:
+                ref = tag.full_name
+                if ref.endswith(":latest"):
+                    fallback_ref = ref
+                else:
+                    found_ref = ref
+                    break
 
         resolved_ref = found_ref or fallback_ref
         if resolved_ref:
@@ -145,13 +151,8 @@ async def prepare_post_renderer_for_helm_deployment(
 
     replacements = mapping.indexed_docker_addresses.transform_values(find_replacement)
 
-    return await Get(
-        HelmPostRenderer,
-        SetupHelmPostRenderer(
-            replacements,
-            description_of_origin=request.field_set.address.spec,
-            extra_post_renderers=request.field_set.post_renderers.to_unparsed_address_inputs(),
-        ),
+    return SetupHelmPostRenderer(
+        replacements, description_of_origin=f"the `helm_deployment` {request.field_set.address}"
     )
 
 

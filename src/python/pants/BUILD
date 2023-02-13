@@ -6,10 +6,12 @@ python_sources(
     overrides={
         # Enable `python -m pants ...` style execution ala `json.tool` or `venv`.
         "__main__.py": {"dependencies": ["src/python/pants/bin:pants_loader"]},
+        "version.py": {"dependencies": ["src/python/pants/_version:resources"]},
     },
 )
 
 python_test_utils(name="test_utils")
+python_tests(name="tests")
 
 python_distribution(
     name="pants-packaged",
@@ -40,4 +42,4 @@ python_distribution(
 # `:pants-packaged`. We don't actually need to use any meaningful file here, though, because we
 # use `entry_points` to link to the actual native code, so clang/gcc do not need to build any
 # native code. This is just a dummy file.
-resources(name="resources", sources=["VERSION", "py.typed", "dummy.c"])
+resources(name="resources", sources=["py.typed", "dummy.c"])

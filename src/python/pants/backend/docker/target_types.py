@@ -13,6 +13,7 @@ from typing_extensions import final
 
 from pants.backend.docker.registries import ALL_DEFAULT_REGISTRIES
 from pants.base.build_environment import get_buildroot
+from pants.core.goals.package import OutputPathField
 from pants.core.goals.run import RestartableField
 from pants.engine.addresses import Address
 from pants.engine.collection import Collection
@@ -95,6 +96,7 @@ class DockerImageContextRootField(StringField):
 
 
 class DockerImageSourceField(OptionalSingleSourceField):
+    none_is_valid_value = True
     default = "Dockerfile"
 
     # When the default glob value is in effect, we don't want the normal glob match error behavior
@@ -348,12 +350,13 @@ class DockerBuildOptionFieldValueMixin(Field):
 
 class DockerImageBuildPullOptionField(DockerBuildOptionFieldValueMixin, BoolField):
     alias = "pull"
-    default = True
+    default = False
     help = softwrap(
         """
         If true, then docker will always attempt to pull a newer version of the image.
 
-        Useful to disable it when building images from other intermediate goals.
+        NOTE: This option cannot be used on images that build off of "transitive" base images
+        referenced by address (i.e. `FROM path/to/your/base/Dockerfile`).
         """
     )
     docker_build_option = "--pull"
@@ -403,6 +406,7 @@ class DockerImageTarget(Target):
         DockerImageTargetStageField,
         DockerImageBuildPullOptionField,
         DockerImageBuildSquashOptionField,
+        OutputPathField,
         RestartableField,
     )
     help = softwrap(
@@ -412,7 +416,7 @@ class DockerImageTarget(Target):
         Any dependencies, as inferred or explicitly specified, will be included in the Docker
         build context, after being packaged if applicable.
 
-        By default, will use a Dockerfile from the same directory as the BUILD file this target
+        By default, it will use a Dockerfile from the same directory as the BUILD file this target
         is defined in. Point at another file with the `source` field, or use the `instructions`
         field to have the Dockerfile contents verbatim directly in the BUILD file.
 

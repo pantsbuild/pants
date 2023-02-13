@@ -1,3 +1,5 @@
+// Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
+// Licensed under the Apache License, Version 2.0 (see LICENSE).
 use std::collections::{BTreeMap, HashSet};
 use std::convert::TryInto;
 use std::fmt::{self, Debug};
@@ -5,7 +7,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use async_trait::async_trait;
-use fs::{directory, DigestTrie, RelativePath};
+use fs::{directory, DigestTrie, RelativePath, SymlinkBehavior};
 use futures::future::{BoxFuture, TryFutureExt};
 use futures::FutureExt;
 use grpc_util::retry::{retry_call, status_is_retryable};
@@ -51,6 +53,7 @@ pub struct CommandRunner {
   inner: Arc<dyn crate::CommandRunner>,
   instance_name: Option<String>,
   process_cache_namespace: Option<String>,
+  append_only_caches_base_path: Option<String>,
   executor: task_executor::Executor,
   store: Store,
   action_cache_client: Arc<ActionCacheClient<LayeredService>>,
@@ -60,7 +63,6 @@ pub struct CommandRunner {
   warnings_behavior: RemoteCacheWarningsBehavior,
   read_errors_counter: Arc<Mutex<BTreeMap<String, usize>>>,
   write_errors_counter: Arc<Mutex<BTreeMap<String, usize>>>,
-  read_timeout: Duration,
 }
 
 impl CommandRunner {
@@ -79,6 +81,7 @@ impl CommandRunner {
     cache_content_behavior: CacheContentBehavior,
     concurrency_limit: usize,
     read_timeout: Duration,
+    append_only_caches_base_path: Option<String>,
   ) -> Result<Self, String> {
     let tls_client_config = if action_cache_address.starts_with("https://") {
       Some(grpc_util::tls::Config::new_without_mtls(root_ca_certs).try_into()?)
@@ -96,6 +99,7 @@ impl CommandRunner {
       tonic::transport::Channel::balance_list(vec![endpoint].into_iter()),
       concurrency_limit,
       http_headers,
+      Some((read_timeout, Metric::RemoteCacheRequestTimeouts)),
     );
     let action_cache_client = Arc::new(ActionCacheClient::new(channel));
 
@@ -103,6 +107,7 @@ impl CommandRunner {
       inner,
       instance_name,
       process_cache_namespace,
+      append_only_caches_base_path,
       executor,
       store,
       action_cache_client,
@@ -112,7 +117,6 @@ impl CommandRunner {
       warnings_behavior,
       read_errors_counter: Arc::new(Mutex::new(BTreeMap::new())),
       write_errors_counter: Arc::new(Mutex::new(BTreeMap::new())),
-      read_timeout,
     })
   }
 
@@ -131,8 +135,15 @@ impl CommandRunner {
     directory_path: RelativePath,
   ) -> Result<Option<(Tree, Vec<Digest>)>, String> {
     let sub_trie = match root_trie.entry(&directory_path)? {
-      Some(directory::Entry::Directory(d)) => d.tree(),
       None => return Ok(None),
+      Some(directory::Entry::Directory(d)) => d.tree(),
+      Some(directory::Entry::Symlink(_)) => {
+        return Err(format!(
+          "Declared output directory path {directory_path:?} in output \
+           digest {trie_digest:?} contained a symlink instead.",
+          trie_digest = root_trie.compute_root_digest(),
+        ))
+      }
       Some(directory::Entry::File(_)) => {
         return Err(format!(
           "Declared output directory path {directory_path:?} in output \
@@ -144,8 +155,9 @@ impl CommandRunner {
 
     let tree = sub_trie.into();
     let mut file_digests = Vec::new();
-    sub_trie.walk(&mut |_, entry| match entry {
+    sub_trie.walk(SymlinkBehavior::Aware, &mut |_, entry| match entry {
       directory::Entry::File(f) => file_digests.push(f.digest()),
+      directory::Entry::Symlink(_) => (),
       directory::Entry::Directory(_) => {}
     });
 
@@ -157,6 +169,7 @@ impl CommandRunner {
     file_path: &str,
   ) -> Result<Option<remexec::OutputFile>, String> {
     match root_trie.entry(&RelativePath::new(file_path)?)? {
+      None => Ok(None),
       Some(directory::Entry::File(f)) => {
         let output_file = remexec::OutputFile {
           digest: Some(f.digest().into()),
@@ -166,7 +179,11 @@ impl CommandRunner {
         };
         Ok(Some(output_file))
       }
-      None => Ok(None),
+      Some(directory::Entry::Symlink(_)) => Err(format!(
+        "Declared output file path {file_path:?} in output \
+           digest {trie_digest:?} contained a symlink instead.",
+        trie_digest = root_trie.compute_root_digest(),
+      )),
       Some(directory::Entry::Directory(_)) => Err(format!(
         "Declared output file path {file_path:?} in output \
            digest {trie_digest:?} contained a directory instead.",
@@ -223,6 +240,7 @@ impl CommandRunner {
         .push(remexec::OutputDirectory {
           path: output_directory.to_owned(),
           tree_digest: Some(tree_digest.into()),
+          is_topologically_sorted: false,
         });
     }
 
@@ -268,7 +286,6 @@ impl CommandRunner {
         self.action_cache_client.clone(),
         self.store.clone(),
         self.cache_content_behavior,
-        self.read_timeout,
       )
       .await;
       match response {
@@ -348,7 +365,7 @@ impl CommandRunner {
         initial.map(|(initial, _)| {
           (
             WorkunitMetadata {
-              desc: initial.desc.as_ref().map(|desc| format!("Hit: {}", desc)),
+              desc: initial.desc.as_ref().map(|desc| format!("Hit: {desc}")),
               ..initial
             },
             Level::Debug,
@@ -428,10 +445,8 @@ impl CommandRunner {
       CacheErrorType::ReadError => "read from",
       CacheErrorType::WriteError => "write to",
     };
-    let log_msg = format!(
-      "Failed to {} remote cache ({} occurrences so far): {}",
-      failure_desc, err_count, err
-    );
+    let log_msg =
+      format!("Failed to {failure_desc} remote cache ({err_count} occurrences so far): {err}");
     let log_at_warn = match self.warnings_behavior {
       RemoteCacheWarningsBehavior::Ignore => false,
       RemoteCacheWarningsBehavior::FirstOnly => err_count == 1,
@@ -475,6 +490,10 @@ impl crate::CommandRunner for CommandRunner {
       self.instance_name.clone(),
       self.process_cache_namespace.clone(),
       &self.store,
+      self
+        .append_only_caches_base_path
+        .as_ref()
+        .map(|s| s.as_ref()),
     )
     .await?;
     let failures_cached = request.cache_scope == ProcessCacheScope::Always;
@@ -532,7 +551,7 @@ impl crate::CommandRunner for CommandRunner {
       }
       // NB: We must box the future to avoid a stack overflow.
       .boxed());
-      let task_name = format!("remote cache write {:?}", action_digest);
+      let task_name = format!("remote cache write {action_digest:?}");
       context
         .tail_tasks
         .spawn_on(&task_name, self.executor.handle(), write_fut.boxed());
@@ -562,12 +581,11 @@ async fn check_action_cache(
   action_cache_client: Arc<ActionCacheClient<LayeredService>>,
   store: Store,
   cache_content_behavior: CacheContentBehavior,
-  timeout_duration: Duration,
 ) -> Result<Option<FallibleProcessResultWithPlatform>, ProcessError> {
   in_workunit!(
     "check_action_cache",
     Level::Debug,
-    desc = Some(format!("Remote cache lookup for: {}", command_description)),
+    desc = Some(format!("Remote cache lookup for: {command_description}")),
     |workunit| async move {
       workunit.increment_counter(Metric::RemoteCacheRequests, 1);
 
@@ -582,13 +600,7 @@ async fn check_action_cache(
             ..remexec::GetActionResultRequest::default()
           };
           let request = apply_headers(Request::new(request), &context.build_id);
-          async move {
-            let lookup_fut = client.get_action_result(request);
-            let timeout_fut = tokio::time::timeout(timeout_duration, lookup_fut);
-            timeout_fut
-              .await
-              .unwrap_or_else(|_| Err(Status::unavailable("Pants client timeout")))
-          }
+          async move { client.get_action_result(request).await }
         },
         status_is_retryable,
       )

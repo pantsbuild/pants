@@ -26,6 +26,8 @@
 #![allow(clippy::mutex_atomic)]
 
 pub mod directory;
+#[cfg(test)]
+mod directory_tests;
 mod glob_matching;
 #[cfg(test)]
 mod glob_matching_tests;
@@ -33,7 +35,8 @@ mod glob_matching_tests;
 mod posixfs_tests;
 
 pub use crate::directory::{
-  DigestTrie, DirectoryDigest, TypedPath, EMPTY_DIGEST_TREE, EMPTY_DIRECTORY_DIGEST,
+  DigestTrie, DirectoryDigest, Entry, SymlinkBehavior, TypedPath, EMPTY_DIGEST_TREE,
+  EMPTY_DIRECTORY_DIGEST,
 };
 pub use crate::glob_matching::{
   FilespecMatcher, GlobMatching, PathGlob, PreparedPathGlobs, DOUBLE_STAR_GLOB, SINGLE_STAR_GLOB,
@@ -47,12 +50,10 @@ use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
 use std::{fmt, fs};
 
-use crate::future::FutureExt;
 use ::ignore::gitignore::{Gitignore, GitignoreBuilder};
 use async_trait::async_trait;
 use bytes::Bytes;
 use deepsize::DeepSizeOf;
-use futures::future::{self, BoxFuture, TryFutureExt};
 use lazy_static::lazy_static;
 use serde::Serialize;
 
@@ -67,14 +68,23 @@ const TARGET_NOFILE_LIMIT: u64 = 10000;
 
 const XDG_CACHE_HOME: &str = "XDG_CACHE_HOME";
 
-/// Follows the unix XDB base spec: http://standards.freedesktop.org/basedir-spec/latest/index.html.
+/// NB: Linux limits path lookups to 40 symlink traversals: https://lwn.net/Articles/650786/
+///
+/// We use a slightly different limit because this is not exactly the same operation: we're
+/// walking recursively while matching globs, and so our link traversals might involve steps
+/// through non-link destinations.
+const MAX_LINK_DEPTH: u8 = 64;
+
+type LinkDepth = u8;
+
+/// Follows the unix XDB base spec: <http://standards.freedesktop.org/basedir-spec/latest/index.html>.
 pub fn default_cache_path() -> PathBuf {
   let cache_path = std::env::var(XDG_CACHE_HOME)
     .ok()
     .filter(|v| !v.is_empty())
     .map(PathBuf::from)
     .or_else(|| dirs_next::home_dir().map(|home| home.join(".cache")))
-    .unwrap_or_else(|| panic!("Could not find home dir or {}.", XDG_CACHE_HOME));
+    .unwrap_or_else(|| panic!("Could not find home dir or {XDG_CACHE_HOME}."));
   cache_path.join("pants")
 }
 
@@ -99,17 +109,14 @@ impl RelativePath {
     for component in candidate.components() {
       match component {
         Component::Prefix(_) => {
-          return Err(format!("Windows paths are not allowed: {:?}", candidate))
+          return Err(format!("Windows paths are not allowed: {candidate:?}"))
         }
-        Component::RootDir => {
-          return Err(format!("Absolute paths are not allowed: {:?}", candidate))
-        }
+        Component::RootDir => return Err(format!("Absolute paths are not allowed: {candidate:?}")),
         Component::CurDir => continue,
         Component::ParentDir => {
           if !relative_path.pop() {
             return Err(format!(
-              "Relative paths that escape the root are not allowed: {:?}",
-              candidate
+              "Relative paths that escape the root are not allowed: {candidate:?}"
             ));
           }
         }
@@ -160,7 +167,7 @@ impl Stat {
     match self {
       &Stat::Dir(Dir(ref p)) => p.as_path(),
       &Stat::File(File { path: ref p, .. }) => p.as_path(),
-      &Stat::Link(Link(ref p)) => p.as_path(),
+      &Stat::Link(Link { path: ref p, .. }) => p.as_path(),
     }
   }
 
@@ -174,10 +181,17 @@ impl Stat {
       is_executable,
     })
   }
+
+  pub fn link(path: PathBuf, target: PathBuf) -> Stat {
+    Stat::Link(Link { path, target })
+  }
 }
 
 #[derive(Clone, Debug, DeepSizeOf, Eq, Hash, PartialEq)]
-pub struct Link(pub PathBuf);
+pub struct Link {
+  pub path: PathBuf,
+  pub target: PathBuf,
+}
 
 #[derive(Clone, Debug, DeepSizeOf, Eq, Hash, PartialEq)]
 pub struct Dir(pub PathBuf);
@@ -202,6 +216,12 @@ pub enum PathStat {
     // The canonical Stat that underlies the Path.
     stat: File,
   },
+  Link {
+    // The symbolic name of some filesystem Path, which is context specific.
+    path: PathBuf,
+    // The canonical Stat that underlies the Path.
+    stat: Link,
+  },
 }
 
 impl PathStat {
@@ -213,10 +233,15 @@ impl PathStat {
     PathStat::File { path, stat }
   }
 
+  pub fn link(path: PathBuf, stat: Link) -> PathStat {
+    PathStat::Link { path, stat }
+  }
+
   pub fn path(&self) -> &Path {
     match self {
-      &PathStat::Dir { ref path, .. } => path.as_path(),
-      &PathStat::File { ref path, .. } => path.as_path(),
+      PathStat::Dir { path, .. } => path.as_path(),
+      PathStat::File { path, .. } => path.as_path(),
+      PathStat::Link { path, .. } => path.as_path(),
     }
   }
 }
@@ -251,21 +276,18 @@ impl GitignoreStyleExcludes {
 
     if let Some(path) = gitignore_path {
       if let Some(err) = ignore_builder.add(path) {
-        return Err(format!("Error adding .gitignore path: {:?}", err));
+        return Err(format!("Error adding .gitignore path: {err:?}"));
       }
     }
     for pattern in &patterns {
-      ignore_builder.add_line(None, pattern).map_err(|e| {
-        format!(
-          "Could not parse glob exclude pattern `{:?}`: {:?}",
-          pattern, e
-        )
-      })?;
+      ignore_builder
+        .add_line(None, pattern)
+        .map_err(|e| format!("Could not parse glob exclude pattern `{pattern:?}`: {e:?}"))?;
     }
 
     let gitignore = ignore_builder
       .build()
-      .map_err(|e| format!("Could not build ignore patterns: {:?}", e))?;
+      .map_err(|e| format!("Could not build ignore patterns: {e:?}"))?;
 
     Ok(Arc::new(Self {
       patterns: patterns,
@@ -320,8 +342,7 @@ impl StrictGlobMatching {
           .to_string(),
       ),
       _ => Err(format!(
-        "Unrecognized strict glob matching behavior: {}.",
-        behavior,
+        "Unrecognized strict glob matching behavior: {behavior}.",
       )),
     }
   }
@@ -346,15 +367,9 @@ impl GlobExpansionConjunction {
     match spec {
       "all_match" => Ok(GlobExpansionConjunction::AllMatch),
       "any_match" => Ok(GlobExpansionConjunction::AnyMatch),
-      _ => Err(format!("Unrecognized conjunction: {}.", spec)),
+      _ => Err(format!("Unrecognized conjunction: {spec}.")),
     }
   }
-}
-
-#[derive(Clone)]
-pub enum SymlinkBehavior {
-  Aware,
-  Oblivious,
 }
 
 #[derive(Debug, DeepSizeOf, Clone, Eq, PartialEq, Hash)]
@@ -438,7 +453,7 @@ impl PosixFS {
           }
         })
       })
-      .map_err(|e| format!("Could not canonicalize root {:?}: {:?}", root, e))?;
+      .map_err(|e| format!("Could not canonicalize root {root:?}: {e:?}"))?;
 
     Ok(PosixFS {
       root: canonical_root,
@@ -452,7 +467,15 @@ impl PosixFS {
     let vfs = self.clone();
     self
       .executor
-      .spawn_blocking(move || vfs.scandir_sync(&dir_relative_to_root))
+      .spawn_blocking(
+        move || vfs.scandir_sync(&dir_relative_to_root),
+        |e| {
+          Err(io::Error::new(
+            io::ErrorKind::Other,
+            format!("Synchronous scandir failed: {e}"),
+          ))
+        },
+      )
       .await
   }
 
@@ -495,7 +518,7 @@ impl PosixFS {
       .map_err(|e| {
         io::Error::new(
           e.kind(),
-          format!("Failed to scan directory {:?}: {}", dir_abs, e),
+          format!("Failed to scan directory {dir_abs:?}: {e}"),
         )
       })?;
     stats.sort_by(|s1, s2| s1.path().cmp(s2.path()));
@@ -511,38 +534,28 @@ impl PosixFS {
   }
 
   pub async fn read_link(&self, link: &Link) -> Result<PathBuf, io::Error> {
-    let link_parent = link.0.parent().map(Path::to_owned);
-    let link_abs = self.root.0.join(link.0.as_path());
-    self
-      .executor
-      .spawn_blocking(move || {
-        link_abs
-          .read_link()
-          .and_then(|path_buf| {
-            if path_buf.is_absolute() {
-              Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!("Absolute symlink: {:?}", path_buf),
-              ))
-            } else {
-              link_parent
-                .map(|parent| parent.join(&path_buf))
-                .ok_or_else(|| {
-                  io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    format!("Symlink without a parent?: {:?}", path_buf),
-                  )
-                })
-            }
-          })
-          .map_err(|e| {
-            io::Error::new(
-              e.kind(),
-              format!("Failed to read link {:?}: {}", link_abs, e),
-            )
-          })
-      })
+    let link_parent = link.path.parent().map(Path::to_owned);
+    let link_abs = self.root.0.join(link.path.as_path());
+    tokio::fs::read_link(&link_abs)
       .await
+      .and_then(|path_buf| {
+        if path_buf.is_absolute() {
+          Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!("Absolute symlink: {path_buf:?}"),
+          ))
+        } else {
+          link_parent
+            .map(|parent| parent.join(&path_buf))
+            .ok_or_else(|| {
+              io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!("Symlink without a parent?: {path_buf:?}"),
+              )
+            })
+        }
+      })
+      .map_err(|e| io::Error::new(e.kind(), format!("Failed to read link {link_abs:?}: {e}")))
   }
 
   ///
@@ -566,8 +579,7 @@ impl PosixFS {
       return Err(io::Error::new(
         io::ErrorKind::InvalidInput,
         format!(
-          "Argument path_for_stat to PosixFS::stat must be relative path, got {:?}",
-          path_for_stat
+          "Argument path_for_stat to PosixFS::stat must be relative path, got {path_for_stat:?}"
         ),
       ));
     }
@@ -576,13 +588,15 @@ impl PosixFS {
       return Err(io::Error::new(
         io::ErrorKind::InvalidInput,
         format!(
-          "Argument absolute_path_to_root to PosixFS::stat must be absolute path, got {:?}",
-          absolute_path_to_root
+          "Argument absolute_path_to_root to PosixFS::stat must be absolute path, got {absolute_path_to_root:?}"
         ),
       ));
     }
     if file_type.is_symlink() {
-      Ok(Some(Stat::Link(Link(path_for_stat))))
+      Ok(Some(Stat::Link(Link {
+        path: path_for_stat.clone(),
+        target: std::fs::read_link(absolute_path_to_root.join(path_for_stat))?,
+      })))
     } else if file_type.is_file() {
       let is_executable = compute_metadata()?.permissions().mode() & 0o100 == 0o100;
       Ok(Some(Stat::File(File {
@@ -596,6 +610,9 @@ impl PosixFS {
     }
   }
 
+  /// NB: This method is synchronous because it is used to stat all files in a directory as one
+  /// blocking operation as part of `scandir_sync` (as recommended by the `tokio` documentation, to
+  /// avoid many small spawned tasks).
   pub fn stat_sync(&self, relative_path: PathBuf) -> Result<Option<Stat>, io::Error> {
     let abs_path = self.root.0.join(&relative_path);
     let metadata = match self.symlink_behavior {
@@ -637,8 +654,25 @@ impl Vfs<io::Error> for Arc<PosixFS> {
 #[async_trait]
 impl Vfs<String> for DigestTrie {
   async fn read_link(&self, link: &Link) -> Result<PathBuf, String> {
-    // DigestTrie does not currently support Links.
-    Err(format!("{:?} does not exist within this Snapshot.", link))
+    let entry = self
+      .entry(&link.path)?
+      .ok_or_else(|| format!("{link:?} does not exist within this Snapshot."))?;
+    let target = match entry {
+      directory::Entry::File(_) => {
+        return Err(format!(
+          "Path `{}` was a file rather than a symlink.",
+          link.path.display()
+        ))
+      }
+      directory::Entry::Symlink(s) => s.target(),
+      directory::Entry::Directory(_) => {
+        return Err(format!(
+          "Path `{}` was a directory rather than a symlink.",
+          link.path.display()
+        ))
+      }
+    };
+    Ok(target.to_path_buf())
   }
 
   async fn scandir(&self, dir: Dir) -> Result<Arc<DirectoryListing>, String> {
@@ -650,11 +684,17 @@ impl Vfs<String> for DigestTrie {
     } else {
       let entry = self
         .entry(&dir.0)?
-        .ok_or_else(|| format!("{:?} does not exist within this Snapshot.", dir))?;
+        .ok_or_else(|| format!("{dir:?} does not exist within this Snapshot."))?;
       match entry {
         directory::Entry::File(_) => {
           return Err(format!(
             "Path `{}` was a file rather than a directory.",
+            dir.0.display()
+          ))
+        }
+        directory::Entry::Symlink(_) => {
+          return Err(format!(
+            "Path `{}` was a symlink rather than a directory.",
             dir.0.display()
           ))
         }
@@ -672,6 +712,10 @@ impl Vfs<String> for DigestTrie {
             path: dir.0.join(f.name().as_ref()),
             is_executable: f.is_executable(),
           }),
+          directory::Entry::Symlink(s) => Stat::Link(Link {
+            path: dir.0.join(s.name().as_ref()),
+            target: s.target().to_path_buf(),
+          }),
           directory::Entry::Directory(d) => Stat::Dir(Dir(dir.0.join(d.name().as_ref()))),
         })
         .collect(),
@@ -684,42 +728,6 @@ impl Vfs<String> for DigestTrie {
 
   fn mk_error(msg: &str) -> String {
     msg.to_owned()
-  }
-}
-
-pub trait PathStatGetter<E> {
-  fn path_stats(&self, paths: Vec<PathBuf>) -> BoxFuture<Result<Vec<Option<PathStat>>, E>>;
-}
-
-impl PathStatGetter<io::Error> for Arc<PosixFS> {
-  fn path_stats(&self, paths: Vec<PathBuf>) -> BoxFuture<Result<Vec<Option<PathStat>>, io::Error>> {
-    async move {
-      future::try_join_all(
-        paths
-          .into_iter()
-          .map(|path| {
-            let fs = self.clone();
-            let fs2 = self.clone();
-            self
-              .executor
-              .spawn_blocking(move || fs2.stat_sync(path))
-              .and_then(move |maybe_stat| {
-                async move {
-                  match maybe_stat {
-                    // Note: This will drop PathStats for symlinks which don't point anywhere.
-                    Some(Stat::Link(link)) => fs.canonicalize_link(link.0.clone(), link).await,
-                    Some(Stat::Dir(dir)) => Ok(Some(PathStat::dir(dir.0.clone(), dir))),
-                    Some(Stat::File(file)) => Ok(Some(PathStat::file(file.path.clone(), file))),
-                    None => Ok(None),
-                  }
-                }
-              })
-          })
-          .collect::<Vec<_>>(),
-      )
-      .await
-    }
-    .boxed()
   }
 }
 
@@ -767,8 +775,15 @@ pub struct FileEntry {
 }
 
 #[derive(Debug, Eq, PartialEq)]
+pub struct SymlinkEntry {
+  pub path: PathBuf,
+  pub target: PathBuf,
+}
+
+#[derive(Debug, Eq, PartialEq)]
 pub enum DigestEntry {
   File(FileEntry),
+  Symlink(SymlinkEntry),
   EmptyDirectory(PathBuf),
 }
 
@@ -776,6 +791,7 @@ impl DigestEntry {
   pub fn path(&self) -> &Path {
     match self {
       DigestEntry::File(file_entry) => &file_entry.path,
+      DigestEntry::Symlink(symlink_entry) => &symlink_entry.path,
       DigestEntry::EmptyDirectory(path) => path,
     }
   }
@@ -790,14 +806,13 @@ pub fn increase_limits() -> Result<String, String> {
   loop {
     let (cur, max) = rlimit::Resource::NOFILE
       .get()
-      .map_err(|e| format!("Could not validate file handle limits: {}", e))?;
+      .map_err(|e| format!("Could not validate file handle limits: {e}"))?;
     // If the limit is less than our target.
     if cur < TARGET_NOFILE_LIMIT {
       let err_suffix = format!(
-        "To avoid 'too many open file handle' errors, we recommend a limit of at least {}: \
+        "To avoid 'too many open file handle' errors, we recommend a limit of at least {TARGET_NOFILE_LIMIT}: \
         please see https://www.pantsbuild.org/docs/troubleshooting#too-many-open-files-error \
-        for more information.",
-        TARGET_NOFILE_LIMIT
+        for more information."
       );
       // If we might be able to increase the soft limit, try to.
       if cur < max {
@@ -805,19 +820,15 @@ pub fn increase_limits() -> Result<String, String> {
         rlimit::Resource::NOFILE
           .set(target_soft_limit, max)
           .map_err(|e| {
-            format!(
-              "Could not raise soft file handle limit above {}: `{}`. {}",
-              cur, e, err_suffix
-            )
+            format!("Could not raise soft file handle limit above {cur}: `{e}`. {err_suffix}")
           })?;
       } else {
         return Err(format!(
-          "File handle limit is capped to: {}. {}",
-          cur, err_suffix
+          "File handle limit is capped to: {cur}. {err_suffix}"
         ));
       }
     } else {
-      return Ok(format!("File handle limit is: {}", cur));
+      return Ok(format!("File handle limit is: {cur}"));
     };
   }
 }
@@ -846,14 +857,14 @@ pub fn safe_create_dir_all_ioerror(path: &Path) -> Result<(), io::Error> {
 
 pub fn safe_create_dir_all(path: &Path) -> Result<(), String> {
   safe_create_dir_all_ioerror(path)
-    .map_err(|e| format!("Failed to create dir {:?} due to {:?}", path, e))
+    .map_err(|e| format!("Failed to create dir {path:?} due to {e:?}"))
 }
 
 pub fn safe_create_dir(path: &Path) -> Result<(), String> {
   match fs::create_dir(path) {
     Ok(()) => Ok(()),
     Err(ref e) if e.kind() == io::ErrorKind::AlreadyExists => Ok(()),
-    Err(err) => Err(format!("{}", err)),
+    Err(err) => Err(format!("{err}")),
   }
 }
 

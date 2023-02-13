@@ -3,11 +3,14 @@
 
 from __future__ import annotations
 
+import base64
+import hashlib
 import inspect
 import io
 import json
 import zipfile
 from textwrap import dedent
+from typing import Iterable
 
 import pytest
 
@@ -53,7 +56,11 @@ def rule_runner() -> RuleRunner:
             get_filtered_environment,
             QueryRule(TestResult, [GoTestRequest.Batch]),
         ],
-        target_types=[GoModTarget, GoPackageTarget, ResourceTarget],
+        target_types=[
+            GoModTarget,
+            GoPackageTarget,
+            ResourceTarget,
+        ],
     )
     rule_runner.set_options(["--go-test-args=-v -bench=."], env_inherit={"PATH"})
     return rule_runner
@@ -258,6 +265,19 @@ def test_embed_in_external_test(rule_runner: RuleRunner) -> None:
     _assert_test_result_success(result)
 
 
+# Implements hashing algorithm from https://cs.opensource.google/go/x/mod/+/refs/tags/v0.5.0:sumdb/dirhash/hash.go.
+def _compute_module_hash(files: Iterable[tuple[str, str]]) -> str:
+    sorted_files = sorted(files, key=lambda x: x[0])
+    summary = ""
+    for name, content in sorted_files:
+        h = hashlib.sha256(content.encode())
+        summary += f"{h.hexdigest()}  {name}\n"
+
+    h = hashlib.sha256(summary.encode())
+    summary_digest = base64.standard_b64encode(h.digest()).decode()
+    return f"h1:{summary_digest}"
+
+
 def test_third_party_package_embed(rule_runner: RuleRunner) -> None:
     # Build the zip file and other content needed to simulate a third-party module.
     import_path = "pantsbuild.org/go-embed-sample-for-test"
@@ -268,23 +288,32 @@ def test_third_party_package_embed(rule_runner: RuleRunner) -> None:
         go 1.16
         """
     )
+    go_mod_sum = _compute_module_hash([("go.mod", go_mod_content)])
+
     embed_content = "This message comes from an embedded file."
-    mod_zip_bytes = io.BytesIO()
-    with zipfile.ZipFile(mod_zip_bytes, "w") as mod_zip:
-        prefix = f"{import_path}@{version}"
-        mod_zip.writestr(f"{prefix}/go.mod", go_mod_content)
-        mod_zip.writestr(
+    prefix = f"{import_path}@{version}"
+    files_in_zip = (
+        (f"{prefix}/go.mod", go_mod_content),
+        (
             f"{prefix}/pkg/message.go",
             dedent(
                 """\
-            package pkg
-            import _ "embed"
-            //go:embed message.txt
-            var Message string
-            """
+        package pkg
+        import _ "embed"
+        //go:embed message.txt
+        var Message string
+        """
             ),
-        )
-        mod_zip.writestr(f"{prefix}/pkg/message.txt", embed_content)
+        ),
+        (f"{prefix}/pkg/message.txt", embed_content),
+    )
+
+    mod_zip_bytes = io.BytesIO()
+    with zipfile.ZipFile(mod_zip_bytes, "w") as mod_zip:
+        for name, content in files_in_zip:
+            mod_zip.writestr(name, content)
+
+    mod_zip_sum = _compute_module_hash(files_in_zip)
 
     rule_runner.write_files(
         {
@@ -302,6 +331,12 @@ def test_third_party_package_embed(rule_runner: RuleRunner) -> None:
                 require (
                 \t{import_path} {version}
                 )
+                """
+            ),
+            "go.sum": dedent(
+                f"""\
+                {import_path} {version} {mod_zip_sum}
+                {import_path} {version}/go.mod {go_mod_sum}
                 """
             ),
             # Note: At least one Go file is necessary due to bug in Go backend even if package is only for tests.

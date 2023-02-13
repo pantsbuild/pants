@@ -26,14 +26,14 @@ backend_packages = [
 Adding `docker_image` targets
 -----------------------------
 
-A Docker image is built from a recipe specified by a [Dockerfile](https://docs.docker.com/engine/reference/builder/). When you build Docker images with Pants, instead of running `docker` on the Dockerfile directly, you let Pants do that for you.
+A Docker image is built from a recipe specified by a [Dockerfile](https://docs.docker.com/engine/reference/builder/). When you build Docker images with Pants, instead of running `docker build` on the Dockerfile directly, you let Pants do that for you.
 
 Pants uses [`docker_image`](doc:reference-docker_image) [targets](doc:targets) to indicate which Dockerfiles you want Pants to know about, and to add any necessary metadata. 
 
 You can generate initial BUILD files for your Docker images, using [tailor](doc:initial-configuration#5-generate-build-files):
 
 ```
-❯ ./pants tailor ::
+❯ pants tailor ::
 Created src/docker/app1/BUILD:
   - Add docker_image target docker
 Created src/docker/app2/BUILD:
@@ -61,31 +61,41 @@ docker_image(
 > 🚧 The `docker_image` `instructions` field
 > 
 > Each `docker_image` uses a `Dockerfile` referred to by the `source` field, unless you have provided a value to the `instructions` field.
-> 
-> When using the `instructions` field, make sure that the default value for `source` does not match a file, or there will be a conflict about which information to use.
 
 Adding dependencies to your `docker_image` targets
 --------------------------------------------------
 
-A Dockerfile executes in a _context_ - a set of files that the commands in the Dockerfile can reference, e.g., by copying them into the image).
+A Dockerfile is built in a _context_ - a set of files that the commands in the Dockerfile can reference, e.g., by copying them into the image.
 
-When you run `docker` directly, the context is usually a directory within your repo. That directory must contain the Dockerfile (typically at the root of the context) and any files that the build requires. If those files are themselves the product of a build step, or if they are sources from elsewhere in the repo, then you have to copy them into the context.
+When you run `docker build` directly, the context is usually a directory within your repo containing the Dockerfile (typically at the root of the context) and any files that the build requires. If those files were themselves the product of a build step, or if they were sources from elsewhere in the repo, then you would have to copy them into the context.
 
-Pants, however, takes care of assembling the context for you. It does so using the dependencies of the `docker_image` target. 
+Pants, however, takes care of assembling the context for you. It does so using the dependencies of the [`docker_image`](doc:reference-docker_image) target, which can include:
 
-A [`docker_image`](doc:reference-docker_image) can depend on loose files belonging to [`file` / `files` targets](doc:resources#files), and on artifacts packaged from a variety of targets, such as [`pex_binary`](doc:reference-pex_binary) , [`python_distribution`](doc:reference-python_distribution), [`archive`](doc:reference-archive), or any other target that can be built via the [package](doc:reference-package) goal.
+- Loose files specified using  [`file` / `files` targets](doc:resources#files).
+- Artifacts packaged from a variety of targets, such as [`pex_binary`](doc:reference-pex_binary) , [`python_distribution`](doc:reference-python_distribution), [`archive`](doc:reference-archive), and any other target that can be built via the [package](doc:reference-package) goal, including other docker images.
 
 The context is assembled as follows:
 
 - The sources of `file` / `files` targets are assembled at their relative path from the repo root.
-- The artifacts of any packageable targets are built, as if by running `./pants package`, and placed in the context using the artifact's `output_path` field.
+- The artifacts of any packaged targets are built, as if by running `pants package`, and placed in the context using the artifact's `output_path` field.
   - The `output_path` defaults to the scheme `path.to.directory/tgt_name.ext`, e.g. `src.python.helloworld/bin.pex`.
 
-### Dependency inference for `pex_binary`
+### Dependency inference support
 
 When you `COPY` PEX binaries into your image, the dependency on the `pex_binary` target will be inferred, so you don't have to add that explicitly to the list of `dependencies` on your `docker_image` target.
 
-For example, the `pex_binary` target `src/python/helloworld/bin.pex` has the default `output_path` of `src.python.helloworld/bin.pex`. So, Pants can infer a dependecy based on the line `COPY src.python.helloworld/bin.pex /bin/helloworld`.
+For example, the `pex_binary` target `src/python/helloworld/bin.pex` has the default `output_path` of `src.python.helloworld/bin.pex`. So, Pants can infer a dependency based on the line `COPY src.python.helloworld/bin.pex /bin/helloworld`.
+
+Inference for Go binaries and artifacts of other packaged targets is similar.
+
+Inference is also supported for `docker_image` targets specified in build arguments, for example:
+
+```dockerfile
+ARG BASE_IMAGE=:base
+FROM $BASE_IMAGE
+```
+
+In the example, `:base` is the base image target address specified using a relative path. Pants will provide the built Docker image name for that target as the `BASE_IMAGE` build arg to the Docker build command.
 
 Building a Docker image
 -----------------------
@@ -93,7 +103,7 @@ Building a Docker image
 You build Docker images using the `package` goal:
 
 ```
-❯ ./pants package path/to/Dockerfile
+❯ pants package path/to/Dockerfile
 ```
 
 ### Build arguments
@@ -125,7 +135,7 @@ ARG VAR3=default
 
 ### Target build stage
 
-When your `Dockerfile` is a multi stage build file, you may specify which stage to build with the [`--docker-build-target-stage`](doc:reference-docker#section-build-target-stage) for all images, or provide a per image setting with the `docker_image` field [`target_stage`](doc:reference-docker_image#codetarget_stagecode).
+When your `Dockerfile` is a multi-stage build file, you may specify which stage to build with the [`--docker-build-target-stage`](doc:reference-docker#section-build-target-stage) for all images, or provide a per image setting with the `docker_image` field [`target_stage`](doc:reference-docker_image#codetarget_stagecode).
 
 ```dockerfile
 FROM python:3.8 AS base
@@ -136,8 +146,10 @@ COPY files /
 ```
 
 ```
-❯ ./pants package --docker-build-target-stage=base Dockerfile
+❯ pants package --docker-build-target-stage=base Dockerfile
 ```
+
+See this [blog post](https://blog.pantsbuild.org/optimizing-python-docker-deploys-using-pants/) for more examples using multi-stage builds.
 
 ### Build time secrets
 
@@ -171,14 +183,14 @@ very-secret-value
 
 ### Build Docker image example
 
-This example copies both a `file` and `pex_binary`:
+This example copies both a `file` and `pex_binary`. The file is specified as an explicit dependency in the `BUILD` file, whereas the `pex_binary` dependency is inferred from the path in the `Dockerfile`.
 
 ```python src/docker/hw/BUILD
 file(name="msg", source="msg.txt")
 
 docker_image(
-    name="docker",
-    dependencies=[":msg", "src/python/hw:bin"],
+    name="helloworld",
+    dependencies=[":msg"],
 )
 ```
 ```dockerfile src/docker/hw/Dockerfile
@@ -190,7 +202,7 @@ COPY src.python.hw/bin.pex /bin/helloworld
 ```text src/docker/hw/msg.txt
 Hello, Docker!
 ```
-```python src/py/hw/BUILD
+```python src/python/hw/BUILD
 python_sources(name="lib")
 
 pex_binary(name="bin", entry_point="main.py")
@@ -207,11 +219,12 @@ print(msg)
 ```
 
 ```
-❯ ./pants package src/docker/hw/Dockerfile
-[...]
-18:07:29.66 [INFO] Completed: Building src.python.hw/bin.pex
-18:07:31.83 [INFO] Completed: Building docker image helloworld:latest
-18:07:31.83 [INFO] Built docker image: helloworld:latest
+❯ pants package src/docker/hw/Dockerfile
+08:09:22.86 [INFO] Completed: Building local_dists.pex
+08:09:23.80 [INFO] Completed: Building src.python.hw/bin.pex
+08:10:42.51 [INFO] Completed: Building docker image helloworld:latest
+08:10:42.51 [INFO] Built docker image: helloworld:latest
+Docker image ID: 1fe744d52222
 ```
 
 Running a Docker image
@@ -220,21 +233,21 @@ Running a Docker image
 You can ask Pants to run a Docker image on your local system with the `run` goal:
 
 ```
-❯ ./pants run src/docker/hw/Dockerfile
+❯ pants run src/docker/hw/Dockerfile
 Hello, Docker!
 ```
 
 Any arguments for the Docker container may be provided as pass through args to the `run` goal, as usual. That is, use either the `--args` option or after all other arguments after a separating double-dash:
 
 ```
-❯ ./pants run src/docker/hw/Dockerfile -- arguments for the container
+❯ pants run src/docker/hw/Dockerfile -- arguments for the container
 Hello, Docker!
 ```
 
 To provide any command line arguments to the `docker run` command, you may use the `--docker-run-args` option:
 
 ```
-❯ ./pants run --docker-run-args="-p 8080 --name demo" src/docker/hw/Dockerfile 
+❯ pants run --docker-run-args="-p 8080 --name demo" src/docker/hw/Dockerfile 
 ```
 
 As with all configuration options, this is not limited to the command line, but may be configured in a Pants rc file (such as `pants.toml`) in the `[docker].run_args` section or as an environment variable, `PANTS_DOCKER_RUN_ARGS` as well.
@@ -242,10 +255,10 @@ As with all configuration options, this is not limited to the command line, but 
 Publishing images
 -----------------
 
-Pants can push your images to registries using `./pants publish`:
+Pants can push your images to registries using `pants publish`:
 
 ```shell
-❯ ./pants publish src/docker/hw:helloworld
+❯ pants publish src/docker/hw:helloworld
 # Will build the image and push it to all registries, with all tags.
 ```
 
@@ -332,7 +345,7 @@ Linting Dockerfiles with Hadolint
 Pants can run [Hadolint](https://github.com/hadolint/hadolint) on your Dockerfiles to check for errors and mistakes:
 
 ```
-❯ ./pants lint src/docker/hw/Dockerfile
+❯ pants lint src/docker/hw/Dockerfile
 ```
 
 This must first be enabled by activating the Hadolint backend:

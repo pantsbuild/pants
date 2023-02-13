@@ -16,9 +16,11 @@ from pants.core.goals.export import (
     ExportRequest,
     ExportResult,
     ExportResults,
+    ExportSubsystem,
     PostProcessingCommand,
     export,
 )
+from pants.core.goals.generate_lockfiles import KnownUserResolveNames, KnownUserResolveNamesRequest
 from pants.core.util_rules.distdir import DistDir
 from pants.core.util_rules.environments import (
     EnvironmentField,
@@ -34,7 +36,7 @@ from pants.engine.process import InteractiveProcess, InteractiveProcessResult
 from pants.engine.rules import QueryRule
 from pants.engine.target import Target, Targets
 from pants.engine.unions import UnionMembership, UnionRule
-from pants.testutil.option_util import create_options_bootstrapper
+from pants.testutil.option_util import create_options_bootstrapper, create_subsystem
 from pants.testutil.rule_runner import (
     MockEffect,
     MockGet,
@@ -99,6 +101,7 @@ def run_export_rule(rule_runner: RuleRunner, targets: List[Target]) -> Tuple[int
                 union_membership,
                 BuildRoot(),
                 DistDir(relpath=Path("dist")),
+                create_subsystem(ExportSubsystem, resolve=[]),
             ],
             mock_gets=[
                 MockGet(
@@ -129,6 +132,7 @@ def run_export_rule(rule_runner: RuleRunner, targets: List[Target]) -> Tuple[int
                 rule_runner.do_not_use_mock(Digest, (MergeDigests,)),
                 rule_runner.do_not_use_mock(Digest, (AddPrefix,)),
                 rule_runner.do_not_use_mock(EnvironmentVars, (EnvironmentVarsRequest,)),
+                rule_runner.do_not_use_mock(KnownUserResolveNames, (KnownUserResolveNamesRequest,)),
                 MockEffect(
                     output_type=InteractiveProcessResult,
                     input_types=(InteractiveProcess,),
@@ -230,6 +234,7 @@ def test_warnings_for_non_local_target_environments(
                 union_membership,
                 BuildRoot(),
                 DistDir(relpath=Path("dist")),
+                create_subsystem(ExportSubsystem, resolve=[]),
             ],
             mock_gets=[
                 MockGet(
@@ -253,6 +258,7 @@ def test_warnings_for_non_local_target_environments(
                 ),
                 rule_runner.do_not_use_mock(Digest, (AddPrefix,)),
                 rule_runner.do_not_use_mock(EnvironmentVars, (EnvironmentVarsRequest,)),
+                rule_runner.do_not_use_mock(KnownUserResolveNames, (KnownUserResolveNamesRequest,)),
                 MockEffect(
                     output_type=InteractiveProcessResult,
                     input_types=(InteractiveProcess,),

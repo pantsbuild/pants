@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import enum
-import importlib
 import logging
 import os
 import re
@@ -167,9 +166,14 @@ class AuthPluginResult:
             if addr and not any(addr.startswith(scheme) for scheme in valid_schemes):
                 name = self.plugin_name or ""
                 raise ValueError(
-                    f"Invalid `{field_name}` in `AuthPluginResult` returned from "
-                    f"`[GLOBAL].remote_auth_plugin` {name}. Must start with `grpc://` or `grpcs://`, but was "
-                    f"{addr}."
+                    softwrap(
+                        f"""
+                        Invalid `{field_name}` in `AuthPluginResult` returned from
+                        `[GLOBAL].remote_auth_plugin` {name}.
+
+                        Must start with `grpc://` or `grpcs://`, but was {addr}.
+                        """
+                    )
                 )
 
         assert_valid_address(self.store_address, "store_address")
@@ -202,13 +206,21 @@ class DynamicRemoteOptions:
             return
         if self.cache_read:
             raise OptionsError(
-                "The `[GLOBAL].remote_cache_read` option requires also setting the"
-                "`[GLOBAL].remote_store_address` option in order to work properly."
+                softwrap(
+                    """
+                    The `[GLOBAL].remote_cache_read` option requires also setting the
+                    `[GLOBAL].remote_store_address` option in order to work properly.
+                    """
+                )
             )
         if self.cache_write:
             raise OptionsError(
-                "The `[GLOBAL].remote_cache_write` option requires also setting the "
-                "`[GLOBAL].remote_store_address` option in order to work properly."
+                softwrap(
+                    """
+                    The `[GLOBAL].remote_cache_write` option requires also setting the
+                    `[GLOBAL].remote_store_address` option in order to work properly.
+                    """
+                )
             )
 
     def _validate_exec_addr(self) -> None:
@@ -216,13 +228,21 @@ class DynamicRemoteOptions:
             return
         if not self.execution_address:
             raise OptionsError(
-                "The `[GLOBAL].remote_execution` option requires also setting the "
-                "`[GLOBAL].remote_execution_address` option in order to work properly."
+                softwrap(
+                    """
+                    The `[GLOBAL].remote_execution` option requires also setting the
+                    `[GLOBAL].remote_execution_address` option in order to work properly.
+                    """
+                )
             )
         if not self.store_address:
             raise OptionsError(
-                "The `[GLOBAL].remote_execution_address` option requires also setting the "
-                "`[GLOBAL].remote_store_address` option. Often these have the same value."
+                softwrap(
+                    """
+                    The `[GLOBAL].remote_execution_address` option requires also setting the
+                    `[GLOBAL].remote_store_address` option. Often these have the same value.
+                    """
+                )
             )
 
     def __post_init__(self) -> None:
@@ -247,30 +267,18 @@ class DynamicRemoteOptions:
         )
 
     @classmethod
-    def _get_auth_plugin_from_option(cls, remote_auth_plugin_option_value: str) -> Callable:
-        if ":" not in remote_auth_plugin_option_value:
-            raise OptionsError(
-                "Invalid value for `--remote-auth-plugin`: "
-                f"{remote_auth_plugin_option_value}. Please use the format "
-                "`path.to.module:my_func`."
-            )
-        auth_plugin_path, auth_plugin_func = remote_auth_plugin_option_value.split(":")
-        auth_plugin_module = importlib.import_module(auth_plugin_path)
-        return cast(Callable, getattr(auth_plugin_module, auth_plugin_func))
-
-    @classmethod
     def _use_oauth_token(cls, bootstrap_options: OptionValueContainer) -> DynamicRemoteOptions:
         oauth_token = (
             Path(bootstrap_options.remote_oauth_bearer_token_path).resolve().read_text().strip()
         )
         if set(oauth_token).intersection({"\n", "\r"}):
             raise OptionsError(
-                f"OAuth bearer token path {bootstrap_options.remote_oauth_bearer_token_path} "
-                "must not contain multiple lines."
-            )
-        if bootstrap_options.remote_auth_plugin:
-            raise OptionsError(
-                "OAuth bearer token path can not be used when setting the `[GLOBAL].remote_auth_plugin` option"
+                softwrap(
+                    f"""
+                    OAuth bearer token path {bootstrap_options.remote_oauth_bearer_token_path}
+                    must not contain multiple lines.
+                    """
+                )
             )
 
         token_header = {"authorization": f"Bearer {oauth_token}"}
@@ -318,22 +326,24 @@ class DynamicRemoteOptions:
         cache_write = cast(bool, bootstrap_options.remote_cache_write)
         if not (execution or cache_read or cache_write):
             return cls.disabled(), None
-        if (
-            bootstrap_options.remote_auth_plugin
-            and bootstrap_options.remote_oauth_bearer_token_path
-        ):
+        if remote_auth_plugin_func and bootstrap_options.remote_oauth_bearer_token_path:
             raise OptionsError(
-                "Both `[GLOBAL].remote_auth_plugin` and `[GLOBAL].remote_auth_plugin` `[GLOBAL].remote_oauth_bearer_token_path` are set. This is not supported. Only one of those should be set in order to provide auth information for remote cache."
+                softwrap(
+                    f"""
+                    Both `{remote_auth_plugin_func}` and `[GLOBAL].remote_oauth_bearer_token_path` are set.
+                    This is not supported. Only one of those should be set in order to provide auth information.
+                    """
+                )
             )
         if bootstrap_options.remote_oauth_bearer_token_path:
             return cls._use_oauth_token(bootstrap_options), None
-        if bootstrap_options.remote_auth_plugin or remote_auth_plugin_func is not None:
+        if remote_auth_plugin_func is not None:
             return cls._use_auth_plugin(
                 bootstrap_options,
                 full_options=full_options,
                 env=env,
                 prior_result=prior_result,
-                remote_auth_plugin_func_from_entry_point=remote_auth_plugin_func,
+                remote_auth_plugin_func=remote_auth_plugin_func,
             )
         return cls._use_no_auth(bootstrap_options), None
 
@@ -373,19 +383,8 @@ class DynamicRemoteOptions:
         full_options: Options,
         env: CompleteEnvironmentVars,
         prior_result: AuthPluginResult | None,
-        remote_auth_plugin_func_from_entry_point: Callable | None,
+        remote_auth_plugin_func: Callable,
     ) -> tuple[DynamicRemoteOptions, AuthPluginResult | None]:
-        if not remote_auth_plugin_func_from_entry_point:
-            remote_auth_plugin_func = cls._get_auth_plugin_from_option(
-                bootstrap_options.remote_auth_plugin
-            )
-        else:
-            remote_auth_plugin_func = remote_auth_plugin_func_from_entry_point
-            if bootstrap_options.remote_auth_plugin:
-                raise OptionsError(
-                    "remote auth plugin already provided via entry point of a plugin. `[GLOBAL].remote_auth_plugin` should not be specified in options."
-                )
-
         execution = cast(bool, bootstrap_options.remote_execution)
         cache_read = cast(bool, bootstrap_options.remote_cache_read)
         cache_write = cast(bool, bootstrap_options.remote_cache_write)
@@ -410,7 +409,6 @@ class DynamicRemoteOptions:
         )
         plugin_name = (
             auth_plugin_result.plugin_name
-            or bootstrap_options.remote_auth_plugin
             or f"{remote_auth_plugin_func.__module__}.{remote_auth_plugin_func.__name__}"
         )
         if not auth_plugin_result.is_available:
@@ -421,7 +419,7 @@ class DynamicRemoteOptions:
             return cls.disabled(), None
 
         logger.debug(
-            f"`[GLOBAL].remote_auth_plugin` {plugin_name} succeeded. Remote caching/execution will be attempted."
+            f"Remote auth plugin `{plugin_name}` succeeded. Remote caching/execution will be attempted."
         )
         execution_headers = auth_plugin_result.execution_headers
         store_headers = auth_plugin_result.store_headers
@@ -513,6 +511,8 @@ class ExecutionOptions:
     remote_execution_overall_deadline_secs: int
     remote_execution_rpc_concurrency: int
 
+    remote_execution_append_only_caches_base_path: str | None
+
     @classmethod
     def from_options(
         cls,
@@ -555,6 +555,7 @@ class ExecutionOptions:
             remote_execution_headers=dynamic_remote_options.execution_headers,
             remote_execution_overall_deadline_secs=bootstrap_options.remote_execution_overall_deadline_secs,
             remote_execution_rpc_concurrency=dynamic_remote_options.execution_rpc_concurrency,
+            remote_execution_append_only_caches_base_path=bootstrap_options.remote_execution_append_only_caches_base_path,
         )
 
 
@@ -642,6 +643,7 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     },
     remote_execution_overall_deadline_secs=60 * 60,  # one hour
     remote_execution_rpc_concurrency=128,
+    remote_execution_append_only_caches_base_path=None,
 )
 
 DEFAULT_LOCAL_STORE_OPTIONS = LocalStoreOptions()
@@ -775,8 +777,12 @@ class BootstrapOptions:
     pants_bin_name = StrOption(
         advanced=True,
         default="./pants",  # noqa: PANTSBIN
-        help="The name of the script or binary used to invoke Pants. "
-        "Useful when printing help messages.",
+        help=softwrap(
+            """
+            The name of the script or binary used to invoke Pants.
+            Useful when printing help messages.
+            """
+        ),
     )
     pants_workdir = StrOption(
         advanced=True,
@@ -1357,7 +1363,8 @@ class BootstrapOptions:
             This is used by some remote servers for routing. Consult your remote server for
             whether this should be set.
 
-            You can also use `[GLOBAL].remote_auth_plugin` to provide a plugin to dynamically set this value.
+            You can also use a Pants plugin which provides remote authentication to dynamically
+            set this value.
             """
         ),
     )
@@ -1386,52 +1393,6 @@ class BootstrapOptions:
             You can also manually add this header via `[GLOBAL].remote_execution_headers` and
             `[GLOBAL].remote_store_headers`, or use `[GLOBAL].remote_auth_plugin` to provide a plugin to
             dynamically set the relevant headers. Otherwise, no authorization will be performed.
-            """
-        ),
-    )
-    remote_auth_plugin = StrOption(
-        default=None,
-        advanced=True,
-        deprecation_start_version="2.15.0.dev2",
-        removal_version="2.16.0.dev1",
-        removal_hint=softwrap(
-            """
-            Remote auth plugins should now provide the function by implementing an entry point called remote_auth.
-
-            If you are developing a plugin, switch to using an entry point.
-
-            If you are only consuming a plugin from someone else, you can delete the remote_auth_plugin option
-            and now only need the plugin to be included in [GLOBAL].plugins
-            """
-        ),
-        help=softwrap(
-            """
-            Path to a plugin to dynamically configure remote caching and execution options.
-
-            Format: `path.to.module:my_func`. Pants will import your module and run your
-            function. Update the `--pythonpath` option to ensure your file is loadable.
-
-            The function should take the kwargs `initial_store_headers: dict[str, str]`,
-            `initial_execution_headers: dict[str, str]`, `options: Options` (from
-            pants.option.options), `env: dict[str, str]`, and
-            `prior_result: AuthPluginResult | None`. It should return an instance of
-            `AuthPluginResult` from `pants.option.global_options`.
-
-            Pants will replace the headers it would normally use with whatever your plugin
-            returns; usually, you should include the `initial_store_headers` and
-            `initial_execution_headers` in your result so that options like
-            `[GLOBAL].remote_store_headers` still work.
-
-            If you return `instance_name`, Pants will replace `[GLOBAL].remote_instance_name`
-            with this value.
-
-            If the returned auth state is `AuthPluginState.UNAVAILABLE`, Pants will disable
-            remote caching and execution.
-
-            If Pantsd is in use, `prior_result` will be the previous
-            `AuthPluginResult` returned by your plugin, which allows you to reuse the result.
-            Otherwise, if Pantsd has been restarted or is not used, the `prior_result` will
-            be `None`.
             """
         ),
     )
@@ -1548,6 +1509,18 @@ class BootstrapOptions:
         advanced=True,
         default=DEFAULT_EXECUTION_OPTIONS.remote_execution_rpc_concurrency,
         help="The number of concurrent requests allowed to the remote execution service.",
+    )
+    remote_execution_append_only_caches_base_path = StrOption(
+        default=None,
+        advanced=True,
+        help=softwrap(
+            """
+            Sets the base path to use when setting up an append-only cache for a process running remotely.
+            If this option is not set, then append-only caches will not be used with remote execution.
+            The option should be set to the absolute path of a writable directory in the remote execution
+            environment where Pants can create append-only caches for use with remotely executing processes.
+            """
+        ),
     )
     watch_filesystem = BoolOption(
         default=True,
@@ -1760,8 +1733,12 @@ class GlobalOptions(BootstrapOptions, Subsystem):
             # TODO: This is a defense against deadlocks due to #11329: we only run one `@goal_rule`
             # at a time, and a `@goal_rule` will only block one thread.
             raise OptionsError(
-                "--rule-threads-core values less than 2 are not supported, but it was set to "
-                f"{opts.rule_threads_core}."
+                softwrap(
+                    f"""
+                    --rule-threads-core values less than 2 are not supported, but it was set to
+                    {opts.rule_threads_core}.
+                    """
+                )
             )
 
         if (
@@ -1783,8 +1760,12 @@ class GlobalOptions(BootstrapOptions, Subsystem):
 
         if not opts.watch_filesystem and (opts.pantsd or opts.loop):
             raise OptionsError(
-                "The `--no-watch-filesystem` option may not be set if "
-                "`--pantsd` or `--loop` is set."
+                softwrap(
+                    """
+                    The `--no-watch-filesystem` option may not be set if
+                    `--pantsd` or `--loop` is set.
+                    """
+                )
             )
 
         def validate_remote_address(opt_name: str) -> None:
@@ -1792,8 +1773,12 @@ class GlobalOptions(BootstrapOptions, Subsystem):
             address = getattr(opts, opt_name)
             if address and not any(address.startswith(scheme) for scheme in valid_schemes):
                 raise OptionsError(
-                    f"The `{opt_name}` option must begin with one of {valid_schemes}, but "
-                    f"was {address}."
+                    softwrap(
+                        f"""
+                        The `{opt_name}` option must begin with one of {valid_schemes}, but
+                        was {address}.
+                        """
+                    )
                 )
 
         validate_remote_address("remote_execution_address")
@@ -1805,13 +1790,21 @@ class GlobalOptions(BootstrapOptions, Subsystem):
             for k, v in getattr(opts, opt_name).items():
                 if not k.isascii():
                     raise OptionsError(
-                        f"All values in `{command_line_opt_name}` must be ASCII, but the key "
-                        f"in `{k}: {v}` has non-ASCII characters."
+                        softwrap(
+                            f"""
+                            All values in `{command_line_opt_name}` must be ASCII, but the key
+                            in `{k}: {v}` has non-ASCII characters.
+                            """
+                        )
                     )
                 if not v.isascii():
                     raise OptionsError(
-                        f"All values in `{command_line_opt_name}` must be ASCII, but the value in "
-                        f"`{k}: {v}` has non-ASCII characters."
+                        softwrap(
+                            f"""
+                            All values in `{command_line_opt_name}` must be ASCII, but the value in
+                            `{k}: {v}` has non-ASCII characters.
+                            """
+                        )
                     )
 
         validate_remote_headers("remote_execution_headers")
@@ -1820,8 +1813,12 @@ class GlobalOptions(BootstrapOptions, Subsystem):
         illegal_build_ignores = [i for i in opts.build_ignore if i.startswith("!")]
         if illegal_build_ignores:
             raise OptionsError(
-                "The `--build-ignore` option does not support negated globs, but was "
-                f"given: {illegal_build_ignores}."
+                softwrap(
+                    f"""
+                    The `--build-ignore` option does not support negated globs, but was
+                    given: {illegal_build_ignores}.
+                    """
+                )
             )
 
     @staticmethod

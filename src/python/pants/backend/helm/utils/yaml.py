@@ -11,11 +11,9 @@ from typing import Any, Callable, Generic, Iterable, Iterator, Mapping, Optional
 
 from pants.engine.collection import Collection
 from pants.util.frozendict import FrozenDict
-from pants.util.meta import frozen_after_init
 
 
 @dataclass(unsafe_hash=True)
-@frozen_after_init
 class YamlPath:
     """Simple implementation of YAML paths using `/` syntax and being the single slash the path to
     the root."""
@@ -24,8 +22,8 @@ class YamlPath:
     _absolute: bool
 
     def __init__(self, elements: Iterable[str], *, absolute: bool) -> None:
-        self._elements = tuple(elements)
-        self._absolute = absolute
+        object.__setattr__(self, "_elements", tuple(elements))
+        object.__setattr__(self, "_absolute", absolute)
 
         if len(self._elements) == 0 and not self._absolute:
             raise ValueError("Relative YAML paths with no elements are not allowed.")
@@ -181,7 +179,7 @@ class _YamlDocumentIndexNode(Generic[T]):
         return {"paths": items_dict}
 
 
-@frozen_after_init
+@dataclass(frozen=True)
 class FrozenYamlIndex(Generic[T]):
     """Represents a frozen collection of items that is indexed by the following keys:
 
@@ -204,7 +202,7 @@ class FrozenYamlIndex(Generic[T]):
                 doc_list[idx] = _YamlDocumentIndexNode(paths=FrozenDict(item_map))
 
             data[file_path] = Collection(doc_list)
-        self._data = FrozenDict(data)
+        object.__setattr__(self, "_data", FrozenDict(data))
 
     def transform_values(self, func: Callable[[T], Optional[R]]) -> FrozenYamlIndex[R]:
         """Transforms the values of the given indexed collection into those that are returned from

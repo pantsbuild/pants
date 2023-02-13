@@ -23,6 +23,7 @@ from pants.backend.python.target_types import (
     GenerateSetupField,
     LongDescriptionPathField,
     PythonDistributionEntryPointsField,
+    PythonDistributionOutputPathField,
     PythonGeneratingSourcesBase,
     PythonProvidesField,
     PythonRequirementsField,
@@ -90,8 +91,7 @@ from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_property
-from pants.util.meta import frozen_after_init
-from pants.util.ordered_set import FrozenOrderedSet
+from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
@@ -212,8 +212,7 @@ class DistBuildChrootRequest:
     interpreter_constraints: InterpreterConstraints
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class SetupKwargs:
     """The keyword arguments to the `setup()` function in the generated `setup.py`."""
 
@@ -255,7 +254,11 @@ class SetupKwargs:
         # would require that all values are immutable, and we may have lists and dictionaries as
         # values. It's too difficult/clunky to convert those all, then to convert them back out of
         # `FrozenDict`. We don't use JSON because it does not preserve data types like `tuple`.
-        self._pickled_bytes = pickle.dumps({k: v for k, v in sorted(kwargs.items())}, protocol=4)
+        object.__setattr__(
+            self,
+            "_pickled_bytes",
+            pickle.dumps({k: v for k, v in sorted(kwargs.items())}, protocol=4),
+        )
 
     @memoized_property
     def kwargs(self) -> dict[str, Any]:
@@ -292,8 +295,10 @@ class SetupKwargsRequest(ABC):
         """Whether the kwargs implementation should be used for this target or not."""
 
     @property
-    def explicit_kwargs(self) -> dict[str, Any]:
-        return self.target[PythonProvidesField].value.kwargs
+    def explicit_kwargs(self) -> Dict[str, Any]:
+        # We return a dict copy of the underlying FrozenDict, because the caller expects a
+        # dict (and we have documented as much).
+        return dict(self.target[PythonProvidesField].value.kwargs)
 
 
 class FinalizedSetupKwargs(SetupKwargs):
@@ -499,6 +504,10 @@ async def package_python_dist(
     working_directory = os.path.join(chroot_prefix, chroot.working_directory)
     prefixed_input = await Get(Digest, AddPrefix(input_digest, chroot_prefix))
     build_system = await Get(BuildSystem, BuildSystemRequest(prefixed_input, working_directory))
+    output_path = dist_tgt.get(PythonDistributionOutputPathField).value
+    assert (
+        output_path is not None
+    ), "output_path should take a default string value if the user has not provided it."
 
     setup_py_result = await Get(
         DistBuildResult,
@@ -515,6 +524,7 @@ async def package_python_dist(
             sdist_config_settings=sdist_config_settings,
             extra_build_time_requirements=extra_build_time_requirements,
             extra_build_time_env=extra_build_time_env,
+            output_path=output_path,
         ),
     )
     dist_snapshot = await Get(Snapshot, Digest, setup_py_result.output)
@@ -860,6 +870,15 @@ async def get_requirements(
     direct_deps_tgts = await MultiGet(
         Get(Targets, DependenciesRequest(tgt.get(Dependencies))) for tgt in owned_by_us
     )
+    direct_deps_chained = OrderedSet(itertools.chain.from_iterable(direct_deps_tgts))
+    # If a python_requirement T has an undeclared requirement R, we recommend fixing that by adding
+    # an explicit dependency from T to a python_requirement target for R. In that case we want to
+    # represent these explicit deps in T's distribution metadata. See issue #17593.
+    transitive_explicit_reqs = await MultiGet(
+        Get(TransitiveTargets, TransitiveTargetsRequest([tgt.address]))
+        for tgt in direct_deps_chained
+        if tgt.has_field(PythonRequirementsField)
+    )
 
     transitive_excludes: FrozenOrderedSet[Target] = FrozenOrderedSet()
     uneval_trans_excl = [
@@ -873,7 +892,9 @@ async def get_requirements(
             itertools.chain.from_iterable(excludes for excludes in nested_trans_excl)
         )
 
-    direct_deps_chained = FrozenOrderedSet(itertools.chain.from_iterable(direct_deps_tgts))
+    direct_deps_chained.update(
+        itertools.chain.from_iterable(t.dependencies for t in transitive_explicit_reqs)
+    )
     direct_deps_with_excl = direct_deps_chained.difference(transitive_excludes)
 
     req_strs = list(

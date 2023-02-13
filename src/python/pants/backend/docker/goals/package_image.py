@@ -2,13 +2,16 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
+import json
 import logging
 import os
 import re
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from functools import partial
 from itertools import chain
 from typing import Iterator, cast
+
+from typing_extensions import Literal
 
 # Re-exporting BuiltDockerImage here, as it has its natural home here, but has moved out to resolve
 # a dependency cycle from docker_build_context.
@@ -34,9 +37,9 @@ from pants.backend.docker.util_rules.docker_build_context import (
     DockerBuildContextRequest,
 )
 from pants.backend.docker.utils import format_rename_suggestion
-from pants.core.goals.package import BuiltPackage, PackageFieldSet
-from pants.core.goals.run import RunFieldSet
+from pants.core.goals.package import BuiltPackage, OutputPathField, PackageFieldSet
 from pants.engine.addresses import Address
+from pants.engine.fs import CreateDigest, Digest, FileContent
 from pants.engine.process import FallibleProcessResult, Process, ProcessExecutionFailure
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import Target, WrappedTarget, WrappedTargetRequest
@@ -65,7 +68,7 @@ class DockerImageOptionValueError(ValueError):
 
 
 @dataclass(frozen=True)
-class DockerFieldSet(PackageFieldSet, RunFieldSet):
+class DockerPackageFieldSet(PackageFieldSet):
     required_fields = (DockerImageSourceField,)
 
     context_root: DockerImageContextRootField
@@ -74,6 +77,7 @@ class DockerFieldSet(PackageFieldSet, RunFieldSet):
     source: DockerImageSourceField
     tags: DockerImageTagsField
     target_stage: DockerImageTargetStageField
+    output_path: OutputPathField
 
     def format_tag(self, tag: str, interpolation_context: InterpolationContext) -> str:
         source = InterpolationContext.TextSource(
@@ -114,15 +118,20 @@ class DockerFieldSet(PackageFieldSet, RunFieldSet):
             repository_text, source=source, error_cls=DockerRepositoryNameError
         ).lower()
 
-    def format_names(
+    def format_image_ref_tags(
         self,
         repository: str,
         tags: tuple[str, ...],
         interpolation_context: InterpolationContext,
-    ) -> Iterator[str]:
+        uses_local_alias,
+    ) -> Iterator[ImageRefTag]:
         for tag in tags:
-            yield ":".join(
-                s for s in [repository, self.format_tag(tag, interpolation_context)] if s
+            formatted = self.format_tag(tag, interpolation_context)
+            yield ImageRefTag(
+                template=tag,
+                formatted=formatted,
+                full_name=":".join(s for s in [repository, formatted] if s),
+                uses_local_alias=uses_local_alias,
             )
 
     def image_refs(
@@ -131,15 +140,19 @@ class DockerFieldSet(PackageFieldSet, RunFieldSet):
         registries: DockerRegistries,
         interpolation_context: InterpolationContext,
         additional_tags: tuple[str, ...] = (),
-    ) -> tuple[str, ...]:
-        """The image refs are the full image name, including any registry and version tag.
+    ) -> Iterator[ImageRefRegistry]:
+        """The per-registry image refs: each returned element is a collection of the tags applied to
+        the image in a single registry.
 
         In the Docker world, the term `tag` is used both for what we here prefer to call the image
         `ref`, as well as for the image version, or tag, that is at the end of the image name
         separated with a colon. By introducing the image `ref` we can retain the use of `tag` for
         the version part of the image name.
 
-        Returns all image refs to apply to the Docker image, on the form:
+        This function returns all image refs to apply to the Docker image, grouped by
+        registry. Within each registry, the `tags` attribute contains a metadata about each tag in
+        the context of that registry, and the `full_name` attribute of each `ImageRefTag` provides
+        the image ref, of the following form:
 
             [<registry>/]<repository-name>[:<tag>]
 
@@ -147,24 +160,55 @@ class DockerFieldSet(PackageFieldSet, RunFieldSet):
         the `default_repository` from configuration or the `repository` field on the target
         `docker_image`.
 
-        This method will always return a non-empty tuple.
+        This method will always return at least one `ImageRefRegistry`, and there will be at least
+        one tag.
         """
         image_tags = (self.tags.value or ()) + additional_tags
         registries_options = tuple(registries.get(*(self.registries.value or [])))
         if not registries_options:
             # The image name is also valid as image ref without registry.
             repository = self.format_repository(default_repository, interpolation_context)
-            return tuple(self.format_names(repository, image_tags, interpolation_context))
-
-        return tuple(
-            "/".join([registry.address, image_name])
-            for registry in registries_options
-            for image_name in self.format_names(
-                self.format_repository(default_repository, interpolation_context, registry),
-                image_tags + registry.extra_image_tags,
-                interpolation_context,
+            yield ImageRefRegistry(
+                registry=None,
+                repository=repository,
+                tags=tuple(
+                    self.format_image_ref_tags(
+                        repository, image_tags, interpolation_context, uses_local_alias=False
+                    )
+                ),
             )
-        )
+            return
+
+        for registry in registries_options:
+            repository = self.format_repository(default_repository, interpolation_context, registry)
+            address_repository = "/".join([registry.address, repository])
+            if registry.use_local_alias and registry.alias:
+                alias_repository = "/".join([registry.alias, repository])
+            else:
+                alias_repository = None
+
+            yield ImageRefRegistry(
+                registry=registry,
+                repository=repository,
+                tags=(
+                    *self.format_image_ref_tags(
+                        address_repository,
+                        image_tags + registry.extra_image_tags,
+                        interpolation_context,
+                        uses_local_alias=False,
+                    ),
+                    *(
+                        self.format_image_ref_tags(
+                            alias_repository,
+                            image_tags + registry.extra_image_tags,
+                            interpolation_context,
+                            uses_local_alias=True,
+                        )
+                        if alias_repository
+                        else []
+                    ),
+                ),
+            )
 
     def get_context_root(self, default_context_root: str) -> str:
         """Examines `default_context_root` and `self.context_root.value` and translates that to a
@@ -187,9 +231,85 @@ class DockerFieldSet(PackageFieldSet, RunFieldSet):
         return os.path.normpath(context_root)
 
 
+@dataclass(frozen=True)
+class ImageRefRegistry:
+    registry: DockerRegistryOptions | None
+    repository: str
+    tags: tuple[ImageRefTag, ...]
+
+
+@dataclass(frozen=True)
+class ImageRefTag:
+    template: str
+    formatted: str
+    full_name: str
+    uses_local_alias: bool
+
+
+@dataclass(frozen=True)
+class DockerInfoV1:
+    """The format of the `$target_name.docker-info.json` file."""
+
+    version: Literal[1]
+    image_id: str
+    # It'd be good to include the digest here (e.g. to allow 'docker run
+    # registry/repository@digest'), but that is only known after pushing to a V2 registry
+
+    registries: list[DockerInfoV1Registry]
+
+    @staticmethod
+    def serialize(image_refs: tuple[ImageRefRegistry, ...], image_id: str) -> bytes:
+        # make sure these are in a consistent order (the exact order doesn't matter
+        # so much), no matter how they were configured
+        sorted_refs = sorted(image_refs, key=lambda r: r.registry.address if r.registry else "")
+
+        info = DockerInfoV1(
+            version=1,
+            image_id=image_id,
+            registries=[
+                DockerInfoV1Registry(
+                    alias=r.registry.alias if r.registry and r.registry.alias else None,
+                    address=r.registry.address if r.registry else None,
+                    repository=r.repository,
+                    tags=[
+                        DockerInfoV1ImageTag(
+                            template=t.template,
+                            tag=t.formatted,
+                            uses_local_alias=t.uses_local_alias,
+                            name=t.full_name,
+                        )
+                        # consistent order, as above
+                        for t in sorted(r.tags, key=lambda t: t.full_name)
+                    ],
+                )
+                for r in sorted_refs
+            ],
+        )
+
+        return json.dumps(asdict(info)).encode()
+
+
+@dataclass(frozen=True)
+class DockerInfoV1Registry:
+    # set if registry was specified as `@something`
+    alias: str | None
+    address: str | None
+    repository: str
+    tags: list[DockerInfoV1ImageTag]
+
+
+@dataclass(frozen=True)
+class DockerInfoV1ImageTag:
+    template: str
+    tag: str
+    uses_local_alias: bool
+    # for convenience, include the concatenated registry/repository:tag name (using this tag)
+    name: str
+
+
 def get_build_options(
     context: DockerBuildContext,
-    field_set: DockerFieldSet,
+    field_set: DockerPackageFieldSet,
     global_target_stage_option: str | None,
     target: Target,
 ) -> Iterator[str]:
@@ -234,7 +354,7 @@ def get_build_options(
 
 @rule
 async def build_docker_image(
-    field_set: DockerFieldSet,
+    field_set: DockerPackageFieldSet,
     options: DockerOptions,
     global_options: GlobalOptions,
     docker: DockerBinary,
@@ -263,12 +383,15 @@ async def build_docker_image(
         if image_tags_request_cls.is_applicable(wrapped_target.target)
     )
 
-    tags = field_set.image_refs(
-        default_repository=options.default_repository,
-        registries=options.registries(),
-        interpolation_context=context.interpolation_context,
-        additional_tags=tuple(chain.from_iterable(additional_image_tags)),
+    image_refs = tuple(
+        field_set.image_refs(
+            default_repository=options.default_repository,
+            registries=options.registries(),
+            interpolation_context=context.interpolation_context,
+            additional_tags=tuple(chain.from_iterable(additional_image_tags)),
+        )
     )
+    tags = tuple(tag.full_name for registry in image_refs for tag in registry.tags)
 
     # Mix the upstream image ids into the env to ensure that Pants invalidates this
     # image-building process correctly when an upstream image changes, even though the
@@ -330,9 +453,13 @@ async def build_docker_image(
     else:
         logger.debug(docker_build_output_msg)
 
+    metadata_filename = field_set.output_path.value_or_default(file_ending="docker-info.json")
+    metadata = DockerInfoV1.serialize(image_refs, image_id=image_id)
+    digest = await Get(Digest, CreateDigest([FileContent(metadata_filename, metadata)]))
+
     return BuiltPackage(
-        result.output_digest,
-        (BuiltDockerImage.create(image_id, tags),),
+        digest,
+        (BuiltDockerImage.create(image_id, tags, metadata_filename),),
     )
 
 
@@ -448,6 +575,5 @@ def format_docker_build_context_help_message(
 def rules():
     return [
         *collect_rules(),
-        UnionRule(PackageFieldSet, DockerFieldSet),
-        UnionRule(RunFieldSet, DockerFieldSet),
+        UnionRule(PackageFieldSet, DockerPackageFieldSet),
     ]

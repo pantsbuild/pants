@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import logging
 import re
 from textwrap import dedent
 from typing import cast
@@ -11,7 +12,9 @@ import pytest
 
 from pants.build_graph.address import BuildFileAddressRequest, MaybeAddress, ResolveError
 from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.core.target_types import GenericTarget
 from pants.engine.addresses import Address, AddressInput, BuildFileAddress
+from pants.engine.env_vars import CompleteEnvironmentVars, EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.fs import DigestContents, FileContent, PathGlobs
 from pants.engine.internals.build_files import (
     AddressFamilyDir,
@@ -21,9 +24,12 @@ from pants.engine.internals.build_files import (
     parse_address_family,
 )
 from pants.engine.internals.defaults import ParametrizeDefault
+from pants.engine.internals.dep_rules import MaybeBuildFileDependencyRulesImplementation
+from pants.engine.internals.mapper import AddressFamily
 from pants.engine.internals.parametrize import Parametrize
 from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser
 from pants.engine.internals.scheduler import ExecutionError
+from pants.engine.internals.session import SessionValues
 from pants.engine.internals.synthetic_targets import (
     SyntheticAddressMaps,
     SyntheticAddressMapsRequest,
@@ -38,6 +44,7 @@ from pants.engine.target import (
     Target,
 )
 from pants.engine.unions import UnionMembership
+from pants.testutil.pytest_util import assert_logged
 from pants.testutil.rule_runner import (
     MockGet,
     QueryRule,
@@ -46,6 +53,7 @@ from pants.testutil.rule_runner import (
     run_rule_with_mocks,
 )
 from pants.util.frozendict import FrozenDict
+from pants.util.strutil import softwrap
 
 
 def test_parse_address_family_empty() -> None:
@@ -55,7 +63,8 @@ def test_parse_address_family_empty() -> None:
         rule_args=[
             Parser(
                 build_root="",
-                target_type_aliases=[],
+                registered_target_types=RegisteredTargetTypes({}),
+                union_membership=UnionMembership({}),
                 object_aliases=BuildFileAliases(),
                 ignore_unrecognized_symbols=False,
             ),
@@ -64,6 +73,8 @@ def test_parse_address_family_empty() -> None:
             AddressFamilyDir("/dev/null"),
             RegisteredTargetTypes({}),
             UnionMembership({}),
+            MaybeBuildFileDependencyRulesImplementation(None),
+            SessionValues({CompleteEnvironmentVars: CompleteEnvironmentVars({})}),
         ],
         mock_gets=[
             MockGet(
@@ -81,6 +92,11 @@ def test_parse_address_family_empty() -> None:
                 input_types=(SyntheticAddressMapsRequest,),
                 mock=lambda _: SyntheticAddressMaps(),
             ),
+            MockGet(
+                output_type=EnvironmentVars,
+                input_types=(EnvironmentVarsRequest, CompleteEnvironmentVars),
+                mock=lambda _1, _2: EnvironmentVars({}),
+            ),
         ],
     )
     assert optional_af.path == "/dev/null"
@@ -97,7 +113,8 @@ def run_prelude_parsing_rule(prelude_content: str) -> BuildFilePreludeSymbols:
             BuildFileOptions((), prelude_globs=("prelude",)),
             Parser(
                 build_root="",
-                target_type_aliases=["target"],
+                registered_target_types=RegisteredTargetTypes({"target": GenericTarget}),
+                union_membership=UnionMembership({}),
                 object_aliases=BuildFileAliases(),
                 ignore_unrecognized_symbols=False,
             ),
@@ -178,7 +195,7 @@ class MockDepsField(Dependencies):
 
 
 class MockMultipleSourcesField(MultipleSourcesField):
-    pass
+    default = ("*.mock",)
 
 
 class MockTgt(Target):
@@ -374,6 +391,28 @@ def test_parametrize_defaults(target_adaptor_rule_runner: RuleRunner) -> None:
     assert target_adaptor.kwargs["tags"] == ParametrizeDefault(a=("a", "root"), b=("non-root", "b"))
 
 
+def test_augment_target_field_defaults(target_adaptor_rule_runner: RuleRunner) -> None:
+    target_adaptor_rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """
+                __defaults__(all=dict(tags=["default-tag"]))
+                mock_tgt(
+                  sources=["*.added", *mock_tgt.sources.default],
+                  tags=["custom-tag", *mock_tgt.tags.default],
+                )
+                """
+            ),
+        },
+    )
+    target_adaptor = target_adaptor_rule_runner.request(
+        TargetAdaptor,
+        [TargetAdaptorRequest(Address(""), description_of_origin="tests")],
+    )
+    assert target_adaptor.kwargs["sources"] == ["*.added", "*.mock"]
+    assert target_adaptor.kwargs["tags"] == ["custom-tag", "default-tag"]
+
+
 def test_target_adaptor_not_found(target_adaptor_rule_runner: RuleRunner) -> None:
     with pytest.raises(ExecutionError) as exc:
         target_adaptor_rule_runner.request(
@@ -426,7 +465,8 @@ def test_build_files_share_globals() -> None:
             BuildFileOptions((), prelude_globs=("prelude",)),
             Parser(
                 build_root="",
-                target_type_aliases=[],
+                registered_target_types=RegisteredTargetTypes({}),
+                union_membership=UnionMembership({}),
                 object_aliases=BuildFileAliases(),
                 ignore_unrecognized_symbols=False,
             ),
@@ -463,3 +503,96 @@ def test_build_files_share_globals() -> None:
     assert symbols.symbols["hello"].__globals__ is symbols.symbols["world"].__globals__
     assert "world" in symbols.symbols["hello"].__globals__
     assert "hello" in symbols.symbols["world"].__globals__
+
+
+def test_macro_undefined_symbol_bootstrap() -> None:
+    # Tests that an undefined symbol in a macro is ignored while bootstrapping. Ignoring undeclared
+    # symbols during parsing is insufficient, because we would need to re-evaluate the preludes after
+    # adding each additional undefined symbol to scope.
+    rule_runner = RuleRunner(
+        rules=[QueryRule(AddressFamily, [AddressFamilyDir])],
+        is_bootstrap=True,
+    )
+    rule_runner.write_files(
+        {
+            "prelude.py": dedent(
+                """
+                def uses_undefined():
+                    return this_is_undefined()
+                """
+            ),
+            "BUILD": dedent(
+                """
+                uses_undefined()
+                """
+            ),
+        }
+    )
+
+    # Parse the root BUILD file.
+    address_family = rule_runner.request(AddressFamily, [AddressFamilyDir("")])
+    assert not address_family.name_to_target_adaptors
+
+
+def test_build_file_env_vars(target_adaptor_rule_runner: RuleRunner) -> None:
+    target_adaptor_rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """
+                mock_tgt(
+                  description=env("MOCK_DESC"),
+                  tags=[
+                    env("DEF", "default"),
+                    env("TAG", "default"),
+                  ]
+                )
+                """
+            ),
+        },
+    )
+    target_adaptor_rule_runner.set_options([], env={"MOCK_DESC": "from env", "TAG": "tag"})
+    target_adaptor = target_adaptor_rule_runner.request(
+        TargetAdaptor,
+        [TargetAdaptorRequest(Address(""), description_of_origin="tests")],
+    )
+    assert target_adaptor.kwargs["description"] == "from env"
+    assert target_adaptor.kwargs["tags"] == ["default", "tag"]
+
+
+def test_invalid_build_file_env_vars(caplog, target_adaptor_rule_runner: RuleRunner) -> None:
+    target_adaptor_rule_runner.write_files(
+        {
+            "src/bad/BUILD": dedent(
+                """
+                DOES_NOT_WORK = "var_name1"
+                DO_THIS_INSTEAD = env("var_name2")
+
+                mock_tgt(description=env(DOES_NOT_WORK), tags=[DO_THIS_INSTEAD])
+                """
+            ),
+        },
+    )
+    target_adaptor_rule_runner.set_options(
+        [], env={"var_name1": "desc from env", "var_name2": "tag-from-env"}
+    )
+    target_adaptor = target_adaptor_rule_runner.request(
+        TargetAdaptor,
+        [TargetAdaptorRequest(Address("src/bad"), description_of_origin="tests")],
+    )
+    assert target_adaptor.kwargs["description"] is None
+    assert target_adaptor.kwargs["tags"] == ["tag-from-env"]
+    assert_logged(
+        caplog,
+        [
+            (
+                logging.WARNING,
+                softwrap(
+                    """
+                    src/bad/BUILD:5: Only constant string values as variable name to `env()` is
+                    currently supported. This `env()` call will always result in the default value
+                    only.
+                    """
+                ),
+            ),
+        ],
+    )

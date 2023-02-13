@@ -9,15 +9,18 @@ import urllib.parse
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Optional, Sequence, Union, cast
+from typing import Generic, Optional, Sequence, TypeVar, Union, cast
 
+from pants.core.goals import package
 from pants.core.goals.package import (
     BuiltPackage,
     BuiltPackageArtifact,
+    EnvironmentAwarePackageRequest,
     OutputPathField,
     PackageFieldSet,
 )
 from pants.core.util_rules.archive import ArchiveFormat, CreateArchive
+from pants.core.util_rules.archive import rules as archive_rules
 from pants.engine.addresses import Address, UnparsedAddressInputs
 from pants.engine.fs import (
     AddPrefix,
@@ -30,6 +33,7 @@ from pants.engine.fs import (
     RemovePrefix,
     Snapshot,
 )
+from pants.engine.platform import Platform
 from pants.engine.rules import Get, MultiGet, collect_rules, rule, rule_helper
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
@@ -59,17 +63,101 @@ from pants.engine.unions import UnionRule
 from pants.util.docutil import bin_name
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
-from pants.util.meta import frozen_after_init
 from pants.util.strutil import softwrap
+
+# -----------------------------------------------------------------------------------------------
+# `per_platform` object
+# -----------------------------------------------------------------------------------------------
+_T = TypeVar("_T")
+
+
+@dataclass(frozen=True)
+class per_platform(Generic[_T]):
+    """An object containing differing homogeneous platform-dependent values.
+
+    The values should be evaluated for the execution environment, and not the host environment
+    (I.e. it should be evaluated in a `rule` which requests `Platform`).
+
+    Expected usage is roughly:
+
+    ```python
+    class MyFieldType(...):
+        value = str | per_platform[str]
+
+        @classmethod
+        def compute_value(  # type: ignore[override]
+            cls,
+            raw_value: Optional[Union[str, per_platform[str]]],
+            address: Address,
+        ) -> Optional[Union[str, per_platform[str]]]:
+            if isinstance(raw_value, per_platform):
+                # NOTE: Ensure the values are homogenous
+                raw_value.check_types(str)
+
+            return raw_value
+
+    ...
+
+    @rule
+    async def my_rule(..., platform: Platform) -> ...:
+        field_value = target[MyFieldType].value
+
+        if isinstance(field_value, per_platform):
+            field_value = field_value.get_value_for_platform(platform)
+
+        ...
+    ```
+
+    NOTE: Support for this object should be heavily weighed, as it would be innaproriate to use in
+    certain contexts (such as the `source` field in a `foo_source` target, where the intent is to
+    support differing source files based on platform. The result would be that dependency inference
+    (and therefore the dependencies field) wouldn't be knowable on the host, which is not something
+    the engine can support yet).
+    """
+
+    linux_arm64: _T | None = None
+    linux_x86_64: _T | None = None
+    macos_arm64: _T | None = None
+    macos_x86_64: _T | None = None
+
+    def check_types(self, type_: type) -> None:
+        fields_and_values = [
+            (field.name, getattr(self, field.name)) for field in dataclasses.fields(self)
+        ]
+        fields_with_values = {name: value for name, value in fields_and_values if value is not None}
+        if not fields_with_values:
+            raise ValueError("`per_platform` must be given at least one platform value.")
+
+        bad_typed_fields = [
+            (name, type(value).__name__)
+            for name, value in fields_with_values.items()
+            if not isinstance(value, type_)
+        ]
+        if bad_typed_fields:
+            raise TypeError(
+                f"The following fields of a `per_platform` object were expected to be of type `{type_.__name__}`:"
+                + ' "'
+                + ", ".join(f"{name} of type '{typename}'" for name, typename in bad_typed_fields)
+                + '".'
+            )
+
+    def get_value_for_platform(self, platform: Platform) -> _T:
+        value = getattr(self, platform.value)
+        if value is None:
+            raise ValueError(
+                f"A request was made to resolve a `per_platform` on `{platform.value}`"
+                + " but the value was `None`. Please specify a value."
+            )
+        return cast("_T", value)
+
 
 # -----------------------------------------------------------------------------------------------
 # Asset target helpers
 # -----------------------------------------------------------------------------------------------
 
 
-@dataclass(unsafe_hash=True)
-@frozen_after_init
-class HTTPSource:
+@dataclass(frozen=True)
+class http_source:
     url: str
     len: int
     sha256: str
@@ -82,11 +170,16 @@ class HTTPSource:
             if not isinstance(value, getattr(builtins, cast(str, field.type))):
                 raise TypeError(f"`{field.name}` must be a `{field.type}`, got `{type(value)!r}`.")
 
-        self.url = url
-        self.len = len
-        self.sha256 = sha256
-        self.filename = filename or urllib.parse.urlparse(url).path.rsplit("/", 1)[-1]
+        object.__setattr__(self, "url", url)
+        object.__setattr__(self, "len", len)
+        object.__setattr__(self, "sha256", sha256)
+        object.__setattr__(
+            self, "filename", filename or urllib.parse.urlparse(url).path.rsplit("/", 1)[-1]
+        )
 
+        self.__post_init__()
+
+    def __post_init__(self):
         if not self.filename:
             raise ValueError(
                 softwrap(
@@ -104,7 +197,7 @@ class HTTPSource:
 
 
 class AssetSourceField(SingleSourceField):
-    value: str | HTTPSource  # type: ignore[assignment]
+    value: str | http_source | per_platform[http_source]  # type: ignore[assignment]
     # @TODO: Don't document http_source, link to it once https://github.com/pantsbuild/pants/issues/14832
     # is implemented.
     help = softwrap(
@@ -116,29 +209,52 @@ class AssetSourceField(SingleSourceField):
 
         If an http_source is provided, represents the network location to download the source from.
         The downloaded file will exist in the sandbox in the same directory as the target.
+
         `http_source` has the following signature:
+
             http_source(url: str, *, len: int, sha256: str, filename: str = "")
+
         The filename defaults to the last part of the URL path (E.g. `example.ext`), but can also be
         specified if you wish to have control over the file name. You cannot, however, specify a
         path separator to download the file into a subdirectory (you must declare a target in desired
         subdirectory).
+
         You can easily get the len and checksum with the following command:
+
             `curl -L $URL | tee >(wc -c) >(shasum -a 256) >/dev/null`
+
+        If a `per_platform` is provided, represents a mapping from platform to `http_source`, where
+        the platform is one of (linux_arm64, linux_x86_64, macos_arm64, macos_x86_64) and is
+        resolved in the execution target. Each `http_source` value MUST have the same filename provided.
         """
     )
 
     @classmethod
     def compute_value(  # type: ignore[override]
-        cls, raw_value: Optional[Union[str, HTTPSource]], address: Address
-    ) -> Optional[Union[str, HTTPSource]]:
+        cls,
+        raw_value: Optional[Union[str, http_source, per_platform[http_source]]],
+        address: Address,
+    ) -> Optional[Union[str, http_source, per_platform[http_source]]]:
         if raw_value is None or isinstance(raw_value, str):
             return super().compute_value(raw_value, address)
-        elif not isinstance(raw_value, HTTPSource):
+        elif isinstance(raw_value, per_platform):
+            raw_value.check_types(http_source)
+            value_as_dict = dataclasses.asdict(raw_value)
+            filenames = {
+                source["filename"] for source in value_as_dict.values() if source is not None
+            }
+            if len(filenames) > 1:
+                raise ValueError(
+                    "Every `http_source` in the `per_platform` must have the same `filename`,"
+                    + f" but found: {', '.join(sorted(filenames))}"
+                )
+
+        elif not isinstance(raw_value, http_source):
             raise InvalidFieldTypeException(
                 address,
                 cls.alias,
                 raw_value,
-                expected_type="a string or an `http_source` object",
+                expected_type="a string, an `http_source` object, or a `per_platform[http_source]` object.",
             )
         return raw_value
 
@@ -155,22 +271,37 @@ class AssetSourceField(SingleSourceField):
     @property
     def file_path(self) -> str:
         assert self.value
-        filename = self.value if isinstance(self.value, str) else self.value.filename
+        filename = (
+            self.value
+            if isinstance(self.value, str)
+            else self.value.filename
+            if isinstance(self.value, http_source)
+            else next(
+                source["filename"]
+                for source in dataclasses.asdict(self.value).values()
+                if source is not None
+            )
+        )
         return os.path.join(self.address.spec_path, filename)
 
 
 @rule_helper
-async def _hydrate_asset_source(request: GenerateSourcesRequest) -> GeneratedSources:
+async def _hydrate_asset_source(
+    request: GenerateSourcesRequest, platform: Platform
+) -> GeneratedSources:
     target = request.protocol_target
     source_field = target[AssetSourceField]
     if isinstance(source_field.value, str):
         return GeneratedSources(request.protocol_sources)
 
-    http_source = source_field.value
-    file_digest = FileDigest(http_source.sha256, http_source.len)
+    source = source_field.value
+    if isinstance(source, per_platform):
+        source = source.get_value_for_platform(platform)
+
+    file_digest = FileDigest(source.sha256, source.len)
     # NB: This just has to run, we don't actually need the result because we know the Digest's
     # FileEntry metadata.
-    await Get(Digest, DownloadFile(http_source.url, file_digest))
+    await Get(Digest, DownloadFile(source.url, file_digest))
     snapshot = await Get(
         Snapshot,
         CreateDigest(
@@ -218,8 +349,10 @@ class GenerateFileSourceRequest(GenerateSourcesRequest):
 
 
 @rule
-async def hydrate_file_source(request: GenerateFileSourceRequest) -> GeneratedSources:
-    return await _hydrate_asset_source(request)
+async def hydrate_file_source(
+    request: GenerateFileSourceRequest, platform: Platform
+) -> GeneratedSources:
+    return await _hydrate_asset_source(request, platform)
 
 
 class FilesGeneratingSourcesField(MultipleSourcesField):
@@ -437,8 +570,10 @@ class GenerateResourceSourceRequest(GenerateSourcesRequest):
 
 
 @rule
-async def hydrate_resource_source(request: GenerateResourceSourceRequest) -> GeneratedSources:
-    return await _hydrate_asset_source(request)
+async def hydrate_resource_source(
+    request: GenerateResourceSourceRequest, platform: Platform
+) -> GeneratedSources:
+    return await _hydrate_asset_source(request, platform)
 
 
 class ResourcesGeneratingSourcesField(MultipleSourcesField):
@@ -681,7 +816,7 @@ async def package_archive_target(field_set: ArchiveFieldSet) -> BuiltPackage:
         FieldSetsPerTarget, FieldSetsPerTargetRequest(PackageFieldSet, package_targets)
     )
     packages = await MultiGet(
-        Get(BuiltPackage, PackageFieldSet, field_set)
+        Get(BuiltPackage, EnvironmentAwarePackageRequest(field_set))
         for field_set in package_field_sets_per_target.field_sets
     )
 
@@ -767,6 +902,8 @@ class LockfilesGeneratorTarget(TargetFilesGenerator):
 def rules():
     return (
         *collect_rules(),
+        *archive_rules(),
+        *package.rules(),
         UnionRule(GenerateSourcesRequest, GenerateResourceSourceRequest),
         UnionRule(GenerateSourcesRequest, GenerateFileSourceRequest),
         UnionRule(GenerateSourcesRequest, RelocateFilesViaCodegenRequest),

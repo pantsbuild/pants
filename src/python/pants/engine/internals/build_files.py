@@ -3,12 +3,15 @@
 
 from __future__ import annotations
 
+import ast
 import builtins
 import itertools
+import logging
 import os.path
+import sys
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Any
+from typing import Any, Sequence, cast
 
 from pants.build_graph.address import (
     Address,
@@ -19,21 +22,35 @@ from pants.build_graph.address import (
     ResolveError,
 )
 from pants.engine.engine_aware import EngineAwareParameter
-from pants.engine.fs import DigestContents, GlobMatchErrorBehavior, PathGlobs, Paths
+from pants.engine.env_vars import CompleteEnvironmentVars, EnvironmentVars, EnvironmentVarsRequest
+from pants.engine.fs import DigestContents, FileContent, GlobMatchErrorBehavior, PathGlobs, Paths
 from pants.engine.internals.defaults import BuildFileDefaults, BuildFileDefaultsParserState
+from pants.engine.internals.dep_rules import (
+    BuildFileDependencyRules,
+    DependencyRuleApplication,
+    MaybeBuildFileDependencyRulesImplementation,
+)
 from pants.engine.internals.mapper import AddressFamily, AddressMap
 from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser, error_on_imports
+from pants.engine.internals.session import SessionValues
 from pants.engine.internals.synthetic_targets import (
     SyntheticAddressMaps,
     SyntheticAddressMapsRequest,
 )
 from pants.engine.internals.target_adaptor import TargetAdaptor, TargetAdaptorRequest
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import RegisteredTargetTypes
+from pants.engine.rules import Get, MultiGet, collect_rules, rule, rule_helper
+from pants.engine.target import (
+    DependenciesRuleApplication,
+    DependenciesRuleApplicationRequest,
+    RegisteredTargetTypes,
+)
 from pants.engine.unions import UnionMembership
+from pants.init.bootstrap_scheduler import BootstrapStatus
 from pants.option.global_options import GlobalOptions
 from pants.util.frozendict import FrozenDict
 from pants.util.strutil import softwrap
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -44,11 +61,16 @@ class BuildFileOptions:
 
 
 @rule
-def extract_build_file_options(global_options: GlobalOptions) -> BuildFileOptions:
+def extract_build_file_options(
+    global_options: GlobalOptions,
+    bootstrap_status: BootstrapStatus,
+) -> BuildFileOptions:
     return BuildFileOptions(
         patterns=global_options.build_patterns,
         ignores=global_options.build_ignore,
-        prelude_globs=global_options.build_file_prelude_globs,
+        prelude_globs=(
+            () if bootstrap_status.in_progress else global_options.build_file_prelude_globs
+        ),
     )
 
 
@@ -143,12 +165,71 @@ class OptionalAddressFamily:
     path: str
     address_family: AddressFamily | None = None
 
+    def ensure(self) -> AddressFamily:
+        if self.address_family is not None:
+            return self.address_family
+        raise ResolveError(f"Directory '{self.path}' does not contain any BUILD files.")
+
 
 @rule
 async def ensure_address_family(request: OptionalAddressFamily) -> AddressFamily:
-    if request.address_family is None:
-        raise ResolveError(f"Directory '{request.path}' does not contain any BUILD files.")
-    return request.address_family
+    return request.ensure()
+
+
+class BUILDFileEnvVarExtractor(ast.NodeVisitor):
+    def __init__(self, filename: str):
+        super().__init__()
+        self.env_vars: set[str] = set()
+        self.filename = filename
+
+    @classmethod
+    def get_env_vars(cls, file_content: FileContent) -> Sequence[str]:
+        obj = cls(file_content.path)
+        obj.visit(ast.parse(file_content.content, file_content.path))
+        return tuple(obj.env_vars)
+
+    def visit_Call(self, node: ast.Call):
+        is_env = isinstance(node.func, ast.Name) and node.func.id == "env"
+        for arg in node.args:
+            if not is_env:
+                self.visit(arg)
+                continue
+
+            # Only first arg may be checked as env name
+            is_env = False
+
+            if sys.version_info[0:2] < (3, 8):
+                value = arg.s if isinstance(arg, ast.Str) else None
+            else:
+                value = arg.value if isinstance(arg, ast.Constant) else None
+            if value:
+                # Found env name in this call, we're done here.
+                self.env_vars.add(value)
+                return
+            else:
+                logging.warning(
+                    f"{self.filename}:{arg.lineno}: Only constant string values as variable name to "
+                    f"`env()` is currently supported. This `env()` call will always result in "
+                    "the default value only."
+                )
+
+        for kwarg in node.keywords:
+            self.visit(kwarg)
+
+
+@rule_helper
+async def _extract_env_vars(
+    file_content: FileContent, env: CompleteEnvironmentVars
+) -> EnvironmentVars:
+    """For BUILD file env vars, we only ever consult the local systems env."""
+    env_vars = BUILDFileEnvVarExtractor.get_env_vars(file_content)
+    return await Get(
+        EnvironmentVars,
+        {
+            EnvironmentVarsRequest(env_vars): EnvironmentVarsRequest,
+            env: CompleteEnvironmentVars,
+        },
+    )
 
 
 @rule(desc="Search for addresses in BUILD files")
@@ -159,6 +240,8 @@ async def parse_address_family(
     directory: AddressFamilyDir,
     registered_target_types: RegisteredTargetTypes,
     union_membership: UnionMembership,
+    maybe_build_file_dependency_rules_implementation: MaybeBuildFileDependencyRulesImplementation,
+    session_values: SessionValues,
 ) -> OptionalAddressFamily:
     """Given an AddressMapper and a directory, return an AddressFamily.
 
@@ -181,6 +264,8 @@ async def parse_address_family(
         return OptionalAddressFamily(directory.path)
 
     defaults = BuildFileDefaults({})
+    dependents_rules: BuildFileDependencyRules | None = None
+    dependencies_rules: BuildFileDependencyRules | None = None
     parent_dirs = tuple(PurePath(directory.path).parents)
     if parent_dirs:
         maybe_parents = await MultiGet(
@@ -189,21 +274,62 @@ async def parse_address_family(
         )
         for maybe_parent in maybe_parents:
             if maybe_parent.address_family is not None:
-                defaults = maybe_parent.address_family.defaults
+                family = maybe_parent.address_family
+                defaults = family.defaults
+                dependents_rules = family.dependents_rules
+                dependencies_rules = family.dependencies_rules
                 break
 
     defaults_parser_state = BuildFileDefaultsParserState.create(
         directory.path, defaults, registered_target_types, union_membership
     )
-    address_maps = [
-        AddressMap.parse(
-            fc.path, fc.content.decode(), parser, prelude_symbols, defaults_parser_state
+    build_file_dependency_rules_class = (
+        maybe_build_file_dependency_rules_implementation.build_file_dependency_rules_class
+    )
+    if build_file_dependency_rules_class is not None:
+        dependents_rules_parser_state = build_file_dependency_rules_class.create_parser_state(
+            directory.path,
+            dependents_rules,
         )
+        dependencies_rules_parser_state = build_file_dependency_rules_class.create_parser_state(
+            directory.path,
+            dependencies_rules,
+        )
+    else:
+        dependents_rules_parser_state = None
+        dependencies_rules_parser_state = None
+
+    all_env_vars = [
+        await _extract_env_vars(fc, session_values[CompleteEnvironmentVars])
         for fc in digest_contents
     ]
 
-    # Freeze defaults.
+    address_maps = [
+        AddressMap.parse(
+            fc.path,
+            fc.content.decode(),
+            parser,
+            prelude_symbols,
+            env_vars,
+            defaults_parser_state,
+            dependents_rules_parser_state,
+            dependencies_rules_parser_state,
+        )
+        for fc, env_vars in zip(digest_contents, all_env_vars)
+    ]
+
+    # Freeze defaults and dependency rules
     frozen_defaults = defaults_parser_state.get_frozen_defaults()
+    frozen_dependents_rules = cast(
+        "BuildFileDependencyRules | None",
+        dependents_rules_parser_state
+        and dependents_rules_parser_state.get_frozen_dependency_rules(),
+    )
+    frozen_dependencies_rules = cast(
+        "BuildFileDependencyRules | None",
+        dependencies_rules_parser_state
+        and dependencies_rules_parser_state.get_frozen_dependency_rules(),
+    )
 
     # Process synthetic targets.
     for address_map in address_maps:
@@ -214,7 +340,11 @@ async def parse_address_family(
     return OptionalAddressFamily(
         directory.path,
         AddressFamily.create(
-            directory.path, (*address_maps, *synthetic_address_maps), frozen_defaults
+            spec_path=directory.path,
+            address_maps=(*address_maps, *synthetic_address_maps),
+            defaults=frozen_defaults,
+            dependents_rules=frozen_dependents_rules,
+            dependencies_rules=frozen_dependencies_rules,
         ),
     )
 
@@ -239,6 +369,20 @@ async def find_build_file(request: BuildFileAddressRequest) -> BuildFileAddress:
     return BuildFileAddress(address, bfa.rel_path) if address.is_generated_target else bfa
 
 
+def _get_target_adaptor(
+    address: Address, address_family: AddressFamily, description_of_origin: str
+) -> TargetAdaptor:
+    target_adaptor = address_family.get_target_adaptor(address)
+    if target_adaptor is None:
+        raise ResolveError.did_you_mean(
+            address,
+            description_of_origin=description_of_origin,
+            known_names=address_family.target_names,
+            namespace=address_family.namespace,
+        )
+    return target_adaptor
+
+
 @rule
 async def find_target_adaptor(request: TargetAdaptorRequest) -> TargetAdaptor:
     """Hydrate a TargetAdaptor so that it may be converted into the Target API."""
@@ -249,15 +393,75 @@ async def find_target_adaptor(request: TargetAdaptorRequest) -> TargetAdaptor:
             f"TargetAdaptors: {request}"
         )
     address_family = await Get(AddressFamily, AddressFamilyDir(address.spec_path))
-    target_adaptor = address_family.get_target_adaptor(address)
-    if target_adaptor is None:
-        raise ResolveError.did_you_mean(
-            address,
-            description_of_origin=request.description_of_origin,
-            known_names=address_family.target_names,
-            namespace=address_family.namespace,
-        )
+    target_adaptor = _get_target_adaptor(address, address_family, request.description_of_origin)
     return target_adaptor
+
+
+def _rules_path(address: Address) -> str:
+    if address.is_file_target and os.path.sep in address._relative_file_path:  # type: ignore[operator]
+        # The file is in a subdirectory of spec_path
+        return os.path.dirname(address.filename)
+    else:
+        return address.spec_path
+
+
+@rule
+async def get_dependencies_rule_application(
+    request: DependenciesRuleApplicationRequest,
+    maybe_build_file_rules_implementation: MaybeBuildFileDependencyRulesImplementation,
+) -> DependenciesRuleApplication:
+    build_file_dependency_rules_class = (
+        maybe_build_file_rules_implementation.build_file_dependency_rules_class
+    )
+    if build_file_dependency_rules_class is None:
+        return DependenciesRuleApplication.allow_all()
+
+    # Fetch up to 4 sets of address families, one each for the target adaptors, and then one each
+    # for the dep rules (as we want the rules from the directory the file is in rather than the
+    # directory where the target generator was declared, if not the same)
+    rules_paths = set(
+        itertools.chain.from_iterable(
+            {address.spec_path, _rules_path(address)}
+            for address in (request.address, *request.dependencies)
+        )
+    )
+    maybe_address_families = await MultiGet(
+        Get(OptionalAddressFamily, AddressFamilyDir(rules_path)) for rules_path in rules_paths
+    )
+    maybe_families = {maybe.path: maybe for maybe in maybe_address_families}
+    origin_tgt_address = request.address.maybe_convert_to_target_generator()
+    origin_target = _get_target_adaptor(
+        origin_tgt_address,
+        maybe_families[origin_tgt_address.spec_path].ensure(),
+        request.description_of_origin,
+    )
+    origin_rules_family = (
+        maybe_families[_rules_path(request.address)].address_family
+        or maybe_families[request.address.spec_path].ensure()
+    )
+    dependencies_rule: dict[Address, DependencyRuleApplication] = {}
+    for dependency_address in request.dependencies:
+        dependency_tgt_address = dependency_address.maybe_convert_to_target_generator()
+        dependency_target = _get_target_adaptor(
+            dependency_tgt_address,
+            maybe_families[dependency_tgt_address.spec_path].ensure(),
+            f"{request.description_of_origin} on {dependency_address}",
+        )
+        dependency_rules_family = (
+            maybe_families[_rules_path(dependency_address)].address_family
+            or maybe_families[dependency_address.spec_path].ensure()
+        )
+        dependencies_rule[
+            dependency_address
+        ] = build_file_dependency_rules_class.check_dependency_rules(
+            origin_address=request.address,
+            origin_adaptor=origin_target,
+            dependencies_rules=origin_rules_family.dependencies_rules,
+            dependency_address=dependency_address,
+            dependency_adaptor=dependency_target,
+            dependents_rules=dependency_rules_family.dependents_rules,
+        )
+    return DependenciesRuleApplication(request.address, FrozenDict(dependencies_rule))
 
 
 def rules():

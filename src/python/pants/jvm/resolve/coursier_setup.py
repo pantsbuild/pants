@@ -27,7 +27,7 @@ from pants.util.memo import memoized_property
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import softwrap
 
-COURSIER_POST_PROCESSING_SCRIPT = textwrap.dedent(
+COURSIER_POST_PROCESSING_SCRIPT = textwrap.dedent(  # noqa: PNT20
     """\
     import json
     import sys
@@ -43,8 +43,8 @@ COURSIER_POST_PROCESSING_SCRIPT = textwrap.dedent(
     for dep in report['dependencies']:
         if not dep.get('file'):
             raise Exception(
-                f"No jar found for {dep['coord']}. Check that it's available in the "
-                "repositories configured in [coursier].repos in pants.toml."
+                f"No jar found for {dep['coord']}. Check that it's available in the"
+                + " repositories configured in [coursier].repos in pants.toml."
             )
         source = PurePath(dep['file'])
         dest_name = dep['coord'].replace(":", "_")
@@ -66,7 +66,7 @@ COURSIER_POST_PROCESSING_SCRIPT = textwrap.dedent(
     """
 )
 
-COURSIER_FETCH_WRAPPER_SCRIPT = textwrap.dedent(
+COURSIER_FETCH_WRAPPER_SCRIPT = textwrap.dedent(  # noqa: PNT20
     """\
     set -eux
 
@@ -87,7 +87,7 @@ COURSIER_FETCH_WRAPPER_SCRIPT = textwrap.dedent(
 
 # TODO: Coursier renders setrlimit error line on macOS.
 #   see https://github.com/pantsbuild/pants/issues/13942.
-POST_PROCESS_COURSIER_STDERR_SCRIPT = textwrap.dedent(
+POST_PROCESS_COURSIER_STDERR_SCRIPT = textwrap.dedent(  # noqa: PNT20
     """\
     #!{python_path}
     import sys

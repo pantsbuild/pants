@@ -13,7 +13,7 @@ use lazy_static::lazy_static;
 use pyo3::exceptions::{PyException, PyTypeError};
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict, PyTuple, PyType};
-use pyo3::{import_exception, intern};
+use pyo3::{create_exception, import_exception, intern};
 use pyo3::{FromPyObject, ToPyObject};
 use smallvec::{smallvec, SmallVec};
 
@@ -35,14 +35,37 @@ mod stdio;
 pub mod testutil;
 pub mod workunits;
 
-pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
+pub fn register(py: Python, m: &PyModule) -> PyResult<()> {
   m.add_class::<PyFailure>()?;
+  m.add("EngineError", py.get_type::<EngineError>())?;
+  m.add("IntrinsicError", py.get_type::<IntrinsicError>())?;
+  m.add(
+    "IncorrectProductError",
+    py.get_type::<IncorrectProductError>(),
+  )?;
+
   Ok(())
 }
+
+create_exception!(native_engine, EngineError, PyException);
+create_exception!(native_engine, IntrinsicError, EngineError);
+create_exception!(native_engine, IncorrectProductError, EngineError);
 
 #[derive(Clone)]
 #[pyclass]
 pub struct PyFailure(pub Failure);
+
+#[pymethods]
+impl PyFailure {
+  fn get_error(&self, py: Python) -> PyErr {
+    match &self.0 {
+      Failure::Throw { val, .. } => val.into_py(py),
+      f @ (Failure::Invalidated | Failure::MissingDigest { .. }) => {
+        EngineError::new_err(format!("{f}"))
+      }
+    }
+  }
+}
 
 // TODO: We import this exception type because `pyo3` doesn't support declaring exceptions with
 // additional fields. See https://github.com/PyO3/pyo3/issues/295
@@ -136,7 +159,7 @@ where
 {
   value
     .getattr(field)
-    .map_err(|e| format!("Could not get field `{}`: {:?}", field, e))?
+    .map_err(|e| format!("Could not get field `{field}`: {e:?}"))?
     .extract::<T>()
     .map_err(|e| {
       format!(
@@ -226,7 +249,7 @@ pub fn doc_url(py: Python, slug: &str) -> String {
 }
 
 pub fn create_exception(py: Python, msg: String) -> Value {
-  Value::new(PyException::new_err(msg).into_py(py))
+  Value::new(IntrinsicError::new_err(msg).into_py(py))
 }
 
 pub fn call_function<'py>(func: &'py PyAny, args: &[Value]) -> PyResult<&'py PyAny> {
@@ -238,12 +261,21 @@ pub fn call_function<'py>(func: &'py PyAny, args: &[Value]) -> PyResult<&'py PyA
 pub fn generator_send(
   py: Python,
   generator: &Value,
-  arg: &Value,
+  arg: Option<Value>,
+  err: Option<PyErr>,
 ) -> Result<GeneratorResponse, Failure> {
   let selectors = py.import("pants.engine.internals.selectors").unwrap();
   let native_engine_generator_send = selectors.getattr("native_engine_generator_send").unwrap();
+  let py_arg = match (arg, err) {
+    (Some(arg), None) => arg.to_object(py),
+    (None, Some(err)) => err.into_py(py),
+    (None, None) => py.None(),
+    (Some(arg), Some(err)) => {
+      panic!("generator_send got both value and error: arg={arg:?}, err={err:?}")
+    }
+  };
   let response = native_engine_generator_send
-    .call1((generator.to_object(py), arg.to_object(py)))
+    .call1((generator.to_object(py), py_arg))
     .map_err(|py_err| Failure::from_py_err_with_gil(py, py_err))?;
 
   if let Ok(b) = response.extract::<PyRef<PyGeneratorResponseBreak>>() {
@@ -268,10 +300,7 @@ pub fn generator_send(
       .collect::<Result<Vec<_>, _>>()?;
     Ok(GeneratorResponse::GetMulti(gets))
   } else {
-    panic!(
-      "native_engine_generator_send returned unrecognized type: {:?}",
-      response
-    );
+    panic!("native_engine_generator_send returned unrecognized type: {response:?}");
   }
 }
 

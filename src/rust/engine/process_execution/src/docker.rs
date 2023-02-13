@@ -1,3 +1,5 @@
+// Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
+// Licensed under the Apache License, Version 2.0 (see LICENSE).
 use std::collections::BTreeMap;
 use std::fmt;
 use std::path::{Path, PathBuf};
@@ -16,7 +18,7 @@ use log::Level;
 use nails::execution::ExitCode;
 use once_cell::sync::Lazy;
 use parking_lot::Mutex;
-use store::Store;
+use store::{ImmutableInputs, Store};
 use task_executor::Executor;
 use workunit_store::{in_workunit, Metric, RunningWorkunit};
 
@@ -25,8 +27,8 @@ use crate::local::{
   KeepSandboxes,
 };
 use crate::{
-  Context, FallibleProcessResultWithPlatform, ImmutableInputs, NamedCaches, Platform, Process,
-  ProcessError, ProcessExecutionStrategy,
+  Context, FallibleProcessResultWithPlatform, NamedCaches, Platform, Process, ProcessError,
+  ProcessExecutionStrategy,
 };
 
 pub(crate) const SANDBOX_BASE_PATH_IN_CONTAINER: &str = "/pants-sandbox";
@@ -201,12 +203,7 @@ async fn pull_image(
       Err(DockerError::DockerResponseServerError {
         status_code: 404, ..
       }) => false,
-      Err(err) => {
-        return Err(format!(
-          "Failed to inspect Docker image `{}`: {:?}",
-          image, err
-        ))
-      }
+      Err(err) => return Err(format!("Failed to inspect Docker image `{image}`: {err:?}")),
     }
   };
 
@@ -225,8 +222,7 @@ async fn pull_image(
     },
     (ImagePullPolicy::Never, false) => {
       return Err(format!(
-        "Image `{}` was not found locally and Pants is configured to not attempt to pull",
-        image
+        "Image `{image}` was not found locally and Pants is configured to not attempt to pull"
       ));
     }
     _ => (false, "")
@@ -267,12 +263,7 @@ async fn pull_image(
               // Ignore content in other event fields, namely `id`, `progress`, and `progress_detail`.
               _ => (),
             },
-            Err(err) => {
-              return Err(format!(
-                "Failed to pull Docker image `{}`: {:?}",
-                image, err
-              ))
-            }
+            Err(err) => return Err(format!("Failed to pull Docker image `{image}`: {err:?}")),
           }
         }
 
@@ -332,7 +323,7 @@ impl<'a> super::CommandRunner for CommandRunner<'a> {
     _workunit: &mut RunningWorkunit,
     req: Process,
   ) -> Result<FallibleProcessResultWithPlatform, ProcessError> {
-    let req_debug_repr = format!("{:#?}", req);
+    let req_debug_repr = format!("{req:#?}");
     in_workunit!(
       "run_local_process_via_docker",
       req.level,
@@ -363,10 +354,7 @@ impl<'a> super::CommandRunner for CommandRunner<'a> {
           .into_os_string()
           .into_string()
           .map_err(|s| {
-            format!(
-              "Unable to convert sandbox path to string due to non UTF-8 characters: {:?}",
-              s
-            )
+            format!("Unable to convert sandbox path to string due to non UTF-8 characters: {s:?}")
           })?;
         apply_chroot(&sandbox_path_in_container, &mut req);
         log::trace!(
@@ -411,7 +399,7 @@ impl<'a> super::CommandRunner for CommandRunner<'a> {
             //
             // Given that this is expected to be rare, we dump the entire process definition in the
             // error.
-            ProcessError::Unclassified(format!("Failed to execute: {}\n\n{}", req_debug_repr, msg))
+            ProcessError::Unclassified(format!("Failed to execute: {req_debug_repr}\n\n{msg}"))
           })
           .await;
 
@@ -425,7 +413,13 @@ impl<'a> super::CommandRunner for CommandRunner<'a> {
             && res.as_ref().map(|r| r.exit_code).unwrap_or(1) != 0
         {
           workdir.keep(&req.description);
-          setup_run_sh_script(&req.env, &req.working_directory, &req.argv, workdir.path())?;
+          setup_run_sh_script(
+            workdir.path(),
+            &req.env,
+            &req.working_directory,
+            &req.argv,
+            workdir.path(),
+          )?;
         }
 
         res
@@ -456,20 +450,17 @@ impl<'a> CapturedWorkdir for CommandRunner<'a> {
     let env = req
       .env
       .iter()
-      .map(|(key, value)| format!("{}={}", key, value))
+      .map(|(key, value)| format!("{key}={value}"))
       .collect::<Vec<_>>();
 
     let working_dir = req
       .working_directory
-      .map(|relpath| Path::new(&sandbox_path_in_container).join(&relpath))
+      .map(|relpath| Path::new(&sandbox_path_in_container).join(relpath))
       .unwrap_or_else(|| Path::new(&sandbox_path_in_container).to_path_buf())
       .into_os_string()
       .into_string()
       .map_err(|s| {
-        format!(
-          "Unable to convert working directory due to non UTF-8 characters: {:?}",
-          s
-        )
+        format!("Unable to convert working directory due to non UTF-8 characters: {s:?}")
       })?;
 
     let image = match req.execution_strategy {
@@ -497,7 +488,7 @@ impl<'a> CapturedWorkdir for CommandRunner<'a> {
     let exec = docker
       .create_exec::<String>(&container_id, config)
       .await
-      .map_err(|err| format!("Failed to create Docker execution in container: {:?}", err))?;
+      .map_err(|err| format!("Failed to create Docker execution in container: {err:?}"))?;
 
     log::trace!("created execution {}", &exec.id);
 
@@ -508,10 +499,7 @@ impl<'a> CapturedWorkdir for CommandRunner<'a> {
     let mut output_stream = if let StartExecResults::Attached { output, .. } = exec_result {
       output.boxed()
     } else {
-      panic!(
-        "Unexpected value returned from start_exec: {:?}",
-        exec_result
-      );
+      panic!("Unexpected value returned from start_exec: {exec_result:?}");
     };
 
     log::trace!("started execution {}", &exec.id);
@@ -583,12 +571,7 @@ impl<'a> ContainerCache<'a> {
       .to_path_buf()
       .into_os_string()
       .into_string()
-      .map_err(|s| {
-        format!(
-          "Unable to convert workdir_path due to non UTF-8 characters: {:?}",
-          s
-        )
-      })?;
+      .map_err(|s| format!("Unable to convert workdir_path due to non UTF-8 characters: {s:?}"))?;
 
     let named_caches_base_dir = named_caches
       .base_dir()
@@ -596,10 +579,7 @@ impl<'a> ContainerCache<'a> {
       .into_os_string()
       .into_string()
       .map_err(|s| {
-        format!(
-          "Unable to convert named_caches workdir due to non UTF-8 characters: {:?}",
-          s
-        )
+        format!("Unable to convert named_caches workdir due to non UTF-8 characters: {s:?}")
       })?;
 
     let immutable_inputs_base_dir = immutable_inputs
@@ -608,10 +588,7 @@ impl<'a> ContainerCache<'a> {
       .into_os_string()
       .into_string()
       .map_err(|s| {
-        format!(
-          "Unable to convert immutable_inputs base dir due to non UTF-8 characters: {:?}",
-          s
-        )
+        format!("Unable to convert immutable_inputs base dir due to non UTF-8 characters: {s:?}")
       })?;
 
     Ok(Self {
@@ -649,16 +626,10 @@ impl<'a> ContainerCache<'a> {
       entrypoint: Some(vec!["/bin/sh".to_string()]),
       host_config: Some(bollard::service::HostConfig {
         binds: Some(vec![
-          format!("{}:{}", work_dir_base, SANDBOX_BASE_PATH_IN_CONTAINER),
-          format!(
-            "{}:{}",
-            named_caches_base_dir, NAMED_CACHES_BASE_PATH_IN_CONTAINER,
-          ),
+          format!("{work_dir_base}:{SANDBOX_BASE_PATH_IN_CONTAINER}"),
+          format!("{named_caches_base_dir}:{NAMED_CACHES_BASE_PATH_IN_CONTAINER}",),
           // DOCKER-TODO: Consider making this bind mount read-only.
-          format!(
-            "{}:{}",
-            immutable_inputs_base_dir, IMMUTABLE_INPUTS_BASE_PATH_IN_CONTAINER
-          ),
+          format!("{immutable_inputs_base_dir}:{IMMUTABLE_INPUTS_BASE_PATH_IN_CONTAINER}"),
         ]),
         // The init process ensures that child processes are properly reaped.
         init: Some(true),
@@ -683,7 +654,7 @@ impl<'a> ContainerCache<'a> {
     let container = docker
       .create_container::<&str, String>(Some(create_options), config)
       .await
-      .map_err(|err| format!("Failed to create Docker container: {:?}", err))?;
+      .map_err(|err| format!("Failed to create Docker container: {err:?}"))?;
 
     log::trace!(
       "created container `{}` for image `{}`",

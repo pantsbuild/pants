@@ -9,7 +9,6 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Iterable, Mapping
 
-from pants.base.deprecated import warn_or_error
 from pants.engine.engine_aware import SideEffecting
 from pants.engine.fs import EMPTY_DIGEST, Digest, FileDigest
 from pants.engine.internals.native_engine import (  # noqa: F401
@@ -21,8 +20,6 @@ from pants.engine.rules import collect_rules, rule
 from pants.option.global_options import KeepSandboxes
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
-from pants.util.meta import frozen_after_init
-from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -48,8 +45,7 @@ class ProcessCacheScope(Enum):
     PER_SESSION = "per_session"
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class Process:
     argv: tuple[str, ...]
     description: str = dataclasses.field(compare=False)
@@ -88,7 +84,6 @@ class Process:
         execution_slot_variable: str | None = None,
         concurrency_available: int = 0,
         cache_scope: ProcessCacheScope = ProcessCacheScope.SUCCESSFUL,
-        platform: Platform | None = None,
         remote_cache_speculation_delay_millis: int = 0,
     ) -> None:
         """Request to run a subprocess, similar to subprocess.Popen.
@@ -119,36 +114,33 @@ class Process:
         """
         if isinstance(argv, str):
             raise ValueError("argv must be a sequence of strings, but was a single string.")
-        self.argv = tuple(argv)
-        self.description = description
-        self.level = level
-        self.input_digest = input_digest
-        self.immutable_input_digests = FrozenDict(immutable_input_digests or {})
-        self.use_nailgun = tuple(use_nailgun)
-        self.working_directory = working_directory
-        self.env = FrozenDict(env or {})
-        self.append_only_caches = FrozenDict(append_only_caches or {})
-        self.output_files = tuple(output_files or ())
-        self.output_directories = tuple(output_directories or ())
-        # NB: A negative or None time value is normalized to -1 to ease the transfer to Rust.
-        self.timeout_seconds = timeout_seconds if timeout_seconds and timeout_seconds > 0 else -1
-        self.jdk_home = jdk_home
-        self.execution_slot_variable = execution_slot_variable
-        self.concurrency_available = concurrency_available
-        self.cache_scope = cache_scope
-        self.remote_cache_speculation_delay_millis = remote_cache_speculation_delay_millis
 
-        if platform is not None:
-            warn_or_error(
-                "2.16.0.dev0",
-                "the `platform` kwarg for `Process`",
-                softwrap(
-                    """
-                    The `platform` kwarg no longer does anything because the `platform` is always
-                    automatically set. To fix this deprecation, delete the kwarg.
-                    """
-                ),
-            )
+        object.__setattr__(self, "argv", tuple(argv))
+        object.__setattr__(self, "description", description)
+        object.__setattr__(self, "level", level)
+        object.__setattr__(self, "input_digest", input_digest)
+        object.__setattr__(
+            self, "immutable_input_digests", FrozenDict(immutable_input_digests or {})
+        )
+        object.__setattr__(self, "use_nailgun", tuple(use_nailgun))
+        object.__setattr__(self, "working_directory", working_directory)
+        object.__setattr__(self, "env", FrozenDict(env or {}))
+        object.__setattr__(self, "append_only_caches", FrozenDict(append_only_caches or {}))
+        object.__setattr__(self, "output_files", tuple(output_files or ()))
+        object.__setattr__(self, "output_directories", tuple(output_directories or ()))
+        # NB: A negative or None time value is normalized to -1 to ease the transfer to Rust.
+        object.__setattr__(
+            self,
+            "timeout_seconds",
+            timeout_seconds if timeout_seconds and timeout_seconds > 0 else -1,
+        )
+        object.__setattr__(self, "jdk_home", jdk_home)
+        object.__setattr__(self, "execution_slot_variable", execution_slot_variable)
+        object.__setattr__(self, "concurrency_available", concurrency_available)
+        object.__setattr__(self, "cache_scope", cache_scope)
+        object.__setattr__(
+            self, "remote_cache_speculation_delay_millis", remote_cache_speculation_delay_millis
+        )
 
 
 @dataclass(frozen=True)
@@ -168,8 +160,7 @@ class ProcessResult:
     metadata: ProcessResultMetadata = field(compare=False, hash=False)
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class FallibleProcessResult:
     """Result of executing a process which might fail.
 
@@ -300,8 +291,7 @@ class InteractiveProcessResult:
     exit_code: int
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class InteractiveProcess(SideEffecting):
     # NB: Although InteractiveProcess supports only some of the features of Process, we construct an
     # underlying Process instance to improve code reuse.
@@ -335,18 +325,22 @@ class InteractiveProcess(SideEffecting):
         sent to a process by hitting Ctrl-C in the terminal to actually reach the process,
         or capture that signal itself, blocking it from the process.
         """
-        self.process = Process(
-            argv,
-            description="Interactive process",
-            env=env,
-            input_digest=input_digest,
-            append_only_caches=append_only_caches,
-            immutable_input_digests=immutable_input_digests,
+        object.__setattr__(
+            self,
+            "process",
+            Process(
+                argv,
+                description="Interactive process",
+                env=env,
+                input_digest=input_digest,
+                append_only_caches=append_only_caches,
+                immutable_input_digests=immutable_input_digests,
+            ),
         )
-        self.run_in_workspace = run_in_workspace
-        self.forward_signals_to_process = forward_signals_to_process
-        self.restartable = restartable
-        self.keep_sandboxes = keep_sandboxes
+        object.__setattr__(self, "run_in_workspace", run_in_workspace)
+        object.__setattr__(self, "forward_signals_to_process", forward_signals_to_process)
+        object.__setattr__(self, "restartable", restartable)
+        object.__setattr__(self, "keep_sandboxes", keep_sandboxes)
 
     @classmethod
     def from_process(

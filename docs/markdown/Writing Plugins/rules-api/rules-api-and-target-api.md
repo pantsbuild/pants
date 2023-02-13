@@ -53,7 +53,7 @@ if target.has_fields([PythonSourceField, PythonTestsTimeoutField]):
 
 As explained in [Concepts](doc:target-api-concepts), subclassing `Field`s is key to how the Target API works.
 
-The `Target` methods `[MyField]`, `.has_field()` and `.get()` understand when a `Field` is subclassesd, as follows:
+The `Target` methods `[MyField]`, `.has_field()` and `.get()` understand when a `Field` is subclassed, as follows:
 
 ```python
 >>> docker_tgt.has_field(DockerSourceField)
@@ -66,11 +66,11 @@ False
 True
 ```
 
-This allows you to express specifically which types of `Field`s you need to work. For example, the `./pants filedeps` goal only needs `SourceField`, and works with any subclasses. Meanwhile, Black and isort need `PythonSourceField`, and work with any subclasses. Finally, the Pytest runner needs `PythonTestSourceField` (or any subclass).
+This allows you to express specifically which types of `Field`s you need to work. For example, the `pants filedeps` goal only needs `SourceField`, and works with any subclasses. Meanwhile, Black and isort need `PythonSourceField`, and work with any subclasses. Finally, the Pytest runner needs `PythonTestSourceField` (or any subclass).
 
 ### A Target's `Address`
 
-Every target is identifed by its `Address`, from `pants.engine.adddresses`. Many types used in the Plugin API will use `Address` objects as fields, and it's also often useful to use the `Address` when writing the description for a `Process` you run.
+Every target is identified by its `Address`, from `pants.engine.addresses`. Many types used in the Plugin API will use `Address` objects as fields, and it's also often useful to use the `Address` when writing the description for a `Process` you run.
 
 A `Target` has a field `address: Address`, e.g. `my_tgt.address`.
 
@@ -79,9 +79,9 @@ You can also create an `Address` object directly, which is often useful in tests
 - `project:tgt` -> `Address("project", target_name="tgt")`
 - `project/` -> `Address("project")`
 - `//:top-level` -> `Address("", target_name="top_level")`
-- `project/app.py:tgt` -> \`Address("project", target_name="tgt", relative_file_name="app.py")
+- `project/app.py:tgt` -> `Address("project", target_name="tgt", relative_file_name="app.py")`
 - `project:tgt#generated` -> `Address("project", target_name="tgt", generated_name="generated")`
-- `project:tgt@shell=zsh`: `Address("project", target_name="tgt", parameters={"shell": "zsh"})`
+- `project:tgt@shell=zsh` -> `Address("project", target_name="tgt", parameters={"shell": "zsh"})`
 
 You can use `str(address)` or `address.spec` to get the normalized string representation. `address.spec_path` will give the path to the parent directory of the target's original BUILD file.
 
@@ -90,7 +90,7 @@ How to resolve targets
 
 How do you get `Target`s in the first place in your plugin? 
 
-As explained in [Goal rules](doc:rules-api-goal-rules), to get all of the targets specified on the command line by a user, you can request the type `Targets` as a parameter to your `@rule` or `@goal_rule`. From there, you can optionally filter out the targets you want, such as by using `target.has_field()`.
+As explained in [Goal rules](doc:rules-api-goal-rules), to get all the targets specified on the command line by a user, you can request the type `Targets` as a parameter to your `@rule` or `@goal_rule`. From there, you can optionally filter out the targets you want, such as by using `target.has_field()`.
 
 ```python
 from pants.engine.target import Targets
@@ -136,8 +136,8 @@ await Get(
         file_globs=(FileGlobSpec("my_dir/*.ext"),),  # `my_dir/*.ext`
         dir_literals=(DirLiteralSpec("my_dir"),),  # `my_dir/`
         dir_globs=(DirGlobSpec("my_dir"),),  # `my_dir:`
-        recursive_globs=(RecursiveGlobs("my_dir"),),  # `my_dir::`
-        ancestor_globs=(AncestorGlobs("my_dir"),),  # i.e. `my_dir` and all ancestors
+        recursive_globs=(RecursiveGlobSpec("my_dir"),),  # `my_dir::`
+        ancestor_globs=(AncestorGlobSpec("my_dir"),),  # i.e. `my_dir` and all ancestors
     )
 )
 ```
@@ -192,7 +192,7 @@ from pants.engine.rules import Get, rule
 @rule
 async def demo(...) -> Foo:
     ...
-    direct_deps = await Get(Targets, DependenciesRequest(target.get(Dependencies))
+    direct_deps = await Get(Targets, DependenciesRequest(target.get(Dependencies)))
 ```
 
 `DependenciesRequest` takes a single argument: `field: Dependencies`. The return type `Targets` is a `Collection` of individual `Target` objects corresponding to each direct dependency of the original target.
@@ -210,7 +210,7 @@ from pants.engine.rules import Get, rule
 @rule
 async def demo(...) -> Foo:
     ...
-    transitive_targets = await Get(TransitiveTargets, TransitiveTargetsRequest([target.address])
+    transitive_targets = await Get(TransitiveTargets, TransitiveTargetsRequest([target.address]))
 ```
 
 `TransitiveTargetsRequest` takes an iterable of `Address`es.
@@ -219,7 +219,7 @@ async def demo(...) -> Foo:
 
 ### Dependencies-like fields
 
-You may want to have a field on your target that's like the normal `dependencies` field, but you do something special with it. For example, Pants's [archive](https://github.com/pantsbuild/pants/blob/969c8dcba6eda0c939918b3bc5157ca45099b4d1/src/python/pants/core/target_types.py#L231-L257) target type has the fields `files` and `packages`, rather than `dependencies`, and it has special logic on those fields like running the equivalent of `./pants package` on the `packages` field.
+You may want to have a field on your target that's like the normal `dependencies` field, but you do something special with it. For example, Pants's [archive](https://github.com/pantsbuild/pants/blob/969c8dcba6eda0c939918b3bc5157ca45099b4d1/src/python/pants/core/target_types.py#L231-L257) target type has the fields `files` and `packages`, rather than `dependencies`, and it has special logic on those fields like running the equivalent of `pants package` on the `packages` field.
 
 Instead of subclassing `Dependencies`, you can subclass `SpecialCasedDependencies` from `pants.engine.target`. You must set the `alias` class property to the field's name.
 
@@ -256,7 +256,7 @@ async def demo(...) -> Foo:
     )
 ```
 
-Pants will include your special-cased dependencies with `./pants dependencies`, `./pants dependents`, and `./pants --changed-since`, but the dependencies will not show up when using `await Get(Addresses, DependenciesRequest)`.
+Pants will include your special-cased dependencies with `pants dependencies`, `pants dependents`, and `pants --changed-since`, but the dependencies will not show up when using `await Get(Addresses, DependenciesRequest)`.
 
 `SourcesField`
 --------------
@@ -272,7 +272,7 @@ from pants.engine.rules import Get, rule
 @rule
 async def demo(...) -> Foo:
     ...
-    sources = await Get(HydratedSources, HydrateSourcesRequest(target[SourcesField])
+    sources = await Get(HydratedSources, HydrateSourcesRequest(target[SourcesField]))
 ```
 
 `HydrateSourcesRequest` expects a `SourcesField` object. This can be a subclass, such as `PythonSourceField` or `GoPackageSourcesField`.
@@ -317,7 +317,7 @@ async def demo(...) -> Foo:
     )
 ```
 
-If the provided `SourcesField` object is already a subclass of one of the `for_sources_types`—or it can be generated into one of those types—then the sources will be hydrated; otherwise, you'll get back a `HydratedSources` object with an empty snapshot and the field `sources_type=None`.
+If the provided `SourcesField` object is already a subclass of one of the `for_sources_types`—or it can be generated into one of those types—then the sources will be hydrated; otherwise, you'll get back a `HydratedSources` object with an empty snapshot and the field `sources_type=None`.
 
 `SourceFilesRequest` also accepts the `enable_codegen` and `for_source_types` arguments. This will filter out any inputted `Sources` field that are not compatible with `for_sources_type`.
 
@@ -373,7 +373,7 @@ Normally, your rule should simply use `tgt.get()` and `tgt.has_field()` instead 
 
 To create a `FieldSet`, create a new dataclass with `@dataclass(frozen=True)`. You will sometimes directly subclass `FieldSet`, but will often subclass something like `BinaryFieldSet` or `TestFieldSet`. Refer to the instructions in [Common plugin tasks](doc:common-plugin-tasks).
 
-List every `Field` that your plugin will use as a field of your dataclass. The types hints you specify will be used by Pants to identify what `Field`s to use, e.g. `PythonSourceField` or `Dependencies`.
+List every `Field` that your plugin will use as a field of your dataclass. The type hints you specify will be used by Pants to identify what `Field`s to use, e.g. `PythonSourceField` or `Dependencies`.
 
 Finally, set the class property `required_fields` as a tuple of the `Field`s that your plugin requires. Pants will use this to filter out irrelevant targets that your plugin does not know how to operate on. Often, this will be the same as the `Field`s that you listed as dataclass fields, but it does not need to be. If a target type does not have registered one of the `Field`s that are in the dataclass fields, and it isn't a required `Field`, then Pants will use a default value as if the user left it off from their BUILD file.
 

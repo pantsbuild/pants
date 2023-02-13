@@ -6,6 +6,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Tuple
 
+import packaging
+
 from pants.backend.python.lint.pylint.subsystem import (
     Pylint,
     PylintFieldSet,
@@ -20,10 +22,12 @@ from pants.backend.python.util_rules.partition import (
 from pants.backend.python.util_rules.pex import (
     Pex,
     PexRequest,
+    PexResolveInfo,
     VenvPex,
     VenvPexProcess,
     VenvPexRequest,
 )
+from pants.backend.python.util_rules.pex_environment import PexEnvironment
 from pants.backend.python.util_rules.pex_from_targets import RequirementsPexRequest
 from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
@@ -115,13 +119,24 @@ async def run_pylint(
     request: PylintRequest.Batch[PylintFieldSet, PartitionMetadata],
     pylint: Pylint,
     first_party_plugins: PylintFirstPartyPlugins,
+    pex_environment: PexEnvironment,
 ) -> LintResult:
     assert request.partition_metadata is not None
+
+    # The coarsened targets in the incoming request are for all targets in the request's original
+    # partition. Since the core `lint` logic re-batches inputs according to `[lint].batch_size`,
+    # this could be many more targets than are actually needed to lint the specific batch of files
+    # received by this rule. Subset the CTs one more time here to only those that are relevant.
+    all_coarsened_targets_by_address = request.partition_metadata.coarsened_targets.by_address()
+    coarsened_targets = CoarsenedTargets(
+        all_coarsened_targets_by_address[field_set.address] for field_set in request.elements
+    )
+    coarsened_closure = tuple(coarsened_targets.closure())
 
     requirements_pex_get = Get(
         Pex,
         RequirementsPexRequest(
-            (target.address for target in request.partition_metadata.coarsened_targets.closure()),
+            (target.address for target in coarsened_closure),
             # NB: These constraints must be identical to the other PEXes. Otherwise, we risk using
             # a different version for the requirements than the other two PEXes, which can result
             # in a PEX runtime error about missing dependencies.
@@ -140,7 +155,7 @@ async def run_pylint(
 
     sources_get = Get(
         PythonSourceFiles,
-        PythonSourceFilesRequest(request.partition_metadata.coarsened_targets.closure()),
+        PythonSourceFilesRequest(coarsened_closure),
     )
     # Ensure that the empty report dir exists.
     report_directory_digest_get = Get(Digest, CreateDigest([Directory(REPORT_DIR)]))
@@ -151,6 +166,11 @@ async def run_pylint(
         sources_get,
         report_directory_digest_get,
     )
+
+    pylint_pex_info = await Get(PexResolveInfo, Pex, pylint_pex)
+    astroid_info = pylint_pex_info.find("astroid")
+    # Astroid is a transitive dependency of pylint and should always be available in the pex.
+    assert astroid_info
 
     pylint_runner_pex, config_files = await MultiGet(
         Get(
@@ -163,10 +183,10 @@ async def run_pylint(
                     internal_only=True,
                     pex_path=[pylint_pex, requirements_pex],
                 ),
-                # TODO(John Sirois): Remove this (change to the default of symlinks) when we can
-                #  upgrade to a version of Pylint with https://github.com/PyCQA/pylint/issues/1470
-                #  resolved.
-                site_packages_copies=True,
+                pex_environment.in_sandbox(working_directory=None),
+                # Astroid < 2.9.1 had a regression that prevented the use of symlinks:
+                # https://github.com/PyCQA/pylint/issues/1470
+                site_packages_copies=(astroid_info.version < packaging.version.Version("2.9.1")),
             ),
         ),
         Get(

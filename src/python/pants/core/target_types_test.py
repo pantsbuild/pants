@@ -23,16 +23,18 @@ from pants.core.target_types import (
     FilesGeneratorTarget,
     FileSourceField,
     FileTarget,
-    HTTPSource,
     RelocatedFiles,
     RelocateFilesViaCodegenRequest,
     ResourceTarget,
+    http_source,
+    per_platform,
 )
 from pants.core.target_types import rules as target_type_rules
 from pants.core.util_rules import archive, source_files, system_binaries
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_SNAPSHOT, DigestContents, FileContent
+from pants.engine.platform import Platform
 from pants.engine.target import (
     GeneratedSources,
     SourcesField,
@@ -306,7 +308,8 @@ def test_archive() -> None:
         assert_archive1_is_valid(get_file("archive1.zip"))
 
 
-def test_url_assets() -> None:
+@pytest.mark.parametrize("use_per_platform", [True, False])
+def test_url_assets(use_per_platform: bool) -> None:
     rule_runner = RuleRunner(
         rules=[
             *target_type_rules(),
@@ -317,29 +320,30 @@ def test_url_assets() -> None:
             *run.rules(),
         ],
         target_types=[FileTarget, ResourceTarget, PythonSourceTarget, PexBinary],
-        objects={"http_source": HTTPSource},
+        objects={"http_source": http_source, "per_platform": per_platform},
     )
     http_source_info = (
         'url="https://raw.githubusercontent.com/python/cpython/7e46ae33bd522cf8331052c3c8835f9366599d8d/Lib/antigravity.py",'
         + "len=500,"
         + 'sha256="8a5ee63e1b79ba2733e7ff4290b6eefea60e7f3a1ccb6bb519535aaf92b44967"'
     )
+
+    def source_field_value(http_source_value: str) -> str:
+        if use_per_platform:
+            return f"per_platform({Platform.create_for_localhost().value}={http_source_value})"
+        return http_source_value
+
     rule_runner.write_files(
         {
             "assets/BUILD": dedent(
                 f"""\
                 resource(
                     name='antigravity',
-                    source=http_source(
-                        {http_source_info},
-                    ),
+                    source={source_field_value(f'http_source({http_source_info})')}
                 )
                 resource(
                     name='antigravity_renamed',
-                    source=http_source(
-                        {http_source_info},
-                        filename="antigravity_renamed.py",
-                    ),
+                    source={source_field_value(f'http_source({http_source_info}, filename="antigravity_renamed.py")')}
                 )
                 """
             ),
@@ -392,7 +396,7 @@ def test_url_assets() -> None:
     ],
 )
 def test_http_source_filename(url, expected):
-    assert HTTPSource(url, len=0, sha256="").filename == expected
+    assert http_source(url, len=0, sha256="").filename == expected
 
 
 @pytest.mark.parametrize(
@@ -426,4 +430,4 @@ def test_http_source_filename(url, expected):
 )
 def test_invalid_http_source(kwargs, exc_match):
     with exc_match:
-        HTTPSource(**kwargs)
+        http_source(**kwargs)

@@ -17,7 +17,7 @@ use futures::future::{self, BoxFuture, FutureExt, TryFutureExt};
 use grpc_util::prost::MessageExt;
 use internment::Intern;
 use protos::gen::pants::cache::{CacheKey, CacheKeyType, ObservedUrl};
-use pyo3::prelude::{Py, PyAny, Python};
+use pyo3::prelude::{Py, PyAny, PyErr, Python};
 use pyo3::IntoPy;
 use url::Url;
 
@@ -29,7 +29,7 @@ use crate::tasks::{self, Rule};
 use fs::{
   self, DigestEntry, Dir, DirectoryDigest, DirectoryListing, File, FileContent, FileEntry,
   GlobExpansionConjunction, GlobMatching, Link, PathGlobs, PathStat, PreparedPathGlobs,
-  RelativePath, StrictGlobMatching, Vfs,
+  RelativePath, StrictGlobMatching, SymlinkBehavior, SymlinkEntry, Vfs,
 };
 use process_execution::{
   self, CacheName, InputDigests, Process, ProcessCacheScope, ProcessResultSource,
@@ -158,12 +158,9 @@ impl Select {
     dependency_key: &DependencyKey<TypeId>,
     edges: &rule_graph::RuleEdges<Rule>,
   ) -> Select {
-    let entry = edges.entry_for(dependency_key).unwrap_or_else(|| {
-      panic!(
-        "{:?} did not declare a dependency on {:?}",
-        edges, dependency_key
-      )
-    });
+    let entry = edges
+      .entry_for(dependency_key)
+      .unwrap_or_else(|| panic!("{edges:?} did not declare a dependency on {dependency_key:?}"));
     Select::new(params, dependency_key.product(), entry)
   }
 
@@ -200,8 +197,7 @@ impl Select {
       .edges_for_inner(&self.entry)
       .ok_or_else(|| {
         throw(format!(
-          "Tried to request {} for {} but found no edges",
-          dependency_key, caller_description
+          "Tried to request {dependency_key} for {caller_description} but found no edges"
         ))
       });
     let params = self.params.clone();
@@ -218,7 +214,7 @@ impl Select {
     match self.entry.as_ref() {
       &rule_graph::Entry::WithDeps(wd) => match wd.as_ref() {
         rule_graph::EntryWithDeps::Rule(ref rule) => match rule.rule() {
-          &tasks::Rule::Task(ref task) => {
+          tasks::Rule::Task(task) => {
             context
               .get(Task {
                 params: self.params.clone(),
@@ -228,7 +224,7 @@ impl Select {
               })
               .await
           }
-          &Rule::Intrinsic(ref intrinsic) => {
+          Rule::Intrinsic(intrinsic) => {
             let values = future::try_join_all(
               intrinsic
                 .inputs
@@ -246,7 +242,7 @@ impl Select {
               .await
           }
         },
-        &rule_graph::EntryWithDeps::Reentry(ref reentry) => {
+        rule_graph::EntryWithDeps::Reentry(reentry) => {
           // TODO: Actually using the `RuleEdges` of this entry to compute inputs is not
           // implemented: doing so would involve doing something similar to what we do for
           // intrinsics above, and waiting to compute inputs before executing the query here.
@@ -282,12 +278,12 @@ impl From<Select> for NodeKey {
 }
 
 pub fn lift_directory_digest(digest: &PyAny) -> Result<DirectoryDigest, String> {
-  let py_digest: externs::fs::PyDigest = digest.extract().map_err(|e| format!("{}", e))?;
+  let py_digest: externs::fs::PyDigest = digest.extract().map_err(|e| format!("{e}"))?;
   Ok(py_digest.0)
 }
 
 pub fn lift_file_digest(digest: &PyAny) -> Result<hashing::Digest, String> {
-  let py_file_digest: externs::fs::PyFileDigest = digest.extract().map_err(|e| format!("{}", e))?;
+  let py_file_digest: externs::fs::PyFileDigest = digest.extract().map_err(|e| format!("{e}"))?;
   Ok(py_file_digest.0)
 }
 
@@ -306,7 +302,7 @@ impl ExecuteProcess {
     let input_digests_fut: Result<_, String> = Python::with_gil(|py| {
       let value = (**value).as_ref(py);
       let input_files = lift_directory_digest(externs::getattr(value, "input_digest").unwrap())
-        .map_err(|err| format!("Error parsing input_digest {}", err))?;
+        .map_err(|err| format!("Error parsing input_digest {err}"))?;
       let immutable_inputs =
         externs::getattr_from_str_frozendict::<&PyAny>(value, "immutable_input_digests")
           .into_iter()
@@ -456,7 +452,7 @@ impl ExecuteProcess {
       .await?;
 
     let definition = serde_json::to_string(&request)
-      .map_err(|e| throw(format!("Failed to serialize process: {}", e)))?;
+      .map_err(|e| throw(format!("Failed to serialize process: {e}")))?;
     workunit.update_metadata(|initial| {
       initial.map(|(initial, level)| {
         (
@@ -557,7 +553,7 @@ impl ReadLink {
       .vfs
       .read_link(&node.0)
       .await
-      .map_err(|e| throw(format!("{}", e)))?;
+      .map_err(|e| throw(format!("{e}")))?;
     Ok(LinkDest(link_dest))
   }
 }
@@ -617,7 +613,7 @@ impl Scandir {
       .vfs
       .scandir(self.0)
       .await
-      .map_err(|e| throw(format!("{}", e)))?;
+      .map_err(|e| throw(format!("{e}")))?;
     Ok(Arc::new(directory_listing))
   }
 }
@@ -641,8 +637,7 @@ fn unmatched_globs_additional_context() -> Option<String> {
   Some(format!(
     "\n\nDo the file(s) exist? If so, check if the file(s) are in your `.gitignore` or the global \
     `pants_ignore` option, which may result in Pants not being able to see the file(s) even though \
-    they exist on disk. Refer to {}.",
-    url
+    they exist on disk. Refer to {url}."
   ))
 }
 
@@ -664,8 +659,12 @@ impl Paths {
 
   async fn create(context: Context, path_globs: PreparedPathGlobs) -> NodeResult<Vec<PathStat>> {
     context
-      .expand_globs(path_globs, unmatched_globs_additional_context())
-      .map_err(|e| throw(format!("{}", e)))
+      .expand_globs(
+        path_globs,
+        SymlinkBehavior::Oblivious,
+        unmatched_globs_additional_context(),
+      )
+      .map_err(|e| throw(format!("{e}")))
       .await
   }
 
@@ -674,10 +673,13 @@ impl Paths {
     let mut dirs = Vec::new();
     for ps in item.iter() {
       match ps {
-        &PathStat::File { ref path, .. } => {
+        PathStat::File { path, .. } => {
           files.push(Snapshot::store_path(py, path)?);
         }
-        &PathStat::Dir { ref path, .. } => {
+        PathStat::Link { path, .. } => {
+          panic!("Paths shouldn't be symlink-aware {path:?}");
+        }
+        PathStat::Dir { path, .. } => {
           dirs.push(Snapshot::store_path(py, path)?);
         }
       }
@@ -785,22 +787,22 @@ impl Snapshot {
     let path_globs = Snapshot::lift_path_globs(item)?;
     path_globs
       .parse()
-      .map_err(|e| format!("Failed to parse PathGlobs for globs({:?}): {}", item, e))
+      .map_err(|e| format!("Failed to parse PathGlobs for globs({item:?}): {e}"))
   }
 
   pub fn store_directory_digest(py: Python, item: DirectoryDigest) -> Result<Value, String> {
-    let py_digest = Py::new(py, externs::fs::PyDigest(item)).map_err(|e| format!("{}", e))?;
+    let py_digest = Py::new(py, externs::fs::PyDigest(item)).map_err(|e| format!("{e}"))?;
     Ok(Value::new(py_digest.into_py(py)))
   }
 
   pub fn store_file_digest(py: Python, item: hashing::Digest) -> Result<Value, String> {
     let py_file_digest =
-      Py::new(py, externs::fs::PyFileDigest(item)).map_err(|e| format!("{}", e))?;
+      Py::new(py, externs::fs::PyFileDigest(item)).map_err(|e| format!("{e}"))?;
     Ok(Value::new(py_file_digest.into_py(py)))
   }
 
   pub fn store_snapshot(py: Python, item: store::Snapshot) -> Result<Value, String> {
-    let py_snapshot = Py::new(py, externs::fs::PySnapshot(item)).map_err(|e| format!("{}", e))?;
+    let py_snapshot = Py::new(py, externs::fs::PySnapshot(item)).map_err(|e| format!("{e}"))?;
     Ok(Value::new(py_snapshot.into_py(py)))
   }
 
@@ -808,7 +810,7 @@ impl Snapshot {
     if let Some(p) = item.as_os_str().to_str() {
       Ok(externs::store_utf8(py, p))
     } else {
-      Err(format!("Could not decode path `{:?}` as UTF8.", item))
+      Err(format!("Could not decode path `{item:?}` as UTF8."))
     }
   }
 
@@ -840,6 +842,21 @@ impl Snapshot {
         Self::store_path(py, &item.path)?,
         Self::store_file_digest(py, item.digest)?,
         externs::store_bool(py, item.is_executable),
+      ],
+    ))
+  }
+
+  fn store_symlink_entry(
+    py: Python,
+    types: &crate::types::Types,
+    item: &SymlinkEntry,
+  ) -> Result<Value, String> {
+    Ok(externs::unsafe_call(
+      py,
+      types.symlink_entry,
+      &[
+        Self::store_path(py, &item.path)?,
+        externs::store_utf8(py, item.target.to_str().unwrap()),
       ],
     ))
   }
@@ -883,6 +900,9 @@ impl Snapshot {
         DigestEntry::File(file_entry) => {
           Self::store_file_entry(py, &context.core.types, file_entry)
         }
+        DigestEntry::Symlink(symlink_entry) => {
+          Self::store_symlink_entry(py, &context.core.types, symlink_entry)
+        }
         DigestEntry::EmptyDirectory(path) => {
           Self::store_empty_directory(py, &context.core.types, path)
         }
@@ -901,12 +921,16 @@ impl Snapshot {
     // We rely on Context::expand_globs to track dependencies for scandirs,
     // and `context.get(DigestFile)` to track dependencies for file digests.
     let path_stats = context
-      .expand_globs(path_globs, unmatched_globs_additional_context())
-      .map_err(|e| throw(format!("{}", e)))
+      .expand_globs(
+        path_globs,
+        SymlinkBehavior::Oblivious,
+        unmatched_globs_additional_context(),
+      )
+      .map_err(|e| throw(format!("{e}")))
       .await?;
 
     store::Snapshot::from_path_stats(context.clone(), path_stats)
-      .map_err(|e| throw(format!("Snapshot failed: {}", e)))
+      .map_err(|e| throw(format!("Snapshot failed: {e}")))
       .await
   }
 }
@@ -940,13 +964,14 @@ impl DownloadedFile {
     &self,
     core: Arc<Core>,
     url: Url,
+    auth_headers: BTreeMap<String, String>,
     digest: hashing::Digest,
   ) -> Result<store::Snapshot, String> {
     let file_name = url
       .path_segments()
       .and_then(Iterator::last)
       .map(str::to_owned)
-      .ok_or_else(|| format!("Error getting the file name from the parsed URL: {}", url))?;
+      .ok_or_else(|| format!("Error getting the file name from the parsed URL: {url}"))?;
     let path = RelativePath::new(&file_name).map_err(|e| {
       format!(
         "The file name derived from {} was {} which is not relative: {:?}",
@@ -957,6 +982,7 @@ impl DownloadedFile {
     // See if we have observed this URL and Digest before: if so, see whether we already have the
     // Digest fetched. The extra layer of indirection through the PersistentCache is to sanity
     // check that a Digest has ever been observed at the given URL.
+    // NB: The auth_headers are not part of the key.
     let url_key = Self::url_key(&url, digest);
     let have_observed_url = core.local_cache.load(&url_key).await?.is_some();
 
@@ -970,7 +996,7 @@ impl DownloadedFile {
         .is_ok());
 
     if !usable_in_store {
-      downloads::download(core.clone(), url, file_name, digest).await?;
+      downloads::download(core.clone(), url, auth_headers, file_name, digest).await?;
       // The value was successfully fetched and matched the digest: record in the ObservedUrls
       // cache.
       core.local_cache.store(&url_key, Bytes::from("")).await?;
@@ -979,19 +1005,21 @@ impl DownloadedFile {
   }
 
   async fn run_node(self, context: Context) -> NodeResult<store::Snapshot> {
-    let (url_str, expected_digest) = Python::with_gil(|py| {
+    let (url_str, expected_digest, auth_headers) = Python::with_gil(|py| {
       let py_download_file_val = self.0.to_value();
       let py_download_file = (*py_download_file_val).as_ref(py);
       let url_str: String = externs::getattr(py_download_file, "url").unwrap();
+      let auth_headers = externs::getattr_from_str_frozendict(py_download_file, "auth_headers");
       let py_file_digest: PyFileDigest =
         externs::getattr(py_download_file, "expected_digest").unwrap();
-      let res: NodeResult<(String, Digest)> = Ok((url_str, py_file_digest.0));
+      let res: NodeResult<(String, Digest, BTreeMap<String, String>)> =
+        Ok((url_str, py_file_digest.0, auth_headers));
       res
     })?;
-    let url = Url::parse(&url_str)
-      .map_err(|err| throw(format!("Error parsing URL {}: {}", url_str, err)))?;
+    let url =
+      Url::parse(&url_str).map_err(|err| throw(format!("Error parsing URL {url_str}: {err}")))?;
     self
-      .load_or_download(context.core, url, expected_digest)
+      .load_or_download(context.core, url, auth_headers, expected_digest)
       .await
       .map_err(throw)
   }
@@ -1044,7 +1072,7 @@ impl Task {
             .core
             .rule_graph
             .edges_for_inner(&entry)
-            .ok_or_else(|| throw(format!("No edges for task {:?} exist!", entry)))?;
+            .ok_or_else(|| throw(format!("No edges for task {entry:?} exist!")))?;
 
           // Find the entry for the Get.
           let select = edges
@@ -1072,20 +1100,18 @@ impl Task {
             .ok_or_else(|| {
               if get.input_types.iter().any(|t| t.is_union()) {
                 throw(format!(
-                  "Invalid Get. Because an input type for `{}` was annotated with `@union`, \
+                  "Invalid Get. Because an input type for `{get}` was annotated with `@union`, \
                   the value for that type should be a member of that union. Did you \
                   intend to register a `UnionRule`? If not, you may be using the incorrect \
                   explicitly declared type.",
-                  get,
                 ))
               } else {
                 // NB: The Python constructor for `Get()` will have already errored if
                 // `type(input) != input_type`.
                 throw(format!(
-                  "{} was not detected in your @rule body at rule compile time. \
+                  "{get} was not detected in your @rule body at rule compile time. \
                   Was the `Get` constructor called in a separate function, or perhaps \
                   dynamically? If so, it must be inlined into the @rule body.",
-                  get,
                 ))
               }
             })?;
@@ -1098,7 +1124,7 @@ impl Task {
 
   ///
   /// Given a python generator Value, loop to request the generator's dependencies until
-  /// it completes with a result Value.
+  /// it completes with a result Value or fails with an error.
   ///
   async fn generate(
     context: &Context,
@@ -1108,22 +1134,40 @@ impl Task {
     generator: Value,
   ) -> NodeResult<(Value, TypeId)> {
     let mut input: Option<Value> = None;
+    let mut err: Option<PyErr> = None;
     loop {
       let context = context.clone();
       let params = params.clone();
-      let response = Python::with_gil(|py| {
-        let input = input.unwrap_or_else(|| Value::from(py.None()));
-        externs::generator_send(py, &generator, &input)
-      })?;
+      let response = Python::with_gil(|py| externs::generator_send(py, &generator, input, err))?;
       match response {
         externs::GeneratorResponse::Get(get) => {
-          let values = Self::gen_get(&context, workunit, &params, entry, vec![get]).await?;
-          input = Some(values.into_iter().next().unwrap());
+          let result = Self::gen_get(&context, workunit, &params, entry, vec![get]).await;
+          match result {
+            Ok(values) => {
+              input = Some(values.into_iter().next().unwrap());
+              err = None;
+            }
+            Err(throw @ Failure::Throw { .. }) => {
+              input = None;
+              err = Some(PyErr::from(throw));
+            }
+            Err(failure) => break Err(failure),
+          }
         }
         externs::GeneratorResponse::GetMulti(gets) => {
-          let values = Self::gen_get(&context, workunit, &params, entry, gets).await?;
-          let gil = Python::acquire_gil();
-          input = Some(externs::store_tuple(gil.python(), values));
+          let result = Self::gen_get(&context, workunit, &params, entry, gets).await;
+          match result {
+            Ok(values) => {
+              let gil = Python::acquire_gil();
+              input = Some(externs::store_tuple(gil.python(), values));
+              err = None;
+            }
+            Err(throw @ Failure::Throw { .. }) => {
+              input = None;
+              err = Some(PyErr::from(throw));
+            }
+            Err(failure) => break Err(failure),
+          }
         }
         externs::GeneratorResponse::Break(val, type_id) => {
           break Ok((val, type_id));
@@ -1168,7 +1212,7 @@ impl Task {
               let val = Value::new(res.into_py(py));
               (val, type_id)
             })
-            .map_err(Failure::from_py_err)
+            .map_err(Failure::from)
         })
       })
       .await?;
@@ -1185,10 +1229,13 @@ impl Task {
     }
 
     if result_type != self.task.product {
-      return Err(throw(format!(
-        "{:?} returned a result value that did not satisfy its constraints: {:?}",
-        self.task.func, result_val
-      )));
+      return Err(
+        externs::IncorrectProductError::new_err(format!(
+          "{:?} returned a result value that did not satisfy its constraints: {:?}",
+          self.task.func, result_val
+        ))
+        .into(),
+      );
     }
 
     if self.task.engine_aware_return_type {
@@ -1242,9 +1289,9 @@ pub enum NodeKey {
 impl NodeKey {
   pub fn fs_subject(&self) -> Option<&Path> {
     match self {
-      &NodeKey::DigestFile(ref s) => Some(s.0.path.as_path()),
-      &NodeKey::ReadLink(ref s) => Some((s.0).0.as_path()),
-      &NodeKey::Scandir(ref s) => Some((s.0).0.as_path()),
+      NodeKey::DigestFile(s) => Some(s.0.path.as_path()),
+      NodeKey::ReadLink(s) => Some((s.0).path.as_path()),
+      NodeKey::Scandir(s) => Some((s.0).0.as_path()),
 
       // Not FS operations:
       // Explicitly listed so that if people add new NodeKeys they need to consider whether their
@@ -1334,7 +1381,9 @@ impl NodeKey {
       NodeKey::DigestFile(DigestFile(File { path, .. })) => {
         Some(format!("Fingerprinting: {}", path.display()))
       }
-      NodeKey::ReadLink(ReadLink(Link(path))) => Some(format!("Reading link: {}", path.display())),
+      NodeKey::ReadLink(ReadLink(Link { path, .. })) => {
+        Some(format!("Reading link: {}", path.display()))
+      }
       NodeKey::Scandir(Scandir(Dir(path))) => {
         Some(format!("Reading directory: {}", path.display()))
       }
@@ -1457,14 +1506,14 @@ impl Node for NodeKey {
     // A Task / @rule is only restartable if it has not had a side effect (as determined by the
     // calls to the `task_side_effected` function).
     match self {
-      &NodeKey::Task(ref s) => !s.side_effected.load(Ordering::SeqCst),
+      NodeKey::Task(s) => !s.side_effected.load(Ordering::SeqCst),
       _ => true,
     }
   }
 
   fn cacheable(&self) -> bool {
     match self {
-      &NodeKey::Task(ref s) => s.task.cacheable,
+      NodeKey::Task(s) => s.task.cacheable,
       &NodeKey::SessionValues(_) | &NodeKey::RunId(_) => false,
       _ => true,
     }
@@ -1520,15 +1569,15 @@ impl Node for NodeKey {
 impl Display for NodeKey {
   fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
     match self {
-      &NodeKey::DigestFile(ref s) => write!(f, "DigestFile({})", s.0.path.display()),
-      &NodeKey::DownloadedFile(ref s) => write!(f, "DownloadedFile({})", s.0),
-      &NodeKey::ExecuteProcess(ref s) => {
+      NodeKey::DigestFile(s) => write!(f, "DigestFile({})", s.0.path.display()),
+      NodeKey::DownloadedFile(s) => write!(f, "DownloadedFile({})", s.0),
+      NodeKey::ExecuteProcess(s) => {
         write!(f, "Process({})", s.process.description)
       }
-      &NodeKey::ReadLink(ref s) => write!(f, "ReadLink({})", (s.0).0.display()),
-      &NodeKey::Scandir(ref s) => write!(f, "Scandir({})", (s.0).0.display()),
-      &NodeKey::Select(ref s) => write!(f, "{}", s.product),
-      &NodeKey::Task(ref task) => {
+      NodeKey::ReadLink(s) => write!(f, "ReadLink({})", (s.0).path.display()),
+      NodeKey::Scandir(s) => write!(f, "Scandir({})", (s.0).0.display()),
+      NodeKey::Select(s) => write!(f, "{}", s.product),
+      NodeKey::Task(task) => {
         let params = {
           let gil = Python::acquire_gil();
           let py = gil.python();
@@ -1547,10 +1596,10 @@ impl Display for NodeKey {
           params.join(", ")
         )
       }
-      &NodeKey::Snapshot(ref s) => write!(f, "Snapshot({})", s.path_globs),
+      NodeKey::Snapshot(s) => write!(f, "Snapshot({})", s.path_globs),
       &NodeKey::SessionValues(_) => write!(f, "SessionValues"),
       &NodeKey::RunId(_) => write!(f, "RunId"),
-      &NodeKey::Paths(ref s) => write!(f, "Paths({})", s.path_globs),
+      NodeKey::Paths(s) => write!(f, "Paths({})", s.path_globs),
     }
   }
 }

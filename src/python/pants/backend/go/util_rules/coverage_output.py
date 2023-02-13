@@ -48,7 +48,9 @@ async def go_render_coverage_report(
     go_test_subsystem: GoTestSubsystem,
 ) -> RenderGoCoverageReportResult:
     output_dir = go_test_subsystem.coverage_output_dir(
-        distdir=distdir_value, import_path=request.raw_report.import_path
+        distdir=distdir_value,
+        address=request.raw_report.pkg_target_address,
+        import_path=request.raw_report.import_path,
     )
     snapshot, digest_contents = await MultiGet(
         Get(Snapshot, Digest, request.raw_report.coverage_digest),

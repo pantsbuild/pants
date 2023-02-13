@@ -11,10 +11,15 @@ from pants.backend.python.dependency_inference.module_mapper import (
     PythonModuleOwners,
     PythonModuleOwnersRequest,
 )
-from pants.backend.python.dependency_inference.rules import PythonInferSubsystem, import_rules
+from pants.backend.python.dependency_inference.rules import import_rules
+from pants.backend.python.dependency_inference.subsystem import (
+    AmbiguityResolution,
+    PythonInferSubsystem,
+)
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import PexCompletePlatformsField, PythonResolveField
 from pants.core.goals.package import OutputPathField
+from pants.core.util_rules.environments import EnvironmentField
 from pants.engine.addresses import Address
 from pants.engine.fs import GlobMatchErrorBehavior, PathGlobs, Paths
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
@@ -168,10 +173,23 @@ async def infer_cloud_function_handler_dependency(
         ),
     )
     module, _, _func = handler.val.partition(":")
+
+    # Only set locality if needed, to avoid unnecessary rule graph memoization misses.
+    # When set, use the source root, which is useful in practice, but incurs fewer memoization
+    # misses than using the full spec_path.
+    locality = None
+    if python_infer_subsystem.ambiguity_resolution == AmbiguityResolution.by_source_root:
+        source_root = await Get(
+            SourceRoot, SourceRootRequest, SourceRootRequest.for_address(request.field_set.address)
+        )
+        locality = source_root.path
+
     owners = await Get(
         PythonModuleOwners,
         PythonModuleOwnersRequest(
-            module, resolve=request.field_set.resolve.normalized_value(python_setup)
+            module,
+            resolve=request.field_set.resolve.normalized_value(python_setup),
+            locality=locality,
         ),
     )
     address = request.field_set.address
@@ -214,6 +232,11 @@ class PythonGoogleCloudFunctionRuntime(StringField):
         """
         The identifier of the Google Cloud Function runtime to target (pythonXY). See
         https://cloud.google.com/functions/docs/concepts/python-runtime.
+
+        In general you'll want to define either a `runtime` or one `complete_platforms` but not
+        both. Specifying a `runtime` is simpler, but less accurate. If you have issues either
+        packaging the Google Cloud Function PEX or running it as a deployed Google Cloud Function,
+        you should try using `complete_platforms` instead.
         """
     )
 
@@ -235,6 +258,18 @@ class PythonGoogleCloudFunctionRuntime(StringField):
             return None
         mo = cast(Match, re.match(self.PYTHON_RUNTIME_REGEX, self.value))
         return int(mo.group("major")), int(mo.group("minor"))
+
+
+class PythonGoogleCloudFunctionCompletePlatforms(PexCompletePlatformsField):
+    help = softwrap(
+        f"""
+        {PexCompletePlatformsField.help}
+
+        N.B.: If specifying `complete_platforms` to work around packaging failures encountered when
+        using the `runtime` field, ensure you delete the `runtime` field from your
+        `python_google_cloud_function` target.
+        """
+    )
 
 
 class GoogleCloudFunctionTypes(Enum):
@@ -264,9 +299,10 @@ class PythonGoogleCloudFunction(Target):
         PythonGoogleCloudFunctionDependencies,
         PythonGoogleCloudFunctionHandlerField,
         PythonGoogleCloudFunctionRuntime,
-        PexCompletePlatformsField,
+        PythonGoogleCloudFunctionCompletePlatforms,
         PythonGoogleCloudFunctionType,
         PythonResolveField,
+        EnvironmentField,
     )
     help = softwrap(
         f"""

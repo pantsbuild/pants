@@ -10,7 +10,7 @@ The `package` goal creates an artifact that can be deployed or distributed.
 
 The exact type of artifact depends on the type of target the goal is invoked on.
 
-You can run `./pants package ::` to build all artifacts in your project. Pants will filter to only the relevant targets.
+You can run `pants package ::` to build all artifacts in your project. Pants will filter to only the relevant targets.
 
 > 👍 Benefit of Pants: artifacts only include your true dependencies
 > 
@@ -18,9 +18,9 @@ You can run `./pants package ::` to build all artifacts in your project. Pants w
 
 > 👍 Benefit of Pants: easily write automated tests of your packaging pipeline
 > 
-> You can depend on a package target in a `python_test` / `python_tests` target through the `runtime_package_dependencies` field. Pants will run the equivalent of `./pants package` beforehand and copy the built artifact into the test's chroot, allowing you to test things like that the artifact has the correct files present and that it's executable.
+> You can depend on a package target in a `python_test` / `python_tests` target through the `runtime_package_dependencies` field. Pants will run the equivalent of `pants package` beforehand and copy the built artifact into the test's chroot, allowing you to test things like that the artifact has the correct files present and that it's executable.
 > 
-> This allows you to test your packaging pipeline by simply running `./pants test ::`, without needing custom integration test scripts.
+> This allows you to test your packaging pipeline by simply running `pants test ::`, without needing custom integration test scripts.
 > 
 > See [test](doc:python-test-goal) for more information.
 
@@ -43,7 +43,7 @@ The PEX metadata will include:
 - The entry point or console script specified by the `pex_binary` target, if any.
 - The intersection of all interpreter constraints applicable to the code in the Pex. See [Interpreter compatibility](doc:python-interpreter-compatibility).
 
-You can also tweak many options, such as the `execution_mode` option to optimize for faster initial runs vs. subsequent runs. Run `./pants help pex_binary`.
+You can also tweak many options, such as the `execution_mode` option to optimize for faster initial runs vs. subsequent runs. Run `pants help pex_binary`.
 
 ### The `entry_point` and `script` fields
 
@@ -68,7 +68,7 @@ Type "help", "copyright", "credits" or "license" for more information.
 (InteractiveConsole)
 ```
 
-If you use the `entry_point` field,  Pants will use dependency inference, which you can confirm by running `./pants dependencies path/to:app`. Otherwise, you must manually add to the `dependencies` field.
+If you use the `entry_point` field,  Pants will use dependency inference, which you can confirm by running `pants dependencies path/to:app`. Otherwise, you must manually add to the `dependencies` field.
 
 #### `entry_point` with a file name
 
@@ -91,7 +91,7 @@ pex_binary(
 )
 ```
 
-This approach has the added benefit that you can use file arguments, e.g. `./pants package helloworld/main.py`, rather than needing to use target addresses like `./pants package helloworld:app`.
+This approach has the added benefit that you can use file arguments, e.g. `pants package helloworld/main.py`, rather than needing to use target addresses like `pants package helloworld:app`.
 
 #### Explicit `entry_point`
 
@@ -119,7 +119,7 @@ pex_binary(
 )
 ```
 
-Unlike using `entry_point` with a file name, this does not work with file arguments; you must use the target address, like `./pants package helloworld:app`.
+Unlike using `entry_point` with a file name, this does not work with file arguments; you must use the target address, like `pants package helloworld:app`.
 
 #### `script`
 
@@ -137,7 +137,23 @@ pex_binary(
 
 You must explicitly add the dependencies you'd like to the `dependencies` field.
 
-This does not work with file arguments; you must use the target address, like `./pants package helloworld:black_bin`.
+This does not work with file arguments; you must use the target address, like `pants package helloworld:black_bin`.
+
+### Injecting command-line arguments and environment variables
+
+You can use the `inject_args` and `inject_env` fields to "freeze" command-line arguments and environment variables into the PEX file. This can save you from having to create shim files around generic binaries. For example:
+
+```python myproduct/myservice/BUILD
+python_requirement(name="gunicorn", requirements=["gunicorn==20.1.0"])
+
+pex_binary(
+  name="myservice_bin",
+  script="gunicorn",
+  args=["myproduct.myservice.wsgi:app", "--name=myservice"],
+  env={"MY_ENV_VAR=1"},
+  dependencies=[":gunicorn"],
+)
+```
 
 > 🚧 PEX files may be platform-specific
 > 
@@ -156,7 +172,7 @@ This does not work with file arguments; you must use the target address, like `.
 ### Examples
 
 ```
-❯ ./pants package helloworld/main.py
+❯ pants package helloworld/main.py
 
 17:36:42 [INFO] Wrote dist/helloworld/helloworld.pex
 ```
@@ -164,7 +180,7 @@ This does not work with file arguments; you must use the target address, like `.
 We can also build the same Pex by using the address of the `pex_binary` target, as described [here](doc:targets).
 
 ```
-❯ ./pants package helloworld:app
+❯ pants package helloworld:app
 
 17:36:42 [INFO] Wrote dist/helloworld/helloworld.pex
 ```
@@ -190,7 +206,7 @@ pex_binaries(
 )
 ```
 
-Use `./pants peek path/to/dir:` to inspect the generated `pex_binary` targets.
+Use `pants peek path/to/dir:` to inspect the generated `pex_binary` targets.
 
 Create a setuptools distribution
 --------------------------------

@@ -225,7 +225,7 @@ async def bsp_resolve_scala_metadata(
             jdk = system_jdk
 
     cmd = "leak_paths.sh"
-    leak_jdk_sandbox_paths = textwrap.dedent(
+    leak_jdk_sandbox_paths = textwrap.dedent(  # noqa: PNT20
         f"""\
         # Script to leak JDK cache paths out of Coursier sandbox so that BSP can use them.
 

@@ -493,6 +493,8 @@ def test_local_requirements_and_path_mappings(
                 ),
                 f"--python-repos-path-mappings=WHEEL_DIR|{path_mappings_dir}",
                 f"--named-caches-dir={tmp_path}",
+                # Use the vendored pip, so we don't have to set up a wheel for it in dir1_path.
+                "--python-pip-version=20.3.4-patched",
             )
 
         rule_runner.set_options(options(dir1_path), env_inherit=PYTHON_BOOTSTRAP_ENV)
@@ -504,6 +506,7 @@ def test_local_requirements_and_path_mappings(
                     interpreter_constraints=InterpreterConstraints(),
                     resolve_name="test",
                     lockfile_dest="test.lock",
+                    diff=False,
                 )
             ],
         )

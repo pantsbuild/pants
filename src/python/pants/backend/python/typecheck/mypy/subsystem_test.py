@@ -49,7 +49,7 @@ def rule_runner() -> RuleRunner:
 
 def test_warn_if_python_version_configured(rule_runner: RuleRunner, caplog) -> None:
     config = {"mypy.ini": "[mypy]\npython_version = 3.6"}
-    rule_runner.write_files(config)  # type: ignore[arg-type]
+    rule_runner.write_files(config)
     config_digest = rule_runner.make_snapshot(config).digest
 
     def maybe_assert_configured(*, has_config: bool, args: list[str], warning: str = "") -> None:

@@ -9,7 +9,7 @@ import pkgutil
 import shlex
 from dataclasses import dataclass
 from pathlib import PurePath
-from textwrap import dedent
+from textwrap import dedent  # noqa: PNT20
 from typing import Any, Iterable, Mapping
 
 import yaml
@@ -36,7 +36,6 @@ from pants.engine.unions import UnionRule
 from pants.util.docutil import git_url
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
-from pants.util.meta import frozen_after_init
 from pants.util.strutil import bullet_list, pluralize, softwrap
 
 logger = logging.getLogger(__name__)
@@ -126,8 +125,7 @@ class SetupHelmPostRenderer(EngineAwareParameter):
         return self.description_of_origin
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class HelmPostRenderer(EngineAwareReturnType):
     exe: str
     digest: Digest
@@ -146,12 +144,14 @@ class HelmPostRenderer(EngineAwareReturnType):
         immutable_input_digests: Mapping[str, Digest] | None = None,
         append_only_caches: Mapping[str, str] | None = None,
     ) -> None:
-        self.exe = exe
-        self.digest = digest
-        self.description_of_origin = description_of_origin
-        self.env = FrozenDict(env or {})
-        self.append_only_caches = FrozenDict(append_only_caches or {})
-        self.immutable_input_digests = FrozenDict(immutable_input_digests or {})
+        object.__setattr__(self, "exe", exe)
+        object.__setattr__(self, "digest", digest)
+        object.__setattr__(self, "description_of_origin", description_of_origin)
+        object.__setattr__(self, "env", FrozenDict(env or {}))
+        object.__setattr__(self, "append_only_caches", FrozenDict(append_only_caches or {}))
+        object.__setattr__(
+            self, "immutable_input_digests", FrozenDict(immutable_input_digests or {})
+        )
 
     def level(self) -> LogLevel | None:
         return LogLevel.DEBUG
@@ -160,7 +160,12 @@ class HelmPostRenderer(EngineAwareReturnType):
         return f"runnable {self.exe} for {self.description_of_origin} is ready."
 
     def metadata(self) -> dict[str, Any] | None:
-        return {"exe": self.exe, "env": self.env, "append_only_caches": self.append_only_caches}
+        return {
+            "exe": self.exe,
+            "env": self.env,
+            "append_only_caches": self.append_only_caches,
+            "description_of_origin": self.description_of_origin,
+        }
 
 
 @rule_helper

@@ -32,6 +32,7 @@ class DockerRegistryOptions:
     skip_push: bool = False
     extra_image_tags: tuple[str, ...] = ()
     repository: str | None = None
+    use_local_alias: bool = False
 
     @classmethod
     def from_dict(cls, alias: str, d: dict[str, Any]) -> DockerRegistryOptions:
@@ -44,6 +45,7 @@ class DockerRegistryOptions:
                 d.get("extra_image_tags", DockerRegistryOptions.extra_image_tags)
             ),
             repository=Parser.to_value_type(d.get("repository"), str, None),
+            use_local_alias=Parser.ensure_bool(d.get("use_local_alias", False)),
         )
 
     def register(self, registries: dict[str, DockerRegistryOptions]) -> None:

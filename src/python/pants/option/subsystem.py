@@ -19,6 +19,7 @@ from pants.option.option_value_container import OptionValueContainer
 from pants.option.options import Options
 from pants.option.scope import Scope, ScopedOptions, ScopeInfo, normalize_scope
 from pants.util.memo import memoized_classmethod
+from pants.util.strutil import softwrap
 
 if TYPE_CHECKING:
     # Needed to avoid an import cycle.
@@ -252,9 +253,14 @@ class Subsystem(metaclass=_SubsystemMeta):
             raise OptionsError(f"{cls.__name__} must set options_scope.")
         if not cls.is_valid_scope_name(options_scope):
             raise OptionsError(
-                f'Options scope "{options_scope}" is not valid:\nReplace in code with a new '
-                "scope name consisting of only lower-case letters, digits, underscores, "
-                "and non-consecutive dashes."
+                softwrap(
+                    """
+                    Options scope "{options_scope}" is not valid.
+
+                    Replace in code with a new scope name consisting of only lower-case letters,
+                    digits, underscores, and non-consecutive dashes.
+                    """
+                )
             )
 
     @classmethod

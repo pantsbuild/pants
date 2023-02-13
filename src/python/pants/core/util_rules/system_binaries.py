@@ -10,8 +10,8 @@ import os
 import subprocess
 from dataclasses import dataclass
 from enum import Enum
-from textwrap import dedent
-from typing import Iterable, Sequence
+from textwrap import dedent  # noqa: PNT20
+from typing import Iterable, Mapping, Sequence
 
 from pants.core.subsystems import python_bootstrap
 from pants.core.subsystems.python_bootstrap import PythonBootstrap
@@ -21,10 +21,11 @@ from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.fs import CreateDigest, FileContent
 from pants.engine.internals.native_engine import Digest
 from pants.engine.internals.selectors import Get, MultiGet
+from pants.engine.platform import Platform
 from pants.engine.process import FallibleProcessResult, Process, ProcessResult
 from pants.engine.rules import collect_rules, rule
+from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
-from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import OrderedSet
 from pants.util.strutil import create_path_env_var, pluralize, softwrap
 
@@ -35,18 +36,19 @@ logger = logging.getLogger(__name__)
 # -------------------------------------------------------------------------------------------
 
 # TODO(#14492): This should be configurable via `[system-binaries]` subsystem, likely per-binary.
-SEARCH_PATHS = ("/usr/bin", "/bin", "/usr/local/bin")
+SEARCH_PATHS = ("/usr/bin", "/bin", "/usr/local/bin", "/opt/homebrew/bin")
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class BinaryPath:
     path: str
     fingerprint: str
 
     def __init__(self, path: str, fingerprint: str | None = None) -> None:
-        self.path = path
-        self.fingerprint = self._fingerprint() if fingerprint is None else fingerprint
+        object.__setattr__(self, "path", path)
+        object.__setattr__(
+            self, "fingerprint", self._fingerprint() if fingerprint is None else fingerprint
+        )
 
     @staticmethod
     def _fingerprint(content: bytes | bytearray | memoryview | None = None) -> str:
@@ -60,22 +62,20 @@ class BinaryPath:
         return cls(path, fingerprint=cls._fingerprint(representative_content))
 
 
-@frozen_after_init
 @dataclass(unsafe_hash=True)
 class BinaryPathTest:
     args: tuple[str, ...]
     fingerprint_stdout: bool
 
     def __init__(self, args: Iterable[str], fingerprint_stdout: bool = True) -> None:
-        self.args = tuple(args)
-        self.fingerprint_stdout = fingerprint_stdout
+        object.__setattr__(self, "args", tuple(args))
+        object.__setattr__(self, "fingerprint_stdout", fingerprint_stdout)
 
 
 class SearchPath(DeduplicatedCollection[str]):
     """The search path for binaries; i.e.: the $PATH."""
 
 
-@frozen_after_init
 @dataclass(unsafe_hash=True)
 class BinaryPathRequest:
     """Request to find a binary of a given name.
@@ -105,21 +105,20 @@ class BinaryPathRequest:
         check_file_entries: bool = False,
         test: BinaryPathTest | None = None,
     ) -> None:
-        self.search_path = SearchPath(search_path)
-        self.binary_name = binary_name
-        self.check_file_entries = check_file_entries
-        self.test = test
+        object.__setattr__(self, "search_path", SearchPath(search_path))
+        object.__setattr__(self, "binary_name", binary_name)
+        object.__setattr__(self, "check_file_entries", check_file_entries)
+        object.__setattr__(self, "test", test)
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class BinaryPaths(EngineAwareReturnType):
     binary_name: str
     paths: tuple[BinaryPath, ...]
 
     def __init__(self, binary_name: str, paths: Iterable[BinaryPath] | None = None):
-        self.binary_name = binary_name
-        self.paths = tuple(OrderedSet(paths) if paths else ())
+        object.__setattr__(self, "binary_name", binary_name)
+        object.__setattr__(self, "paths", tuple(OrderedSet(paths) if paths else ()))
 
     def message(self) -> str:
         if not self.paths:
@@ -181,7 +180,6 @@ class BinaryNotFoundError(EnvironmentError):
 class BinaryShimsRequest:
     """Request to create shims for one or more system binaries."""
 
-    output_directory: str
     rationale: str = dataclasses.field(compare=False)
 
     # Create shims for provided binary paths
@@ -192,7 +190,7 @@ class BinaryShimsRequest:
 
     @classmethod
     def for_binaries(
-        cls, *names: str, rationale: str, output_directory: str, search_path: Sequence[str]
+        cls, *names: str, rationale: str, search_path: Sequence[str]
     ) -> BinaryShimsRequest:
         return cls(
             requests=tuple(
@@ -200,30 +198,42 @@ class BinaryShimsRequest:
                 for binary_name in names
             ),
             rationale=rationale,
-            output_directory=output_directory,
         )
 
     @classmethod
     def for_paths(
-        cls, *paths: BinaryPath, rationale: str, output_directory: str
+        cls,
+        *paths: BinaryPath,
+        rationale: str,
     ) -> BinaryShimsRequest:
-        return cls(paths=paths, rationale=rationale, output_directory=output_directory)
+        return cls(
+            paths=paths,
+            rationale=rationale,
+        )
 
 
 @dataclass(frozen=True)
 class BinaryShims:
     """The shims created for a BinaryShimsRequest is placed in `bin_directory` of the `digest`.
 
-    The purpose of these shims is so that a Process may be executed with `bin_directory` added to
-    PATH so that the binaries are available for execution.
+    The purpose of these shims is so that a Process may be executed with `immutable_input_digests`
+    provided to the `Process`, and `path_component` included in its `PATH` environment variable.
 
     The alternative is to add the directories hosting the binaries directly, but that opens up for
     many more unrelated binaries to also be executable from PATH, leaking into the sandbox
     unnecessarily.
     """
 
-    bin_directory: str
     digest: Digest
+    cache_name: str
+
+    @property
+    def immutable_input_digests(self) -> Mapping[str, Digest]:
+        return FrozenDict({self.cache_name: self.digest})
+
+    @property
+    def path_component(self) -> str:
+        return os.path.join("{chroot}", self.cache_name)
 
 
 # -------------------------------------------------------------------------------------------
@@ -295,7 +305,10 @@ class GunzipBinary:
         return (self.python.path, "-c", script)
 
 
+@dataclass(frozen=True)
 class TarBinary(BinaryPath):
+    platform: Platform
+
     def create_archive_argv(
         self,
         output_filename: str,
@@ -321,7 +334,9 @@ class TarBinary(BinaryPath):
     ) -> tuple[str, ...]:
         # Note that the `output_dir` must already exist.
         # The caller should validate that it's a valid `.tar` file.
-        prog_args = ("-Ilz4",) if archive_suffix == ".tar.lz4" else ()
+        prog_args = (
+            ("-Ilz4",) if archive_suffix == ".tar.lz4" and not self.platform.is_macos else ()
+        )
         return (self.path, *prog_args, "-xf", archive_path, "-C", extract_path)
 
 
@@ -408,13 +423,13 @@ class GitBinary(BinaryPath):
 async def create_binary_shims(
     binary_shims_request: BinaryShimsRequest,
     bash: BashBinary,
-    mkdir: MkdirBinary,
-    chmod: ChmodBinary,
 ) -> BinaryShims:
     """Creates a bin directory with shims for all requested binaries.
 
-    Useful as input digest for a Process to setup a `bin` directory for PATH.
+    This can be provided to a `Process` as an `immutable_input_digest`, or can be merged into the
+    input digest.
     """
+
     paths = binary_shims_request.paths
     requests = binary_shims_request.requests
     if requests:
@@ -427,43 +442,27 @@ async def create_binary_shims(
         )
         paths += first_paths
 
-    all_paths = (binary.path for binary in paths)
-    bin_relpath = binary_shims_request.output_directory
-    script = ";".join(
-        (
-            f"{mkdir.path} -p {bin_relpath}",
-            *(
-                " && ".join(
-                    [
-                        # The `printf` cmd is a bash builtin, so always available.
-                        f"printf '{_create_shim(bash.path, binary_path)}' > '{bin_relpath}/{os.path.basename(binary_path)}'",
-                        f"{chmod.path} +x '{bin_relpath}/{os.path.basename(binary_path)}'",
-                    ]
-                )
-                for binary_path in all_paths
-            ),
+    scripts = [
+        FileContent(
+            os.path.basename(path.path), _create_shim(bash.path, path.path), is_executable=True
         )
-    )
-    result = await Get(
-        ProcessResult,
-        Process(
-            argv=(bash.path, "-c", script),
-            description=f"Setup binary shims so that Pants can {binary_shims_request.rationale}.",
-            output_directories=(bin_relpath,),
-            level=LogLevel.DEBUG,
-        ),
-    )
-    return BinaryShims(bin_relpath, result.output_digest)
+        for path in paths
+    ]
+
+    digest = await Get(Digest, CreateDigest(scripts))
+    cache_name = f"_binary_shims_{digest.fingerprint}"
+
+    return BinaryShims(digest, cache_name)
 
 
-def _create_shim(bash: str, binary: str) -> str:
+def _create_shim(bash: str, binary: str) -> bytes:
     """The binary shim script to be placed in the output directory for the digest."""
     return dedent(
         f"""\
         #!{bash}
         exec "{binary}" "$@"
         """
-    )
+    ).encode()
 
 
 @rule(desc="Finding the `bash` binary", level=LogLevel.DEBUG)
@@ -686,7 +685,7 @@ def find_gunzip(python: PythonBinary) -> GunzipBinary:
 
 
 @rule(desc="Finding the `tar` binary", level=LogLevel.DEBUG)
-async def find_tar() -> TarBinary:
+async def find_tar(platform: Platform) -> TarBinary:
     request = BinaryPathRequest(
         binary_name="tar", search_path=SEARCH_PATHS, test=BinaryPathTest(args=["--version"])
     )
@@ -694,7 +693,7 @@ async def find_tar() -> TarBinary:
     first_path = paths.first_path_or_raise(
         request, rationale="download the tools Pants needs to run"
     )
-    return TarBinary(first_path.path, first_path.fingerprint)
+    return TarBinary(first_path.path, first_path.fingerprint, platform)
 
 
 @rule(desc="Finding the `cat` binary", level=LogLevel.DEBUG)

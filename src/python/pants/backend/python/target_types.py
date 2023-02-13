@@ -42,6 +42,7 @@ from pants.engine.target import (
     AsyncFieldMixin,
     BoolField,
     Dependencies,
+    DictStringToStringField,
     DictStringToStringSequenceField,
     Field,
     IntField,
@@ -292,7 +293,7 @@ class ConsoleScript(MainSpecification):
         return self.name
 
 
-class PexEntryPointField(AsyncFieldMixin, SecondaryOwnerMixin, Field):
+class EntryPointField(AsyncFieldMixin, SecondaryOwnerMixin, Field):
     alias = "entry_point"
     default = None
     help = softwrap(
@@ -333,6 +334,11 @@ class PexEntryPointField(AsyncFieldMixin, SecondaryOwnerMixin, Field):
         return {"includes": [full_glob]}
 
 
+class PexEntryPointField(EntryPointField):
+    # Specialist subclass for use with `PexBinary` targets.
+    pass
+
+
 # See `target_types_rules.py` for the `ResolvePexEntryPointRequest -> ResolvedPexEntryPoint` rule.
 @dataclass(frozen=True)
 class ResolvedPexEntryPoint:
@@ -344,7 +350,7 @@ class ResolvedPexEntryPoint:
 class ResolvePexEntryPointRequest:
     """Determine the `entry_point` for a `pex_binary` after applying all syntactic sugar."""
 
-    entry_point_field: PexEntryPointField
+    entry_point_field: EntryPointField
 
 
 class PexScriptField(Field):
@@ -369,6 +375,26 @@ class PexScriptField(Field):
         if not isinstance(value, str):
             raise InvalidFieldTypeException(address, cls.alias, value, expected_type="a string")
         return ConsoleScript(value)
+
+
+class PexArgsField(StringSequenceField):
+    alias = "args"
+    help = softwrap(
+        """
+        Freeze these command-line args into the PEX. Allows you to run generic entry points
+        on specific arguments without creating a shim file.
+        """
+    )
+
+
+class PexEnvField(DictStringToStringField):
+    alias = "env"
+    help = softwrap(
+        """
+        Freeze these environment variables into the PEX. Allows you to run generic entry points
+        on a specific environment without creating a shim file.
+        """
+    )
 
 
 class PexPlatformsField(StringSequenceField):
@@ -625,6 +651,7 @@ class PexVenvSitePackagesCopies(BoolField):
 
 
 _PEX_BINARY_COMMON_FIELDS = (
+    EnvironmentField,
     InterpreterConstraintsField,
     PythonResolveField,
     PexBinaryDependenciesField,
@@ -653,6 +680,8 @@ class PexBinary(Target):
         *_PEX_BINARY_COMMON_FIELDS,
         PexEntryPointField,
         PexScriptField,
+        PexArgsField,
+        PexEnvField,
         OutputPathField,
     )
     help = softwrap(
@@ -1027,6 +1056,7 @@ class PythonSourceTarget(Target):
         PythonResolveField,
         PythonRunGoalUseSandboxField,
         PythonSourceField,
+        RestartableField,
     )
     help = "A single Python source file."
 
@@ -1108,6 +1138,7 @@ class PythonSourcesGeneratorTarget(TargetFilesGenerator):
         PythonRunGoalUseSandboxField,
         PythonDependenciesField,
         InterpreterConstraintsField,
+        RestartableField,
     )
     settings_request_cls = PythonFilesGeneratorSettingsRequest
     help = softwrap(
@@ -1254,6 +1285,11 @@ class PythonRequirementResolveField(PythonResolveField):
     )
 
 
+class PythonRequirementEntryPointField(EntryPointField):
+    # Specialist subclass for matching `PythonRequirementTarget` when running.
+    pass
+
+
 class PythonRequirementTarget(Target):
     alias = "python_requirement"
     core_fields = (
@@ -1263,6 +1299,7 @@ class PythonRequirementTarget(Target):
         PythonRequirementModulesField,
         PythonRequirementTypeStubModulesField,
         PythonRequirementResolveField,
+        PythonRequirementEntryPointField,
     )
     help = softwrap(
         f"""
@@ -1322,7 +1359,7 @@ class PythonDistributionDependenciesField(Dependencies):
 class PythonProvidesField(ScalarField, AsyncFieldMixin):
     alias = "provides"
     expected_type = PythonArtifact
-    expected_type_help = "setup_py(name='my-dist', **kwargs)"
+    expected_type_help = "python_artifact(name='my-dist', **kwargs)"
     value: PythonArtifact
     required = True
     help = softwrap(
@@ -1374,6 +1411,19 @@ class PythonDistributionEntryPointsField(NestedDictStringToStringField, AsyncFie
             {bin_name()} dependencies <python_distribution target address>
         """
     )
+
+
+class PythonDistributionOutputPathField(StringField, AsyncFieldMixin):
+    help = softwrap(
+        """
+        The path to the directory to write the distribution file to, relative the dist directory.
+
+        If undefined, this defaults to the empty path, i.e. the output goes at the top
+        level of the dist dir.
+        """
+    )
+    alias = "output_path"
+    default = ""
 
 
 @dataclass(frozen=True)
@@ -1548,6 +1598,7 @@ class PythonDistribution(Target):
         SDistConfigSettingsField,
         BuildBackendEnvVarsField,
         LongDescriptionPathField,
+        PythonDistributionOutputPathField,
     )
     help = softwrap(
         f"""

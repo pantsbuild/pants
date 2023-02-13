@@ -48,7 +48,6 @@ from pants.util.docutil import bin_name, doc_url
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized
-from pants.util.meta import frozen_after_init
 from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
@@ -81,8 +80,19 @@ def default_sources_for_target_type(tgt_type: type[Target]) -> tuple[str, ...]:
     return tuple()
 
 
-@frozen_after_init
-@dataclass(order=True, unsafe_hash=True)
+def has_source_or_sources_field(tgt_type: type[Target]) -> bool:
+    """Tell whether a given target type has a `source` or `sources` field.
+
+    This may be useful when determining whether it's possible to tailor a target with the passed
+    source(s) field value if the target doesn't have such a field in the first place.
+    """
+    for field in tgt_type.core_fields:
+        if issubclass(field, (OptionalSingleSourceField, MultipleSourcesField)):
+            return True
+    return False
+
+
+@dataclass(order=True, frozen=True)
 class PutativeTarget:
     """A potential target to add, detected by various heuristics.
 
@@ -147,8 +157,9 @@ class PutativeTarget:
                 )
             )
 
-        default_sources = default_sources_for_target_type(target_type)
-        if (explicit_sources or triggering_sources) and not default_sources:
+        if (explicit_sources or triggering_sources) and not has_source_or_sources_field(
+            target_type
+        ):
             raise AssertionError(
                 softwrap(
                     f"""
@@ -158,6 +169,7 @@ class PutativeTarget:
                     """
                 )
             )
+        default_sources = default_sources_for_target_type(target_type)
         owned_sources = explicit_sources or default_sources or tuple()
         return cls(
             path,
@@ -180,13 +192,13 @@ class PutativeTarget:
         kwargs: Mapping[str, str | int | bool | tuple[str, ...]] | None = None,
         comments: Iterable[str] = tuple(),
     ) -> None:
-        self.path = path
-        self.name = name
-        self.type_alias = type_alias
-        self.triggering_sources = tuple(triggering_sources)
-        self.owned_sources = tuple(owned_sources)
-        self.kwargs = FrozenDict(kwargs or {})
-        self.comments = tuple(comments)
+        object.__setattr__(self, "path", path)
+        object.__setattr__(self, "name", name)
+        object.__setattr__(self, "type_alias", type_alias)
+        object.__setattr__(self, "triggering_sources", tuple(triggering_sources))
+        object.__setattr__(self, "owned_sources", tuple(owned_sources))
+        object.__setattr__(self, "kwargs", FrozenDict(kwargs or {}))
+        object.__setattr__(self, "comments", tuple(comments))
 
     @property
     def address(self) -> Address:
@@ -393,15 +405,6 @@ class TailorSubsystem(GoalSubsystem):
 class TailorGoal(Goal):
     subsystem_cls = TailorSubsystem
     environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY
-
-
-def group_by_dir(paths: Iterable[str]) -> dict[str, set[str]]:
-    """For a list of file paths, returns a dict of directory path -> files in that dir."""
-    ret = defaultdict(set)
-    for path in paths:
-        dirname, filename = os.path.split(path)
-        ret[dirname].add(filename)
-    return ret
 
 
 def group_by_build_file(

@@ -1,3 +1,5 @@
+// Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
+// Licensed under the Apache License, Version 2.0 (see LICENSE).
 use std::collections::HashMap;
 use std::convert::TryInto;
 use std::pin::Pin;
@@ -179,11 +181,11 @@ impl StubCASResponder {
 
   fn read_internal(&self, req: &ReadRequest) -> Result<Vec<ReadResponse>, Status> {
     let parsed_resource_name = parse_read_resource_name(&req.resource_name)
-      .map_err(|err| Status::invalid_argument(format!("Failed to parse resource name: {}", err)))?;
+      .map_err(|err| Status::invalid_argument(format!("Failed to parse resource name: {err}")))?;
 
     let digest = parsed_resource_name.hash;
     let fingerprint = Fingerprint::from_hex_string(digest)
-      .map_err(|e| Status::invalid_argument(format!("Bad digest {}: {}", digest, e)))?;
+      .map_err(|e| Status::invalid_argument(format!("Bad digest {digest}: {e}")))?;
     if self.always_errors {
       return Err(Status::internal(
         "StubCAS is configured to always fail".to_owned(),
@@ -194,15 +196,14 @@ impl StubCASResponder {
     match maybe_bytes {
       Some(bytes) => Ok(
         bytes
-          .chunks(self.chunk_size_bytes as usize)
+          .chunks(self.chunk_size_bytes)
           .map(|b| ReadResponse {
             data: bytes.slice_ref(b),
           })
           .collect(),
       ),
       None => Err(Status::not_found(format!(
-        "Did not find digest {}",
-        fingerprint
+        "Did not find digest {fingerprint}"
       ))),
     }
   }
@@ -252,8 +253,7 @@ impl ByteStream for StubCASResponder {
         Ok(r) => r,
         Err(e) => {
           return Err(Status::invalid_argument(format!(
-            "Client sent an error: {}",
-            e
+            "Client sent an error: {e}"
           )))
         }
       };
@@ -504,6 +504,7 @@ impl ContentAddressableStorage for StubCASResponder {
           message: status.message().to_string(),
           ..protos::gen::google::rpc::Status::default()
         }),
+        compressor: remexec::compressor::Value::Identity as i32,
       });
     }
 
@@ -531,7 +532,7 @@ impl Capabilities for StubCASResponder {
 
     let response = ServerCapabilities {
       cache_capabilities: Some(CacheCapabilities {
-        digest_function: vec![remexec::digest_function::Value::Sha256 as i32],
+        digest_functions: vec![remexec::digest_function::Value::Sha256 as i32],
         max_batch_total_size_bytes: 0,
         ..CacheCapabilities::default()
       }),

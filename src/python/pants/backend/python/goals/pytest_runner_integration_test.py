@@ -33,6 +33,7 @@ from pants.backend.python.target_types import (
     PythonTestUtilsGeneratorTarget,
 )
 from pants.backend.python.util_rules import local_dists, pex_from_targets
+from pants.core.goals import package
 from pants.core.goals.test import (
     TestDebugAdapterRequest,
     TestDebugRequest,
@@ -48,6 +49,7 @@ from pants.engine.process import InteractiveProcessResult
 from pants.engine.rules import Get, rule
 from pants.engine.target import Target
 from pants.engine.unions import UnionRule
+from pants.testutil.debug_adapter_util import debugadapter_port_for_testing
 from pants.testutil.python_interpreter_selection import (
     all_major_minor_python_versions,
     skip_unless_python27_and_python3_present,
@@ -71,6 +73,7 @@ def rule_runner() -> RuleRunner:
             *target_types_rules.rules(),
             *local_dists.rules(),
             *setup_py.rules(),
+            *package.rules(),
             QueryRule(Partitions, (PyTestRequest.PartitionRequest,)),
             QueryRule(TestResult, (PyTestRequest.Batch,)),
             QueryRule(TestDebugRequest, (PyTestRequest.Batch,)),
@@ -108,6 +111,7 @@ def _configure_pytest_runner(
     args = [
         "--backend-packages=pants.backend.python",
         f"--source-root-patterns={SOURCE_ROOT}",
+        f"--debug-adapter-port={debugadapter_port_for_testing()}",
         *(extra_args or ()),
     ]
     rule_runner.set_options(args, env=env, env_inherit={"PATH", "PYENV_ROOT", "HOME"})
@@ -128,6 +132,7 @@ def run_pytest(
     *,
     extra_args: list[str] | None = None,
     env: dict[str, str] | None = None,
+    test_debug_adapter: bool = True,
 ) -> TestResult:
     _configure_pytest_runner(rule_runner, extra_args=extra_args, env=env)
     batch = _get_pytest_batch(rule_runner, test_targets)
@@ -137,6 +142,19 @@ def run_pytest(
         with mock_console(rule_runner.options_bootstrapper):
             debug_result = rule_runner.run_interactive_process(debug_request.process)
             assert test_result.exit_code == debug_result.exit_code
+
+    if test_debug_adapter:
+        debug_adapter_request = rule_runner.request(TestDebugAdapterRequest, [batch])
+        if debug_adapter_request.process is not None:
+            with mock_console(rule_runner.options_bootstrapper) as mocked_console:
+                _, stdioreader = mocked_console
+                debug_adapter_result = rule_runner.run_interactive_process(
+                    debug_adapter_request.process
+                )
+                assert (
+                    test_result.exit_code == debug_adapter_result.exit_code
+                ), f"{stdioreader.get_stdout()}\n{stdioreader.get_stderr()}"
+
     return test_result
 
 
@@ -289,14 +307,14 @@ def test_uses_correct_python_version(rule_runner: RuleRunner) -> None:
     py2_tgt = rule_runner.get_target(
         Address(PACKAGE, target_name="py2", relative_file_path="tests.py")
     )
-    result = run_pytest(rule_runner, [py2_tgt], extra_args=extra_args)
+    result = run_pytest(rule_runner, [py2_tgt], extra_args=extra_args, test_debug_adapter=False)
     assert result.exit_code == 2
     assert "SyntaxError: invalid syntax" in result.stdout
 
     py3_tgt = rule_runner.get_target(
         Address(PACKAGE, target_name="py3", relative_file_path="tests.py")
     )
-    result = run_pytest(rule_runner, [py3_tgt], extra_args=extra_args)
+    result = run_pytest(rule_runner, [py3_tgt], extra_args=extra_args, test_debug_adapter=False)
     assert result.exit_code == 0
     assert f"{PACKAGE}/tests.py ." in result.stdout
 
@@ -539,14 +557,14 @@ def test_extra_env_vars(rule_runner: RuleRunner) -> None:
             ),
             f"{PACKAGE}/BUILD": dedent(
                 """\
-            python_tests(
-                extra_env_vars=(
-                    "PYTHON_TESTS_VAR_WITHOUT_VALUE",
-                    "PYTHON_TESTS_VAR_WITH_VALUE=python_tests_var_with_value",
-                    "PYTHON_TESTS_OVERRIDE_WITH_VALUE_VAR=python_tests_override_with_value_var_override",
+                python_tests(
+                    extra_env_vars=(
+                        "PYTHON_TESTS_VAR_WITHOUT_VALUE",
+                        "PYTHON_TESTS_VAR_WITH_VALUE=python_tests_var_with_value",
+                        "PYTHON_TESTS_OVERRIDE_WITH_VALUE_VAR=python_tests_override_with_value_var_override",
+                    )
                 )
-            )
-            """
+                """
             ),
         }
     )
@@ -555,13 +573,83 @@ def test_extra_env_vars(rule_runner: RuleRunner) -> None:
         rule_runner,
         [tgt],
         extra_args=[
-            '--test-extra-env-vars=["ARG_WITH_VALUE_VAR=arg_with_value_var", "ARG_WITHOUT_VALUE_VAR", "PYTHON_TESTS_OVERRIDE_ARG_WITH_VALUE_VAR"]'
+            "--test-extra-env-vars=['ARG_WITH_VALUE_VAR=arg_with_value_var', 'ARG_WITHOUT_VALUE_VAR', 'PYTHON_TESTS_OVERRIDE_ARG_WITH_VALUE_VAR']"
         ],
         env={
             "ARG_WITHOUT_VALUE_VAR": "arg_without_value_value",
             "PYTHON_TESTS_VAR_WITHOUT_VALUE": "python_tests_var_without_value",
             "PYTHON_TESTS_OVERRIDE_WITH_VALUE_VAR": "python_tests_override_with_value_var",
         },
+    )
+    assert result.exit_code == 0
+
+
+def test_pytest_addopts_test_extra_env(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            f"{PACKAGE}/test_pytest_addopts_test_extra_env.py": dedent(
+                """\
+                import os
+
+                def test_addopts():
+                    assert "-vv" in os.getenv("PYTEST_ADDOPTS")
+                    assert "--maxfail=2" in os.getenv("PYTEST_ADDOPTS")
+                """
+            ),
+            f"{PACKAGE}/BUILD": dedent(
+                """\
+                python_tests()
+                """
+            ),
+        }
+    )
+    tgt = rule_runner.get_target(
+        Address(PACKAGE, relative_file_path="test_pytest_addopts_test_extra_env.py")
+    )
+    result = run_pytest(
+        rule_runner,
+        [tgt],
+        extra_args=[
+            "--test-extra-env-vars=['PYTEST_ADDOPTS=-vv --maxfail=2']",
+        ],
+    )
+    assert result.exit_code == 0
+
+
+def test_pytest_addopts_field_set_extra_env(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            f"{PACKAGE}/test_pytest_addopts_field_set_extra_env.py": dedent(
+                """\
+                import os
+
+                def test_addopts():
+                    assert "-vv" not in os.getenv("PYTEST_ADDOPTS")
+                    assert "--maxfail=2" not in os.getenv("PYTEST_ADDOPTS")
+                    assert "-ra" in os.getenv("PYTEST_ADDOPTS")
+                    assert "-q" in os.getenv("PYTEST_ADDOPTS")
+                """
+            ),
+            f"{PACKAGE}/BUILD": dedent(
+                """\
+                python_tests(
+                    extra_env_vars=(
+                        "PYTEST_ADDOPTS=-ra -q",
+                    )
+                )
+                """
+            ),
+        }
+    )
+    tgt = rule_runner.get_target(
+        Address(PACKAGE, relative_file_path="test_pytest_addopts_field_set_extra_env.py")
+    )
+    result = run_pytest(
+        rule_runner,
+        [tgt],
+        extra_args=[
+            "--test-extra-env-vars=['PYTEST_ADDOPTS=-vv --maxfail=2']",  # should be overridden by `python_tests`
+        ],
     )
     assert result.exit_code == 0
 
@@ -732,9 +820,9 @@ def test_debug_adaptor_request_argv(rule_runner: RuleRunner) -> None:
         "./pytest_runner.pex_pex_shim.sh",
         "--listen",
         "127.0.0.1:5678",
-        "--wait-for-client",
         "-c",
         unittest.mock.ANY,
+        "--color=no",
         "tests/python/pants_test/test_foo.py",
     )
 

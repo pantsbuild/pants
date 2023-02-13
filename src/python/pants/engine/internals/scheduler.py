@@ -22,14 +22,15 @@ from pants.engine.fs import (
     DigestEntries,
     DigestSubset,
     Directory,
-    DownloadFile,
     FileContent,
     FileDigest,
     FileEntry,
+    NativeDownloadFile,
     PathGlobs,
     PathGlobsAndRoot,
     Paths,
     Snapshot,
+    SymlinkEntry,
 )
 from pants.engine.goal import Goal
 from pants.engine.internals import native_engine
@@ -149,13 +150,14 @@ class Scheduler:
             paths=Paths,
             file_content=FileContent,
             file_entry=FileEntry,
+            symlink_entry=SymlinkEntry,
             directory=Directory,
             digest_contents=DigestContents,
             digest_entries=DigestEntries,
             path_globs=PathGlobs,
             create_digest=CreateDigest,
             digest_subset=DigestSubset,
-            download_file=DownloadFile,
+            native_download_file=NativeDownloadFile,
             platform=Platform,
             process=Process,
             process_result=FallibleProcessResult,
@@ -189,6 +191,7 @@ class Scheduler:
             execution_headers=execution_options.remote_execution_headers,
             execution_overall_deadline_secs=execution_options.remote_execution_overall_deadline_secs,
             execution_rpc_concurrency=execution_options.remote_execution_rpc_concurrency,
+            append_only_caches_base_path=execution_options.remote_execution_append_only_caches_base_path,
         )
         py_local_store_options = PyLocalStoreOptions(
             store_dir=local_store_options.store_dir,
@@ -211,6 +214,7 @@ class Scheduler:
             graceful_shutdown_timeout=execution_options.process_execution_graceful_shutdown_timeout,
         )
 
+        self._py_executor = executor
         self._py_scheduler = native_engine.scheduler_create(
             executor,
             tasks,
@@ -238,6 +242,10 @@ class Scheduler:
     @property
     def py_scheduler(self) -> PyScheduler:
         return self._py_scheduler
+
+    @property
+    def py_executor(self) -> PyExecutor:
+        return self._py_executor
 
     def _to_params_list(self, subject_or_params: Any | Params) -> Sequence[Any]:
         if isinstance(subject_or_params, Params):

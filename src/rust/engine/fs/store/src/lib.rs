@@ -26,6 +26,8 @@
 #![allow(clippy::mutex_atomic)]
 #![recursion_limit = "256"]
 
+mod immutable_inputs;
+pub use crate::immutable_inputs::{ImmutableInputs, WorkdirSymlink};
 mod snapshot;
 pub use crate::snapshot::{OneOffStoreFileByDigest, Snapshot, StoreFileByDigest};
 mod snapshot_ops;
@@ -35,12 +37,13 @@ mod snapshot_ops_tests;
 mod snapshot_tests;
 pub use crate::snapshot_ops::{SnapshotOps, SubsetParams};
 
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::fmt::{self, Debug, Display};
+use std::fs::hard_link;
 use std::fs::OpenOptions;
 use std::future::Future;
-use std::io::{self, Read, Write};
-use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
+use std::io::{self, Read, Seek, Write};
+use std::os::unix::fs::{symlink, OpenOptionsExt, PermissionsExt};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Weak};
 use std::time::{Duration, Instant};
@@ -50,12 +53,11 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use fs::{
   default_cache_path, directory, DigestEntry, DigestTrie, Dir, DirectoryDigest, File, FileContent,
-  FileEntry, PathStat, Permissions, RelativePath, EMPTY_DIRECTORY_DIGEST,
+  FileEntry, Link, PathStat, Permissions, RelativePath, SymlinkBehavior, SymlinkEntry,
+  EMPTY_DIRECTORY_DIGEST,
 };
 use futures::future::{self, BoxFuture, Either, FutureExt, TryFutureExt};
 use grpc_util::prost::MessageExt;
-use grpc_util::retry::{retry_call, status_is_retryable};
-use grpc_util::status_to_str;
 use hashing::Digest;
 use parking_lot::Mutex;
 use prost::Message;
@@ -67,10 +69,15 @@ use sharded_lmdb::DEFAULT_LEASE_TIME;
 use tryfuture::try_future;
 use workunit_store::{in_workunit, Level, Metric};
 
-use crate::remote::ByteStoreError;
-
-const MEGABYTES: usize = 1024 * 1024;
+const KILOBYTES: usize = 1024;
+const MEGABYTES: usize = 1024 * KILOBYTES;
 const GIGABYTES: usize = 1024 * MEGABYTES;
+
+/// How big a file must be to become an immutable input symlink.
+// NB: These numbers were chosen after micro-benchmarking the code on one machine at the time of
+// writing. They were chosen using a rough equation from the microbenchmarks that are optimized
+// for somewhere between 2 and 3 uses of the corresponding entry to "break even".
+const IMMUTABLE_FILE_SIZE_LIMIT: usize = 512 * KILOBYTES;
 
 mod local;
 #[cfg(test)]
@@ -133,6 +140,12 @@ impl Display for StoreError {
 impl From<String> for StoreError {
   fn from(err: String) -> Self {
     Self::Unclassified(err)
+  }
+}
+
+impl From<io::Error> for StoreError {
+  fn from(err: io::Error) -> Self {
+    Self::Unclassified(err.to_string())
   }
 }
 
@@ -222,6 +235,72 @@ impl RemoteStore {
       .await
       .map(|&()| ())
   }
+
+  /// Download the digest to the local byte store from this remote store. The function `f_remote`
+  /// can be used to validate the bytes (NB. if provided, the whole value will be buffered into
+  /// memory to provide the `Bytes` argument, and thus `f_remote` should only be used for small digests).
+  async fn download_digest_to_local(
+    &self,
+    local_store: local::ByteStore,
+    digest: Digest,
+    entry_type: EntryType,
+    f_remote: Option<&(dyn Fn(Bytes) -> Result<(), String> + Send + Sync + 'static)>,
+  ) -> Result<(), StoreError> {
+    let remote_store = self.store.clone();
+    let create_missing = || {
+      StoreError::MissingDigest(
+        "Was not present in either the local or remote store".to_owned(),
+        digest,
+      )
+    };
+    self
+      .maybe_download(digest, async move {
+        let stored_digest = if digest.size_bytes <= IMMUTABLE_FILE_SIZE_LIMIT || f_remote.is_some()
+        {
+          // (if there's a function to call, always just buffer fully into memory)
+          let bytes = remote_store
+            .load_bytes(digest)
+            .await?
+            .ok_or_else(create_missing)?;
+          if let Some(f_remote) = f_remote {
+            f_remote(bytes.clone())?;
+          }
+          local_store
+            .store_bytes(entry_type, None, bytes, true)
+            .await?
+        } else {
+          assert!(f_remote.is_none());
+          // TODO(#18048): choose a file that can be plopped into the local store directly, when
+          // large files are stored there
+          let file = tokio::task::spawn_blocking(tempfile::tempfile)
+            .await
+            .map_err(|e| e.to_string())??;
+          let file = tokio::fs::File::from_std(file);
+
+          let file = remote_store
+            .load_file(digest, file)
+            .await?
+            .ok_or_else(create_missing)?;
+
+          let file = file.into_std().await;
+          local_store
+            .store(entry_type, true, true, move || {
+              let mut file = file.try_clone()?;
+              file.rewind()?;
+              Ok(file)
+            })
+            .await?
+        };
+        if digest == stored_digest {
+          Ok(())
+        } else {
+          Err(StoreError::Unclassified(format!(
+            "CAS gave wrong digest: expected {digest:?}, got {stored_digest:?}"
+          )))
+        }
+      })
+      .await
+  }
 }
 
 ///
@@ -229,9 +308,9 @@ impl RemoteStore {
 ///
 /// Store keeps content on disk, and can optionally delegate to backfill its on-disk storage by
 /// fetching files from a remote server which implements the gRPC bytestream interface
-/// (see https://github.com/googleapis/googleapis/blob/master/google/bytestream/bytestream.proto)
+/// (see <https://github.com/googleapis/googleapis/blob/master/google/bytestream/bytestream.proto>)
 /// as specified by the gRPC remote execution interface (see
-/// https://github.com/googleapis/googleapis/blob/master/google/devtools/remoteexecution/v1test/)
+/// <https://github.com/googleapis/googleapis/blob/master/google/devtools/remoteexecution/v1test/>)
 ///
 /// It can also write back to a remote gRPC server, but will only do so when explicitly instructed
 /// to do so.
@@ -240,6 +319,7 @@ impl RemoteStore {
 pub struct Store {
   local: local::ByteStore,
   remote: Option<RemoteStore>,
+  immutable_inputs_base: Option<PathBuf>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -275,17 +355,20 @@ impl Store {
     Ok(Store {
       local: local::ByteStore::new(executor, path)?,
       remote: None,
+      immutable_inputs_base: None,
     })
   }
 
   pub fn local_only_with_options<P: AsRef<Path>>(
     executor: task_executor::Executor,
     path: P,
+    immutable_inputs_base: &Path,
     options: LocalOptions,
   ) -> Result<Store, String> {
     Ok(Store {
       local: local::ByteStore::new_with_options(executor, path, options)?,
       remote: None,
+      immutable_inputs_base: Some(immutable_inputs_base.to_path_buf()),
     })
   }
 
@@ -299,6 +382,7 @@ impl Store {
     Store {
       local: self.local,
       remote: None,
+      immutable_inputs_base: self.immutable_inputs_base,
     }
   }
 
@@ -333,6 +417,7 @@ impl Store {
         capabilities_cell_opt,
         batch_api_size_limit,
       )?)),
+      immutable_inputs_base: self.immutable_inputs_base,
     })
   }
 
@@ -455,12 +540,7 @@ impl Store {
   ) -> Result<T, StoreError> {
     // No transformation or verification is needed for files.
     self
-      .load_bytes_with(
-        EntryType::File,
-        digest,
-        move |v: &[u8]| Ok(f(v)),
-        |_: Bytes| Ok(()),
-      )
+      .load_bytes_with(EntryType::File, digest, move |v: &[u8]| Ok(f(v)), None)
       .await
   }
 
@@ -474,7 +554,7 @@ impl Store {
   ) -> Result<DirectoryDigest, String> {
     // Collect all Directory structs in the trie.
     let mut directories = Vec::new();
-    tree.walk(&mut |_, entry| match entry {
+    tree.walk(SymlinkBehavior::Aware, &mut |_, entry| match entry {
       directory::Entry::Directory(d) => {
         let directory = d.as_remexec_directory();
         if cfg!(debug_assertions) {
@@ -483,6 +563,7 @@ impl Store {
         directories.push((Some(d.digest()), directory.to_bytes()))
       }
       directory::Entry::File(_) => (),
+      directory::Entry::Symlink(_) => (),
     });
 
     // Then store them as a batch.
@@ -536,11 +617,11 @@ impl Store {
       .walk(digest.as_digest(), |_, path_so_far, _, directory| {
         let mut path_stats = Vec::new();
         path_stats.extend(directory.directories.iter().map(move |dir_node| {
-          let path = path_so_far.join(dir_node.name.clone());
+          let path = path_so_far.join(&dir_node.name);
           (PathStat::dir(path.clone(), Dir(path)), None)
         }));
         path_stats.extend(directory.files.iter().map(move |file_node| {
-          let path = path_so_far.join(file_node.name.clone());
+          let path = path_so_far.join(&file_node.name);
           (
             PathStat::file(
               path.clone(),
@@ -550,6 +631,19 @@ impl Store {
               },
             ),
             Some((path, file_node.digest.as_ref().unwrap().try_into().unwrap())),
+          )
+        }));
+        path_stats.extend(directory.symlinks.iter().map(move |link_node| {
+          let path = path_so_far.join(&link_node.name);
+          (
+            PathStat::link(
+              path.clone(),
+              Link {
+                path,
+                target: link_node.target.clone().into(),
+              },
+            ),
+            None,
           )
         }));
         future::ok(path_stats).boxed()
@@ -609,10 +703,7 @@ impl Store {
         // and only verify in debug mode, as it's slightly expensive.
         move |bytes: &[u8]| {
           let directory = remexec::Directory::decode(bytes).map_err(|e| {
-            format!(
-              "LMDB corruption: Directory bytes for {:?} were not valid: {:?}",
-              digest, e
-            )
+            format!("LMDB corruption: Directory bytes for {digest:?} were not valid: {e:?}")
           })?;
           if cfg!(debug_assertions) {
             protos::verify_directory_canonical(digest, &directory)?;
@@ -621,16 +712,13 @@ impl Store {
         },
         // Eagerly verify that CAS-returned Directories are canonical, so that we don't write them
         // into our local store.
-        move |bytes: Bytes| {
+        Some(&move |bytes| {
           let directory = remexec::Directory::decode(bytes).map_err(|e| {
-            format!(
-              "CAS returned Directory proto for {:?} which was not valid: {:?}",
-              digest, e
-            )
+            format!("CAS returned Directory proto for {digest:?} which was not valid: {e:?}")
           })?;
           protos::verify_directory_canonical(digest, &directory)?;
           Ok(())
-        },
+        }),
       )
       .await
   }
@@ -658,17 +746,13 @@ impl Store {
   async fn load_bytes_with<
     T: Send + 'static,
     FLocal: Fn(&[u8]) -> Result<T, String> + Clone + Send + Sync + 'static,
-    FRemote: Fn(Bytes) -> Result<(), String> + Send + Sync + 'static,
   >(
     &self,
     entry_type: EntryType,
     digest: Digest,
     f_local: FLocal,
-    f_remote: FRemote,
+    f_remote: Option<&(dyn Fn(Bytes) -> Result<(), String> + Send + Sync + 'static)>,
   ) -> Result<T, StoreError> {
-    let local = self.local.clone();
-    let maybe_remote = self.remote.clone();
-
     if let Some(bytes_res) = self
       .local
       .load_bytes_with(entry_type, digest, f_local.clone())
@@ -677,47 +761,11 @@ impl Store {
       return Ok(bytes_res?);
     }
 
-    let remote = maybe_remote.ok_or_else(|| {
+    let remote = self.remote.clone().ok_or_else(|| {
       StoreError::MissingDigest("Was not present in the local store".to_owned(), digest)
     })?;
-    let remote_store = remote.store.clone();
-
     remote
-      .maybe_download(digest, async move {
-        // TODO: Now that we always copy from the remote store to the local store before executing
-        // the caller's logic against the local store, `remote::ByteStore::load_bytes_with` no
-        // longer needs to accept a function.
-        let bytes = retry_call(
-          remote_store,
-          |remote_store| async move { remote_store.load_bytes_with(digest, Ok).await },
-          |err| match err {
-            ByteStoreError::Grpc(status) => status_is_retryable(status),
-            _ => false,
-          },
-        )
-        .await
-        .map_err(|err| match err {
-          ByteStoreError::Grpc(status) => status_to_str(status),
-          ByteStoreError::Other(msg) => msg,
-        })?
-        .ok_or_else(|| {
-          StoreError::MissingDigest(
-            "Was not present in either the local or remote store".to_owned(),
-            digest,
-          )
-        })?;
-
-        f_remote(bytes.clone())?;
-        let stored_digest = local.store_bytes(entry_type, None, bytes, true).await?;
-        if digest == stored_digest {
-          Ok(())
-        } else {
-          Err(StoreError::Unclassified(format!(
-            "CAS gave wrong digest: expected {:?}, got {:?}",
-            digest, stored_digest
-          )))
-        }
-      })
+      .download_digest_to_local(self.local.clone(), digest, entry_type, f_remote)
       .await?;
 
     Ok(
@@ -811,7 +859,7 @@ impl Store {
       )
       .await?;
 
-      let ingested_file_sizes = ingested_digests.iter().map(|(digest, _)| digest.size_bytes);
+      let ingested_file_sizes = ingested_digests.keys().map(|digest| digest.size_bytes);
       let uploaded_file_sizes = digests_to_upload.iter().map(|digest| digest.size_bytes);
 
       Ok(UploadSummary {
@@ -845,10 +893,7 @@ impl Store {
     match maybe_bytes {
       Some(bytes) => Ok(remote.store_bytes(bytes).await?),
       None => Err(StoreError::MissingDigest(
-        format!(
-          "Failed to upload {entry_type:?}: Not found in local store",
-          entry_type = entry_type,
-        ),
+        format!("Failed to upload {entry_type:?}: Not found in local store",),
         digest,
       )),
     }
@@ -865,21 +910,13 @@ impl Store {
         let result = local
           .load_bytes_with(entry_type, digest, move |bytes| {
             buffer.write_all(bytes).map_err(|e| {
-              format!(
-                "Failed to write {entry_type:?} {digest:?} to temporary buffer: {err}",
-                entry_type = entry_type,
-                digest = digest,
-                err = e
-              )
+              format!("Failed to write {entry_type:?} {digest:?} to temporary buffer: {e}")
             })
           })
           .await?;
         match result {
           None => Err(StoreError::MissingDigest(
-            format!(
-              "Failed to upload {entry_type:?}: Not found in local store",
-              entry_type = entry_type,
-            ),
+            format!("Failed to upload {entry_type:?}: Not found in local store",),
             digest,
           )),
           Some(Err(err)) => Err(err.into()),
@@ -912,11 +949,11 @@ impl Store {
     // Collect all file digests.
     let mut file_digests = file_digests.into_iter().collect::<HashSet<_>>();
     for digest_trie in digest_tries {
-      digest_trie.walk(&mut |_, entry| match entry {
+      digest_trie.walk(SymlinkBehavior::Aware, &mut |_, entry| match entry {
         directory::Entry::File(f) => {
           file_digests.insert(f.digest());
         }
-        directory::Entry::Directory(_) => (),
+        directory::Entry::Symlink(_) | directory::Entry::Directory(_) => (),
       });
     }
 
@@ -943,53 +980,66 @@ impl Store {
     Ok(missing.is_empty())
   }
 
-  ///
-  /// Ensure that a directory is locally loadable, which will download it from the Remote store as
-  /// a sideeffect (if one is configured).
-  ///
-  pub async fn ensure_local_has_recursive_directory(
+  /// Ensure that the files are locally loadable. This will download them from the remote store as
+  /// a side effect, if one is configured.
+  pub async fn ensure_downloaded(
     &self,
-    dir_digest: DirectoryDigest,
+    mut file_digests: HashSet<Digest>,
+    directory_digests: HashSet<DirectoryDigest>,
   ) -> Result<(), StoreError> {
-    let mut file_digests = Vec::new();
-    self
-      .load_digest_trie(dir_digest)
-      .await?
-      .walk(&mut |_, entry| match entry {
-        directory::Entry::File(f) => file_digests.push(f.digest()),
-        directory::Entry::Directory(_) => (),
-      });
+    let file_digests_from_directories =
+      future::try_join_all(directory_digests.into_iter().map(|dir_digest| async move {
+        let mut file_digests_for_dir = Vec::new();
+        let trie = self.load_digest_trie(dir_digest).await?;
+        trie.walk(SymlinkBehavior::Aware, &mut |_, entry| match entry {
+          directory::Entry::File(f) => file_digests_for_dir.push(f.digest()),
+          directory::Entry::Symlink(_) | directory::Entry::Directory(_) => (),
+        });
+        // Also ensure that the directory trie is persisted to disk, not only its file entries.
+        self.record_digest_trie(trie, true).await?;
+        Ok::<_, StoreError>(file_digests_for_dir)
+      }))
+      .await?;
+    file_digests.extend(file_digests_from_directories.into_iter().flatten());
 
+    let missing_file_digests = self
+      .local
+      .get_missing_digests(EntryType::File, file_digests)
+      .await?;
+    if missing_file_digests.is_empty() {
+      return Ok(());
+    }
+
+    let remote = &self.remote.clone().ok_or_else(|| {
+      StoreError::MissingDigest(
+        "Was not present in the local store".to_owned(),
+        *missing_file_digests.iter().next().unwrap(),
+      )
+    })?;
     let _ = future::try_join_all(
-      file_digests
+      missing_file_digests
         .into_iter()
-        .map(|file_digest| self.ensure_local_has_file(file_digest))
-        .collect::<Vec<_>>(),
+        .map(|file_digest| async move {
+          if let Err(e) = remote
+            .download_digest_to_local(self.local.clone(), file_digest, EntryType::File, None)
+            .await
+          {
+            log::debug!("Missing file digest from remote store: {:?}", file_digest);
+            in_workunit!(
+              "missing_file_counter",
+              Level::Trace,
+              |workunit| async move {
+                workunit.increment_counter(Metric::RemoteStoreMissingDigest, 1);
+              },
+            )
+            .await;
+            return Err(e);
+          }
+          Ok(())
+        }),
     )
     .await?;
     Ok(())
-  }
-
-  /// Ensure that a file is locally loadable, which will download it from the Remote store as
-  /// a side effect (if one is configured). Called only with the Digest of a File.
-  pub async fn ensure_local_has_file(&self, file_digest: Digest) -> Result<(), StoreError> {
-    if let Err(e) = self
-      .load_bytes_with(EntryType::File, file_digest, |_| Ok(()), |_| Ok(()))
-      .await
-    {
-      log::debug!("Missing file digest from remote store: {:?}", file_digest);
-      in_workunit!(
-        "missing_file_counter",
-        Level::Trace,
-        |workunit| async move {
-          workunit.increment_counter(Metric::RemoteStoreMissingDigest, 1);
-        },
-      )
-      .await;
-      Err(e)
-    } else {
-      Ok(())
-    }
   }
 
   /// Load a REv2 Tree from a remote CAS _without_ persisting the embedded Directory protos in
@@ -997,7 +1047,7 @@ impl Store {
   /// the Directory protos that comprise the output directories from a remote execution
   /// reported by an ActionResult.
   ///
-  /// Returns an Option<DirectoryDigest> representing the `root` of the Tree (if it in fact
+  /// Returns an `Option<DirectoryDigest>` representing the `root` of the Tree (if it in fact
   /// exists in the remote CAS).
   ///
   /// This method requires that this Store be configured with a remote CAS, and will return an
@@ -1012,35 +1062,14 @@ impl Store {
       return Err("Cannot load Trees from a remote without a remote".to_owned());
     };
 
-    let tree_opt = retry_call(
-      remote,
-      |remote| async move {
-        remote
-          .store
-          .load_bytes_with(tree_digest, |b| {
-            let tree = Tree::decode(b).map_err(|e| format!("protobuf decode error: {:?}", e))?;
-            Ok(tree)
-          })
-          .await
-      },
-      |err| match err {
-        ByteStoreError::Grpc(status) => status_is_retryable(status),
-        _ => false,
-      },
-    )
-    .await
-    .map_err(|err| match err {
-      ByteStoreError::Grpc(status) => status_to_str(status),
-      ByteStoreError::Other(msg) => msg,
-    })?;
-
-    let tree = match tree_opt {
-      Some(t) => t,
-      None => return Ok(None),
-    };
-
-    let trie = DigestTrie::try_from(tree)?;
-    Ok(Some(trie.into()))
+    match remote.store.load_bytes(tree_digest).await? {
+      Some(b) => {
+        let tree = Tree::decode(b).map_err(|e| format!("protobuf decode error: {e:?}"))?;
+        let trie = DigestTrie::try_from(tree)?;
+        Ok(Some(trie.into()))
+      }
+      None => Ok(None),
+    }
   }
 
   pub async fn lease_all_recursively<'a, Ds: Iterator<Item = &'a Digest>>(
@@ -1077,7 +1106,7 @@ impl Store {
         }
         Ok(())
       }
-      Err(err) => Err(format!("Garbage collection failed: {:?}", err)),
+      Err(err) => Err(format!("Garbage collection failed: {err:?}")),
     }
   }
 
@@ -1197,33 +1226,49 @@ impl Store {
     &self,
     destination: PathBuf,
     digest: DirectoryDigest,
+    mutable_paths: &BTreeSet<RelativePath>,
+    immutable_inputs: Option<&ImmutableInputs>,
     perms: Permissions,
   ) -> Result<(), StoreError> {
     // Load the DigestTrie for the digest, and convert it into a mapping between a fully qualified
     // parent path and its children.
     let mut parent_to_child = HashMap::new();
-    self
-      .load_digest_trie(digest)
-      .await?
-      .walk(&mut |path, entry| {
-        if let Some(parent) = path.parent() {
-          parent_to_child
-            .entry(destination.join(parent))
-            .or_insert_with(Vec::new)
-            .push(entry.clone());
-        }
-      });
+    let tree = self.load_digest_trie(digest).await?;
+    tree.walk(SymlinkBehavior::Aware, &mut |path, entry| {
+      if let Some(parent) = path.parent() {
+        parent_to_child
+          .entry(destination.join(parent))
+          .or_insert_with(Vec::new)
+          .push(entry.clone());
+      }
+    });
+
+    let mut mutable_path_ancestors = BTreeSet::new();
+    for relpath in mutable_paths {
+      mutable_path_ancestors.extend(relpath.ancestors().map(|p| destination.join(p)));
+    }
 
     self
-      .materialize_directory_helper(destination, true, &parent_to_child, perms)
+      .materialize_directory_children(
+        destination.clone(),
+        true,
+        false,
+        &parent_to_child,
+        &mutable_path_ancestors,
+        immutable_inputs,
+        perms,
+      )
       .await
   }
 
-  fn materialize_directory_helper<'a>(
+  fn materialize_directory_children<'a>(
     &self,
     destination: PathBuf,
     is_root: bool,
+    force_mutable: bool,
     parent_to_child: &'a HashMap<PathBuf, Vec<directory::Entry>>,
+    mutable_paths: &'a BTreeSet<PathBuf>,
+    immutable_inputs: Option<&'a ImmutableInputs>,
     perms: Permissions,
   ) -> BoxFuture<'a, Result<(), StoreError>> {
     let store = self.clone();
@@ -1232,13 +1277,16 @@ impl Store {
       store
         .local
         .executor()
-        .spawn_blocking(move || {
-          if is_root {
-            fs::safe_create_dir_all(&destination2)
-          } else {
-            fs::safe_create_dir(&destination2)
-          }
-        })
+        .spawn_blocking(
+          move || {
+            if is_root {
+              fs::safe_create_dir_all(&destination2)
+            } else {
+              fs::safe_create_dir(&destination2)
+            }
+          },
+          |e| Err(format!("Directory creation task failed: {e}")),
+        )
         .map_err(|e| {
           format!(
             "Failed to create directory {}: {}",
@@ -1254,19 +1302,38 @@ impl Store {
           let path = destination.join(child.name().as_ref());
           let store = store.clone();
           child_futures.push(async move {
+            let can_be_immutable =
+              immutable_inputs.is_some() && !mutable_paths.contains(&path) && !force_mutable;
+
             match child {
               directory::Entry::File(f) => {
-                let mode = match perms {
-                  Permissions::ReadOnly if f.is_executable() => 0o555,
-                  Permissions::ReadOnly => 0o444,
-                  Permissions::Writable if f.is_executable() => 0o755,
-                  Permissions::Writable => 0o644,
-                };
-                store.materialize_file(path, f.digest(), mode).await
+                store
+                  .materialize_file_maybe_hardlink(
+                    path,
+                    f.digest(),
+                    perms,
+                    f.is_executable(),
+                    can_be_immutable,
+                    immutable_inputs,
+                  )
+                  .await
+              }
+              directory::Entry::Symlink(s) => {
+                store
+                  .materialize_symlink(path, s.target().to_str().unwrap().to_string())
+                  .await
               }
               directory::Entry::Directory(_) => {
                 store
-                  .materialize_directory_helper(path, false, parent_to_child, perms)
+                  .materialize_directory_children(
+                    path.clone(),
+                    false,
+                    mutable_paths.contains(&path),
+                    parent_to_child,
+                    mutable_paths,
+                    immutable_inputs,
+                    perms,
+                  )
                   .await
               }
             }
@@ -1291,11 +1358,36 @@ impl Store {
     .boxed()
   }
 
+  async fn materialize_file_maybe_hardlink(
+    &self,
+    destination: PathBuf,
+    digest: Digest,
+    perms: Permissions,
+    is_executable: bool,
+    can_be_immutable: bool,
+    immutable_inputs: Option<&ImmutableInputs>,
+  ) -> Result<(), StoreError> {
+    if can_be_immutable && digest.size_bytes > IMMUTABLE_FILE_SIZE_LIMIT {
+      let dest_path = immutable_inputs
+        .unwrap()
+        .path_for_file(digest, is_executable)
+        .await?;
+      self
+        .materialize_hardlink(destination, dest_path.to_str().unwrap().to_string())
+        .await
+    } else {
+      self
+        .materialize_file(destination, digest, perms, is_executable)
+        .await
+    }
+  }
+
   async fn materialize_file(
     &self,
     destination: PathBuf,
     digest: Digest,
-    mode: u32,
+    perms: Permissions,
+    is_executable: bool,
   ) -> Result<(), StoreError> {
     self
       .load_file_bytes_with(digest, move |bytes| {
@@ -1303,7 +1395,12 @@ impl Store {
           .create(true)
           .write(true)
           .truncate(true)
-          .mode(mode)
+          .mode(match perms {
+            Permissions::ReadOnly if is_executable => 0o555,
+            Permissions::ReadOnly => 0o444,
+            Permissions::Writable if is_executable => 0o755,
+            Permissions::Writable => 0o644,
+          })
           .open(&destination)
           .map_err(|e| {
             format!(
@@ -1319,6 +1416,24 @@ impl Store {
       .await?
   }
 
+  pub async fn materialize_symlink(
+    &self,
+    destination: PathBuf,
+    target: String,
+  ) -> Result<(), StoreError> {
+    symlink(target, destination)?;
+    Ok(())
+  }
+
+  pub async fn materialize_hardlink(
+    &self,
+    destination: PathBuf,
+    target: String,
+  ) -> Result<(), StoreError> {
+    hard_link(target, destination)?;
+    Ok(())
+  }
+
   ///
   /// Returns files sorted by their path.
   ///
@@ -1330,8 +1445,9 @@ impl Store {
     self
       .load_digest_trie(digest)
       .await?
-      .walk(&mut |path, entry| match entry {
+      .walk(SymlinkBehavior::Oblivious, &mut |path, entry| match entry {
         directory::Entry::File(f) => files.push((path.to_owned(), f.digest(), f.is_executable())),
+        directory::Entry::Symlink(_) => (),
         directory::Entry::Directory(_) => (),
       });
 
@@ -1341,7 +1457,7 @@ impl Store {
         let content = store
           .load_file_bytes_with(digest, Bytes::copy_from_slice)
           .await
-          .map_err(|e| e.enrich(&format!("Couldn't find file contents for {:?}", path)))?;
+          .map_err(|e| e.enrich(&format!("Couldn't find file contents for {path:?}")))?;
         Ok(FileContent {
           path,
           content,
@@ -1364,15 +1480,20 @@ impl Store {
     }
 
     let mut entries = Vec::new();
-    self
-      .load_digest_trie(digest)
-      .await?
-      .walk(&mut |path, entry| match entry {
+    self.load_digest_trie(digest).await?.walk(
+      SymlinkBehavior::Aware,
+      &mut |path, entry| match entry {
         directory::Entry::File(f) => {
           entries.push(DigestEntry::File(FileEntry {
             path: path.to_owned(),
             digest: f.digest(),
             is_executable: f.is_executable(),
+          }));
+        }
+        directory::Entry::Symlink(s) => {
+          entries.push(DigestEntry::Symlink(SymlinkEntry {
+            path: path.to_owned(),
+            target: s.target().to_path_buf(),
           }));
         }
         directory::Entry::Directory(d) => {
@@ -1382,7 +1503,8 @@ impl Store {
             entries.push(DigestEntry::EmptyDirectory(path.to_owned()));
           }
         }
-      });
+      },
+    );
 
     Ok(entries)
   }

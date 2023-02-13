@@ -18,6 +18,8 @@ from pants.backend.go.util_rules import (
     build_pkg_target,
     first_party_pkg,
     go_mod,
+    implicit_linker_deps,
+    import_analysis,
     link,
     sdk,
     tests_analysis,
@@ -43,6 +45,8 @@ def rule_runner() -> RuleRunner:
             *first_party_pkg.rules(),
             *go_mod.rules(),
             *link.rules(),
+            *import_analysis.rules(),
+            *implicit_linker_deps.rules(),
             *sdk.rules(),
             *target_type_rules.rules(),
             *tests_analysis.rules(),
@@ -96,7 +100,7 @@ def test_transform_test_args() -> None:
     )
 
 
-def test_internal_test_success(rule_runner: RuleRunner) -> None:
+def test_all_the_tests_are_successful(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "foo/BUILD": "go_mod(name='mod')\ngo_package()",
@@ -107,16 +111,75 @@ def test_internal_test_success(rule_runner: RuleRunner) -> None:
                 func add(x, y int) int {
                   return x + y
                 }
+                func Add(x, y int) int {
+                  return add(x, y)
+                }
                 """
             ),
-            "foo/add_test.go": textwrap.dedent(
+            "foo/fib.go": textwrap.dedent(
                 """
                 package foo
-                import "testing"
-                func TestAdd(t *testing.T) {
+                func Fib(n int) int {
+                  if n < 2 {
+                    return n
+                  }
+                  return Fib(n-1) + Fib(n-2)
+                }
+                """
+            ),
+            "foo/internal_test.go": textwrap.dedent(
+                """
+                package foo
+
+                import (
+                   "fmt"
+                   "testing"
+                )
+
+                func TestAddInternal(t *testing.T) {
                   if add(2, 3) != 5 {
                     t.Fail()
                   }
+                }
+
+                func BenchmarkAddInternal(b *testing.B) {
+                  for n := 0; n < b.N; n++ {
+                    Fib(10)
+                  }
+                }
+
+                func ExamplePrintInternal() {
+                  fmt.Println("foo")
+                  // Output: foo
+                }
+                """
+            ),
+            "foo/external_test.go": textwrap.dedent(
+                """
+                package foo_test
+
+                import (
+                   "foo"
+
+                   "fmt"
+                   "testing"
+                )
+
+                func TestAddExternal(t *testing.T) {
+                  if foo.Add(2, 3) != 5 {
+                    t.Fail()
+                  }
+                }
+
+                func BenchmarkAddExternal(b *testing.B) {
+                  for n := 0; n < b.N; n++ {
+                    foo.Fib(10)
+                  }
+                }
+
+                func ExamplePrintExternal() {
+                  fmt.Println("foo")
+                  // Output: foo
                 }
                 """
             ),
@@ -127,7 +190,13 @@ def test_internal_test_success(rule_runner: RuleRunner) -> None:
         TestResult, [GoTestRequest.Batch("", (GoTestFieldSet.create(tgt),), None)]
     )
     assert result.exit_code == 0
-    assert "PASS: TestAdd" in result.stdout
+    print(f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}")
+    assert "PASS: TestAddInternal" in result.stdout
+    assert "PASS: ExamplePrintInternal" in result.stdout
+    assert "BenchmarkAddInternal" in result.stdout
+    assert "PASS: TestAddExternal" in result.stdout
+    assert "PASS: ExamplePrintExternal" in result.stdout
+    assert "BenchmarkAddExternal" in result.stdout
 
 
 def test_internal_test_fails(rule_runner: RuleRunner) -> None:
@@ -152,71 +221,6 @@ def test_internal_test_fails(rule_runner: RuleRunner) -> None:
     )
     assert result.exit_code == 1
     assert "FAIL: TestAdd" in result.stdout
-
-
-def test_internal_benchmark_passes(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files(
-        {
-            "foo/BUILD": "go_mod(name='mod')\ngo_package()",
-            "foo/go.mod": "module foo",
-            "foo/fib.go": textwrap.dedent(
-                """
-                package foo
-                func Fib(n int) int {
-                  if n < 2 {
-                    return n
-                  }
-                  return Fib(n-1) + Fib(n-2)
-                }
-                """
-            ),
-            "foo/fib_test.go": textwrap.dedent(
-                """
-                package foo
-                import "testing"
-                func BenchmarkAdd(b *testing.B) {
-                  for n := 0; n < b.N; n++ {
-                    Fib(10)
-                  }
-                }
-                """
-            ),
-        }
-    )
-    tgt = rule_runner.get_target(Address("foo"))
-    result = rule_runner.request(
-        TestResult, [GoTestRequest.Batch("", (GoTestFieldSet.create(tgt),), None)]
-    )
-    assert result.exit_code == 0
-    assert "BenchmarkAdd" in result.stdout
-    assert "PASS" in result.stdout
-
-
-def test_internal_example_passes(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files(
-        {
-            "foo/BUILD": "go_mod(name='mod')\ngo_package()",
-            "foo/go.mod": "module foo",
-            "foo/print_test.go": textwrap.dedent(
-                """
-                package foo
-                import (
-                  "fmt"
-                )
-                func ExamplePrint() {
-                  fmt.Println("foo")
-                  // Output: foo
-                }
-                """
-            ),
-        }
-    )
-    tgt = rule_runner.get_target(Address("foo"))
-    result = rule_runner.request(
-        TestResult, [GoTestRequest.Batch("", (GoTestFieldSet.create(tgt),), None)]
-    )
-    assert result.exit_code == 0
-    assert "PASS: ExamplePrint" in result.stdout
 
 
 def test_internal_test_with_test_main(rule_runner: RuleRunner) -> None:
@@ -296,43 +300,6 @@ def test_internal_test_fails_to_compile(rule_runner: RuleRunner) -> None:
     assert "dep/f.go:1:1: expected 'package', found invalid\n" in result.stderr
 
 
-def test_external_test_success(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files(
-        {
-            "foo/BUILD": "go_mod(name='mod')\ngo_package()",
-            "foo/go.mod": "module foo",
-            "foo/add.go": textwrap.dedent(
-                """
-                package foo
-                func Add(x, y int) int {
-                  return x + y
-                }
-                """
-            ),
-            "foo/add_test.go": textwrap.dedent(
-                """
-                package foo_test
-                import (
-                  "foo"
-                  "testing"
-                )
-                func TestAdd(t *testing.T) {
-                  if foo.Add(2, 3) != 5 {
-                    t.Fail()
-                  }
-                }
-                """
-            ),
-        }
-    )
-    tgt = rule_runner.get_target(Address("foo"))
-    result = rule_runner.request(
-        TestResult, [GoTestRequest.Batch("", (GoTestFieldSet.create(tgt),), None)]
-    )
-    assert result.exit_code == 0
-    assert "PASS: TestAdd" in result.stdout
-
-
 def test_external_test_fails(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -366,83 +333,6 @@ def test_external_test_fails(rule_runner: RuleRunner) -> None:
     )
     assert result.exit_code == 1
     assert "FAIL: TestAdd" in result.stdout
-
-
-def test_external_benchmark_passes(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files(
-        {
-            "foo/BUILD": "go_mod(name='mod')\ngo_package()",
-            "foo/go.mod": "module foo",
-            "foo/fib.go": textwrap.dedent(
-                """
-                package foo
-                func Fib(n int) int {
-                  if n < 2 {
-                    return n
-                  }
-                  return Fib(n-1) + Fib(n-2)
-                }
-                """
-            ),
-            "foo/fib_test.go": textwrap.dedent(
-                """
-                package foo_test
-                import (
-                  "foo"
-                  "testing"
-                )
-                func BenchmarkAdd(b *testing.B) {
-                  for n := 0; n < b.N; n++ {
-                    foo.Fib(10)
-                  }
-                }
-                """
-            ),
-        }
-    )
-    tgt = rule_runner.get_target(Address("foo"))
-    result = rule_runner.request(
-        TestResult, [GoTestRequest.Batch("", (GoTestFieldSet.create(tgt),), None)]
-    )
-    assert result.exit_code == 0
-    assert "BenchmarkAdd" in result.stdout
-    assert "PASS" in result.stdout
-
-
-def test_external_example_passes(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files(
-        {
-            "foo/BUILD": "go_mod(name='mod')\ngo_package()",
-            "foo/go.mod": "module foo",
-            "foo/print.go": textwrap.dedent(
-                """
-                package foo
-                import "fmt"
-                func MyPrint(msg string) {
-                  fmt.Println(msg)
-                }
-                """
-            ),
-            "foo/print_test.go": textwrap.dedent(
-                """
-                package foo_test
-                import (
-                  "foo"
-                )
-                func ExamplePrint() {
-                  foo.MyPrint("foo")
-                  // Output: foo
-                }
-                """
-            ),
-        }
-    )
-    tgt = rule_runner.get_target(Address("foo"))
-    result = rule_runner.request(
-        TestResult, [GoTestRequest.Batch("", (GoTestFieldSet.create(tgt),), None)]
-    )
-    assert result.exit_code == 0
-    assert "PASS: ExamplePrint" in result.stdout
 
 
 def test_external_test_with_test_main(rule_runner: RuleRunner) -> None:
@@ -682,7 +572,7 @@ def test_no_tests(rule_runner: RuleRunner) -> None:
     result = rule_runner.request(
         TestResult, [GoTestRequest.Batch("", (GoTestFieldSet.create(tgt),), None)]
     )
-    assert result.skipped
+    assert result.exit_code is None
 
 
 def test_compilation_error(rule_runner: RuleRunner) -> None:
@@ -761,3 +651,59 @@ def test_file_dependencies(rule_runner: RuleRunner) -> None:
         TestResult, [GoTestRequest.Batch("", (GoTestFieldSet.create(tgt),), None)]
     )
     assert result.exit_code == 0
+
+
+def test_profile_options_write_results(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "foo/BUILD": "go_mod(name='mod')\ngo_package()",
+            "foo/go.mod": "module foo",
+            "foo/add.go": textwrap.dedent(
+                """
+                package foo
+                func add(x, y int) int {
+                  return x + y
+                }
+                """
+            ),
+            "foo/add_test.go": textwrap.dedent(
+                """
+                package foo
+                import "testing"
+                func TestAdd(t *testing.T) {
+                  if add(2, 3) != 5 {
+                    t.Fail()
+                  }
+                }
+                """
+            ),
+        }
+    )
+    rule_runner.set_options(
+        [
+            "--go-test-args=-v -bench=.",
+            "--go-test-block-profile",
+            "--go-test-cpu-profile",
+            "--go-test-mem-profile",
+            "--go-test-mutex-profile",
+            "--go-test-trace",
+        ],
+        env_inherit={"PATH"},
+    )
+    tgt = rule_runner.get_target(Address("foo"))
+    result = rule_runner.request(
+        TestResult, [GoTestRequest.Batch("", (GoTestFieldSet.create(tgt),), None)]
+    )
+    assert result.exit_code == 0
+    assert "PASS: TestAdd" in result.stdout
+
+    extra_output = result.extra_output
+    assert extra_output is not None
+    assert sorted(extra_output.files) == [
+        "block.out",
+        "cpu.out",
+        "mem.out",
+        "mutex.out",
+        "test_runner",
+        "trace.out",
+    ]

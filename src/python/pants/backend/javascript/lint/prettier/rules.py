@@ -61,7 +61,7 @@ async def prettier_fmt(request: PrettierFmtRequest.Batch, prettier: Prettier) ->
     result = await Get(
         ProcessResult,
         NpxProcess(
-            npm_package=prettier.default_version,
+            npm_package=prettier.version,
             args=(
                 "--write",
                 *request.files,

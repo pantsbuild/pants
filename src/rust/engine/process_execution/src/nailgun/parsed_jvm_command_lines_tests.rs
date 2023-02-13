@@ -1,3 +1,5 @@
+// Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
+// Licensed under the Apache License, Version 2.0 (see LICENSE).
 use crate::nailgun::parsed_jvm_command_lines::ParsedJVMCommandLines;
 
 // TODO we should be able to use https://docs.rs/crate/derive_builder/0.8.0
@@ -95,7 +97,7 @@ impl CLIBuilder {
   }
 
   pub fn render_to_parsed_args(&self) -> ParsedJVMCommandLines {
-    let mut nailgun_args: Vec<String> = self.jdk.iter().map(|e| e.clone()).collect();
+    let mut nailgun_args: Vec<String> = self.jdk.iter().cloned().collect();
     nailgun_args.extend(self.args_before_classpath.clone());
     nailgun_args.extend(self.classpath_flag.clone());
     nailgun_args.extend(self.classpath_value.clone());

@@ -31,10 +31,10 @@ backend_packages = [
 ]
 ```
 
-Then run [`./pants tailor ::`](doc:initial-configuration#5-generate-build-files) to generate BUILD files. This will create `java_sources` and `scala_sources` targets in every directory containing library code, as well as test targets like `scalatest_tests` and `junit_tests` for filenames that look like tests.
+Then run [`pants tailor ::`](doc:initial-configuration#5-generate-build-files) to generate BUILD files. This will create `java_sources` and `scala_sources` targets in every directory containing library code, as well as test targets like `scalatest_tests` and `junit_tests` for filenames that look like tests.
 
 ```
-❯ ./pants tailor ::
+❯ pants tailor ::
 Created src/jvm/org/pantsbuild/example/app/BUILD:
   - Add scala_sources target app
 Created src/jvm/org/pantsbuild/example/lib/BUILD:
@@ -43,10 +43,10 @@ Created tests/jvm/org/pantsbuild/example/lib/BUILD:
   - Add scalatest_tests target lib
 ```
 
-You can run `./pants list ::` to see all targets in your project:
+You can run `pants list ::` to see all targets in your project:
 
 ```
-❯ ./pants list
+❯ pants list
 ...
 src/jvm/org/pantsbuild/example/app:app
 src/jvm/org/pantsbuild/example/app/ExampleApp.scala
@@ -96,7 +96,7 @@ jvm_artifact(
 )
 ```
 
-Pants requires use of a lockfile for thirdparty dependencies. After adding or editing `jvm_artifact` targets, you will need to update affected lockfiles by running `./pants generate-lockfiles`. The default lockfile is located at `3rdparty/jvm/default.lock`, but it can be relocated (as well as additional resolves declared) via the [`[jvm].resolves` option](doc:reference-jvm#section-resolves).
+Pants requires use of a lockfile for thirdparty dependencies. After adding or editing `jvm_artifact` targets, you will need to update affected lockfiles by running `pants generate-lockfiles`. The default lockfile is located at `3rdparty/jvm/default.lock`, but it can be relocated (as well as additional resolves declared) via the [`[jvm].resolves` option](doc:reference-jvm#section-resolves).
 
 > 📘 Thirdparty symbols and the `packages` argument
 > 
@@ -143,40 +143,40 @@ Hello world!
 Compile code
 ------------
 
-To manually check that sources compile, use `./pants check`:
+To manually check that sources compile, use `pants check`:
 
 ```
 # Check a single file
-❯ ./pants check src/jvm/org/pantsbuild/example/lib/ExampleLib.java
+❯ pants check src/jvm/org/pantsbuild/example/lib/ExampleLib.java
 
 # Check files located recursively under a directory
-❯ ./pants check src/jvm::
+❯ pants check src/jvm::
 
 # Check the whole repository
-❯ ./pants check ::
+❯ pants check ::
 ```
 
 Run tests
 ---------
 
-To run tests, use `./pants test`:
+To run tests, use `pants test`:
 
 ```
 # Run a single test file
-❯ ./pants test tests/jvm/org/pantsbuild/example/lib/ExampleLibSpec.scala
+❯ pants test tests/jvm/org/pantsbuild/example/lib/ExampleLibSpec.scala
 
 # Test all files in a directory
-❯ ./pants test tests/jvm::
+❯ pants test tests/jvm::
 
 # Test the whole repository
-❯ ./pants test ::
+❯ pants test ::
 ```
 
 You can also pass through arguments to the test runner with `--`, e.g.:
 
 ```
 # Pass `-z hello` to scalatest in order to test a single method
-❯ ./pants test tests/jvm/org/pantsbuild/example/lib/ExampleLibSpec.scala -- -z hello
+❯ pants test tests/jvm/org/pantsbuild/example/lib/ExampleLibSpec.scala -- -z hello
 ```
 
 ### Timeouts
@@ -213,15 +213,15 @@ timeout_maximum = 600
 
 If a target sets its `timeout` higher than `[test].timeout_maximum`, Pants will use the value in `[test].timeout_maximum`.
 
-Use the option `./pants test --no-timeouts` to temporarily disable timeouts, e.g. when debugging.
+Use the option `pants test --no-timeouts` to temporarily disable timeouts, e.g. when debugging.
 
 ### Setting environment variables
 
-Test runs are _hermetic_, meaning that they are stripped of the parent `./pants` process's environment variables. This is important for reproducibility, and it also increases cache hits.
+Test runs are _hermetic_, meaning that they are stripped of the parent `pants` process's environment variables. This is important for reproducibility, and it also increases cache hits.
 
 To add any arbitrary environment variable back to the process, you can either add the environment variable to the specific tests with the `extra_env_vars` field on `junit_test` / `junit_tests` / `scala_junit_test` / `scala_junit_tests` / `scalatest_test` / `scalatest_tests` targets or to all your tests with the `[test].extra_env_vars` option. Generally, prefer the field `extra_env_vars` field so that more of your tests are hermetic.
 
-With both `[test].extra_env_vars` and the `extra_env_vars` field, you can either hardcode a value or leave off a value to "allowlist" it and read from the parent `./pants` process's environment.
+With both `[test].extra_env_vars` and the `extra_env_vars` field, you can either hardcode a value or leave off a value to "allowlist" it and read from the parent `pants` process's environment.
 
 ```toml pants.toml
 [test]
@@ -241,6 +241,21 @@ junit_tests(
 )
 ```
 
+Protobuf
+--------
+
+There's support for [ScalaPB](https://scalapb.github.io/) and [protoc Java generated code](https://developers.google.com/protocol-buffers/docs/reference/java-generated), currently in beta stage. To enable them, activate the relevant backends in `pants.toml`:
+
+```toml
+[GLOBAL]
+backend_packages = [
+    "pants.backend.experimental.codegen.protobuf.scala",
+    "pants.backend.experimental.codegen.protobuf.java",
+]
+```
+
+This adds the new `protobuf_source` target, which you can confirm by running `pants help protobuf_source`. 
+
 Lint and Format
 ---------------
 
@@ -250,13 +265,13 @@ Once enabled, `lint` and `fmt` will check and automatically reformat your code:
 
 ```
 # Format this directory and all subdirectories
-❯ ./pants fmt src/jvm::
+❯ pants fmt src/jvm::
 
 # Check that the whole project is formatted
-❯ ./pants lint ::
+❯ pants lint ::
 
 # Format all changed files
-❯ ./pants --changed-since=HEAD fmt
+❯ pants --changed-since=HEAD fmt
 ```
 
 Working in an IDE
@@ -317,7 +332,7 @@ groups_config_files = ["bsp-groups.toml"]
 
 #### Per-user setup
 
-1. Run ./pants experimental-bsp to write the BSP connection file and script.
+1. Run pants experimental-bsp to write the BSP connection file and script.
 2. Ensure that you have the IntelliJ Scala plugin installed (it provides BSP support).
 3. In IntelliJ, choose `File > New > Project from Existing Sources…`
 4. Choose the root of the repository for the project from the file dialog.
@@ -330,7 +345,7 @@ groups_config_files = ["bsp-groups.toml"]
 
 ### Troubleshooting
 
-- If you see errors related to missing tools, you can set additional environment variables for BSP invocations in `pants.toml` under the `[experimental-bsp].runner_env_vars` option, and then re-run `./pants experimental-bsp`.
+- If you see errors related to missing tools, you can set additional environment variables for BSP invocations in `pants.toml` under the `[experimental-bsp].runner_env_vars` option, and then re-run `pants experimental-bsp`.
   - This is necessary because IntelliJ is invoked on macOS generally by launchd and not from the shell. Any `PATH` set in the shell will not be passed to the Pants BSP server in that case.
   - If this is developer-specific, consider setting `--experimental-bsp-runner-env-args` as a command-line option, or using a `.pantsrc` file.
 - After configuration changes, or after adding new thirdparty dependencies, you will generally need to reload the BSP configuration ([for now](https://github.com/pantsbuild/pants/issues/15054)), which you can do with this button in the side panel:

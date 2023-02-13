@@ -33,6 +33,10 @@ from pants.engine.internals.parametrize import (
     _TargetParametrizationsRequest,
 )
 from pants.engine.internals.selectors import Get, MultiGet
+from pants.engine.internals.synthetic_targets import (
+    SyntheticTargetsSpecPaths,
+    SyntheticTargetsSpecPathsRequest,
+)
 from pants.engine.rules import collect_rules, rule, rule_helper
 from pants.engine.target import (
     FieldSet,
@@ -129,6 +133,7 @@ async def addresses_from_raw_specs_without_file_owners(
     build_file_options: BuildFileOptions,
     specs_filter: SpecsFilter,
     local_environment_name: ChosenLocalEnvironmentName,
+    union_membership: UnionMembership,
 ) -> Addresses:
     matched_addresses: OrderedSet[Address] = OrderedSet()
     filtering_disabled = specs.filter_by_global_options is False
@@ -155,8 +160,12 @@ async def addresses_from_raw_specs_without_file_owners(
         Get(Paths, PathGlobs, build_file_globs),
         Get(Paths, PathGlobs, validation_globs),
     )
-
-    dirnames = {os.path.dirname(f) for f in build_file_paths.files}
+    dirnames = set(
+        await Get(
+            SyntheticTargetsSpecPaths, SyntheticTargetsSpecPathsRequest(tuple(specs.glob_specs()))
+        )
+    )
+    dirnames.update(os.path.dirname(f) for f in build_file_paths.files)
     address_families = await MultiGet(Get(AddressFamily, AddressFamilyDir(d)) for d in dirnames)
     base_addresses = Addresses(
         itertools.chain.from_iterable(

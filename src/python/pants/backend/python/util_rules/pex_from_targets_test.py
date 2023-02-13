@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path, PurePath
 from textwrap import dedent
-from typing import Iterable, List, Mapping, cast
+from typing import Iterable, List, cast
 from unittest.mock import Mock
 
 import pytest
@@ -94,7 +94,7 @@ def rule_runner() -> RuleRunner:
 def test_choose_compatible_resolve(rule_runner: RuleRunner) -> None:
     def create_target_files(
         directory: str, *, req_resolve: str, source_resolve: str, test_resolve: str
-    ) -> dict[str | PurePath, str | bytes]:
+    ) -> dict[str, str]:
         return {
             f"{directory}/BUILD": dedent(
                 f"""\
@@ -792,31 +792,30 @@ def test_lockfile_requirements_selection(
     internal_only: bool,
     run_against_entire_lockfile: bool,
 ) -> None:
-    mode_files: Mapping[str | PurePath, str | bytes]
+    mode_files: dict[str, str | bytes] = {
+        "a.py": "",
+        "BUILD": dedent(
+            """
+                python_sources(name="lib", dependencies=[":setuptools"])
+                python_requirement(name="setuptools", requirements=["setuptools"])
+                """
+        ),
+    }
     if mode == ResolveMode.resolve_all_constraints:
-        mode_files = {"constraints.txt": "setuptools==54.1.2"}
+        mode_files.update({"constraints.txt": "setuptools==54.1.2"})
     elif mode == ResolveMode.poetry_or_manual:
-        mode_files = {"3rdparty/python/default.lock": setuptools_poetry_lockfile}
+        mode_files.update({"3rdparty/python/default.lock": setuptools_poetry_lockfile})
     else:
         assert mode == ResolveMode.pex
 
         requirements = rule_runner.request(Setuptools, []).pex_requirements()
         assert isinstance(requirements, EntireLockfile)
         assert isinstance(requirements.lockfile, LockfileContent)
-        mode_files = {"3rdparty/python/default.lock": requirements.lockfile.file_content.content}
+        mode_files.update(
+            {"3rdparty/python/default.lock": requirements.lockfile.file_content.content}
+        )
 
-    rule_runner.write_files(
-        {
-            **mode_files,
-            "a.py": "",
-            "BUILD": dedent(
-                """
-                python_sources(name="lib", dependencies=[":setuptools"])
-                python_requirement(name="setuptools", requirements=["setuptools"])
-                """
-            ),
-        }
-    )
+    rule_runner.write_files(mode_files)
 
     if mode == ResolveMode.resolve_all_constraints:
         options = [

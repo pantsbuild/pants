@@ -11,7 +11,11 @@ from dataclasses import dataclass
 from enum import Enum, auto
 from typing import ClassVar, Iterable, Iterator, Sequence
 
-from pants.core.target_types import FilesGeneratingSourcesField, FileSourceField
+from pants.core.target_types import (
+    FilesGeneratingSourcesField,
+    FileSourceField,
+    RelocatedFilesOriginalTargetsField,
+)
 from pants.engine.collection import Collection
 from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.environment import EnvironmentName
@@ -32,7 +36,6 @@ from pants.engine.unions import UnionMembership, union
 from pants.jvm.resolve.key import CoursierResolveKey
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
-from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import strip_v2_chroot_path
 
@@ -213,8 +216,7 @@ def calculate_jvm_request_types(union_membership: UnionMembership) -> ClasspathE
     return ClasspathEntryRequestFactory(tuple(cpe_impls), sources_by_impl)
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class ClasspathEntry:
     """A JVM classpath entry represented as a series of JAR files, and their dependencies.
 
@@ -246,9 +248,9 @@ class ClasspathEntry:
         filenames: Iterable[str] = (),
         dependencies: Iterable[ClasspathEntry] = (),
     ):
-        self.digest = digest
-        self.filenames = tuple(filenames)
-        self.dependencies = FrozenOrderedSet(dependencies)
+        object.__setattr__(self, "digest", digest)
+        object.__setattr__(self, "filenames", tuple(filenames))
+        object.__setattr__(self, "dependencies", FrozenOrderedSet(dependencies))
 
     @classmethod
     def merge(cls, digest: Digest, entries: Iterable[ClasspathEntry]) -> ClasspathEntry:
@@ -425,7 +427,9 @@ def classpath_dependency_requests(
         return sum(
             1
             for t in coarsened_dep.members
-            if t.has_field(FileSourceField) or t.has_field(FilesGeneratingSourcesField)
+            if t.has_field(FileSourceField)
+            or t.has_field(FilesGeneratingSourcesField)
+            or t.has_field(RelocatedFilesOriginalTargetsField)
         ) == len(coarsened_dep.members)
 
     return ClasspathEntryRequests(

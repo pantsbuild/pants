@@ -29,7 +29,7 @@ impl Env {
       name
     )];
     if id.0 == Scope::Global {
-      names.push(format!("PANTS_{}", name));
+      names.push(format!("PANTS_{name}"));
     }
     if name.starts_with("PANTS_") {
       names.push(name);
@@ -55,7 +55,7 @@ impl OptionsSource for Env {
 
   fn get_bool(&self, id: &OptionId) -> Result<Option<bool>, String> {
     if let Some(value) = self.get_string(id)? {
-      parse_bool(&*value)
+      parse_bool(&value)
         .map(Some)
         .map_err(|e| e.render(self.display(id)))
     } else {

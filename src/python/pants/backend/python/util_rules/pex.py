@@ -10,7 +10,7 @@ import os
 import shlex
 from dataclasses import dataclass
 from pathlib import PurePath
-from textwrap import dedent
+from textwrap import dedent  # noqa: PNT20
 from typing import Iterable, Iterator, Mapping, TypeVar
 
 import packaging.specifiers
@@ -61,7 +61,6 @@ from pants.engine.rules import Get, collect_rules, rule, rule_helper
 from pants.engine.target import HydratedSources, HydrateSourcesRequest, SourcesField, Targets
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
-from pants.util.meta import frozen_after_init
 from pants.util.strutil import pluralize, softwrap
 
 logger = logging.getLogger(__name__)
@@ -103,13 +102,13 @@ class CompletePlatforms(DeduplicatedCollection[str]):
 
 
 @rule
-async def digest_complete_platforms(
-    complete_platforms: PexCompletePlatformsField,
+async def digest_complete_platform_addresses(
+    addresses: UnparsedAddressInputs,
 ) -> CompletePlatforms:
     original_file_targets = await Get(
         Targets,
         UnparsedAddressInputs,
-        complete_platforms.to_unparsed_address_inputs(),
+        addresses,
     )
     original_files_sources = await MultiGet(
         Get(
@@ -124,8 +123,16 @@ async def digest_complete_platforms(
     return CompletePlatforms.from_snapshot(snapshot)
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@rule
+async def digest_complete_platforms(
+    complete_platforms: PexCompletePlatformsField,
+) -> CompletePlatforms:
+    return await Get(
+        CompletePlatforms, UnparsedAddressInputs, complete_platforms.to_unparsed_address_inputs()
+    )
+
+
+@dataclass(frozen=True)
 class PexRequest(EngineAwareParameter):
     output_filename: str
     internal_only: bool
@@ -138,6 +145,8 @@ class PexRequest(EngineAwareParameter):
     sources: Digest | None
     additional_inputs: Digest
     main: MainSpecification | None
+    inject_args: tuple[str, ...]
+    inject_env: FrozenDict[str, str]
     additional_args: tuple[str, ...]
     pex_path: tuple[Pex, ...]
     description: str | None = dataclasses.field(compare=False)
@@ -156,6 +165,8 @@ class PexRequest(EngineAwareParameter):
         sources: Digest | None = None,
         additional_inputs: Digest | None = None,
         main: MainSpecification | None = None,
+        inject_args: Iterable[str] = (),
+        inject_env: Mapping[str, str] = FrozenDict(),
         additional_args: Iterable[str] = (),
         pex_path: Iterable[Pex] = (),
         description: str | None = None,
@@ -189,27 +200,33 @@ class PexRequest(EngineAwareParameter):
             directly in the Pex, but should be present in the environment when building the Pex.
         :param main: The main for the built Pex, equivalent to Pex's `-e` or '-c' flag. If
             left off, the Pex will open up as a REPL.
+        :param inject_args: Command line arguments to freeze in to the PEX.
+        :param inject_env: Environment variables to freeze in to the PEX.
         :param additional_args: Any additional Pex flags.
         :param pex_path: Pex files to add to the PEX_PATH.
         :param description: A human-readable description to render in the dynamic UI when building
             the Pex.
         """
-        self.output_filename = output_filename
-        self.internal_only = internal_only
+        object.__setattr__(self, "output_filename", output_filename)
+        object.__setattr__(self, "internal_only", internal_only)
         # Use any explicitly requested layout, or Packed for internal PEXes (which is a much
         # friendlier layout for the CAS than Zipapp.)
-        self.layout = layout or (PexLayout.PACKED if internal_only else PexLayout.ZIPAPP)
-        self.python = python
-        self.requirements = requirements
-        self.interpreter_constraints = interpreter_constraints
-        self.platforms = platforms
-        self.complete_platforms = complete_platforms
-        self.sources = sources
-        self.additional_inputs = additional_inputs or EMPTY_DIGEST
-        self.main = main
-        self.additional_args = tuple(additional_args)
-        self.pex_path = tuple(pex_path)
-        self.description = description
+        object.__setattr__(
+            self, "layout", layout or (PexLayout.PACKED if internal_only else PexLayout.ZIPAPP)
+        )
+        object.__setattr__(self, "python", python)
+        object.__setattr__(self, "requirements", requirements)
+        object.__setattr__(self, "interpreter_constraints", interpreter_constraints)
+        object.__setattr__(self, "platforms", platforms)
+        object.__setattr__(self, "complete_platforms", complete_platforms)
+        object.__setattr__(self, "sources", sources)
+        object.__setattr__(self, "additional_inputs", additional_inputs or EMPTY_DIGEST)
+        object.__setattr__(self, "main", main)
+        object.__setattr__(self, "inject_args", tuple(inject_args))
+        object.__setattr__(self, "inject_env", FrozenDict(inject_env))
+        object.__setattr__(self, "additional_args", tuple(additional_args))
+        object.__setattr__(self, "pex_path", tuple(pex_path))
+        object.__setattr__(self, "description", description)
 
         self.__post_init__()
 
@@ -517,6 +534,11 @@ async def build_pex(
     if request.main is not None:
         argv.extend(request.main.iter_pex_args())
 
+    for injected_arg in request.inject_args:
+        argv.extend(["--inject-args", str(injected_arg)])
+    for k, v in sorted(request.inject_env.items()):
+        argv.extend(["--inject-env", f"{k}={v}"])
+
     # TODO(John Sirois): Right now any request requirements will shadow corresponding pex path
     #  requirements, which could lead to problems. Support shading python binaries.
     #  See: https://github.com/pantsbuild/pants/issues/9206
@@ -667,13 +689,12 @@ class VenvScriptWriter:
 
     @classmethod
     def create(
-        cls, pex_environment: PexEnvironment, pex: Pex, venv_rel_dir: PurePath
+        cls, complete_pex_env: CompletePexEnvironment, pex: Pex, venv_rel_dir: PurePath
     ) -> VenvScriptWriter:
         # N.B.: We don't know the working directory that will be used in any given
         # invocation of the venv scripts; so we deal with working_directory once in an
         # `adjust_relative_paths` function inside the script to save rule authors from having to do
         # CWD offset math in every rule for all the relative paths their process depends on.
-        complete_pex_env = pex_environment.in_sandbox(working_directory=None)
         venv_dir = complete_pex_env.pex_root / venv_rel_dir
         return cls(complete_pex_env=complete_pex_env, pex=pex, venv_dir=venv_dir)
 
@@ -791,37 +812,42 @@ class VenvPex:
     venv_rel_dir: str
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class VenvPexRequest:
     pex_request: PexRequest
+    complete_pex_env: CompletePexEnvironment
     bin_names: tuple[str, ...] = ()
     site_packages_copies: bool = False
 
     def __init__(
         self,
         pex_request: PexRequest,
+        complete_pex_env: CompletePexEnvironment,
         bin_names: Iterable[str] = (),
         site_packages_copies: bool = False,
     ) -> None:
         """A request for a PEX that runs in a venv and optionally exposes select venv `bin` scripts.
 
         :param pex_request: The details of the desired PEX.
+        :param complete_pex_env: The complete PEX environment the pex will be run in.
         :param bin_names: The names of venv `bin` scripts to expose for execution.
         :param site_packages_copies: `True` to use copies (hardlinks when possible) of PEX
             dependencies when installing them in the venv site-packages directory. By default this
             is `False` and symlinks are used instead which is a win in the time and space dimensions
             but results in a non-standard venv structure that does trip up some libraries.
         """
-        self.pex_request = pex_request
-        self.bin_names = tuple(bin_names)
-        self.site_packages_copies = site_packages_copies
+        object.__setattr__(self, "pex_request", pex_request)
+        object.__setattr__(self, "complete_pex_env", complete_pex_env)
+        object.__setattr__(self, "bin_names", tuple(bin_names))
+        object.__setattr__(self, "site_packages_copies", site_packages_copies)
 
 
 @rule
-def wrap_venv_prex_request(pex_request: PexRequest) -> VenvPexRequest:
+def wrap_venv_prex_request(
+    pex_request: PexRequest, pex_environment: PexEnvironment
+) -> VenvPexRequest:
     # Allow creating a VenvPex from a plain PexRequest when no extra bin scripts need to be exposed.
-    return VenvPexRequest(pex_request)
+    return VenvPexRequest(pex_request, pex_environment.in_sandbox(working_directory=None))
 
 
 @rule
@@ -877,7 +903,9 @@ async def create_venv_pex(
     venv_rel_dir = abs_pex_path.relative_to(abs_pex_root).parent
 
     venv_script_writer = VenvScriptWriter.create(
-        pex_environment=pex_environment, pex=venv_pex_result.create_pex(), venv_rel_dir=venv_rel_dir
+        complete_pex_env=request.complete_pex_env,
+        pex=venv_pex_result.create_pex(),
+        venv_rel_dir=venv_rel_dir,
     )
     pex = venv_script_writer.exe(bash)
     python = venv_script_writer.python(bash)
@@ -904,8 +932,7 @@ async def create_venv_pex(
     )
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class PexProcess:
     pex: Pex
     argv: tuple[str, ...]
@@ -938,19 +965,21 @@ class PexProcess:
         concurrency_available: int = 0,
         cache_scope: ProcessCacheScope = ProcessCacheScope.SUCCESSFUL,
     ) -> None:
-        self.pex = pex
-        self.argv = tuple(argv)
-        self.description = description
-        self.level = level
-        self.input_digest = input_digest
-        self.working_directory = working_directory
-        self.extra_env = FrozenDict(extra_env or {})
-        self.output_files = tuple(output_files) if output_files else None
-        self.output_directories = tuple(output_directories) if output_directories else None
-        self.timeout_seconds = timeout_seconds
-        self.execution_slot_variable = execution_slot_variable
-        self.concurrency_available = concurrency_available
-        self.cache_scope = cache_scope
+        object.__setattr__(self, "pex", pex)
+        object.__setattr__(self, "argv", tuple(argv))
+        object.__setattr__(self, "description", description)
+        object.__setattr__(self, "level", level)
+        object.__setattr__(self, "input_digest", input_digest)
+        object.__setattr__(self, "working_directory", working_directory)
+        object.__setattr__(self, "extra_env", FrozenDict(extra_env or {}))
+        object.__setattr__(self, "output_files", tuple(output_files) if output_files else None)
+        object.__setattr__(
+            self, "output_directories", tuple(output_directories) if output_directories else None
+        )
+        object.__setattr__(self, "timeout_seconds", timeout_seconds)
+        object.__setattr__(self, "execution_slot_variable", execution_slot_variable)
+        object.__setattr__(self, "concurrency_available", concurrency_available)
+        object.__setattr__(self, "cache_scope", cache_scope)
 
 
 @rule
@@ -984,7 +1013,6 @@ async def setup_pex_process(request: PexProcess, pex_environment: PexEnvironment
     )
 
 
-@frozen_after_init
 @dataclass(unsafe_hash=True)
 class VenvPexProcess:
     venv_pex: VenvPex
@@ -1020,20 +1048,22 @@ class VenvPexProcess:
         cache_scope: ProcessCacheScope = ProcessCacheScope.SUCCESSFUL,
         append_only_caches: Mapping[str, str] | None = None,
     ) -> None:
-        self.venv_pex = venv_pex
-        self.argv = tuple(argv)
-        self.description = description
-        self.level = level
-        self.input_digest = input_digest
-        self.working_directory = working_directory
-        self.extra_env = FrozenDict(extra_env) if extra_env else None
-        self.output_files = tuple(output_files) if output_files else None
-        self.output_directories = tuple(output_directories) if output_directories else None
-        self.timeout_seconds = timeout_seconds
-        self.execution_slot_variable = execution_slot_variable
-        self.concurrency_available = concurrency_available
-        self.cache_scope = cache_scope
-        self.append_only_caches = FrozenDict(append_only_caches or {})
+        object.__setattr__(self, "venv_pex", venv_pex)
+        object.__setattr__(self, "argv", tuple(argv))
+        object.__setattr__(self, "description", description)
+        object.__setattr__(self, "level", level)
+        object.__setattr__(self, "input_digest", input_digest)
+        object.__setattr__(self, "working_directory", working_directory)
+        object.__setattr__(self, "extra_env", FrozenDict(extra_env) if extra_env else None)
+        object.__setattr__(self, "output_files", tuple(output_files) if output_files else None)
+        object.__setattr__(
+            self, "output_directories", tuple(output_directories) if output_directories else None
+        )
+        object.__setattr__(self, "timeout_seconds", timeout_seconds)
+        object.__setattr__(self, "execution_slot_variable", execution_slot_variable)
+        object.__setattr__(self, "concurrency_available", concurrency_available)
+        object.__setattr__(self, "cache_scope", cache_scope)
+        object.__setattr__(self, "append_only_caches", FrozenDict(append_only_caches or {}))
 
 
 @rule

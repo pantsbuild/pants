@@ -34,9 +34,10 @@ from pants.testutil.python_interpreter_selection import (
     python_interpreter_path,
     skip_unless_python36_and_python37_present,
 )
-from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.testutil.rule_runner import EXECUTOR, QueryRule, RuleRunner
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_rmtree, touch
+from pants.util.strutil import softwrap
 
 DEFAULT_VERSION = "0.0.0"
 
@@ -184,7 +185,7 @@ def plugin_resolution(
         complete_env = CompleteEnvironmentVars(
             {**{k: os.environ[k] for k in ["PATH", "HOME", "PYENV_ROOT"] if k in os.environ}, **env}
         )
-        bootstrap_scheduler = create_bootstrap_scheduler(options_bootstrapper)
+        bootstrap_scheduler = create_bootstrap_scheduler(options_bootstrapper, EXECUTOR)
         cache_dir = options_bootstrapper.bootstrap_options.for_global_scope().named_caches_dir
 
         input_working_set = WorkingSet(entries=[])
@@ -313,8 +314,12 @@ def _do_test_exact_requirements_interpreter_change(rule_runner: RuleRunner, sdis
                 plugins=[Plugin("jake", "1.2.3"), Plugin("jane", "3.4.5")],
             ):
                 pytest.fail(
-                    "Plugin re-resolution is expected for an incompatible interpreter and it is "
-                    "expected to fail since we removed the dist `repo_dir` above."
+                    softwrap(
+                        """
+                            Plugin re-resolution is expected for an incompatible interpreter and it
+                            is expected to fail since we removed the dist `repo_dir` above.
+                        """
+                    )
                 )
 
         # But for a compatible interpreter the exact resolve results should be re-used and load

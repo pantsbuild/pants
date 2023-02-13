@@ -20,7 +20,8 @@ from pants.engine.process import InteractiveProcess, InteractiveProcessResult
 # (core)
 # ------------------------------------------------------------------------------
 
-class PyFailure: ...
+class PyFailure:
+    def get_error(self) -> Exception | None: ...
 
 # ------------------------------------------------------------------------------
 # Address (parsing)
@@ -39,6 +40,8 @@ def address_spec_parse(
 
 class PyExecutor:
     def __init__(self, core_threads: int, max_threads: int) -> None: ...
+    def to_borrowed(self) -> PyExecutor: ...
+    def shutdown(self, duration_secs: float) -> None: ...
 
 # ------------------------------------------------------------------------------
 # FS
@@ -77,6 +80,10 @@ class Snapshot:
     names/content.
 
     You can lift a `Digest` to a `Snapshot` with `await Get(Snapshot, Digest, my_digest)`.
+
+    The `files` and `dirs` properties are symlink oblivious. If you require knowing about symlinks,
+    you can use the `digest` property to request the `DigestEntries`:
+    `await Get(DigestEntries, Digest, snapshot.digest)`.
     """
 
     @classmethod
@@ -474,3 +481,14 @@ class PyThreadLocals:
 
 class PollTimeout(Exception):
     pass
+
+# Prefer to import these exception types from `pants.base.exceptions`
+
+class EngineError(Exception):
+    """Base exception used for errors originating from the native engine."""
+
+class IntrinsicError(EngineError):
+    """Exceptions raised for failures within intrinsic methods implemented in Rust."""
+
+class IncorrectProductError(EngineError):
+    """Exceptions raised when a rule's return value doesn't match its declared type."""

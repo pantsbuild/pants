@@ -27,7 +27,7 @@
 
 use criterion::{criterion_group, criterion_main, Criterion};
 
-use std::collections::HashSet;
+use std::collections::{BTreeSet, HashSet};
 use std::io::{BufRead, BufReader, BufWriter, Write};
 use std::os::unix::ffi::OsStrExt;
 use std::path::PathBuf;
@@ -43,10 +43,10 @@ use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use task_executor::Executor;
 use tempfile::TempDir;
 
-use store::{OneOffStoreFileByDigest, Snapshot, SnapshotOps, Store, SubsetParams};
+use store::{ImmutableInputs, OneOffStoreFileByDigest, Snapshot, SnapshotOps, Store, SubsetParams};
 
 fn executor() -> Executor {
-  Executor::global(num_cpus::get(), num_cpus::get() * 4, || ()).unwrap()
+  Executor::new_owned(num_cpus::get(), num_cpus::get() * 4, || ()).unwrap()
 }
 
 pub fn criterion_benchmark_materialize(c: &mut Criterion) {
@@ -62,6 +62,10 @@ pub fn criterion_benchmark_materialize(c: &mut Criterion) {
       let (store, _tempdir, digest) = snapshot(&executor, count, size);
       let parent_dest = TempDir::new().unwrap();
       let parent_dest_path = parent_dest.path();
+      let immutable_inputs_dest = TempDir::new().unwrap();
+      let immutable_inputs_path = immutable_inputs_dest.path();
+      let immutable_inputs = ImmutableInputs::new(store.clone(), immutable_inputs_path).unwrap();
+
       cgroup
         .sample_size(10)
         .measurement_time(Duration::from_secs(30))
@@ -74,7 +78,13 @@ pub fn criterion_benchmark_materialize(c: &mut Criterion) {
               let dest = new_temp.path().to_path_buf();
               std::mem::forget(new_temp);
               let _ = executor
-                .block_on(store.materialize_directory(dest, digest.clone(), perms))
+                .block_on(store.materialize_directory(
+                  dest,
+                  digest.clone(),
+                  &BTreeSet::new(),
+                  Some(&immutable_inputs),
+                  perms,
+                ))
                 .unwrap();
             })
           },

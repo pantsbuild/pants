@@ -10,8 +10,10 @@ from pants.engine.fs import (
     CreateDigest,
     Digest,
     DigestContents,
+    DigestEntries,
     Directory,
     FileContent,
+    SymlinkEntry,
 )
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.process import (
@@ -32,6 +34,7 @@ def new_rule_runner() -> RuleRunner:
             QueryRule(ProcessResult, [Process]),
             QueryRule(FallibleProcessResult, [Process]),
             QueryRule(InteractiveProcessResult, [InteractiveProcess]),
+            QueryRule(DigestEntries, [Digest]),
         ],
     )
 
@@ -258,6 +261,18 @@ def test_create_files(rule_runner: RuleRunner) -> None:
     )
     result = rule_runner.request(ProcessResult, [process])
     assert result.stdout == b"hellogoodbye"
+
+
+def test_process_output_symlink_aware(rule_runner: RuleRunner) -> None:
+    process = Process(
+        argv=("/bin/ln", "-s", "dest", "source"),
+        output_files=["source"],
+        description="",
+        working_directory="",
+    )
+    result = rule_runner.request(ProcessResult, [process])
+    entries = rule_runner.request(DigestEntries, [result.output_digest])
+    assert entries == DigestEntries([SymlinkEntry("source", "dest")])
 
 
 @pytest.mark.parametrize("run_in_workspace", [True, False])

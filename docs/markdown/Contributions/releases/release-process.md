@@ -124,7 +124,7 @@ Update the release page in `src/python/pants/notes` for this release series, e.g
 
 Run `git fetch --all --tags` to be sure you have the latest release tags available locally.
 
-From the `main` branch, run `./pants run build-support/bin/changelog.py -- --prior 2.9.0.dev0 --new 2.9.0.dev1` with the relevant versions. 
+From the `main` branch, run `pants run build-support/bin/changelog.py -- --prior 2.9.0.dev0 --new 2.9.0.dev1` with the relevant versions. 
 
 This will generate the sections to copy into the release notes. Delete any empty sections. Do not paste the `Internal` section into the notes file. Instead, paste into a comment on the prep PR.
 
@@ -142,7 +142,7 @@ You are encouraged to fix typos and tweak change descriptions for clarity to use
 
 ### 2. Update `CONTRIBUTORS.md`
 
-Run `./pants run build-support/bin/contributors.py`
+Run `pants run build-support/bin/contributors.py`
 
 Take note of any new contributors since the last release so that you can give a shoutout in the announcement email.
 
@@ -196,7 +196,7 @@ Also, update the [Changelog](doc:changelog) page with the new release series at 
 
 ### Regenerate the references
 
-On the relevant release branch, run `./pants run build-support/bin/generate_docs.py -- --sync --api-key <key>` with your key from <https://dash.readme.com/project/pants/v2.8/api-key>.
+On the relevant release branch, run `pants run build-support/bin/generate_docs.py -- --sync --api-key <key>` with your key from <https://dash.readme.com/project/pants/v2.8/api-key>.
 
 ### `stable` releases - Update the default docsite
 
@@ -264,7 +264,7 @@ Announce the release to:
 You can get a contributor list by running the following, where `<tag>` is the tag for the prior release (eg: `release_2.9.0.dev0`):
 
 ```bash
-./pants run ./build-support/bin/contributors.py -- -s <tag>
+pants run ./build-support/bin/contributors.py -- -s <tag>
 ```
 
 > ❗️ Update the links in these templates!
@@ -341,3 +341,36 @@ For the first stable release in the series, first, write a blog post to summariz
 > Mario Rozell
 >
 > _(For more information on how Pants is released, please see the [release strategy](https://www.pantsbuild.org/docs/release-strategy) page.)_
+
+When Things Go Wrong
+--------------------
+
+From time to time, a release will fail. It's a complex process. The first thing to do after you've
+exhausted your knowledge and debugging skills or patience is to contact others. You might reach out
+to the development or maintainers channels on Pantbuild Slack in the absence of other ideas about
+whom to ask for help.
+
+Some issues are well known or well understood, and they are documented here.
+
+#### https://binaries.pantsbuild.com outage / missing wheels
+
+The https://binaries.pantsbuild.com site is an S3 bucket that houses Pantsbuild wheels generated in
+CI and used as part of the release process. If there are missing wheels or the wheels can't be
+fetched due to connectivity issues or an S3 outage, you'll learn about this through the release
+script erroring out. The script is idempotent; so you can just run it again, potentially waiting
+longer for wheels to be built in CI or outages to clear.
+
+When the release script finishes, it creates and pushes a release tag. This will trigger a [release
+GitHub workflow](https://github.com/pantsbuild/pants/blob/main/.github/workflows/release.yaml) that
+could ~silently error later if there were to be an S3 outage. This job currently is responsible for
+pushing a file mapping the release tag to the commit it tags out to
+`https://binaries.pantsbuild.com/tags/pantsbuild.pants/<tag>`. If the tag is missing, it should be
+fixed by running the following in an environment where you have both `AWS_ACCESS_KEY_ID` and
+`AWS_SECRET_ACCESS_KEY` of an account that has permissions to push to the Pantsbuild S3 bucket:
+```
+pants run build-support/bin/backfill_s3_release_tag_mappings.py -- \
+   --aws-cli-symlink-path $HOME/bin
+```
+If this sounds mysterious or new to you, you probably don't have such an account and should ask for
+help from other maintainers. You may want to adjust the `--aws-cli-symlink-path` to your liking as
+well, consult `--help` for more information.

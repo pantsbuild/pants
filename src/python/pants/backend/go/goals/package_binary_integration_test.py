@@ -48,7 +48,11 @@ def rule_runner() -> RuleRunner:
             *sdk.rules(),
             QueryRule(BuiltPackage, (GoBinaryFieldSet,)),
         ],
-        target_types=[GoBinaryTarget, GoModTarget, GoPackageTarget],
+        target_types=[
+            GoBinaryTarget,
+            GoModTarget,
+            GoPackageTarget,
+        ],
     )
     rule_runner.set_options([], env_inherit={"PATH"})
     return rule_runner

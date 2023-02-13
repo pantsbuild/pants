@@ -10,7 +10,6 @@ from typing import Any
 from pants.backend.java.subsystems.junit import JUnit
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.goals.test import (
-    TestDebugAdapterRequest,
     TestDebugRequest,
     TestExtraEnv,
     TestExtraEnvVarsField,
@@ -67,6 +66,7 @@ class JunitTestFieldSet(TestFieldSet):
 class JunitTestRequest(TestRequest):
     tool_subsystem = JUnit
     field_set_type = JunitTestFieldSet
+    supports_debug = True
 
 
 class JunitToolLockfileSentinel(GenerateJvmToolLockfileSentinel):
@@ -204,15 +204,6 @@ async def setup_junit_debug_request(
 
 
 @rule
-async def setup_junit_debug_adapter_request(
-    _: JunitTestRequest.Batch[JunitTestFieldSet, Any],
-) -> TestDebugAdapterRequest:
-    raise NotImplementedError(
-        "Debugging JUnit tests using a debug adapter has not yet been implemented."
-    )
-
-
-@rule
 def generate_junit_lockfile_request(
     _: JunitToolLockfileSentinel, junit: JUnit
 ) -> GenerateJvmLockfileFromTool:
@@ -223,7 +214,6 @@ def rules():
     return [
         *collect_rules(),
         *lockfile.rules(),
-        UnionRule(TestFieldSet, JunitTestFieldSet),
         UnionRule(GenerateToolLockfileSentinel, JunitToolLockfileSentinel),
         *JunitTestRequest.rules(),
     ]

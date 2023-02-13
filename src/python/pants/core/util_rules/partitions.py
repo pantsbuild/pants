@@ -14,6 +14,7 @@ from typing_extensions import Protocol
 
 from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
 from pants.engine.collection import Collection
+from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
@@ -24,7 +25,7 @@ from pants.engine.target import (
     _get_field_set_fields,
 )
 from pants.util.memo import memoized
-from pants.util.meta import frozen_after_init, runtime_ignore_subscripts
+from pants.util.meta import runtime_ignore_subscripts
 
 _FieldSetT = TypeVar("_FieldSetT", bound=FieldSet)
 
@@ -150,11 +151,9 @@ class Partitions(Collection[Partition[PartitionElementT, PartitionMetadataT]]):
         return Partitions([Partition(tuple(elements), metadata or _EmptyMetadata())])
 
 
-# NB: Not frozen so it can be subclassed
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 @runtime_ignore_subscripts
-class _BatchBase(Generic[PartitionElementT, PartitionMetadataT]):
+class _BatchBase(Generic[PartitionElementT, PartitionMetadataT], EngineAwareParameter):
     """Base class for a collection of elements that should all be processed together.
 
     For example, a collection of strings pointing to files that should be linted in one process, or
@@ -168,7 +167,7 @@ class _BatchBase(Generic[PartitionElementT, PartitionMetadataT]):
 
 @dataclass(frozen=True)
 @runtime_ignore_subscripts
-class _PartitionFieldSetsRequestBase(Generic[_FieldSetT]):
+class _PartitionFieldSetsRequestBase(Generic[_FieldSetT], EngineAwareParameter):
     """Returns a unique type per calling type.
 
     This serves us 2 purposes:
@@ -180,7 +179,7 @@ class _PartitionFieldSetsRequestBase(Generic[_FieldSetT]):
 
 
 @dataclass(frozen=True)
-class _PartitionFilesRequestBase:
+class _PartitionFilesRequestBase(EngineAwareParameter):
     """Returns a unique type per calling type.
 
     This serves us 2 purposes:

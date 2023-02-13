@@ -13,9 +13,9 @@ from pants.backend.python.util_rules.pex_requirements import (
     EntireLockfile,
     LoadedLockfile,
     LoadedLockfileRequest,
+    Lockfile,
+    LockfileContent,
     PexRequirements,
-    ToolCustomLockfile,
-    ToolDefaultLockfile,
 )
 from pants.core.goals.generate_lockfiles import DEFAULT_TOOL_LOCKFILE, NO_TOOL_LOCKFILE
 from pants.core.util_rules.lockfile_metadata import calculate_invalidation_digest
@@ -49,7 +49,6 @@ class PythonToolRequirementsBase(Subsystem):
     register_lockfile: ClassVar[bool] = False
     default_lockfile_resource: ClassVar[tuple[str, str] | None] = None
     default_lockfile_url: ClassVar[str | None] = None
-    uses_requirements_from_source_plugins: ClassVar[bool] = False
 
     version = StrOption(
         advanced=True,
@@ -153,27 +152,23 @@ class PythonToolRequirementsBase(Subsystem):
 
         hex_digest = calculate_invalidation_digest(requirements)
 
-        lockfile: ToolDefaultLockfile | ToolCustomLockfile
+        lockfile: LockfileContent | Lockfile
         if self.lockfile == DEFAULT_TOOL_LOCKFILE:
             assert self.default_lockfile_resource is not None
-            lockfile = ToolDefaultLockfile(
+            lockfile = LockfileContent(
                 file_content=FileContent(
                     f"{self.options_scope}_default.lock",
                     importlib.resources.read_binary(*self.default_lockfile_resource),
                 ),
                 lockfile_hex_digest=hex_digest,
                 resolve_name=self.options_scope,
-                uses_project_interpreter_constraints=(not self.register_interpreter_constraints),
-                uses_source_plugins=self.uses_requirements_from_source_plugins,
             )
         else:
-            lockfile = ToolCustomLockfile(
+            lockfile = Lockfile(
                 file_path=self.lockfile,
                 file_path_description_of_origin=f"the option `[{self.options_scope}].lockfile`",
                 lockfile_hex_digest=hex_digest,
                 resolve_name=self.options_scope,
-                uses_project_interpreter_constraints=(not self.register_interpreter_constraints),
-                uses_source_plugins=self.uses_requirements_from_source_plugins,
             )
         return EntireLockfile(lockfile, complete_req_strings=tuple(requirements))
 
@@ -339,6 +334,9 @@ class ExportToolOption(BoolOption):
         return super().__new__(
             cls,
             default=True,
+            removal_version="2.23.0.dev0",
+            removal_hint="Use the export goal's --resolve option to select tools to export, instead "
+            "of using this option to exempt a tool from export-by-default.",
             help=(
                 lambda subsystem_cls: softwrap(
                     f"""

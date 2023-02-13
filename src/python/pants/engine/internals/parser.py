@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import os.path
 import re
 import threading
 import tokenize
@@ -11,13 +10,18 @@ from dataclasses import dataclass
 from difflib import get_close_matches
 from io import StringIO
 from pathlib import PurePath
-from typing import Any, Iterable
+from typing import Any, Callable
 
+from pants.base.deprecated import warn_or_error
 from pants.base.exceptions import MappingError
 from pants.base.parse_context import ParseContext
 from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.engine.env_vars import EnvironmentVars
 from pants.engine.internals.defaults import BuildFileDefaultsParserState, SetDefaultsT
+from pants.engine.internals.dep_rules import BuildFileDependencyRulesParserState
 from pants.engine.internals.target_adaptor import TargetAdaptor
+from pants.engine.target import Field, ImmutableValue, RegisteredTargetTypes
+from pants.engine.unions import UnionMembership
 from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
 from pants.util.strutil import softwrap
@@ -39,28 +43,38 @@ class UnaddressableObjectError(MappingError):
 class ParseState(threading.local):
     def __init__(self):
         self._defaults: BuildFileDefaultsParserState | None = None
-        self._rel_path: str | None = None
-        self._target_adapters: list[TargetAdaptor] = []
+        self._dependents_rules: BuildFileDependencyRulesParserState | None = None
+        self._dependencies_rules: BuildFileDependencyRulesParserState | None = None
+        self._filepath: str | None = None
+        self._target_adaptors: list[TargetAdaptor] = []
 
-    def reset(self, rel_path: str, defaults: BuildFileDefaultsParserState) -> None:
+    def reset(
+        self,
+        filepath: str,
+        defaults: BuildFileDefaultsParserState,
+        dependents_rules: BuildFileDependencyRulesParserState | None,
+        dependencies_rules: BuildFileDependencyRulesParserState | None,
+    ) -> None:
         self._defaults = defaults
-        self._rel_path = rel_path
-        self._target_adapters.clear()
+        self._dependents_rules = dependents_rules
+        self._dependencies_rules = dependencies_rules
+        self._filepath = filepath
+        self._target_adaptors.clear()
 
-    def add(self, target_adapter: TargetAdaptor) -> None:
-        self._target_adapters.append(target_adapter)
+    def add(self, target_adaptor: TargetAdaptor) -> None:
+        self._target_adaptors.append(target_adaptor)
 
-    def rel_path(self) -> str:
-        if self._rel_path is None:
+    def filepath(self) -> str:
+        if self._filepath is None:
             raise AssertionError(
-                "The BUILD file rel_path was accessed before being set. This indicates a "
+                "The BUILD file filepath was accessed before being set. This indicates a "
                 "programming error in Pants. Please file a bug report at "
                 "https://github.com/pantsbuild/pants/issues/new."
             )
-        return self._rel_path
+        return self._filepath
 
     def parsed_targets(self) -> list[TargetAdaptor]:
-        return list(self._target_adapters)
+        return list(self._target_adaptors)
 
     @property
     def defaults(self) -> BuildFileDefaultsParserState:
@@ -75,26 +89,51 @@ class ParseState(threading.local):
     def set_defaults(self, *args: SetDefaultsT, **kwargs) -> None:
         self.defaults.set_defaults(*args, **kwargs)
 
+    def set_dependents_rules(self, *args, **kwargs) -> None:
+        if self._dependents_rules is not None:
+            self._dependents_rules.set_dependency_rules(self.filepath(), *args, **kwargs)
+
+    def set_dependencies_rules(self, *args, **kwargs) -> None:
+        if self._dependencies_rules is not None:
+            self._dependencies_rules.set_dependency_rules(self.filepath(), *args, **kwargs)
+
+
+class RegistrarField:
+    __slots__ = ("_field_type", "_default")
+
+    def __init__(self, field_type: type[Field], default: Callable[[], Any]) -> None:
+        self._field_type = field_type
+        self._default = default
+
+    @property
+    def default(self) -> ImmutableValue:
+        return self._default()
+
 
 class Parser:
     def __init__(
         self,
         *,
         build_root: str,
-        target_type_aliases: Iterable[str],
+        registered_target_types: RegisteredTargetTypes,
+        union_membership: UnionMembership,
         object_aliases: BuildFileAliases,
         ignore_unrecognized_symbols: bool,
     ) -> None:
         self._symbols, self._parse_state = self._generate_symbols(
-            build_root, target_type_aliases, object_aliases
+            build_root,
+            object_aliases,
+            registered_target_types,
+            union_membership,
         )
         self.ignore_unrecognized_symbols = ignore_unrecognized_symbols
 
     @staticmethod
     def _generate_symbols(
         build_root: str,
-        target_type_aliases: Iterable[str],
         object_aliases: BuildFileAliases,
+        registered_target_types: RegisteredTargetTypes,
+        union_membership: UnionMembership,
     ) -> tuple[FrozenDict[str, Any], ParseState]:
         # N.B.: We re-use the thread local ParseState across symbols for performance reasons.
         # This allows a single construction of all symbols here that can be re-used for each BUILD
@@ -104,6 +143,29 @@ class Parser:
         class Registrar:
             def __init__(self, type_alias: str) -> None:
                 self._type_alias = type_alias
+                for field_type in registered_target_types.aliases_to_types[
+                    type_alias
+                ].class_field_types(union_membership):
+                    registrar_field = RegistrarField(
+                        field_type, self._field_default_factory(field_type)
+                    )
+                    setattr(self, field_type.alias, registrar_field)
+                    if field_type.deprecated_alias:
+
+                        def deprecated_field(self):
+                            # TODO(17720) Support fixing automatically with `build-file` deprecation
+                            # fixer.
+                            warn_or_error(
+                                removal_version=field_type.deprecated_alias_removal_version,
+                                entity=f"the field name {field_type.deprecated_alias}",
+                                hint=(
+                                    f"Instead, use `{type_alias}.{field_type.alias}`, which "
+                                    "behaves the same."
+                                ),
+                            )
+                            return registrar_field
+
+                        setattr(self, field_type.deprecated_alias, property(deprecated_field))
 
             def __str__(self) -> str:
                 """The BuildFileDefaultsParserState.set_defaults() rely on string inputs.
@@ -117,7 +179,7 @@ class Parser:
                 # Target names default to the name of the directory their BUILD file is in
                 # (as long as it's not the root directory).
                 if "name" not in kwargs:
-                    if not parse_state.rel_path():
+                    if not parse_state.filepath():
                         raise UnaddressableObjectError(
                             "Targets in root-level BUILD files must be named explicitly."
                         )
@@ -129,15 +191,28 @@ class Parser:
                 parse_state.add(target_adaptor)
                 return target_adaptor
 
+            def _field_default_factory(self, field_type: type[Field]) -> Callable[[], Any]:
+                def resolve_field_default() -> Any:
+                    target_defaults = parse_state.defaults.get(self._type_alias)
+                    if target_defaults:
+                        for field_alias in (field_type.alias, field_type.deprecated_alias):
+                            if field_alias and field_alias in target_defaults:
+                                return target_defaults[field_alias]
+                    return field_type.default
+
+                return resolve_field_default
+
         symbols: dict[str, Any] = {
             **object_aliases.objects,
-            "build_file_dir": lambda: PurePath(parse_state.rel_path()),
+            "build_file_dir": lambda: PurePath(parse_state.filepath()).parent,
             "__defaults__": parse_state.set_defaults,
+            "__dependents_rules__": parse_state.set_dependents_rules,
+            "__dependencies_rules__": parse_state.set_dependencies_rules,
         }
-        symbols.update((alias, Registrar(alias)) for alias in target_type_aliases)
+        symbols.update((alias, Registrar(alias)) for alias in registered_target_types.aliases)
 
         parse_context = ParseContext(
-            build_root=build_root, type_aliases=symbols, rel_path_oracle=parse_state
+            build_root=build_root, type_aliases=symbols, filepath_oracle=parse_state
         )
         for alias, object_factory in object_aliases.context_aware_object_factories.items():
             symbols[alias] = object_factory(parse_context)
@@ -153,20 +228,45 @@ class Parser:
         filepath: str,
         build_file_content: str,
         extra_symbols: BuildFilePreludeSymbols,
+        env_vars: EnvironmentVars,
         defaults: BuildFileDefaultsParserState,
+        dependents_rules: BuildFileDependencyRulesParserState | None,
+        dependencies_rules: BuildFileDependencyRulesParserState | None,
     ) -> list[TargetAdaptor]:
-        self._parse_state.reset(rel_path=os.path.dirname(filepath), defaults=defaults)
+        self._parse_state.reset(
+            filepath=filepath,
+            defaults=defaults,
+            dependents_rules=dependents_rules,
+            dependencies_rules=dependencies_rules,
+        )
 
-        global_symbols = {**self._symbols, **extra_symbols.symbols}
+        global_symbols: dict[str, Any] = {
+            "env": env_vars.get,
+            **self._symbols,
+            **extra_symbols.symbols,
+        }
 
         if self.ignore_unrecognized_symbols:
+            defined_symbols = set()
             while True:
                 try:
                     exec(build_file_content, global_symbols)
                 except NameError as e:
                     bad_symbol = _extract_symbol_from_name_error(e)
+                    if bad_symbol in defined_symbols:
+                        # We have previously attempted to define this symbol, but have received
+                        # another error for it. This can indicate that the symbol is being used
+                        # from code which has already been compiled, such as builtin functions.
+                        raise
+                    defined_symbols.add(bad_symbol)
+
                     global_symbols[bad_symbol] = _unrecognized_symbol_func
-                    self._parse_state.reset(rel_path=os.path.dirname(filepath), defaults=defaults)
+                    self._parse_state.reset(
+                        filepath=filepath,
+                        defaults=defaults,
+                        dependents_rules=dependents_rules,
+                        dependencies_rules=dependencies_rules,
+                    )
                     continue
                 break
 
@@ -216,9 +316,9 @@ def error_on_imports(build_file_content: str, filepath: str) -> None:
             continue
         raise ParseError(
             f"Import used in {filepath} at line {lineno}. Import statements are banned in "
-            "BUILD files because they can easily break Pants caching and lead to stale results. "
-            f"\n\nInstead, consider writing a macro ({doc_url('macros')}) or "
-            f"writing a plugin ({doc_url('plugins-overview')}."
+            "BUILD files and macros (that act like a normal BUILD file) because they can easily "
+            "break Pants caching and lead to stale results. "
+            f"\n\nInstead, consider writing a plugin ({doc_url('plugins-overview')})."
         )
 
 

@@ -17,7 +17,7 @@ __pycache__/
 .build.properties
 .buildcache/
 .coverage*
-.emacs.desktop
+.emacs.desktop*
 .idea
 /.vscode/
 .cache

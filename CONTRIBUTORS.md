@@ -14,9 +14,11 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Andy Reitz
 + Antoine Tollenaere
 + Asher Foa
++ Aurelien Didier
 + Bardur Arantsson
 + Bastian Wegge
 + Benjy Weinberger
++ Berkay Öztürk
 + Bill Farner
 + Billy "Hyun Joon" Seol
 + Borja Lorente
@@ -24,6 +26,7 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Brian Larson
 + Brian Wickman
 + Bruno Bieth
++ Bryan Weber
 + Caitie McCaffrey
 + Caleb Lloyd
 + Carina C. Zona
@@ -35,6 +38,7 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Chris Heisterkamp
 + Chris Livingston
 + Chris Pesto
++ Chris Targett
 + Chris Williams
 + Christopher Livingston
 + Christopher Maier
@@ -94,6 +98,7 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Guy Marom
 + Harley Cooper
 + Henry Fuller
++ Herbert Rusznak
 + Huon Wilson
 + Hwasung Lee
 + Ian Tabolt
@@ -112,6 +117,7 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Jan Paul Erkelens
 + Jason Jackson
 + Jason Song
++ Jay Crumb
 + Jeff Jenkins
 + Jeremy Hintz
 + Jessica Rosenfield
@@ -140,6 +146,7 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Joshua Cohen
 + Joshua Humphries
 + Justin Trobec
++ KadenAgrey
 + Karin Lundberg
 + Kaushik Srenevasan
 + Ken Howard
@@ -159,6 +166,7 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Luc Cary
 + Luca Clementi
 + Lukasz Jastrzebski
++ Mahesh Vashishtha
 + Marc Abramowitz
 + Marcelo Trylesinski
 + Marcin Podolski
@@ -179,6 +187,7 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Maxim Khutornenko
 + Maxim Popenko
 + Michael Doherty
++ Michael Glass
 + Michal Bryc
 + Mike Cripps
 + Mike Lindsey
@@ -250,16 +259,19 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Tim Treptow
 + Timur Abishev
 + Tina Huang
++ Tobias Nilsson
 + Todd Stumpf
 + Tom Dimiduk
 + Tom Dyas
 + Tom Howland
++ Tom Solberg
 + Tomasz Godzik
 + Tomasz Pasternak
 + Travis Crawford
 + Troy Howard
 + Tushar Singh
 + Ugo Di Girolamo
++ Viktor Kleen
 + Walter Scheper
 + Wei An
 + Wilhelmina Drengwitz
@@ -273,6 +285,7 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + billybecker
 + eugene yokota
 + hephex
++ philipp-sontag-by
 + twunderlich-grapl
 + wimax-grapl
 + Ólafur Páll Geirsson

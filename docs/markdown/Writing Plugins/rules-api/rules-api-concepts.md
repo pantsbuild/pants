@@ -36,12 +36,12 @@ async def run_shellcheck(target: Target, shellcheck: Shellcheck) -> LintResult:
 
 You do not call a rule like you would a normal function. In the above examples, you would not say `int_to_str(26)` or `run_shellcheck(tgt, shellcheck)`. Instead, the Pants engine determines when rules are used and calls the rules for you.
 
-Each rule should be pure; you should not use side-effects like `subprocess.run()`, `print()`, or the `requests` library. Instead, the Rules API has its own alternatives that are understood by the Pants engine and which work properly with its caching and parallelism.
+Each rule should be pure; you should not use side effects like `subprocess.run()`, `print()`, or the `requests` library. Instead, the Rules API has its own alternatives that are understood by the Pants engine and which work properly with its caching and parallelism.
 
 The rule graph
 --------------
 
-All of the registered rules create a rule graph, with each type as a node and the edges being dependencies used to compute those types.
+All the registered rules create a rule graph, with each type as a node and the edges being dependencies used to compute those types.
 
 For example, the `list` goal uses this rule definition and results in the below graph:
 
@@ -56,7 +56,7 @@ async def list_targets(
 
 ![](https://files.readme.io/7d5163f-Rule_graph_example-2.png)
 
-At the top of the graph will always be the goals that Pants runs, such as `list` and `test`. These goals are the entry-point into the graph. When a user runs `./pants list`, the engine looks for a special type of rule, called a `@goal_rule`, that implements the respective goal. From there, the `@goal_rule` might request certain types like `Console` and `Addresses`, which will cause other helper `@rule`s to be used. To view the graph for a goal, see: [Visualize the rule graph](doc:rules-api-tips#debugging-visualize-the-rule-graph).
+At the top of the graph will always be the goals that Pants runs, such as `list` and `test`. These goals are the entry-point into the graph. When a user runs `pants list`, the engine looks for a special type of rule, called a `@goal_rule`, that implements the respective goal. From there, the `@goal_rule` might request certain types like `Console` and `Addresses`, which will cause other helper `@rule`s to be used. To view the graph for a goal, see: [Visualize the rule graph](doc:rules-api-tips#debugging-visualize-the-rule-graph).
 
 The graph also has several "roots", such as `Console`, `Specs`, and `OptionsBootstrapper` in this example. Those roots are injected into the graph as the initial input, whereas all other types are derived from those roots.
 
@@ -140,7 +140,7 @@ async def call_fibonacci(...) -> Foo:
 > 
 > Currently, you can only give a single input. It is not possible to do something like `Get(OutputType, InputType1(...), InputType2(...))`.
 > 
-> Instead, it's common for rules to create a "Request" data class, such as `PexRequest` or `SourceFilesRequest`. This request centralizes all of the data it needs to operate into one data structure, which allows for call sites to say `await Get(SourceFiles, SourceFilesRequest, my_request)`, for example.
+> Instead, it's common for rules to create a "Request" data class, such as `PexRequest` or `SourceFilesRequest`. This request centralizes all the data it needs to operate into one data structure, which allows for call sites to say `await Get(SourceFiles, SourceFilesRequest, my_request)`, for example.
 > 
 > See <https://github.com/pantsbuild/pants/issues/7490> for the tracking issue.
 
@@ -231,9 +231,7 @@ async def demo(name: Name) -> Foo:
 > 
 > Sometimes, you may want to have a custom `__init__()` constructor. For example, you may want your dataclass to store a `tuple[str, ...]`, but for your constructor to take the more flexible `Iterable[str]` which you then convert to an immutable tuple sequence.
 > 
-> Normally, `@dataclass(frozen=True)` will not allow you to have a custom `__init__()`. But, if you do not set `frozen=True`, then your dataclass would be mutable, which is dangerous with the engine.  
-> 
-> Instead, we added a decorator called `@frozen_after_init`, which can be combined with `@dataclass(unsafe_hash=True)`.
+> The Python docs suggest using `object.__setattr__` to set attributes in your `__init__` for frozen dataclasses.
 > 
 > ```python
 > from __future__ import annotations
@@ -241,15 +239,12 @@ async def demo(name: Name) -> Foo:
 > from dataclasses import dataclass
 > from typing import Iterable
 > 
-> from pants.util.meta import frozen_after_init
-> 
-> @frozen_after_init
-> @dataclass(unsafe_hash=True)
+> @dataclass(frozen=True)
 > class Example:
 >     args: tuple[str, ...]
 > 
 >     def __init__(self, args: Iterable[str]) -> None:
->         self.args = tuple(args)
+>         object.__setattr__(self, "args", tuple(args))
 > ```
 
 ### `Collection`: a newtype for `tuple`

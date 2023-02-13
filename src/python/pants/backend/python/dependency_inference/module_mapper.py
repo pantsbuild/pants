@@ -6,6 +6,7 @@ from __future__ import annotations
 import enum
 import itertools
 import logging
+import os
 from collections import defaultdict
 from dataclasses import dataclass
 from functools import total_ordering
@@ -57,6 +58,13 @@ class ModuleProviderType(enum.Enum):
 class ModuleProvider:
     addr: Address
     typ: ModuleProviderType
+
+
+@dataclass(frozen=True, order=True)
+class PossibleModuleProvider:
+    provider: ModuleProvider
+    # 0 = The provider mapped to the module itself, 1 = the provider mapped to its parent, etc.
+    ancestry: int
 
 
 def module_from_stripped_path(path: PurePath) -> str:
@@ -127,9 +135,12 @@ class FirstPartyPythonMappingImplMarker:
     """
 
 
-class FirstPartyPythonModuleMapping(
-    FrozenDict[ResolveName, FrozenDict[str, Tuple[ModuleProvider, ...]]]
-):
+@dataclass(frozen=True)
+class FirstPartyPythonModuleMapping:
+    resolves_to_modules_to_providers: FrozenDict[
+        ResolveName, FrozenDict[str, Tuple[ModuleProvider, ...]]
+    ]
+
     """A merged mapping of each resolve name to the first-party module names contained and their
     owning addresses.
 
@@ -137,28 +148,35 @@ class FirstPartyPythonModuleMapping(
     implementations for each codegen backends.
     """
 
-    def _providers_for_resolve(self, module: str, resolve: str) -> tuple[ModuleProvider, ...]:
-        mapping = self.get(resolve)
+    def _providers_for_resolve(
+        self, module: str, resolve: str
+    ) -> tuple[PossibleModuleProvider, ...]:
+        mapping = self.resolves_to_modules_to_providers.get(resolve)
         if not mapping:
             return ()
 
         result = mapping.get(module, ())
         if result:
-            return result
+            return tuple(PossibleModuleProvider(provider, 0) for provider in result)
 
-        # If the module is not found, try the parent, if any. This is to accommodate `from`
-        # imports, where we don't care about the specific symbol, but only the module. For example,
-        # with `from my_project.app import App`, we only care about the `my_project.app` part.
+        # If the module is not found, try the parent, if any. This is to handle `from` imports
+        # where the "module" we were handed was actually a symbol inside the module.
+        # E.g., with `from my_project.app import App`, we would be passed "my_project.app.App".
         #
         # We do not look past the direct parent, as this could cause multiple ambiguous owners to
         # be resolved. This contrasts with the third-party module mapping, which will try every
         # ancestor.
+        # TODO: Now that we capture the ancestry, we could look past the direct parent.
+        #  One reason to do so would be to unify more of the FirstParty and ThirdParty impls.
         if "." not in module:
             return ()
         parent_module = module.rsplit(".", maxsplit=1)[0]
-        return mapping.get(parent_module, ())
+        parent_providers = mapping.get(parent_module, ())
+        return tuple(PossibleModuleProvider(mp, 1) for mp in parent_providers)
 
-    def providers_for_module(self, module: str, resolve: str | None) -> tuple[ModuleProvider, ...]:
+    def providers_for_module(
+        self, module: str, resolve: str | None
+    ) -> tuple[PossibleModuleProvider, ...]:
         """Find all providers for the module.
 
         If `resolve` is None, will not consider resolves, i.e. any `python_source` et al can be
@@ -168,7 +186,8 @@ class FirstPartyPythonModuleMapping(
             return self._providers_for_resolve(module, resolve)
         return tuple(
             itertools.chain.from_iterable(
-                self._providers_for_resolve(module, resolve) for resolve in list(self.keys())
+                self._providers_for_resolve(module, resolve)
+                for resolve in list(self.resolves_to_modules_to_providers.keys())
             )
         )
 
@@ -193,13 +212,15 @@ async def merge_first_party_module_mappings(
             for module, providers in modules_to_providers.items():
                 resolves_to_modules_to_providers[resolve][module].extend(providers)
     return FirstPartyPythonModuleMapping(
-        (
-            resolve,
-            FrozenDict(
-                (mod, tuple(sorted(providers))) for mod, providers in sorted(mapping.items())
-            ),
+        FrozenDict(
+            (
+                resolve,
+                FrozenDict(
+                    (mod, tuple(sorted(providers))) for mod, providers in sorted(mapping.items())
+                ),
+            )
+            for resolve, mapping in sorted(resolves_to_modules_to_providers.items())
         )
-        for resolve, mapping in sorted(resolves_to_modules_to_providers.items())
     )
 
 
@@ -242,29 +263,36 @@ async def map_first_party_python_targets_to_modules(
 # -----------------------------------------------------------------------------------------------
 
 
-class ThirdPartyPythonModuleMapping(
-    FrozenDict[ResolveName, FrozenDict[str, Tuple[ModuleProvider, ...]]]
-):
+@dataclass(frozen=True)
+class ThirdPartyPythonModuleMapping:
     """A mapping of each resolve to the modules they contain and the addresses providing those
     modules."""
 
-    def _providers_for_resolve(self, module: str, resolve: str) -> tuple[ModuleProvider, ...]:
-        mapping = self.get(resolve)
+    resolves_to_modules_to_providers: FrozenDict[
+        ResolveName, FrozenDict[str, Tuple[ModuleProvider, ...]]
+    ]
+
+    def _providers_for_resolve(
+        self, module: str, resolve: str, ancestry: int = 0
+    ) -> tuple[PossibleModuleProvider, ...]:
+        mapping = self.resolves_to_modules_to_providers.get(resolve)
         if not mapping:
             return ()
 
         result = mapping.get(module, ())
         if result:
-            return result
+            return tuple(PossibleModuleProvider(mp, ancestry) for mp in result)
 
         # If the module is not found, recursively try the ancestor modules, if any. For example,
         # pants.task.task.Task -> pants.task.task -> pants.task -> pants
         if "." not in module:
             return ()
         parent_module = module.rsplit(".", maxsplit=1)[0]
-        return self._providers_for_resolve(parent_module, resolve)
+        return self._providers_for_resolve(parent_module, resolve, ancestry + 1)
 
-    def providers_for_module(self, module: str, resolve: str | None) -> tuple[ModuleProvider, ...]:
+    def providers_for_module(
+        self, module: str, resolve: str | None
+    ) -> tuple[PossibleModuleProvider, ...]:
         """Find all providers for the module.
 
         If `resolve` is None, will not consider resolves, i.e. any `python_requirement` can be
@@ -274,21 +302,22 @@ class ThirdPartyPythonModuleMapping(
             return self._providers_for_resolve(module, resolve)
         return tuple(
             itertools.chain.from_iterable(
-                self._providers_for_resolve(module, resolve) for resolve in list(self.keys())
+                self._providers_for_resolve(module, resolve)
+                for resolve in list(self.resolves_to_modules_to_providers.keys())
             )
         )
 
 
 @rule(desc="Creating map of third party targets to Python modules", level=LogLevel.DEBUG)
 async def map_third_party_modules_to_addresses(
-    all_python_tgts: AllPythonTargets,
+    all_python_targets: AllPythonTargets,
     python_setup: PythonSetup,
 ) -> ThirdPartyPythonModuleMapping:
     resolves_to_modules_to_providers: DefaultDict[
         ResolveName, DefaultDict[str, list[ModuleProvider]]
     ] = defaultdict(lambda: defaultdict(list))
 
-    for tgt in all_python_tgts.third_party:
+    for tgt in all_python_targets.third_party:
         resolve = tgt[PythonRequirementResolveField].normalized_value(python_setup)
 
         def add_modules(modules: Iterable[str], *, type_stub: bool = False) -> None:
@@ -335,13 +364,15 @@ async def map_third_party_modules_to_addresses(
                 add_modules(DEFAULT_MODULE_MAPPING.get(proj_name, (fallback_value,)))
 
     return ThirdPartyPythonModuleMapping(
-        (
-            resolve,
-            FrozenDict(
-                (mod, tuple(sorted(providers))) for mod, providers in sorted(mapping.items())
-            ),
+        FrozenDict(
+            (
+                resolve,
+                FrozenDict(
+                    (mod, tuple(sorted(providers))) for mod, providers in sorted(mapping.items())
+                ),
+            )
+            for resolve, mapping in sorted(resolves_to_modules_to_providers.items())
         )
-        for resolve, mapping in sorted(resolves_to_modules_to_providers.items())
     )
 
 
@@ -354,8 +385,10 @@ async def map_third_party_modules_to_addresses(
 class PythonModuleOwners:
     """The target(s) that own a Python module.
 
-    If >1 targets own the same module, and they're implementations (vs .pyi type stubs), they will
-    be put into `ambiguous` instead of `unambiguous`. `unambiguous` should never be > 2.
+    Up to 2 targets can unambiguously own the same module, if one is an implementation and the other
+    is a .pyi type stub. It is ambiguous for >1 implementation target to own the same module, and
+    those targets will be put into `ambiguous` instead of `unambiguous`. Therefore, `unambiguous`
+    should never be >2; and only 1 of `unambiguous` and `ambiguous` should have targets.
     """
 
     unambiguous: tuple[Address, ...]
@@ -378,6 +411,9 @@ class PythonModuleOwners:
 class PythonModuleOwnersRequest:
     module: str
     resolve: str | None
+    # If specified, resolve ambiguity by choosing the symbol provider with the
+    # closest common ancestor to this path. Must be a path relative to the build root.
+    locality: str | None = None
 
 
 @rule
@@ -386,24 +422,60 @@ async def map_module_to_address(
     first_party_mapping: FirstPartyPythonModuleMapping,
     third_party_mapping: ThirdPartyPythonModuleMapping,
 ) -> PythonModuleOwners:
-    providers = [
+    possible_providers: tuple[PossibleModuleProvider, ...] = (
         *third_party_mapping.providers_for_module(request.module, resolve=request.resolve),
         *first_party_mapping.providers_for_module(request.module, resolve=request.resolve),
-    ]
-    addresses = tuple(provider.addr for provider in providers)
+    )
 
-    # There's no ambiguity if there are only 0-1 providers.
-    if len(providers) < 2:
-        return PythonModuleOwners(addresses)
+    # We first attempt to disambiguate conflicting providers by taking - for each provider type -
+    # the providers of the closest ancestors to the requested modules.
+    # E.g., if we have a provider for foo.bar and for foo.bar.baz, prefer the latter.
+    # This prevents issues with namespace packages that are split between first-party and
+    # third-party (e.g., https://github.com/pantsbuild/pants/discussions/17286).
 
-    # Else, it's ambiguous unless there are exactly two providers and one is a type stub and the
-    # other an implementation.
-    if len(providers) == 2 and (providers[0].typ == ModuleProviderType.TYPE_STUB) ^ (
-        providers[1].typ == ModuleProviderType.TYPE_STUB
-    ):
-        return PythonModuleOwners(addresses)
+    # Map from provider type to mutable pair of
+    # [closest ancestry, list of provider of that type at that ancestry level].
+    type_to_closest_providers: dict[ModuleProviderType, list] = defaultdict(lambda: [999, []])
+    for possible_provider in possible_providers:
+        val = type_to_closest_providers[possible_provider.provider.typ]
+        if possible_provider.ancestry < val[0]:
+            val[0] = possible_provider.ancestry
+            val[1] = []
+        # NB This must come after the < check above, so we handle the possible_provider
+        # that caused that check to pass.
+        if possible_provider.ancestry == val[0]:
+            val[1].append(possible_provider.provider)
 
-    return PythonModuleOwners((), ambiguous=addresses)
+    if request.locality:
+        # For each provider type, if we have more than one provider left, prefer
+        # the one with the closest common ancestor to the requester.
+        for val in type_to_closest_providers.values():
+            providers = val[1]
+            if len(providers) < 2:
+                continue
+            providers_with_closest_common_ancestor: list[ModuleProvider] = []
+            closest_common_ancestor_len = 0
+            for provider in providers:
+                common_ancestor_len = len(
+                    os.path.commonpath([request.locality, provider.addr.spec_path])
+                )
+                if common_ancestor_len > closest_common_ancestor_len:
+                    closest_common_ancestor_len = common_ancestor_len
+                    providers_with_closest_common_ancestor = []
+                if common_ancestor_len == closest_common_ancestor_len:
+                    providers_with_closest_common_ancestor.append(provider)
+            providers[:] = providers_with_closest_common_ancestor
+
+    remaining_providers: list[ModuleProvider] = list(
+        itertools.chain(*[val[1] for val in type_to_closest_providers.values()])
+    )
+    addresses = tuple(provider.addr for provider in remaining_providers)
+    # Check that we have at most one remaining provider for each provider type.
+    # If we have more than one, signal ambiguity.
+    if any(len(val[1]) > 1 for val in type_to_closest_providers.values()):
+        return PythonModuleOwners((), ambiguous=addresses)
+
+    return PythonModuleOwners(addresses)
 
 
 def rules():

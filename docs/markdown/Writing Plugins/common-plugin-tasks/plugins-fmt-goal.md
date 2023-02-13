@@ -6,9 +6,7 @@ hidden: false
 createdAt: "2020-07-01T04:52:28.820Z"
 updatedAt: "2022-04-27T18:37:11.334Z"
 ---
-In Pants, every formatter is also a linter, meaning that if you can run a tool with `./pants fmt`,
-you can run the same tool in check-only mode with `./pants lint`.
-Start by skimming [Add a linter](doc:plugins-lint-goal) to familiarize yourself with how linters work.
+In Pants, every formatter is also a linter, meaning that if you can run a tool with `pants fmt`, you can run the same tool in check-only mode with `pants lint`. Start by skimming [Add a linter](doc:plugins-lint-goal) to familiarize yourself with how linters work.
 
 This guide assumes that you are running a formatter that already exists outside of Pants as a stand-alone binary, such as running Black or Prettier.
 
@@ -16,14 +14,9 @@ If you are instead writing your own formatting logic inline, you can skip Step 1
 
 # 1. Install your formatter
 
-There are several ways for Pants to install your formatter. See [Installing tools](doc:rules-api-installing-tools).
-This example will use `ExternalTool` because there is already a pre-compiled binary for shfmt.
+There are several ways for Pants to install your formatter. See [Installing tools](doc:rules-api-installing-tools). This example will use `ExternalTool` because there is already a pre-compiled binary for shfmt.
 
-You will also likely want to register some options, like `--config`, `--skip`, and `--args`.
-Options are registered through a [`Subsystem`](doc:rules-api-subsystems).
-If you are using `ExternalTool`, this is already a subclass of `Subsystem`.
-Otherwise, create a subclass of `Subsystem`. Then, set the class property `options_scope` to the
-name of the tool, e.g. `"shfmt"` or `"prettier"`. Finally, add options from `pants.option.option_types`.
+You will also likely want to register some options, like `--config`, `--skip`, and `--args`. Options are registered through a [`Subsystem`](doc:rules-api-subsystems). If you are using `ExternalTool`, this is already a subclass of `Subsystem`. Otherwise, create a subclass of `Subsystem`. Then, set the class property `options_scope` to the name of the tool, e.g. `"shfmt"` or `"prettier"`. Finally, add options from `pants.option.option_types`.
 
 ```python
 from pants.core.util_rules.external_tool import ExternalTool
@@ -178,7 +171,7 @@ def rules():
     return [*shfmt.rules()]
 ```
 
-Now, when you run `./pants fmt ::` or `./pants lint ::`, your new formatter should run.
+Now, when you run `pants fmt ::` or `pants lint ::`, your new formatter should run.
 
 # 4. Add tests (optional)
 

@@ -11,6 +11,13 @@ set -eo pipefail
 
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
+# Source any custom bootstrap settings for Pants from PANTS_BOOTSTRAP if it exists.
+: "${PANTS_BOOTSTRAP:=.pants.bootstrap}"
+if [[ -f "${PANTS_BOOTSTRAP}" ]]; then
+  # shellcheck source=/dev/null
+  source "${PANTS_BOOTSTRAP}"
+fi
+
 # Exposes:
 # + determine_python: Determine which interpreter version to use.
 # shellcheck source=build-support/common.sh

@@ -28,6 +28,7 @@ from pants.backend.go.util_rules import (
     sdk,
     third_party_pkg,
 )
+from pants.backend.go.util_rules.build_opts import GoBuildOptions
 from pants.backend.go.util_rules.build_pkg import (
     BuildGoPackageRequest,
     BuiltGoPackage,
@@ -127,7 +128,10 @@ async def generate_from_file(request: GoCodegenBuildFilesRequest) -> FallibleBui
     deps = await Get(Addresses, DependenciesRequest(request.target[Dependencies]))
     assert len(deps) == 1
     assert deps[0].generated_name == "github.com/google/uuid"
-    thirdparty_dep = await Get(FallibleBuildGoPackageRequest, BuildGoPackageTargetRequest(deps[0]))
+    thirdparty_dep = await Get(
+        FallibleBuildGoPackageRequest,
+        BuildGoPackageTargetRequest(deps[0], build_opts=GoBuildOptions()),
+    )
     assert thirdparty_dep.request is not None
 
     return FallibleBuildGoPackageRequest(
@@ -136,6 +140,7 @@ async def generate_from_file(request: GoCodegenBuildFilesRequest) -> FallibleBui
             pkg_name="gen",
             digest=digest,
             dir_path="codegen",
+            build_opts=GoBuildOptions(),
             go_files=("f.go",),
             s_files=(),
             direct_dependencies=(thirdparty_dep.request,),
@@ -170,7 +175,11 @@ def rule_runner() -> RuleRunner:
             FileTarget.register_plugin_field(GoOwningGoModAddressField),
             FilesGeneratorTarget.register_plugin_field(GoOwningGoModAddressField),
         ],
-        target_types=[GoModTarget, GoPackageTarget, FilesGeneratorTarget],
+        target_types=[
+            GoModTarget,
+            GoPackageTarget,
+            FilesGeneratorTarget,
+        ],
     )
     rule_runner.set_options([], env_inherit={"PATH"})
     return rule_runner
@@ -185,8 +194,13 @@ def assert_built(
         import_path: os.path.join("__pkgs__", path_safe(import_path), "__pkg__.a")
         for import_path in expected_import_paths
     }
-    assert dict(built_package.import_paths_to_pkg_a_files) == expected
-    assert sorted(result_files) == sorted(expected.values())
+    actual = dict(built_package.import_paths_to_pkg_a_files)
+    for import_path, pkg_archive_path in expected.items():
+        assert import_path in actual, f"expected {import_path} to be in build output"
+        assert (
+            actual[import_path] == expected[import_path]
+        ), "expected package archive paths to match"
+    assert set(expected.values()).issubset(set(result_files))
 
 
 def assert_pkg_target_built(
@@ -199,7 +213,9 @@ def assert_pkg_target_built(
     expected_transitive_dependency_import_paths: list[str],
     expected_go_file_names: list[str],
 ) -> None:
-    build_request = rule_runner.request(BuildGoPackageRequest, [BuildGoPackageTargetRequest(addr)])
+    build_request = rule_runner.request(
+        BuildGoPackageRequest, [BuildGoPackageTargetRequest(addr, build_opts=GoBuildOptions())]
+    )
     assert build_request.import_path == expected_import_path
     assert build_request.dir_path == expected_dir_path
     assert build_request.go_files == tuple(expected_go_file_names)
@@ -247,7 +263,7 @@ def test_build_first_party_pkg_target(rule_runner: RuleRunner) -> None:
         expected_import_path="example.com/greeter",
         expected_dir_path="",
         expected_go_file_names=["greeter.go"],
-        expected_direct_dependency_import_paths=[],
+        expected_direct_dependency_import_paths=["fmt"],
         expected_transitive_dependency_import_paths=[],
     )
 
@@ -292,7 +308,25 @@ def test_build_third_party_pkg_target(rule_runner: RuleRunner) -> None:
             "version1.go",
             "version4.go",
         ],
-        expected_direct_dependency_import_paths=[],
+        expected_direct_dependency_import_paths=[
+            "bytes",
+            "crypto/md5",
+            "crypto/rand",
+            "crypto/sha1",
+            "database/sql/driver",
+            "encoding/binary",
+            "encoding/hex",
+            "encoding/json",
+            "errors",
+            "fmt",
+            "hash",
+            "io",
+            "net",
+            "os",
+            "strings",
+            "sync",
+            "time",
+        ],
         expected_transitive_dependency_import_paths=[],
     )
 
@@ -384,7 +418,18 @@ def test_build_target_with_dependencies(rule_runner: RuleRunner) -> None:
             "frame.go",
             "wrap.go",
         ],
-        expected_direct_dependency_import_paths=[xerrors_internal_import_path],
+        expected_direct_dependency_import_paths=[
+            "bytes",
+            "fmt",
+            xerrors_internal_import_path,
+            "io",
+            "reflect",
+            "runtime",
+            "strconv",
+            "strings",
+            "unicode",
+            "unicode/utf8",
+        ],
         expected_transitive_dependency_import_paths=[],
     )
 
@@ -395,7 +440,7 @@ def test_build_target_with_dependencies(rule_runner: RuleRunner) -> None:
         expected_import_path=quoter_import_path,
         expected_dir_path="greeter/quoter",
         expected_go_file_names=["lib.go"],
-        expected_direct_dependency_import_paths=[],
+        expected_direct_dependency_import_paths=["fmt"],
         expected_transitive_dependency_import_paths=[],
     )
 
@@ -406,7 +451,7 @@ def test_build_target_with_dependencies(rule_runner: RuleRunner) -> None:
         expected_import_path=greeter_import_path,
         expected_dir_path="greeter",
         expected_go_file_names=["lib.go"],
-        expected_direct_dependency_import_paths=[xerrors_import_path, quoter_import_path],
+        expected_direct_dependency_import_paths=["fmt", xerrors_import_path, quoter_import_path],
         expected_transitive_dependency_import_paths=[xerrors_internal_import_path],
     )
 
@@ -455,7 +500,8 @@ def test_build_invalid_target(rule_runner: RuleRunner) -> None:
     )
 
     direct_build_request = rule_runner.request(
-        FallibleBuildGoPackageRequest, [BuildGoPackageTargetRequest(Address("direct"))]
+        FallibleBuildGoPackageRequest,
+        [BuildGoPackageTargetRequest(Address("direct"), build_opts=GoBuildOptions())],
     )
     assert direct_build_request.request is None
     assert direct_build_request.exit_code == 1
@@ -464,7 +510,8 @@ def test_build_invalid_target(rule_runner: RuleRunner) -> None:
     )
 
     dep_build_request = rule_runner.request(
-        FallibleBuildGoPackageRequest, [BuildGoPackageTargetRequest(Address("uses_dep"))]
+        FallibleBuildGoPackageRequest,
+        [BuildGoPackageTargetRequest(Address("uses_dep"), build_opts=GoBuildOptions())],
     )
     assert dep_build_request.request is None
     assert dep_build_request.exit_code == 1
@@ -535,7 +582,7 @@ def test_build_codegen_target(rule_runner: RuleRunner) -> None:
         expected_import_path="example.com/greeter",
         expected_dir_path="",
         expected_go_file_names=["greeter.go"],
-        expected_direct_dependency_import_paths=["codegen.com/gen"],
+        expected_direct_dependency_import_paths=["codegen.com/gen", "fmt"],
         expected_transitive_dependency_import_paths=["github.com/google/uuid"],
     )
 

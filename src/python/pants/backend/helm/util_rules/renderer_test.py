@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-from pathlib import PurePath
 from textwrap import dedent
 
 import pytest
@@ -55,7 +54,7 @@ def _read_file_from_digest(rule_runner: RuleRunner, *, digest: Digest, filename:
     return config_file_contents[0].content.decode("utf-8")
 
 
-def _common_workspace_files() -> dict[str | PurePath, str | bytes]:
+def _common_workspace_files() -> dict[str, str]:
     return {
         "src/mychart/BUILD": "helm_chart()",
         "src/mychart/Chart.yaml": HELM_CHART_FILE,

@@ -1,3 +1,5 @@
+// Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
+// Licensed under the Apache License, Version 2.0 (see LICENSE).
 use std::collections::{BTreeMap, HashSet};
 use std::convert::TryInto;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -149,6 +151,7 @@ fn create_cached_runner(
       cache_content_behavior,
       256,
       CACHE_READ_TIMEOUT,
+      None,
     )
     .expect("caching command runner"),
   )
@@ -162,7 +165,7 @@ async fn create_process(store_setup: &StoreSetup) -> (Process, Digest) {
   ]);
   let EntireExecuteRequest {
     action, command, ..
-  } = make_execute_request(&process, None, None, &store_setup.store)
+  } = make_execute_request(&process, None, None, &store_setup.store, None)
     .await
     .unwrap();
   let (_command_digest, action_digest) =
@@ -187,7 +190,7 @@ async fn cache_read_success() {
 
   assert_eq!(local_runner_call_counter.load(Ordering::SeqCst), 0);
   let remote_result = cache_runner
-    .run(Context::default(), &mut workunit, process.into())
+    .run(Context::default(), &mut workunit, process)
     .await
     .unwrap();
   assert_eq!(remote_result.exit_code, 0);
@@ -220,7 +223,7 @@ async fn cache_read_skipped_on_action_cache_errors() {
   );
   assert_eq!(local_runner_call_counter.load(Ordering::SeqCst), 0);
   let remote_result = cache_runner
-    .run(Context::default(), &mut workunit, process.into())
+    .run(Context::default(), &mut workunit, process)
     .await
     .unwrap();
   assert_eq!(remote_result.exit_code, 1);
@@ -257,7 +260,7 @@ async fn cache_read_skipped_on_missing_digest() {
   );
   assert_eq!(local_runner_call_counter.load(Ordering::SeqCst), 0);
   let remote_result = cache_runner
-    .run(Context::default(), &mut workunit, process.into())
+    .run(Context::default(), &mut workunit, process)
     .await
     .unwrap();
   assert_eq!(remote_result.exit_code, 1);
@@ -295,7 +298,7 @@ async fn cache_read_eager_fetch() {
 
     assert_eq!(local_runner_call_counter.load(Ordering::SeqCst), 0);
     let remote_result = cache_runner
-      .run(Context::default(), workunit, process.into())
+      .run(Context::default(), workunit, process)
       .await
       .unwrap();
 
@@ -352,7 +355,7 @@ async fn cache_read_speculation() {
 
     assert_eq!(local_runner_call_counter.load(Ordering::SeqCst), 0);
     let result = cache_runner
-      .run(Context::default(), workunit, process.into())
+      .run(Context::default(), workunit, process)
       .await
       .unwrap();
 
@@ -478,7 +481,7 @@ async fn cache_write_success() {
 
   let context = Context::default();
   let local_result = cache_runner
-    .run(context.clone(), &mut workunit, process.clone().into())
+    .run(context.clone(), &mut workunit, process.clone())
     .await
     .unwrap();
   context.tail_tasks.wait(Duration::from_secs(2)).await;
@@ -511,7 +514,7 @@ async fn cache_write_not_for_failures() {
   assert!(store_setup.cas.action_cache.action_map.lock().is_empty());
 
   let local_result = cache_runner
-    .run(Context::default(), &mut workunit, process.clone().into())
+    .run(Context::default(), &mut workunit, process.clone())
     .await
     .unwrap();
   assert_eq!(local_result.exit_code, 1);
@@ -540,7 +543,7 @@ async fn cache_write_does_not_block() {
 
   let context = Context::default();
   let local_result = cache_runner
-    .run(context.clone(), &mut workunit, process.clone().into())
+    .run(context.clone(), &mut workunit, process.clone())
     .await
     .unwrap();
   assert_eq!(local_result.exit_code, 0);
@@ -733,6 +736,7 @@ async fn make_action_result_basic() {
     CacheContentBehavior::Defer,
     256,
     CACHE_READ_TIMEOUT,
+    None,
   )
   .expect("caching command runner");
 
@@ -782,6 +786,7 @@ async fn make_action_result_basic() {
     remexec::OutputDirectory {
       path: "pets/cats".to_owned(),
       tree_digest: Some(TestTree::roland_at_root().digest().into()),
+      is_topologically_sorted: false,
     }
   );
 

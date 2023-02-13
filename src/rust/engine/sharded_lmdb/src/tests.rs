@@ -1,3 +1,5 @@
+// Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
+// Licensed under the Apache License, Version 2.0 (see LICENSE).
 use std::collections::HashMap;
 
 use bytes::{Buf, Bytes};
@@ -30,10 +32,8 @@ async fn shard_counts() {
 
     // Confirm that each database gets an even share.
     let mut databases = HashMap::new();
-    for prefix_byte in 0u8..=255u8 {
-      *databases
-        .entry(s.get_raw(&[prefix_byte]).0.clone())
-        .or_insert(0) += 1;
+    for prefix_byte in 0_u8..=255_u8 {
+      *databases.entry(s.get_raw(&[prefix_byte]).0).or_insert(0) += 1;
     }
     assert_eq!(databases.len(), shard_count as usize);
     for (_, count) in databases {
@@ -81,7 +81,7 @@ async fn store_failure() {
   let (s, _tempdir) = new_store(1);
 
   // Produces Readers that never stabilize.
-  let contents = Mutex::new((0..100).map(|b| bytes(b)));
+  let contents = Mutex::new((0..100).map(bytes));
 
   let result = s
     .store(true, false, move || {

@@ -8,7 +8,6 @@ import os
 import sys
 import time
 import warnings
-from textwrap import dedent
 
 from pants import ox
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE
@@ -18,6 +17,7 @@ from pants.bin.pants_env_vars import (
     RECURSION_LIMIT,
 )
 from pants.bin.pants_runner import PantsRunner
+from pants.util.strutil import softwrap
 
 
 class PantsLoader:
@@ -56,7 +56,7 @@ class PantsLoader:
             and os.environ.get(IGNORE_UNRECOGNIZED_ENCODING, None) is None
         ):
             raise RuntimeError(
-                dedent(
+                softwrap(
                     f"""
                     Your system's preferred encoding is `{encoding}`, but Pants requires `UTF-8`.
                     Specifically, Python's `locale.getpreferredencoding()` must resolve to `UTF-8`.

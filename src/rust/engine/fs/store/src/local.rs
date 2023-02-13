@@ -1,3 +1,5 @@
+// Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
+// Licensed under the Apache License, Version 2.0 (see LICENSE).
 use super::{EntryType, ShrinkBehavior};
 
 use std::collections::{BinaryHeap, HashSet};
@@ -108,7 +110,7 @@ impl ByteStore {
       dbs?
         .lease(digest.hash)
         .await
-        .map_err(|err| format!("Error leasing digest {:?}: {}", digest, err))?;
+        .map_err(|err| format!("Error leasing digest {digest:?}: {err}"))?;
     }
     Ok(())
   }
@@ -169,7 +171,7 @@ impl ByteStore {
             used_bytes -= aged_fingerprint.size_bytes;
             txn.commit()
           })
-          .map_err(|err| format!("Error garbage collecting: {}", err))?;
+          .map_err(|err| format!("Error garbage collecting: {err}"))?;
       }
     }
 
@@ -191,16 +193,16 @@ impl ByteStore {
       EntryType::Directory => self.inner.directory_dbs.clone(),
     };
 
-    for &(ref env, ref database, ref lease_database) in &database?.all_lmdbs() {
+    for (env, database, lease_database) in &database?.all_lmdbs() {
       let txn = env
         .begin_ro_txn()
-        .map_err(|err| format!("Error beginning transaction to garbage collect: {}", err))?;
+        .map_err(|err| format!("Error beginning transaction to garbage collect: {err}"))?;
       let mut cursor = txn
         .open_ro_cursor(*database)
-        .map_err(|err| format!("Failed to open lmdb read cursor: {}", err))?;
+        .map_err(|err| format!("Failed to open lmdb read cursor: {err}"))?;
       for key_res in cursor.iter() {
         let (key, bytes) =
-          key_res.map_err(|err| format!("Failed to advance lmdb read cursor: {}", err))?;
+          key_res.map_err(|err| format!("Failed to advance lmdb read cursor: {err}"))?;
         *used_bytes += bytes.len();
 
         // Random access into the lease_database is slower than iterating, but hopefully garbage
@@ -216,7 +218,7 @@ impl ByteStore {
           })
           .unwrap_or_else(|e| match e {
             NotFound => 0,
-            e => panic!("Error reading lease, probable lmdb corruption: {:?}", e),
+            e => panic!("Error reading lease, probable lmdb corruption: {e:?}"),
           });
 
         let leased_until = time::UNIX_EPOCH + Duration::from_secs(lease_until_unix_timestamp);
@@ -434,16 +436,16 @@ impl ByteStore {
       EntryType::Directory => self.inner.directory_dbs.clone(),
     };
     let mut digests = vec![];
-    for &(ref env, ref database, ref _lease_database) in &database?.all_lmdbs() {
+    for (env, database, _lease_database) in &database?.all_lmdbs() {
       let txn = env
         .begin_ro_txn()
-        .map_err(|err| format!("Error beginning transaction to garbage collect: {}", err))?;
+        .map_err(|err| format!("Error beginning transaction to garbage collect: {err}"))?;
       let mut cursor = txn
         .open_ro_cursor(*database)
-        .map_err(|err| format!("Failed to open lmdb read cursor: {}", err))?;
+        .map_err(|err| format!("Failed to open lmdb read cursor: {err}"))?;
       for key_res in cursor.iter() {
         let (key, bytes) =
-          key_res.map_err(|err| format!("Failed to advance lmdb read cursor: {}", err))?;
+          key_res.map_err(|err| format!("Failed to advance lmdb read cursor: {err}"))?;
         let v = VersionedFingerprint::from_bytes_unsafe(key);
         let fingerprint = v.get_fingerprint();
         digests.push(Digest::new(fingerprint, bytes.len()));

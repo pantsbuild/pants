@@ -1,4 +1,6 @@
-use std::collections::{BTreeMap, HashMap};
+// Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
+// Licensed under the Apache License, Version 2.0 (see LICENSE).
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::fs::File;
 use std::io::Read;
 use std::os::unix::fs::PermissionsExt;
@@ -8,7 +10,10 @@ use tempfile::TempDir;
 use testutil::data::{TestData, TestDirectory};
 
 use bytes::{Bytes, BytesMut};
-use fs::{DigestEntry, FileEntry, Permissions, EMPTY_DIRECTORY_DIGEST};
+use fs::{
+  DigestEntry, DirectoryDigest, FileEntry, Link, PathStat, Permissions, RelativePath,
+  EMPTY_DIRECTORY_DIGEST,
+};
 use grpc_util::prost::MessageExt;
 use grpc_util::tls;
 use hashing::{Digest, Fingerprint};
@@ -16,7 +21,10 @@ use mock::StubCAS;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use workunit_store::WorkunitStore;
 
-use crate::{EntryType, FileContent, Store, StoreError, UploadSummary, MEGABYTES};
+use crate::{
+  EntryType, FileContent, ImmutableInputs, Snapshot, Store, StoreError, StoreFileByDigest,
+  UploadSummary, MEGABYTES,
+};
 
 pub(crate) const STORE_BATCH_API_SIZE_LIMIT: usize = 4 * 1024 * 1024;
 
@@ -57,7 +65,7 @@ pub fn extra_big_file_bytes() -> Bytes {
 
 pub async fn load_file_bytes(store: &Store, digest: Digest) -> Result<Bytes, StoreError> {
   store
-    .load_file_bytes_with(digest, |bytes| Bytes::copy_from_slice(bytes))
+    .load_file_bytes_with(digest, Bytes::copy_from_slice)
     .await
 }
 
@@ -172,6 +180,36 @@ async fn load_file_falls_back_and_backfills() {
 }
 
 #[tokio::test]
+async fn load_file_falls_back_and_backfills_for_huge_file() {
+  let dir = TempDir::new().unwrap();
+
+  // 5MB of data
+  let testdata = TestData::new(&"12345".repeat(MEGABYTES));
+
+  let _ = WorkunitStore::setup_for_tests();
+  let cas = StubCAS::builder()
+    .chunk_size_bytes(MEGABYTES)
+    .file(&testdata)
+    .build();
+
+  assert!(
+    load_file_bytes(&new_store(dir.path(), &cas.address()), testdata.digest()).await
+      == Ok(testdata.bytes()),
+    "Read from CAS"
+  );
+  assert_eq!(1, cas.read_request_count());
+  assert!(
+    crate::local_tests::load_file_bytes(
+      &crate::local_tests::new_store(dir.path()),
+      testdata.digest(),
+    )
+    .await
+      == Ok(Some(testdata.bytes())),
+    "Read from local cache"
+  );
+}
+
+#[tokio::test]
 async fn load_directory_falls_back_and_backfills() {
   let dir = TempDir::new().unwrap();
 
@@ -219,7 +257,10 @@ async fn load_recursive_directory() {
     .build();
 
   new_store(dir.path(), &cas.address())
-    .ensure_local_has_recursive_directory(recursive_testdir_digest.clone())
+    .ensure_downloaded(
+      HashSet::new(),
+      HashSet::from([recursive_testdir_digest.clone()]),
+    )
     .await
     .expect("Downloading recursive directory should have succeeded.");
 
@@ -322,6 +363,52 @@ async fn load_directory_remote_error_is_error() {
 }
 
 #[tokio::test]
+async fn roundtrip_symlink() {
+  let _ = WorkunitStore::setup_for_tests();
+  let dir = TempDir::new().unwrap();
+
+  #[derive(Clone)]
+  struct NoopDigester;
+
+  impl StoreFileByDigest<String> for NoopDigester {
+    fn store_by_digest(
+      &self,
+      _: fs::File,
+    ) -> futures::future::BoxFuture<'static, Result<hashing::Digest, String>> {
+      unimplemented!();
+    }
+  }
+
+  let input_digest: DirectoryDigest = Snapshot::from_path_stats(
+    NoopDigester,
+    vec![PathStat::link(
+      "x".into(),
+      Link {
+        path: "x".into(),
+        target: "y".into(),
+      },
+    )],
+  )
+  .await
+  .unwrap()
+  .into();
+
+  let store = new_local_store(dir.path());
+
+  store
+    .ensure_directory_digest_persisted(input_digest.clone())
+    .await
+    .unwrap();
+
+  // Discard the DigestTrie to force it to be reloaded from disk.
+  let digest = DirectoryDigest::from_persisted_digest(input_digest.as_digest());
+  assert!(digest.tree.is_none());
+
+  let output_digest: DirectoryDigest = store.load_digest_trie(digest).await.unwrap().into();
+  assert_eq!(input_digest.as_digest(), output_digest.as_digest());
+}
+
+#[tokio::test]
 async fn malformed_remote_directory_is_error() {
   let dir = TempDir::new().unwrap();
 
@@ -347,12 +434,11 @@ async fn malformed_remote_directory_is_error() {
 async fn non_canonical_remote_directory_is_error() {
   let mut non_canonical_directory = TestDirectory::containing_roland().directory();
   non_canonical_directory.files.push({
-    let file = remexec::FileNode {
+    remexec::FileNode {
       name: "roland".to_string(),
       digest: Some((&TestData::roland().digest()).into()),
       ..Default::default()
-    };
-    file
+    }
   });
   let non_canonical_directory_bytes = non_canonical_directory.to_bytes();
   let directory_digest = Digest::of_bytes(&non_canonical_directory_bytes);
@@ -363,12 +449,12 @@ async fn non_canonical_remote_directory_is_error() {
   let _ = WorkunitStore::setup_for_tests();
   let cas = StubCAS::builder()
     .unverified_content(
-      non_canonical_directory_fingerprint.clone(),
+      non_canonical_directory_fingerprint,
       non_canonical_directory_bytes,
     )
     .build();
   new_store(dir.path(), &cas.address())
-    .load_directory(directory_digest.clone())
+    .load_directory(directory_digest)
     .await
     .expect_err("Want error");
 
@@ -520,8 +606,7 @@ async fn expand_missing_directory() {
     .expect_err("Want error");
   assert!(
     matches!(error, StoreError::MissingDigest { .. }),
-    "Bad error: {}",
-    error
+    "Bad error: {error}"
   );
 }
 
@@ -542,8 +627,7 @@ async fn expand_directory_missing_subdir() {
     .expect_err("Want error");
   assert!(
     matches!(error, StoreError::MissingDigest { .. }),
-    "Bad error message: {}",
-    error
+    "Bad error message: {error}"
   );
 }
 
@@ -747,8 +831,7 @@ async fn upload_missing_files() {
     .expect_err("Want error");
   assert!(
     matches!(error, StoreError::MissingDigest { .. }),
-    "Bad error: {}",
-    error
+    "Bad error: {error}"
   );
 }
 
@@ -792,8 +875,7 @@ async fn upload_missing_file_in_directory() {
     .expect_err("Want error");
   assert!(
     matches!(error, StoreError::MissingDigest { .. }),
-    "Bad error: {}",
-    error
+    "Bad error: {error}"
   );
 }
 
@@ -894,7 +976,7 @@ async fn instance_name_download() {
 
   assert_eq!(
     store_with_remote
-      .load_file_bytes_with(TestData::roland().digest(), |b| Bytes::copy_from_slice(b))
+      .load_file_bytes_with(TestData::roland().digest(), Bytes::copy_from_slice)
       .await
       .unwrap(),
     TestData::roland().bytes()
@@ -978,7 +1060,7 @@ async fn auth_download() {
 
   assert_eq!(
     store_with_remote
-      .load_file_bytes_with(TestData::roland().digest(), |b| Bytes::copy_from_slice(b))
+      .load_file_bytes_with(TestData::roland().digest(), Bytes::copy_from_slice)
       .await
       .unwrap(),
     TestData::roland().bytes()
@@ -993,7 +1075,12 @@ async fn materialize_missing_file() {
   let store_dir = TempDir::new().unwrap();
   let store = new_local_store(store_dir.path());
   store
-    .materialize_file(file.clone(), TestData::roland().digest(), 0o644)
+    .materialize_file(
+      file.clone(),
+      TestData::roland().digest(),
+      Permissions::ReadOnly,
+      false,
+    )
     .await
     .expect_err("Want unknown digest error");
 }
@@ -1012,7 +1099,12 @@ async fn materialize_file() {
     .await
     .expect("Error saving bytes");
   store
-    .materialize_file(file.clone(), testdata.digest(), 0o644)
+    .materialize_file(
+      file.clone(),
+      testdata.digest(),
+      Permissions::ReadOnly,
+      false,
+    )
     .await
     .expect("Error materializing file");
   assert_eq!(file_contents(&file), testdata.bytes());
@@ -1029,6 +1121,8 @@ async fn materialize_missing_directory() {
     .materialize_directory(
       materialize_dir.path().to_owned(),
       TestDirectory::recursive().directory_digest(),
+      &BTreeSet::new(),
+      None,
       Permissions::Writable,
     )
     .await
@@ -1061,6 +1155,8 @@ async fn materialize_directory(perms: Permissions, executable_file: bool) {
     .materialize_directory(
       materialize_dir.path().to_owned(),
       recursive_testdir.directory_digest(),
+      &BTreeSet::new(),
+      None,
       perms,
     )
     .await
@@ -1097,7 +1193,7 @@ async fn materialize_directory(perms: Permissions, executable_file: bool) {
     is_readonly(&materialize_dir.path().join("cats").join("feed.ext"))
   );
   assert_eq!(readonly, is_readonly(&materialize_dir.path().join("cats")));
-  assert_eq!(readonly, is_readonly(&materialize_dir.path()));
+  assert_eq!(readonly, is_readonly(materialize_dir.path()));
 }
 
 #[tokio::test]
@@ -1185,9 +1281,7 @@ fn assert_same_filecontents(left: Vec<FileContent>, right: Vec<FileContent>) {
   assert_eq!(
     left.len(),
     right.len(),
-    "FileContents did not match, different lengths: left: {:?} right: {:?}",
-    left,
-    right
+    "FileContents did not match, different lengths: left: {left:?} right: {right:?}"
   );
 
   let mut success = true;
@@ -1216,8 +1310,7 @@ fn assert_same_filecontents(left: Vec<FileContent>, right: Vec<FileContent>) {
   }
   assert!(
     success,
-    "FileContents did not match: Left: {:?}, Right: {:?}",
-    left, right
+    "FileContents did not match: Left: {left:?}, Right: {right:?}"
   );
 }
 
@@ -1280,9 +1373,7 @@ fn assert_same_digest_entries(left: Vec<DigestEntry>, right: Vec<DigestEntry>) {
   assert_eq!(
     left.len(),
     right.len(),
-    "DigestEntry vectors did not match, different lengths: left: {:?} right: {:?}",
-    left,
-    right
+    "DigestEntry vectors did not match, different lengths: left: {left:?} right: {right:?}"
   );
 
   let mut success = true;
@@ -1315,21 +1406,19 @@ fn assert_same_digest_entries(left: Vec<DigestEntry>, right: Vec<DigestEntry>) {
         if path_left != path_right {
           success = false;
           eprintln!(
-            "Paths did not match for empty directory at index {}: {:?}, {:?}",
-            index, path_left, path_right
+            "Paths did not match for empty directory at index {index}: {path_left:?}, {path_right:?}"
           );
         }
       }
       (l, r) => {
         success = false;
-        eprintln!("Differing types at index {}: {:?}, {:?}", index, l, r)
+        eprintln!("Differing types at index {index}: {l:?}, {r:?}")
       }
     }
   }
   assert!(
     success,
-    "FileEntry vectors did not match: Left: {:?}, Right: {:?}",
-    left, right
+    "FileEntry vectors did not match: Left: {left:?}, Right: {right:?}"
   );
 }
 
@@ -1527,10 +1616,12 @@ async fn explicitly_overwrites_already_existing_file() {
     .build();
   let store = new_store(tempfile::tempdir().unwrap(), &cas.address());
 
-  let _ = store
+  store
     .materialize_directory(
       dir_to_write_to.path().to_owned(),
       contents_dir.directory_digest(),
+      &BTreeSet::new(),
+      None,
       Permissions::Writable,
     )
     .await
@@ -1538,4 +1629,91 @@ async fn explicitly_overwrites_already_existing_file() {
 
   let file_contents = std::fs::read(&file_path).unwrap();
   assert_eq!(file_contents, b"abc123".to_vec());
+}
+
+#[ignore] // see #17754
+#[tokio::test]
+async fn big_file_immutable_link() {
+  let materialize_dir = TempDir::new().unwrap();
+  let input_file = materialize_dir.path().join("input_file");
+  let output_file = materialize_dir.path().join("output_file");
+  let output_dir = materialize_dir.path().join("output_dir");
+  let nested_output_file = output_dir.join("file");
+
+  let file_bytes = extra_big_file_bytes();
+  let file_digest = extra_big_file_digest();
+
+  let nested_directory = remexec::Directory {
+    files: vec![remexec::FileNode {
+      name: "file".to_owned(),
+      digest: Some(file_digest.into()),
+      is_executable: true,
+      ..remexec::FileNode::default()
+    }],
+    ..remexec::Directory::default()
+  };
+  let directory = remexec::Directory {
+    files: vec![
+      remexec::FileNode {
+        name: "input_file".to_owned(),
+        digest: Some(file_digest.into()),
+        is_executable: true,
+        ..remexec::FileNode::default()
+      },
+      remexec::FileNode {
+        name: "output_file".to_owned(),
+        digest: Some(file_digest.into()),
+        is_executable: true,
+        ..remexec::FileNode::default()
+      },
+    ],
+    directories: vec![remexec::DirectoryNode {
+      name: "output_dir".to_string(),
+      digest: Some(hashing::Digest::of_bytes(&nested_directory.to_bytes()).into()),
+    }],
+    ..remexec::Directory::default()
+  };
+  let directory_digest =
+    fs::DirectoryDigest::from_persisted_digest(hashing::Digest::of_bytes(&directory.to_bytes()));
+
+  let store_dir = TempDir::new().unwrap();
+  let store = new_local_store(store_dir.path());
+  let immutable_inputs_dir = TempDir::new().unwrap();
+  let immutable_inputs = ImmutableInputs::new(store.clone(), immutable_inputs_dir.path()).unwrap();
+  store
+    .record_directory(&nested_directory, false)
+    .await
+    .expect("Error saving Directory");
+  store
+    .record_directory(&directory, false)
+    .await
+    .expect("Error saving Directory");
+  store
+    .store_file_bytes(file_bytes.clone(), false)
+    .await
+    .expect("Error saving bytes");
+
+  store
+    .materialize_directory(
+      materialize_dir.path().to_owned(),
+      directory_digest,
+      &BTreeSet::from([
+        RelativePath::new("output_file").unwrap(),
+        RelativePath::new("output_dir").unwrap(),
+      ]),
+      Some(&immutable_inputs),
+      Permissions::Writable,
+    )
+    .await
+    .expect("Error materializing file");
+
+  let assert_is_linked = |path: &PathBuf, is_linked: bool| {
+    assert_eq!(file_contents(path), file_bytes);
+    assert!(is_executable(path));
+    assert_eq!(path.metadata().unwrap().permissions().readonly(), is_linked);
+  };
+
+  assert_is_linked(&input_file, true);
+  assert_is_linked(&output_file, false);
+  assert_is_linked(&nested_output_file, false);
 }

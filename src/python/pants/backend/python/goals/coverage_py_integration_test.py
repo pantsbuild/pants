@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import platform
 import sqlite3
 from pathlib import Path
 from textwrap import dedent
@@ -314,6 +315,10 @@ def test_coverage_html_xml_json_lcov(batched: bool) -> None:
 def test_default_coverage_issues_12390() -> None:
     # N.B.: This ~replicates the repo used to reproduce this issue at
     # https://github.com/alexey-tereshenkov-oxb/monorepo-coverage-pants.
+    if platform.system() == "Darwin" and platform.machine() == "arm64":
+        pytest.skip(reason="No PySide2 wheels available for macOS M1")
+    if platform.system() == "Linux" and platform.machine() == "aarch64":
+        pytest.skip(reason="No PySide2 wheels available for Linux ARM")
     files = {
         "requirements.txt": "PySide2==5.15.2",
         "BUILD": dedent(

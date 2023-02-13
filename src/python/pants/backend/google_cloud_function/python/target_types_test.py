@@ -10,17 +10,14 @@ from pants.backend.google_cloud_function.python.target_types import (
     InferPythonCloudFunctionHandlerDependency,
     PythonCloudFunctionHandlerInferenceFieldSet,
     PythonGoogleCloudFunction,
+    PythonGoogleCloudFunctionCompletePlatforms,
     PythonGoogleCloudFunctionHandlerField,
     PythonGoogleCloudFunctionRuntime,
     ResolvedPythonGoogleHandler,
     ResolvePythonGoogleHandlerRequest,
 )
 from pants.backend.google_cloud_function.python.target_types import rules as target_type_rules
-from pants.backend.python.target_types import (
-    PexCompletePlatformsField,
-    PythonRequirementTarget,
-    PythonSourcesGeneratorTarget,
-)
+from pants.backend.python.target_types import PythonRequirementTarget, PythonSourcesGeneratorTarget
 from pants.backend.python.target_types_rules import rules as python_target_types_rules
 from pants.build_graph.address import Address
 from pants.core.target_types import FileTarget
@@ -298,17 +295,17 @@ def test_at_least_one_target_platform(rule_runner: RuleRunner) -> None:
 
     runtime = rule_runner.get_target(Address("project", target_name="runtime"))
     assert "python37" == runtime[PythonGoogleCloudFunctionRuntime].value
-    assert runtime[PexCompletePlatformsField].value is None
+    assert runtime[PythonGoogleCloudFunctionCompletePlatforms].value is None
 
     complete_platforms = rule_runner.get_target(
         Address("project", target_name="complete_platforms")
     )
     assert complete_platforms[PythonGoogleCloudFunctionRuntime].value is None
-    assert (":python37",) == complete_platforms[PexCompletePlatformsField].value
+    assert (":python37",) == complete_platforms[PythonGoogleCloudFunctionCompletePlatforms].value
 
     both = rule_runner.get_target(Address("project", target_name="both"))
     assert "python37" == both[PythonGoogleCloudFunctionRuntime].value
-    assert (":python37",) == both[PexCompletePlatformsField].value
+    assert (":python37",) == both[PythonGoogleCloudFunctionCompletePlatforms].value
 
     with pytest.raises(
         ExecutionError,

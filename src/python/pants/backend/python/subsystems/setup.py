@@ -8,7 +8,8 @@ import logging
 import os
 from typing import Iterable, List, Optional, TypeVar, cast
 
-from pants.backend.python.pip_requirement import PipRequirement
+from packaging.utils import canonicalize_name
+
 from pants.core.goals.generate_lockfiles import UnrecognizedResolveNamesError
 from pants.option.option_types import (
     BoolOption,
@@ -24,6 +25,15 @@ from pants.util.memo import memoized_method, memoized_property
 from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
+
+
+@enum.unique
+class PipVersion(enum.Enum):
+    V20_3_4 = "20.3.4-patched"
+    V22_2_2 = "22.2.2"
+    V22_3 = "22.3"
+    V22_3_1 = "22.3.1"
+    V23_0 = "23.0"
 
 
 @enum.unique
@@ -180,6 +190,11 @@ class PythonSetup(Subsystem):
             """
         ),
     )
+    pip_version = EnumOption(
+        default=PipVersion.V20_3_4,
+        help="Use this version of Pip for resolving requirements and generating lockfiles.",
+        advanced=True,
+    )
     _resolves_to_interpreter_constraints = DictOption["list[str]"](
         help=softwrap(
             """
@@ -245,7 +260,8 @@ class PythonSetup(Subsystem):
             You can use the key `{RESOLVE_OPTION_KEY__DEFAULT}` to set a default value for all
             resolves.
 
-            For each resolve's value, you can use the value `:all:` to disable all binary packages.
+            For each resolve, you can also use the value `:all:` to disable all binary packages:
+            `{{'data-science': [':all:']}}`.
 
             Note that some packages are tricky to compile and may fail to install when this option
             is used on them. See https://pip.pypa.io/en/stable/cli/pip_install/#install-no-binary
@@ -268,7 +284,8 @@ class PythonSetup(Subsystem):
             You can use the key `{RESOLVE_OPTION_KEY__DEFAULT}` to set a default value for all
             resolves.
 
-            For each resolve's value, you can use the value `:all:` to disable all source packages.
+            For each resolve you can use the value `:all:` to disable all source packages:
+            `{{'data-science': [':all:']}}`.
 
             Packages without binary distributions will fail to install when this option is used on
             them. See https://pip.pypa.io/en/stable/cli/pip_install/#install-only-binary for
@@ -467,6 +484,15 @@ class PythonSetup(Subsystem):
         ),
         advanced=True,
     )
+    tailor_py_typed_targets = BoolOption(
+        default=True,
+        help=softwrap(
+            """
+            If true, add `resource` targets for marker files named `py.typed` with the `tailor` goal.
+            """
+        ),
+        advanced=True,
+    )
     macos_big_sur_compatibility = BoolOption(
         default=False,
         help=softwrap(
@@ -479,6 +505,31 @@ class PythonSetup(Subsystem):
         ),
         advanced=True,
     )
+    enable_lockfile_targets = BoolOption(
+        default=True,
+        help=softwrap(
+            """
+            Create targets for all Python lockfiles defined in `[python].resolves`.
+
+            The lockfile targets will then be used as dependencies to the `python_requirement`
+            targets that use them, invalidating source targets per resolve when the lockfile
+            changes.
+
+            If another targets address is in conflict with the created lockfile target, it will
+            shadow the lockfile target and it will not be available as a dependency for any
+            `python_requirement` targets.
+            """
+        ),
+        advanced=True,
+    )
+    repl_history = BoolOption(
+        default=True,
+        help="Whether to use the standard Python command history file when running a repl.",
+    )
+
+    @property
+    def enable_synthetic_lockfiles(self) -> bool:
+        return self.enable_resolves and self.enable_lockfile_targets
 
     @memoized_property
     def resolves_to_interpreter_constraints(self) -> dict[str, tuple[str, ...]]:
@@ -531,17 +582,9 @@ class PythonSetup(Subsystem):
     @memoized_method
     def resolves_to_no_binary(
         self, all_python_tool_resolve_names: tuple[str, ...]
-    ) -> dict[str, list[PipRequirement]]:
+    ) -> dict[str, list[str]]:
         return {
-            resolve: [
-                PipRequirement.parse(
-                    v,
-                    description_of_origin=(
-                        f"the option `[python].resolves_to_no_binary` for the resolve {resolve}"
-                    ),
-                )
-                for v in vals
-            ]
+            resolve: [canonicalize_name(v) for v in vals]
             for resolve, vals in self._resolves_to_option_helper(
                 self._resolves_to_no_binary,
                 "resolves_to_no_binary",
@@ -552,17 +595,9 @@ class PythonSetup(Subsystem):
     @memoized_method
     def resolves_to_only_binary(
         self, all_python_tool_resolve_names: tuple[str, ...]
-    ) -> dict[str, list[PipRequirement]]:
+    ) -> dict[str, list[str]]:
         return {
-            resolve: [
-                PipRequirement.parse(
-                    v,
-                    description_of_origin=(
-                        f"the option `[python].resolves_to_only_binary` for the resolve {resolve}"
-                    ),
-                )
-                for v in vals
-            ]
+            resolve: sorted([canonicalize_name(v) for v in vals])
             for resolve, vals in self._resolves_to_option_helper(
                 self._resolves_to_only_binary,
                 "resolves_to_only_binary",

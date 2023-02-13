@@ -5,9 +5,11 @@ from __future__ import annotations
 
 import re
 from enum import Enum
+from typing import ClassVar, Optional
 
-from pants.backend.shell.shell_setup import ShellSetup
+from pants.backend.shell.subsystems.shell_setup import ShellSetup
 from pants.core.goals.test import RuntimePackageDependenciesField, TestTimeoutField
+from pants.core.util_rules.environments import EnvironmentField
 from pants.core.util_rules.system_binaries import BinaryPathTest
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
@@ -18,6 +20,7 @@ from pants.engine.target import (
     MultipleSourcesField,
     OverridesField,
     SingleSourceField,
+    SpecialCasedDependencies,
     StringField,
     StringSequenceField,
     Target,
@@ -108,7 +111,7 @@ class Shunit2Shell(Enum):
         return BinaryPathTest((arg,))
 
 
-class Shunit2TestDependenciesField(Dependencies):
+class Shunit2TestDependenciesField(ShellDependenciesField):
     supports_transitive_excludes = True
 
 
@@ -258,19 +261,105 @@ class ShellCommandCommandField(StringField):
     help = "Shell command to execute.\n\nThe command is executed as 'bash -c <command>' by default."
 
 
-class ShellCommandOutputsField(StringSequenceField):
-    alias = "outputs"
+class RunInSandboxRunnableField(StringField):
+    alias = "runnable"
+    required = True
     help = softwrap(
         """
-        Specify the shell command output files and directories.
-
-        Use a trailing slash on directory names, i.e. `my_dir/`.
+        Address to a target that can be invoked by the `run` goal (and does not set
+        `run_in_sandbox_behavior=NOT_SUPPORTED`). This will be executed along with any arguments
+        specified by `argv`, in a sandbox with that target's transitive dependencies, along with
+        the transitive dependencies specified by `execution_dependencies`.
         """
     )
 
 
-class ShellCommandDependenciesField(Dependencies):
-    pass
+class ShellCommandOutputsField(StringSequenceField):
+    alias = "outputs"
+    help = softwrap(
+        """
+        Specify the shell command output files and directories, relative to the value of `workdir`.
+
+        Use a trailing slash on directory names, i.e. `my_dir/`.
+
+        Relative paths (including `..`) may be used, as long as the path does not ascend further
+        than the build root.
+        """
+    )
+    removal_hint = "To fix, use `output_files` and `output_directories` instead."
+    removal_version = "2.17.0.dev0"
+
+
+class ShellCommandOutputFilesField(StringSequenceField):
+    alias = "output_files"
+    required = False
+    default = ()
+    help = softwrap(
+        """
+        Specify the shell command's output files to capture, relative to the value of `workdir`.
+
+        For directories, use `output_directories`. At least one of `output_files` and
+        `output_directories` must be specified.
+
+        Relative paths (including `..`) may be used, as long as the path does not ascend further
+        than the build root.
+        """
+    )
+
+
+class ShellCommandOutputDirectoriesField(StringSequenceField):
+    alias = "output_directories"
+    required = False
+    default = ()
+    help = softwrap(
+        """
+        Specify full directories (including recursive descendants) of output to capture from the
+        shell command, relative to the value of `workdir`.
+
+        For individual files, use `output_files`. At least one of `output_files` and
+        `output_directories` must be specified.
+
+        Relative paths (including `..`) may be used, as long as the path does not ascend further
+        than the build root.
+        """
+    )
+
+
+class ShellCommandOutputDependenciesField(ShellDependenciesField):
+    supports_transitive_excludes = True
+    alias = "output_dependencies"
+    deprecated_alias = "dependencies"
+    deprecated_alias_removal_version = "2.17.0.dev0"
+
+    help = softwrap(
+        """
+        Any dependencies that the output artifacts require in order to be effectively consumed.
+
+        To enable legacy use cases, if `execution_dependencies` is `None`, these dependencies will
+        be materialized in the command execution sandbox. This behavior is deprecated, and will be
+        removed in version 2.17.0.dev0.
+        """
+    )
+
+
+class ShellCommandExecutionDependenciesField(SpecialCasedDependencies):
+    alias = "execution_dependencies"
+    required = False
+    default = None
+
+    help = softwrap(
+        """
+        The execution dependencies for this shell command.
+
+        Dependencies specified here are those required to make the command complete successfully
+        (e.g. file inputs, binaries compiled from other targets, etc), but NOT required to make
+        the output side-effects useful. Dependencies that are required to use the side-effects
+        produced by this command should be specified using the `output_dependencies` field.
+
+        If this field is specified, dependencies from `output_dependencies` will not be added to
+        the execution sandbox.
+        """
+    )
 
 
 class ShellCommandSourcesField(MultipleSourcesField):
@@ -278,6 +367,38 @@ class ShellCommandSourcesField(MultipleSourcesField):
     alias = "_sources"
     uses_source_roots = False
     expected_num_files = 0
+
+
+class RunInSandboxSourcesField(MultipleSourcesField):
+    # We solely register this field for codegen to work.
+    alias = "_sources"
+    uses_source_roots = False
+    expected_num_files = 0
+
+
+class ShellCommandIsInteractiveField(MultipleSourcesField):
+    # We use this to determine whether this is an interactive process.
+    alias = "_is_interactive"
+    uses_source_roots = False
+    expected_num_files = 0
+
+
+class RunInSandboxArgumentsField(StringSequenceField):
+    alias = "args"
+    default = ()
+    help = f"Extra arguments to pass into the `{RunInSandboxRunnableField.alias}` field."
+
+
+class RunInSandboxStdoutFilenameField(StringField):
+    alias = "stdout"
+    default = None
+    help = "A filename to capture the contents of `stdout` to, relative to the value of `workdir`."
+
+
+class RunInSandboxStderrFilenameField(StringField):
+    alias = "stderr"
+    default = None
+    help = "A filename to capture the contents of `stdout` to, relative to the value of `workdir`."
 
 
 class ShellCommandTimeoutField(IntField):
@@ -289,7 +410,7 @@ class ShellCommandTimeoutField(IntField):
 
 class ShellCommandToolsField(StringSequenceField):
     alias = "tools"
-    required = True
+    default = ()
     help = softwrap(
         """
         Specify required executable tools that might be used.
@@ -318,24 +439,68 @@ class ShellCommandLogOutputField(BoolField):
     help = "Set to true if you want the output from the command logged to the console."
 
 
-class ShellCommandRunWorkdirField(StringField):
+class ShellCommandWorkdirField(StringField):
     alias = "workdir"
-    default = "."
-    help = "Sets the current working directory of the command, relative to the project root."
+    default: ClassVar[Optional[str]] = "."
+    help = softwrap(
+        "Sets the current working directory of the command. \n\n"
+        "Values are relative to the build root, except in the following cases:\n\n"
+        "* `.` specifies the location of the `BUILD` file.\n"
+        "* Values beginning with `./` are relative to the location of the `BUILD` file.\n"
+        "* `/` or the empty string specifies the build root.\n"
+        "* Values beginning with `/` are also relative to the build root."
+    )
+
+
+class RunShellCommandWorkdirField(ShellCommandWorkdirField):
+    default = None
+    help = softwrap(
+        "Sets the current working directory of the command that is `run`. If `None`, run the "
+        "command from the directory you are invoking Pants from."
+    )
+
+
+class ShellCommandOutputRootDirField(StringField):
+    alias = "root_output_directory"
+    default = "/"
+    help = softwrap(
+        "Adjusts the location of files output by this command, when consumed as a dependency.\n\n"
+        "Values are relative to the build root, except in the following cases:\n\n"
+        "* `.` specifies the location of the `BUILD` file.\n"
+        "* Values beginning with `./` are relative to the location of the `BUILD` file.\n"
+        "* `/` or the empty string specifies the build root.\n"
+        "* Values beginning with `/` are also relative to the build root."
+    )
+
+
+class ShellCommandTestDependenciesField(ShellCommandExecutionDependenciesField):
+    pass
+
+
+class SkipShellCommandTestsField(BoolField):
+    alias = "skip_tests"
+    default = False
+    help = "If true, don't run this tests for target."
 
 
 class ShellCommandTarget(Target):
     alias = "experimental_shell_command"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        ShellCommandDependenciesField,
+        ShellCommandOutputDependenciesField,
+        ShellCommandExecutionDependenciesField,
         ShellCommandCommandField,
         ShellCommandLogOutputField,
         ShellCommandOutputsField,
+        ShellCommandOutputFilesField,
+        ShellCommandOutputDirectoriesField,
         ShellCommandSourcesField,
         ShellCommandTimeoutField,
         ShellCommandToolsField,
         ShellCommandExtraEnvVarsField,
+        ShellCommandWorkdirField,
+        ShellCommandOutputRootDirField,
+        EnvironmentField,
     )
     help = softwrap(
         """
@@ -346,8 +511,9 @@ class ShellCommandTarget(Target):
             experimental_shell_command(
                 command="./my-script.sh --flag",
                 tools=["tar", "curl", "cat", "bash", "env"],
-                dependencies=[":scripts"],
-                outputs=["results/", "logs/my-script.log"],
+                execution_dependencies=[":scripts"],
+                output_files=["logs/my-script.log"],
+                output_directories=["results"],
             )
 
             shell_sources(name="scripts")
@@ -361,13 +527,54 @@ class ShellCommandTarget(Target):
     )
 
 
+class ShellRunInSandboxTarget(Target):
+    alias = "experimental_run_in_sandbox"
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        RunInSandboxRunnableField,
+        RunInSandboxArgumentsField,
+        ShellCommandExecutionDependenciesField,
+        ShellCommandOutputDependenciesField,
+        ShellCommandLogOutputField,
+        ShellCommandOutputFilesField,
+        ShellCommandOutputDirectoriesField,
+        RunInSandboxSourcesField,
+        ShellCommandTimeoutField,
+        ShellCommandToolsField,
+        ShellCommandExtraEnvVarsField,
+        ShellCommandWorkdirField,
+        ShellCommandOutputRootDirField,
+        RunInSandboxStdoutFilenameField,
+        RunInSandboxStderrFilenameField,
+        EnvironmentField,
+    )
+    help = softwrap(
+        """
+        Execute any runnable target for its side effects.
+
+        Example BUILD file:
+
+            experimental_run_in_sandbox(
+                runnable=":python_source",
+                argv=[""],
+                tools=["tar", "curl", "cat", "bash", "env"],
+                execution_dependencies=[":scripts"],
+                outputs=["results/", "logs/my-script.log"],
+            )
+
+            shell_sources(name="scripts")
+        """
+    )
+
+
 class ShellCommandRunTarget(Target):
     alias = "experimental_run_shell_command"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        ShellCommandDependenciesField,
+        ShellCommandExecutionDependenciesField,
         ShellCommandCommandField,
-        ShellCommandRunWorkdirField,
+        RunShellCommandWorkdirField,
+        ShellCommandIsInteractiveField,
     )
     help = softwrap(
         """
@@ -377,16 +584,53 @@ class ShellCommandRunTarget(Target):
 
             experimental_run_shell_command(
                 command="./scripts/my-script.sh --data-files-dir={chroot}",
-                dependencies=["src/project/files:data"],
+                execution_dependencies=["src/project/files:data"],
             )
 
         The `command` may use either `{chroot}` on the command line, or the `$CHROOT`
         environment variable to get the root directory for where any dependencies are located.
 
         In contrast to the `experimental_shell_command`, in addition to `workdir` you only have
-        the `command` and `dependencies` fields as the `tools` you are going to use are already
-        on the PATH which is inherited from the Pants environment. Also, the `outputs` does not
-        apply, as any output files produced will end up directly in your project tree.
+        the `command` and `execution_dependencies` fields as the `tools` you are going to use are
+        already on the PATH which is inherited from the Pants environment. Also, the `outputs` does
+        not apply, as any output files produced will end up directly in your project tree.
+        """
+    )
+
+
+class ShellCommandTestTarget(Target):
+    alias = "experimental_test_shell_command"
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        ShellCommandTestDependenciesField,
+        ShellCommandCommandField,
+        ShellCommandLogOutputField,
+        ShellCommandSourcesField,
+        ShellCommandTimeoutField,
+        ShellCommandToolsField,
+        ShellCommandExtraEnvVarsField,
+        EnvironmentField,
+        SkipShellCommandTestsField,
+        ShellCommandWorkdirField,
+    )
+    help = softwrap(
+        """
+        Run a script as a test via the `test` goal, with all dependencies packaged/copied available in the chroot.
+
+        Example BUILD file:
+
+            experimental_test_shell_command(
+                name="test",
+                tools=["test"],
+                command="test -r $CHROOT/some-data-file.txt",
+                execution_dependencies=["src/project/files:data"],
+            )
+
+        The `command` may use either `{chroot}` on the command line, or the `$CHROOT`
+        environment variable to get the root directory for where any dependencies are located.
+
+        In contrast to the `experimental_run_shell_command`, this target is intended to run shell commands as tests
+        and will only run them via the `test` goal.
         """
     )
 

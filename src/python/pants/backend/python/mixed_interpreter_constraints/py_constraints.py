@@ -10,6 +10,7 @@ from pants.backend.project_info.dependents import Dependents, DependentsRequest
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import InterpreterConstraintsField
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
+from pants.base.deprecated import warn_or_error
 from pants.engine.addresses import Addresses
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem, Outputting
@@ -39,15 +40,33 @@ class PyConstraintsSubsystem(Outputting, GoalSubsystem):
             """
             Output a CSV summary of interpreter constraints for your whole repository. The
             headers are `Target`, `Constraints`, `Transitive Constraints`, `# Dependencies`,
-            and `# Dependees`.
+            and `# Dependents` (or `# Dependees`, if summary_use_new_header is False).
 
             This information can be useful when prioritizing a migration from one Python version to
-            another (e.g. to Python 3). Use `# Dependencies` and `# Dependees` to help prioritize
+            another (e.g. to Python 3). Use `# Dependencies` and `# Dependents` to help prioritize
             which targets are easiest to port (low # dependencies) and highest impact to port
-            (high # dependees).
+            (high # dependents).
 
             Use a tool like Pandas or Excel to process the CSV. Use the option
             `--py-constraints-output-file=summary.csv` to write directly to a file.
+            """
+        ),
+    )
+
+    summary_use_new_header = BoolOption(
+        default=True,
+        help=softwrap(
+            """
+            If False, use the legacy, misleading `#Dependees` header name in the summary CSV table.
+            If True, will use the new, more accurate, `# Dependents` name for the same column.
+
+            This is a temporary option to ease migration to the new header name. Set this option to
+            True to start working with the new header.
+
+            This option's default value will change to True in 2.16.x, and it will be deprecated
+            in that version.
+
+            This option, and the ability to use the old name, will be removed entirely in 2.17.x.
             """
         ),
     )
@@ -68,6 +87,16 @@ async def py_constraints(
     union_membership: UnionMembership,
 ) -> PyConstraintsGoal:
     if py_constraints_subsystem.summary:
+        if not py_constraints_subsystem.summary_use_new_header:
+            warn_or_error(
+                "2.17.0.dev0",
+                "the old, misleading, `# Dependees` header",
+                "Set --summary-use-new-header to true to start using the new `# Dependents` header.",
+            )
+
+        dependents_header = (
+            "# Dependents" if py_constraints_subsystem.summary_use_new_header else "# Dependees"
+        )
         if addresses:
             console.print_stderr(
                 softwrap(
@@ -98,7 +127,7 @@ async def py_constraints(
             for transitive_targets in transitive_targets_per_tgt
         ]
 
-        dependees_per_root = await MultiGet(
+        dependents_per_root = await MultiGet(
             Get(Dependents, DependentsRequest([tgt.address], transitive=True, include_roots=False))
             for tgt in all_python_targets
         )
@@ -109,14 +138,14 @@ async def py_constraints(
                 "Constraints": str(constraints),
                 "Transitive Constraints": str(transitive_constraints),
                 "# Dependencies": len(transitive_targets.dependencies),
-                "# Dependees": len(dependees),
+                dependents_header: len(dependents),
             }
-            for tgt, constraints, transitive_constraints, transitive_targets, dependees in zip(
+            for tgt, constraints, transitive_constraints, transitive_targets, dependents in zip(
                 all_python_targets,
                 constraints_per_tgt,
                 transitive_constraints_per_tgt,
                 transitive_targets_per_tgt,
-                dependees_per_root,
+                dependents_per_root,
             )
         ]
 
@@ -128,7 +157,7 @@ async def py_constraints(
                     "Constraints",
                     "Transitive Constraints",
                     "# Dependencies",
-                    "# Dependees",
+                    dependents_header,
                 ],
             )
             writer.writeheader()

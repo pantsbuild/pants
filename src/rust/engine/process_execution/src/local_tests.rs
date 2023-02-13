@@ -1,3 +1,5 @@
+// Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
+// Licensed under the Apache License, Version 2.0 (see LICENSE).
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::path::PathBuf;
 use std::str;
@@ -9,7 +11,7 @@ use spectral::{assert_that, string::StrAssertions};
 use tempfile::TempDir;
 
 use fs::EMPTY_DIRECTORY_DIGEST;
-use store::Store;
+use store::{ImmutableInputs, Store};
 use testutil::data::{TestData, TestDirectory};
 use testutil::path::{find_bash, which};
 use testutil::{owned_string_vec, relative_paths};
@@ -17,8 +19,8 @@ use workunit_store::{RunningWorkunit, WorkunitStore};
 
 use crate::{
   local, local::KeepSandboxes, CacheName, CommandRunner as CommandRunnerTrait, Context,
-  FallibleProcessResultWithPlatform, ImmutableInputs, InputDigests, NamedCaches, Platform, Process,
-  ProcessError, RelativePath,
+  FallibleProcessResultWithPlatform, InputDigests, NamedCaches, Platform, Process, ProcessError,
+  RelativePath,
 };
 
 #[derive(PartialEq, Debug)]
@@ -91,9 +93,9 @@ async fn env() {
 
   let stdout = String::from_utf8(result.stdout_bytes.to_vec()).unwrap();
   let got_env: BTreeMap<String, String> = stdout
-    .split("\n")
+    .split('\n')
     .filter(|line| !line.is_empty())
-    .map(|line| line.splitn(2, "="))
+    .map(|line| line.splitn(2, '='))
     .map(|mut parts| {
       (
         parts.next().unwrap().to_string(),
@@ -307,7 +309,7 @@ async fn append_only_cache_created() {
   let name = "geo";
   let dest_base = ".cache";
   let cache_name = CacheName::new(name.to_owned()).unwrap();
-  let cache_dest = RelativePath::new(format!("{}/{}", dest_base, name)).unwrap();
+  let cache_dest = RelativePath::new(format!("{dest_base}/{name}")).unwrap();
   let result = run_command_locally(
     Process::new(owned_string_vec(&["/bin/ls", dest_base]))
       .append_only_caches(vec![(cache_name, cache_dest)].into_iter().collect()),
@@ -315,7 +317,7 @@ async fn append_only_cache_created() {
   .await
   .unwrap();
 
-  assert_eq!(result.stdout_bytes, format!("{}\n", name).as_bytes());
+  assert_eq!(result.stdout_bytes, format!("{name}\n").as_bytes());
   assert_eq!(result.stderr_bytes, "".as_bytes());
   assert_eq!(result.original.exit_code, 0);
   assert_eq!(result.original.output_directory, *EMPTY_DIRECTORY_DIGEST);
@@ -383,9 +385,9 @@ async fn test_chroot_placeholder() {
 
   let stdout = String::from_utf8(result.stdout_bytes.to_vec()).unwrap();
   let got_env: BTreeMap<String, String> = stdout
-    .split("\n")
+    .split('\n')
     .filter(|line| !line.is_empty())
-    .map(|line| line.splitn(2, "="))
+    .map(|line| line.splitn(2, '='))
     .map(|mut parts| {
       (
         parts.next().unwrap().to_string(),
@@ -796,7 +798,7 @@ async fn run_command_locally_in_dir(
   executor: Option<task_executor::Executor>,
 ) -> Result<LocalTestResult, ProcessError> {
   let store_dir = TempDir::new().unwrap();
-  let executor = executor.unwrap_or_else(|| task_executor::Executor::new());
+  let executor = executor.unwrap_or_else(task_executor::Executor::new);
   let store =
     store.unwrap_or_else(|| Store::local_only(executor.clone(), store_dir.path()).unwrap());
   let (_caches_dir, named_caches, immutable_inputs) =
@@ -809,7 +811,7 @@ async fn run_command_locally_in_dir(
     immutable_inputs,
     cleanup,
   );
-  let original = runner.run(Context::default(), workunit, req.into()).await?;
+  let original = runner.run(Context::default(), workunit, req).await?;
   let stdout_bytes = store
     .load_file_bytes_with(original.stdout_digest, |bytes| bytes.to_vec())
     .await?;

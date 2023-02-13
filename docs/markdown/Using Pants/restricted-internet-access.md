@@ -13,11 +13,11 @@ In such cases, users are typically still able to access internal proxies and ser
 Installing Pants
 ----------------
 
-The `./pants` script from [Installing Pants](doc:installation) uses PyPI to download and install the wheel `pantsbuild.pants` and all of Pants's dependencies. 
+The `pants` script from [Installing Pants](doc:installation) uses PyPI to download and install the wheel `pantsbuild.pants` and all of Pants's dependencies. 
 
-If you cannot access PyPI directly, you may have an internal mirror or custom Python package repository. If so, you can ensure that `pantsbuild.pants` and all of its dependencies are available in that repository, and modify your `./pants` script to bootstrap from it.
+If you cannot access PyPI directly, you may have an internal mirror or custom Python package repository. If so, you can ensure that `pantsbuild.pants` and all of its dependencies are available in that repository, and modify your `pants` script to bootstrap from it.
 
-Otherwise, you may instead download Pants as a PEX binary from <https://github.com/pantsbuild/pants/releases>. After downloading the PEX artifact, you can rename the file to `./pants`, run `chmod +x ./pants`, then run `./pants --version` like you normally would. 
+Otherwise, you may instead download Pants as a PEX binary from <https://github.com/pantsbuild/pants/releases>. After downloading the PEX artifact, you can rename the file to `pants`, run `chmod +x pants`, then run `pants --version` like you normally would. 
 
 You may want to check the binary into version control so that everyone in your organization can use it. To upgrade to a new Pants release, update the `pants_version` option in `pants.toml` and download the newest release from <https://github.com/pantsbuild/pants/releases>.
 
@@ -43,7 +43,7 @@ You may need to set standard proxy-related environment variables, such as `http_
 env_vars.add = ["http_proxy=http://myproxy", "https_proxy"]
 ```
 
-You can use lowercase or all-caps env var names.
+You may need to use lowercase or uppercase env var names, or both.
 
 Note that if you leave of the env var's value, as for `https_proxy` above, Pants will use the value of the same variable in the environment in which it is invoked.
 
@@ -58,7 +58,7 @@ There are three types of tools that Pants may need to download and invoke:
 
 If you cannot access these resources from their default locations, you can customize those locations.
 
-You can get a list of the tools Pants uses, in all three categories, with `./pants help tools`. 
+You can get a list of the tools Pants uses, in all three categories, with `pants help tools`. 
 
 ### Python tools
 
@@ -91,7 +91,7 @@ The platform name used to replace the `{platform}` placeholder can be modified u
 
 This is best understood by looking at an example:
 
-`./pants help-advanced protoc` (or its [online equivalent](doc:reference-protoc#advanced-options)) shows that the default URL template is `https://github.com/protocolbuffers/protobuf/releases/download/v{version}/protoc-{version}-{platform}.zip`. 
+`pants help-advanced protoc` (or its [online equivalent](doc:reference-protoc#advanced-options)) shows that the default URL template is `https://github.com/protocolbuffers/protobuf/releases/download/v{version}/protoc-{version}-{platform}.zip`. 
 
 - We see the `version` option is set to `3.11.4`. 
 - We are running on macOS ARM, so look up `macos_arm64` in the `url_platform_mapping` option and find the string `osx-x86_64`. 

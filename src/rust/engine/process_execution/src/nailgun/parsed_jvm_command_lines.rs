@@ -1,3 +1,5 @@
+// Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
+// Licensed under the Apache License, Version 2.0 (see LICENSE).
 use itertools::Itertools;
 use std::slice::Iter;
 
@@ -79,10 +81,7 @@ impl ParsedJVMCommandLines {
       .ok_or_else(|| "No classpath value found!".to_string())
       .and_then(|elem| {
         if ParsedJVMCommandLines::is_flag(elem) {
-          Err(format!(
-            "Classpath value has incorrect formatting {}.",
-            elem
-          ))
+          Err(format!("Classpath value has incorrect formatting {elem}."))
         } else {
           Ok(elem)
         }

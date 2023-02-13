@@ -61,7 +61,7 @@ from pants.engine.rules import Get, rule
 @rule
 async def partial_env(...) -> Foo:
     relevant_env_vars = await Get(EnvironmentVars, EnvironmentVarsRequest(["RELEVANT_VAR", "PATH"]))
-    ..
+    ...
 ```
 
 ### Output Files
@@ -78,7 +78,7 @@ To use a timeout, set the `timeout_seconds: int` field. Otherwise, the process w
 > 
 > By default, a `Process` will be cached to `~/.cache/pants/lmdb_store` if the `exit_code` is `0`.
 > 
-> If it not safe to cache your `Process`—usually the case when you know that a process accesses files outside of its sandbox—you can change the cacheability of your `Process` using the `ProcessCacheScope` parameter:
+> If it's not safe to cache your `Process` -- usually the case when you know that a process accesses files outside its sandbox -- you can change the cacheability of your `Process` using the `ProcessCacheScope` parameter:
 > 
 > ```python
 > from pants.engine.process import Process, ProcessCacheScope, ProcessResult
@@ -90,7 +90,7 @@ To use a timeout, set the `timeout_seconds: int` field. Otherwise, the process w
 >         description="Not persisted between Pants runs ('sessions').",
 >         cache_scope=ProcessCacheScope.PER_SESSION,
 >     )
->     ..
+>     ...
 > ```
 > 
 > `ProcessCacheScope` supports other options as well, including `ALWAYS`.
@@ -126,6 +126,6 @@ async def hello_world() -> HelloWorld:
 
 You may either set the parameter `input_digest: Digest`, or you may set `run_in_workspace=True`. When running in the workspace, you will have access to any file in the build root. If the process can safely be restarted, set the `restartable=True` flag, which will allow the engine to interrupt and restart the process if its inputs have changed.
 
-To set environment variables, use the parameter `env: Mapping[str, str]`, like you would with `Process`. You can also set `hermetic_env=False` to inherit the environment variables from the parent `./pants` process.
+To set environment variables, use the parameter `env: Mapping[str, str]`, like you would with `Process`. You can also set `hermetic_env=False` to inherit the environment variables from the parent `pants` process.
 
 The `Effect` will return an `InteractiveProcessResult`, which has a single field `exit_code: int`.

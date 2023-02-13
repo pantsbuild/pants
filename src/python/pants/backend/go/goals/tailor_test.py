@@ -46,7 +46,11 @@ def rule_runner() -> RuleRunner:
             *link.rules(),
             QueryRule(PutativeTargets, [PutativeGoTargetsRequest, AllOwnedSources]),
         ],
-        target_types=[GoModTarget, GoBinaryTarget, GoPackageTarget],
+        target_types=[
+            GoModTarget,
+            GoBinaryTarget,
+            GoPackageTarget,
+        ],
     )
     rule_runner.set_options([], env_inherit={"PATH"})
     return rule_runner

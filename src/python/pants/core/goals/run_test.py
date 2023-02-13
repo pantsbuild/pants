@@ -10,11 +10,11 @@ from typing import Iterable, Mapping, cast
 
 import pytest
 
-from pants.base.build_root import BuildRoot
 from pants.core.goals.run import (
     Run,
     RunDebugAdapterRequest,
     RunFieldSet,
+    RunInSandboxBehavior,
     RunRequest,
     RunSubsystem,
     run,
@@ -47,6 +47,7 @@ from pants.testutil.rule_runner import (
     mock_console,
     run_rule_with_mocks,
 )
+from pants.util.frozendict import FrozenDict
 
 
 @pytest.fixture
@@ -70,11 +71,13 @@ def create_mock_run_debug_adapter_request(
 
 class TestRunFieldSet(RunFieldSet):
     required_fields = ()
+    run_in_sandbox_behavior = RunInSandboxBehavior.NOT_SUPPORTED
 
 
 @dataclass(frozen=True)
 class TestRunSecondaryFieldSet(RunFieldSet):
     required_fields = ()
+    run_in_sandbox_behavior = RunInSandboxBehavior.NOT_SUPPORTED
 
     just_borrowing: SecondaryOwnerField
 
@@ -92,8 +95,9 @@ def single_target_run(
     rule_runner: RuleRunner,
     *,
     program_text: bytes,
-    targets_to_field_sets: Mapping[Target, Iterable[FieldSet]] = {A_TARGET: [A_FIELD_SET]},
-    run_field_set_types=[TestRunFieldSet],
+    targets_to_field_sets: Mapping[Target, Iterable[FieldSet]] = FrozenDict(
+        {A_TARGET: (A_FIELD_SET,)}
+    ),
 ) -> Run:
     workspace = Workspace(rule_runner.scheduler, _enforce_effects=False)
 
@@ -113,7 +117,6 @@ def single_target_run(
                     keep_sandboxes=KeepSandboxes.never,
                 ),
                 workspace,
-                BuildRoot(),
                 rule_runner.environment,
             ],
             mock_gets=[
@@ -218,7 +221,6 @@ def test_filters_secondary_owners_single_target(rule_runner: RuleRunner) -> None
         rule_runner,
         program_text=program_text,
         targets_to_field_sets={target: [fs1, fs2]},
-        run_field_set_types=[TestRunFieldSet, TestRunSecondaryFieldSet],
     )
     assert res.exit_code == 0
 
@@ -233,7 +235,6 @@ def test_filters_secondary_owners_multi_target(rule_runner: RuleRunner) -> None:
         rule_runner,
         program_text=program_text,
         targets_to_field_sets={t1: [fs1], t2: [fs2]},
-        run_field_set_types=[TestRunFieldSet, TestRunSecondaryFieldSet],
     )
     assert res.exit_code == 0
 
@@ -246,7 +247,6 @@ def test_only_secondary_owner_ok_single_target(rule_runner: RuleRunner) -> None:
         rule_runner,
         program_text=program_text,
         targets_to_field_sets={target: [field_set]},
-        run_field_set_types=[TestRunFieldSet, TestRunSecondaryFieldSet],
     )
     assert res.exit_code == 0
 
@@ -262,7 +262,6 @@ def test_only_secondary_owner_error_multi_target(rule_runner: RuleRunner) -> Non
             rule_runner,
             program_text=program_text,
             targets_to_field_sets={t1: [fs1], t2: [fs2]},
-            run_field_set_types=[TestRunSecondaryFieldSet],
         )
 
 

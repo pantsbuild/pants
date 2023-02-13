@@ -12,14 +12,9 @@ If you are instead writing your own linting logic inline, you can skip Step 1. I
 
 # 1. Install your linter
 
-There are several ways for Pants to install your linter. See [Installing tools](doc:rules-api-installing-tools).
-This example will use `ExternalTool` because there is already a pre-compiled binary for Shellcheck.
+There are several ways for Pants to install your linter. See [Installing tools](doc:rules-api-installing-tools). This example will use `ExternalTool` because there is already a pre-compiled binary for Shellcheck.
 
-You will also likely want to register some options, like `--config`, `--skip`, and `--args`.
-Options are registered through a [`Subsystem`](doc:rules-api-subsystems).
-If you are using `ExternalTool`, this is already a subclass of `Subsystem`.
-Otherwise, create a subclass of `Subsystem`. Then, set the class property `options_scope` to the name
-of the tool, e.g. `"shellcheck"` or `"eslint"`. Finally, add options from `pants.option.option_types`.
+You will also likely want to register some options, like `--config`, `--skip`, and `--args`. Options are registered through a [`Subsystem`](doc:rules-api-subsystems). If you are using `ExternalTool`, this is already a subclass of `Subsystem`. Otherwise, create a subclass of `Subsystem`. Then, set the class property `options_scope` to the name of the tool, e.g. `"shellcheck"` or `"eslint"`. Finally, add options from `pants.option.option_types`.
 
 ```python
 from pants.core.util_rules.external_tool import ExternalTool
@@ -62,12 +57,9 @@ class Shellcheck(ExternalTool):
 
 # Set up a `FieldSet` and `LintTargetsRequest`
 
-As described in [Rules and the Target API](doc:rules-api-and-target-api), a `FieldSet` is a way to
-tell Pants which `Field`s you care about targets having for your plugin to work.
+As described in [Rules and the Target API](doc:rules-api-and-target-api), a `FieldSet` is a way to tell Pants which `Field`s you care about targets having for your plugin to work.
 
-Usually, you should add a subclass of the `Sources` field to the class property `required_fields`,
-such as `BashSources` or `PythonSources`.
-This means that your linter will run on any target with that sources field or a subclass of it.
+Usually, you should add a subclass of the `Sources` field to the class property `required_fields`, such as `BashSources` or `PythonSources`. This means that your linter will run on any target with that sources field or a subclass of it.
 
 Create a new dataclass that subclasses `FieldSet`:
 
@@ -100,9 +92,7 @@ class ShellcheckRequest(LintTargetsRequest):
 
 # 3. Create a rule for your linter logic
 
-Your rule should take as a parameter `ShellcheckRequest.Batch` and the
-`Subsystem` (or `ExternalTool`) from step 1 (a `Batch` is an object containing a subset of all
-the matched field sets for your tool). It should return a `LintResult`:
+Your rule should take as a parameter `ShellcheckRequest.Batch` and the `Subsystem` (or `ExternalTool`) from step 1 (a `Batch` is an object containing a subset of all the matched field sets for your tool). It should return a `LintResult`:
 
 ```python
 from pants.engine.rules import rule
@@ -117,9 +107,7 @@ async def run_shellcheck(
     return LintResult.create(...)
 ```
 
-The `ShellcheckRequest.Batch` instance has a property called `.elements`, which in this case,
-stores a collection of the `FieldSet`s defined in step 2. Each `FieldSet` corresponds to a single target.
-Pants will have already validated that there is at least one valid `FieldSet`.
+The `ShellcheckRequest.Batch` instance has a property called `.elements`, which in this case, stores a collection of the `FieldSet`s defined in step 2. Each `FieldSet` corresponds to a single target. Pants will have already validated that there is at least one valid `FieldSet`.
 
 If you used `ExternalTool` in step 1, you will use `Get(DownloadedExternalTool, ExternalToolRequest)` to install the tool.
 
@@ -235,7 +223,7 @@ def rules():
     return [*shellcheck.rules()]
 ```
 
-Now, when you run `./pants lint ::`, your new linter should run.
+Now, when you run `pants lint ::`, your new linter should run.
 
 # 4. Add tests (optional)
 

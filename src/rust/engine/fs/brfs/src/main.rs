@@ -82,13 +82,13 @@ pub fn digest_from_filepath(str: &str) -> Result<Digest, String> {
   let mut parts = str.split('-');
   let fingerprint_str = parts
     .next()
-    .ok_or_else(|| format!("Invalid digest: {} wasn't of form fingerprint-size", str))?;
+    .ok_or_else(|| format!("Invalid digest: {str} wasn't of form fingerprint-size"))?;
   let fingerprint = Fingerprint::from_hex_string(fingerprint_str)?;
   let size_bytes = parts
     .next()
-    .ok_or_else(|| format!("Invalid digest: {} wasn't of form fingerprint-size", str))?
+    .ok_or_else(|| format!("Invalid digest: {str} wasn't of form fingerprint-size"))?
     .parse::<usize>()
-    .map_err(|err| format!("Invalid digest; size {} not a number: {}", str, err))?;
+    .map_err(|err| format!("Invalid digest; size {str} not a number: {err}"))?;
   Ok(Digest::new(fingerprint, size_bytes))
 }
 
@@ -764,7 +764,7 @@ async fn main() {
   let runtime = task_executor::Executor::new();
 
   let local_only_store =
-    Store::local_only(runtime.clone(), &store_path).expect("Error making local store.");
+    Store::local_only(runtime.clone(), store_path).expect("Error making local store.");
   let store = match args.value_of("server-address") {
     Some(address) => local_only_store
       .into_with_remote(
@@ -799,7 +799,7 @@ async fn main() {
     F: Fn() -> SignalKind,
   {
     SignalStream::new(
-      signal(install_fn()).unwrap_or_else(|_| panic!("Failed to install SIG{:?} handler", sig)),
+      signal(install_fn()).unwrap_or_else(|_| panic!("Failed to install SIG{sig:?} handler")),
     )
     .map(move |_| Some(sig))
   }

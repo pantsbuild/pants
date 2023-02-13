@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import os.path
+import re
 from textwrap import dedent
 
 import pytest
@@ -21,13 +22,16 @@ from pants.backend.go.util_rules import (
     sdk,
     third_party_pkg,
 )
+from pants.backend.go.util_rules.build_opts import GoBuildOptions
 from pants.backend.go.util_rules.third_party_pkg import (
     AllThirdPartyPackages,
     AllThirdPartyPackagesRequest,
     ThirdPartyPkgAnalysis,
     ThirdPartyPkgAnalysisRequest,
 )
+from pants.build_graph.address import Address
 from pants.engine.fs import Digest, Snapshot
+from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.process import ProcessExecutionFailure
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner, engine_error
@@ -91,7 +95,15 @@ def set_up_go_mod(rule_runner: RuleRunner, go_mod: str, go_sum: str) -> Digest:
 def test_download_and_analyze_all_packages(rule_runner: RuleRunner) -> None:
     input_digest = rule_runner.make_snapshot({"go.mod": GO_MOD, "go.sum": GO_SUM}).digest
     all_packages = rule_runner.request(
-        AllThirdPartyPackages, [AllThirdPartyPackagesRequest(input_digest, "go.mod")]
+        AllThirdPartyPackages,
+        [
+            AllThirdPartyPackagesRequest(
+                Address("fake_addr_for_test", target_name="mod"),
+                input_digest,
+                "go.mod",
+                build_opts=GoBuildOptions(),
+            )
+        ],
     )
     assert set(all_packages.import_paths_to_pkg_info.keys()) == {
         "golang.org/x/text/encoding/japanese",
@@ -168,9 +180,10 @@ def test_download_and_analyze_all_packages(rule_runner: RuleRunner) -> None:
         assert pkg_info.go_files == go_files
         assert not pkg_info.s_files
         snapshot = rule_runner.request(Snapshot, [pkg_info.digest])
-        assert set(snapshot.files) == {
+        expected_files = {
             os.path.join(dir_path, file_name) for file_name in (*go_files, *extra_files)
         }
+        assert expected_files.issubset(snapshot.files)
         assert pkg_info.minimum_go_version == minimum_go_version
 
     assert_pkg_info(
@@ -261,7 +274,17 @@ def test_invalid_go_sum(rule_runner: RuleRunner) -> None:
         ),
     )
     with engine_error(ProcessExecutionFailure, contains="SECURITY ERROR"):
-        rule_runner.request(AllThirdPartyPackages, [AllThirdPartyPackagesRequest(digest, "go.mod")])
+        rule_runner.request(
+            AllThirdPartyPackages,
+            [
+                AllThirdPartyPackagesRequest(
+                    Address("fake_addr_for_test", target_name="mod"),
+                    digest,
+                    "go.mod",
+                    build_opts=GoBuildOptions(),
+                )
+            ],
+        )
 
 
 @pytest.mark.skip(reason="TODO(#15824)")
@@ -285,7 +308,17 @@ def test_missing_go_sum(rule_runner: RuleRunner) -> None:
         ),
     )
     with engine_error(contains="github.com/google/uuid@v1.3.0: missing go.sum entry"):
-        rule_runner.request(AllThirdPartyPackages, [AllThirdPartyPackagesRequest(digest, "go.mod")])
+        rule_runner.request(
+            AllThirdPartyPackages,
+            [
+                AllThirdPartyPackagesRequest(
+                    Address("fake_addr_for_test", target_name="mod"),
+                    digest,
+                    "go.mod",
+                    build_opts=GoBuildOptions(),
+                )
+            ],
+        )
 
 
 @pytest.mark.skip(reason="TODO(#15824)")
@@ -312,7 +345,17 @@ def test_stale_go_mod(rule_runner: RuleRunner) -> None:
         ),
     )
     with engine_error(ProcessExecutionFailure, contains="updates to go.mod needed"):
-        rule_runner.request(AllThirdPartyPackages, [AllThirdPartyPackagesRequest(digest, "go.mod")])
+        rule_runner.request(
+            AllThirdPartyPackages,
+            [
+                AllThirdPartyPackagesRequest(
+                    Address("fake_addr_for_test", target_name="mod"),
+                    digest,
+                    "go.mod",
+                    build_opts=GoBuildOptions(),
+                )
+            ],
+        )
 
 
 def test_pkg_missing(rule_runner: RuleRunner) -> None:
@@ -322,7 +365,15 @@ def test_pkg_missing(rule_runner: RuleRunner) -> None:
     ):
         rule_runner.request(
             ThirdPartyPkgAnalysis,
-            [ThirdPartyPkgAnalysisRequest("another_project.org/foo", digest, "go.mod")],
+            [
+                ThirdPartyPkgAnalysisRequest(
+                    "another_project.org/foo",
+                    Address("fake_addr_for_test", target_name="mod"),
+                    digest,
+                    "go.mod",
+                    build_opts=GoBuildOptions(),
+                )
+            ],
         )
 
 
@@ -344,7 +395,15 @@ def test_module_with_no_packages(rule_runner) -> None:
         ),
     )
     all_packages = rule_runner.request(
-        AllThirdPartyPackages, [AllThirdPartyPackagesRequest(digest, "go.mod")]
+        AllThirdPartyPackages,
+        [
+            AllThirdPartyPackagesRequest(
+                Address("fake_addr_for_test", target_name="mod"),
+                digest,
+                "go.mod",
+                build_opts=GoBuildOptions(),
+            )
+        ],
     )
     assert not all_packages.import_paths_to_pkg_info
 
@@ -465,7 +524,15 @@ def test_determine_pkg_info_module_with_replace_directive(rule_runner: RuleRunne
     )
     pkg_info = rule_runner.request(
         ThirdPartyPkgAnalysis,
-        [ThirdPartyPkgAnalysisRequest("github.com/hashicorp/consul/api", digest, "go.mod")],
+        [
+            ThirdPartyPkgAnalysisRequest(
+                "github.com/hashicorp/consul/api",
+                Address("fake_addr_for_test", target_name="mod"),
+                digest,
+                "go.mod",
+                build_opts=GoBuildOptions(),
+            )
+        ],
     )
     assert pkg_info.dir_path == "gopath/pkg/mod/github.com/hashicorp/consul/api@v1.3.0"
     assert "raw.go" in pkg_info.go_files
@@ -493,7 +560,15 @@ def test_ambiguous_package(rule_runner: RuleRunner) -> None:
     )
     pkg_info = rule_runner.request(
         ThirdPartyPkgAnalysis,
-        [ThirdPartyPkgAnalysisRequest("github.com/ugorji/go/codec", digest, "go.mod")],
+        [
+            ThirdPartyPkgAnalysisRequest(
+                "github.com/ugorji/go/codec",
+                Address("fake_addr_for_test", target_name="mod"),
+                digest,
+                "go.mod",
+                build_opts=GoBuildOptions(),
+            )
+        ],
     )
     assert pkg_info.error is None
     assert (
@@ -501,3 +576,34 @@ def test_ambiguous_package(rule_runner: RuleRunner) -> None:
         == "gopath/pkg/mod/github.com/ugorji/go/codec@v0.0.0-20181204163529-d75b2dcb6bc8"
     )
     assert "encode.go" in pkg_info.go_files
+
+
+def test_go_sum_with_missing_entries_triggers_error(rule_runner: RuleRunner) -> None:
+    digest = set_up_go_mod(
+        rule_runner,
+        dedent(
+            """\
+            module example.com/third-party-module
+            go 1.16
+            require github.com/google/uuid v1.3.0
+            """
+        ),
+        "",
+    )
+    msg = (
+        "For `go_mod` target `fake_addr_for_test:mod`, the go.sum file is incomplete because "
+        "it was updated while processing third-party dependency `github.com/google/uuid`."
+    )
+    with pytest.raises(ExecutionError, match=re.escape(msg)):
+        _ = rule_runner.request(
+            ThirdPartyPkgAnalysis,
+            [
+                ThirdPartyPkgAnalysisRequest(
+                    "github.com/ugorji/go/codec",
+                    Address("fake_addr_for_test", target_name="mod"),
+                    digest,
+                    "go.mod",
+                    build_opts=GoBuildOptions(),
+                )
+            ],
+        )

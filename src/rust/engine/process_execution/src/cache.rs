@@ -1,3 +1,5 @@
+// Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
+// Licensed under the Apache License, Version 2.0 (see LICENSE).
 use std::fmt::{self, Debug};
 use std::sync::Arc;
 use std::time::Instant;
@@ -82,6 +84,7 @@ impl crate::CommandRunner for CommandRunner {
           None,
           self.process_cache_namespace.clone(),
           &self.file_store,
+          None,
         )
         .await
         .into(),
@@ -116,7 +119,7 @@ impl crate::CommandRunner for CommandRunner {
                 initial.map(|(initial, _)| {
                   (
                     WorkunitMetadata {
-                      desc: initial.desc.as_ref().map(|desc| format!("Hit: {}", desc)),
+                      desc: initial.desc.as_ref().map(|desc| format!("Hit: {desc}")),
                       ..initial
                     },
                     Level::Debug,
@@ -185,10 +188,10 @@ impl CommandRunner {
     let maybe_cache_value = self.cache.load(action_key).await?;
     let maybe_execute_response = if let Some(bytes) = maybe_cache_value {
       let decoded: PlatformAndResponseBytes = bincode::deserialize(&bytes)
-        .map_err(|err| format!("Could not deserialize platform and response: {}", err))?;
+        .map_err(|err| format!("Could not deserialize platform and response: {err}"))?;
       let platform = decoded.platform;
       let execute_response = ExecuteResponse::decode(&decoded.response_bytes[..])
-        .map_err(|e| format!("Invalid ExecuteResponse: {:?}", e))?;
+        .map_err(|e| format!("Invalid ExecuteResponse: {e:?}"))?;
       Some((execute_response, platform))
     } else {
       return Ok(None);
@@ -243,6 +246,7 @@ impl CommandRunner {
       output_directories: vec![remexec::OutputDirectory {
         path: String::new(),
         tree_digest: Some((&result.output_directory.as_digest()).into()),
+        is_topologically_sorted: false,
       }],
       stdout_digest: Some((&stdout_digest).into()),
       stderr_digest: Some((&stderr_digest).into()),
@@ -262,19 +266,14 @@ impl CommandRunner {
     let mut response_bytes = Vec::with_capacity(execute_response.encoded_len());
     execute_response
       .encode(&mut response_bytes)
-      .map_err(|err| format!("Error serializing execute process result to cache: {}", err))?;
+      .map_err(|err| format!("Error serializing execute process result to cache: {err}"))?;
 
     let bytes_to_store = bincode::serialize(&PlatformAndResponseBytes {
       platform: result.platform,
       response_bytes,
     })
     .map(Bytes::from)
-    .map_err(|err| {
-      format!(
-        "Error serializing platform and execute process result: {}",
-        err
-      )
-    })?;
+    .map_err(|err| format!("Error serializing platform and execute process result: {err}"))?;
 
     self.cache.store(action_key, bytes_to_store).await?;
     Ok(())
