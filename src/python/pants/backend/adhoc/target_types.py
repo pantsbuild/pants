@@ -213,7 +213,6 @@ class AdhocToolTarget(Target):
             adhoc_tool(
                 {AdhocToolRunnableField.alias}=":python_source",
                 {AdhocToolArgumentsField.alias}=[""],
-                {AdhocToolToolsField.alias}=["tar", "curl", "cat", "bash", "env"],
                 {AdhocToolExecutionDependenciesField.alias}=[":scripts"],
                 {AdhocToolOutputDirectoriesField.alias}=["logs/my-script.log"],
                 {AdhocToolOutputFilesField.alias}=["results/"],
