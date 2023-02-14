@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use deepsize::DeepSizeOf;
 use serde::Serialize;
 
-use fs::{default_cache_path, safe_create_dir_all, RelativePath};
+use fs::{default_cache_path, safe_create_dir_all_ioerror, RelativePath};
 use store::WorkdirSymlink;
 
 #[derive(Clone, Debug, DeepSizeOf, Eq, PartialEq, Hash, PartialOrd, Ord, Serialize)]
@@ -41,9 +41,8 @@ pub struct NamedCaches {
 }
 
 impl NamedCaches {
-  pub fn new(local_base: PathBuf) -> Result<NamedCaches, String> {
-    safe_create_dir_all(&local_base)?;
-    Ok(Self { local_base })
+  pub fn new(local_base: PathBuf) -> NamedCaches {
+    NamedCaches { local_base }
   }
 
   pub fn base_dir(&self) -> &Path {
@@ -71,7 +70,13 @@ impl NamedCaches {
       .collect::<Vec<_>>();
 
     for symlink in &symlinks {
-      safe_create_dir_all(&symlink.dst)?;
+      safe_create_dir_all_ioerror(&symlink.dst).map_err(|err| {
+        format!(
+          "Error creating directory {}: {:?}",
+          symlink.dst.display(),
+          err
+        )
+      })?
     }
 
     Ok(symlinks)

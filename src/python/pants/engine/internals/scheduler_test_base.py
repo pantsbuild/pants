@@ -2,17 +2,12 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
-from dataclasses import replace
 from pathlib import Path
 
 from pants.engine.internals.native_engine import PyExecutor
 from pants.engine.internals.scheduler import Scheduler, SchedulerSession
 from pants.engine.unions import UnionMembership
-from pants.option.global_options import (
-    DEFAULT_EXECUTION_OPTIONS,
-    DEFAULT_LOCAL_STORE_OPTIONS,
-    DockerStrategy,
-)
+from pants.option.global_options import DEFAULT_EXECUTION_OPTIONS, DEFAULT_LOCAL_STORE_OPTIONS
 from pants.util.contextutil import temporary_file_path
 from pants.util.dirutil import safe_mkdtemp
 from pants.util.logging import LogLevel
@@ -40,7 +35,6 @@ class SchedulerTestBase:
 
         local_execution_root_dir = os.path.realpath(safe_mkdtemp())
         named_caches_dir = os.path.realpath(safe_mkdtemp())
-        execution_options = replace(DEFAULT_EXECUTION_OPTIONS, docker_strategy=DockerStrategy.mount)
         scheduler = Scheduler(
             ignore_patterns=[],
             use_gitignore=False,
@@ -51,7 +45,7 @@ class SchedulerTestBase:
             rules=rules,
             union_membership=UnionMembership({}),
             executor=self._executor,
-            execution_options=execution_options,
+            execution_options=DEFAULT_EXECUTION_OPTIONS,
             local_store_options=DEFAULT_LOCAL_STORE_OPTIONS,
             include_trace_on_error=include_trace_on_error,
         )

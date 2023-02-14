@@ -209,7 +209,6 @@ class Scheduler:
             local_parallelism=execution_options.process_execution_local_parallelism,
             local_enable_nailgun=execution_options.process_execution_local_enable_nailgun,
             remote_parallelism=execution_options.process_execution_remote_parallelism,
-            docker_strategy=execution_options.docker_strategy.value,
             child_max_memory=execution_options.process_total_child_memory_usage or 0,
             child_default_memory=execution_options.process_per_child_memory_usage,
             graceful_shutdown_timeout=execution_options.process_execution_graceful_shutdown_timeout,

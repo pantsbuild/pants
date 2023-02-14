@@ -32,7 +32,6 @@ prost-types = "0.9"
 serde = "1.0"
 serde_derive = "1.0"
 sharded_lmdb = { path = "../../sharded_lmdb" }
-tar = { version = "0.4", default-features = false }
 task_executor = { path = "../../task_executor" }
 tempfile = "3"
 tokio-rustls = "0.23"

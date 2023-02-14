@@ -747,7 +747,8 @@ async fn prepare_workdir_exclusive_relative() {
     work_dir.path().to_owned(),
     &process,
     TestDirectory::recursive().directory_digest(),
-    &store,
+    store,
+    executor,
     &named_caches,
     &immutable_inputs,
     None,
@@ -768,7 +769,7 @@ pub(crate) fn named_caches_and_immutable_inputs(
 
   (
     root,
-    NamedCaches::new(named_cache_dir).unwrap(),
+    NamedCaches::new(named_cache_dir),
     ImmutableInputs::new(store, &root_path).unwrap(),
   )
 }

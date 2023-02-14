@@ -42,6 +42,7 @@ from pants.engine.unions import UnionMembership, UnionRule
 from pants.init import specs_calculator
 from pants.init.bootstrap_scheduler import BootstrapStatus
 from pants.option.global_options import (
+    DEFAULT_EXECUTION_OPTIONS,
     DynamicRemoteOptions,
     ExecutionOptions,
     GlobalOptions,
@@ -235,6 +236,8 @@ class EngineInitializer:
         rules = build_configuration.rules
         union_membership: UnionMembership
         registered_target_types = RegisteredTargetTypes.create(build_configuration.target_types)
+
+        execution_options = execution_options or DEFAULT_EXECUTION_OPTIONS
 
         @rule
         def parser_singleton() -> Parser:
