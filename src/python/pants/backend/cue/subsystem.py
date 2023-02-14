@@ -6,13 +6,13 @@ from __future__ import annotations
 from pants.core.util_rules.external_tool import TemplatedExternalTool
 from pants.engine.platform import Platform
 from pants.option.option_types import ArgsListOption, SkipOption
-from pants.util.strutil import softwrap
+from pants.util.strutil import help_text
 
 
 class Cue(TemplatedExternalTool):
     options_scope = "cue"
     name = "CUE"
-    help = softwrap(
+    help = help_text(
         """
         CUE is an open-source data validation language and inference engine with its roots in logic
         programming. Although the language is not a general-purpose programming language, it has

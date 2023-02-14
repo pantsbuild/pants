@@ -20,13 +20,13 @@ from pants.engine.rules import Rule, collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.option.option_types import ArgsListOption, SkipOption
 from pants.util.docutil import git_url
-from pants.util.strutil import softwrap
+from pants.util.strutil import help_text
 
 
 class ClangFormat(PythonToolBase):
     options_scope = "clang-format"
     name = "ClangFormat"
-    help = softwrap(
+    help = help_text(
         """
         The clang-format utility for formatting C/C++ (and others) code
         (https://clang.llvm.org/docs/ClangFormat.html). The clang-format binaries

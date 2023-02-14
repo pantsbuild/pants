@@ -15,7 +15,7 @@ from pants.engine.target import (
     Target,
     ValidNumbers,
 )
-from pants.util.strutil import softwrap
+from pants.util.strutil import help_text
 
 
 class AdhocToolDependenciesField(Dependencies):
@@ -25,7 +25,7 @@ class AdhocToolDependenciesField(Dependencies):
 class AdhocToolRunnableField(StringField):
     alias = "runnable"
     required = True
-    help = softwrap(
+    help = help_text(
         """
         Address to a target that can be invoked by the `run` goal (and does not set
         `run_in_sandbox_behavior=NOT_SUPPORTED`). This will be executed along with any arguments
@@ -39,7 +39,7 @@ class AdhocToolOutputFilesField(StringSequenceField):
     alias = "output_files"
     required = False
     default = ()
-    help = softwrap(
+    help = help_text(
         """
         Specify the shell command's output files to capture, relative to the value of `workdir`.
 
@@ -56,7 +56,7 @@ class AdhocToolOutputDirectoriesField(StringSequenceField):
     alias = "output_directories"
     required = False
     default = ()
-    help = softwrap(
+    help = help_text(
         """
         Specify full directories (including recursive descendants) of output to capture from the
         shell command, relative to the value of `workdir`.
@@ -76,7 +76,7 @@ class AdhocToolOutputDependenciesField(AdhocToolDependenciesField):
     deprecated_alias = "dependencies"
     deprecated_alias_removal_version = "2.17.0.dev0"
 
-    help = softwrap(
+    help = help_text(
         """
         Any dependencies that the output artifacts require in order to be effectively consumed.
 
@@ -92,7 +92,7 @@ class AdhocToolExecutionDependenciesField(SpecialCasedDependencies):
     required = False
     default = None
 
-    help = softwrap(
+    help = help_text(
         """
         The execution dependencies for this shell command.
 
@@ -141,7 +141,7 @@ class AdhocToolTimeoutField(IntField):
 
 class AdhocToolExtraEnvVarsField(StringSequenceField):
     alias = "extra_env_vars"
-    help = softwrap(
+    help = help_text(
         """
         Additional environment variables to include in the shell process.
         Entries are strings in the form `ENV_VAR=value` to use explicitly; or just
@@ -159,7 +159,7 @@ class AdhocToolLogOutputField(BoolField):
 class AdhocToolWorkdirField(StringField):
     alias = "workdir"
     default = "."
-    help = softwrap(
+    help = help_text(
         "Sets the current working directory of the command. \n\n"
         "Values are relative to the build root, except in the following cases:\n\n"
         "* `.` specifies the location of the `BUILD` file.\n"
@@ -172,7 +172,7 @@ class AdhocToolWorkdirField(StringField):
 class AdhocToolOutputRootDirField(StringField):
     alias = "root_output_directory"
     default = "/"
-    help = softwrap(
+    help = help_text(
         "Adjusts the location of files output by this command, when consumed as a dependency.\n\n"
         "Values are relative to the build root, except in the following cases:\n\n"
         "* `.` specifies the location of the `BUILD` file.\n"
@@ -204,7 +204,7 @@ class AdhocToolTarget(Target):
         AdhocToolStderrFilenameField,
         EnvironmentField,
     )
-    help = softwrap(
+    help = help_text(
         f"""
         Execute any runnable target for its side effects.
 

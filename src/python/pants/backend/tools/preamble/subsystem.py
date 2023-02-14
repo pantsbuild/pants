@@ -7,13 +7,13 @@ from typing import Sequence
 from pants.option.option_types import DictOption, SkipOption
 from pants.option.subsystem import Subsystem
 from pants.source.filespec import FilespecMatcher
-from pants.util.strutil import softwrap
+from pants.util.strutil import help_text, softwrap
 
 
 class PreambleSubsystem(Subsystem):
     options_scope = "preamble"
     name = "preamble"
-    help = softwrap(
+    help = help_text(
         """
         Formats files with a preamble, with the preamble looked up based on path.
 

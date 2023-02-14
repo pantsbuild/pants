@@ -40,7 +40,7 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionRule
 from pants.util.enums import match
-from pants.util.strutil import softwrap
+from pants.util.strutil import help_text
 
 
 class ShellDependenciesField(AdhocToolDependenciesField):
@@ -153,7 +153,7 @@ class Shunit2TestTarget(Target):
         Shunit2ShellField,
         RuntimePackageDependenciesField,
     )
-    help = softwrap(
+    help = help_text(
         f"""
         A single test file for Bourne-based shell scripts using the shunit2 test framework.
 
@@ -270,7 +270,7 @@ class ShellCommandCommandField(StringField):
 
 class ShellCommandOutputsField(StringSequenceField):
     alias = "outputs"
-    help = softwrap(
+    help = help_text(
         """
         Specify the shell command output files and directories, relative to the value of `workdir`.
 
@@ -314,7 +314,7 @@ class ShellCommandTimeoutField(AdhocToolTimeoutField):
 class ShellCommandToolsField(StringSequenceField):
     alias = "tools"
     default = ()
-    help = softwrap(
+    help = help_text(
         """
         Specify required executable tools that might be used.
 
@@ -340,7 +340,7 @@ class ShellCommandWorkdirField(AdhocToolWorkdirField):
 class RunShellCommandWorkdirField(StringField):
     alias = "workdir"
     default = "."
-    help = softwrap(
+    help = help_text(
         "Sets the current working directory of the command that is `run`. Values that begin with "
         "`.` are relative to the directory you are running Pants from. Values that begin with `/` "
         "are from your project root."
@@ -380,7 +380,7 @@ class ShellCommandTarget(Target):
         ShellCommandOutputRootDirField,
         EnvironmentField,
     )
-    help = softwrap(
+    help = help_text(
         """
         Execute any external tool for its side effects.
 
@@ -413,7 +413,7 @@ class ShellCommandRunTarget(Target):
         ShellCommandCommandField,
         RunShellCommandWorkdirField,
     )
-    help = softwrap(
+    help = help_text(
         """
         Run a script in the workspace, with all dependencies packaged/copied into a chroot.
 
@@ -450,7 +450,7 @@ class ShellCommandTestTarget(Target):
         SkipShellCommandTestsField,
         ShellCommandWorkdirField,
     )
-    help = softwrap(
+    help = help_text(
         """
         Run a script as a test via the `test` goal, with all dependencies packaged/copied available in the chroot.
 
