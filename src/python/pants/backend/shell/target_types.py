@@ -10,6 +10,7 @@ from pants.backend.adhoc.target_types import (
     AdhocToolDependenciesField,
     AdhocToolExecutionDependenciesField,
     AdhocToolExtraEnvVarsField,
+    AdhocToolLogOutputField,
     AdhocToolOutputDependenciesField,
     AdhocToolOutputDirectoriesField,
     AdhocToolOutputFilesField,
@@ -328,10 +329,8 @@ class ShellCommandExtraEnvVarsField(AdhocToolExtraEnvVarsField):
     pass
 
 
-class ShellCommandLogOutputField(BoolField):
-    alias = "log_output"
-    default = False
-    help = "Set to true if you want the output from the command logged to the console."
+class ShellCommandLogOutputField(AdhocToolLogOutputField):
+    pass
 
 
 class ShellCommandWorkdirField(AdhocToolWorkdirField):

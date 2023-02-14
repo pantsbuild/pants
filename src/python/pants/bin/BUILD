@@ -13,7 +13,6 @@ python_sources(
 target(
     name="plugins",
     dependencies=[
-        "src/python/pants/backend/adhoc",
         "src/python/pants/backend/build_files/fix/deprecations",
         "src/python/pants/backend/build_files/fmt/buildifier",
         "src/python/pants/backend/awslambda/python",
