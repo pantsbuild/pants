@@ -249,8 +249,7 @@ impl RemoteStore {
     };
     self
       .maybe_download(digest, async move {
-        let stored_digest = f_remote.is_some()
-        {
+        let stored_digest = if f_remote.is_some() {
           // (if there's a function to call, always just buffer fully into memory)
           let bytes = remote_store
             .load_bytes(digest)

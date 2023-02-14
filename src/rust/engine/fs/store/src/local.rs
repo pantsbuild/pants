@@ -10,7 +10,7 @@ use std::sync::Arc;
 use std::time::{self, Duration, Instant};
 
 use bytes::{Buf, Bytes};
-use futures::future;
+use futures::future::{self, try_join_all};
 use hashing::{hash, hash_path, verified_copy, Digest, Fingerprint, EMPTY_DIGEST};
 use lmdb::Error::NotFound;
 use lmdb::{self, Cursor, Transaction};
@@ -303,14 +303,20 @@ impl ByteStore {
     initial_lease: bool,
   ) -> Result<Vec<Digest>, String> {
     let mut small_items = vec![];
-    let mut result = vec![];
+    let mut big_items = vec![];
     for (digest, bytes) in items {
       if matches!(entry_type, EntryType::File) && ByteStore::uses_large_file_store(bytes.len()) {
-        result.push(self.store_large_bytes(bytes, digest).await?);
+        big_items.push((digest, bytes));
       } else {
         small_items.push((digest, bytes));
       }
     }
+    let mut result = try_join_all(
+      big_items
+        .iter()
+        .map(|(digest, bytes)| self.store_large_bytes(bytes.clone(), *digest)),
+    )
+    .await?;
 
     let dbs = match entry_type {
       EntryType::Directory => self.inner.directory_dbs.clone(),
@@ -344,7 +350,7 @@ impl ByteStore {
   }
 
   /// Returns whether this file digest should/does use the "large file store" instead of the LMDB.
-  pub fn uses_large_file_store(len: usize) -> bool {
+  pub(crate) fn uses_large_file_store(len: usize) -> bool {
     len > LARGE_FILE_SIZE_LIMIT
   }
 
@@ -453,8 +459,16 @@ impl ByteStore {
       let mut reader = std::fs::File::open(src)
         .map_err(|e| format!("Failed to read {src:?} for digest {digest:?}: {e}"))?;
       let mut writer: Vec<u8> = vec![];
-      io::copy(&mut reader, &mut writer)
+      let bytelen = io::copy(&mut reader, &mut writer)
         .map_err(|e| format!("Failed to load large file into memory: {e}"))?;
+      if bytelen != digest.size_bytes {
+        return Err(format!(
+          "Got hash collision reading from store - digest {:?} was requested, but retrieved \
+              bytes with that fingerprint had length {}. Congratulations, you may have broken \
+              sha256! Underlying bytes: {:?}",
+          digest, bytelen, writer
+        ));
+      }
       Ok(Some(f(&writer[..])))
     } else {
       let dbs = match entry_type {
