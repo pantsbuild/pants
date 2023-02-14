@@ -61,16 +61,22 @@ class NodeBuildScript:
     entry_point: str
     output_directories: tuple[str, ...] = ()
     output_files: tuple[str, ...] = ()
+    extra_caches: tuple[str, ...] = ()
 
-    def __init__(
-        self,
+    @classmethod
+    def create(
+        cls,
         entry_point: str,
         output_directories: Iterable[str] = (),
         output_files: Iterable[str] = (),
-    ) -> None:
-        object.__setattr__(self, "entry_point", entry_point)
-        object.__setattr__(self, "output_directories", tuple(output_directories))
-        object.__setattr__(self, "output_files", tuple(output_files))
+        extra_caches: Iterable[str] = (),
+    ) -> NodeBuildScript:
+        return cls(
+            entry_point=entry_point,
+            output_directories=tuple(output_directories),
+            output_files=tuple(output_files),
+            extra_caches=tuple(extra_caches),
+        )
 
 
 class NodePackageScriptsField(SequenceField[NodeBuildScript]):
@@ -227,6 +233,40 @@ class NodeBuildScriptOutputDirectoriesField(StringSequenceField):
     )
 
 
+class NodeBuildScriptExtraCaches(StringSequenceField):
+    alias = "extra_caches"
+    required = False
+    default = ()
+    help = softwrap(
+        """
+        Specify directories that pants should treat as caches for the build script.
+
+        These directories will not be available as sources, but are available to
+        subsequent executions of the build script.
+
+        Example usage:
+        # BUILD
+        package_json(
+            scripts=node_build_script(
+                entry_point="build",
+                output_directories=["dist"],
+                extra_caches=[".parcel-cache"],
+            )
+        )
+
+        # package.json
+        {
+            ...
+            "scripts": {
+                "build": "parcel build --dist-dir=dist --cache-dir=.parcel-cache"
+                ...
+            }
+            ...
+        }
+        """
+    )
+
+
 class NodeBuildScriptTarget(Target):
     core_fields = (
         *COMMON_TARGET_FIELDS,
@@ -234,6 +274,7 @@ class NodeBuildScriptTarget(Target):
         NodeBuildScriptOutputDirectoriesField,
         NodeBuildScriptOutputFilesField,
         NodeBuildScriptSourcesField,
+        NodeBuildScriptExtraCaches,
         NodePackageDependenciesField,
     )
 
@@ -278,6 +319,7 @@ class PackageJsonEntryPoints:
         exports: str | Mapping[str, str] | None = content.get("exports")
         main: str | None = content.get("main")
         browser: str | None = content.get("browser")
+        source: str | None = content.get("source")
         if exports:
             if isinstance(exports, str):
                 return FrozenDict({".": exports})
@@ -287,6 +329,8 @@ class PackageJsonEntryPoints:
             return FrozenDict({".": browser})
         elif main:
             return FrozenDict({".": main})
+        elif source:
+            return FrozenDict({".": source})
         return FrozenDict()
 
     @staticmethod
@@ -501,10 +545,12 @@ async def generate_node_package_targets(
                         NodeBuildScriptEntryPointField.alias: build_script.entry_point,
                         NodeBuildScriptOutputDirectoriesField.alias: build_script.output_directories,
                         NodeBuildScriptOutputFilesField.alias: build_script.output_files,
+                        NodeBuildScriptExtraCaches.alias: build_script.extra_caches,
                         NodePackageDependenciesField.alias: [
                             file_tgt.address.spec,
                             *(tgt.address.spec for tgt in third_party_tgts),
                             *request.template.get("dependencies", []),
+                            package_target.address.spec,
                         ],
                     },
                     request.generator.address.create_generated(build_script.entry_point),
@@ -544,4 +590,4 @@ def rules() -> Iterable[Rule | UnionRule]:
 
 
 def build_file_aliases() -> BuildFileAliases:
-    return BuildFileAliases(objects={"node_build_script": NodeBuildScript})
+    return BuildFileAliases(objects={"node_build_script": NodeBuildScript.create})

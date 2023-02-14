@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from typing import ClassVar, Iterable
 
@@ -13,6 +14,7 @@ from pants.backend.javascript.install_node_package import (
 from pants.backend.javascript.nodejs_project_environment import NodeJsProjectEnvironmentProcess
 from pants.backend.javascript.package_json import (
     NodeBuildScriptEntryPointField,
+    NodeBuildScriptExtraCaches,
     NodeBuildScriptOutputDirectoriesField,
     NodeBuildScriptOutputFilesField,
     NodeBuildScriptSourcesField,
@@ -28,6 +30,7 @@ from pants.engine.process import ProcessResult
 from pants.engine.rules import Rule, collect_rules, rule
 from pants.engine.target import GeneratedSources, GenerateSourcesRequest
 from pants.engine.unions import UnionRule
+from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.strutil import softwrap
 
@@ -71,6 +74,9 @@ async def pack_node_package_into_tgz_for_publication(
     return BuiltPackage(result.output_digest, (BuiltPackageArtifact(archive_file),))
 
 
+_NOT_ALPHANUMERIC = re.compile("[^0-9a-zA-Z]+")
+
+
 @rule
 async def run_node_build_script(
     req: GenerateResourcesFromNodeBuildScriptRequest,
@@ -81,6 +87,7 @@ async def run_node_build_script(
     output_files = req.protocol_target[NodeBuildScriptOutputFilesField]
     output_dirs = req.protocol_target[NodeBuildScriptOutputDirectoriesField]
     script_name = req.protocol_target[NodeBuildScriptEntryPointField].value
+    extra_caches = req.protocol_target[NodeBuildScriptExtraCaches].value
     if not (output_dirs.value or output_files.value):
         raise ValueError(
             softwrap(
@@ -92,6 +99,11 @@ async def run_node_build_script(
                 """
             )
         )
+
+    def cache_name(cache_path: str) -> str:
+        parts = (installation.project_env.package_dir(), script_name, cache_path)
+        return "_".join(_NOT_ALPHANUMERIC.sub("_", part) for part in parts if part)
+
     args = ("run", script_name)
     result = await Get(
         ProcessResult,
@@ -103,6 +115,9 @@ async def run_node_build_script(
             output_files=output_files.value or (),
             output_directories=output_dirs.value or (),
             level=LogLevel.INFO,
+            per_package_caches=FrozenDict(
+                {cache_name(extra_cache): extra_cache for extra_cache in extra_caches or ()}
+            ),
         ),
     )
 

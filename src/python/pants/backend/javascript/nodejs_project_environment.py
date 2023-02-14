@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os.path
 from collections.abc import Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from pants.backend.javascript import package_json, resolve
 from pants.backend.javascript.nodejs_project import NodeJSProject
@@ -24,6 +24,7 @@ from pants.engine.process import Process
 from pants.engine.rules import Rule, collect_rules, rule
 from pants.engine.target import Target
 from pants.engine.unions import UnionRule
+from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 
 
@@ -62,6 +63,12 @@ class NodeJsProjectEnvironment:
         else:
             return None
 
+    def package_dir(self) -> str:
+        if self.package and not self.project.single_workspace:
+            return self.ensure_target().residence_dir
+        else:
+            return self.root_dir
+
     def relative_workspace_directory(self) -> str:
         target = self.ensure_target()
         from_root_to_workspace = os.path.relpath(target.residence_dir, self.root_dir)
@@ -82,6 +89,7 @@ class NodeJsProjectEnvironmentProcess:
     input_digest: Digest = EMPTY_DIGEST
     output_files: tuple[str, ...] = ()
     output_directories: tuple[str, ...] = ()
+    per_package_caches: FrozenDict[str, str] = field(default_factory=FrozenDict)
 
 
 @rule(desc="Assembling nodejs project environment")
@@ -117,7 +125,12 @@ async def setup_nodejs_project_environment_process(req: NodeJsProjectEnvironment
         args = tuple(req.args)
         output_files = req.output_files
         output_directories = req.output_directories
-
+    per_package_caches = FrozenDict(
+        {
+            key: os.path.join(req.env.package_dir(), value)
+            for key, value in req.per_package_caches.items()
+        }
+    )
     return await Get(
         Process,
         NodeJSToolProcess,
@@ -129,6 +142,7 @@ async def setup_nodejs_project_environment_process(req: NodeJsProjectEnvironment
             working_directory=req.env.root_dir,
             output_files=output_files,
             output_directories=output_directories,
+            append_only_caches=per_package_caches,
         ),
     )
 

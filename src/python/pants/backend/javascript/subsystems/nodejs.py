@@ -4,8 +4,8 @@
 from __future__ import annotations
 
 import os.path
-from dataclasses import dataclass
-from typing import ClassVar, Iterable
+from dataclasses import dataclass, field
+from typing import ClassVar, Iterable, Mapping
 
 from pants.core.util_rules.external_tool import (
     DownloadedExternalTool,
@@ -18,7 +18,7 @@ from pants.engine.platform import Platform
 from pants.engine.process import Process
 from pants.engine.rules import Get, Rule, collect_rules, rule
 from pants.engine.unions import UnionRule
-from pants.option.global_options import NamedCachesDirOption
+from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 
 
@@ -65,6 +65,7 @@ class NodeJSToolProcess:
     output_files: tuple[str, ...] = ()
     output_directories: tuple[str, ...] = ()
     working_directory: str | None = None
+    append_only_caches: FrozenDict[str, str] = field(default_factory=FrozenDict)
 
     @classmethod
     def npm(
@@ -76,6 +77,7 @@ class NodeJSToolProcess:
         output_files: tuple[str, ...] = (),
         output_directories: tuple[str, ...] = (),
         working_directory: str | None = None,
+        append_only_caches: FrozenDict[str, str] | None = None,
     ) -> NodeJSToolProcess:
         return cls(
             args=("npm", *args),
@@ -85,6 +87,7 @@ class NodeJSToolProcess:
             output_files=output_files,
             output_directories=output_directories,
             working_directory=working_directory,
+            append_only_caches=append_only_caches or FrozenDict(),
         )
 
     @classmethod
@@ -119,11 +122,13 @@ class NodeJSProcessEnvironment:
             "npm_config_cache": self.npm_config_cache,  # Normally stored at ~/.npm
         }
 
+    @property
+    def append_only_caches(self) -> Mapping[str, str]:
+        return {"npm": self.npm_config_cache}
+
 
 @rule(level=LogLevel.DEBUG)
-async def node_process_environment(
-    nodejs: NodeJS, platform: Platform, named_caches_dir: NamedCachesDirOption
-) -> NodeJSProcessEnvironment:
+async def node_process_environment(nodejs: NodeJS, platform: Platform) -> NodeJSProcessEnvironment:
     # Get reference to tool
     assert nodejs.default_url_platform_mapping is not None
     plat_str = nodejs.default_url_platform_mapping[platform.value]
@@ -134,9 +139,7 @@ async def node_process_environment(
         "bin",
     )
 
-    return NodeJSProcessEnvironment(
-        binary_directory=nodejs_bin_dir, npm_config_cache=str(named_caches_dir.val / "npm")
-    )
+    return NodeJSProcessEnvironment(binary_directory=nodejs_bin_dir, npm_config_cache=".cache/npm")
 
 
 @rule(level=LogLevel.DEBUG)
@@ -163,6 +166,7 @@ async def setup_node_tool_process(
         level=request.level,
         env=environment.to_env_dict(),
         working_directory=request.working_directory,
+        append_only_caches={**request.append_only_caches, **environment.append_only_caches},
     )
 
 
