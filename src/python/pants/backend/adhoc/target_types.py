@@ -26,11 +26,12 @@ class AdhocToolRunnableField(StringField):
     alias = "runnable"
     required = True
     help = help_text(
-        """
+        lambda: f"""
         Address to a target that can be invoked by the `run` goal (and does not set
         `run_in_sandbox_behavior=NOT_SUPPORTED`). This will be executed along with any arguments
-        specified by `argv`, in a sandbox with that target's transitive dependencies, along with
-        the transitive dependencies specified by `execution_dependencies`.
+        specified by `{AdhocToolArgumentsField.alias}`, in a sandbox with that target's transitive
+        dependencies, along with the transitive dependencies specified by
+        `{AdhocToolExecutionDependenciesField.alias}`.
         """
     )
 
@@ -40,11 +41,13 @@ class AdhocToolOutputFilesField(StringSequenceField):
     required = False
     default = ()
     help = help_text(
-        """
-        Specify the shell command's output files to capture, relative to the value of `workdir`.
+        lambda: f"""
+        Specify the shell command's output files to capture, relative to the value of
+        `{AdhocToolWorkdirField.alias}`.
 
-        For directories, use `output_directories`. At least one of `output_files` and
-        `output_directories` must be specified.
+        For directories, use `{AdhocToolOutputDirectoriesField.alias}`. At least one of
+        `{AdhocToolOutputFilesField.alias}` and`{AdhocToolOutputDirectoriesField.alias}` must be
+        specified.
 
         Relative paths (including `..`) may be used, as long as the path does not ascend further
         than the build root.
@@ -57,12 +60,13 @@ class AdhocToolOutputDirectoriesField(StringSequenceField):
     required = False
     default = ()
     help = help_text(
-        """
+        lambda: f"""
         Specify full directories (including recursive descendants) of output to capture from the
-        shell command, relative to the value of `workdir`.
+        shell command, relative to the value of `{AdhocToolWorkdirField.alias}`.
 
-        For individual files, use `output_files`. At least one of `output_files` and
-        `output_directories` must be specified.
+        For individual files, use `{AdhocToolOutputFilesField.alias}`. At least one of
+        `{AdhocToolOutputFilesField.alias}` and`{AdhocToolOutputDirectoriesField.alias}` must be
+        specified.
 
         Relative paths (including `..`) may be used, as long as the path does not ascend further
         than the build root.
@@ -77,12 +81,12 @@ class AdhocToolOutputDependenciesField(AdhocToolDependenciesField):
     deprecated_alias_removal_version = "2.17.0.dev0"
 
     help = help_text(
-        """
+        lambda: f"""
         Any dependencies that the output artifacts require in order to be effectively consumed.
 
-        To enable legacy use cases, if `execution_dependencies` is `None`, these dependencies will
-        be materialized in the command execution sandbox. This behavior is deprecated, and will be
-        removed in version 2.17.0.dev0.
+        To enable legacy use cases, if `{AdhocToolExecutionDependenciesField.alias}` is `None`,
+        these dependencies will be materialized in the command execution sandbox. This behavior
+        is deprecated, and will be removed in version 2.17.0.dev0.
         """
     )
 
@@ -93,16 +97,17 @@ class AdhocToolExecutionDependenciesField(SpecialCasedDependencies):
     default = None
 
     help = help_text(
-        """
+        lambda: f"""
         The execution dependencies for this shell command.
 
         Dependencies specified here are those required to make the command complete successfully
         (e.g. file inputs, binaries compiled from other targets, etc), but NOT required to make
         the output side-effects useful. Dependencies that are required to use the side-effects
-        produced by this command should be specified using the `output_dependencies` field.
+        produced by this command should be specified using the
+        `{AdhocToolOutputDependenciesField.alias}` field.
 
-        If this field is specified, dependencies from `output_dependencies` will not be added to
-        the execution sandbox.
+        If this field is specified, dependencies from `{AdhocToolOutputDependenciesField.alias}`
+        will not be added to the execution sandbox.
         """
     )
 
@@ -117,19 +122,31 @@ class AdhocToolSourcesField(MultipleSourcesField):
 class AdhocToolArgumentsField(StringSequenceField):
     alias = "args"
     default = ()
-    help = f"Extra arguments to pass into the `{AdhocToolRunnableField.alias}` field."
+    help = help_text(
+        lambda: f"Extra arguments to pass into the `{AdhocToolRunnableField.alias}` field."
+    )
 
 
 class AdhocToolStdoutFilenameField(StringField):
     alias = "stdout"
     default = None
-    help = "A filename to capture the contents of `stdout` to, relative to the value of `workdir`."
+    help = help_text(
+        lambda: f"""
+        A filename to capture the contents of `stdout` to, relative to the value of
+        `{AdhocToolWorkdirField.alias}`.
+        """
+    )
 
 
 class AdhocToolStderrFilenameField(StringField):
     alias = "stderr"
     default = None
-    help = "A filename to capture the contents of `stderr` to, relative to the value of `workdir`."
+    help = help_text(
+        lambda: f"""
+        A filename to capture the contents of `stderr` to, relative to the value of
+        `{AdhocToolWorkdirField.alias}`
+        """
+    )
 
 
 class AdhocToolTimeoutField(IntField):
@@ -205,12 +222,12 @@ class AdhocToolTarget(Target):
         EnvironmentField,
     )
     help = help_text(
-        f"""
+        lambda: f"""
         Execute any runnable target for its side effects.
 
         Example BUILD file:
 
-            adhoc_tool(
+            {AdhocToolTarget.alias}(
                 {AdhocToolRunnableField.alias}=":python_source",
                 {AdhocToolArgumentsField.alias}=[""],
                 {AdhocToolExecutionDependenciesField.alias}=[":scripts"],
