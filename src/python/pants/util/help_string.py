@@ -49,5 +49,4 @@ class HelpString:
     payload: str
 
     def __get__(self, obj, objtype=None) -> str:
-        print(self._vars.keys())
         return self.payload.format(**self._vars)
