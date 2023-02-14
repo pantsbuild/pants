@@ -19,7 +19,7 @@ from pants.core.target_types import (
 )
 from pants.core.util_rules import stripped_source_files
 from pants.engine import fs
-from pants.engine.collection import Collection
+from pants.engine.collection import Collection, DeduplicatedCollection
 from pants.engine.fs import DigestContents, PathGlobs
 from pants.engine.internals import graph
 from pants.engine.internals.native_engine import Digest, Snapshot
@@ -295,6 +295,7 @@ class PackageJsonEntryPoints:
 
     exports: FrozenDict[str, str]
     bin: FrozenDict[str, str]
+    root_dir: str
 
     @property
     def globs(self) -> Iterable[str]:
@@ -302,15 +303,16 @@ class PackageJsonEntryPoints:
             yield export.replace("*", "**/*")
         yield from self.bin.values()
 
-    def globs_relative_to(self, pkg_json: PackageJson) -> Iterable[str]:
+    def globs_from_root(self) -> Iterable[str]:
         for path in self.globs:
-            yield os.path.normpath(os.path.join(pkg_json.root_dir, path))
+            yield os.path.normpath(os.path.join(self.root_dir, path))
 
     @classmethod
     def from_package_json(cls, pkg_json: PackageJson) -> PackageJsonEntryPoints:
         return cls(
             exports=cls._exports_form_package_json(pkg_json),
             bin=cls._binaries_from_package_json(pkg_json),
+            root_dir=pkg_json.root_dir,
         )
 
     @staticmethod
@@ -477,6 +479,33 @@ async def all_package_json() -> AllPackageJson:
     return AllPackageJson(await Get(PackageJsonForGlobs, PathGlobs(["**/package.json"])))
 
 
+class AllPackageJsonNames(DeduplicatedCollection[str]):
+    """Used to not invalidate all generated node package targets when any package.json contents are
+    changed."""
+
+
+@rule
+async def all_package_json_names(all_pkg_jsons: AllPackageJson) -> AllPackageJsonNames:
+    return AllPackageJsonNames(pkg.name for pkg in all_pkg_jsons)
+
+
+@rule
+async def package_json_for_source(source_field: PackageJsonSourceField) -> PackageJson:
+    [pkg_json] = await Get(
+        PackageJsonForGlobs, PathGlobs, source_field.path_globs(UnmatchedBuildFileGlobs.error)
+    )
+    return pkg_json
+
+
+@rule
+async def script_entrypoints_for_source(
+    source_field: PackageJsonSourceField,
+) -> PackageJsonEntryPoints:
+    return PackageJsonEntryPoints.from_package_json(
+        await Get(PackageJson, PackageJsonSourceField, source_field)
+    )
+
+
 class GenerateNodePackageTargets(GenerateTargetsRequest):
     generate_from = PackageJsonTarget
 
@@ -485,7 +514,7 @@ class GenerateNodePackageTargets(GenerateTargetsRequest):
 async def generate_node_package_targets(
     request: GenerateNodePackageTargets,
     union_membership: UnionMembership,
-    all_pkg_jsons: AllPackageJson,
+    first_party_names: AllPackageJsonNames,
 ) -> GeneratedTargets:
     file = request.generator[PackageJsonSourceField].file_path
     file_tgt = TargetGeneratorSourcesHelperTarget(
@@ -494,13 +523,10 @@ async def generate_node_package_targets(
         union_membership,
     )
 
-    [pkg_json] = await Get(
-        PackageJsonForGlobs,
-        PathGlobs,
-        request.generator[PackageJsonSourceField].path_globs(UnmatchedBuildFileGlobs.error),
+    pkg_json = await Get(
+        PackageJson, PackageJsonSourceField, request.generator[PackageJsonSourceField]
     )
 
-    first_party_names = {pkg.name for pkg in all_pkg_jsons}
     third_party_tgts = [
         NodeThirdPartyPackageTarget(
             {

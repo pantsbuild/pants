@@ -65,7 +65,7 @@ def test_packages_sources_as_resource_using_build_tool(rule_runner: RuleRunner) 
                     "version": "0.0.1",
                     "source": "lib/index.mjs",
                     "scripts": {
-                        "build": "parcel build lib/index.mjs --dist-dir=dist --cache-dir=.parcel-cache "
+                        "build": "parcel build lib/index.mjs --dist-dir=dist --cache-dir=.parcel-cache"
                     },
                     "devDependencies": {"parcel": "2.6.2"},
                 }

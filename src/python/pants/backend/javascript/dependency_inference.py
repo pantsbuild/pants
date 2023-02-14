@@ -17,19 +17,16 @@ from pants.backend.javascript.package_json import (
     OwningNodePackage,
     OwningNodePackageRequest,
     PackageJsonEntryPoints,
-    PackageJsonForGlobs,
     PackageJsonSourceField,
 )
 from pants.backend.javascript.target_types import JSDependenciesField, JSSourceField
 from pants.build_graph.address import Address
 from pants.engine.addresses import Addresses
-from pants.engine.fs import PathGlobs
 from pants.engine.internals.graph import Owners, OwnersRequest
 from pants.engine.internals.selectors import Get
 from pants.engine.rules import Rule, collect_rules, rule
 from pants.engine.target import FieldSet, InferDependenciesRequest, InferredDependencies, Targets
 from pants.engine.unions import UnionRule
-from pants.option.global_options import UnmatchedBuildFileGlobs
 from pants.util.frozendict import FrozenDict
 from pants.util.ordered_set import FrozenOrderedSet
 
@@ -62,15 +59,10 @@ class InferJSDependenciesRequest(InferDependenciesRequest):
 async def infer_node_package_dependencies(
     request: InferNodePackageDependenciesRequest,
 ) -> InferredDependencies:
-    source: PackageJsonSourceField = request.field_set.source
-    [pkg_json] = await Get(
-        PackageJsonForGlobs, PathGlobs, source.path_globs(UnmatchedBuildFileGlobs.error)
+    entry_points = await Get(
+        PackageJsonEntryPoints, PackageJsonSourceField, request.field_set.source
     )
-    entry_points = PackageJsonEntryPoints.from_package_json(pkg_json)
-
-    candidate_js_files = await Get(
-        Owners, OwnersRequest(tuple(entry_points.globs_relative_to(pkg_json)))
-    )
+    candidate_js_files = await Get(Owners, OwnersRequest(tuple(entry_points.globs_from_root())))
     js_targets = await Get(Targets, Addresses(candidate_js_files))
     return InferredDependencies(tgt.address for tgt in js_targets if tgt.has_field(JSSourceField))
 
