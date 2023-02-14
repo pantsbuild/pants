@@ -639,7 +639,7 @@ async fn timeout() {
   ];
 
   let mut process = Process::new(argv).docker(IMAGE.to_owned());
-  process.timeout = Some(Duration::from_millis(500));
+  process.timeout = Some(Duration::from_secs(2));
   process.description = "sleepy-cat".to_string();
 
   let result = run_command_via_docker(process).await.unwrap();
