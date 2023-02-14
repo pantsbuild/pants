@@ -255,31 +255,30 @@ impl PyExecutionStrategyOptions {
   fn __new__(
     local_parallelism: usize,
     remote_parallelism: usize,
-    local_keep_sandboxes: &str,
+    local_keep_sandboxes: String,
     local_cache: bool,
     local_enable_nailgun: bool,
     remote_cache_read: bool,
     remote_cache_write: bool,
-    docker_strategy: &str,
     child_default_memory: usize,
     child_max_memory: usize,
     graceful_shutdown_timeout: usize,
-  ) -> PyO3Result<Self> {
-    Ok(Self(ExecutionStrategyOptions {
+  ) -> Self {
+    Self(ExecutionStrategyOptions {
       local_parallelism,
       remote_parallelism,
-      local_keep_sandboxes: process_execution::local::KeepSandboxes::from_str(local_keep_sandboxes)
-        .map_err(|e| PyException::new_err(format!("{e}")))?,
+      local_keep_sandboxes: process_execution::local::KeepSandboxes::from_str(
+        &local_keep_sandboxes,
+      )
+      .unwrap(),
       local_cache,
       local_enable_nailgun,
       remote_cache_read,
       remote_cache_write,
-      docker_strategy: process_execution::docker::DockerStrategy::from_str(docker_strategy)
-        .map_err(|e| PyException::new_err(format!("{e}")))?,
       child_default_memory,
       child_max_memory,
-      graceful_shutdown_timeout: Duration::from_secs(graceful_shutdown_timeout.try_into()?),
-    }))
+      graceful_shutdown_timeout: Duration::from_secs(graceful_shutdown_timeout.try_into().unwrap()),
+    })
   }
 }
 

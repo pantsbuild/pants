@@ -348,8 +348,7 @@ async fn main() {
         args
           .named_cache_path
           .unwrap_or_else(NamedCaches::default_path),
-      )
-      .unwrap(),
+      ),
       ImmutableInputs::new(store.clone(), &workdir).unwrap(),
       KeepSandboxes::Never,
     )) as Box<dyn process_execution::CommandRunner>,
