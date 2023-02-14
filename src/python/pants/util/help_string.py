@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import inspect
 from dataclasses import dataclass
-from typing import Any, Callable, Mapping
+from typing import Any, Callable, Mapping, cast
 
 
 def help_string_factory(vars: Mapping[str, Any] | None = None) -> Callable[[str], HelpString]:
@@ -22,13 +22,8 @@ def help_string_factory(vars: Mapping[str, Any] | None = None) -> Callable[[str]
     _vars: Mapping[str, Any]
 
     if vars is None:
-        frame = inspect.currentframe()
-        # `inspect.currentframe()` is being called from within this function
-        assert frame is not None
-        previous = frame.f_back
-        # `f_back` is from a frame that calls this function
-        assert previous is not None
-        _vars = previous.f_globals
+        frame: Any = inspect.currentframe()
+        _vars = frame.f_back.f_globals
     else:
         _vars = vars
 
@@ -36,6 +31,14 @@ def help_string_factory(vars: Mapping[str, Any] | None = None) -> Callable[[str]
         return HelpString(_vars, payload)
 
     return help_string
+
+
+def help_string(payload: str) -> HelpString:
+    """Returns a `HelpString`, a string descriptor that can be used to refer to properties of global
+    classes that are defined later in the same file, allowing for help strings to refer to actual
+    `alias`es."""
+    vars = cast(Any, inspect.currentframe()).f_back.f_globals
+    return help_string_factory(vars)(payload)
 
 
 @dataclass(frozen=True)
@@ -46,4 +49,5 @@ class HelpString:
     payload: str
 
     def __get__(self, obj, objtype=None) -> str:
+        print(self._vars.keys())
         return self.payload.format(**self._vars)

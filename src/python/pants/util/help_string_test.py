@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 
-from pants.util.help_string import help_string_factory
+from pants.util.help_string import help_string, help_string_factory
 
 
 def test_help_string():
@@ -33,3 +33,16 @@ def test_help_string_mutual_references():
     locals()  # `globals` updates automatically, `locals` does not
     assert FieldA.help == f"Does a thing involving `{FieldB.alias}`."
     assert FieldB.help == f"Provides a thing for `{FieldA.alias}` to use."
+
+
+def test_global():
+    assert GlobalA.help == f"See `{GlobalB.__name__}`."
+    assert GlobalB.help == f"See `{GlobalA.__name__}`."
+
+
+class GlobalA:
+    help = help_string("See `{GlobalB.__name__}`.")
+
+
+class GlobalB:
+    help = help_string("See `{GlobalA.__name__}`.")
