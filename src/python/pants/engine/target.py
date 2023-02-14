@@ -61,6 +61,7 @@ from pants.util.collections import ensure_list, ensure_str_list
 from pants.util.dirutil import fast_relpath
 from pants.util.docutil import bin_name, doc_url
 from pants.util.frozendict import FrozenDict
+from pants.util.help_string import HelpString
 from pants.util.memo import memoized_method, memoized_property
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import bullet_list, pluralize, softwrap
@@ -142,7 +143,7 @@ class Field:
 
     # Subclasses must define these.
     alias: ClassVar[str]
-    help: ClassVar[str]
+    help: ClassVar[str | HelpString]
 
     # Subclasses must define at least one of these two.
     default: ClassVar[ImmutableValue]
