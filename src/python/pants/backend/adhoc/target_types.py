@@ -205,17 +205,18 @@ class AdhocToolTarget(Target):
         EnvironmentField,
     )
     help = softwrap(
-        """
+        f"""
         Execute any runnable target for its side effects.
 
         Example BUILD file:
 
             adhoc_tool(
-                runnable=":python_source",
-                argv=[""],
-                tools=["tar", "curl", "cat", "bash", "env"],
-                execution_dependencies=[":scripts"],
-                outputs=["results/", "logs/my-script.log"],
+                {AdhocToolRunnableField.alias}=":python_source",
+                {AdhocToolArgumentsField.alias}=[""],
+                {AdhocToolToolsField.alias}=["tar", "curl", "cat", "bash", "env"],
+                {AdhocToolExecutionDependenciesField.alias}=[":scripts"],
+                {AdhocToolOutputDirectoriesField.alias}=["logs/my-script.log"],
+                {AdhocToolOutputFilesField.alias}=["results/"],
             )
 
             shell_sources(name="scripts")
