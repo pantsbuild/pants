@@ -20,6 +20,7 @@ from pants.option.ranked_value import Rank, RankedValue
 from pants.option.scope import GLOBAL_SCOPE
 from pants.option.subsystem import Subsystem
 from pants.util.logging import LogLevel
+from pants.util.strutil import help_text
 
 
 class LogLevelSimple(Enum):
@@ -229,7 +230,7 @@ def test_grouping():
 def test_get_all_help_info():
     class Global(Subsystem):
         options_scope = GLOBAL_SCOPE
-        help = "Global options."
+        help = help_text("Global options.")
 
         opt1 = IntOption(default=42, help="Option 1")
         # This is special in having a short option `-l`. Make sure it works.

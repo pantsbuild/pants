@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
 from pants.backend.python.target_types import PythonDistribution
 from pants.engine.target import StringSequenceField, Targets
-from pants.util.strutil import softwrap
+from pants.util.strutil import help_text
 
 
 class StevedoreNamespace(str):
@@ -33,7 +33,7 @@ class StevedoreNamespace(str):
 # This is a lot like a SpecialCasedDependencies field, but it doesn't list targets directly.
 class StevedoreNamespacesField(StringSequenceField):
     alias = "stevedore_namespaces"
-    help = softwrap(
+    help = help_text(
         f"""
         List the stevedore namespaces required by this target.
 

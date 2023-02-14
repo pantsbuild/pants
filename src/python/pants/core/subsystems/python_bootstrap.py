@@ -19,14 +19,14 @@ from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.rules import Get, _uncacheable_rule, collect_rules, rule
 from pants.option.option_types import StrListOption
 from pants.option.subsystem import Subsystem
-from pants.util.strutil import softwrap
+from pants.util.strutil import help_text, softwrap
 
 logger = logging.getLogger(__name__)
 
 
 class PythonBootstrapSubsystem(Subsystem):
     options_scope = "python-bootstrap"
-    help = softwrap(
+    help = help_text(
         """
         Options used to locate Python interpreters used by all Pants backends.
 

@@ -297,3 +297,16 @@ def strval(val: str | Callable[[], str]) -> str:
         return val
     else:
         return val()
+
+
+def help_text(val: str | Callable[[], str]) -> str | Callable[[], str]:
+    """Convenience method for defining an optionally lazy-evaluated softwrapped help string.
+
+    This exists because `mypy` does not respect the type hints defined on base `Field` and `Target`
+    classes.
+    """
+    # This can go away when https://github.com/python/mypy/issues/14702 is fixed
+    if isinstance(val, str):
+        return softwrap(val)
+    else:
+        return lambda: softwrap(val())  # type: ignore[operator]

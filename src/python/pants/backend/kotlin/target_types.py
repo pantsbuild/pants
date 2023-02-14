@@ -28,7 +28,7 @@ from pants.jvm.target_types import (
     JvmResolveField,
     JvmRunnableSourceFieldSet,
 )
-from pants.util.strutil import softwrap
+from pants.util.strutil import help_text
 
 
 class KotlinSourceField(SingleSourceField):
@@ -40,7 +40,7 @@ class KotlinGeneratorSourcesField(MultipleSourcesField):
 
 
 class KotlincConsumedPluginIdsField(StringSequenceField):
-    help = softwrap(
+    help = help_text(
         """
         The IDs of Kotlin compiler plugins that this source file requires.
 
@@ -190,7 +190,7 @@ class KotlincPluginArtifactField(StringField, AsyncFieldMixin):
 
 class KotlincPluginIdField(StringField):
     alias = "plugin_id"
-    help = softwrap(
+    help = help_text(
         """
         The ID for `kotlinc` to use when setting options for the plugin.
 
@@ -201,7 +201,7 @@ class KotlincPluginIdField(StringField):
 
 class KotlincPluginArgsField(StringSequenceField):
     alias = "plugin_args"
-    help = softwrap(
+    help = help_text(
         """
         Optional list of argument to pass to the plugin.
         """
@@ -216,7 +216,7 @@ class KotlincPluginTarget(Target):
         KotlincPluginIdField,
         KotlincPluginArgsField,
     )
-    help = softwrap(
+    help = help_text(
         """
         A plugin for `kotlinc`.
 

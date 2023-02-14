@@ -64,7 +64,7 @@ from pants.util.docutil import bin_name, doc_url
 from pants.util.frozendict import FrozenDict
 from pants.util.memo import memoized_method, memoized_property
 from pants.util.ordered_set import FrozenOrderedSet
-from pants.util.strutil import bullet_list, pluralize, softwrap
+from pants.util.strutil import bullet_list, help_text, pluralize, softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -2174,7 +2174,7 @@ class OptionalSingleSourceField(SourcesField, StringField):
     """
 
     alias = "source"
-    help = softwrap(
+    help = help_text(
         """
         A single file that belongs to this target.
 
@@ -2469,8 +2469,9 @@ class Dependencies(StringSequenceField, AsyncFieldMixin):
     """
 
     alias = "dependencies"
-    help = softwrap(
-        f"""
+    help = help_text(
+        softwrap(
+            f"""
         Addresses to other targets that this target depends on, e.g.
         ['helloworld/subdir:lib', 'helloworld/main.py:lib', '3rdparty:reqs#django'].
 
@@ -2491,6 +2492,7 @@ class Dependencies(StringSequenceField, AsyncFieldMixin):
         `['!helloworld/subdir:lib', '!./sibling.txt']`. Ignores are intended for false positives
         with dependency inference; otherwise, simply leave off the dependency from the BUILD file.
         """
+        )
     )
     supports_transitive_excludes = False
 
@@ -2789,7 +2791,7 @@ class SpecialCasedDependencies(StringSequenceField, AsyncFieldMixin):
 
 class Tags(StringSequenceField):
     alias = "tags"
-    help = softwrap(
+    help = help_text(
         f"""
         Arbitrary strings to describe a target.
 
@@ -2801,7 +2803,7 @@ class Tags(StringSequenceField):
 
 class DescriptionField(StringField):
     alias = "description"
-    help = softwrap(
+    help = help_text(
         f"""
         A human-readable description of the target.
 
