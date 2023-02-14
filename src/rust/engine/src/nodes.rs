@@ -334,15 +334,6 @@ impl ExecuteProcess {
   ) -> Result<Process, StoreError> {
     let env = externs::getattr_from_str_frozendict(value, "env");
 
-    /*let working_directory = externs::getattr_as_optional_string(value, "working_directory")
-    .map_err(|e| format!("Failed to get `working_directory` from field: {e}"))?
-    .and_then(|dir| {
-        match RelativePath::new(dir) {
-            Ok(dir) => Some(dir),
-            Err(_) => None
-        }
-    });*/
-
     let working_directory = externs::getattr_as_optional_string(value, "working_directory")
       .map_err(|e| format!("Failed to get `working_directory` from field: {e}"))?
       .map(RelativePath::new)
