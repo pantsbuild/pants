@@ -14,12 +14,12 @@ from pants.backend.python.target_types import (
 from pants.engine.addresses import Address
 from pants.engine.target import DictStringToStringSequenceField, OverridesField
 from pants.util.frozendict import FrozenDict
-from pants.util.strutil import softwrap
+from pants.util.strutil import help_text
 
 
 class ModuleMappingField(DictStringToStringSequenceField):
     alias = "module_mapping"
-    help = softwrap(
+    help = help_text(
         f"""
         A mapping of requirement names to a list of the modules they provide.
 
@@ -43,7 +43,7 @@ class ModuleMappingField(DictStringToStringSequenceField):
 
 class TypeStubsModuleMappingField(DictStringToStringSequenceField):
     alias = "type_stubs_module_mapping"
-    help = softwrap(
+    help = help_text(
         f"""
         A mapping of type-stub requirement names to a list of the modules they provide.
 
@@ -66,7 +66,7 @@ class TypeStubsModuleMappingField(DictStringToStringSequenceField):
 
 
 class RequirementsOverrideField(OverridesField):
-    help = softwrap(
+    help = help_text(
         """
         Override the field values for generated `python_requirement` targets.
 

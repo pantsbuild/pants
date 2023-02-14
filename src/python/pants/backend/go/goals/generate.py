@@ -46,7 +46,7 @@ from pants.engine.target import Targets
 from pants.option.option_types import StrListOption
 from pants.option.subsystem import Subsystem
 from pants.util.dirutil import group_by_dir
-from pants.util.strutil import softwrap
+from pants.util.strutil import help_text, softwrap
 
 # Adapted from Go toolchain.
 # See https://github.com/golang/go/blob/master/src/cmd/go/internal/generate/generate.go and
@@ -63,7 +63,7 @@ _GENERATE_DIRECTIVE_RE = re.compile(rb"^//go:generate[ \t](.*)$")
 
 class GoGenerateGoalSubsystem(GoalSubsystem):
     name = "go-generate"
-    help = softwrap(
+    help = help_text(
         """
         Run each command in a package described by a `//go:generate` directive. This is equivalent to running
         `go generate` on a Go package.
