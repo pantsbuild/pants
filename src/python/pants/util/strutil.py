@@ -293,10 +293,7 @@ def fmt_memory_size(value: int, *, units: Iterable[str] = _MEMORY_UNITS) -> str:
 
 
 def strval(val: str | Callable[[], str]) -> str:
-    if isinstance(val, str):
-        return val
-    else:
-        return val()
+    return val if isinstance(val, str) else val()
 
 
 def help_text(val: str | Callable[[], str]) -> str | Callable[[], str]:
