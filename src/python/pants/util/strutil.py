@@ -6,7 +6,7 @@ from __future__ import annotations
 import re
 import shlex
 import textwrap
-from typing import Iterable
+from typing import Callable, Iterable
 
 
 def ensure_binary(text_or_binary: bytes | str) -> bytes:
@@ -290,3 +290,10 @@ def fmt_memory_size(value: int, *, units: Iterable[str] = _MEMORY_UNITS) -> str:
         unit_idx += 1
 
     return f"{int(amount)}{units[unit_idx]}"
+
+
+def strval(val: str | Callable[[], str]) -> str:
+    if isinstance(val, str):
+        return val
+    else:
+        return val()

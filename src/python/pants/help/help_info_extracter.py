@@ -42,7 +42,7 @@ from pants.option.options import Options
 from pants.option.parser import OptionValueHistory, Parser
 from pants.option.scope import ScopeInfo
 from pants.util.frozendict import LazyFrozenDict
-from pants.util.strutil import first_paragraph
+from pants.util.strutil import first_paragraph, strval
 
 
 class HelpJSONEncoder(json.JSONEncoder):
@@ -222,7 +222,7 @@ class TargetFieldHelpInfo:
         return cls(
             alias=field.alias,
             provider=provider,
-            description=field.help,
+            description=strval(field.help),
             type_hint=type_hint,
             required=field.required,
             default=(
@@ -256,11 +256,12 @@ class TargetTypeHelpInfo:
             # TargetGenerator, they are legal arguments... and that is what most help consumers
             # are interested in.
             fields.extend(target_type.moved_fields)
+        helpstr = strval(target_type.help)
         return cls(
             alias=target_type.alias,
             provider=provider,
-            summary=first_paragraph(target_type.help),
-            description=target_type.help,
+            summary=first_paragraph(helpstr),
+            description=helpstr,
             fields=tuple(
                 TargetFieldHelpInfo.create(
                     field,

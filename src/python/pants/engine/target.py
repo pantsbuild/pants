@@ -19,6 +19,7 @@ from enum import Enum
 from pathlib import PurePath
 from typing import (
     Any,
+    Callable,
     ClassVar,
     Dict,
     Generic,
@@ -142,7 +143,7 @@ class Field:
 
     # Subclasses must define these.
     alias: ClassVar[str]
-    help: ClassVar[str]
+    help: ClassVar[str | Callable[[], str]]
 
     # Subclasses must define at least one of these two.
     default: ClassVar[ImmutableValue]
@@ -362,7 +363,7 @@ class Target:
     # Subclasses must define these
     alias: ClassVar[str]
     core_fields: ClassVar[Tuple[Type[Field], ...]]
-    help: ClassVar[str]
+    help: ClassVar[str | Callable[[], str]]
 
     removal_version: ClassVar[str | None] = None
     removal_hint: ClassVar[str | None] = None

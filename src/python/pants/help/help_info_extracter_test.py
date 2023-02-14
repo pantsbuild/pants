@@ -254,7 +254,7 @@ def test_get_all_help_info():
     class QuxField(StringField):
         alias = "qux"
         default = "blahblah"
-        help = "A qux string."
+        help = lambda: "A qux string."
 
     class QuuxField(IntField):
         alias = "quux"
