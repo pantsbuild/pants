@@ -114,6 +114,7 @@ pub struct ExecutionStrategyOptions {
   pub local_enable_nailgun: bool,
   pub remote_cache_read: bool,
   pub remote_cache_write: bool,
+  pub docker_strategy: docker::DockerStrategy,
   pub child_max_memory: usize,
   pub child_default_memory: usize,
   pub graceful_shutdown_timeout: Duration,
@@ -248,6 +249,7 @@ impl Core {
       named_caches.clone(),
       immutable_inputs.clone(),
       exec_strategy_opts.local_keep_sandboxes,
+      exec_strategy_opts.docker_strategy,
     )?);
     let runner = Box::new(SwitchedCommandRunner::new(docker_runner, runner, |req| {
       matches!(req.execution_strategy, ProcessExecutionStrategy::Docker(_))
@@ -535,7 +537,7 @@ impl Core {
     };
 
     let immutable_inputs = ImmutableInputs::new(store.clone(), &local_execution_root_dir)?;
-    let named_caches = NamedCaches::new(named_caches_dir);
+    let named_caches = NamedCaches::new(named_caches_dir)?;
     let command_runners = Self::make_command_runners(
       &full_store,
       &store,

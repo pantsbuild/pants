@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import Enum
 from pathlib import Path
 from textwrap import dedent
@@ -28,7 +28,11 @@ from pants.engine.rules import (
     rule_helper,
 )
 from pants.engine.unions import UnionMembership
-from pants.option.global_options import DEFAULT_EXECUTION_OPTIONS, DEFAULT_LOCAL_STORE_OPTIONS
+from pants.option.global_options import (
+    DEFAULT_EXECUTION_OPTIONS,
+    DEFAULT_LOCAL_STORE_OPTIONS,
+    DockerStrategy,
+)
 from pants.testutil.rule_runner import MockGet, run_rule_with_mocks
 from pants.util.enums import match
 from pants.util.logging import LogLevel
@@ -36,6 +40,7 @@ from pants.util.logging import LogLevel
 
 def create_scheduler(rules, validate=True):
     """Create a Scheduler."""
+    execution_options = replace(DEFAULT_EXECUTION_OPTIONS, docker_strategy=DockerStrategy.mount)
     return Scheduler(
         ignore_patterns=[],
         use_gitignore=False,
@@ -46,7 +51,7 @@ def create_scheduler(rules, validate=True):
         rules=rules,
         union_membership=UnionMembership({}),
         executor=PyExecutor(core_threads=2, max_threads=4),
-        execution_options=DEFAULT_EXECUTION_OPTIONS,
+        execution_options=execution_options,
         local_store_options=DEFAULT_LOCAL_STORE_OPTIONS,
         validate_reachability=validate,
     )

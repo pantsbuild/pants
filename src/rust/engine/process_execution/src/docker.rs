@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 use std::collections::BTreeMap;
 use std::fmt;
+use std::os::fd::{AsRawFd, FromRawFd};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -18,13 +19,16 @@ use log::Level;
 use nails::execution::ExitCode;
 use once_cell::sync::Lazy;
 use parking_lot::Mutex;
-use store::{ImmutableInputs, Store};
+use tokio::io::AsyncWriteExt;
+
+use fs::DirectoryDigest;
+use store::{ImmutableInputs, Store, StoreError};
 use task_executor::Executor;
 use workunit_store::{in_workunit, Metric, RunningWorkunit};
 
 use crate::local::{
-  apply_chroot, create_sandbox, prepare_workdir, setup_run_sh_script, CapturedWorkdir, ChildOutput,
-  KeepSandboxes,
+  apply_chroot, create_sandbox, prepare_workdir, prepare_workdir_digest, setup_run_sh_script,
+  CapturedWorkdir, ChildOutput, KeepSandboxes,
 };
 use crate::{
   Context, FallibleProcessResultWithPlatform, NamedCaches, Platform, Process, ProcessError,
@@ -41,6 +45,18 @@ pub static IMAGE_PULL_CACHE: Lazy<ImagePullCache> = Lazy::new(ImagePullCache::ne
 /// Process-wide Docker connection.
 pub static DOCKER: Lazy<DockerOnceCell> = Lazy::new(DockerOnceCell::new);
 
+#[derive(Copy, Clone, Debug, Eq, PartialEq, strum_macros::EnumString)]
+#[strum(serialize_all = "snake_case")]
+pub enum DockerStrategy {
+  /// Inputs are written to a bind mount on the Docker host. This strategy is not completely
+  /// reliable in the case of virtualization (such as is used by Docker on macOS or Windows),
+  /// because bind-mount propagation can have latency or bugs. See #18162.
+  Mount,
+  /// Inputs are piped into an `exec` of `tar`, such that they are extracted inside the
+  /// container.
+  Pipe,
+}
+
 /// `CommandRunner` that executes processes using a local Docker client.
 pub struct CommandRunner<'a> {
   store: Store,
@@ -50,6 +66,7 @@ pub struct CommandRunner<'a> {
   named_caches: NamedCaches,
   immutable_inputs: ImmutableInputs,
   keep_sandboxes: KeepSandboxes,
+  strategy: DockerStrategy,
   container_cache: ContainerCache<'a>,
 }
 
@@ -286,6 +303,7 @@ impl<'a> CommandRunner<'a> {
     named_caches: NamedCaches,
     immutable_inputs: ImmutableInputs,
     keep_sandboxes: KeepSandboxes,
+    strategy: DockerStrategy,
   ) -> Result<Self, String> {
     let container_cache = ContainerCache::new(
       docker,
@@ -303,6 +321,7 @@ impl<'a> CommandRunner<'a> {
       named_caches,
       immutable_inputs,
       keep_sandboxes,
+      strategy,
       container_cache,
     })
   }
@@ -362,20 +381,64 @@ impl<'a> super::CommandRunner for CommandRunner<'a> {
           &sandbox_path_in_container
         );
 
+        // Obtain ID of the base container in which to run the execution for this process.
+        let container_id = {
+          let image = match &req.execution_strategy {
+            ProcessExecutionStrategy::Docker(image) => Ok(image),
+            pes => Err(format!(
+              "The Docker execution strategy was: {pes:?}, but the Docker CommandRunner was used."
+            )),
+          }?;
+
+          self
+            .container_cache
+            .container_id_for_image(image, &req.platform, &context.build_id)
+            .await?
+        };
+
         // Prepare the workdir.
-        // DOCKER-NOTE: The input root will be bind mounted into the container.
-        let exclusive_spawn = prepare_workdir(
-          workdir.path().to_owned(),
-          &req,
-          req.input_digests.input_files.clone(),
-          self.store.clone(),
-          self.executor.clone(),
-          &self.named_caches,
-          &self.immutable_inputs,
-          Some(Path::new(NAMED_CACHES_BASE_PATH_IN_CONTAINER)),
-          Some(Path::new(IMMUTABLE_INPUTS_BASE_PATH_IN_CONTAINER)),
-        )
-        .await?;
+        match self.strategy {
+          DockerStrategy::Mount => {
+            prepare_workdir(
+              workdir.path().to_owned(),
+              &req,
+              req.input_digests.input_files.clone(),
+              &self.store,
+              &self.named_caches,
+              &self.immutable_inputs,
+              Some(Path::new(NAMED_CACHES_BASE_PATH_IN_CONTAINER)),
+              Some(Path::new(IMMUTABLE_INPUTS_BASE_PATH_IN_CONTAINER)),
+            )
+            .await?;
+          }
+          DockerStrategy::Pipe => {
+            // NB: For now, we continue to materialize files into a bind mount, but we do so from
+            // within the container. This allows us to capture outputs without an additional
+            // tar-pipe, but if it causes issues (outputs capture races similar to the input race
+            // on #18162), we'll need to adjust accordingly.
+            let inputs_digest = prepare_workdir_digest(
+              &req,
+              req.input_digests.input_files.clone(),
+              &self.store,
+              &self.named_caches,
+              None,
+              Some(Path::new(NAMED_CACHES_BASE_PATH_IN_CONTAINER)),
+              None,
+            )
+            .await?;
+
+            let docker = self.docker.get().await?;
+            pipe_inputs(
+              docker,
+              &self.store,
+              &self.executor,
+              &container_id,
+              &sandbox_path_in_container,
+              inputs_digest,
+            )
+            .await?;
+          }
+        }
 
         workunit.increment_counter(Metric::DockerExecutionRequests, 1);
 
@@ -386,8 +449,9 @@ impl<'a> super::CommandRunner for CommandRunner<'a> {
             self.store.clone(),
             self.executor.clone(),
             workdir.path().to_owned(),
-            sandbox_path_in_container,
-            exclusive_spawn,
+            (container_id, sandbox_path_in_container),
+            // Processes exec'd in Docker never require exclusive spawning.
+            false,
             req.platform,
           )
           .map_err(|msg| {
@@ -435,13 +499,13 @@ impl<'a> super::CommandRunner for CommandRunner<'a> {
 
 #[async_trait]
 impl<'a> CapturedWorkdir for CommandRunner<'a> {
-  type WorkdirToken = String;
+  type WorkdirToken = (String, String);
 
   async fn run_in_workdir<'s, 'c, 'w, 'r>(
     &'s self,
-    context: &'c Context,
+    _context: &'c Context,
     _workdir_path: &'w Path,
-    sandbox_path_in_container: Self::WorkdirToken,
+    (container_id, sandbox_path_in_container): Self::WorkdirToken,
     req: Process,
     _exclusive_spawn: bool,
   ) -> Result<BoxStream<'r, Result<ChildOutput, String>>, String> {
@@ -462,17 +526,6 @@ impl<'a> CapturedWorkdir for CommandRunner<'a> {
       .map_err(|s| {
         format!("Unable to convert working directory due to non UTF-8 characters: {s:?}")
       })?;
-
-    let image = match req.execution_strategy {
-      ProcessExecutionStrategy::Docker(image) => Ok(image),
-      _ => Err("The Docker execution strategy was not set on the Process, but the Docker CommandRunner was used.")
-    }?;
-
-    // Obtain ID of the base container in which to run the execution for this process.
-    let container_id = self
-      .container_cache
-      .container_id_for_image(&image, &req.platform, &context.build_id)
-      .await?;
 
     let config = bollard::exec::CreateExecOptions {
       env: Some(env),
@@ -541,6 +594,110 @@ impl<'a> CapturedWorkdir for CommandRunner<'a> {
     };
 
     Ok(stream.boxed())
+  }
+}
+
+async fn pipe_inputs(
+  docker: &Docker,
+  store: &Store,
+  executor: &Executor,
+  container_id: &str,
+  working_dir: &str,
+  inputs_digest: DirectoryDigest,
+) -> Result<(), ProcessError> {
+  let config = bollard::exec::CreateExecOptions {
+    cmd: Some(vec!["tar", "-xf", "-"]),
+    working_dir: Some(working_dir),
+    attach_stdin: Some(true),
+    attach_stdout: Some(true),
+    attach_stderr: Some(true),
+    ..bollard::exec::CreateExecOptions::default()
+  };
+
+  let exec = docker
+    .create_exec(container_id, config)
+    .await
+    .map_err(|err| format!("Failed to create Docker execution in container: {err:?}"))?;
+
+  let exec_result = docker
+    .start_exec(&exec.id, None)
+    .await
+    .map_err(|err| format!("Failed to start Docker execution `{}`: {:?}", &exec.id, err))?;
+  let StartExecResults::Attached { mut output, mut input } = exec_result else {
+    panic!("Unexpected value returned from start_exec: {exec_result:?}");
+  };
+
+  // Spawn tasks to write the input tar file.
+  let input_tasks = {
+    // NB: Because this takes a blocking `Write` instance, we copy from an intermediate pipe.
+    let (pipe_reader, pipe_writer) = os_pipe::pipe()
+      .map_err(|e| ProcessError::Unclassified(format!("Failed to create pipe: {e}")))?;
+    let store = store.clone();
+    let writer = executor.spawn(
+      async move {
+        store
+          .directory_as_tar_file(inputs_digest, pipe_writer)
+          .await
+      },
+      |e| Err(format!("Writer task failed: {e}").into()),
+    );
+    let copier = executor.spawn(
+      async move {
+        let mut reader = unsafe { tokio::fs::File::from_raw_fd(pipe_reader.as_raw_fd()) };
+        tokio::io::copy(&mut reader, &mut input)
+          .await
+          .map_err(|e| format!("Failed to copy tar file inputs: {e}"))?;
+        input
+          .shutdown()
+          .await
+          .map_err(|e| format!("Failed to flush tar file inputs: {e}"))
+      },
+      |e| Err(format!("Copier task failed: {e}")),
+    );
+    futures::future::try_join(writer, copier.map_err(StoreError::from))
+  };
+
+  // Read output from the execution.
+  let mut output_stdio = Vec::new();
+  while let Some(output_msg_res) = output.next().await {
+    let output_msg = output_msg_res
+      .map_err(|e| format!("Failed to read container output while streaming inputs: {e}"))?;
+    match output_msg {
+      LogOutput::StdOut { message } | LogOutput::StdErr { message } => output_stdio.push(message),
+      _ => {
+        // TODO: Is this going to echo stdin back to us as well?
+      }
+    }
+  }
+
+  input_tasks.await?;
+
+  let exec_metadata = docker.inspect_exec(&exec.id).await.map_err(|err| {
+    format!(
+      "Failed to inspect Docker execution `{}`: {:?}",
+      &exec.id, err
+    )
+  })?;
+
+  let status_code = exec_metadata.exit_code.ok_or_else(|| {
+    format!(
+      "Inspected execution `{}` for exit status but status was missing.",
+      &exec.id
+    )
+  })?;
+
+  if status_code == 0 {
+    Ok(())
+  } else {
+    let last_lines = output_stdio
+      .iter()
+      .rev()
+      .take(5)
+      .rev()
+      .map(|l| String::from_utf8_lossy(l))
+      .collect::<Vec<_>>()
+      .join("");
+    Err(format!("Failed to pipe inputs to container. Trailing output:\n{last_lines:?}").into())
   }
 }
 

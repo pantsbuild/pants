@@ -16,8 +16,9 @@ use testutil::data::{TestData, TestDirectory};
 use testutil::{owned_string_vec, relative_paths};
 use workunit_store::{RunningWorkunit, WorkunitStore};
 
-use super::docker::SANDBOX_BASE_PATH_IN_CONTAINER;
-use crate::docker::{DockerOnceCell, ImagePullCache};
+use crate::docker::{
+  DockerOnceCell, DockerStrategy, ImagePullCache, SANDBOX_BASE_PATH_IN_CONTAINER,
+};
 use crate::local::KeepSandboxes;
 use crate::local_tests::named_caches_and_immutable_inputs;
 use crate::{
@@ -102,9 +103,7 @@ async fn runner_errors_if_docker_image_not_set() {
     .await
     .unwrap_err();
   if let ProcessError::Unclassified(msg) = &err {
-    assert!(
-      msg.contains("The Docker execution strategy was not set on the Process, but the Docker CommandRunner was used")
-    );
+    assert!(msg.ends_with(", but the Docker CommandRunner was used."));
   } else {
     panic!("unexpected value: {err:?}")
   }
@@ -174,7 +173,7 @@ fn extract_env(
   exclude_keys: &[&str],
 ) -> Result<BTreeMap<String, String>, String> {
   let content =
-    String::from_utf8(content).map_err(|_| "Invalid UTF-8 in env output".to_string())?;
+    String::from_utf8(content).map_err(|e| format!("Invalid UTF-8 in env output: {e}"))?;
   let result = content
     .split('\n')
     .filter(|line| !line.is_empty())
@@ -188,6 +187,18 @@ fn extract_env(
     .filter(|x| !exclude_keys.iter().any(|&k| k == x.0))
     .collect();
   Ok(result)
+}
+
+fn extract_ls(content: Vec<u8>) -> Result<Vec<String>, String> {
+  let content =
+    String::from_utf8(content).map_err(|e| format!("Invalid UTF-8 in ls output: {e}"))?;
+  let mut items: Vec<_> = content
+    .split('\n')
+    .filter(|line| !line.is_empty())
+    .map(|line| line.to_owned())
+    .collect();
+  items.sort();
+  Ok(items)
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
@@ -442,6 +453,8 @@ async fn output_overlapping_file_and_dir() {
 async fn append_only_cache_created() {
   skip_if_no_docker_available_in_macos_ci!();
 
+  let _logger = env_logger::try_init();
+
   let name = "geo";
   let dest_base = ".cache";
   let cache_name = CacheName::new(name.to_owned()).unwrap();
@@ -495,6 +508,7 @@ async fn test_chroot_placeholder() {
       .docker(IMAGE.to_owned()),
     work_root.clone(),
     KeepSandboxes::Always,
+    DockerStrategy::Mount,
     &mut workunit,
     None,
     None,
@@ -506,6 +520,53 @@ async fn test_chroot_placeholder() {
   let path = format!("/usr/bin:{SANDBOX_BASE_PATH_IN_CONTAINER}");
   assert!(got_env.get(&"PATH".to_string()).unwrap().starts_with(&path));
   assert!(got_env.get(&"PATH".to_string()).unwrap().ends_with("/bin"));
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_piped_inputs() {
+  skip_if_no_docker_available_in_macos_ci!();
+
+  let (_, mut workunit) = WorkunitStore::setup_for_tests();
+
+  let store_dir = TempDir::new().unwrap();
+  let executor = task_executor::Executor::new();
+  let store = Store::local_only(executor.clone(), store_dir.path()).unwrap();
+
+  store
+    .store_file_bytes(TestData::roland().bytes(), false)
+    .await
+    .expect("Error saving file bytes");
+  store
+    .record_directory(&TestDirectory::containing_roland().directory(), true)
+    .await
+    .expect("Error saving directory");
+
+  let work_tmpdir = TempDir::new().unwrap();
+
+  let mut process = Process::new(vec!["/bin/ls".to_owned()]).docker(IMAGE.to_owned());
+  process.input_digests = InputDigests::new(
+    &store,
+    TestDirectory::containing_roland().directory_digest(),
+    BTreeMap::default(),
+    BTreeSet::default(),
+  )
+  .await
+  .unwrap();
+
+  let result = run_command_via_docker_in_dir(
+    process,
+    work_tmpdir.path().to_owned(),
+    KeepSandboxes::Always,
+    DockerStrategy::Pipe,
+    &mut workunit,
+    Some(store),
+    Some(executor),
+  )
+  .await
+  .unwrap();
+
+  let got_ls = extract_ls(result.stdout_bytes).unwrap();
+  assert_eq!(vec!["roland.ext"], got_ls);
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
@@ -578,7 +639,7 @@ async fn timeout() {
   ];
 
   let mut process = Process::new(argv).docker(IMAGE.to_owned());
-  process.timeout = Some(Duration::from_millis(500));
+  process.timeout = Some(Duration::from_secs(2));
   process.description = "sleepy-cat".to_string();
 
   let result = run_command_via_docker(process).await.unwrap();
@@ -634,6 +695,7 @@ async fn working_directory() {
     process,
     work_dir.path().to_owned(),
     KeepSandboxes::Never,
+    DockerStrategy::Mount,
     &mut workunit,
     Some(store),
     Some(executor),
@@ -703,6 +765,7 @@ async fn immutable_inputs() {
     process,
     work_dir.path().to_owned(),
     KeepSandboxes::Never,
+    DockerStrategy::Mount,
     &mut workunit,
     Some(store),
     Some(executor),
@@ -723,6 +786,7 @@ async fn run_command_via_docker_in_dir(
   mut req: Process,
   dir: PathBuf,
   cleanup: KeepSandboxes,
+  strategy: DockerStrategy,
   workunit: &mut RunningWorkunit,
   store: Option<Store>,
   executor: Option<task_executor::Executor>,
@@ -746,6 +810,7 @@ async fn run_command_via_docker_in_dir(
     named_caches,
     immutable_inputs,
     cleanup,
+    strategy,
   )?;
   let result: Result<_, ProcessError> = async {
     let original = runner.run(Context::default(), workunit, req).await?;
@@ -775,6 +840,7 @@ async fn run_command_via_docker(req: Process) -> Result<LocalTestResult, Process
     req,
     work_dir_path,
     KeepSandboxes::Never,
+    DockerStrategy::Mount,
     &mut workunit,
     None,
     None,
