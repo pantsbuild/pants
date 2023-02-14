@@ -129,7 +129,7 @@ class AdhocToolStdoutFilenameField(StringField):
 class AdhocToolStderrFilenameField(StringField):
     alias = "stderr"
     default = None
-    help = "A filename to capture the contents of `stdout` to, relative to the value of `workdir`."
+    help = "A filename to capture the contents of `stderr` to, relative to the value of `workdir`."
 
 
 class AdhocToolTimeoutField(IntField):
