@@ -27,7 +27,7 @@ from pants.engine.internals.defaults import ParametrizeDefault
 from pants.engine.internals.dep_rules import MaybeBuildFileDependencyRulesImplementation
 from pants.engine.internals.mapper import AddressFamily
 from pants.engine.internals.parametrize import Parametrize
-from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser
+from pants.engine.internals.parser import BuildFilePreludeSymbols, BuildFileSymbolInfo, Parser
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.internals.session import SessionValues
 from pants.engine.internals.synthetic_targets import (
@@ -71,7 +71,7 @@ def test_parse_address_family_empty() -> None:
             ),
             BootstrapStatus(in_progress=False),
             BuildFileOptions(("BUILD",)),
-            BuildFilePreludeSymbols(FrozenDict()),
+            BuildFilePreludeSymbols(FrozenDict(), FrozenDict()),
             AddressFamilyDir("/dev/null"),
             RegisteredTargetTypes({}),
             UnionMembership({}),
@@ -186,6 +186,23 @@ def test_prelude_references_builtin_symbols() -> None:
     # In the real world, this would define the target (note it doesn't need to return, as BUILD files
     # don't). In the test we're just ensuring we don't get a `NameError`
     result.symbols["make_a_target"]()
+
+
+def test_prelude_docstrings() -> None:
+    macro_docstring = "This is the doc-string for `macro_func`."
+    prelude_content = dedent(
+        f"""
+        def macro_func(arg: int) -> str:
+            '''{macro_docstring}'''
+            pass
+        """
+    )
+    result = run_prelude_parsing_rule(prelude_content)
+    info = result.info["macro_func"]
+    assert BuildFileSymbolInfo("macro_func", result.symbols["macro_func"]) == info
+    assert macro_docstring == info.help
+    assert "(arg: int) -> str" == info.signature
+    assert {"macro_func"} == set(result.info)
 
 
 class ResolveField(StringField):

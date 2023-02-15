@@ -42,7 +42,7 @@ def parse_address_map(build_file: str, *, ignore_unrecognized_symbols: bool = Fa
         path,
         build_file,
         parser,
-        BuildFilePreludeSymbols(FrozenDict()),
+        BuildFilePreludeSymbols(FrozenDict(), FrozenDict()),
         EnvironmentVars({}),
         False,
         BuildFileDefaultsParserState.create(

@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import inspect
 import re
 import threading
 import tokenize
@@ -10,7 +11,7 @@ from dataclasses import dataclass
 from difflib import get_close_matches
 from io import StringIO
 from pathlib import PurePath
-from typing import Any, Callable
+from typing import Any, Callable, Mapping
 
 from pants.base.deprecated import warn_or_error
 from pants.base.exceptions import MappingError
@@ -30,6 +31,32 @@ from pants.util.strutil import softwrap
 @dataclass(frozen=True)
 class BuildFilePreludeSymbols:
     symbols: FrozenDict[str, Any]
+    info: FrozenDict[str, BuildFileSymbolInfo]
+
+    @classmethod
+    def from_namespace(cls, ns: Mapping[str, Any]) -> BuildFilePreludeSymbols:
+        info = {}
+        for name, symb in ns.items():
+            if hasattr(symb, "__name__"):
+                info[name] = BuildFileSymbolInfo(name, symb)
+        return cls(symbols=FrozenDict(ns), info=FrozenDict(info))
+
+
+@dataclass(frozen=True)
+class BuildFileSymbolInfo:
+    name: str
+    value: Any
+
+    @property
+    def help(self) -> str | None:
+        return inspect.getdoc(self.value)
+
+    @property
+    def signature(self) -> str | None:
+        if not callable(self.value):
+            return None
+        else:
+            return str(inspect.signature(self.value))
 
 
 class ParseError(Exception):

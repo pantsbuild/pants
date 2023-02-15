@@ -41,7 +41,7 @@ def test_imports_banned(defaults_parser_state: BuildFileDefaultsParserState) -> 
         parser.parse(
             "dir/BUILD",
             "\nx = 'hello'\n\nimport os\n",
-            BuildFilePreludeSymbols(FrozenDict()),
+            BuildFilePreludeSymbols(FrozenDict(), FrozenDict()),
             EnvironmentVars({}),
             False,
             defaults_parser_state,
@@ -67,7 +67,7 @@ def test_unrecognized_symbol(defaults_parser_state: BuildFileDefaultsParserState
             object_aliases=build_file_aliases,
             ignore_unrecognized_symbols=False,
         )
-        prelude_symbols = BuildFilePreludeSymbols(FrozenDict({"prelude": 0}))
+        prelude_symbols = BuildFilePreludeSymbols(FrozenDict({"prelude": 0}), FrozenDict())
         fmt_extra_sym = str(extra_targets)[1:-1] + (", ") if len(extra_targets) != 0 else ""
         with pytest.raises(ParseError) as exc:
             parser.parse(
