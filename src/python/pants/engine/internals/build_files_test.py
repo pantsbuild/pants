@@ -135,7 +135,17 @@ def run_prelude_parsing_rule(prelude_content: str) -> BuildFilePreludeSymbols:
 
 
 def test_prelude_parsing_good() -> None:
-    result = run_prelude_parsing_rule("def foo(): return 1")
+    prelude_content = dedent(
+        """
+        def bar():
+            __defaults__(all=dict(ok=123))
+            return build_file_dir()
+
+        def foo():
+            return 1
+        """
+    )
+    result = run_prelude_parsing_rule(prelude_content)
     assert result.symbols["foo"]() == 1
 
 
@@ -157,6 +167,45 @@ def test_prelude_parsing_illegal_import() -> None:
     with pytest.raises(
         Exception,
         match="Import used in /dev/null/prelude at line 1\\. Import statements are banned",
+    ):
+        run_prelude_parsing_rule(prelude_content)
+
+
+def test_prelude_check_filepath() -> None:
+    prelude_content = dedent(
+        """
+        build_file_dir()
+        """
+    )
+    with pytest.raises(
+        Exception,
+        match="The BUILD file `build_file_dir` may only be used in BUILD files\\. If used",
+    ):
+        run_prelude_parsing_rule(prelude_content)
+
+
+def test_prelude_check_defaults() -> None:
+    prelude_content = dedent(
+        """
+        __defaults__(all=dict(bad=123))
+        """
+    )
+    with pytest.raises(
+        Exception,
+        match="The BUILD file `__defaults__` may only be used in BUILD files\\. If used",
+    ):
+        run_prelude_parsing_rule(prelude_content)
+
+
+def test_prelude_check_env() -> None:
+    prelude_content = dedent(
+        """
+        env("nope")
+        """
+    )
+    with pytest.raises(
+        Exception,
+        match="The BUILD file `env` may only be used in BUILD files\\.$",
     ):
         run_prelude_parsing_rule(prelude_content)
 
