@@ -71,7 +71,7 @@ def test_parse_address_family_empty() -> None:
             ),
             BootstrapStatus(in_progress=False),
             BuildFileOptions(("BUILD",)),
-            BuildFilePreludeSymbols(FrozenDict(), FrozenDict()),
+            BuildFilePreludeSymbols(FrozenDict()),
             AddressFamilyDir("/dev/null"),
             RegisteredTargetTypes({}),
             UnionMembership({}),

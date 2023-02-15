@@ -25,21 +25,24 @@ from pants.engine.target import Field, ImmutableValue, RegisteredTargetTypes
 from pants.engine.unions import UnionMembership
 from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
+from pants.util.memo import memoized_property
 from pants.util.strutil import softwrap
 
 
 @dataclass(frozen=True)
 class BuildFilePreludeSymbols:
-    symbols: FrozenDict[str, Any]
     info: FrozenDict[str, BuildFileSymbolInfo]
+
+    @memoized_property
+    def symbols(self) -> FrozenDict[str, Any]:
+        return FrozenDict({name: symbol.value for name, symbol in self.info.items()})
 
     @classmethod
     def from_namespace(cls, ns: Mapping[str, Any]) -> BuildFilePreludeSymbols:
         info = {}
         for name, symb in ns.items():
-            if hasattr(symb, "__name__"):
-                info[name] = BuildFileSymbolInfo(name, symb)
-        return cls(symbols=FrozenDict(ns), info=FrozenDict(info))
+            info[name] = BuildFileSymbolInfo(name, symb)
+        return cls(info=FrozenDict(info))
 
 
 @dataclass(frozen=True)
@@ -49,7 +52,7 @@ class BuildFileSymbolInfo:
 
     @property
     def help(self) -> str | None:
-        return inspect.getdoc(self.value)
+        return inspect.getdoc(self.value) if hasattr(self.value, "__name__") else None
 
     @property
     def signature(self) -> str | None:
