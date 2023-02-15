@@ -263,16 +263,29 @@ impl RemoteStore {
             .await?
         } else {
           assert!(f_remote.is_none());
-          let dest = local_store
-            .get_temp_immutable_large_file(digest)
-            .await?;
-          let dest_file = dest.clone().open().await?;
+          if ByteStore::uses_large_file_store(digest.size_bytes) {
+            let dest = local_store.get_temp_immutable_large_file(digest).await?;
+            let dest_file = dest.clone().open().await?;
 
-          remote_store
-            .load_file(digest, dest_file)
-            .await?
-            .ok_or_else(create_missing)?;
-          dest.persist().await?;
+            remote_store
+              .load_file(digest, dest_file)
+              .await?
+              .ok_or_else(create_missing)?;
+            dest.persist().await?;
+          } else {
+            // NB: The file is "small", let's just load in memory
+            let bytes = remote_store
+              .load_bytes(digest)
+              .await?
+              .ok_or_else(create_missing)?;
+            if let Some(f_remote) = f_remote {
+              f_remote(bytes.clone())?;
+            }
+            local_store
+              .store_bytes(entry_type, None, bytes, true)
+              .await?;
+          }
+
           digest
         };
         if digest == stored_digest {
