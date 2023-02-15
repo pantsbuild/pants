@@ -3,10 +3,11 @@
 
 from __future__ import annotations
 
-from typing import ClassVar, Iterable, Sequence
+from typing import Any, ClassVar, Iterable, Sequence
 
 from pants.backend.python.target_types import ConsoleScript, EntryPoint, MainSpecification
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
+from pants.backend.python.util_rules.lockfile import LockfileRules
 from pants.backend.python.util_rules.pex import PexRequest
 from pants.backend.python.util_rules.pex_requirements import (
     EntireLockfile,
@@ -52,6 +53,7 @@ class PythonToolRequirementsBase(Subsystem):
     register_lockfile: ClassVar[bool] = False
     default_lockfile_resource: ClassVar[tuple[str, str] | None] = None
     default_lockfile_url: ClassVar[str | None] = None
+    lockfile_rules_type: LockfileRules = LockfileRules.PYTHON
 
     install_from_resolve = StrOption(
         advanced=True,
@@ -260,6 +262,11 @@ class PythonToolRequirementsBase(Subsystem):
             main=main,
             sources=sources,
         )
+
+    @classmethod
+    def rules(cls: Any) -> Iterable[Any]:
+        yield from super().rules()
+        yield from cls.lockfile_rules_type.default_rules(cls)
 
 
 class PythonToolBase(PythonToolRequirementsBase):

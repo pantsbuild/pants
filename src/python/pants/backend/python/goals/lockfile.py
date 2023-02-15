@@ -57,7 +57,7 @@ class GeneratePythonLockfile(GenerateLockfile):
     @classmethod
     def from_tool(
         cls,
-        subsystem: PythonToolRequirementsBase,
+        subsystem: "PythonToolRequirementsBase",
         interpreter_constraints: InterpreterConstraints | None = None,
         extra_requirements: Iterable[str] = (),
     ) -> GeneratePythonLockfile:
