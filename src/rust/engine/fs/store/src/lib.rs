@@ -66,6 +66,7 @@ use protos::require_digest;
 use remexec::{ServerCapabilities, Tree};
 use serde_derive::Serialize;
 use sharded_lmdb::DEFAULT_LEASE_TIME;
+use tokio::io::AsyncWriteExt;
 use tryfuture::try_future;
 use workunit_store::{in_workunit, Level, Metric};
 
@@ -267,10 +268,11 @@ impl RemoteStore {
             let dest = local_store.get_temp_immutable_large_file(digest).await?;
             let dest_file = dest.clone().open().await?;
 
-            remote_store
+            let mut dest_file = remote_store
               .load_file(digest, dest_file)
               .await?
               .ok_or_else(create_missing)?;
+            dest_file.flush().await.map_err(|e| e.to_string())?;
             dest.persist().await?;
           } else {
             // NB: The file is "small", let's just load in memory
@@ -1354,7 +1356,7 @@ impl Store {
           destination,
           self
             .local
-            .large_file_path(digest)
+            .large_file_path(digest.hash)
             .to_str()
             .unwrap()
             .to_string(),

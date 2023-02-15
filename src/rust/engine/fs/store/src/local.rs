@@ -116,18 +116,24 @@ impl ByteStore {
       return Ok(Some(EntryType::Directory));
     }
 
+    async fn exists(path: PathBuf) -> Result<bool, String> {
+      Ok(tokio::fs::File::open(path).await.is_ok())
+    }
+
     // In parallel, check for the given fingerprint in both databases.
     let d_dbs = self.inner.directory_dbs.clone()?;
     let is_dir = d_dbs.exists(fingerprint);
     let f_dbs = self.inner.file_dbs.clone()?;
-    let is_file = f_dbs.exists(fingerprint);
+    let is_dbs_file = f_dbs.exists(fingerprint);
+    let is_immut_file = exists(self.large_file_path(fingerprint));
 
     // TODO: Could technically use select to return slightly more quickly with the first
     // affirmative answer, but this is simpler.
-    match future::try_join(is_dir, is_file).await? {
-      (true, _) => Ok(Some(EntryType::Directory)),
-      (_, true) => Ok(Some(EntryType::File)),
-      (false, false) => Ok(None),
+    match future::try_join3(is_dir, is_dbs_file, is_immut_file).await? {
+      (true, _, _) => Ok(Some(EntryType::Directory)),
+      (_, true, _) => Ok(Some(EntryType::File)),
+      (_, _, true) => Ok(Some(EntryType::File)),
+      (false, false, false) => Ok(None),
     }
   }
 
@@ -377,15 +383,14 @@ impl ByteStore {
   }
 
   /// Assuming uses_large_file_store(digest) is true, return the path inside the store.
-  pub fn large_file_path(&self, digest: Digest) -> PathBuf {
-    assert!(ByteStore::uses_large_file_store(digest.size_bytes));
-    let digest_hash = digest.hash.to_hex();
+  pub fn large_file_path(&self, fingerprint: Fingerprint) -> PathBuf {
+    let hex = fingerprint.to_hex();
     // We use 2-character directories to help shard the files so there isn't a plethora in one single dir.
     self
       .inner
       .large_files_root
-      .join(digest_hash.get(0..2).unwrap())
-      .join(digest_hash)
+      .join(hex.get(0..2).unwrap())
+      .join(hex)
   }
 
   ///
@@ -477,27 +482,29 @@ impl ByteStore {
     }
 
     let res = if ByteStore::uses_large_file_store(digest.size_bytes) {
-      let src = &self.large_file_path(digest);
-      let mut file = tokio::fs::File::open(src)
-        .await
-        .map_err(|e| format!("Failed to read {src:?} for digest {digest:?}: {e}"))?;
-      // @TODO: Use mmap instead of copying into user-space
-      let mut contents: Vec<u8> = vec![];
-      file
-        .read_to_end(&mut contents)
-        .await
-        .map_err(|e| format!("Failed to load large file into memory: {e}"))?;
-      if contents.len() != digest.size_bytes {
-        return Err(format!(
-          "Got hash collision reading from store - digest {:?} was requested, but retrieved \
-              bytes with that fingerprint had length {}. Congratulations, you may have broken \
-              sha256! Underlying bytes: {:?}",
-          digest,
-          contents.len(),
-          contents
-        ));
+      let src = &self.large_file_path(digest.hash);
+      let file_result = tokio::fs::File::open(src).await;
+      if let Ok(mut file) = file_result {
+        // @TODO: Use mmap instead of copying into user-space
+        let mut contents: Vec<u8> = vec![];
+        file
+          .read_to_end(&mut contents)
+          .await
+          .map_err(|e| format!("Failed to load large file into memory: {e}"))?;
+        if contents.len() != digest.size_bytes {
+          return Err(format!(
+            "Got hash collision reading from store - digest {:?} was requested, but retrieved \
+                bytes with that fingerprint had length {}. Congratulations, you may have broken \
+                sha256! Underlying bytes: {:?}",
+            digest,
+            contents.len(),
+            contents
+          ));
+        }
+        Ok(Some(f(&contents[..])))
+      } else {
+        Ok(None)
       }
-      Ok(Some(f(&contents[..])))
     } else {
       let dbs = match entry_type {
         EntryType::Directory => self.inner.directory_dbs.clone(),
@@ -563,7 +570,7 @@ impl ByteStore {
     &self,
     digest: Digest,
   ) -> Result<TempImmutableLargeFile, String> {
-    let dest = self.large_file_path(digest);
+    let dest = self.large_file_path(digest.hash);
     if !dest.parent().unwrap().exists() {
       // Throwaway the result as a way of not worrying about race conditions between multiple
       // threads/processes creating the same parent dirs. If there was an error we'll fail later.

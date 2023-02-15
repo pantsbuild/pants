@@ -191,10 +191,11 @@ async fn load_file_falls_back_and_backfills_for_huge_file() {
     .file(&testdata)
     .build();
 
-  assert!(
-    load_file_bytes(&new_store(dir.path(), &cas.address()), testdata.digest()).await
-      == Ok(testdata.bytes()),
-    "Read from CAS"
+  assert_eq!(
+    load_file_bytes(&new_store(dir.path(), &cas.address()), testdata.digest())
+      .await
+      .unwrap(),
+    testdata.bytes()
   );
   assert_eq!(1, cas.read_request_count());
   assert!(
