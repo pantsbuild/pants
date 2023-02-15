@@ -235,6 +235,7 @@ async def _extract_env_vars(
 @rule(desc="Search for addresses in BUILD files")
 async def parse_address_family(
     parser: Parser,
+    bootstrap_status: BootstrapStatus,
     build_file_options: BuildFileOptions,
     prelude_symbols: BuildFilePreludeSymbols,
     directory: AddressFamilyDir,
@@ -311,6 +312,7 @@ async def parse_address_family(
             parser,
             prelude_symbols,
             env_vars,
+            bootstrap_status.in_progress,
             defaults_parser_state,
             dependents_rules_parser_state,
             dependencies_rules_parser_state,
