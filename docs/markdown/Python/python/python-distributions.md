@@ -64,6 +64,8 @@ Running `pants package example/dists:mydist` will cause Pants to inspect the `[b
 
 If you want to build just a wheel or just an sdist, you can set `sdist=False` or `wheel=False` on the `python_distribution` target.
 
+NOTE - Pants is currently unable to pull 3rd party dependency information from a setup.py file. If you intend to use a python_distribution based on a manually managed setup.py file, you must store your dependencies in another block such as [python_requirements](https://www.pantsbuild.org/docs/reference-python_requirements), [pipenv_requirements](https://www.pantsbuild.org/docs/reference-pipenv_requirements), or [poetry_requirements](https://www.pantsbuild.org/docs/reference-poetry_requirements). 
+
 ### Setuptools
 
 If relying on legacy Setuptools behavior, you don't have a `pyproject.toml` resource, so your target is simply:
