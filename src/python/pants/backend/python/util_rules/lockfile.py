@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Iterable, Type, TypeVar, Protocol
+from typing import TYPE_CHECKING, Iterable, Type
 
 from pants.backend.python.goals import lockfile
 from pants.backend.python.goals.lockfile import GeneratePythonLockfile
@@ -13,21 +13,19 @@ from pants.engine.rules import rule
 from pants.engine.unions import UnionRule
 from pants.util.memo import memoized
 
-
-class PythonToolBase(Protocol):
-    """Projection of necessary fields, avoids import cycle"""
-    options_scope: str
+if TYPE_CHECKING:
+    from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
 
 
 @memoized
-def _pex_simple_lockfile_rules(python_tool: Type[PythonToolBase]) -> Iterable:
+def _pex_simple_lockfile_rules(python_tool: Type["PythonToolRequirementsBase"]) -> Iterable:
     class SimplePexLockfileSentinel(GenerateToolLockfileSentinel):
         resolve_name = python_tool.options_scope
 
     @rule(_param_type_overrides={"request": SimplePexLockfileSentinel, "tool": python_tool})
     async def lockfile_generator(
         request: GenerateToolLockfileSentinel,
-        tool: PythonToolBase,
+        tool: "PythonToolRequirementsBase",
     ) -> GeneratePythonLockfile:
         return GeneratePythonLockfile.from_tool(tool)
 

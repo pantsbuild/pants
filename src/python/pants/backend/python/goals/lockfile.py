@@ -8,10 +8,9 @@ import os.path
 from collections import defaultdict
 from dataclasses import dataclass
 from operator import itemgetter
-from typing import Iterable
+from typing import TYPE_CHECKING, Iterable
 
 from pants.backend.python.pip_requirement import PipRequirement
-from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import PythonRequirementResolveField, PythonRequirementsField
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
@@ -47,6 +46,9 @@ from pants.engine.unions import UnionRule
 from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
+
+if TYPE_CHECKING:
+    from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
 
 
 @dataclass(frozen=True)
