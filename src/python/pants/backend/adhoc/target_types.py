@@ -177,12 +177,16 @@ class AdhocToolWorkdirField(StringField):
     alias = "workdir"
     default = "."
     help = help_text(
-        "Sets the current working directory of the command. \n\n"
-        "Values are relative to the build root, except in the following cases:\n\n"
-        "* `.` specifies the location of the `BUILD` file.\n"
-        "* Values beginning with `./` are relative to the location of the `BUILD` file.\n"
-        "* `/` or the empty string specifies the build root.\n"
-        "* Values beginning with `/` are also relative to the build root."
+        """
+        Sets the current working directory of the command.
+
+        Values are relative to the build root, except in the following cases:
+
+        * `.` specifies the location of the `BUILD` file.
+        * Values beginning with `./` are relative to the location of the `BUILD` file.
+        * `/` or the empty string specifies the build root.
+        * Values beginning with `/` are also relative to the build root.
+        """
     )
 
 
@@ -190,12 +194,15 @@ class AdhocToolOutputRootDirField(StringField):
     alias = "root_output_directory"
     default = "/"
     help = help_text(
-        "Adjusts the location of files output by this command, when consumed as a dependency.\n\n"
-        "Values are relative to the build root, except in the following cases:\n\n"
-        "* `.` specifies the location of the `BUILD` file.\n"
-        "* Values beginning with `./` are relative to the location of the `BUILD` file.\n"
-        "* `/` or the empty string specifies the build root.\n"
-        "* Values beginning with `/` are also relative to the build root."
+        """Adjusts the location of files output by this command, when consumed as a dependency.
+
+        Values are relative to the build root, except in the following cases:
+
+        * `.` specifies the location of the `BUILD` file.
+        * Values beginning with `./` are relative to the location of the `BUILD` file.
+        * `/` or the empty string specifies the build root.
+        * Values beginning with `/` are also relative to the build root.
+        """
     )
 
 
