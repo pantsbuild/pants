@@ -33,7 +33,7 @@ class AddTrailingComma(PythonToolBase):
         "src/python/pants/backend/python/lint/add_trailing_comma/add_trailing_comma.lock"
     )
     default_lockfile_url = git_url(default_lockfile_path)
-    lockfile_rules_type = LockfileRules.PYTHON
+    lockfile_rules_type = LockfileRules.SIMPLE
 
     skip = SkipOption("fmt", "lint")
     args = ArgsListOption(example="--py36-plus")

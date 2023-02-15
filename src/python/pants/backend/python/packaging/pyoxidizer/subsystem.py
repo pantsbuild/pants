@@ -32,7 +32,7 @@ class PyOxidizer(PythonToolBase):
     default_lockfile_resource = ("pants.backend.python.packaging.pyoxidizer", "pyoxidizer.lock")
     default_lockfile_path = "src/python/pants/backend/python/packaging/pyoxidizer/pyoxidizer.lock"
     default_lockfile_url = git_url(default_lockfile_path)
-    lockfile_rules_type = LockfileRules.PYTHON
+    lockfile_rules_type = LockfileRules.SIMPLE
 
     args = ArgsListOption(example="--release")
 

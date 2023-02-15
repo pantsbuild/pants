@@ -38,15 +38,15 @@ class LockfileRules(Enum):
     """The type of lockfile generation strategy to use for a tool.
 
     - CUSTOM : Only Python lockfile rules are added, the rest are implemented by the tool
-    - PYTHON : A tool that can be installed with pip simply with `pip install mytool`.
-        It does not need other information about the code it operates on
+    - SIMPLE : A python tool that can be installed with pip simply with `pip install mytool`.
+        It does not need other information about the code it operates on, such as their interpreter constraints.
     """
 
     CUSTOM = "custom"
-    PYTHON = "python"
+    SIMPLE = "simple"
 
     def default_rules(self, cls) -> Iterable:
-        if self == LockfileRules.PYTHON:
+        if self == LockfileRules.SIMPLE:
             yield from _pex_simple_lockfile_rules(cls)
         else:
             return

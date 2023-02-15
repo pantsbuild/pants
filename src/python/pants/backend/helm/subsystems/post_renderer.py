@@ -58,7 +58,7 @@ class HelmPostRendererSubsystem(PythonToolRequirementsBase):
         f"src/python/{_HELM_POSTRENDERER_PACKAGE.replace('.', '/')}/post_renderer.lock"
     )
     default_lockfile_url = git_url(default_lockfile_path)
-    lockfile_rules_type = LockfileRules.PYTHON
+    lockfile_rules_type = LockfileRules.SIMPLE
 
 
 _HELM_POST_RENDERER_TOOL = "__pants_helm_post_renderer.py"

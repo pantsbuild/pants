@@ -25,7 +25,7 @@ class SetuptoolsSCM(PythonToolBase):
     default_lockfile_resource = ("pants.backend.python.subsystems", "setuptools_scm.lock")
     default_lockfile_path = "src/python/pants/backend/python/subsystems/setuptools_scm.lock"
     default_lockfile_url = git_url(default_lockfile_path)
-    lockfile_rules_type = LockfileRules.PYTHON
+    lockfile_rules_type = LockfileRules.SIMPLE
 
 
 def rules():

@@ -77,7 +77,7 @@ class PythonProtobufMypyPlugin(PythonToolRequirementsBase):
     default_lockfile_resource = ("pants.backend.codegen.protobuf.python", "mypy_protobuf.lock")
     default_lockfile_path = "src/python/pants/backend/codegen/protobuf/python/mypy_protobuf.lock"
     default_lockfile_url = git_url(default_lockfile_path)
-    lockfile_rules_type = LockfileRules.PYTHON
+    lockfile_rules_type = LockfileRules.SIMPLE
 
 
 @dataclass(frozen=True)

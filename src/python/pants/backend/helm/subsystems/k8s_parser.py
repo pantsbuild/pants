@@ -44,7 +44,7 @@ class HelmKubeParserSubsystem(PythonToolRequirementsBase):
         f"src/python/{_HELM_K8S_PARSER_PACKAGE.replace('.', '/')}/k8s_parser.lock"
     )
     default_lockfile_url = git_url(default_lockfile_path)
-    lockfile_rules_type = LockfileRules.PYTHON
+    lockfile_rules_type = LockfileRules.SIMPLE
 
 
 @dataclass(frozen=True)

@@ -42,7 +42,7 @@ class ClangFormat(PythonToolBase):
     default_lockfile_resource = ("pants.backend.cc.lint.clangformat", "clangformat.lock")
     default_lockfile_path = "src/python/pants/backend/cc/lint/clangformat/clangformat.lock"
     default_lockfile_url = git_url(default_lockfile_path)
-    lockfile_rules_type = LockfileRules.PYTHON
+    lockfile_rules_type = LockfileRules.SIMPLE
 
     export = ExportToolOption()
 

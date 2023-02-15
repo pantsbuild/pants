@@ -27,7 +27,7 @@ class Docformatter(PythonToolBase):
     default_lockfile_resource = ("pants.backend.python.lint.docformatter", "docformatter.lock")
     default_lockfile_path = "src/python/pants/backend/python/lint/docformatter/docformatter.lock"
     default_lockfile_url = git_url(default_lockfile_path)
-    lockfile_rules_type = LockfileRules.PYTHON
+    lockfile_rules_type = LockfileRules.SIMPLE
 
     skip = SkipOption("fmt", "lint")
     args = ArgsListOption(example="--wrap-summaries=100 --pre-summary-newline")
