@@ -42,7 +42,7 @@ class AdhocToolOutputFilesField(StringSequenceField):
     default = ()
     help = help_text(
         lambda: f"""
-        Specify the shell command's output files to capture, relative to the value of
+        Specify the output files to capture, relative to the value of
         `{AdhocToolWorkdirField.alias}`.
 
         For directories, use `{AdhocToolOutputDirectoriesField.alias}`. At least one of
@@ -61,8 +61,8 @@ class AdhocToolOutputDirectoriesField(StringSequenceField):
     default = ()
     help = help_text(
         lambda: f"""
-        Specify full directories (including recursive descendants) of output to capture from the
-        shell command, relative to the value of `{AdhocToolWorkdirField.alias}`.
+        Specify full directories (including recursive descendants) of output to capture, relative
+        to the value of `{AdhocToolWorkdirField.alias}`.
 
         For individual files, use `{AdhocToolOutputFilesField.alias}`. At least one of
         `{AdhocToolOutputFilesField.alias}` and`{AdhocToolOutputDirectoriesField.alias}` must be
@@ -85,8 +85,8 @@ class AdhocToolOutputDependenciesField(AdhocToolDependenciesField):
         Any dependencies that the output artifacts require in order to be effectively consumed.
 
         To enable legacy use cases, if `{AdhocToolExecutionDependenciesField.alias}` is `None`,
-        these dependencies will be materialized in the command execution sandbox. This behavior
-        is deprecated, and will be removed in version 2.17.0.dev0.
+        these dependencies will be materialized in the execution sandbox. This behavior is
+        deprecated, and will be removed in version 2.17.0.dev0.
         """
     )
 
@@ -98,7 +98,7 @@ class AdhocToolExecutionDependenciesField(SpecialCasedDependencies):
 
     help = help_text(
         lambda: f"""
-        The execution dependencies for this shell command.
+        The execution dependencies for this command.
 
         Dependencies specified here are those required to make the command complete successfully
         (e.g. file inputs, binaries compiled from other targets, etc), but NOT required to make
@@ -160,7 +160,8 @@ class AdhocToolExtraEnvVarsField(StringSequenceField):
     alias = "extra_env_vars"
     help = help_text(
         """
-        Additional environment variables to include in the shell process.
+        Additional environment variables to provide to the process.
+
         Entries are strings in the form `ENV_VAR=value` to use explicitly; or just
         `ENV_VAR` to copy the value of a variable in Pants's own environment.
         """
@@ -170,7 +171,7 @@ class AdhocToolExtraEnvVarsField(StringSequenceField):
 class AdhocToolLogOutputField(BoolField):
     alias = "log_output"
     default = False
-    help = "Set to true if you want the output from the command logged to the console."
+    help = "Set to true if you want the output logged to the console."
 
 
 class AdhocToolWorkdirField(StringField):
@@ -178,7 +179,7 @@ class AdhocToolWorkdirField(StringField):
     default = "."
     help = help_text(
         """
-        Sets the current working directory of the command.
+        Sets the working directory for the process.
 
         Values are relative to the build root, except in the following cases:
 
@@ -194,7 +195,7 @@ class AdhocToolOutputRootDirField(StringField):
     alias = "root_output_directory"
     default = "/"
     help = help_text(
-        """Adjusts the location of files output by this command, when consumed as a dependency.
+        """Adjusts the location of files output by this target, when consumed as a dependency.
 
         Values are relative to the build root, except in the following cases:
 
