@@ -3,15 +3,10 @@
 
 from __future__ import annotations
 
-from pants.backend.python.goals import lockfile
 from pants.backend.python.goals.export import ExportPythonTool, ExportPythonToolSentinel
-from pants.backend.python.goals.lockfile import (
-    GeneratePythonLockfile,
-    GeneratePythonToolLockfileSentinel,
-)
 from pants.backend.python.subsystems.python_tool_base import ExportToolOption, PythonToolBase
 from pants.backend.python.target_types import ConsoleScript
-from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
+from pants.backend.python.util_rules.lockfile import LockfileRules
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.option.option_types import ArgsListOption, SkipOption
@@ -33,6 +28,7 @@ class Autoflake(PythonToolBase):
     default_lockfile_resource = ("pants.backend.python.lint.autoflake", "autoflake.lock")
     default_lockfile_path = "src/python/pants/backend/python/lint/autoflake/autoflake.lock"
     default_lockfile_url = git_url(default_lockfile_path)
+    lockfile_rules_type = LockfileRules.PYTHON
 
     skip = SkipOption("fmt", "lint")
     args = ArgsListOption(
@@ -43,17 +39,6 @@ class Autoflake(PythonToolBase):
         default=["--remove-all-unused-imports"],
     )
     export = ExportToolOption()
-
-
-class AutoflakeLockfileSentinel(GeneratePythonToolLockfileSentinel):
-    resolve_name = Autoflake.options_scope
-
-
-@rule()
-async def setup_autoflake_lockfile(
-    _: AutoflakeLockfileSentinel, autoflake: Autoflake
-) -> GeneratePythonLockfile:
-    return GeneratePythonLockfile.from_tool(autoflake)
 
 
 class AutoflakeExportSentinel(ExportPythonToolSentinel):
@@ -72,7 +57,5 @@ def autoflake_export(_: AutoflakeExportSentinel, autoflake: Autoflake) -> Export
 def rules():
     return (
         *collect_rules(),
-        *lockfile.rules(),
-        UnionRule(GenerateToolLockfileSentinel, AutoflakeLockfileSentinel),
         UnionRule(ExportPythonToolSentinel, AutoflakeExportSentinel),
     )

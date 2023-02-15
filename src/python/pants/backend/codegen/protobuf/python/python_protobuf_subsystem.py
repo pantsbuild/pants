@@ -10,14 +10,9 @@ from pants.backend.codegen.protobuf.target_types import (
 )
 from pants.backend.codegen.utils import find_python_runtime_library_or_raise_error
 from pants.backend.python.dependency_inference.module_mapper import ThirdPartyPythonModuleMapping
-from pants.backend.python.goals import lockfile
-from pants.backend.python.goals.lockfile import (
-    GeneratePythonLockfile,
-    GeneratePythonToolLockfileSentinel,
-)
 from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
 from pants.backend.python.subsystems.setup import PythonSetup
-from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
+from pants.backend.python.util_rules.lockfile import LockfileRules
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import FieldSet, InferDependenciesRequest, InferredDependencies
 from pants.engine.unions import UnionRule
@@ -82,17 +77,7 @@ class PythonProtobufMypyPlugin(PythonToolRequirementsBase):
     default_lockfile_resource = ("pants.backend.codegen.protobuf.python", "mypy_protobuf.lock")
     default_lockfile_path = "src/python/pants/backend/codegen/protobuf/python/mypy_protobuf.lock"
     default_lockfile_url = git_url(default_lockfile_path)
-
-
-class MypyProtobufLockfileSentinel(GeneratePythonToolLockfileSentinel):
-    resolve_name = PythonProtobufMypyPlugin.options_scope
-
-
-@rule
-def setup_mypy_protobuf_lockfile(
-    _: MypyProtobufLockfileSentinel, mypy_protobuf: PythonProtobufMypyPlugin
-) -> GeneratePythonLockfile:
-    return GeneratePythonLockfile.from_tool(mypy_protobuf)
+    lockfile_rules_type = LockfileRules.PYTHON
 
 
 @dataclass(frozen=True)
@@ -159,7 +144,5 @@ async def infer_dependencies(
 def rules():
     return [
         *collect_rules(),
-        *lockfile.rules(),
         UnionRule(InferDependenciesRequest, InferPythonProtobufDependencies),
-        UnionRule(GenerateToolLockfileSentinel, MypyProtobufLockfileSentinel),
     ]

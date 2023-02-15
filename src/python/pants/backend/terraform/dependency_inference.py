@@ -5,18 +5,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import PurePath
 
-from pants.backend.python.goals import lockfile
-from pants.backend.python.goals.lockfile import (
-    GeneratePythonLockfile,
-    GeneratePythonToolLockfileSentinel,
-)
 from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
 from pants.backend.python.target_types import EntryPoint
+from pants.backend.python.util_rules.lockfile import LockfileRules
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.backend.terraform.target_types import TerraformModuleSourcesField
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.base.specs import DirGlobSpec, RawSpecs
-from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.engine.fs import CreateDigest, Digest, FileContent
 from pants.engine.internals.selectors import Get
 from pants.engine.process import Process, ProcessResult
@@ -50,17 +45,7 @@ class TerraformHcl2Parser(PythonToolRequirementsBase):
     default_lockfile_resource = ("pants.backend.terraform", "hcl2.lock")
     default_lockfile_path = "src/python/pants/backend/terraform/hcl2.lock"
     default_lockfile_url = git_url(default_lockfile_path)
-
-
-class TerraformHcl2ParserLockfileSentinel(GeneratePythonToolLockfileSentinel):
-    resolve_name = TerraformHcl2Parser.options_scope
-
-
-@rule
-def setup_lockfile_request(
-    _: TerraformHcl2ParserLockfileSentinel, hcl2_parser: TerraformHcl2Parser
-) -> GeneratePythonLockfile:
-    return GeneratePythonLockfile.from_tool(hcl2_parser)
+    lockfile_rules_type = LockfileRules.PYTHON
 
 
 @dataclass(frozen=True)
@@ -163,7 +148,5 @@ async def infer_terraform_module_dependencies(
 def rules():
     return [
         *collect_rules(),
-        *lockfile.rules(),
         UnionRule(InferDependenciesRequest, InferTerraformModuleDependenciesRequest),
-        UnionRule(GenerateToolLockfileSentinel, TerraformHcl2ParserLockfileSentinel),
     ]
