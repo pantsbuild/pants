@@ -39,6 +39,7 @@ class AddressMap:
         build_file_content: str,
         parser: Parser,
         extra_symbols: BuildFilePreludeSymbols,
+        is_bootstrap: bool,
         defaults: BuildFileDefaultsParserState,
     ) -> AddressMap:
         """Parses a source for targets.
@@ -47,7 +48,9 @@ class AddressMap:
         the same namespace but from a separate source are left as unresolved pointers.
         """
         try:
-            target_adaptors = parser.parse(filepath, build_file_content, extra_symbols, defaults)
+            target_adaptors = parser.parse(
+                filepath, build_file_content, extra_symbols, is_bootstrap, defaults
+            )
         except Exception as e:
             raise MappingError(f"Failed to parse ./{filepath}:\n{e}")
         return cls.create(filepath, target_adaptors)

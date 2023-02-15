@@ -39,6 +39,7 @@ def test_imports_banned(defaults_parser_state: BuildFileDefaultsParserState) -> 
             "dir/BUILD",
             "\nx = 'hello'\n\nimport os\n",
             BuildFilePreludeSymbols(FrozenDict()),
+            False,
             defaults_parser_state,
         )
     assert "Import used in dir/BUILD at line 4" in str(exc.value)
@@ -64,6 +65,7 @@ def test_unrecognized_symbol(defaults_parser_state: BuildFileDefaultsParserState
                 "dir/BUILD",
                 "fake",
                 prelude_symbols,
+                False,
                 defaults_parser_state,
             )
         assert str(exc.value) == (
@@ -86,6 +88,7 @@ def test_unrecognized_symbol(defaults_parser_state: BuildFileDefaultsParserState
                 "dir/BUILD",
                 "fake",
                 prelude_symbols,
+                False,
                 defaults_parser_state,
             )
 

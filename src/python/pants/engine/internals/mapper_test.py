@@ -40,6 +40,7 @@ def parse_address_map(build_file: str, *, ignore_unrecognized_symbols: bool = Fa
         build_file,
         parser,
         BuildFilePreludeSymbols(FrozenDict()),
+        False,
         BuildFileDefaultsParserState.create(
             "", BuildFileDefaults({}), RegisteredTargetTypes({}), UnionMembership({})
         ),

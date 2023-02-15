@@ -41,8 +41,12 @@ class ParseState(threading.local):
         self._defaults: BuildFileDefaultsParserState | None = None
         self._rel_path: str | None = None
         self._target_adapters: list[TargetAdaptor] = []
+        self._is_bootstrap: bool | None = None
 
-    def reset(self, rel_path: str, defaults: BuildFileDefaultsParserState) -> None:
+    def reset(
+        self, rel_path: str, is_bootstrap: bool, defaults: BuildFileDefaultsParserState
+    ) -> None:
+        self._is_bootstrap = is_bootstrap
         self._defaults = defaults
         self._rel_path = rel_path
         self._target_adapters.clear()
@@ -72,8 +76,21 @@ class ParseState(threading.local):
             )
         return self._defaults
 
-    def set_defaults(self, *args: SetDefaultsT, **kwargs) -> None:
-        self.defaults.set_defaults(*args, **kwargs)
+    @property
+    def is_bootstrap(self) -> bool:
+        if self._is_bootstrap is None:
+            raise AssertionError(
+                "Internal error in Pants. Please file a bug report at "
+                "https://github.com/pantsbuild/pants/issues/new"
+            )
+        return self._is_bootstrap
+
+    def set_defaults(
+        self, *args: SetDefaultsT, ignore_unknown_fields: bool = False, **kwargs
+    ) -> None:
+        self.defaults.set_defaults(
+            *args, ignore_unknown_fields=self.is_bootstrap or ignore_unknown_fields, **kwargs
+        )
 
 
 class Parser:
@@ -153,9 +170,12 @@ class Parser:
         filepath: str,
         build_file_content: str,
         extra_symbols: BuildFilePreludeSymbols,
+        is_bootstrap: bool,
         defaults: BuildFileDefaultsParserState,
     ) -> list[TargetAdaptor]:
-        self._parse_state.reset(rel_path=os.path.dirname(filepath), defaults=defaults)
+        self._parse_state.reset(
+            rel_path=os.path.dirname(filepath), is_bootstrap=is_bootstrap, defaults=defaults
+        )
 
         global_symbols = {**self._symbols, **extra_symbols.symbols}
 
@@ -174,7 +194,11 @@ class Parser:
                     defined_symbols.add(bad_symbol)
 
                     global_symbols[bad_symbol] = _unrecognized_symbol_func
-                    self._parse_state.reset(rel_path=os.path.dirname(filepath), defaults=defaults)
+                    self._parse_state.reset(
+                        rel_path=os.path.dirname(filepath),
+                        is_bootstrap=is_bootstrap,
+                        defaults=defaults,
+                    )
                     continue
                 break
 

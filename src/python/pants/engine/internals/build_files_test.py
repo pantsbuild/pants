@@ -39,6 +39,7 @@ from pants.engine.target import (
     Target,
 )
 from pants.engine.unions import UnionMembership
+from pants.init.bootstrap_scheduler import BootstrapStatus
 from pants.testutil.rule_runner import (
     MockGet,
     QueryRule,
@@ -60,6 +61,7 @@ def test_parse_address_family_empty() -> None:
                 object_aliases=BuildFileAliases(),
                 ignore_unrecognized_symbols=False,
             ),
+            BootstrapStatus(in_progress=False),
             BuildFileOptions(("BUILD",)),
             BuildFilePreludeSymbols(FrozenDict()),
             AddressFamilyDir("/dev/null"),
@@ -493,3 +495,25 @@ def test_macro_undefined_symbol_bootstrap() -> None:
     # Parse the root BUILD file.
     address_family = rule_runner.request(AddressFamily, [AddressFamilyDir("")])
     assert not address_family.name_to_target_adaptors
+
+
+def test_default_plugin_field_bootstrap() -> None:
+    # Tests that an unknown field in `__defaults__` is ignored while bootstrapping.
+    rule_runner = RuleRunner(
+        rules=[QueryRule(AddressFamily, [AddressFamilyDir])],
+        target_types=[MockTgt],
+        is_bootstrap=True,
+    )
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """
+                __defaults__({mock_tgt: dict(presumably_plugin_field="default", tags=["ok"])})
+                """
+            ),
+        }
+    )
+
+    # Parse the root BUILD file.
+    address_family = rule_runner.request(AddressFamily, [AddressFamilyDir("")])
+    assert dict(tags=("ok",)) == dict(address_family.defaults["mock_tgt"])

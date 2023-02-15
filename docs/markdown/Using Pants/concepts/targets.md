@@ -167,7 +167,7 @@ Use the `all` keyword argument to provide default field values that should apply
 
 The `extend=True` keyword argument allows to add to any existing default field values set by a previous `__defaults__` call rather than replacing them.
 
-Default fields and values are validated against their target types, except when provided using the `all` keyword, in which case only values for fields applicable to each target are validated.
+Default fields and values are validated against their target types, except when provided using the `all` keyword, in which case only values for fields applicable to each target are validated. Use `ignore_unknown_fields=True` to ignore invalid fields.
 
 This means, that it is legal to provide a default value for `all` targets, even if it is only a subset of targets that actually supports that particular field.
 
@@ -199,6 +199,21 @@ To reset any modified defaults, simply override with the empty dict:
 ```python src/example/nodefaults/BUILD
     __defaults__(all={})
 ```
+
+Supporting optional plugin fields
+---------------------------------
+
+Normally Pants presents an error message when attempting to provide a default value for a field that doesn't exist for the target. However, some fields comes from plugins, and to support disabling a plugin without having to remove any default values referencing any plugin fields it was providing, there is a `ignore_unknown_fields` option to use:
+
+```python example/BUILD
+    __defaults__(
+      {
+        # Defaults...
+      },
+      ignore_unknown_fields=True,
+    )
+```
+
 
 Target generation
 =================

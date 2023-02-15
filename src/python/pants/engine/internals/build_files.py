@@ -160,6 +160,7 @@ async def ensure_address_family(request: OptionalAddressFamily) -> AddressFamily
 @rule(desc="Search for addresses in BUILD files")
 async def parse_address_family(
     parser: Parser,
+    bootstrap_status: BootstrapStatus,
     build_file_options: BuildFileOptions,
     prelude_symbols: BuildFilePreludeSymbols,
     directory: AddressFamilyDir,
@@ -203,7 +204,12 @@ async def parse_address_family(
     )
     address_maps = [
         AddressMap.parse(
-            fc.path, fc.content.decode(), parser, prelude_symbols, defaults_parser_state
+            fc.path,
+            fc.content.decode(),
+            parser,
+            prelude_symbols,
+            bootstrap_status.in_progress,
+            defaults_parser_state,
         )
         for fc in digest_contents
     ]
