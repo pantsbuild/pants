@@ -9,7 +9,7 @@
 //     "CPython<3.10,>=3.7"
 //   ],
 //   "generated_with_requirements": [
-//     "lambdex==0.1.8"
+//     "lambdex==0.1.9"
 //   ],
 //   "manylinux": "manylinux2014",
 //   "requirement_constraints": [],
@@ -31,13 +31,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "38bb16c0b3322b84e18062468344475c65bc0a79693727477477576c229aeefb",
-              "url": "https://files.pythonhosted.org/packages/ec/aa/e265e9b42db08d85e36b84428b3118a702f8bbc3c6bbde96ac363bf927fa/lambdex-0.1.8-py2.py3-none-any.whl"
+              "hash": "a92dd8191ddbacbe6048ea4b78b30c90a1dd50a515d8a3c49e55629637ae6eff",
+              "url": "https://files.pythonhosted.org/packages/20/89/05c73da172c510299869e904543825222ffa990b719ffaba4bce2d1be0c4/lambdex-0.1.9-py2.py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "f2f542b3e0cea7ac49ff6472dafd8330b7883de6f62438c23e1fc986e9cc4f27",
-              "url": "https://files.pythonhosted.org/packages/ef/81/87dcfe5534096ae67bd92ad5deefa00b761d95e54b21d879fe3624ed74c4/lambdex-0.1.8.tar.gz"
+              "hash": "0000f89a9322f95b88a8d756fc88bd5d34a491b63e779aa7cc29972debdbd94a",
+              "url": "https://files.pythonhosted.org/packages/d0/be/178cf646ec16fbaed37e60c3d1394a2e7dab4462fcc83bbd758b26cd0acd/lambdex-0.1.9.tar.gz"
             }
           ],
           "project_name": "lambdex",
@@ -48,7 +48,7 @@
             "pex>=1.1.15"
           ],
           "requires_python": "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,!=3.5.*,<3.12,>=2.7",
-          "version": "0.1.8"
+          "version": "0.1.9"
         },
         {
           "artifacts": [
@@ -79,7 +79,7 @@
   "pip_version": "20.3.4-patched",
   "prefer_older_binary": false,
   "requirements": [
-    "lambdex==0.1.8"
+    "lambdex==0.1.9"
   ],
   "requires_python": [
     "<3.10,>=3.7"
