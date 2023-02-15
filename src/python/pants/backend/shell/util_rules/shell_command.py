@@ -12,27 +12,30 @@ from pants.backend.shell.subsystems.shell_setup import ShellSetup
 from pants.backend.shell.target_types import (
     RunShellCommandWorkdirField,
     ShellCommandCommandField,
+    ShellCommandExecutionDependenciesField,
     ShellCommandExtraEnvVarsField,
     ShellCommandLogOutputField,
+    ShellCommandOutputDependenciesField,
+    ShellCommandOutputDirectoriesField,
+    ShellCommandOutputFilesField,
     ShellCommandOutputRootDirField,
+    ShellCommandOutputsField,
     ShellCommandSourcesField,
     ShellCommandTarget,
     ShellCommandTimeoutField,
     ShellCommandToolsField,
     ShellCommandWorkdirField,
 )
-from pants.backend.shell.util_rules.adhoc_process_support import (
-    AdhocProcessRequest,
-    AdhocProcessResult,
-    _execution_environment_from_dependencies,
-    _parse_outputs_from_command,
-)
-from pants.backend.shell.util_rules.adhoc_process_support import (
-    rules as adhoc_process_support_rules,
-)
 from pants.backend.shell.util_rules.builtin import BASH_BUILTIN_COMMANDS
 from pants.core.goals.run import RunFieldSet, RunInSandboxBehavior, RunRequest
 from pants.core.target_types import FileSourceField
+from pants.core.util_rules.adhoc_process_support import (
+    AdhocProcessRequest,
+    AdhocProcessResult,
+    ResolvedExecutionDependencies,
+    ResolveExecutionDependenciesRequest,
+)
+from pants.core.util_rules.adhoc_process_support import rules as adhoc_process_support_rules
 from pants.core.util_rules.environments import EnvironmentNameRequest
 from pants.core.util_rules.system_binaries import BashBinary, BinaryShims, BinaryShimsRequest
 from pants.engine.environment import EnvironmentName
@@ -80,7 +83,15 @@ async def _prepare_process_request_from_target(
     if not command:
         raise ValueError(f"Missing `command` line in `{description}.")
 
-    dependencies_digest = await _execution_environment_from_dependencies(shell_command)
+    execution_environment = await Get(
+        ResolvedExecutionDependencies,
+        ResolveExecutionDependenciesRequest(
+            shell_command.address,
+            shell_command.get(ShellCommandExecutionDependenciesField).value,
+            shell_command.get(ShellCommandOutputDependenciesField).value,
+        ),
+    )
+    dependencies_digest = execution_environment.digest
 
     output_files, output_directories = _parse_outputs_from_command(shell_command, description)
 
@@ -117,6 +128,24 @@ async def _prepare_process_request_from_target(
         log_on_process_errors=_LOG_ON_PROCESS_ERRORS,
         log_output=shell_command[ShellCommandLogOutputField].value,
     )
+
+
+def _parse_outputs_from_command(
+    adhoc_process_target: Target, description: str
+) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    outputs = adhoc_process_target.get(ShellCommandOutputsField).value or ()
+    output_files = adhoc_process_target.get(ShellCommandOutputFilesField).value or ()
+    output_directories = adhoc_process_target.get(ShellCommandOutputDirectoriesField).value or ()
+    if outputs and (output_files or output_directories):
+        raise ValueError(
+            "Both new-style `output_files` or `output_directories` and old-style `outputs` were "
+            f"specified in {description}. To fix, move all values from `outputs` to "
+            "`output_files` or `output_directories`."
+        )
+    elif outputs:
+        output_files = tuple(f for f in outputs if not f.endswith("/"))
+        output_directories = tuple(d for d in outputs if d.endswith("/"))
+    return output_files, output_directories
 
 
 @rule
@@ -192,8 +221,15 @@ async def _interactive_shell_command(
         "CHROOT": "{chroot}",
     }
 
-    # Needed to ensure that underlying filesystem does not change during run
-    dependencies_digest = await _execution_environment_from_dependencies(shell_command)
+    execution_environment = await Get(
+        ResolvedExecutionDependencies,
+        ResolveExecutionDependenciesRequest(
+            shell_command.address,
+            shell_command.get(ShellCommandExecutionDependenciesField).value,
+            shell_command.get(ShellCommandOutputDependenciesField).value,
+        ),
+    )
+    dependencies_digest = execution_environment.digest
 
     _working_directory = working_directory or "."
     relpath = os.path.relpath(

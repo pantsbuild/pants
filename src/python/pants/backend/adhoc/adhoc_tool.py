@@ -4,28 +4,30 @@ from __future__ import annotations
 
 import logging
 
-from pants.backend.shell.target_types import (
-    RunInSandboxArgumentsField,
-    RunInSandboxRunnableField,
-    RunInSandboxSourcesField,
-    RunInSandboxStderrFilenameField,
-    RunInSandboxStdoutFilenameField,
-    ShellCommandLogOutputField,
-    ShellCommandOutputRootDirField,
-    ShellCommandWorkdirField,
-)
-from pants.backend.shell.util_rules.adhoc_process_support import (
-    AdhocProcessRequest,
-    AdhocProcessResult,
-    _execution_environment_from_dependencies,
-    _parse_outputs_from_command,
-)
-from pants.backend.shell.util_rules.adhoc_process_support import (
-    rules as adhoc_process_support_rules,
+from pants.backend.adhoc.target_types import (
+    AdhocToolArgumentsField,
+    AdhocToolExecutionDependenciesField,
+    AdhocToolLogOutputField,
+    AdhocToolOutputDependenciesField,
+    AdhocToolOutputDirectoriesField,
+    AdhocToolOutputFilesField,
+    AdhocToolOutputRootDirField,
+    AdhocToolRunnableField,
+    AdhocToolSourcesField,
+    AdhocToolStderrFilenameField,
+    AdhocToolStdoutFilenameField,
+    AdhocToolWorkdirField,
 )
 from pants.build_graph.address import Address, AddressInput
 from pants.core.goals.run import RunFieldSet, RunInSandboxRequest
 from pants.core.target_types import FileSourceField
+from pants.core.util_rules.adhoc_process_support import (
+    AdhocProcessRequest,
+    AdhocProcessResult,
+    ResolvedExecutionDependencies,
+    ResolveExecutionDependenciesRequest,
+)
+from pants.core.util_rules.adhoc_process_support import rules as adhoc_process_support_rules
 from pants.core.util_rules.environments import EnvironmentNameRequest
 from pants.engine.addresses import Addresses
 from pants.engine.environment import EnvironmentName
@@ -45,14 +47,14 @@ from pants.util.logging import LogLevel
 logger = logging.getLogger(__name__)
 
 
-class GenerateFilesFromRunInSandboxRequest(GenerateSourcesRequest):
-    input = RunInSandboxSourcesField
+class GenerateFilesFromAdhocToolRequest(GenerateSourcesRequest):
+    input = AdhocToolSourcesField
     output = FileSourceField
 
 
 @rule(desc="Running run_in_sandbox target", level=LogLevel.DEBUG)
 async def run_in_sandbox_request(
-    request: GenerateFilesFromRunInSandboxRequest,
+    request: GenerateFilesFromAdhocToolRequest,
 ) -> GeneratedSources:
     target = request.protocol_target
     description = f"the `{target.alias}` at {target.address}"
@@ -60,7 +62,7 @@ async def run_in_sandbox_request(
         EnvironmentName, EnvironmentNameRequest, EnvironmentNameRequest.from_target(target)
     )
 
-    runnable_address_str = target[RunInSandboxRunnableField].value
+    runnable_address_str = target[AdhocToolRunnableField].value
     if not runnable_address_str:
         raise Exception(f"Must supply a value for `runnable` for {description}.")
 
@@ -70,7 +72,7 @@ async def run_in_sandbox_request(
         AddressInput.parse(
             runnable_address_str,
             relative_to=target.address.spec_path,
-            description_of_origin=f"The `{RunInSandboxRunnableField.alias}` field of {description}",
+            description_of_origin=f"The `{AdhocToolRunnableField.alias}` field of {description}",
         ),
     )
 
@@ -83,8 +85,8 @@ async def run_in_sandbox_request(
     )
     run_field_set: RunFieldSet = field_sets.field_sets[0]
 
-    working_directory = target[ShellCommandWorkdirField].value or ""
-    root_output_directory = target[ShellCommandOutputRootDirField].value or ""
+    working_directory = target[AdhocToolWorkdirField].value or ""
+    root_output_directory = target[AdhocToolOutputRootDirField].value or ""
 
     # Must be run in target environment so that the binaries/envvars match the execution
     # environment when we actually run the process.
@@ -92,13 +94,22 @@ async def run_in_sandbox_request(
         RunInSandboxRequest, {environment_name: EnvironmentName, run_field_set: RunFieldSet}
     )
 
-    dependencies_digest = await _execution_environment_from_dependencies(target)
+    execution_environment = await Get(
+        ResolvedExecutionDependencies,
+        ResolveExecutionDependenciesRequest(
+            target.address,
+            target.get(AdhocToolExecutionDependenciesField).value,
+            target.get(AdhocToolOutputDependenciesField).value,
+        ),
+    )
+    dependencies_digest = execution_environment.digest
 
     input_digest = await Get(Digest, MergeDigests((dependencies_digest, run_request.digest)))
 
-    output_files, output_directories = _parse_outputs_from_command(target, description)
+    output_files = target.get(AdhocToolOutputFilesField).value or ()
+    output_directories = target.get(AdhocToolOutputDirectoriesField).value or ()
 
-    extra_args = target.get(RunInSandboxArgumentsField).value or ()
+    extra_args = target.get(AdhocToolArgumentsField).value or ()
 
     process_request = AdhocProcessRequest(
         description=description,
@@ -115,7 +126,7 @@ async def run_in_sandbox_request(
         fetch_env_vars=(),
         supplied_env_var_values=FrozenDict(**run_request.extra_env),
         log_on_process_errors=None,
-        log_output=target[ShellCommandLogOutputField].value,
+        log_output=target[AdhocToolLogOutputField].value,
     )
 
     adhoc_result = await Get(
@@ -130,8 +141,8 @@ async def run_in_sandbox_request(
     adjusted = adhoc_result.adjusted_digest
 
     extras = (
-        (target[RunInSandboxStdoutFilenameField].value, result.stdout),
-        (target[RunInSandboxStderrFilenameField].value, result.stderr),
+        (target[AdhocToolStdoutFilenameField].value, result.stdout),
+        (target[AdhocToolStderrFilenameField].value, result.stderr),
     )
     extra_contents = {i: j for i, j in extras if i}
 
@@ -150,5 +161,5 @@ def rules():
     return [
         *collect_rules(),
         *adhoc_process_support_rules(),
-        UnionRule(GenerateSourcesRequest, GenerateFilesFromRunInSandboxRequest),
+        UnionRule(GenerateSourcesRequest, GenerateFilesFromAdhocToolRequest),
     ]

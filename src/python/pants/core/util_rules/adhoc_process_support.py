@@ -6,18 +6,10 @@ import dataclasses
 import itertools
 import logging
 import os
-import re
 import shlex
 from dataclasses import dataclass
 from typing import Union
 
-from pants.backend.shell.target_types import (
-    ShellCommandExecutionDependenciesField,
-    ShellCommandOutputDependenciesField,
-    ShellCommandOutputDirectoriesField,
-    ShellCommandOutputFilesField,
-    ShellCommandOutputsField,
-)
 from pants.base.deprecated import warn_or_error
 from pants.build_graph.address import Address
 from pants.core.goals.package import BuiltPackage, EnvironmentAwarePackageRequest, PackageFieldSet
@@ -29,12 +21,11 @@ from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, Directory, MergeDigests, Snapshot
 from pants.engine.internals.native_engine import RemovePrefix
 from pants.engine.process import FallibleProcessResult, Process, ProcessResult, ProductDescription
-from pants.engine.rules import Get, MultiGet, collect_rules, rule, rule_helper
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     FieldSetsPerTarget,
     FieldSetsPerTargetRequest,
     SourcesField,
-    Target,
     TransitiveTargets,
     TransitiveTargetsRequest,
 )
@@ -68,32 +59,48 @@ class AdhocProcessResult:
     adjusted_digest: Digest
 
 
-@rule_helper
-async def _execution_environment_from_dependencies(adhoc_process_target: Target) -> Digest:
+@dataclass(frozen=True)
+class ResolveExecutionDependenciesRequest:
+    address: Address
+    execution_dependencies: tuple[str, ...] | None
+    dependencies: tuple[str, ...] | None  # can go away after 2.17.0.dev0 per deprecation
 
-    runtime_dependencies_defined = (
-        adhoc_process_target.get(ShellCommandExecutionDependenciesField).value is not None
-    )
 
-    any_dependencies_defined = (
-        adhoc_process_target.get(ShellCommandOutputDependenciesField).value is not None
-    )
+@dataclass(frozen=True)
+class ResolvedExecutionDependencies:
+    digest: Digest
+
+
+@rule
+async def resolve_execution_environment(
+    request: ResolveExecutionDependenciesRequest,
+) -> ResolvedExecutionDependencies:
+
+    target_address = request.address
+    raw_execution_dependencies = request.execution_dependencies
+    raw_regular_dependencies = request.dependencies
+
+    execution_dependencies_defined = raw_execution_dependencies is not None
+
+    any_dependencies_defined = raw_regular_dependencies is not None
 
     # If we're specifying the `dependencies` as relevant to the execution environment, then include
     # this command as a root for the transitive dependency search for execution dependencies.
-    maybe_this_target = (adhoc_process_target.address,) if not runtime_dependencies_defined else ()
+    maybe_this_target = (target_address,) if not execution_dependencies_defined else ()
 
     # Always include the execution dependencies that were specified
-    if runtime_dependencies_defined:
-        runtime_dependencies = await Get(
+    if execution_dependencies_defined:
+        _descr = f"the `execution_dependencies` from the target {target_address}"
+        execution_dependencies = await Get(
             Addresses,
-            UnparsedAddressInputs,
-            adhoc_process_target.get(
-                ShellCommandExecutionDependenciesField
-            ).to_unparsed_address_inputs(),
+            UnparsedAddressInputs(
+                raw_execution_dependencies or (),
+                owning_address=target_address,
+                description_of_origin=_descr,
+            ),
         )
     elif any_dependencies_defined:
-        runtime_dependencies = Addresses()
+        execution_dependencies = Addresses()
         warn_or_error(
             "2.17.0.dev0",
             (
@@ -108,15 +115,15 @@ async def _execution_environment_from_dependencies(adhoc_process_target: Target)
             print_warning=True,
         )
     else:
-        runtime_dependencies = Addresses()
+        execution_dependencies = Addresses()
 
     transitive = await Get(
         TransitiveTargets,
-        TransitiveTargetsRequest(itertools.chain(maybe_this_target, runtime_dependencies)),
+        TransitiveTargetsRequest(itertools.chain(maybe_this_target, execution_dependencies)),
     )
 
     all_dependencies = (
-        *(i for i in transitive.roots if i is not adhoc_process_target),
+        *(i for i in transitive.roots if i.address is not target_address),
         *transitive.dependencies,
     )
 
@@ -144,30 +151,7 @@ async def _execution_environment_from_dependencies(adhoc_process_target: Target)
         Digest, MergeDigests([sources.snapshot.digest, *(pkg.digest for pkg in packages)])
     )
 
-    return dependencies_digest
-
-
-def _parse_outputs_from_command(
-    adhoc_process_target: Target, description: str
-) -> tuple[tuple[str, ...], tuple[str, ...]]:
-    outputs = adhoc_process_target.get(ShellCommandOutputsField).value or ()
-    output_files = adhoc_process_target.get(ShellCommandOutputFilesField).value or ()
-    output_directories = adhoc_process_target.get(ShellCommandOutputDirectoriesField).value or ()
-    if outputs and (output_files or output_directories):
-        raise ValueError(
-            "Both new-style `output_files` or `output_directories` and old-style `outputs` were "
-            f"specified in {description}. To fix, move all values from `outputs` to "
-            "`output_files` or `output_directories`."
-        )
-    elif outputs:
-        output_files = tuple(f for f in outputs if not f.endswith("/"))
-        output_directories = tuple(d for d in outputs if d.endswith("/"))
-    return output_files, output_directories
-
-
-def _shell_tool_safe_env_name(tool_name: str) -> str:
-    """Replace any characters not suitable in an environment variable name with `_`."""
-    return re.sub(r"\W", "_", tool_name)
+    return ResolvedExecutionDependencies(dependencies_digest)
 
 
 @rule
@@ -197,8 +181,8 @@ async def run_adhoc_process(
         if result.stderr:
             logger.warning(result.stderr.decode())
 
-    working_directory = _parse_working_directory(request.working_directory, request.address)
-    root_output_directory = _parse_working_directory(
+    working_directory = _parse_relative_directory(request.working_directory, request.address)
+    root_output_directory = _parse_relative_directory(
         request.root_output_directory, working_directory
     )
 
@@ -216,7 +200,7 @@ async def prepare_adhoc_process(
 
     description = request.description
     address = request.address
-    working_directory = _parse_working_directory(request.working_directory or "", address)
+    working_directory = _parse_relative_directory(request.working_directory or "", address)
     argv = request.argv
     timeout: int | None = request.timeout
     output_files = request.output_files
@@ -283,7 +267,7 @@ def _output_at_build_root(process: Process, bash: BashBinary) -> Process:
     )
 
 
-def _parse_working_directory(workdir_in: str, relative_to: Union[Address, str]) -> str:
+def _parse_relative_directory(workdir_in: str, relative_to: Union[Address, str]) -> str:
     """Convert the `workdir` field into something that can be understood by `Process`."""
 
     if isinstance(relative_to, Address):

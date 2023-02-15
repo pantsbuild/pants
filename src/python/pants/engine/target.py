@@ -2470,8 +2470,7 @@ class Dependencies(StringSequenceField, AsyncFieldMixin):
 
     alias = "dependencies"
     help = help_text(
-        softwrap(
-            f"""
+        f"""
         Addresses to other targets that this target depends on, e.g.
         ['helloworld/subdir:lib', 'helloworld/main.py:lib', '3rdparty:reqs#django'].
 
@@ -2492,7 +2491,6 @@ class Dependencies(StringSequenceField, AsyncFieldMixin):
         `['!helloworld/subdir:lib', '!./sibling.txt']`. Ignores are intended for false positives
         with dependency inference; otherwise, simply leave off the dependency from the BUILD file.
         """
-        )
     )
     supports_transitive_excludes = False
 
