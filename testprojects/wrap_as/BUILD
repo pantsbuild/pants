@@ -1,12 +1,12 @@
 # Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-experimental_shell_command(
+shell_command(
     name="manufacture_python_code",
     command='echo print\\(\\"Hello, World!\\"\\) > hello_world.py',
     output_files=["hello_world.py"],
 )
 
-experimental_shell_command(
+shell_command(
     name="manufacture_resource",
     command="echo hi > resource.txt",
     output_files=["resource.txt"],

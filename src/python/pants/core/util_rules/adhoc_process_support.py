@@ -103,10 +103,7 @@ async def resolve_execution_environment(
         execution_dependencies = Addresses()
         warn_or_error(
             "2.17.0.dev0",
-            (
-                "Using `dependencies` to specify execution-time dependencies for "
-                "`experimental_shell_command` "
-            ),
+            ("Using `dependencies` to specify execution-time dependencies for `shell_command` "),
             (
                 "To clear this warning, use the `output_dependencies` and `execution_dependencies`"
                 "fields. Set `execution_dependencies=()` if you have no execution-time "
