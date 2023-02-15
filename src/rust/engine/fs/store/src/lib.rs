@@ -41,7 +41,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::fmt::{self, Debug, Display};
 use std::fs::OpenOptions;
 use std::future::Future;
-use std::io::{self, Seek, Write};
+use std::io::{self, Write};
 use std::os::unix::fs::{symlink, OpenOptionsExt, PermissionsExt};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Weak};
@@ -263,26 +263,17 @@ impl RemoteStore {
             .await?
         } else {
           assert!(f_remote.is_none());
-          // TODO(#18048): choose a file that can be plopped into the local store directly, when
-          // large files are stored there
-          let file = tokio::task::spawn_blocking(tempfile::tempfile)
-            .await
-            .map_err(|e| e.to_string())??;
-          let file = tokio::fs::File::from_std(file);
+          let dest = local_store
+            .get_temp_immutable_large_file(digest)
+            .await?;
+          let dest_file = dest.clone().open().await?;
 
-          let file = remote_store
-            .load_file(digest, file)
+          remote_store
+            .load_file(digest, dest_file)
             .await?
             .ok_or_else(create_missing)?;
-
-          let file = file.into_std().await;
-          local_store
-            .store(entry_type, true, true, move || {
-              let mut file = file.try_clone()?;
-              file.rewind()?;
-              Ok(file)
-            })
-            .await?
+          dest.persist().await?;
+          digest
         };
         if digest == stored_digest {
           Ok(())

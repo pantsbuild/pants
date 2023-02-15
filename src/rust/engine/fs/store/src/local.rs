@@ -4,19 +4,19 @@ use super::{EntryType, ShrinkBehavior};
 
 use std::collections::{BinaryHeap, HashSet};
 use std::fmt::Debug;
-use std::io::{self};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{self, Duration, Instant};
 
 use bytes::{Buf, Bytes};
-use futures::future::{self, try_join_all};
-use hashing::{hash, hash_path, verified_copy, Digest, Fingerprint, EMPTY_DIGEST};
+use futures::future::{self, try_join, try_join_all};
+use hashing::{async_verified_copy, hash, hash_path, Digest, Fingerprint, EMPTY_DIGEST};
 use lmdb::Error::NotFound;
 use lmdb::{self, Cursor, Transaction};
 use sharded_lmdb::{ShardedLmdb, VersionedFingerprint};
 use std::os::unix::fs::PermissionsExt;
 use tempfile::NamedTempFile;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use workunit_store::ObservationMetric;
 
 /// How big a file must be to be stored as a file on disk.
@@ -24,6 +24,28 @@ use workunit_store::ObservationMetric;
 // writing. They were chosen using a rough equation from the microbenchmarks that are optimized
 // for somewhere between 2 and 3 uses of the corresponding entry to "break even".
 const LARGE_FILE_SIZE_LIMIT: usize = 512 * 1024;
+
+#[derive(Debug, Clone)]
+pub struct TempImmutableLargeFile {
+  tmp_path: PathBuf,
+  final_path: PathBuf,
+}
+
+impl TempImmutableLargeFile {
+  pub async fn open(&self) -> tokio::io::Result<tokio::fs::File> {
+    tokio::fs::File::create(self.tmp_path.clone()).await
+  }
+
+  pub async fn persist(&self) -> Result<(), String> {
+    tokio::fs::rename(self.tmp_path.clone(), self.final_path.clone())
+      .await
+      .map_err(|e| format!("Error while renaming: {e}."))?;
+    tokio::fs::set_permissions(&self.final_path, std::fs::Permissions::from_mode(0o555))
+      .await
+      .map_err(|e| e.to_string())?;
+    Ok(())
+  }
+}
 
 #[derive(Debug, Clone)]
 pub struct ByteStore {
@@ -456,20 +478,26 @@ impl ByteStore {
 
     let res = if ByteStore::uses_large_file_store(digest.size_bytes) {
       let src = &self.large_file_path(digest);
-      let mut reader = std::fs::File::open(src)
+      let mut file = tokio::fs::File::open(src)
+        .await
         .map_err(|e| format!("Failed to read {src:?} for digest {digest:?}: {e}"))?;
-      let mut writer: Vec<u8> = vec![];
-      let bytelen = io::copy(&mut reader, &mut writer)
+      // @TODO: Use mmap instead of copying into user-space
+      let mut contents: Vec<u8> = vec![];
+      file
+        .read_to_end(&mut contents)
+        .await
         .map_err(|e| format!("Failed to load large file into memory: {e}"))?;
-      if bytelen != digest.size_bytes {
+      if contents.len() != digest.size_bytes {
         return Err(format!(
           "Got hash collision reading from store - digest {:?} was requested, but retrieved \
               bytes with that fingerprint had length {}. Congratulations, you may have broken \
               sha256! Underlying bytes: {:?}",
-          digest, bytelen, writer
+          digest,
+          contents.len(),
+          contents
         ));
       }
-      Ok(Some(f(&writer[..])))
+      Ok(Some(f(&contents[..])))
     } else {
       let dbs = match entry_type {
         EntryType::Directory => self.inner.directory_dbs.clone(),
@@ -531,32 +559,29 @@ impl ByteStore {
     Ok(digests)
   }
 
-  async fn rename_temp_large_file(
+  pub(crate) async fn get_temp_immutable_large_file(
     &self,
-    src: NamedTempFile,
     digest: Digest,
-  ) -> Result<Digest, String> {
-    let dest = self.large_file_path(digest);
-    tokio::fs::rename(&src, dest.clone())
-      .await
-      .map_err(|e| format!("Error while renaming: {e}."))?;
-    tokio::fs::set_permissions(&dest, std::fs::Permissions::from_mode(0o555))
-      .await
-      .map_err(|e| format!("Failed to set permissions for {dest:?}: {e}"))?;
-    Ok(digest)
-  }
-
-  async fn make_temp_dest(&self, digest: Digest) -> Result<NamedTempFile, String> {
+  ) -> Result<TempImmutableLargeFile, String> {
     let dest = self.large_file_path(digest);
     if !dest.parent().unwrap().exists() {
-      // Throway the result as a way of not worrying about race conditions.
-      // If there was an error we'll fail later.
+      // Throwaway the result as a way of not worrying about race conditions between multiple
+      // threads/processes creating the same parent dirs. If there was an error we'll fail later.
       let _ = tokio::fs::create_dir_all(dest.parent().unwrap()).await;
     }
+    let dest2 = dest.clone();
     // Make the tempdir in the same dir as the final file so that materializing the final file doesn't
     // have to worry about parent dirs.
-    NamedTempFile::new_in(dest.parent().unwrap())
-      .map_err(|e| format!("Failed to create temporary file for large file: {e}"))
+    let named_temp_file =
+      tokio::task::spawn_blocking(move || NamedTempFile::new_in(dest.parent().unwrap()))
+        .await
+        .map_err(|e| e.to_string())?
+        .map_err(|e| e.to_string())?;
+    let (_, path) = named_temp_file.keep().map_err(|e| e.to_string())?;
+    Ok(TempImmutableLargeFile {
+      tmp_path: path,
+      final_path: dest2,
+    })
   }
 
   async fn store_large_bytes(
@@ -568,14 +593,15 @@ impl ByteStore {
       digest =
         Some(hash(&mut src.clone().reader()).map_err(|e| format!("Failed to hash bytes: {e}"))?);
     }
-    let temp_dest = self.make_temp_dest(digest.unwrap()).await?;
-    tokio::fs::write(temp_dest.path(), src.clone())
+    let dest = self.get_temp_immutable_large_file(digest.unwrap()).await?;
+    let mut dest_file = dest.open().await.map_err(|e| e.to_string())?;
+    dest_file
+      .write_all(&src.clone())
       .await
-      .map_err(|e| format!("Failed to copy from {src:?} or store in {temp_dest:?}: {e:?}"))?;
-
-    self
-      .rename_temp_large_file(temp_dest, digest.unwrap())
-      .await
+      .map_err(|e| e.to_string())?;
+    dest_file.flush().await.map_err(|e| e.to_string())?;
+    dest.persist().await?;
+    Ok(digest.unwrap())
   }
 
   async fn store_large_file(
@@ -584,20 +610,16 @@ impl ByteStore {
     digest: Digest,
     data_is_immutable: bool,
   ) -> Result<(), String> {
-    let temp_dest = self.make_temp_dest(digest).await?;
-
+    let dest = self.get_temp_immutable_large_file(digest).await?;
     let mut attempts = 0;
     loop {
-      let should_retry = !verified_copy(
-        digest,
-        data_is_immutable,
-        &mut std::fs::File::open(src.clone())
-          .map_err(|e| format!("Failed to open {src:?}: {e}."))?,
-        &mut temp_dest
-          .reopen()
-          .map_err(|e| format!("Failed to open {temp_dest:?}: {e}."))?,
-      )
-      .map_err(|e| format!("Failed to copy from {src:?} or store in {temp_dest:?}: {e:?}"))?;
+      let (mut reader, mut writer) =
+        try_join(tokio::fs::File::open(src.clone()), dest.clone().open())
+          .await
+          .map_err(|e| e.to_string())?;
+      let should_retry = !async_verified_copy(digest, data_is_immutable, &mut reader, &mut writer)
+        .await
+        .map_err(|e| e.to_string())?;
 
       if should_retry {
         attempts += 1;
@@ -607,11 +629,12 @@ impl ByteStore {
           return Err(format!("Failed to store {src:?}."));
         }
       } else {
+        writer.flush().await.map_err(|e| e.to_string())?;
+        dest.persist().await?;
         break;
       }
     }
 
-    self.rename_temp_large_file(temp_dest, digest).await?;
     Ok(())
   }
 }

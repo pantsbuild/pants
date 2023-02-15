@@ -26,9 +26,11 @@
 #![allow(clippy::mutex_atomic)]
 
 use std::fmt;
-use std::io::{self, Write};
+use std::io::{self, Error, Write};
 use std::path::Path;
+use std::pin::Pin;
 use std::str::FromStr;
+use std::task::{Context, Poll};
 
 use byteorder::ByteOrder;
 use deepsize::DeepSizeOf;
@@ -38,6 +40,7 @@ use serde::de::{MapAccess, Visitor};
 use serde::ser::{Serialize, SerializeStruct, Serializer};
 use serde::{Deserialize, Deserializer};
 use sha2::{Digest as Sha256Digest, Sha256};
+use tokio::io::{AsyncRead, AsyncWrite};
 
 pub const EMPTY_FINGERPRINT: Fingerprint = Fingerprint([
   0xe3, 0xb0, 0xc4, 0x42, 0x98, 0xfc, 0x1c, 0x14, 0x9a, 0xfb, 0xf4, 0xc8, 0x99, 0x6f, 0xb9, 0x24,
@@ -270,14 +273,14 @@ impl Digest {
 ///
 /// A Write instance that fingerprints all data that passes through it.
 ///
-pub struct WriterHasher<W: Write> {
+pub struct WriterHasher<T> {
   hasher: Sha256,
   byte_count: usize,
-  inner: W,
+  inner: T,
 }
 
-impl<W: Write> WriterHasher<W> {
-  pub fn new(inner: W) -> WriterHasher<W> {
+impl<T> WriterHasher<T> {
+  pub fn new(inner: T) -> WriterHasher<T> {
     WriterHasher {
       hasher: Sha256::default(),
       byte_count: 0,
@@ -288,7 +291,7 @@ impl<W: Write> WriterHasher<W> {
   ///
   /// Returns the result of fingerprinting this stream, and Drops the stream.
   ///
-  pub fn finish(self) -> (Digest, W) {
+  pub fn finish(self) -> (Digest, T) {
     (
       Digest::new(
         Fingerprint::from_bytes(self.hasher.finalize()),
@@ -310,6 +313,33 @@ impl<W: Write> Write for WriterHasher<W> {
 
   fn flush(&mut self) -> io::Result<()> {
     self.inner.flush()
+  }
+}
+
+impl<AW: ?Sized + AsyncWrite + Unpin> AsyncWrite for WriterHasher<&mut AW> {
+  fn poll_write(
+    mut self: Pin<&mut Self>,
+    cx: &mut Context<'_>,
+    buf: &[u8],
+  ) -> Poll<Result<usize, Error>> {
+    let inner = Pin::new(&mut *self.inner);
+    let result = inner.poll_write(cx, buf);
+    if let Poll::Ready(Ok(written)) = result {
+      // Hash the bytes that were successfully written.
+      self.hasher.update(&buf[0..written]);
+      self.byte_count += written;
+    }
+    result
+  }
+
+  fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Error>> {
+    let inner = Pin::new(&mut *self.inner);
+    inner.poll_flush(cx)
+  }
+
+  fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Error>> {
+    let inner = Pin::new(&mut *self.inner);
+    inner.poll_shutdown(cx)
   }
 }
 
@@ -367,6 +397,42 @@ where
     Ok(copied as usize == expected_digest.size_bytes)
   } else {
     Ok(expected_digest == copy_and_hash(reader, writer)?)
+  }
+}
+
+///
+/// Copy the data from reader and hash the bytes in one pass.
+/// Use hash() to just hash without copying the data anywhere.
+///
+pub async fn async_copy_and_hash<R, W>(reader: &mut R, writer: &mut W) -> tokio::io::Result<Digest>
+where
+  R: AsyncRead + Unpin + ?Sized,
+  W: AsyncWrite + Unpin + ?Sized,
+{
+  let mut hasher = WriterHasher::new(writer);
+  let _ = tokio::io::copy(reader, &mut hasher).await?;
+  Ok(hasher.finish().0)
+}
+
+///
+/// Copy from reader to writer and return whether the copied data matches expected_digest.
+///
+pub async fn async_verified_copy<R, W>(
+  expected_digest: Digest,
+  data_is_immutable: bool,
+  reader: &mut R,
+  writer: &mut W,
+) -> tokio::io::Result<bool>
+where
+  R: AsyncRead + Unpin + ?Sized,
+  W: AsyncWrite + Unpin + ?Sized,
+{
+  if data_is_immutable {
+    // Trust that the data hasn't changed, and only validate its length.
+    let copied = tokio::io::copy(reader, writer).await?;
+    Ok(copied as usize == expected_digest.size_bytes)
+  } else {
+    Ok(expected_digest == async_copy_and_hash(reader, writer).await?)
   }
 }
 
