@@ -6,6 +6,7 @@ from typing import Iterable, Type
 import pytest
 
 from pants.backend.python.dependency_inference.rules import import_rules
+from pants.backend.python.goals import lockfile
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import ConsoleScript
 from pants.core.goals import generate_lockfiles
@@ -64,6 +65,7 @@ class MockTarget(Target):
 def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
         rules=[
+            *lockfile.rules(),
             *generate_lockfiles.rules(),
             *import_rules(),
             *FakeTool.rules(),
