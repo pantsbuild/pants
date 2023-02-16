@@ -276,7 +276,7 @@ def test_use_simple_extra_post_renderer(rule_runner: RuleRunner) -> None:
                 """\
               shell_sources(name="scripts")
 
-              experimental_run_shell_command(
+              run_shell_command(
                 name="custom_post_renderer",
                 command="src/shell/my-script.sh",
                 execution_dependencies=[":scripts"]

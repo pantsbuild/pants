@@ -547,12 +547,12 @@ def test_run_shell_command_request(rule_runner: RuleRunner) -> None:
         {
             "src/BUILD": dedent(
                 """\
-                experimental_run_shell_command(
+                run_shell_command(
                   name="test",
                   command="some cmd string",
                 )
 
-                experimental_run_shell_command(
+                run_shell_command(
                   name="cd-test",
                   command="some cmd string",
                   workdir="src/with space'n quote",

@@ -279,7 +279,7 @@ data:
 type: Opaque
 ```
 ```python src/deploy/BUILD
-experimental_run_shell_command(
+run_shell_command(
   name="vals",
   command="vals eval -f -",
 )
@@ -290,7 +290,7 @@ helm_deployment(
 )
 ```
 
-In the previous example we define a `shell_command` target that will invoke the `vals eval` command (`vals` needs to be installed in the local machine) as part of the Helm post-rendering machinery, which will result on the `ref+vault` reference being replaced by the actual value stored in Vault at the given path.
+In the previous example we define a `run_shell_command` target that will invoke the `vals eval` command (`vals` needs to be installed in the local machine) as part of the Helm post-rendering machinery, which will result on the `ref+vault` reference being replaced by the actual value stored in Vault at the given path.
 
 > 📘 Using multiple post-renderers
 >
