@@ -102,7 +102,7 @@ def test_sources_and_files(rule_runner: RuleRunner) -> None:
         {
             "src/BUILD": dedent(
                 """\
-                experimental_shell_command(
+                shell_command(
                   name="hello",
                   execution_dependencies=[":build-utils", ":files"],
                   tools=[
@@ -154,7 +154,7 @@ def test_quotes_command(rule_runner: RuleRunner) -> None:
         {
             "src/BUILD": dedent(
                 """\
-                experimental_shell_command(
+                shell_command(
                   name="quotes",
                   tools=["echo", "tee"],
                   command='echo "foo bar" | tee out.log',
@@ -178,7 +178,7 @@ def test_chained_shell_commands(rule_runner: RuleRunner) -> None:
         {
             "src/a/BUILD": dedent(
                 """\
-                experimental_shell_command(
+                shell_command(
                   name="msg",
                   tools=["echo"],
                   output_files=["../msg"],
@@ -188,7 +188,7 @@ def test_chained_shell_commands(rule_runner: RuleRunner) -> None:
             ),
             "src/b/BUILD": dedent(
                 """\
-                experimental_shell_command(
+                shell_command(
                   name="msg",
                   tools=["cp", "echo"],
                   output_files=["../msg"],
@@ -218,7 +218,7 @@ def test_chained_shell_commands_with_workdir(rule_runner: RuleRunner) -> None:
         {
             "src/a/BUILD": dedent(
                 """\
-                experimental_shell_command(
+                shell_command(
                   name="msg",
                   tools=["echo"],
                   output_files=["msg"],
@@ -229,7 +229,7 @@ def test_chained_shell_commands_with_workdir(rule_runner: RuleRunner) -> None:
             ),
             "src/b/BUILD": dedent(
                 """\
-                experimental_shell_command(
+                shell_command(
                   name="msg",
                   tools=["cp", "echo"],
                   output_files=["msg"],
@@ -263,7 +263,7 @@ def test_side_effecting_command(caplog, rule_runner: RuleRunner) -> None:
         {
             "src/BUILD": dedent(
                 """\
-                experimental_shell_command(
+                shell_command(
                   name="side-effect",
                   command="echo 'server started' && echo 'warn msg' >&2",
                   tools=["echo"],
@@ -294,7 +294,7 @@ def test_tool_search_path_stable(rule_runner: RuleRunner) -> None:
         {
             "src/BUILD": dedent(
                 """\
-                experimental_shell_command(
+                shell_command(
                   name="paths",
                   command="mkdir subdir; cd subdir; ls .",
                   tools=["cd", "ls", "mkdir"],
@@ -316,7 +316,7 @@ def test_shell_command_masquerade_as_a_files_target(rule_runner: RuleRunner) -> 
         {
             "src/BUILD": dedent(
                 """\
-                experimental_shell_command(
+                shell_command(
                   name="content-gen",
                   command="echo contents > contents.txt",
                   tools=["echo"],
@@ -359,7 +359,7 @@ def test_package_dependencies(caplog, rule_runner: RuleRunner) -> None:
         {
             "src/BUILD": dedent(
                 """\
-                experimental_shell_command(
+                shell_command(
                   name="msg-gen",
                   command="echo message > msg.txt",
                   tools=["echo"],
@@ -372,7 +372,7 @@ def test_package_dependencies(caplog, rule_runner: RuleRunner) -> None:
                   files=[":msg-gen"],
                 )
 
-                experimental_shell_command(
+                shell_command(
                   name="test",
                   command="ls",
                   tools=["ls"],
@@ -403,14 +403,14 @@ def test_execution_dependencies(caplog, rule_runner: RuleRunner) -> None:
         {
             "src/BUILD": dedent(
                 """\
-                experimental_shell_command(
+                shell_command(
                   name="a1",
                   command="echo message > msg.txt",
                   output_files=["msg.txt"],
                   workdir="/",
                 )
 
-                experimental_shell_command(
+                shell_command(
                     name="a2",
                     tools=["cat"],
                     command="cat msg.txt > msg2.txt",
@@ -421,7 +421,7 @@ def test_execution_dependencies(caplog, rule_runner: RuleRunner) -> None:
 
                 # Fails because runtime dependencies are not exported
                 # transitively
-                experimental_shell_command(
+                shell_command(
                     name="expect_fail_1",
                     tools=["cat"],
                     command="cat msg.txt",
@@ -430,7 +430,7 @@ def test_execution_dependencies(caplog, rule_runner: RuleRunner) -> None:
                 )
 
                 # Fails because `output_dependencies` are not available at runtime
-                experimental_shell_command(
+                shell_command(
                     name="expect_fail_2",
                     tools=["cat"],
                     command="cat msg.txt",
@@ -441,7 +441,7 @@ def test_execution_dependencies(caplog, rule_runner: RuleRunner) -> None:
 
                 # Fails because runtime dependencies are not fetched transitively
                 # even if the root is requested through `output_dependencies`
-                experimental_shell_command(
+                shell_command(
                     name="expect_fail_3",
                     tools=["cat"],
                     command="cat msg.txt",
@@ -450,7 +450,7 @@ def test_execution_dependencies(caplog, rule_runner: RuleRunner) -> None:
                 )
 
                 # Succeeds because `a1` and `a2` are requested directly
-                experimental_shell_command(
+                shell_command(
                     name="expect_success_1",
                     tools=["cat"],
                     command="cat msg.txt msg2.txt > output.txt",
@@ -461,7 +461,7 @@ def test_execution_dependencies(caplog, rule_runner: RuleRunner) -> None:
 
                 # Succeeds becuase `a1` and `a2` are requested directly and `output_dependencies`
                 # are made available at runtime
-                experimental_shell_command(
+                shell_command(
                     name="expect_success_2",
                     tools=["cat"],
                     command="cat msg.txt msg2.txt > output.txt",
@@ -506,14 +506,14 @@ def test_old_style_dependencies(caplog, rule_runner: RuleRunner) -> None:
         {
             "src/BUILD": dedent(
                 """\
-                experimental_shell_command(
+                shell_command(
                   name="a1",
                   command="echo message > msg.txt",
                   outputs=["msg.txt"],
                   workdir="/",\
                 )
 
-                experimental_shell_command(
+                shell_command(
                     name="a2",
                     tools=["cat"],
                     command="cat msg.txt > msg2.txt",
@@ -522,7 +522,7 @@ def test_old_style_dependencies(caplog, rule_runner: RuleRunner) -> None:
                     workdir="/",
                 )
 
-                experimental_shell_command(
+                shell_command(
                     name="expect_success",
                     tools=["cat"],
                     command="cat msg.txt msg2.txt > output.txt",
@@ -594,7 +594,7 @@ def test_path_populated_with_tools(
         {
             "src/BUILD": dedent(
                 f"""\
-                experimental_shell_command(
+                shell_command(
                   name="tools-populated",
                   tools=["which", "{tool_name}"],
                   command='which {tool_name}',
@@ -627,7 +627,7 @@ def test_shell_command_boot_script(rule_runner: RuleRunner) -> None:
         {
             "src/BUILD": dedent(
                 """\
-                experimental_shell_command(
+                shell_command(
                   name="boot-script-test",
                   tools=[
                     "python3.8",
@@ -656,7 +656,7 @@ def test_shell_command_boot_script_in_build_root(rule_runner: RuleRunner) -> Non
         {
             "BUILD": dedent(
                 """\
-                experimental_shell_command(
+                shell_command(
                   name="boot-script-test",
                   tools=[
                     "python3.8",
@@ -684,7 +684,7 @@ def test_shell_command_extra_env_vars(caplog, rule_runner: RuleRunner) -> None:
         {
             "src/BUILD": dedent(
                 """\
-                experimental_shell_command(
+                shell_command(
                   name="extra-env-test",
                   tools=["echo"],
                   extra_env_vars=["FOO", "HELLO=world", "BAR"],
@@ -710,7 +710,7 @@ def test_relative_directories(rule_runner: RuleRunner) -> None:
         {
             "src/BUILD": dedent(
                 """\
-                experimental_shell_command(
+                shell_command(
                   name="quotes",
                   tools=["echo"],
                   command='echo foosh > ../foosh.txt',
@@ -733,7 +733,7 @@ def test_relative_directories_2(rule_runner: RuleRunner) -> None:
         {
             "src/BUILD": dedent(
                 """\
-                experimental_shell_command(
+                shell_command(
                   name="quotes",
                   tools=["echo"],
                   command='echo foosh > ../newdir/foosh.txt',
@@ -756,7 +756,7 @@ def test_cannot_escape_build_root(rule_runner: RuleRunner) -> None:
         {
             "src/BUILD": dedent(
                 """\
-                experimental_shell_command(
+                shell_command(
                   name="quotes",
                   tools=["echo"],
                   command='echo foosh > ../../invalid.txt',
@@ -785,7 +785,7 @@ def test_missing_tool_called(
         {
             "src/BUILD": dedent(
                 """\
-                experimental_shell_command(
+                shell_command(
                   name="gerald-is-not-here",
                   command="gerald hello",
                   log_output=True,

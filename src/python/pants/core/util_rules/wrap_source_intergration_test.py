@@ -11,7 +11,7 @@ def test_synthesized_python_is_included_in_package() -> None:
     sources = {
         "src/BUILD": dedent(
             """\
-            experimental_shell_command(
+            shell_command(
                 name="manufacture_python_code",
                 tools=["touch",],
                 command='echo print\\\\(\\\\"Hello, World!\\\\"\\\\) > hello_world.py',

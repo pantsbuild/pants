@@ -362,7 +362,9 @@ class SkipShellCommandTestsField(BoolField):
 
 
 class ShellCommandTarget(Target):
-    alias = "experimental_shell_command"
+    alias = "shell_command"
+    deprecated_alias = "experimental_shell_command"
+    deprecated_alias_removal_version = "2.18.0.dev0"
     core_fields = (
         *COMMON_TARGET_FIELDS,
         ShellCommandOutputDependenciesField,
@@ -386,7 +388,7 @@ class ShellCommandTarget(Target):
 
         Example BUILD file:
 
-            experimental_shell_command(
+            shell_command(
                 command="./my-script.sh --flag",
                 tools=["tar", "curl", "cat", "bash", "env"],
                 execution_dependencies=[":scripts"],
@@ -427,7 +429,7 @@ class ShellCommandRunTarget(Target):
         The `command` may use either `{chroot}` on the command line, or the `$CHROOT`
         environment variable to get the root directory for where any dependencies are located.
 
-        In contrast to the `experimental_shell_command`, in addition to `workdir` you only have
+        In contrast to the `shell_command`, in addition to `workdir` you only have
         the `command` and `execution_dependencies` fields as the `tools` you are going to use are
         already on the PATH which is inherited from the Pants environment. Also, the `outputs` does
         not apply, as any output files produced will end up directly in your project tree.
