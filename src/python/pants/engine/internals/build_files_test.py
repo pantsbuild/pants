@@ -27,7 +27,7 @@ from pants.engine.internals.defaults import ParametrizeDefault
 from pants.engine.internals.dep_rules import MaybeBuildFileDependencyRulesImplementation
 from pants.engine.internals.mapper import AddressFamily
 from pants.engine.internals.parametrize import Parametrize
-from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser
+from pants.engine.internals.parser import BuildFilePreludeSymbols, BuildFileSymbolInfo, Parser
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.internals.session import SessionValues
 from pants.engine.internals.synthetic_targets import (
@@ -135,7 +135,17 @@ def run_prelude_parsing_rule(prelude_content: str) -> BuildFilePreludeSymbols:
 
 
 def test_prelude_parsing_good() -> None:
-    result = run_prelude_parsing_rule("def foo(): return 1")
+    prelude_content = dedent(
+        """
+        def bar():
+            __defaults__(all=dict(ok=123))
+            return build_file_dir()
+
+        def foo():
+            return 1
+        """
+    )
+    result = run_prelude_parsing_rule(prelude_content)
     assert result.symbols["foo"]() == 1
 
 
@@ -157,6 +167,45 @@ def test_prelude_parsing_illegal_import() -> None:
     with pytest.raises(
         Exception,
         match="Import used in /dev/null/prelude at line 1\\. Import statements are banned",
+    ):
+        run_prelude_parsing_rule(prelude_content)
+
+
+def test_prelude_check_filepath() -> None:
+    prelude_content = dedent(
+        """
+        build_file_dir()
+        """
+    )
+    with pytest.raises(
+        Exception,
+        match="The BUILD file `build_file_dir` may only be used in BUILD files\\. If used",
+    ):
+        run_prelude_parsing_rule(prelude_content)
+
+
+def test_prelude_check_defaults() -> None:
+    prelude_content = dedent(
+        """
+        __defaults__(all=dict(bad=123))
+        """
+    )
+    with pytest.raises(
+        Exception,
+        match="The BUILD file `__defaults__` may only be used in BUILD files\\. If used",
+    ):
+        run_prelude_parsing_rule(prelude_content)
+
+
+def test_prelude_check_env() -> None:
+    prelude_content = dedent(
+        """
+        env("nope")
+        """
+    )
+    with pytest.raises(
+        Exception,
+        match="The BUILD file `env` may only be used in BUILD files\\.$",
     ):
         run_prelude_parsing_rule(prelude_content)
 
@@ -186,6 +235,23 @@ def test_prelude_references_builtin_symbols() -> None:
     # In the real world, this would define the target (note it doesn't need to return, as BUILD files
     # don't). In the test we're just ensuring we don't get a `NameError`
     result.symbols["make_a_target"]()
+
+
+def test_prelude_docstrings() -> None:
+    macro_docstring = "This is the doc-string for `macro_func`."
+    prelude_content = dedent(
+        f"""
+        def macro_func(arg: int) -> str:
+            '''{macro_docstring}'''
+            pass
+        """
+    )
+    result = run_prelude_parsing_rule(prelude_content)
+    info = result.info["macro_func"]
+    assert BuildFileSymbolInfo("macro_func", result.symbols["macro_func"]) == info
+    assert macro_docstring == info.help
+    assert "(arg: int) -> str" == info.signature
+    assert {"macro_func"} == set(result.info)
 
 
 class ResolveField(StringField):
