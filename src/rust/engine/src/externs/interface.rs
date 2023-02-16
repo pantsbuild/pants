@@ -1643,6 +1643,7 @@ fn write_digest(
         .materialize_directory(
           destination.clone(),
           lifted_digest,
+          true, // Force everything we write to be mutable
           &BTreeSet::new(),
           fs::Permissions::Writable,
         )

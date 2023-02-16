@@ -1121,6 +1121,7 @@ async fn materialize_missing_directory() {
     .materialize_directory(
       materialize_dir.path().to_owned(),
       TestDirectory::recursive().directory_digest(),
+      false,
       &BTreeSet::new(),
       Permissions::Writable,
     )
@@ -1154,6 +1155,7 @@ async fn materialize_directory(perms: Permissions, executable_file: bool) {
     .materialize_directory(
       materialize_dir.path().to_owned(),
       recursive_testdir.directory_digest(),
+      false,
       &BTreeSet::new(),
       perms,
     )
@@ -1618,6 +1620,7 @@ async fn explicitly_overwrites_already_existing_file() {
     .materialize_directory(
       dir_to_write_to.path().to_owned(),
       contents_dir.directory_digest(),
+      false,
       &BTreeSet::new(),
       Permissions::Writable,
     )
@@ -1692,6 +1695,7 @@ async fn big_file_immutable_link() {
     .materialize_directory(
       materialize_dir.path().to_owned(),
       directory_digest,
+      false,
       &BTreeSet::from([
         RelativePath::new("output_file").unwrap(),
         RelativePath::new("output_dir").unwrap(),

@@ -523,6 +523,7 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
             .materialize_directory(
               destination,
               output_digest,
+              false,
               &BTreeSet::new(),
               Permissions::Writable,
             )
@@ -543,7 +544,13 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
         let digest = DirectoryDigest::from_persisted_digest(Digest::new(fingerprint, size_bytes));
         Ok(
           store
-            .materialize_directory(destination, digest, &BTreeSet::new(), Permissions::Writable)
+            .materialize_directory(
+              destination,
+              digest,
+              false,
+              &BTreeSet::new(),
+              Permissions::Writable,
+            )
             .await?,
         )
       }

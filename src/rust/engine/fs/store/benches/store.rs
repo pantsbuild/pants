@@ -43,7 +43,7 @@ use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use task_executor::Executor;
 use tempfile::TempDir;
 
-use store::{ImmutableInputs, OneOffStoreFileByDigest, Snapshot, SnapshotOps, Store, SubsetParams};
+use store::{OneOffStoreFileByDigest, Snapshot, SnapshotOps, Store, SubsetParams};
 
 fn executor() -> Executor {
   Executor::new_owned(num_cpus::get(), num_cpus::get() * 4, || ()).unwrap()
@@ -62,9 +62,6 @@ pub fn criterion_benchmark_materialize(c: &mut Criterion) {
       let (store, _tempdir, digest) = snapshot(&executor, count, size);
       let parent_dest = TempDir::new().unwrap();
       let parent_dest_path = parent_dest.path();
-      let immutable_inputs_dest = TempDir::new().unwrap();
-      let immutable_inputs_path = immutable_inputs_dest.path();
-      let immutable_inputs = ImmutableInputs::new(store.clone(), immutable_inputs_path).unwrap();
 
       cgroup
         .sample_size(10)
@@ -81,8 +78,8 @@ pub fn criterion_benchmark_materialize(c: &mut Criterion) {
                 .block_on(store.materialize_directory(
                   dest,
                   digest.clone(),
+                  false,
                   &BTreeSet::new(),
-                  Some(&immutable_inputs),
                   perms,
                 ))
                 .unwrap();

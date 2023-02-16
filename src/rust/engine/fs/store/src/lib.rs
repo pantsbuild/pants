@@ -250,32 +250,9 @@ impl RemoteStore {
     };
     self
       .maybe_download(digest, async move {
-        let stored_digest = if f_remote.is_some() {
-          // (if there's a function to call, always just buffer fully into memory)
-          let bytes = remote_store
-            .load_bytes(digest)
-            .await?
-            .ok_or_else(create_missing)?;
-          if let Some(f_remote) = f_remote {
-            f_remote(bytes.clone())?;
-          }
-          local_store
-            .store_bytes(entry_type, None, bytes, true)
-            .await?
-        } else {
-          assert!(f_remote.is_none());
-          if ByteStore::uses_large_file_store(digest.size_bytes) {
-            let dest = local_store.get_temp_immutable_large_file(digest).await?;
-            let dest_file = dest.clone().open().await?;
-
-            let mut dest_file = remote_store
-              .load_file(digest, dest_file)
-              .await?
-              .ok_or_else(create_missing)?;
-            dest_file.flush().await.map_err(|e| e.to_string())?;
-            dest.persist().await?;
-          } else {
-            // NB: The file is "small", let's just load in memory
+        let stored_digest =
+          if !ByteStore::uses_large_file_store(digest.size_bytes) || f_remote.is_some() {
+            // (if there's a function to call, always just buffer fully into memory)
             let bytes = remote_store
               .load_bytes(digest)
               .await?
@@ -285,11 +262,20 @@ impl RemoteStore {
             }
             local_store
               .store_bytes(entry_type, None, bytes, true)
-              .await?;
-          }
+              .await?
+          } else {
+            assert!(f_remote.is_none());
+            let dest = local_store.get_temp_immutable_large_file(digest).await?;
+            let dest_file = dest.clone().open().await?;
 
-          digest
-        };
+            let mut dest_file = remote_store
+              .load_file(digest, dest_file)
+              .await?
+              .ok_or_else(create_missing)?;
+            dest_file.flush().await.map_err(|e| e.to_string())?;
+            dest.persist().await?;
+            digest
+          };
         if digest == stored_digest {
           Ok(())
         } else {
@@ -1216,6 +1202,7 @@ impl Store {
     &self,
     destination: PathBuf,
     digest: DirectoryDigest,
+    force_mutable: bool,
     mutable_paths: &BTreeSet<RelativePath>,
     perms: Permissions,
   ) -> Result<(), StoreError> {
@@ -1241,7 +1228,7 @@ impl Store {
       .materialize_directory_children(
         destination.clone(),
         true,
-        false,
+        force_mutable,
         &parent_to_child,
         &mutable_path_ancestors,
         perms,
@@ -1313,7 +1300,7 @@ impl Store {
                   .materialize_directory_children(
                     path.clone(),
                     false,
-                    mutable_paths.contains(&path),
+                    mutable_paths.contains(&path) || force_mutable,
                     parent_to_child,
                     mutable_paths,
                     perms,

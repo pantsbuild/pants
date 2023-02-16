@@ -327,7 +327,8 @@ class TarBinary(BinaryPath):
         )
 
         files_from = ("--files-from", input_file_list_filename) if input_file_list_filename else ()
-        return (self.path, f"c{compression}f", output_filename, *input_files) + files_from
+        # NB: -h follows symlinks, which ensures we don't capture a symlink to an immutable input, for instance
+        return (self.path, f"c{compression}fh", output_filename, *input_files) + files_from
 
     def extract_archive_argv(
         self, archive_path: str, extract_path: str, *, archive_suffix: str

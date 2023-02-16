@@ -365,6 +365,7 @@ async fn main() {
       .materialize_directory(
         output,
         result.output_directory,
+        false,
         &BTreeSet::new(),
         Permissions::Writable,
       )

@@ -104,6 +104,7 @@ impl ImmutableInputs {
           .materialize_directory(
             dest.clone(),
             directory_digest,
+            false,
             &BTreeSet::new(),
             Permissions::ReadOnly,
           )
