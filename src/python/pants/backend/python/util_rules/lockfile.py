@@ -21,6 +21,9 @@ def _pex_simple_lockfile_rules(python_tool: Type["PythonToolRequirementsBase"]) 
     class SimplePexLockfileSentinel(GenerateToolLockfileSentinel):
         resolve_name = python_tool.options_scope
 
+    SimplePexLockfileSentinel.__name__ = f"{python_tool.__name__}LockfileSentinel"
+    SimplePexLockfileSentinel.__qualname__ = f"{__name__}.{python_tool.__name__}LockfileSentinel"
+
     @rule(_param_type_overrides={"request": SimplePexLockfileSentinel, "tool": python_tool})
     async def lockfile_generator(
         request: GenerateToolLockfileSentinel,
