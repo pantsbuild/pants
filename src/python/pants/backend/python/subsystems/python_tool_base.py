@@ -53,7 +53,7 @@ class PythonToolRequirementsBase(Subsystem):
     register_lockfile: ClassVar[bool] = False
     default_lockfile_resource: ClassVar[tuple[str, str] | None] = None
     default_lockfile_url: ClassVar[str | None] = None
-    lockfile_rules_type: LockfileRules = LockfileRules.SIMPLE
+    lockfile_rules_type: LockfileRules = LockfileRules.CUSTOM
 
     install_from_resolve = StrOption(
         advanced=True,
