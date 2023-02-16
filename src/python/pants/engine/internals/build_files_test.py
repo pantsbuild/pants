@@ -71,7 +71,7 @@ def test_parse_address_family_empty() -> None:
             ),
             BootstrapStatus(in_progress=False),
             BuildFileOptions(("BUILD",)),
-            BuildFilePreludeSymbols(FrozenDict()),
+            BuildFilePreludeSymbols(FrozenDict(), ()),
             AddressFamilyDir("/dev/null"),
             RegisteredTargetTypes({}),
             UnionMembership({}),
@@ -205,7 +205,7 @@ def test_prelude_check_env() -> None:
     )
     with pytest.raises(
         Exception,
-        match="The BUILD file `env` may only be used in BUILD files\\.$",
+        match="The BUILD file `env` may only be used in BUILD files\\. If used",
     ):
         run_prelude_parsing_rule(prelude_content)
 
@@ -252,6 +252,17 @@ def test_prelude_docstrings() -> None:
     assert macro_docstring == info.help
     assert "(arg: int) -> str" == info.signature
     assert {"macro_func"} == set(result.info)
+
+
+def test_prelude_reference_env_vars() -> None:
+    prelude_content = dedent(
+        """
+        def macro():
+            env("MY_ENV")
+        """
+    )
+    result = run_prelude_parsing_rule(prelude_content)
+    assert ("MY_ENV",) == result.referenced_env_vars
 
 
 class ResolveField(StringField):
@@ -581,6 +592,9 @@ def test_macro_undefined_symbol_bootstrap() -> None:
         rules=[QueryRule(AddressFamily, [AddressFamilyDir])],
         is_bootstrap=True,
     )
+    rule_runner.set_options(
+        args=("--build-file-prelude-globs=prelude.py",),
+    )
     rule_runner.write_files(
         {
             "prelude.py": dedent(
@@ -647,6 +661,35 @@ def test_build_file_env_vars(target_adaptor_rule_runner: RuleRunner) -> None:
     )
     assert target_adaptor.kwargs["description"] == "from env"
     assert target_adaptor.kwargs["tags"] == ["default", "tag"]
+
+
+def test_prelude_env_vars(target_adaptor_rule_runner: RuleRunner) -> None:
+    target_adaptor_rule_runner.write_files(
+        {
+            "prelude.py": dedent(
+                """
+                def macro_val():
+                    return env("MACRO_ENV")
+                """
+            ),
+            "BUILD": dedent(
+                """
+                mock_tgt(
+                  description=macro_val(),
+                )
+                """
+            ),
+        },
+    )
+    target_adaptor_rule_runner.set_options(
+        args=("--build-file-prelude-globs=prelude.py",),
+        env={"MACRO_ENV": "from env"},
+    )
+    target_adaptor = target_adaptor_rule_runner.request(
+        TargetAdaptor,
+        [TargetAdaptorRequest(Address(""), description_of_origin="tests")],
+    )
+    assert target_adaptor.kwargs["description"] == "from env"
 
 
 def test_invalid_build_file_env_vars(caplog, target_adaptor_rule_runner: RuleRunner) -> None:

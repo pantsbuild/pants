@@ -38,7 +38,7 @@ from pants.engine.internals.synthetic_targets import (
     SyntheticAddressMapsRequest,
 )
 from pants.engine.internals.target_adaptor import TargetAdaptor, TargetAdaptorRequest
-from pants.engine.rules import Get, MultiGet, collect_rules, rule, rule_helper
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     DependenciesRuleApplication,
     DependenciesRuleApplicationRequest,
@@ -92,6 +92,7 @@ async def evaluate_preludes(
         **parser.builtin_symbols,
     }
     locals: dict[str, Any] = {}
+    env_vars: set[str] = set()
     for file_content in prelude_digest_contents:
         try:
             file_content_str = file_content.content.decode()
@@ -100,6 +101,7 @@ async def evaluate_preludes(
         except Exception as e:
             raise Exception(f"Error parsing prelude file {file_content.path}: {e}")
         error_on_imports(file_content_str, file_content.path)
+        env_vars.update(BUILDFileEnvVarExtractor.get_env_vars(file_content))
     # __builtins__ is a dict, so isn't hashable, and can't be put in a FrozenDict.
     # Fortunately, we don't care about it - preludes should not be able to override builtins, so we just pop it out.
     # TODO: Give a nice error message if a prelude tries to set a expose a non-hashable value.
@@ -107,7 +109,7 @@ async def evaluate_preludes(
     # Ensure preludes can reference each other by populating the shared globals object with references
     # to the other symbols
     globals.update(locals)
-    return BuildFilePreludeSymbols.from_namespace(locals)
+    return BuildFilePreludeSymbols.create(locals, env_vars)
 
 
 @rule
@@ -207,7 +209,7 @@ class BUILDFileEnvVarExtractor(ast.NodeVisitor):
                 self.env_vars.add(value)
                 return
             else:
-                logging.warning(
+                logger.warning(
                     f"{self.filename}:{arg.lineno}: Only constant string values as variable name to "
                     f"`env()` is currently supported. This `env()` call will always result in "
                     "the default value only."
@@ -217,12 +219,11 @@ class BUILDFileEnvVarExtractor(ast.NodeVisitor):
             self.visit(kwarg)
 
 
-@rule_helper
 async def _extract_env_vars(
-    file_content: FileContent, env: CompleteEnvironmentVars
+    file_content: FileContent, extra_env: Sequence[str], env: CompleteEnvironmentVars
 ) -> EnvironmentVars:
     """For BUILD file env vars, we only ever consult the local systems env."""
-    env_vars = BUILDFileEnvVarExtractor.get_env_vars(file_content)
+    env_vars = (*BUILDFileEnvVarExtractor.get_env_vars(file_content), *extra_env)
     return await Get(
         EnvironmentVars,
         {
@@ -301,7 +302,9 @@ async def parse_address_family(
         dependencies_rules_parser_state = None
 
     all_env_vars = [
-        await _extract_env_vars(fc, session_values[CompleteEnvironmentVars])
+        await _extract_env_vars(
+            fc, prelude_symbols.referenced_env_vars, session_values[CompleteEnvironmentVars]
+        )
         for fc in digest_contents
     ]
 
