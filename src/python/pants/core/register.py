@@ -6,6 +6,7 @@
 These are always activated and cannot be disabled.
 """
 from pants.backend.codegen import export_codegen_goal
+from pants.backend.python.goals import lockfile as python_lockfile
 from pants.bsp.rules import rules as bsp_rules
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.core.goals import (
@@ -71,6 +72,7 @@ def rules():
         *export_codegen_goal.rules(),
         *fmt.rules(),
         *fix.rules(),
+        *python_lockfile.rules(),
         *generate_lockfiles.rules(),
         *lint.rules(),
         *update_build_files.rules(),
