@@ -94,6 +94,7 @@ TEST_FLAGS = {
     "run": True,
     "short": False,
     "shuffle": True,
+    "skip": True,
     "timeout": True,
     "trace": True,
     "v": False,
