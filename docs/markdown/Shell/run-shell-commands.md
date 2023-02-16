@@ -48,9 +48,9 @@ In case there are resulting files that should be captured and passed to any cons
 > 
 > We are gathering feedback on this target before we promote it from its experimental status. Please reach out to us on [Slack](doc:getting-help) or [GitHub](https://github.com/pantsbuild/pants) with your ideas or issues.
 
-The `experimental_run_shell_command` target
+The `run_shell_command` target
 -------------------------------------------
 
-Unlike `shell_command`, the [`experimental_run_shell_command` target](doc:reference-experimental_run_shell_command) runs directly in your workspace, without sandboxing.
+Unlike `shell_command`, the [`run_shell_command` target](doc:reference-run_shell_command) runs directly in your workspace, without sandboxing.
 
 This target type allows you to formalize the Pants dependencies of shell scripts, and track when their impact on your workspace might have changed. But since its outputs cannot be captured, it must be a root target in your build graph (i.e.: it may not be consumed by other targets).

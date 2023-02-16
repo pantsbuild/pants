@@ -10,7 +10,7 @@ def test_passthrough_args() -> None:
     sources = {
         "src/BUILD": dedent(
             """\
-            experimental_run_shell_command(
+            run_shell_command(
                 name="args-test",
                 command='echo "cmd name (arg 0)=$0, args:$@"',
             )
