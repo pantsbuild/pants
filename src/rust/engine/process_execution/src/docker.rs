@@ -374,6 +374,7 @@ impl<'a> super::CommandRunner for CommandRunner<'a> {
           &self.immutable_inputs,
           Some(Path::new(NAMED_CACHES_BASE_PATH_IN_CONTAINER)),
           Some(Path::new(IMMUTABLE_INPUTS_BASE_PATH_IN_CONTAINER)),
+          false, // NB: Don't allow local store symlinks. Docker will refuse them.
         )
         .await?;
 

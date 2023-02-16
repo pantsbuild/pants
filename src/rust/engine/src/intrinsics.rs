@@ -570,6 +570,7 @@ fn interactive_process(
         &context.core.immutable_inputs,
         None,
         None,
+        true,
       )
       .await?;
       apply_chroot(tempdir.path().to_str().unwrap(), &mut process);

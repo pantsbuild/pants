@@ -375,6 +375,7 @@ impl NailgunProcess {
       immutable_inputs,
       None,
       None,
+      true,
     )
     .await?;
     let workdir_include_names = list_workdir(workdir.path()).await?;

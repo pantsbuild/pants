@@ -288,6 +288,7 @@ impl super::CommandRunner for CommandRunner {
           &self.immutable_inputs,
           None,
           None,
+          true,
         )
         .await?;
 
@@ -644,6 +645,7 @@ pub async fn prepare_workdir(
   immutable_inputs: &ImmutableInputs,
   named_caches_prefix: Option<&Path>,
   immutable_inputs_prefix: Option<&Path>,
+  allow_local_store_symlinks: bool,
 ) -> Result<bool, StoreError> {
   // Collect the symlinks to create for immutable inputs or named caches.
   let immutable_inputs_symlinks = {
@@ -717,7 +719,7 @@ pub async fn prepare_workdir(
       .materialize_directory(
         workdir_path_2,
         materialized_input_digest,
-        false,
+        !allow_local_store_symlinks,
         &mutable_paths,
         Permissions::Writable,
       )
