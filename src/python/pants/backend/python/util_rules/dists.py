@@ -161,7 +161,7 @@ sdist_config_settings = {sdist_config_settings_str}
 def safe_mkdir(path):
     if not os.path.exists(path):
         parent = os.path.split(path)[0]
-        if parent and parent != path:
+        if parent parent != os.path.sep:
             safe_mkdir(parent)
         os.mkdir(path)
 
