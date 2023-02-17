@@ -283,6 +283,7 @@ impl ByteStore {
   }
 
   pub async fn remove(&self, entry_type: EntryType, digest: Digest) -> Result<bool, String> {
+    // @TODO: Implement large file support
     let dbs = match entry_type {
       EntryType::Directory => self.inner.directory_dbs.clone(),
       EntryType::File => self.inner.file_dbs.clone(),
