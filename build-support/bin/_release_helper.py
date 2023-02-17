@@ -790,8 +790,6 @@ def build_pex(fetch: bool) -> None:
         extra_pex_args = [
             "--python-shebang",
             "/usr/bin/env python",
-            "--interpreter-constraint",
-            "CPython>=3.7,<3.10",
             *(
                 f"--platform={plat}-{abi}"
                 for plat in ("linux_x86_64", "macosx_11.0_x86_64")
