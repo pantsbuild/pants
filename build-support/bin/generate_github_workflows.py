@@ -238,7 +238,7 @@ def install_go() -> Step:
     return {
         "name": "Install Go",
         "uses": "actions/setup-go@v3",
-        "with": {"go-version": "1.19.5"},
+        "with": {"go-version": "1.20.1"},
     }
 
 

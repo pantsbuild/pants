@@ -442,7 +442,7 @@ jobs:
     - name: Install Go
       uses: actions/setup-go@v3
       with:
-        go-version: 1.19.5
+        go-version: 1.20.1
     - env: {}
       name: Build wheels
       run: 'USE_PY39=true ./build-support/bin/release.sh build-local-pex
@@ -510,7 +510,7 @@ jobs:
     - name: Install Go
       uses: actions/setup-go@v3
       with:
-        go-version: 1.19.5
+        go-version: 1.20.1
     - env:
         ARCHFLAGS: -arch x86_64
       name: Build wheels
@@ -579,7 +579,7 @@ jobs:
     - name: Install Go
       uses: actions/setup-go@v3
       with:
-        go-version: 1.19.5
+        go-version: 1.20.1
     - env:
         ARCHFLAGS: -arch arm64
       name: Build wheels
@@ -814,7 +814,7 @@ jobs:
     - name: Install Go
       uses: actions/setup-go@v3
       with:
-        go-version: 1.19.5
+        go-version: 1.20.1
     - if: runner.os == 'Linux'
       name: Download Apache `thrift` binary (Linux)
       run: 'mkdir -p "${HOME}/.thrift"
@@ -888,7 +888,7 @@ jobs:
     - name: Install Go
       uses: actions/setup-go@v3
       with:
-        go-version: 1.19.5
+        go-version: 1.20.1
     - if: runner.os == 'Linux'
       name: Download Apache `thrift` binary (Linux)
       run: 'mkdir -p "${HOME}/.thrift"
@@ -962,7 +962,7 @@ jobs:
     - name: Install Go
       uses: actions/setup-go@v3
       with:
-        go-version: 1.19.5
+        go-version: 1.20.1
     - if: runner.os == 'Linux'
       name: Download Apache `thrift` binary (Linux)
       run: 'mkdir -p "${HOME}/.thrift"
