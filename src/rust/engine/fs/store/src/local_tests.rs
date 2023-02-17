@@ -3,6 +3,7 @@
 use crate::local::ByteStore;
 use crate::{EntryType, LocalOptions, ShrinkBehavior};
 
+use std::collections::HashSet;
 use std::io;
 use std::path::Path;
 use std::time::Duration;
@@ -590,8 +591,40 @@ async fn empty_directory_is_known() {
 async fn all_digests() {
   let dir = TempDir::new().unwrap();
   let store = new_store(dir.path());
-  let digest = prime_store_with_file_bytes(&store, TestData::roland().bytes()).await;
-  assert_eq!(Ok(vec![digest]), store.all_digests(EntryType::File));
+  let digest1 = prime_store_with_file_bytes(&store, TestData::roland().bytes()).await;
+  assert_eq!(Ok(vec![digest1]), store.all_digests(EntryType::File));
+  let large_testdata = TestData::new("123456789".repeat(1000).as_str());
+  let digest2 = prime_store_with_file_bytes(&store, large_testdata.bytes()).await;
+  assert_eq!(
+    Ok(vec![digest1, digest2]),
+    store.all_digests(EntryType::File)
+  );
+}
+
+#[tokio::test]
+async fn get_missing_digests() {
+  let dir = TempDir::new().unwrap();
+  let store = new_store(dir.path());
+  let small_testdata = TestData::roland();
+  let large_testdata = TestData::new("123456789".repeat(1000 * 512).as_str());
+
+  prime_store_with_file_bytes(&store, small_testdata.bytes()).await;
+  prime_store_with_file_bytes(&store, large_testdata.bytes()).await;
+  let missing = store
+    .get_missing_digests(
+      EntryType::File,
+      HashSet::from([
+        small_testdata.digest(),
+        large_testdata.digest(),
+        hashing::Digest::of_bytes("1".as_bytes()),
+      ]),
+    )
+    .await
+    .unwrap();
+  assert_eq!(
+    missing,
+    HashSet::from([hashing::Digest::of_bytes("1".as_bytes())])
+  )
 }
 
 pub fn new_store<P: AsRef<Path>>(dir: P) -> ByteStore {

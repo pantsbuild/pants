@@ -303,7 +303,7 @@ impl ByteStore {
     initial_lease: bool,
   ) -> Result<Digest, String> {
     let len = bytes.len();
-    if matches!(entry_type, EntryType::File) && ByteStore::uses_large_file_store(len) {
+    if entry_type == EntryType::File && ByteStore::uses_large_file_store(len) {
       Ok(self.store_large_bytes(bytes, digest).await?)
     } else {
       let dbs = match entry_type {
@@ -333,7 +333,7 @@ impl ByteStore {
     let mut small_items = vec![];
     let mut big_items = vec![];
     for (digest, bytes) in items {
-      if matches!(entry_type, EntryType::File) && ByteStore::uses_large_file_store(bytes.len()) {
+      if entry_type == EntryType::File && ByteStore::uses_large_file_store(bytes.len()) {
         big_items.push((digest, bytes));
       } else {
         small_items.push((digest, bytes));
@@ -470,36 +470,41 @@ impl ByteStore {
     entry_type: EntryType,
     digests: HashSet<Digest>,
   ) -> Result<HashSet<Digest>, String> {
-    let mut large_digests = vec![];
-    let mut small_digests = vec![];
+    let mut large_file_digests = vec![];
+    let mut other_digests = vec![];
     for digest in digests.iter() {
-      if ByteStore::uses_large_file_store(digest.size_bytes) {
-        large_digests.push(digest);
+      if entry_type == EntryType::File && ByteStore::uses_large_file_store(digest.size_bytes) {
+        large_file_digests.push(digest);
       }
       // Avoid I/O for this case. This allows some client-provided operations (like
       // merging snapshots) to work without needing to first store the empty snapshot.
       else if *digest != EMPTY_DIGEST {
-        small_digests.push(digest);
+        other_digests.push(digest);
       }
     }
 
     let mut existing = HashSet::new();
-    if !large_digests.is_empty() {
+    if !large_file_digests.is_empty() {
       existing.extend(
         self
-          .get_existing_large_fingerprints(large_digests.iter().map(|digest| digest.hash).collect())
+          .get_existing_large_fingerprints(
+            large_file_digests
+              .iter()
+              .map(|digest| digest.hash)
+              .collect(),
+          )
           .await,
       );
     }
 
-    if !small_digests.is_empty() {
+    if !other_digests.is_empty() {
       let dbs = match entry_type {
         EntryType::Directory => self.inner.directory_dbs.clone(),
         EntryType::File => self.inner.file_dbs.clone(),
       }?;
       existing.extend(
         dbs
-          .exists_batch(small_digests.iter().map(|digest| digest.hash).collect())
+          .exists_batch(other_digests.iter().map(|digest| digest.hash).collect())
           .await?,
       );
     }
@@ -610,6 +615,25 @@ impl ByteStore {
         let v = VersionedFingerprint::from_bytes_unsafe(key);
         let fingerprint = v.get_fingerprint();
         digests.push(Digest::new(fingerprint, bytes.len()));
+      }
+    }
+    if entry_type == EntryType::File {
+      let maybe_shards = std::fs::read_dir(self.inner.large_files_root.clone());
+      if let Ok(shards) = maybe_shards {
+        for entry in shards {
+          let shard = entry.map_err(|e| e.to_string())?;
+          let large_files = std::fs::read_dir(shard.path()).map_err(|e| e.to_string())?;
+          for entry in large_files {
+            let large_file = entry.map_err(|e| e.to_string())?;
+            let path = large_file.path();
+            let hash = path.file_name().unwrap().to_str().unwrap();
+            let length = large_file.metadata().map_err(|e| e.to_string())?.len();
+            digests.push(Digest::new(
+              Fingerprint::from_hex_string(hash).unwrap(),
+              length as usize,
+            ));
+          }
+        }
       }
     }
     Ok(digests)
