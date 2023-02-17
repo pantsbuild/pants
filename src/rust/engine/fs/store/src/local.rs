@@ -9,7 +9,7 @@ use std::sync::Arc;
 use std::time::{self, Duration, Instant};
 
 use bytes::{Buf, Bytes};
-use futures::future::{self, try_join, try_join_all};
+use futures::future::{self, join_all, try_join, try_join_all};
 use hashing::{async_verified_copy, hash, hash_path, Digest, Fingerprint, EMPTY_DIGEST};
 use lmdb::Error::NotFound;
 use lmdb::{self, Cursor, Transaction};
@@ -426,6 +426,41 @@ impl ByteStore {
   }
 
   ///
+  /// Determine which of the given Fingerprints are already present in the large file store,
+  /// returning them as a set.
+  ///
+  async fn get_existing_large_fingerprints(
+    &self,
+    fingerprints: Vec<Fingerprint>,
+  ) -> HashSet<Fingerprint> {
+    let paths_to_check = fingerprints
+      .iter()
+      .map(|fingerprint| self.large_file_path(*fingerprint))
+      .collect::<Vec<_>>();
+
+    #[allow(clippy::redundant_closure)]
+    let results = join_all(
+      paths_to_check
+        .iter()
+        .map(|path| tokio::fs::File::open(path)),
+    )
+    .await;
+    let existing = results
+      .iter()
+      .zip(fingerprints)
+      .filter_map(|(result, fingerprint)| {
+        if result.is_ok() {
+          Some(fingerprint)
+        } else {
+          None
+        }
+      })
+      .collect::<Vec<_>>();
+
+    HashSet::from_iter(existing)
+  }
+
+  ///
   /// Given a collection of Digests (digests),
   /// returns the set of digests from that collection not present in the
   /// underlying LMDB store.
@@ -435,25 +470,39 @@ impl ByteStore {
     entry_type: EntryType,
     digests: HashSet<Digest>,
   ) -> Result<HashSet<Digest>, String> {
-    let fingerprints_to_check = digests
-      .iter()
-      .filter_map(|digest| {
-        // Avoid I/O for this case. This allows some client-provided operations (like
-        // merging snapshots) to work without needing to first store the empty snapshot.
-        if *digest == EMPTY_DIGEST {
-          None
-        } else {
-          Some(digest.hash)
-        }
-      })
-      .collect::<Vec<_>>();
+    let mut large_digests = vec![];
+    let mut small_digests = vec![];
+    for digest in digests.iter() {
+      if ByteStore::uses_large_file_store(digest.size_bytes) {
+        large_digests.push(digest);
+      }
+      // Avoid I/O for this case. This allows some client-provided operations (like
+      // merging snapshots) to work without needing to first store the empty snapshot.
+      else if *digest != EMPTY_DIGEST {
+        small_digests.push(digest);
+      }
+    }
 
-    let dbs = match entry_type {
-      EntryType::Directory => self.inner.directory_dbs.clone(),
-      EntryType::File => self.inner.file_dbs.clone(),
-    }?;
+    let mut existing = HashSet::new();
+    if !large_digests.is_empty() {
+      existing.extend(
+        self
+          .get_existing_large_fingerprints(large_digests.iter().map(|digest| digest.hash).collect())
+          .await,
+      );
+    }
 
-    let existing = dbs.exists_batch(fingerprints_to_check).await?;
+    if !small_digests.is_empty() {
+      let dbs = match entry_type {
+        EntryType::Directory => self.inner.directory_dbs.clone(),
+        EntryType::File => self.inner.file_dbs.clone(),
+      }?;
+      existing.extend(
+        dbs
+          .exists_batch(small_digests.iter().map(|digest| digest.hash).collect())
+          .await?,
+      );
+    }
 
     let missing = digests
       .into_iter()
