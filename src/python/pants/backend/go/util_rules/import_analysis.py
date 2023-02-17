@@ -40,6 +40,13 @@ class GoStdLibPackage:
     syso_files: tuple[str, ...]
     cgo_flags: CGoCompilerFlags
 
+    # Embed configuration.
+    #
+    # Note: `EmbedConfig` is not resolved here to avoid issues with trying to build the the embed analyzer.
+    # The `EmbedConfig` will be resolved in `build_pkg_target.py` rules.
+    embed_patterns: tuple[str, ...]
+    embed_files: tuple[str, ...]
+
 
 class GoStdLibPackages(FrozenDict[str, GoStdLibPackage]):
     """A mapping of standard library import paths to an analysis of the package at that import
@@ -95,6 +102,8 @@ async def analyze_go_stdlib_packages(request: GoStdLibPackagesRequest) -> GoStdL
                 ldflags=tuple(pkg_json.get("CgoLDFLAGS", [])),
                 pkg_config=tuple(pkg_json.get("CgoPkgConfig", [])),
             ),
+            embed_patterns=tuple(pkg_json.get("EmbedPatterns", [])),
+            embed_files=tuple(pkg_json.get("EmbedFiles", [])),
         )
 
     return GoStdLibPackages(stdlib_packages)

@@ -27,7 +27,7 @@ from pants.engine.target import (
     Targets,
 )
 from pants.engine.unions import UnionRule
-from pants.util.strutil import softwrap
+from pants.util.strutil import help_text
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +55,7 @@ class WrapSourceInputsField(SpecialCasedDependencies):
 class WrapSourceOutputsField(StringSequenceField):
     alias = "outputs"
     required = False
-    help = softwrap(
+    help = help_text(
         "The output files that are made available in the new context by this target. If not "
         "specified, the target will capture all files with the expected extensions for this "
         "source format: see the help for the target for the specific extensions. If no extensions "
@@ -127,7 +127,7 @@ def wrap_source_rule_and_target(
             WrapSourceInputsField,
             WrapSourceOutputsField,
         )
-        help = softwrap(
+        help = help_text(
             "Allow files and sources produced by the targets specified by `inputs` to be consumed "
             f"by rules that specifically expect a `{source_field_type.__name__}`.\n\n"
             f"Note that this target does not modify the files in any way. {outputs_help}\n\n"

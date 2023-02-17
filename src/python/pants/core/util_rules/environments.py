@@ -43,14 +43,14 @@ from pants.option.subsystem import Subsystem
 from pants.util.enums import match
 from pants.util.frozendict import FrozenDict
 from pants.util.memo import memoized
-from pants.util.strutil import bullet_list, softwrap
+from pants.util.strutil import bullet_list, help_text, softwrap
 
 logger = logging.getLogger(__name__)
 
 
 class EnvironmentsSubsystem(Subsystem):
     options_scope = "environments-preview"
-    help = softwrap(
+    help = help_text(
         """
         A highly experimental subsystem to allow setting environment variables and executable
         search paths for different environments, e.g. macOS vs. Linux.
@@ -93,7 +93,7 @@ class EnvironmentField(StringField):
     alias = "environment"
     default = LOCAL_ENVIRONMENT_MATCHER
     value: str
-    help = softwrap(
+    help = help_text(
         f"""
         Specify which environment target to consume environment-sensitive options from.
 
@@ -118,7 +118,7 @@ class CompatiblePlatformsField(StringSequenceField):
     default = tuple(plat.value for plat in Platform)
     valid_choices = Platform
     value: tuple[str, ...]
-    help = softwrap(
+    help = help_text(
         f"""
         Which platforms this environment can be used with.
 
@@ -133,7 +133,7 @@ class CompatiblePlatformsField(StringSequenceField):
 
 
 class LocalFallbackEnvironmentField(FallbackEnvironmentField):
-    help = softwrap(
+    help = help_text(
         f"""
         The environment to fallback to when this local environment cannot be used because the
         field `{CompatiblePlatformsField.alias}` is not compatible with the local host.
@@ -154,7 +154,7 @@ class LocalFallbackEnvironmentField(FallbackEnvironmentField):
 class LocalEnvironmentTarget(Target):
     alias = "local_environment"
     core_fields = (*COMMON_TARGET_FIELDS, CompatiblePlatformsField, LocalFallbackEnvironmentField)
-    help = softwrap(
+    help = help_text(
         f"""
         Configuration of a local execution environment for specific platforms.
 
@@ -179,7 +179,7 @@ class DockerImageField(StringField):
     alias = "image"
     required = True
     value: str
-    help = softwrap(
+    help = help_text(
         """
         The docker image ID to use when this environment is loaded.
 
@@ -198,7 +198,7 @@ class DockerPlatformField(StringField):
     alias = "platform"
     default = None
     valid_choices = Platform
-    help = softwrap(
+    help = help_text(
         """
         If set, Docker will always use the specified platform when pulling and running the image.
 
@@ -236,7 +236,7 @@ def docker_platform_field_default_factory(
 
 
 class DockerFallbackEnvironmentField(FallbackEnvironmentField):
-    help = softwrap(
+    help = help_text(
         f"""
         The environment to fallback to when this Docker environment cannot be used because either
         the global option `--docker-execution` is false, or the
@@ -258,7 +258,7 @@ class DockerEnvironmentTarget(Target):
         DockerPlatformField,
         DockerFallbackEnvironmentField,
     )
-    help = softwrap(
+    help = help_text(
         """
         Configuration of a Docker environment used for building your code.
 
@@ -285,7 +285,7 @@ class RemoteExtraPlatformPropertiesField(StringSequenceField):
     alias = "extra_platform_properties"
     default = ()
     value: tuple[str, ...]
-    help = softwrap(
+    help = help_text(
         """
         Platform properties to set on remote execution requests.
 
@@ -298,7 +298,7 @@ class RemoteExtraPlatformPropertiesField(StringSequenceField):
 
 
 class RemoteFallbackEnvironmentField(FallbackEnvironmentField):
-    help = softwrap(
+    help = help_text(
         f"""
         The environment to fallback to when remote execution is disabled via the global option
         `--remote-execution`.
@@ -318,7 +318,7 @@ class RemoteFallbackEnvironmentField(FallbackEnvironmentField):
 class RemoteEnvironmentCacheBinaryDiscovery(BoolField):
     alias = "cache_binary_discovery"
     default = False
-    help = softwrap(
+    help = help_text(
         f"""
         If true, will cache system binary discovery, e.g. finding Python interpreters.
 
@@ -346,7 +346,7 @@ class RemoteEnvironmentTarget(Target):
         RemoteFallbackEnvironmentField,
         RemoteEnvironmentCacheBinaryDiscovery,
     )
-    help = softwrap(
+    help = help_text(
         """
         Configuration of a remote execution environment used for building your code.
 

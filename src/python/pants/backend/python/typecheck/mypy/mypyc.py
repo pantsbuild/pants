@@ -18,13 +18,13 @@ from pants.backend.python.util_rules.pex_from_targets import RequirementsPexRequ
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import BoolField, Target
 from pants.engine.unions import UnionRule
-from pants.util.strutil import softwrap
+from pants.util.strutil import help_text
 
 
 class UsesMyPycField(BoolField):
     alias = "uses_mypyc"
     default = False
-    help = softwrap(
+    help = help_text(
         """
         If true, this distribution is built using mypyc.
 

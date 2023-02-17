@@ -24,12 +24,12 @@ from pants.engine.unions import UnionRule
 from pants.option.option_types import BoolOption
 from pants.option.subsystem import Subsystem
 from pants.util.docutil import doc_url, git_url
-from pants.util.strutil import softwrap
+from pants.util.strutil import help_text, softwrap
 
 
 class PythonProtobufSubsystem(Subsystem):
     options_scope = "python-protobuf"
-    help = softwrap(
+    help = help_text(
         f"""
         Options related to the Protobuf Python backend.
 

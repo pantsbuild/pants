@@ -11,13 +11,13 @@ from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.option.option_types import ArgsListOption
 from pants.util.docutil import git_url
-from pants.util.strutil import softwrap
+from pants.util.strutil import help_text
 
 
 class PyOxidizer(PythonToolBase):
     options_scope = "pyoxidizer"
     name = "PyOxidizer"
-    help = softwrap(
+    help = help_text(
         """
         The PyOxidizer utility for packaging Python code in a Rust binary
         (https://pyoxidizer.readthedocs.io/en/stable/pyoxidizer.html).

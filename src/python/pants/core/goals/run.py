@@ -58,7 +58,7 @@ from pants.option.global_options import GlobalOptions
 from pants.option.option_types import ArgsListOption, BoolOption
 from pants.util.frozendict import FrozenDict
 from pants.util.memo import memoized
-from pants.util.strutil import softwrap
+from pants.util.strutil import help_text, softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -111,7 +111,7 @@ class RunFieldSet(FieldSet, metaclass=ABCMeta):
 class RestartableField(BoolField):
     alias = "restartable"
     default = False
-    help = softwrap(
+    help = help_text(
         """
         If true, runs of this target with the `run` goal may be interrupted and
         restarted when its input files change.
@@ -177,7 +177,7 @@ class RunInSandboxRequest(RunRequest):
 
 class RunSubsystem(GoalSubsystem):
     name = "run"
-    help = softwrap(
+    help = help_text(
         """
         Runs a binary target.
 

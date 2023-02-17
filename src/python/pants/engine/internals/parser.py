@@ -47,14 +47,17 @@ class ParseState(threading.local):
         self._dependencies_rules: BuildFileDependencyRulesParserState | None = None
         self._filepath: str | None = None
         self._target_adaptors: list[TargetAdaptor] = []
+        self._is_bootstrap: bool | None = None
 
     def reset(
         self,
         filepath: str,
+        is_bootstrap: bool,
         defaults: BuildFileDefaultsParserState,
         dependents_rules: BuildFileDependencyRulesParserState | None,
         dependencies_rules: BuildFileDependencyRulesParserState | None,
     ) -> None:
+        self._is_bootstrap = is_bootstrap
         self._defaults = defaults
         self._dependents_rules = dependents_rules
         self._dependencies_rules = dependencies_rules
@@ -86,8 +89,21 @@ class ParseState(threading.local):
             )
         return self._defaults
 
-    def set_defaults(self, *args: SetDefaultsT, **kwargs) -> None:
-        self.defaults.set_defaults(*args, **kwargs)
+    @property
+    def is_bootstrap(self) -> bool:
+        if self._is_bootstrap is None:
+            raise AssertionError(
+                "Internal error in Pants. Please file a bug report at "
+                "https://github.com/pantsbuild/pants/issues/new"
+            )
+        return self._is_bootstrap
+
+    def set_defaults(
+        self, *args: SetDefaultsT, ignore_unknown_fields: bool = False, **kwargs
+    ) -> None:
+        self.defaults.set_defaults(
+            *args, ignore_unknown_fields=self.is_bootstrap or ignore_unknown_fields, **kwargs
+        )
 
     def set_dependents_rules(self, *args, **kwargs) -> None:
         if self._dependents_rules is not None:
@@ -229,12 +245,14 @@ class Parser:
         build_file_content: str,
         extra_symbols: BuildFilePreludeSymbols,
         env_vars: EnvironmentVars,
+        is_bootstrap: bool,
         defaults: BuildFileDefaultsParserState,
         dependents_rules: BuildFileDependencyRulesParserState | None,
         dependencies_rules: BuildFileDependencyRulesParserState | None,
     ) -> list[TargetAdaptor]:
         self._parse_state.reset(
             filepath=filepath,
+            is_bootstrap=is_bootstrap,
             defaults=defaults,
             dependents_rules=dependents_rules,
             dependencies_rules=dependencies_rules,
@@ -263,6 +281,7 @@ class Parser:
                     global_symbols[bad_symbol] = _unrecognized_symbol_func
                     self._parse_state.reset(
                         filepath=filepath,
+                        is_bootstrap=is_bootstrap,
                         defaults=defaults,
                         dependents_rules=dependents_rules,
                         dependencies_rules=dependencies_rules,

@@ -23,6 +23,7 @@ target(
         "src/python/pants/backend/codegen/thrift/apache/python",
         "src/python/pants/backend/docker",
         "src/python/pants/backend/docker/lint/hadolint",
+        "src/python/pants/backend/experimental/adhoc",
         "src/python/pants/backend/experimental/cc",
         "src/python/pants/backend/experimental/cc/lint/clangformat",
         "src/python/pants/backend/experimental/codegen/avro/java",

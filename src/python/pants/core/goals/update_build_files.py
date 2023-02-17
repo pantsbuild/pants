@@ -48,7 +48,7 @@ from pants.option.option_types import BoolOption, EnumOption
 from pants.util.docutil import bin_name, doc_url
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized
-from pants.util.strutil import softwrap
+from pants.util.strutil import help_text, softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -107,7 +107,7 @@ class DeprecationFixerRequest(RewrittenBuildFileRequest):
 
 class UpdateBuildFilesSubsystem(GoalSubsystem):
     name = "update-build-files"
-    help = softwrap(
+    help = help_text(
         f"""
         Format and fix safe deprecations in BUILD files.
 
