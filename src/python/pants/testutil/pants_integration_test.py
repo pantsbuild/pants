@@ -248,7 +248,6 @@ def setup_tmpdir(
 
     This is useful to set up controlled test environments, such as setting up source files and
     BUILD files.
-
     """
 
     raw_files = raw_files or {}
