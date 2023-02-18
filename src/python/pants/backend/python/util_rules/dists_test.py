@@ -59,14 +59,13 @@ def do_test_backend_shim(rule_runner: RuleRunner, constraints: str) -> None:
         input=input_digest,
         working_directory="",
         build_time_source_roots=tuple(),
-        output_path="dist",
         wheel_config_settings=FrozenDict({"setting1": ("value1",), "setting2": ("value2",)}),
     )
     res = rule_runner.request(DistBuildResult, [req])
 
     is_py2 = "2.7" in constraints
-    assert res.sdist_path == "dist/foobar-1.2.3.tar.gz"
-    assert res.wheel_path == f"dist/foobar-1.2.3-py{'2' if is_py2 else '3'}-none-any.whl"
+    assert res.sdist_path == "foobar-1.2.3.tar.gz"
+    assert res.wheel_path == f"foobar-1.2.3-py{'2' if is_py2 else '3'}-none-any.whl"
 
 
 @skip_unless_python27_present
