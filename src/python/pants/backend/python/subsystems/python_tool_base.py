@@ -3,11 +3,11 @@
 
 from __future__ import annotations
 
+from enum import Enum
 from typing import Any, ClassVar, Iterable, Sequence
 
 from pants.backend.python.target_types import ConsoleScript, EntryPoint, MainSpecification
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.lockfile import LockfileRules
 from pants.backend.python.util_rules.pex import PexRequest
 from pants.backend.python.util_rules.pex_requirements import (
     EntireLockfile,
@@ -26,6 +26,18 @@ from pants.option.option_types import BoolOption, StrListOption, StrOption
 from pants.option.subsystem import Subsystem
 from pants.util.docutil import bin_name, doc_url
 from pants.util.strutil import softwrap
+
+
+class LockfileRules(Enum):
+    """The type of lockfile generation strategy to use for a tool.
+
+    - CUSTOM : Only Python lockfile rules are added, the rest are implemented by the tool
+    - SIMPLE : A python tool that can be installed with pip simply with `pip install mytool`.
+        It does not need other information about the code it operates on, such as their interpreter constraints.
+    """
+
+    CUSTOM = "custom"
+    SIMPLE = "simple"
 
 
 class PythonToolRequirementsBase(Subsystem):
@@ -266,7 +278,9 @@ class PythonToolRequirementsBase(Subsystem):
     @classmethod
     def rules(cls: Any) -> Iterable[Any]:
         yield from super().rules()
-        yield from cls.lockfile_rules_type.default_rules(cls)
+        from pants.backend.python.util_rules import lockfile
+
+        yield from lockfile.default_rules(cls)
 
 
 class PythonToolBase(PythonToolRequirementsBase):

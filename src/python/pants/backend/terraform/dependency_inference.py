@@ -5,9 +5,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import PurePath
 
-from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
+from pants.backend.python.subsystems.python_tool_base import (
+    LockfileRules,
+    PythonToolRequirementsBase,
+)
 from pants.backend.python.target_types import EntryPoint
-from pants.backend.python.util_rules.lockfile import LockfileRules
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.backend.terraform.target_types import TerraformModuleSourcesField
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior

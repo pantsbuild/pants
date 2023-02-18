@@ -3,17 +3,17 @@
 
 from __future__ import annotations
 
-from enum import Enum
-from typing import TYPE_CHECKING, Iterable, Type
+from typing import Iterable, Type
 
 from pants.backend.python.goals.lockfile import GeneratePythonLockfile
+from pants.backend.python.subsystems.python_tool_base import (
+    LockfileRules,
+    PythonToolRequirementsBase,
+)
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.engine.rules import rule
 from pants.engine.unions import UnionRule
 from pants.util.memo import memoized
-
-if TYPE_CHECKING:
-    from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
 
 
 @memoized
@@ -37,19 +37,8 @@ def _pex_simple_lockfile_rules(python_tool: Type["PythonToolRequirementsBase"]) 
     )
 
 
-class LockfileRules(Enum):
-    """The type of lockfile generation strategy to use for a tool.
-
-    - CUSTOM : Only Python lockfile rules are added, the rest are implemented by the tool
-    - SIMPLE : A python tool that can be installed with pip simply with `pip install mytool`.
-        It does not need other information about the code it operates on, such as their interpreter constraints.
-    """
-
-    CUSTOM = "custom"
-    SIMPLE = "simple"
-
-    def default_rules(self, cls) -> Iterable:
-        if self == LockfileRules.SIMPLE:
-            yield from _pex_simple_lockfile_rules(cls)
-        else:
-            return
+def default_rules(cls: Type[PythonToolRequirementsBase]) -> Iterable:
+    if cls.lockfile_rules_type == LockfileRules.SIMPLE:
+        yield from _pex_simple_lockfile_rules(cls)
+    else:
+        return

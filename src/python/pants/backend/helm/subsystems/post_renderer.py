@@ -15,10 +15,12 @@ from typing import Any, Iterable, Mapping
 import yaml
 
 from pants.backend.helm.utils.yaml import FrozenYamlIndex
-from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
+from pants.backend.python.subsystems.python_tool_base import (
+    LockfileRules,
+    PythonToolRequirementsBase,
+)
 from pants.backend.python.target_types import EntryPoint
 from pants.backend.python.util_rules import pex
-from pants.backend.python.util_rules.lockfile import LockfileRules
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.core.goals.run import RunFieldSet, RunRequest
 from pants.core.util_rules.system_binaries import CatBinary

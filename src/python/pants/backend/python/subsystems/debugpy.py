@@ -3,9 +3,8 @@
 
 from __future__ import annotations
 
-from pants.backend.python.subsystems.python_tool_base import PythonToolBase
+from pants.backend.python.subsystems.python_tool_base import LockfileRules, PythonToolBase
 from pants.backend.python.target_types import EntryPoint
-from pants.backend.python.util_rules.lockfile import LockfileRules
 from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
 from pants.engine.rules import collect_rules
 from pants.option.option_types import ArgsListOption

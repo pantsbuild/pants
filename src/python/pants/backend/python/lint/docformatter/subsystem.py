@@ -3,9 +3,12 @@
 
 
 from pants.backend.python.goals.export import ExportPythonTool, ExportPythonToolSentinel
-from pants.backend.python.subsystems.python_tool_base import ExportToolOption, PythonToolBase
+from pants.backend.python.subsystems.python_tool_base import (
+    ExportToolOption,
+    LockfileRules,
+    PythonToolBase,
+)
 from pants.backend.python.target_types import ConsoleScript
-from pants.backend.python.util_rules.lockfile import LockfileRules
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.option.option_types import ArgsListOption, SkipOption

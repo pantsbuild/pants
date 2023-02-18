@@ -3,9 +3,8 @@
 
 from __future__ import annotations
 
-from pants.backend.python.subsystems.python_tool_base import PythonToolBase
+from pants.backend.python.subsystems.python_tool_base import LockfileRules, PythonToolBase
 from pants.backend.python.target_types import ConsoleScript
-from pants.backend.python.util_rules.lockfile import LockfileRules
 from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.engine.fs import CreateDigest
 from pants.engine.rules import collect_rules
