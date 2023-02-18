@@ -157,15 +157,13 @@ build_sdist = {build_sdist}
 wheel_config_settings = {wheel_config_settings_str}
 sdist_config_settings = {sdist_config_settings_str}
 
-# Python 2.7 doesn't have the exist_ok arg on os.makedirs(), so we have to emulate it.
-def safe_mkdir(path):
-    if not os.path.exists(path):
-        parent = os.path.split(path)[0]
-        if parent and parent != os.path.sep:
-            safe_mkdir(parent)
-        os.mkdir(path)
+# Python 2.7 doesn't have the exist_ok arg on os.makedirs().
+try:
+    os.makedirs(dist_dir)
+except OSError as e:
+    if e.errno != errno.EEXIST:
+        raise
 
-safe_mkdir(dist_dir)
 wheel_path = backend.build_wheel(dist_dir, wheel_config_settings) if build_wheel else None
 sdist_path = backend.build_sdist(dist_dir, sdist_config_settings) if build_sdist else None
 
