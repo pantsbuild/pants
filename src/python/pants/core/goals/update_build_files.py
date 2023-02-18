@@ -19,6 +19,7 @@ from pants.backend.build_files.fix.deprecations import renamed_fields_rules, ren
 from pants.backend.build_files.fix.deprecations.base import FixedBUILDFile
 from pants.backend.build_files.fmt.black.register import BlackRequest
 from pants.backend.build_files.fmt.yapf.register import YapfRequest
+from pants.backend.python.goals import lockfile
 from pants.backend.python.lint.black.rules import _run_black
 from pants.backend.python.lint.black.subsystem import Black
 from pants.backend.python.lint.yapf.rules import _run_yapf
@@ -427,6 +428,7 @@ def rules():
         *collect_rules(renamed_fields_rules),
         *collect_rules(renamed_targets_rules),
         *pex.rules(),
+        *lockfile.rules(),
         UnionRule(RewrittenBuildFileRequest, RenameDeprecatedTargetsRequest),
         UnionRule(RewrittenBuildFileRequest, RenameDeprecatedFieldsRequest),
         # NB: We want this to come at the end so that running Black or Yapf happens
