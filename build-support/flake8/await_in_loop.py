@@ -42,7 +42,7 @@ def check_for_await_in_loop(tree: ast.AST, filename: str) -> Iterator[tuple[int,
             finally:
                 self._in_loop = old
 
-        def traverse(self, node: ast.Ast | list[ast.Ast]):
+        def traverse(self, node: ast.AST | list[ast.AST]):
             if isinstance(node, list):
                 for x in node:
                     self.visit(x)
