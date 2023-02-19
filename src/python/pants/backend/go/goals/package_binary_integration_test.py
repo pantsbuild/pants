@@ -3,15 +3,9 @@
 
 from __future__ import annotations
 
-import base64
-import hashlib
-import io
-import json
 import os.path
 import subprocess
-import zipfile
 from textwrap import dedent
-from typing import Iterable
 
 import pytest
 
@@ -19,6 +13,7 @@ from pants.backend.go import target_type_rules
 from pants.backend.go.goals import package_binary
 from pants.backend.go.goals.package_binary import GoBinaryFieldSet
 from pants.backend.go.target_types import GoBinaryTarget, GoModTarget, GoPackageTarget
+from pants.backend.go.testutil import gen_module_gomodproxy
 from pants.backend.go.util_rules import (
     assembly,
     build_pkg,
@@ -112,36 +107,18 @@ def test_package_simple(rule_runner: RuleRunner) -> None:
     assert result.stdout == b"Hello world!\n"
 
 
-def _gen_third_party_pkg():
-    # Implements hashing algorithm from https://cs.opensource.google/go/x/mod/+/refs/tags/v0.5.0:sumdb/dirhash/hash.go.
-    def _compute_module_hash(files: Iterable[tuple[str, str]]) -> str:
-        sorted_files = sorted(files, key=lambda x: x[0])
-        summary = ""
-        for name, content in sorted_files:
-            h = hashlib.sha256(content.encode())
-            summary += f"{h.hexdigest()}  {name}\n"
-
-        h = hashlib.sha256(summary.encode())
-        summary_digest = base64.standard_b64encode(h.digest()).decode()
-        return f"h1:{summary_digest}"
-
-    import_path = "pantsbuild.org/go-embed-sample-for-test"
+def test_package_third_party_requires_main(rule_runner: RuleRunner) -> None:
+    import_path = "pantsbuild.org/go-sample-for-test"
     version = "v0.0.1"
-    go_mod_content = dedent(
-        f"""\
-        module {import_path}
-        go 1.16
-        """
-    )
-    go_mod_sum = _compute_module_hash([("go.mod", go_mod_content)])
 
-    prefix = f"{import_path}@{version}"
-    files_in_zip = (
-        (f"{prefix}/go.mod", go_mod_content),
+    fake_gomod = gen_module_gomodproxy(
+        version,
+        import_path,
         (
-            f"{prefix}/pkg/hello/hello.go",
-            dedent(
-                """\
+            (
+                "pkg/hello/hello.go",
+                dedent(
+                    """\
         package hello
         import "fmt"
 
@@ -150,43 +127,26 @@ def _gen_third_party_pkg():
             fmt.Println("Hello world!")
         }
         """
+                ),
             ),
-        ),
-        (
-            f"{prefix}/cmd/hello/main.go",
-            dedent(
-                """\
+            (
+                "cmd/hello/main.go",
+                dedent(
+                    f"""\
         package main
-        import "pantsbuild.org/go-embed-sample-for-test/pkg/hello"
+        import "{import_path}/pkg/hello"
 
 
-        func main() {
+        func main() {{
             hello.Hello()
-        }
+        }}
         """
+                ),
             ),
         ),
     )
 
-    mod_zip_bytes = io.BytesIO()
-    with zipfile.ZipFile(mod_zip_bytes, "w") as mod_zip:
-        for name, content in files_in_zip:
-            mod_zip.writestr(name, content)
-
-    mod_zip_sum = _compute_module_hash(files_in_zip)
-    return mod_zip_sum, go_mod_sum, import_path, version, go_mod_content, mod_zip_bytes
-
-
-def test_package_third_party_requires_main(rule_runner: RuleRunner) -> None:
-    (
-        mod_zip_sum,
-        go_mod_sum,
-        import_path,
-        version,
-        go_mod_content,
-        mod_zip_bytes,
-    ) = _gen_third_party_pkg()
-    rule_runner.write_files(
+    fake_gomod.update(
         {
             "BUILD": dedent(
                 f"""\
@@ -204,25 +164,10 @@ def test_package_third_party_requires_main(rule_runner: RuleRunner) -> None:
                 )
                 """
             ),
-            "go.sum": dedent(
-                f"""\
-                {import_path} {version} {mod_zip_sum}
-                {import_path} {version}/go.mod {go_mod_sum}
-                """
-            ),
-            # Setup the third-party dependency as a custom Go module proxy site.
-            # See https://go.dev/ref/mod#goproxy-protocol for details.
-            f"go-mod-proxy/{import_path}/@v/list": f"{version}\n",
-            f"go-mod-proxy/{import_path}/@v/{version}.info": json.dumps(
-                {
-                    "Version": version,
-                    "Time": "2022-01-01T01:00:00Z",
-                }
-            ),
-            f"go-mod-proxy/{import_path}/@v/{version}.mod": go_mod_content,
-            f"go-mod-proxy/{import_path}/@v/{version}.zip": mod_zip_bytes.getvalue(),
         }
     )
+
+    rule_runner.write_files(fake_gomod)
 
     rule_runner.set_options(
         [
@@ -239,15 +184,45 @@ def test_package_third_party_requires_main(rule_runner: RuleRunner) -> None:
 
 
 def test_package_third_party_can_run(rule_runner: RuleRunner) -> None:
-    (
-        mod_zip_sum,
-        go_mod_sum,
-        import_path,
+    import_path = "pantsbuild.org/go-sample-for-test"
+    version = "v0.0.1"
+
+    fake_gomod = gen_module_gomodproxy(
         version,
-        go_mod_content,
-        mod_zip_bytes,
-    ) = _gen_third_party_pkg()
-    rule_runner.write_files(
+        import_path,
+        (
+            (
+                "pkg/hello/hello.go",
+                dedent(
+                    """\
+        package hello
+        import "fmt"
+
+
+        func Hello() {
+            fmt.Println("Hello world!")
+        }
+        """
+                ),
+            ),
+            (
+                "cmd/hello/main.go",
+                dedent(
+                    f"""\
+        package main
+        import "{import_path}/pkg/hello"
+
+
+        func main() {{
+            hello.Hello()
+        }}
+        """
+                ),
+            ),
+        ),
+    )
+
+    fake_gomod.update(
         {
             "BUILD": dedent(
                 f"""\
@@ -265,25 +240,10 @@ def test_package_third_party_can_run(rule_runner: RuleRunner) -> None:
                 )
                 """
             ),
-            "go.sum": dedent(
-                f"""\
-                {import_path} {version} {mod_zip_sum}
-                {import_path} {version}/go.mod {go_mod_sum}
-                """
-            ),
-            # Setup the third-party dependency as a custom Go module proxy site.
-            # See https://go.dev/ref/mod#goproxy-protocol for details.
-            f"go-mod-proxy/{import_path}/@v/list": f"{version}\n",
-            f"go-mod-proxy/{import_path}/@v/{version}.info": json.dumps(
-                {
-                    "Version": version,
-                    "Time": "2022-01-01T01:00:00Z",
-                }
-            ),
-            f"go-mod-proxy/{import_path}/@v/{version}.mod": go_mod_content,
-            f"go-mod-proxy/{import_path}/@v/{version}.zip": mod_zip_bytes.getvalue(),
         }
     )
+
+    rule_runner.write_files(fake_gomod)
 
     rule_runner.set_options(
         [

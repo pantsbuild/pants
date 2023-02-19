@@ -3,13 +3,7 @@
 
 from __future__ import annotations
 
-import base64
-import hashlib
-import io
-import json
-import zipfile
 from textwrap import dedent
-from typing import Iterable
 
 import pytest
 
@@ -23,6 +17,7 @@ from pants.backend.go.target_types import (
     GoPackageTarget,
     GoThirdPartyPackageTarget,
 )
+from pants.backend.go.testutil import gen_module_gomodproxy
 from pants.backend.go.util_rules import (
     assembly,
     build_pkg,
@@ -272,35 +267,17 @@ def test_third_party_package_targets_cannot_be_manually_created() -> None:
 
 
 def test_determine_main_pkg_for_go_binary(rule_runner: RuleRunner) -> None:
-    # Implements hashing algorithm from https://cs.opensource.google/go/x/mod/+/refs/tags/v0.5.0:sumdb/dirhash/hash.go.
-    def _compute_module_hash(files: Iterable[tuple[str, str]]) -> str:
-        sorted_files = sorted(files, key=lambda x: x[0])
-        summary = ""
-        for name, content in sorted_files:
-            h = hashlib.sha256(content.encode())
-            summary += f"{h.hexdigest()}  {name}\n"
-
-        h = hashlib.sha256(summary.encode())
-        summary_digest = base64.standard_b64encode(h.digest()).decode()
-        return f"h1:{summary_digest}"
-
-    import_path = "pantsbuild.org/go-embed-sample-for-test"
+    import_path = "pantsbuild.org/go-sample-for-test"
     version = "v0.0.1"
-    go_mod_content = dedent(
-        f"""\
-        module {import_path}
-        go 1.16
-        """
-    )
-    go_mod_sum = _compute_module_hash([("go.mod", go_mod_content)])
 
-    prefix = f"{import_path}@{version}"
-    files_in_zip = (
-        (f"{prefix}/go.mod", go_mod_content),
+    fake_gomod = gen_module_gomodproxy(
+        version,
+        import_path,
         (
-            f"{prefix}/pkg/hello/hello.go",
-            dedent(
-                """\
+            (
+                "pkg/hello/hello.go",
+                dedent(
+                    """\
         package hello
         import "fmt"
 
@@ -309,32 +286,27 @@ def test_determine_main_pkg_for_go_binary(rule_runner: RuleRunner) -> None:
             fmt.Println("Hello world!")
         }
         """
+                ),
             ),
-        ),
-        (
-            f"{prefix}/cmd/hello/main.go",
-            dedent(
-                """\
+            (
+                "cmd/hello/main.go",
+                dedent(
+                    f"""\
         package main
-        import "pantsbuild.org/go-embed-sample-for-test/pkg/hello"
+        import "{import_path}/pkg/hello"
 
 
-        func main() {
+        func main() {{
             hello.Hello()
-        }
+        }}
         """
+                ),
             ),
         ),
     )
 
-    mod_zip_bytes = io.BytesIO()
-    with zipfile.ZipFile(mod_zip_bytes, "w") as mod_zip:
-        for name, content in files_in_zip:
-            mod_zip.writestr(name, content)
-
-    mod_zip_sum = _compute_module_hash(files_in_zip)
-
-    rule_runner.write_files(
+    # mypy gets sad if update is reversed or ** is used here
+    fake_gomod.update(
         {
             "go.mod": dedent(
                 f"""\
@@ -344,12 +316,6 @@ def test_determine_main_pkg_for_go_binary(rule_runner: RuleRunner) -> None:
                 require (
                 \t{import_path} {version}
                 )
-                """
-            ),
-            "go.sum": dedent(
-                f"""\
-                {import_path} {version} {mod_zip_sum}
-                {import_path} {version}/go.mod {go_mod_sum}
                 """
             ),
             "BUILD": "go_mod(name='mod')",
@@ -368,19 +334,10 @@ def test_determine_main_pkg_for_go_binary(rule_runner: RuleRunner) -> None:
                 go_binary(main=':dep')
                 """
             ),
-            # Setup the third-party dependency as a custom Go module proxy site.
-            # See https://go.dev/ref/mod#goproxy-protocol for details.
-            f"go-mod-proxy/{import_path}/@v/list": f"{version}\n",
-            f"go-mod-proxy/{import_path}/@v/{version}.info": json.dumps(
-                {
-                    "Version": version,
-                    "Time": "2022-01-01T01:00:00Z",
-                }
-            ),
-            f"go-mod-proxy/{import_path}/@v/{version}.mod": go_mod_content,
-            f"go-mod-proxy/{import_path}/@v/{version}.zip": mod_zip_bytes.getvalue(),
         }
     )
+
+    rule_runner.write_files(fake_gomod)
 
     rule_runner.set_options(
         [
@@ -412,7 +369,7 @@ def test_determine_main_pkg_for_go_binary(rule_runner: RuleRunner) -> None:
     assert get_main(Address("external")) == Address(
         "",
         target_name="mod",
-        generated_name="pantsbuild.org/go-embed-sample-for-test/cmd/hello",
+        generated_name="pantsbuild.org/go-sample-for-test/cmd/hello",
     )
 
     with engine_error(ResolveError, contains="none were found"):
