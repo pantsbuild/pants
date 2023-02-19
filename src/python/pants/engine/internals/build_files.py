@@ -301,7 +301,9 @@ async def parse_address_family(
         dependencies_rules_parser_state = None
 
     all_env_vars = [
-        await _extract_env_vars(fc, session_values[CompleteEnvironmentVars])
+        await _extract_env_vars(  # noqa: PNT30: requires triage
+            fc, session_values[CompleteEnvironmentVars]
+        )
         for fc in digest_contents
     ]
 

@@ -850,7 +850,7 @@ async def cgo_compile_request(
         oseq = oseq + 1
         out_obj_files.append(ofile)
 
-        compile_process = await _cc(
+        compile_process = await _cc(  # noqa: PNT30: requires triage
             binary_name=golang_env_aware.cgo_gcc_binary_name,
             input_digest=cgo_result.output_digest,
             dir_path=dir_path,
@@ -869,7 +869,7 @@ async def cgo_compile_request(
         oseq = oseq + 1
         out_obj_files.append(ofile)
 
-        compile_process = await _cc(
+        compile_process = await _cc(  # noqa: PNT30: requires triage
             binary_name=golang_env_aware.cgo_gxx_binary_name,
             input_digest=cgo_result.output_digest,
             dir_path=dir_path,
@@ -887,7 +887,7 @@ async def cgo_compile_request(
         oseq = oseq + 1
         out_obj_files.append(ofile)
 
-        compile_process = await _cc(
+        compile_process = await _cc(  # noqa: PNT30: requires triage
             binary_name=golang_env_aware.cgo_gcc_binary_name,
             input_digest=cgo_result.output_digest,
             dir_path=dir_path,
@@ -907,7 +907,7 @@ async def cgo_compile_request(
         oseq = oseq + 1
         out_obj_files.append(ofile)
 
-        compile_process = await _cc(
+        compile_process = await _cc(  # noqa: PNT30: requires triage
             binary_name=golang_env_aware.cgo_fortran_binary_name,
             input_digest=cgo_result.output_digest,
             dir_path=dir_path,

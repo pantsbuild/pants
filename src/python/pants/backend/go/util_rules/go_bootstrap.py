@@ -59,7 +59,7 @@ async def _go_search_paths(
     expanded: list[str] = []
     for s in paths:
         if s == "<PATH>":
-            expanded.extend(await _environment_paths())
+            expanded.extend(await _environment_paths())  # noqa: PNT30: requires triage
         elif s in special_strings:
             special_paths = special_strings[s]()
             expanded.extend(special_paths)

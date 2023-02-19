@@ -854,7 +854,7 @@ async def find_owners(
             candidate_tgts = deleted_candidate_tgts
             sources_set = deleted_files
 
-        build_file_addresses = await MultiGet(
+        build_file_addresses = await MultiGet(  # noqa: PNT30: requires triage
             Get(
                 BuildFileAddress,
                 BuildFileAddressRequest(

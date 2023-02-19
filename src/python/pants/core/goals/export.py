@@ -163,7 +163,9 @@ async def export(
                 env={"PATH": environment.get("PATH", ""), **cmd.extra_env},
                 run_in_workspace=True,
             )
-            ipr = await Effect(InteractiveProcessResult, InteractiveProcess, ip)
+            ipr = await Effect(  # noqa: PNT30: requires triage
+                InteractiveProcessResult, InteractiveProcess, ip
+            )
             if ipr.exit_code:
                 raise ExportError(f"Failed to write {result.description} to {result_dir}")
         if result.resolve:

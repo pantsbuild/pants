@@ -141,7 +141,7 @@ async def prepare_post_renderer_for_helm_deployment(
         return resolved_ref
 
     docker_addr_ref_mapping = {
-        addr: await resolve_docker_image_ref(addr, ctx)
+        addr: await resolve_docker_image_ref(addr, ctx)  # noqa: PNT30: requires triage
         for addr, ctx in zip(docker_addresses, docker_contexts)
     }
 

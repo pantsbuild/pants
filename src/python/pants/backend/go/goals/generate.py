@@ -221,7 +221,7 @@ async def _run_generators(
             args[i] = _expand_env(arg, env)
 
         # Invoke the subprocess and store its output for use as input root of next command (if any).
-        result = await Get(
+        result = await Get(  # noqa: PNT30: requires triage
             ProcessResult,
             Process(
                 argv=args,
@@ -232,7 +232,9 @@ async def _run_generators(
                 description=f"Process `go generate` directives in file: {os.path.join(dir_path, go_file)}",
             ),
         )
-        digest = await Get(Digest, AddPrefix(result.output_digest, dir_path))
+        digest = await Get(  # noqa: PNT30: requires triage
+            Digest, AddPrefix(result.output_digest, dir_path)
+        )
 
     return digest
 
@@ -316,10 +318,10 @@ async def run_go_package_generators(
     # an earlier-processed file prevents later files from being processed.
     output_digest = EMPTY_DIGEST
     for go_file in analysis.go_files:
-        output_digest_for_go_file = await _run_generators(
+        output_digest_for_go_file = await _run_generators(  # noqa: PNT30: requires triage
             analysis, pkg_digest.digest, dir_path, go_file, goroot, env
         )
-        output_digest = await Get(
+        output_digest = await Get(  # noqa: PNT30: requires triage
             Digest, OverwriteMergeDigests(output_digest, output_digest_for_go_file)
         )
 

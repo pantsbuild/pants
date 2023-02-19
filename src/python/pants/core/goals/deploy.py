@@ -194,7 +194,7 @@ async def run_deploy(console: Console, deploy_subsystem: DeploySubsystem) -> Dep
 
         # Publish all deployment dependencies first.
         for publish in publish_processes:
-            ec, statuses = await _invoke_process(
+            ec, statuses = await _invoke_process(  # noqa: PNT30: requires triage
                 console,
                 publish.process,
                 names=publish.names,
@@ -210,7 +210,7 @@ async def run_deploy(console: Console, deploy_subsystem: DeploySubsystem) -> Dep
 
         for deploy in deploy_processes:
             # Invoke the deployment.
-            ec, statuses = await _invoke_process(
+            ec, statuses = await _invoke_process(  # noqa: PNT30: requires triage
                 console,
                 deploy.process,
                 names=[deploy.name],

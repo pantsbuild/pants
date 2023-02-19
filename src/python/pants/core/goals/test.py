@@ -766,7 +766,7 @@ async def _run_debug_tests(
                 )
             )
 
-        debug_result = await Effect(
+        debug_result = await Effect(  # noqa: PNT30: requires triage
             InteractiveProcessResult,
             {
                 debug_request.process: InteractiveProcess,
@@ -912,7 +912,7 @@ async def run_tests(
                 OpenFiles, OpenFilesRequest(coverage_report_files, error_if_open_not_found=False)
             )
             for process in open_files.processes:
-                _ = await Effect(
+                _ = await Effect(  # noqa: PNT30: requires triage
                     InteractiveProcessResult,
                     {process: InteractiveProcess, local_environment_name.val: EnvironmentName},
                 )
