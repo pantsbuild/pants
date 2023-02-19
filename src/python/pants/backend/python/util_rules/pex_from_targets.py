@@ -279,8 +279,8 @@ async def choose_python_resolve(
     return ChosenPythonResolve(
         name=chosen_resolve,
         lockfile=Lockfile(
-            file_path=python_setup.resolves[chosen_resolve],
-            file_path_description_of_origin=(
+            url=python_setup.resolves[chosen_resolve],
+            url_description_of_origin=(
                 f"the resolve `{chosen_resolve}` (from `[python].resolves`)"
             ),
             resolve_name=chosen_resolve,

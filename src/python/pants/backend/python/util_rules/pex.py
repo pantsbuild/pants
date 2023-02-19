@@ -618,7 +618,7 @@ def _build_pex_description(request: PexRequest) -> str:
     if isinstance(request.requirements, EntireLockfile):
         lockfile = request.requirements.lockfile
         if isinstance(lockfile, Lockfile):
-            desc_suffix = f"from {lockfile.file_path}"
+            desc_suffix = f"from {lockfile.url}"
         else:
             desc_suffix = f"from {lockfile.file_content.path}"
     else:

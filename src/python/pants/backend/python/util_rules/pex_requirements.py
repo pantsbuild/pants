@@ -3,9 +3,12 @@
 
 from __future__ import annotations
 
+import importlib.resources
 import logging
+import os
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Iterable, Iterator
+from urllib.parse import urlparse
 
 from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.subsystems.repos import PythonRepos
@@ -47,8 +50,8 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class Lockfile:
-    file_path: str
-    file_path_description_of_origin: str
+    url: str
+    url_description_of_origin: str
     resolve_name: str
     lockfile_hex_digest: str | None = None
 
@@ -162,24 +165,35 @@ async def load_lockfile(
     python_setup: PythonSetup,
 ) -> LoadedLockfile:
     lockfile = request.lockfile
-    if isinstance(lockfile, Lockfile):
+    parts = urlparse(lockfile.url)
+    # urlparse retains the leading / in URLs with a netloc.
+    lockfile_path = parts.path[1:] if parts.path.startswith("/") else parts.path
+    if parts.scheme in {"", "file"}:
         synthetic_lock = False
-        lockfile_path = lockfile.file_path
         lockfile_digest = await Get(
             Digest,
             PathGlobs(
                 [lockfile_path],
                 glob_match_error_behavior=GlobMatchErrorBehavior.error,
-                description_of_origin=lockfile.file_path_description_of_origin,
+                description_of_origin=lockfile.url_description_of_origin,
             ),
         )
         _digest_contents = await Get(DigestContents, Digest, lockfile_digest)
         lock_bytes = _digest_contents[0].content
-    else:
+    elif parts.scheme == "resource":
         synthetic_lock = True
-        _fc = lockfile.file_content
+        _fc = FileContent(
+            lockfile_path,
+            # The "netloc" in our made-up "resource://" scheme is the package.
+            importlib.resources.read_binary(parts.netloc, lockfile_path),
+        )
         lockfile_path, lock_bytes = (_fc.path, _fc.content)
         lockfile_digest = await Get(Digest, CreateDigest([_fc]))
+    else:
+        raise ValueError(
+            f"Unsupported scheme {parts.scheme} for lockfile URL: {lockfile.url} "
+            f"(origin: {lockfile.url_description_of_origin})"
+        )
 
     is_pex_native = is_probably_pex_json_lockfile(lock_bytes)
     if is_pex_native:
@@ -285,7 +299,7 @@ class PexRequirements:
         fields: Iterable[PythonRequirementsField],
         constraints_strings: Iterable[str],
     ) -> PexRequirements:
-        field_requirements = {str(python_req) for field in fields for python_req in field.value}
+        field_requirements = {str(python_req) for fld in fields for python_req in fld.value}
         return PexRequirements(field_requirements, constraints_strings=constraints_strings)
 
     @classmethod
@@ -545,7 +559,7 @@ def _invalid_lockfile_error(
     resolve = lockfile.resolve_name
     yield "You are using "
     if isinstance(lockfile, Lockfile):
-        yield f"the `{resolve}` lockfile at {lockfile.file_path} "
+        yield f"the `{resolve}` lockfile at {lockfile.url} "
     else:
         yield f"the built-in `{resolve}` lockfile provided by Pants "
     yield "with incompatible inputs.\n\n"
