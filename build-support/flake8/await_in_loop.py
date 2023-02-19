@@ -110,7 +110,7 @@ def check_for_await_in_loop(tree: ast.AST, filename: str) -> Iterator[tuple[int,
                     (
                         node.lineno,
                         node.col_offset,
-                        "PNT30 `await` in a loop may be a performance hazard: prefer concurrent requests via MultiGet, or add `# noqa: PNT30 - <explanation>` if this is required",
+                        "PNT30 `await` in a loop may be a performance hazard: prefer concurrent requests via MultiGet, or add `# noqa: PNT30: <explanation>` if this is required",
                         None,
                     )
                 )
