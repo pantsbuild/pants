@@ -165,6 +165,12 @@ async def load_lockfile(
     python_setup: PythonSetup,
 ) -> LoadedLockfile:
     lockfile = request.lockfile
+    # TODO: Fold "resource://" URL support into the DownloadFile primitive, instead of
+    #  manually handling it here. That would also give us support for https:// URLs for tool
+    #  lockfiles (e.g., we could choose to download the default_lockfile_url instead of
+    #  embedding the lockfiles as resources). This would require capturing the SHA256 of
+    #  every current tool lockfile, and we need to think through the consequences of
+    #  downloading lockfiles, so we punt for now.
     parts = urlparse(lockfile.url)
     # urlparse retains the leading / in URLs with a netloc.
     lockfile_path = parts.path[1:] if parts.path.startswith("/") else parts.path

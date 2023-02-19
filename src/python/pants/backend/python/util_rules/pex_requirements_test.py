@@ -152,8 +152,8 @@ def test_validate_lockfiles(
         ["bad-req"] if invalid_reqs else [str(r) for r in METADATA.requirements]
     )
     lockfile = Lockfile(
-        file_path="lock.txt",
-        file_path_description_of_origin="foo",
+        url="lock.txt",
+        url_description_of_origin="foo",
         resolve_name="a",
     )
 

@@ -396,7 +396,7 @@ def test_lockfiles(rule_runner: RuleRunner) -> None:
     def create_lock(path: str) -> None:
         lock = Lockfile(
             path,
-            file_path_description_of_origin="foo",
+            url_description_of_origin="foo",
             resolve_name="a",
         )
         create_pex_and_get_pex_info(
@@ -681,7 +681,7 @@ def test_setup_pex_requirements() -> None:
     lockfile_path = "foo.lock"
     lockfile_digest = rule_runner.make_snapshot_of_empty_files([lockfile_path]).digest
     lockfile_obj = Lockfile(
-        lockfile_path, file_path_description_of_origin="foo", resolve_name="resolve"
+        lockfile_path, url_description_of_origin="foo", resolve_name="resolve"
     )
 
     def create_loaded_lockfile(is_pex_lock: bool) -> LoadedLockfile:
@@ -844,8 +844,8 @@ def test_build_pex_description() -> None:
     assert_description(
         EntireLockfile(
             Lockfile(
-                file_path="lock.txt",
-                file_path_description_of_origin="foo",
+                url="lock.txt",
+                url_description_of_origin="foo",
                 resolve_name="a",
             )
         ),
@@ -872,21 +872,12 @@ def test_lockfile_validation(rule_runner: RuleRunner) -> None:
     ).add_header_to_lockfile(b"", regenerate_command="regen", delimeter="#")
     rule_runner.write_files({"lock.txt": lock_content.decode()})
 
-    lockfile = Lockfile(
+    _lockfile = Lockfile(
         "lock.txt",
-        file_path_description_of_origin="a test",
+        url_description_of_origin="a test",
         resolve_name="a",
     )
     with engine_error(InvalidLockfileError):
         create_pex_and_get_all_data(
-            rule_runner, requirements=EntireLockfile(lockfile, ("ansicolors",))
-        )
-
-    lockfile_content = LockfileContent(
-        FileContent("lock.txt", lock_content),
-        resolve_name="a",
-    )
-    with engine_error(InvalidLockfileError):
-        create_pex_and_get_all_data(
-            rule_runner, requirements=EntireLockfile(lockfile_content, ("ansicolors",))
+            rule_runner, requirements=EntireLockfile(_lockfile, ("ansicolors",))
         )

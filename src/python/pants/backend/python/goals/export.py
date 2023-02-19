@@ -266,8 +266,8 @@ async def export_virtualenv_for_resolve(
     if lockfile_path:
         # It's a user resolve.
         lockfile = Lockfile(
-            file_path=lockfile_path,
-            file_path_description_of_origin=f"the resolve `{resolve}`",
+            url=lockfile_path,
+            url_description_of_origin=f"the resolve `{resolve}`",
             resolve_name=resolve,
         )
 

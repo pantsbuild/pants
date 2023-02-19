@@ -87,7 +87,7 @@ async def _parse_lockfile(lockfile: Lockfile | LockfileContent) -> FrozenDict[st
         return None
     except json.JSONDecodeError as e:
         file_path = (
-            lockfile.file_path if isinstance(lockfile, Lockfile) else lockfile.file_content.path
+            lockfile.url if isinstance(lockfile, Lockfile) else lockfile.file_content.path
         )
         logger.debug(f"{file_path}: Failed to parse lockfile contents: {e}")
         return None
@@ -106,8 +106,8 @@ async def _generate_python_lockfile_diff(
     )
     old = await _parse_lockfile(
         Lockfile(
-            file_path=path,
-            file_path_description_of_origin="generated lockfile",
+            url=path,
+            url_description_of_origin="generated lockfile",
             resolve_name=resolve_name,
         )
     )

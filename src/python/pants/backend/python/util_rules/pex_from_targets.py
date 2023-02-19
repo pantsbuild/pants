@@ -568,7 +568,7 @@ async def get_repository_pex(
         PexRequest(
             description=softwrap(
                 f"""
-                Installing {chosen_resolve.lockfile.file_path} for the resolve
+                Installing {chosen_resolve.lockfile.url} for the resolve
                 `{chosen_resolve.name}`
                 """
             ),
