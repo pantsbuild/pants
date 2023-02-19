@@ -6,7 +6,7 @@ from __future__ import annotations
 import ast
 from contextlib import contextmanager
 from pathlib import PurePath
-from typing import Iterator
+from typing import Iterator, Sequence
 
 
 def check_for_await_in_loop(tree: ast.AST, filename: str) -> Iterator[tuple[int, int, str, None]]:
@@ -42,7 +42,7 @@ def check_for_await_in_loop(tree: ast.AST, filename: str) -> Iterator[tuple[int,
             finally:
                 self._in_loop = old
 
-        def traverse(self, node: ast.AST | list[ast.AST]):
+        def traverse(self, node: ast.AST | Sequence[ast.AST]):
             if isinstance(node, list):
                 for x in node:
                     self.visit(x)
