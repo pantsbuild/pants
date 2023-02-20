@@ -56,13 +56,6 @@ class Lockfile:
 
 
 @dataclass(frozen=True)
-class LockfileContent:
-    file_content: FileContent
-    resolve_name: str
-    lockfile_hex_digest: str | None = None
-
-
-@dataclass(frozen=True)
 class LoadedLockfile:
     """A lockfile after loading and header stripping.
 
@@ -86,14 +79,14 @@ class LoadedLockfile:
     as_constraints_strings: FrozenOrderedSet[str] | None
     # The original file or file content (which may not have identical content to the output
     # `lockfile_digest`).
-    original_lockfile: Lockfile | LockfileContent
+    original_lockfile: Lockfile
 
 
 @dataclass(frozen=True)
 class LoadedLockfileRequest:
     """A request to load and validate the content of the given lockfile."""
 
-    lockfile: Lockfile | LockfileContent
+    lockfile: Lockfile
 
 
 def strip_comments_from_pex_json_lockfile(lockfile_bytes: bytes) -> bytes:
@@ -250,7 +243,7 @@ class EntireLockfile:
        content anyway.
     """
 
-    lockfile: Lockfile | LockfileContent
+    lockfile: Lockfile
     # If available, the current complete set of requirement strings that influence this lockfile.
     # Used for metadata validation.
     complete_req_strings: tuple[str, ...] | None = None
@@ -472,7 +465,7 @@ async def determine_resolve_pex_config(
 def validate_metadata(
     metadata: PythonLockfileMetadata,
     interpreter_constraints: InterpreterConstraints,
-    lockfile: Lockfile | LockfileContent,
+    lockfile: Lockfile,
     consumed_req_strings: Iterable[str],
     python_setup: PythonSetup,
     resolve_config: ResolvePexConfig,
@@ -555,7 +548,7 @@ def _common_failure_reasons(
 def _invalid_lockfile_error(
     metadata: PythonLockfileMetadata,
     validation: LockfileMetadataValidation,
-    lockfile: Lockfile | LockfileContent,
+    lockfile: Lockfile,
     *,
     user_requirements: set[PipRequirement],
     user_interpreter_constraints: InterpreterConstraints,
@@ -563,10 +556,10 @@ def _invalid_lockfile_error(
 ) -> Iterator[str]:
     resolve = lockfile.resolve_name
     yield "You are using "
-    if isinstance(lockfile, Lockfile):
-        yield f"the `{resolve}` lockfile at {lockfile.url} "
-    else:
+    if lockfile.url.startswith("resource://"):
         yield f"the built-in `{resolve}` lockfile provided by Pants "
+    else:
+        yield f"the `{resolve}` lockfile at {lockfile.url} "
     yield "with incompatible inputs.\n\n"
 
     if any(
@@ -629,9 +622,7 @@ def _invalid_lockfile_error(
     yield from _common_failure_reasons(validation.failure_reasons, maybe_constraints_file_path)
 
     yield "To regenerate your lockfile, "
-    yield f"run `{bin_name()} generate-lockfiles --resolve={resolve}`." if isinstance(
-        lockfile, Lockfile
-    ) else f"update your plugin generating this object: {lockfile}"
+    yield f"run `{bin_name()} generate-lockfiles --resolve={resolve}`."
 
 
 def rules():

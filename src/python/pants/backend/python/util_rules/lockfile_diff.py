@@ -19,7 +19,8 @@ if TYPE_CHECKING:
 from pants.backend.python.util_rules.pex_requirements import (
     LoadedLockfile,
     LoadedLockfileRequest,
-    Lockfile, strip_comments_from_pex_json_lockfile,
+    Lockfile,
+    strip_comments_from_pex_json_lockfile,
 )
 from pants.base.exceptions import EngineError
 from pants.core.goals.generate_lockfiles import LockfileDiff, LockfilePackages, PackageName

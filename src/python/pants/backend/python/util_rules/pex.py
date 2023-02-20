@@ -37,7 +37,6 @@ from pants.backend.python.util_rules.pex_requirements import (
     EntireLockfile,
     LoadedLockfile,
     LoadedLockfileRequest,
-    Lockfile,
 )
 from pants.backend.python.util_rules.pex_requirements import (
     PexRequirements as PexRequirements,  # Explicit re-export.
@@ -617,10 +616,7 @@ def _build_pex_description(request: PexRequest) -> str:
 
     if isinstance(request.requirements, EntireLockfile):
         lockfile = request.requirements.lockfile
-        if isinstance(lockfile, Lockfile):
-            desc_suffix = f"from {lockfile.url}"
-        else:
-            desc_suffix = f"from {lockfile.file_content.path}"
+        desc_suffix = f"from {lockfile.url}"
     else:
         if not request.requirements.req_strings:
             return f"Building {request.output_filename}"

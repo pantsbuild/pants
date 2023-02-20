@@ -810,9 +810,7 @@ def test_lockfile_requirements_selection(
         lock_content = importlib.resources.read_binary(
             "pants.backend.python.subsystems", "setuptools.lock"
         )
-        mode_files.update(
-            {"3rdparty/python/default.lock": lock_content}
-        )
+        mode_files.update({"3rdparty/python/default.lock": lock_content})
 
     rule_runner.write_files(mode_files)
 

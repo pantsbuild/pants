@@ -47,7 +47,6 @@ from pants.backend.python.util_rules.pex_requirements import (
     LoadedLockfile,
     LoadedLockfileRequest,
     Lockfile,
-    LockfileContent,
     PexRequirements,
     ResolvePexConfig,
     ResolvePexConfigRequest,
@@ -519,7 +518,7 @@ def test_local_requirements_and_path_mappings(
         rule_runner.write_files({"test.lock": lock_file_content.content})
         lockfile_obj = EntireLockfile(
             Lockfile(url="test.lock", url_description_of_origin="test", resolve_name="test"),
-            (wheel_req_str,)
+            (wheel_req_str,),
         )
 
         # Wipe cache to ensure `--path-mappings` works.
@@ -682,9 +681,7 @@ def test_setup_pex_requirements() -> None:
 
     lockfile_path = "foo.lock"
     lockfile_digest = rule_runner.make_snapshot_of_empty_files([lockfile_path]).digest
-    lockfile_obj = Lockfile(
-        lockfile_path, url_description_of_origin="foo", resolve_name="resolve"
-    )
+    lockfile_obj = Lockfile(lockfile_path, url_description_of_origin="foo", resolve_name="resolve")
 
     def create_loaded_lockfile(is_pex_lock: bool) -> LoadedLockfile:
         return LoadedLockfile(
@@ -835,8 +832,9 @@ def test_build_pex_description() -> None:
 
     assert_description(
         EntireLockfile(
-            LockfileContent(
-                file_content=FileContent("lock.txt", b""),
+            Lockfile(
+                url="lock.txt",
+                url_description_of_origin="test",
                 resolve_name="a",
             )
         ),

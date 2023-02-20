@@ -17,9 +17,9 @@ from pants.backend.python.util_rules.pex_requirements import (
     ResolvePexConfig,
     ResolvePexConstraintsFile,
     _pex_lockfile_requirement_count,
-    strip_comments_from_pex_json_lockfile,
     get_metadata,
     is_probably_pex_json_lockfile,
+    strip_comments_from_pex_json_lockfile,
     validate_metadata,
 )
 from pants.core.util_rules.lockfile_metadata import (
