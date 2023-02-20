@@ -24,12 +24,13 @@ use testutil::{owned_string_vec, relative_paths};
 use tokio::time::{sleep, timeout};
 use workunit_store::{Level, RunId, RunningWorkunit, WorkunitStore};
 
-use crate::remote::{CommandRunner, EntireExecuteRequest, ExecutionError, OperationOrStatus};
-use crate::{
-  CacheName, CommandRunner as CommandRunnerTrait, Context, FallibleProcessResultWithPlatform,
-  InputDigests, Platform, Process, ProcessCacheScope, ProcessError, ProcessExecutionStrategy,
-};
+use crate::remote::{CommandRunner, ExecutionError, OperationOrStatus};
 use fs::{DirectoryDigest, RelativePath, SymlinkBehavior, EMPTY_DIRECTORY_DIGEST};
+use process_execution::{
+  CacheName, CommandRunner as CommandRunnerTrait, Context, EntireExecuteRequest,
+  FallibleProcessResultWithPlatform, InputDigests, Platform, Process, ProcessCacheScope,
+  ProcessError, ProcessExecutionStrategy,
+};
 use std::any::type_name;
 use std::io::Cursor;
 use tonic::{Code, Status};
@@ -104,11 +105,11 @@ async fn make_execute_request() {
     arguments: vec!["/bin/echo".to_owned(), "yo".to_owned()],
     environment_variables: vec![
       remexec::command::EnvironmentVariable {
-        name: crate::remote::CACHE_KEY_EXECUTION_STRATEGY.to_owned(),
+        name: process_execution::CACHE_KEY_EXECUTION_STRATEGY.to_owned(),
         value: ProcessExecutionStrategy::RemoteExecution(vec![]).cache_value(),
       },
       remexec::command::EnvironmentVariable {
-        name: crate::remote::CACHE_KEY_TARGET_PLATFORM_ENV_VAR_NAME.to_owned(),
+        name: process_execution::CACHE_KEY_TARGET_PLATFORM_ENV_VAR_NAME.to_owned(),
         value: "linux_x86_64".to_owned(),
       },
       remexec::command::EnvironmentVariable {
@@ -153,7 +154,7 @@ async fn make_execute_request() {
   };
 
   assert_eq!(
-    crate::remote::make_execute_request(&req, None, None, &store, None).await,
+    process_execution::make_execute_request(&req, None, None, &store, None).await,
     Ok(EntireExecuteRequest {
       action: want_action,
       command: want_command,
@@ -200,11 +201,11 @@ async fn make_execute_request_with_instance_name() {
     arguments: vec!["/bin/echo".to_owned(), "yo".to_owned()],
     environment_variables: vec![
       remexec::command::EnvironmentVariable {
-        name: crate::remote::CACHE_KEY_EXECUTION_STRATEGY.to_owned(),
+        name: process_execution::CACHE_KEY_EXECUTION_STRATEGY.to_owned(),
         value: ProcessExecutionStrategy::RemoteExecution(vec![]).cache_value(),
       },
       remexec::command::EnvironmentVariable {
-        name: crate::remote::CACHE_KEY_TARGET_PLATFORM_ENV_VAR_NAME.to_owned(),
+        name: process_execution::CACHE_KEY_TARGET_PLATFORM_ENV_VAR_NAME.to_owned(),
         value: "linux_x86_64".to_owned(),
       },
       remexec::command::EnvironmentVariable {
@@ -255,8 +256,14 @@ async fn make_execute_request_with_instance_name() {
   };
 
   assert_eq!(
-    crate::remote::make_execute_request(&req, Some("dark-tower".to_owned()), None, &store, None)
-      .await,
+    process_execution::make_execute_request(
+      &req,
+      Some("dark-tower".to_owned()),
+      None,
+      &store,
+      None
+    )
+    .await,
     Ok(EntireExecuteRequest {
       action: want_action,
       command: want_command,
@@ -300,15 +307,15 @@ async fn make_execute_request_with_cache_key_gen_version() {
     arguments: vec!["/bin/echo".to_owned(), "yo".to_owned()],
     environment_variables: vec![
       remexec::command::EnvironmentVariable {
-        name: crate::remote::CACHE_KEY_EXECUTION_STRATEGY.to_owned(),
+        name: process_execution::CACHE_KEY_EXECUTION_STRATEGY.to_owned(),
         value: ProcessExecutionStrategy::RemoteExecution(vec![]).cache_value(),
       },
       remexec::command::EnvironmentVariable {
-        name: crate::remote::CACHE_KEY_TARGET_PLATFORM_ENV_VAR_NAME.to_owned(),
+        name: process_execution::CACHE_KEY_TARGET_PLATFORM_ENV_VAR_NAME.to_owned(),
         value: "linux_x86_64".to_owned(),
       },
       remexec::command::EnvironmentVariable {
-        name: crate::remote::CACHE_KEY_GEN_VERSION_ENV_VAR_NAME.to_owned(),
+        name: process_execution::CACHE_KEY_GEN_VERSION_ENV_VAR_NAME.to_owned(),
         value: "meep".to_owned(),
       },
       remexec::command::EnvironmentVariable {
@@ -356,7 +363,8 @@ async fn make_execute_request_with_cache_key_gen_version() {
   };
 
   assert_eq!(
-    crate::remote::make_execute_request(&req, None, Some("meep".to_owned()), &store, None).await,
+    process_execution::make_execute_request(&req, None, Some("meep".to_owned()), &store, None)
+      .await,
     Ok(EntireExecuteRequest {
       action: want_action,
       command: want_command,
@@ -383,11 +391,11 @@ async fn make_execute_request_with_jdk() {
     arguments: vec!["/bin/echo".to_owned(), "yo".to_owned()],
     environment_variables: vec![
       remexec::command::EnvironmentVariable {
-        name: crate::remote::CACHE_KEY_EXECUTION_STRATEGY.to_owned(),
+        name: process_execution::CACHE_KEY_EXECUTION_STRATEGY.to_owned(),
         value: ProcessExecutionStrategy::Local.cache_value(),
       },
       remexec::command::EnvironmentVariable {
-        name: crate::remote::CACHE_KEY_TARGET_PLATFORM_ENV_VAR_NAME.to_owned(),
+        name: process_execution::CACHE_KEY_TARGET_PLATFORM_ENV_VAR_NAME.to_owned(),
         value: "linux_x86_64".to_owned(),
       },
     ],
@@ -431,7 +439,7 @@ async fn make_execute_request_with_jdk() {
   };
 
   assert_eq!(
-    crate::remote::make_execute_request(&req, None, None, &store, None).await,
+    process_execution::make_execute_request(&req, None, None, &store, None).await,
     Ok(EntireExecuteRequest {
       action: want_action,
       command: want_command,
@@ -464,11 +472,11 @@ async fn make_execute_request_with_jdk_and_extra_platform_properties() {
     arguments: vec!["/bin/echo".to_owned(), "yo".to_owned()],
     environment_variables: vec![
       remexec::command::EnvironmentVariable {
-        name: crate::remote::CACHE_KEY_EXECUTION_STRATEGY.to_owned(),
+        name: process_execution::CACHE_KEY_EXECUTION_STRATEGY.to_owned(),
         value: ProcessExecutionStrategy::RemoteExecution(vec![]).cache_value(),
       },
       remexec::command::EnvironmentVariable {
-        name: crate::remote::CACHE_KEY_TARGET_PLATFORM_ENV_VAR_NAME.to_owned(),
+        name: process_execution::CACHE_KEY_TARGET_PLATFORM_ENV_VAR_NAME.to_owned(),
         value: "linux_x86_64".to_owned(),
       },
     ],
@@ -530,7 +538,7 @@ async fn make_execute_request_with_jdk_and_extra_platform_properties() {
   };
 
   assert_eq!(
-    crate::remote::make_execute_request(&req, None, None, &store, None).await,
+    process_execution::make_execute_request(&req, None, None, &store, None).await,
     Ok(EntireExecuteRequest {
       action: want_action,
       command: want_command,
@@ -574,11 +582,11 @@ async fn make_execute_request_with_timeout() {
     arguments: vec!["/bin/echo".to_owned(), "yo".to_owned()],
     environment_variables: vec![
       remexec::command::EnvironmentVariable {
-        name: crate::remote::CACHE_KEY_EXECUTION_STRATEGY.to_owned(),
+        name: process_execution::CACHE_KEY_EXECUTION_STRATEGY.to_owned(),
         value: ProcessExecutionStrategy::RemoteExecution(vec![]).cache_value(),
       },
       remexec::command::EnvironmentVariable {
-        name: crate::remote::CACHE_KEY_TARGET_PLATFORM_ENV_VAR_NAME.to_owned(),
+        name: process_execution::CACHE_KEY_TARGET_PLATFORM_ENV_VAR_NAME.to_owned(),
         value: "linux_x86_64".to_owned(),
       },
       remexec::command::EnvironmentVariable {
@@ -624,7 +632,7 @@ async fn make_execute_request_with_timeout() {
   };
 
   assert_eq!(
-    crate::remote::make_execute_request(&req, None, None, &store, None).await,
+    process_execution::make_execute_request(&req, None, None, &store, None).await,
     Ok(EntireExecuteRequest {
       action: want_action,
       command: want_command,
@@ -678,11 +686,11 @@ async fn make_execute_request_with_append_only_caches() {
     ],
     environment_variables: vec![
       remexec::command::EnvironmentVariable {
-        name: crate::remote::CACHE_KEY_EXECUTION_STRATEGY.to_owned(),
+        name: process_execution::CACHE_KEY_EXECUTION_STRATEGY.to_owned(),
         value: ProcessExecutionStrategy::RemoteExecution(vec![]).cache_value(),
       },
       remexec::command::EnvironmentVariable {
-        name: crate::remote::CACHE_KEY_TARGET_PLATFORM_ENV_VAR_NAME.to_owned(),
+        name: process_execution::CACHE_KEY_TARGET_PLATFORM_ENV_VAR_NAME.to_owned(),
         value: "linux_x86_64".to_owned(),
       },
       remexec::command::EnvironmentVariable {
@@ -743,7 +751,7 @@ async fn make_execute_request_with_append_only_caches() {
   ));
 
   let got_execute_request =
-    crate::remote::make_execute_request(&req, None, None, &store, Some("/append-only-caches"))
+    process_execution::make_execute_request(&req, None, None, &store, Some("/append-only-caches"))
       .await
       .unwrap();
   assert_eq!(
@@ -829,11 +837,11 @@ async fn make_execute_request_using_immutable_inputs() {
     arguments: vec!["/bin/echo".to_owned(), "yo".to_owned()],
     environment_variables: vec![
       remexec::command::EnvironmentVariable {
-        name: crate::remote::CACHE_KEY_EXECUTION_STRATEGY.to_owned(),
+        name: process_execution::CACHE_KEY_EXECUTION_STRATEGY.to_owned(),
         value: ProcessExecutionStrategy::RemoteExecution(vec![]).cache_value(),
       },
       remexec::command::EnvironmentVariable {
-        name: crate::remote::CACHE_KEY_TARGET_PLATFORM_ENV_VAR_NAME.to_owned(),
+        name: process_execution::CACHE_KEY_TARGET_PLATFORM_ENV_VAR_NAME.to_owned(),
         value: "linux_x86_64".to_owned(),
       },
       remexec::command::EnvironmentVariable {
@@ -878,7 +886,7 @@ async fn make_execute_request_using_immutable_inputs() {
   };
 
   assert_eq!(
-    crate::remote::make_execute_request(&req, None, None, &store, None).await,
+    process_execution::make_execute_request(&req, None, None, &store, None).await,
     Ok(EntireExecuteRequest {
       action: want_action,
       command: want_command,
@@ -901,7 +909,7 @@ async fn successful_with_only_call_to_execute() {
   let mock_server = {
     let EntireExecuteRequest {
       execute_request, ..
-    } = crate::remote::make_execute_request(
+    } = process_execution::make_execute_request(
       &execute_request.clone().try_into().unwrap(),
       None,
       None,
@@ -952,7 +960,7 @@ async fn successful_after_reconnect_with_wait_execution() {
   let mock_server = {
     let EntireExecuteRequest {
       execute_request, ..
-    } = crate::remote::make_execute_request(
+    } = process_execution::make_execute_request(
       &execute_request.clone().try_into().unwrap(),
       None,
       None,
@@ -1007,7 +1015,7 @@ async fn successful_after_reconnect_from_retryable_error() {
   let mock_server = {
     let EntireExecuteRequest {
       execute_request, ..
-    } = crate::remote::make_execute_request(
+    } = process_execution::make_execute_request(
       &execute_request.clone().try_into().unwrap(),
       None,
       None,
@@ -1072,7 +1080,7 @@ async fn creates_executing_workunit() {
   let mock_server = {
     let EntireExecuteRequest {
       execute_request, ..
-    } = crate::remote::make_execute_request(
+    } = process_execution::make_execute_request(
       &execute_request.clone().try_into().unwrap(),
       None,
       None,
@@ -1162,10 +1170,12 @@ async fn dropped_request_cancels() {
   let mock_server = {
     mock::execution_server::TestServer::new(
       mock::execution_server::MockExecution::new(vec![ExpectedAPICall::Execute {
-        execute_request: crate::remote::make_execute_request(&request, None, None, &store, None)
-          .await
-          .unwrap()
-          .execute_request,
+        execute_request: process_execution::make_execute_request(
+          &request, None, None, &store, None,
+        )
+        .await
+        .unwrap()
+        .execute_request,
         stream_responses: Ok(vec![
           make_incomplete_operation(&op_name),
           make_delayed_incomplete_operation(&op_name, delayed_operation_time),
@@ -1216,7 +1226,7 @@ async fn server_rejecting_execute_request_gives_error() {
 
   let mock_server = mock::execution_server::TestServer::new(
     mock::execution_server::MockExecution::new(vec![ExpectedAPICall::Execute {
-      execute_request: crate::remote::make_execute_request(
+      execute_request: process_execution::make_execute_request(
         &Process::new(owned_string_vec(&["/bin/echo", "-n", "bar"])),
         None,
         None,
@@ -1250,7 +1260,7 @@ async fn server_sending_triggering_timeout_with_deadline_exceeded() {
   let mock_server = {
     let EntireExecuteRequest {
       execute_request, ..
-    } = crate::remote::make_execute_request(
+    } = process_execution::make_execute_request(
       &execute_request.clone().try_into().unwrap(),
       None,
       None,
@@ -1304,7 +1314,7 @@ async fn sends_headers() {
   let mock_server = {
     let EntireExecuteRequest {
       execute_request, ..
-    } = crate::remote::make_execute_request(
+    } = process_execution::make_execute_request(
       &execute_request.clone().try_into().unwrap(),
       None,
       None,
@@ -1506,7 +1516,7 @@ async fn ensure_inline_stdio_is_stored() {
 
     let EntireExecuteRequest {
       execute_request, ..
-    } = crate::remote::make_execute_request(
+    } = process_execution::make_execute_request(
       &echo_roland_request().try_into().unwrap(),
       None,
       None,
@@ -1592,7 +1602,7 @@ async fn bad_result_bytes() {
 
     mock::execution_server::TestServer::new(
       mock::execution_server::MockExecution::new(vec![ExpectedAPICall::Execute {
-        execute_request: crate::remote::make_execute_request(
+        execute_request: process_execution::make_execute_request(
           &execute_request.clone().try_into().unwrap(),
           None,
           None,
@@ -1641,7 +1651,7 @@ async fn initial_response_error() {
 
     let EntireExecuteRequest {
       execute_request, ..
-    } = crate::remote::make_execute_request(
+    } = process_execution::make_execute_request(
       &execute_request.clone().try_into().unwrap(),
       None,
       None,
@@ -1696,7 +1706,7 @@ async fn initial_response_missing_response_and_error() {
 
     let EntireExecuteRequest {
       execute_request, ..
-    } = crate::remote::make_execute_request(
+    } = process_execution::make_execute_request(
       &execute_request.clone().try_into().unwrap(),
       None,
       None,
@@ -1742,7 +1752,7 @@ async fn fails_after_retry_limit_exceeded() {
   let mock_server = {
     let EntireExecuteRequest {
       execute_request, ..
-    } = crate::remote::make_execute_request(
+    } = process_execution::make_execute_request(
       &execute_request.clone().try_into().unwrap(),
       None,
       None,
@@ -1806,7 +1816,7 @@ async fn fails_after_retry_limit_exceeded_with_stream_close() {
     let op_name = "foo-bar".to_owned();
     let EntireExecuteRequest {
       execute_request, ..
-    } = crate::remote::make_execute_request(
+    } = process_execution::make_execute_request(
       &execute_request.clone().try_into().unwrap(),
       None,
       None,
@@ -1889,7 +1899,7 @@ async fn execute_missing_file_uploads_if_known() {
 
     let EntireExecuteRequest {
       execute_request, ..
-    } = crate::remote::make_execute_request(
+    } = process_execution::make_execute_request(
       &cat_roland_request().try_into().unwrap(),
       None,
       None,
@@ -1911,7 +1921,7 @@ async fn execute_missing_file_uploads_if_known() {
           ]),
         },
         ExpectedAPICall::Execute {
-          execute_request: crate::remote::make_execute_request(
+          execute_request: process_execution::make_execute_request(
             &cat_roland_request().try_into().unwrap(),
             None,
             None,
@@ -2298,7 +2308,7 @@ async fn digest_command() {
     ..Default::default()
   };
 
-  let digest = crate::remote::digest(&command).unwrap();
+  let digest = process_execution::digest(&command).unwrap();
 
   assert_eq!(
     &digest.hash.to_hex(),
@@ -2684,7 +2694,7 @@ fn make_precondition_failure_status(
   }
 }
 
-async fn run_cmd_runner<R: crate::CommandRunner>(
+async fn run_cmd_runner<R: CommandRunnerTrait>(
   request: Process,
   command_runner: R,
   store: Store,
@@ -2835,7 +2845,8 @@ async fn extract_output_files_from_response(
     .result
     .as_ref()
     .ok_or_else(|| "No ActionResult found".to_string())?;
-  let directory_digest = crate::remote::extract_output_files(store, action_result, false).await?;
+  let directory_digest =
+    process_execution::extract_output_files(store, action_result, false).await?;
   Ok(directory_digest.as_digest())
 }
 

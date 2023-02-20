@@ -910,6 +910,7 @@ dependencies = [
  "pyo3-build-config 0.17.2",
  "rand 0.8.5",
  "regex",
+ "remote",
  "reqwest",
  "rule_graph",
  "serde_json",
@@ -2451,6 +2452,7 @@ dependencies = [
  "process_execution",
  "prost",
  "protos",
+ "remote",
  "shlex",
  "store",
  "task_executor",
@@ -2768,6 +2770,51 @@ name = "regex-syntax"
 version = "0.6.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a3f87b73ce11b1619a3c6332f45341e0047173771e8b8b73f87bfeefb7b56244"
+
+[[package]]
+name = "remote"
+version = "0.0.1"
+dependencies = [
+ "async-lock",
+ "async-oncecell",
+ "async-stream",
+ "async-trait",
+ "bytes",
+ "concrete_time",
+ "deepsize",
+ "derivative",
+ "env_logger",
+ "fs",
+ "futures",
+ "grpc_util",
+ "hashing",
+ "libc",
+ "log",
+ "maplit",
+ "mock",
+ "once_cell",
+ "parking_lot 0.12.1",
+ "process_execution",
+ "prost",
+ "prost-types",
+ "protos",
+ "rand 0.8.5",
+ "sharded_lmdb",
+ "spectral",
+ "store",
+ "strum",
+ "strum_macros",
+ "task_executor",
+ "tempfile",
+ "testutil",
+ "tokio",
+ "tokio-rustls 0.23.4",
+ "tokio-util 0.7.4",
+ "tonic",
+ "tryfuture",
+ "uuid",
+ "workunit_store",
+]
 
 [[package]]
 name = "remove_dir_all"

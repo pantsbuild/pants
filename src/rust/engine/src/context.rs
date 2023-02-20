@@ -30,11 +30,13 @@ use parking_lot::Mutex;
 use docker::docker;
 use process_execution::switched::SwitchedCommandRunner;
 use process_execution::{
-  self, bounded, local, nailgun, remote, remote_cache, CacheContentBehavior, CommandRunner,
-  NamedCaches, ProcessExecutionStrategy, RemoteCacheWarningsBehavior,
+  self, bounded, local, nailgun, CacheContentBehavior, CommandRunner, NamedCaches,
+  ProcessExecutionStrategy,
 };
 use protos::gen::build::bazel::remote::execution::v2::ServerCapabilities;
 use regex::Regex;
+use remote::remote_cache::RemoteCacheWarningsBehavior;
+use remote::{self, remote_cache};
 use rule_graph::RuleGraph;
 use store::{self, ImmutableInputs, Store};
 use task_executor::Executor;
@@ -263,7 +265,7 @@ impl Core {
       // We always create the remote execution runner if it is globally enabled, but it may not
       // actually be used thanks to the `SwitchedCommandRunner` below. Only one of local execution
       // or remote execution will be used for any particular process.
-      let remote_execution_runner = Box::new(remote::CommandRunner::new(
+      let remote_execution_runner = Box::new(remote::remote::CommandRunner::new(
         // We unwrap because global_options.py will have already validated this is defined.
         remoting_opts.execution_address.as_ref().unwrap(),
         instance_name,

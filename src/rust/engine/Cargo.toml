@@ -42,6 +42,7 @@ members = [
   "nailgun",
   "options",
   "process_execution",
+  "process_execution/remote",
   "process_executor",
   "rule_graph",
   "sharded_lmdb",
@@ -83,6 +84,7 @@ default-members = [
   "nailgun",
   "options",
   "process_execution",
+  "process_execution/remote",
   "process_executor",
   "rule_graph",
   "sharded_lmdb",
@@ -164,6 +166,7 @@ ui = { path = "ui" }
 url = "2.3"
 watch = { path = "watch" }
 workunit_store = { path = "workunit_store" }
+remote = { path = "process_execution/remote" }
 
 [dev-dependencies]
 testutil = { path = "./testutil" }

@@ -23,13 +23,13 @@ use workunit_store::{
   in_workunit, Level, Metric, ObservationMetric, RunningWorkunit, WorkunitMetadata,
 };
 
-use crate::remote::{
-  apply_headers, make_execute_request, populate_fallible_execution_result, EntireExecuteRequest,
+use crate::remote::apply_headers;
+use process_execution::{
+  check_cache_content, populate_fallible_execution_result, CacheContentBehavior, Context,
+  FallibleProcessResultWithPlatform, Platform, Process, ProcessCacheScope, ProcessError,
+  ProcessResultSource,
 };
-use crate::{
-  check_cache_content, CacheContentBehavior, Context, FallibleProcessResultWithPlatform, Platform,
-  Process, ProcessCacheScope, ProcessError, ProcessResultSource,
-};
+use process_execution::{make_execute_request, EntireExecuteRequest};
 use tonic::{Code, Request, Status};
 
 #[derive(Clone, Copy, Debug, strum_macros::EnumString)]
@@ -50,7 +50,7 @@ pub enum RemoteCacheWarningsBehavior {
 /// then locally.
 #[derive(Clone)]
 pub struct CommandRunner {
-  inner: Arc<dyn crate::CommandRunner>,
+  inner: Arc<dyn process_execution::CommandRunner>,
   instance_name: Option<String>,
   process_cache_namespace: Option<String>,
   append_only_caches_base_path: Option<String>,
@@ -67,7 +67,7 @@ pub struct CommandRunner {
 
 impl CommandRunner {
   pub fn new(
-    inner: Arc<dyn crate::CommandRunner>,
+    inner: Arc<dyn process_execution::CommandRunner>,
     instance_name: Option<String>,
     process_cache_namespace: Option<String>,
     executor: task_executor::Executor,
@@ -474,7 +474,7 @@ enum CacheErrorType {
 }
 
 #[async_trait]
-impl crate::CommandRunner for CommandRunner {
+impl process_execution::CommandRunner for CommandRunner {
   async fn run(
     &self,
     context: Context,
