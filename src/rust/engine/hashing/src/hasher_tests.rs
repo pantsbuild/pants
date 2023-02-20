@@ -2,7 +2,7 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use tempfile::TempDir;
-use tokio::io::AsyncWriteExt;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 #[test]
 fn hashes() {
@@ -28,9 +28,9 @@ fn hashes() {
 async fn async_hashes() {
   let tmpdir = TempDir::new().unwrap();
   let tmppath = tmpdir.path().to_owned();
-
   let mut src_file = tokio::fs::File::create(tmppath.join("src")).await.unwrap();
   src_file.write_all(b"meep").await.unwrap();
+  let mut src_file = tokio::fs::File::open(tmppath.join("src")).await.unwrap();
   let mut dest_file = tokio::fs::File::create(tmppath.join("dest")).await.unwrap();
 
   let mut hasher = super::WriterHasher::new(&mut dest_file);
@@ -46,4 +46,12 @@ async fn async_hashes() {
     4,
   );
   assert_eq!(hasher.finish().0, want);
+  let mut contents = vec![];
+  tokio::fs::File::open(tmppath.join("dest"))
+    .await
+    .unwrap()
+    .read_to_end(&mut contents)
+    .await
+    .unwrap();
+  assert_eq!("meep".as_bytes().to_vec(), contents);
 }
