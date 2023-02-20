@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import importlib.resources
 import logging
-import os
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Iterable, Iterator
 from urllib.parse import urlparse
@@ -97,7 +96,7 @@ class LoadedLockfileRequest:
     lockfile: Lockfile | LockfileContent
 
 
-def _strip_comments_from_pex_json_lockfile(lockfile_bytes: bytes) -> bytes:
+def strip_comments_from_pex_json_lockfile(lockfile_bytes: bytes) -> bytes:
     """Pex does not like the header Pants adds to lockfiles, as it violates JSON.
 
     Note that we only strip lines starting with `//`, which is all that Pants will ever add. If
@@ -204,7 +203,7 @@ async def load_lockfile(
     is_pex_native = is_probably_pex_json_lockfile(lock_bytes)
     if is_pex_native:
         header_delimiter = "//"
-        stripped_lock_bytes = _strip_comments_from_pex_json_lockfile(lock_bytes)
+        stripped_lock_bytes = strip_comments_from_pex_json_lockfile(lock_bytes)
         lockfile_digest = await Get(
             Digest,
             CreateDigest([FileContent(lockfile_path, stripped_lock_bytes)]),

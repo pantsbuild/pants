@@ -17,7 +17,7 @@ from pants.backend.python.util_rules.pex_requirements import (
     ResolvePexConfig,
     ResolvePexConstraintsFile,
     _pex_lockfile_requirement_count,
-    _strip_comments_from_pex_json_lockfile,
+    strip_comments_from_pex_json_lockfile,
     get_metadata,
     is_probably_pex_json_lockfile,
     validate_metadata,
@@ -249,7 +249,7 @@ def test_is_probably_pex_json_lockfile():
 
 def test_strip_comments_from_pex_json_lockfile() -> None:
     def assert_stripped(lock: str, expected: str) -> None:
-        assert _strip_comments_from_pex_json_lockfile(lock.encode()).decode() == expected
+        assert strip_comments_from_pex_json_lockfile(lock.encode()).decode() == expected
 
     assert_stripped("{}", "{}")
     assert_stripped(

@@ -516,8 +516,10 @@ def test_local_requirements_and_path_mappings(
         assert b"${WHEEL_DIR}/ansicolors-1.1.8-py2.py3-none-any.whl" in lock_file_content.content
         assert b"files.pythonhosted.org" not in lock_file_content.content
 
+        rule_runner.write_files({"test.lock": lock_file_content.content})
         lockfile_obj = EntireLockfile(
-            LockfileContent(lock_file_content, resolve_name="test"), (wheel_req_str,)
+            Lockfile(url="test.lock", url_description_of_origin="test", resolve_name="test"),
+            (wheel_req_str,)
         )
 
         # Wipe cache to ensure `--path-mappings` works.
