@@ -573,7 +573,13 @@ class Parser:
                 else:
                     fromfile = val_or_str[1:]
                     try:
-                        with open(fromfile) as fp:
+                        fromfile_path = Path(fromfile)
+                        fromfile_path = (
+                            fromfile_path
+                            if fromfile_path.is_absolute()
+                            else Path(get_buildroot(), fromfile)
+                        )
+                        with fromfile_path.open() as fp:
                             s = fp.read()
                             if fromfile.endswith(".json"):
                                 return json.loads(s)
