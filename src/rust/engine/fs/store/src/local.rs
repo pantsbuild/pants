@@ -423,23 +423,25 @@ impl ByteStore {
     src: PathBuf,
   ) -> Result<Digest, String> {
     let digest = hash_path(src.clone())?;
-
-    if ByteStore::uses_large_file_store(digest.size_bytes) {
-      self
-        .store_large_file(src, digest, data_is_immutable)
-        .await?;
-    } else {
-      let dbs = match entry_type {
-        EntryType::Directory => self.inner.directory_dbs.clone(),
-        EntryType::File => self.inner.file_dbs.clone(),
-      };
-      let _ = dbs?
-        .store(initial_lease, data_is_immutable, digest, move || {
-          std::fs::File::open(&src)
-        })
-        .await;
+    let immutable_path = self.immutable_store_file_if_required(digest);
+    match immutable_path {
+      Some(src) => {
+        self
+          .store_large_file(src, digest, data_is_immutable)
+          .await?;
+      }
+      None => {
+        let dbs = match entry_type {
+          EntryType::Directory => self.inner.directory_dbs.clone(),
+          EntryType::File => self.inner.file_dbs.clone(),
+        };
+        let _ = dbs?
+          .store(initial_lease, data_is_immutable, digest, move || {
+            std::fs::File::open(&src)
+          })
+          .await;
+      }
     }
-
     Ok(digest)
   }
 
@@ -665,29 +667,34 @@ impl ByteStore {
     Ok(digests)
   }
 
-  pub(crate) async fn get_temp_immutable_large_file(
+  pub(crate) async fn temp_immutable_store_file_if_required(
     &self,
     digest: Digest,
-  ) -> Result<TempImmutableLargeFile, String> {
-    let dest = self.immutable_store_file_path(digest.hash);
-    if !dest.parent().unwrap().exists() {
-      // Throwaway the result as a way of not worrying about race conditions between multiple
-      // threads/processes creating the same parent dirs. If there was an error we'll fail later.
-      let _ = tokio::fs::create_dir_all(dest.parent().unwrap()).await;
+  ) -> Result<Option<TempImmutableLargeFile>, String> {
+    let immutable_path = self.immutable_store_file_if_required(digest);
+    match immutable_path {
+      Some(dest) => {
+        if !dest.parent().unwrap().exists() {
+          // Throwaway the result as a way of not worrying about race conditions between multiple
+          // threads/processes creating the same parent dirs. If there was an error we'll fail later.
+          let _ = tokio::fs::create_dir_all(dest.parent().unwrap()).await;
+        }
+        let dest2 = dest.clone();
+        // Make the tempdir in the same dir as the final file so that materializing the final file doesn't
+        // have to worry about parent dirs.
+        let named_temp_file =
+          tokio::task::spawn_blocking(move || NamedTempFile::new_in(dest.parent().unwrap()))
+            .await
+            .map_err(|e| e.to_string())?
+            .map_err(|e| e.to_string())?;
+        let (_, path) = named_temp_file.keep().map_err(|e| e.to_string())?;
+        Ok(Some(TempImmutableLargeFile {
+          tmp_path: path,
+          final_path: dest2,
+        }))
+      }
+      None => Ok(None),
     }
-    let dest2 = dest.clone();
-    // Make the tempdir in the same dir as the final file so that materializing the final file doesn't
-    // have to worry about parent dirs.
-    let named_temp_file =
-      tokio::task::spawn_blocking(move || NamedTempFile::new_in(dest.parent().unwrap()))
-        .await
-        .map_err(|e| e.to_string())?
-        .map_err(|e| e.to_string())?;
-    let (_, path) = named_temp_file.keep().map_err(|e| e.to_string())?;
-    Ok(TempImmutableLargeFile {
-      tmp_path: path,
-      final_path: dest2,
-    })
   }
 
   async fn store_large_bytes(
@@ -699,7 +706,10 @@ impl ByteStore {
       digest =
         Some(hash(&mut src.clone().reader()).map_err(|e| format!("Failed to hash bytes: {e}"))?);
     }
-    let dest = self.get_temp_immutable_large_file(digest.unwrap()).await?;
+    let dest = self
+      .temp_immutable_store_file_if_required(digest.unwrap())
+      .await?
+      .unwrap();
     let mut dest_file = dest.open().await.map_err(|e| e.to_string())?;
     dest_file
       .write_all(&src.clone())
@@ -716,7 +726,10 @@ impl ByteStore {
     digest: Digest,
     data_is_immutable: bool,
   ) -> Result<(), String> {
-    let dest = self.get_temp_immutable_large_file(digest).await?;
+    let dest = self
+      .temp_immutable_store_file_if_required(digest)
+      .await?
+      .unwrap();
     let mut attempts = 0;
     loop {
       let (mut reader, mut writer) =

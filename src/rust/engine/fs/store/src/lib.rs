@@ -58,7 +58,6 @@ use fs::{
 use futures::future::{self, BoxFuture, Either, FutureExt, TryFutureExt};
 use grpc_util::prost::MessageExt;
 use hashing::Digest;
-use local::ByteStore;
 use parking_lot::Mutex;
 use prost::Message;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
@@ -250,8 +249,25 @@ impl RemoteStore {
     };
     self
       .maybe_download(digest, async move {
-        let stored_digest =
-          if !ByteStore::uses_large_file_store(digest.size_bytes) || f_remote.is_some() {
+        let immutable_file = if f_remote.is_some() {
+          None
+        } else {
+          local_store
+            .temp_immutable_store_file_if_required(digest)
+            .await?
+        };
+        let stored_digest = match immutable_file {
+          Some(tmp_path) => {
+            let dest_file = tmp_path.clone().open().await?;
+            let mut dest_file = remote_store
+              .load_file(digest, dest_file)
+              .await?
+              .ok_or_else(create_missing)?;
+            dest_file.flush().await.map_err(|e| e.to_string())?;
+            tmp_path.persist().await?;
+            digest
+          }
+          None => {
             // (if there's a function to call, always just buffer fully into memory)
             let bytes = remote_store
               .load_bytes(digest)
@@ -263,19 +279,8 @@ impl RemoteStore {
             local_store
               .store_bytes(entry_type, None, bytes, true)
               .await?
-          } else {
-            assert!(f_remote.is_none());
-            let dest = local_store.get_temp_immutable_large_file(digest).await?;
-            let dest_file = dest.clone().open().await?;
-
-            let mut dest_file = remote_store
-              .load_file(digest, dest_file)
-              .await?
-              .ok_or_else(create_missing)?;
-            dest_file.flush().await.map_err(|e| e.to_string())?;
-            dest.persist().await?;
-            digest
-          };
+          }
+        };
         if digest == stored_digest {
           Ok(())
         } else {
