@@ -283,7 +283,11 @@ impl ByteStore {
   }
 
   pub async fn remove(&self, entry_type: EntryType, digest: Digest) -> Result<bool, String> {
-    // @TODO: Implement large file support
+    if entry_type == EntryType::File && ByteStore::uses_large_file_store(digest.size_bytes) {
+      let path = self.large_file_path(digest.hash);
+      return Ok(tokio::fs::remove_file(path).await.is_ok());
+    }
+
     let dbs = match entry_type {
       EntryType::Directory => self.inner.directory_dbs.clone(),
       EntryType::File => self.inner.file_dbs.clone(),
@@ -622,10 +626,16 @@ impl ByteStore {
       let maybe_shards = std::fs::read_dir(self.inner.large_files_root.clone());
       if let Ok(shards) = maybe_shards {
         for entry in shards {
-          let shard = entry.map_err(|e| e.to_string())?;
-          let large_files = std::fs::read_dir(shard.path()).map_err(|e| e.to_string())?;
+          let shard = entry.map_err(|e| format!("Error iterating the large file store: {e}."))?;
+          let large_files = std::fs::read_dir(shard.path())
+            .map_err(|e| format!("Failed to read shard directory: {e}."))?;
           for entry in large_files {
-            let large_file = entry.map_err(|e| e.to_string())?;
+            let large_file = entry.map_err(|e| {
+              format!(
+                "Error iterating large file store shard {:?}: {e}",
+                shard.path().file_name()
+              )
+            })?;
             let path = large_file.path();
             let hash = path.file_name().unwrap().to_str().unwrap();
             let length = large_file.metadata().map_err(|e| e.to_string())?.len();
