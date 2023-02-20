@@ -494,7 +494,7 @@ async fn write_one_meg(store: &ByteStore, byte: u8) {
   for _ in 0..1024 * 1024 {
     bytes.put_u8(byte);
   }
-  let fingerprint = Fingerprint::from_bytes_unsafe(&bytes);
+  let fingerprint = Digest::of_bytes(&bytes).hash;
   store
     .store_bytes(EntryType::File, fingerprint, bytes.freeze(), false)
     .await
