@@ -1337,22 +1337,22 @@ impl Store {
     is_executable: bool,
     can_be_immutable: bool,
   ) -> Result<(), StoreError> {
-    if can_be_immutable && ByteStore::uses_large_file_store(digest.size_bytes) {
-      self
-        .materialize_symlink(
-          destination,
-          self
-            .local
-            .large_file_path(digest.hash)
-            .to_str()
-            .unwrap()
-            .to_string(),
-        )
-        .await
+    let symlink_dest = if can_be_immutable {
+      self.local.immutable_store_file_if_required(digest)
     } else {
-      self
-        .materialize_file(destination, digest, perms, is_executable)
-        .await
+      None
+    };
+    match symlink_dest {
+      Some(path) => {
+        self
+          .materialize_symlink(destination, path.to_str().unwrap().to_string())
+          .await
+      }
+      None => {
+        self
+          .materialize_file(destination, digest, perms, is_executable)
+          .await
+      }
     }
   }
 

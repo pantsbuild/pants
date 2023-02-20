@@ -125,7 +125,7 @@ impl ByteStore {
     let is_dir = d_dbs.exists(fingerprint);
     let f_dbs = self.inner.file_dbs.clone()?;
     let is_dbs_file = f_dbs.exists(fingerprint);
-    let is_immut_file = exists(self.large_file_path(fingerprint));
+    let is_immut_file = exists(self.immutable_store_file_path(fingerprint));
 
     // TODO: Could technically use select to return slightly more quickly with the first
     // affirmative answer, but this is simpler.
@@ -283,16 +283,21 @@ impl ByteStore {
   }
 
   pub async fn remove(&self, entry_type: EntryType, digest: Digest) -> Result<bool, String> {
-    if entry_type == EntryType::File && ByteStore::uses_large_file_store(digest.size_bytes) {
-      let path = self.large_file_path(digest.hash);
-      return Ok(tokio::fs::remove_file(path).await.is_ok());
-    }
-
-    let dbs = match entry_type {
-      EntryType::Directory => self.inner.directory_dbs.clone(),
-      EntryType::File => self.inner.file_dbs.clone(),
+    let maybe_path = if entry_type == EntryType::File {
+      self.immutable_store_file_if_required(digest)
+    } else {
+      None
     };
-    dbs?.remove(digest.hash).await
+    match maybe_path {
+      Some(path) => Ok(tokio::fs::remove_file(path).await.is_ok()),
+      None => {
+        let dbs = match entry_type {
+          EntryType::Directory => self.inner.directory_dbs.clone(),
+          EntryType::File => self.inner.file_dbs.clone(),
+        };
+        dbs?.remove(digest.hash).await
+      }
+    }
   }
 
   ///
@@ -387,8 +392,8 @@ impl ByteStore {
     len > LARGE_FILE_SIZE_LIMIT
   }
 
-  /// Assuming uses_large_file_store(digest) is true, return the path inside the store.
-  pub fn large_file_path(&self, fingerprint: Fingerprint) -> PathBuf {
+  /// The path to file inside the immutable store
+  fn immutable_store_file_path(&self, fingerprint: Fingerprint) -> PathBuf {
     let hex = fingerprint.to_hex();
     // We use 2-character directories to help shard the files so there isn't a plethora in one single dir.
     self
@@ -396,6 +401,14 @@ impl ByteStore {
       .large_files_root
       .join(hex.get(0..2).unwrap())
       .join(hex)
+  }
+
+  /// Return the path to the immutable store file, if the digest is large enough
+  pub fn immutable_store_file_if_required(&self, digest: Digest) -> Option<PathBuf> {
+    if ByteStore::uses_large_file_store(digest.size_bytes) {
+      return Some(self.immutable_store_file_path(digest.hash));
+    }
+    None
   }
 
   ///
@@ -440,7 +453,7 @@ impl ByteStore {
   ) -> HashSet<Fingerprint> {
     let paths_to_check = fingerprints
       .iter()
-      .map(|fingerprint| self.large_file_path(*fingerprint))
+      .map(|fingerprint| self.immutable_store_file_path(*fingerprint))
       .collect::<Vec<_>>();
 
     #[allow(clippy::redundant_closure)]
@@ -540,51 +553,53 @@ impl ByteStore {
       return Ok(Some(f(&[])));
     }
 
-    let res = if ByteStore::uses_large_file_store(digest.size_bytes) {
-      let src = &self.large_file_path(digest.hash);
-      let file_result = tokio::fs::File::open(src).await;
-      if let Ok(mut file) = file_result {
-        // @TODO: Use mmap instead of copying into user-space
-        let mut contents: Vec<u8> = vec![];
-        file
-          .read_to_end(&mut contents)
-          .await
-          .map_err(|e| format!("Failed to load large file into memory: {e}"))?;
-        if contents.len() != digest.size_bytes {
-          return Err(format!(
-            "Got hash collision reading from store - digest {:?} was requested, but retrieved \
-                bytes with that fingerprint had length {}. Congratulations, you may have broken \
-                sha256! Underlying bytes: {:?}",
-            digest,
-            contents.len(),
-            contents
-          ));
-        }
-        Ok(Some(f(&contents[..])))
-      } else {
-        Ok(None)
-      }
-    } else {
-      let dbs = match entry_type {
-        EntryType::Directory => self.inner.directory_dbs.clone(),
-        EntryType::File => self.inner.file_dbs.clone(),
-      }?;
-      dbs
-        .load_bytes_with(digest.hash, move |bytes| {
-          if bytes.len() == digest.size_bytes {
-            Ok(f(bytes))
-          } else {
-            Err(format!(
-              "Got hash collision reading from store - digest {:?} was requested, but retrieved \
-                  bytes with that fingerprint had length {}. Congratulations, you may have broken \
-                  sha256! Underlying bytes: {:?}",
-              digest,
-              bytes.len(),
-              bytes
-            ))
+    let res = match self.immutable_store_file_if_required(digest) {
+      Some(path) => {
+        let file_result = tokio::fs::File::open(path).await;
+        if let Ok(mut file) = file_result {
+          // @TODO: Use mmap instead of copying into user-space
+          let mut contents: Vec<u8> = vec![];
+          file
+            .read_to_end(&mut contents)
+            .await
+            .map_err(|e| format!("Failed to load large file into memory: {e}"))?;
+          if contents.len() != digest.size_bytes {
+            return Err(format!(
+                "Got hash collision reading from store - digest {:?} was requested, but retrieved \
+                    bytes with that fingerprint had length {}. Congratulations, you may have broken \
+                    sha256! Underlying bytes: {:?}",
+                digest,
+                contents.len(),
+                contents
+              ));
           }
-        })
-        .await
+          Ok(Some(f(&contents[..])))
+        } else {
+          Ok(None)
+        }
+      }
+      None => {
+        let dbs = match entry_type {
+          EntryType::Directory => self.inner.directory_dbs.clone(),
+          EntryType::File => self.inner.file_dbs.clone(),
+        }?;
+        dbs
+            .load_bytes_with(digest.hash, move |bytes| {
+              if bytes.len() == digest.size_bytes {
+                Ok(f(bytes))
+              } else {
+                Err(format!(
+                  "Got hash collision reading from store - digest {:?} was requested, but retrieved \
+                      bytes with that fingerprint had length {}. Congratulations, you may have broken \
+                      sha256! Underlying bytes: {:?}",
+                  digest,
+                  bytes.len(),
+                  bytes
+                ))
+              }
+            })
+            .await
+      }
     };
 
     if let Some(workunit_store_handle) = workunit_store::get_workunit_store_handle() {
@@ -654,7 +669,7 @@ impl ByteStore {
     &self,
     digest: Digest,
   ) -> Result<TempImmutableLargeFile, String> {
-    let dest = self.large_file_path(digest.hash);
+    let dest = self.immutable_store_file_path(digest.hash);
     if !dest.parent().unwrap().exists() {
       // Throwaway the result as a way of not worrying about race conditions between multiple
       // threads/processes creating the same parent dirs. If there was an error we'll fail later.
