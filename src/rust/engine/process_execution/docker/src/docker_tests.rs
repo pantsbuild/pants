@@ -16,9 +16,7 @@ use testutil::data::{TestData, TestDirectory};
 use testutil::{owned_string_vec, relative_paths};
 use workunit_store::{RunningWorkunit, WorkunitStore};
 
-use crate::docker::{
-  DockerOnceCell, ImagePullCache, SANDBOX_BASE_PATH_IN_CONTAINER,
-};
+use crate::docker::{DockerOnceCell, ImagePullCache, SANDBOX_BASE_PATH_IN_CONTAINER};
 use process_execution::local::KeepSandboxes;
 use process_execution::{
   local, CacheName, CommandRunner, Context, FallibleProcessResultWithPlatform, InputDigests,

@@ -86,9 +86,6 @@ extern crate uname;
 
 pub use crate::children::ManagedChild;
 pub use crate::named_caches::{CacheName, NamedCaches};
-// pub use remote::remote_cache::RemoteCacheWarningsBehavior;
-
-// use remote::EntireExecuteRequest;
 
 // Environment variable which is exclusively used for cache key invalidation.
 // This may be not specified in an Process, and may be populated only by the
@@ -585,7 +582,6 @@ impl Process {
   /// Process struct wholesale. We can reconsider this if we end up with more production callsites
   /// that require partial options.
   ///
-  // #[cfg(test)]
   pub fn new(argv: Vec<String>) -> Process {
     Process {
       argv,
