@@ -7,7 +7,7 @@ publish = false
 
 [dependencies]
 protos = { path = "../protos" }
-clap = "3"
+clap = { version = "3", features = ["derive"] }
 dirs-next = "2"
 env_logger = "0.9.0"
 fs = { path = "../fs" }
@@ -19,7 +19,6 @@ process_execution = { path = "../process_execution" }
 prost = "0.9"
 shlex = "1.1.0"
 store = { path = "../fs/store" }
-structopt = "0.3.26"
 task_executor = { path = "../task_executor" }
 tokio = { version = "1.21", features = ["rt-multi-thread", "macros"] }
 workunit_store = { path = "../workunit_store"}

@@ -33,6 +33,7 @@ use std::process::exit;
 use std::sync::Arc;
 use std::time::Duration;
 
+use clap::StructOpt;
 use fs::{DirectoryDigest, Permissions, RelativePath};
 use hashing::{Digest, Fingerprint};
 use process_execution::{
@@ -44,7 +45,6 @@ use protos::gen::build::bazel::remote::execution::v2::{Action, Command};
 use protos::gen::buildbarn::cas::UncachedActionResult;
 use protos::require_digest;
 use store::{ImmutableInputs, Store};
-use structopt::StructOpt;
 use workunit_store::{in_workunit, Level, WorkunitStore};
 
 #[derive(Clone, Debug, Default)]
@@ -112,7 +112,7 @@ struct ActionDigestSpec {
 }
 
 #[derive(StructOpt)]
-#[structopt(name = "process_executor", setting = structopt::clap::AppSettings::TrailingVarArg)]
+#[structopt(name = "process_executor", setting = clap::AppSettings::TrailingVarArg)]
 struct Opt {
   #[structopt(flatten)]
   command: CommandSpec,
