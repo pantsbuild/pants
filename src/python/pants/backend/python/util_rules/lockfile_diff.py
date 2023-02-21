@@ -20,7 +20,7 @@ from pants.backend.python.util_rules.pex_requirements import (
     LoadedLockfile,
     LoadedLockfileRequest,
     Lockfile,
-    LockfileContent,
+    strip_comments_from_pex_json_lockfile,
 )
 from pants.base.exceptions import EngineError
 from pants.core.goals.generate_lockfiles import LockfileDiff, LockfilePackages, PackageName
@@ -72,24 +72,28 @@ def _pex_lockfile_requirements(
 
 
 @rule_helper
-async def _parse_lockfile(lockfile: Lockfile | LockfileContent) -> FrozenDict[str, Any] | None:
+async def _parse_lockfile(lockfile: Lockfile) -> FrozenDict[str, Any] | None:
     try:
         loaded = await Get(
             LoadedLockfile,
             LoadedLockfileRequest(lockfile),
         )
         fc = await Get(DigestContents, Digest, loaded.lockfile_digest)
-        parsed_lockfile = json.loads(fc[0].content)
-        return FrozenDict.deep_freeze(parsed_lockfile)
+        parsed = await _parse_lockfile_content(next(iter(fc)).content, lockfile.url)
+        return parsed
     except EngineError:
         # May fail in case the file doesn't exist, which is expected when parsing the "old" lockfile
         # the first time a new lockfile is generated.
         return None
+
+
+@rule_helper
+async def _parse_lockfile_content(content: bytes, url: str) -> FrozenDict[str, Any] | None:
+    try:
+        parsed_lockfile = json.loads(content)
+        return FrozenDict.deep_freeze(parsed_lockfile)
     except json.JSONDecodeError as e:
-        file_path = (
-            lockfile.file_path if isinstance(lockfile, Lockfile) else lockfile.file_content.path
-        )
-        logger.debug(f"{file_path}: Failed to parse lockfile contents: {e}")
+        logger.debug(f"{url}: Failed to parse lockfile contents: {e}")
         return None
 
 
@@ -97,17 +101,14 @@ async def _parse_lockfile(lockfile: Lockfile | LockfileContent) -> FrozenDict[st
 async def _generate_python_lockfile_diff(
     digest: Digest, resolve_name: str, path: str
 ) -> LockfileDiff:
-    new_content = await Get(DigestContents, Digest, digest)
-    new = await _parse_lockfile(
-        LockfileContent(
-            file_content=next(c for c in new_content if c.path == path),
-            resolve_name=resolve_name,
-        )
-    )
+    new_digest_contents = await Get(DigestContents, Digest, digest)
+    new_content = next(c for c in new_digest_contents if c.path == path).content
+    new_content = strip_comments_from_pex_json_lockfile(new_content)
+    new = await _parse_lockfile_content(new_content, path)
     old = await _parse_lockfile(
         Lockfile(
-            file_path=path,
-            file_path_description_of_origin="generated lockfile",
+            url=path,
+            url_description_of_origin="existing lockfile",
             resolve_name=resolve_name,
         )
     )
