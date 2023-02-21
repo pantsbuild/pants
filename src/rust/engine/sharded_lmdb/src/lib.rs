@@ -34,7 +34,7 @@ use std::sync::Arc;
 use std::time::{self, Duration};
 
 use bytes::{BufMut, Bytes};
-use hashing::{verified_copy, Digest, Fingerprint, WriterHasher, FINGERPRINT_SIZE};
+use hashing::{sync_verified_copy, Digest, Fingerprint, WriterHasher, FINGERPRINT_SIZE};
 use lmdb::{
   self, Database, DatabaseFlags, Environment, EnvironmentCopyFlags, EnvironmentFlags,
   RwTransaction, Transaction, WriteFlags,
@@ -532,7 +532,7 @@ impl ShardedLmdb {
                   .writer();
                 let mut read = data_provider().map_err(|e| format!("Failed to read: {e}"))?;
                 let should_retry =
-                  !verified_copy(digest, data_is_immutable, &mut read, &mut writer).map_err(
+                  !sync_verified_copy(digest, data_is_immutable, &mut read, &mut writer).map_err(
                     |e| format!("Failed to copy from {read:?} or store in {env:?}: {e:?}"),
                   )?;
 
