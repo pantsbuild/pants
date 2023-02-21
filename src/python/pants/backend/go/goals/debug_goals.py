@@ -113,12 +113,10 @@ async def dump_go_import_paths_for_module(
     targets: UnexpandedTargets, console: Console
 ) -> DumpGoImportPathsForModule:
     for tgt in targets:
-        console.write_stdout(
-            f"Target: {tgt.address} ({tgt.__class__} ({isinstance(tgt, GoModTarget)})\n"
-        )
         if not isinstance(tgt, GoModTarget):
             continue
 
+        console.write_stdout(f"{tgt.address}:\n")
         package_mapping = await Get(
             GoModuleImportPathsMapping, GoImportPathMappingRequest(tgt.address)
         )
