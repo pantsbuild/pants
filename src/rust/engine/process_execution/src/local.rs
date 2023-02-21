@@ -228,10 +228,10 @@ pub enum ChildOutput {
 ///
 /// Collect the outputs of a child process.
 ///
-async fn collect_child_outputs<'a>(
+pub async fn collect_child_outputs<'a, 'b>(
   stdout: &'a mut BytesMut,
   stderr: &'a mut BytesMut,
-  mut stream: BoxStream<'static, Result<ChildOutput, String>>,
+  mut stream: BoxStream<'b, Result<ChildOutput, String>>,
 ) -> Result<i32, String> {
   let mut exit_code = 1;
 
@@ -669,7 +669,8 @@ pub async fn prepare_workdir(
   };
   let named_caches_symlinks = {
     let symlinks = named_caches
-      .local_paths(&req.append_only_caches)
+      .paths(&req.append_only_caches)
+      .await
       .map_err(|err| {
         StoreError::Unclassified(format!(
           "Failed to make named cache(s) for local execution: {err:?}"
@@ -680,7 +681,7 @@ pub async fn prepare_workdir(
         .into_iter()
         .map(|symlink| WorkdirSymlink {
           src: symlink.src,
-          dst: prefix.join(symlink.dst.strip_prefix(named_caches.base_dir()).unwrap()),
+          dst: prefix.join(symlink.dst.strip_prefix(named_caches.base_path()).unwrap()),
         })
         .collect::<Vec<_>>(),
       None => symlinks,

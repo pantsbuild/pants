@@ -733,7 +733,7 @@ async fn run_command_via_docker_in_dir(
   let executor = executor.unwrap_or_else(task_executor::Executor::new);
   let store =
     store.unwrap_or_else(|| Store::local_only(executor.clone(), store_dir.path()).unwrap());
-  let (_caches_dir, named_caches, immutable_inputs) =
+  let (_caches_dir, _named_caches, immutable_inputs) =
     named_caches_and_immutable_inputs(store.clone());
   let docker = Box::new(DockerOnceCell::new());
   let image_pull_cache = Box::new(ImagePullCache::new());
@@ -743,7 +743,6 @@ async fn run_command_via_docker_in_dir(
     &docker,
     &image_pull_cache,
     dir.clone(),
-    named_caches,
     immutable_inputs,
     cleanup,
   )?;
