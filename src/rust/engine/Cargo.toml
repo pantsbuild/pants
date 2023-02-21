@@ -30,7 +30,6 @@ members = [
   "cache",
   "client",
   "concrete_time",
-  "docker",
   "fs",
   "fs/brfs",
   "fs/fs_util",
@@ -42,6 +41,7 @@ members = [
   "nailgun",
   "options",
   "process_execution",
+  "process_execution/docker",
   "process_execution/remote",
   "process_executor",
   "rule_graph",
@@ -73,7 +73,6 @@ default-members = [
   "cache",
   "client",
   "concrete_time",
-  "docker",
   "fs",
   "fs/fs_util",
   "fs/store",
@@ -84,6 +83,7 @@ default-members = [
   "nailgun",
   "options",
   "process_execution",
+  "process_execution/docker",
   "process_execution/remote",
   "process_executor",
   "rule_graph",
@@ -124,7 +124,7 @@ crossbeam-channel = "0.5"
 deepsize = { git = "https://github.com/stuhood/deepsize.git", rev = "5c8bee5443fcafe4aaa9274490d354412d0955c1", features=["internment", "smallvec"] }
 derivative = "2.2"
 async-oncecell = "0.2"
-docker = { path = "docker" }
+docker = { path = "process_execution/docker" }
 fnv = "1.0.5"
 fs = { path = "fs" }
 futures = "0.3"

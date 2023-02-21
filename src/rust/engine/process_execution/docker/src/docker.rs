@@ -27,8 +27,8 @@ use task_executor::Executor;
 use workunit_store::{in_workunit, Metric, RunningWorkunit};
 
 use process_execution::local::{
-  apply_chroot, create_sandbox, prepare_workdir, prepare_workdir_digest, setup_run_sh_script,
-  CapturedWorkdir, ChildOutput, KeepSandboxes,
+  apply_chroot, create_sandbox, prepare_workdir, setup_run_sh_script, CapturedWorkdir, ChildOutput,
+  KeepSandboxes,
 };
 use process_execution::{
   Context, FallibleProcessResultWithPlatform, NamedCaches, Platform, Process, ProcessError,

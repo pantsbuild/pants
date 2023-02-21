@@ -17,7 +17,7 @@ use testutil::{owned_string_vec, relative_paths};
 use workunit_store::{RunningWorkunit, WorkunitStore};
 
 use crate::docker::{
-  DockerOnceCell, DockerStrategy, ImagePullCache, SANDBOX_BASE_PATH_IN_CONTAINER,
+  DockerOnceCell, ImagePullCache, SANDBOX_BASE_PATH_IN_CONTAINER,
 };
 use process_execution::local::KeepSandboxes;
 use process_execution::{
@@ -760,7 +760,7 @@ pub(crate) fn named_caches_and_immutable_inputs(
 
   (
     root,
-    NamedCaches::new(named_cache_dir).unwrap(),
+    NamedCaches::new(named_cache_dir),
     ImmutableInputs::new(store, &root_path).unwrap(),
   )
 }
