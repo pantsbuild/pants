@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import os
 from textwrap import dedent
-from typing import Dict, cast
+from typing import cast
 
 from pants.backend.go.testutil import gen_module_gomodproxy
 from pants.testutil.pants_integration_test import run_pants, setup_tmpdir
@@ -129,7 +129,7 @@ def test_run_binary_third_party() -> None:
     }
 
     with setup_tmpdir(
-        cast(Dict[str, str], fake_gomod), cast(Dict[str, bytes], raw_files)
+        cast("dict[str, str]", fake_gomod), cast("dict[str, bytes]", raw_files)
     ) as tmpdir:
         # required for GOPROXY to work correctly when the go-mod-proxy
         # is in a subdir of the cwd.
