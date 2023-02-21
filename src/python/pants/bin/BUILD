@@ -34,6 +34,8 @@ target(
         "src/python/pants/backend/experimental/codegen/thrift/scrooge/scala",
         "src/python/pants/backend/experimental/debian",
         "src/python/pants/backend/experimental/go",
+        "src/python/pants/backend/experimental/go/debug_goals",
+        "src/python/pants/backend/experimental/go/lint/golangci_lint",
         "src/python/pants/backend/experimental/go/lint/vet",
         "src/python/pants/backend/experimental/helm",
         "src/python/pants/backend/experimental/java",
