@@ -139,7 +139,9 @@ async def node_process_environment(nodejs: NodeJS, platform: Platform) -> NodeJS
         "bin",
     )
 
-    return NodeJSProcessEnvironment(binary_directory=nodejs_bin_dir, npm_config_cache=".cache/npm")
+    return NodeJSProcessEnvironment(
+        binary_directory=nodejs_bin_dir, npm_config_cache=os.path.join("{chroot}", ".cache", "npm")
+    )
 
 
 @rule(level=LogLevel.DEBUG)
