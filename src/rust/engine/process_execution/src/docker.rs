@@ -1,6 +1,7 @@
 // Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 use std::collections::{BTreeMap, HashMap};
+use std::ffi::OsStr;
 use std::fmt;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -13,7 +14,7 @@ use bollard::image::CreateImageOptions;
 use bollard::service::CreateImageInfo;
 use bollard::volume::CreateVolumeOptions;
 use bollard::{errors::Error as DockerError, Docker};
-use bytes::BytesMut;
+use bytes::{Bytes, BytesMut};
 use futures::stream::BoxStream;
 use futures::{FutureExt, StreamExt, TryFutureExt};
 use hashing::Digest;
@@ -350,26 +351,42 @@ impl<'a> super::CommandRunner for CommandRunner<'a> {
         // Start working on a mutable version of the process.
         let mut req = req;
 
-        // Update env, replacing `{chroot}` placeholders with the path to the sandbox
-        // within the Docker container.
-        let sandbox_relpath = workdir
-          .path()
-          .strip_prefix(&self.work_dir_base)
-          .map_err(|err| {
-            format!("Internal error - base directory was not prefix of sandbox directory: {err}")
-          })?;
-        let sandbox_path_in_container = Path::new(&SANDBOX_BASE_PATH_IN_CONTAINER)
-          .join(sandbox_relpath)
-          .into_os_string()
-          .into_string()
-          .map_err(|s| {
-            format!("Unable to convert sandbox path to string due to non UTF-8 characters: {s:?}")
-          })?;
-        apply_chroot(&sandbox_path_in_container, &mut req);
-        log::trace!(
-          "sandbox_path_in_container = {:?}",
-          &sandbox_path_in_container
-        );
+        // Compute the absolute working directory within the container, and update the env to
+        // replace `{chroot}` placeholders with the path to the sandbox within the Docker container.
+        let working_dir = {
+          let sandbox_relpath =
+            workdir
+              .path()
+              .strip_prefix(&self.work_dir_base)
+              .map_err(|err| {
+                format!(
+                  "Internal error - base directory was not prefix of sandbox directory: {err}"
+                )
+              })?;
+          let sandbox_path_in_container = Path::new(&SANDBOX_BASE_PATH_IN_CONTAINER)
+            .join(sandbox_relpath)
+            .into_os_string()
+            .into_string()
+            .map_err(|s| {
+              format!("Unable to convert sandbox path to string due to non UTF-8 characters: {s:?}")
+            })?;
+          apply_chroot(&sandbox_path_in_container, &mut req);
+          log::trace!(
+            "sandbox_path_in_container = {:?}",
+            &sandbox_path_in_container
+          );
+
+          req
+            .working_directory
+            .as_ref()
+            .map(|relpath| Path::new(&sandbox_path_in_container).join(relpath))
+            .unwrap_or_else(|| Path::new(&sandbox_path_in_container).to_path_buf())
+            .into_os_string()
+            .into_string()
+            .map_err(|s| {
+              format!("Unable to convert working directory due to non UTF-8 characters: {s:?}")
+            })?
+        };
 
         // Prepare the workdir.
         // DOCKER-NOTE: The input root will be bind mounted into the container.
@@ -395,7 +412,7 @@ impl<'a> super::CommandRunner for CommandRunner<'a> {
             self.store.clone(),
             self.executor.clone(),
             workdir.path().to_owned(),
-            (container_id, sandbox_path_in_container),
+            (container_id, working_dir),
             exclusive_spawn,
             req.platform,
           )
@@ -450,27 +467,74 @@ impl<'a> CapturedWorkdir for CommandRunner<'a> {
     &'s self,
     _context: &'c Context,
     _workdir_path: &'w Path,
-    (container_id, sandbox_path_in_container): Self::WorkdirToken,
+    (container_id, working_dir): Self::WorkdirToken,
     req: Process,
     _exclusive_spawn: bool,
   ) -> Result<BoxStream<'r, Result<ChildOutput, String>>, String> {
     let docker = self.docker.get().await?;
-
-    let working_dir = req
-      .working_directory
-      .map(|relpath| Path::new(&sandbox_path_in_container).join(relpath))
-      .unwrap_or_else(|| Path::new(&sandbox_path_in_container).to_path_buf())
-      .into_os_string()
-      .into_string()
-      .map_err(|s| {
-        format!("Unable to convert working directory due to non UTF-8 characters: {s:?}")
-      })?;
 
     Command::new(req.argv)
       .env(req.env)
       .working_dir(working_dir)
       .spawn(docker, container_id)
       .await
+  }
+
+  async fn prepare_workdir_for_capture(
+    &self,
+    _context: &Context,
+    _workdir_path: &Path,
+    (container_id, working_dir): Self::WorkdirToken,
+    req: &Process,
+  ) -> Result<(), String> {
+    // Docker on Linux will frequently produce root-owned output files in bind mounts, because we
+    // do not assume anything about the users that exist in the image.
+    if matches!(
+      Platform::current()?,
+      Platform::Macos_x86_64 | Platform::Macos_arm64
+    ) {
+      return Ok(());
+    }
+
+    let docker = self.docker.get().await?;
+
+    let args = ["chmod", "a+r", "-R"]
+      .into_iter()
+      .map(OsStr::new)
+      .chain(
+        req
+          .output_files
+          .iter()
+          .chain(req.output_directories.iter())
+          .map(|p| p.as_ref().as_os_str()),
+      )
+      .map(|s| {
+        s.to_owned().into_string().map_err(|s| {
+          format!(
+            "Unable to convert output_files or output_directories due to \
+             non UTF-8 characters: {s:?}"
+          )
+        })
+      })
+      .collect::<Result<Vec<_>, _>>()?;
+
+    let (exit_code, stdout, stderr) = Command::new(args)
+      .working_dir(working_dir)
+      .output(docker, container_id)
+      .await?;
+
+    // Failing processes may not create their output files, so we do not treat this as fatal.
+    if exit_code != 0 {
+      log::debug!(
+        "Failed to chmod process outputs in Docker container:\n\
+        stdout:\n{}\n\
+        stderr:\n{}\n",
+        String::from_utf8_lossy(&stdout),
+        String::from_utf8_lossy(&stderr)
+      );
+    }
+
+    Ok(())
   }
 }
 
@@ -568,6 +632,19 @@ impl Command {
     };
 
     Ok(stream.boxed())
+  }
+
+  /// Execute the command that has been specified, and return its exit code, stdout, and stderr.
+  async fn output(
+    &mut self,
+    docker: &Docker,
+    container_id: String,
+  ) -> Result<(i32, Bytes, Bytes), String> {
+    let child_outputs = self.spawn(docker, container_id).await?;
+    let mut stdout = BytesMut::with_capacity(8192);
+    let mut stderr = BytesMut::with_capacity(8192);
+    let exit_code = collect_child_outputs(&mut stdout, &mut stderr, child_outputs).await?;
+    Ok((exit_code, stdout.freeze(), stderr.freeze()))
   }
 }
 
@@ -745,17 +822,14 @@ impl<'a> ContainerCache<'a> {
     let directory = directory.into_os_string().into_string().map_err(|s| {
       format!("Unable to convert named cache path to string due to non UTF-8 characters: {s:?}")
     })?;
-    let child_outputs = Command::new(vec![
+    let (exit_code, stdout, stderr) = Command::new(vec![
       "mkdir".to_owned(),
       "-p".to_owned(),
       directory.to_owned(),
     ])
-    .spawn(&docker, container_id)
+    .output(&docker, container_id)
     .await?;
 
-    let mut stdout = BytesMut::with_capacity(8192);
-    let mut stderr = BytesMut::with_capacity(8192);
-    let exit_code = collect_child_outputs(&mut stdout, &mut stderr, child_outputs).await?;
     if exit_code == 0 {
       Ok(())
     } else {

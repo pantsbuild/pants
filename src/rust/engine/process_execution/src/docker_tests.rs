@@ -542,6 +542,38 @@ async fn all_containing_directories_for_outputs_are_created() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
+async fn outputs_readable_only_by_container_user_are_captured() {
+  skip_if_no_docker_available_in_macos_ci!();
+
+  let result = run_command_via_docker(
+    Process::new(vec![
+      SH_PATH.to_string(),
+      "-c".to_owned(),
+      format!(
+        // Ensure that files are only readable by the container user (which on Linux would usually
+        // mean that a non-root user outside the container would not have access).
+        "/bin/mkdir birds/falcons && echo -n {} > cats/roland.ext && chmod o-r -R birds cats",
+        TestData::roland().string()
+      ),
+    ])
+    .output_files(relative_paths(&["cats/roland.ext"]).collect())
+    .output_directories(relative_paths(&["birds/falcons"]).collect())
+    .docker(IMAGE.to_owned()),
+  )
+  .await
+  .unwrap();
+
+  assert_eq!(result.stdout_bytes, "".as_bytes());
+  assert_eq!(result.stderr_bytes, "".as_bytes());
+  assert_eq!(result.original.exit_code, 0);
+  assert_eq!(
+    result.original.output_directory,
+    TestDirectory::nested_dir_and_file().directory_digest()
+  );
+  assert_eq!(result.original.platform, platform_for_tests().unwrap());
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 async fn output_empty_dir() {
   skip_if_no_docker_available_in_macos_ci!();
 

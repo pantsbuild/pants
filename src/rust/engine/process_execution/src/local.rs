@@ -457,7 +457,7 @@ impl CapturedWorkdir for CommandRunner {
 
 #[async_trait]
 pub trait CapturedWorkdir {
-  type WorkdirToken: Send;
+  type WorkdirToken: Clone + Send;
 
   async fn run_and_capture_workdir(
     &self,
@@ -479,6 +479,7 @@ pub trait CapturedWorkdir {
     // is that we eventually want to pass incremental results on down the line for streaming
     // process results to console logs, etc.
     let exit_code_result = {
+      let workdir_token = workdir_token.clone();
       let exit_code_future = collect_child_outputs(
         &mut stdout,
         &mut stderr,
@@ -503,6 +504,9 @@ pub trait CapturedWorkdir {
     };
 
     // Capture the process outputs.
+    self
+      .prepare_workdir_for_capture(&context, &workdir_path, workdir_token, &req)
+      .await?;
     let output_snapshot = if req.output_files.is_empty() && req.output_directories.is_empty() {
       store::Snapshot::empty()
     } else {
@@ -604,6 +608,20 @@ pub trait CapturedWorkdir {
     req: Process,
     exclusive_spawn: bool,
   ) -> Result<BoxStream<'r, Result<ChildOutput, String>>, String>;
+
+  ///
+  /// An optionally-implemented method which is called after the child process has completed, but
+  /// before capturing the sandbox. The default implementation does nothing.
+  ///
+  async fn prepare_workdir_for_capture(
+    &self,
+    _context: &Context,
+    _workdir_path: &Path,
+    _workdir_token: Self::WorkdirToken,
+    _req: &Process,
+  ) -> Result<(), String> {
+    Ok(())
+  }
 }
 
 ///
