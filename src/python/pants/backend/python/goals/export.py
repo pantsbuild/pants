@@ -35,7 +35,7 @@ from pants.engine.environment import EnvironmentName
 from pants.engine.internals.native_engine import AddPrefix, Digest, MergeDigests
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import ProcessResult
-from pants.engine.rules import collect_rules, rule, rule_helper
+from pants.engine.rules import collect_rules, rule
 from pants.engine.target import Target
 from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.option.option_types import BoolOption, EnumOption
@@ -123,7 +123,6 @@ class ExportPluginOptions:
     )
 
 
-@rule_helper
 async def _get_full_python_version(pex_or_venv_pex: Pex | VenvPex) -> str:
     # Get the full python version (including patch #).
     is_venv_pex = isinstance(pex_or_venv_pex, VenvPex)

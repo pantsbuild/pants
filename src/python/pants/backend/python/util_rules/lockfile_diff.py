@@ -25,7 +25,7 @@ from pants.backend.python.util_rules.pex_requirements import (
 from pants.base.exceptions import EngineError
 from pants.core.goals.generate_lockfiles import LockfileDiff, LockfilePackages, PackageName
 from pants.engine.fs import Digest, DigestContents
-from pants.engine.rules import Get, rule_helper
+from pants.engine.rules import Get
 from pants.util.frozendict import FrozenDict
 
 logger = logging.getLogger(__name__)
@@ -71,7 +71,6 @@ def _pex_lockfile_requirements(
     return LockfilePackages(requirements)
 
 
-@rule_helper
 async def _parse_lockfile(lockfile: Lockfile) -> FrozenDict[str, Any] | None:
     try:
         loaded = await Get(
@@ -87,7 +86,6 @@ async def _parse_lockfile(lockfile: Lockfile) -> FrozenDict[str, Any] | None:
         return None
 
 
-@rule_helper
 async def _parse_lockfile_content(content: bytes, url: str) -> FrozenDict[str, Any] | None:
     try:
         parsed_lockfile = json.loads(content)
@@ -97,7 +95,6 @@ async def _parse_lockfile_content(content: bytes, url: str) -> FrozenDict[str, A
         return None
 
 
-@rule_helper
 async def _generate_python_lockfile_diff(
     digest: Digest, resolve_name: str, path: str
 ) -> LockfileDiff:

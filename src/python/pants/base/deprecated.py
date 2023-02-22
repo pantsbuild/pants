@@ -111,7 +111,7 @@ def warn_or_error(
     *,
     start_version: str | None = None,
     print_warning: bool = True,
-    stacklevel: int = 2,
+    stacklevel: int = 0,
     context: int = 1,
 ) -> None:
     """Check the removal_version against the current Pants version.

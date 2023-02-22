@@ -390,6 +390,8 @@ def rule_helper(
 ) -> Callable[P, R] | Callable[[Callable[P, R]], Callable[P, R]]:
     """Decorator which marks a function as a "rule helper".
 
+    This docstring is now deprecated. Any async method may now use `await Get/MultiGet`.
+
     Functions marked as rule helpers are allowed to be called by rules and other rule helpers
     and can `await Get/MultiGet`. The rule parser adds these functions' awaitables to the rule's
     awaitables.

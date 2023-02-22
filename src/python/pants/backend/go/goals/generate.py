@@ -41,7 +41,7 @@ from pants.engine.internals.native_engine import (
 )
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import collect_rules, goal_rule, rule, rule_helper
+from pants.engine.rules import collect_rules, goal_rule, rule
 from pants.engine.target import Targets
 from pants.option.option_types import StrListOption
 from pants.option.subsystem import Subsystem
@@ -158,7 +158,6 @@ def _expand_env(s: str, m: Mapping[str, str]) -> str:
     return buf + s[i:]
 
 
-@rule_helper
 async def _run_generators(
     analysis: FirstPartyPkgAnalysis,
     digest: Digest,
