@@ -489,6 +489,9 @@ impl<'a> CapturedWorkdir for CommandRunner<'a> {
   ) -> Result<(), String> {
     // Docker on Linux will frequently produce root-owned output files in bind mounts, because we
     // do not assume anything about the users that exist in the image.
+    //
+    // TODO: Changing permissions allows the files to be captured, but not for them to be removed.
+    // See https://github.com/pantsbuild/pants/issues/18329.
     if matches!(
       Platform::current()?,
       Platform::Macos_x86_64 | Platform::Macos_arm64
@@ -699,7 +702,7 @@ impl<'a> ContainerCache<'a> {
   /// (named) caches.
   async fn make_container(
     docker: Docker,
-    image: String,
+    image_name: String,
     platform: Platform,
     image_pull_scope: ImagePullScope,
     image_pull_cache: ImagePullCache,
@@ -710,16 +713,16 @@ impl<'a> ContainerCache<'a> {
     image_pull_cache
       .pull_image(
         &docker,
-        &image,
+        &image_name,
         &platform,
         image_pull_scope,
         ImagePullPolicy::OnlyIfLatestOrMissing,
       )
       .await?;
 
-    let named_cache_volume_name = Self::maybe_make_named_cache_volume(&docker, &image)
+    let named_cache_volume_name = Self::maybe_make_named_cache_volume(&docker, &image_name)
       .await
-      .map_err(|e| format!("Failed to create named cache volume for {image}: {e}"))?;
+      .map_err(|e| format!("Failed to create named cache volume for {image_name}: {e}"))?;
 
     let config = bollard::container::Config {
       entrypoint: Some(vec!["/bin/sh".to_string()]),
@@ -734,17 +737,13 @@ impl<'a> ContainerCache<'a> {
         init: Some(true),
         ..bollard::service::HostConfig::default()
       }),
-      image: Some(image.clone()),
+      image: Some(image_name.clone()),
       tty: Some(true),
       open_stdin: Some(true),
       ..bollard::container::Config::default()
     };
 
-    log::trace!(
-      "creating cached container with config for image `{}`: {:?}",
-      image,
-      &config
-    );
+    log::trace!("creating cached container with config for image `{image_name}`: {config:?}",);
 
     let create_options = CreateContainerOptions::<&str> {
       name: "",
@@ -760,15 +759,14 @@ impl<'a> ContainerCache<'a> {
       .await
       .map_err(|err| {
         format!(
-          "Failed to start Docker container `{}` for image `{}`: {:?}",
-          &container.id, image, err
+          "Failed to start Docker container `{}` for image `{image_name}`: {err:?}",
+          &container.id
         )
       })?;
 
     log::debug!(
-      "started container `{}` for image `{}`",
+      "started container `{}` for image `{image_name}`",
       &container.id,
-      image
     );
 
     Ok(container.id)
@@ -780,9 +778,9 @@ impl<'a> ContainerCache<'a> {
   /// it configurable whether the image version is attached in future releases.
   async fn maybe_make_named_cache_volume(
     docker: &Docker,
-    image: &str,
+    image_name: &str,
   ) -> Result<String, DockerError> {
-    let image_hash = Digest::of_bytes(image.as_bytes())
+    let image_hash = Digest::of_bytes(image_name.as_bytes())
       .hash
       .to_hex()
       .chars()
@@ -801,7 +799,7 @@ impl<'a> ContainerCache<'a> {
     }
 
     let mut labels = HashMap::new();
-    labels.insert("image_name", image);
+    labels.insert("image_name", image_name);
     docker
       .create_volume::<&str>(CreateVolumeOptions {
         name: &named_cache_volume_name,
@@ -843,11 +841,11 @@ impl<'a> ContainerCache<'a> {
     }
   }
 
-  /// Return the container ID and NamedCaches for a container running `image` for use as a place
+  /// Return the container ID and NamedCaches for a container running `image_name` for use as a place
   /// to invoke build actions as executions within the cached container.
   pub async fn container_for_image(
     &self,
-    image: &str,
+    image_name: &str,
     platform: &Platform,
     build_generation: &str,
   ) -> Result<(String, NamedCaches), String> {
@@ -857,7 +855,7 @@ impl<'a> ContainerCache<'a> {
     let container_id_cell = {
       let mut containers = self.containers.lock();
       let cell = containers
-        .entry((image.to_string(), *platform))
+        .entry((image_name.to_string(), *platform))
         .or_insert_with(|| Arc::new(OnceCell::new()));
       cell.clone()
     };
@@ -870,7 +868,7 @@ impl<'a> ContainerCache<'a> {
       .get_or_try_init(async move {
         let container_id = Self::make_container(
           docker.clone(),
-          image.to_string(),
+          image_name.to_string(),
           *platform,
           image_pull_scope,
           self.image_pull_cache.clone(),
