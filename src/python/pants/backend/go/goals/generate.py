@@ -221,7 +221,7 @@ async def _run_generators(
             args[i] = _expand_env(arg, env)
 
         # Invoke the subprocess and store its output for use as input root of next command (if any).
-        result = await Get(  # noqa: PNT30: requires triage
+        result = await Get(  # noqa: PNT30: this is inherently sequential
             ProcessResult,
             Process(
                 argv=args,
@@ -232,7 +232,7 @@ async def _run_generators(
                 description=f"Process `go generate` directives in file: {os.path.join(dir_path, go_file)}",
             ),
         )
-        digest = await Get(  # noqa: PNT30: requires triage
+        digest = await Get(  # noqa: PNT30: this is inherently sequential
             Digest, AddPrefix(result.output_digest, dir_path)
         )
 
