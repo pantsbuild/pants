@@ -374,11 +374,11 @@ def test_default_coverage_issues_12390() -> None:
 def test_global_coverage() -> None:
     files = {
         "minimalcov/minimalcov/src/foo.py": 'print("In the foo module!")',
-        "minimalcov/minimalcov/src/foo_not_covered.py": 'print("No test coverage!")',
+        "minimalcov/minimalcov/src/foo_no_cov.py": 'print("No test coverage!")',
         "minimalcov/minimalcov/src/BUILD": "python_sources()",
         "minimalcov/minimalcov/tests/test_foo.py": dedent(
             """\
-            import minimalcov.src.foo
+            import foo
 
             def test_1():
                 assert True
@@ -394,7 +394,7 @@ def test_global_coverage() -> None:
             "test",
             "--use-coverage",
             "::",
-            f"--source-root-patterns=['/{tmpdir}/minimalcov']",
+            f"--source-root-patterns=['/{tmpdir}/minimalcov/minimalcov/src','/{tmpdir}/minimalcov/minimalcov/tests']",
             "--coverage-py-report=raw",
             "--coverage-py-global-report",
         ]
@@ -406,10 +406,10 @@ def test_global_coverage() -> None:
             Name                                                  Stmts   Miss  Cover
             -------------------------------------------------------------------------
             {tmpdir}/minimalcov/minimalcov/src/foo.py              1      0   100%
-            {tmpdir}/minimalcov/minimalcov/src/foo_not_covered.py  1      1   0%
+            {tmpdir}/minimalcov/minimalcov/src/foo_no_cov.py       1      1     0%
             {tmpdir}/minimalcov/minimalcov/tests/test_foo.py       3      0   100%
             -------------------------------------------------------------------------
-            TOTAL                                                     5      1   80%
+            TOTAL                                                     5      1    80%
             """
         )
         in result.stderr
