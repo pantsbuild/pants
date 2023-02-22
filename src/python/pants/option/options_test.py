@@ -9,6 +9,7 @@ import unittest.mock
 from contextlib import contextmanager
 from enum import Enum
 from functools import partial
+from pathlib import Path
 from textwrap import dedent
 from typing import Any, Callable, Dict, cast
 
@@ -17,6 +18,7 @@ import toml
 import yaml
 from packaging.version import Version
 
+from pants.base.build_environment import get_buildroot
 from pants.base.deprecated import CodeRemovedError, warn_or_error
 from pants.base.hash_utils import CoercingEncoder
 from pants.engine.fs import FileContent
@@ -46,7 +48,7 @@ from pants.option.parser import Parser
 from pants.option.ranked_value import Rank, RankedValue
 from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
 from pants.option.subsystem import Subsystem
-from pants.util.contextutil import temporary_file, temporary_file_path
+from pants.util.contextutil import pushd, temporary_dir, temporary_file, temporary_file_path
 
 _FAKE_CUR_VERSION = "1.0.0.dev0"
 
@@ -1516,6 +1518,15 @@ class OptionsTest(unittest.TestCase):
             fp.close()
             options = self._parse(flags=f"fromfile --{'dictvalue'}=@{fp.name}")
             assert {"a": "multiline\n"} == options.for_scope("fromfile")["dictvalue"]
+
+    def test_fromfile_relative_to_build_root(self) -> None:
+        with temporary_dir(root_dir=get_buildroot()) as tempdir:
+            dirname = tempdir.split("/")[-1]
+            tempfile = Path(tempdir, "config")
+            tempfile.write_text("{'a': 'multiline\\n'}")
+            with pushd(tempdir):
+                options = self._parse(flags=f"fromfile --dictvalue=@{dirname}/config")
+                assert {"a": "multiline\n"} == options.for_scope("fromfile")["dictvalue"]
 
     def test_fromfile_error(self) -> None:
         options = self._parse(flags="fromfile --string=@/does/not/exist")
