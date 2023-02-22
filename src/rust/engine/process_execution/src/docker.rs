@@ -488,7 +488,9 @@ impl<'a> CapturedWorkdir for CommandRunner<'a> {
     req: &Process,
   ) -> Result<(), String> {
     // Docker on Linux will frequently produce root-owned output files in bind mounts, because we
-    // do not assume anything about the users that exist in the image.
+    // do not assume anything about the users that exist in the image. But Docker on macOS (at least
+    // version 14.6.2 using gRPC-FUSE filesystem virtualization) creates files in bind mounts as the
+    // user running Docker. See https://github.com/pantsbuild/pants/issues/18306.
     //
     // TODO: Changing permissions allows the files to be captured, but not for them to be removed.
     // See https://github.com/pantsbuild/pants/issues/18329.
