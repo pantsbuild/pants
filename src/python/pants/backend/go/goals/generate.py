@@ -318,7 +318,7 @@ async def run_go_package_generators(
     # an earlier-processed file prevents later files from being processed.
     output_digest = EMPTY_DIGEST
     for go_file in analysis.go_files:
-        output_digest_for_go_file = await _run_generators(  # noqa: PNT30: requires triage
+        output_digest_for_go_file = await _run_generators(
             analysis, pkg_digest.digest, dir_path, go_file, goroot, env
         )
         output_digest = await Get(  # noqa: PNT30: requires triage

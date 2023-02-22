@@ -244,7 +244,7 @@ async def run_publish(
             continue
 
         logger.debug(f"Execute {pub.process}")
-        res = await Effect(  # noqa: PNT30: requires triage
+        res = await Effect(
             InteractiveProcessResult,
             {pub.process: InteractiveProcess, local_environment.val: EnvironmentName},
         )

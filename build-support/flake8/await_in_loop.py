@@ -104,8 +104,23 @@ def check_for_await_in_loop(tree: ast.AST, filename: str) -> Iterator[tuple[int,
 
         visit_ListComp = visit_GeneratorExp = visit_SetComp = visit_DictComp = visit_comp
 
+        def _await_that_could_be_multiget(self, node: ast.Await) -> bool:
+            """Check for `await Get(...)` or `await MultiGet(...)` literally"""
+            value = node.value
+
+            # This checks for `await Get()` and `await MultiGet()` literally, because there's not
+            # currently MultiGet support for rule_helpers (i.e. `[await some_rule_helper(x) for x in
+            # ...]` cannot become `await MultiGet([rule_helper(x) for x in ...])` ). Once that's
+            # supported, this could flip to default to True, except for `await Effect`.
+
+            return (
+                isinstance(value, ast.Call)
+                and isinstance(value.func, ast.Name)
+                and value.func.id in ("Get", "MultiGet")
+            )
+
         def visit_Await(self, node: ast.Await):
-            if self._in_loop:
+            if self._in_loop and self._await_that_could_be_multiget(node):
                 violations.append(
                     (
                         node.lineno,
