@@ -573,20 +573,13 @@ class Parser:
                 else:
                     fromfile = val_or_str[1:]
                     try:
-                        fromfile_path = Path(fromfile)
-                        fromfile_path = (
-                            fromfile_path
-                            if fromfile_path.is_absolute()
-                            else Path(get_buildroot(), fromfile)
-                        )
-                        with fromfile_path.open() as fp:
-                            s = fp.read()
-                            if fromfile.endswith(".json"):
-                                return json.loads(s)
-                            elif fromfile.endswith(".yml") or fromfile.endswith(".yaml"):
-                                return yaml.safe_load(s)
-                            else:
-                                return s.strip()
+                        contents = Path(get_buildroot(), fromfile).read_text()
+                        if fromfile.endswith(".json"):
+                            return json.loads(contents)
+                        elif fromfile.endswith(".yml") or fromfile.endswith(".yaml"):
+                            return yaml.safe_load(contents)
+                        else:
+                            return contents.strip()
                     except (OSError, ValueError, yaml.YAMLError) as e:
                         raise FromfileError(
                             f"Failed to read {dest} in {self._scope_str()} from file {fromfile}: {e!r}"
