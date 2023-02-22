@@ -61,11 +61,13 @@ async def _find_binary(
         else None
     )
 
+    search_paths = tuple(extra_search_paths) + SEARCH_PATHS
+
     binaries = await Get(
         BinaryPaths,
         BinaryPathRequest(
             binary_name=binary_name,
-            search_path=(tuple(extra_search_paths) + SEARCH_PATHS),
+            search_path=search_paths,
             test=test,
         ),
     )
@@ -79,7 +81,15 @@ async def _find_binary(
 
         return binary
 
-    raise ValueError(f"Could not find a binary with `{binary_name}` with the provided constraints.")
+    raise ValueError(
+        f"Could not find a binary with `{binary_name}`"
+        + (
+            ""
+            if not fingerprint_pattern
+            else f" with output matching `{fingerprint_pattern}` when run with arguments `{' '.join(fingerprint_args or ())}`"
+        )
+        + f". The following paths were searched: {', '.join(search_paths)}."
+    )
 
 
 @rule(level=LogLevel.DEBUG)

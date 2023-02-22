@@ -307,7 +307,7 @@ class SystemBinaryTarget(Target):
         paths provided, as well as default search paths. If
         `{SystemBinaryFingerprintPattern.alias}` is specified, each binary that is located will be
         executed with the arguments from `{SystemBinaryFingerprintArgsField.alias}`. Any binaries
-        that do not match the pattern will be excluded.
+        whose output does not match the pattern will be excluded.
 
         The first non-excluded binary will be the one that is resolved.
         """
