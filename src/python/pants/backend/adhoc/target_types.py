@@ -252,15 +252,6 @@ class AdhocToolTarget(Target):
 # `system_binary` target
 # ---
 
-"""
-system_binary(
-    binary_name="sh",
-    extra_search_paths=["/bin", "/opt"],
-    fingerprint_args=["--version"],
-    fingerprint_regex="blah",
-)
-"""
-
 
 class SystemBinaryNameField(StringField):
     alias = "binary_name"
