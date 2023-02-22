@@ -90,7 +90,4 @@ def test_fingerprint(fingerprint: str, passes: bool) -> None:
             assert "[INFO] I am a duck!" in result.stderr.strip()
         else:
             assert result.exit_code != 0
-            assert (
-                "Could not find a binary with `bash` with the provided constraints."
-                in result.stderr.strip()
-            )
+            assert "Could not find a binary with name `bash`" in result.stderr.strip()

@@ -82,7 +82,7 @@ async def _find_binary(
         return binary
 
     raise ValueError(
-        f"Could not find a binary with `{binary_name}`"
+        f"Could not find a binary with name `{binary_name}`"
         + (
             ""
             if not fingerprint_pattern
