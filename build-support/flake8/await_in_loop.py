@@ -47,7 +47,7 @@ def check_for_await_in_loop(tree: ast.AST, filename: str) -> Iterator[tuple[int,
                 for x in node:
                     self.visit(x)
             else:
-                self.visit(x)
+                self.visit(node)
 
         def visit_for(self, node: ast.For | ast.AsyncFor):
             """Example::
