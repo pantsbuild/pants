@@ -1314,6 +1314,8 @@ dependencies = [
  "serde",
  "serde_test",
  "sha2",
+ "tempfile",
+ "tokio",
 ]
 
 [[package]]
