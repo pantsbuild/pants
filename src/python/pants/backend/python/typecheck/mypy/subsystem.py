@@ -221,8 +221,8 @@ class MyPy(PythonToolBase):
             requirements = PexRequirements(self.extra_type_stubs)
         else:
             tool_lockfile = Lockfile(
-                file_path=self.extra_type_stubs_lockfile,
-                file_path_description_of_origin=(
+                url=self.extra_type_stubs_lockfile,
+                url_description_of_origin=(
                     f"the option `[{self.options_scope}].extra_type_stubs_lockfile`"
                 ),
                 lockfile_hex_digest=calculate_invalidation_digest(self.extra_type_stubs),
