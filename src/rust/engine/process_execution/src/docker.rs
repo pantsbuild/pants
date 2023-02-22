@@ -1,4 +1,5 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
+use std::ffi::OsStr;
 use std::fmt;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -9,9 +10,12 @@ use bollard::container::{CreateContainerOptions, LogOutput, RemoveContainerOptio
 use bollard::exec::StartExecResults;
 use bollard::image::CreateImageOptions;
 use bollard::service::CreateImageInfo;
+use bollard::volume::CreateVolumeOptions;
 use bollard::{errors::Error as DockerError, Docker};
+use bytes::{Bytes, BytesMut};
 use futures::stream::BoxStream;
-use futures::{StreamExt, TryFutureExt};
+use futures::{FutureExt, StreamExt, TryFutureExt};
+use hashing::Digest;
 use log::Level;
 use nails::execution::ExitCode;
 use once_cell::sync::Lazy;
@@ -21,8 +25,8 @@ use task_executor::Executor;
 use workunit_store::{in_workunit, Metric, RunningWorkunit};
 
 use crate::local::{
-  apply_chroot, create_sandbox, prepare_workdir, setup_run_sh_script, CapturedWorkdir, ChildOutput,
-  KeepSandboxes,
+  apply_chroot, collect_child_outputs, create_sandbox, prepare_workdir, setup_run_sh_script,
+  CapturedWorkdir, ChildOutput, KeepSandboxes,
 };
 use crate::{
   Context, FallibleProcessResultWithPlatform, ImmutableInputs, NamedCaches, Platform, Process,
@@ -45,7 +49,6 @@ pub struct CommandRunner<'a> {
   executor: Executor,
   docker: &'a DockerOnceCell,
   work_dir_base: PathBuf,
-  named_caches: NamedCaches,
   immutable_inputs: ImmutableInputs,
   keep_sandboxes: KeepSandboxes,
   container_cache: ContainerCache<'a>,
@@ -292,24 +295,17 @@ impl<'a> CommandRunner<'a> {
     docker: &'a DockerOnceCell,
     image_pull_cache: &'a ImagePullCache,
     work_dir_base: PathBuf,
-    named_caches: NamedCaches,
     immutable_inputs: ImmutableInputs,
     keep_sandboxes: KeepSandboxes,
   ) -> Result<Self, String> {
-    let container_cache = ContainerCache::new(
-      docker,
-      image_pull_cache,
-      &work_dir_base,
-      &named_caches,
-      &immutable_inputs,
-    )?;
+    let container_cache =
+      ContainerCache::new(docker, image_pull_cache, &work_dir_base, &immutable_inputs)?;
 
     Ok(CommandRunner {
       store,
       executor,
       docker,
       work_dir_base,
-      named_caches,
       immutable_inputs,
       keep_sandboxes,
       container_cache,
@@ -347,32 +343,63 @@ impl<'a> super::CommandRunner for CommandRunner<'a> {
           self.keep_sandboxes,
         )?;
 
+        // Obtain ID of the base container in which to run the execution for this process.
+        let (container_id, named_caches) = {
+          let image = if let ProcessExecutionStrategy::Docker(image) = &req.execution_strategy {
+            image
+          } else {
+            return Err(ProcessError::Unclassified(
+              "The Docker execution strategy was not set on the Process, but \
+                 the Docker CommandRunner was used."
+                .to_owned(),
+            ));
+          };
+
+          self
+            .container_cache
+            .container_for_image(image, &req.platform, &context.build_id)
+            .await?
+        };
+
         // Start working on a mutable version of the process.
         let mut req = req;
 
-        // Update env, replacing `{chroot}` placeholders with the path to the sandbox
-        // within the Docker container.
-        let sandbox_relpath = workdir
-          .path()
-          .strip_prefix(&self.work_dir_base)
-          .map_err(|err| {
-            format!("Internal error - base directory was not prefix of sandbox directory: {err}")
-          })?;
-        let sandbox_path_in_container = Path::new(&SANDBOX_BASE_PATH_IN_CONTAINER)
-          .join(sandbox_relpath)
-          .into_os_string()
-          .into_string()
-          .map_err(|s| {
-            format!(
-              "Unable to convert sandbox path to string due to non UTF-8 characters: {:?}",
-              s
-            )
-          })?;
-        apply_chroot(&sandbox_path_in_container, &mut req);
-        log::trace!(
-          "sandbox_path_in_container = {:?}",
-          &sandbox_path_in_container
-        );
+        // Compute the absolute working directory within the container, and update the env to
+        // replace `{chroot}` placeholders with the path to the sandbox within the Docker container.
+        let working_dir = {
+          let sandbox_relpath =
+            workdir
+              .path()
+              .strip_prefix(&self.work_dir_base)
+              .map_err(|err| {
+                format!(
+                  "Internal error - base directory was not prefix of sandbox directory: {err}"
+                )
+              })?;
+          let sandbox_path_in_container = Path::new(&SANDBOX_BASE_PATH_IN_CONTAINER)
+            .join(sandbox_relpath)
+            .into_os_string()
+            .into_string()
+            .map_err(|s| {
+              format!("Unable to convert sandbox path to string due to non UTF-8 characters: {s:?}")
+            })?;
+          apply_chroot(&sandbox_path_in_container, &mut req);
+          log::trace!(
+            "sandbox_path_in_container = {:?}",
+            &sandbox_path_in_container
+          );
+
+          req
+            .working_directory
+            .as_ref()
+            .map(|relpath| Path::new(&sandbox_path_in_container).join(relpath))
+            .unwrap_or_else(|| Path::new(&sandbox_path_in_container).to_path_buf())
+            .into_os_string()
+            .into_string()
+            .map_err(|s| {
+              format!("Unable to convert working directory due to non UTF-8 characters: {s:?}")
+            })?
+        };
 
         // Prepare the workdir.
         // DOCKER-NOTE: The input root will be bind mounted into the container.
@@ -382,7 +409,7 @@ impl<'a> super::CommandRunner for CommandRunner<'a> {
           req.input_digests.input_files.clone(),
           self.store.clone(),
           self.executor.clone(),
-          &self.named_caches,
+          &named_caches,
           &self.immutable_inputs,
           Some(Path::new(NAMED_CACHES_BASE_PATH_IN_CONTAINER)),
           Some(Path::new(IMMUTABLE_INPUTS_BASE_PATH_IN_CONTAINER)),
@@ -398,7 +425,7 @@ impl<'a> super::CommandRunner for CommandRunner<'a> {
             self.store.clone(),
             self.executor.clone(),
             workdir.path().to_owned(),
-            sandbox_path_in_container,
+            (container_id, working_dir),
             exclusive_spawn,
             req.platform,
           )
@@ -441,61 +468,128 @@ impl<'a> super::CommandRunner for CommandRunner<'a> {
 
 #[async_trait]
 impl<'a> CapturedWorkdir for CommandRunner<'a> {
-  type WorkdirToken = String;
+  type WorkdirToken = (String, String);
 
   async fn run_in_workdir<'s, 'c, 'w, 'r>(
     &'s self,
-    context: &'c Context,
+    _context: &'c Context,
     _workdir_path: &'w Path,
-    sandbox_path_in_container: Self::WorkdirToken,
+    (container_id, working_dir): Self::WorkdirToken,
     req: Process,
     _exclusive_spawn: bool,
   ) -> Result<BoxStream<'r, Result<ChildOutput, String>>, String> {
     let docker = self.docker.get().await?;
 
-    let env = req
-      .env
-      .iter()
-      .map(|(key, value)| format!("{}={}", key, value))
-      .collect::<Vec<_>>();
+    Command::new(req.argv)
+      .env(req.env)
+      .working_dir(working_dir)
+      .spawn(docker, container_id)
+      .await
+  }
 
-    let working_dir = req
-      .working_directory
-      .map(|relpath| Path::new(&sandbox_path_in_container).join(&relpath))
-      .unwrap_or_else(|| Path::new(&sandbox_path_in_container).to_path_buf())
-      .into_os_string()
-      .into_string()
-      .map_err(|s| {
-        format!(
-          "Unable to convert working directory due to non UTF-8 characters: {:?}",
-          s
-        )
-      })?;
+  async fn prepare_workdir_for_capture(
+    &self,
+    _context: &Context,
+    _workdir_path: &Path,
+    (container_id, working_dir): Self::WorkdirToken,
+    req: &Process,
+  ) -> Result<(), String> {
+    // Docker on Linux will frequently produce root-owned output files in bind mounts, because we
+    // do not assume anything about the users that exist in the image. But Docker on macOS (at least
+    // version 14.6.2 using gRPC-FUSE filesystem virtualization) creates files in bind mounts as the
+    // user running Docker. See https://github.com/pantsbuild/pants/issues/18306.
+    //
+    // TODO: Changing permissions allows the files to be captured, but not for them to be removed.
+    // See https://github.com/pantsbuild/pants/issues/18329.
+    if matches!(
+      Platform::current()?,
+      Platform::Macos_x86_64 | Platform::Macos_arm64
+    ) {
+      return Ok(());
+    }
 
-    let image = match req.execution_strategy {
-      ProcessExecutionStrategy::Docker(image) => Ok(image),
-      _ => Err("The Docker execution strategy was not set on the Process, but the Docker CommandRunner was used.")
-    }?;
+    let docker = self.docker.get().await?;
 
-    // Obtain ID of the base container in which to run the execution for this process.
-    let container_id = self
-      .container_cache
-      .container_id_for_image(&image, &req.platform, &context.build_id)
+    let args = ["chmod", "a+r", "-R"]
+      .into_iter()
+      .map(OsStr::new)
+      .chain(
+        req
+          .output_files
+          .iter()
+          .chain(req.output_directories.iter())
+          .map(|p| p.as_ref().as_os_str()),
+      )
+      .map(|s| {
+        s.to_owned().into_string().map_err(|s| {
+          format!(
+            "Unable to convert output_files or output_directories due to \
+             non UTF-8 characters: {s:?}"
+          )
+        })
+      })
+      .collect::<Result<Vec<_>, _>>()?;
+
+    let (exit_code, stdout, stderr) = Command::new(args)
+      .working_dir(working_dir)
+      .output(docker, container_id)
       .await?;
 
-    let config = bollard::exec::CreateExecOptions {
-      env: Some(env),
-      cmd: Some(req.argv),
-      working_dir: Some(working_dir),
+    // Failing processes may not create their output files, so we do not treat this as fatal.
+    if exit_code != 0 {
+      log::debug!(
+        "Failed to chmod process outputs in Docker container:\n\
+        stdout:\n{}\n\
+        stderr:\n{}\n",
+        String::from_utf8_lossy(&stdout),
+        String::from_utf8_lossy(&stderr)
+      );
+    }
+
+    Ok(())
+  }
+}
+
+/// A loose clone of `std::process:Command` for Docker `exec`.
+struct Command(bollard::exec::CreateExecOptions<String>);
+
+impl Command {
+  fn new(argv: Vec<String>) -> Self {
+    Self(bollard::exec::CreateExecOptions {
+      cmd: Some(argv),
       attach_stdout: Some(true),
       attach_stderr: Some(true),
       ..bollard::exec::CreateExecOptions::default()
-    };
+    })
+  }
 
-    log::trace!("creating execution with config: {:?}", &config);
+  fn working_dir(&mut self, working_dir: String) -> &mut Self {
+    self.0.working_dir = Some(working_dir);
+    self
+  }
+
+  fn env<I: IntoIterator<Item = (String, String)>>(&mut self, env: I) -> &mut Self {
+    self.0.env = Some(
+      env
+        .into_iter()
+        .map(|(key, value)| format!("{key}={value}"))
+        .collect(),
+    );
+    self
+  }
+
+  /// Execute the command that has been specified, and return a stream of ChildOutputs.
+  ///
+  /// NB: See the TODO on the `ChildOutput` definition.
+  async fn spawn<'a, 'b>(
+    &'a mut self,
+    docker: &'a Docker,
+    container_id: String,
+  ) -> Result<BoxStream<'b, Result<ChildOutput, String>>, String> {
+    log::trace!("creating execution with config: {:?}", self.0);
 
     let exec = docker
-      .create_exec::<String>(&container_id, config)
+      .create_exec::<String>(&container_id, self.0.clone())
       .await
       .map_err(|err| format!("Failed to create Docker execution in container: {:?}", err))?;
 
@@ -554,7 +648,25 @@ impl<'a> CapturedWorkdir for CommandRunner<'a> {
 
     Ok(stream.boxed())
   }
+
+  /// Execute the command that has been specified, and return its exit code, stdout, and stderr.
+  async fn output(
+    &mut self,
+    docker: &Docker,
+    container_id: String,
+  ) -> Result<(i32, Bytes, Bytes), String> {
+    let child_outputs = self.spawn(docker, container_id).await?;
+    let mut stdout = BytesMut::with_capacity(8192);
+    let mut stderr = BytesMut::with_capacity(8192);
+    let exit_code = collect_child_outputs(&mut stdout, &mut stderr, child_outputs).await?;
+    Ok((exit_code, stdout.freeze(), stderr.freeze()))
+  }
 }
+
+/// Container ID and NamedCaches for that container. async_oncecell::OnceCell is used so that
+/// multiple tasks trying to access an initializing container do not try to start multiple
+/// containers.
+type CachedContainer = Arc<OnceCell<(String, NamedCaches)>>;
 
 /// Caches running containers so that build actions can be invoked by running "executions"
 /// within those cached containers.
@@ -562,13 +674,9 @@ struct ContainerCache<'a> {
   docker: &'a DockerOnceCell,
   image_pull_cache: &'a ImagePullCache,
   work_dir_base: String,
-  named_caches_base_dir: String,
   immutable_inputs_base_dir: String,
-  /// Cache that maps image name to container ID. async_oncecell::OnceCell is used so that
-  /// multiple tasks trying to access an initializing container do not try to start multiple
-  /// containers.
-  #[allow(clippy::type_complexity)]
-  containers: Mutex<BTreeMap<(String, Platform), Arc<OnceCell<String>>>>,
+  /// Cache that maps image name / platform to a cached container.
+  containers: Mutex<BTreeMap<(String, Platform), CachedContainer>>,
 }
 
 impl<'a> ContainerCache<'a> {
@@ -576,7 +684,6 @@ impl<'a> ContainerCache<'a> {
     docker: &'a DockerOnceCell,
     image_pull_cache: &'a ImagePullCache,
     work_dir_base: &Path,
-    named_caches: &NamedCaches,
     immutable_inputs: &ImmutableInputs,
   ) -> Result<Self, String> {
     let work_dir_base = work_dir_base
@@ -586,18 +693,6 @@ impl<'a> ContainerCache<'a> {
       .map_err(|s| {
         format!(
           "Unable to convert workdir_path due to non UTF-8 characters: {:?}",
-          s
-        )
-      })?;
-
-    let named_caches_base_dir = named_caches
-      .base_dir()
-      .to_path_buf()
-      .into_os_string()
-      .into_string()
-      .map_err(|s| {
-        format!(
-          "Unable to convert named_caches workdir due to non UTF-8 characters: {:?}",
           s
         )
       })?;
@@ -618,42 +713,43 @@ impl<'a> ContainerCache<'a> {
       docker,
       image_pull_cache,
       work_dir_base,
-      named_caches_base_dir,
       immutable_inputs_base_dir,
       containers: Mutex::default(),
     })
   }
 
+  /// Creates a container, and creates (if necessary) and attaches a volume for image specific
+  /// (named) caches.
   async fn make_container(
     docker: Docker,
-    image: String,
+    image_name: String,
     platform: Platform,
     image_pull_scope: ImagePullScope,
     image_pull_cache: ImagePullCache,
     work_dir_base: String,
-    named_caches_base_dir: String,
     immutable_inputs_base_dir: String,
   ) -> Result<String, String> {
     // Pull the image.
     image_pull_cache
       .pull_image(
         &docker,
-        &image,
+        &image_name,
         &platform,
         image_pull_scope,
         ImagePullPolicy::OnlyIfLatestOrMissing,
       )
       .await?;
 
+    let named_cache_volume_name = Self::maybe_make_named_cache_volume(&docker, &image_name)
+      .await
+      .map_err(|e| format!("Failed to create named cache volume for {image_name}: {e}"))?;
+
     let config = bollard::container::Config {
       entrypoint: Some(vec!["/bin/sh".to_string()]),
       host_config: Some(bollard::service::HostConfig {
         binds: Some(vec![
-          format!("{}:{}", work_dir_base, SANDBOX_BASE_PATH_IN_CONTAINER),
-          format!(
-            "{}:{}",
-            named_caches_base_dir, NAMED_CACHES_BASE_PATH_IN_CONTAINER,
-          ),
+          format!("{work_dir_base}:{SANDBOX_BASE_PATH_IN_CONTAINER}"),
+          format!("{named_cache_volume_name}:{NAMED_CACHES_BASE_PATH_IN_CONTAINER}",),
           // DOCKER-TODO: Consider making this bind mount read-only.
           format!(
             "{}:{}",
@@ -664,17 +760,13 @@ impl<'a> ContainerCache<'a> {
         init: Some(true),
         ..bollard::service::HostConfig::default()
       }),
-      image: Some(image.clone()),
+      image: Some(image_name.clone()),
       tty: Some(true),
       open_stdin: Some(true),
       ..bollard::container::Config::default()
     };
 
-    log::trace!(
-      "creating cached container with config for image `{}`: {:?}",
-      image,
-      &config
-    );
+    log::trace!("creating cached container with config for image `{image_name}`: {config:?}",);
 
     let create_options = CreateContainerOptions::<&str> {
       name: "",
@@ -685,68 +777,143 @@ impl<'a> ContainerCache<'a> {
       .await
       .map_err(|err| format!("Failed to create Docker container: {:?}", err))?;
 
-    log::trace!(
-      "created container `{}` for image `{}`",
-      &container.id,
-      image
-    );
-
     docker
       .start_container::<String>(&container.id, None)
       .await
       .map_err(|err| {
         format!(
-          "Failed to start Docker container `{}` for image `{}`: {:?}",
-          &container.id, image, err
+          "Failed to start Docker container `{}` for image `{image_name}`: {err:?}",
+          &container.id
         )
       })?;
 
-    log::trace!(
-      "started container `{}` for image `{}`",
+    log::debug!(
+      "started container `{}` for image `{image_name}`",
       &container.id,
-      image
     );
 
     Ok(container.id)
   }
 
-  /// Return the container ID of a container running `image` for use as a place to invoke
-  /// build actions as executions within the cached container.
-  pub async fn container_id_for_image(
+  /// Creates a volume for named caches for the given image name. In production usage, the image
+  /// name will have been expanded to include its SHA256 fingerprint, so the named cache will be
+  /// dedicated to a particular image version. That is conservative, so we might consider making
+  /// it configurable whether the image version is attached in future releases.
+  async fn maybe_make_named_cache_volume(
+    docker: &Docker,
+    image_name: &str,
+  ) -> Result<String, DockerError> {
+    let image_hash = Digest::of_bytes(image_name.as_bytes())
+      .hash
+      .to_hex()
+      .chars()
+      .take(12)
+      .collect::<String>();
+    let named_cache_volume_name = format!("pants-named-caches-{image_hash}");
+    // TODO: Use a filter on volume name.
+    let volume_exists = docker
+      .list_volumes::<&str>(None)
+      .await?
+      .volumes
+      .map(|volumes| volumes.iter().any(|v| v.name == named_cache_volume_name))
+      .unwrap_or(false);
+    if volume_exists {
+      return Ok(named_cache_volume_name);
+    }
+
+    let mut labels = HashMap::new();
+    labels.insert("image_name", image_name);
+    docker
+      .create_volume::<&str>(CreateVolumeOptions {
+        name: &named_cache_volume_name,
+        driver: "local",
+        labels,
+        ..CreateVolumeOptions::default()
+      })
+      .await?;
+
+    Ok(named_cache_volume_name)
+  }
+
+  async fn make_named_cache_directory(
+    docker: Docker,
+    container_id: String,
+    directory: PathBuf,
+  ) -> Result<(), String> {
+    let directory = directory.into_os_string().into_string().map_err(|s| {
+      format!("Unable to convert named cache path to string due to non UTF-8 characters: {s:?}")
+    })?;
+    let (exit_code, stdout, stderr) = Command::new(vec![
+      "mkdir".to_owned(),
+      "-p".to_owned(),
+      directory.to_owned(),
+    ])
+    .output(&docker, container_id)
+    .await?;
+
+    if exit_code == 0 {
+      Ok(())
+    } else {
+      Err(format!(
+        "Failed to create parent directory for named cache in Docker container:\n\
+         stdout:\n{}\n\
+         stderr:\n{}\n",
+        String::from_utf8_lossy(&stdout),
+        String::from_utf8_lossy(&stderr)
+      ))
+    }
+  }
+
+  /// Return the container ID and NamedCaches for a container running `image_name` for use as a place
+  /// to invoke build actions as executions within the cached container.
+  pub async fn container_for_image(
     &self,
-    image: &str,
+    image_name: &str,
     platform: &Platform,
     build_generation: &str,
-  ) -> Result<String, String> {
+  ) -> Result<(String, NamedCaches), String> {
     let docker = self.docker.get().await?;
     let docker = docker.clone();
 
     let container_id_cell = {
       let mut containers = self.containers.lock();
       let cell = containers
-        .entry((image.to_string(), *platform))
+        .entry((image_name.to_string(), *platform))
         .or_insert_with(|| Arc::new(OnceCell::new()));
       cell.clone()
     };
 
     let work_dir_base = self.work_dir_base.clone();
-    let named_caches_base_dir = self.named_caches_base_dir.clone();
     let immutable_inputs_base_dir = self.immutable_inputs_base_dir.clone();
     let image_pull_scope = ImagePullScope::new(build_generation);
 
     let container_id = container_id_cell
       .get_or_try_init(async move {
-        Self::make_container(
-          docker,
-          image.to_string(),
+        let container_id = Self::make_container(
+          docker.clone(),
+          image_name.to_string(),
           *platform,
           image_pull_scope,
           self.image_pull_cache.clone(),
           work_dir_base,
-          named_caches_base_dir,
           immutable_inputs_base_dir,
         )
-        .await
+        .await?;
+
+        let named_caches = {
+          let docker = docker.to_owned();
+          let container_id = container_id.clone();
+          NamedCaches::new(NAMED_CACHES_BASE_PATH_IN_CONTAINER.into(), move |dst| {
+            ContainerCache::make_named_cache_directory(
+              docker.clone(),
+              container_id.clone(),
+              dst.to_owned(),
+            )
+            .boxed()
+          })
+        };
+
+        Ok::<_, String>((container_id, named_caches))
       })
       .await?;
 
@@ -778,7 +945,7 @@ impl<'a> ContainerCache<'a> {
       .cloned()
       .collect::<Vec<_>>();
 
-    let removal_futures = container_ids.into_iter().map(|id| async move {
+    let removal_futures = container_ids.into_iter().map(|(id, _)| async move {
       let remove_options = RemoveContainerOptions {
         force: true,
         ..RemoveContainerOptions::default()

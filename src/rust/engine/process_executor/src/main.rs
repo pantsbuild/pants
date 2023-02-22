@@ -344,10 +344,10 @@ async fn main() {
       store.clone(),
       executor,
       workdir.clone(),
-      NamedCaches::new(
+      NamedCaches::new_local(
         args
           .named_cache_path
-          .unwrap_or_else(NamedCaches::default_path),
+          .unwrap_or_else(NamedCaches::default_local_path),
       ),
       ImmutableInputs::new(store.clone(), &workdir).unwrap(),
       KeepSandboxes::Never,
