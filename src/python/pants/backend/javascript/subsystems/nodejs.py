@@ -156,7 +156,7 @@ async def setup_node_tool_process(
         DownloadedExternalTool, ExternalToolRequest, nodejs.get_request(platform)
     )
 
-    immutable_input_digests = {NodeJSProcessEnvironment.base_bin_dir: downloaded_nodejs.digest}
+    immutable_input_digests = {environment.base_bin_dir: downloaded_nodejs.digest}
 
     return Process(
         argv=filter(None, request.args),
