@@ -16,7 +16,7 @@ RUN /tmp/download_install.sh buildbox-run-hosttools 5fc4184de288f19d40a90c649846
 
 # Install buildgrid.
 RUN git clone https://gitlab.com/BuildGrid/buildgrid.git && \
-    git -C buildgrid reset --hard 82341d090db55e11257d92ea38f9afd61fa15486
+    git -C buildgrid reset --hard 55011817110dec2478b2321ae43d835e91d78f70
 
 RUN pip install ./buildgrid
 
