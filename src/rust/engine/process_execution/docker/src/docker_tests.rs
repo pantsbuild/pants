@@ -749,16 +749,14 @@ async fn immutable_inputs() {
   assert_eq!(result.original.exit_code, 0);
 }
 
-pub(crate) fn named_caches_and_immutable_inputs(
-  store: Store,
-) -> (TempDir, NamedCaches, ImmutableInputs) {
+fn named_caches_and_immutable_inputs(store: Store) -> (TempDir, NamedCaches, ImmutableInputs) {
   let root = TempDir::new().unwrap();
   let root_path = root.path().to_owned();
   let named_cache_dir = root_path.join("named");
 
   (
     root,
-    NamedCaches::new(named_cache_dir),
+    NamedCaches::new_local(named_cache_dir),
     ImmutableInputs::new(store, &root_path).unwrap(),
   )
 }

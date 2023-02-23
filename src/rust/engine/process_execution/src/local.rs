@@ -45,7 +45,6 @@ use crate::{
 
 pub const USER_EXECUTABLE_MODE: u32 = 0o100755;
 
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq, strum_macros::EnumString)]
 #[strum(serialize_all = "snake_case")]
 pub enum KeepSandboxes {

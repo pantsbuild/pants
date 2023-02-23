@@ -9,6 +9,7 @@ publish = false
 async-stream = "0.3"
 async-trait = "0.1"
 async-lock = "2.5"
+async-oncecell = "0.2"
 walkdir = "2"
 protos = { path = "../protos" }
 bytes = "1.2"
