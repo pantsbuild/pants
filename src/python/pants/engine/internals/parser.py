@@ -120,21 +120,21 @@ class ParseState(threading.local):
         raise NameError(
             softwrap(
                 f"""
-                The BUILD file {name} may only be used in BUILD files.{note}
+                The BUILD file symbol `{name}` may only be used in BUILD files.{note}
                 """
             )
         )
 
     def filepath(self) -> str:
-        return self._prelude_check("`build_file_dir`", self._filepath)
+        return self._prelude_check("build_file_dir", self._filepath)
 
     @property
     def defaults(self) -> BuildFileDefaultsParserState:
-        return self._prelude_check("`__defaults__`", self._defaults)
+        return self._prelude_check("__defaults__", self._defaults)
 
     @property
     def env_vars(self) -> EnvironmentVars:
-        return self._prelude_check("`env`", self._env_vars)
+        return self._prelude_check("env", self._env_vars)
 
     @property
     def is_bootstrap(self) -> bool:

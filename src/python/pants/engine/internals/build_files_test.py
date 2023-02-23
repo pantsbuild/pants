@@ -179,7 +179,7 @@ def test_prelude_check_filepath() -> None:
     )
     with pytest.raises(
         Exception,
-        match="The BUILD file `build_file_dir` may only be used in BUILD files\\. If used",
+        match="The BUILD file symbol `build_file_dir` may only be used in BUILD files\\. If used",
     ):
         run_prelude_parsing_rule(prelude_content)
 
@@ -192,7 +192,7 @@ def test_prelude_check_defaults() -> None:
     )
     with pytest.raises(
         Exception,
-        match="The BUILD file `__defaults__` may only be used in BUILD files\\. If used",
+        match="The BUILD file symbol `__defaults__` may only be used in BUILD files\\. If used",
     ):
         run_prelude_parsing_rule(prelude_content)
 
@@ -205,7 +205,7 @@ def test_prelude_check_env() -> None:
     )
     with pytest.raises(
         Exception,
-        match="The BUILD file `env` may only be used in BUILD files\\. If used",
+        match="The BUILD file symbol `env` may only be used in BUILD files\\. If used",
     ):
         run_prelude_parsing_rule(prelude_content)
 
