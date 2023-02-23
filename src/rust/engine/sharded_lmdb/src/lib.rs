@@ -34,7 +34,7 @@ use std::sync::Arc;
 use std::time::{self, Duration};
 
 use bytes::{BufMut, Bytes};
-use hashing::{Digest, Fingerprint, WriterHasher, FINGERPRINT_SIZE};
+use hashing::{sync_verified_copy, Digest, Fingerprint, WriterHasher, FINGERPRINT_SIZE};
 use lmdb::{
   self, Database, DatabaseFlags, Environment, EnvironmentCopyFlags, EnvironmentFlags,
   RwTransaction, Transaction, WriteFlags,
@@ -483,9 +483,8 @@ impl ShardedLmdb {
   }
 
   ///
-  /// Stores the given Read instance under its computed digest. This method performs two passes
-  /// over the source to 1) hash it, 2) store it. If !data_is_immutable, the second pass will
-  /// re-hash the data to confirm that it hasn't changed.
+  /// Stores the given Read instance under its computed digest in two passes. If !data_is_immutable,
+  /// we will re-hash the data to confirm that it hasn't changed.
   ///
   /// If the Read instance gets longer between Reads, we will not detect that here, but any
   /// captured data will still be valid.
@@ -532,24 +531,10 @@ impl ShardedLmdb {
                   )?
                   .writer();
                 let mut read = data_provider().map_err(|e| format!("Failed to read: {e}"))?;
-                let should_retry = if data_is_immutable {
-                  // Trust that the data hasn't changed, and only validate its length.
-                  let copied = io::copy(&mut read, &mut writer).map_err(|e| {
-                    format!("Failed to copy from {read:?} or store in {env:?}: {e:?}")
-                  })?;
-
-                  // Should retry if the file got shorter between reads.
-                  copied as usize != digest.size_bytes
-                } else {
-                  // Confirm that the data hasn't changed.
-                  let mut hasher = WriterHasher::new(writer);
-                  let _ = io::copy(&mut read, &mut hasher).map_err(|e| {
-                    format!("Failed to copy from {read:?} or store in {env:?}: {e:?}")
-                  })?;
-
-                  // Should retry if the Digest changed between reads.
-                  digest != hasher.finish().0
-                };
+                let should_retry =
+                  !sync_verified_copy(digest, data_is_immutable, &mut read, &mut writer).map_err(
+                    |e| format!("Failed to copy from {read:?} or store in {env:?}: {e:?}"),
+                  )?;
 
                 if should_retry {
                   let msg = format!("Input {read:?} changed while reading.");

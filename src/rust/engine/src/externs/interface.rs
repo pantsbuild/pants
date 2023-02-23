@@ -1494,11 +1494,11 @@ fn capture_snapshots(
     let path_globs_and_roots = values
       .into_iter()
       .map(|value| {
-        let root: PathBuf = externs::getattr(value, "root").unwrap();
+        let root: PathBuf = externs::getattr(value, "root")?;
         let path_globs =
-          nodes::Snapshot::lift_prepared_path_globs(externs::getattr(value, "path_globs").unwrap());
+          nodes::Snapshot::lift_prepared_path_globs(externs::getattr(value, "path_globs")?);
         let digest_hint = {
-          let maybe_digest: &PyAny = externs::getattr(value, "digest_hint").unwrap();
+          let maybe_digest: &PyAny = externs::getattr(value, "digest_hint")?;
           if maybe_digest.is_none() {
             None
           } else {

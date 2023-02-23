@@ -319,7 +319,9 @@ class FieldDefaults:
 
     See https://github.com/pantsbuild/pants/issues/12934 about potentially allowing unions
     (including Field registrations) to have `@rule_helper` methods, which would allow the
-    computation of an AsyncField to directly require a subsystem.
+    computation of an AsyncField to directly require a subsystem. Since
+    https://github.com/pantsbuild/pants/pull/17947 rules may use any methods as rule helpers without
+    special decoration so this should now be possible to implement.
     """
 
     _factories: FrozenDict[type[Field], FieldDefaultFactory]

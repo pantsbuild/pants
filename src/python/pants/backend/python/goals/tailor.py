@@ -36,7 +36,7 @@ from pants.core.goals.tailor import (
 from pants.core.target_types import ResourceTarget
 from pants.engine.fs import DigestContents, FileContent, PathGlobs, Paths
 from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.rules import collect_rules, rule, rule_helper
+from pants.engine.rules import collect_rules, rule
 from pants.engine.target import Target, UnexpandedTargets
 from pants.engine.unions import UnionRule
 from pants.source.filespec import FilespecMatcher
@@ -91,7 +91,6 @@ def is_entry_point(content: bytes) -> bool:
     return _entry_point_re.search(content) is not None
 
 
-@rule_helper
 async def _find_resource_py_typed_targets(
     py_typed_files_globs: PathGlobs, all_owned_sources: AllOwnedSources
 ) -> list[PutativeTarget]:
@@ -113,7 +112,6 @@ async def _find_resource_py_typed_targets(
     return putative_targets
 
 
-@rule_helper
 async def _find_source_targets(
     py_files_globs: PathGlobs, all_owned_sources: AllOwnedSources, python_setup: PythonSetup
 ) -> list[PutativeTarget]:

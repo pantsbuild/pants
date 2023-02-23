@@ -245,7 +245,6 @@ impl Core {
       &DOCKER,
       &IMAGE_PULL_CACHE,
       local_execution_root_dir.to_path_buf(),
-      named_caches.clone(),
       immutable_inputs.clone(),
       exec_strategy_opts.local_keep_sandboxes,
     )?);
@@ -535,7 +534,7 @@ impl Core {
     };
 
     let immutable_inputs = ImmutableInputs::new(store.clone(), &local_execution_root_dir)?;
-    let named_caches = NamedCaches::new(named_caches_dir);
+    let named_caches = NamedCaches::new_local(named_caches_dir);
     let command_runners = Self::make_command_runners(
       &full_store,
       &store,

@@ -10,6 +10,7 @@ import glob
 import hashlib
 import os
 import re
+import shutil
 import subprocess
 import tempfile
 import zipfile
@@ -158,7 +159,7 @@ def reversion(
             check_dst = os.path.join(chroot, "check-wheel")
             os.mkdir(check_dst)
             subprocess.run(args=["wheel", "unpack", "-d", check_dst, tmp_whl_file], check=True)
-            os.rename(tmp_whl_file, dst_whl_file)
+            shutil.move(tmp_whl_file, dst_whl_file)
         print("Wrote whl with version {} to {}.\n".format(target_version, dst_whl_file))
 
 

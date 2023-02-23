@@ -36,10 +36,12 @@ from pants.backend.go.util_rules.build_pkg import (
     FallibleBuiltGoPackage,
 )
 from pants.backend.go.util_rules.build_pkg_target import (
+    BuildGoPackageRequestForStdlibRequest,
     BuildGoPackageTargetRequest,
     GoCodegenBuildRequest,
 )
 from pants.backend.go.util_rules.go_mod import OwningGoMod, OwningGoModRequest
+from pants.backend.go.util_rules.import_analysis import GoStdLibPackages, GoStdLibPackagesRequest
 from pants.core.target_types import FilesGeneratorTarget, FileSourceField, FileTarget
 from pants.engine.addresses import Address, Addresses
 from pants.engine.fs import CreateDigest, Digest, FileContent, Snapshot
@@ -170,6 +172,8 @@ def rule_runner() -> RuleRunner:
             QueryRule(FallibleBuiltGoPackage, [BuildGoPackageRequest]),
             QueryRule(BuildGoPackageRequest, [BuildGoPackageTargetRequest]),
             QueryRule(FallibleBuildGoPackageRequest, [BuildGoPackageTargetRequest]),
+            QueryRule(GoStdLibPackages, (GoStdLibPackagesRequest,)),
+            QueryRule(BuildGoPackageRequest, (BuildGoPackageRequestForStdlibRequest,)),
             UnionRule(GoCodegenBuildRequest, GoCodegenBuildFilesRequest),
             UnionRule(GoModuleImportPathsMappingsHook, GenerateFromFileImportPathsMappingHook),
             FileTarget.register_plugin_field(GoOwningGoModAddressField),
@@ -640,3 +644,33 @@ def test_xtest_deps(rule_runner: RuleRunner) -> None:
         expected_direct_dependency_import_paths=[],
         expected_transitive_dependency_import_paths=[],
     )
+
+
+def test_stdlib_embed_config(rule_runner: RuleRunner) -> None:
+    import_path = "crypto/internal/nistec"
+    stdlib_packages = rule_runner.request(
+        GoStdLibPackages, [GoStdLibPackagesRequest(with_race_detector=False, cgo_enabled=False)]
+    )
+    pkg_info = stdlib_packages.get(import_path)
+    if not pkg_info:
+        pytest.skip(
+            f"Skipping test since `{import_path}` import path not available in Go standard library."
+        )
+
+    assert "embed" in pkg_info.imports
+    assert pkg_info.embed_patterns
+    assert pkg_info.embed_files
+
+    build_request = rule_runner.request(
+        BuildGoPackageRequest,
+        [
+            BuildGoPackageRequestForStdlibRequest(
+                import_path=import_path, build_opts=GoBuildOptions(cgo_enabled=False)
+            )
+        ],
+    )
+
+    embed_config = build_request.embed_config
+    assert embed_config is not None
+    assert embed_config.patterns
+    assert embed_config.files
