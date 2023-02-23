@@ -1,7 +1,13 @@
 # Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
 
+import collections.abc
+from typing import Iterable, Optional, Tuple, Union
+
+from pants.build_graph.address import Address
+from pants.core.util_rules.adhoc_process_support import runnable
 from pants.core.util_rules.environments import EnvironmentField
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
@@ -9,7 +15,7 @@ from pants.engine.target import (
     Dependencies,
     IntField,
     MultipleSourcesField,
-    SpecialCasedDependencies,
+    SequenceField,
     StringField,
     StringSequenceField,
     Target,
@@ -91,10 +97,12 @@ class AdhocToolOutputDependenciesField(AdhocToolDependenciesField):
     )
 
 
-class AdhocToolExecutionDependenciesField(SpecialCasedDependencies):
+class AdhocToolExecutionDependenciesField(SequenceField[Union[str, runnable]]):
     alias = "execution_dependencies"
     required = False
     default = None
+    expected_element_type = Union[str, runnable]
+    expected_type_description = "an iterable of strings, or `_runnable` dependency objects"
 
     help = help_text(
         lambda: f"""
@@ -106,10 +114,30 @@ class AdhocToolExecutionDependenciesField(SpecialCasedDependencies):
         produced by this command should be specified using the
         `{AdhocToolOutputDependenciesField.alias}` field.
 
+        If the `runnable` requires another dependency to be available on the `PATH`, use
+        `_runnable(name=NAME, address=ADDRESS)`.
+
         If this field is specified, dependencies from `{AdhocToolOutputDependenciesField.alias}`
         will not be added to the execution sandbox.
         """
     )
+
+    @classmethod
+    def compute_value(
+        cls, raw_value: Optional[Iterable[Union[str, runnable]]], address: Address
+    ) -> Optional[Tuple[Union[str, runnable], ...]]:
+        if not raw_value:
+            return None
+        if isinstance(raw_value, str) or not isinstance(raw_value, collections.abc.Iterable):
+            raise ValueError(
+                f"Value for {cls.alias} must be an iterable (and not a single string)."
+            )
+        for pos, value in enumerate(raw_value):
+            if not (isinstance(value, str) or isinstance(value, runnable)):
+                raise ValueError(
+                    f"Every item should be a string or a `runnable`. Item {pos} was not."
+                )
+        return tuple(raw_value)
 
 
 class AdhocToolSourcesField(MultipleSourcesField):

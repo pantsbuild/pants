@@ -240,7 +240,7 @@ async def _resolve_runnable_dependencies(
             raise ValueError(
                 "One or more runnable dependencies have mutually incompatible environments."
             )
-        
+
     digest, shim_digest = await MultiGet(
         Get(Digest, MergeDigests(digests)), Get(Digest, CreateDigest(shims))
     )
