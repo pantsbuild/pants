@@ -749,7 +749,6 @@ async fn immutable_inputs() {
   assert_eq!(result.original.exit_code, 0);
 }
 
-
 async fn run_command_via_docker_in_dir(
   mut req: Process,
   dir: PathBuf,
@@ -767,10 +766,7 @@ async fn run_command_via_docker_in_dir(
   let root = TempDir::new().unwrap();
   let root_path = root.path().to_owned();
 
-  let immutable_inputs = ImmutableInputs::new(
-        store.clone(),
-        &root_path
-      ).unwrap();
+  let immutable_inputs = ImmutableInputs::new(store.clone(), &root_path).unwrap();
 
   let docker = Box::new(DockerOnceCell::new());
   let image_pull_cache = Box::new(ImagePullCache::new());
