@@ -88,7 +88,7 @@ class NodePackageScriptsField(SequenceField[NodeBuildScript]):
         Custom node package manager scripts that should be known
         and ran as part of relevant goals.
 
-        Maps the package.json#scripts section to a cache:able pants invocation.
+        Maps the package.json#scripts section to a cacheable pants invocation.
         """
     )
     expected_type_description = (
