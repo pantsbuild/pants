@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from difflib import get_close_matches
 from io import StringIO
 from pathlib import PurePath
-from typing import Any, Callable, Mapping, TypeVar
+from typing import Any, Callable, Iterable, Mapping, TypeVar
 
 from pants.base.deprecated import warn_or_error
 from pants.base.exceptions import MappingError
@@ -34,17 +34,18 @@ T = TypeVar("T")
 @dataclass(frozen=True)
 class BuildFilePreludeSymbols:
     info: FrozenDict[str, BuildFileSymbolInfo]
+    referenced_env_vars: tuple[str, ...]
 
     @memoized_property
     def symbols(self) -> FrozenDict[str, Any]:
         return FrozenDict({name: symbol.value for name, symbol in self.info.items()})
 
     @classmethod
-    def from_namespace(cls, ns: Mapping[str, Any]) -> BuildFilePreludeSymbols:
+    def create(cls, ns: Mapping[str, Any], env_vars: Iterable[str]) -> BuildFilePreludeSymbols:
         info = {}
         for name, symb in ns.items():
             info[name] = BuildFileSymbolInfo(name, symb)
-        return cls(info=FrozenDict(info))
+        return cls(info=FrozenDict(info), referenced_env_vars=tuple(sorted(env_vars)))
 
 
 @dataclass(frozen=True)
@@ -119,21 +120,21 @@ class ParseState(threading.local):
         raise NameError(
             softwrap(
                 f"""
-                The BUILD file {name} may only be used in BUILD files.{note}
+                The BUILD file symbol `{name}` may only be used in BUILD files.{note}
                 """
             )
         )
 
     def filepath(self) -> str:
-        return self._prelude_check("`build_file_dir`", self._filepath)
+        return self._prelude_check("build_file_dir", self._filepath)
 
     @property
     def defaults(self) -> BuildFileDefaultsParserState:
-        return self._prelude_check("`__defaults__`", self._defaults)
+        return self._prelude_check("__defaults__", self._defaults)
 
     @property
     def env_vars(self) -> EnvironmentVars:
-        return self._prelude_check("`env`", self._env_vars, closure_supported=False)
+        return self._prelude_check("env", self._env_vars)
 
     @property
     def is_bootstrap(self) -> bool:
