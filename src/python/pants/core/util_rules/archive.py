@@ -10,8 +10,7 @@ from dataclasses import dataclass
 from pathlib import PurePath
 
 from pants.core.util_rules import system_binaries
-from pants.core.util_rules.system_binaries import SEARCH_PATHS
-from pants.core.util_rules.system_binaries import ArchiveFormat as ArchiveFormat
+from pants.core.util_rules.system_binaries import ArchiveFormat as ArchiveFormat, SearchPath, SystemBinariesSubsystem
 from pants.core.util_rules.system_binaries import (
     BashBinary,
     BashBinaryRequest,
@@ -36,7 +35,7 @@ from pants.engine.fs import (
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.util.logging import LogLevel
-from pants.util.strutil import softwrap
+from pants.util.strutil import create_path_env_var, softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +53,7 @@ class CreateArchive:
 
 
 @rule(desc="Creating an archive file", level=LogLevel.DEBUG)
-async def create_archive(request: CreateArchive) -> Digest:
+async def create_archive(request: CreateArchive, system_binaries: SystemBinariesSubsystem) -> Digest:
 
     # #16091 -- if an arg list is really long, archive utilities tend to get upset.
     # passing a list of filenames into the utilities fixes this.
@@ -90,7 +89,15 @@ async def create_archive(request: CreateArchive) -> Digest:
             input_file_list_filename=FILE_LIST_FILENAME,
         )
         # `tar` expects to find a couple binaries like `gzip` and `xz` by looking on the PATH.
-        env = {"PATH": os.pathsep.join(SEARCH_PATHS)}
+        compression_tool = {
+            ArchiveFormat.TGZ: "gzip",
+            ArchiveFormat.TBZ2: "bzip2",
+            ArchiveFormat.TXZ: "xz"
+        }.get(request.format)
+        if compression_tool:
+            env = {"PATH": create_path_env_var(system_binaries.search_path_for_binary(compression_tool))}
+        else:
+            env = {}
 
         # `tar` requires that the output filename's parent directory exists,so if the caller
         # wants the output in a directory we explicitly create it here.
@@ -147,8 +154,21 @@ async def convert_digest_to_MaybeExtractArchiveRequest(
     return MaybeExtractArchiveRequest(digest)
 
 
+def infer_decompression_tool(tar_suffix: str) -> str | None:
+    if tar_suffix.endswith((".tar.gz", ".tgz")):
+        return "gunzip"
+    elif tar_suffix.endswith(("tar.gz2", "tbz2")):
+        return "bunzip2"
+    elif tar_suffix.endswith((".tar.xz", ".txz")):
+        return "unxz"
+    elif tar_suffix.endswith(".tar.lz4"):
+        return "unlz4"
+    else:
+        return None
+
+
 @rule(desc="Extracting an archive file", level=LogLevel.DEBUG)
-async def maybe_extract_archive(request: MaybeExtractArchiveRequest) -> ExtractedArchive:
+async def maybe_extract_archive(request: MaybeExtractArchiveRequest, system_binaries: SystemBinariesSubsystem) -> ExtractedArchive:
     """If digest contains a single archive file, extract it, otherwise return the input digest."""
     extract_archive_dir = "__extract_archive_dir"
     snapshot, output_dir_digest = await MultiGet(
@@ -185,7 +205,11 @@ async def maybe_extract_archive(request: MaybeExtractArchiveRequest) -> Extracte
             archive_path, extract_archive_dir, archive_suffix=archive_suffix
         )
         # `tar` expects to find a couple binaries like `gzip` and `xz` by looking on the PATH.
-        env = {"PATH": os.pathsep.join(SEARCH_PATHS)}
+        decompression_tool = infer_decompression_tool(archive_suffix)
+        if decompression_tool:
+            env = {"PATH": create_path_env_var(system_binaries.search_path_for_binary(decompression_tool))}
+        else:
+            env = {}
     else:
         input_digest, gunzip = await MultiGet(
             merge_digest_get,
