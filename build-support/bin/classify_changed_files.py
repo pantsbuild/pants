@@ -28,7 +28,7 @@ _release_globs = [
     "src/python/pants/notes/*",
     "src/python/pants/init/BUILD",
     "build-support/bin/release.sh",
-    "build-support/bin/release_helper.py",
+    "build-support/bin/_release_helper.py",
 ]
 _ci_config_globs = [
     "build-support/bin/classify_changed_files.py",
