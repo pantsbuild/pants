@@ -5,7 +5,8 @@ use std::collections::HashMap;
 use std::fs::OpenOptions;
 use std::io;
 use std::net::Ipv4Addr;
-use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
+use std::os::fd::OwnedFd;
+use std::os::unix::io::{AsRawFd, RawFd};
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -290,8 +291,7 @@ impl RawFdNail {
       Ok((Box::new(tty), None))
     } else {
       let (pipe_reader, pipe_writer) = os_pipe::pipe()?;
-      let write_handle =
-        File::from_std(unsafe { std::fs::File::from_raw_fd(pipe_writer.into_raw_fd()) });
+      let write_handle = File::from_std(std::fs::File::from(OwnedFd::from(pipe_writer)));
       Ok((Box::new(pipe_reader), Some(sink_for(write_handle))))
     }
   }
@@ -322,7 +322,7 @@ impl RawFdNail {
       Ok((stream::empty().boxed(), Box::new(tty)))
     } else {
       let (pipe_reader, pipe_writer) = os_pipe::pipe()?;
-      let read_handle = unsafe { std::fs::File::from_raw_fd(pipe_reader.into_raw_fd()) };
+      let read_handle = std::fs::File::from(OwnedFd::from(pipe_reader));
       Ok((
         blocking_stream_for(read_handle)?.boxed(),
         Box::new(pipe_writer),
