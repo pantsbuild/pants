@@ -12,4 +12,5 @@ python_tests(
     },
 )
 
+# The package.json file is inlined in ./rules_integration_tests.py
 resource(name="package_lock_json", source="package-lock.json")
