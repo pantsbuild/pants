@@ -104,13 +104,15 @@ async def run_in_sandbox_request(
     )
     dependencies_digest = execution_environment.digest
     runnable_dependencies = execution_environment.runnable_dependencies
-    
+
     immutable_input_digests = dict(run_request.immutable_input_digests or {})
-    extra_env = dict(run_request.extra_env or {})
+    extra_env: dict[str, str] = dict(run_request.extra_env or {})
     append_only_caches = dict(run_request.append_only_caches or {})
 
     if runnable_dependencies:
-        extra_env["PATH"] = extra_env.get("PATH", "") + f":{{chroot}}/{runnable_dependencies.path_component}"
+        extra_env["PATH"] = (
+            extra_env.get("PATH", "") + f":{{chroot}}/{runnable_dependencies.path_component}"
+        )
         immutable_input_digests.update(runnable_dependencies.immutable_input_digests)
         append_only_caches.update(runnable_dependencies.append_only_caches)
 

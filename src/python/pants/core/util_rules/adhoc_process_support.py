@@ -129,7 +129,9 @@ async def _resolve_runnable_dependencies(
         logger.warning(f"{field_set=}")
 
     runnables = await MultiGet(
-        Get(RunInSandboxRequest, RunFieldSet, field_set.field_sets[0]) for field_set in fspt if field_set.field_sets
+        Get(RunInSandboxRequest, RunFieldSet, field_set.field_sets[0])
+        for field_set in fspt
+        if field_set.field_sets
     )
 
     digests: list[Digest] = []

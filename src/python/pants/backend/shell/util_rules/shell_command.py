@@ -114,11 +114,14 @@ async def _prepare_process_request_from_target(
 
     runnable_dependencies = execution_environment.runnable_dependencies
     if runnable_dependencies:
-        supplied_env_var_values["PATH"] = supplied_env_var_values.get("PATH", "") + f":{{chroot}}/{runnable_dependencies.path_component}"
+        supplied_env_var_values["PATH"] = (
+            supplied_env_var_values.get("PATH", "")
+            + f":{{chroot}}/{runnable_dependencies.path_component}"
+        )
         _safe_update(supplied_env_var_values, runnable_dependencies.extra_env)
         _safe_update(immutable_input_digests, runnable_dependencies.immutable_input_digests)
         append_only_caches = runnable_dependencies.append_only_caches
-        
+
     return AdhocProcessRequest(
         description=description,
         address=shell_command.address,
