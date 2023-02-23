@@ -30,6 +30,7 @@ members = [
   "cache",
   "client",
   "concrete_time",
+  "docker",
   "fs",
   "fs/brfs",
   "fs/fs_util",
@@ -71,6 +72,7 @@ default-members = [
   "cache",
   "client",
   "concrete_time",
+  "docker",
   "fs",
   "fs/fs_util",
   "fs/store",
@@ -120,6 +122,7 @@ crossbeam-channel = "0.5"
 deepsize = { git = "https://github.com/stuhood/deepsize.git", rev = "5c8bee5443fcafe4aaa9274490d354412d0955c1", features=["internment", "smallvec"] }
 derivative = "2.2"
 async-oncecell = "0.2"
+docker = { path = "docker" }
 fnv = "1.0.5"
 fs = { path = "fs" }
 futures = "0.3"

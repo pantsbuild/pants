@@ -26,11 +26,11 @@ use store::{ImmutableInputs, Store};
 use task_executor::Executor;
 use workunit_store::{in_workunit, Metric, RunningWorkunit};
 
-use crate::local::{
-  apply_chroot, collect_child_outputs, create_sandbox, prepare_workdir, setup_run_sh_script,
+use process_execution::local::{
+  apply_chroot, create_sandbox, prepare_workdir, prepare_workdir_digest, setup_run_sh_script,
   CapturedWorkdir, ChildOutput, KeepSandboxes,
 };
-use crate::{
+use process_execution::{
   Context, FallibleProcessResultWithPlatform, NamedCaches, Platform, Process, ProcessError,
   ProcessExecutionStrategy,
 };
@@ -312,7 +312,7 @@ impl fmt::Debug for CommandRunner<'_> {
 }
 
 #[async_trait]
-impl<'a> super::CommandRunner for CommandRunner<'a> {
+impl<'a> process_execution::CommandRunner for CommandRunner<'a> {
   async fn run(
     &self,
     context: Context,

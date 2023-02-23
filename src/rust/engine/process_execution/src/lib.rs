@@ -60,13 +60,9 @@ pub mod switched;
 
 pub mod children;
 
-pub mod docker;
-#[cfg(test)]
-mod docker_tests;
-
 pub mod local;
 #[cfg(test)]
-mod local_tests;
+pub mod local_tests;
 
 pub mod nailgun;
 
@@ -565,7 +561,7 @@ impl Process {
   /// Process struct wholesale. We can reconsider this if we end up with more production callsites
   /// that require partial options.
   ///
-  #[cfg(test)]
+  // #[cfg(test)]
   pub fn new(argv: Vec<String>) -> Process {
     Process {
       argv,
@@ -852,7 +848,7 @@ pub(crate) async fn check_cache_content(
 #[derive(Clone)]
 pub struct Context {
   workunit_store: WorkunitStore,
-  build_id: String,
+  pub build_id: String,
   run_id: RunId,
   tail_tasks: TailTasks,
 }

@@ -811,6 +811,43 @@ dependencies = [
 ]
 
 [[package]]
+name = "docker"
+version = "0.0.1"
+dependencies = [
+ "async-lock",
+ "async-oncecell",
+ "async-stream",
+ "async-trait",
+ "bollard",
+ "bollard-stubs",
+ "env_logger",
+ "fs",
+ "futures",
+ "lazy_static",
+ "log",
+ "maplit",
+ "mock",
+ "nails",
+ "once_cell",
+ "os_pipe",
+ "parking_lot 0.12.1",
+ "process_execution",
+ "sharded_lmdb",
+ "spectral",
+ "store",
+ "strum",
+ "strum_macros",
+ "task_executor",
+ "tempfile",
+ "testutil",
+ "tokio",
+ "tokio-rustls 0.23.4",
+ "tokio-util 0.7.4",
+ "tryfuture",
+ "workunit_store",
+]
+
+[[package]]
 name = "either"
 version = "1.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -845,6 +882,7 @@ dependencies = [
  "crossbeam-channel",
  "deepsize",
  "derivative",
+ "docker",
  "env_logger",
  "fnv",
  "fs",
@@ -2403,6 +2441,7 @@ version = "0.0.1"
 dependencies = [
  "clap",
  "dirs-next",
+ "docker",
  "env_logger",
  "fs",
  "futures",

@@ -16,6 +16,7 @@ grpc_util = { path = "../grpc_util" }
 hashing = { path = "../hashing" }
 log = "0.4"
 process_execution = { path = "../process_execution" }
+docker = { path = "../docker"}
 prost = "0.9"
 shlex = "1.1.0"
 store = { path = "../fs/store" }

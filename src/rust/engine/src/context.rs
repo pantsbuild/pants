@@ -26,10 +26,11 @@ use graph::{self, EntryId, Graph, InvalidationResult, NodeContext};
 use hashing::Digest;
 use log::info;
 use parking_lot::Mutex;
-use process_execution::docker::{DOCKER, IMAGE_PULL_CACHE};
+// use docker::docker::{self, DOCKER, IMAGE_PULL_CACHE};
+use docker::docker;
 use process_execution::switched::SwitchedCommandRunner;
 use process_execution::{
-  self, bounded, docker, local, nailgun, remote, remote_cache, CacheContentBehavior, CommandRunner,
+  self, bounded, local, nailgun, remote, remote_cache, CacheContentBehavior, CommandRunner,
   NamedCaches, ProcessExecutionStrategy, RemoteCacheWarningsBehavior,
 };
 use protos::gen::build::bazel::remote::execution::v2::ServerCapabilities;
@@ -242,8 +243,8 @@ impl Core {
     let docker_runner = Box::new(docker::CommandRunner::new(
       local_runner_store.clone(),
       executor.clone(),
-      &DOCKER,
-      &IMAGE_PULL_CACHE,
+      &docker::DOCKER,
+      &docker::IMAGE_PULL_CACHE,
       local_execution_root_dir.to_path_buf(),
       immutable_inputs.clone(),
       exec_strategy_opts.local_keep_sandboxes,
