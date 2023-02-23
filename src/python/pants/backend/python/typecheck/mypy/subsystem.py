@@ -44,7 +44,7 @@ from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.lockfile_metadata import calculate_invalidation_digest
 from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.fs import EMPTY_DIGEST, Digest, DigestContents, FileContent
-from pants.engine.rules import Get, collect_rules, rule, rule_helper
+from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import (
     AllTargets,
     AllTargetsRequest,
@@ -348,7 +348,6 @@ async def mypy_first_party_plugins(
 # --------------------------------------------------------------------------------------
 
 
-@rule_helper
 async def _mypy_interpreter_constraints(
     mypy: MyPy, python_setup: PythonSetup
 ) -> InterpreterConstraints:

@@ -43,7 +43,7 @@ from pants.core.util_rules.system_binaries import CpBinary, MkdirBinary, MvBinar
 from pants.engine.collection import Collection
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests, RemovePrefix
 from pants.engine.process import FallibleProcessResult, Process
-from pants.engine.rules import Get, MultiGet, collect_rules, rule, rule_helper
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import CoarsenedTargets, CoarsenedTargetsRequest
 from pants.engine.unions import UnionRule
 from pants.option.global_options import GlobalOptions
@@ -73,7 +73,6 @@ class MyPyRequest(CheckRequest):
     tool_name = MyPy.options_scope
 
 
-@rule_helper
 async def _generate_argv(
     mypy: MyPy,
     *,
