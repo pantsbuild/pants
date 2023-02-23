@@ -557,7 +557,7 @@ async def generate_node_package_targets(
                 *request.template.get("dependencies", []),
             ],
         },
-        request.generator.address.create_generated(pkg_json.name),
+        request.generator.address.create_generated(pkg_json.name.replace("@", "__")),
         union_membership,
     )
     scripts = PackageJsonScripts.from_package_json(pkg_json).scripts
