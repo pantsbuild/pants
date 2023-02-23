@@ -41,7 +41,7 @@ from pants.core.util_rules.system_binaries import BashBinary, BinaryShims, Binar
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import Digest, Snapshot
 from pants.engine.process import Process
-from pants.engine.rules import Get, collect_rules, rule, rule_helper
+from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import (
     GeneratedSources,
     GenerateSourcesRequest,
@@ -66,7 +66,6 @@ class ShellCommandProcessFromTargetRequest:
     target: Target
 
 
-@rule_helper
 async def _prepare_process_request_from_target(
     shell_command: Target,
     shell_setup: ShellSetup.EnvironmentAware,
@@ -200,7 +199,6 @@ async def shell_command_in_sandbox(
     return GeneratedSources(output)
 
 
-@rule_helper
 async def _interactive_shell_command(
     shell_command: Target,
     bash: BashBinary,

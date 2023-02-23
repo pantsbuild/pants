@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import inspect
 import re
 import threading
 import tokenize
@@ -10,7 +11,7 @@ from dataclasses import dataclass
 from difflib import get_close_matches
 from io import StringIO
 from pathlib import PurePath
-from typing import Any, Callable
+from typing import Any, Callable, Mapping, TypeVar
 
 from pants.base.deprecated import warn_or_error
 from pants.base.exceptions import MappingError
@@ -24,12 +25,43 @@ from pants.engine.target import Field, ImmutableValue, RegisteredTargetTypes
 from pants.engine.unions import UnionMembership
 from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
+from pants.util.memo import memoized_property
 from pants.util.strutil import softwrap
+
+T = TypeVar("T")
 
 
 @dataclass(frozen=True)
 class BuildFilePreludeSymbols:
-    symbols: FrozenDict[str, Any]
+    info: FrozenDict[str, BuildFileSymbolInfo]
+
+    @memoized_property
+    def symbols(self) -> FrozenDict[str, Any]:
+        return FrozenDict({name: symbol.value for name, symbol in self.info.items()})
+
+    @classmethod
+    def from_namespace(cls, ns: Mapping[str, Any]) -> BuildFilePreludeSymbols:
+        info = {}
+        for name, symb in ns.items():
+            info[name] = BuildFileSymbolInfo(name, symb)
+        return cls(info=FrozenDict(info))
+
+
+@dataclass(frozen=True)
+class BuildFileSymbolInfo:
+    name: str
+    value: Any
+
+    @property
+    def help(self) -> str | None:
+        return inspect.getdoc(self.value) if hasattr(self.value, "__name__") else None
+
+    @property
+    def signature(self) -> str | None:
+        if not callable(self.value):
+            return None
+        else:
+            return str(inspect.signature(self.value))
 
 
 class ParseError(Exception):
@@ -48,6 +80,7 @@ class ParseState(threading.local):
         self._filepath: str | None = None
         self._target_adaptors: list[TargetAdaptor] = []
         self._is_bootstrap: bool | None = None
+        self._env_vars: EnvironmentVars | None = None
 
     def reset(
         self,
@@ -56,38 +89,51 @@ class ParseState(threading.local):
         defaults: BuildFileDefaultsParserState,
         dependents_rules: BuildFileDependencyRulesParserState | None,
         dependencies_rules: BuildFileDependencyRulesParserState | None,
+        env_vars: EnvironmentVars,
     ) -> None:
         self._is_bootstrap = is_bootstrap
         self._defaults = defaults
         self._dependents_rules = dependents_rules
         self._dependencies_rules = dependencies_rules
+        self._env_vars = env_vars
         self._filepath = filepath
         self._target_adaptors.clear()
 
     def add(self, target_adaptor: TargetAdaptor) -> None:
         self._target_adaptors.append(target_adaptor)
 
-    def filepath(self) -> str:
-        if self._filepath is None:
-            raise AssertionError(
-                "The BUILD file filepath was accessed before being set. This indicates a "
-                "programming error in Pants. Please file a bug report at "
-                "https://github.com/pantsbuild/pants/issues/new."
-            )
-        return self._filepath
-
     def parsed_targets(self) -> list[TargetAdaptor]:
         return list(self._target_adaptors)
 
+    def _prelude_check(self, name: str, value: T | None, closure_supported: bool = True) -> T:
+        if value is not None:
+            return value
+        note = (
+            (
+                " If used in a prelude file, it must be within a function that is called from a BUILD"
+                " file."
+            )
+            if closure_supported
+            else ""
+        )
+        raise NameError(
+            softwrap(
+                f"""
+                The BUILD file {name} may only be used in BUILD files.{note}
+                """
+            )
+        )
+
+    def filepath(self) -> str:
+        return self._prelude_check("`build_file_dir`", self._filepath)
+
     @property
     def defaults(self) -> BuildFileDefaultsParserState:
-        if self._defaults is None:
-            raise AssertionError(
-                "The BUILD file __defaults__ was accessed before being set. This indicates a "
-                "programming error in Pants. Please file a bug report at "
-                "https://github.com/pantsbuild/pants/issues/new."
-            )
-        return self._defaults
+        return self._prelude_check("`__defaults__`", self._defaults)
+
+    @property
+    def env_vars(self) -> EnvironmentVars:
+        return self._prelude_check("`env`", self._env_vars, closure_supported=False)
 
     @property
     def is_bootstrap(self) -> bool:
@@ -97,6 +143,9 @@ class ParseState(threading.local):
                 "https://github.com/pantsbuild/pants/issues/new"
             )
         return self._is_bootstrap
+
+    def get_env(self, name: str, *args, **kwargs) -> Any:
+        return self.env_vars.get(name, *args, **kwargs)
 
     def set_defaults(
         self, *args: SetDefaultsT, ignore_unknown_fields: bool = False, **kwargs
@@ -221,6 +270,7 @@ class Parser:
         symbols: dict[str, Any] = {
             **object_aliases.objects,
             "build_file_dir": lambda: PurePath(parse_state.filepath()).parent,
+            "env": parse_state.get_env,
             "__defaults__": parse_state.set_defaults,
             "__dependents_rules__": parse_state.set_dependents_rules,
             "__dependencies_rules__": parse_state.set_dependencies_rules,
@@ -256,10 +306,10 @@ class Parser:
             defaults=defaults,
             dependents_rules=dependents_rules,
             dependencies_rules=dependencies_rules,
+            env_vars=env_vars,
         )
 
         global_symbols: dict[str, Any] = {
-            "env": env_vars.get,
             **self._symbols,
             **extra_symbols.symbols,
         }
@@ -285,6 +335,7 @@ class Parser:
                         defaults=defaults,
                         dependents_rules=dependents_rules,
                         dependencies_rules=dependencies_rules,
+                        env_vars=env_vars,
                     )
                     continue
                 break

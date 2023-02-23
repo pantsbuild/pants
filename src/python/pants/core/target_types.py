@@ -34,7 +34,7 @@ from pants.engine.fs import (
     Snapshot,
 )
 from pants.engine.platform import Platform
-from pants.engine.rules import Get, MultiGet, collect_rules, rule, rule_helper
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     AllTargets,
@@ -285,7 +285,6 @@ class AssetSourceField(SingleSourceField):
         return os.path.join(self.address.spec_path, filename)
 
 
-@rule_helper
 async def _hydrate_asset_source(
     request: GenerateSourcesRequest, platform: Platform
 ) -> GeneratedSources:

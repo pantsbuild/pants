@@ -673,9 +673,6 @@ def run_rule_with_mocks(
     """
 
     task_rule = getattr(rule, "rule", None)
-    rule_helper = getattr(rule, "rule_helper", None)
-    if task_rule is None and rule_helper is None:
-        raise TypeError(f"Expected to receive a decorated `@rule` or `@rule_helper`; got: {rule}")
 
     # Perform additional validation on `@rule` that the correct args are provided. We don't have
     # an easy way to do this for `@rule_helper` yet.

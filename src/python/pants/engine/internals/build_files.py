@@ -38,7 +38,7 @@ from pants.engine.internals.synthetic_targets import (
     SyntheticAddressMapsRequest,
 )
 from pants.engine.internals.target_adaptor import TargetAdaptor, TargetAdaptorRequest
-from pants.engine.rules import Get, MultiGet, collect_rules, rule, rule_helper
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     DependenciesRuleApplication,
     DependenciesRuleApplicationRequest,
@@ -95,7 +95,7 @@ async def evaluate_preludes(
     for file_content in prelude_digest_contents:
         try:
             file_content_str = file_content.content.decode()
-            content = compile(file_content_str, file_content.path, "exec")
+            content = compile(file_content_str, file_content.path, "exec", dont_inherit=True)
             exec(content, globals, locals)
         except Exception as e:
             raise Exception(f"Error parsing prelude file {file_content.path}: {e}")
@@ -107,7 +107,7 @@ async def evaluate_preludes(
     # Ensure preludes can reference each other by populating the shared globals object with references
     # to the other symbols
     globals.update(locals)
-    return BuildFilePreludeSymbols(FrozenDict(locals))
+    return BuildFilePreludeSymbols.from_namespace(locals)
 
 
 @rule
@@ -217,7 +217,6 @@ class BUILDFileEnvVarExtractor(ast.NodeVisitor):
             self.visit(kwarg)
 
 
-@rule_helper
 async def _extract_env_vars(
     file_content: FileContent, env: CompleteEnvironmentVars
 ) -> EnvironmentVars:
