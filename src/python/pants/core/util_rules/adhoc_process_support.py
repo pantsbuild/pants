@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import dataclasses
-import itertools
 import logging
 import os
 import shlex
@@ -80,27 +79,24 @@ async def resolve_execution_environment(
     raw_execution_dependencies = request.execution_dependencies
     raw_regular_dependencies = request.dependencies
 
-    execution_dependencies_defined = raw_execution_dependencies is not None
-
     any_dependencies_defined = raw_regular_dependencies is not None
 
-    # If we're specifying the `dependencies` as relevant to the execution environment, then include
-    # this command as a root for the transitive dependency search for execution dependencies.
-    maybe_this_target = (target_address,) if not execution_dependencies_defined else ()
-
     # Always include the execution dependencies that were specified
-    if execution_dependencies_defined:
+    if raw_execution_dependencies is not None:
         _descr = f"the `execution_dependencies` from the target {target_address}"
         execution_dependencies = await Get(
             Addresses,
             UnparsedAddressInputs(
-                raw_execution_dependencies or (),
+                raw_execution_dependencies,
                 owning_address=target_address,
                 description_of_origin=_descr,
             ),
         )
     elif any_dependencies_defined:
-        execution_dependencies = Addresses()
+        # If we're specifying the `dependencies` as relevant to the execution environment, then
+        # include this command as a root for the transitive dependency search for execution
+        # dependencies.
+        execution_dependencies = Addresses((target_address,))
         warn_or_error(
             "2.17.0.dev0",
             "Using `dependencies` to specify execution-time dependencies for `shell_command` ",
@@ -112,11 +108,11 @@ async def resolve_execution_environment(
             print_warning=True,
         )
     else:
-        execution_dependencies = Addresses()
+        execution_dependencies = Addresses((target_address,))
 
     transitive = await Get(
         TransitiveTargets,
-        TransitiveTargetsRequest(itertools.chain(maybe_this_target, execution_dependencies)),
+        TransitiveTargetsRequest(execution_dependencies),
     )
 
     all_dependencies = (
