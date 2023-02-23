@@ -292,7 +292,6 @@ def _runnable_dependency_shim(
     return dedent(
         f"""\
         #!{bash}
-        echo $_PANTS_SHIM_ROOT > /dev/stderr
         {env_str}
         exec {binary} "$@"
         """
