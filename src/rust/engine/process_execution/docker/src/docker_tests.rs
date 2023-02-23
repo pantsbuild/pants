@@ -20,7 +20,7 @@ use crate::docker::{DockerOnceCell, ImagePullCache, SANDBOX_BASE_PATH_IN_CONTAIN
 use process_execution::local::KeepSandboxes;
 use process_execution::{
   local, CacheName, CommandRunner, Context, FallibleProcessResultWithPlatform, InputDigests,
-  NamedCaches, Platform, Process, ProcessError,
+  Platform, Process, ProcessError,
 };
 
 /// Docker image to use for most tests in this file.
@@ -749,17 +749,6 @@ async fn immutable_inputs() {
   assert_eq!(result.original.exit_code, 0);
 }
 
-fn named_caches_and_immutable_inputs(store: Store) -> (TempDir, NamedCaches, ImmutableInputs) {
-  let root = TempDir::new().unwrap();
-  let root_path = root.path().to_owned();
-  let named_cache_dir = root_path.join("named");
-
-  (
-    root,
-    NamedCaches::new_local(named_cache_dir),
-    ImmutableInputs::new(store, &root_path).unwrap(),
-  )
-}
 
 async fn run_command_via_docker_in_dir(
   mut req: Process,
@@ -774,8 +763,14 @@ async fn run_command_via_docker_in_dir(
   let executor = executor.unwrap_or_else(task_executor::Executor::new);
   let store =
     store.unwrap_or_else(|| Store::local_only(executor.clone(), store_dir.path()).unwrap());
-  let (_caches_dir, _named_caches, immutable_inputs) =
-    named_caches_and_immutable_inputs(store.clone());
+
+  let root = TempDir::new().unwrap();
+  let root_path = root.path().to_owned();
+
+  let immutable_inputs = ImmutableInputs::new(
+        store.clone(),
+        &root_path
+      ).unwrap();
 
   let docker = Box::new(DockerOnceCell::new());
   let image_pull_cache = Box::new(ImagePullCache::new());
