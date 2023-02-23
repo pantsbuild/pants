@@ -78,8 +78,6 @@ pub mod local;
 #[cfg(test)]
 pub mod local_tests;
 
-pub mod nailgun;
-
 pub mod named_caches;
 
 extern crate uname;

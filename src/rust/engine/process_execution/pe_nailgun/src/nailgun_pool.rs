@@ -24,8 +24,8 @@ use store::{ImmutableInputs, Store};
 use task_executor::Executor;
 use workunit_store::{in_workunit, Level};
 
-use crate::local::prepare_workdir;
-use crate::{NamedCaches, Process, ProcessError};
+use process_execution::local::prepare_workdir;
+use process_execution::{NamedCaches, Process, ProcessError};
 
 lazy_static! {
   static ref NAILGUN_PORT_REGEX: Regex = Regex::new(r".*\s+port\s+(\d+)\.$").unwrap();
@@ -430,7 +430,8 @@ struct NailgunProcessFingerprint {
 
 impl NailgunProcessFingerprint {
   pub async fn new(name: String, nailgun_req: &Process, store: &Store) -> Result<Self, String> {
-    let nailgun_req_digest = crate::get_digest(nailgun_req, None, None, store, None).await;
+    let nailgun_req_digest =
+      process_execution::get_digest(nailgun_req, None, None, store, None).await;
     Ok(NailgunProcessFingerprint {
       name,
       fingerprint: nailgun_req_digest.hash,

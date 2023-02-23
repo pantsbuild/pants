@@ -9,8 +9,6 @@ publish = false
 async-stream = "0.3"
 async-trait = "0.1"
 async-lock = "2.5"
-bollard = { git = "https://github.com/fussybeaver/bollard.git", rev = "2d66d11b44aeff0373ece3d64a44b243e5152973" }
-bollard-stubs = { git = "https://github.com/fussybeaver/bollard.git", rev = "2d66d11b44aeff0373ece3d64a44b243e5152973" }
 walkdir = "2"
 protos = { path = "../protos" }
 bytes = "1.2"
@@ -43,16 +41,13 @@ lazy_static = "1"
 parking_lot = "0.12"
 itertools = "0.10"
 serde = "1.0.136"
-async-oncecell = "0.2"
 bincode = "1.3.3"
 once_cell = "1.15"
-os_pipe = "1.0"
 prost = "0.9"
 prost-types = "0.9"
 rand = "0.8"
 strum = "0.24"
 strum_macros = "0.24"
-tonic = { version = "0.6", features = ["transport", "codegen", "tls", "tls-roots", "prost"] }
 tryfuture = { path = "../tryfuture" }
 
 [dev-dependencies]

@@ -30,8 +30,7 @@ use parking_lot::Mutex;
 use docker::docker;
 use process_execution::switched::SwitchedCommandRunner;
 use process_execution::{
-  self, bounded, local, nailgun, CacheContentBehavior, CommandRunner, NamedCaches,
-  ProcessExecutionStrategy,
+  self, bounded, local, CacheContentBehavior, CommandRunner, NamedCaches, ProcessExecutionStrategy,
 };
 use protos::gen::build::bazel::remote::execution::v2::ServerCapabilities;
 use regex::Regex;
@@ -222,7 +221,7 @@ impl Core {
         exec_strategy_opts.local_parallelism * 2
       };
 
-      let nailgun_runner = nailgun::CommandRunner::new(
+      let nailgun_runner = pe_nailgun::CommandRunner::new(
         local_execution_root_dir.to_path_buf(),
         local_runner_store.clone(),
         executor.clone(),

@@ -823,27 +823,22 @@ dependencies = [
  "env_logger",
  "fs",
  "futures",
- "lazy_static",
  "log",
  "maplit",
  "mock",
  "nails",
  "once_cell",
- "os_pipe",
  "parking_lot 0.12.1",
  "process_execution",
  "sharded_lmdb",
  "spectral",
  "store",
- "strum",
- "strum_macros",
  "task_executor",
  "tempfile",
  "testutil",
  "tokio",
  "tokio-rustls 0.23.4",
  "tokio-util 0.7.4",
- "tryfuture",
  "workunit_store",
 ]
 
@@ -903,6 +898,7 @@ dependencies = [
  "nailgun",
  "num_enum",
  "parking_lot 0.12.1",
+ "pe_nailgun",
  "petgraph",
  "process_execution",
  "protos",
@@ -2202,6 +2198,37 @@ dependencies = [
 ]
 
 [[package]]
+name = "pe_nailgun"
+version = "0.0.1"
+dependencies = [
+ "async-lock",
+ "async-stream",
+ "async-trait",
+ "env_logger",
+ "futures",
+ "hashing",
+ "itertools",
+ "lazy_static",
+ "log",
+ "maplit",
+ "mock",
+ "nails",
+ "parking_lot 0.12.1",
+ "process_execution",
+ "regex",
+ "sharded_lmdb",
+ "spectral",
+ "store",
+ "task_executor",
+ "tempfile",
+ "testutil",
+ "tokio",
+ "tokio-rustls 0.23.4",
+ "tokio-util 0.7.4",
+ "workunit_store",
+]
+
+[[package]]
 name = "peg"
 version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2384,12 +2411,9 @@ name = "process_execution"
 version = "0.0.1"
 dependencies = [
  "async-lock",
- "async-oncecell",
  "async-stream",
  "async-trait",
  "bincode",
- "bollard",
- "bollard-stubs",
  "bytes",
  "cache",
  "concrete_time",
@@ -2409,7 +2433,6 @@ dependencies = [
  "nails",
  "nix",
  "once_cell",
- "os_pipe",
  "parking_lot 0.12.1",
  "prost",
  "prost-types",
@@ -2430,7 +2453,6 @@ dependencies = [
  "tokio",
  "tokio-rustls 0.23.4",
  "tokio-util 0.7.4",
- "tonic",
  "tryfuture",
  "uname",
  "uuid",
@@ -2444,7 +2466,6 @@ version = "0.0.1"
 dependencies = [
  "clap",
  "dirs-next",
- "docker",
  "env_logger",
  "fs",
  "futures",
@@ -2783,7 +2804,6 @@ dependencies = [
  "async-trait",
  "bytes",
  "concrete_time",
- "deepsize",
  "derivative",
  "env_logger",
  "fs",
@@ -2813,8 +2833,6 @@ dependencies = [
  "tokio-rustls 0.23.4",
  "tokio-util 0.7.4",
  "tonic",
- "tryfuture",
- "uuid",
  "workunit_store",
 ]
 

@@ -1,7 +1,7 @@
 [package]
 version = "0.0.1"
 edition = "2021"
-name = "remote"
+name = "pe_nailgun"
 authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 publish = false
 
@@ -9,34 +9,22 @@ publish = false
 async-stream = "0.3"
 async-trait = "0.1"
 async-lock = "2.5"
-protos = { path = "../../protos" }
-bytes = "1.2"
-derivative = "2.2"
-# TODO: Waiting on https://github.com/Aeledfyr/deepsize/pull/{30,31,32}.
-# deepsize = { git = "https://github.com/stuhood/deepsize.git", rev = "5c8bee5443fcafe4aaa9274490d354412d0955c1", features=["log"] }
-grpc_util = { path = "../../grpc_util" }
-fs = { path = "../../fs" }
 futures = "0.3"
-hashing = { path = "../../hashing" }
-libc = "0.2.137"
 log = "0.4"
+nails = "0.13"
 store = { path = "../../fs/store" }
 task_executor = { path = "../../task_executor" }
-concrete_time = { path = "../../concrete_time" }
 tokio = { version = "1.21", features = ["net", "process", "rt-multi-thread", "sync", "time"] }
 tokio-rustls = "0.23"
 tokio-util = { version = "0.7", features = ["codec"] }
 workunit_store = { path = "../../workunit_store" }
-async-oncecell = "0.2"
-once_cell = "1.15"
-prost = "0.9"
-prost-types = "0.9"
-rand = "0.8"
-tonic = { version = "0.6", features = ["transport", "codegen", "tls", "tls-roots", "prost"] }
+itertools = "0.10"
 process_execution = { path = ".." }
-strum = "0.24"
-strum_macros = "0.24"
-parking_lot = "0.12"
+lazy_static = "1"
+regex = "1"
+tempfile = "3"
+hashing = { path = "../../hashing" }
+
 
 [dev-dependencies]
 env_logger = "0.9.0"
@@ -48,3 +36,4 @@ spectral = "0.6.0"
 tempfile = "3"
 testutil = { path = "../../testutil" }
 tokio = { version = "1.21", features = ["macros"] }
+process_execution = { path = ".." }

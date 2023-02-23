@@ -42,6 +42,7 @@ members = [
   "options",
   "process_execution",
   "process_execution/docker",
+  "process_execution/pe_nailgun",
   "process_execution/remote",
   "process_executor",
   "rule_graph",
@@ -84,6 +85,7 @@ default-members = [
   "options",
   "process_execution",
   "process_execution/docker",
+  "process_execution/pe_nailgun",
   "process_execution/remote",
   "process_executor",
   "rule_graph",
@@ -167,6 +169,7 @@ url = "2.3"
 watch = { path = "watch" }
 workunit_store = { path = "workunit_store" }
 remote = { path = "process_execution/remote" }
+pe_nailgun = { path = "process_execution/pe_nailgun" }
 
 [dev-dependencies]
 testutil = { path = "./testutil" }
