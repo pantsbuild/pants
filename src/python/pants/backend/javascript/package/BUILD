@@ -3,6 +3,13 @@
 
 python_sources()
 
-python_tests(name="test", dependencies=[":package_lock_json"])
+python_tests(
+    name="test",
+    overrides={
+        "rules_integration_test.py": dict(
+            dependencies=[":package_lock_json"],
+        ),
+    },
+)
 
 resource(name="package_lock_json", source="package-lock.json")
