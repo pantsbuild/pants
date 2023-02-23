@@ -101,6 +101,77 @@ class RunnableDependencies:
     path_component: str
     immutable_input_digests: FrozenDict[str, Digest]
     append_only_caches: FrozenDict[str, str]
+    extra_env: FrozenDict[str, str]
+
+
+async def _resolve_runnable_dependencies(
+    bash: BashBinary, deps: tuple[runnable, ...], owning: Address, origin: str
+) -> tuple[Digest, RunnableDependencies]:
+    addresses = await Get(
+        Addresses,
+        UnparsedAddressInputs(
+            (dep.address for dep in deps),
+            owning_address=owning,
+            description_of_origin=origin,
+        ),
+    )
+
+    targets = await Get(Targets, Addresses, addresses)
+
+    fspt = (
+        await Get(
+            FieldSetsPerTarget,
+            FieldSetsPerTargetRequest(RunFieldSet, targets),
+        ),
+    )
+
+    for field_set in fspt:
+        logger.warning(f"{field_set=}")
+
+    runnables = await MultiGet(
+        Get(RunInSandboxRequest, RunFieldSet, field_set.field_sets[0]) for field_set in fspt if field_set.field_sets
+    )
+
+    digests: list[Digest] = []
+    shims: list[FileContent] = []
+    immutable_input_digests: dict[str, Digest] = {}
+    append_only_caches: dict[str, str] = {}
+
+    for dep, runnable in zip(deps, runnables):
+        digests.append(runnable.digest)
+        shims.append(
+            FileContent(
+                dep.name,
+                _runnable_dependency_shim(bash.path, runnable.args, runnable.extra_env),
+                is_executable=True,
+            )
+        )
+
+        try:
+            _safe_update(immutable_input_digests, runnable.immutable_input_digests or {})
+            _safe_update(append_only_caches, runnable.append_only_caches or {})
+        except ValueError:
+            # This error message could use improvement, but this is experimental for now *shrug*
+            raise ValueError(
+                "One or more runnable dependencies have mutually incompatible environments."
+            )
+
+    digest, shim_digest = await MultiGet(
+        Get(Digest, MergeDigests(digests)), Get(Digest, CreateDigest(shims))
+    )
+    shim_digest_path = f"shims_{shim_digest.fingerprint}"
+
+    immutable_input_digests[shim_digest_path] = shim_digest
+
+    return (
+        digest,
+        RunnableDependencies(
+            shim_digest_path,
+            FrozenDict(immutable_input_digests),
+            FrozenDict(append_only_caches),
+            FrozenDict({"_PANTS_SHIM_ROOT": "{chroot}"}),
+        ),
+    )
 
 
 @rule
@@ -192,72 +263,6 @@ async def resolve_execution_environment(
     return ResolvedExecutionDependencies(dependencies_digest, runnable_dependencies)
 
 
-async def _resolve_runnable_dependencies(
-    bash: BashBinary, deps: tuple[runnable, ...], owning: Address, origin: str
-) -> tuple[Digest, RunnableDependencies]:
-    addresses = await Get(
-        Addresses,
-        UnparsedAddressInputs(
-            (dep.address for dep in deps),
-            owning_address=owning,
-            description_of_origin=origin,
-        ),
-    )
-
-    targets = await Get(Targets, Addresses, addresses)
-
-    fspt = (
-        await Get(
-            FieldSetsPerTarget,
-            FieldSetsPerTargetRequest(RunFieldSet, targets),
-        ),
-    )
-
-    runnables = await MultiGet(
-        Get(RunInSandboxRequest, RunFieldSet, field_set) for field_set in fspt
-    )
-
-    digests: list[Digest] = []
-    shims: list[FileContent] = []
-    immutable_input_digests: dict[str, Digest] = {}
-    append_only_caches: dict[str, str] = {}
-
-    for dep, runnable in zip(deps, runnables):
-        digests.append(runnable.digest)
-        shims.append(
-            FileContent(
-                dep.name,
-                _runnable_dependency_shim(bash.path, runnable.args, runnable.extra_env),
-                is_executable=True,
-            )
-        )
-
-        try:
-            _safe_update(immutable_input_digests, runnable.immutable_input_digests or {})
-            _safe_update(append_only_caches, runnable.append_only_caches or {})
-        except ValueError:
-            # This error message could use improvement, but this is experimental for now *shrug*
-            raise ValueError(
-                "One or more runnable dependencies have mutually incompatible environments."
-            )
-
-    digest, shim_digest = await MultiGet(
-        Get(Digest, MergeDigests(digests)), Get(Digest, CreateDigest(shims))
-    )
-    shim_digest_path = f"shims_{shim_digest.fingerprint}"
-
-    immutable_input_digests[shim_digest_path] = shim_digest
-
-    return (
-        digest,
-        RunnableDependencies(
-            shim_digest_path,
-            FrozenDict(immutable_input_digests),
-            FrozenDict(append_only_caches),
-        ),
-    )
-
-
 K = TypeVar("K")
 V = TypeVar("V")
 
@@ -273,13 +278,19 @@ def _runnable_dependency_shim(
     bash: str, args: Iterable[str], extra_env: Mapping[str, str]
 ) -> bytes:
     """The binary shim script to be placed in the output directory for the digest."""
-    binary = " ".join(shlex.quote(arg) for arg in args)
+
+    def _quote(s: str) -> str:
+        quoted = shlex.quote(s)
+        return quoted.replace("{chroot}", "'${_PANTS_SHIM_ROOT}'")
+
+    binary = " ".join(_quote(arg) for arg in args)
     env_str = "\n".join(
-        f"export {shlex.quote(key)}={shlex.quote(value)}" for (key, value) in extra_env.items()
+        f"export {shlex.quote(key)}={_quote(value)}" for (key, value) in extra_env.items()
     )
     return dedent(
         f"""\
         #!{bash}
+        echo $_PANTS_SHIM_ROOT > /dev/stderr
         {env_str}
         exec {binary} "$@"
         """

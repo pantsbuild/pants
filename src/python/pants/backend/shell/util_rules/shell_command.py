@@ -34,6 +34,7 @@ from pants.core.util_rules.adhoc_process_support import (
     AdhocProcessResult,
     ResolvedExecutionDependencies,
     ResolveExecutionDependenciesRequest,
+    _safe_update,
 )
 from pants.core.util_rules.adhoc_process_support import rules as adhoc_process_support_rules
 from pants.core.util_rules.environments import EnvironmentNameRequest
@@ -107,9 +108,17 @@ async def _prepare_process_request_from_target(
         ),
     )
 
-    immutable_input_digests = resolved_tools.immutable_input_digests
+    immutable_input_digests = dict(resolved_tools.immutable_input_digests)
     supplied_env_var_values = {"PATH": resolved_tools.path_component}
+    append_only_caches: FrozenDict[str, str] | None = None
 
+    runnable_dependencies = execution_environment.runnable_dependencies
+    if runnable_dependencies:
+        supplied_env_var_values["PATH"] = supplied_env_var_values.get("PATH", "") + f":{{chroot}}/{runnable_dependencies.path_component}"
+        _safe_update(supplied_env_var_values, runnable_dependencies.extra_env)
+        _safe_update(immutable_input_digests, runnable_dependencies.immutable_input_digests)
+        append_only_caches = runnable_dependencies.append_only_caches
+        
     return AdhocProcessRequest(
         description=description,
         address=shell_command.address,
@@ -121,7 +130,7 @@ async def _prepare_process_request_from_target(
         output_files=output_files,
         output_directories=output_directories,
         fetch_env_vars=shell_command.get(ShellCommandExtraEnvVarsField).value or (),
-        append_only_caches=None,
+        append_only_caches=append_only_caches,
         supplied_env_var_values=FrozenDict(supplied_env_var_values),
         immutable_input_digests=FrozenDict(immutable_input_digests),
         log_on_process_errors=_LOG_ON_PROCESS_ERRORS,

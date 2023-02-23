@@ -103,6 +103,16 @@ async def run_in_sandbox_request(
         ),
     )
     dependencies_digest = execution_environment.digest
+    runnable_dependencies = execution_environment.runnable_dependencies
+    
+    immutable_input_digests = dict(run_request.immutable_input_digests or {})
+    extra_env = dict(run_request.extra_env or {})
+    append_only_caches = dict(run_request.append_only_caches or {})
+
+    if runnable_dependencies:
+        extra_env["PATH"] = extra_env.get("PATH", "") + f":{{chroot}}/{runnable_dependencies.path_component}"
+        immutable_input_digests.update(runnable_dependencies.immutable_input_digests)
+        append_only_caches.update(runnable_dependencies.append_only_caches)
 
     input_digest = await Get(Digest, MergeDigests((dependencies_digest, run_request.digest)))
 
@@ -119,12 +129,12 @@ async def run_in_sandbox_request(
         argv=tuple(run_request.args + extra_args),
         timeout=None,
         input_digest=input_digest,
-        immutable_input_digests=FrozenDict(run_request.immutable_input_digests or {}),
-        append_only_caches=FrozenDict(run_request.append_only_caches or {}),
+        immutable_input_digests=FrozenDict(immutable_input_digests),
+        append_only_caches=FrozenDict(append_only_caches),
         output_files=output_files,
         output_directories=output_directories,
         fetch_env_vars=(),
-        supplied_env_var_values=FrozenDict(**run_request.extra_env),
+        supplied_env_var_values=FrozenDict(extra_env),
         log_on_process_errors=None,
         log_output=target[AdhocToolLogOutputField].value,
     )
