@@ -4,12 +4,14 @@ from textwrap import dedent
 
 import pytest
 
-from pants.backend.javascript.import_parser.rules import (
+from pants.backend.javascript.dependency_inference.import_parser.rules import (
     InstalledJavascriptImportParser,
     JSImportStrings,
     ParseJsImportStrings,
 )
-from pants.backend.javascript.import_parser.rules import rules as import_parser_rules
+from pants.backend.javascript.dependency_inference.import_parser.rules import (
+    rules as import_parser_rules,
+)
 from pants.backend.javascript.target_types import (
     JSSourceField,
     JSSourcesGeneratorTarget,

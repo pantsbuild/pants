@@ -6,7 +6,8 @@ import itertools
 from dataclasses import dataclass
 from typing import Iterable
 
-from pants.backend.javascript import dependency_inference, nodejs_project_environment
+from pants.backend.javascript import nodejs_project_environment
+from pants.backend.javascript.dependency_inference.rules import rules as dependency_inference_rules
 from pants.backend.javascript.nodejs_project_environment import (
     NodeJsProjectEnvironment,
     NodeJsProjectEnvironmentProcess,
@@ -137,6 +138,6 @@ def rules() -> Iterable[Rule | UnionRule]:
     return [
         *nodejs.rules(),
         *nodejs_project_environment.rules(),
-        *dependency_inference.rules(),
+        *dependency_inference_rules(),
         *collect_rules(),
     ]

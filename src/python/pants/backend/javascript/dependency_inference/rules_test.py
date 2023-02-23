@@ -7,13 +7,14 @@ from textwrap import dedent
 
 import pytest
 
-from pants.backend.javascript import dependency_inference, package_json
-from pants.backend.javascript.dependency_inference import (
+from pants.backend.javascript import package_json
+from pants.backend.javascript.dependency_inference.rules import (
     InferJSDependenciesRequest,
     InferNodePackageDependenciesRequest,
     JSSourceInferenceFieldSet,
     NodePackageInferenceFieldSet,
 )
+from pants.backend.javascript.dependency_inference.rules import rules as dependency_inference_rules
 from pants.backend.javascript.package_json import AllPackageJson
 from pants.backend.javascript.target_types import JSSourcesGeneratorTarget, JSSourceTarget
 from pants.build_graph.address import Address
@@ -29,7 +30,7 @@ def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             *package_json.rules(),
-            *dependency_inference.rules(),
+            *dependency_inference_rules(),
             QueryRule(AllPackageJson, ()),
             QueryRule(Owners, (OwnersRequest,)),
             QueryRule(InferredDependencies, (InferNodePackageDependenciesRequest,)),

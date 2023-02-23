@@ -8,8 +8,13 @@ from dataclasses import dataclass
 from typing import Iterable
 
 from pants.backend.javascript import package_json
-from pants.backend.javascript.import_parser.rules import JSImportStrings, ParseJsImportStrings
-from pants.backend.javascript.import_parser.rules import rules as import_parser_rules
+from pants.backend.javascript.dependency_inference.import_parser.rules import (
+    JSImportStrings,
+    ParseJsImportStrings,
+)
+from pants.backend.javascript.dependency_inference.import_parser.rules import (
+    rules as import_parser_rules,
+)
 from pants.backend.javascript.package_json import (
     FirstPartyNodePackageTargets,
     NodePackageDependenciesField,
