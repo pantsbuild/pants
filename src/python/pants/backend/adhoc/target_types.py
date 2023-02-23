@@ -318,6 +318,16 @@ class SystemBinaryFingerprintArgsField(StringSequenceField):
     )
 
 
+class SystemBinaryFingerprintDependenciesField(AdhocToolExecutionDependenciesField):
+    alias = "fingerprint_dependencies"
+    help = help_text(
+        """
+        Specifies any dependencies that need to be available to the binary to complete the search
+        process. Runnable dependencies may be specified with `_runnable`.
+        """
+    )
+
+
 class SystemBinaryTarget(Target):
     alias = "system_binary"
     core_fields = (
@@ -326,6 +336,7 @@ class SystemBinaryTarget(Target):
         SystemBinaryExtraSearchPathsField,
         SystemBinaryFingerprintPattern,
         SystemBinaryFingerprintArgsField,
+        SystemBinaryFingerprintDependenciesField,
     )
     help = help_text(
         lambda: f"""
