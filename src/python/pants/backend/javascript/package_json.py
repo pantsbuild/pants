@@ -518,7 +518,7 @@ async def generate_node_package_targets(
 ) -> GeneratedTargets:
     file = request.generator[PackageJsonSourceField].file_path
     file_tgt = TargetGeneratorSourcesHelperTarget(
-        {TargetGeneratorSourcesHelperSourcesField.alias: file},
+        {TargetGeneratorSourcesHelperSourcesField.alias: os.path.basename(file)},
         request.generator.address.create_generated(file),
         union_membership,
     )
