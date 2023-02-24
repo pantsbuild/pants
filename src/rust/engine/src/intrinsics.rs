@@ -28,9 +28,9 @@ use pyo3::types::PyString;
 use pyo3::{PyAny, PyRef, Python, ToPyObject};
 use tokio::process;
 
+use docker::docker::{ImagePullPolicy, ImagePullScope, DOCKER, IMAGE_PULL_CACHE};
 use fs::{DigestTrie, DirectoryDigest, RelativePath, TypedPath};
 use hashing::{Digest, EMPTY_DIGEST};
-use process_execution::docker::{ImagePullPolicy, ImagePullScope, DOCKER, IMAGE_PULL_CACHE};
 use process_execution::local::{
   apply_chroot, create_sandbox, prepare_workdir, setup_run_sh_script, KeepSandboxes,
 };

@@ -8,7 +8,7 @@ use tempfile::TempDir;
 use testutil::owned_string_vec;
 use workunit_store::WorkunitStore;
 
-use crate::nailgun::NailgunPool;
+use crate::NailgunPool;
 use crate::{NamedCaches, Process};
 
 fn pool(size: usize) -> (NailgunPool, NamedCaches, ImmutableInputs) {

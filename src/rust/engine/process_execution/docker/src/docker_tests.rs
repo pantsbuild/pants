@@ -10,17 +10,15 @@ use fs::{RelativePath, EMPTY_DIRECTORY_DIGEST};
 use maplit::hashset;
 use spectral::assert_that;
 use spectral::string::StrAssertions;
-use store::Store;
+use store::{ImmutableInputs, Store};
 use tempfile::TempDir;
 use testutil::data::{TestData, TestDirectory};
 use testutil::{owned_string_vec, relative_paths};
 use workunit_store::{RunningWorkunit, WorkunitStore};
 
-use super::docker::SANDBOX_BASE_PATH_IN_CONTAINER;
-use crate::docker::{DockerOnceCell, ImagePullCache};
-use crate::local::KeepSandboxes;
-use crate::local_tests::named_caches_and_immutable_inputs;
-use crate::{
+use crate::docker::{DockerOnceCell, ImagePullCache, SANDBOX_BASE_PATH_IN_CONTAINER};
+use process_execution::local::KeepSandboxes;
+use process_execution::{
   local, CacheName, CommandRunner, Context, FallibleProcessResultWithPlatform, InputDigests,
   Platform, Process, ProcessError,
 };
@@ -760,13 +758,16 @@ async fn run_command_via_docker_in_dir(
   executor: Option<task_executor::Executor>,
 ) -> Result<LocalTestResult, ProcessError> {
   req.platform = platform_for_tests().map_err(ProcessError::Unclassified)?;
-
   let store_dir = TempDir::new().unwrap();
   let executor = executor.unwrap_or_else(task_executor::Executor::new);
   let store =
     store.unwrap_or_else(|| Store::local_only(executor.clone(), store_dir.path()).unwrap());
-  let (_caches_dir, _named_caches, immutable_inputs) =
-    named_caches_and_immutable_inputs(store.clone());
+
+  let root = TempDir::new().unwrap();
+  let root_path = root.path().to_owned();
+
+  let immutable_inputs = ImmutableInputs::new(store.clone(), &root_path).unwrap();
+
   let docker = Box::new(DockerOnceCell::new());
   let image_pull_cache = Box::new(ImagePullCache::new());
   let runner = crate::docker::CommandRunner::new(
