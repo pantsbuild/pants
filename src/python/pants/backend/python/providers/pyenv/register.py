@@ -6,4 +6,4 @@ from pants.backend.python.providers.pyenv.rules import rules as pyenv_rules
 
 
 def rules():
-    return [*pyenv_rules()]
+    return pyenv_rules()
