@@ -104,6 +104,94 @@ class RunnableDependencies:
     extra_env: FrozenDict[str, str]
 
 
+#
+# Things that need a home
+#
+
+
+@dataclass(frozen=True)
+class ExtraSandboxContents:
+    digest: Digest
+    path: str | None
+    immutable_input_digests: FrozenDict[str, Digest]
+    append_only_caches: FrozenDict[str, str]
+    extra_env: FrozenDict[str, str]
+
+
+@dataclass(frozen=True)
+class MergeExtraSandboxContents:
+    additions: tuple[ExtraSandboxContents, ...]
+
+
+@dataclass(frozen=True)
+class AddExtraSandboxContentsToProcess:
+    process: Process
+    contents: ExtraSandboxContents
+
+
+@rule
+async def merge_extra_sandbox_contents(request: MergeExtraSandboxContents) -> ExtraSandboxContents:
+    additions = request.additions
+
+    digests = []
+    paths = []
+    immutable_input_digests: dict[str, Digest] = {}
+    append_only_caches: dict[str, str] = {}
+    extra_env: dict[str, str] = {}
+
+    for addition in additions:
+        digests.append(addition.digest)
+        if addition.path is not None:
+            paths.append(addition.path)
+        _safe_update(immutable_input_digests, addition.immutable_input_digests)
+        _safe_update(append_only_caches, addition.append_only_caches)
+        _safe_update(extra_env, addition.extra_env)
+
+    digest = await Get(Digest, MergeDigests(digests))
+    path = ":".join(paths) if paths else None
+
+    return ExtraSandboxContents(
+        digest,
+        path,
+        FrozenDict(immutable_input_digests),
+        FrozenDict(append_only_caches),
+        FrozenDict(extra_env),
+    )
+
+
+@rule
+async def add_extra_contents_to_prcess(request: AddExtraSandboxContentsToProcess) -> Process:
+
+    proc = request.process
+    extras = request.contents
+    new_digest = await Get(
+        Digest, MergeDigests((request.process.input_digest, request.contents.digest))
+    )
+    immutable_input_digests = dict(proc.immutable_input_digests)
+    append_only_caches = dict(proc.append_only_caches)
+    env = dict(proc.env)
+
+    _safe_update(immutable_input_digests, extras.immutable_input_digests)
+    _safe_update(append_only_caches, extras.append_only_caches)
+    _safe_update(env, extras.extra_env)
+    # need to do `PATH` after `env` in case `extra_env` contains a `PATH`.
+    if extras.path:
+        env["PATH"] = extras.path + (":" + env["PATH"]) if "PATH" in env else ""
+
+    return dataclasses.replace(
+        proc,
+        input_digest=new_digest,
+        immutable_input_digests=FrozenDict(immutable_input_digests),
+        append_only_caches=FrozenDict(append_only_caches),
+        env=FrozenDict(env),
+    )
+
+
+#
+# END THINGS THAT NEED A HOME
+#
+
+
 async def _resolve_runnable_dependencies(
     bash: BashBinary, deps: tuple[runnable, ...], owning: Address, origin: str
 ) -> tuple[Digest, RunnableDependencies]:
@@ -134,13 +222,19 @@ async def _resolve_runnable_dependencies(
         if field_set.field_sets
     )
 
-    digests: list[Digest] = []
     shims: list[FileContent] = []
-    immutable_input_digests: dict[str, Digest] = {}
-    append_only_caches: dict[str, str] = {}
+    extras: list[ExtraSandboxContents] = []
 
     for dep, runnable in zip(deps, runnables):
-        digests.append(runnable.digest)
+        extras.append(
+            ExtraSandboxContents(
+                digest=runnable.digest,
+                path=None,
+                immutable_input_digests=FrozenDict(runnable.immutable_input_digests or {}),
+                append_only_caches=FrozenDict(runnable.append_only_caches or {}),
+                extra_env=FrozenDict(),
+            )
+        )
         shims.append(
             FileContent(
                 dep.name,
@@ -149,28 +243,22 @@ async def _resolve_runnable_dependencies(
             )
         )
 
-        try:
-            _safe_update(immutable_input_digests, runnable.immutable_input_digests or {})
-            _safe_update(append_only_caches, runnable.append_only_caches or {})
-        except ValueError:
-            # This error message could use improvement, but this is experimental for now *shrug*
-            raise ValueError(
-                "One or more runnable dependencies have mutually incompatible environments."
-            )
-
-    digest, shim_digest = await MultiGet(
-        Get(Digest, MergeDigests(digests)), Get(Digest, CreateDigest(shims))
+    merged_extras: ExtraSandboxContents
+    merged_extras, shim_digest = await MultiGet(
+        Get(ExtraSandboxContents, MergeExtraSandboxContents(tuple(extras))),
+        Get(Digest, CreateDigest(shims)),
     )
-    shim_digest_path = f"shims_{shim_digest.fingerprint}"
 
-    immutable_input_digests[shim_digest_path] = shim_digest
+    shim_digest_path = f"shims_{shim_digest.fingerprint}"
+    immutable_input_digests = {shim_digest_path: shim_digest}
+    _safe_update(immutable_input_digests, merged_extras.immutable_input_digests)
 
     return (
-        digest,
+        merged_extras.digest,
         RunnableDependencies(
             shim_digest_path,
             FrozenDict(immutable_input_digests),
-            FrozenDict(append_only_caches),
+            merged_extras.append_only_caches,
             FrozenDict({"_PANTS_SHIM_ROOT": "{chroot}"}),
         ),
     )
@@ -269,11 +357,12 @@ K = TypeVar("K")
 V = TypeVar("V")
 
 
-def _safe_update(d1: dict[K, V], d2: Mapping[K, V]) -> None:
+def _safe_update(d1: dict[K, V], d2: Mapping[K, V]) -> dict[K, V]:
     for k, v in d2.items():
         if k in d1 and d1[k] != v:
             raise ValueError("Beep")
         d1[k] = v
+    return d1
 
 
 def _runnable_dependency_shim(
