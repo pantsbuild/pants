@@ -28,7 +28,7 @@ class ForwardRefPatched(typing.ForwardRef, _root=True):  # type: ignore[call-arg
         unionised_arg = _translate_piped_types_to_union(arg)
         super().__init__(unionised_arg, *args, **kwargs)
 
-    def _evaluate(self, globalns, localns, recursive_guard):
+    def _evaluate(self, globalns, *args, **kwargs):
         if globalns and "Union" not in globalns:
             globalns["Union"] = typing.Union
-        return super()._evaluate(globalns, localns, recursive_guard)
+        return super()._evaluate(globalns, *args, **kwargs)
