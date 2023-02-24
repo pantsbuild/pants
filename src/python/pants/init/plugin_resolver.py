@@ -80,6 +80,7 @@ async def resolve_plugins(
             internal_only=True,
             python=python,
             requirements=requirements,
+            interpreter_constraints=request.interpreter_constraints or InterpreterConstraints(),
             description=f"Resolving plugins: {', '.join(requirements.req_strings)}",
         ),
     )
