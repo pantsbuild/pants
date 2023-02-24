@@ -82,12 +82,8 @@ async def collect_fixture_configs(
     pytest_pex, requirements_pex, prepared_sources, root_sources = await MultiGet(
         Get(
             Pex,
-            PexRequest(
-                output_filename="pytest.pex",
-                requirements=pytest.pex_requirements(),
-                interpreter_constraints=interpreter_constraints,
-                internal_only=True,
-            ),
+            PexRequest,
+            pytest.to_pex_request(interpreter_constraints=interpreter_constraints),
         ),
         Get(Pex, RequirementsPexRequest(addresses)),
         Get(
