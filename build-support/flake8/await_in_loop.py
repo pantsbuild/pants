@@ -105,7 +105,7 @@ def check_for_await_in_loop(tree: ast.AST, filename: str) -> Iterator[tuple[int,
         visit_ListComp = visit_GeneratorExp = visit_SetComp = visit_DictComp = visit_comp
 
         def _await_that_could_be_multiget(self, node: ast.Await) -> bool:
-            """Check for `await Get(...)` or `await MultiGet(...)` literally"""
+            """Check for `await Get(...)` or `await MultiGet(...)` literally."""
             value = node.value
 
             # This checks for `await Get()` and `await MultiGet()` literally, because there's not
