@@ -118,7 +118,10 @@ async def _create_python_source_run_request(
         digest=merged_digest,
         args=[_in_chroot(venv_pex.pex.argv0)],
         extra_env=extra_env,
-        append_only_caches=complete_pex_environment.append_only_caches,
+        append_only_caches={
+            **complete_pex_environment.append_only_caches,
+            **venv_pex.append_only_caches,
+        },
     )
 
 

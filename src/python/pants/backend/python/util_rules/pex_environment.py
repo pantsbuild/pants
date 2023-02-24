@@ -89,8 +89,27 @@ class PexSubsystem(Subsystem):
         return level
 
 
+@dataclass(frozen=True)
 class PythonExecutable(BinaryPath, EngineAwareReturnType):
-    """The BinaryPath of a Python executable."""
+    """The BinaryPath of a Python executable, along with some extras."""
+
+    append_only_caches: FrozenDict[str, str] = FrozenDict({})
+
+    def __post_init__(self) -> None:
+        if not PurePath(self.path).is_absolute():
+            raise ValueError(
+                softwrap(
+                    f"""
+                    PythonExecutable expects the path to be absolute. Tools like Pex internalize the
+                    absolute path to Python (since `sys.executable` is expected to be absolute).
+
+                    In order to ensure the cache key for Python process is "correct" (especially in
+                    remote cache/execution situations) we require the Python path is absolute.
+
+                    Got: {self.path}
+                    """
+                )
+            )
 
     def message(self) -> str:
         return f"Selected {self.path} to run PEXes with."

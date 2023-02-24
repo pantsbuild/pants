@@ -53,17 +53,30 @@ from pants.core.util_rules.system_binaries import BashBinary
 from pants.engine.addresses import UnparsedAddressInputs
 from pants.engine.collection import Collection, DeduplicatedCollection
 from pants.engine.engine_aware import EngineAwareParameter
+from pants.engine.environment import EnvironmentName
 from pants.engine.fs import EMPTY_DIGEST, AddPrefix, CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.internals.native_engine import Snapshot
 from pants.engine.internals.selectors import MultiGet
 from pants.engine.process import Process, ProcessCacheScope, ProcessResult
 from pants.engine.rules import Get, collect_rules, rule, rule_helper
 from pants.engine.target import HydratedSources, HydrateSourcesRequest, SourcesField, Targets
+from pants.engine.unions import UnionMembership, union
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
-from pants.util.strutil import pluralize, softwrap
+from pants.util.strutil import bullet_list, pluralize, softwrap
 
 logger = logging.getLogger(__name__)
+
+
+@union(in_scope_types=[EnvironmentName])
+@dataclass(frozen=True)
+class PythonProvider:
+    """Union which should have 0 or 1 implementations registered which provide Python.
+
+    Subclasses should provide a rule from their subclass type to `PythonExecutable`.
+    """
+
+    interpreter_constraints: InterpreterConstraints
 
 
 class PexPlatforms(DeduplicatedCollection[str]):
@@ -307,7 +320,27 @@ async def find_interpreter(
     interpreter_constraints: InterpreterConstraints,
     pex_subsystem: PexSubsystem,
     env_target: EnvironmentTarget,
+    union_membership: UnionMembership,
 ) -> PythonExecutable:
+    python_providers = union_membership.get(PythonProvider)
+    if len(python_providers) > 1:
+        raise ValueError(
+            softwrap(
+                f"""
+                Too many Python provider plugins were registered. We expected 0 or 1, but found
+                {len(python_providers)}. Providers were:
+
+                {bullet_list(repr(provider.__class__) for provider in python_providers)}
+                """
+            )
+        )
+    if python_providers:
+        python_provider = next(iter(python_providers))
+        python = await Get(
+            PythonExecutable, PythonProvider, python_provider(interpreter_constraints)
+        )
+        return python
+
     formatted_constraints = " OR ".join(str(constraint) for constraint in interpreter_constraints)
     result = await Get(
         ProcessResult,
@@ -805,6 +838,7 @@ class VenvScriptWriter:
 @dataclass(frozen=True)
 class VenvPex:
     digest: Digest
+    append_only_caches: FrozenDict[str, str] | None
     pex_filename: str
     pex: Script
     python: Script
@@ -921,9 +955,13 @@ async def create_venv_pex(
         ),
     )
     input_digest = await Get(Digest, MergeDigests((venv_script_writer.pex.digest, scripts_digest)))
+    append_only_caches = (
+        venv_pex_result.python.append_only_caches if venv_pex_result.python else None
+    )
 
     return VenvPex(
         digest=input_digest,
+        append_only_caches=append_only_caches,
         pex_filename=venv_pex_result.pex_filename,
         pex=pex.script,
         python=python.script,
@@ -996,6 +1034,7 @@ async def setup_pex_process(request: PexProcess, pex_environment: PexEnvironment
         if request.input_digest
         else pex.digest
     )
+    append_only_caches = request.pex.python.append_only_caches if request.pex.python else {}
     return Process(
         argv,
         description=request.description,
@@ -1005,7 +1044,10 @@ async def setup_pex_process(request: PexProcess, pex_environment: PexEnvironment
         env=env,
         output_files=request.output_files,
         output_directories=request.output_directories,
-        append_only_caches=complete_pex_env.append_only_caches,
+        append_only_caches={
+            **complete_pex_env.append_only_caches,
+            **append_only_caches,
+        },
         timeout_seconds=request.timeout_seconds,
         execution_slot_variable=request.execution_slot_variable,
         concurrency_available=request.concurrency_available,
@@ -1087,6 +1129,7 @@ async def setup_venv_pex_process(
             working_directory=request.working_directory
         ).append_only_caches,
         **request.append_only_caches,
+        **venv_pex.append_only_caches,
     )
     return Process(
         argv=argv,
