@@ -103,7 +103,7 @@ async def get_python(
             # they should list a more precise IC.
         ),
     )
-    specific_python = which_python_result.stdout.decode("ascii").strip()
+    specific_python = which_python_result.stdout.decode().strip()
 
     shim_digest = await Get(
         Digest,
