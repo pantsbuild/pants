@@ -24,13 +24,11 @@ def restore_forward_ref() -> None:
 
 # We are not supposed to subclass this... but we want to support | annotations.
 class ForwardRefPatched(typing.ForwardRef, _root=True):  # type: ignore[call-arg, misc]
-    def __init__(self, arg, *args, is_class=False, **kwargs):
+    def __init__(self, arg, *args, **kwargs):
         unionised_arg = _translate_piped_types_to_union(arg)
-        if unionised_arg != arg:
-            is_class = True
-        super().__init__(unionised_arg, *args, is_class=is_class, **kwargs)
+        super().__init__(unionised_arg, *args, **kwargs)
 
     def _evaluate(self, globalns, localns, recursive_guard):
-        if self.__forward_is_class__ and globalns and "Union" not in globalns:
+        if globalns and "Union" not in globalns:
             globalns["Union"] = typing.Union
         return super()._evaluate(globalns, localns, recursive_guard)
