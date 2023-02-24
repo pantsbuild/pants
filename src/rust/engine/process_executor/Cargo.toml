@@ -22,3 +22,4 @@ store = { path = "../fs/store" }
 task_executor = { path = "../task_executor" }
 tokio = { version = "1.21", features = ["rt-multi-thread", "macros"] }
 workunit_store = { path = "../workunit_store"}
+remote = { path = "../process_execution/remote"}

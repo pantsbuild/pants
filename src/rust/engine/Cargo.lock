@@ -811,6 +811,40 @@ dependencies = [
 ]
 
 [[package]]
+name = "docker"
+version = "0.0.1"
+dependencies = [
+ "async-lock",
+ "async-oncecell",
+ "async-stream",
+ "async-trait",
+ "bollard",
+ "bollard-stubs",
+ "bytes",
+ "env_logger",
+ "fs",
+ "futures",
+ "hashing",
+ "log",
+ "maplit",
+ "mock",
+ "nails",
+ "once_cell",
+ "parking_lot 0.12.1",
+ "process_execution",
+ "sharded_lmdb",
+ "spectral",
+ "store",
+ "task_executor",
+ "tempfile",
+ "testutil",
+ "tokio",
+ "tokio-rustls 0.23.4",
+ "tokio-util 0.7.4",
+ "workunit_store",
+]
+
+[[package]]
 name = "either"
 version = "1.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -845,6 +879,7 @@ dependencies = [
  "crossbeam-channel",
  "deepsize",
  "derivative",
+ "docker",
  "env_logger",
  "fnv",
  "fs",
@@ -865,6 +900,7 @@ dependencies = [
  "nailgun",
  "num_enum",
  "parking_lot 0.12.1",
+ "pe_nailgun",
  "petgraph",
  "process_execution",
  "protos",
@@ -872,6 +908,7 @@ dependencies = [
  "pyo3-build-config 0.17.2",
  "rand 0.8.5",
  "regex",
+ "remote",
  "reqwest",
  "rule_graph",
  "serde_json",
@@ -2163,6 +2200,37 @@ dependencies = [
 ]
 
 [[package]]
+name = "pe_nailgun"
+version = "0.0.1"
+dependencies = [
+ "async-lock",
+ "async-stream",
+ "async-trait",
+ "env_logger",
+ "futures",
+ "hashing",
+ "itertools",
+ "lazy_static",
+ "log",
+ "maplit",
+ "mock",
+ "nails",
+ "parking_lot 0.12.1",
+ "process_execution",
+ "regex",
+ "sharded_lmdb",
+ "spectral",
+ "store",
+ "task_executor",
+ "tempfile",
+ "testutil",
+ "tokio",
+ "tokio-rustls 0.23.4",
+ "tokio-util 0.7.4",
+ "workunit_store",
+]
+
+[[package]]
 name = "peg"
 version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2349,13 +2417,12 @@ dependencies = [
  "async-stream",
  "async-trait",
  "bincode",
- "bollard",
- "bollard-stubs",
  "bytes",
  "cache",
  "concrete_time",
  "deepsize",
  "derivative",
+ "env_logger",
  "fs",
  "futures",
  "grpc_util",
@@ -2389,7 +2456,6 @@ dependencies = [
  "tokio",
  "tokio-rustls 0.23.4",
  "tokio-util 0.7.4",
- "tonic",
  "tryfuture",
  "uname",
  "uuid",
@@ -2412,6 +2478,7 @@ dependencies = [
  "process_execution",
  "prost",
  "protos",
+ "remote",
  "shlex",
  "store",
  "task_executor",
@@ -2729,6 +2796,48 @@ name = "regex-syntax"
 version = "0.6.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a3f87b73ce11b1619a3c6332f45341e0047173771e8b8b73f87bfeefb7b56244"
+
+[[package]]
+name = "remote"
+version = "0.0.1"
+dependencies = [
+ "async-lock",
+ "async-oncecell",
+ "async-stream",
+ "async-trait",
+ "bytes",
+ "concrete_time",
+ "derivative",
+ "env_logger",
+ "fs",
+ "futures",
+ "grpc_util",
+ "hashing",
+ "libc",
+ "log",
+ "maplit",
+ "mock",
+ "once_cell",
+ "parking_lot 0.12.1",
+ "process_execution",
+ "prost",
+ "prost-types",
+ "protos",
+ "rand 0.8.5",
+ "sharded_lmdb",
+ "spectral",
+ "store",
+ "strum",
+ "strum_macros",
+ "task_executor",
+ "tempfile",
+ "testutil",
+ "tokio",
+ "tokio-rustls 0.23.4",
+ "tokio-util 0.7.4",
+ "tonic",
+ "workunit_store",
+]
 
 [[package]]
 name = "remove_dir_all"
@@ -3364,10 +3473,11 @@ dependencies = [
 
 [[package]]
 name = "thread_local"
-version = "1.1.3"
+version = "1.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8018d24e04c95ac8790716a5987d0fec4f8b27249ffa0f7d33f1369bdfb88cbd"
+checksum = "3fdd6f064ccff2d6567adcb3873ca630700f00b5ad3f060c25b5dcfd9a4ce152"
 dependencies = [
+ "cfg-if 1.0.0",
  "once_cell",
 ]
 

@@ -102,12 +102,12 @@ image: example.com/registry/my-app:latest
 apiVersion: v1
 kind: Pod
 metadata:
-  name: my_pod
+  name: my-pod
   labels:
     chart: "{{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}"
 spec:
   containers:
-    - name: my_app
+    - name: my-app
       # Uses the `image` value entry from the deployment inputs
       image: {{ .Values.image }}
 ```

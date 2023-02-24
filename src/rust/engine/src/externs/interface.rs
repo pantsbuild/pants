@@ -29,7 +29,7 @@ use log::{self, debug, error, warn, Log};
 use logging::logger::PANTS_LOGGER;
 use logging::{Logger, PythonLogLevel};
 use petgraph::graph::{DiGraph, Graph};
-use process_execution::{CacheContentBehavior, RemoteCacheWarningsBehavior};
+use process_execution::CacheContentBehavior;
 use pyo3::exceptions::{PyException, PyIOError, PyKeyboardInterrupt, PyValueError};
 use pyo3::prelude::{
   pyclass, pyfunction, pymethods, pymodule, wrap_pyfunction, PyModule, PyObject,
@@ -38,6 +38,7 @@ use pyo3::prelude::{
 use pyo3::types::{PyBytes, PyDict, PyList, PyTuple, PyType};
 use pyo3::{create_exception, IntoPy, PyAny, PyRef};
 use regex::Regex;
+use remote::remote_cache::RemoteCacheWarningsBehavior;
 use rule_graph::{self, DependencyKey, RuleGraph};
 use task_executor::Executor;
 use workunit_store::{

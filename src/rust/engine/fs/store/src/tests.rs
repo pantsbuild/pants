@@ -121,7 +121,12 @@ async fn load_file_prefers_local() {
   let testdata = TestData::roland();
 
   crate::local_tests::new_store(dir.path())
-    .store_bytes(EntryType::File, None, testdata.bytes(), false)
+    .store_bytes(
+      EntryType::File,
+      testdata.fingerprint(),
+      testdata.bytes(),
+      false,
+    )
     .await
     .expect("Store failed");
 
@@ -140,7 +145,12 @@ async fn load_directory_prefers_local() {
   let testdir = TestDirectory::containing_roland();
 
   crate::local_tests::new_store(dir.path())
-    .store_bytes(EntryType::Directory, None, testdir.bytes(), false)
+    .store_bytes(
+      EntryType::Directory,
+      testdir.fingerprint(),
+      testdir.bytes(),
+      false,
+    )
     .await
     .expect("Store failed");
 

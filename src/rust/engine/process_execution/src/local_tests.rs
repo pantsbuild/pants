@@ -757,7 +757,7 @@ async fn prepare_workdir_exclusive_relative() {
   .await
   .unwrap();
 
-  assert_eq!(exclusive_spawn, true);
+  assert!(exclusive_spawn);
 }
 
 pub(crate) fn named_caches_and_immutable_inputs(

@@ -20,11 +20,12 @@ use store::Store;
 use testutil::data::{TestData, TestDirectory, TestTree};
 use workunit_store::{RunId, RunningWorkunit, WorkunitStore};
 
-use crate::remote::{ensure_action_stored_locally, make_execute_request, EntireExecuteRequest};
-use crate::{
-  CacheContentBehavior, CommandRunner as CommandRunnerTrait, Context,
-  FallibleProcessResultWithPlatform, Platform, Process, ProcessCacheScope, ProcessError,
-  ProcessResultMetadata, ProcessResultSource, RemoteCacheWarningsBehavior,
+use crate::remote::ensure_action_stored_locally;
+use crate::remote_cache::RemoteCacheWarningsBehavior;
+use process_execution::{
+  make_execute_request, CacheContentBehavior, CommandRunner as CommandRunnerTrait, Context,
+  EntireExecuteRequest, FallibleProcessResultWithPlatform, Platform, Process, ProcessCacheScope,
+  ProcessError, ProcessResultMetadata, ProcessResultSource,
 };
 
 const CACHE_READ_TIMEOUT: Duration = Duration::from_secs(5);

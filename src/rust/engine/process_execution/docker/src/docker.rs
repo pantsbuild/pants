@@ -26,11 +26,11 @@ use store::{ImmutableInputs, Store};
 use task_executor::Executor;
 use workunit_store::{in_workunit, Metric, RunningWorkunit};
 
-use crate::local::{
+use process_execution::local::{
   apply_chroot, collect_child_outputs, create_sandbox, prepare_workdir, setup_run_sh_script,
   CapturedWorkdir, ChildOutput, KeepSandboxes,
 };
-use crate::{
+use process_execution::{
   Context, FallibleProcessResultWithPlatform, NamedCaches, Platform, Process, ProcessError,
   ProcessExecutionStrategy,
 };
@@ -312,7 +312,7 @@ impl fmt::Debug for CommandRunner<'_> {
 }
 
 #[async_trait]
-impl<'a> super::CommandRunner for CommandRunner<'a> {
+impl<'a> process_execution::CommandRunner for CommandRunner<'a> {
   async fn run(
     &self,
     context: Context,
@@ -660,7 +660,7 @@ type CachedContainer = Arc<OnceCell<(String, NamedCaches)>>;
 
 /// Caches running containers so that build actions can be invoked by running "executions"
 /// within those cached containers.
-struct ContainerCache<'a> {
+pub(crate) struct ContainerCache<'a> {
   docker: &'a DockerOnceCell,
   image_pull_cache: &'a ImagePullCache,
   work_dir_base: String,
