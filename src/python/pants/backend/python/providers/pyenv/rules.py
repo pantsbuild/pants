@@ -64,7 +64,7 @@ class PyenvSubsystem(TemplatedExternalTool):
         return f"./pyenv-{self.version}/bin/pyenv"
 
 
-class PythonToolchainRequest(PythonProvider):
+class PyenvPythonProvider(PythonProvider):
     pass
 
 
@@ -74,7 +74,7 @@ PYENV_APPEND_ONLY_CACHES = FrozenDict({"pyenv": PYENV_NAMED_CACHE})
 
 @rule
 async def get_python(
-    request: PythonToolchainRequest,
+    request: PyenvPythonProvider,
     python_setup: PythonSetup,
     platform: Platform,
     pyenv_subsystem: PyenvSubsystem,
@@ -129,7 +129,7 @@ async def get_python(
                         fi
                         echo "$DEST"/bin/python
                         """
-                    ).encode("ascii"),
+                    ).encode(),
                     is_executable=True,
                 )
             ]
@@ -144,7 +144,7 @@ async def get_python(
     #   fastest-yet-still-correct solution is to always run this process and make it bail
     #   early-and-quickly if the requisite Python already exists.
     #   2. Pyenv compiles Python using whatever compiler the system is configured to use. Python
-    #   then stores this information so that it cn use the same compiler when compiling extension
+    #   then stores this information so that it can use the same compiler when compiling extension
     #   modules. Therefore caching the compiled Python is somewhat unsafe (especially for a remote
     #   cache).
     result = await Get(
@@ -168,7 +168,7 @@ async def get_python(
     )
 
     return PythonExecutable(
-        path=result.stdout.decode("utf-8").splitlines()[-1].strip(),
+        path=result.stdout.decode().splitlines()[-1].strip(),
         fingerprint=None,
         append_only_caches=PYENV_APPEND_ONLY_CACHES,
     )
@@ -179,5 +179,5 @@ def rules():
         *collect_rules(),
         *pex_rules(),
         *external_tools_rules(),
-        UnionRule(PythonProvider, PythonToolchainRequest),
+        UnionRule(PythonProvider, PyenvPythonProvider),
     )
