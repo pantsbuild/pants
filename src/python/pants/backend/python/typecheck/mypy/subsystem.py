@@ -44,7 +44,7 @@ from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.lockfile_metadata import calculate_invalidation_digest
 from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.fs import EMPTY_DIGEST, Digest, DigestContents, FileContent
-from pants.engine.rules import Get, collect_rules, rule, rule_helper
+from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import (
     AllTargets,
     AllTargetsRequest,
@@ -221,8 +221,8 @@ class MyPy(PythonToolBase):
             requirements = PexRequirements(self.extra_type_stubs)
         else:
             tool_lockfile = Lockfile(
-                file_path=self.extra_type_stubs_lockfile,
-                file_path_description_of_origin=(
+                url=self.extra_type_stubs_lockfile,
+                url_description_of_origin=(
                     f"the option `[{self.options_scope}].extra_type_stubs_lockfile`"
                 ),
                 lockfile_hex_digest=calculate_invalidation_digest(self.extra_type_stubs),
@@ -348,7 +348,6 @@ async def mypy_first_party_plugins(
 # --------------------------------------------------------------------------------------
 
 
-@rule_helper
 async def _mypy_interpreter_constraints(
     mypy: MyPy, python_setup: PythonSetup
 ) -> InterpreterConstraints:

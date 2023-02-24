@@ -37,7 +37,6 @@ from pants.backend.python.util_rules.pex_requirements import (
     EntireLockfile,
     LoadedLockfile,
     LoadedLockfileRequest,
-    Lockfile,
 )
 from pants.backend.python.util_rules.pex_requirements import (
     PexRequirements as PexRequirements,  # Explicit re-export.
@@ -58,7 +57,7 @@ from pants.engine.fs import EMPTY_DIGEST, AddPrefix, CreateDigest, Digest, FileC
 from pants.engine.internals.native_engine import Snapshot
 from pants.engine.internals.selectors import MultiGet
 from pants.engine.process import Process, ProcessCacheScope, ProcessResult
-from pants.engine.rules import Get, collect_rules, rule, rule_helper
+from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import HydratedSources, HydrateSourcesRequest, SourcesField, Targets
 from pants.engine.unions import UnionMembership, union
 from pants.util.frozendict import FrozenDict
@@ -408,7 +407,6 @@ class _BuildPexPythonSetup:
     argv: list[str]
 
 
-@rule_helper
 async def _determine_pex_python_and_platforms(request: PexRequest) -> _BuildPexPythonSetup:
     # NB: If `--platform` is specified, this signals that the PEX should not be built locally.
     # `--interpreter-constraint` only makes sense in the context of building locally. These two
@@ -449,7 +447,6 @@ class _BuildPexRequirementsSetup:
     concurrency_available: int
 
 
-@rule_helper
 async def _setup_pex_requirements(
     request: PexRequest, python_setup: PythonSetup
 ) -> _BuildPexRequirementsSetup:
@@ -650,10 +647,7 @@ def _build_pex_description(request: PexRequest) -> str:
 
     if isinstance(request.requirements, EntireLockfile):
         lockfile = request.requirements.lockfile
-        if isinstance(lockfile, Lockfile):
-            desc_suffix = f"from {lockfile.file_path}"
-        else:
-            desc_suffix = f"from {lockfile.file_content.path}"
+        desc_suffix = f"from {lockfile.url}"
     else:
         if not request.requirements.req_strings:
             return f"Building {request.output_filename}"

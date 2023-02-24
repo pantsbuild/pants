@@ -42,7 +42,7 @@ from pants.engine.fs import (
 from pants.engine.internals.native_engine import EMPTY_DIGEST, Digest, MergeDigests
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import FallibleProcessResult, Process, ProcessResult
-from pants.engine.rules import collect_rules, rule, rule_helper
+from pants.engine.rules import collect_rules, rule
 from pants.util.logging import LogLevel
 
 _logger = logging.getLogger(__name__)
@@ -326,7 +326,6 @@ async def make_cgo_compile_wrapper_script(
     return CGoCompilerWrapperScript(digest=digest)
 
 
-@rule_helper
 async def _cc(
     binary_name: str,
     input_digest: Digest,
@@ -375,7 +374,6 @@ async def _cc(
     )
 
 
-@rule_helper
 async def _gccld(
     binary_name: str,
     input_digest: Digest,
@@ -451,7 +449,6 @@ class _DynImportResult:
 # see https://github.com/golang/go/blob/f28fa952b5f81a63afd96c9c58dceb99cc7d1dbf/src/cmd/go/internal/work/exec.go#L3020
 #
 # Note: Commented-out Go code remains in this function because it was not clear yet how to adapt that code.
-@rule_helper
 async def _dynimport(
     import_path: str,
     input_digest: Digest,
@@ -640,7 +637,6 @@ def _check_link_args_in_content(src: bytes):
     check_linker_flags(flags, "go:cgo_ldflag")
 
 
-@rule_helper
 async def _ensure_only_allowed_link_args(
     digest: Digest, dir_path: str, go_files: Iterable[str]
 ) -> None:

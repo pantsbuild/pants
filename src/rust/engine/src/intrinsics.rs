@@ -20,7 +20,6 @@ use crate::tasks::Intrinsic;
 use crate::types::Types;
 use crate::Failure;
 
-use bytes::Bytes;
 use futures::future::{BoxFuture, FutureExt, TryFutureExt};
 use futures::try_join;
 use indexmap::IndexMap;
@@ -28,9 +27,9 @@ use pyo3::types::PyString;
 use pyo3::{PyAny, PyRef, Python, ToPyObject};
 use tokio::process;
 
+use docker::docker::{ImagePullPolicy, ImagePullScope, DOCKER, IMAGE_PULL_CACHE};
 use fs::{DigestTrie, DirectoryDigest, RelativePath, TypedPath};
 use hashing::{Digest, EMPTY_DIGEST};
-use process_execution::docker::{ImagePullPolicy, ImagePullScope, DOCKER, IMAGE_PULL_CACHE};
 use process_execution::local::{
   apply_chroot, create_sandbox, prepare_workdir, setup_run_sh_script, KeepSandboxes,
 };
@@ -441,13 +440,13 @@ fn create_digest_to_digest(
 
   let mut typed_paths: Vec<TypedPath> = Vec::with_capacity(items.len());
   let mut file_digests: HashMap<PathBuf, Digest> = HashMap::with_capacity(items.len());
-  let mut bytes_to_store: Vec<(Option<Digest>, Bytes)> = Vec::with_capacity(new_file_count);
+  let mut items_to_store = Vec::with_capacity(new_file_count);
 
   for item in &items {
     match item {
       CreateDigestItem::FileContent(path, bytes, is_executable) => {
         let digest = Digest::of_bytes(bytes);
-        bytes_to_store.push((Some(digest), bytes.clone()));
+        items_to_store.push((digest.hash, bytes.clone()));
         typed_paths.push(TypedPath::File {
           path,
           is_executable: *is_executable,
@@ -475,8 +474,7 @@ fn create_digest_to_digest(
   let store = context.core.store();
   let trie = DigestTrie::from_unique_paths(typed_paths, &file_digests).unwrap();
   async move {
-    // The digests returned here are already in the `file_digests` map.
-    let _ = store.store_file_bytes_batch(bytes_to_store, true).await?;
+    store.store_file_bytes_batch(items_to_store, true).await?;
     let gil = Python::acquire_gil();
     let value = Snapshot::store_directory_digest(gil.python(), trie.into())?;
     Ok(value)

@@ -42,7 +42,7 @@ from pants.engine.process import (
     InteractiveProcessResult,
     ProcessResultMetadata,
 )
-from pants.engine.rules import Effect, Get, MultiGet, collect_rules, goal_rule, rule, rule_helper
+from pants.engine.rules import Effect, Get, MultiGet, collect_rules, goal_rule, rule
 from pants.engine.target import (
     FieldSet,
     FieldSetsPerTarget,
@@ -688,7 +688,6 @@ class TestExtraEnvVarsField(StringSequenceField, metaclass=ABCMeta):
     )
 
 
-@rule_helper
 async def _get_test_batches(
     core_request_types: Iterable[type[TestRequest]],
     targets_to_field_sets: TargetRootsToFieldSets,
@@ -731,7 +730,6 @@ async def _get_test_batches(
     ]
 
 
-@rule_helper
 async def _run_debug_tests(
     batches: Iterable[TestRequest.Batch],
     test_subsystem: TestSubsystem,

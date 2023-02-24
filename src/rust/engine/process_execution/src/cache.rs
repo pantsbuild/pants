@@ -79,7 +79,7 @@ impl crate::CommandRunner for CommandRunner {
     let write_failures_to_cache = req.cache_scope == ProcessCacheScope::Always;
     let key = CacheKey {
       digest: Some(
-        crate::digest(
+        crate::get_digest(
           &req,
           None,
           self.process_cache_namespace.clone(),
@@ -200,7 +200,7 @@ impl CommandRunner {
     // Deserialize the cache entry if it existed.
     let result = if let Some((execute_response, platform)) = maybe_execute_response {
       if let Some(ref action_result) = execute_response.result {
-        crate::remote::populate_fallible_execution_result(
+        crate::populate_fallible_execution_result(
           self.file_store.clone(),
           context.run_id,
           action_result,

@@ -246,3 +246,69 @@ class AdhocToolTarget(Target):
             shell_sources(name="scripts")
         """
     )
+
+
+# ---
+# `system_binary` target
+# ---
+
+
+class SystemBinaryNameField(StringField):
+    alias = "binary_name"
+    required = True
+    help = "The name of the binary to find."
+
+
+class SystemBinaryExtraSearchPathsField(StringSequenceField):
+    alias = "extra_search_paths"
+    default = ()
+    help = help_text(
+        """
+        Extra search paths to look for the binary. These take priority over Pants' default
+        search paths.
+        """
+    )
+
+
+class SystemBinaryFingerprintPattern(StringField):
+    alias = "fingerprint"
+    required = False
+    default = None
+    help = help_text(
+        """
+        A regular expression which will be used to match the fingerprint outputs from
+        candidate binaries found during the search process.
+        """
+    )
+
+
+class SystemBinaryFingerprintArgsField(StringSequenceField):
+    alias = "fingerprint_args"
+    default = ()
+    help = help_text(
+        "Specifies arguments that will be used to run the binary during the search process."
+    )
+
+
+class SystemBinaryTarget(Target):
+    alias = "system_binary"
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        SystemBinaryNameField,
+        SystemBinaryExtraSearchPathsField,
+        SystemBinaryFingerprintPattern,
+        SystemBinaryFingerprintArgsField,
+    )
+    help = help_text(
+        lambda: f"""
+        A system binary that can be run with `pants run` or consumed by `{AdhocToolTarget.alias}`.
+
+        Pants will search for binaries with name `{SystemBinaryNameField.alias}` in the search
+        paths provided, as well as default search paths. If
+        `{SystemBinaryFingerprintPattern.alias}` is specified, each binary that is located will be
+        executed with the arguments from `{SystemBinaryFingerprintArgsField.alias}`. Any binaries
+        whose output does not match the pattern will be excluded.
+
+        The first non-excluded binary will be the one that is resolved.
+        """
+    )

@@ -25,7 +25,7 @@ from pants.core.goals.run import RunDebugAdapterRequest, RunRequest
 from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
 from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests
-from pants.engine.rules import Get, MultiGet, rule_helper
+from pants.engine.rules import Get, MultiGet
 from pants.engine.target import TransitiveTargets, TransitiveTargetsRequest
 from pants.util.frozendict import FrozenDict
 
@@ -34,7 +34,6 @@ def _in_chroot(relpath: str) -> str:
     return os.path.join("{chroot}", relpath)
 
 
-@rule_helper
 async def _create_python_source_run_request(
     address: Address,
     *,
@@ -129,7 +128,6 @@ async def _create_python_source_run_request(
     )
 
 
-@rule_helper
 async def _create_python_source_run_dap_request(
     regular_run_request: RunRequest,
     *,

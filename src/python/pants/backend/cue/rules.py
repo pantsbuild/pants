@@ -7,7 +7,7 @@ from pants.core.util_rules.external_tool import DownloadedExternalTool, External
 from pants.engine.fs import Digest, MergeDigests, Snapshot
 from pants.engine.platform import Platform
 from pants.engine.process import FallibleProcessResult, Process
-from pants.engine.rules import Get, rule_helper
+from pants.engine.rules import Get
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 
@@ -16,7 +16,6 @@ def generate_argv(*args: str, files: tuple[str, ...], cue: Cue) -> tuple[str, ..
     return args + cue.args + files
 
 
-@rule_helper
 async def _run_cue(
     *args: str, cue: Cue, snapshot: Snapshot, platform: Platform, **kwargs
 ) -> FallibleProcessResult:
