@@ -289,7 +289,7 @@ def test_missing_type_annotation() -> None:
         /.*/rule_visitor_test\.py:\d+: Could not resolve type for `request\.bad_meth`
         in module pants\.engine\.internals\.rule_visitor_test\.
 
-        Return type annotation required for `bad_meth` in /.*/rule_visitor_test\.py:\d+
+        Failed to look up return type hint for `bad_meth` in /.*/rule_visitor_test\.py:\d+
         """
     )
     with pytest.raises(RuleTypeError, match=err):
@@ -304,3 +304,15 @@ def test_closure() -> None:
         Get(str, closure_func())
 
     assert_awaitables(myrule, [(str, int)])
+
+
+class McUnion:
+    b: bool
+    v: int | float
+
+
+def test_union_types() -> None:
+    async def somerule(mc: McUnion):
+        Get(str, mc.b)
+
+    assert_awaitables(somerule, [(str, bool)])
