@@ -1034,7 +1034,9 @@ async def setup_pex_process(request: PexProcess, pex_environment: PexEnvironment
         if request.input_digest
         else pex.digest
     )
-    append_only_caches = request.pex.python.append_only_caches if request.pex.python else {}
+    append_only_caches = (
+        request.pex.python.append_only_caches if request.pex.python else FrozenDict({})
+    )
     return Process(
         argv,
         description=request.description,
@@ -1129,7 +1131,7 @@ async def setup_venv_pex_process(
             working_directory=request.working_directory
         ).append_only_caches,
         **request.append_only_caches,
-        **venv_pex.append_only_caches,
+        **(FrozenDict({}) if venv_pex.append_only_caches is None else venv_pex.append_only_caches),
     )
     return Process(
         argv=argv,

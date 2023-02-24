@@ -95,6 +95,16 @@ class PythonExecutable(BinaryPath, EngineAwareReturnType):
 
     append_only_caches: FrozenDict[str, str] = FrozenDict({})
 
+    def __init__(
+        self,
+        path: str,
+        fingerprint: str | None = None,
+        append_only_caches: Mapping[str, str] = FrozenDict({}),
+    ) -> None:
+        super().__init__(path, fingerprint)
+        object.__setattr__(self, "append_only_caches", FrozenDict(append_only_caches))
+        self.__post_init__()
+
     def __post_init__(self) -> None:
         if not PurePath(self.path).is_absolute():
             raise ValueError(

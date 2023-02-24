@@ -1,7 +1,7 @@
 # Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from textwrap import dedent
+from textwrap import dedent  # noqa: PNT20
 
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.util_rules.pex import PythonProvider
@@ -68,7 +68,8 @@ class PythonToolchainRequest(PythonProvider):
     pass
 
 
-PYENV_APPEND_ONLY_CACHES = FrozenDict({"pyenv": ".pyenv"})
+PYENV_NAMED_CACHE = ".pyenv"
+PYENV_APPEND_ONLY_CACHES = FrozenDict({"pyenv": PYENV_NAMED_CACHE})
 
 
 @rule
@@ -78,8 +79,6 @@ async def get_python(
     platform: Platform,
     pyenv_subsystem: PyenvSubsystem,
 ) -> PythonExecutable:
-    pyenv_version = pyenv_subsystem.version
-
     env_vars, pyenv = await MultiGet(
         Get(EnvironmentVars, EnvironmentVarsRequest(["PATH", "LDFLAGS"])),
         Get(DownloadedExternalTool, ExternalToolRequest, pyenv_subsystem.get_request(platform)),
@@ -88,7 +87,10 @@ async def get_python(
     python_to_use = request.interpreter_constraints.minimum_python_version(
         python_setup.interpreter_versions_universe
     )
-    assert python_to_use is not None, "whoopsie"
+    if python_to_use is None:
+        raise ValueError(
+            f"Couldn't determine a compatible Interpreter Constraint from {python_setup.interpreter_versions_universe}"
+        )
 
     which_python_result = await Get(
         ProcessResult,
@@ -113,17 +115,16 @@ async def get_python(
                         f"""\
                         #!/usr/bin/env bash
                         set -e
-                        mkdir .pyenv/{pyenv_version} || true
-                        DEST=$(realpath .pyenv/{pyenv_version}/{specific_python})
+                        DEST=$(realpath {PYENV_NAMED_CACHE}/{specific_python})
                         if [ ! -d "$DEST" ]; then
-                            export PYENV_ROOT=$(realpath $(mktemp -d -u -p .pyenv/{pyenv_version} {specific_python}.XXXXXX))
+                            export PYENV_ROOT=$(realpath $(mktemp -d -u -p {PYENV_NAMED_CACHE} {specific_python}.XXXXXX))
                             # export LDFLAGS="$LDFLAGS -Wl,-rpath=PYENV_ROOT/lib"
                             {pyenv.exe} install {specific_python}
                             # Removing write perms helps ensure users aren't accidentally modifying Python
                             # or the site-packages
                             chmod -R -w "$PYENV_ROOT"/versions/{specific_python}
                             chmod +w "$PYENV_ROOT"/versions/{specific_python}
-                            ln -s "$PYENV_ROOT"/versions/{specific_python} .pyenv/{pyenv_version}/{specific_python}
+                            ln -s "$PYENV_ROOT"/versions/{specific_python} {PYENV_NAMED_CACHE}/{specific_python}
                             rm -rf "$PYENV_ROOT"/shims
                         fi
                         echo "$DEST"/bin/python

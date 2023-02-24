@@ -195,7 +195,7 @@ async def setup_pex_cli_process(
         # If a subcommand is used, we need to use the `pex3` console script.
         **({"PEX_SCRIPT": "pex3"} if request.subcommand else {}),
     }
-    append_only_caches = request.python.append_only_caches if request.python else {}
+    append_only_caches = request.python.append_only_caches if request.python else FrozenDict({})
 
     return Process(
         normalized_argv,

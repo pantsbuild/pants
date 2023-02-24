@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import shutil
 from textwrap import dedent
-from typing import Tuple
 
 import pytest
 
@@ -42,7 +41,7 @@ def rule_runner() -> RuleRunner:
 def run_run_request(
     rule_runner: RuleRunner,
     target: Target,
-) -> Tuple[int, str, str]:
+) -> str:
     args = [
         "--backend-packages=['pants.backend.python', 'pants.backend.python.providers.pyenv']",
         "--source-root-patterns=['src']",
@@ -58,11 +57,8 @@ def run_run_request(
         append_only_caches=run_request.append_only_caches,
     )
     with mock_console(rule_runner.options_bootstrapper) as mocked_console:
-        result = rule_runner.run_interactive_process(run_process)
-        stdout = mocked_console[1].get_stdout()
-        stderr = mocked_console[1].get_stderr()
-
-    return result.exit_code, stdout.strip(), stderr.strip()
+        rule_runner.run_interactive_process(run_process)
+        return mocked_console[1].get_stdout().strip()
 
 
 @pytest.mark.parametrize("py_version", ["==2.7.*", "==3.9.*"])
@@ -82,7 +78,7 @@ def test_using_pyenv(rule_runner, py_version):
     )
 
     target = rule_runner.get_target(Address("src", relative_file_path="app.py"))
-    _1, stdout, _2 = run_run_request(rule_runner, target)
+    stdout = run_run_request(rule_runner, target)
     named_caches_dir = (
         rule_runner.options_bootstrapper.bootstrap_options.for_global_scope().named_caches_dir
     )
@@ -93,7 +89,7 @@ def test_venv_pex_reconstruction(rule_runner):
     """A VenvPex refers to the location of the venv so it doesn't have to re-construct if it exists.
 
     Part of this location is a hash of the interpreter. Without careful consideration it can be easy
-    for this hash to drift from build-time to run-time. This invalidates the assumption that the
+    for this hash to drift from build-time to run-time. This test validates the assumption that the
     venv could be reconstructed exactly if the underlying directory was wiped clean.
     """
     rule_runner.write_files(
@@ -114,9 +110,9 @@ def test_venv_pex_reconstruction(rule_runner):
     )
 
     target = rule_runner.get_target(Address("src", relative_file_path="app.py"))
-    _1, stdout1, _2 = run_run_request(rule_runner, target)
+    stdout1 = run_run_request(rule_runner, target)
     assert "pex_root/venvs/" in stdout1
     venv_location = stdout1
     shutil.rmtree(venv_location)
-    _1, stdout2, _2 = run_run_request(rule_runner, target)
+    stdout2 = run_run_request(rule_runner, target)
     assert stdout1 == stdout2
