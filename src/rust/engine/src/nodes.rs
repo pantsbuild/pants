@@ -301,7 +301,7 @@ impl ExecuteProcess {
   ) -> Result<InputDigests, StoreError> {
     let input_digests_fut: Result<_, String> = Python::with_gil(|py| {
       let value = (**value).as_ref(py);
-      let input_files = lift_directory_digest(externs::getattr(value, "input_digest").unwrap())
+      let input_files = lift_directory_digest(externs::getattr(value, "input_digest").map_err(|err| format!("Error retrieving `input_digest`: {err}"))?)
         .map_err(|err| format!("Error parsing input_digest {err}"))?;
       let immutable_inputs =
         externs::getattr_from_str_frozendict::<&PyAny>(value, "immutable_input_digests")
@@ -309,7 +309,7 @@ impl ExecuteProcess {
           .map(|(path, digest)| Ok((RelativePath::new(path)?, lift_directory_digest(digest)?)))
           .collect::<Result<BTreeMap<_, _>, String>>()?;
       let use_nailgun = externs::getattr::<Vec<String>>(value, "use_nailgun")
-        .unwrap()
+        .map_err(|err| format!("Failed to get value `use_nailgun`: {err}"))?
         .into_iter()
         .map(RelativePath::new)
         .collect::<Result<BTreeSet<_>, _>>()?;
@@ -340,18 +340,19 @@ impl ExecuteProcess {
       .transpose()?;
 
     let output_files = externs::getattr::<Vec<String>>(value, "output_files")
-      .unwrap()
+      .map_err(|err| format!("Failed to get field `output_files`: {err}"))?
       .into_iter()
       .map(RelativePath::new)
       .collect::<Result<_, _>>()?;
 
     let output_directories = externs::getattr::<Vec<String>>(value, "output_directories")
-      .unwrap()
+      .map_err(|err| format!("Failed to get field `output_directories`: {err}"))?
       .into_iter()
       .map(RelativePath::new)
       .collect::<Result<_, _>>()?;
 
-    let timeout_in_seconds: f64 = externs::getattr(value, "timeout_seconds").unwrap();
+    let timeout_in_seconds: f64 = externs::getattr(value, "timeout_seconds")
+      .map_err(|err| format!("Failed to get field `timeout_seconds`: {err}"))?;
 
     let timeout = if timeout_in_seconds < 0.0 {
       None
@@ -359,8 +360,12 @@ impl ExecuteProcess {
       Some(Duration::from_millis((timeout_in_seconds * 1000.0) as u64))
     };
 
-    let description: String = externs::getattr(value, "description").unwrap();
-    let py_level = externs::getattr(value, "level").unwrap();
+    let description: String = externs::getattr(value, "description")
+      .map_err(|err| format!("Failed to get field `description`: {err}"))?;
+
+    let py_level = externs::getattr(value, "level")
+      .map_err(|err| format!("Failed to get field `level`: {err}"))?;
+
     let level = externs::val_to_log_level(py_level)?;
 
     let append_only_caches =
@@ -377,17 +382,21 @@ impl ExecuteProcess {
       externs::getattr_as_optional_string(value, "execution_slot_variable")
         .map_err(|e| format!("Failed to get `execution_slot_variable` for field: {e}"))?;
 
-    let concurrency_available: usize = externs::getattr(value, "concurrency_available").unwrap();
+    let concurrency_available: usize = externs::getattr(value, "concurrency_available")
+        .map_err(|e| format!("Failed to get `concurrency_available` for field: {e}"))?;
+
 
     let cache_scope: ProcessCacheScope = {
-      let cache_scope_enum = externs::getattr(value, "cache_scope").unwrap();
+      let cache_scope_enum = externs::getattr(value, "cache_scope")
+        .map_err(|e| format!("Failed to get `cache_scope` for field: {e}"))?;
       externs::getattr::<String>(cache_scope_enum, "name")
-        .unwrap()
+        .map_err(|e| format!("Failed to get `name` for field: {e}"))?
         .try_into()?
     };
 
     let remote_cache_speculation_delay = std::time::Duration::from_millis(
-      externs::getattr::<i32>(value, "remote_cache_speculation_delay_millis").unwrap() as u64,
+      externs::getattr::<i32>(value, "remote_cache_speculation_delay_millis")
+        .map_err(|e| format!("Failed to get `name` for field: {e}"))? as u64
     );
 
     Ok(Process {
@@ -407,7 +416,7 @@ impl ExecuteProcess {
       concurrency_available,
       cache_scope,
       execution_strategy: process_config.execution_strategy,
-      remote_cache_speculation_delay: remote_cache_speculation_delay,
+      remote_cache_speculation_delay,
     })
   }
 
@@ -773,17 +782,27 @@ impl Snapshot {
   }
 
   pub fn lift_path_globs(item: &PyAny) -> Result<PathGlobs, String> {
-    let globs: Vec<String> = externs::getattr(item, "globs").unwrap();
+    let globs: Vec<String> = externs::getattr(item, "globs")
+      .map_err(|e| format!("Failed to get `globs` for field: {e}"))?;
+
     let description_of_origin = externs::getattr_as_optional_string(item, "description_of_origin")
       .map_err(|e| format!("Failed to get `description_of_origin` for field: {e}"))?;
 
-    let glob_match_error_behavior = externs::getattr(item, "glob_match_error_behavior").unwrap();
-    let failure_behavior: String = externs::getattr(glob_match_error_behavior, "value").unwrap();
+    let glob_match_error_behavior = externs::getattr(item, "glob_match_error_behavior")
+      .map_err(|e| format!("Failed to get `glob_match_error_behavior` for field: {e}"))?;
+
+    let failure_behavior: String = externs::getattr(glob_match_error_behavior, "value")
+      .map_err(|e| format!("Failed to get `value` for field: {e}"))?;
+
     let strict_glob_matching =
       StrictGlobMatching::create(failure_behavior.as_str(), description_of_origin)?;
 
-    let conjunction_obj = externs::getattr(item, "conjunction").unwrap();
-    let conjunction_string: String = externs::getattr(conjunction_obj, "value").unwrap();
+    let conjunction_obj = externs::getattr(item, "conjunction")
+      .map_err(|e| format!("Failed to get `conjunction` for field: {e}"))?;
+
+    let conjunction_string: String = externs::getattr(conjunction_obj, "value")
+      .map_err(|e| format!("Failed to get `value` for field: {e}"))?;
+
     let conjunction = GlobExpansionConjunction::create(&conjunction_string)?;
     Ok(PathGlobs::new(globs, strict_glob_matching, conjunction))
   }
@@ -1013,10 +1032,12 @@ impl DownloadedFile {
     let (url_str, expected_digest, auth_headers) = Python::with_gil(|py| {
       let py_download_file_val = self.0.to_value();
       let py_download_file = (*py_download_file_val).as_ref(py);
-      let url_str: String = externs::getattr(py_download_file, "url").unwrap();
+      let url_str: String = externs::getattr(py_download_file, "url")
+          .map_err(|e| format!("Failed to get `url` for field: {e}"))?;
       let auth_headers = externs::getattr_from_str_frozendict(py_download_file, "auth_headers");
       let py_file_digest: PyFileDigest =
-        externs::getattr(py_download_file, "expected_digest").unwrap();
+        externs::getattr(py_download_file, "expected_digest")
+          .map_err(|e| format!("Failed to get `expected_digest` for field: {e}"))?;
       let res: NodeResult<(String, Digest, BTreeMap<String, String>)> =
         Ok((url_str, py_file_digest.0, auth_headers));
       res
