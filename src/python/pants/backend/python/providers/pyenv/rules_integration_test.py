@@ -57,23 +57,27 @@ def run_run_request(
         append_only_caches=run_request.append_only_caches,
     )
     with mock_console(rule_runner.options_bootstrapper) as mocked_console:
-        rule_runner.run_interactive_process(run_process)
+        exit_code = rule_runner.run_interactive_process(run_process)
+        if exit_code:
+            print(mocked_console[1].get_stderr().strip())
         return mocked_console[1].get_stdout().strip()
 
 
-@pytest.mark.parametrize("py_version", ["==2.7.*", "==3.9.*"])
+@pytest.mark.parametrize("py_version", ["2.7", "3.9"])
 def test_using_pyenv(rule_runner, py_version):
     rule_runner.write_files(
         {
             "src/app.py": dedent(
                 """\
                 import os.path
+                import sys
                 import sysconfig
 
                 print(sysconfig.get_config_var("prefix"))
+                print(sys.version.replace("\\n", " "))
                 """
             ),
-            "src/BUILD": f"python_sources(interpreter_constraints=['{py_version}'])",
+            "src/BUILD": f"python_sources(interpreter_constraints=['=={py_version}.*'])",
         }
     )
 
@@ -82,7 +86,9 @@ def test_using_pyenv(rule_runner, py_version):
     named_caches_dir = (
         rule_runner.options_bootstrapper.bootstrap_options.for_global_scope().named_caches_dir
     )
-    assert stdout.startswith(f"{named_caches_dir}/pyenv")
+    prefix_dir, version = stdout.splitlines()
+    assert prefix_dir.startswith(f"{named_caches_dir}/pyenv")
+    assert py_version in version
 
 
 def test_venv_pex_reconstruction(rule_runner):

@@ -101,8 +101,8 @@ class PythonExecutable(BinaryPath, EngineAwareReturnType):
         fingerprint: str | None = None,
         append_only_caches: Mapping[str, str] = FrozenDict({}),
     ) -> None:
-        super().__init__(path, fingerprint)
         object.__setattr__(self, "append_only_caches", FrozenDict(append_only_caches))
+        super().__init__(path, fingerprint)
         self.__post_init__()
 
     def __post_init__(self) -> None:
