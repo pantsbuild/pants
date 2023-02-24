@@ -35,7 +35,7 @@ from pants.engine.internals.parametrize import (  # noqa: F401
     _TargetParametrizationsRequest as _TargetParametrizationsRequest,
 )
 from pants.engine.internals.target_adaptor import TargetAdaptor, TargetAdaptorRequest
-from pants.engine.rules import Get, MultiGet, collect_rules, rule, rule_helper
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     AllTargets,
     AllTargetsRequest,
@@ -171,7 +171,6 @@ def warn_deprecated_field_type(field_type: type[Field]) -> None:
     )
 
 
-@rule_helper
 async def _determine_target_adaptor_and_type(
     address: Address, registered_target_types: RegisteredTargetTypes, *, description_of_origin: str
 ) -> tuple[TargetAdaptor, type[Target]]:
@@ -1133,7 +1132,6 @@ async def determine_explicitly_provided_dependencies(
     )
 
 
-@rule_helper
 async def _fill_parameters(
     field_alias: str,
     consumer_tgt: Target,

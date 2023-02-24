@@ -63,12 +63,12 @@ class BuildSystem:
     build_backend: str
 
     @classmethod
-    def legacy(cls, setuptools: Setuptools) -> BuildSystem:
-        return cls(setuptools.pex_requirements(), "setuptools.build_meta:__legacy__")
+    def legacy(cls, _setuptools: Setuptools) -> BuildSystem:
+        return cls(_setuptools.pex_requirements(), "setuptools.build_meta:__legacy__")
 
 
 @rule
-async def find_build_system(request: BuildSystemRequest, setuptools: Setuptools) -> BuildSystem:
+async def find_build_system(request: BuildSystemRequest, _setuptools: Setuptools) -> BuildSystem:
     digest_contents = await Get(
         DigestContents,
         DigestSubset(
@@ -100,7 +100,7 @@ async def find_build_system(request: BuildSystemRequest, setuptools: Setuptools)
     #   the source tree is not using this specification, and tools should revert to the legacy
     #   behaviour of running setup.py."
     if ret is None:
-        ret = BuildSystem.legacy(setuptools)
+        ret = BuildSystem.legacy(_setuptools)
     return ret
 
 

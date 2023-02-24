@@ -19,7 +19,6 @@ from pants.core.goals.generate_lockfiles import DEFAULT_TOOL_LOCKFILE, NO_TOOL_L
 from pants.core.util_rules.lockfile_metadata import calculate_invalidation_digest
 from pants.engine.fs import Digest
 from pants.engine.internals.selectors import Get
-from pants.engine.rules import rule_helper
 from pants.option.errors import OptionsError
 from pants.option.option_types import BoolOption, StrListOption, StrOption
 from pants.option.subsystem import Subsystem
@@ -289,7 +288,6 @@ class PythonToolBase(PythonToolRequirementsBase):
         )
 
     @staticmethod
-    @rule_helper
     async def _find_python_interpreter_constraints_from_lockfile(
         subsystem: PythonToolBase,
     ) -> InterpreterConstraints:

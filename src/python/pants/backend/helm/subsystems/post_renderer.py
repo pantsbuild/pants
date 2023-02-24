@@ -30,7 +30,7 @@ from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnTyp
 from pants.engine.fs import CreateDigest, Digest, FileContent
 from pants.engine.internals.native_engine import MergeDigests
 from pants.engine.process import Process
-from pants.engine.rules import Get, MultiGet, collect_rules, rule, rule_helper
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import FieldSetsPerTarget, FieldSetsPerTargetRequest, Targets
 from pants.engine.unions import UnionRule
 from pants.util.docutil import git_url
@@ -168,7 +168,6 @@ class HelmPostRenderer(EngineAwareReturnType):
         }
 
 
-@rule_helper
 async def _resolve_post_renderers(
     address_inputs: UnparsedAddressInputs,
 ) -> Iterable[RunRequest]:

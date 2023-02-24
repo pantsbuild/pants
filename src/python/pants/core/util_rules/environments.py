@@ -22,7 +22,7 @@ from pants.engine.internals.scheduler import SchedulerSession
 from pants.engine.internals.selectors import Params
 from pants.engine.platform import Platform
 from pants.engine.process import ProcessCacheScope
-from pants.engine.rules import Get, MultiGet, QueryRule, collect_rules, rule, rule_helper
+from pants.engine.rules import Get, MultiGet, QueryRule, collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     BoolField,
@@ -375,7 +375,6 @@ class RemoteEnvironmentTarget(Target):
 # -------------------------------------------------------------------------------------------
 
 
-@rule_helper
 async def _warn_on_non_local_environments(specified_targets: Iterable[Target], source: str) -> None:
     """Raise a warning when the user runs a local-only operation against a target that expects a
     non-local environment.
@@ -671,7 +670,6 @@ async def resolve_single_environment_name(
     return environment_names[0]
 
 
-@rule_helper
 async def _apply_fallback_environment(env_tgt: Target, error_msg: str) -> EnvironmentName:
     fallback_field = env_tgt[FallbackEnvironmentField]
     if fallback_field.value is None:
@@ -845,7 +843,6 @@ async def get_target_for_environment_name(
     return EnvironmentTarget(tgt)
 
 
-@rule_helper
 async def _maybe_add_docker_image_id(image_name: str, platform: Platform, address: Address) -> str:
     # If the image name appears to be just an image ID, just return it as-is.
     if image_name.startswith("sha256:"):
