@@ -113,9 +113,9 @@ async def get_python(
                         f"""\
                         #!/usr/bin/env bash
                         set -e
+                        mkdir .pyenv/{pyenv_version} || true
                         DEST=$(realpath .pyenv/{pyenv_version}/{specific_python})
                         if [ ! -d "$DEST" ]; then
-                            # Ensure this is on the same FS as the dest so the `mv` is atomic.
                             export PYENV_ROOT=$(realpath $(mktemp -d -u -p .pyenv/{pyenv_version} {specific_python}.XXXXXX))
                             # export LDFLAGS="$LDFLAGS -Wl,-rpath=PYENV_ROOT/lib"
                             {pyenv.exe} install {specific_python}
@@ -157,7 +157,7 @@ async def get_python(
                 "PATH": env_vars.get("PATH", ""),
                 "TMPDIR": "{chroot}/tmpdir",
                 "LDFLAGS": env_vars.get("LDFLAGS", ""),
-                "PYTHON_CONFIGURE_OPTS": pyenv_subsystem.python_configure_opts,
+                "PYTHON_CONFIGURE_OPTS": " ".join(pyenv_subsystem.python_configure_opts),
             },
             # Don't cache, we want this to always be run so that we can assume for the rest of the
             # session the named_cache destination for this Python is valid, as the Python ecosystem
