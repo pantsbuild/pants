@@ -398,14 +398,14 @@ impl ShardedLmdb {
   ///
   pub async fn store_bytes(
     &self,
-    fingerprint: Option<Fingerprint>,
+    fingerprint: Fingerprint,
     bytes: Bytes,
     initial_lease: bool,
   ) -> Result<Fingerprint, String> {
-    let fingerprints = self
+    self
       .store_bytes_batch(vec![(fingerprint, bytes)], initial_lease)
       .await?;
-    Ok(fingerprints[0])
+    Ok(fingerprint)
   }
 
   ///
@@ -416,9 +416,9 @@ impl ShardedLmdb {
   ///
   pub async fn store_bytes_batch(
     &self,
-    items: Vec<(Option<Fingerprint>, Bytes)>,
+    items: Vec<(Fingerprint, Bytes)>,
     initial_lease: bool,
-  ) -> Result<Vec<Fingerprint>, String> {
+  ) -> Result<(), String> {
     let store = self.clone();
     self
       .executor
@@ -427,8 +427,7 @@ impl ShardedLmdb {
           // Group the items by the Environment that they will be applied to.
           let mut items_by_env = HashMap::new();
           let mut fingerprints = Vec::new();
-          for (maybe_fingerprint, bytes) in items {
-            let fingerprint = maybe_fingerprint.unwrap_or_else(|| Digest::of_bytes(&bytes).hash);
+          for (fingerprint, bytes) in items {
             let effective_key = VersionedFingerprint::new(fingerprint, ShardedLmdb::SCHEMA_VERSION);
             let (env_id, _, env, db, lease_database) = store.get_raw(&fingerprint.0);
 
@@ -475,7 +474,7 @@ impl ShardedLmdb {
               })?;
           }
 
-          Ok(fingerprints)
+          Ok(())
         },
         |e| Err(format!("`store_bytes_batch` task failed: {e}")),
       )
