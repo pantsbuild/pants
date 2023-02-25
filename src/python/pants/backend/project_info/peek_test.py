@@ -11,6 +11,7 @@ from pants.backend.visibility.rules import rules as visibility_rules
 from pants.base.specs import RawSpecs, RecursiveGlobSpec
 from pants.core.target_types import ArchiveTarget, FilesGeneratorTarget, FileTarget, GenericTarget
 from pants.engine.addresses import Address
+from pants.engine.internals.dep_rules import DependencyRuleAction, DependencyRuleApplication
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
 
@@ -68,7 +69,7 @@ from pants.testutil.rule_runner import RuleRunner
                 ]
                 """
             ),
-            id="single-files-target/exclude-defaults",
+            id="single-files-target/exclude-defaults-regression",
         ),
         pytest.param(
             [
@@ -171,7 +172,16 @@ from pants.testutil.rule_runner import RuleRunner
                     dependencies_rules=("does", "apply", "*"),
                     dependents_rules=("fall-through", "*"),
                     applicable_dep_rules=(
-                        "foo/BUILD[*] -> foo/BUILD[*] : ALLOW\nfiles foo:baz -> files foo/a.txt:baz",
+                        DependencyRuleApplication(
+                            action=DependencyRuleAction.ALLOW,
+                            rule_description="foo/BUILD[*] -> foo/BUILD[*]",
+                            origin_address=Address("foo", target_name="baz"),
+                            origin_type="files",
+                            dependency_address=Address(
+                                "foo", target_name="baz", relative_file_path="a.txt"
+                            ),
+                            dependency_type="files",
+                        ),
                     ),
                 ),
             ],
@@ -184,7 +194,14 @@ from pants.testutil.rule_runner import RuleRunner
                     "address": "foo:baz",
                     "target_type": "files",
                     "_applicable_dep_rules": [
-                      "foo/BUILD[*] -> foo/BUILD[*] : ALLOW\\nfiles foo:baz -> files foo/a.txt:baz"
+                      {
+                        "action": "ALLOW",
+                        "rule_description": "foo/BUILD[*] -> foo/BUILD[*]",
+                        "origin_address": "foo:baz",
+                        "origin_type": "files",
+                        "dependency_address": "foo/a.txt:baz",
+                        "dependency_type": "files"
+                      }
                     ],
                     "_dependencies_rules": [
                       "does",
@@ -316,7 +333,16 @@ def test_get_target_data_with_dep_rules(rule_runner: RuleRunner) -> None:
             dependencies_rules=("does", "apply", "*"),
             dependents_rules=("fall-through", "*"),
             applicable_dep_rules=(
-                "foo/BUILD[*] -> foo/BUILD[*] : ALLOW\nfiles foo:baz -> files foo/a.txt:baz",
+                DependencyRuleApplication(
+                    action=DependencyRuleAction.ALLOW,
+                    rule_description="foo/BUILD[*] -> foo/BUILD[*]",
+                    origin_address=Address("foo", target_name="baz"),
+                    origin_type="files",
+                    dependency_address=Address(
+                        "foo", target_name="baz", relative_file_path="a.txt"
+                    ),
+                    dependency_type="files",
+                ),
             ),
         ),
         TargetData(

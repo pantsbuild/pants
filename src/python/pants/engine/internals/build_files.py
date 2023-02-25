@@ -410,7 +410,6 @@ def _rules_path(address: Address) -> str:
         return address.spec_path
 
 
-@rule_helper
 async def _get_target_family_and_adaptor_for_dep_rules(
     *addresses: Address, description_of_origin: str
 ) -> tuple[tuple[AddressFamily, TargetAdaptor], ...]:

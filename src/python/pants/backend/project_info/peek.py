@@ -15,7 +15,7 @@ from pants.engine.collection import Collection
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem, Outputting
 from pants.engine.internals.build_files import _get_target_family_and_adaptor_for_dep_rules
-from pants.engine.internals.dep_rules import DependencyRuleSet
+from pants.engine.internals.dep_rules import DependencyRuleApplication, DependencyRuleSet
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
 from pants.engine.target import (
     Dependencies,
@@ -84,7 +84,7 @@ class TargetData:
 
     dependencies_rules: tuple[str, ...] | None = None
     dependents_rules: tuple[str, ...] | None = None
-    applicable_dep_rules: tuple[str, ...] | None = None
+    applicable_dep_rules: tuple[DependencyRuleApplication, ...] | None = None
 
     def to_dict(self, exclude_defaults: bool = False, include_dep_rules: bool = False) -> dict:
         nothing = object()
@@ -226,7 +226,7 @@ async def get_target_data(
             for tgt, deps in zip(sorted_targets, dependencies_per_target)
         )
         applicable_dep_rules_map = {
-            application.address: tuple(str(rule) for rule in application.dependencies_rule.values())
+            application.address: tuple(application.dependencies_rule.values())
             for application in all_applicable_dep_rules
         }
 

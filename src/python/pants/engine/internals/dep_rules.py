@@ -49,6 +49,9 @@ class DependencyRuleAction(Enum):
             raise NotImplementedError(f"{type(self).__name__}.execute() not implemented for {self}")
         return None
 
+    def __str__(self) -> str:
+        return self.name
+
 
 @dataclass(frozen=True)
 class DependencyRuleApplication:
@@ -157,7 +160,7 @@ async def get_build_file_dependency_rules_implementation(
             f"There must be at most one BUILD file dependency rules implementation, got: {impls}"
         )
     for request_type in request_types:
-        impl = await Get(  # noqa: PNT30: requires triage
+        impl = await Get(  # noqa: PNT30: this for loop will never process more than a single iteration.
             BuildFileDependencyRulesImplementation,
             BuildFileDependencyRulesImplementationRequest,
             request_type(),
