@@ -111,6 +111,8 @@ def warn_or_error(
     *,
     start_version: str | None = None,
     print_warning: bool = True,
+    stacklevel: int = 0,
+    context: int = 1,
 ) -> None:
     """Check the removal_version against the current Pants version.
 
@@ -133,6 +135,8 @@ def warn_or_error(
     :param print_warning: Whether to print a warning for deprecations *before* their removal.
         If this flag is off, an exception will still be raised for options past their deprecation
         date.
+    :param stacklevel: How far up the call stack to go for blame. Use 0 to disable.
+    :param context: How many lines of source context to include.
     :raises DeprecationError: if the removal_version parameter is invalid.
     :raises CodeRemovedError: if the current version is later than the version marked for removal.
     """
@@ -151,6 +155,13 @@ def warn_or_error(
         f"DEPRECATED: {entity} {get_deprecated_tense(removal_version)} removed in version "
         f"{removal_version}."
     )
+    if stacklevel > 0:
+        # Get stack frames, ignoring those for internal/builtin code.
+        frames = [frame for frame in inspect.stack(context) if frame.index is not None]
+        if stacklevel < len(frames):
+            frame = frames[stacklevel]
+            code_context = "    ".join(frame.code_context) if frame.code_context else ""
+            msg += f"\n ==> {frame.filename}:{frame.lineno}\n    {code_context}"
     if hint:
         msg += f"\n\n{hint}"
 
@@ -199,6 +210,8 @@ def deprecated(
                 f"{func.__module__}.{func.__qualname__}()",
                 hint,
                 start_version=start_version,
+                stacklevel=3,
+                context=3,
             )
             return func(*args, **kwargs)
 

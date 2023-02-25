@@ -10,11 +10,11 @@ from __future__ import annotations
 
 from typing import Iterable
 
-from pants.engine.rules import Rule
-from pants.engine.unions import UnionRule
+from pants.backend.python.goals import lockfile as python_lockfile
 from pants.backend.tools.yamllint import rules as yamllint_rules
 from pants.backend.tools.yamllint import subsystem as subsystem
-from pants.backend.python.goals import lockfile as python_lockfile
+from pants.engine.rules import Rule
+from pants.engine.unions import UnionRule
 
 
 def rules() -> Iterable[Rule | UnionRule]:

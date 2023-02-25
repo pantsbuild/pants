@@ -37,7 +37,7 @@ from pants.jvm.target_types import (
     JvmResolveField,
     JvmRunnableSourceFieldSet,
 )
-from pants.util.strutil import softwrap
+from pants.util.strutil import help_text
 
 
 class ScalaSettingsRequest(TargetFilesGeneratorSettingsRequest):
@@ -67,7 +67,7 @@ class ScalaDependenciesField(Dependencies):
 
 
 class ScalaConsumedPluginNamesField(StringSequenceField):
-    help = softwrap(
+    help = help_text(
         """
         The names of Scala plugins that this source file requires.
 
@@ -169,7 +169,7 @@ class ScalatestTestsGeneratorTarget(TargetFilesGenerator):
         JvmResolveField,
     )
     settings_request_cls = ScalaSettingsRequest
-    help = softwrap(
+    help = help_text(
         f"""
         Generate a `scalatest_test` target for each file in the `sources` field (defaults to
         all files in the directory matching {ScalatestTestsGeneratorSourcesField.default}).
@@ -329,7 +329,7 @@ class ScalacPluginArtifactField(StringField, AsyncFieldMixin):
 
 class ScalacPluginNameField(StringField):
     alias = "plugin_name"
-    help = softwrap(
+    help = help_text(
         """
         The name that `scalac` should use to load the plugin.
 
@@ -345,7 +345,7 @@ class ScalacPluginTarget(Target):
         ScalacPluginArtifactField,
         ScalacPluginNameField,
     )
-    help = softwrap(
+    help = help_text(
         """
         A plugin for `scalac`.
 

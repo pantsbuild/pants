@@ -23,7 +23,7 @@ from pants.engine.fs import DownloadFile
 from pants.engine.internals.native_engine import EMPTY_DIGEST, Digest
 from pants.engine.platform import Platform
 from pants.engine.process import Process
-from pants.engine.rules import Get, Rule, collect_rules, rule, rule_helper
+from pants.engine.rules import Get, Rule, collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import OrderedSet
@@ -69,12 +69,11 @@ class CCToolchain:
         return tuple(filter(None, command))
 
 
-@rule_helper
 async def _executable_path(binary_names: Iterable[str], search_paths: Iterable[str]) -> str:
     """Find the path to an executable by checking whether the executable supports a version
     option."""
     for name in binary_names:
-        binary_paths = await Get(
+        binary_paths = await Get(  # noqa: PNT30: requires triage
             BinaryPaths,
             BinaryPathRequest(
                 binary_name=name,
@@ -90,7 +89,6 @@ async def _executable_path(binary_names: Iterable[str], search_paths: Iterable[s
     raise BinaryNotFoundError(f"Could not find any of '{binary_names}' in any of {search_paths}.")
 
 
-@rule_helper
 async def _setup_downloadable_toolchain(
     request: CCToolchainRequest,
     subsystem: ExternalCCSubsystem,
@@ -119,7 +117,6 @@ async def _setup_downloadable_toolchain(
     )
 
 
-@rule_helper
 async def _setup_system_toolchain(
     request: CCToolchainRequest, subsystem: CCSubsystem
 ) -> CCToolchain:

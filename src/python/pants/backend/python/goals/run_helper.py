@@ -25,7 +25,7 @@ from pants.core.goals.run import RunDebugAdapterRequest, RunRequest
 from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
 from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests
-from pants.engine.rules import Get, MultiGet, rule_helper
+from pants.engine.rules import Get, MultiGet
 from pants.engine.target import TransitiveTargets, TransitiveTargetsRequest
 
 
@@ -33,7 +33,6 @@ def _in_chroot(relpath: str) -> str:
     return os.path.join("{chroot}", relpath)
 
 
-@rule_helper
 async def _create_python_source_run_request(
     address: Address,
     *,
@@ -122,12 +121,12 @@ async def _create_python_source_run_request(
     )
 
 
-@rule_helper
 async def _create_python_source_run_dap_request(
     regular_run_request: RunRequest,
     *,
     debugpy: DebugPy,
     debug_adapter: DebugAdapterSubsystem,
+    run_in_sandbox: bool,
 ) -> RunDebugAdapterRequest:
     launcher_digest = await Get(
         Digest,
@@ -141,14 +140,6 @@ async def _create_python_source_run_dap_request(
                             CHROOT = os.environ["PANTS_CHROOT"]
 
                             del os.environ["PEX_INTERPRETER"]
-
-                            # See https://github.com/pantsbuild/pants/issues/17540
-                            # For `run --debug-adapter`, the client might send a `pathMappings`
-                            # (this is likely as VS Code likes to configure that by default) with
-                            # a `remoteRoot` of ".". For `run`, CWD is set to the build root, so
-                            # breakpoints set in-repo will never be hit. We fix this by monkeypatching
-                            # pydevd (the library powering debugpy) so that a remoteRoot of "."
-                            # means the sandbox root.
 
                             import debugpy._vendored.force_pydevd
                             from _pydevd_bundle.pydevd_process_net_command_json import PyDevJsonCommandProcessor
@@ -181,7 +172,18 @@ async def _create_python_source_run_dap_request(
     )
     extra_env = dict(regular_run_request.extra_env)
     extra_env["PEX_INTERPRETER"] = "1"
-    extra_env["PANTS_CHROOT"] = _in_chroot("").rstrip("/")
+    # See https://github.com/pantsbuild/pants/issues/17540
+    # and https://github.com/pantsbuild/pants/issues/18243
+    # For `run --debug-adapter`, the client might send a `pathMappings`
+    # (this is likely as VS Code likes to configure that by default) with a `remoteRoot` of ".".
+    #
+    # For `run`, CWD is the build root. If `run_in_sandbox` is False, everything is OK.
+    # If `run_in_sandbox` is True, breakpoints won't be hit as CWD != sandbox root.
+    #
+    # We fix this by monkeypatching pydevd (the library powering debugpy) so that a remoteRoot of "."
+    # means the sandbox root.
+    # See https://github.com/fabioz/PyDev.Debugger/pull/243 for a better solution.
+    extra_env["PANTS_CHROOT"] = _in_chroot("").rstrip("/") if run_in_sandbox else "."
     args = [
         *regular_run_request.args,
         _in_chroot("__debugpy_launcher.py"),

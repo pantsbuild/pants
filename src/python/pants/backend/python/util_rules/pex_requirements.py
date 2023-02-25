@@ -3,9 +3,11 @@
 
 from __future__ import annotations
 
+import importlib.resources
 import logging
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Iterable, Iterator
+from urllib.parse import urlparse
 
 from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.subsystems.repos import PythonRepos
@@ -47,15 +49,8 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class Lockfile:
-    file_path: str
-    file_path_description_of_origin: str
-    resolve_name: str
-    lockfile_hex_digest: str | None = None
-
-
-@dataclass(frozen=True)
-class LockfileContent:
-    file_content: FileContent
+    url: str
+    url_description_of_origin: str
     resolve_name: str
     lockfile_hex_digest: str | None = None
 
@@ -84,17 +79,17 @@ class LoadedLockfile:
     as_constraints_strings: FrozenOrderedSet[str] | None
     # The original file or file content (which may not have identical content to the output
     # `lockfile_digest`).
-    original_lockfile: Lockfile | LockfileContent
+    original_lockfile: Lockfile
 
 
 @dataclass(frozen=True)
 class LoadedLockfileRequest:
     """A request to load and validate the content of the given lockfile."""
 
-    lockfile: Lockfile | LockfileContent
+    lockfile: Lockfile
 
 
-def _strip_comments_from_pex_json_lockfile(lockfile_bytes: bytes) -> bytes:
+def strip_comments_from_pex_json_lockfile(lockfile_bytes: bytes) -> bytes:
     """Pex does not like the header Pants adds to lockfiles, as it violates JSON.
 
     Note that we only strip lines starting with `//`, which is all that Pants will ever add. If
@@ -162,29 +157,46 @@ async def load_lockfile(
     python_setup: PythonSetup,
 ) -> LoadedLockfile:
     lockfile = request.lockfile
-    if isinstance(lockfile, Lockfile):
+    # TODO: Fold "resource://" URL support into the DownloadFile primitive, instead of
+    #  manually handling it here. That would also give us support for https:// URLs for tool
+    #  lockfiles (e.g., we could choose to download the default_lockfile_url instead of
+    #  embedding the lockfiles as resources). This would require capturing the SHA256 of
+    #  every current tool lockfile, and we need to think through the consequences of
+    #  downloading lockfiles, so we punt for now.
+    parts = urlparse(lockfile.url)
+    # urlparse retains the leading / in URLs with a netloc.
+    lockfile_path = parts.path[1:] if parts.path.startswith("/") else parts.path
+    if parts.scheme in {"", "file"}:
         synthetic_lock = False
-        lockfile_path = lockfile.file_path
         lockfile_digest = await Get(
             Digest,
             PathGlobs(
                 [lockfile_path],
                 glob_match_error_behavior=GlobMatchErrorBehavior.error,
-                description_of_origin=lockfile.file_path_description_of_origin,
+                description_of_origin=lockfile.url_description_of_origin,
             ),
         )
         _digest_contents = await Get(DigestContents, Digest, lockfile_digest)
         lock_bytes = _digest_contents[0].content
-    else:
+    elif parts.scheme == "resource":
         synthetic_lock = True
-        _fc = lockfile.file_content
+        _fc = FileContent(
+            lockfile_path,
+            # The "netloc" in our made-up "resource://" scheme is the package.
+            importlib.resources.read_binary(parts.netloc, lockfile_path),
+        )
         lockfile_path, lock_bytes = (_fc.path, _fc.content)
         lockfile_digest = await Get(Digest, CreateDigest([_fc]))
+    else:
+        raise ValueError(
+            f"Unsupported scheme {parts.scheme} for lockfile URL: {lockfile.url} "
+            f"(origin: {lockfile.url_description_of_origin})"
+        )
 
     is_pex_native = is_probably_pex_json_lockfile(lock_bytes)
     if is_pex_native:
         header_delimiter = "//"
-        stripped_lock_bytes = _strip_comments_from_pex_json_lockfile(lock_bytes)
+        stripped_lock_bytes = strip_comments_from_pex_json_lockfile(lock_bytes)
         lockfile_digest = await Get(
             Digest,
             CreateDigest([FileContent(lockfile_path, stripped_lock_bytes)]),
@@ -231,7 +243,7 @@ class EntireLockfile:
        content anyway.
     """
 
-    lockfile: Lockfile | LockfileContent
+    lockfile: Lockfile
     # If available, the current complete set of requirement strings that influence this lockfile.
     # Used for metadata validation.
     complete_req_strings: tuple[str, ...] | None = None
@@ -285,7 +297,7 @@ class PexRequirements:
         fields: Iterable[PythonRequirementsField],
         constraints_strings: Iterable[str],
     ) -> PexRequirements:
-        field_requirements = {str(python_req) for field in fields for python_req in field.value}
+        field_requirements = {str(python_req) for fld in fields for python_req in fld.value}
         return PexRequirements(field_requirements, constraints_strings=constraints_strings)
 
     @classmethod
@@ -453,7 +465,7 @@ async def determine_resolve_pex_config(
 def validate_metadata(
     metadata: PythonLockfileMetadata,
     interpreter_constraints: InterpreterConstraints,
-    lockfile: Lockfile | LockfileContent,
+    lockfile: Lockfile,
     consumed_req_strings: Iterable[str],
     python_setup: PythonSetup,
     resolve_config: ResolvePexConfig,
@@ -536,7 +548,7 @@ def _common_failure_reasons(
 def _invalid_lockfile_error(
     metadata: PythonLockfileMetadata,
     validation: LockfileMetadataValidation,
-    lockfile: Lockfile | LockfileContent,
+    lockfile: Lockfile,
     *,
     user_requirements: set[PipRequirement],
     user_interpreter_constraints: InterpreterConstraints,
@@ -544,10 +556,10 @@ def _invalid_lockfile_error(
 ) -> Iterator[str]:
     resolve = lockfile.resolve_name
     yield "You are using "
-    if isinstance(lockfile, Lockfile):
-        yield f"the `{resolve}` lockfile at {lockfile.file_path} "
-    else:
+    if lockfile.url.startswith("resource://"):
         yield f"the built-in `{resolve}` lockfile provided by Pants "
+    else:
+        yield f"the `{resolve}` lockfile at {lockfile.url} "
     yield "with incompatible inputs.\n\n"
 
     if any(
@@ -610,9 +622,7 @@ def _invalid_lockfile_error(
     yield from _common_failure_reasons(validation.failure_reasons, maybe_constraints_file_path)
 
     yield "To regenerate your lockfile, "
-    yield f"run `{bin_name()} generate-lockfiles --resolve={resolve}`." if isinstance(
-        lockfile, Lockfile
-    ) else f"update your plugin generating this object: {lockfile}"
+    yield f"run `{bin_name()} generate-lockfiles --resolve={resolve}`."
 
 
 def rules():

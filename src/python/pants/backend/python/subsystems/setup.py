@@ -32,6 +32,8 @@ class PipVersion(enum.Enum):
     V20_3_4 = "20.3.4-patched"
     V22_2_2 = "22.2.2"
     V22_3 = "22.3"
+    V22_3_1 = "22.3.1"
+    V23_0 = "23.0"
 
 
 @enum.unique
@@ -478,6 +480,15 @@ class PythonSetup(Subsystem):
             """
             If true, add `pex_binary` targets for Python files named `__main__.py` or with a
             `__main__` clause with the `tailor` goal.
+            """
+        ),
+        advanced=True,
+    )
+    tailor_py_typed_targets = BoolOption(
+        default=True,
+        help=softwrap(
+            """
+            If true, add `resource` targets for marker files named `py.typed` with the `tailor` goal.
             """
         ),
         advanced=True,

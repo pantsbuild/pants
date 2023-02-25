@@ -41,7 +41,7 @@ from pants.engine.fs import CreateDigest, Digest, DigestContents, FileContent, M
 from pants.engine.internals.synthetic_targets import SyntheticAddressMaps, SyntheticTargetsRequest
 from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.engine.process import ProcessCacheScope, ProcessResult
-from pants.engine.rules import Get, collect_rules, rule, rule_helper
+from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import AllTargets
 from pants.engine.unions import UnionRule
 from pants.util.docutil import bin_name
@@ -105,7 +105,6 @@ class _PipArgsAndConstraintsSetup:
     digest: Digest
 
 
-@rule_helper
 async def _setup_pip_args_and_constraints_file(resolve_name: str) -> _PipArgsAndConstraintsSetup:
     resolve_config = await Get(ResolvePexConfig, ResolvePexConfigRequest(resolve_name))
 

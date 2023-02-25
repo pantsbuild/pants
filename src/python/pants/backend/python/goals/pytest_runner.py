@@ -226,13 +226,7 @@ async def setup_pytest_for_target(
 
     requirements_pex_get = Get(Pex, RequirementsPexRequest(addresses))
     pytest_pex_get = Get(
-        Pex,
-        PexRequest(
-            output_filename="pytest.pex",
-            requirements=pytest.pex_requirements(),
-            interpreter_constraints=interpreter_constraints,
-            internal_only=True,
-        ),
+        Pex, PexRequest, pytest.to_pex_request(interpreter_constraints=interpreter_constraints)
     )
 
     # Ensure that the empty extra output dir exists.

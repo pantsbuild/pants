@@ -19,6 +19,7 @@ from enum import Enum
 from pathlib import PurePath
 from typing import (
     Any,
+    Callable,
     ClassVar,
     Dict,
     Generic,
@@ -63,7 +64,7 @@ from pants.util.docutil import bin_name, doc_url
 from pants.util.frozendict import FrozenDict
 from pants.util.memo import memoized_method, memoized_property
 from pants.util.ordered_set import FrozenOrderedSet
-from pants.util.strutil import bullet_list, pluralize, softwrap
+from pants.util.strutil import bullet_list, help_text, pluralize, softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -142,7 +143,7 @@ class Field:
 
     # Subclasses must define these.
     alias: ClassVar[str]
-    help: ClassVar[str]
+    help: ClassVar[str | Callable[[], str]]
 
     # Subclasses must define at least one of these two.
     default: ClassVar[ImmutableValue]
@@ -318,7 +319,9 @@ class FieldDefaults:
 
     See https://github.com/pantsbuild/pants/issues/12934 about potentially allowing unions
     (including Field registrations) to have `@rule_helper` methods, which would allow the
-    computation of an AsyncField to directly require a subsystem.
+    computation of an AsyncField to directly require a subsystem. Since
+    https://github.com/pantsbuild/pants/pull/17947 rules may use any methods as rule helpers without
+    special decoration so this should now be possible to implement.
     """
 
     _factories: FrozenDict[type[Field], FieldDefaultFactory]
@@ -362,7 +365,7 @@ class Target:
     # Subclasses must define these
     alias: ClassVar[str]
     core_fields: ClassVar[Tuple[Type[Field], ...]]
-    help: ClassVar[str]
+    help: ClassVar[str | Callable[[], str]]
 
     removal_version: ClassVar[str | None] = None
     removal_hint: ClassVar[str | None] = None
@@ -2173,7 +2176,7 @@ class OptionalSingleSourceField(SourcesField, StringField):
     """
 
     alias = "source"
-    help = softwrap(
+    help = help_text(
         """
         A single file that belongs to this target.
 
@@ -2468,7 +2471,7 @@ class Dependencies(StringSequenceField, AsyncFieldMixin):
     """
 
     alias = "dependencies"
-    help = softwrap(
+    help = help_text(
         f"""
         Addresses to other targets that this target depends on, e.g.
         ['helloworld/subdir:lib', 'helloworld/main.py:lib', '3rdparty:reqs#django'].
@@ -2788,7 +2791,7 @@ class SpecialCasedDependencies(StringSequenceField, AsyncFieldMixin):
 
 class Tags(StringSequenceField):
     alias = "tags"
-    help = softwrap(
+    help = help_text(
         f"""
         Arbitrary strings to describe a target.
 
@@ -2800,7 +2803,7 @@ class Tags(StringSequenceField):
 
 class DescriptionField(StringField):
     alias = "description"
-    help = softwrap(
+    help = help_text(
         f"""
         A human-readable description of the target.
 

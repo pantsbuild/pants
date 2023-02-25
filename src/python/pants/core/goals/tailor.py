@@ -48,7 +48,7 @@ from pants.util.docutil import bin_name, doc_url
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized
-from pants.util.strutil import softwrap
+from pants.util.strutil import help_text, softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -78,6 +78,18 @@ def default_sources_for_target_type(tgt_type: type[Target]) -> tuple[str, ...]:
         if issubclass(field, MultipleSourcesField):
             return field.default or tuple()
     return tuple()
+
+
+def has_source_or_sources_field(tgt_type: type[Target]) -> bool:
+    """Tell whether a given target type has a `source` or `sources` field.
+
+    This may be useful when determining whether it's possible to tailor a target with the passed
+    source(s) field value if the target doesn't have such a field in the first place.
+    """
+    for field in tgt_type.core_fields:
+        if issubclass(field, (OptionalSingleSourceField, MultipleSourcesField)):
+            return True
+    return False
 
 
 @dataclass(order=True, frozen=True)
@@ -145,8 +157,9 @@ class PutativeTarget:
                 )
             )
 
-        default_sources = default_sources_for_target_type(target_type)
-        if (explicit_sources or triggering_sources) and not default_sources:
+        if (explicit_sources or triggering_sources) and not has_source_or_sources_field(
+            target_type
+        ):
             raise AssertionError(
                 softwrap(
                     f"""
@@ -156,6 +169,7 @@ class PutativeTarget:
                     """
                 )
             )
+        default_sources = default_sources_for_target_type(target_type)
         owned_sources = explicit_sources or default_sources or tuple()
         return cls(
             path,
@@ -255,7 +269,7 @@ class PutativeTargets(DeduplicatedCollection[PutativeTarget]):
 
 class TailorSubsystem(GoalSubsystem):
     name = "tailor"
-    help = softwrap(
+    help = help_text(
         """
         Auto-generate BUILD file targets for new source files.
 

@@ -19,14 +19,14 @@ from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.rules import Get, _uncacheable_rule, collect_rules, rule
 from pants.option.option_types import StrListOption
 from pants.option.subsystem import Subsystem
-from pants.util.strutil import softwrap
+from pants.util.strutil import help_text, softwrap
 
 logger = logging.getLogger(__name__)
 
 
 class PythonBootstrapSubsystem(Subsystem):
     options_scope = "python-bootstrap"
-    help = softwrap(
+    help = help_text(
         """
         Options used to locate Python interpreters used by all Pants backends.
 
@@ -159,7 +159,9 @@ async def _expand_interpreter_search_paths(
                 from_pexrc = special_paths
             expanded.extend(special_paths)
         elif s == "<PYENV>" or s == "<PYENV_LOCAL>":
-            paths = await Get(_SearchPaths, _PyEnvPathsRequest(env_tgt, s == "<PYENV_LOCAL>"))
+            paths = await Get(  # noqa: PNT30: requires triage
+                _SearchPaths, _PyEnvPathsRequest(env_tgt, s == "<PYENV_LOCAL>")
+            )
             expanded.extend(paths.paths)
         else:
             expanded.append(s)

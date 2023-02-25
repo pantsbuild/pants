@@ -11,7 +11,7 @@ from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
 from pants.engine.addresses import Addresses
 from pants.engine.fs import AddPrefix, Digest
 from pants.engine.internals.selectors import Get
-from pants.engine.rules import collect_rules, rule_helper
+from pants.engine.rules import collect_rules
 from pants.engine.target import CoarsenedTargets, SourcesField
 from pants.util.strutil import path_safe
 
@@ -24,14 +24,13 @@ def _jvm_resources_directory(target_id: BuildTargetIdentifier) -> str:
     return f"jvm/resources/{path_safe(target_id.uri)}"
 
 
-@rule_helper
 async def _jvm_bsp_resources(
     request: BSPResourcesRequest,
     build_root: BuildRoot,
 ) -> BSPResourcesResult:
     """Generically handles a BSPResourcesRequest (subclass).
 
-    This is a `@rule_helper` rather than a `@rule` for the same reason as `_jvm_bsp_compile`.
+    This is a rule helper rather than a `@rule` for the same reason as `_jvm_bsp_compile`.
     """
     coarsened_targets = await Get(
         CoarsenedTargets, Addresses([fs.address for fs in request.field_sets])

@@ -13,7 +13,7 @@ from pants.core.util_rules.asdf import AsdfToolPathsRequest, AsdfToolPathsResult
 from pants.core.util_rules.environments import EnvironmentTarget, LocalEnvironmentTarget
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.internals.selectors import Get
-from pants.engine.rules import collect_rules, rule, rule_helper
+from pants.engine.rules import collect_rules, rule
 from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
@@ -24,7 +24,6 @@ class GoBootstrap:
     go_search_paths: tuple[str, ...]
 
 
-@rule_helper
 async def _go_search_paths(
     env_tgt: EnvironmentTarget, golang_subsystem: GolangSubsystem, paths: Iterable[str]
 ) -> tuple[str, ...]:
@@ -68,7 +67,6 @@ async def _go_search_paths(
     return tuple(expanded)
 
 
-@rule_helper
 async def _environment_paths() -> list[str]:
     """Returns a list of paths specified by the PATH env var."""
     env = await Get(EnvironmentVars, EnvironmentVarsRequest(("PATH",)))

@@ -11,7 +11,7 @@ from pants.engine.target import (
     Target,
     generate_multiple_sources_field_help_message,
 )
-from pants.util.strutil import softwrap
+from pants.util.strutil import help_text
 
 
 class CuePackageSourcesField(MultipleSourcesField):
@@ -27,7 +27,7 @@ class CuePackageTarget(Target):
         *COMMON_TARGET_FIELDS,
         CuePackageSourcesField,
     )
-    help = softwrap(
+    help = help_text(
         """
         The `cue_package` target defines a CUE package. Within a module, CUE organizes files grouped
         by package. A package can be defined within the module or externally. Definitions and

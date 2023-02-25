@@ -33,7 +33,7 @@ jobs:
       uses: actions/cache@v3
       with:
         key: Linux-ARM64-rustup-${{ hashFiles('rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.67.0-*
+        path: '~/.rustup/toolchains/1.67.1-*
 
           ~/.rustup/update-hashes
 
@@ -99,7 +99,7 @@ jobs:
         TMPDIR: ${{ runner.temp }}
       if: needs.classify_changes.outputs.rust == 'true'
       name: Test Rust
-      run: ./cargo test --tests -- --nocapture
+      run: ./cargo test --tests -- --nocapture --test-threads=8
     strategy:
       matrix:
         python-version:
@@ -134,7 +134,7 @@ jobs:
       uses: actions/cache@v3
       with:
         key: Linux-x86_64-rustup-${{ hashFiles('rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.67.0-*
+        path: '~/.rustup/toolchains/1.67.1-*
 
           ~/.rustup/update-hashes
 
@@ -212,9 +212,7 @@ jobs:
 
         ./cargo check --benches
 
-        ./cargo doc
-
-        '
+        ./cargo doc'
     strategy:
       matrix:
         python-version:
@@ -249,7 +247,7 @@ jobs:
       uses: actions/cache@v3
       with:
         key: macOS11-x86_64-rustup-${{ hashFiles('rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.67.0-*
+        path: '~/.rustup/toolchains/1.67.1-*
 
           ~/.rustup/update-hashes
 

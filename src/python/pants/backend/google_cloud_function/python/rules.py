@@ -126,14 +126,7 @@ async def package_python_google_cloud_function(
         additional_args=additional_pex_args,
         additional_lockfile_args=additional_pex_args,
     )
-
-    lambdex_request = PexRequest(
-        output_filename="lambdex.pex",
-        internal_only=True,
-        requirements=lambdex.pex_requirements(),
-        interpreter_constraints=lambdex.interpreter_constraints,
-        main=lambdex.main,
-    )
+    lambdex_request = lambdex.to_pex_request()
 
     lambdex_pex, pex_result, handler, transitive_targets = await MultiGet(
         Get(VenvPex, PexRequest, lambdex_request),

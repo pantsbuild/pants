@@ -13,7 +13,7 @@ from pants.base.build_root import BuildRoot
 from pants.core.util_rules.environments import EnvironmentTarget, LocalEnvironmentTarget
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.internals.selectors import Get
-from pants.engine.rules import _uncacheable_rule, collect_rules, rule_helper
+from pants.engine.rules import _uncacheable_rule, collect_rules
 from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
@@ -37,7 +37,6 @@ class AsdfToolPathsResult:
     local_tool_paths: tuple[str, ...] = ()
 
 
-@rule_helper
 async def _resolve_asdf_tool_paths(
     env_tgt: EnvironmentTarget,
     tool_name: str,

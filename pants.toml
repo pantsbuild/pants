@@ -20,6 +20,7 @@ backend_packages.add = [
   "pants.backend.shell.lint.shfmt",
   "pants.backend.docker",
   "pants.backend.docker.lint.hadolint",
+  "pants.backend.experimental.adhoc",
   "pants.backend.experimental.go",
   "pants.backend.experimental.java",
   "pants.backend.experimental.java.lint.google_java_format",
@@ -139,6 +140,7 @@ venv_use_symlinks = true
 interpreter_constraints = [">=3.7,<3.10"]
 macos_big_sur_compatibility = true
 enable_resolves = true
+pip_version = "23.0"
 
 [python.resolves]
 python-default = "3rdparty/python/user_reqs.lock"

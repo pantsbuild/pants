@@ -24,7 +24,7 @@ from typing import (
 
 from typing_extensions import ParamSpec, Protocol
 
-from pants.base.deprecated import warn_or_error
+from pants.base.deprecated import deprecated, warn_or_error
 from pants.engine.engine_aware import SideEffecting
 from pants.engine.goal import Goal
 from pants.engine.internals.rule_visitor import collect_awaitables
@@ -376,10 +376,21 @@ def rule_helper(func: None = None, **kwargs: Any) -> Callable[[Callable[P, R]], 
     ...
 
 
+@deprecated(
+    removal_version="2.20.0.dev0",
+    hint=softwrap(
+        """
+        The `@rule_helper` decorator is no longer needed. `@rule` methods may call any other
+        methods, and if they are `async` may also use `Get` and `MultiGet`.
+        """
+    ),
+)
 def rule_helper(
     func: Callable[P, R] | None = None, **kwargs: Any
 ) -> Callable[P, R] | Callable[[Callable[P, R]], Callable[P, R]]:
     """Decorator which marks a function as a "rule helper".
+
+    This docstring is now deprecated. Any async method may now use `await Get/MultiGet`.
 
     Functions marked as rule helpers are allowed to be called by rules and other rule helpers
     and can `await Get/MultiGet`. The rule parser adds these functions' awaitables to the rule's
