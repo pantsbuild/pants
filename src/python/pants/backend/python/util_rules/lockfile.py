@@ -4,7 +4,9 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Iterable, Protocol, Type
+from typing import Iterable, Type
+
+from typing_extensions import Protocol
 
 from pants.backend.python.goals.lockfile import GeneratePythonLockfile
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
