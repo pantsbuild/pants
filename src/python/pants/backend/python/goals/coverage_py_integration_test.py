@@ -371,7 +371,7 @@ def test_default_coverage_issues_12390() -> None:
     ), result.stderr
 
 
-def test_global_coverage() -> None:
+def test_coverage_filter_issue_18057() -> None:
     files = {
         "minimalcov/minimalcov/__init__.py": "",
         "minimalcov/minimalcov/src/__init__.py": "",
@@ -397,8 +397,8 @@ def test_global_coverage() -> None:
             "--use-coverage",
             "::",
             f"--source-root-patterns=['/{tmpdir}/minimalcov']",
+            f"--coverage-py-filter=['{tmpdir}/minimalcov']",
             "--coverage-py-report=raw",
-            "--coverage-py-global-report",
         ]
         result = run_pants(command)
         result.assert_success()
