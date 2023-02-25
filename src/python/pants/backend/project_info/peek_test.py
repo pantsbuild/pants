@@ -16,10 +16,11 @@ from pants.testutil.rule_runner import RuleRunner
 
 
 @pytest.mark.parametrize(
-    "expanded_target_infos, exclude_defaults, expected_output",
+    "expanded_target_infos, exclude_defaults, include_dep_rules, expected_output",
     [
         pytest.param(
             [],
+            False,
             False,
             "[]\n",
             id="null-case",
@@ -41,15 +42,13 @@ from pants.testutil.rule_runner import RuleRunner
                 )
             ],
             True,
+            False,
             dedent(
                 """\
                 [
                   {
                     "address": "example:files_target",
                     "target_type": "files",
-                    "_applicable_dep_rules": null,
-                    "_dependencies_rules": null,
-                    "_dependents_rules": null,
                     "dependencies": [],
                     "overrides": {
                       "('foo.txt',)": {
@@ -69,7 +68,7 @@ from pants.testutil.rule_runner import RuleRunner
                 ]
                 """
             ),
-            id="single-files-target/exclude-defaults-regression",
+            id="single-files-target/exclude-defaults",
         ),
         pytest.param(
             [
@@ -82,15 +81,13 @@ from pants.testutil.rule_runner import RuleRunner
                 )
             ],
             False,
+            False,
             dedent(
                 """\
                 [
                   {
                     "address": "example:files_target",
                     "target_type": "files",
-                    "_applicable_dep_rules": null,
-                    "_dependencies_rules": null,
-                    "_dependents_rules": null,
                     "dependencies": [],
                     "description": null,
                     "overrides": null,
@@ -131,15 +128,13 @@ from pants.testutil.rule_runner import RuleRunner
                 ),
             ],
             True,
+            False,
             dedent(
                 """\
                 [
                   {
                     "address": "example:files_target",
                     "target_type": "files",
-                    "_applicable_dep_rules": null,
-                    "_dependencies_rules": null,
-                    "_dependents_rules": null,
                     "dependencies": [],
                     "sources": [],
                     "sources_raw": [
@@ -152,9 +147,6 @@ from pants.testutil.rule_runner import RuleRunner
                   {
                     "address": "example:archive_target",
                     "target_type": "archive",
-                    "_applicable_dep_rules": null,
-                    "_dependencies_rules": null,
-                    "_dependents_rules": null,
                     "dependencies": [
                       "foo/bar:baz",
                       "qux:quux"
@@ -183,6 +175,7 @@ from pants.testutil.rule_runner import RuleRunner
                     ),
                 ),
             ],
+            True,
             True,
             dedent(
                 """\
@@ -219,8 +212,10 @@ from pants.testutil.rule_runner import RuleRunner
         ),
     ],
 )
-def test_render_targets_as_json(expanded_target_infos, exclude_defaults, expected_output):
-    actual_output = peek.render_json(expanded_target_infos, exclude_defaults)
+def test_render_targets_as_json(
+    expanded_target_infos, exclude_defaults, include_dep_rules, expected_output
+):
+    actual_output = peek.render_json(expanded_target_infos, exclude_defaults, include_dep_rules)
     assert actual_output == expected_output
 
 
@@ -265,19 +260,11 @@ def test_get_target_data(rule_runner: RuleRunner) -> None:
             GenericTarget({"dependencies": [":baz"]}, Address("foo", target_name="bar")),
             None,
             ("foo/a.txt:baz", "foo/b.txt:baz"),
-            applicable_dep_rules=(
-                "foo -> foo : ALLOW\ntarget foo:bar -> files foo/a.txt:baz",
-                "foo -> foo : ALLOW\ntarget foo:bar -> files foo/b.txt:baz",
-            ),
         ),
         TargetData(
             FilesGeneratorTarget({"sources": ["*.txt"]}, Address("foo", target_name="baz")),
             ("foo/a.txt", "foo/b.txt"),
             ("foo/a.txt:baz", "foo/b.txt:baz"),
-            applicable_dep_rules=(
-                "foo -> foo : ALLOW\nfiles foo:baz -> files foo/a.txt:baz",
-                "foo -> foo : ALLOW\nfiles foo:baz -> files foo/b.txt:baz",
-            ),
         ),
         TargetData(
             FileTarget(
@@ -285,7 +272,6 @@ def test_get_target_data(rule_runner: RuleRunner) -> None:
             ),
             ("foo/a.txt",),
             (),
-            applicable_dep_rules=(),
         ),
         TargetData(
             FileTarget(
@@ -293,12 +279,12 @@ def test_get_target_data(rule_runner: RuleRunner) -> None:
             ),
             ("foo/b.txt",),
             (),
-            applicable_dep_rules=(),
         ),
     ]
 
 
 def test_get_target_data_with_dep_rules(rule_runner: RuleRunner) -> None:
+    rule_runner.set_options(["--peek-include-dep-rules"])
     rule_runner.write_files(
         {
             "foo/BUILD": dedent(
