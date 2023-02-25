@@ -181,7 +181,10 @@ async def _determine_target_adaptor_and_type(
     target_type = registered_target_types.aliases_to_types.get(target_adaptor.type_alias, None)
     if target_type is None:
         raise UnrecognizedTargetTypeException(
-            target_adaptor.type_alias, registered_target_types, address
+            target_adaptor.type_alias,
+            registered_target_types,
+            address,
+            build_file_source=target_adaptor.source,
         )
     if (
         target_type.deprecated_alias is not None
@@ -204,7 +207,12 @@ async def resolve_target_parametrizations(
     target_adaptor, target_type = await _determine_target_adaptor_and_type(
         address, registered_target_types, description_of_origin=request.description_of_origin
     )
-
+    create_target = functools.partial(
+        target_type,
+        name_explicitly_set=target_adaptor.name_explicitly_set,
+        union_membership=union_membership,
+        build_file_source=target_adaptor.source,
+    )
     target = None
     parametrizations: list[_TargetParametrization] = []
     generate_request: type[GenerateTargetsRequest] | None = None
@@ -242,18 +250,20 @@ async def resolve_target_parametrizations(
                 repr(f) for f in generator_fields_parametrized
             )
             raise InvalidFieldException(
-                f"Only fields which will be moved to generated targets may be parametrized, "
-                f"so target generator {address} (with type {target_type.alias}) cannot "
-                f"parametrize the {generator_fields_parametrized_text} {noun}."
+                softwrap(
+                    f"""
+                    {target_adaptor.source}: Only fields which will be moved to generated targets
+                    may be parametrized, so target generator {address} (with type
+                    {target_type.alias}) cannot parametrize the {generator_fields_parametrized_text}
+                    {noun}.
+                    """
+                )
             )
 
-        base_generator = target_type(
+        base_generator = create_target(
             generator_fields,
             address,
-            name_explicitly_set=target_adaptor.name_explicitly_set,
-            union_membership=union_membership,
         )
-
         overrides = {}
         if base_generator.has_field(OverridesField):
             overrides_field = base_generator[OverridesField]
@@ -274,11 +284,9 @@ async def resolve_target_parametrizations(
 
         generators = [
             (
-                target_type(
+                create_target(
                     generator_fields,
                     address,
-                    name_explicitly_set=target_adaptor.name is not None,
-                    union_membership=union_membership,
                 ),
                 template,
             )
@@ -311,11 +319,9 @@ async def resolve_target_parametrizations(
             generated = FrozenDict(
                 (
                     parameterized_address,
-                    target_type(
+                    create_target(
                         parameterized_fields,
                         parameterized_address,
-                        name_explicitly_set=target_adaptor.name_explicitly_set,
-                        union_membership=union_membership,
                     ),
                 )
                 for parameterized_address, parameterized_fields in (first, *rest)
@@ -323,11 +329,9 @@ async def resolve_target_parametrizations(
             parametrizations.append(_TargetParametrization(None, generated))
         else:
             # The target was not parametrized.
-            target = target_type(
+            target = create_target(
                 target_adaptor.kwargs,
                 address,
-                name_explicitly_set=target_adaptor.name_explicitly_set,
-                union_membership=union_membership,
             )
             parametrizations.append(_TargetParametrization(target, FrozenDict()))
 
@@ -405,6 +409,7 @@ async def resolve_target_for_bootstrapping(
         name_explicitly_set=target_adaptor.name_explicitly_set,
         union_membership=union_membership,
         ignore_unrecognized_fields=True,
+        build_file_source=target_adaptor.source,
     )
     return WrappedTargetForBootstrap(target)
 
@@ -1174,15 +1179,20 @@ async def resolve_dependencies(
     local_environment_name: ChosenLocalEnvironmentName,
 ) -> Addresses:
     environment_name = local_environment_name.val
-    wrapped_tgt, explicitly_provided = await MultiGet(
-        Get(
-            WrappedTarget,
-            # It's only possible to find dependencies for a target that we already know exists.
-            WrappedTargetRequest(request.field.address, description_of_origin="<infallible>"),
-        ),
-        Get(ExplicitlyProvidedDependencies, DependenciesRequest, request),
+    wrapped_tgt = await Get(
+        WrappedTarget,
+        # It's only possible to find dependencies for a target that we already know exists.
+        WrappedTargetRequest(request.field.address, description_of_origin="<infallible>"),
     )
     tgt = wrapped_tgt.target
+    try:
+        explicitly_provided = await Get(
+            ExplicitlyProvidedDependencies, DependenciesRequest, request
+        )
+    except Exception as e:
+        raise InvalidFieldException(
+            f"{tgt.build_file_source}: Failed to get dependencies for {tgt.address}: {e}"
+        )
 
     # Infer any dependencies (based on `SourcesField` field).
     inference_request_types = cast(
@@ -1420,9 +1430,21 @@ async def generate_file_targets(
     request: GenerateFileTargets,
     union_membership: UnionMembership,
 ) -> GeneratedTargets:
-    sources_paths = await Get(
-        SourcesPaths, SourcesPathsRequest(request.generator[MultipleSourcesField])
-    )
+    try:
+        sources_paths = await Get(
+            SourcesPaths, SourcesPathsRequest(request.generator[MultipleSourcesField])
+        )
+    except Exception as e:
+        tgt = request.generator
+        fld = tgt[MultipleSourcesField]
+        raise InvalidFieldException(
+            softwrap(
+                f"""
+                {tgt.build_file_source}: Invalid field value for {fld.alias!r} in target {tgt.address}:
+                {e}
+                """
+            )
+        ) from e
 
     add_dependencies_on_all_siblings = False
     if request.generator.settings_request_cls:

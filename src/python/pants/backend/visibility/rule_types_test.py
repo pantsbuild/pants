@@ -223,7 +223,7 @@ def test_visibility_rule_set_parse(expected: VisibilityRuleSet, arg: Any) -> Non
 )
 def test_visibility_rule_set_match(expected: bool, target: str, rule_spec: tuple) -> None:
     assert expected == parse_ruleset(rule_spec, "").match(
-        Address(""), TargetAdaptor(target, None), ""
+        Address(""), TargetAdaptor(target, None, "BUILD:1"), ""
     )
 
 
@@ -347,10 +347,10 @@ def test_check_dependency_rules(
         dependency_type=target_type,
     ) == BuildFileVisibilityRules.check_dependency_rules(
         origin_address=origin_address,
-        origin_adaptor=TargetAdaptor(target_type, "source"),
+        origin_adaptor=TargetAdaptor(target_type, "source", "BUILD:1"),
         dependencies_rules=dependencies_rules,
         dependency_address=dependency_address,
-        dependency_adaptor=TargetAdaptor(target_type, "target"),
+        dependency_adaptor=TargetAdaptor(target_type, "target", "BUILD:1"),
         dependents_rules=dependents_rules,
     )
 

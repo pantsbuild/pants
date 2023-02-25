@@ -379,6 +379,7 @@ class Target:
     field_values: FrozenDict[type[Field], Field]
     residence_dir: str
     name_explicitly_set: bool
+    build_file_source: str
 
     @final
     def __init__(
@@ -393,6 +394,7 @@ class Target:
         name_explicitly_set: bool = True,
         residence_dir: str | None = None,
         ignore_unrecognized_fields: bool = False,
+        build_file_source: str | None = None,
     ) -> None:
         """Create a target.
 
@@ -410,6 +412,7 @@ class Target:
             like `dir:` know whether to match the target or not.
         :param ignore_unrecognized_fields: Don't error if fields are not recognized. This is only
             intended for when Pants is bootstrapping itself.
+        :param build_file_source: Path to BUILD file and line number where this target is declared.
         """
         if self.removal_version and not address.is_generated_target:
             if not self.removal_hint:
@@ -423,23 +426,33 @@ class Target:
                 hint=f"Using the `{self.alias}` target type for {address}. {self.removal_hint}",
             )
 
-        object.__setattr__(self, "address", address)
-        object.__setattr__(
-            self, "plugin_fields", self._find_plugin_fields(union_membership or UnionMembership({}))
-        )
         object.__setattr__(
             self, "residence_dir", residence_dir if residence_dir is not None else address.spec_path
         )
-        object.__setattr__(self, "name_explicitly_set", name_explicitly_set)
+        object.__setattr__(self, "address", address)
         object.__setattr__(
-            self,
-            "field_values",
-            self._calculate_field_values(
-                unhydrated_values, address, ignore_unrecognized_fields=ignore_unrecognized_fields
-            ),
+            self, "build_file_source", build_file_source or f"{self.residence_dir}??"
         )
+        object.__setattr__(self, "name_explicitly_set", name_explicitly_set)
+        try:
+            object.__setattr__(
+                self,
+                "plugin_fields",
+                self._find_plugin_fields(union_membership or UnionMembership({})),
+            )
+            object.__setattr__(
+                self,
+                "field_values",
+                self._calculate_field_values(
+                    unhydrated_values,
+                    address,
+                    ignore_unrecognized_fields=ignore_unrecognized_fields,
+                ),
+            )
 
-        self.validate()
+            self.validate()
+        except Exception as e:
+            raise InvalidTargetException(f"{self.build_file_source}: {e}") from e
 
     @final
     def _calculate_field_values(
@@ -509,8 +522,9 @@ class Target:
         return (
             f"{self.__class__}("
             f"address={self.address}, "
-            f"alias={repr(self.alias)}, "
-            f"residence_dir={repr(self.residence_dir)}, "
+            f"alias={self.alias!r}, "
+            f"residence_dir={self.residence_dir!r}, "
+            f"source={self.build_file_source!r}, "
             f"{fields})"
         )
 
@@ -1553,7 +1567,7 @@ class InvalidTargetException(Exception):
 
     Suggested template:
 
-         f"The `{repr(alias)}` target {address} ..."
+         f"The `{alias!r}` target {address} ..."
     """
 
 
@@ -1566,7 +1580,7 @@ class InvalidFieldException(Exception):
 
     Suggested template:
 
-         f"The {repr(alias)} field in target {address} must ..., but ..."
+         f"The {alias!r} field in target {address} must ..., but ..."
     """
 
 
@@ -1609,14 +1623,22 @@ class UnrecognizedTargetTypeException(Exception):
         target_type: str,
         registered_target_types: RegisteredTargetTypes,
         address: Address | None = None,
+        build_file_source: str | None = None,
     ) -> None:
         for_address = f" for address {address}" if address else ""
+        prefix = f"{build_file_source}: " if build_file_source else ""
         super().__init__(
-            f"Target type {repr(target_type)} is not registered{for_address}.\n\nAll valid target "
-            f"types: {sorted(registered_target_types.aliases)}\n\n(If {repr(target_type)} is a "
-            "custom target type, refer to "
-            "https://groups.google.com/forum/#!topic/pants-devel/WsRFODRLVZI for instructions on "
-            "writing a light-weight Target API binding.)"
+            softwrap(
+                f"""
+                {prefix}Target type {target_type!r} is not registered{for_address}.
+
+                All valid target types: {sorted(registered_target_types.aliases)}
+
+                (If {target_type!r} is a custom target type, refer to
+                {doc_url('target-api-concepts')} for getting it registered with Pants.)
+
+                """
+            )
         )
 
 

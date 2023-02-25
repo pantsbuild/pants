@@ -29,13 +29,18 @@ class TargetAdaptor:
     """A light-weight object to store target information before being converted into the Target
     API."""
 
-    def __init__(self, type_alias: str, name: str | None, **kwargs: Any) -> None:
+    __slots__ = ("type_alias", "name", "kwargs", "source")
+
+    def __init__(self, type_alias: str, name: str | None, __source__: str, **kwargs: Any) -> None:
         self.type_alias = type_alias
         self.name = name
         self.kwargs = kwargs
+        self.source = __source__
 
     def __repr__(self) -> str:
-        return f"TargetAdaptor(type_alias={self.type_alias}, name={self.name})"
+        return (
+            f"TargetAdaptor(type_alias={self.type_alias}, name={self.name}, source={self.source})"
+        )
 
     def __eq__(self, other: Any | TargetAdaptor) -> bool:
         if not isinstance(other, TargetAdaptor):

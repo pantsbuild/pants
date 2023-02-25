@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import functools
 from collections import defaultdict
 from dataclasses import dataclass
 from textwrap import dedent
@@ -23,7 +24,7 @@ from pants.engine.internals.synthetic_targets import (
     SyntheticTargetsSpecPaths,
     rules,
 )
-from pants.engine.internals.target_adaptor import TargetAdaptor
+from pants.engine.internals.target_adaptor import TargetAdaptor as _TargetAdaptor
 from pants.engine.rules import QueryRule, rule
 from pants.engine.target import (
     Dependencies,
@@ -37,6 +38,8 @@ from pants.engine.target import (
 )
 from pants.testutil.rule_runner import RuleRunner, engine_error
 from pants.util.strutil import softwrap
+
+TargetAdaptor = functools.partial(_TargetAdaptor, __source__="BUILD:x")
 
 
 @dataclass(frozen=True)
