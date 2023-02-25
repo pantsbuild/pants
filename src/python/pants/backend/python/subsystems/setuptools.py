@@ -58,12 +58,12 @@ async def setup_setuptools_lockfile(
     _: SetuptoolsLockfileSentinel, setuptools: Setuptools, python_setup: PythonSetup
 ) -> GeneratePythonLockfile:
     if not setuptools.uses_custom_lockfile:
-        return GeneratePythonLockfile.from_tool(setuptools)
+        return setuptools.to_lockfile_request()
 
     interpreter_constraints = await _find_all_unique_interpreter_constraints(
         python_setup, PythonDistributionFieldSet
     )
-    return GeneratePythonLockfile.from_tool(setuptools, interpreter_constraints)
+    return setuptools.to_lockfile_request(interpreter_constraints)
 
 
 def rules():

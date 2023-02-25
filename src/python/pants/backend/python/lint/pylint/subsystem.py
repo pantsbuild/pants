@@ -244,16 +244,15 @@ async def setup_pylint_lockfile(
     python_setup: PythonSetup,
 ) -> GeneratePythonLockfile:
     if not pylint.uses_custom_lockfile:
-        return GeneratePythonLockfile.from_tool(pylint)
+        return pylint.to_lockfile_request()
 
     constraints = await _find_all_unique_interpreter_constraints(
         python_setup,
         PylintFieldSet,
         extra_constraints_per_tgt=first_party_plugins.interpreter_constraints_fields,
     )
-    return GeneratePythonLockfile.from_tool(
-        pylint,
-        constraints,
+    return pylint.to_lockfile_request(
+        interpreter_constraints=constraints,
         extra_requirements=first_party_plugins.requirement_strings,
     )
 

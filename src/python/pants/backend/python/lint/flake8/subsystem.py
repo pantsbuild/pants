@@ -254,16 +254,15 @@ async def setup_flake8_lockfile(
     python_setup: PythonSetup,
 ) -> GeneratePythonLockfile:
     if not flake8.uses_custom_lockfile:
-        return GeneratePythonLockfile.from_tool(flake8)
+        return flake8.to_lockfile_request()
 
     constraints = await _find_all_unique_interpreter_constraints(
         python_setup,
         Flake8FieldSet,
         extra_constraints_per_tgt=first_party_plugins.interpreter_constraints_fields,
     )
-    return GeneratePythonLockfile.from_tool(
-        flake8,
-        constraints,
+    return flake8.to_lockfile_request(
+        interpreter_constraints=constraints,
         extra_requirements=first_party_plugins.requirement_strings,
     )
 

@@ -100,10 +100,10 @@ async def setup_bandit_lockfile(
     _: BanditLockfileSentinel, bandit: Bandit, python_setup: PythonSetup
 ) -> GeneratePythonLockfile:
     if not bandit.uses_custom_lockfile:
-        return GeneratePythonLockfile.from_tool(bandit)
+        return bandit.to_lockfile_request()
 
     constraints = await _find_all_unique_interpreter_constraints(python_setup, BanditFieldSet)
-    return GeneratePythonLockfile.from_tool(bandit, constraints)
+    return bandit.to_lockfile_request(interpreter_constraints=constraints)
 
 
 class BanditExportSentinel(ExportPythonToolSentinel):

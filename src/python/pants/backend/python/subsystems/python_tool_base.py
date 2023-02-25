@@ -6,6 +6,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import Any, ClassVar, Iterable, Sequence
 
+from pants.backend.python.goals.lockfile import GeneratePythonLockfile
 from pants.backend.python.target_types import ConsoleScript, EntryPoint, MainSpecification
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import PexRequest
@@ -25,6 +26,7 @@ from pants.option.errors import OptionsError
 from pants.option.option_types import BoolOption, StrListOption, StrOption
 from pants.option.subsystem import Subsystem
 from pants.util.docutil import bin_name, doc_url
+from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import softwrap
 
 
@@ -257,6 +259,37 @@ class PythonToolRequirementsBase(Subsystem):
         This assumes you have set the class property `register_interpreter_constraints = True`.
         """
         return InterpreterConstraints(self._interpreter_constraints)
+
+    def to_lockfile_request(
+        self,
+        interpreter_constraints: InterpreterConstraints | None = None,
+        extra_requirements: Iterable[str] = (),
+    ) -> GeneratePythonLockfile:
+        """Create a request for a dedicated lockfile for the tool.
+
+        If the tool determines its interpreter constraints by using the constraints of user code,
+        rather than the option `--interpreter-constraints`, you must pass the arg
+        `interpreter_constraints`.
+        """
+        if not self.uses_custom_lockfile:
+            return GeneratePythonLockfile(
+                requirements=FrozenOrderedSet(),
+                interpreter_constraints=InterpreterConstraints(),
+                resolve_name=self.options_scope,
+                lockfile_dest=self.lockfile,
+                diff=False,
+            )
+        return GeneratePythonLockfile(
+            requirements=FrozenOrderedSet((*self.all_requirements, *extra_requirements)),
+            interpreter_constraints=(
+                interpreter_constraints
+                if interpreter_constraints is not None
+                else self.interpreter_constraints
+            ),
+            resolve_name=self.options_scope,
+            lockfile_dest=self.lockfile,
+            diff=False,
+        )
 
     def to_pex_request(
         self,
