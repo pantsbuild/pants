@@ -71,7 +71,9 @@ async def go_show_package_analysis(targets: Targets, console: Console) -> ShowGo
         elif target.has_field(GoThirdPartyPackageDependenciesField):
             import_path = target[GoImportPathField].value
             go_mod_address = target.address.maybe_convert_to_target_generator()
-            go_mod_info = await Get(GoModInfo, GoModInfoRequest(go_mod_address))
+            go_mod_info = await Get(  # noqa: PNT30: requires triage
+                GoModInfo, GoModInfoRequest(go_mod_address)
+            )
             third_party_analysis_gets.append(
                 Get(
                     ThirdPartyPkgAnalysis,
@@ -126,7 +128,7 @@ async def dump_go_import_paths_for_module(
             continue
 
         console.write_stdout(f"{tgt.address}:\n")
-        package_mapping = await Get(
+        package_mapping = await Get(  # noqa: PNT30: requires triage
             GoModuleImportPathsMapping, GoImportPathMappingRequest(tgt.address)
         )
         for import_path, address_set in package_mapping.mapping.items():

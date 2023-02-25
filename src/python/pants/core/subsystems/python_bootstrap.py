@@ -159,7 +159,9 @@ async def _expand_interpreter_search_paths(
                 from_pexrc = special_paths
             expanded.extend(special_paths)
         elif s == "<PYENV>" or s == "<PYENV_LOCAL>":
-            paths = await Get(_SearchPaths, _PyEnvPathsRequest(env_tgt, s == "<PYENV_LOCAL>"))
+            paths = await Get(  # noqa: PNT30: requires triage
+                _SearchPaths, _PyEnvPathsRequest(env_tgt, s == "<PYENV_LOCAL>")
+            )
             expanded.extend(paths.paths)
         else:
             expanded.append(s)

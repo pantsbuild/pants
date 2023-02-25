@@ -97,16 +97,24 @@ async def detect_django_apps(
         ics_to_tgts[ics].append(tgt)
 
     for ics, tgts in ics_to_tgts.items():
-        sources = await MultiGet(
+        sources = await MultiGet(  # noqa: PNT30: requires triage
             [Get(HydratedSources, HydrateSourcesRequest(tgt[SourcesField])) for tgt in tgts]
         )
-        apps_digest = await Get(Digest, MergeDigests([src.snapshot.digest for src in sources]))
-        prefixed_apps_digest = await Get(Digest, AddPrefix(apps_digest, apps_sandbox_prefix))
+        apps_digest = await Get(  # noqa: PNT30: requires triage
+            Digest, MergeDigests([src.snapshot.digest for src in sources])
+        )
+        prefixed_apps_digest = await Get(  # noqa: PNT30: requires triage
+            Digest, AddPrefix(apps_digest, apps_sandbox_prefix)
+        )
 
-        input_digest = await Get(Digest, MergeDigests([prefixed_apps_digest, script_digest]))
-        python_interpreter = await Get(PythonExecutable, InterpreterConstraints, ics)
+        input_digest = await Get(  # noqa: PNT30: requires triage
+            Digest, MergeDigests([prefixed_apps_digest, script_digest])
+        )
+        python_interpreter = await Get(  # noqa: PNT30: requires triage
+            PythonExecutable, InterpreterConstraints, ics
+        )
 
-        process_result = await Get(
+        process_result = await Get(  # noqa: PNT30: requires triage
             ProcessResult,
             Process(
                 argv=[
