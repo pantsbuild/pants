@@ -20,10 +20,10 @@ from pants.core.target_types import (
 from pants.core.util_rules import stripped_source_files
 from pants.engine import fs
 from pants.engine.collection import Collection, DeduplicatedCollection
-from pants.engine.fs import DigestContents, PathGlobs
+from pants.engine.fs import DigestContents, FileContent, PathGlobs
 from pants.engine.internals import graph
 from pants.engine.internals.native_engine import Digest, Snapshot
-from pants.engine.internals.selectors import Get
+from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import Rule, collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
@@ -448,30 +448,34 @@ async def find_owning_package(request: OwningNodePackageRequest) -> OwningNodePa
 
 
 @rule
+async def parse_package_json(content: FileContent) -> PackageJson:
+    parsed_package_json = FrozenDict.deep_freeze(json.loads(content.content))
+    return PackageJson(
+        content=parsed_package_json,
+        name=parsed_package_json["name"],
+        version=parsed_package_json["version"],
+        snapshot=await Get(Snapshot, PathGlobs([content.path])),
+        module=parsed_package_json.get("type"),
+        workspaces=tuple(parsed_package_json.get("workspaces", ())),
+        dependencies=FrozenDict.deep_freeze(
+            {
+                **parsed_package_json.get("dependencies", {}),
+                **parsed_package_json.get("devDependencies", {}),
+                **parsed_package_json.get("peerDependencies", {}),
+            }
+        ),
+    )
+
+
+@rule
 async def read_package_jsons(globs: PathGlobs) -> PackageJsonForGlobs:
     snapshot = await Get(Snapshot, PathGlobs, globs)
     digest_contents = await Get(DigestContents, Digest, snapshot.digest)
-
-    pkgs = []
-    for digest_content in digest_contents:
-        parsed_package_json = FrozenDict.deep_freeze(json.loads(digest_content.content))
-        pkg = PackageJson(
-            content=parsed_package_json,
-            name=parsed_package_json["name"],
-            version=parsed_package_json["version"],
-            snapshot=await Get(Snapshot, PathGlobs([digest_content.path])),
-            module=parsed_package_json.get("type"),
-            workspaces=tuple(parsed_package_json.get("workspaces", ())),
-            dependencies=FrozenDict.deep_freeze(
-                {
-                    **parsed_package_json.get("dependencies", {}),
-                    **parsed_package_json.get("devDependencies", {}),
-                    **parsed_package_json.get("peerDependencies", {}),
-                }
-            ),
+    return PackageJsonForGlobs(
+        await MultiGet(
+            Get(PackageJson, FileContent, digest_content) for digest_content in digest_contents
         )
-        pkgs.append(pkg)
-    return PackageJsonForGlobs(pkgs)
+    )
 
 
 @rule
