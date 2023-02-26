@@ -35,7 +35,6 @@ from pants.engine.target import (
     NestedDictStringToStringField,
     OptionalSingleSourceField,
     OverridesField,
-    RequiredFieldMissingException,
     ScalarField,
     SequenceField,
     SingleSourceField,
@@ -155,7 +154,7 @@ def test_field_and_target_eq() -> None:
 
 
 def test_invalid_fields_rejected() -> None:
-    with pytest.raises(InvalidFieldException) as exc:
+    with pytest.raises(InvalidTargetException) as exc:
         FortranTarget({"invalid_field": True}, Address("", target_name="lib"))
     assert "Unrecognized field `invalid_field=True`" in str(exc)
     assert "//:lib" in str(exc)
@@ -203,7 +202,7 @@ def test_get_field() -> None:
 
 
 def test_field_hydration_is_eager() -> None:
-    with pytest.raises(InvalidFieldException) as exc:
+    with pytest.raises(InvalidTargetException) as exc:
         FortranTarget(
             {FortranExtensions.alias: ["FortranExt1", "DoesNotStartWithFortran"]},
             Address("", target_name="bad_extension"),
@@ -390,7 +389,7 @@ def test_override_preexisting_field_via_new_target() -> None:
     )
 
     # Custom validation
-    with pytest.raises(InvalidFieldException) as exc:
+    with pytest.raises(InvalidTargetException) as exc:
         CustomFortranTarget(
             {FortranExtensions.alias: CustomFortranExtensions.banned_extensions},
             Address("", target_name="invalid"),
@@ -413,7 +412,7 @@ def test_required_field() -> None:
     # No errors when defined
     RequiredTarget({"field": "present"}, address)
 
-    with pytest.raises(RequiredFieldMissingException) as exc:
+    with pytest.raises(InvalidTargetException) as exc:
         RequiredTarget({}, address)
     assert str(address) in str(exc.value)
     assert "field" in str(exc.value)
