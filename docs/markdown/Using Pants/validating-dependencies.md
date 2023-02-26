@@ -7,7 +7,7 @@ createdAt: "2022-12-12T09:10:16.427Z"
 updatedAt: "2022-12-12T03:00:53.427Z"
 ---
 
-Visibility rules are the mechanism by which to control who may depend on whom. It is an implementation of Pants's dependency rules API. With these rules a dependency between two files (or targets) may be set for entire directory trees down to single files. Targets may be selected not only by its file path but also by target type, name and tags.
+Visibility rules are the mechanism by which to control who may depend on whom. It is an implementation of Pants's dependency rules API. With these rules a dependency between two files (or targets) may be set for entire directory trees down to single files. A target may be selected not only by its file path but also by target type, name and tags.
 
 To jump right in, start with [enabling the backend](doc:validating-dependencies#enable-visibility-backend) and add some rules to your BUILD files.
 
@@ -266,9 +266,9 @@ The previous example, using this alternative syntax for the selectors, would loo
 Glob syntax
 -----------
 
-The visibility rules is all about matching globs. There are two primary kinds of globs supported, the simple glob syntax and the path glob syntax. Simple globs only supports `*` as a match anything and is otherwise case sensitive and are used for all glob values except for the `path` part of a __target rule spec__. The path glob syntax is described further below.
+The visibility rules are all about matching globs. There are two kinds of glob syntax: the simple glob syntax and the path glob syntax. Simple globs only support `*` to match anything and are otherwise case sensitive, and are used for all glob values except for the `path` part of a __target rule spec__. The path glob syntax is described further below.
 
-Path globs have two wildcards, the `*` as a match anything non-recursively and the `**` for a recursive match anything. All globs are matched until the end of the value it is being applied to, so if there is no trailing wildcard (`*` or `**`) the end of the path glob it will match until the end of the path. This allows for matching on file names regardless of where in the project tree they are:
+Path globs have two wildcards, the `*` to match anything non-recursively and the `**` to match anything recursively. Each glob is matched until the end of the value it is being applied to, so if there is no trailing wildcard (`*` or `**`) on the end of the path glob, it will match to the end of the path. This allows for matching on file names regardless of where in the project tree they are:
 ```
 .py
 my_source.py
