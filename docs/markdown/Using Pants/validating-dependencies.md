@@ -266,9 +266,10 @@ The previous example, using this alternative syntax for the selectors, would loo
 Glob syntax
 -----------
 
-The visibility rules are all about matching globs. There are two kinds of glob syntax: the simple glob syntax and the path glob syntax. Simple globs only support `*` to match anything and are otherwise case sensitive, and are used for all glob values except for the `path` part of a __target rule spec__. The path glob syntax is described further below.
+The visibility rules are all about matching globs. There are two wildcards, the `*` to match anything except `/` and the `**` to match anything including any `/`. (For paths that is non-recursive and recursive globbing respectively.)
 
-Path globs have two wildcards, the `*` to match anything non-recursively and the `**` to match anything recursively. Each glob is matched until the end of the value it is being applied to, so if there is no trailing wildcard (`*` or `**`) on the end of the path glob, it will match to the end of the path. This allows for matching on file names regardless of where in the project tree they are:
+Globs are matched until the end of the value it is being applied to, so if there is no trailing wildcard (`*` or `**`) on the end of the path glob, it will match to the end of the value. An example where this is usefull is for matching on file names regardless of where in the project tree they are:
+
 ```
 .py
 my_source.py
@@ -279,11 +280,7 @@ Any leading wildcards may be used to emphasize this if desired, but will functio
 ```
 *.py
 */my_source.py
-*/my_*.py
-
-**/*.py
-**/*my_source.py
-**/*my_*.py
+**/my_*.py
 ```
 
 When providing a file name, like `my_source.py` it will be assumed that it will be the full name, so `another_my_source.py` will _not_ be considered a match in that case.
