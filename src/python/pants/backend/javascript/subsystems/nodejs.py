@@ -150,7 +150,7 @@ class NodeJSProcessEnvironment:
 
     def to_env_dict(self) -> dict[str, str]:
         return {
-            "PATH": os.path.pathsep.join((os.path.join(os.path.sep, "bin"), self.binary_directory)),
+            "PATH": f"/bin:{self.binary_directory}",
             "npm_config_cache": self.npm_config_cache,  # Normally stored at ~/.npm
         }
 
