@@ -17,6 +17,7 @@ from pants.backend.javascript.package_json import (
 )
 from pants.core.goals.generate_lockfiles import GenerateLockfileResult, KnownUserResolveNames
 from pants.engine.fs import DigestContents, PathGlobs
+from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
 
@@ -60,6 +61,38 @@ def test_resolves_are_dotted_package_paths(rule_runner: RuleRunner) -> None:
         KnownUserResolveNames, (projects, KnownPackageJsonUserResolveNamesRequest())
     )
     assert set(resolves.names) == {"src.js.foo", "src.js.bar"}
+
+
+def test_user_can_override_resolve_aliases(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/js/foo/BUILD": "package_json()",
+            "src/js/foo/package.json": given_package_with_name("ham"),
+            "src/js/bar/BUILD": "package_json()",
+            "src/js/bar/package.json": given_package_with_name("spam"),
+        }
+    )
+    projects = rule_runner.request(AllNodeJSProjects, [])
+    rule_runner.set_options(["--nodejs-resolves={'user:1': 'src/js/foo/package-lock.json'}"])
+    resolves = rule_runner.request(
+        KnownUserResolveNames, (projects, KnownPackageJsonUserResolveNamesRequest())
+    )
+    assert set(resolves.names) == {"user:1", "src.js.bar"}
+
+
+def test_user_override_non_existing_resolve_is_an_error(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/js/foo/BUILD": "package_json()",
+            "src/js/foo/package.json": given_package_with_name("ham"),
+        }
+    )
+    projects = rule_runner.request(AllNodeJSProjects, [])
+    rule_runner.set_options(["--nodejs-resolves={'user:1': 'does/not/exist/package-lock.json'}"])
+    with pytest.raises(ExecutionError):
+        rule_runner.request(
+            KnownUserResolveNames, (projects, KnownPackageJsonUserResolveNamesRequest())
+        )
 
 
 def test_generates_lockfile_for_package_json_project(rule_runner: RuleRunner) -> None:

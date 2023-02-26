@@ -18,8 +18,11 @@ from pants.engine.platform import Platform
 from pants.engine.process import Process
 from pants.engine.rules import Get, Rule, collect_rules, rule
 from pants.engine.unions import UnionRule
+from pants.option.option_types import DictOption
+from pants.util.docutil import bin_name
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
+from pants.util.strutil import softwrap
 
 
 class NodeJS(TemplatedExternalTool):
@@ -42,6 +45,26 @@ class NodeJS(TemplatedExternalTool):
         "linux_x86_64": "linux-x64",
     }
 
+    resolves = DictOption[str](
+        default={},
+        help=softwrap(
+            f"""
+            A mapping of names to lockfile paths used in your project.
+
+            The default name of a resolve will be the path to the directory containing
+            a lockfile, from the build root, {os.path.sep} replaced with '.'.
+
+            Example:
+            An npm lockfile located at `js/package/package-lock.json'
+            will result in a resolve named `js.package`.
+
+            Run `{bin_name()} generate-lockfiles` to
+            generate the lockfile(s).
+            """
+        ),
+        advanced=True,
+    )
+
     def generate_url(self, plat: Platform) -> str:
         """NodeJS binaries are compressed as .gz for Mac, .xz for Linux."""
         url = super().generate_url(plat)
@@ -52,6 +75,15 @@ class NodeJS(TemplatedExternalTool):
         assert self.default_url_platform_mapping is not None
         plat_str = self.default_url_platform_mapping[plat.value]
         return f"./node-{self.version}-{plat_str}/bin/node"
+
+
+class UserChosenNodeJSResolveAliases(FrozenDict[str, str]):
+    pass
+
+
+@rule(level=LogLevel.DEBUG)
+async def user_chosen_resolve_aliases(nodejs: NodeJS) -> UserChosenNodeJSResolveAliases:
+    return UserChosenNodeJSResolveAliases((value, key) for key, value in nodejs.resolves.items())
 
 
 @dataclass(frozen=True)
