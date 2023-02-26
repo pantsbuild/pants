@@ -301,8 +301,11 @@ impl ExecuteProcess {
   ) -> Result<InputDigests, StoreError> {
     let input_digests_fut: Result<_, String> = Python::with_gil(|py| {
       let value = (**value).as_ref(py);
-      let input_files = lift_directory_digest(externs::getattr(value, "input_digest").map_err(|err| format!("Error retrieving `input_digest`: {err}"))?)
-        .map_err(|err| format!("Error parsing input_digest {err}"))?;
+      let input_files = lift_directory_digest(
+        externs::getattr(value, "input_digest")
+          .map_err(|err| format!("Error retrieving `input_digest`: {err}"))?,
+      )
+      .map_err(|err| format!("Error parsing input_digest {err}"))?;
       let immutable_inputs =
         externs::getattr_from_str_frozendict::<&PyAny>(value, "immutable_input_digests")
           .into_iter()
@@ -383,8 +386,7 @@ impl ExecuteProcess {
         .map_err(|e| format!("Failed to get `execution_slot_variable` for field: {e}"))?;
 
     let concurrency_available: usize = externs::getattr(value, "concurrency_available")
-        .map_err(|e| format!("Failed to get `concurrency_available` for field: {e}"))?;
-
+      .map_err(|e| format!("Failed to get `concurrency_available` for field: {e}"))?;
 
     let cache_scope: ProcessCacheScope = {
       let cache_scope_enum = externs::getattr(value, "cache_scope")
@@ -396,7 +398,7 @@ impl ExecuteProcess {
 
     let remote_cache_speculation_delay = std::time::Duration::from_millis(
       externs::getattr::<i32>(value, "remote_cache_speculation_delay_millis")
-        .map_err(|e| format!("Failed to get `name` for field: {e}"))? as u64
+        .map_err(|e| format!("Failed to get `name` for field: {e}"))? as u64,
     );
 
     Ok(Process {
@@ -1033,11 +1035,10 @@ impl DownloadedFile {
       let py_download_file_val = self.0.to_value();
       let py_download_file = (*py_download_file_val).as_ref(py);
       let url_str: String = externs::getattr(py_download_file, "url")
-          .map_err(|e| format!("Failed to get `url` for field: {e}"))?;
+        .map_err(|e| format!("Failed to get `url` for field: {e}"))?;
       let auth_headers = externs::getattr_from_str_frozendict(py_download_file, "auth_headers");
-      let py_file_digest: PyFileDigest =
-        externs::getattr(py_download_file, "expected_digest")
-          .map_err(|e| format!("Failed to get `expected_digest` for field: {e}"))?;
+      let py_file_digest: PyFileDigest = externs::getattr(py_download_file, "expected_digest")
+        .map_err(|e| format!("Failed to get `expected_digest` for field: {e}"))?;
       let res: NodeResult<(String, Digest, BTreeMap<String, String>)> =
         Ok((url_str, py_file_digest.0, auth_headers));
       res

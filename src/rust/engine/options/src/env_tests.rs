@@ -32,12 +32,10 @@ fn test_display() {
 #[test]
 fn test_scope() {
   let env = env([("PANTS_PYTHON_EXAMPLE", "true")]);
-  assert!(
-    env
-      .get_bool(&option_id!(["python"], "example"))
-      .unwrap()
-      .unwrap()
-  );
+  assert!(env
+    .get_bool(&option_id!(["python"], "example"))
+    .unwrap()
+    .unwrap());
 }
 
 #[test]
