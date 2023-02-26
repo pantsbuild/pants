@@ -92,9 +92,16 @@ async def determine_package_json_user_resolves(
 
 @rule
 async def setup_user_lockfile_requests(
-    requested: RequestedPackageJsonUserResolveNames, all_projects: AllNodeJSProjects
+    requested: RequestedPackageJsonUserResolveNames,
+    all_projects: AllNodeJSProjects,
+    user_chosen_resolves: UserChosenNodeJSResolveAliases,
 ) -> UserGenerateLockfiles:
-    projects_by_name = {project.resolve_name: project for project in all_projects}
+    def get_name(project: NodeJSProject) -> str:
+        return user_chosen_resolves.get(
+            os.path.join(project.root_dir, "package-lock.json"), project.resolve_name
+        )
+
+    projects_by_name = {get_name(project): project for project in all_projects}
     return UserGenerateLockfiles(
         GeneratePackageLockJsonFile(
             resolve_name=name,

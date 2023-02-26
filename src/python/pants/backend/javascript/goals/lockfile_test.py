@@ -1,5 +1,7 @@
 # Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+from __future__ import annotations
+
 import json
 
 import pytest
@@ -8,6 +10,7 @@ from pants.backend.javascript.goals import lockfile
 from pants.backend.javascript.goals.lockfile import (
     GeneratePackageLockJsonFile,
     KnownPackageJsonUserResolveNamesRequest,
+    RequestedPackageJsonUserResolveNames,
 )
 from pants.backend.javascript.nodejs_project import AllNodeJSProjects
 from pants.backend.javascript.package_json import (
@@ -15,7 +18,12 @@ from pants.backend.javascript.package_json import (
     PackageJsonForGlobs,
     PackageJsonTarget,
 )
-from pants.core.goals.generate_lockfiles import GenerateLockfileResult, KnownUserResolveNames
+from pants.backend.javascript.subsystems.nodejs import UserChosenNodeJSResolveAliases
+from pants.core.goals.generate_lockfiles import (
+    GenerateLockfileResult,
+    KnownUserResolveNames,
+    UserGenerateLockfiles,
+)
 from pants.engine.fs import DigestContents, PathGlobs
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import QueryRule
@@ -34,6 +42,14 @@ def rule_runner() -> RuleRunner:
             QueryRule(PackageJsonForGlobs, (PathGlobs,)),
             QueryRule(AllPackageJson, (PathGlobs,)),
             QueryRule(GenerateLockfileResult, (GeneratePackageLockJsonFile,)),
+            QueryRule(
+                UserGenerateLockfiles,
+                (
+                    RequestedPackageJsonUserResolveNames,
+                    AllNodeJSProjects,
+                    UserChosenNodeJSResolveAliases,
+                ),
+            ),
         ],
         target_types=[PackageJsonTarget],
     )
@@ -93,6 +109,39 @@ def test_user_override_non_existing_resolve_is_an_error(rule_runner: RuleRunner)
         rule_runner.request(
             KnownUserResolveNames, (projects, KnownPackageJsonUserResolveNamesRequest())
         )
+
+
+@pytest.mark.parametrize(
+    "alias_args, expected_resolve",
+    [
+        pytest.param(
+            ["--nodejs-resolves={'my-resolve': 'src/js/package-lock.json'}"],
+            "my-resolve",
+            id="Aliased resolve",
+        ),
+        pytest.param([""], "src.js", id="Default resolve"),
+    ],
+)
+def test_generates_lockfile_with_expected_resolve_name(
+    rule_runner: RuleRunner, alias_args: list[str], expected_resolve: str
+) -> None:
+    rule_runner.write_files(
+        {
+            "src/js/BUILD": "package_json()",
+            "src/js/package.json": given_package_with_name("ham"),
+        }
+    )
+    projects = rule_runner.request(AllNodeJSProjects, [])
+    rule_runner.set_options(alias_args)
+    [lockfile] = rule_runner.request(
+        UserGenerateLockfiles,
+        (
+            projects,
+            RequestedPackageJsonUserResolveNames((expected_resolve,)),
+            UserChosenNodeJSResolveAliases(),
+        ),
+    )
+    assert lockfile.resolve_name == expected_resolve
 
 
 def test_generates_lockfile_for_package_json_project(rule_runner: RuleRunner) -> None:
