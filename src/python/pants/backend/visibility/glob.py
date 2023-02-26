@@ -44,7 +44,7 @@ class PathGlobAnchorMode(Enum):
 @dataclass(frozen=True)
 class PathGlob:
     raw: str
-    anchor_mode: PathGlobAnchorMode = field(compare=False)
+    anchor_mode: PathGlobAnchorMode
     glob: Pattern = field(compare=False)
     uplvl: int
 

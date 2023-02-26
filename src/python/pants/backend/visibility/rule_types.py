@@ -10,7 +10,7 @@ from pathlib import PurePath
 from pprint import pformat
 from typing import Any, Iterable, Iterator, Sequence, cast
 
-from pants.backend.visibility.glob import PathGlob, TargetGlob
+from pants.backend.visibility.glob import TargetGlob
 from pants.engine.addresses import Address
 from pants.engine.internals.dep_rules import (
     BuildFileDependencyRules,
@@ -63,7 +63,7 @@ class VisibilityRule:
     """A single rule with an associated action when matched against a given path."""
 
     action: DependencyRuleAction
-    glob: PathGlob
+    glob: TargetGlob
 
     @classmethod
     def parse(
@@ -82,10 +82,10 @@ class VisibilityRule:
         else:
             action = DependencyRuleAction.ALLOW
             pattern = rule
-        return cls(action, PathGlob.parse(pattern, relpath))
+        return cls(action, TargetGlob.parse(pattern, relpath))
 
-    def match(self, path: str, relpath: str) -> bool:
-        return self.glob.match(path, relpath)
+    def match(self, address: Address, adaptor: TargetAdaptor, relpath: str) -> bool:
+        return self.glob.match(address, adaptor, relpath)
 
     def __str__(self) -> str:
         prefix = ""
@@ -216,6 +216,7 @@ class BuildFileVisibilityRules(BuildFileDependencyRules):
                 address=origin_address,
                 adaptor=origin_adaptor,
                 other_address=dependency_address,
+                other_adaptor=dependency_adaptor,
             )
             if dependencies_rules is not None
             else (None, DependencyRuleAction.ALLOW, None)
@@ -237,6 +238,7 @@ class BuildFileVisibilityRules(BuildFileDependencyRules):
                 address=dependency_address,
                 adaptor=dependency_adaptor,
                 other_address=origin_address,
+                other_adaptor=origin_adaptor,
             )
             if dependents_rules is not None
             else (None, DependencyRuleAction.ALLOW, None)
@@ -281,6 +283,7 @@ class BuildFileVisibilityRules(BuildFileDependencyRules):
         address: Address,
         adaptor: TargetAdaptor,
         other_address: Address,
+        other_adaptor: TargetAdaptor,
     ) -> tuple[VisibilityRuleSet | None, DependencyRuleAction | None, str | None]:
         """Get applicable rule for target type from `path`.
 
@@ -290,10 +293,10 @@ class BuildFileVisibilityRules(BuildFileDependencyRules):
         ruleset = self.get_ruleset(address, adaptor, relpath)
         if ruleset is None:
             return None, None, None
-        path = self._get_address_path(other_address)
         for visibility_rule in ruleset.rules:
-            if visibility_rule.match(path, relpath):
+            if visibility_rule.match(other_address, other_adaptor, relpath):
                 if visibility_rule.action != DependencyRuleAction.ALLOW:
+                    path = self._get_address_path(other_address)
                     logger.debug(
                         softwrap(
                             f"""
