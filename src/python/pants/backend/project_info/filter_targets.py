@@ -18,7 +18,7 @@ from pants.util.docutil import bin_name
 from pants.util.enums import match
 from pants.util.filtering import TargetFilter, and_filters, create_filters
 from pants.util.memo import memoized
-from pants.util.strutil import softwrap
+from pants.util.strutil import help_text, softwrap
 
 
 class TargetGranularity(Enum):
@@ -29,7 +29,7 @@ class TargetGranularity(Enum):
 
 class FilterSubsystem(LineOriented, GoalSubsystem):
     name = "filter"
-    help = softwrap(
+    help = help_text(
         """
         Filter the input targets based on various criteria.
 

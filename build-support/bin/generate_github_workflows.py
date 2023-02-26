@@ -238,7 +238,7 @@ def install_go() -> Step:
     return {
         "name": "Install Go",
         "uses": "actions/setup-go@v3",
-        "with": {"go-version": "1.17.1"},
+        "with": {"go-version": "1.19.5"},
     }
 
 
@@ -315,6 +315,14 @@ class Helper:
         if self.platform == Platform.LINUX_ARM64:
             ret["PANTS_CONFIG_FILES"] = "+['pants.ci.toml','pants.ci.aarch64.toml']"
         return ret
+
+    def maybe_append_cargo_test_parallelism(self, cmd: str) -> str:
+        if self.platform == Platform.LINUX_ARM64:
+            # TODO: The ARM64 runner has enough cores to reliably trigger #18191 using
+            # our default settings. We lower parallelism here as a bandaid to work around
+            # #18191 until it can be resolved.
+            return f"{cmd} --test-threads=8"
+        return cmd
 
     def wrap_cmd(self, cmd: str) -> str:
         if self.platform == Platform.MACOS11_ARM64:
@@ -528,19 +536,23 @@ def bootstrap_jobs(
         # We pass --tests to skip doc tests because our generated protos contain
         # invalid doc tests in their comments. We do not pass --all as BRFS tests don't
         # pass on GHA MacOS containers.
-        step_cmd = helper.wrap_cmd("./cargo test --tests -- --nocapture")
+        step_cmd = helper.wrap_cmd(
+            helper.maybe_append_cargo_test_parallelism("./cargo test --tests -- --nocapture")
+        )
     elif rust_testing == RustTesting.ALL:
         human_readable_job_name += ", test and lint Rust"
         human_readable_step_name = "Test and lint Rust"
         # We pass --tests to skip doc tests because our generated protos contain
         # invalid doc tests in their comments.
-        step_cmd = dedent(
-            """\
-            ./build-support/bin/check_rust_pre_commit.sh
-            ./cargo test --all --tests -- --nocapture
-            ./cargo check --benches
-            ./cargo doc
-            """
+        step_cmd = "\n".join(
+            [
+                "./build-support/bin/check_rust_pre_commit.sh",
+                helper.maybe_append_cargo_test_parallelism(
+                    "./cargo test --all --tests -- --nocapture"
+                ),
+                "./cargo check --benches",
+                "./cargo doc",
+            ]
         )
     else:
         raise ValueError(f"Unrecognized RustTesting value: {rust_testing}")
@@ -705,13 +717,7 @@ def build_wheels_job(platform: Platform, python_versions: list[str]) -> Jobs:
         # Unfortunately Equinix do not support the CentOS 7 image on the hardware we've been
         # generously given by the Runs on ARM program. Se we have to build in this image.
         container = {
-            "image": "registry.hub.docker.com/pantsbuild/wheel_build_aarch64:v2-2e4d40b8b5",
-            # The uid/gid for the gha user and group we set up on the self-hosted runner.
-            # Necessary to avoid https://github.com/actions/runner/issues/434.
-            # Alternatively we could run absolutely everything in a container,
-            # or we could run the runner as root (which seems like a bad idea),
-            # or we can modify the standard image to include this user.
-            "options": "--user 1000:1000",
+            "image": "registry.hub.docker.com/pantsbuild/wheel_build_aarch64:v3-8384c5cf",
         }
     else:
         container = None

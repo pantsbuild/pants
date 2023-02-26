@@ -29,7 +29,7 @@ use log::{self, debug, error, warn, Log};
 use logging::logger::PANTS_LOGGER;
 use logging::{Logger, PythonLogLevel};
 use petgraph::graph::{DiGraph, Graph};
-use process_execution::{CacheContentBehavior, RemoteCacheWarningsBehavior};
+use process_execution::CacheContentBehavior;
 use pyo3::exceptions::{PyException, PyIOError, PyKeyboardInterrupt, PyValueError};
 use pyo3::prelude::{
   pyclass, pyfunction, pymethods, pymodule, wrap_pyfunction, PyModule, PyObject,
@@ -38,6 +38,7 @@ use pyo3::prelude::{
 use pyo3::types::{PyBytes, PyDict, PyList, PyTuple, PyType};
 use pyo3::{create_exception, IntoPy, PyAny, PyRef};
 use regex::Regex;
+use remote::remote_cache::RemoteCacheWarningsBehavior;
 use rule_graph::{self, DependencyKey, RuleGraph};
 use task_executor::Executor;
 use workunit_store::{
@@ -353,8 +354,7 @@ impl PyLocalStoreOptions {
   ) -> PyO3Result<Self> {
     if shard_count.count_ones() != 1 {
       return Err(PyValueError::new_err(format!(
-        "The local store shard count must be a power of two: got {}",
-        shard_count
+        "The local store shard count must be a power of two: got {shard_count}"
       )));
     }
     Ok(Self(LocalStoreOptions {
@@ -493,7 +493,7 @@ fn py_result_from_root(py: Python, result: Result<Value, Failure>) -> PyResult {
     Err(f) => {
       let (val, python_traceback, engine_traceback) = match f {
         f @ (Failure::Invalidated | Failure::MissingDigest { .. }) => {
-          let msg = format!("{}", f);
+          let msg = format!("{f}");
           let python_traceback = Failure::native_traceback(&msg);
           (
             externs::create_exception(py, msg),
@@ -956,7 +956,7 @@ fn session_poll_workunits(
       let py_session = py_session.extract::<PyRef<PySession>>(py)?;
       let py_level: PythonLogLevel = max_log_verbosity_level
         .try_into()
-        .map_err(|e| PyException::new_err(format!("{}", e)))?;
+        .map_err(|e| PyException::new_err(format!("{e}")))?;
       (py_scheduler.0.core.clone(), py_session.0.clone(), py_level)
     };
     core.executor.enter(|| {
@@ -1129,7 +1129,7 @@ fn tasks_task_begin(
 ) -> PyO3Result<()> {
   let py_level: PythonLogLevel = level
     .try_into()
-    .map_err(|e| PyException::new_err(format!("{}", e)))?;
+    .map_err(|e| PyException::new_err(format!("{e}")))?;
   let func = Function(Key::from_value(func.into())?);
   let output_type = TypeId::new(output_type);
   let arg_types = arg_types.into_iter().map(TypeId::new).collect();
@@ -1255,7 +1255,7 @@ fn session_new_run_id(py_session: &PySession) {
 }
 
 #[pyfunction]
-fn session_get_metrics<'py>(py: Python<'py>, py_session: &PySession) -> HashMap<&'static str, u64> {
+fn session_get_metrics(py: Python<'_>, py_session: &PySession) -> HashMap<&'static str, u64> {
   py.allow_threads(|| py_session.0.workunit_store().get_metrics())
 }
 
@@ -1417,8 +1417,8 @@ pub(crate) fn generate_panic_string(payload: &(dyn Any + Send)) -> String {
     .cloned()
     .or_else(|| payload.downcast_ref::<&str>().map(|&s| s.to_string()))
   {
-    Some(ref s) => format!("panic at '{}'", s),
-    None => format!("Non-string panic payload at {:p}", payload),
+    Some(ref s) => format!("panic at '{s}'"),
+    None => format!("Non-string panic payload at {payload:p}"),
   }
 }
 
@@ -1495,11 +1495,11 @@ fn capture_snapshots(
     let path_globs_and_roots = values
       .into_iter()
       .map(|value| {
-        let root: PathBuf = externs::getattr(value, "root").unwrap();
+        let root: PathBuf = externs::getattr(value, "root")?;
         let path_globs =
-          nodes::Snapshot::lift_prepared_path_globs(externs::getattr(value, "path_globs").unwrap());
+          nodes::Snapshot::lift_prepared_path_globs(externs::getattr(value, "path_globs")?);
         let digest_hint = {
-          let maybe_digest: &PyAny = externs::getattr(value, "digest_hint").unwrap();
+          let maybe_digest: &PyAny = externs::getattr(value, "digest_hint")?;
           if maybe_digest.is_none() {
             None
           } else {
@@ -1674,8 +1674,7 @@ fn stdio_initialize(
       Regex::new(re).map_err(|e| {
         PyException::new_err(
           format!(
-            "Failed to parse warning filter. Please check the global option `--ignore-warnings`.\n\n{}",
-            e,
+            "Failed to parse warning filter. Please check the global option `--ignore-warnings`.\n\n{e}",
           )
         )
       })
@@ -1691,7 +1690,7 @@ fn stdio_initialize(
     regex_filters,
     log_file_path,
   )
-  .map_err(|s| PyException::new_err(format!("Could not initialize logging: {}", s)))?;
+  .map_err(|s| PyException::new_err(format!("Could not initialize logging: {s}")))?;
 
   Ok((
     externs::stdio::PyStdioRead,

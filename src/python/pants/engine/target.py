@@ -19,6 +19,7 @@ from enum import Enum
 from pathlib import PurePath
 from typing import (
     Any,
+    Callable,
     ClassVar,
     Dict,
     Generic,
@@ -62,9 +63,8 @@ from pants.util.dirutil import fast_relpath
 from pants.util.docutil import bin_name, doc_url
 from pants.util.frozendict import FrozenDict
 from pants.util.memo import memoized_method, memoized_property
-from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet
-from pants.util.strutil import bullet_list, pluralize, softwrap
+from pants.util.strutil import bullet_list, help_text, pluralize, softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -89,7 +89,7 @@ class _NoValue:
 NO_VALUE = _NoValue()
 
 
-@frozen_after_init
+@dataclass(frozen=True)
 class Field:
     """A Field.
 
@@ -143,7 +143,7 @@ class Field:
 
     # Subclasses must define these.
     alias: ClassVar[str]
-    help: ClassVar[str]
+    help: ClassVar[str | Callable[[], str]]
 
     # Subclasses must define at least one of these two.
     default: ClassVar[ImmutableValue]
@@ -156,12 +156,15 @@ class Field:
     deprecated_alias: ClassVar[str | None] = None
     deprecated_alias_removal_version: ClassVar[str | None] = None
 
+    value: Optional[ImmutableValue]
+
     @final
     def __init__(self, raw_value: Optional[Any], address: Address) -> None:
         if raw_value is NO_VALUE and not self.none_is_valid_value:
             raw_value = None
         self._check_deprecated(raw_value, address)
-        self.value: Optional[ImmutableValue] = self.compute_value(raw_value, address)
+
+        object.__setattr__(self, "value", self.compute_value(raw_value, address))
 
     @classmethod
     def compute_value(cls, raw_value: Optional[Any], address: Address) -> ImmutableValue:
@@ -205,14 +208,10 @@ class Field:
     def __hash__(self) -> int:
         return hash((self.__class__, self.value))
 
-    def __eq__(self, other: Union[Any, Field]) -> bool:
-        if not isinstance(other, Field):
-            return NotImplemented
-        return (self.__class__, self.value) == (other.__class__, other.value)
-
 
 # NB: By subclassing `Field`, MyPy understands our type hints, and it means it doesn't matter which
 # order you use for inheriting the field template vs. the mixin.
+@dataclass(frozen=True)
 class AsyncFieldMixin(Field):
     """A mixin to store the field's original `Address` for use during hydration by the engine.
 
@@ -259,16 +258,15 @@ class AsyncFieldMixin(Field):
         sources2 = await Get(HydratedSources, HydrateSourcesRequest(custom_tgt.get(CustomSources)))
     """
 
+    address: Address
+
     @final  # type: ignore[misc]
     def __init__(self, raw_value: Optional[Any], address: Address) -> None:
+        # N.B.: We store the address here and not in the Field base class, because the memory usage
+        # of storing this value in every field was shown to be excessive / lead to performance
+        # issues.
+        object.__setattr__(self, "address", address)
         super().__init__(raw_value, address)
-        # We must temporarily unfreeze the field, but then we refreeze to continue avoiding
-        # subclasses from adding arbitrary fields.
-        with self._unfrozen():  # type: ignore[attr-defined]
-            # N.B.: We store the address here and not in the Field base class, because the memory usage
-            # of storing this value in every field was shown to be excessive / lead to performance
-            # issues.
-            self.address = address
 
     def __repr__(self) -> str:
         return (
@@ -278,15 +276,6 @@ class AsyncFieldMixin(Field):
 
     def __hash__(self) -> int:
         return hash((self.__class__, self.value, self.address))
-
-    def __eq__(self, other: Union[Any, AsyncFieldMixin]) -> bool:
-        if not isinstance(other, AsyncFieldMixin):
-            return NotImplemented
-        return (self.__class__, self.value, self.address) == (
-            other.__class__,
-            other.value,
-            other.address,
-        )
 
 
 @union
@@ -330,7 +319,9 @@ class FieldDefaults:
 
     See https://github.com/pantsbuild/pants/issues/12934 about potentially allowing unions
     (including Field registrations) to have `@rule_helper` methods, which would allow the
-    computation of an AsyncField to directly require a subsystem.
+    computation of an AsyncField to directly require a subsystem. Since
+    https://github.com/pantsbuild/pants/pull/17947 rules may use any methods as rule helpers without
+    special decoration so this should now be possible to implement.
     """
 
     _factories: FrozenDict[type[Field], FieldDefaultFactory]
@@ -362,7 +353,7 @@ class FieldDefaults:
 _F = TypeVar("_F", bound=Field)
 
 
-@frozen_after_init
+@dataclass(frozen=True)
 class Target:
     """A Target represents an addressable set of metadata.
 
@@ -374,7 +365,7 @@ class Target:
     # Subclasses must define these
     alias: ClassVar[str]
     core_fields: ClassVar[Tuple[Type[Field], ...]]
-    help: ClassVar[str]
+    help: ClassVar[str | Callable[[], str]]
 
     removal_version: ClassVar[str | None] = None
     removal_hint: ClassVar[str | None] = None
@@ -432,13 +423,22 @@ class Target:
                 hint=f"Using the `{self.alias}` target type for {address}. {self.removal_hint}",
             )
 
-        self.address = address
-        self.plugin_fields = self._find_plugin_fields(union_membership or UnionMembership({}))
-        self.residence_dir = residence_dir if residence_dir is not None else address.spec_path
-        self.name_explicitly_set = name_explicitly_set
-        self.field_values = self._calculate_field_values(
-            unhydrated_values, address, ignore_unrecognized_fields=ignore_unrecognized_fields
+        object.__setattr__(self, "address", address)
+        object.__setattr__(
+            self, "plugin_fields", self._find_plugin_fields(union_membership or UnionMembership({}))
         )
+        object.__setattr__(
+            self, "residence_dir", residence_dir if residence_dir is not None else address.spec_path
+        )
+        object.__setattr__(self, "name_explicitly_set", name_explicitly_set)
+        object.__setattr__(
+            self,
+            "field_values",
+            self._calculate_field_values(
+                unhydrated_values, address, ignore_unrecognized_fields=ignore_unrecognized_fields
+            ),
+        )
+
         self.validate()
 
     @final
@@ -920,8 +920,7 @@ class CoarsenedTargets(Collection[CoarsenedTarget]):
     __hash__ = Tuple.__hash__
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class CoarsenedTargetsRequest:
     """A request to get CoarsenedTargets for input roots."""
 
@@ -936,9 +935,9 @@ class CoarsenedTargetsRequest:
         expanded_targets: bool = False,
         include_special_cased_deps: bool = False,
     ) -> None:
-        self.roots = tuple(roots)
-        self.expanded_targets = expanded_targets
-        self.include_special_cased_deps = include_special_cased_deps
+        object.__setattr__(self, "roots", tuple(roots))
+        object.__setattr__(self, "expanded_targets", expanded_targets)
+        object.__setattr__(self, "include_special_cased_deps", include_special_cased_deps)
 
 
 @dataclass(frozen=True)
@@ -958,8 +957,7 @@ class TransitiveTargets:
         return FrozenOrderedSet([*self.roots, *self.dependencies])
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class TransitiveTargetsRequest:
     """A request to get the transitive dependencies of the input roots.
 
@@ -973,17 +971,16 @@ class TransitiveTargetsRequest:
     def __init__(
         self, roots: Iterable[Address], *, include_special_cased_deps: bool = False
     ) -> None:
-        self.roots = tuple(roots)
-        self.include_special_cased_deps = include_special_cased_deps
+        object.__setattr__(self, "roots", tuple(roots))
+        object.__setattr__(self, "include_special_cased_deps", include_special_cased_deps)
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class RegisteredTargetTypes:
     aliases_to_types: FrozenDict[str, Type[Target]]
 
     def __init__(self, aliases_to_types: Mapping[str, Type[Target]]) -> None:
-        self.aliases_to_types = FrozenDict(aliases_to_types)
+        object.__setattr__(self, "aliases_to_types", FrozenDict(aliases_to_types))
 
     @classmethod
     def create(cls, target_types: Iterable[Type[Target]]) -> RegisteredTargetTypes:
@@ -1439,13 +1436,16 @@ class FieldSet(EngineAwareParameter, metaclass=ABCMeta):
         return f"{self.__class__.__name__}(address={self.address})"
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class TargetRootsToFieldSets(Generic[_FS]):
     mapping: FrozenDict[Target, Tuple[_FS, ...]]
 
     def __init__(self, mapping: Mapping[Target, Iterable[_FS]]) -> None:
-        self.mapping = FrozenDict({tgt: tuple(field_sets) for tgt, field_sets in mapping.items()})
+        object.__setattr__(
+            self,
+            "mapping",
+            FrozenDict({tgt: tuple(field_sets) for tgt, field_sets in mapping.items()}),
+        )
 
     @memoized_property
     def field_sets(self) -> Tuple[_FS, ...]:
@@ -1493,8 +1493,7 @@ def get_shard(key: str, num_shards: int) -> int:
     return zlib.crc32(key.encode()) % num_shards
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class TargetRootsToFieldSetsRequest(Generic[_FS]):
     field_set_superclass: Type[_FS]
     goal_description: str
@@ -1511,39 +1510,37 @@ class TargetRootsToFieldSetsRequest(Generic[_FS]):
         shard: int = 0,
         num_shards: int = -1,
     ) -> None:
-        self.field_set_superclass = field_set_superclass
-        self.goal_description = goal_description
-        self.no_applicable_targets_behavior = no_applicable_targets_behavior
-        self.shard = shard
-        self.num_shards = num_shards
+        object.__setattr__(self, "field_set_superclass", field_set_superclass)
+        object.__setattr__(self, "goal_description", goal_description)
+        object.__setattr__(self, "no_applicable_targets_behavior", no_applicable_targets_behavior)
+        object.__setattr__(self, "shard", shard)
+        object.__setattr__(self, "num_shards", num_shards)
 
     def is_in_shard(self, key: str) -> bool:
         return get_shard(key, self.num_shards) == self.shard
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class FieldSetsPerTarget(Generic[_FS]):
     # One tuple of FieldSet instances per input target.
     collection: Tuple[Tuple[_FS, ...], ...]
 
     def __init__(self, collection: Iterable[Iterable[_FS]]):
-        self.collection = tuple(tuple(iterable) for iterable in collection)
+        object.__setattr__(self, "collection", tuple(tuple(iterable) for iterable in collection))
 
     @memoized_property
     def field_sets(self) -> Tuple[_FS, ...]:
         return tuple(itertools.chain.from_iterable(self.collection))
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class FieldSetsPerTargetRequest(Generic[_FS]):
     field_set_superclass: Type[_FS]
     targets: Tuple[Target, ...]
 
     def __init__(self, field_set_superclass: Type[_FS], targets: Iterable[Target]):
-        self.field_set_superclass = field_set_superclass
-        self.targets = tuple(targets)
+        object.__setattr__(self, "field_set_superclass", field_set_superclass)
+        object.__setattr__(self, "targets", tuple(targets))
 
 
 # -----------------------------------------------------------------------------------------------
@@ -2179,7 +2176,7 @@ class OptionalSingleSourceField(SourcesField, StringField):
     """
 
     alias = "source"
-    help = softwrap(
+    help = help_text(
         """
         A single file that belongs to this target.
 
@@ -2272,8 +2269,7 @@ class SingleSourceField(OptionalSingleSourceField):
         return result
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class HydrateSourcesRequest(EngineAwareParameter):
     field: SourcesField
     for_sources_types: tuple[type[SourcesField], ...]
@@ -2295,9 +2291,10 @@ class HydrateSourcesRequest(EngineAwareParameter):
         If `enable_codegen` is set to `True`, any codegen sources will try to be converted to one
         of the `for_sources_types`.
         """
-        self.field = field
-        self.for_sources_types = tuple(for_sources_types)
-        self.enable_codegen = enable_codegen
+        object.__setattr__(self, "field", field)
+        object.__setattr__(self, "for_sources_types", tuple(for_sources_types))
+        object.__setattr__(self, "enable_codegen", enable_codegen)
+
         self.__post_init__()
 
     def __post_init__(self) -> None:
@@ -2474,7 +2471,7 @@ class Dependencies(StringSequenceField, AsyncFieldMixin):
     """
 
     alias = "dependencies"
-    help = softwrap(
+    help = help_text(
         f"""
         Addresses to other targets that this target depends on, e.g.
         ['helloworld/subdir:lib', 'helloworld/main.py:lib', '3rdparty:reqs#django'].
@@ -2676,8 +2673,7 @@ class InferDependenciesRequest(Generic[FS], EngineAwareParameter):
     field_set: FS
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class InferredDependencies:
     include: FrozenOrderedSet[Address]
     exclude: FrozenOrderedSet[Address]
@@ -2689,8 +2685,8 @@ class InferredDependencies:
         exclude: Iterable[Address] = (),
     ) -> None:
         """The result of inferring dependencies."""
-        self.include = FrozenOrderedSet(sorted(include))
-        self.exclude = FrozenOrderedSet(sorted(exclude))
+        object.__setattr__(self, "include", FrozenOrderedSet(sorted(include)))
+        object.__setattr__(self, "exclude", FrozenOrderedSet(sorted(exclude)))
 
 
 @union(in_scope_types=[EnvironmentName])
@@ -2795,7 +2791,7 @@ class SpecialCasedDependencies(StringSequenceField, AsyncFieldMixin):
 
 class Tags(StringSequenceField):
     alias = "tags"
-    help = softwrap(
+    help = help_text(
         f"""
         Arbitrary strings to describe a target.
 
@@ -2807,7 +2803,7 @@ class Tags(StringSequenceField):
 
 class DescriptionField(StringField):
     alias = "description"
-    help = softwrap(
+    help = help_text(
         f"""
         A human-readable description of the target.
 

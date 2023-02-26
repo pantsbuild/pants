@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import atexit
 import dataclasses
 import functools
 import os
@@ -208,10 +209,16 @@ _I = TypeVar("_I")
 _O = TypeVar("_O")
 
 
-# Use the ~minimum possible parallelism since integration tests using RuleRunner will already be run
-# by Pants using an appropriate Parallelism. We must set max_threads > core_threads; so 2 is the
-# minimum, but, via trial and error, 3 minimizes test times on average.
-_EXECUTOR = PyExecutor(core_threads=1, max_threads=3)
+# A global executor for Schedulers created in unit tests, which is shutdown using `atexit`. This
+# allows for reusing threads, and avoids waiting for straggling tasks during teardown of each test.
+EXECUTOR = PyExecutor(
+    # Use the ~minimum possible parallelism since integration tests using RuleRunner will already
+    # be run by Pants using an appropriate Parallelism. We must set max_threads > core_threads; so
+    # 2 is the minimum, but, via trial and error, 3 minimizes test times on average.
+    core_threads=1,
+    max_threads=3,
+)
+atexit.register(lambda: EXECUTOR.shutdown(5))
 
 
 # Environment variable names required for locating Python interpreters, for use with RuleRunner's
@@ -340,7 +347,8 @@ class RuleRunner:
                 named_caches_dir=named_caches_dir,
                 build_root=self.build_root,
                 build_configuration=self.build_config,
-                executor=_EXECUTOR,
+                # Each Scheduler that is created borrows the global executor, which is shut down `atexit`.
+                executor=EXECUTOR.to_borrowed(),
                 execution_options=ExecutionOptions.from_options(
                     global_options, dynamic_remote_options
                 ),
@@ -665,9 +673,6 @@ def run_rule_with_mocks(
     """
 
     task_rule = getattr(rule, "rule", None)
-    rule_helper = getattr(rule, "rule_helper", None)
-    if task_rule is None and rule_helper is None:
-        raise TypeError(f"Expected to receive a decorated `@rule` or `@rule_helper`; got: {rule}")
 
     # Perform additional validation on `@rule` that the correct args are provided. We don't have
     # an easy way to do this for `@rule_helper` yet.

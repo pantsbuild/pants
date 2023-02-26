@@ -32,6 +32,7 @@ from pants.core.goals.package import (
     PackageFieldSet,
 )
 from pants.core.target_types import FileSourceField
+from pants.core.util_rules.environments import EnvironmentField
 from pants.engine.addresses import UnparsedAddressInputs
 from pants.engine.platform import Platform
 from pants.engine.process import ProcessResult
@@ -58,6 +59,7 @@ class PythonAwsLambdaFieldSet(PackageFieldSet):
     runtime: PythonAwsLambdaRuntime
     complete_platforms: PythonAwsLambdaCompletePlatforms
     output_path: OutputPathField
+    environment: EnvironmentField
 
 
 @rule
@@ -91,10 +93,8 @@ async def package_python_awslambda(
             )
         )
 
-    output_filename = field_set.output_path.value_or_default(
-        # Lambdas typically use the .zip suffix, so we use that instead of .pex.
-        file_ending="zip",
-    )
+    # Lambdas typically use the .zip suffix.
+    output_filename = field_set.output_path.value_or_default(file_ending="zip")
 
     # We hardcode the platform value to the appropriate one for each AWS Lambda runtime.
     # (Running the "hello world" lambda in the example code will report the platform, and can be
@@ -123,11 +123,12 @@ async def package_python_awslambda(
         CompletePlatforms, PythonAwsLambdaCompletePlatforms, field_set.complete_platforms
     )
 
+    pex_filename = f"{output_filename}.pex"
     pex_request = PexFromTargetsRequest(
         addresses=[field_set.address],
         internal_only=False,
         include_requirements=field_set.include_requirements.value,
-        output_filename=output_filename,
+        output_filename=pex_filename,
         platforms=PexPlatforms(pex_platforms),
         complete_platforms=complete_platforms,
         additional_args=additional_pex_args,
@@ -163,12 +164,13 @@ async def package_python_awslambda(
             )
         )
 
-    # NB: Lambdex modifies its input pex in-place, so the input file is also the output file.
+    # NB: Lambdex can modify its input pex in-place, but the REAPI doesn't support that,
+    #  so we provide it with an explicit `-o` option to write to a new file.
     result = await Get(
         ProcessResult,
         VenvPexProcess(
             lambdex_pex,
-            argv=("build", "-e", handler.val, output_filename),
+            argv=("build", "-e", handler.val, "-o", output_filename, pex_filename),
             input_digest=pex_result.digest,
             output_files=(output_filename,),
             description=f"Setting up handler in {output_filename}",

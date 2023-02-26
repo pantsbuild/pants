@@ -16,8 +16,8 @@ updatedAt: "2022-07-25T23:52:25.735Z"
 >
 > Go's builtin tooling is already excellent! Many projects may be fine only using Go's tooling, although Pants offers some unique benefits:
 >
-> - A consistent interface for all languages/tools in your repository, such as being able to run `./pants fmt lint check test package`.
-> - Integration with Git, such as running `./pants --changed-since=HEAD test`.
+> - A consistent interface for all languages/tools in your repository, such as being able to run `pants fmt lint check test package`.
+> - Integration with Git, such as running `pants --changed-since=HEAD test`.
 > - Caching, such as caching test results on a per-package basis.
 > - [Remote execution and remote caching](doc:remote-caching-execution).
 > - [Advanced project introspection](doc:project-introspection), such as finding all code that transitively depends on a certain package.
@@ -40,10 +40,10 @@ You may want to set the option `[golang].minimum_expected_version` to a value li
 
 You can also set `[golang].go_search_paths` to influence where Pants looks for Go, e.g. `["/usr/bin"]`. It defaults to your `PATH`.
 
-Then run [`./pants tailor ::`](doc:initial-configuration#5-generate-build-files) to generate BUILD files. This will add a `go_mod` target where you have your `go.mod` file, a `go_package` target for every directory with a `.go` file, and a `go_binary` target in every directory where you have `package main`.
+Then run [`pants tailor ::`](doc:initial-configuration#5-generate-build-files) to generate BUILD files. This will add a `go_mod` target where you have your `go.mod` file, a `go_package` target for every directory with a `.go` file, and a `go_binary` target in every directory where you have `package main`.
 
 ```
-❯ ./pants tailor ::
+❯ pants tailor ::
 Created BUILD:
   - Add go_mod target root
 Created cmd/deploy/BUILD:
@@ -62,10 +62,10 @@ Each `go_package` target allows you to set metadata for that directory, such as 
 
 The `go_mod` target generates a `go_third_party_package` target for each package belonging to the modules declared in your `go.mod`. You will rarely need to interact with these directly, thanks to dependency inference.
 
-You can run `./pants list ::` to see all targets in your project, including generated `go_third_party_package` targets:
+You can run `pants list ::` to see all targets in your project, including generated `go_third_party_package` targets:
 
 ```
-❯ ./pants list
+❯ pants list
 ...
 //:root#golang.org/x/net/ipv4
 //:root#golang.org/x/net/ipv6
@@ -114,10 +114,10 @@ Hello world!
 Package and run binaries
 ------------------------
 
-To run a binary, use `./pants run path/to/main_pkg:` (note the colon). You can pass through arguments with `--`, like this:
+To run a binary, use `pants run path/to/main_pkg:` (note the colon). You can pass through arguments with `--`, like this:
 
 ```
-❯ ./pants run cmd/deploy: -- --help
+❯ pants run cmd/deploy: -- --help
 Usage of /Users/pantsbuild/example/.pants.d/tmpzfh33ggu/cmd.deploy/bin:
       --allow-insecure-auth        allow credentials to be passed unencrypted (i.e., no TLS)
   -A, --auth-token-env string      name of environment variable with auth bearer token
@@ -125,10 +125,10 @@ Usage of /Users/pantsbuild/example/.pants.d/tmpzfh33ggu/cmd.deploy/bin:
 pflag: help requested
 ```
 
-You can also package your binaries (aka `go build`) by using `./pants package`. `package ::` will build all your project's binaries, whereas `package path/to/main_pkg:` will build only the binary in that directory.
+You can also package your binaries (aka `go build`) by using `pants package`. `package ::` will build all your project's binaries, whereas `package path/to/main_pkg:` will build only the binary in that directory.
 
 ```
-❯ ./pants package ::
+❯ pants package ::
 [INFO] Wrote dist/cmd.deploy/bin
 [INFO] Wrote dist/cmd.runner/bin
 ```
@@ -142,17 +142,17 @@ go_binary(name="bin", output_path="deploy")
 Compile code
 ------------
 
-To manually check that a package compiles, use `./pants check`:
+To manually check that a package compiles, use `pants check`:
 
 ```
 # Check this package
-❯ ./pants check pkg/deploy:
+❯ pants check pkg/deploy:
 
 # Check this directory and all subdirectories
-❯ ./pants check pkg::
+❯ pants check pkg::
 
 # Check the whole project
-❯ ./pants check ::
+❯ pants check ::
 ```
 
 (Instead, you can simply run `package`, `run`, and `test`. Pants will compile all the relevant packages.)
@@ -160,20 +160,20 @@ To manually check that a package compiles, use `./pants check`:
 Run tests
 ---------
 
-To run tests, use `./pants test`:
+To run tests, use `pants test`:
 
 ```
 # Test this package
-❯ ./pants test pkg/deploy:
+❯ pants test pkg/deploy:
 
 # Test this directory and all subdirectories
-❯ ./pants check pkg::
+❯ pants check pkg::
 
 # Test the whole project
-❯ ./pants test ::
+❯ pants test ::
 ```
 
-You can pass through arguments with `--`, e.g. `./pants test pkg/deploy: -- -v -run TestFoo`.
+You can pass through arguments with `--`, e.g. `pants test pkg/deploy: -- -v -run TestFoo`.
 
 ### Loose files in tests (`testdata`)
 
@@ -227,25 +227,25 @@ timeout_maximum = 600
 
 If a target sets its `timeout` higher than `[test].timeout_maximum`, Pants will use the value in `[test].timeout_maximum`.
 
-Use the option `./pants test --no-timeouts` to temporarily disable timeouts, e.g. when debugging.
+Use the option `pants test --no-timeouts` to temporarily disable timeouts, e.g. when debugging.
 
 Gofmt
 -----
 
-Gofmt is activated by default when you activate the Go backend. Simply run `./pants fmt` and `./pants lint`:
+Gofmt is activated by default when you activate the Go backend. Simply run `pants fmt` and `pants lint`:
 
 ```
 # Format a single directory
-❯ ./pants fmt cmd/deploy:
+❯ pants fmt cmd/deploy:
 
 # Format this directory and all subdirectories
-❯ ./pants fmt cmd::
+❯ pants fmt cmd::
 
 # Check that the whole project is formatted
-❯ ./pants lint ::
+❯ pants lint ::
 
 # Format all changed files
-❯ ./pants --changed-since=HEAD fmt
+❯ pants --changed-since=HEAD fmt
 ```
 
 If you'd like to disable Gofmt, set this:
@@ -258,7 +258,7 @@ skip = true
 To only run Gofmt, use `--fmt-only` and `--lint-only`:
 
 ```bash
-❯ ./pants fmt --only=gofmt ::
+❯ pants fmt --only=gofmt ::
 ```
 
 golangci-lint
@@ -275,10 +275,10 @@ backend_packages = [
 ]
 ```
 
-Now you can run `./pants lint`:
+Now you can run `pants lint`:
 
 ```
-$ ./pants lint main.go
+$ pants lint main.go
 20:39:43.10 [ERROR] Completed: Lint with golangci-lint - golangci-lint failed (exit code 1).
 main.go:5:6: func `bad` is unused (unused)
 func bad() {
@@ -302,13 +302,13 @@ args = ["--fast", "--tests"]
 Temporarily disable golangci-lint with `--golangci-lint-skip`:
 
 ```bash
-./pants --golangci-lint-skip lint ::
+pants --golangci-lint-skip lint ::
 ```
 
 Only run golangci-lint with `--lint-only`:
 
 ```bash
-./pants lint --only=golangci-lint ::
+pants lint --only=golangci-lint ::
 ```
 
 > 👍 Benefit of Pants: golangci-lint runs in parallel with other linters

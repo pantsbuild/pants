@@ -31,6 +31,7 @@ from pants.backend.python.lint.isort.subsystem import Isort
 from pants.backend.python.lint.pydocstyle.subsystem import Pydocstyle
 from pants.backend.python.lint.pylint.subsystem import Pylint
 from pants.backend.python.lint.pyupgrade.subsystem import PyUpgrade
+from pants.backend.python.lint.ruff.subsystem import Ruff
 from pants.backend.python.lint.yapf.subsystem import Yapf
 from pants.backend.python.packaging.pyoxidizer.subsystem import PyOxidizer
 from pants.backend.python.subsystems.debugpy import DebugPy
@@ -46,6 +47,7 @@ from pants.backend.python.typecheck.mypy.subsystem import MyPy
 from pants.backend.scala.lint.scalafmt.subsystem import ScalafmtSubsystem
 from pants.backend.scala.subsystems.scalatest import Scalatest
 from pants.backend.terraform.dependency_inference import TerraformHcl2Parser
+from pants.backend.tools.yamllint.subsystem import Yamllint
 from pants.jvm.resolve.jvm_tool import JvmToolBase
 from pants.util.strutil import softwrap
 
@@ -126,7 +128,9 @@ AllTools = (
     DefaultTool.python(SetuptoolsSCM),
     DefaultTool.python(TerraformHcl2Parser, backend="pants.backend.experimental.terraform"),
     DefaultTool.python(TwineSubsystem),
+    DefaultTool.python(Yamllint, backend="pants.backend.experimental.tools.yamllint"),
     DefaultTool.python(Yapf, backend="pants.backend.python.lint.yapf"),
+    DefaultTool.python(Ruff, backend="pants.backend.experimental.python.lint.ruff"),
     # JVM
     DefaultTool.jvm(AvroSubsystem, backend="pants.backend.experimental.codegen.avro.java"),
     DefaultTool.jvm(GoogleJavaFormatSubsystem),

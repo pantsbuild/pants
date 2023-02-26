@@ -42,7 +42,7 @@ from pants.engine.fs import AddPrefix, CreateDigest, Digest, FileContent, MergeD
 from pants.engine.internals.native_engine import Snapshot
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import _uncacheable_rule, collect_rules, rule, rule_helper
+from pants.engine.rules import _uncacheable_rule, collect_rules, rule
 from pants.engine.target import CoarsenedTarget, CoarsenedTargets, FieldSet, Targets
 from pants.engine.unions import UnionRule
 from pants.jvm.bsp.compile import _jvm_bsp_compile, jvm_classes_directory
@@ -147,7 +147,6 @@ async def collect_thirdparty_modules(
     )
 
 
-@rule_helper
 async def _materialize_scala_runtime_jars(scala_version: str) -> Snapshot:
     tool_classpath = await Get(
         ToolClasspath,

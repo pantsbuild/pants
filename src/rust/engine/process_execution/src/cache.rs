@@ -79,7 +79,7 @@ impl crate::CommandRunner for CommandRunner {
     let write_failures_to_cache = req.cache_scope == ProcessCacheScope::Always;
     let key = CacheKey {
       digest: Some(
-        crate::digest(
+        crate::get_digest(
           &req,
           None,
           self.process_cache_namespace.clone(),
@@ -119,7 +119,7 @@ impl crate::CommandRunner for CommandRunner {
                 initial.map(|(initial, _)| {
                   (
                     WorkunitMetadata {
-                      desc: initial.desc.as_ref().map(|desc| format!("Hit: {}", desc)),
+                      desc: initial.desc.as_ref().map(|desc| format!("Hit: {desc}")),
                       ..initial
                     },
                     Level::Debug,
@@ -188,10 +188,10 @@ impl CommandRunner {
     let maybe_cache_value = self.cache.load(action_key).await?;
     let maybe_execute_response = if let Some(bytes) = maybe_cache_value {
       let decoded: PlatformAndResponseBytes = bincode::deserialize(&bytes)
-        .map_err(|err| format!("Could not deserialize platform and response: {}", err))?;
+        .map_err(|err| format!("Could not deserialize platform and response: {err}"))?;
       let platform = decoded.platform;
       let execute_response = ExecuteResponse::decode(&decoded.response_bytes[..])
-        .map_err(|e| format!("Invalid ExecuteResponse: {:?}", e))?;
+        .map_err(|e| format!("Invalid ExecuteResponse: {e:?}"))?;
       Some((execute_response, platform))
     } else {
       return Ok(None);
@@ -200,7 +200,7 @@ impl CommandRunner {
     // Deserialize the cache entry if it existed.
     let result = if let Some((execute_response, platform)) = maybe_execute_response {
       if let Some(ref action_result) = execute_response.result {
-        crate::remote::populate_fallible_execution_result(
+        crate::populate_fallible_execution_result(
           self.file_store.clone(),
           context.run_id,
           action_result,
@@ -266,19 +266,14 @@ impl CommandRunner {
     let mut response_bytes = Vec::with_capacity(execute_response.encoded_len());
     execute_response
       .encode(&mut response_bytes)
-      .map_err(|err| format!("Error serializing execute process result to cache: {}", err))?;
+      .map_err(|err| format!("Error serializing execute process result to cache: {err}"))?;
 
     let bytes_to_store = bincode::serialize(&PlatformAndResponseBytes {
       platform: result.platform,
       response_bytes,
     })
     .map(Bytes::from)
-    .map_err(|err| {
-      format!(
-        "Error serializing platform and execute process result: {}",
-        err
-      )
-    })?;
+    .map_err(|err| format!("Error serializing platform and execute process result: {err}"))?;
 
     self.cache.store(action_key, bytes_to_store).await?;
     Ok(())

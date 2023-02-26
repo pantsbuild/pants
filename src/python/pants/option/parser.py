@@ -53,7 +53,6 @@ from pants.option.option_util import is_dict_option, is_list_option
 from pants.option.option_value_container import OptionValueContainer, OptionValueContainerBuilder
 from pants.option.ranked_value import Rank, RankedValue
 from pants.option.scope import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION, ScopeInfo
-from pants.util.meta import frozen_after_init
 from pants.util.strutil import softwrap
 
 
@@ -142,8 +141,7 @@ class Parser:
     def history(self, dest: str) -> OptionValueHistory | None:
         return self._history.get(dest)
 
-    @frozen_after_init
-    @dataclass(unsafe_hash=True)
+    @dataclass(frozen=True)
     class ParseArgsRequest:
         flag_value_map: dict[str, list[Any]]
         namespace: OptionValueContainerBuilder
@@ -161,10 +159,10 @@ class Parser:
             :param flags_in_scope: Iterable of arg strings to parse into flag values.
             :param namespace: The object to register the flag values on
             """
-            self.flag_value_map = self._create_flag_value_map(flags_in_scope)
-            self.namespace = namespace
-            self.passthrough_args = passthrough_args
-            self.allow_unknown_flags = allow_unknown_flags
+            object.__setattr__(self, "flag_value_map", self._create_flag_value_map(flags_in_scope))
+            object.__setattr__(self, "namespace", namespace)
+            object.__setattr__(self, "passthrough_args", passthrough_args)
+            object.__setattr__(self, "allow_unknown_flags", allow_unknown_flags)
 
         @staticmethod
         def _create_flag_value_map(flags: Iterable[str]) -> DefaultDict[str, list[str | None]]:
@@ -575,14 +573,13 @@ class Parser:
                 else:
                     fromfile = val_or_str[1:]
                     try:
-                        with open(fromfile) as fp:
-                            s = fp.read()
-                            if fromfile.endswith(".json"):
-                                return json.loads(s)
-                            elif fromfile.endswith(".yml") or fromfile.endswith(".yaml"):
-                                return yaml.safe_load(s)
-                            else:
-                                return s.strip()
+                        contents = Path(get_buildroot(), fromfile).read_text()
+                        if fromfile.endswith(".json"):
+                            return json.loads(contents)
+                        elif fromfile.endswith(".yml") or fromfile.endswith(".yaml"):
+                            return yaml.safe_load(contents)
+                        else:
+                            return contents.strip()
                     except (OSError, ValueError, yaml.YAMLError) as e:
                         raise FromfileError(
                             f"Failed to read {dest} in {self._scope_str()} from file {fromfile}: {e!r}"

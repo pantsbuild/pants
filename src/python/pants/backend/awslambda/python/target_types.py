@@ -18,6 +18,7 @@ from pants.backend.python.dependency_inference.subsystem import (
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import PexCompletePlatformsField, PythonResolveField
 from pants.core.goals.package import OutputPathField
+from pants.core.util_rules.environments import EnvironmentField
 from pants.engine.addresses import Address
 from pants.engine.fs import GlobMatchErrorBehavior, PathGlobs, Paths
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
@@ -41,14 +42,14 @@ from pants.engine.unions import UnionRule
 from pants.source.filespec import Filespec
 from pants.source.source_root import SourceRoot, SourceRootRequest
 from pants.util.docutil import doc_url
-from pants.util.strutil import softwrap
+from pants.util.strutil import help_text, softwrap
 
 
 class PythonAwsLambdaHandlerField(StringField, AsyncFieldMixin, SecondaryOwnerMixin):
     alias = "handler"
     required = True
     value: str
-    help = softwrap(
+    help = help_text(
         """
         Entry point to the AWS Lambda handler.
 
@@ -228,7 +229,7 @@ async def infer_lambda_handler_dependency(
 class PythonAwsLambdaIncludeRequirements(BoolField):
     alias = "include_requirements"
     default = True
-    help = softwrap(
+    help = help_text(
         """
         Whether to resolve requirements and include them in the Pex. This is most useful with Lambda
         Layers to make code uploads smaller when deps are in layers.
@@ -242,7 +243,7 @@ class PythonAwsLambdaRuntime(StringField):
 
     alias = "runtime"
     default = None
-    help = softwrap(
+    help = help_text(
         """
         The identifier of the AWS Lambda runtime to target (pythonX.Y).
         See https://docs.aws.amazon.com/lambda/latest/dg/lambda-python.html.
@@ -279,7 +280,7 @@ class PythonAwsLambdaRuntime(StringField):
 
 
 class PythonAwsLambdaCompletePlatforms(PexCompletePlatformsField):
-    help = softwrap(
+    help = help_text(
         f"""
         {PexCompletePlatformsField.help}
 
@@ -301,8 +302,9 @@ class PythonAWSLambda(Target):
         PythonAwsLambdaRuntime,
         PythonAwsLambdaCompletePlatforms,
         PythonResolveField,
+        EnvironmentField,
     )
-    help = softwrap(
+    help = help_text(
         f"""
         A self-contained Python function suitable for uploading to AWS Lambda.
 

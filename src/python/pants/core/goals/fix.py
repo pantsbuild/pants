@@ -30,13 +30,12 @@ from pants.engine.environment import EnvironmentName
 from pants.engine.fs import Digest, MergeDigests, PathGlobs, Snapshot, SnapshotDiff, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import FallibleProcessResult, ProcessResult
-from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule, rule_helper
+from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
 from pants.engine.unions import UnionMembership, UnionRule, distinct_union_type_per_subclass, union
 from pants.option.option_types import BoolOption
 from pants.util.collections import partition_sequentially
 from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
-from pants.util.meta import frozen_after_init
 from pants.util.strutil import softwrap, strip_v2_chroot_path
 
 logger = logging.getLogger(__name__)
@@ -51,7 +50,6 @@ class FixResult(EngineAwareReturnType):
     tool_name: str
 
     @staticmethod
-    @rule_helper(_public=True)
     async def create(
         request: FixRequest.Batch,
         process_result: ProcessResult | FallibleProcessResult,
@@ -122,8 +120,7 @@ class FixRequest(LintRequest):
     is_fixer = True
 
     @distinct_union_type_per_subclass(in_scope_types=[EnvironmentName])
-    @frozen_after_init
-    @dataclass(unsafe_hash=True)
+    @dataclass(frozen=True)
     class Batch(LintRequest.Batch):
         snapshot: Snapshot
 
@@ -213,7 +210,6 @@ class Fix(Goal):
     environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY
 
 
-@rule_helper
 async def _write_files(workspace: Workspace, batched_results: Iterable[_FixBatchResult]):
     if any(batched_result.did_change for batched_result in batched_results):
         # NB: this will fail if there are any conflicting changes, which we want to happen rather
@@ -262,7 +258,6 @@ class _BatchableMultiToolGoalSubsystem(_MultiToolGoalSubsystem, Protocol):
     batch_size: BatchSizeOption
 
 
-@rule_helper
 async def _do_fix(
     core_request_types: Iterable[type[_CoreRequestType]],
     target_partitioners: Iterable[type[_TargetPartitioner]],
@@ -386,7 +381,9 @@ async def fix_batch(
     results = []
     for request_type, tool_name, files, key in request:
         batch = request_type(tool_name, files, key, current_snapshot)
-        result = await Get(FixResult, FixRequest.Batch, batch)
+        result = await Get(  # noqa: PNT30: this is inherently sequential
+            FixResult, FixRequest.Batch, batch
+        )
         results.append(result)
 
         assert set(result.output.files) == set(

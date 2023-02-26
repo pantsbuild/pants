@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import inspect
 import re
 import threading
 import tokenize
@@ -10,7 +11,7 @@ from dataclasses import dataclass
 from difflib import get_close_matches
 from io import StringIO
 from pathlib import PurePath
-from typing import Any
+from typing import Any, Callable, Iterable, Mapping, TypeVar
 
 from pants.base.deprecated import warn_or_error
 from pants.base.exceptions import MappingError
@@ -24,12 +25,44 @@ from pants.engine.target import Field, ImmutableValue, RegisteredTargetTypes
 from pants.engine.unions import UnionMembership
 from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
+from pants.util.memo import memoized_property
 from pants.util.strutil import softwrap
+
+T = TypeVar("T")
 
 
 @dataclass(frozen=True)
 class BuildFilePreludeSymbols:
-    symbols: FrozenDict[str, Any]
+    info: FrozenDict[str, BuildFileSymbolInfo]
+    referenced_env_vars: tuple[str, ...]
+
+    @memoized_property
+    def symbols(self) -> FrozenDict[str, Any]:
+        return FrozenDict({name: symbol.value for name, symbol in self.info.items()})
+
+    @classmethod
+    def create(cls, ns: Mapping[str, Any], env_vars: Iterable[str]) -> BuildFilePreludeSymbols:
+        info = {}
+        for name, symb in ns.items():
+            info[name] = BuildFileSymbolInfo(name, symb)
+        return cls(info=FrozenDict(info), referenced_env_vars=tuple(sorted(env_vars)))
+
+
+@dataclass(frozen=True)
+class BuildFileSymbolInfo:
+    name: str
+    value: Any
+
+    @property
+    def help(self) -> str | None:
+        return inspect.getdoc(self.value) if hasattr(self.value, "__name__") else None
+
+    @property
+    def signature(self) -> str | None:
+        if not callable(self.value):
+            return None
+        else:
+            return str(inspect.signature(self.value))
 
 
 class ParseError(Exception):
@@ -47,47 +80,80 @@ class ParseState(threading.local):
         self._dependencies_rules: BuildFileDependencyRulesParserState | None = None
         self._filepath: str | None = None
         self._target_adaptors: list[TargetAdaptor] = []
+        self._is_bootstrap: bool | None = None
+        self._env_vars: EnvironmentVars | None = None
 
     def reset(
         self,
         filepath: str,
+        is_bootstrap: bool,
         defaults: BuildFileDefaultsParserState,
         dependents_rules: BuildFileDependencyRulesParserState | None,
         dependencies_rules: BuildFileDependencyRulesParserState | None,
+        env_vars: EnvironmentVars,
     ) -> None:
+        self._is_bootstrap = is_bootstrap
         self._defaults = defaults
         self._dependents_rules = dependents_rules
         self._dependencies_rules = dependencies_rules
+        self._env_vars = env_vars
         self._filepath = filepath
         self._target_adaptors.clear()
 
     def add(self, target_adaptor: TargetAdaptor) -> None:
         self._target_adaptors.append(target_adaptor)
 
-    def filepath(self) -> str:
-        if self._filepath is None:
-            raise AssertionError(
-                "The BUILD file filepath was accessed before being set. This indicates a "
-                "programming error in Pants. Please file a bug report at "
-                "https://github.com/pantsbuild/pants/issues/new."
-            )
-        return self._filepath
-
     def parsed_targets(self) -> list[TargetAdaptor]:
         return list(self._target_adaptors)
 
+    def _prelude_check(self, name: str, value: T | None, closure_supported: bool = True) -> T:
+        if value is not None:
+            return value
+        note = (
+            (
+                " If used in a prelude file, it must be within a function that is called from a BUILD"
+                " file."
+            )
+            if closure_supported
+            else ""
+        )
+        raise NameError(
+            softwrap(
+                f"""
+                The BUILD file symbol `{name}` may only be used in BUILD files.{note}
+                """
+            )
+        )
+
+    def filepath(self) -> str:
+        return self._prelude_check("build_file_dir", self._filepath)
+
     @property
     def defaults(self) -> BuildFileDefaultsParserState:
-        if self._defaults is None:
-            raise AssertionError(
-                "The BUILD file __defaults__ was accessed before being set. This indicates a "
-                "programming error in Pants. Please file a bug report at "
-                "https://github.com/pantsbuild/pants/issues/new."
-            )
-        return self._defaults
+        return self._prelude_check("__defaults__", self._defaults)
 
-    def set_defaults(self, *args: SetDefaultsT, **kwargs) -> None:
-        self.defaults.set_defaults(*args, **kwargs)
+    @property
+    def env_vars(self) -> EnvironmentVars:
+        return self._prelude_check("env", self._env_vars)
+
+    @property
+    def is_bootstrap(self) -> bool:
+        if self._is_bootstrap is None:
+            raise AssertionError(
+                "Internal error in Pants. Please file a bug report at "
+                "https://github.com/pantsbuild/pants/issues/new"
+            )
+        return self._is_bootstrap
+
+    def get_env(self, name: str, *args, **kwargs) -> Any:
+        return self.env_vars.get(name, *args, **kwargs)
+
+    def set_defaults(
+        self, *args: SetDefaultsT, ignore_unknown_fields: bool = False, **kwargs
+    ) -> None:
+        self.defaults.set_defaults(
+            *args, ignore_unknown_fields=self.is_bootstrap or ignore_unknown_fields, **kwargs
+        )
 
     def set_dependents_rules(self, *args, **kwargs) -> None:
         if self._dependents_rules is not None:
@@ -99,14 +165,15 @@ class ParseState(threading.local):
 
 
 class RegistrarField:
-    __slots__ = ("_field_type",)
+    __slots__ = ("_field_type", "_default")
 
-    def __init__(self, field_type: type[Field]) -> None:
+    def __init__(self, field_type: type[Field], default: Callable[[], Any]) -> None:
         self._field_type = field_type
+        self._default = default
 
     @property
     def default(self) -> ImmutableValue:
-        return self._field_type.default
+        return self._default()
 
 
 class Parser:
@@ -145,7 +212,9 @@ class Parser:
                 for field_type in registered_target_types.aliases_to_types[
                     type_alias
                 ].class_field_types(union_membership):
-                    registrar_field = RegistrarField(field_type)
+                    registrar_field = RegistrarField(
+                        field_type, self._field_default_factory(field_type)
+                    )
                     setattr(self, field_type.alias, registrar_field)
                     if field_type.deprecated_alias:
 
@@ -188,9 +257,21 @@ class Parser:
                 parse_state.add(target_adaptor)
                 return target_adaptor
 
+            def _field_default_factory(self, field_type: type[Field]) -> Callable[[], Any]:
+                def resolve_field_default() -> Any:
+                    target_defaults = parse_state.defaults.get(self._type_alias)
+                    if target_defaults:
+                        for field_alias in (field_type.alias, field_type.deprecated_alias):
+                            if field_alias and field_alias in target_defaults:
+                                return target_defaults[field_alias]
+                    return field_type.default
+
+                return resolve_field_default
+
         symbols: dict[str, Any] = {
             **object_aliases.objects,
             "build_file_dir": lambda: PurePath(parse_state.filepath()).parent,
+            "env": parse_state.get_env,
             "__defaults__": parse_state.set_defaults,
             "__dependents_rules__": parse_state.set_dependents_rules,
             "__dependencies_rules__": parse_state.set_dependencies_rules,
@@ -215,19 +296,21 @@ class Parser:
         build_file_content: str,
         extra_symbols: BuildFilePreludeSymbols,
         env_vars: EnvironmentVars,
+        is_bootstrap: bool,
         defaults: BuildFileDefaultsParserState,
         dependents_rules: BuildFileDependencyRulesParserState | None,
         dependencies_rules: BuildFileDependencyRulesParserState | None,
     ) -> list[TargetAdaptor]:
         self._parse_state.reset(
             filepath=filepath,
+            is_bootstrap=is_bootstrap,
             defaults=defaults,
             dependents_rules=dependents_rules,
             dependencies_rules=dependencies_rules,
+            env_vars=env_vars,
         )
 
         global_symbols: dict[str, Any] = {
-            "env": env_vars.get,
             **self._symbols,
             **extra_symbols.symbols,
         }
@@ -249,9 +332,11 @@ class Parser:
                     global_symbols[bad_symbol] = _unrecognized_symbol_func
                     self._parse_state.reset(
                         filepath=filepath,
+                        is_bootstrap=is_bootstrap,
                         defaults=defaults,
                         dependents_rules=dependents_rules,
                         dependencies_rules=dependencies_rules,
+                        env_vars=env_vars,
                     )
                     continue
                 break

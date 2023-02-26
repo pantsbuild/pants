@@ -28,7 +28,8 @@ def test_find_putative_targets(rule_runner: RuleRunner) -> None:
             "src/owned/BUILD": "javascript_sources()\n",
             "src/owned/OwnedFile.js": "",
             "src/unowned/UnownedFile1.js": "",
-            "src/unowned/UnownedFile2.js": "",
+            "src/unowned/UnownedFile2.mjs": "",
+            "src/unowned/UnownedFile3.cjs": "",
         }
     )
     putative_targets = rule_runner.request(
@@ -45,7 +46,7 @@ def test_find_putative_targets(rule_runner: RuleRunner) -> None:
                     JSSourcesGeneratorTarget,
                     "src/unowned",
                     "unowned",
-                    ["UnownedFile1.js", "UnownedFile2.js"],
+                    ["UnownedFile1.js", "UnownedFile2.mjs", "UnownedFile3.cjs"],
                 ),
             ]
         )

@@ -37,7 +37,7 @@ from pants.engine.internals.synthetic_targets import (
     SyntheticTargetsSpecPaths,
     SyntheticTargetsSpecPathsRequest,
 )
-from pants.engine.rules import collect_rules, rule, rule_helper
+from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
     FieldSet,
     FieldSetsPerTarget,
@@ -72,7 +72,6 @@ logger = logging.getLogger(__name__)
 # -----------------------------------------------------------------------------------------------
 
 
-@rule_helper
 async def _determine_literal_addresses_from_raw_specs(
     literal_specs: tuple[AddressLiteralSpec, ...],
     local_environment_name: ChosenLocalEnvironmentName,

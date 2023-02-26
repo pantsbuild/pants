@@ -12,20 +12,18 @@ from pants.engine.env_vars import CompleteEnvironmentVars
 from pants.engine.platform import Platform
 from pants.engine.process import InteractiveProcess
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.util.meta import frozen_after_init
 
 logger = logging.getLogger(__name__)
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class OpenFilesRequest:
     files: Tuple[PurePath, ...]
     error_if_open_not_found: bool
 
     def __init__(self, files: Iterable[PurePath], *, error_if_open_not_found: bool = True) -> None:
-        self.files = tuple(files)
-        self.error_if_open_not_found = error_if_open_not_found
+        object.__setattr__(self, "files", tuple(files))
+        object.__setattr__(self, "error_if_open_not_found", error_if_open_not_found)
 
 
 @dataclass(frozen=True)

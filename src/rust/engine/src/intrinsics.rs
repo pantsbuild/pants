@@ -20,7 +20,6 @@ use crate::tasks::Intrinsic;
 use crate::types::Types;
 use crate::Failure;
 
-use bytes::Bytes;
 use futures::future::{BoxFuture, FutureExt, TryFutureExt};
 use futures::try_join;
 use indexmap::IndexMap;
@@ -28,9 +27,9 @@ use pyo3::types::PyString;
 use pyo3::{PyAny, PyRef, Python, ToPyObject};
 use tokio::process;
 
+use docker::docker::{ImagePullPolicy, ImagePullScope, DOCKER, IMAGE_PULL_CACHE};
 use fs::{DigestTrie, DirectoryDigest, RelativePath, TypedPath};
 use hashing::{Digest, EMPTY_DIGEST};
-use process_execution::docker::{ImagePullPolicy, ImagePullScope, DOCKER, IMAGE_PULL_CACHE};
 use process_execution::local::{
   apply_chroot, create_sandbox, prepare_workdir, setup_run_sh_script, KeepSandboxes,
 };
@@ -153,7 +152,7 @@ impl Intrinsics {
     let function = self
       .intrinsics
       .get(intrinsic)
-      .unwrap_or_else(|| panic!("Unrecognized intrinsic: {:?}", intrinsic));
+      .unwrap_or_else(|| panic!("Unrecognized intrinsic: {intrinsic:?}"));
     function(context, args).await
   }
 }
@@ -170,7 +169,7 @@ fn process_request_to_process_result(
           .unwrap()
           .as_ref()
           .extract(py)
-          .map_err(|e| format!("{}", e))
+          .map_err(|e| format!("{e}"))
       })?;
     let process_request =
       ExecuteProcess::lift(&context.core.store(), args.pop().unwrap(), process_config)
@@ -271,9 +270,9 @@ fn remove_prefix_request_to_digest(
       let py_remove_prefix = (*args[0])
         .as_ref(py)
         .extract::<PyRef<PyRemovePrefix>>()
-        .map_err(|e| throw(format!("{}", e)))?;
+        .map_err(|e| throw(format!("{e}")))?;
       let prefix = RelativePath::new(&py_remove_prefix.prefix)
-        .map_err(|e| throw(format!("The `prefix` must be relative: {}", e)))?;
+        .map_err(|e| throw(format!("The `prefix` must be relative: {e}")))?;
       let res: NodeResult<_> = Ok((py_remove_prefix.digest.clone(), prefix));
       res
     })?;
@@ -294,9 +293,9 @@ fn add_prefix_request_to_digest(
       let py_add_prefix = (*args[0])
         .as_ref(py)
         .extract::<PyRef<PyAddPrefix>>()
-        .map_err(|e| throw(format!("{}", e)))?;
+        .map_err(|e| throw(format!("{e}")))?;
       let prefix = RelativePath::new(&py_add_prefix.prefix)
-        .map_err(|e| throw(format!("The `prefix` must be relative: {}", e)))?;
+        .map_err(|e| throw(format!("The `prefix` must be relative: {e}")))?;
       let res: NodeResult<(DirectoryDigest, RelativePath)> =
         Ok((py_add_prefix.digest.clone(), prefix));
       res
@@ -336,7 +335,7 @@ fn merge_digests_request_to_digest(
         .as_ref(py)
         .extract::<PyRef<PyMergeDigests>>()
         .map(|py_merge_digests| py_merge_digests.0.clone())
-        .map_err(|e| throw(format!("{}", e)))
+        .map_err(|e| throw(format!("{e}")))
     })?;
     let digest = store.merge(digests).await?;
     let gil = Python::acquire_gil();
@@ -369,7 +368,7 @@ fn path_globs_to_digest(
       let py_path_globs = (*args[0]).as_ref(py);
       Snapshot::lift_path_globs(py_path_globs)
     })
-    .map_err(|e| throw(format!("Failed to parse PathGlobs: {}", e)))?;
+    .map_err(|e| throw(format!("Failed to parse PathGlobs: {e}")))?;
     let snapshot = context.get(Snapshot::from_path_globs(path_globs)).await?;
     let gil = Python::acquire_gil();
     let value = Snapshot::store_directory_digest(gil.python(), snapshot.into())?;
@@ -388,7 +387,7 @@ fn path_globs_to_paths(
       let py_path_globs = (*args[0]).as_ref(py);
       Snapshot::lift_path_globs(py_path_globs)
     })
-    .map_err(|e| throw(format!("Failed to parse PathGlobs: {}", e)))?;
+    .map_err(|e| throw(format!("Failed to parse PathGlobs: {e}")))?;
     let paths = context.get(Paths::from_path_globs(path_globs)).await?;
     let gil = Python::acquire_gil();
     let value = Paths::store_paths(gil.python(), &core, &paths)?;
@@ -441,13 +440,13 @@ fn create_digest_to_digest(
 
   let mut typed_paths: Vec<TypedPath> = Vec::with_capacity(items.len());
   let mut file_digests: HashMap<PathBuf, Digest> = HashMap::with_capacity(items.len());
-  let mut bytes_to_store: Vec<(Option<Digest>, Bytes)> = Vec::with_capacity(new_file_count);
+  let mut items_to_store = Vec::with_capacity(new_file_count);
 
   for item in &items {
     match item {
       CreateDigestItem::FileContent(path, bytes, is_executable) => {
         let digest = Digest::of_bytes(bytes);
-        bytes_to_store.push((Some(digest), bytes.clone()));
+        items_to_store.push((digest.hash, bytes.clone()));
         typed_paths.push(TypedPath::File {
           path,
           is_executable: *is_executable,
@@ -475,8 +474,7 @@ fn create_digest_to_digest(
   let store = context.core.store();
   let trie = DigestTrie::from_unique_paths(typed_paths, &file_digests).unwrap();
   async move {
-    // The digests returned here are already in the `file_digests` map.
-    let _ = store.store_file_bytes_batch(bytes_to_store, true).await?;
+    store.store_file_bytes_batch(items_to_store, true).await?;
     let gil = Python::acquire_gil();
     let value = Snapshot::store_directory_digest(gil.python(), trie.into())?;
     Ok(value)
@@ -615,17 +613,17 @@ fn interactive_process(
             .stdin(Stdio::from(
               term_stdin
                 .try_clone_as_file()
-                .map_err(|e| format!("Couldn't clone stdin: {}", e))?,
+                .map_err(|e| format!("Couldn't clone stdin: {e}"))?,
             ))
             .stdout(Stdio::from(
               term_stdout
                 .try_clone_as_file()
-                .map_err(|e| format!("Couldn't clone stdout: {}", e))?,
+                .map_err(|e| format!("Couldn't clone stdout: {e}"))?,
             ))
             .stderr(Stdio::from(
               term_stderr
                 .try_clone_as_file()
-                .map_err(|e| format!("Couldn't clone stderr: {}", e))?,
+                .map_err(|e| format!("Couldn't clone stderr: {e}"))?,
             ));
           let mut subprocess = ManagedChild::spawn(command, context.core.graceful_shutdown_timeout)?;
           tokio::select! {
@@ -637,7 +635,7 @@ fn interactive_process(
                 log::warn!("Failed to kill spawned process group ({}). Will try killing only the top process.\n\
                           This is unexpected: please file an issue about this problem at \
                           [https://github.com/pantsbuild/pants/issues/new]", e);
-                subprocess.kill().map_err(|e| format!("Failed to interrupt child process: {}", e)).await?;
+                subprocess.kill().map_err(|e| format!("Failed to interrupt child process: {e}")).await?;
               };
               subprocess.wait().await.map_err(|e| e.to_string())
             }
@@ -658,7 +656,7 @@ fn interactive_process(
         };
         if run_in_workspace {
           let cwd = current_dir()
-          .map_err(|e| format!("Could not detect current working directory: {err}", err = e))?;
+          .map_err(|e| format!("Could not detect current working directory: {e}"))?;
           do_setup_run_sh_script(cwd.as_path())?;
         } else {
           do_setup_run_sh_script(tempdir.path())?;
@@ -709,7 +707,7 @@ fn docker_resolve_image(
         ImagePullPolicy::OnlyIfLatestOrMissing,
       )
       .await
-      .map_err(|err| format!("Failed to pull image `{}`: {}", image_name, err))?;
+      .map_err(|err| format!("Failed to pull image `{image_name}`: {err}"))?;
 
     let image_metadata = docker.inspect_image(&image_name).await.map_err(|err| {
       format!(

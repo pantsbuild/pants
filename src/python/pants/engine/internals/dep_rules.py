@@ -143,7 +143,7 @@ async def get_build_file_dependency_rules_implementation(
             f"There must be at most one BUILD file dependency rules implementation, got: {impls}"
         )
     for request_type in request_types:
-        impl = await Get(
+        impl = await Get(  # noqa: PNT30: requires triage
             BuildFileDependencyRulesImplementation,
             BuildFileDependencyRulesImplementationRequest,
             request_type(),

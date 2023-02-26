@@ -40,7 +40,7 @@ impl ManagedChild {
         nix::unistd::setsid().map(|_pgid| ()).map_err(|e| {
           std::io::Error::new(
             std::io::ErrorKind::Other,
-            format!("Could not create new pgid: {}", e),
+            format!("Could not create new pgid: {e}"),
           )
         })
       });
@@ -49,7 +49,7 @@ impl ManagedChild {
     // Then spawn.
     let child = command
       .spawn()
-      .map_err(|e| format!("Error executing interactive process: {}", e))?;
+      .map_err(|e| format!("Error executing interactive process: {e}"))?;
     Ok(Self {
       child,
       graceful_shutdown_timeout,
@@ -60,7 +60,7 @@ impl ManagedChild {
   fn get_pgid(&self) -> Result<Pid, String> {
     let pid = self.id().ok_or_else(|| "Process had no PID.".to_owned())?;
     let pgid = getpgid(Some(Pid::from_raw(pid as i32)))
-      .map_err(|e| format!("Could not get process group id of child process: {}", e))?;
+      .map_err(|e| format!("Could not get process group id of child process: {e}"))?;
     Ok(pgid)
   }
 
@@ -69,7 +69,7 @@ impl ManagedChild {
     let pgid = self.get_pgid()?;
     // the negative PGID will signal the entire process group.
     signal::kill(Pid::from_raw(-pgid.as_raw()), signal)
-      .map_err(|e| format!("Failed to interrupt child process group: {}", e))?;
+      .map_err(|e| format!("Failed to interrupt child process group: {e}"))?;
     Ok(())
   }
 

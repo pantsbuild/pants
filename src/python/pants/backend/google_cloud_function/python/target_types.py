@@ -19,6 +19,7 @@ from pants.backend.python.dependency_inference.subsystem import (
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import PexCompletePlatformsField, PythonResolveField
 from pants.core.goals.package import OutputPathField
+from pants.core.util_rules.environments import EnvironmentField
 from pants.engine.addresses import Address
 from pants.engine.fs import GlobMatchErrorBehavior, PathGlobs, Paths
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
@@ -41,14 +42,14 @@ from pants.engine.unions import UnionRule
 from pants.source.filespec import Filespec
 from pants.source.source_root import SourceRoot, SourceRootRequest
 from pants.util.docutil import doc_url
-from pants.util.strutil import softwrap
+from pants.util.strutil import help_text
 
 
 class PythonGoogleCloudFunctionHandlerField(StringField, AsyncFieldMixin, SecondaryOwnerMixin):
     alias = "handler"
     required = True
     value: str
-    help = softwrap(
+    help = help_text(
         """
         Entry point to the Google Cloud Function handler.
 
@@ -227,7 +228,7 @@ class PythonGoogleCloudFunctionRuntime(StringField):
     alias = "runtime"
     default = None
     valid_choices = PythonGoogleCloudFunctionRuntimes
-    help = softwrap(
+    help = help_text(
         """
         The identifier of the Google Cloud Function runtime to target (pythonXY). See
         https://cloud.google.com/functions/docs/concepts/python-runtime.
@@ -260,7 +261,7 @@ class PythonGoogleCloudFunctionRuntime(StringField):
 
 
 class PythonGoogleCloudFunctionCompletePlatforms(PexCompletePlatformsField):
-    help = softwrap(
+    help = help_text(
         f"""
         {PexCompletePlatformsField.help}
 
@@ -281,7 +282,7 @@ class PythonGoogleCloudFunctionType(StringField):
     alias = "type"
     required = True
     valid_choices = GoogleCloudFunctionTypes
-    help = softwrap(
+    help = help_text(
         """
         The trigger type of the cloud function. Can either be 'event' or 'http'.
         See https://cloud.google.com/functions/docs/concepts/python-runtime for reference to
@@ -301,8 +302,9 @@ class PythonGoogleCloudFunction(Target):
         PythonGoogleCloudFunctionCompletePlatforms,
         PythonGoogleCloudFunctionType,
         PythonResolveField,
+        EnvironmentField,
     )
-    help = softwrap(
+    help = help_text(
         f"""
         A self-contained Python function suitable for uploading to Google Cloud Function.
 

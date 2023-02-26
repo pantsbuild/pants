@@ -18,7 +18,7 @@ Helm's ultimate purpose is to simplify the deployment of Kubernetes resources an
 
 This hinders reproducibility since operators end up having a set of configuration files and additional shell scripts that ensure that the Helm command line usued to deploy a piece of software into a given environment is always the same.
 
-Pants solves this problem by providing with the ability to manage the configuration files and the different parameters of a deployment as single unit such that a simple command line as `./pants experimental-deploy ::` will always have the same effect on each of the deployments previously defined.
+Pants solves this problem by providing with the ability to manage the configuration files and the different parameters of a deployment as single unit such that a simple command line as `pants experimental-deploy ::` will always have the same effect on each of the deployments previously defined.
 
 Defining Helm deployments
 -------------------------
@@ -69,7 +69,7 @@ There are quite a few things to notice in the previous example:
 * One of those value files (`common-values.yaml`) provides with default values that are common to all deployments.
 * Each deployment uses an additional `xxx-override.yaml` file with values that are specific to the given deployment.
 
-The `helm_deployment` target has many additional fields including the target kubernetes namespace, adding inline override values (similar to using helm's `--set` arg) and many others. Please run `./pants help helm_deployment` to see all the posibilities.
+The `helm_deployment` target has many additional fields including the target kubernetes namespace, adding inline override values (similar to using helm's `--set` arg) and many others. Please run `pants help helm_deployment` to see all the posibilities.
 
 Dependencies with `docker_image` targets
 ----------------------------------------
@@ -102,12 +102,12 @@ image: example.com/registry/my-app:latest
 apiVersion: v1
 kind: Pod
 metadata:
-  name: my_pod
+  name: my-pod
   labels:
     chart: "{{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}"
 spec:
   containers:
-    - name: my_app
+    - name: my-app
       # Uses the `image` value entry from the deployment inputs
       image: {{ .Values.image }}
 ```
@@ -121,7 +121,7 @@ helm_deployment(dependencies=["src/chart"], values={"image": "src/docker"})
 > You should use typical Docker registry addresses in your Helm charts. Because Helm charts are distributable artifacts and may be used with tools other than Pants, you should create your charts such that when that chart is being used, all Docker image addresses are valid references to images in accessible Docker registries. As shown in the example, we recommend that you make the image address value configurable, especially for charts that deploy first-party Docker images.
 > Your chart resources can still use off-the-shelf images published with other means, and in those cases you will also be referencing the Docker image address. Usage of Pants' target addresses is intended for your own first-party images because the image reference of those is not known at the time we create the sources (they are computed later).
 
-With this setup we should be able to run `./pants dependencies src/deployment` and Pants should give the following output:
+With this setup we should be able to run `pants dependencies src/deployment` and Pants should give the following output:
 
 ```text
 src/chart
@@ -215,7 +215,7 @@ extra_env_vars = ["DEPLOY_TIME"]
 Now you can launch a deployment using the following command:
 
 ```
-DEPLOY_TIME=$(date) ./pants experimental-deploy src/deployment:dev
+DEPLOY_TIME=$(date) pants experimental-deploy src/deployment:dev
 ```
 
 > 🚧 Ensuring repeatable deployments
@@ -253,7 +253,7 @@ In this example, the deployment at `src/deploy:main` declares a dependency on a 
 Post-renderers
 --------------
 
-User-defined [Helm post-renderers](https://helm.sh/docs/topics/advanced/#post-rendering) are supported by the Helm backend by means of the `post_renderers` field in the `helm_deployment` target. This field takes addresses to other runnable targets (any target that can be run using `./pants run [address]`) and will build and run those targets as part of `experimental-deploy` goal. The referenced targets can be either shell commands or custom-made in any of the other languages supported by Pants.
+User-defined [Helm post-renderers](https://helm.sh/docs/topics/advanced/#post-rendering) are supported by the Helm backend by means of the `post_renderers` field in the `helm_deployment` target. This field takes addresses to other runnable targets (any target that can be run using `pants run [address]`) and will build and run those targets as part of `experimental-deploy` goal. The referenced targets can be either shell commands or custom-made in any of the other languages supported by Pants.
 
 As an example, let's show how we can use the tool [`vals`](https://github.com/variantdev/vals) as a post-renderer and replace all references to secret values stored in HashiCorp Vault by their actual values. The following example is composed of a Helm chart that creates a secret resource in Kubernetes and a Helm deployment that is configured to use `vals` as a post-renderer:
 
@@ -279,7 +279,7 @@ data:
 type: Opaque
 ```
 ```python src/deploy/BUILD
-experimental_run_shell_command(
+run_shell_command(
   name="vals",
   command="vals eval -f -",
 )
@@ -290,7 +290,7 @@ helm_deployment(
 )
 ```
 
-In the previous example we define a `experimental_shell_command` target that will invoke the `vals eval` command (`vals` needs to be installed in the local machine) as part of the Helm post-rendering machinery, which will result on the `ref+vault` reference being replaced by the actual value stored in Vault at the given path.
+In the previous example we define a `run_shell_command` target that will invoke the `vals eval` command (`vals` needs to be installed in the local machine) as part of the Helm post-rendering machinery, which will result on the `ref+vault` reference being replaced by the actual value stored in Vault at the given path.
 
 > 📘 Using multiple post-renderers
 >
@@ -299,7 +299,7 @@ In the previous example we define a `experimental_shell_command` target that wil
 Deploying
 ---------
 
-Continuing with the example in the previous section, we can deploy it into Kubernetes using the command `./pants experimental-deploy src/deployment`. This will trigger the following steps:
+Continuing with the example in the previous section, we can deploy it into Kubernetes using the command `pants experimental-deploy src/deployment`. This will trigger the following steps:
 
 1. Analyse the dependencies of the given deployment.
 2. Build and publish any first-party Docker image and Helm charts that are part of those dependencies.
@@ -313,7 +313,7 @@ Please note that the list of valid pass-through arguments has been limited to th
 For example, to make an atomic deployment into a non-default Kubernetes context you can use a command like the following one:
 
 ```
-./pants experimental-deploy src/deployments:prod -- --kube-context my-custom-kube-context --atomic
+pants experimental-deploy src/deployments:prod -- --kube-context my-custom-kube-context --atomic
 ```
 
 > 📘 How does Pants authenticate with the Kubernetes cluster?

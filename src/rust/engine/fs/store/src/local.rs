@@ -110,7 +110,7 @@ impl ByteStore {
       dbs?
         .lease(digest.hash)
         .await
-        .map_err(|err| format!("Error leasing digest {:?}: {}", digest, err))?;
+        .map_err(|err| format!("Error leasing digest {digest:?}: {err}"))?;
     }
     Ok(())
   }
@@ -171,7 +171,7 @@ impl ByteStore {
             used_bytes -= aged_fingerprint.size_bytes;
             txn.commit()
           })
-          .map_err(|err| format!("Error garbage collecting: {}", err))?;
+          .map_err(|err| format!("Error garbage collecting: {err}"))?;
       }
     }
 
@@ -193,16 +193,16 @@ impl ByteStore {
       EntryType::Directory => self.inner.directory_dbs.clone(),
     };
 
-    for &(ref env, ref database, ref lease_database) in &database?.all_lmdbs() {
+    for (env, database, lease_database) in &database?.all_lmdbs() {
       let txn = env
         .begin_ro_txn()
-        .map_err(|err| format!("Error beginning transaction to garbage collect: {}", err))?;
+        .map_err(|err| format!("Error beginning transaction to garbage collect: {err}"))?;
       let mut cursor = txn
         .open_ro_cursor(*database)
-        .map_err(|err| format!("Failed to open lmdb read cursor: {}", err))?;
+        .map_err(|err| format!("Failed to open lmdb read cursor: {err}"))?;
       for key_res in cursor.iter() {
         let (key, bytes) =
-          key_res.map_err(|err| format!("Failed to advance lmdb read cursor: {}", err))?;
+          key_res.map_err(|err| format!("Failed to advance lmdb read cursor: {err}"))?;
         *used_bytes += bytes.len();
 
         // Random access into the lease_database is slower than iterating, but hopefully garbage
@@ -218,7 +218,7 @@ impl ByteStore {
           })
           .unwrap_or_else(|e| match e {
             NotFound => 0,
-            e => panic!("Error reading lease, probable lmdb corruption: {:?}", e),
+            e => panic!("Error reading lease, probable lmdb corruption: {e:?}"),
           });
 
         let leased_until = time::UNIX_EPOCH + Duration::from_secs(lease_until_unix_timestamp);
@@ -251,27 +251,23 @@ impl ByteStore {
   }
 
   ///
-  /// Store the given data in a single pass, optionally using the given Digest. Prefer `Self::store`
+  /// Store the given data in a single pass, using the given Fingerprint. Prefer `Self::store`
   /// for values which should not be pulled into memory, and `Self::store_bytes_batch` when storing
   /// multiple values at a time.
   ///
   pub async fn store_bytes(
     &self,
     entry_type: EntryType,
-    digest: Option<Digest>,
+    fingerprint: Fingerprint,
     bytes: Bytes,
     initial_lease: bool,
-  ) -> Result<Digest, String> {
+  ) -> Result<(), String> {
     let dbs = match entry_type {
       EntryType::Directory => self.inner.directory_dbs.clone(),
       EntryType::File => self.inner.file_dbs.clone(),
     };
-    let len = bytes.len();
-    let fingerprint = dbs?
-      .store_bytes(digest.map(|d| d.hash), bytes, initial_lease)
-      .await?;
-
-    Ok(Digest::new(fingerprint, len))
+    dbs?.store_bytes(fingerprint, bytes, initial_lease).await?;
+    Ok(())
   }
 
   ///
@@ -283,37 +279,17 @@ impl ByteStore {
   pub async fn store_bytes_batch(
     &self,
     entry_type: EntryType,
-    items: Vec<(Option<Digest>, Bytes)>,
+    items: Vec<(Fingerprint, Bytes)>,
     initial_lease: bool,
-  ) -> Result<Vec<Digest>, String> {
+  ) -> Result<(), String> {
     let dbs = match entry_type {
       EntryType::Directory => self.inner.directory_dbs.clone(),
       EntryType::File => self.inner.file_dbs.clone(),
     };
-    // NB: False positive: we do actually need to create the Vec here, since `items` will move
-    // before we use `lens`.
-    #[allow(clippy::needless_collect)]
-    let lens = items
-      .iter()
-      .map(|(_, bytes)| bytes.len())
-      .collect::<Vec<_>>();
-    let fingerprints = dbs?
-      .store_bytes_batch(
-        items
-          .into_iter()
-          .map(|(d, bytes)| (d.map(|d| d.hash), bytes))
-          .collect(),
-        initial_lease,
-      )
-      .await?;
 
-    Ok(
-      fingerprints
-        .into_iter()
-        .zip(lens.into_iter())
-        .map(|(f, len)| Digest::new(f, len))
-        .collect(),
-    )
+    dbs?.store_bytes_batch(items, initial_lease).await?;
+
+    Ok(())
   }
 
   ///
@@ -436,16 +412,16 @@ impl ByteStore {
       EntryType::Directory => self.inner.directory_dbs.clone(),
     };
     let mut digests = vec![];
-    for &(ref env, ref database, ref _lease_database) in &database?.all_lmdbs() {
+    for (env, database, _lease_database) in &database?.all_lmdbs() {
       let txn = env
         .begin_ro_txn()
-        .map_err(|err| format!("Error beginning transaction to garbage collect: {}", err))?;
+        .map_err(|err| format!("Error beginning transaction to garbage collect: {err}"))?;
       let mut cursor = txn
         .open_ro_cursor(*database)
-        .map_err(|err| format!("Failed to open lmdb read cursor: {}", err))?;
+        .map_err(|err| format!("Failed to open lmdb read cursor: {err}"))?;
       for key_res in cursor.iter() {
         let (key, bytes) =
-          key_res.map_err(|err| format!("Failed to advance lmdb read cursor: {}", err))?;
+          key_res.map_err(|err| format!("Failed to advance lmdb read cursor: {err}"))?;
         let v = VersionedFingerprint::from_bytes_unsafe(key);
         let fingerprint = v.get_fingerprint();
         digests.push(Digest::new(fingerprint, bytes.len()));

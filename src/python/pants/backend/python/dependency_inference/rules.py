@@ -47,7 +47,7 @@ from pants.core.target_types import AllAssetTargets, AllAssetTargetsByPath, AllA
 from pants.core.util_rules import stripped_source_files
 from pants.engine.addresses import Address, Addresses
 from pants.engine.internals.graph import Owners, OwnersRequest
-from pants.engine.rules import Get, MultiGet, rule, rule_helper
+from pants.engine.rules import Get, MultiGet, rule
 from pants.engine.target import (
     DependenciesRequest,
     ExplicitlyProvidedDependencies,
@@ -206,6 +206,33 @@ def _collect_imports_info(
     )
 
 
+def _remove_ignored_imports(
+    unowned_imports: frozenset[str], ignored_paths: tuple[str, ...]
+) -> frozenset[str]:
+    """Remove unowned imports given a list of paths to ignore.
+
+    E.g. having
+    ```
+    import foo.bar
+    from foo.bar import baz
+    import foo.barley
+    ```
+
+    and passing `ignored-paths=["foo.bar"]`, only `foo.bar` and `foo.bar.baz` will be ignored.
+    """
+    if not ignored_paths:
+        return unowned_imports
+
+    unowned_imports_filtered = set()
+    for unowned_import in unowned_imports:
+        if not any(
+            unowned_import == ignored_path or unowned_import.startswith(f"{ignored_path}.")
+            for ignored_path in ignored_paths
+        ):
+            unowned_imports_filtered.add(unowned_import)
+    return frozenset(unowned_imports_filtered)
+
+
 @dataclass(frozen=True)
 class UnownedImportsPossibleOwnersRequest:
     """A request to find possible owners for several imports originating in a resolve."""
@@ -230,7 +257,6 @@ class UnownedImportPossibleOwners:
     value: list[tuple[Address, ResolveName]]
 
 
-@rule_helper
 async def _find_other_owners_for_unowned_imports(
     req: UnownedImportsPossibleOwnersRequest,
 ) -> UnownedImportsPossibleOwners:
@@ -272,7 +298,6 @@ async def find_other_owners_for_unowned_import(
     return UnownedImportPossibleOwners(other_owners)
 
 
-@rule_helper
 async def _handle_unowned_imports(
     address: Address,
     unowned_dependency_behavior: UnownedDependencyUsage,
@@ -330,7 +355,6 @@ async def _handle_unowned_imports(
         raise UnownedDependencyError(msg)
 
 
-@rule_helper
 async def _exec_parse_deps(
     field_set: PythonImportDependenciesInferenceFieldSet,
     python_setup: PythonSetup,
@@ -443,6 +467,9 @@ async def infer_python_dependencies_via_source(
         ResolvedParsedPythonDependenciesRequest(request.field_set, parsed_dependencies, resolve),
     )
     import_deps, unowned_imports = _collect_imports_info(resolved_dependencies.resolve_results)
+    unowned_imports = _remove_ignored_imports(
+        unowned_imports, python_infer_subsystem.ignored_unowned_imports
+    )
 
     asset_deps, unowned_assets = _collect_imports_info(resolved_dependencies.assets)
 

@@ -20,7 +20,7 @@ class Affected(enum.Enum):
     other = "other"
 
 
-_docs_globs = ["docs/*", "build-support/bin/generate_user_list.py"]
+_docs_globs = ["README.md", "**/README.md", "docs/*", "build-support/bin/generate_user_list.py"]
 _rust_globs = ["src/rust/engine/*", "rust-toolchain", "build-support/bin/rust/*"]
 _release_globs = [
     "pants.toml",
@@ -28,7 +28,7 @@ _release_globs = [
     "src/python/pants/notes/*",
     "src/python/pants/init/BUILD",
     "build-support/bin/release.sh",
-    "build-support/bin/release_helper.py",
+    "build-support/bin/_release_helper.py",
 ]
 _ci_config_globs = [
     "build-support/bin/classify_changed_files.py",

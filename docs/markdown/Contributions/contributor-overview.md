@@ -71,14 +71,14 @@ To begin, [set up Pants on your local machine](doc:contributor-setup).
 To run a test, run:
 
 ```bash
-$ ./pants test src/python/pants/util/frozendict_test.py
+$ pants test src/python/pants/util/frozendict_test.py
 ```
 
 Periodically, you will want to run MyPy and the autoformatters and linters:
 
 ```bash
 # Format un-committed changes
-$ ./pants --changed-since=HEAD fmt
+$ pants --changed-since=HEAD fmt
 
 # Run the pre-commit checks, including `check` and `lint`
 $ build-support/githooks/pre-commit

@@ -3,7 +3,7 @@
 
 import string
 from collections import namedtuple
-from dataclasses import dataclass
+from dataclasses import FrozenInstanceError, dataclass
 from enum import Enum
 from typing import Any, ClassVar, Dict, Iterable, List, Optional, Sequence, Set, Tuple, cast
 
@@ -52,7 +52,6 @@ from pants.engine.unions import UnionMembership
 from pants.option.global_options import UnmatchedBuildFileGlobs
 from pants.testutil.pytest_util import no_exception
 from pants.util.frozendict import FrozenDict
-from pants.util.meta import FrozenInstanceError
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
 # -----------------------------------------------------------------------------------------------
@@ -118,7 +117,7 @@ def test_field_and_target_eq() -> None:
 
     # Ensure the field is frozen.
     with pytest.raises(FrozenInstanceError):
-        field.y = "foo"  # type: ignore[attr-defined]
+        field.value = "foo"
 
     tgt = FortranTarget({"version": "dev0"}, addr)
     assert tgt.address == addr
@@ -137,7 +136,7 @@ def test_field_and_target_eq() -> None:
 
     # Ensure the target is frozen.
     with pytest.raises(FrozenInstanceError):
-        tgt.y = "foo"  # type: ignore[attr-defined]
+        tgt.address = addr  # type: ignore[misc]
 
     # Ensure that subclasses are not equal.
     class SubclassField(FortranVersion):
@@ -447,7 +446,7 @@ def test_async_field_mixin() -> None:
 
     # Ensure it's still frozen.
     with pytest.raises(FrozenInstanceError):
-        field.y = "foo"  # type: ignore[attr-defined]
+        field.value = 11
 
     # Ensure that subclasses are not equal.
     class Subclass(ExampleField):

@@ -7,6 +7,8 @@ from dataclasses import FrozenInstanceError as FrozenInstanceError
 from functools import wraps
 from typing import Any, Callable, Iterator, Optional, Type, TypeVar, Union
 
+from pants.util.strutil import softwrap
+
 T = TypeVar("T")
 C = TypeVar("C", bound=Type)
 
@@ -144,37 +146,52 @@ def frozen_after_init(cls: C) -> C:
     before @dataclass.
     """
 
-    prev_init = cls.__init__
-    prev_setattr = cls.__setattr__
+    # NB: Import inside function and use inner function to avoid circular import
+    from pants.base.deprecated import deprecated
 
-    def freeze_instance(self) -> None:
-        self._is_frozen = True
+    @deprecated(
+        removal_version="2.17.0.dev0",
+        hint=softwrap(
+            """
+            Use `frozen=True` and remove `unsafe_hash=True` in your dataclass decorator,
+            and `object.__setattr__(self, "attrname", <value>)` in your `__init__`.
+            """
+        ),
+    )
+    def frozen_after_init(cls: C) -> C:
+        prev_init = cls.__init__
+        prev_setattr = cls.__setattr__
 
-    @contextmanager
-    def unfrozen(self) -> Iterator:
-        old_is_frozen = self._is_frozen
-        try:
-            self._is_frozen = False
-            yield
-        finally:
-            self._is_frozen = old_is_frozen
+        def freeze_instance(self) -> None:
+            self._is_frozen = True
 
-    @wraps(prev_init)
-    def new_init(self, *args: Any, **kwargs: Any) -> None:
-        prev_init(self, *args, **kwargs)
-        self._freeze_instance()
+        @contextmanager
+        def unfrozen(self) -> Iterator:
+            old_is_frozen = self._is_frozen
+            try:
+                self._is_frozen = False
+                yield
+            finally:
+                self._is_frozen = old_is_frozen
 
-    @wraps(prev_setattr)
-    def new_setattr(self, key: str, value: Any) -> None:
-        if getattr(self, "_is_frozen", False) and key != "_is_frozen":
-            raise FrozenInstanceError(
-                f"Attempting to modify the attribute {key} after the object {self} was created."
-            )
-        prev_setattr(self, key, value)  # type: ignore[call-arg]
+        @wraps(prev_init)
+        def new_init(self, *args: Any, **kwargs: Any) -> None:
+            prev_init(self, *args, **kwargs)
+            self._freeze_instance()
 
-    cls._freeze_instance = freeze_instance
-    cls._unfrozen = unfrozen
-    cls.__init__ = new_init
-    cls.__setattr__ = new_setattr  # type: ignore[assignment]
+        @wraps(prev_setattr)
+        def new_setattr(self, key: str, value: Any) -> None:
+            if getattr(self, "_is_frozen", False) and key != "_is_frozen":
+                raise FrozenInstanceError(
+                    f"Attempting to modify the attribute {key} after the object {self} was created."
+                )
+            prev_setattr(self, key, value)  # type: ignore[call-arg]
 
-    return cls
+        cls._freeze_instance = freeze_instance
+        cls._unfrozen = unfrozen
+        cls.__init__ = new_init
+        cls.__setattr__ = new_setattr  # type: ignore[assignment]
+
+        return cls
+
+    return frozen_after_init(cls)

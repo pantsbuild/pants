@@ -37,4 +37,4 @@ def rules():
     return [ProtobufSourceTarget.register_plugin_field(ProtobufJdkVersionField)]
 ```
 
-To confirm this worked, run `./pants help protobuf_source`.
+To confirm this worked, run `pants help protobuf_source`.

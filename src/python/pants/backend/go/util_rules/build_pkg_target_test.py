@@ -16,12 +16,7 @@ from pants.backend.go.dependency_inference import (
     GoModuleImportPathsMappings,
     GoModuleImportPathsMappingsHook,
 )
-from pants.backend.go.target_types import (
-    GoModTarget,
-    GoOwningGoModAddressField,
-    GoPackageTarget,
-    GoSdkTarget,
-)
+from pants.backend.go.target_types import GoModTarget, GoOwningGoModAddressField, GoPackageTarget
 from pants.backend.go.util_rules import (
     assembly,
     build_pkg,
@@ -41,10 +36,12 @@ from pants.backend.go.util_rules.build_pkg import (
     FallibleBuiltGoPackage,
 )
 from pants.backend.go.util_rules.build_pkg_target import (
+    BuildGoPackageRequestForStdlibRequest,
     BuildGoPackageTargetRequest,
     GoCodegenBuildRequest,
 )
 from pants.backend.go.util_rules.go_mod import OwningGoMod, OwningGoModRequest
+from pants.backend.go.util_rules.import_analysis import GoStdLibPackages, GoStdLibPackagesRequest
 from pants.core.target_types import FilesGeneratorTarget, FileSourceField, FileTarget
 from pants.engine.addresses import Address, Addresses
 from pants.engine.fs import CreateDigest, Digest, FileContent, Snapshot
@@ -175,6 +172,8 @@ def rule_runner() -> RuleRunner:
             QueryRule(FallibleBuiltGoPackage, [BuildGoPackageRequest]),
             QueryRule(BuildGoPackageRequest, [BuildGoPackageTargetRequest]),
             QueryRule(FallibleBuildGoPackageRequest, [BuildGoPackageTargetRequest]),
+            QueryRule(GoStdLibPackages, (GoStdLibPackagesRequest,)),
+            QueryRule(BuildGoPackageRequest, (BuildGoPackageRequestForStdlibRequest,)),
             UnionRule(GoCodegenBuildRequest, GoCodegenBuildFilesRequest),
             UnionRule(GoModuleImportPathsMappingsHook, GenerateFromFileImportPathsMappingHook),
             FileTarget.register_plugin_field(GoOwningGoModAddressField),
@@ -184,7 +183,6 @@ def rule_runner() -> RuleRunner:
             GoModTarget,
             GoPackageTarget,
             FilesGeneratorTarget,
-            GoSdkTarget,
         ],
     )
     rule_runner.set_options([], env_inherit={"PATH"})
@@ -200,8 +198,13 @@ def assert_built(
         import_path: os.path.join("__pkgs__", path_safe(import_path), "__pkg__.a")
         for import_path in expected_import_paths
     }
-    assert dict(built_package.import_paths_to_pkg_a_files) == expected
-    assert sorted(result_files) == sorted(expected.values())
+    actual = dict(built_package.import_paths_to_pkg_a_files)
+    for import_path, pkg_archive_path in expected.items():
+        assert import_path in actual, f"expected {import_path} to be in build output"
+        assert (
+            actual[import_path] == expected[import_path]
+        ), "expected package archive paths to match"
+    assert set(expected.values()).issubset(set(result_files))
 
 
 def assert_pkg_target_built(
@@ -264,7 +267,7 @@ def test_build_first_party_pkg_target(rule_runner: RuleRunner) -> None:
         expected_import_path="example.com/greeter",
         expected_dir_path="",
         expected_go_file_names=["greeter.go"],
-        expected_direct_dependency_import_paths=[],
+        expected_direct_dependency_import_paths=["fmt"],
         expected_transitive_dependency_import_paths=[],
     )
 
@@ -309,7 +312,25 @@ def test_build_third_party_pkg_target(rule_runner: RuleRunner) -> None:
             "version1.go",
             "version4.go",
         ],
-        expected_direct_dependency_import_paths=[],
+        expected_direct_dependency_import_paths=[
+            "bytes",
+            "crypto/md5",
+            "crypto/rand",
+            "crypto/sha1",
+            "database/sql/driver",
+            "encoding/binary",
+            "encoding/hex",
+            "encoding/json",
+            "errors",
+            "fmt",
+            "hash",
+            "io",
+            "net",
+            "os",
+            "strings",
+            "sync",
+            "time",
+        ],
         expected_transitive_dependency_import_paths=[],
     )
 
@@ -401,7 +422,18 @@ def test_build_target_with_dependencies(rule_runner: RuleRunner) -> None:
             "frame.go",
             "wrap.go",
         ],
-        expected_direct_dependency_import_paths=[xerrors_internal_import_path],
+        expected_direct_dependency_import_paths=[
+            "bytes",
+            "fmt",
+            xerrors_internal_import_path,
+            "io",
+            "reflect",
+            "runtime",
+            "strconv",
+            "strings",
+            "unicode",
+            "unicode/utf8",
+        ],
         expected_transitive_dependency_import_paths=[],
     )
 
@@ -412,7 +444,7 @@ def test_build_target_with_dependencies(rule_runner: RuleRunner) -> None:
         expected_import_path=quoter_import_path,
         expected_dir_path="greeter/quoter",
         expected_go_file_names=["lib.go"],
-        expected_direct_dependency_import_paths=[],
+        expected_direct_dependency_import_paths=["fmt"],
         expected_transitive_dependency_import_paths=[],
     )
 
@@ -423,7 +455,7 @@ def test_build_target_with_dependencies(rule_runner: RuleRunner) -> None:
         expected_import_path=greeter_import_path,
         expected_dir_path="greeter",
         expected_go_file_names=["lib.go"],
-        expected_direct_dependency_import_paths=[xerrors_import_path, quoter_import_path],
+        expected_direct_dependency_import_paths=["fmt", xerrors_import_path, quoter_import_path],
         expected_transitive_dependency_import_paths=[xerrors_internal_import_path],
     )
 
@@ -554,7 +586,7 @@ def test_build_codegen_target(rule_runner: RuleRunner) -> None:
         expected_import_path="example.com/greeter",
         expected_dir_path="",
         expected_go_file_names=["greeter.go"],
-        expected_direct_dependency_import_paths=["codegen.com/gen"],
+        expected_direct_dependency_import_paths=["codegen.com/gen", "fmt"],
         expected_transitive_dependency_import_paths=["github.com/google/uuid"],
     )
 
@@ -612,3 +644,33 @@ def test_xtest_deps(rule_runner: RuleRunner) -> None:
         expected_direct_dependency_import_paths=[],
         expected_transitive_dependency_import_paths=[],
     )
+
+
+def test_stdlib_embed_config(rule_runner: RuleRunner) -> None:
+    import_path = "crypto/internal/nistec"
+    stdlib_packages = rule_runner.request(
+        GoStdLibPackages, [GoStdLibPackagesRequest(with_race_detector=False, cgo_enabled=False)]
+    )
+    pkg_info = stdlib_packages.get(import_path)
+    if not pkg_info:
+        pytest.skip(
+            f"Skipping test since `{import_path}` import path not available in Go standard library."
+        )
+
+    assert "embed" in pkg_info.imports
+    assert pkg_info.embed_patterns
+    assert pkg_info.embed_files
+
+    build_request = rule_runner.request(
+        BuildGoPackageRequest,
+        [
+            BuildGoPackageRequestForStdlibRequest(
+                import_path=import_path, build_opts=GoBuildOptions(cgo_enabled=False)
+            )
+        ],
+    )
+
+    embed_config = build_request.embed_config
+    assert embed_config is not None
+    assert embed_config.patterns
+    assert embed_config.files

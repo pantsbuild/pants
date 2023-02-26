@@ -112,6 +112,6 @@ With the [Pants plugin API](doc:plugins-overview), your custom rules will run wi
 Some example plugins that users have written:
 
 - Cython support
-- Building a Docker image, including packages built via `./pants package`
+- Building a Docker image, including packages built via `pants package`
 - Custom `setup.py` logic to compute the `version` dynamically
 - Jupyter support

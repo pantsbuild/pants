@@ -32,6 +32,7 @@ from pants.core.goals.package import (
     PackageFieldSet,
 )
 from pants.core.target_types import FileSourceField
+from pants.core.util_rules.environments import EnvironmentField
 from pants.engine.addresses import UnparsedAddressInputs
 from pants.engine.platform import Platform
 from pants.engine.process import ProcessResult
@@ -57,6 +58,7 @@ class PythonGoogleCloudFunctionFieldSet(PackageFieldSet):
     complete_platforms: PythonGoogleCloudFunctionCompletePlatforms
     type: PythonGoogleCloudFunctionType
     output_path: OutputPathField
+    environment: EnvironmentField
 
 
 @rule
@@ -124,14 +126,7 @@ async def package_python_google_cloud_function(
         additional_args=additional_pex_args,
         additional_lockfile_args=additional_pex_args,
     )
-
-    lambdex_request = PexRequest(
-        output_filename="lambdex.pex",
-        internal_only=True,
-        requirements=lambdex.pex_requirements(),
-        interpreter_constraints=lambdex.interpreter_constraints,
-        main=lambdex.main,
-    )
+    lambdex_request = lambdex.to_pex_request()
 
     lambdex_pex, pex_result, handler, transitive_targets = await MultiGet(
         Get(VenvPex, PexRequest, lambdex_request),

@@ -84,7 +84,7 @@ pub fn default_cache_path() -> PathBuf {
     .filter(|v| !v.is_empty())
     .map(PathBuf::from)
     .or_else(|| dirs_next::home_dir().map(|home| home.join(".cache")))
-    .unwrap_or_else(|| panic!("Could not find home dir or {}.", XDG_CACHE_HOME));
+    .unwrap_or_else(|| panic!("Could not find home dir or {XDG_CACHE_HOME}."));
   cache_path.join("pants")
 }
 
@@ -109,17 +109,14 @@ impl RelativePath {
     for component in candidate.components() {
       match component {
         Component::Prefix(_) => {
-          return Err(format!("Windows paths are not allowed: {:?}", candidate))
+          return Err(format!("Windows paths are not allowed: {candidate:?}"))
         }
-        Component::RootDir => {
-          return Err(format!("Absolute paths are not allowed: {:?}", candidate))
-        }
+        Component::RootDir => return Err(format!("Absolute paths are not allowed: {candidate:?}")),
         Component::CurDir => continue,
         Component::ParentDir => {
           if !relative_path.pop() {
             return Err(format!(
-              "Relative paths that escape the root are not allowed: {:?}",
-              candidate
+              "Relative paths that escape the root are not allowed: {candidate:?}"
             ));
           }
         }
@@ -242,9 +239,9 @@ impl PathStat {
 
   pub fn path(&self) -> &Path {
     match self {
-      &PathStat::Dir { ref path, .. } => path.as_path(),
-      &PathStat::File { ref path, .. } => path.as_path(),
-      &PathStat::Link { ref path, .. } => path.as_path(),
+      PathStat::Dir { path, .. } => path.as_path(),
+      PathStat::File { path, .. } => path.as_path(),
+      PathStat::Link { path, .. } => path.as_path(),
     }
   }
 }
@@ -279,21 +276,18 @@ impl GitignoreStyleExcludes {
 
     if let Some(path) = gitignore_path {
       if let Some(err) = ignore_builder.add(path) {
-        return Err(format!("Error adding .gitignore path: {:?}", err));
+        return Err(format!("Error adding .gitignore path: {err:?}"));
       }
     }
     for pattern in &patterns {
-      ignore_builder.add_line(None, pattern).map_err(|e| {
-        format!(
-          "Could not parse glob exclude pattern `{:?}`: {:?}",
-          pattern, e
-        )
-      })?;
+      ignore_builder
+        .add_line(None, pattern)
+        .map_err(|e| format!("Could not parse glob exclude pattern `{pattern:?}`: {e:?}"))?;
     }
 
     let gitignore = ignore_builder
       .build()
-      .map_err(|e| format!("Could not build ignore patterns: {:?}", e))?;
+      .map_err(|e| format!("Could not build ignore patterns: {e:?}"))?;
 
     Ok(Arc::new(Self {
       patterns: patterns,
@@ -348,8 +342,7 @@ impl StrictGlobMatching {
           .to_string(),
       ),
       _ => Err(format!(
-        "Unrecognized strict glob matching behavior: {}.",
-        behavior,
+        "Unrecognized strict glob matching behavior: {behavior}.",
       )),
     }
   }
@@ -374,7 +367,7 @@ impl GlobExpansionConjunction {
     match spec {
       "all_match" => Ok(GlobExpansionConjunction::AllMatch),
       "any_match" => Ok(GlobExpansionConjunction::AnyMatch),
-      _ => Err(format!("Unrecognized conjunction: {}.", spec)),
+      _ => Err(format!("Unrecognized conjunction: {spec}.")),
     }
   }
 }
@@ -460,7 +453,7 @@ impl PosixFS {
           }
         })
       })
-      .map_err(|e| format!("Could not canonicalize root {:?}: {:?}", root, e))?;
+      .map_err(|e| format!("Could not canonicalize root {root:?}: {e:?}"))?;
 
     Ok(PosixFS {
       root: canonical_root,
@@ -525,7 +518,7 @@ impl PosixFS {
       .map_err(|e| {
         io::Error::new(
           e.kind(),
-          format!("Failed to scan directory {:?}: {}", dir_abs, e),
+          format!("Failed to scan directory {dir_abs:?}: {e}"),
         )
       })?;
     stats.sort_by(|s1, s2| s1.path().cmp(s2.path()));
@@ -549,7 +542,7 @@ impl PosixFS {
         if path_buf.is_absolute() {
           Err(io::Error::new(
             io::ErrorKind::InvalidData,
-            format!("Absolute symlink: {:?}", path_buf),
+            format!("Absolute symlink: {path_buf:?}"),
           ))
         } else {
           link_parent
@@ -557,17 +550,12 @@ impl PosixFS {
             .ok_or_else(|| {
               io::Error::new(
                 io::ErrorKind::InvalidData,
-                format!("Symlink without a parent?: {:?}", path_buf),
+                format!("Symlink without a parent?: {path_buf:?}"),
               )
             })
         }
       })
-      .map_err(|e| {
-        io::Error::new(
-          e.kind(),
-          format!("Failed to read link {:?}: {}", link_abs, e),
-        )
-      })
+      .map_err(|e| io::Error::new(e.kind(), format!("Failed to read link {link_abs:?}: {e}")))
   }
 
   ///
@@ -591,8 +579,7 @@ impl PosixFS {
       return Err(io::Error::new(
         io::ErrorKind::InvalidInput,
         format!(
-          "Argument path_for_stat to PosixFS::stat must be relative path, got {:?}",
-          path_for_stat
+          "Argument path_for_stat to PosixFS::stat must be relative path, got {path_for_stat:?}"
         ),
       ));
     }
@@ -601,8 +588,7 @@ impl PosixFS {
       return Err(io::Error::new(
         io::ErrorKind::InvalidInput,
         format!(
-          "Argument absolute_path_to_root to PosixFS::stat must be absolute path, got {:?}",
-          absolute_path_to_root
+          "Argument absolute_path_to_root to PosixFS::stat must be absolute path, got {absolute_path_to_root:?}"
         ),
       ));
     }
@@ -670,7 +656,7 @@ impl Vfs<String> for DigestTrie {
   async fn read_link(&self, link: &Link) -> Result<PathBuf, String> {
     let entry = self
       .entry(&link.path)?
-      .ok_or_else(|| format!("{:?} does not exist within this Snapshot.", link))?;
+      .ok_or_else(|| format!("{link:?} does not exist within this Snapshot."))?;
     let target = match entry {
       directory::Entry::File(_) => {
         return Err(format!(
@@ -698,7 +684,7 @@ impl Vfs<String> for DigestTrie {
     } else {
       let entry = self
         .entry(&dir.0)?
-        .ok_or_else(|| format!("{:?} does not exist within this Snapshot.", dir))?;
+        .ok_or_else(|| format!("{dir:?} does not exist within this Snapshot."))?;
       match entry {
         directory::Entry::File(_) => {
           return Err(format!(
@@ -820,14 +806,13 @@ pub fn increase_limits() -> Result<String, String> {
   loop {
     let (cur, max) = rlimit::Resource::NOFILE
       .get()
-      .map_err(|e| format!("Could not validate file handle limits: {}", e))?;
+      .map_err(|e| format!("Could not validate file handle limits: {e}"))?;
     // If the limit is less than our target.
     if cur < TARGET_NOFILE_LIMIT {
       let err_suffix = format!(
-        "To avoid 'too many open file handle' errors, we recommend a limit of at least {}: \
+        "To avoid 'too many open file handle' errors, we recommend a limit of at least {TARGET_NOFILE_LIMIT}: \
         please see https://www.pantsbuild.org/docs/troubleshooting#too-many-open-files-error \
-        for more information.",
-        TARGET_NOFILE_LIMIT
+        for more information."
       );
       // If we might be able to increase the soft limit, try to.
       if cur < max {
@@ -835,19 +820,15 @@ pub fn increase_limits() -> Result<String, String> {
         rlimit::Resource::NOFILE
           .set(target_soft_limit, max)
           .map_err(|e| {
-            format!(
-              "Could not raise soft file handle limit above {}: `{}`. {}",
-              cur, e, err_suffix
-            )
+            format!("Could not raise soft file handle limit above {cur}: `{e}`. {err_suffix}")
           })?;
       } else {
         return Err(format!(
-          "File handle limit is capped to: {}. {}",
-          cur, err_suffix
+          "File handle limit is capped to: {cur}. {err_suffix}"
         ));
       }
     } else {
-      return Ok(format!("File handle limit is: {}", cur));
+      return Ok(format!("File handle limit is: {cur}"));
     };
   }
 }
@@ -876,14 +857,14 @@ pub fn safe_create_dir_all_ioerror(path: &Path) -> Result<(), io::Error> {
 
 pub fn safe_create_dir_all(path: &Path) -> Result<(), String> {
   safe_create_dir_all_ioerror(path)
-    .map_err(|e| format!("Failed to create dir {:?} due to {:?}", path, e))
+    .map_err(|e| format!("Failed to create dir {path:?} due to {e:?}"))
 }
 
 pub fn safe_create_dir(path: &Path) -> Result<(), String> {
   match fs::create_dir(path) {
     Ok(()) => Ok(()),
     Err(ref e) if e.kind() == io::ErrorKind::AlreadyExists => Ok(()),
-    Err(err) => Err(format!("{}", err)),
+    Err(err) => Err(format!("{err}")),
   }
 }
 

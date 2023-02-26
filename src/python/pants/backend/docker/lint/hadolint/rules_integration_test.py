@@ -28,7 +28,7 @@ def rule_runner() -> RuleRunner:
             *docker_rules(),
             *external_tool.rules(),
             *hadolint_rules(),
-            package.find_all_packageable_targets,
+            *package.rules(),
             *source_files.rules(),
             QueryRule(Partitions, [HadolintRequest.PartitionRequest]),
             QueryRule(LintResult, [HadolintRequest.Batch]),

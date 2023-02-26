@@ -10,7 +10,7 @@ import pytest
 from pants.backend.go import target_type_rules
 from pants.backend.go.goals import check
 from pants.backend.go.goals.check import GoCheckFieldSet, GoCheckRequest
-from pants.backend.go.target_types import GoModTarget, GoPackageTarget, GoSdkTarget
+from pants.backend.go.target_types import GoModTarget, GoPackageTarget
 from pants.backend.go.util_rules import (
     assembly,
     build_pkg,
@@ -44,7 +44,7 @@ def rule_runner() -> RuleRunner:
             *target_type_rules.rules(),
             QueryRule(CheckResults, [GoCheckRequest]),
         ],
-        target_types=[GoModTarget, GoPackageTarget, GoSdkTarget],
+        target_types=[GoModTarget, GoPackageTarget],
     )
     rule_runner.set_options([], env_inherit={"PATH"})
     return rule_runner

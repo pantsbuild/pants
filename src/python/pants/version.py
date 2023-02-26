@@ -11,10 +11,13 @@ import pants._version
 from pants.util.resources import read_resource
 
 # Set this env var to override the version pants reports. Useful for testing.
+# Do not change. (see below)
 _PANTS_VERSION_OVERRIDE = "_PANTS_VERSION_OVERRIDE"
 
 
 VERSION: str = (
+    # Do not remove/change this env var without coordinating with `pantsbuild/scie-pants` as it is
+    # being used when bootstrapping Pants with a released version.
     os.environ.get(_PANTS_VERSION_OVERRIDE)
     or
     # NB: We expect VERSION to always have an entry and want a runtime failure if this is false.
