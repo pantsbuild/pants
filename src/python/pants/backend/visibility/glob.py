@@ -17,6 +17,11 @@ from pants.util.memo import memoized_classmethod
 from pants.util.strutil import softwrap
 
 
+def is_path_glob(spec: str) -> bool:
+    """Check if `spec` should be treated as a `path` glob."""
+    return len(spec) > 0 and spec[0].isalnum() or spec[0] in "_.:/*"
+
+
 class PathGlobAnchorMode(Enum):
     PROJECT_ROOT = "//"
     DECLARED_PATH = "/"
@@ -131,7 +136,7 @@ class PathGlob:
 RULE_REGEXP = "|".join(
     (
         r"(?:<(?P<type>[^>]*)>)",
-        r"(?:\[(?P<path>[^]]*)\])",
+        r"(?:\[(?P<path>[^]:]*)?(?::(?P<name>[^]]*))?\])",
         r"(?:\((?P<tags>[^)]*)\))",
     )
 )
@@ -140,12 +145,14 @@ RULE_REGEXP = "|".join(
 @dataclass(frozen=True)
 class TargetGlob:
     type_: str | None
+    name: str | None
     path: PathGlob | None
     tags: tuple[str, ...] | None
 
     def __post_init__(self) -> None:
-        if not isinstance(self.type_, (str, type(None))):
-            raise ValueError(f"invalid target type, expected glob but got: {self.type_!r}")
+        for what, value in (("type", self.type_), ("name", self.name)):
+            if not isinstance(value, (str, type(None))):
+                raise ValueError(f"invalid target {what}, expected glob but got: {value!r}")
         if not isinstance(self.path, (PathGlob, type(None))):
             raise ValueError(f"invalid target path, expected glob but got: {self.path!r}")
         if not isinstance(self.tags, (tuple, type(None))):
@@ -154,13 +161,22 @@ class TargetGlob:
             )
 
     def __str__(self) -> str:
+        """Full syntax:
+
+            <target-type>[path:target-name](tag-1, tag-2)
+
+        If no target-type nor tags:
+
+            path:target-name
+        """
         type_ = f"<{self.type_}>" if self.type_ else ""
+        name = f":{self.name}" if self.name else ""
         tags = (
             f"({', '.join(str(tag) if ',' not in tag else repr(tag) for tag in self.tags)})"
             if self.tags
             else ""
         )
-        path = self.path or ""
+        path = f"{self.path}{name}" if self.path else name
         if path and (type_ or tags):
             path = f"[{path}]"
         return f"{type_}{path}{tags}" or "!*"
@@ -169,13 +185,14 @@ class TargetGlob:
     def create(  # type: ignore[misc]
         cls: type[TargetGlob],
         type_: str | None,
+        name: str | None,
         path: PathGlob | None,
         tags: tuple[str, ...] | None,
     ) -> TargetGlob:
-        return cls(type_=type_, path=path, tags=tags)
+        return cls(type_=type_, path=path, name=name, tags=tags)
 
     @classmethod
-    def parse(cls, spec: str | Mapping[str, Any], base: str) -> TargetGlob:
+    def parse(cls: type[TargetGlob], spec: str | Mapping[str, Any], base: str) -> TargetGlob:
         if isinstance(spec, str):
             spec_dict = cls._parse_string(spec)
         elif isinstance(spec, Mapping):
@@ -184,10 +201,11 @@ class TargetGlob:
             raise ValueError(f"Invalid target spec, expected string or dict but got: {spec!r}")
 
         if not spec_dict:
-            raise ValueError("Target spec must not be empty.")
+            raise ValueError(f"Target spec must not be empty. {spec!r}")
 
         return cls.create(  # type: ignore[call-arg]
             type_=spec_dict.get("type"),
+            name=spec_dict.get("name"),
             path=(PathGlob.parse(spec_dict["path"], base) if spec_dict.get("path") else None),
             tags=cls._parse_tags(spec_dict.get("tags")),
         )
@@ -196,8 +214,9 @@ class TargetGlob:
     def _parse_string(spec: str) -> Mapping[str, Any]:
         if not spec:
             return {}
-        if spec[0] not in "<[(":
-            return dict(path=spec)
+        if is_path_glob(spec):
+            path, _, name = spec.partition(":")
+            return dict(path=path, name=name)
         return {
             tag: val
             for tag, val in itertools.chain.from_iterable(
@@ -241,12 +260,15 @@ class TargetGlob:
             return address.spec_path
 
     def match(self, address: Address, adaptor: TargetAdaptor, base: str) -> bool:
-        if not (self.type_ or self.path or self.tags):
+        if not (self.type_ or self.name or self.path or self.tags):
             # Nothing rules this target in.
             return False
 
         # target type
         if self.type_ and not fnmatchcase(adaptor.type_alias, self.type_):
+            return False
+        # target name
+        if self.name and not fnmatchcase(address.target_name, self.name):
             return False
         # target path (includes filename for source targets)
         if self.path and not self.path.match(self.address_path(address), base):

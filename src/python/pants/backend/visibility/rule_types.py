@@ -40,7 +40,7 @@ class BuildFileVisibilityRulesError(DependencyRulesError):
         example = (
             pformat((tuple(map(str, ruleset.selectors)), *map(str, ruleset.rules), "!*"))
             if ruleset is not None
-            else '(<target patterns>, <existing rules...>, "!*"),'
+            else '(<target selector(s)>, <rule(s), ...>, "!*"),'
         )
         return cls(
             softwrap(
@@ -132,7 +132,7 @@ class VisibilityRuleSet:
                     At least one target selector must have a filtering rule that can match
                     something, for example:
 
-                        ("python_*", {rules})
+                        ("<python_*>", {rules})
                     """
                 )
             )
@@ -141,12 +141,12 @@ class VisibilityRuleSet:
     def parse(cls, build_file: str, arg: Any) -> VisibilityRuleSet:
         """Translate input `arg` from BUILD file call.
 
-        The arg is a rule spec tuple with two or more elements, where the first is the target type
-        pattern(s) and the rest are rules.
+        The arg is a rule spec tuple with two or more elements, where the first is the target
+        selector(s) and the rest are target rules.
         """
         if not isinstance(arg, Sequence) or isinstance(arg, str) or len(arg) < 2:
             raise ValueError(
-                "Invalid rule spec, expected (<target type pattern(s)>, <rule>, ...) "
+                "Invalid rule spec, expected (<target selector(s)>, <rule(s)>, <rule(s)>, ...) "
                 f"but got: {arg!r}"
             )
 
