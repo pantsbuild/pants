@@ -251,23 +251,18 @@ async fn invalidate_randomly() {
 
 #[tokio::test]
 async fn poll_cacheable() {
+  let _logger = env_logger::try_init();
   let graph = empty_graph();
   let context = TContext::new(graph.clone());
 
   // Poll with an empty graph should succeed.
-  let (result, token1) = graph
-    .poll(TNode::new(2), None, None, &context)
-    .await
-    .unwrap();
-  assert_eq!(result, vec![T(0, 0), T(1, 0), T(2, 0)]);
+  let (result, token1) = graph.poll(TNode::new(2), None, None, &context).await;
+  assert_eq!(result.unwrap(), vec![T(0, 0), T(1, 0), T(2, 0)]);
 
   // Re-polling on a non-empty graph but with no LastObserved token should return immediately with
   // the same value, and the same token.
-  let (result, token2) = graph
-    .poll(TNode::new(2), None, None, &context)
-    .await
-    .unwrap();
-  assert_eq!(result, vec![T(0, 0), T(1, 0), T(2, 0)]);
+  let (result, token2) = graph.poll(TNode::new(2), None, None, &context).await;
+  assert_eq!(result.unwrap(), vec![T(0, 0), T(1, 0), T(2, 0)]);
   assert_eq!(token1, token2);
 
   // But polling with the previous token should wait, since nothing has changed.
@@ -279,9 +274,10 @@ async fn poll_cacheable() {
 
   // Invalidating something and re-polling should re-compute.
   graph.invalidate_from_roots(true, |n| n.id == 0);
-  let (result, _) = graph
+  let result = graph
     .poll(TNode::new(2), Some(token2), None, &context)
     .await
+    .0
     .unwrap();
   assert_eq!(result, vec![T(0, 0), T(1, 0), T(2, 0)]);
 }
@@ -298,11 +294,8 @@ async fn poll_uncacheable() {
   };
 
   // Poll with an empty graph should succeed.
-  let (result, token1) = graph
-    .poll(TNode::new(2), None, None, &context)
-    .await
-    .unwrap();
-  assert_eq!(result, vec![T(0, 0), T(1, 0), T(2, 0)]);
+  let (result, token1) = graph.poll(TNode::new(2), None, None, &context).await;
+  assert_eq!(result.unwrap(), vec![T(0, 0), T(1, 0), T(2, 0)]);
 
   // Polling with the previous token (in the same session) should wait, since nothing has changed.
   let request = graph.poll(TNode::new(2), Some(token1), None, &context);
@@ -313,11 +306,30 @@ async fn poll_uncacheable() {
 
   // Invalidating something and re-polling should re-compute.
   graph.invalidate_from_roots(true, |n| n.id == 0);
-  let (result, _) = graph
+  let result = graph
     .poll(TNode::new(2), Some(token1), None, &context)
     .await
+    .0
     .unwrap();
   assert_eq!(result, vec![T(0, 0), T(1, 0), T(2, 0)]);
+}
+
+#[tokio::test]
+async fn poll_errored() {
+  let _logger = env_logger::try_init();
+  let graph = empty_graph();
+  let context = TContext::new(graph.clone()).with_errors(vec![TNode::new(0)].into_iter().collect());
+
+  // Poll should error.
+  let (result, token1) = graph.poll(TNode::new(2), None, None, &context).await;
+  assert_eq!(result.err().unwrap(), TError::Error);
+
+  // Polling with the previous token should wait, since nothing has changed.
+  let request = graph.poll(TNode::new(2), Some(token1), None, &context);
+  match timeout(Duration::from_millis(1000), request).await {
+    Err(Elapsed { .. }) => (),
+    e => panic!("Should have timed out, instead got: {e:?}"),
+  }
 }
 
 #[tokio::test]
@@ -755,6 +767,9 @@ impl Node for TNode {
   async fn run(self, context: TContext) -> Result<Vec<T>, TError> {
     let mut abort_guard = context.abort_guard(self.clone());
     context.ran(self.clone());
+    if context.errors.contains(&self) {
+      return Err(TError::Error);
+    }
     let token = T(self.id, context.salt());
     context.maybe_delay(&self).await;
     let res = match context.dependencies_of(&self) {
@@ -857,6 +872,8 @@ struct TContext {
   // the next smallest node.
   edges: Arc<HashMap<TNode, Vec<TNode>>>,
   delays: Arc<HashMap<TNode, Duration>>,
+  // Nodes which should error when they run.
+  errors: Arc<HashSet<TNode>>,
   non_restartable: Arc<HashSet<TNode>>,
   uncacheable: Arc<HashSet<TNode>>,
   graph: Arc<Graph<TNode>>,
@@ -879,6 +896,7 @@ impl NodeContext for TContext {
       salt: self.salt,
       edges: self.edges.clone(),
       delays: self.delays.clone(),
+      errors: self.errors.clone(),
       non_restartable: self.non_restartable.clone(),
       uncacheable: self.uncacheable.clone(),
       graph: self.graph.clone(),
@@ -913,6 +931,7 @@ impl TContext {
       salt: 0,
       edges: Arc::default(),
       delays: Arc::default(),
+      errors: Arc::default(),
       non_restartable: Arc::default(),
       uncacheable: Arc::default(),
       graph,
@@ -930,6 +949,11 @@ impl TContext {
 
   fn with_delays(mut self, delays: HashMap<TNode, Duration>) -> TContext {
     self.delays = Arc::new(delays);
+    self
+  }
+
+  fn with_errors(mut self, errors: HashSet<TNode>) -> TContext {
+    self.errors = Arc::new(errors);
     self
   }
 
@@ -1038,6 +1062,7 @@ impl Drop for AbortGuard {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum TError {
+  Error,
   Cyclic(Vec<usize>),
   Invalidated,
 }
