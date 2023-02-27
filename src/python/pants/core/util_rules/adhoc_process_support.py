@@ -349,9 +349,12 @@ V = TypeVar("V")
 
 
 def _safe_update(d1: dict[K, V], d2: Mapping[K, V]) -> dict[K, V]:
+    """Updates `d1` with the values from `d2`, raising an exception if a key exists in both
+    dictionaries, but with a different value."""
+
     for k, v in d2.items():
         if k in d1 and d1[k] != v:
-            raise ValueError("Beep")
+            raise ValueError(f"Key {k} was specified in both dictionaries with different values.")
         d1[k] = v
     return d1
 
