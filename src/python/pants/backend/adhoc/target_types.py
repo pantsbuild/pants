@@ -3,11 +3,6 @@
 
 from __future__ import annotations
 
-import collections.abc
-from typing import Iterable, Optional, Tuple, Union
-
-from pants.build_graph.address import Address
-from pants.core.util_rules.adhoc_process_support import runnable
 from pants.core.util_rules.environments import EnvironmentField
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
@@ -15,7 +10,7 @@ from pants.engine.target import (
     Dependencies,
     IntField,
     MultipleSourcesField,
-    SequenceField,
+    SpecialCasedDependencies,
     StringField,
     StringSequenceField,
     Target,
@@ -97,47 +92,43 @@ class AdhocToolOutputDependenciesField(AdhocToolDependenciesField):
     )
 
 
-class AdhocToolExecutionDependenciesField(SequenceField[Union[str, runnable]]):
+class AdhocToolExecutionDependenciesField(SpecialCasedDependencies):
     alias = "execution_dependencies"
     required = False
     default = None
-    expected_element_type = Union[str, runnable]
-    expected_type_description = "an iterable of strings, or `_runnable` dependency objects"
 
     help = help_text(
         lambda: f"""
         The execution dependencies for this command.
 
         Dependencies specified here are those required to make the command complete successfully
-        (e.g. file inputs, binaries compiled from other targets, etc), but NOT required to make
+        (e.g. file inputs, packages compiled from other targets, etc), but NOT required to make
         the output side-effects useful. Dependencies that are required to use the side-effects
         produced by this command should be specified using the
         `{AdhocToolOutputDependenciesField.alias}` field.
-
-        If the `runnable` requires another dependency to be available on the `PATH`, use
-        `_runnable(name=NAME, address=ADDRESS)`.
 
         If this field is specified, dependencies from `{AdhocToolOutputDependenciesField.alias}`
         will not be added to the execution sandbox.
         """
     )
 
-    @classmethod
-    def compute_value(
-        cls, raw_value: Optional[Iterable[Union[str, runnable]]], address: Address
-    ) -> Optional[Tuple[Union[str, runnable], ...]]:
-        if not raw_value:
-            return None
-        if isinstance(raw_value, str) or not isinstance(raw_value, collections.abc.Iterable):
-            raise ValueError(
-                f"Value for {cls.alias} must be an iterable (and not a single string)."
-            )
-        for pos, value in enumerate(raw_value):
-            if not (isinstance(value, str) or isinstance(value, runnable)):
-                raise ValueError(
-                    f"Every item should be a string or a `runnable`. Item {pos} was not."
-                )
-        return tuple(raw_value)
+
+class AdhocToolRunnableDependenciesField(SpecialCasedDependencies):
+    alias = "runnable_dependencies"
+    required = False
+    default = None
+
+    help = help_text(
+        lambda: f"""
+        The execution dependencies for this command.
+
+        Dependencies specified here are those required to exist on the `PATH` to make the command
+        complete successfully (interpreters specified in a `#!` command, etc).
+
+        See also `{AdhocToolOutputDependenciesField.alias}` and
+        `{AdhocToolExecutionDependenciesField.alias}.
+        """
+    )
 
 
 class AdhocToolSourcesField(MultipleSourcesField):
@@ -245,6 +236,7 @@ class AdhocToolTarget(Target):
         AdhocToolArgumentsField,
         AdhocToolExecutionDependenciesField,
         AdhocToolOutputDependenciesField,
+        AdhocToolRunnableDependenciesField,
         AdhocToolLogOutputField,
         AdhocToolOutputFilesField,
         AdhocToolOutputDirectoriesField,
@@ -318,12 +310,12 @@ class SystemBinaryFingerprintArgsField(StringSequenceField):
     )
 
 
-class SystemBinaryFingerprintDependenciesField(AdhocToolExecutionDependenciesField):
+class SystemBinaryFingerprintDependenciesField(AdhocToolRunnableDependenciesField):
     alias = "fingerprint_dependencies"
     help = help_text(
         """
-        Specifies any dependencies that need to be available to the binary to complete the search
-        process. Runnable dependencies may be specified with `_runnable`.
+        Specifies any runnable dependencies that need to be available on the `PATH` when the binary is
+        run, so that the search process may complete successfully.
         """
     )
 

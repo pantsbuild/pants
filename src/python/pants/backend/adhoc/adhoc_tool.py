@@ -12,6 +12,7 @@ from pants.backend.adhoc.target_types import (
     AdhocToolOutputDirectoriesField,
     AdhocToolOutputFilesField,
     AdhocToolOutputRootDirField,
+    AdhocToolRunnableDependenciesField,
     AdhocToolRunnableField,
     AdhocToolSourcesField,
     AdhocToolStderrFilenameField,
@@ -103,6 +104,7 @@ async def run_in_sandbox_request(
             target.address,
             target.get(AdhocToolExecutionDependenciesField).value,
             target.get(AdhocToolOutputDependenciesField).value,
+            target.get(AdhocToolRunnableDependenciesField).value,
         ),
     )
     dependencies_digest = execution_environment.digest
@@ -110,7 +112,8 @@ async def run_in_sandbox_request(
 
     extra_env: dict[str, str] = dict(run_request.extra_env or {})
     extra_path = extra_env.get("PATH", None)
-    del extra_env["PATH"]
+    if extra_path is not None:
+        del extra_env["PATH"]
 
     extra_sandbox_contents = []
 

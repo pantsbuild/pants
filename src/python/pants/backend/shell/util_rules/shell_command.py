@@ -20,6 +20,7 @@ from pants.backend.shell.target_types import (
     ShellCommandOutputFilesField,
     ShellCommandOutputRootDirField,
     ShellCommandOutputsField,
+    ShellCommandRunnableDependenciesField,
     ShellCommandSourcesField,
     ShellCommandTarget,
     ShellCommandTimeoutField,
@@ -91,6 +92,7 @@ async def _prepare_process_request_from_target(
             shell_command.address,
             shell_command.get(ShellCommandExecutionDependenciesField).value,
             shell_command.get(ShellCommandOutputDependenciesField).value,
+            shell_command.get(ShellCommandRunnableDependenciesField).value,
         ),
     )
     dependencies_digest = execution_environment.digest
@@ -256,6 +258,7 @@ async def _interactive_shell_command(
             shell_command.address,
             shell_command.get(ShellCommandExecutionDependenciesField).value,
             shell_command.get(ShellCommandOutputDependenciesField).value,
+            shell_command.get(ShellCommandRunnableDependenciesField).value,
         ),
     )
     dependencies_digest = execution_environment.digest

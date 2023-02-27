@@ -20,7 +20,6 @@ from pants.core.goals.run import RunFieldSet, RunInSandboxBehavior, RunRequest
 from pants.core.util_rules.adhoc_process_support import (
     ResolvedExecutionDependencies,
     ResolveExecutionDependenciesRequest,
-    runnable,
 )
 from pants.core.util_rules.system_binaries import (
     SEARCH_PATHS,
@@ -62,7 +61,7 @@ async def _find_binary(
     extra_search_paths: Iterable[str],
     fingerprint_pattern: str | None,
     fingerprint_args: tuple[str, ...] | None,
-    fingerprint_dependencies: tuple[str | runnable, ...] | None,
+    fingerprint_dependencies: tuple[str, ...] | None,
 ) -> BinaryPath:
 
     search_paths = tuple(extra_search_paths) + SEARCH_PATHS
@@ -79,7 +78,7 @@ async def _find_binary(
 
     deps = await Get(
         ResolvedExecutionDependencies,
-        ResolveExecutionDependenciesRequest(address, fingerprint_dependencies or (), None),
+        ResolveExecutionDependenciesRequest(address, (), None, fingerprint_dependencies),
     )
     rds = deps.runnable_dependencies
     env: dict[str, str] = {}

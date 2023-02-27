@@ -72,8 +72,9 @@ class AdhocProcessResult:
 @dataclass(frozen=True)
 class ResolveExecutionDependenciesRequest:
     address: Address
-    execution_dependencies: tuple[str | runnable, ...] | None
+    execution_dependencies: tuple[str, ...] | None
     dependencies: tuple[str, ...] | None  # can go away after 2.17.0.dev0 per deprecation
+    runnable_dependencies: tuple[str, ...] | None
 
 
 @dataclass(frozen=True)
@@ -193,12 +194,16 @@ async def add_extra_contents_to_prcess(request: AddExtraSandboxContentsToProcess
 
 
 async def _resolve_runnable_dependencies(
-    bash: BashBinary, deps: tuple[runnable, ...], owning: Address, origin: str
-) -> tuple[Digest, RunnableDependencies]:
+    bash: BashBinary, deps: tuple[str, ...] | None, owning: Address, origin: str
+) -> tuple[Digest, RunnableDependencies | None]:
+
+    if not deps:
+        return EMPTY_DIGEST, None
+
     addresses = await Get(
         Addresses,
         UnparsedAddressInputs(
-            (dep.address for dep in deps),
+            (dep for dep in deps),
             owning_address=owning,
             description_of_origin=origin,
         ),
@@ -206,26 +211,30 @@ async def _resolve_runnable_dependencies(
 
     targets = await Get(Targets, Addresses, addresses)
 
-    fspt = (
-        await Get(
-            FieldSetsPerTarget,
-            FieldSetsPerTargetRequest(RunFieldSet, targets),
-        ),
+    fspt = await Get(
+        FieldSetsPerTarget,
+        FieldSetsPerTargetRequest(RunFieldSet, targets),
     )
 
-    for field_set in fspt:
-        logger.warning(f"{field_set=}")
+    for address, field_set in zip(addresses, fspt.collection):
+        if not field_set:
+            raise ValueError(
+                dedent(
+                    f"""\
+                    Address `{address.spec}` was specified as a runnable dependency, but is not
+                    runnable.
+                    """
+                )
+            )
 
     runnables = await MultiGet(
-        Get(RunInSandboxRequest, RunFieldSet, field_set.field_sets[0])
-        for field_set in fspt
-        if field_set.field_sets
+        Get(RunInSandboxRequest, RunFieldSet, field_set[0]) for field_set in fspt.collection
     )
 
     shims: list[FileContent] = []
     extras: list[ExtraSandboxContents] = []
 
-    for dep, runnable in zip(deps, runnables):
+    for address, runnable in zip(addresses, runnables):
         extras.append(
             ExtraSandboxContents(
                 digest=runnable.digest,
@@ -237,19 +246,18 @@ async def _resolve_runnable_dependencies(
         )
         shims.append(
             FileContent(
-                dep.name,
+                address.target_name,
                 _runnable_dependency_shim(bash.path, runnable.args, runnable.extra_env),
                 is_executable=True,
             )
         )
 
-    merged_extras: ExtraSandboxContents
     merged_extras, shim_digest = await MultiGet(
         Get(ExtraSandboxContents, MergeExtraSandboxContents(tuple(extras))),
         Get(Digest, CreateDigest(shims)),
     )
 
-    shim_digest_path = f"shims_{shim_digest.fingerprint}"
+    shim_digest_path = f"_runnable_dependency_shims_{shim_digest.fingerprint}"
     immutable_input_digests = {shim_digest_path: shim_digest}
     _safe_update(immutable_input_digests, merged_extras.immutable_input_digests)
 
@@ -279,19 +287,13 @@ async def resolve_execution_environment(
     # Always include the execution dependencies that were specified
     if raw_execution_dependencies is not None:
         _descr = f"the `execution_dependencies` from the target {target_address}"
-        strings = (i for i in raw_execution_dependencies if isinstance(i, str))
-        runnables = tuple(i for i in raw_execution_dependencies if isinstance(i, runnable))
-
         execution_dependencies = await Get(
             Addresses,
             UnparsedAddressInputs(
-                strings,
+                raw_execution_dependencies,
                 owning_address=target_address,
                 description_of_origin=_descr,
             ),
-        )
-        runnables_digest, runnable_dependencies = await _resolve_runnable_dependencies(
-            bash, runnables, target_address, _descr
         )
     elif any_dependencies_defined:
         # If we're specifying the `dependencies` as relevant to the execution environment, then
@@ -308,10 +310,8 @@ async def resolve_execution_environment(
             ),
             print_warning=True,
         )
-        runnables_digest, runnable_dependencies = EMPTY_DIGEST, None
     else:
         execution_dependencies = Addresses((target_address,))
-        runnables_digest, runnable_dependencies = EMPTY_DIGEST, None
 
     transitive = await Get(
         TransitiveTargets,
@@ -341,6 +341,11 @@ async def resolve_execution_environment(
     packages = await MultiGet(
         Get(BuiltPackage, EnvironmentAwarePackageRequest(field_set))
         for field_set in pkgs_per_target.field_sets
+    )
+
+    _descr = f"the `runnable_dependencies` from the target {target_address}"
+    runnables_digest, runnable_dependencies = await _resolve_runnable_dependencies(
+        bash, request.runnable_dependencies, target_address, _descr
     )
 
     dependencies_digest = await Get(
