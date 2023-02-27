@@ -2,16 +2,18 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import difflib
+import itertools
 import json
 import textwrap
 from itertools import cycle
-from typing import Callable, Dict, Iterable, List, Optional, Set, Tuple, cast
+from typing import Any, Callable, Dict, Iterable, List, Optional, Set, Tuple, cast
 
 from typing_extensions import Literal
 
 from pants.base.build_environment import pants_version
 from pants.help.help_formatter import HelpFormatter
 from pants.help.help_info_extracter import AllHelpInfo, HelpJSONEncoder
+from pants.help.help_json_schema import build_scope_properties
 from pants.help.help_tools import ToolHelpInfo
 from pants.help.maybe_color import MaybeColor
 from pants.option.arg_splitter import (
@@ -49,6 +51,7 @@ class HelpPrinter(MaybeColor):
             "subsystems",
             "targets",
             "tools",
+            "json-schema",
         }
 
     def print_help(self) -> Literal[0, 1]:
@@ -225,6 +228,8 @@ class HelpPrinter(MaybeColor):
             self._print_all_api_types()
         elif thing == "backends":
             self._print_all_backends()
+        elif thing == "json-schema":
+            self._print_json_schema()
 
     def _print_all_goals(self) -> None:
         goal_descriptions: Dict[str, str] = {}
@@ -338,6 +343,10 @@ class HelpPrinter(MaybeColor):
             f"Use `{self.maybe_green(api_help_cmd)}` to get help for a specific API type or rule.\n"
         )
 
+    def _print_json_schema(self) -> None:
+        schema = self._get_json_schema(self._get_help_json())
+        print(json.dumps(schema, indent=2, sort_keys=True, cls=HelpJSONEncoder))
+
     def _print_all_backends(self) -> None:
         self._print_title("Backends")
         print(
@@ -401,6 +410,7 @@ class HelpPrinter(MaybeColor):
         print_cmd(
             "help-advanced [goal/subsystem]", "Help for a goal or subsystem's advanced options."
         )
+        print_cmd("help json-schema", "Print a JSON schema for Pants TOML config file.")
         print_cmd("help-all", "Print a JSON object containing all help info.")
 
         print("")
@@ -532,3 +542,41 @@ class HelpPrinter(MaybeColor):
         return json.dumps(
             self._all_help_info.asdict(), sort_keys=True, indent=2, cls=HelpJSONEncoder
         )
+
+    @staticmethod
+    def _get_json_schema(all_help_raw: str) -> Dict[str, Any]:
+        """Generate a JSON schema file contents (https://json-schema.org/).
+
+        This schema file can be used by IDEs (PyCharm, VSCode, etc) to provide autocompletion when
+        editing Pants configuration files in TOML format. It can also be used to validate the
+        configuration file(s) programmatically.
+        """
+        all_help = json.loads(all_help_raw)["scope_to_help_info"]
+
+        # set GLOBAL scope that is declared under an empty string
+        all_help["GLOBAL"] = all_help[""]
+        del all_help[""]
+
+        # build ruleset for all scopes (where "scope" is a [section]
+        # in the pants.toml configuration file such as "pytest" or "mypy")
+        ruleset = {}
+        for scope, options in all_help.items():
+            ruleset[scope] = {
+                "description": all_help[scope]["description"],
+                "type": "object",
+                "properties": {},
+            }
+            ruleset = build_scope_properties(
+                ruleset=ruleset,
+                options=itertools.chain(options["basic"], options["advanced"]),
+                scope=scope,
+            )
+
+        schema: Dict[str, Any] = dict()
+        schema["$schema"] = "http://json-schema.org/draft-04/schema#"
+        schema["description"] = "Pants configuration file schema: https://www.pantsbuild.org/"
+        schema["properties"] = ruleset
+        # custom plugins may have own configuration sections
+        schema["additionalProperties"] = True
+        schema["type"] = "object"
+        return schema
