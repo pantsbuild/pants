@@ -105,7 +105,7 @@ def test_runnable_dependencies() -> None:
             adhoc_tool(
                 name="adhoc",
                 runnable=":bash",
-                execution_dependencies=[_runnable(name="bash", address=":bash"),],
+                runnable_dependencies=[":bash",],
                 args=["-c", "bash -c 'echo I am a duck.'"],
                 log_output=True,
                 stdout="stdout",
