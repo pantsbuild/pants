@@ -34,6 +34,7 @@ class PipVersion(enum.Enum):
     V22_3 = "22.3"
     V22_3_1 = "22.3.1"
     V23_0 = "23.0"
+    V23_0_1 = "23.0.1"
 
 
 @enum.unique
