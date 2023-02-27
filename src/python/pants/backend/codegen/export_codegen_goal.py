@@ -63,7 +63,7 @@ async def export_codegen(
             {
                 tgt_type.alias
                 for tgt_type in registered_target_types.types
-                for input_source, _ in inputs_to_outputs
+                for input_source in {input_source for input_source, _ in inputs_to_outputs}
                 if tgt_type.class_has_field(input_source, union_membership=union_membership)
             }
         )
