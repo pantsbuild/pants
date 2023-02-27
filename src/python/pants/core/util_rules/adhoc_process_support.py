@@ -84,20 +84,6 @@ class ResolvedExecutionDependencies:
 
 
 @dataclass(frozen=True)
-class runnable:
-    """Allows for an execution dependency to be specified as `runnable`.
-
-    When resolved, the dependency will be available on the `PATH` with the name `name`.
-
-    `runnable` dependencies are not resolved transitively, and must be defined on the target that
-    wants to run those dependencies.
-    """
-
-    name: str
-    address: str
-
-
-@dataclass(frozen=True)
 class RunnableDependencies:
     path_component: str
     immutable_input_digests: FrozenDict[str, Digest]

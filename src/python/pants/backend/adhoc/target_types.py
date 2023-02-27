@@ -123,7 +123,8 @@ class AdhocToolRunnableDependenciesField(SpecialCasedDependencies):
         The execution dependencies for this command.
 
         Dependencies specified here are those required to exist on the `PATH` to make the command
-        complete successfully (interpreters specified in a `#!` command, etc).
+        complete successfully (interpreters specified in a `#!` command, etc). Note that these
+        dependencies will be made available on the `PATH` with the name of the target.
 
         See also `{AdhocToolOutputDependenciesField.alias}` and
         `{AdhocToolExecutionDependenciesField.alias}.
@@ -314,8 +315,9 @@ class SystemBinaryFingerprintDependenciesField(AdhocToolRunnableDependenciesFiel
     alias = "fingerprint_dependencies"
     help = help_text(
         """
-        Specifies any runnable dependencies that need to be available on the `PATH` when the binary is
-        run, so that the search process may complete successfully.
+        Specifies any runnable dependencies that need to be available on the `PATH` when the binary
+        is run, so that the search process may complete successfully. The name of the target must
+        be the name of the runnable dependency that is called by this binary.
         """
     )
 
