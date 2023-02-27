@@ -7,7 +7,7 @@ createdAt: "2022-12-12T09:10:16.427Z"
 updatedAt: "2022-12-12T03:00:53.427Z"
 ---
 
-Visibility rules are the mechanism by which to control who may depend on whom. It is an implementation of Pants's dependency rules API. With these rules a dependency between two files (or targets) may be set for entire directory trees down to single files. A target may be selected not only by its file path but also by target type, name and tags.
+Visibility rules are the mechanism by which to control who may depend on whom. It is an implementation of Pants's dependency rules API. With these rules a dependency between two files (or targets) may be set for entire directory trees down to single files. A target may be selected not only by its file path but also by target type, name, and tags.
 
 To jump right in, start with [enabling the backend](doc:validating-dependencies#enable-visibility-backend) and add some rules to your BUILD files.
 
@@ -180,9 +180,9 @@ __dependencies_rules__(
 )
 ```
 
-The selector and rule share a common syntax (refered to as a __target rule spec__), that is a dictionary value with properties describing what targets it applies to, and together this pair of selector(s) and rules is called a __rule set__. A rule set may have multiple selectors wrapped in a list/tuple and the rules may be spread out or grouped in any fashion. Allowing to group rules like this allows for easier re-use/insertion of rules from macros or similar.
+The selector and rule share a common syntax (refered to as a __target rule spec__), that is a dictionary value with properties describing what targets it applies to. Together, this pair of selector(s) and rules is called a __rule set__. A rule set may have multiple selectors wrapped in a list/tuple and the rules may be spread out or grouped in any fashion. Grouping rules like this makes it easier to re-use/insert rules from macros or similar.
 
-The __target rule spec__ has four properties: `type`, `name`, `tags` and `path`. From the above example, when determining which rule set to apply for the dependencies of `src/a/main.py` Pants will look for the first selector for `src/a/BUILD` that satisifies the properties `type=python_sources`, `tags=["apps"]` and `path=src/a/main.py`. The selection is based on exclusion so only when there is a property value and it doesn't match the targets property it will move on to the next selector, so the lack of a property will be considered to match anything. Consequently an empty target spec would match all targets but as this is coneptually not very clear when reading the rules it is disallowed and will yield an error if used.
+The __target rule spec__ has four properties: `type`, `name`, `tags`, and `path`. From the above example, when determining which rule set to apply for the dependencies of `src/a/main.py` Pants will look for the first selector for `src/a/BUILD` that satisifies the properties `type=python_sources`, `tags=["apps"]`, and `path=src/a/main.py`. The selection is based on exclusion so only when there is a property value and it doesn't match the target's property it will move on to the next selector; the lack of a property will be considered to match anything. Consequently an empty target spec would match all targets, but this is disallowed and will raise an error if used because it is conceptually not very clear when reading the rules.
 
 The values of a __target rule spec__ supports wildcard patterns (or globs) in order to have a single selector match multiple different targets, as described in [glob syntax](doc:targets#glob-syntax). When listing multiple values for the `tags` property, the target must have all of them in order to match. Spread the tags over multiple selectors in order to switch from _AND_ to _OR_ as required. The target `type` to match against will be that of the type used in the BUILD file, as the path (and target address) may refer to a generated target it is the target generators type that will be used during the selector matching process.
 
@@ -233,7 +233,7 @@ __dependents_rules__(
 )
 ```
 
-There are some syntactic sugar for __target rule specs__ so they may be declared in a more concise text form rather than as a dictionary (we have used this for the rules already--this is also the form on which they are presented in messages from Pants, when possible). The syntax is `<type>[path:name](tags, ...)`. Empty parts are optional and can be left out, and if only `path` (and/or `name`) is provided the enclosing square brackets are optional. Providing all the selectors from the previous example code block in string form for reference:
+There is some syntactic sugar for __target rule specs__ so they may be declared in a more concise text form rather than as a dictionary (we have used this text form for the rules already--this is also the form in which they are presented in messages from Pants, when possible). The syntax is `<type>[path:name](tags, ...)`. Empty parts are optional and can be left out, and if only `path` (and/or `name`) is provided the enclosing square brackets are optional. For reference, the string form of the selectors in the previous example code block would look like this:
 
 ```python
 python_sources            # {"type": python_sources}  -- target types works as strings when used bare
@@ -241,7 +241,7 @@ python_sources            # {"type": python_sources}  -- target types works as s
 "<python_*>(any-python)"  # {"type": "python_*", "tags":["any-python"]}
 "<*>(libs)"               # {"type": "*", "tags":["libs"]}
 "[special-cased.py]"      # {"path": "special-cased.py"}
-# May omit square brackets when only providing a path/name:
+# May omit square brackets when only providing a path and/or name:
 "special-cased.py"        # {"path": "special-cased.py"}
 ":my-target-name"         # {"name": "my-target-name"}
 "//src/**:named-*"        # {"path": "//src/**", "name": "named-*"}
@@ -266,9 +266,9 @@ The previous example, using this alternative syntax for the selectors, would loo
 Glob syntax
 -----------
 
-The visibility rules are all about matching globs. There are two wildcards, the `*` to match anything except `/` and the `**` to match anything including any `/`. (For paths that is non-recursive and recursive globbing respectively.)
+The visibility rules are all about matching globs. There are two wildcards: the `*` matches anything except `/`, and the `**` matches anything including `/`. (For paths that is non-recursive and recursive globbing respectively.)
 
-Globs are matched until the end of the value it is being applied to, so if there is no trailing wildcard (`*` or `**`) on the end of the path glob, it will match to the end of the value. An example where this is usefull is for matching on file names regardless of where in the project tree they are:
+A glob is matched until the end of the value it is being applied to, so if there is no trailing wildcard (`*` or `**`) on the end of the path glob, it will match to the end of the value. An example where this is useful is for matching on file names regardless of where in the project tree they are:
 
 ```
 .py

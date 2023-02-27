@@ -18,7 +18,7 @@ from pants.util.strutil import softwrap
 
 def is_path_glob(spec: str) -> bool:
     """Check if `spec` should be treated as a `path` glob."""
-    return len(spec) > 0 and spec[0].isalnum() or spec[0] in "_.:/*"
+    return len(spec) > 0 and (spec[0].isalnum() or spec[0] in "_.:/*")
 
 
 def glob_to_regexp(pattern: str, snap_to_path: bool = False) -> str:
