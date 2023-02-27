@@ -9,7 +9,7 @@ updatedAt: "2022-07-12T00:00:00.000Z"
 You can download an installer script that will install the Pants binary with this command:
 
 ```
-curl --proto '=https' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh
+curl --proto '=https' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh | bash
 ```
 
 This script will install `pants` into `~/bin`, which must be on your PATH. The installer script will warn you if it is not.
