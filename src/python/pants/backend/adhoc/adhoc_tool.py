@@ -119,9 +119,9 @@ async def run_in_sandbox_request(
         ExtraSandboxContents(
             EMPTY_DIGEST,
             extra_path,
-            FrozenDict(run_request.immutable_input_digests or {}),
-            FrozenDict(run_request.append_only_caches or {}),
-            FrozenDict(run_request.extra_env or {}),
+            run_request.immutable_input_digests or FrozenDict(),
+            run_request.append_only_caches or FrozenDict(),
+            run_request.extra_env or FrozenDict(),
         )
     )
 
@@ -158,8 +158,8 @@ async def run_in_sandbox_request(
         argv=tuple(run_request.args + extra_args),
         timeout=None,
         input_digest=input_digest,
-        immutable_input_digests=merged_extras.immutable_input_digests,
-        append_only_caches=merged_extras.append_only_caches,
+        immutable_input_digests=FrozenDict.frozen(merged_extras.immutable_input_digests),
+        append_only_caches=FrozenDict.frozen(merged_extras.append_only_caches),
         output_files=output_files,
         output_directories=output_directories,
         fetch_env_vars=(),

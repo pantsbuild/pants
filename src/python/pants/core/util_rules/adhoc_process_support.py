@@ -86,9 +86,9 @@ class ResolvedExecutionDependencies:
 @dataclass(frozen=True)
 class RunnableDependencies:
     path_component: str
-    immutable_input_digests: FrozenDict[str, Digest]
-    append_only_caches: FrozenDict[str, str]
-    extra_env: FrozenDict[str, str]
+    immutable_input_digests: Mapping[str, Digest]
+    append_only_caches: Mapping[str, str]
+    extra_env: Mapping[str, str]
 
 
 #
@@ -100,9 +100,9 @@ class RunnableDependencies:
 class ExtraSandboxContents:
     digest: Digest
     path: str | None
-    immutable_input_digests: FrozenDict[str, Digest]
-    append_only_caches: FrozenDict[str, str]
-    extra_env: FrozenDict[str, str]
+    immutable_input_digests: Mapping[str, Digest]
+    append_only_caches: Mapping[str, str]
+    extra_env: Mapping[str, str]
 
 
 @dataclass(frozen=True)
