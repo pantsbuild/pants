@@ -64,6 +64,15 @@ class FrozenDict(Mapping[K, V]):
 
         return cls({k: _freeze(v) for k, v in data.items()})
 
+    @staticmethod
+    def frozen(to_freeze: Mapping[K, V]) -> FrozenDict[K, V]:
+        """Returns a `FrozenDict` containing the keys and values of `to_freeze`.
+
+        If `to_freeze` is already a `FrozenDict`, returns the same object.
+        """
+
+        return to_freeze if isinstance(to_freeze, FrozenDict) else FrozenDict(to_freeze)
+
     def __getitem__(self, k: K) -> V:
         return self._data[k]
 
