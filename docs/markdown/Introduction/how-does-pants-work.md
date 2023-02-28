@@ -68,6 +68,7 @@ Work is broken down into many small units and kept warm in a daemon so that as l
 ### Hermetic execution
 
 Pants sandboxes all processes that it executes, ensuring that cache keys are always accurate, and builds are always correct.
+This implies, amongst other things, processes can't access your local [environment variables](docs:reference-subprocess-environment) or even setting stored in your home directory (as this uses `HOME`).
 
 ### Dependency inference
 

@@ -265,3 +265,10 @@ It works mostly same as a normal installation, but has an important difference: 
 This may cause problems if your code or tests ry to create a container with a bind-mount of a directory or file _under the current working directory_.  Container creation will fail with "invalid mount config for type "bind": bind source path does not exist", because Pants' default `local_execution_root_dir` option is `/tmp`, which the Snap-based Docker service cannot access.
 
 You can work around this issue by explicitly setting `[GLOBAL].local_execution_root_dir` to a directory outside the system `/tmp` directory, such as `"%(buildroot)s/tmp"`.
+
+Passing environment variables
+-----------------------------
+Pants [sandboxes](docs:how-does-pants-work#hermetic-execution) subprocess from your environment variables.
+So for instance if you're wanting Pants to use your `~/.gitconfig` or `~/.netrc` you need to pass in the `HOME` environment variable.
+This is done via the [subprocess environment](doc:reference-subprocess-environment).
+You can also use this to pass API keys.
