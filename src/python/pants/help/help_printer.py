@@ -3,6 +3,7 @@
 
 import difflib
 import json
+import re
 import textwrap
 from itertools import cycle
 from typing import Callable, Dict, Iterable, List, Optional, Set, Tuple, cast
@@ -47,6 +48,7 @@ class HelpPrinter(MaybeColor):
             "global",
             "goals",
             "subsystems",
+            "symbols",
             "targets",
             "tools",
         }
@@ -225,6 +227,8 @@ class HelpPrinter(MaybeColor):
             self._print_all_api_types()
         elif thing == "backends":
             self._print_all_backends()
+        elif thing == "symbols":
+            self._print_all_symbols()
 
     def _print_all_goals(self) -> None:
         goal_descriptions: Dict[str, str] = {}
@@ -371,6 +375,24 @@ class HelpPrinter(MaybeColor):
                             width=self._width - enabled_col_width - 1,
                         )
                     )
+                )
+
+    def _print_all_symbols(self) -> None:
+        self._print_title("BUILD file symbols")
+        symbols = self._all_help_info.name_to_build_file_info
+        for symbol in symbols.values():
+            if re.match("_[^_]", symbol.name):
+                continue
+
+            print(self.maybe_cyan(symbol.name))
+            if symbol.signature:
+                print(self.maybe_magenta(f"  Signature: {symbol.name}{symbol.signature}\n"))
+            if symbol.documentation:
+                print(
+                    "\n".join(
+                        hard_wrap(symbol.documentation or "", indent=2, width=self._width - 2)
+                    )
+                    + "\n"
                 )
 
     def _print_global_help(self):

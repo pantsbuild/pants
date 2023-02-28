@@ -31,14 +31,19 @@ from pants.engine.internals.dep_rules import (
     MaybeBuildFileDependencyRulesImplementation,
 )
 from pants.engine.internals.mapper import AddressFamily, AddressMap
-from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser, error_on_imports
+from pants.engine.internals.parser import (
+    BuildFilePreludeSymbols,
+    BuildFileSymbolsInfo,
+    Parser,
+    error_on_imports,
+)
 from pants.engine.internals.session import SessionValues
 from pants.engine.internals.synthetic_targets import (
     SyntheticAddressMaps,
     SyntheticAddressMapsRequest,
 )
 from pants.engine.internals.target_adaptor import TargetAdaptor, TargetAdaptorRequest
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.rules import Get, MultiGet, QueryRule, collect_rules, rule
 from pants.engine.target import (
     DependenciesRuleApplication,
     DependenciesRuleApplicationRequest,
@@ -111,6 +116,15 @@ async def evaluate_preludes(
     # to the other symbols
     globals.update(locals)
     return BuildFilePreludeSymbols.create(locals, env_vars)
+
+
+@rule
+async def get_all_build_file_symbols_info(
+    parser: Parser, prelude_symbols: BuildFilePreludeSymbols
+) -> BuildFileSymbolsInfo:
+    return BuildFileSymbolsInfo.from_info(
+        parser.symbols_info.info.values(), prelude_symbols.info.values()
+    )
 
 
 @rule
@@ -471,4 +485,7 @@ async def get_dependencies_rule_application(
 
 
 def rules():
-    return collect_rules()
+    return (
+        *collect_rules(),
+        QueryRule(BuildFileSymbolsInfo, ()),
+    )

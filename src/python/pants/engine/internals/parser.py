@@ -334,6 +334,10 @@ class Parser:
         return symbols_info, parse_state
 
     @property
+    def symbols_info(self) -> BuildFileSymbolsInfo:
+        return self._symbols_info
+
+    @property
     def symbols(self) -> FrozenDict[str, Any]:
         return self._symbols_info.symbols
 

@@ -34,6 +34,7 @@ from pants.base import deprecated
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.core.util_rules.environments import option_field_name_for
 from pants.engine.goal import GoalSubsystem
+from pants.engine.internals.parser import BuildFileSymbolInfo, BuildFileSymbolsInfo
 from pants.engine.rules import Rule, TaskRule
 from pants.engine.target import Field, RegisteredTargetTypes, StringField, Target, TargetGenerator
 from pants.engine.unions import UnionMembership, UnionRule, is_union
@@ -399,6 +400,13 @@ class BackendHelpInfo:
 
 
 @dataclass(frozen=True)
+class BuildFileSymbolHelpInfo:
+    name: str
+    signature: str | None
+    documentation: str | None
+
+
+@dataclass(frozen=True)
 class AllHelpInfo:
     """All available help info."""
 
@@ -408,6 +416,7 @@ class AllHelpInfo:
     name_to_rule_info: LazyFrozenDict[str, RuleInfo]
     name_to_api_type_info: LazyFrozenDict[str, PluginAPITypeInfo]
     name_to_backend_help_info: LazyFrozenDict[str, BackendHelpInfo]
+    name_to_build_file_info: LazyFrozenDict[str, BuildFileSymbolHelpInfo]
 
     def non_deprecated_option_scope_help_infos(self):
         for oshi in self.scope_to_help_info.values():
@@ -434,6 +443,7 @@ class HelpInfoExtracter:
         union_membership: UnionMembership,
         consumed_scopes_mapper: ConsumedScopesMapper,
         registered_target_types: RegisteredTargetTypes,
+        build_symbols: BuildFileSymbolsInfo,
         build_configuration: BuildConfiguration | None = None,
     ) -> AllHelpInfo:
         def option_scope_help_info_loader_for(
@@ -547,6 +557,7 @@ class HelpInfoExtracter:
             name_to_rule_info=cls.get_rule_infos(build_configuration),
             name_to_api_type_info=cls.get_api_type_infos(build_configuration, union_membership),
             name_to_backend_help_info=cls.get_backend_help_info(options),
+            name_to_build_file_info=cls.get_build_file_info(build_symbols),
         )
 
     @staticmethod
@@ -876,6 +887,25 @@ class HelpInfoExtracter:
                 for discovered_backend in sorted(
                     chain(builtin_backends, inrepo_backends, plugin_backends)
                 )
+            }
+        )
+
+    @classmethod
+    def get_build_file_info(
+        cls, build_symbols: BuildFileSymbolsInfo
+    ) -> LazyFrozenDict[str, BuildFileSymbolHelpInfo]:
+        def get_build_file_symbol_help_info_loader(
+            symbol: BuildFileSymbolInfo,
+        ) -> Callable[[], BuildFileSymbolHelpInfo]:
+            def load() -> BuildFileSymbolHelpInfo:
+                return BuildFileSymbolHelpInfo(symbol.name, symbol.signature, symbol.help)
+
+            return load
+
+        return LazyFrozenDict(
+            {
+                symbol.name: get_build_file_symbol_help_info_loader(symbol)
+                for symbol in build_symbols.info.values()
             }
         )
 
