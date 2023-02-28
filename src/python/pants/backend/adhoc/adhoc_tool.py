@@ -111,9 +111,7 @@ async def run_in_sandbox_request(
     runnable_dependencies = execution_environment.runnable_dependencies
 
     extra_env: dict[str, str] = dict(run_request.extra_env or {})
-    extra_path = extra_env.get("PATH", None)
-    if extra_path is not None:
-        del extra_env["PATH"]
+    extra_path = extra_env.pop("PATH", None)
 
     extra_sandbox_contents = []
 
