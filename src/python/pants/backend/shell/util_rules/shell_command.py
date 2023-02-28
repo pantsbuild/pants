@@ -156,7 +156,7 @@ async def _prepare_process_request_from_target(
         fetch_env_vars=shell_command.get(ShellCommandExtraEnvVarsField).value or (),
         append_only_caches=merged_extras.append_only_caches,
         supplied_env_var_values=FrozenDict(extra_env),
-        immutable_input_digests=FrozenDict(merged_extras.immutable_input_digests),
+        immutable_input_digests=merged_extras.immutable_input_digests,
         log_on_process_errors=_LOG_ON_PROCESS_ERRORS,
         log_output=shell_command[ShellCommandLogOutputField].value,
     )

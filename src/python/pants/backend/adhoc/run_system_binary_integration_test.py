@@ -102,11 +102,18 @@ def test_runnable_dependencies() -> None:
                 binary_name="bash",
             )
 
+            system_binary(
+                name="awk",
+                binary_name="awk",
+                fingerprint_args=["--version"],
+                fingerprint=".*",
+            )
+
             adhoc_tool(
                 name="adhoc",
                 runnable=":bash",
-                runnable_dependencies=[":bash",],
-                args=["-c", "bash -c 'echo I am a duck.'"],
+                runnable_dependencies=[":awk",],
+                args=["-c", "awk 'BEGIN {{ print \\"I am a duck.\\" }}'"],
                 log_output=True,
                 stdout="stdout",
             )
