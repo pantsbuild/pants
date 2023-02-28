@@ -38,7 +38,7 @@ def test_system_binary_and_adhoc_tool() -> None:
 
     with setup_tmpdir(sources) as tmpdir:
         args = [
-            "--backend-packages=['pants.backend.experimental.adhoc', 'pants.backend.python']",
+            "--backend-packages=['pants.backend.experimental.adhoc',]",
             f"--source-root-patterns=['{tmpdir}/src']",
             "export-codegen",
             f"{tmpdir}/src:adhoc",
@@ -79,7 +79,7 @@ def test_fingerprint(fingerprint: str, passes: bool) -> None:
 
     with setup_tmpdir(sources) as tmpdir:
         args = [
-            "--backend-packages=['pants.backend.experimental.adhoc', 'pants.backend.python']",
+            "--backend-packages=['pants.backend.experimental.adhoc',]",
             f"--source-root-patterns=['{tmpdir}/src']",
             "export-codegen",
             f"{tmpdir}/src:adhoc",
@@ -91,3 +91,42 @@ def test_fingerprint(fingerprint: str, passes: bool) -> None:
         else:
             assert result.exit_code != 0
             assert "Could not find a binary with name `bash`" in result.stderr.strip()
+
+
+def test_runnable_dependencies() -> None:
+    sources = {
+        "src/BUILD": dedent(
+            """\
+            system_binary(
+                name="bash",
+                binary_name="bash",
+            )
+
+            system_binary(
+                name="awk",
+                binary_name="awk",
+                fingerprint_args=["--version"],
+                fingerprint=".*",
+            )
+
+            adhoc_tool(
+                name="adhoc",
+                runnable=":bash",
+                runnable_dependencies=[":awk",],
+                args=["-c", "awk 'BEGIN {{ print \\"I am a duck.\\" }}'"],
+                log_output=True,
+                stdout="stdout",
+            )
+            """
+        ),
+    }
+
+    with setup_tmpdir(sources) as tmpdir:
+        args = [
+            "--backend-packages=['pants.backend.experimental.adhoc',]",
+            f"--source-root-patterns=['{tmpdir}/src']",
+            "export-codegen",
+            f"{tmpdir}/src:adhoc",
+        ]
+        result = run_pants(args)
+        assert "[INFO] I am a duck." in result.stderr.strip()

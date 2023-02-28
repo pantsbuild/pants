@@ -1,6 +1,7 @@
 # Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
 
 from pants.core.util_rules.environments import EnvironmentField
 from pants.engine.target import (
@@ -101,13 +102,32 @@ class AdhocToolExecutionDependenciesField(SpecialCasedDependencies):
         The execution dependencies for this command.
 
         Dependencies specified here are those required to make the command complete successfully
-        (e.g. file inputs, binaries compiled from other targets, etc), but NOT required to make
+        (e.g. file inputs, packages compiled from other targets, etc), but NOT required to make
         the output side-effects useful. Dependencies that are required to use the side-effects
         produced by this command should be specified using the
         `{AdhocToolOutputDependenciesField.alias}` field.
 
         If this field is specified, dependencies from `{AdhocToolOutputDependenciesField.alias}`
         will not be added to the execution sandbox.
+        """
+    )
+
+
+class AdhocToolRunnableDependenciesField(SpecialCasedDependencies):
+    alias = "runnable_dependencies"
+    required = False
+    default = None
+
+    help = help_text(
+        lambda: f"""
+        The execution dependencies for this command.
+
+        Dependencies specified here are those required to exist on the `PATH` to make the command
+        complete successfully (interpreters specified in a `#!` command, etc). Note that these
+        dependencies will be made available on the `PATH` with the name of the target.
+
+        See also `{AdhocToolOutputDependenciesField.alias}` and
+        `{AdhocToolExecutionDependenciesField.alias}.
         """
     )
 
@@ -217,6 +237,7 @@ class AdhocToolTarget(Target):
         AdhocToolArgumentsField,
         AdhocToolExecutionDependenciesField,
         AdhocToolOutputDependenciesField,
+        AdhocToolRunnableDependenciesField,
         AdhocToolLogOutputField,
         AdhocToolOutputFilesField,
         AdhocToolOutputDirectoriesField,
@@ -290,6 +311,17 @@ class SystemBinaryFingerprintArgsField(StringSequenceField):
     )
 
 
+class SystemBinaryFingerprintDependenciesField(AdhocToolRunnableDependenciesField):
+    alias = "fingerprint_dependencies"
+    help = help_text(
+        """
+        Specifies any runnable dependencies that need to be available on the `PATH` when the binary
+        is run, so that the search process may complete successfully. The name of the target must
+        be the name of the runnable dependency that is called by this binary.
+        """
+    )
+
+
 class SystemBinaryTarget(Target):
     alias = "system_binary"
     core_fields = (
@@ -298,6 +330,7 @@ class SystemBinaryTarget(Target):
         SystemBinaryExtraSearchPathsField,
         SystemBinaryFingerprintPattern,
         SystemBinaryFingerprintArgsField,
+        SystemBinaryFingerprintDependenciesField,
     )
     help = help_text(
         lambda: f"""
