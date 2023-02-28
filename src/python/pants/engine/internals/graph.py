@@ -35,7 +35,7 @@ from pants.engine.internals.parametrize import (  # noqa: F401
     _TargetParametrizationsRequest as _TargetParametrizationsRequest,
 )
 from pants.engine.internals.target_adaptor import TargetAdaptor, TargetAdaptorRequest
-from pants.engine.rules import Get, MultiGet, collect_rules, rule, rule_helper
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     AllTargets,
     AllTargetsRequest,
@@ -171,7 +171,6 @@ def warn_deprecated_field_type(field_type: type[Field]) -> None:
     )
 
 
-@rule_helper
 async def _determine_target_adaptor_and_type(
     address: Address, registered_target_types: RegisteredTargetTypes, *, description_of_origin: str
 ) -> tuple[TargetAdaptor, type[Target]]:
@@ -586,7 +585,7 @@ async def transitive_dependency_mapping(request: _DependencyMappingRequest) -> _
     while queued:
         direct_dependencies: tuple[Collection[Target], ...]
         if request.expanded_targets:
-            direct_dependencies = await MultiGet(
+            direct_dependencies = await MultiGet(  # noqa: PNT30: this is inherently sequential
                 Get(
                     Targets,
                     DependenciesRequest(
@@ -597,7 +596,7 @@ async def transitive_dependency_mapping(request: _DependencyMappingRequest) -> _
                 for tgt in queued
             )
         else:
-            direct_dependencies = await MultiGet(
+            direct_dependencies = await MultiGet(  # noqa: PNT30: this is inherently sequential
                 Get(
                     UnexpandedTargets,
                     DependenciesRequest(
@@ -854,7 +853,7 @@ async def find_owners(
             candidate_tgts = deleted_candidate_tgts
             sources_set = deleted_files
 
-        build_file_addresses = await MultiGet(
+        build_file_addresses = await MultiGet(  # noqa: PNT30: requires triage
             Get(
                 BuildFileAddress,
                 BuildFileAddressRequest(
@@ -1133,7 +1132,6 @@ async def determine_explicitly_provided_dependencies(
     )
 
 
-@rule_helper
 async def _fill_parameters(
     field_alias: str,
     consumer_tgt: Target,

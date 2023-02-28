@@ -14,7 +14,7 @@ from pants.engine.addresses import UnparsedAddressInputs
 from pants.engine.fs import DigestSubset, PathGlobs
 from pants.engine.internals.native_engine import Digest, Snapshot
 from pants.engine.internals.selectors import Get
-from pants.engine.rules import Rule, collect_rules, rule, rule_helper
+from pants.engine.rules import Rule, collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     GeneratedSources,
@@ -63,7 +63,6 @@ class WrapSourceOutputsField(StringSequenceField):
     )
 
 
-@rule_helper
 async def _wrap_source(wrapper: GenerateSourcesRequest) -> GeneratedSources:
     request = wrapper.protocol_target
     default_extensions = {i for i in (wrapper.output.expected_file_extensions or ()) if i}

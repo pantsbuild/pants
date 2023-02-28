@@ -114,7 +114,7 @@ async def setup_goroot(
         if compatible_go_version(
             compiler_version=version, target_version=golang_subsystem.minimum_expected_version
         ):
-            env_result = await Get(
+            env_result = await Get(  # noqa: PNT30: requires triage
                 ProcessResult,
                 Process(
                     (binary_path.path, "env", "-json"),

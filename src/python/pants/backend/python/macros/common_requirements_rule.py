@@ -30,7 +30,7 @@ from pants.core.target_types import (
 from pants.engine.addresses import Address
 from pants.engine.fs import DigestContents, GlobMatchErrorBehavior, PathGlobs
 from pants.engine.internals.target_adaptor import TargetAdaptor, TargetAdaptorRequest
-from pants.engine.rules import Get, rule_helper
+from pants.engine.rules import Get
 from pants.engine.target import (
     Dependencies,
     GenerateTargetsRequest,
@@ -44,7 +44,6 @@ logger = logging.getLogger(__name__)
 ParseRequirementsCallback = Callable[[bytes, str], Iterable[PipRequirement]]
 
 
-@rule_helper
 async def _generate_requirements(
     request: GenerateTargetsRequest,
     union_membership: UnionMembership,

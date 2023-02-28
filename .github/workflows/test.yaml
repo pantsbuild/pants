@@ -102,7 +102,7 @@ jobs:
         TMPDIR: ${{ runner.temp }}
       if: needs.classify_changes.outputs.rust == 'true'
       name: Test Rust
-      run: ./cargo test --tests -- --nocapture
+      run: ./cargo test --tests -- --nocapture --test-threads=8
     strategy:
       matrix:
         python-version:
@@ -217,9 +217,7 @@ jobs:
 
         ./cargo check --benches
 
-        ./cargo doc
-
-        '
+        ./cargo doc'
     strategy:
       matrix:
         python-version:
@@ -330,8 +328,7 @@ jobs:
     timeout-minutes: 60
   build_wheels_linux_arm64:
     container:
-      image: registry.hub.docker.com/pantsbuild/wheel_build_aarch64:v2-2e4d40b8b5
-      options: --user 1000:1000
+      image: registry.hub.docker.com/pantsbuild/wheel_build_aarch64:v3-8384c5cf
     env:
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
@@ -374,7 +371,6 @@ jobs:
         '
     - env:
         PANTS_CONFIG_FILES: +['pants.ci.toml','pants.ci.aarch64.toml']
-        PANTS_SUBPROCESS_ENVIRONMENT_ENV_VARS: HOME
       name: Build wheels
       run: 'USE_PY39=true ./build-support/bin/release.sh build-local-pex
 

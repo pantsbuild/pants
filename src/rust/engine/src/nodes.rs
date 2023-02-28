@@ -333,10 +333,11 @@ impl ExecuteProcess {
     process_config: externs::process::PyProcessConfigFromEnvironment,
   ) -> Result<Process, StoreError> {
     let env = externs::getattr_from_str_frozendict(value, "env");
-    let working_directory = match externs::getattr_as_optional_string(value, "working_directory") {
-      None => None,
-      Some(dir) => Some(RelativePath::new(dir)?),
-    };
+
+    let working_directory = externs::getattr_as_optional_string(value, "working_directory")
+      .map_err(|e| format!("Failed to get `working_directory` from field: {e}"))?
+      .map(RelativePath::new)
+      .transpose()?;
 
     let output_files = externs::getattr::<Vec<String>>(value, "output_files")
       .unwrap()
@@ -368,10 +369,13 @@ impl ExecuteProcess {
         .map(|(name, dest)| Ok((CacheName::new(name)?, RelativePath::new(dest)?)))
         .collect::<Result<_, String>>()?;
 
-    let jdk_home = externs::getattr_as_optional_string(value, "jdk_home").map(PathBuf::from);
+    let jdk_home = externs::getattr_as_optional_string(value, "jdk_home")
+      .map_err(|e| format!("Failed to get `jdk_home` from field: {e}"))?
+      .map(PathBuf::from);
 
     let execution_slot_variable =
-      externs::getattr_as_optional_string(value, "execution_slot_variable");
+      externs::getattr_as_optional_string(value, "execution_slot_variable")
+        .map_err(|e| format!("Failed to get `execution_slot_variable` for field: {e}"))?;
 
     let concurrency_available: usize = externs::getattr(value, "concurrency_available").unwrap();
 
@@ -770,7 +774,8 @@ impl Snapshot {
 
   pub fn lift_path_globs(item: &PyAny) -> Result<PathGlobs, String> {
     let globs: Vec<String> = externs::getattr(item, "globs").unwrap();
-    let description_of_origin = externs::getattr_as_optional_string(item, "description_of_origin");
+    let description_of_origin = externs::getattr_as_optional_string(item, "description_of_origin")
+      .map_err(|e| format!("Failed to get `description_of_origin` for field: {e}"))?;
 
     let glob_match_error_behavior = externs::getattr(item, "glob_match_error_behavior").unwrap();
     let failure_behavior: String = externs::getattr(glob_match_error_behavior, "value").unwrap();

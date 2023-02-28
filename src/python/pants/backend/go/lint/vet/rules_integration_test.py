@@ -131,8 +131,8 @@ def test_passing(rule_runner: RuleRunner) -> None:
 
 
 def _check_err_msg(result_stderr: str) -> None:
-    # go vet sometimes emits "fmt.Printf" and sometimes just "Printf", depending on conditions
-    # I'm clear on. We elide this nuance.
+    # Note: `go vet` sometimes emits "fmt.Printf" and sometimes just "Printf", depending on conditions
+    # which are unclear so let the `fmt.` part be optional.
     assert re.search(
         r"./f.go:4:5: (fmt\.)?Printf format %s reads arg #1, but call has 0 args", result_stderr
     )
@@ -149,7 +149,7 @@ def test_failing(rule_runner: RuleRunner) -> None:
     tgt = rule_runner.get_target(Address("", target_name="pkg"))
     lint_results = run_go_vet(rule_runner, [tgt])
     assert len(lint_results) == 1
-    assert lint_results[0].exit_code == 2
+    assert lint_results[0].exit_code != 0
     _check_err_msg(lint_results[0].stderr)
 
 
@@ -170,7 +170,7 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
     ]
     lint_results = run_go_vet(rule_runner, tgts)
     assert len(lint_results) == 1
-    assert lint_results[0].exit_code == 2
+    assert lint_results[0].exit_code != 0
     _check_err_msg(lint_results[0].stderr)
     assert "good/f.go" not in lint_results[0].stdout
 

@@ -50,8 +50,8 @@ async def find_putative_targets(
     paths = tuple(targets)
 
     while paths:
-        digest = await Get(Digest, PathGlobs(paths))
-        result = await Get(
+        digest = await Get(Digest, PathGlobs(paths))  # noqa: PNT30: this is inherently sequential
+        result = await Get(  # noqa: PNT30: this is inherently sequential
             OpenApiDependencies,
             ParseOpenApiSources(
                 sources_digest=digest,

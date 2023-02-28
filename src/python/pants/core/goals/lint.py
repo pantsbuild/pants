@@ -34,7 +34,7 @@ from pants.engine.fs import EMPTY_DIGEST, Digest, PathGlobs, SpecsPaths, Workspa
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.native_engine import Snapshot
 from pants.engine.process import FallibleProcessResult
-from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule_helper
+from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
 from pants.engine.target import FieldSet, FilteredTargets
 from pants.engine.unions import UnionMembership, UnionRule, distinct_union_type_per_subclass, union
 from pants.option.option_types import BoolOption
@@ -315,7 +315,6 @@ class _MultiToolGoalSubsystem(Protocol):
     only: OnlyOption
 
 
-@rule_helper
 async def _get_partitions_by_request_type(
     core_request_types: Iterable[type[_CoreRequestType]],
     target_partitioners: Iterable[type[_TargetPartitioner]],

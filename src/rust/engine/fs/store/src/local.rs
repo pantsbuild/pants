@@ -301,14 +301,14 @@ impl ByteStore {
   }
 
   ///
-  /// Store the given data in a single pass, optionally using the given Digest. Prefer `Self::store`
+  /// Store the given data in a single pass, using the given Fingerprint. Prefer `Self::store`
   /// for values which should not be pulled into memory, and `Self::store_bytes_batch` when storing
   /// multiple values at a time.
   ///
   pub async fn store_bytes(
     &self,
     entry_type: EntryType,
-    digest: Option<Digest>,
+    fingerprint: Fingerprint,
     bytes: Bytes,
     initial_lease: bool,
   ) -> Result<Digest, String> {
@@ -337,7 +337,7 @@ impl ByteStore {
   pub async fn store_bytes_batch(
     &self,
     entry_type: EntryType,
-    items: Vec<(Option<Digest>, Bytes)>,
+    items: Vec<(Fingerprint, Bytes)>,
     initial_lease: bool,
   ) -> Result<Vec<Digest>, String> {
     let mut small_items = vec![];
@@ -360,31 +360,9 @@ impl ByteStore {
       EntryType::Directory => self.inner.directory_dbs.clone(),
       EntryType::File => self.inner.file_dbs.clone(),
     };
-    // NB: False positive: we do actually need to create the Vec here, since `items` will move
-    // before we use `lens`.
-    #[allow(clippy::needless_collect)]
-    let lens = small_items
-      .iter()
-      .map(|(_, bytes)| bytes.len())
-      .collect::<Vec<_>>();
-    let fingerprints = dbs?
-      .store_bytes_batch(
-        small_items
-          .into_iter()
-          .map(|(d, bytes)| (d.map(|d| d.hash), bytes))
-          .collect(),
-        initial_lease,
-      )
-      .await?;
+    dbs?.store_bytes_batch(items, initial_lease).await?;
 
-    result.extend(
-      fingerprints
-        .into_iter()
-        .zip(lens.into_iter())
-        .map(|(f, len)| Digest::new(f, len)),
-    );
-
-    Ok(result)
+    Ok(())
   }
 
   /// Returns whether this file digest should/does use the "large file store" instead of the LMDB.

@@ -347,7 +347,10 @@ impl<AW: ?Sized + AsyncWrite + Unpin> AsyncWrite for WriterHasher<&mut AW> {
 /// Copy the data from reader and hash the bytes in one pass.
 /// Use hash() to just hash without copying the data anywhere.
 ///
-pub fn copy_and_hash<R: ?Sized, W: ?Sized>(reader: &mut R, writer: &mut W) -> io::Result<Digest>
+pub fn sync_copy_and_hash<R: ?Sized, W: ?Sized>(
+  reader: &mut R,
+  writer: &mut W,
+) -> io::Result<Digest>
 where
   R: io::Read,
   W: io::Write,
@@ -358,30 +361,9 @@ where
 }
 
 ///
-/// Hashes the data into a Digest.
-///
-pub fn hash<R: ?Sized>(reader: &mut R) -> io::Result<Digest>
-where
-  R: io::Read,
-{
-  copy_and_hash(reader, &mut io::sink())
-}
-
-///
-/// Hashes the data into a Digest.
-///
-pub fn hash_path<P: AsRef<Path> + std::fmt::Debug + Clone>(path: P) -> Result<Digest, String> {
-  copy_and_hash(
-    &mut std::fs::File::open(path.clone()).map_err(|e| format!("Failed to open {path:?}: {e}."))?,
-    &mut io::sink(),
-  )
-  .map_err(|e| format!("Failed to hash {path:?}: {e}."))
-}
-
-///
 /// Copy from reader to writer and return whether the copied data matches expected_digest.
 ///
-pub fn verified_copy<R: ?Sized, W: ?Sized>(
+pub fn sync_verified_copy<R: ?Sized, W: ?Sized>(
   expected_digest: Digest,
   data_is_immutable: bool,
   reader: &mut R,
@@ -396,7 +378,7 @@ where
     let copied = io::copy(reader, writer)?;
     Ok(copied as usize == expected_digest.size_bytes)
   } else {
-    Ok(expected_digest == copy_and_hash(reader, writer)?)
+    Ok(expected_digest == sync_copy_and_hash(reader, writer)?)
   }
 }
 

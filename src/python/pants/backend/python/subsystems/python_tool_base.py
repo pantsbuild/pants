@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import importlib.resources
 from typing import ClassVar, Iterable, Sequence
 
 from pants.backend.python.target_types import ConsoleScript, EntryPoint, MainSpecification
@@ -14,14 +13,12 @@ from pants.backend.python.util_rules.pex_requirements import (
     LoadedLockfile,
     LoadedLockfileRequest,
     Lockfile,
-    LockfileContent,
     PexRequirements,
 )
 from pants.core.goals.generate_lockfiles import DEFAULT_TOOL_LOCKFILE, NO_TOOL_LOCKFILE
 from pants.core.util_rules.lockfile_metadata import calculate_invalidation_digest
-from pants.engine.fs import Digest, FileContent
+from pants.engine.fs import Digest
 from pants.engine.internals.selectors import Get
-from pants.engine.rules import rule_helper
 from pants.option.errors import OptionsError
 from pants.option.option_types import BoolOption, StrListOption, StrOption
 from pants.option.subsystem import Subsystem
@@ -152,24 +149,21 @@ class PythonToolRequirementsBase(Subsystem):
 
         hex_digest = calculate_invalidation_digest(requirements)
 
-        lockfile: LockfileContent | Lockfile
         if self.lockfile == DEFAULT_TOOL_LOCKFILE:
             assert self.default_lockfile_resource is not None
-            lockfile = LockfileContent(
-                file_content=FileContent(
-                    f"{self.options_scope}_default.lock",
-                    importlib.resources.read_binary(*self.default_lockfile_resource),
-                ),
-                lockfile_hex_digest=hex_digest,
-                resolve_name=self.options_scope,
-            )
+            pkg, path = self.default_lockfile_resource
+            url = f"resource://{pkg}/{path}"
+            origin = f"The built-in default lockfile for {self.options_scope}"
         else:
-            lockfile = Lockfile(
-                file_path=self.lockfile,
-                file_path_description_of_origin=f"the option `[{self.options_scope}].lockfile`",
-                lockfile_hex_digest=hex_digest,
-                resolve_name=self.options_scope,
-            )
+            url = self.lockfile
+            origin = f"the option `[{self.options_scope}].lockfile`"
+
+        lockfile = Lockfile(
+            url=url,
+            url_description_of_origin=origin,
+            lockfile_hex_digest=hex_digest,
+            resolve_name=self.options_scope,
+        )
         return EntireLockfile(lockfile, complete_req_strings=tuple(requirements))
 
     @property
@@ -294,7 +288,6 @@ class PythonToolBase(PythonToolRequirementsBase):
         )
 
     @staticmethod
-    @rule_helper
     async def _find_python_interpreter_constraints_from_lockfile(
         subsystem: PythonToolBase,
     ) -> InterpreterConstraints:

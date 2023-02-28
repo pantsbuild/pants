@@ -34,16 +34,7 @@ from pants.engine.internals.specs_rules import (
     TooManyTargetsException,
 )
 from pants.engine.process import InteractiveProcess, InteractiveProcessResult
-from pants.engine.rules import (
-    Effect,
-    Get,
-    Rule,
-    _uncacheable_rule,
-    collect_rules,
-    goal_rule,
-    rule,
-    rule_helper,
-)
+from pants.engine.rules import Effect, Get, Rule, _uncacheable_rule, collect_rules, goal_rule, rule
 from pants.engine.target import (
     BoolField,
     FieldSet,
@@ -231,7 +222,6 @@ def _partition(
     return tuple(filter(pred, t2)), tuple(filterfalse(pred, t1))
 
 
-@rule_helper
 async def _find_what_to_run(
     goal_description: str,
 ) -> tuple[RunFieldSet, Target]:
@@ -343,7 +333,6 @@ def _unsupported_debug_adapter_rules(cls: type[RunFieldSet]) -> Iterable:
     return collect_rules(locals())
 
 
-@rule_helper
 async def _run_request(request: RunFieldSet) -> RunInSandboxRequest:
     run_request = await Get(RunRequest, RunFieldSet, request)
     return run_request.to_run_in_sandbox_request()

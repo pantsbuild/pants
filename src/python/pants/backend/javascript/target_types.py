@@ -13,7 +13,7 @@ from pants.engine.target import (
     generate_multiple_sources_field_help_message,
 )
 
-JS_FILE_EXTENSIONS = (".js",)
+JS_FILE_EXTENSIONS = (".js", ".cjs", ".mjs")
 
 
 class JSDependenciesField(Dependencies):

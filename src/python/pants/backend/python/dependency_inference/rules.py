@@ -47,7 +47,7 @@ from pants.core.target_types import AllAssetTargets, AllAssetTargetsByPath, AllA
 from pants.core.util_rules import stripped_source_files
 from pants.engine.addresses import Address, Addresses
 from pants.engine.internals.graph import Owners, OwnersRequest
-from pants.engine.rules import Get, MultiGet, rule, rule_helper
+from pants.engine.rules import Get, MultiGet, rule
 from pants.engine.target import (
     DependenciesRequest,
     ExplicitlyProvidedDependencies,
@@ -257,7 +257,6 @@ class UnownedImportPossibleOwners:
     value: list[tuple[Address, ResolveName]]
 
 
-@rule_helper
 async def _find_other_owners_for_unowned_imports(
     req: UnownedImportsPossibleOwnersRequest,
 ) -> UnownedImportsPossibleOwners:
@@ -299,7 +298,6 @@ async def find_other_owners_for_unowned_import(
     return UnownedImportPossibleOwners(other_owners)
 
 
-@rule_helper
 async def _handle_unowned_imports(
     address: Address,
     unowned_dependency_behavior: UnownedDependencyUsage,
@@ -357,7 +355,6 @@ async def _handle_unowned_imports(
         raise UnownedDependencyError(msg)
 
 
-@rule_helper
 async def _exec_parse_deps(
     field_set: PythonImportDependenciesInferenceFieldSet,
     python_setup: PythonSetup,

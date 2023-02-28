@@ -40,7 +40,7 @@ from pants.engine.fs import (
 )
 from pants.engine.internals.native_engine import FileDigest
 from pants.engine.process import InteractiveProcess, Process, ProcessCacheScope, ProcessResult
-from pants.engine.rules import Get, MultiGet, collect_rules, rule, rule_helper
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize, softwrap
 from pants.util.value_interpolation import InterpolationContext, InterpolationValue
@@ -184,7 +184,6 @@ class RenderedHelmFiles(EngineAwareReturnType):
         return not self.post_processed
 
 
-@rule_helper
 async def _build_interpolation_context(helm_subsystem: HelmSubsystem) -> InterpolationContext:
     interpolation_context: dict[str, dict[str, str] | InterpolationValue] = {}
 
@@ -194,7 +193,6 @@ async def _build_interpolation_context(helm_subsystem: HelmSubsystem) -> Interpo
     return InterpolationContext.from_dict(interpolation_context)
 
 
-@rule_helper
 async def _sort_value_file_names_for_evaluation(
     address: Address,
     *,

@@ -29,7 +29,7 @@ use log::{self, debug, error, warn, Log};
 use logging::logger::PANTS_LOGGER;
 use logging::{Logger, PythonLogLevel};
 use petgraph::graph::{DiGraph, Graph};
-use process_execution::{CacheContentBehavior, RemoteCacheWarningsBehavior};
+use process_execution::CacheContentBehavior;
 use pyo3::exceptions::{PyException, PyIOError, PyKeyboardInterrupt, PyValueError};
 use pyo3::prelude::{
   pyclass, pyfunction, pymethods, pymodule, wrap_pyfunction, PyModule, PyObject,
@@ -38,6 +38,7 @@ use pyo3::prelude::{
 use pyo3::types::{PyBytes, PyDict, PyList, PyTuple, PyType};
 use pyo3::{create_exception, IntoPy, PyAny, PyRef};
 use regex::Regex;
+use remote::remote_cache::RemoteCacheWarningsBehavior;
 use rule_graph::{self, DependencyKey, RuleGraph};
 use task_executor::Executor;
 use workunit_store::{
@@ -1494,11 +1495,11 @@ fn capture_snapshots(
     let path_globs_and_roots = values
       .into_iter()
       .map(|value| {
-        let root: PathBuf = externs::getattr(value, "root").unwrap();
+        let root: PathBuf = externs::getattr(value, "root")?;
         let path_globs =
-          nodes::Snapshot::lift_prepared_path_globs(externs::getattr(value, "path_globs").unwrap());
+          nodes::Snapshot::lift_prepared_path_globs(externs::getattr(value, "path_globs")?);
         let digest_hint = {
-          let maybe_digest: &PyAny = externs::getattr(value, "digest_hint").unwrap();
+          let maybe_digest: &PyAny = externs::getattr(value, "digest_hint")?;
           if maybe_digest.is_none() {
             None
           } else {

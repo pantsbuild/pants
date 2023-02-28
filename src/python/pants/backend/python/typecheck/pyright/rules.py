@@ -40,7 +40,7 @@ from pants.engine.fs import CreateDigest, DigestContents, FileContent
 from pants.engine.internals.native_engine import Digest, MergeDigests
 from pants.engine.internals.selectors import MultiGet
 from pants.engine.process import FallibleProcessResult, Process
-from pants.engine.rules import Get, Rule, collect_rules, rule, rule_helper
+from pants.engine.rules import Get, Rule, collect_rules, rule
 from pants.engine.target import CoarsenedTargets, CoarsenedTargetsRequest, FieldSet, Target
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
@@ -84,7 +84,6 @@ class PyrightPartitions(Collection[PyrightPartition]):
     pass
 
 
-@rule_helper
 async def _patch_config_file(
     config_files: ConfigFiles, venv_dir: str, source_roots: Iterable[str]
 ) -> Digest:

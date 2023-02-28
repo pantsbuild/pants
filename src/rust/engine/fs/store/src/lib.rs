@@ -57,7 +57,7 @@ use fs::{
 };
 use futures::future::{self, BoxFuture, Either, FutureExt, TryFutureExt};
 use grpc_util::prost::MessageExt;
-use hashing::Digest;
+use hashing::{Digest, Fingerprint};
 use parking_lot::Mutex;
 use prost::Message;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
@@ -434,10 +434,12 @@ impl Store {
     bytes: Bytes,
     initial_lease: bool,
   ) -> Result<Digest, String> {
+    let digest = Digest::of_bytes(&bytes);
     self
       .local
-      .store_bytes(EntryType::File, None, bytes, initial_lease)
-      .await
+      .store_bytes(EntryType::File, digest.hash, bytes, initial_lease)
+      .await?;
+    Ok(digest)
   }
 
   ///
@@ -448,9 +450,9 @@ impl Store {
   ///
   pub async fn store_file_bytes_batch(
     &self,
-    items: Vec<(Option<Digest>, Bytes)>,
+    items: Vec<(Fingerprint, Bytes)>,
     initial_lease: bool,
-  ) -> Result<Vec<Digest>, String> {
+  ) -> Result<(), String> {
     self
       .local
       .store_bytes_batch(EntryType::File, items, initial_lease)
@@ -541,7 +543,7 @@ impl Store {
         if cfg!(debug_assertions) {
           protos::verify_directory_canonical(d.digest(), &directory).unwrap();
         }
-        directories.push((Some(d.digest()), directory.to_bytes()))
+        directories.push((d.digest().hash, directory.to_bytes()))
       }
       directory::Entry::File(_) => (),
       directory::Entry::Symlink(_) => (),
@@ -549,11 +551,13 @@ impl Store {
 
     // Then store them as a batch.
     let local = self.local.clone();
-    let digests = local
+    let root = &directories[0];
+    let top_digest = Digest::new(root.0, root.1.len());
+    local
       .store_bytes_batch(EntryType::Directory, directories, initial_lease)
       .await?;
 
-    Ok(DirectoryDigest::new(digests[0], tree))
+    Ok(DirectoryDigest::new(top_digest, tree))
   }
 
   ///
@@ -567,10 +571,12 @@ impl Store {
     initial_lease: bool,
   ) -> Result<Digest, String> {
     let local = self.local.clone();
-    let digest = local
+    let bytes = directory.to_bytes();
+    let digest = Digest::of_bytes(&bytes);
+    local
       .store_bytes(
         EntryType::Directory,
-        None,
+        digest.hash,
         directory.to_bytes(),
         initial_lease,
       )

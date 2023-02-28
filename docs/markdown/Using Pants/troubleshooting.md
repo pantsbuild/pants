@@ -106,6 +106,8 @@ Is the missing import from first-party code? Common issues:
   - Try running `pants tailor ::`. Warning: some target types like [`resources` and `files`](doc:assets) must be manually added.
 - [Source roots](doc:source-roots) are not set up properly (Python and JVM only).
   - This allows converting file paths like `src/py/project/app.py` to the Python module `project.app`.
+- Code generation such as [Protobuf](doc:protobuf-python) is not set up properly (Python and JVM only).
+  - Generate missing targets so that produced modules could be found. If there are any Python files that are known to be created ad hoc only at runtime, you might consider using `.pyi` stub files for the modules to be discovered during dependency inference.
 
  Common issues with both first and third-party imports:
 

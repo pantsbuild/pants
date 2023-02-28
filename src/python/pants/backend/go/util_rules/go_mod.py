@@ -24,7 +24,7 @@ from pants.build_graph.address import Address, AddressInput
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import Digest
 from pants.engine.process import ProcessResult
-from pants.engine.rules import Get, collect_rules, rule, rule_helper
+from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import (
     AllUnexpandedTargets,
     HydratedSources,
@@ -106,7 +106,6 @@ async def find_nearest_ancestor_go_mod(
     return NearestAncestorGoModResult(go_mod_targets[0].address)
 
 
-@rule_helper
 async def _find_explict_owning_go_mod_address(
     address: Address,
     field: GoOwningGoModAddressField,
