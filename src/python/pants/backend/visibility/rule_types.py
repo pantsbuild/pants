@@ -169,6 +169,9 @@ class VisibilityRuleSet:
     def __str__(self) -> str:
         return self.build_file
 
+    def peek(self) -> tuple[str, ...]:
+        return tuple(map(str, self.rules))
+
     @staticmethod
     def _noop_rule(rule: str) -> bool:
         return not rule or rule.startswith("#")
@@ -308,8 +311,10 @@ class BuildFileVisibilityRules(BuildFileDependencyRules):
         return ruleset, None, None
 
     def get_ruleset(
-        self, address: Address, target: TargetAdaptor, relpath: str
+        self, address: Address, target: TargetAdaptor, relpath: str | None = None
     ) -> VisibilityRuleSet | None:
+        if relpath is None:
+            relpath = self._get_address_relpath(address)
         for ruleset in self.rulesets:
             if ruleset.match(address, target, relpath):
                 return ruleset

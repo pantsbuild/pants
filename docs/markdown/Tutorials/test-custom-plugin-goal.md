@@ -254,12 +254,12 @@ def test_get_git_version() -> None:
         mock_gets=[
             MockGet(
                 output_type=BinaryPaths,
-                input_type=BinaryPathRequest,
+                input_types=(BinaryPathRequest,),
                 mock=mock_binary_paths,
             ),
             MockGet(
                 output_type=ProcessResult,
-                input_type=Process,
+                input_types=(Process,),
                 mock=mock_process_git_describe,
             ),
         ],
@@ -272,7 +272,7 @@ You could write the helper functions returning the mock objects as lambdas, if y
 ```python
 MockGet(
     output_type=BinaryPaths,
-    input_type=BinaryPathRequest,
+    input_types=(BinaryPathRequest,),
     mock=lambda request: BinaryPaths(binary_name="git", paths=[BinaryPath("/usr/bin/git")]),
 ),
 ```

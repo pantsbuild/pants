@@ -3,6 +3,9 @@
 #   ./pants run build-support/bin/generate_github_workflows.py
 
 
+concurrency:
+  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
 env:
   PANTS_CONFIG_FILES: +['pants.ci.toml']
   RUST_BACKTRACE: all
@@ -11,8 +14,7 @@ jobs:
     env:
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
-    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only
-      != 'true')
+    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only != 'true')
     name: Bootstrap Pants, test Rust (Linux-ARM64)
     needs:
     - classify_changes
@@ -28,8 +30,7 @@ jobs:
     - name: Tell Pants to use Python ${{ matrix.python-version }}
       run: 'echo "PY=python${{ matrix.python-version }}" >> $GITHUB_ENV
 
-        echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version
-        }}.*'']" >> $GITHUB_ENV
+        echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version }}.*'']" >> $GITHUB_ENV
 
         '
     - name: Cache Rust toolchain
@@ -68,8 +69,7 @@ jobs:
 
         '
     - name: Bootstrap Pants
-      run: ./pants version > ${{ runner.temp }}/_pants_version.stdout && [[ -s ${{
-        runner.temp }}/_pants_version.stdout ]]
+      run: ./pants version > ${{ runner.temp }}/_pants_version.stdout && [[ -s ${{ runner.temp }}/_pants_version.stdout ]]
     - name: Run smoke tests
       run: './pants list ::
 
@@ -112,8 +112,7 @@ jobs:
     env:
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
-    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only
-      != 'true')
+    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only != 'true')
     name: Bootstrap Pants, test and lint Rust (Linux-x86_64)
     needs:
     - classify_changes
@@ -131,8 +130,7 @@ jobs:
     - name: Tell Pants to use Python ${{ matrix.python-version }}
       run: 'echo "PY=python${{ matrix.python-version }}" >> $GITHUB_ENV
 
-        echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version
-        }}.*'']" >> $GITHUB_ENV
+        echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version }}.*'']" >> $GITHUB_ENV
 
         '
     - name: Cache Rust toolchain
@@ -171,8 +169,7 @@ jobs:
 
         '
     - name: Bootstrap Pants
-      run: ./pants version > ${{ runner.temp }}/_pants_version.stdout && [[ -s ${{
-        runner.temp }}/_pants_version.stdout ]]
+      run: ./pants version > ${{ runner.temp }}/_pants_version.stdout && [[ -s ${{ runner.temp }}/_pants_version.stdout ]]
     - name: Run smoke tests
       run: './pants list ::
 
@@ -227,8 +224,7 @@ jobs:
     env:
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
-    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only
-      != 'true')
+    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only != 'true')
     name: Bootstrap Pants, test Rust (macOS11-x86_64)
     needs:
     - classify_changes
@@ -246,8 +242,7 @@ jobs:
     - name: Tell Pants to use Python ${{ matrix.python-version }}
       run: 'echo "PY=python${{ matrix.python-version }}" >> $GITHUB_ENV
 
-        echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version
-        }}.*'']" >> $GITHUB_ENV
+        echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version }}.*'']" >> $GITHUB_ENV
 
         '
     - name: Cache Rust toolchain
@@ -286,8 +281,7 @@ jobs:
 
         '
     - name: Bootstrap Pants
-      run: ./pants version > ${{ runner.temp }}/_pants_version.stdout && [[ -s ${{
-        runner.temp }}/_pants_version.stdout ]]
+      run: ./pants version > ${{ runner.temp }}/_pants_version.stdout && [[ -s ${{ runner.temp }}/_pants_version.stdout ]]
     - name: Run smoke tests
       run: './pants list ::
 
@@ -332,9 +326,8 @@ jobs:
     env:
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
-    if: ((github.repository_owner == 'pantsbuild') && (github.event_name == 'push'
-      || needs.classify_changes.outputs.release == 'true')) && (needs.classify_changes.outputs.docs_only
-      != 'true')
+    if: ((github.repository_owner == 'pantsbuild') && (github.event_name == 'push' || needs.classify_changes.outputs.release
+      == 'true')) && (needs.classify_changes.outputs.docs_only != 'true')
     name: Build wheels (Linux-ARM64)
     needs:
     - classify_changes
@@ -350,8 +343,7 @@ jobs:
     - name: Configure Git
       run: git config --global safe.directory "$GITHUB_WORKSPACE"
     - name: Install rustup
-      run: 'curl --proto ''=https'' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s --
-        -v -y --default-toolchain none
+      run: 'curl --proto ''=https'' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -v -y --default-toolchain none
 
         echo "${HOME}/.cargo/bin" >> $GITHUB_PATH
 
@@ -400,9 +392,8 @@ jobs:
     env:
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
-    if: ((github.repository_owner == 'pantsbuild') && (github.event_name == 'push'
-      || needs.classify_changes.outputs.release == 'true')) && (needs.classify_changes.outputs.docs_only
-      != 'true')
+    if: ((github.repository_owner == 'pantsbuild') && (github.event_name == 'push' || needs.classify_changes.outputs.release
+      == 'true')) && (needs.classify_changes.outputs.docs_only != 'true')
     name: Build wheels (Linux-x86_64)
     needs:
     - classify_changes
@@ -416,8 +407,7 @@ jobs:
     - name: Configure Git
       run: git config --global safe.directory "$GITHUB_WORKSPACE"
     - name: Install rustup
-      run: 'curl --proto ''=https'' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s --
-        -v -y --default-toolchain none
+      run: 'curl --proto ''=https'' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -v -y --default-toolchain none
 
         echo "${HOME}/.cargo/bin" >> $GITHUB_PATH
 
@@ -467,9 +457,8 @@ jobs:
     env:
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
-    if: ((github.repository_owner == 'pantsbuild') && (github.event_name == 'push'
-      || needs.classify_changes.outputs.release == 'true')) && (needs.classify_changes.outputs.docs_only
-      != 'true')
+    if: ((github.repository_owner == 'pantsbuild') && (github.event_name == 'push' || needs.classify_changes.outputs.release
+      == 'true')) && (needs.classify_changes.outputs.docs_only != 'true')
     name: Build wheels (macOS10-15-x86_64)
     needs:
     - classify_changes
@@ -536,9 +525,8 @@ jobs:
     env:
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
-    if: ((github.repository_owner == 'pantsbuild') && (github.event_name == 'push'
-      || needs.classify_changes.outputs.release == 'true')) && (needs.classify_changes.outputs.docs_only
-      != 'true')
+    if: ((github.repository_owner == 'pantsbuild') && (github.event_name == 'push' || needs.classify_changes.outputs.release
+      == 'true')) && (needs.classify_changes.outputs.docs_only != 'true')
     name: Build wheels (macOS11-ARM64)
     needs:
     - classify_changes
@@ -610,8 +598,8 @@ jobs:
       uses: mheap/github-action-required-labels@v2.1.0
       with:
         count: 1
-        labels: category:new feature, category:user api change, category:plugin api
-          change, category:performance, category:bugfix, category:documentation, category:internal
+        labels: category:new feature, category:user api change, category:plugin api change, category:performance, category:bugfix,
+          category:documentation, category:internal
         mode: exactly
   classify_changes:
     if: github.repository_owner == 'pantsbuild'
@@ -637,14 +625,11 @@ jobs:
         separator: '|'
     - id: classify
       name: Classify changed files
-      run: "affected=$(python build-support/bin/classify_changed_files.py \"${{ steps.files.outputs.all_modified_files\
-        \ }}\")\necho \"Affected:\"\nif [[ \"${affected}\" == \"docs\" ]]; then\n\
-        \  echo \"docs_only=true\" >> $GITHUB_OUTPUT\n  echo \"docs_only\"\nfi\nfor\
-        \ i in ${affected}; do\n  echo \"${i}=true\" >> $GITHUB_OUTPUT\n  echo \"\
-        ${i}\"\ndone\n"
+      run: "affected=$(python build-support/bin/classify_changed_files.py \"${{ steps.files.outputs.all_modified_files }}\"\
+        )\necho \"Affected:\"\nif [[ \"${affected}\" == \"docs\" ]]; then\n  echo \"docs_only=true\" >> $GITHUB_OUTPUT\n \
+        \ echo \"docs_only\"\nfi\nfor i in ${affected}; do\n  echo \"${i}=true\" >> $GITHUB_OUTPUT\n  echo \"${i}\"\ndone\n"
   lint_python:
-    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only
-      != 'true')
+    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only != 'true')
     name: Lint Python and Shell
     needs:
     - bootstrap_pants_linux_x86_64
@@ -663,8 +648,7 @@ jobs:
     - name: Tell Pants to use Python ${{ matrix.python-version }}
       run: 'echo "PY=python${{ matrix.python-version }}" >> $GITHUB_ENV
 
-        echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version
-        }}.*'']" >> $GITHUB_ENV
+        echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version }}.*'']" >> $GITHUB_ENV
 
         '
     - name: Download native binaries
@@ -700,12 +684,10 @@ jobs:
     runs-on:
     - ubuntu-20.04
     steps:
-    - run: "merge_ok=\"${{ needs.set_merge_ok.outputs.merge_ok }}\"\nif [[ \"${merge_ok}\"\
-        \ == \"true\" ]]; then\n    echo \"Merge OK\"\n    exit 0\nelse\n    echo\
-        \ \"Merge NOT OK\"\n    exit 1\nfi\n"
+    - run: "merge_ok=\"${{ needs.set_merge_ok.outputs.merge_ok }}\"\nif [[ \"${merge_ok}\" == \"true\" ]]; then\n    echo\
+        \ \"Merge OK\"\n    exit 0\nelse\n    echo \"Merge NOT OK\"\n    exit 1\nfi\n"
   set_merge_ok:
-    if: always() && !contains(needs.*.result, 'failure') && !contains(needs.*.result,
-      'cancelled')
+    if: always() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
     name: Set Merge OK
     needs:
     - classify_changes
@@ -735,8 +717,7 @@ jobs:
   test_python_linux_arm64:
     env:
       PANTS_CONFIG_FILES: +['pants.ci.toml','pants.ci.aarch64.toml']
-    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only
-      != 'true')
+    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only != 'true')
     name: Test Python (Linux-ARM64)
     needs:
     - bootstrap_pants_linux_arm64
@@ -758,8 +739,7 @@ jobs:
     - name: Tell Pants to use Python ${{ matrix.python-version }}
       run: 'echo "PY=python${{ matrix.python-version }}" >> $GITHUB_ENV
 
-        echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version
-        }}.*'']" >> $GITHUB_ENV
+        echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version }}.*'']" >> $GITHUB_ENV
 
         '
     - name: Download native binaries
@@ -789,8 +769,7 @@ jobs:
     timeout-minutes: 90
   test_python_linux_x86_64_0:
     env: {}
-    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only
-      != 'true')
+    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only != 'true')
     name: Test Python (Linux-x86_64) Shard 0/3
     needs:
     - bootstrap_pants_linux_x86_64
@@ -815,8 +794,7 @@ jobs:
       name: Download Apache `thrift` binary (Linux)
       run: 'mkdir -p "${HOME}/.thrift"
 
-        curl --fail -L https://binaries.pantsbuild.org/bin/thrift/linux/x86_64/0.15.0/thrift
-        -o "${HOME}/.thrift/thrift"
+        curl --fail -L https://binaries.pantsbuild.org/bin/thrift/linux/x86_64/0.15.0/thrift -o "${HOME}/.thrift/thrift"
 
         chmod +x "${HOME}/.thrift/thrift"
 
@@ -830,8 +808,7 @@ jobs:
     - name: Tell Pants to use Python ${{ matrix.python-version }}
       run: 'echo "PY=python${{ matrix.python-version }}" >> $GITHUB_ENV
 
-        echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version
-        }}.*'']" >> $GITHUB_ENV
+        echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version }}.*'']" >> $GITHUB_ENV
 
         '
     - name: Expose Pythons
@@ -863,8 +840,7 @@ jobs:
     timeout-minutes: 90
   test_python_linux_x86_64_1:
     env: {}
-    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only
-      != 'true')
+    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only != 'true')
     name: Test Python (Linux-x86_64) Shard 1/3
     needs:
     - bootstrap_pants_linux_x86_64
@@ -889,8 +865,7 @@ jobs:
       name: Download Apache `thrift` binary (Linux)
       run: 'mkdir -p "${HOME}/.thrift"
 
-        curl --fail -L https://binaries.pantsbuild.org/bin/thrift/linux/x86_64/0.15.0/thrift
-        -o "${HOME}/.thrift/thrift"
+        curl --fail -L https://binaries.pantsbuild.org/bin/thrift/linux/x86_64/0.15.0/thrift -o "${HOME}/.thrift/thrift"
 
         chmod +x "${HOME}/.thrift/thrift"
 
@@ -904,8 +879,7 @@ jobs:
     - name: Tell Pants to use Python ${{ matrix.python-version }}
       run: 'echo "PY=python${{ matrix.python-version }}" >> $GITHUB_ENV
 
-        echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version
-        }}.*'']" >> $GITHUB_ENV
+        echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version }}.*'']" >> $GITHUB_ENV
 
         '
     - name: Expose Pythons
@@ -937,8 +911,7 @@ jobs:
     timeout-minutes: 90
   test_python_linux_x86_64_2:
     env: {}
-    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only
-      != 'true')
+    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only != 'true')
     name: Test Python (Linux-x86_64) Shard 2/3
     needs:
     - bootstrap_pants_linux_x86_64
@@ -963,8 +936,7 @@ jobs:
       name: Download Apache `thrift` binary (Linux)
       run: 'mkdir -p "${HOME}/.thrift"
 
-        curl --fail -L https://binaries.pantsbuild.org/bin/thrift/linux/x86_64/0.15.0/thrift
-        -o "${HOME}/.thrift/thrift"
+        curl --fail -L https://binaries.pantsbuild.org/bin/thrift/linux/x86_64/0.15.0/thrift -o "${HOME}/.thrift/thrift"
 
         chmod +x "${HOME}/.thrift/thrift"
 
@@ -978,8 +950,7 @@ jobs:
     - name: Tell Pants to use Python ${{ matrix.python-version }}
       run: 'echo "PY=python${{ matrix.python-version }}" >> $GITHUB_ENV
 
-        echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version
-        }}.*'']" >> $GITHUB_ENV
+        echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version }}.*'']" >> $GITHUB_ENV
 
         '
     - name: Expose Pythons
@@ -1012,8 +983,7 @@ jobs:
   test_python_macos11_x86_64:
     env:
       ARCHFLAGS: -arch x86_64
-    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only
-      != 'true')
+    if: (github.repository_owner == 'pantsbuild') && (needs.classify_changes.outputs.docs_only != 'true')
     name: Test Python (macOS11-x86_64)
     needs:
     - bootstrap_pants_macos11_x86_64
@@ -1037,8 +1007,7 @@ jobs:
     - name: Tell Pants to use Python ${{ matrix.python-version }}
       run: 'echo "PY=python${{ matrix.python-version }}" >> $GITHUB_ENV
 
-        echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version
-        }}.*'']" >> $GITHUB_ENV
+        echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=[''==${{ matrix.python-version }}.*'']" >> $GITHUB_ENV
 
         '
     - name: Expose Pythons

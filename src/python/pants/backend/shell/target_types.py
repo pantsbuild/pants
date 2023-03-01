@@ -15,6 +15,7 @@ from pants.backend.adhoc.target_types import (
     AdhocToolOutputDirectoriesField,
     AdhocToolOutputFilesField,
     AdhocToolOutputRootDirField,
+    AdhocToolRunnableDependenciesField,
     AdhocToolTimeoutField,
     AdhocToolWorkdirField,
 )
@@ -300,6 +301,10 @@ class ShellCommandExecutionDependenciesField(AdhocToolExecutionDependenciesField
     pass
 
 
+class ShellCommandRunnableDependenciesField(AdhocToolRunnableDependenciesField):
+    pass
+
+
 class ShellCommandSourcesField(MultipleSourcesField):
     # We solely register this field for codegen to work.
     alias = "_sources"
@@ -369,6 +374,7 @@ class ShellCommandTarget(Target):
         *COMMON_TARGET_FIELDS,
         ShellCommandOutputDependenciesField,
         ShellCommandExecutionDependenciesField,
+        ShellCommandRunnableDependenciesField,
         ShellCommandCommandField,
         ShellCommandLogOutputField,
         ShellCommandOutputsField,
@@ -414,6 +420,7 @@ class ShellCommandRunTarget(Target):
     core_fields = (
         *COMMON_TARGET_FIELDS,
         ShellCommandExecutionDependenciesField,
+        ShellCommandRunnableDependenciesField,
         ShellCommandCommandField,
         RunShellCommandWorkdirField,
     )
