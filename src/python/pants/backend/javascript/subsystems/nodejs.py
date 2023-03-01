@@ -51,8 +51,10 @@ class NodeJS(TemplatedExternalTool):
             f"""
             A mapping of names to lockfile paths used in your project.
 
-            The default name of a resolve will be the path to the directory containing
-            a lockfile, from the build root, {os.path.sep} replaced with '.'.
+            Specifying a resolve name is optional. If unspecified,
+            the default resolve name is calculated by taking the path
+            from the build root to the directory containing the lockfile
+            and replacing '{os.path.sep}' with '.' in that path.
 
             Example:
             An npm lockfile located at `js/package/package-lock.json'
