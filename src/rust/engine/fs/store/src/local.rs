@@ -8,9 +8,10 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{self, Duration, Instant};
 
-use bytes::{Buf, Bytes};
+use async_trait::async_trait;
+use bytes::Bytes;
 use futures::future::{self, join_all, try_join, try_join_all};
-use hashing::{async_verified_copy, hash, hash_path, Digest, Fingerprint, EMPTY_DIGEST};
+use hashing::{async_copy_and_hash, async_verified_copy, Digest, Fingerprint, EMPTY_DIGEST};
 use lmdb::Error::NotFound;
 use lmdb::{self, Cursor, Transaction};
 use sharded_lmdb::{ShardedLmdb, VersionedFingerprint};
@@ -47,6 +48,298 @@ impl TempImmutableLargeFile {
   }
 }
 
+/// Trait for the underlying storage, which is either a ShardedLMDB or a ShardedFS.
+#[async_trait]
+trait UnderlyingByteStore {
+  async fn exists_batch(
+    &self,
+    fingerprints: Vec<Fingerprint>,
+  ) -> Result<HashSet<Fingerprint>, String>;
+  async fn exists(&self, fingerprint: Fingerprint) -> Result<bool, String> {
+    let missing = self.exists_batch(vec![fingerprint]).await?;
+    Ok(missing.contains(&fingerprint))
+  }
+
+  async fn lease(&self, fingerprint: Fingerprint) -> Result<(), String>;
+
+  async fn remove(&self, fingerprint: Fingerprint) -> Result<bool, String>;
+
+  async fn store_bytes_batch(
+    &self,
+    items: Vec<(Fingerprint, Bytes)>,
+    initial_lease: bool,
+  ) -> Result<(), String>;
+
+  async fn store(
+    &self,
+    initial_lease: bool,
+    src_is_immutable: bool,
+    expected_digest: Digest,
+    src: PathBuf,
+  ) -> Result<(), String>;
+
+  async fn load_bytes_with<
+    T: Send + 'static,
+    F: FnMut(&[u8]) -> Result<T, String> + Send + Sync + 'static,
+  >(
+    &self,
+    fingerprint: Fingerprint,
+    mut f: F,
+  ) -> Result<Option<T>, String>;
+
+  fn all_digests(&self) -> Result<Vec<Digest>, String>;
+}
+
+#[async_trait]
+impl UnderlyingByteStore for ShardedLmdb {
+  async fn exists_batch(
+    &self,
+    fingerprints: Vec<Fingerprint>,
+  ) -> Result<HashSet<Fingerprint>, String> {
+    self.exists_batch(fingerprints).await
+  }
+
+  async fn lease(&self, fingerprint: Fingerprint) -> Result<(), String> {
+    self.lease(fingerprint).await
+  }
+
+  async fn remove(&self, fingerprint: Fingerprint) -> Result<bool, String> {
+    self.remove(fingerprint).await
+  }
+
+  async fn store_bytes_batch(
+    &self,
+    items: Vec<(Fingerprint, Bytes)>,
+    initial_lease: bool,
+  ) -> Result<(), String> {
+    self.store_bytes_batch(items, initial_lease).await
+  }
+  async fn store(
+    &self,
+    initial_lease: bool,
+    src_is_immutable: bool,
+    expected_digest: Digest,
+    src: PathBuf,
+  ) -> Result<(), String> {
+    self
+      .store(
+        initial_lease,
+        src_is_immutable,
+        expected_digest,
+        move || std::fs::File::open(&src),
+      )
+      .await
+  }
+
+  async fn load_bytes_with<
+    T: Send + 'static,
+    F: FnMut(&[u8]) -> Result<T, String> + Send + Sync + 'static,
+  >(
+    &self,
+    fingerprint: Fingerprint,
+    f: F,
+  ) -> Result<Option<T>, String> {
+    self.load_bytes_with(fingerprint, f).await
+  }
+
+  fn all_digests(&self) -> Result<Vec<Digest>, String> {
+    let mut digests = vec![];
+    for (env, database, _lease_database) in &self.all_lmdbs() {
+      let txn = env
+        .begin_ro_txn()
+        .map_err(|err| format!("Error beginning transaction to garbage collect: {err}"))?;
+      let mut cursor = txn
+        .open_ro_cursor(*database)
+        .map_err(|err| format!("Failed to open lmdb read cursor: {err}"))?;
+      for key_res in cursor.iter() {
+        let (key, bytes) =
+          key_res.map_err(|err| format!("Failed to advance lmdb read cursor: {err}"))?;
+        let v = VersionedFingerprint::from_bytes_unsafe(key);
+        let fingerprint = v.get_fingerprint();
+        digests.push(Digest::new(fingerprint, bytes.len()));
+      }
+    }
+    Ok(digests)
+  }
+}
+
+// We shard so there isn't a plethora of entries in one single dir.
+#[derive(Debug)]
+struct ShardedFSDB {
+  root: PathBuf,
+}
+
+impl ShardedFSDB {
+  pub(crate) fn get_path(&self, fingerprint: Fingerprint) -> PathBuf {
+    let hex = fingerprint.to_hex();
+    self.root.join(hex.get(0..2).unwrap()).join(hex)
+  }
+
+  async fn get_tempfile(&self, fingerprint: Fingerprint) -> Result<TempImmutableLargeFile, String> {
+    let path = self.get_path(fingerprint);
+    if !path.parent().unwrap().exists() {
+      // Throwaway the result as a way of not worrying about race conditions between multiple
+      // threads/processes creating the same parent dirs. If there was an error we'll fail later.
+      let _ = tokio::fs::create_dir_all(path.parent().unwrap()).await;
+    }
+
+    let path2 = path.clone();
+    // Make the tempdir in the same dir as the final file so that materializing the final file doesn't
+    // have to worry about parent dirs.
+    let named_temp_file =
+      tokio::task::spawn_blocking(move || NamedTempFile::new_in(path.parent().unwrap()))
+        .await
+        .map_err(|e| e.to_string())?
+        .map_err(|e| e.to_string())?;
+    let (_, path) = named_temp_file.keep().map_err(|e| e.to_string())?;
+    Ok(TempImmutableLargeFile {
+      tmp_path: path,
+      final_path: path2,
+    })
+  }
+}
+
+#[async_trait]
+impl UnderlyingByteStore for ShardedFSDB {
+  async fn exists_batch(
+    &self,
+    fingerprints: Vec<Fingerprint>,
+  ) -> Result<HashSet<Fingerprint>, String> {
+    let results = join_all(
+      fingerprints
+        .iter()
+        .map(|fingerprint| tokio::fs::metadata(self.get_path(*fingerprint))),
+    )
+    .await;
+    let existing = results
+      .iter()
+      .zip(fingerprints)
+      .filter_map(|(result, fingerprint)| {
+        if result.is_ok() {
+          Some(fingerprint)
+        } else {
+          None
+        }
+      })
+      .collect::<Vec<_>>();
+
+    Ok(HashSet::from_iter(existing))
+  }
+
+  async fn lease(&self, _fingerprint: Fingerprint) -> Result<(), String> {
+    todo!();
+  }
+
+  async fn remove(&self, fingerprint: Fingerprint) -> Result<bool, String> {
+    Ok(
+      tokio::fs::remove_file(self.get_path(fingerprint))
+        .await
+        .is_ok(),
+    )
+  }
+
+  async fn store_bytes_batch(
+    &self,
+    items: Vec<(Fingerprint, Bytes)>,
+    _initial_lease: bool,
+  ) -> Result<(), String> {
+    try_join_all(items.iter().map(|(fingerprint, bytes)| async move {
+      let tempfile = self.get_tempfile(*fingerprint).await?;
+      let mut dest = tempfile
+        .open()
+        .await
+        .map_err(|e| format!("Failed to open {tempfile:?}: {e}"))?;
+      dest.write_all(bytes).await.map_err(|e| e.to_string())?;
+      tempfile.persist().await?;
+      Ok::<(), String>(())
+    }))
+    .await?;
+
+    Ok(())
+  }
+
+  async fn store(
+    &self,
+    _initial_lease: bool,
+    src_is_immutable: bool,
+    expected_digest: Digest,
+    src: PathBuf,
+  ) -> Result<(), String> {
+    let dest = self.get_tempfile(expected_digest.hash).await?;
+    let mut attempts = 0;
+    loop {
+      let (mut reader, mut writer) = try_join(tokio::fs::File::open(src.clone()), dest.open())
+        .await
+        .map_err(|e| e.to_string())?;
+      let should_retry =
+        !async_verified_copy(expected_digest, src_is_immutable, &mut reader, &mut writer)
+          .await
+          .map_err(|e| e.to_string())?;
+
+      if should_retry {
+        attempts += 1;
+        let msg = format!("Input {src:?} changed while reading.");
+        log::debug!("{}", msg);
+        if attempts > 10 {
+          return Err(format!("Failed to store {src:?}."));
+        }
+      } else {
+        writer.flush().await.map_err(|e| e.to_string())?;
+        dest.persist().await?;
+        break;
+      }
+    }
+
+    Ok(())
+  }
+
+  async fn load_bytes_with<
+    T: Send + 'static,
+    F: FnMut(&[u8]) -> Result<T, String> + Send + Sync + 'static,
+  >(
+    &self,
+    fingerprint: Fingerprint,
+    mut f: F,
+  ) -> Result<Option<T>, String> {
+    let tempfile = self.get_tempfile(fingerprint).await?;
+    if let Ok(mut file) = tempfile.open().await {
+      // @TODO: Use mmap instead of copying into user-space
+      let mut contents: Vec<u8> = vec![];
+      file
+        .read_to_end(&mut contents)
+        .await
+        .map_err(|e| format!("Failed to load large file into memory: {e}"))?;
+      Ok(Some(f(&contents[..])?))
+    } else {
+      Ok(None)
+    }
+  }
+
+  fn all_digests(&self) -> Result<Vec<Digest>, String> {
+    let maybe_shards = std::fs::read_dir(self.root.clone());
+    let mut digests = vec![];
+    if let Ok(shards) = maybe_shards {
+      for entry in shards {
+        let shard = entry.map_err(|e| format!("Error iterating dir {:?}: {e}.", self.root))?;
+        let large_files = std::fs::read_dir(shard.path())
+          .map_err(|e| format!("Failed to read shard directory: {e}."))?;
+        for entry in large_files {
+          let large_file = entry
+            .map_err(|e| format!("Error iterating dir {:?}: {e}", shard.path().file_name()))?;
+          let path = large_file.path();
+          let hash = path.file_name().unwrap().to_str().unwrap();
+          let length = large_file.metadata().map_err(|e| e.to_string())?.len();
+          digests.push(Digest::new(
+            Fingerprint::from_hex_string(hash).unwrap(),
+            length as usize,
+          ));
+        }
+      }
+    }
+    Ok(digests)
+  }
+}
+
 #[derive(Debug, Clone)]
 pub struct ByteStore {
   inner: Arc<InnerStore>,
@@ -57,9 +350,9 @@ struct InnerStore {
   // Store directories separately from files because:
   //  1. They may have different lifetimes.
   //  2. It's nice to know whether we should be able to parse something as a proto.
-  file_dbs: Result<Arc<ShardedLmdb>, String>,
-  directory_dbs: Result<Arc<ShardedLmdb>, String>,
-  large_files_root: PathBuf,
+  file_lmdb: Result<Arc<ShardedLmdb>, String>,
+  directory_lmdb: Result<Arc<ShardedLmdb>, String>,
+  file_fsdb: ShardedFSDB,
   executor: task_executor::Executor,
 }
 
@@ -77,29 +370,31 @@ impl ByteStore {
     options: super::LocalOptions,
   ) -> Result<ByteStore, String> {
     let root = path.as_ref();
-    let files_root = root.join("files");
-    let directories_root = root.join("directories");
-    let large_files_root = root.join("immutable");
+    let lmdb_files_root = root.join("files");
+    let lmdb_directories_root = root.join("directories");
+    let fsdb_files_root = root.join("immutable").join("files");
 
     Ok(ByteStore {
       inner: Arc::new(InnerStore {
-        file_dbs: ShardedLmdb::new(
-          files_root,
+        file_lmdb: ShardedLmdb::new(
+          lmdb_files_root,
           options.files_max_size_bytes,
           executor.clone(),
           options.lease_time,
           options.shard_count,
         )
         .map(Arc::new),
-        directory_dbs: ShardedLmdb::new(
-          directories_root,
+        directory_lmdb: ShardedLmdb::new(
+          lmdb_directories_root,
           options.directories_max_size_bytes,
           executor.clone(),
           options.lease_time,
           options.shard_count,
         )
         .map(Arc::new),
-        large_files_root,
+        file_fsdb: ShardedFSDB {
+          root: fsdb_files_root,
+        },
         executor,
       }),
     })
@@ -116,20 +411,16 @@ impl ByteStore {
       return Ok(Some(EntryType::Directory));
     }
 
-    async fn exists(path: PathBuf) -> Result<bool, String> {
-      Ok(tokio::fs::File::open(path).await.is_ok())
-    }
-
-    // In parallel, check for the given fingerprint in both databases.
-    let d_dbs = self.inner.directory_dbs.clone()?;
-    let is_dir = d_dbs.exists(fingerprint);
-    let f_dbs = self.inner.file_dbs.clone()?;
-    let is_dbs_file = f_dbs.exists(fingerprint);
-    let is_immut_file = exists(self.immutable_store_file_path(fingerprint));
+    // In parallel, check for the given fingerprint in all databases.
+    let directory_lmdb = self.inner.directory_lmdb.clone()?;
+    let is_lmdb_dir = directory_lmdb.exists(fingerprint);
+    let file_lmdb = self.inner.file_lmdb.clone()?;
+    let is_lmdb_file = file_lmdb.exists(fingerprint);
+    let is_fsdb_file = self.inner.file_fsdb.exists(fingerprint);
 
     // TODO: Could technically use select to return slightly more quickly with the first
     // affirmative answer, but this is simpler.
-    match future::try_join3(is_dir, is_dbs_file, is_immut_file).await? {
+    match future::try_join3(is_lmdb_dir, is_lmdb_file, is_fsdb_file).await? {
       (true, _, _) => Ok(Some(EntryType::Directory)),
       (_, true, _) => Ok(Some(EntryType::File)),
       (_, _, true) => Ok(Some(EntryType::File)),
@@ -144,8 +435,8 @@ impl ByteStore {
     // NB: Lease extension happens periodically in the background, so this code needn't be parallel.
     for (digest, entry_type) in digests {
       let dbs = match entry_type {
-        EntryType::File => self.inner.file_dbs.clone(),
-        EntryType::Directory => self.inner.directory_dbs.clone(),
+        EntryType::File => self.inner.file_lmdb.clone(),
+        EntryType::Directory => self.inner.directory_lmdb.clone(),
       };
       dbs?
         .lease(digest.hash)
@@ -190,8 +481,8 @@ impl ByteStore {
         return Ok(used_bytes);
       }
       let lmdbs = match aged_fingerprint.entry_type {
-        EntryType::File => self.inner.file_dbs.clone(),
-        EntryType::Directory => self.inner.directory_dbs.clone(),
+        EntryType::File => self.inner.file_lmdb.clone(),
+        EntryType::Directory => self.inner.directory_lmdb.clone(),
       };
       let (env, database, lease_database) = lmdbs.clone()?.get(&aged_fingerprint.fingerprint);
       {
@@ -216,7 +507,7 @@ impl ByteStore {
     }
 
     if shrink_behavior == ShrinkBehavior::Compact {
-      self.inner.file_dbs.clone()?.compact()?;
+      self.inner.file_lmdb.clone()?.compact()?;
     }
 
     Ok(used_bytes)
@@ -229,8 +520,8 @@ impl ByteStore {
     fingerprints_by_expired_ago: &mut BinaryHeap<AgedFingerprint>,
   ) -> Result<(), String> {
     let database = match entry_type {
-      EntryType::File => self.inner.file_dbs.clone(),
-      EntryType::Directory => self.inner.directory_dbs.clone(),
+      EntryType::File => self.inner.file_lmdb.clone(),
+      EntryType::Directory => self.inner.directory_lmdb.clone(),
     };
 
     for (env, database, lease_database) in &database?.all_lmdbs() {
@@ -283,19 +574,15 @@ impl ByteStore {
   }
 
   pub async fn remove(&self, entry_type: EntryType, digest: Digest) -> Result<bool, String> {
-    let maybe_path = if entry_type == EntryType::File {
-      self.immutable_store_file_if_required(digest)
-    } else {
-      None
-    };
-    match maybe_path {
-      Some(path) => Ok(tokio::fs::remove_file(path).await.is_ok()),
-      None => {
-        let dbs = match entry_type {
-          EntryType::Directory => self.inner.directory_dbs.clone(),
-          EntryType::File => self.inner.file_dbs.clone(),
-        };
-        dbs?.remove(digest.hash).await
+    match entry_type {
+      EntryType::Directory => self.inner.directory_lmdb.clone()?.remove(digest.hash).await,
+      EntryType::File => {
+        let (lmdb_result, fsdb_result) = try_join(
+          self.inner.file_lmdb.clone()?.remove(digest.hash),
+          self.inner.file_fsdb.remove(digest.hash),
+        )
+        .await?;
+        Ok(lmdb_result || fsdb_result)
       }
     }
   }
@@ -311,21 +598,10 @@ impl ByteStore {
     fingerprint: Fingerprint,
     bytes: Bytes,
     initial_lease: bool,
-  ) -> Result<Digest, String> {
-    let len = bytes.len();
-    if entry_type == EntryType::File && ByteStore::uses_large_file_store(len) {
-      Ok(self.store_large_bytes(bytes, digest).await?)
-    } else {
-      let dbs = match entry_type {
-        EntryType::Directory => self.inner.directory_dbs.clone(),
-        EntryType::File => self.inner.file_dbs.clone(),
-      };
-      let fingerprint = dbs?
-        .store_bytes(digest.map(|d| d.hash), bytes, initial_lease)
-        .await?;
-
-      Ok(Digest::new(fingerprint, len))
-    }
+  ) -> Result<(), String> {
+    self
+      .store_bytes_batch(entry_type, vec![(fingerprint, bytes)], initial_lease)
+      .await
   }
 
   ///
@@ -339,54 +615,14 @@ impl ByteStore {
     entry_type: EntryType,
     items: Vec<(Fingerprint, Bytes)>,
     initial_lease: bool,
-  ) -> Result<Vec<Digest>, String> {
-    let mut small_items = vec![];
-    let mut big_items = vec![];
-    for (digest, bytes) in items {
-      if entry_type == EntryType::File && ByteStore::uses_large_file_store(bytes.len()) {
-        big_items.push((digest, bytes));
-      } else {
-        small_items.push((digest, bytes));
-      }
-    }
-    let mut result = try_join_all(
-      big_items
-        .iter()
-        .map(|(digest, bytes)| self.store_large_bytes(bytes.clone(), *digest)),
-    )
-    .await?;
-
+  ) -> Result<(), String> {
     let dbs = match entry_type {
-      EntryType::Directory => self.inner.directory_dbs.clone(),
-      EntryType::File => self.inner.file_dbs.clone(),
+      EntryType::Directory => self.inner.directory_lmdb.clone(),
+      EntryType::File => self.inner.file_lmdb.clone(),
     };
     dbs?.store_bytes_batch(items, initial_lease).await?;
 
     Ok(())
-  }
-
-  /// Returns whether this file digest should/does use the "large file store" instead of the LMDB.
-  pub(crate) fn uses_large_file_store(len: usize) -> bool {
-    len > LARGE_FILE_SIZE_LIMIT
-  }
-
-  /// The path to file inside the immutable store
-  fn immutable_store_file_path(&self, fingerprint: Fingerprint) -> PathBuf {
-    let hex = fingerprint.to_hex();
-    // We use 2-character directories to help shard the files so there isn't a plethora in one single dir.
-    self
-      .inner
-      .large_files_root
-      .join(hex.get(0..2).unwrap())
-      .join(hex)
-  }
-
-  /// Return the path to the immutable store file, if the digest is large enough
-  pub fn immutable_store_file_if_required(&self, digest: Digest) -> Option<PathBuf> {
-    if ByteStore::uses_large_file_store(digest.size_bytes) {
-      return Some(self.immutable_store_file_path(digest.hash));
-    }
-    None
   }
 
   ///
@@ -397,65 +633,35 @@ impl ByteStore {
     &self,
     entry_type: EntryType,
     initial_lease: bool,
-    data_is_immutable: bool,
+    src_is_immutable: bool,
     src: PathBuf,
   ) -> Result<Digest, String> {
-    let digest = hash_path(src.clone())?;
-    let immutable_path = self.immutable_store_file_if_required(digest);
-    match immutable_path {
-      Some(src) => {
-        self
-          .store_large_file(src, digest, data_is_immutable)
-          .await?;
-      }
-      None => {
-        let dbs = match entry_type {
-          EntryType::Directory => self.inner.directory_dbs.clone(),
-          EntryType::File => self.inner.file_dbs.clone(),
-        };
-        let _ = dbs?
-          .store(initial_lease, data_is_immutable, digest, move || {
-            std::fs::File::open(&src)
-          })
-          .await;
-      }
+    let mut file = tokio::fs::File::open(src.clone())
+      .await
+      .map_err(|e| format!("Failed to open {src:?}: {e}"))?;
+    let digest = async_copy_and_hash(&mut file, &mut tokio::io::sink())
+      .await
+      .map_err(|e| format!("Failed to hash {src:?}: {e}"))?;
+
+    if entry_type == EntryType::File && ByteStore::should_use_fsdb(digest.size_bytes) {
+      self
+        .inner
+        .file_fsdb
+        .store(initial_lease, src_is_immutable, digest, src)
+        .await?;
+    } else {
+      let dbs = match entry_type {
+        EntryType::Directory => self.inner.directory_lmdb.clone()?,
+        EntryType::File => self.inner.file_lmdb.clone()?,
+      };
+      let _ = dbs
+        .store(initial_lease, src_is_immutable, digest, move || {
+          std::fs::File::open(&src)
+        })
+        .await;
     }
+
     Ok(digest)
-  }
-
-  ///
-  /// Determine which of the given Fingerprints are already present in the large file store,
-  /// returning them as a set.
-  ///
-  async fn get_existing_large_fingerprints(
-    &self,
-    fingerprints: Vec<Fingerprint>,
-  ) -> HashSet<Fingerprint> {
-    let paths_to_check = fingerprints
-      .iter()
-      .map(|fingerprint| self.immutable_store_file_path(*fingerprint))
-      .collect::<Vec<_>>();
-
-    #[allow(clippy::redundant_closure)]
-    let results = join_all(
-      paths_to_check
-        .iter()
-        .map(|path| tokio::fs::File::open(path)),
-    )
-    .await;
-    let existing = results
-      .iter()
-      .zip(fingerprints)
-      .filter_map(|(result, fingerprint)| {
-        if result.is_ok() {
-          Some(fingerprint)
-        } else {
-          None
-        }
-      })
-      .collect::<Vec<_>>();
-
-    HashSet::from_iter(existing)
   }
 
   ///
@@ -468,50 +674,49 @@ impl ByteStore {
     entry_type: EntryType,
     digests: HashSet<Digest>,
   ) -> Result<HashSet<Digest>, String> {
-    let mut large_file_digests = vec![];
-    let mut other_digests = vec![];
+    let mut fsdb_digests = vec![];
+    let mut lmdb_digests = vec![];
     for digest in digests.iter() {
-      if entry_type == EntryType::File && ByteStore::uses_large_file_store(digest.size_bytes) {
-        large_file_digests.push(digest);
+      if entry_type == EntryType::File && ByteStore::should_use_fsdb(digest.size_bytes) {
+        fsdb_digests.push(digest);
       }
       // Avoid I/O for this case. This allows some client-provided operations (like
       // merging snapshots) to work without needing to first store the empty snapshot.
       else if *digest != EMPTY_DIGEST {
-        other_digests.push(digest);
+        lmdb_digests.push(digest);
       }
     }
 
-    let mut existing = HashSet::new();
-    if !large_file_digests.is_empty() {
-      existing.extend(
-        self
-          .get_existing_large_fingerprints(
-            large_file_digests
-              .iter()
-              .map(|digest| digest.hash)
-              .collect(),
-          )
-          .await,
-      );
-    }
+    let lmdb = match entry_type {
+      EntryType::Directory => self.inner.directory_lmdb.clone(),
+      EntryType::File => self.inner.file_lmdb.clone(),
+    }?;
+    let (mut existing, existing_lmdb_digests) = try_join(
+      self
+        .inner
+        .file_fsdb
+        .exists_batch(fsdb_digests.iter().map(|digest| digest.hash).collect()),
+      lmdb.exists_batch(lmdb_digests.iter().map(|digest| digest.hash).collect()),
+    )
+    .await?;
 
-    if !other_digests.is_empty() {
-      let dbs = match entry_type {
-        EntryType::Directory => self.inner.directory_dbs.clone(),
-        EntryType::File => self.inner.file_dbs.clone(),
-      }?;
-      existing.extend(
-        dbs
-          .exists_batch(other_digests.iter().map(|digest| digest.hash).collect())
-          .await?,
-      );
-    }
+    existing.extend(existing_lmdb_digests);
 
     let missing = digests
       .into_iter()
       .filter(|digest| *digest != EMPTY_DIGEST && !existing.contains(&digest.hash))
       .collect::<HashSet<_>>();
     Ok(missing)
+  }
+
+  ///
+  /// Return the path this digest is persistent on the filesystem at, or None.
+  ///
+  pub async fn load_from_fs(&self, digest: Digest) -> Result<Option<PathBuf>, String> {
+    if self.inner.file_fsdb.exists(digest.hash).await? {
+      return Ok(Some(self.inner.file_fsdb.get_path(digest.hash)));
+    }
+    Ok(None)
   }
 
   ///
@@ -533,53 +738,33 @@ impl ByteStore {
       return Ok(Some(f(&[])));
     }
 
-    let res = match self.immutable_store_file_if_required(digest) {
-      Some(path) => {
-        let file_result = tokio::fs::File::open(path).await;
-        if let Ok(mut file) = file_result {
-          // @TODO: Use mmap instead of copying into user-space
-          let mut contents: Vec<u8> = vec![];
-          file
-            .read_to_end(&mut contents)
-            .await
-            .map_err(|e| format!("Failed to load large file into memory: {e}"))?;
-          if contents.len() != digest.size_bytes {
-            return Err(format!(
-                "Got hash collision reading from store - digest {:?} was requested, but retrieved \
-                    bytes with that fingerprint had length {}. Congratulations, you may have broken \
-                    sha256! Underlying bytes: {:?}",
-                digest,
-                contents.len(),
-                contents
-              ));
-          }
-          Ok(Some(f(&contents[..])))
-        } else {
-          Ok(None)
-        }
+    let len_checked_f = move |bytes: &[u8]| {
+      if bytes.len() == digest.size_bytes {
+        Ok(f(bytes))
+      } else {
+        Err(format!(
+          "Got hash collision reading from store - digest {:?} was requested, but retrieved \
+                bytes with that fingerprint had length {}. Congratulations, you may have broken \
+                sha256! Underlying bytes: {:?}",
+          digest,
+          bytes.len(),
+          bytes
+        ))
       }
-      None => {
-        let dbs = match entry_type {
-          EntryType::Directory => self.inner.directory_dbs.clone(),
-          EntryType::File => self.inner.file_dbs.clone(),
-        }?;
-        dbs
-            .load_bytes_with(digest.hash, move |bytes| {
-              if bytes.len() == digest.size_bytes {
-                Ok(f(bytes))
-              } else {
-                Err(format!(
-                  "Got hash collision reading from store - digest {:?} was requested, but retrieved \
-                      bytes with that fingerprint had length {}. Congratulations, you may have broken \
-                      sha256! Underlying bytes: {:?}",
-                  digest,
-                  bytes.len(),
-                  bytes
-                ))
-              }
-            })
-            .await
-      }
+    };
+
+    let result = if entry_type == EntryType::File && ByteStore::should_use_fsdb(digest.size_bytes) {
+      self
+        .inner
+        .file_fsdb
+        .load_bytes_with(digest.hash, len_checked_f)
+        .await?
+    } else {
+      let dbs = match entry_type {
+        EntryType::Directory => self.inner.directory_lmdb.clone(),
+        EntryType::File => self.inner.file_lmdb.clone(),
+      }?;
+      dbs.load_bytes_with(digest.hash, len_checked_f).await?
     };
 
     if let Some(workunit_store_handle) = workunit_store::get_workunit_store_handle() {
@@ -593,146 +778,22 @@ impl ByteStore {
       );
     }
 
-    res
+    Ok(result)
   }
 
   pub fn all_digests(&self, entry_type: EntryType) -> Result<Vec<Digest>, String> {
-    let database = match entry_type {
-      EntryType::File => self.inner.file_dbs.clone(),
-      EntryType::Directory => self.inner.directory_dbs.clone(),
-    };
+    let lmdb = match entry_type {
+      EntryType::File => self.inner.file_lmdb.clone(),
+      EntryType::Directory => self.inner.directory_lmdb.clone(),
+    }?;
     let mut digests = vec![];
-    for (env, database, _lease_database) in &database?.all_lmdbs() {
-      let txn = env
-        .begin_ro_txn()
-        .map_err(|err| format!("Error beginning transaction to garbage collect: {err}"))?;
-      let mut cursor = txn
-        .open_ro_cursor(*database)
-        .map_err(|err| format!("Failed to open lmdb read cursor: {err}"))?;
-      for key_res in cursor.iter() {
-        let (key, bytes) =
-          key_res.map_err(|err| format!("Failed to advance lmdb read cursor: {err}"))?;
-        let v = VersionedFingerprint::from_bytes_unsafe(key);
-        let fingerprint = v.get_fingerprint();
-        digests.push(Digest::new(fingerprint, bytes.len()));
-      }
-    }
-    if entry_type == EntryType::File {
-      let maybe_shards = std::fs::read_dir(self.inner.large_files_root.clone());
-      if let Ok(shards) = maybe_shards {
-        for entry in shards {
-          let shard = entry.map_err(|e| format!("Error iterating the large file store: {e}."))?;
-          let large_files = std::fs::read_dir(shard.path())
-            .map_err(|e| format!("Failed to read shard directory: {e}."))?;
-          for entry in large_files {
-            let large_file = entry.map_err(|e| {
-              format!(
-                "Error iterating large file store shard {:?}: {e}",
-                shard.path().file_name()
-              )
-            })?;
-            let path = large_file.path();
-            let hash = path.file_name().unwrap().to_str().unwrap();
-            let length = large_file.metadata().map_err(|e| e.to_string())?.len();
-            digests.push(Digest::new(
-              Fingerprint::from_hex_string(hash).unwrap(),
-              length as usize,
-            ));
-          }
-        }
-      }
-    }
+    digests.extend(lmdb.all_digests()?);
+    digests.extend(self.inner.file_fsdb.all_digests()?);
     Ok(digests)
   }
 
-  pub(crate) async fn temp_immutable_store_file_if_required(
-    &self,
-    digest: Digest,
-  ) -> Result<Option<TempImmutableLargeFile>, String> {
-    let immutable_path = self.immutable_store_file_if_required(digest);
-    match immutable_path {
-      Some(dest) => {
-        if !dest.parent().unwrap().exists() {
-          // Throwaway the result as a way of not worrying about race conditions between multiple
-          // threads/processes creating the same parent dirs. If there was an error we'll fail later.
-          let _ = tokio::fs::create_dir_all(dest.parent().unwrap()).await;
-        }
-        let dest2 = dest.clone();
-        // Make the tempdir in the same dir as the final file so that materializing the final file doesn't
-        // have to worry about parent dirs.
-        let named_temp_file =
-          tokio::task::spawn_blocking(move || NamedTempFile::new_in(dest.parent().unwrap()))
-            .await
-            .map_err(|e| e.to_string())?
-            .map_err(|e| e.to_string())?;
-        let (_, path) = named_temp_file.keep().map_err(|e| e.to_string())?;
-        Ok(Some(TempImmutableLargeFile {
-          tmp_path: path,
-          final_path: dest2,
-        }))
-      }
-      None => Ok(None),
-    }
-  }
-
-  async fn store_large_bytes(
-    &self,
-    src: Bytes,
-    mut digest: Option<Digest>,
-  ) -> Result<Digest, String> {
-    if digest.is_none() {
-      digest =
-        Some(hash(&mut src.clone().reader()).map_err(|e| format!("Failed to hash bytes: {e}"))?);
-    }
-    let dest = self
-      .temp_immutable_store_file_if_required(digest.unwrap())
-      .await?
-      .unwrap();
-    let mut dest_file = dest.open().await.map_err(|e| e.to_string())?;
-    dest_file
-      .write_all(&src.clone())
-      .await
-      .map_err(|e| e.to_string())?;
-    dest_file.flush().await.map_err(|e| e.to_string())?;
-    dest.persist().await?;
-    Ok(digest.unwrap())
-  }
-
-  async fn store_large_file(
-    &self,
-    src: PathBuf,
-    digest: Digest,
-    data_is_immutable: bool,
-  ) -> Result<(), String> {
-    let dest = self
-      .temp_immutable_store_file_if_required(digest)
-      .await?
-      .unwrap();
-    let mut attempts = 0;
-    loop {
-      let (mut reader, mut writer) =
-        try_join(tokio::fs::File::open(src.clone()), dest.clone().open())
-          .await
-          .map_err(|e| e.to_string())?;
-      let should_retry = !async_verified_copy(digest, data_is_immutable, &mut reader, &mut writer)
-        .await
-        .map_err(|e| e.to_string())?;
-
-      if should_retry {
-        attempts += 1;
-        let msg = format!("Input {src:?} changed while reading.");
-        log::debug!("{}", msg);
-        if attempts > 10 {
-          return Err(format!("Failed to store {src:?}."));
-        }
-      } else {
-        writer.flush().await.map_err(|e| e.to_string())?;
-        dest.persist().await?;
-        break;
-      }
-    }
-
-    Ok(())
+  fn should_use_fsdb(len: usize) -> bool {
+    len >= LARGE_FILE_SIZE_LIMIT
   }
 }
 

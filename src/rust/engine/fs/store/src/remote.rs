@@ -477,7 +477,7 @@ impl ByteStore {
   }
 
   /// Write the data for `digest` (if it exists in the remote store) into `file`.
-  pub async fn load_file(
+  pub async fn _load_file(
     &self,
     digest: Digest,
     file: tokio::fs::File,

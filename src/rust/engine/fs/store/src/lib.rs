@@ -58,6 +58,7 @@ use fs::{
 use futures::future::{self, BoxFuture, Either, FutureExt, TryFutureExt};
 use grpc_util::prost::MessageExt;
 use hashing::{Digest, Fingerprint};
+use local::ByteStore;
 use parking_lot::Mutex;
 use prost::Message;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
@@ -65,7 +66,7 @@ use protos::require_digest;
 use remexec::{ServerCapabilities, Tree};
 use serde_derive::Serialize;
 use sharded_lmdb::DEFAULT_LEASE_TIME;
-use tokio::io::AsyncWriteExt;
+//use tokio::io::AsyncWriteExt;
 use tryfuture::try_future;
 use workunit_store::{in_workunit, Level, Metric};
 
@@ -249,45 +250,32 @@ impl RemoteStore {
     };
     self
       .maybe_download(digest, async move {
-        let immutable_file = if f_remote.is_some() {
-          None
-        } else {
-          local_store
-            .temp_immutable_store_file_if_required(digest)
+        let store_into_fsdb = f_remote.is_none()
+          && entry_type == EntryType::File
+          && ByteStore::should_use_fsdb(digest.size_bytes);
+        if store_into_fsdb {
+          let tempfile = local_store
+            .get_file_fsdb()
+            .get_tempfile(digest.hash)
+            .await?;
+          remote_store
+            .load_file(digest, tempfile.open().await?)
             .await?
-        };
-        let stored_digest = match immutable_file {
-          Some(tmp_path) => {
-            let dest_file = tmp_path.clone().open().await?;
-            let mut dest_file = remote_store
-              .load_file(digest, dest_file)
-              .await?
-              .ok_or_else(create_missing)?;
-            dest_file.flush().await.map_err(|e| e.to_string())?;
-            tmp_path.persist().await?;
-            digest
-          }
-          None => {
-            // (if there's a function to call, always just buffer fully into memory)
-            let bytes = remote_store
-              .load_bytes(digest)
-              .await?
-              .ok_or_else(create_missing)?;
-            if let Some(f_remote) = f_remote {
-              f_remote(bytes.clone())?;
-            }
-            local_store
-              .store_bytes(entry_type, None, bytes, true)
-              .await?
-          }
-        };
-        if digest == stored_digest {
-          Ok(())
+            .ok_or_else(create_missing)?;
+          tempfile.persist().await?;
         } else {
-          Err(StoreError::Unclassified(format!(
-            "CAS gave wrong digest: expected {digest:?}, got {stored_digest:?}"
-          )))
+          let bytes = remote_store
+            .load_bytes(digest)
+            .await?
+            .ok_or_else(create_missing)?;
+          if let Some(f_remote) = f_remote {
+            f_remote(bytes.clone())?;
+          }
+          local_store
+            .store_bytes(entry_type, digest.hash, bytes, true)
+            .await?;
         }
+        Ok(())
       })
       .await
   }
@@ -456,7 +444,8 @@ impl Store {
     self
       .local
       .store_bytes_batch(EntryType::File, items, initial_lease)
-      .await
+      .await?;
+    Ok(())
   }
 
   ///
@@ -1349,7 +1338,7 @@ impl Store {
     can_be_immutable: bool,
   ) -> Result<(), StoreError> {
     let symlink_dest = if can_be_immutable {
-      self.local.immutable_store_file_if_required(digest)
+      self.local.load_from_fs(digest).await?
     } else {
       None
     };

@@ -27,7 +27,6 @@
 
 use std::fmt;
 use std::io::{self, Error, Write};
-use std::path::Path;
 use std::pin::Pin;
 use std::str::FromStr;
 use std::task::{Context, Poll};
