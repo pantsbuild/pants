@@ -164,8 +164,8 @@ impl UnderlyingByteStore for ShardedLmdb {
 }
 
 // We shard so there isn't a plethora of entries in one single dir.
-#[derive(Debug)]
-struct ShardedFSDB {
+#[derive(Debug, Clone)]
+pub(crate) struct ShardedFSDB {
   root: PathBuf,
 }
 
@@ -175,7 +175,10 @@ impl ShardedFSDB {
     self.root.join(hex.get(0..2).unwrap()).join(hex)
   }
 
-  async fn get_tempfile(&self, fingerprint: Fingerprint) -> Result<TempImmutableLargeFile, String> {
+  pub(crate) async fn get_tempfile(
+    &self,
+    fingerprint: Fingerprint,
+  ) -> Result<TempImmutableLargeFile, String> {
     let path = self.get_path(fingerprint);
     if !path.parent().unwrap().exists() {
       // Throwaway the result as a way of not worrying about race conditions between multiple
@@ -792,8 +795,12 @@ impl ByteStore {
     Ok(digests)
   }
 
-  fn should_use_fsdb(len: usize) -> bool {
+  pub(crate) fn should_use_fsdb(len: usize) -> bool {
     len >= LARGE_FILE_SIZE_LIMIT
+  }
+
+  pub(crate) fn get_file_fsdb(&self) -> ShardedFSDB {
+    self.inner.file_fsdb.clone()
   }
 }
 

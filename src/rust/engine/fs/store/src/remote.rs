@@ -477,16 +477,12 @@ impl ByteStore {
   }
 
   /// Write the data for `digest` (if it exists in the remote store) into `file`.
-  pub async fn _load_file(
+  pub async fn load_file(
     &self,
     digest: Digest,
     file: tokio::fs::File,
   ) -> Result<Option<tokio::fs::File>, String> {
-    let mut result = self.load(digest, file).await;
-    if let Ok(Some(ref mut file)) = result {
-      file.rewind().await.map_err(|e| e.to_string())?;
-    }
-    result
+    self.load(digest, file).await
   }
 
   ///
