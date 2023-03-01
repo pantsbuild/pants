@@ -24,7 +24,7 @@ from pants.core.util_rules.system_binaries import (
 )
 from pants.engine.internals.native_engine import EMPTY_DIGEST
 from pants.engine.internals.selectors import Get
-from pants.engine.rules import collect_rules, rule, rule_helper
+from pants.engine.rules import collect_rules, rule
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
@@ -47,7 +47,6 @@ class SystemBinaryFieldSet(RunFieldSet):
     fingerprint_argv: SystemBinaryFingerprintArgsField
 
 
-@rule_helper
 async def _find_binary(
     binary_name: str,
     extra_search_paths: Iterable[str],

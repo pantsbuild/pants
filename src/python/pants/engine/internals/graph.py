@@ -585,7 +585,7 @@ async def transitive_dependency_mapping(request: _DependencyMappingRequest) -> _
     while queued:
         direct_dependencies: tuple[Collection[Target], ...]
         if request.expanded_targets:
-            direct_dependencies = await MultiGet(
+            direct_dependencies = await MultiGet(  # noqa: PNT30: this is inherently sequential
                 Get(
                     Targets,
                     DependenciesRequest(
@@ -596,7 +596,7 @@ async def transitive_dependency_mapping(request: _DependencyMappingRequest) -> _
                 for tgt in queued
             )
         else:
-            direct_dependencies = await MultiGet(
+            direct_dependencies = await MultiGet(  # noqa: PNT30: this is inherently sequential
                 Get(
                     UnexpandedTargets,
                     DependenciesRequest(
@@ -853,7 +853,7 @@ async def find_owners(
             candidate_tgts = deleted_candidate_tgts
             sources_set = deleted_files
 
-        build_file_addresses = await MultiGet(
+        build_file_addresses = await MultiGet(  # noqa: PNT30: requires triage
             Get(
                 BuildFileAddress,
                 BuildFileAddressRequest(

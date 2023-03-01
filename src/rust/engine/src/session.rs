@@ -31,7 +31,7 @@ const STRAGGLER_LOGGING_INTERVAL: Duration = Duration::from_secs(30);
 // Root requests are limited to Select nodes, which produce (python) Values.
 pub type Root = Select;
 
-pub type ObservedValueResult = Result<(Value, Option<LastObserved>), Failure>;
+pub type ObservedValueResult = (Result<Value, Failure>, Option<LastObserved>);
 
 ///
 /// An enum for the two cases of `--[no-]dynamic-ui`.

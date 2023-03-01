@@ -237,7 +237,7 @@ async def update_build_files(
     }
     build_file_to_change_descriptions: DefaultDict[str, list[str]] = defaultdict(list)
     for rewrite_request_cls in rewrite_request_classes:
-        all_rewritten_files = await MultiGet(
+        all_rewritten_files = await MultiGet(  # noqa: PNT30: requires triage
             Get(
                 RewrittenBuildFile,
                 RewrittenBuildFileRequest,

@@ -381,7 +381,9 @@ async def fix_batch(
     results = []
     for request_type, tool_name, files, key in request:
         batch = request_type(tool_name, files, key, current_snapshot)
-        result = await Get(FixResult, FixRequest.Batch, batch)
+        result = await Get(  # noqa: PNT30: this is inherently sequential
+            FixResult, FixRequest.Batch, batch
+        )
         results.append(result)
 
         assert set(result.output.files) == set(

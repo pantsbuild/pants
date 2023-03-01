@@ -48,7 +48,7 @@ async def pyupgrade_fix(request: PyUpgradeRequest.Batch, pyupgrade: PyUpgrade) -
     # use the new file with the new digest. However that isn't the UX we want for our users.)
     input_digest = request.snapshot.digest
     for _ in range(10):  # Give the loop an upper bound to guard against infinite runs
-        result = await Get(
+        result = await Get(  # noqa: PNT30: this is inherently sequential
             FallibleProcessResult,
             VenvPexProcess(
                 pyupgrade_pex,
