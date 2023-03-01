@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import dataclasses
 from textwrap import dedent
+from typing import Sequence
 
 import pytest
 
@@ -187,7 +188,7 @@ def _snapshot(fingerprint: str, files: tuple[str, ...]) -> Snapshot:
             [
                 TargetData(
                     FilesGeneratorTarget({"sources": ["*.txt"]}, Address("foo", target_name="baz")),
-                    ("foo/a.txt",),
+                    _snapshot("", ("foo/a.txt",)),
                     ("foo/a.txt:baz",),
                     dependencies_rules=("does", "apply", "*"),
                     dependents_rules=("fall-through", "*"),
@@ -238,6 +239,7 @@ def _snapshot(fingerprint: str, files: tuple[str, ...]) -> Snapshot:
                     "sources": [
                       "foo/a.txt"
                     ],
+                    "sources_fingerprint": "0000000000000000000000000000000000000000000000000000000000000000",
                     "sources_raw": [
                       "*.txt"
                     ]
@@ -274,6 +276,19 @@ def test_non_matching_build_target(rule_runner: RuleRunner) -> None:
     assert result.stdout == "[]\n"
 
 
+def _normalize_fingerprints(tds: Sequence[TargetData]) -> list[TargetData]:
+    """We're not here to test the computation of fingerprints."""
+    return [
+        dataclasses.replace(
+            td,
+            expanded_sources=None
+            if td.expanded_sources is None
+            else _snapshot("", td.expanded_sources.files),
+        )
+        for td in tds
+    ]
+
+
 def test_get_target_data(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -293,17 +308,7 @@ def test_get_target_data(rule_runner: RuleRunner) -> None:
         [RawSpecs(recursive_globs=(RecursiveGlobSpec("foo"),), description_of_origin="tests")],
     )
 
-    normalised = [
-        dataclasses.replace(
-            td,
-            expanded_sources=None
-            if td.expanded_sources is None
-            else _snapshot("", td.expanded_sources.files),
-        )
-        for td in tds
-    ]
-
-    assert normalised == [
+    assert _normalize_fingerprints(tds) == [
         TargetData(
             GenericTarget({"dependencies": [":baz"]}, Address("foo", target_name="bar")),
             None,
@@ -356,10 +361,10 @@ def test_get_target_data_with_dep_rules(rule_runner: RuleRunner) -> None:
         TargetDatas,
         [RawSpecs(recursive_globs=(RecursiveGlobSpec("foo"),), description_of_origin="tests")],
     )
-    assert list(tds) == [
+    assert _normalize_fingerprints(tds) == [
         TargetData(
             FilesGeneratorTarget({"sources": ["*.txt"]}, Address("foo", target_name="baz")),
-            ("foo/a.txt",),
+            _snapshot("", ("foo/a.txt",)),
             ("foo/a.txt:baz",),
             dependencies_rules=("does", "apply", "*"),
             dependents_rules=("fall-through", "*"),
@@ -380,7 +385,7 @@ def test_get_target_data_with_dep_rules(rule_runner: RuleRunner) -> None:
             FileTarget(
                 {"source": "a.txt"}, Address("foo", relative_file_path="a.txt", target_name="baz")
             ),
-            ("foo/a.txt",),
+            _snapshot("", ("foo/a.txt",)),
             (),
             dependencies_rules=("does", "apply", "*"),
             dependents_rules=("fall-through", "*"),
