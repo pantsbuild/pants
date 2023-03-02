@@ -3,11 +3,9 @@
 
 import dataclasses
 from dataclasses import dataclass
-from textwrap import dedent
+from textwrap import dedent  # noqa: PNT20
 
-from pants.backend.python.providers.pyenv.target_types import (  # noqa: PNT20
-    PyenvInstallSentinelField,
-)
+from pants.backend.python.providers.pyenv.target_types import PyenvInstallSentinelField
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.util_rules.pex import PythonProvider
 from pants.backend.python.util_rules.pex import rules as pex_rules
@@ -128,6 +126,8 @@ async def get_pyenv_install_info(
                     "install_python_shim.sh",
                     dedent(
                         f"""\
+                        #!/usr/bin/env bash
+                        set -e
                         export PYENV_ROOT=$(readlink {PYENV_NAMED_CACHE})
                         DEST="$PYENV_ROOT"/versions/$1
                         if [ ! -f "$DEST"/DONE ]; then
