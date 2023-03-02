@@ -64,5 +64,9 @@ def _pex_simple_lockfile_rules(python_tool: Type[LockfileRequestable]) -> Iterab
 def default_rules(cls: Type[LockfileRequestable]) -> Iterable:
     if cls.lockfile_rules_type == LockfileRules.SIMPLE:
         yield from _pex_simple_lockfile_rules(cls)
-    else:
+    elif cls.lockfile_rules_type == LockfileRules.CUSTOM:
         return
+    else:
+        raise NotImplementedError(
+            f"Lockfile rule generator of type {cls.lockfile_rules_type} is missing default rules!"
+        )
