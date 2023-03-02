@@ -3,6 +3,11 @@
 
 
 from pants.backend.python.providers.pyenv.rules import rules as pyenv_rules
+from pants.backend.python.providers.pyenv.target_types import PyenvInstall
+
+
+def target_types():
+    return [PyenvInstall]
 
 
 def rules():
