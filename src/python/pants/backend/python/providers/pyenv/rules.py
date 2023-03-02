@@ -115,7 +115,7 @@ async def get_python(
                         f"""\
                         #!/usr/bin/env bash
                         set -e
-                        DEST=.pyenv/versions/3.7.16
+                        DEST={PYENV_NAMED_CACHE}/versions/{specific_python}
                         while [ ! -f $DEST/DONE ]; do
                             LOCKFILE=$DEST/DONE.lock
                             mkdir -p $DEST 2>/dev/null || true
@@ -123,7 +123,7 @@ async def get_python(
                             if ln $TMPLOCK $LOCKFILE 2>/dev/null ; then
                                 trap 'rm -f $LOCKFILE' EXIT
                                 export PYENV_ROOT=.pyenv
-                                ./pyenv-2.3.13/bin/pyenv install 3.7.16
+                                {pyenv.exe} install {specific_python}
                                 # Removing write perms helps ensure users aren't accidentally modifying Python
                                 # or the site-packages
                                 chmod -R -w $DEST
