@@ -6,7 +6,7 @@ createdAt: "2020-02-21T17:44:53.022Z"
 updatedAt: "2022-07-12T00:00:00.000Z"
 ---
 
-You can download an installer script that will install the Pants binary with this command:
+You can download and run an installer script that will install the Pants binary with this command:
 
 ```
 curl --proto '=https' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh | bash
