@@ -115,19 +115,26 @@ async def get_python(
                         f"""\
                         #!/usr/bin/env bash
                         set -e
-                        DEST=$(realpath {PYENV_NAMED_CACHE}/{specific_python})
-                        if [ ! -d "$DEST" ]; then
-                            export PYENV_ROOT=$(realpath $(mktemp -d -u -p {PYENV_NAMED_CACHE} {specific_python}.XXXXXX))
-                            # export LDFLAGS="$LDFLAGS -Wl,-rpath=PYENV_ROOT/lib"
-                            {pyenv.exe} install {specific_python}
-                            # Removing write perms helps ensure users aren't accidentally modifying Python
-                            # or the site-packages
-                            chmod -R -w "$PYENV_ROOT"/versions/{specific_python}
-                            chmod +w "$PYENV_ROOT"/versions/{specific_python}
-                            ln -s "$PYENV_ROOT"/versions/{specific_python} {PYENV_NAMED_CACHE}/{specific_python}
-                            rm -rf "$PYENV_ROOT"/shims
-                        fi
-                        echo "$DEST"/bin/python
+                        DEST=.pyenv/versions/3.7.16
+                        while [ ! -f $DEST/DONE ]; do
+                            LOCKFILE=$DEST/DONE.lock
+                            mkdir -p $DEST 2>/dev/null || true
+                            TMPLOCK=$(mktemp -p $DEST DONE.lock.XXXX)
+                            if ln $TMPLOCK $LOCKFILE 2>/dev/null ; then
+                                trap 'rm -f $LOCKFILE' EXIT
+                                export PYENV_ROOT=.pyenv
+                                ./pyenv-2.3.13/bin/pyenv install 3.7.16
+                                # Removing write perms helps ensure users aren't accidentally modifying Python
+                                # or the site-packages
+                                chmod -R -w $DEST
+                                chmod +w $DEST
+                                touch $DEST/DONE
+                            else
+                                sleep 1
+                            fi
+                            rm -f $TMPLOCK
+                        done
+                        echo $(realpath $DEST/bin/python)
                         """
                     ).encode(),
                     is_executable=True,
