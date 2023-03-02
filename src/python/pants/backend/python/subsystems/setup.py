@@ -85,7 +85,7 @@ class PythonSetup(Subsystem):
     def interpreter_constraints(self) -> tuple[str, ...]:
         # TODO: In 2.17.0.dev0 we should set the default above to None and tweak the message here
         #  appropriately.
-        if not self.options.is_default("interpreter_constraints"):
+        if self.options.is_default("interpreter_constraints"):
             warn_or_error(
                 "2.17.0.dev0",
                 "the factory default interpreter constraints value",
