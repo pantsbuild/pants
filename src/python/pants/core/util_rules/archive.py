@@ -10,12 +10,16 @@ from dataclasses import dataclass
 from pathlib import PurePath
 
 from pants.core.util_rules import system_binaries
-from pants.core.util_rules.system_binaries import ArchiveFormat as ArchiveFormat, SearchPath, SystemBinariesSubsystem
+from pants.core.util_rules.system_binaries import ArchiveFormat as ArchiveFormat
 from pants.core.util_rules.system_binaries import (
     BashBinary,
     BashBinaryRequest,
+    BinaryPathRequest,
+    BinaryShims,
+    BinaryShimsRequest,
     GunzipBinary,
     GunzipBinaryRequest,
+    SystemBinariesSubsystem,
     TarBinary,
     TarBinaryRequest,
     UnzipBinary,
@@ -35,7 +39,7 @@ from pants.engine.fs import (
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.util.logging import LogLevel
-from pants.util.strutil import create_path_env_var, softwrap
+from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +57,9 @@ class CreateArchive:
 
 
 @rule(desc="Creating an archive file", level=LogLevel.DEBUG)
-async def create_archive(request: CreateArchive, system_binaries: SystemBinariesSubsystem) -> Digest:
+async def create_archive(
+    request: CreateArchive, system_binaries: SystemBinariesSubsystem
+) -> Digest:
 
     # #16091 -- if an arg list is really long, archive utilities tend to get upset.
     # passing a list of filenames into the utilities fixes this.
@@ -64,6 +70,7 @@ async def create_archive(request: CreateArchive, system_binaries: SystemBinaries
     file_list_file_digest = await Get(Digest, CreateDigest([file_list_file]))
     files_digests = [file_list_file_digest, request.snapshot.digest]
     input_digests = []
+    immutable_input_digests = None
 
     if request.format == ArchiveFormat.ZIP:
         zip_binary, bash_binary = await MultiGet(
@@ -92,10 +99,18 @@ async def create_archive(request: CreateArchive, system_binaries: SystemBinaries
         compression_tool = {
             ArchiveFormat.TGZ: "gzip",
             ArchiveFormat.TBZ2: "bzip2",
-            ArchiveFormat.TXZ: "xz"
+            ArchiveFormat.TXZ: "xz",
         }.get(request.format)
         if compression_tool:
-            env = {"PATH": create_path_env_var(system_binaries.search_path_for_binary(compression_tool))}
+            compression_tool_shims = await Get(
+                BinaryShims,
+                BinaryShimsRequest(
+                    requests=(BinaryPathRequest(binary_name=compression_tool, search_path=None),),
+                    rationale=f"{compression_tool} for tar",
+                ),
+            )
+            env = {"PATH": compression_tool_shims.path_component}
+            immutable_input_digests = compression_tool_shims.immutable_input_digests
         else:
             env = {}
 
@@ -118,6 +133,7 @@ async def create_archive(request: CreateArchive, system_binaries: SystemBinaries
             description=f"Create {request.output_filename}",
             level=LogLevel.DEBUG,
             output_files=(request.output_filename,),
+            immutable_input_digests=immutable_input_digests,
         ),
     )
     return result.output_digest
@@ -160,7 +176,7 @@ def infer_decompression_tool(tar_suffix: str) -> str | None:
     elif tar_suffix.endswith(("tar.gz2", "tbz2")):
         return "bunzip2"
     elif tar_suffix.endswith((".tar.xz", ".txz")):
-        return "unxz"
+        return "xz"
     elif tar_suffix.endswith(".tar.lz4"):
         return "unlz4"
     else:
@@ -168,7 +184,9 @@ def infer_decompression_tool(tar_suffix: str) -> str | None:
 
 
 @rule(desc="Extracting an archive file", level=LogLevel.DEBUG)
-async def maybe_extract_archive(request: MaybeExtractArchiveRequest, system_binaries: SystemBinariesSubsystem) -> ExtractedArchive:
+async def maybe_extract_archive(
+    request: MaybeExtractArchiveRequest, system_binaries: SystemBinariesSubsystem
+) -> ExtractedArchive:
     """If digest contains a single archive file, extract it, otherwise return the input digest."""
     extract_archive_dir = "__extract_archive_dir"
     snapshot, output_dir_digest = await MultiGet(
@@ -189,6 +207,8 @@ async def maybe_extract_archive(request: MaybeExtractArchiveRequest, system_bina
         return ExtractedArchive(request.digest)
 
     merge_digest_get = Get(Digest, MergeDigests((request.digest, output_dir_digest)))
+    immutable_input_digests = None
+
     if is_zip:
         input_digest, unzip_binary = await MultiGet(
             merge_digest_get,
@@ -207,7 +227,15 @@ async def maybe_extract_archive(request: MaybeExtractArchiveRequest, system_bina
         # `tar` expects to find a couple binaries like `gzip` and `xz` by looking on the PATH.
         decompression_tool = infer_decompression_tool(archive_suffix)
         if decompression_tool:
-            env = {"PATH": create_path_env_var(system_binaries.search_path_for_binary(decompression_tool))}
+            decompression_tool_shims = await Get(
+                BinaryShims,
+                BinaryShimsRequest(
+                    requests=(BinaryPathRequest(binary_name=decompression_tool, search_path=None),),
+                    rationale=f"{decompression_tool} for tar",
+                ),
+            )
+            env = {"PATH": decompression_tool_shims.path_component}
+            immutable_input_digests = decompression_tool_shims.immutable_input_digests
         else:
             env = {}
     else:
@@ -227,6 +255,7 @@ async def maybe_extract_archive(request: MaybeExtractArchiveRequest, system_bina
             description=f"Extract {archive_path}",
             level=LogLevel.DEBUG,
             output_directories=(extract_archive_dir,),
+            immutable_input_digests=immutable_input_digests,
         ),
     )
     resulting_digest = await Get(Digest, RemovePrefix(result.output_digest, extract_archive_dir))

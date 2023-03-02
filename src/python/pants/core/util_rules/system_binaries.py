@@ -24,12 +24,12 @@ from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.platform import Platform
 from pants.engine.process import FallibleProcessResult, Process, ProcessResult
 from pants.engine.rules import collect_rules, rule
+from pants.option.option_types import StrListOption
+from pants.option.subsystem import Subsystem
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import OrderedSet
 from pants.util.strutil import create_path_env_var, pluralize, softwrap
-from pants.option.option_types import StrListOption
-from pants.option.subsystem import Subsystem
 
 logger = logging.getLogger(__name__)
 
@@ -40,18 +40,20 @@ logger = logging.getLogger(__name__)
 # TODO(#14492): This should be configurable via `[system-binaries]` subsystem, likely per-binary.
 SEARCH_PATHS_GET_RID_OF_ME = ("/usr/bin", "/bin", "/usr/local/bin", "/opt/homebrew/bin")
 
+
 class SystemBinariesSubsystem(Subsystem):
     options_scope = "system-binaries"
     help = "TODO"
 
-    _default_search_path = StrListOption(
-        "--default-search-paths",
-        default = [*SEARCH_PATHS_GET_RID_OF_ME],
-        help = "TODO"
-    )
+    class EnvironmentAware(Subsystem.EnvironmentAware):
+        _default_search_path = StrListOption(
+            "--default-search-paths",
+            default=[*SEARCH_PATHS_GET_RID_OF_ME],
+            advanced=True,
+            metavar="<binary-paths>",
+            help="TODO",
+        )
 
-    def search_path_for_binary(self, binary_name: str) -> SearchPath:
-        return SearchPath(self._default_search_path)
 
 @dataclass(frozen=True)
 class BinaryPath:
@@ -258,6 +260,7 @@ class BinaryShims:
 
 class BashBinary(BinaryPath):
     """The `bash` binary."""
+
 
 @dataclass(frozen=True)
 class BashBinaryRequest:
@@ -497,7 +500,11 @@ async def get_bash() -> BashBinary:
 
 
 @rule
-async def find_binary(request: BinaryPathRequest, env_target: EnvironmentTarget, system_binaries: SystemBinariesSubsystem) -> BinaryPaths:
+async def find_binary(
+    request: BinaryPathRequest,
+    env_target: EnvironmentTarget,
+    system_binaries: SystemBinariesSubsystem.EnvironmentAware,
+) -> BinaryPaths:
     # If we are not already locating bash, recurse to locate bash to use it as an absolute path in
     # our shebang. This avoids mixing locations that we would search for bash into the search paths
     # of the request we are servicing.
@@ -544,13 +551,17 @@ async def find_binary(request: BinaryPathRequest, env_target: EnvironmentTarget,
         CreateDigest([FileContent(script_path, script_content.encode(), is_executable=True)]),
     )
 
+    # TODO: This should support more granular search paths
+    def search_path_for_binary(binary_name: str) -> SearchPath:
+        return SearchPath(system_binaries._default_search_path)
+
     # Some subtle notes about executing this script:
     #
     #  - We run the script with `ProcessResult` instead of `FallibleProcessResult` so that we
     #      can catch bugs in the script itself, given an earlier silent failure.
     search_path = create_path_env_var(
-        request.search_path if request.search_path
-            else system_binaries.search_path_for_binary(request.binary_name))
+        request.search_path if request.search_path else search_path_for_binary(request.binary_name)
+    )
     result = await Get(
         ProcessResult,
         Process(
@@ -672,9 +683,7 @@ async def find_python(python_bootstrap: PythonBootstrap) -> PythonBinary:
 
 @rule(desc="Finding the `zip` binary", level=LogLevel.DEBUG)
 async def find_zip() -> ZipBinary:
-    request = BinaryPathRequest(
-        binary_name="zip", test=BinaryPathTest(args=["-v"])
-    )
+    request = BinaryPathRequest(binary_name="zip", test=BinaryPathTest(args=["-v"]))
     paths = await Get(BinaryPaths, BinaryPathRequest, request)
     first_path = paths.first_path_or_raise(request, rationale="create `.zip` archives")
     return ZipBinary(first_path.path, first_path.fingerprint)
@@ -682,9 +691,7 @@ async def find_zip() -> ZipBinary:
 
 @rule(desc="Finding the `unzip` binary", level=LogLevel.DEBUG)
 async def find_unzip() -> UnzipBinary:
-    request = BinaryPathRequest(
-        binary_name="unzip", test=BinaryPathTest(args=["-v"])
-    )
+    request = BinaryPathRequest(binary_name="unzip", test=BinaryPathTest(args=["-v"]))
     paths = await Get(BinaryPaths, BinaryPathRequest, request)
     first_path = paths.first_path_or_raise(
         request, rationale="download the tools Pants needs to run"
@@ -699,9 +706,7 @@ def find_gunzip(python: PythonBinary) -> GunzipBinary:
 
 @rule(desc="Finding the `tar` binary", level=LogLevel.DEBUG)
 async def find_tar(platform: Platform) -> TarBinary:
-    request = BinaryPathRequest(
-        binary_name="tar", test=BinaryPathTest(args=["--version"])
-    )
+    request = BinaryPathRequest(binary_name="tar", test=BinaryPathTest(args=["--version"]))
     paths = await Get(BinaryPaths, BinaryPathRequest, request)
     first_path = paths.first_path_or_raise(
         request, rationale="download the tools Pants needs to run"

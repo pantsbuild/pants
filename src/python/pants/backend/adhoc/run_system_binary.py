@@ -22,7 +22,7 @@ from pants.core.util_rules.adhoc_process_support import (
     ResolveExecutionDependenciesRequest,
 )
 from pants.core.util_rules.system_binaries import (
-    SEARCH_PATHS,
+    SEARCH_PATHS_GET_RID_OF_ME,
     BinaryPath,
     BinaryPathRequest,
     BinaryPaths,
@@ -64,7 +64,7 @@ async def _find_binary(
     fingerprint_dependencies: tuple[str, ...] | None,
 ) -> BinaryPath:
 
-    search_paths = tuple(extra_search_paths) + SEARCH_PATHS
+    search_paths = tuple(extra_search_paths) + SEARCH_PATHS_GET_RID_OF_ME
 
     binaries = await Get(
         BinaryPaths,
