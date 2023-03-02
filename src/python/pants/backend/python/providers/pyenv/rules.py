@@ -34,11 +34,6 @@ class PyenvSubsystem(TemplatedExternalTool):
     default_version = "2.3.13"
     default_url_template = "https://github.com/pyenv/pyenv/archive/refs/tags/v{version}.tar.gz"
 
-    python_configure_opts = StrListOption(
-        help="Flags to use when configuring CPython.",
-        advanced=True,
-    )
-
     @classproperty
     def default_known_versions(cls):
         return [
@@ -122,7 +117,7 @@ async def get_python(
                             TMPLOCK=$(mktemp -p $DEST DONE.lock.XXXX)
                             if ln $TMPLOCK $LOCKFILE 2>/dev/null ; then
                                 trap 'rm -f $LOCKFILE' EXIT
-                                export PYENV_ROOT=.pyenv
+                                export PYENV_ROOT={PYENV_NAMED_CACHE}
                                 {pyenv.exe} install {specific_python}
                                 # Removing write perms helps ensure users aren't accidentally modifying Python
                                 # or the site-packages
@@ -142,6 +137,7 @@ async def get_python(
             ]
         ),
     )
+
     digest = await Get(Digest, MergeDigests([shim_digest, pyenv.digest]))
 
     # NB: We don't cache this process at any level for two reasons:
@@ -165,7 +161,6 @@ async def get_python(
                 "PATH": env_vars.get("PATH", ""),
                 "TMPDIR": "{chroot}/tmpdir",
                 "LDFLAGS": env_vars.get("LDFLAGS", ""),
-                "PYTHON_CONFIGURE_OPTS": " ".join(pyenv_subsystem.python_configure_opts),
             },
             # Don't cache, we want this to always be run so that we can assume for the rest of the
             # session the named_cache destination for this Python is valid, as the Python ecosystem
