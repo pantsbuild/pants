@@ -332,7 +332,7 @@ You may need to set additional environment variables with `[docker].env_vars`.
 > It can help to simulate a hermetic environment by using `env -i`. With credential helpers, it also helps to directly invoke the helper without Docker and Pants. For example, you can symlink the tools you think you need into a directory like `/some/isolated/directory`, then run the below:
 > 
 > ```
-> ❯ echo europe-north1-docker.pkg.dev | env -i PATH=/some/isolated/directory docker-credential-gcloud get
+> ❯ echo europe-north1-docker.pkg.dev | env -i PATH=/some/isolated/directory docker-credential-gcr get
 > {
 >   "Secret": "ya29.A0ARrdaM-...-ZhScVscwTVtQ",
 >   "Username": "_dcgcloud_token"
