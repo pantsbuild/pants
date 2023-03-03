@@ -69,7 +69,7 @@ class PyenvSubsystem(TemplatedExternalTool):
 
             sudo rm -rf <named_caches_dir>/pyenv/versions/<specific_version>
             # env vars from https://github.com/pyenv/pyenv/blob/master/plugins/python-build/README.md#building-for-maximum-performance
-            PYTHON_CONFIGURE_OPTS='--enable-optimizations --with-lto' {bin_name()} run :pyenv-install -- 3.10
+            PYTHON_CONFIGURE_OPTS='--enable-optimizations --with-lto' {bin_name()} run :pants-pyenv-install -- 3.10
         """
     )
 
@@ -316,12 +316,14 @@ async def run_pyenv_install(
     digest = await Get(Digest, MergeDigests([run_request.digest, wrapper_script_digest]))
     return dataclasses.replace(
         run_request,
-        args=["{chroot}/run_install_python_shim.sh"],
+        args=("{chroot}/run_install_python_shim.sh",),
         digest=digest,
-        extra_env={
-            "CHROOT": "{chroot}",
-            **run_request.extra_env,
-        },
+        extra_env=FrozenDict(
+            {
+                "CHROOT": "{chroot}",
+                **run_request.extra_env,
+            }
+        ),
     )
 
 
