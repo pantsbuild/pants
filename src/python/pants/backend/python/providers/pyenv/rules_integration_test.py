@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import shutil
 from textwrap import dedent
-from pants.backend.python.providers.pyenv.target_types import PyenvInstall
 
 import pytest
 
@@ -14,6 +13,7 @@ from pants.backend.python.dependency_inference import rules as dependency_infere
 from pants.backend.python.goals.run_python_source import PythonSourceFieldSet
 from pants.backend.python.goals.run_python_source import rules as run_rules
 from pants.backend.python.providers.pyenv.rules import rules as pyenv_rules
+from pants.backend.python.providers.pyenv.target_types import PyenvInstall
 from pants.backend.python.target_types import PythonSourcesGeneratorTarget
 from pants.build_graph.address import Address
 from pants.core.goals.run import RunRequest
