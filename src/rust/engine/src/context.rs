@@ -433,7 +433,6 @@ impl Core {
               err
             )
           })?;
-        // TODO: Use the once_cell::Lazy here
         let pem_re = Regex::new(PEM_RE_STR).unwrap();
         let certs_res: Result<Vec<reqwest::Certificate>, _> = pem_re
           .find_iter(&content)
