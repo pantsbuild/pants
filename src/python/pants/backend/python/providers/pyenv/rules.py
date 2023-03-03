@@ -270,7 +270,7 @@ class SyntheticPyenvTargetsRequest(SyntheticTargetsRequest):
 @rule
 async def make_synthetic_targets(request: SyntheticPyenvTargetsRequest) -> SyntheticAddressMaps:
     return SyntheticAddressMaps.for_targets_request(
-        request, [("BUILD.pyenv", (TargetAdaptor("_pyenv_install", "pyenv-install"),))]
+        request, [("BUILD.pyenv", (TargetAdaptor("_pyenv_install", "pants-pyenv-install"),))]
     )
 
 
