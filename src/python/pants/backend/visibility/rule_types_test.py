@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import logging
+import os.path
 import re
 from pathlib import PurePath
 from textwrap import dedent
@@ -127,7 +128,7 @@ def test_flatten(expected, xs) -> None:
 
 
 @pytest.mark.parametrize(
-    "expected, rule, path, relpath",
+    "expected, spec, path, relpath",
     [
         (True, "src/a", "src/a", ""),
         (True, "?src/a", "src/a", ""),
@@ -153,10 +154,18 @@ def test_flatten(expected, xs) -> None:
         (True, "my_file.ext", "path/my_file.ext", ""),
         (False, "my_file.ext", "not_my_file.ext", ""),
         (True, "*my_file.ext", "path/some_of_my_file.ext", ""),
+        (True, ":tgt-*", "where/ever/it/is.from", "no/matter/how/far"),
+        (True, "<target>", "src/a", ""),
+        (False, "<target>[src/b]", "src/a", ""),
+        (False, "<file>", "src/a", ""),
     ],
 )
-def test_visibility_rule(expected: bool, rule: str, path: str, relpath: str) -> None:
-    assert parse_rule(rule).match(path, relpath) == expected
+def test_visibility_rule(expected: bool, spec: str, path: str, relpath: str) -> None:
+    rule = parse_rule(spec)
+    address = Address(
+        os.path.dirname(path), relative_file_path=os.path.basename(path), target_name="tgt-name"
+    )
+    assert expected == rule.match(address, TargetAdaptor("target", None), relpath)
 
 
 @pytest.mark.parametrize(
@@ -165,15 +174,15 @@ def test_visibility_rule(expected: bool, rule: str, path: str, relpath: str) -> 
         (
             VisibilityRuleSet(
                 "test/path/BUILD",
-                (TargetGlob.parse("target", ""),),
+                (TargetGlob.parse("<target>", ""),),
                 (parse_rule("src/*"),),
             ),
-            ("target", "src/*"),
+            ("<target>", "src/*"),
         ),
         (
             VisibilityRuleSet(
                 "test/path/BUILD",
-                (TargetGlob.parse("files", ""), TargetGlob.parse("resources", "")),
+                (TargetGlob.parse("<files>", ""), TargetGlob.parse("<resources>", "")),
                 (
                     parse_rule(
                         "src/*",
@@ -182,7 +191,18 @@ def test_visibility_rule(expected: bool, rule: str, path: str, relpath: str) -> 
                     parse_rule("!*"),
                 ),
             ),
-            (("files", "resources"), "src/*", "res/*", "!*"),
+            (("<files>", "<resources>"), "src/*", "res/*", "!*"),
+        ),
+        (
+            VisibilityRuleSet(
+                build_file="test/path/BUILD",
+                selectors=(TargetGlob.parse("<target>", ""),),
+                rules=(
+                    parse_rule("src/*"),
+                    parse_rule("src/a:lib"),
+                ),
+            ),
+            ("<target>", "src/*", "src/a:lib"),
         ),
     ],
 )
@@ -197,33 +217,39 @@ def test_visibility_rule_set_parse(expected: VisibilityRuleSet, arg: Any) -> Non
         (
             True,
             "python_sources",
-            ("<python_*>", ""),
+            ("<python_*>", "*"),
         ),
         (
             False,
             "shell_sources",
-            ("<python_*>", ""),
+            ("<python_*>", "*"),
         ),
         (
             True,
             "files",
-            (("<files>", "<resources>"), ""),
+            (("<files>", "<resources>"), "*"),
         ),
         (
             True,
             "resources",
-            (("<files>", "<resources>"), ""),
+            (("<files>", "<resources>"), "*"),
         ),
         (
             False,
             "resource",
-            (("<files>", "<resources>"), ""),
+            (("<files>", "<resources>"), "*"),
+        ),
+        (
+            True,
+            "target",
+            (":tgt-name", "*"),
         ),
     ],
 )
 def test_visibility_rule_set_match(expected: bool, target: str, rule_spec: tuple) -> None:
-    assert expected == parse_ruleset(rule_spec, "").match(
-        Address(""), TargetAdaptor(target, None), ""
+    ruleset = parse_ruleset(rule_spec, "")
+    assert expected == ruleset.match(
+        Address("", target_name="tgt-name"), TargetAdaptor(target, None), ""
     )
 
 

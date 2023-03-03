@@ -3,22 +3,31 @@
 from __future__ import annotations
 
 import dataclasses
-import itertools
 import logging
 import os
 import shlex
 from dataclasses import dataclass
-from typing import Union
+from textwrap import dedent  # noqa: PNT20
+from typing import Iterable, Mapping, TypeVar, Union
 
 from pants.base.deprecated import warn_or_error
 from pants.build_graph.address import Address
 from pants.core.goals.package import BuiltPackage, EnvironmentAwarePackageRequest, PackageFieldSet
+from pants.core.goals.run import RunFieldSet, RunInSandboxRequest
 from pants.core.target_types import FileSourceField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.core.util_rules.system_binaries import BashBinary
 from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
-from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, Directory, MergeDigests, Snapshot
+from pants.engine.fs import (
+    EMPTY_DIGEST,
+    CreateDigest,
+    Digest,
+    Directory,
+    FileContent,
+    MergeDigests,
+    Snapshot,
+)
 from pants.engine.internals.native_engine import RemovePrefix
 from pants.engine.process import FallibleProcessResult, Process, ProcessResult, ProductDescription
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
@@ -26,6 +35,7 @@ from pants.engine.target import (
     FieldSetsPerTarget,
     FieldSetsPerTargetRequest,
     SourcesField,
+    Targets,
     TransitiveTargets,
     TransitiveTargetsRequest,
 )
@@ -64,43 +74,218 @@ class ResolveExecutionDependenciesRequest:
     address: Address
     execution_dependencies: tuple[str, ...] | None
     dependencies: tuple[str, ...] | None  # can go away after 2.17.0.dev0 per deprecation
+    runnable_dependencies: tuple[str, ...] | None
 
 
 @dataclass(frozen=True)
 class ResolvedExecutionDependencies:
     digest: Digest
+    runnable_dependencies: RunnableDependencies | None
+
+
+@dataclass(frozen=True)
+class RunnableDependencies:
+    path_component: str
+    immutable_input_digests: Mapping[str, Digest]
+    append_only_caches: Mapping[str, str]
+    extra_env: Mapping[str, str]
+
+
+#
+# Things that need a home
+#
+
+
+@dataclass(frozen=True)
+class ExtraSandboxContents:
+    digest: Digest
+    path: str | None
+    immutable_input_digests: Mapping[str, Digest]
+    append_only_caches: Mapping[str, str]
+    extra_env: Mapping[str, str]
+
+
+@dataclass(frozen=True)
+class MergeExtraSandboxContents:
+    additions: tuple[ExtraSandboxContents, ...]
+
+
+@dataclass(frozen=True)
+class AddExtraSandboxContentsToProcess:
+    process: Process
+    contents: ExtraSandboxContents
+
+
+@rule
+async def merge_extra_sandbox_contents(request: MergeExtraSandboxContents) -> ExtraSandboxContents:
+    additions = request.additions
+
+    digests = []
+    paths = []
+    immutable_input_digests: dict[str, Digest] = {}
+    append_only_caches: dict[str, str] = {}
+    extra_env: dict[str, str] = {}
+
+    for addition in additions:
+        digests.append(addition.digest)
+        if addition.path is not None:
+            paths.append(addition.path)
+        _safe_update(immutable_input_digests, addition.immutable_input_digests)
+        _safe_update(append_only_caches, addition.append_only_caches)
+        _safe_update(extra_env, addition.extra_env)
+
+    digest = await Get(Digest, MergeDigests(digests))
+    path = ":".join(paths) if paths else None
+
+    return ExtraSandboxContents(
+        digest,
+        path,
+        FrozenDict(immutable_input_digests),
+        FrozenDict(append_only_caches),
+        FrozenDict(extra_env),
+    )
+
+
+@rule
+async def add_extra_contents_to_prcess(request: AddExtraSandboxContentsToProcess) -> Process:
+
+    proc = request.process
+    extras = request.contents
+    new_digest = await Get(
+        Digest, MergeDigests((request.process.input_digest, request.contents.digest))
+    )
+    immutable_input_digests = dict(proc.immutable_input_digests)
+    append_only_caches = dict(proc.append_only_caches)
+    env = dict(proc.env)
+
+    _safe_update(immutable_input_digests, extras.immutable_input_digests)
+    _safe_update(append_only_caches, extras.append_only_caches)
+    _safe_update(env, extras.extra_env)
+    # need to do `PATH` after `env` in case `extra_env` contains a `PATH`.
+    if extras.path:
+        env["PATH"] = extras.path + (":" + env["PATH"]) if "PATH" in env else ""
+
+    return dataclasses.replace(
+        proc,
+        input_digest=new_digest,
+        immutable_input_digests=FrozenDict(immutable_input_digests),
+        append_only_caches=FrozenDict(append_only_caches),
+        env=FrozenDict(env),
+    )
+
+
+#
+# END THINGS THAT NEED A HOME
+#
+
+
+async def _resolve_runnable_dependencies(
+    bash: BashBinary, deps: tuple[str, ...] | None, owning: Address, origin: str
+) -> tuple[Digest, RunnableDependencies | None]:
+
+    if not deps:
+        return EMPTY_DIGEST, None
+
+    addresses = await Get(
+        Addresses,
+        UnparsedAddressInputs(
+            (dep for dep in deps),
+            owning_address=owning,
+            description_of_origin=origin,
+        ),
+    )
+
+    targets = await Get(Targets, Addresses, addresses)
+
+    fspt = await Get(
+        FieldSetsPerTarget,
+        FieldSetsPerTargetRequest(RunFieldSet, targets),
+    )
+
+    for address, field_set in zip(addresses, fspt.collection):
+        if not field_set:
+            raise ValueError(
+                dedent(
+                    f"""\
+                    Address `{address.spec}` was specified as a runnable dependency, but is not
+                    runnable.
+                    """
+                )
+            )
+
+    runnables = await MultiGet(
+        Get(RunInSandboxRequest, RunFieldSet, field_set[0]) for field_set in fspt.collection
+    )
+
+    shims: list[FileContent] = []
+    extras: list[ExtraSandboxContents] = []
+
+    for address, runnable in zip(addresses, runnables):
+        extras.append(
+            ExtraSandboxContents(
+                digest=runnable.digest,
+                path=None,
+                immutable_input_digests=FrozenDict(runnable.immutable_input_digests or {}),
+                append_only_caches=FrozenDict(runnable.append_only_caches or {}),
+                extra_env=FrozenDict(),
+            )
+        )
+        shims.append(
+            FileContent(
+                address.target_name,
+                _runnable_dependency_shim(bash.path, runnable.args, runnable.extra_env),
+                is_executable=True,
+            )
+        )
+
+    merged_extras, shim_digest = await MultiGet(
+        Get(ExtraSandboxContents, MergeExtraSandboxContents(tuple(extras))),
+        Get(Digest, CreateDigest(shims)),
+    )
+
+    shim_digest_path = f"_runnable_dependency_shims_{shim_digest.fingerprint}"
+    immutable_input_digests = {shim_digest_path: shim_digest}
+    _safe_update(immutable_input_digests, merged_extras.immutable_input_digests)
+
+    return (
+        merged_extras.digest,
+        RunnableDependencies(
+            shim_digest_path,
+            FrozenDict(immutable_input_digests),
+            merged_extras.append_only_caches,
+            FrozenDict({"_PANTS_SHIM_ROOT": "{chroot}"}),
+        ),
+    )
 
 
 @rule
 async def resolve_execution_environment(
     request: ResolveExecutionDependenciesRequest,
+    bash: BashBinary,
 ) -> ResolvedExecutionDependencies:
 
     target_address = request.address
     raw_execution_dependencies = request.execution_dependencies
     raw_regular_dependencies = request.dependencies
 
-    execution_dependencies_defined = raw_execution_dependencies is not None
-
     any_dependencies_defined = raw_regular_dependencies is not None
 
-    # If we're specifying the `dependencies` as relevant to the execution environment, then include
-    # this command as a root for the transitive dependency search for execution dependencies.
-    maybe_this_target = (target_address,) if not execution_dependencies_defined else ()
-
     # Always include the execution dependencies that were specified
-    if execution_dependencies_defined:
+    if raw_execution_dependencies is not None:
         _descr = f"the `execution_dependencies` from the target {target_address}"
         execution_dependencies = await Get(
             Addresses,
             UnparsedAddressInputs(
-                raw_execution_dependencies or (),
+                raw_execution_dependencies,
                 owning_address=target_address,
                 description_of_origin=_descr,
             ),
         )
     elif any_dependencies_defined:
-        execution_dependencies = Addresses()
+        # If we're specifying the `dependencies` as relevant to the execution environment, then
+        # include this command as a root for the transitive dependency search for execution
+        # dependencies.
+        execution_dependencies = Addresses((target_address,))
         warn_or_error(
             "2.17.0.dev0",
             "Using `dependencies` to specify execution-time dependencies for `shell_command` ",
@@ -112,11 +297,11 @@ async def resolve_execution_environment(
             print_warning=True,
         )
     else:
-        execution_dependencies = Addresses()
+        execution_dependencies = Addresses((target_address,))
 
     transitive = await Get(
         TransitiveTargets,
-        TransitiveTargetsRequest(itertools.chain(maybe_this_target, execution_dependencies)),
+        TransitiveTargetsRequest(execution_dependencies),
     )
 
     all_dependencies = (
@@ -144,11 +329,56 @@ async def resolve_execution_environment(
         for field_set in pkgs_per_target.field_sets
     )
 
-    dependencies_digest = await Get(
-        Digest, MergeDigests([sources.snapshot.digest, *(pkg.digest for pkg in packages)])
+    _descr = f"the `runnable_dependencies` from the target {target_address}"
+    runnables_digest, runnable_dependencies = await _resolve_runnable_dependencies(
+        bash, request.runnable_dependencies, target_address, _descr
     )
 
-    return ResolvedExecutionDependencies(dependencies_digest)
+    dependencies_digest = await Get(
+        Digest,
+        MergeDigests(
+            [sources.snapshot.digest, runnables_digest, *(pkg.digest for pkg in packages)]
+        ),
+    )
+
+    return ResolvedExecutionDependencies(dependencies_digest, runnable_dependencies)
+
+
+K = TypeVar("K")
+V = TypeVar("V")
+
+
+def _safe_update(d1: dict[K, V], d2: Mapping[K, V]) -> dict[K, V]:
+    """Updates `d1` with the values from `d2`, raising an exception if a key exists in both
+    dictionaries, but with a different value."""
+
+    for k, v in d2.items():
+        if k in d1 and d1[k] != v:
+            raise ValueError(f"Key {k} was specified in both dictionaries with different values.")
+        d1[k] = v
+    return d1
+
+
+def _runnable_dependency_shim(
+    bash: str, args: Iterable[str], extra_env: Mapping[str, str]
+) -> bytes:
+    """The binary shim script to be placed in the output directory for the digest."""
+
+    def _quote(s: str) -> str:
+        quoted = shlex.quote(s)
+        return quoted.replace("{chroot}", "'${_PANTS_SHIM_ROOT}'")
+
+    binary = " ".join(_quote(arg) for arg in args)
+    env_str = "\n".join(
+        f"export {shlex.quote(key)}={_quote(value)}" for (key, value) in extra_env.items()
+    )
+    return dedent(
+        f"""\
+        #!{bash}
+        {env_str}
+        exec {binary} "$@"
+        """
+    ).encode()
 
 
 @rule
