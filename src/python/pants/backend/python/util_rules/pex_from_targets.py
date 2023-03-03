@@ -36,6 +36,7 @@ from pants.backend.python.util_rules.pex_requirements import (
     LoadedLockfileRequest,
     Lockfile,
     PexRequirements,
+    Resolve,
 )
 from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
@@ -427,8 +428,7 @@ async def _determine_requirements_for_pex_from_targets(
         chosen_resolve = await Get(
             ChosenPythonResolve, ChosenPythonResolveRequest(request.addresses)
         )
-        loaded_lockfile = await Get(LoadedLockfile, LoadedLockfileRequest(chosen_resolve.lockfile))
-        return dataclasses.replace(requirements, from_superset=loaded_lockfile)
+        return dataclasses.replace(requirements, from_superset=Resolve(chosen_resolve.name))
 
     # Else, request the repository PEX and possibly subset it.
     repository_pex_request = await Get(
