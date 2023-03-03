@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import shutil
 from textwrap import dedent
+from pants.backend.python.providers.pyenv.target_types import PyenvInstall
 
 import pytest
 
@@ -34,6 +35,7 @@ def rule_runner() -> RuleRunner:
         ],
         target_types=[
             PythonSourcesGeneratorTarget,
+            PyenvInstall,
         ],
     )
 
