@@ -801,7 +801,7 @@ def test_build_pex_description() -> None:
             requirements=requirements,
             description=description,
         )
-        assert _build_pex_description(request) == expected
+        assert _build_pex_description(request, {}) == expected
 
     repo_pex = Pex(EMPTY_DIGEST, "repo.pex", None)
 

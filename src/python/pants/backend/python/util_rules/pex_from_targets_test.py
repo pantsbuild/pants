@@ -47,7 +47,9 @@ from pants.backend.python.util_rules.pex_requirements import (
     EntireLockfile,
     LoadedLockfile,
     LoadedLockfileRequest,
+    Lockfile,
     PexRequirements,
+    Resolve,
 )
 from pants.backend.python.util_rules.pex_test_utils import get_all_data
 from pants.build_graph.address import Address
@@ -164,8 +166,14 @@ def test_determine_requirements_for_pex_from_targets() -> None:
     req_strings = ["req1", "req2"]
     global_requirement_constraints = ["constraint1", "constraint2"]
 
+    resolve__pex = Resolve("pex")
     loaded_lockfile__pex = Mock(is_pex_native=True, as_constraints_strings=None)
+    chosen_resolve__pex = Mock(lockfile=Mock())
+    chosen_resolve__pex.name = "pex"  # name has special meaning in Mock(), so must set it here.
+    resolve__not_pex = Resolve("not_pex")
     loaded_lockfile__not_pex = Mock(is_pex_native=False, as_constraints_strings=req_strings)
+    chosen_resolve__not_pex = Mock(lockfile=Mock())
+    chosen_resolve__not_pex.name = "not_pex"  # ditto.
 
     repository_pex_request__lockfile = Mock()
     repository_pex_request__constraints = Mock()
@@ -236,7 +244,18 @@ def test_determine_requirements_for_pex_from_targets() -> None:
                 MockGet(
                     output_type=ChosenPythonResolve,
                     input_types=(ChosenPythonResolveRequest,),
-                    mock=lambda _: Mock(lockfile=Mock()),
+                    mock=lambda _: (
+                        chosen_resolve__pex
+                        if _mode == RequirementMode.PEX_LOCKFILE
+                        else chosen_resolve__not_pex
+                    ),
+                ),
+                MockGet(
+                    output_type=Lockfile,
+                    input_types=(Resolve,),
+                    mock=lambda _: (
+                        resolve__pex if _mode == RequirementMode.PEX_LOCKFILE else resolve__not_pex
+                    ),
                 ),
                 MockGet(
                     output_type=LoadedLockfile,
@@ -272,7 +291,7 @@ def test_determine_requirements_for_pex_from_targets() -> None:
             expected=PexRequirements(),
         )
 
-    # Pex lockfiles: usually, return PexRequirements with from_superset as the LoadedLockfile.
+    # Pex lockfiles: usually, return PexRequirements with from_superset as the resolve.
     #   Except for when run_against_entire_lockfile is set and it's an internal_only Pex, then
     #   return PexRequest.
     for internal_only in (True, False):
@@ -280,13 +299,13 @@ def test_determine_requirements_for_pex_from_targets() -> None:
             RequirementMode.PEX_LOCKFILE,
             _internal_only=internal_only,
             _platforms=False,
-            expected=PexRequirements(req_strings, from_superset=loaded_lockfile__pex),
+            expected=PexRequirements(req_strings, from_superset=resolve__pex),
         )
     assert_setup(
         RequirementMode.PEX_LOCKFILE,
         _internal_only=False,
         _platforms=True,
-        expected=PexRequirements(req_strings, from_superset=loaded_lockfile__pex),
+        expected=PexRequirements(req_strings, from_superset=resolve__pex),
     )
     for platforms in (True, False):
         assert_setup(
@@ -294,7 +313,7 @@ def test_determine_requirements_for_pex_from_targets() -> None:
             _internal_only=False,
             run_against_entire_lockfile=True,
             _platforms=platforms,
-            expected=PexRequirements(req_strings, from_superset=loaded_lockfile__pex),
+            expected=PexRequirements(req_strings, from_superset=resolve__pex),
         )
     assert_setup(
         RequirementMode.PEX_LOCKFILE,
@@ -822,6 +841,8 @@ def test_lockfile_requirements_selection(
         # NB: It doesn't matter what the lockfile generator is set to: only what is actually on disk.
         options = [
             "--python-enable-resolves",
+            "--python-default-resolve=myresolve",
+            "--python-resolves={'myresolve':'3rdparty/python/default.lock'}",
         ]
 
     if run_against_entire_lockfile:
@@ -855,5 +876,5 @@ def test_lockfile_requirements_selection(
             assert not get_all_data(rule_runner, result.requirements.from_superset).is_zipapp
         else:
             assert mode == ResolveMode.pex
-            assert isinstance(result.requirements.from_superset, LoadedLockfile)
-            assert result.requirements.from_superset.is_pex_native
+            assert isinstance(result.requirements.from_superset, Resolve)
+            assert result.requirements.from_superset.name == "myresolve"

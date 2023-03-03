@@ -48,11 +48,31 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
+class Resolve:
+    # A named resolve for a "user lockfile".
+    # Soon to be the only kind of lockfile, as this class will help
+    # get rid of the "tool lockfile" concept.
+    name: str
+
+
+@dataclass(frozen=True)
 class Lockfile:
     url: str
     url_description_of_origin: str
     resolve_name: str
     lockfile_hex_digest: str | None = None
+
+
+@rule
+async def get_lockfile_for_resolve(resolve: Resolve, python_setup: PythonSetup) -> Lockfile:
+    lockfile_path = python_setup.resolves.get(resolve.name)
+    if not lockfile_path:
+        raise ValueError(f"No such resolve: {resolve.name}")
+    return Lockfile(
+        url=lockfile_path,
+        url_description_of_origin=f"the resolve `{resolve.name}`",
+        resolve_name=resolve.name,
+    )
 
 
 @dataclass(frozen=True)
@@ -258,14 +278,15 @@ class PexRequirements:
     # If these requirements should be resolved as a subset of either a repository PEX, or a
     # PEX-native lockfile, the superset to use. # NB: Use of a lockfile here asserts that the
     # lockfile is PEX-native, because legacy lockfiles do not support subset resolves.
-    from_superset: Pex | LoadedLockfile | None
+    # TODO: Once we've fully phased out "tool lockfiles", we can remove the LoadedLockfile option.
+    from_superset: Pex | LoadedLockfile | Resolve | None
 
     def __init__(
         self,
         req_strings: Iterable[str] = (),
         *,
         constraints_strings: Iterable[str] = (),
-        from_superset: Pex | LoadedLockfile | None = None,
+        from_superset: Pex | LoadedLockfile | Resolve | None = None,
     ) -> None:
         """
         :param req_strings: The requirement strings to resolve.
