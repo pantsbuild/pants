@@ -132,8 +132,12 @@ class RemotePantsRunner:
     ) -> ExitCode:
         global_options = self._bootstrap_options.for_global_scope()
 
-        # Merge the nailgun TTY capability environment variables with the passed environment dict.
-        ng_env = ttynames_to_env(sys.stdin, sys.stdout, sys.stderr)
+        try:
+            # Merge the nailgun TTY capability environment variables with the passed environment dict.
+            ng_env = ttynames_to_env(sys.stdin, sys.stdout, sys.stderr)
+        except OSError as e:
+            logger.debug("Failed to execute ttynames_to_env:  %s", e)
+            ng_env = {}
         modified_env = {
             **self._env,
             **ng_env,
