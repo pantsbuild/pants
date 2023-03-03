@@ -278,15 +278,14 @@ class PexRequirements:
     # If these requirements should be resolved as a subset of either a repository PEX, or a
     # PEX-native lockfile, the superset to use. # NB: Use of a lockfile here asserts that the
     # lockfile is PEX-native, because legacy lockfiles do not support subset resolves.
-    # TODO: Once we've fully phased out "tool lockfiles", we can remove the LoadedLockfile option.
-    from_superset: Pex | LoadedLockfile | Resolve | None
+    from_superset: Pex | Resolve | None
 
     def __init__(
         self,
         req_strings: Iterable[str] = (),
         *,
         constraints_strings: Iterable[str] = (),
-        from_superset: Pex | LoadedLockfile | Resolve | None = None,
+        from_superset: Pex | Resolve | None = None,
     ) -> None:
         """
         :param req_strings: The requirement strings to resolve.
@@ -298,19 +297,6 @@ class PexRequirements:
             self, "constraints_strings", FrozenOrderedSet(sorted(constraints_strings))
         )
         object.__setattr__(self, "from_superset", from_superset)
-
-        self.__post_init__()
-
-    def __post_init__(self):
-        if isinstance(self.from_superset, LoadedLockfile) and not self.from_superset.is_pex_native:
-            raise ValueError(
-                softwrap(
-                    f"""
-                    The lockfile {self.from_superset.original_lockfile} was not in PEX's
-                    native format, and so cannot be directly used as a superset.
-                    """
-                )
-            )
 
     @classmethod
     def create_from_requirement_fields(

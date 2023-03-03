@@ -422,8 +422,6 @@ async def _setup_pex_requirements(
     resolve_name: str | None
     if isinstance(request.requirements, EntireLockfile):
         resolve_name = request.requirements.lockfile.resolve_name
-    elif isinstance(request.requirements.from_superset, LoadedLockfile):
-        resolve_name = request.requirements.from_superset.original_lockfile.resolve_name
     elif isinstance(request.requirements.from_superset, Resolve):
         resolve_name = request.requirements.from_superset.name
     else:
@@ -474,13 +472,9 @@ async def _setup_pex_requirements(
             concurrency_available,
         )
 
-    if request.requirements.from_superset is not None:
-        if isinstance(request.requirements.from_superset, LoadedLockfile):
-            loaded_lockfile = request.requirements.from_superset
-        else:
-            assert isinstance(request.requirements.from_superset, Resolve)
-            lockfile = await Get(Lockfile, Resolve, request.requirements.from_superset)
-            loaded_lockfile = await Get(LoadedLockfile, LoadedLockfileRequest(lockfile))
+    elif isinstance(request.requirements.from_superset, Resolve):
+        lockfile = await Get(Lockfile, Resolve, request.requirements.from_superset)
+        loaded_lockfile = await Get(LoadedLockfile, LoadedLockfileRequest(lockfile))
 
         # NB: This is also validated in the constructor.
         assert loaded_lockfile.is_pex_native
@@ -619,7 +613,7 @@ async def build_pex(
     )
 
 
-def _build_pex_description(request: PexRequest, resolve_to_lockfile: dict[str, str]) -> str:
+def _build_pex_description(request: PexRequest, resolve_to_lockfile: Mapping[str, str]) -> str:
     if request.description:
         return request.description
 
@@ -638,15 +632,11 @@ def _build_pex_description(request: PexRequest, resolve_to_lockfile: dict[str, s
                 {', '.join(request.requirements.req_strings)}
                 """
             )
-        elif request.requirements.from_superset is not None:
-            if isinstance(request.requirements.from_superset, LoadedLockfile):
-                lockfile_path = request.requirements.from_superset.lockfile_path
-            else:
-                assert isinstance(request.requirements.from_superset, Resolve)
-                # At this point we know this is a valid user resolve, so we can assume
-                # it's available in the dict. Nonetheless we use get() so that any weird error
-                # here gives a bad message rather than an outright crash.
-                lockfile_path = resolve_to_lockfile.get(request.requirements.from_superset.name, "")
+        elif isinstance(request.requirements.from_superset, Resolve):
+            # At this point we know this is a valid user resolve, so we can assume
+            # it's available in the dict. Nonetheless we use get() so that any weird error
+            # here gives a bad message rather than an outright crash.
+            lockfile_path = resolve_to_lockfile.get(request.requirements.from_superset.name, "")
             return softwrap(
                 f"""
                 Building {pluralize(len(request.requirements.req_strings), 'requirement')}
