@@ -48,6 +48,7 @@ from pants.backend.python.util_rules.pex_requirements import (
     LoadedLockfileRequest,
     Lockfile,
     PexRequirements,
+    Resolve,
     ResolvePexConfig,
     ResolvePexConfigRequest,
 )
@@ -710,6 +711,11 @@ def test_setup_pex_requirements() -> None:
             rule_args=[request, create_subsystem(PythonSetup)],
             mock_gets=[
                 MockGet(
+                    output_type=Lockfile,
+                    input_types=(Resolve,),
+                    mock=lambda _: lockfile_obj,
+                ),
+                MockGet(
                     output_type=LoadedLockfile,
                     input_types=(LoadedLockfileRequest,),
                     mock=lambda _: create_loaded_lockfile(is_pex_lock),
@@ -770,7 +776,7 @@ def test_setup_pex_requirements() -> None:
 
     # Subset of Pex lockfile.
     assert_setup(
-        PexRequirements(["req1"], from_superset=create_loaded_lockfile(is_pex_lock=True)),
+        PexRequirements(["req1"], from_superset=Resolve("resolve")),
         _BuildPexRequirementsSetup(
             [lockfile_digest], ["req1", "--lock", lockfile_path, *pex_args], 1
         ),
@@ -801,7 +807,7 @@ def test_build_pex_description() -> None:
             requirements=requirements,
             description=description,
         )
-        assert _build_pex_description(request) == expected
+        assert _build_pex_description(request, {}) == expected
 
     repo_pex = Pex(EMPTY_DIGEST, "repo.pex", None)
 
