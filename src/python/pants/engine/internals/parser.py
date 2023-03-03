@@ -82,7 +82,10 @@ class BuildFileSymbolInfo:
         if not callable(self.value):
             return None
         else:
-            return str(inspect.signature(self.value))
+            try:
+                return str(inspect.signature(self.value))
+            except ValueError:
+                return None
 
 
 class ParseError(Exception):
