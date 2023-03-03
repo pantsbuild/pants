@@ -8,18 +8,19 @@ import hashlib
 import logging
 import os
 import subprocess
+import sys
 from dataclasses import dataclass
 from enum import Enum
 from textwrap import dedent  # noqa: PNT20
 from typing import Iterable, Mapping, Sequence
 
 from pants.core.subsystems import python_bootstrap
-from pants.core.subsystems.python_bootstrap import PythonBootstrap
-from pants.core.util_rules.environments import EnvironmentTarget
+from pants.core.util_rules.environments import EnvironmentTarget, LocalEnvironmentTarget
+from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.engine.collection import DeduplicatedCollection
 from pants.engine.engine_aware import EngineAwareReturnType
-from pants.engine.fs import CreateDigest, FileContent
-from pants.engine.internals.native_engine import Digest
+from pants.engine.fs import CreateDigest, DownloadFile, FileContent
+from pants.engine.internals.native_engine import Digest, FileDigest
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.platform import Platform
 from pants.engine.process import FallibleProcessResult, Process, ProcessResult
@@ -251,15 +252,15 @@ class BashBinary(BinaryPath):
 class BashBinaryRequest:
     search_path: SearchPath = BashBinary.DEFAULT_SEARCH_PATH
 
+@dataclass(frozen=True)
+class PythonBuildStandaloneBinary:
+    """A Python interpreter for use by `@rule` code as an alternative to BashBinary scripts.
 
-class PythonBinary(BinaryPath):
-    """A Python3 interpreter for use by `@rule` code as an alternative to BashBinary scripts.
-
-    Python is usable for `@rule` scripting independently of `pants.backend.python`, but currently
-    thirdparty dependencies are not supported, because PEX lives in that backend.
-
-    TODO: Consider extracting PEX out into the core in order to support thirdparty dependencies.
+    @TODO:...
     """
+
+    path: str
+    immutable_input_digests: FrozenDict[str, Digest] = FrozenDict({})
 
 
 # Note that updating this will impact the `archive` target defined in `core/target_types.py`.
@@ -287,7 +288,7 @@ class UnzipBinary(BinaryPath):
 
 @dataclass(frozen=True)
 class GunzipBinary:
-    python: PythonBinary
+    python_binary: PythonBuildStandaloneBinary
 
     def extract_archive_argv(self, archive_path: str, extract_path: str) -> tuple[str, ...]:
         archive_name = os.path.basename(archive_path)
@@ -302,7 +303,7 @@ class GunzipBinary:
                     shutil.copyfileobj(source, dest)
             """
         )
-        return (self.python.path, "-c", script)
+        return (self.python_binary.path, "-c", script)
 
 
 @dataclass(frozen=True)
@@ -583,78 +584,37 @@ async def find_binary(request: BinaryPathRequest, env_target: EnvironmentTarget)
     )
 
 
-@rule(desc="Finding a `python` binary", level=LogLevel.TRACE)
-async def find_python(python_bootstrap: PythonBootstrap) -> PythonBinary:
-    # PEX files are compatible with bootstrapping via Python 2.7 or Python 3.5+, but we select 3.6+
-    # for maximum compatibility with internal scripts.
-    interpreter_search_paths = python_bootstrap.interpreter_search_paths
-    all_python_binary_paths = await MultiGet(
-        Get(
-            BinaryPaths,
-            BinaryPathRequest(
-                search_path=interpreter_search_paths,
-                binary_name=binary_name,
-                check_file_entries=True,
-                test=BinaryPathTest(
-                    args=[
-                        "-c",
-                        # N.B.: The following code snippet must be compatible with Python 3.6+.
-                        #
-                        # We hash the underlying Python interpreter executable to ensure we detect
-                        # changes in the real interpreter that might otherwise be masked by Pyenv
-                        # shim scripts found on the search path. Naively, just printing out the full
-                        # version_info would be enough, but that does not account for supported abi
-                        # changes (e.g.: a pyenv switch from a py27mu interpreter to a py27m
-                        # interpreter.)
-                        #
-                        # When hashing, we pick 8192 for efficiency of reads and fingerprint updates
-                        # (writes) since it's a common OS buffer size and an even multiple of the
-                        # hash block size.
-                        dedent(
-                            """\
-                            import sys
+@rule(desc="Finding or downloading Python for scripts", level=LogLevel.TRACE)
+async def download_python_build_standalone(platform: Platform, env_tgt: EnvironmentTarget) -> PythonBuildStandaloneBinary:
+    if isinstance(env_tgt.val, LocalEnvironmentTarget):
+        return PythonBuildStandaloneBinary(sys.executable)
 
-                            major, minor = sys.version_info[:2]
-                            if not (major == 3 and minor >= 6):
-                                sys.exit(1)
+    url_plat, fingerprint, bytelen = {
+        "linux_arm64": None,
+        "linux_x86_64": ("", "44254b934edc8a0d414f256775ee71e192785a6ffb8dd39aa81d9d232f46a741", 47148816),
+        "linux_x86_64": ("", "44254b934edc8a0d414f256775ee71e192785a6ffb8dd39aa81d9d232f46a741", 47148816),
 
-                            import hashlib
-                            hasher = hashlib.sha256()
-                            with open(sys.executable, "rb") as fp:
-                                for chunk in iter(lambda: fp.read(8192), b""):
-                                    hasher.update(chunk)
-                            sys.stdout.write(hasher.hexdigest())
-                            """
-                        ),
-                    ],
-                    fingerprint_stdout=False,  # We already emit a usable fingerprint to stdout.
-                ),
-            ),
-        )
-        for binary_name in python_bootstrap.interpreter_names
-    )
+        # No PGO release for aarch64 it seems...
+        "linux_arm64": ("aarch64-unknown-linux-gnu-lto", "3d20f40654e4356bd42c4e70ec28f4b8d8dd559884467a4e1745c08729fb740a", 106653301),
+        "linux_x86_64": ("x86_64-unknown-linux-gnu-pgo+lto", "c5f7ad956c8870573763ed58b59d7f145830a93378234b815c068c893c0d5c1e", 42148524),
+        "macos_arm64": ("aarch64-apple-darwin-pgo+lto", "2508b8d4b725bb45c3e03d2ddd2b8441f1a74677cb6bd6076e692c0923135ded", 33272226),
+        "macos_x86_64": ("x86_64-apple-darwin-pgo+lto", "1153b4d3b03cf1e1d8ec93c098160586f665fcc2d162c0812140a716a688df58", 32847401),
 
-    for binary_paths in all_python_binary_paths:
-        path = binary_paths.first_path
-        if path:
-            return PythonBinary(
-                path=path.path,
-                fingerprint=path.fingerprint,
+    }[platform]
+
+    python_build_standalone = await Get(DownloadedExternalTool, ExternalToolRequest(
+        DownloadFile(
+            f"https://github.com/indygreg/python-build-standalone/releases/download/20230116/cpython-3.10.9+20230116-{url_plat}-full.tar.zst",
+            FileDigest(
+                fingerprint=fingerprint,
+                serialized_bytes_length=bytelen,
             )
+        ),
+        exe="pyoxy"
+    ))
+    # @TODO: rename the exe to `python3.10`, and maybe copy the license?
 
-    raise BinaryNotFoundError(
-        # TODO(#7735): Update error message to mention local_environment.
-        softwrap(
-            f"""
-            Was not able to locate a Python interpreter to execute rule code.
-
-            Please ensure that Python is available in one of the locations identified by
-            `[python-bootstrap].search_path`, which currently expands to:
-
-            {interpreter_search_paths}
-        """
-        )
-    )
+    ...
 
 
 @rule(desc="Finding the `zip` binary", level=LogLevel.DEBUG)
@@ -680,8 +640,8 @@ async def find_unzip() -> UnzipBinary:
 
 
 @rule
-def find_gunzip(python: PythonBinary) -> GunzipBinary:
-    return GunzipBinary(python)
+def find_gunzip(pyoxy: PyOxyBinary) -> GunzipBinary:
+    return GunzipBinary(pyoxy)
 
 
 @rule(desc="Finding the `tar` binary", level=LogLevel.DEBUG)
