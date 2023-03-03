@@ -34,7 +34,7 @@ from pants.base import deprecated
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.core.util_rules.environments import option_field_name_for
 from pants.engine.goal import GoalSubsystem
-from pants.engine.internals.parser import BuildFileSymbolInfo, BuildFileSymbolsInfo
+from pants.engine.internals.parser import BuildFileSymbolInfo, BuildFileSymbolsInfo, Registrar
 from pants.engine.rules import Rule, TaskRule
 from pants.engine.target import Field, RegisteredTargetTypes, StringField, Target, TargetGenerator
 from pants.engine.unions import UnionMembership, UnionRule, is_union
@@ -402,6 +402,7 @@ class BackendHelpInfo:
 @dataclass(frozen=True)
 class BuildFileSymbolHelpInfo:
     name: str
+    is_target: bool
     signature: str | None
     documentation: str | None
 
@@ -890,15 +891,20 @@ class HelpInfoExtracter:
             }
         )
 
-    @classmethod
+    @staticmethod
     def get_build_file_info(
-        cls, build_symbols: BuildFileSymbolsInfo
+        build_symbols: BuildFileSymbolsInfo,
     ) -> LazyFrozenDict[str, BuildFileSymbolHelpInfo]:
         def get_build_file_symbol_help_info_loader(
             symbol: BuildFileSymbolInfo,
         ) -> Callable[[], BuildFileSymbolHelpInfo]:
             def load() -> BuildFileSymbolHelpInfo:
-                return BuildFileSymbolHelpInfo(symbol.name, symbol.signature, symbol.help)
+                return BuildFileSymbolHelpInfo(
+                    name=symbol.name,
+                    is_target=isinstance(symbol.value, Registrar),
+                    signature=symbol.signature,
+                    documentation=symbol.help,
+                )
 
             return load
 

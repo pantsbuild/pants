@@ -28,7 +28,7 @@ from pants.engine.unions import UnionMembership
 from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
 from pants.util.memo import memoized_property
-from pants.util.strutil import softwrap
+from pants.util.strutil import docstring, softwrap
 
 logger = logging.getLogger(__name__)
 T = TypeVar("T")
@@ -185,16 +185,18 @@ class ParseState(threading.local):
         return self._is_bootstrap
 
     def get_env(self, name: str, *args, **kwargs) -> Any:
-        """Reference environment variables."""
+        """Reference environment variable."""
         return self.env_vars.get(name, *args, **kwargs)
 
-    def set_defaults(
-        self, *args: SetDefaultsT, ignore_unknown_fields: bool = False, **kwargs
-    ) -> None:
+    @docstring(
         f"""Provide default field values.
 
         Learn more {doc_url("targets#field-default-values")}
         """
+    )
+    def set_defaults(
+        self, *args: SetDefaultsT, ignore_unknown_fields: bool = False, **kwargs
+    ) -> None:
         self.defaults.set_defaults(
             *args, ignore_unknown_fields=self.is_bootstrap or ignore_unknown_fields, **kwargs
         )
@@ -220,6 +222,68 @@ class RegistrarField:
     @property
     def default(self) -> ImmutableValue:
         return self._default()
+
+
+class Registrar:
+    def __init__(
+        self, parse_state: ParseState, type_alias: str, field_types: tuple[type[Field], ...]
+    ) -> None:
+        self._parse_state = parse_state
+        self._type_alias = type_alias
+        for field_type in field_types:
+            registrar_field = RegistrarField(field_type, self._field_default_factory(field_type))
+            setattr(self, field_type.alias, registrar_field)
+            if field_type.deprecated_alias:
+
+                def deprecated_field(self):
+                    # TODO(17720) Support fixing automatically with `build-file` deprecation
+                    # fixer.
+                    warn_or_error(
+                        removal_version=field_type.deprecated_alias_removal_version,
+                        entity=f"the field name {field_type.deprecated_alias}",
+                        hint=(
+                            f"Instead, use `{type_alias}.{field_type.alias}`, which "
+                            "behaves the same."
+                        ),
+                    )
+                    return registrar_field
+
+                setattr(self, field_type.deprecated_alias, property(deprecated_field))
+
+    def __str__(self) -> str:
+        """The BuildFileDefaultsParserState.set_defaults() rely on string inputs.
+
+        This allows the use of the BUILD file symbols for the target types to be used un- quoted for
+        the defaults dictionary.
+        """
+        return self._type_alias
+
+    def __call__(self, **kwargs: Any) -> TargetAdaptor:
+        # Target names default to the name of the directory their BUILD file is in
+        # (as long as it's not the root directory).
+        if "name" not in kwargs:
+            if not self._parse_state.filepath():
+                raise UnaddressableObjectError(
+                    "Targets in root-level BUILD files must be named explicitly."
+                )
+            kwargs["name"] = None
+
+        raw_values = dict(self._parse_state.defaults.get(self._type_alias))
+        raw_values.update(kwargs)
+        target_adaptor = TargetAdaptor(self._type_alias, **raw_values)
+        self._parse_state.add(target_adaptor)
+        return target_adaptor
+
+    def _field_default_factory(self, field_type: type[Field]) -> Callable[[], Any]:
+        def resolve_field_default() -> Any:
+            target_defaults = self._parse_state.defaults.get(self._type_alias)
+            if target_defaults:
+                for field_alias in (field_type.alias, field_type.deprecated_alias):
+                    if field_alias and field_alias in target_defaults:
+                        return target_defaults[field_alias]
+            return field_type.default
+
+        return resolve_field_default
 
 
 class Parser:
@@ -252,69 +316,14 @@ class Parser:
         # file parse with a reset of the ParseState for the calling thread.
         parse_state = ParseState()
 
-        class Registrar:
-            def __init__(self, type_alias: str) -> None:
-                self._type_alias = type_alias
-                for field_type in registered_target_types.aliases_to_types[
-                    type_alias
-                ].class_field_types(union_membership):
-                    registrar_field = RegistrarField(
-                        field_type, self._field_default_factory(field_type)
-                    )
-                    setattr(self, field_type.alias, registrar_field)
-                    if field_type.deprecated_alias:
+        def create_registrar_for_target(alias: str) -> tuple[str, Registrar]:
+            return alias, Registrar(
+                parse_state,
+                alias,
+                registered_target_types.aliases_to_types[alias].class_field_types(union_membership),
+            )
 
-                        def deprecated_field(self):
-                            # TODO(17720) Support fixing automatically with `build-file` deprecation
-                            # fixer.
-                            warn_or_error(
-                                removal_version=field_type.deprecated_alias_removal_version,
-                                entity=f"the field name {field_type.deprecated_alias}",
-                                hint=(
-                                    f"Instead, use `{type_alias}.{field_type.alias}`, which "
-                                    "behaves the same."
-                                ),
-                            )
-                            return registrar_field
-
-                        setattr(self, field_type.deprecated_alias, property(deprecated_field))
-
-            def __str__(self) -> str:
-                """The BuildFileDefaultsParserState.set_defaults() rely on string inputs.
-
-                This allows the use of the BUILD file symbols for the target types to be used un-
-                quoted for the defaults dictionary.
-                """
-                return self._type_alias
-
-            def __call__(self, **kwargs: Any) -> TargetAdaptor:
-                # Target names default to the name of the directory their BUILD file is in
-                # (as long as it's not the root directory).
-                if "name" not in kwargs:
-                    if not parse_state.filepath():
-                        raise UnaddressableObjectError(
-                            "Targets in root-level BUILD files must be named explicitly."
-                        )
-                    kwargs["name"] = None
-
-                raw_values = dict(parse_state.defaults.get(self._type_alias))
-                raw_values.update(kwargs)
-                target_adaptor = TargetAdaptor(self._type_alias, **raw_values)
-                parse_state.add(target_adaptor)
-                return target_adaptor
-
-            def _field_default_factory(self, field_type: type[Field]) -> Callable[[], Any]:
-                def resolve_field_default() -> Any:
-                    target_defaults = parse_state.defaults.get(self._type_alias)
-                    if target_defaults:
-                        for field_alias in (field_type.alias, field_type.deprecated_alias):
-                            if field_alias and field_alias in target_defaults:
-                                return target_defaults[field_alias]
-                    return field_type.default
-
-                return resolve_field_default
-
-        type_aliases = {alias: Registrar(alias) for alias in registered_target_types.aliases}
+        type_aliases = dict(map(create_registrar_for_target, registered_target_types.aliases))
         parse_context = ParseContext(
             build_root=build_root,
             type_aliases=type_aliases,

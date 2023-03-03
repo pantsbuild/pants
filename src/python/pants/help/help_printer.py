@@ -123,6 +123,9 @@ class HelpPrinter(MaybeColor):
                 self._all_help_info.name_to_target_type_info.keys(), self._print_target_help
             ),
             **_help_table(
+                self._all_help_info.name_to_build_file_info.keys(), self._print_symbol_help
+            ),
+            **_help_table(
                 self._all_help_info.name_to_api_type_info.keys(), self._print_api_type_help
             ),
             **_help_table(self._all_help_info.name_to_rule_info.keys(), self._print_rule_help),
@@ -228,7 +231,7 @@ class HelpPrinter(MaybeColor):
         elif thing == "backends":
             self._print_all_backends()
         elif thing == "symbols":
-            self._print_all_symbols()
+            self._print_all_symbols(show_advanced)
 
     def _print_all_goals(self) -> None:
         goal_descriptions: Dict[str, str] = {}
@@ -377,23 +380,23 @@ class HelpPrinter(MaybeColor):
                     )
                 )
 
-    def _print_all_symbols(self) -> None:
+    def _print_all_symbols(self, include_targets: bool) -> None:
         self._print_title("BUILD file symbols")
         symbols = self._all_help_info.name_to_build_file_info
-        for symbol in symbols.values():
-            if re.match("_[^_]", symbol.name):
-                continue
+        names = {
+            symbol.name
+            for symbol in symbols.values()
+            if (include_targets or not symbol.is_target) and not re.match("_[^_]", symbol.name)
+        }
+        longest_symbol_name = max(len(name) for name in names)
+        chars_before_description = longest_symbol_name + 2
 
-            print(self.maybe_cyan(symbol.name))
-            if symbol.signature:
-                print(self.maybe_magenta(f"  Signature: {symbol.name}{symbol.signature}\n"))
-            if symbol.documentation:
-                print(
-                    "\n".join(
-                        hard_wrap(symbol.documentation or "", indent=2, width=self._width - 2)
-                    )
-                    + "\n"
-                )
+        for name in sorted(names):
+            name_str = self.maybe_cyan(f"{name}".ljust(chars_before_description))
+            summary = self._format_summary_description(
+                first_paragraph(symbols[name].documentation or ""), chars_before_description
+            )
+            print(f"{name_str}{summary}\n")
 
     def _print_global_help(self):
         def print_cmd(args: str, desc: str):
@@ -490,6 +493,13 @@ class HelpPrinter(MaybeColor):
                 )
                 print("\n" + formatted_desc)
         print()
+
+    def _print_symbol_help(self, name: str, _: bool) -> None:
+        self._print_title(f"`{name}` BUILD file symbol")
+        symbol = self._all_help_info.name_to_build_file_info[name]
+        if symbol.signature:
+            print(self.maybe_magenta(f"Signature: {symbol.name}{symbol.signature}\n"))
+        print("\n".join(hard_wrap(symbol.documentation or "Undocumented.", width=self._width)))
 
     def _print_api_type_help(self, name: str, show_advanced: bool) -> None:
         self._print_title(f"`{name}` api type")
