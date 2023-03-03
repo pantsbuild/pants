@@ -4,22 +4,18 @@
 python_sources()
 
 
-_DEFAULT_RULES = (
+# Setup rules about which parts of the codebase may depend on backend sources.
+
+DEFAULT_BACKEND_RULES = (
     # Allow dependencies within/between backends.
     "/**",
     # Allow the pants bin plugins target to depend on backends.
-    # BUG: can't use the actual target address here..
-    # "src/python/pants/bin:plugins", <-- broken
-    "src/python/pants/bin",
+    "src/python/pants/bin:plugins",
     # Allow test utils and fixtures to depend on code in backend modules.
     "/../testutil/**",
     "//pants-plugins/internal_plugins/test_lockfile_fixtures/*",
     # Allow test sources to depend on code in backend modules.
-    # Would prefer to filter on target type here, rather than on file name..
-    # This relates to this issue comment:
-    # https://github.com/pantsbuild/pants/issues/17873#issuecomment-1364153426
-    # So we could instead say: "*_tests" and that would match all target types that end with `_tests`.
-    "*_test.py",
+    "<*_tests>",
     "//tests/**",
     # Allow build-support to use what ever.
     "//build-support/**",
@@ -43,7 +39,7 @@ __dependents_rules__(
             "[/python/lint/yapf/subsystem.py]",
         ),
         "src/python/pants/core/goals/update_build_files.py",
-        _DEFAULT_RULES,
+        DEFAULT_BACKEND_RULES,
     ),
     (
         (
@@ -52,74 +48,70 @@ __dependents_rules__(
             "[/python/util_rules/pex_requirements.py]",
         ),
         "src/python/pants/init/plugin_resolver.py",
-        _DEFAULT_RULES,
+        DEFAULT_BACKEND_RULES,
     ),
     (
-        # This section is sub-optimal. It would be easier to reason about if rules from sets with
-        # identical selectors where merged. i.e. If we could include the
-        # `[/python/util_rules/pex.py]` selector in each of the two previous rule sets, we could get
-        # rid of this one entirely.
         "[/python/util_rules/pex.py]",
         "src/python/pants/core/goals/update_build_files.py",
         "src/python/pants/init/plugin_resolver.py",
-        _DEFAULT_RULES,
+        DEFAULT_BACKEND_RULES,
     ),
     (
         "[/python/goals/setup_py.py]",
         "//pants-plugins/internal_plugins/releases/register.py",
-        _DEFAULT_RULES,
+        DEFAULT_BACKEND_RULES,
     ),
     (
         "[/project_info/filter_targets.py]",
         "src/python/pants/build_graph/build_configuration.py",
         "src/python/pants/engine/internals/specs_rules.py",
         "src/python/pants/engine/internals/mapper.py",
-        _DEFAULT_RULES,
+        DEFAULT_BACKEND_RULES,
     ),
     (
         "[/project_info/dependents.py]",
         "src/python/pants/vcs/changed.py",
-        _DEFAULT_RULES,
+        DEFAULT_BACKEND_RULES,
     ),
     (
         "[/project_info/peek.py]",
         "src/python/pants/explorer/server/graphql/**",
-        _DEFAULT_RULES,
+        DEFAULT_BACKEND_RULES,
     ),
     (
         "[/project_info]",
         "src/python/pants/init/extension_loader.py",
-        _DEFAULT_RULES,
+        DEFAULT_BACKEND_RULES,
     ),
     (
         "[/java/subsystems/java_infer.py]",
         "src/python/pants/jvm/dependency_inference/artifact_mapper.py",
-        _DEFAULT_RULES,
+        DEFAULT_BACKEND_RULES,
     ),
     (
         "[/java/subsystems/junit.py]",
         "src/python/pants/jvm/test/junit.py",
-        _DEFAULT_RULES,
+        DEFAULT_BACKEND_RULES,
     ),
     (
         "[/docker/target_types.py]",
         "src/python/pants/explorer/server/graphql/query/conftest.py",
-        _DEFAULT_RULES,
+        DEFAULT_BACKEND_RULES,
     ),
     (
         "[/codegen/export_codegen_goal.py]",
         "src/python/pants/core/register.py",
-        _DEFAULT_RULES,
+        DEFAULT_BACKEND_RULES,
     ),
     (
         "[/__init__.py]",
         "src/python/pants/help/help_info_extracter.py",
-        _DEFAULT_RULES,
+        DEFAULT_BACKEND_RULES,
     ),
     # Generic rule set:
     (
-        # Applies to all targets in this subtree.
+        # Applies for all targets in this subtree.
         "*",
-        _DEFAULT_RULES,
+        DEFAULT_BACKEND_RULES,
     ),
 )
