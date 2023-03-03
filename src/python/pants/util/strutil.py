@@ -316,6 +316,8 @@ R = TypeVar("R")
 
 
 def docstring(doc: str | Callable[[], str]) -> Callable[[Callable[P, R]], Callable[P, R]]:
+    """Use this decorator to provide a dynamic doc-string to a function."""
+
     def wrapper(func: Callable[P, R]) -> Callable[P, R]:
         func.__doc__ = strval(doc)
         return func

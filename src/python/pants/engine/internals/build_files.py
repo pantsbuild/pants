@@ -497,5 +497,8 @@ async def get_dependencies_rule_application(
 def rules():
     return (
         *collect_rules(),
+        # The `BuildFileSymbolsInfo` is consumed by the `HelpInfoExtracter` and uses the scheduler
+        # session `product_request()` directly so we need an explicit QueryRule to provide this type
+        # as an valid entrypoint into the rule graph.
         QueryRule(BuildFileSymbolsInfo, ()),
     )
