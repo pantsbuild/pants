@@ -122,9 +122,7 @@ class HelpPrinter(MaybeColor):
             **_help_table(
                 self._all_help_info.name_to_target_type_info.keys(), self._print_target_help
             ),
-            **_help_table(
-                self._all_help_info.name_to_build_file_info.keys(), self._print_symbol_help
-            ),
+            **_help_table(self._symbol_names(include_targets=False), self._print_symbol_help),
             **_help_table(
                 self._all_help_info.name_to_api_type_info.keys(), self._print_api_type_help
             ),
@@ -380,14 +378,19 @@ class HelpPrinter(MaybeColor):
                     )
                 )
 
+    def _symbol_names(self, include_targets: bool) -> Iterable[str]:
+        return sorted(
+            {
+                symbol.name
+                for symbol in self._all_help_info.name_to_build_file_info.values()
+                if (include_targets or not symbol.is_target) and not re.match("_[^_]", symbol.name)
+            }
+        )
+
     def _print_all_symbols(self, include_targets: bool) -> None:
         self._print_title("BUILD file symbols")
         symbols = self._all_help_info.name_to_build_file_info
-        names = {
-            symbol.name
-            for symbol in symbols.values()
-            if (include_targets or not symbol.is_target) and not re.match("_[^_]", symbol.name)
-        }
+        names = self._symbol_names(include_targets)
         longest_symbol_name = max(len(name) for name in names)
         chars_before_description = longest_symbol_name + 2
 
