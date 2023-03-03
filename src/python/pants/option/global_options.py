@@ -965,8 +965,8 @@ class BootstrapOptions:
     )
     pantsd_max_memory_usage = MemorySizeOption(
         advanced=True,
-        default=memory_size("1GiB"),
-        default_help_repr="1GiB",
+        default=memory_size("4GiB"),
+        default_help_repr="4GiB",
         help=softwrap(
             """
             The maximum memory usage of the pantsd process.

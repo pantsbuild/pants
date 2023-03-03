@@ -425,6 +425,38 @@ def _rules_path(address: Address) -> str:
         return address.spec_path
 
 
+async def _get_target_family_and_adaptor_for_dep_rules(
+    *addresses: Address, description_of_origin: str
+) -> tuple[tuple[AddressFamily, TargetAdaptor], ...]:
+    # Fetch up to 2 sets of address families per address, as we want the rules from the directory
+    # the file is in rather than the directory where the target generator was declared, if not the
+    # same.
+    rules_paths = set(
+        itertools.chain.from_iterable(
+            {address.spec_path, _rules_path(address)} for address in addresses
+        )
+    )
+    maybe_address_families = await MultiGet(
+        Get(OptionalAddressFamily, AddressFamilyDir(rules_path)) for rules_path in rules_paths
+    )
+    maybe_families = {maybe.path: maybe for maybe in maybe_address_families}
+
+    return tuple(
+        (
+            (
+                maybe_families[_rules_path(address)].address_family
+                or maybe_families[address.spec_path].ensure()
+            ),
+            _get_target_adaptor(
+                address,
+                maybe_families[address.spec_path].ensure(),
+                description_of_origin,
+            ),
+        )
+        for address in addresses
+    )
+
+
 @rule
 async def get_dependencies_rule_application(
     request: DependenciesRuleApplicationRequest,
@@ -436,41 +468,19 @@ async def get_dependencies_rule_application(
     if build_file_dependency_rules_class is None:
         return DependenciesRuleApplication.allow_all()
 
-    # Fetch up to 4 sets of address families, one each for the target adaptors, and then one each
-    # for the dep rules (as we want the rules from the directory the file is in rather than the
-    # directory where the target generator was declared, if not the same)
-    rules_paths = set(
-        itertools.chain.from_iterable(
-            {address.spec_path, _rules_path(address)}
-            for address in (request.address, *request.dependencies)
-        )
+    (
+        origin_rules_family,
+        origin_target,
+    ), *dependencies_family_adaptor = await _get_target_family_and_adaptor_for_dep_rules(
+        request.address,
+        *request.dependencies,
+        description_of_origin=request.description_of_origin,
     )
-    maybe_address_families = await MultiGet(
-        Get(OptionalAddressFamily, AddressFamilyDir(rules_path)) for rules_path in rules_paths
-    )
-    maybe_families = {maybe.path: maybe for maybe in maybe_address_families}
-    origin_tgt_address = request.address.maybe_convert_to_target_generator()
-    origin_target = _get_target_adaptor(
-        origin_tgt_address,
-        maybe_families[origin_tgt_address.spec_path].ensure(),
-        request.description_of_origin,
-    )
-    origin_rules_family = (
-        maybe_families[_rules_path(request.address)].address_family
-        or maybe_families[request.address.spec_path].ensure()
-    )
+
     dependencies_rule: dict[Address, DependencyRuleApplication] = {}
-    for dependency_address in request.dependencies:
-        dependency_tgt_address = dependency_address.maybe_convert_to_target_generator()
-        dependency_target = _get_target_adaptor(
-            dependency_tgt_address,
-            maybe_families[dependency_tgt_address.spec_path].ensure(),
-            f"{request.description_of_origin} on {dependency_address}",
-        )
-        dependency_rules_family = (
-            maybe_families[_rules_path(dependency_address)].address_family
-            or maybe_families[dependency_address.spec_path].ensure()
-        )
+    for dependency_address, (dependency_rules_family, dependency_target) in zip(
+        request.dependencies, dependencies_family_adaptor
+    ):
         dependencies_rule[
             dependency_address
         ] = build_file_dependency_rules_class.check_dependency_rules(
