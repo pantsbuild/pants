@@ -37,8 +37,10 @@ def test_adhoc_tool_is_loaded_by_backend() -> None:
         args = [
             "--backend-packages=['pants.backend.experimental.adhoc', 'pants.backend.python']",
             f"--source-root-patterns=['{tmpdir}/src']",
+            "--print-stacktrace",
             "package",
             f"{tmpdir}/src:archive",
         ]
         result = run_pants(args)
+        print(result.stdout.strip())
         assert "[INFO] I'm Fleegan Floop!" in result.stderr.strip()

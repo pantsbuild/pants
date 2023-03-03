@@ -136,6 +136,7 @@ async def run_in_sandbox_request(
             )
         )
 
+    print(extra_sandbox_contents)
     merged_extras = await Get(
         ExtraSandboxContents, MergeExtraSandboxContents(tuple(extra_sandbox_contents))
     )
