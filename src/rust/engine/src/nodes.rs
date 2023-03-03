@@ -312,7 +312,7 @@ impl ExecuteProcess {
           .map(|(path, digest)| Ok((RelativePath::new(path)?, lift_directory_digest(digest)?)))
           .collect::<Result<BTreeMap<_, _>, String>>()?;
       let use_nailgun = externs::getattr::<Vec<String>>(value, "use_nailgun")
-        .map_err(|err| format!("Failed to get value `use_nailgun`: {err}"))?
+        .map_err(|err| format!("Failed to get field `use_nailgun`: {err}"))?
         .into_iter()
         .map(RelativePath::new)
         .collect::<Result<BTreeSet<_>, _>>()?;
