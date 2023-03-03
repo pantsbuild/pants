@@ -9,11 +9,14 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use async_oncecell::OnceCell;
-use bytes::{Bytes, BytesMut};
-use futures::Future;
+use async_trait::async_trait;
+use bytes::Bytes;
 use futures::StreamExt;
+use futures::{Future, FutureExt};
 use grpc_util::retry::{retry_call, status_is_retryable};
-use grpc_util::{headers_to_http_header_map, layered_service, status_to_str, LayeredService};
+use grpc_util::{
+  headers_to_http_header_map, layered_service, status_ref_to_str, status_to_str, LayeredService,
+};
 use hashing::Digest;
 use log::Level;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
@@ -23,6 +26,8 @@ use remexec::{
   content_addressable_storage_client::ContentAddressableStorageClient, BatchUpdateBlobsRequest,
   ServerCapabilities,
 };
+use tokio::io::{AsyncSeekExt, AsyncWrite, AsyncWriteExt};
+use tokio::sync::Mutex;
 use tonic::{Code, Request, Status};
 use workunit_store::{in_workunit, ObservationMetric};
 
@@ -57,16 +62,65 @@ enum ByteStoreError {
   Other(String),
 }
 
+impl ByteStoreError {
+  fn retryable(&self) -> bool {
+    match self {
+      ByteStoreError::Grpc(status) => status_is_retryable(status),
+      ByteStoreError::Other(_) => false,
+    }
+  }
+}
+
+impl From<Status> for ByteStoreError {
+  fn from(status: Status) -> ByteStoreError {
+    ByteStoreError::Grpc(status)
+  }
+}
+
+impl From<String> for ByteStoreError {
+  fn from(string: String) -> ByteStoreError {
+    ByteStoreError::Other(string)
+  }
+}
+impl From<std::io::Error> for ByteStoreError {
+  fn from(err: std::io::Error) -> ByteStoreError {
+    ByteStoreError::Other(err.to_string())
+  }
+}
+
 impl fmt::Display for ByteStoreError {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     match self {
-      ByteStoreError::Grpc(status) => fmt::Display::fmt(status, f),
+      ByteStoreError::Grpc(status) => fmt::Display::fmt(&status_ref_to_str(status), f),
       ByteStoreError::Other(msg) => fmt::Display::fmt(msg, f),
     }
   }
 }
 
 impl std::error::Error for ByteStoreError {}
+
+/// Places that write the result of a remote `load`
+#[async_trait]
+trait LoadDestination: AsyncWrite + Send + Sync + Unpin + 'static {
+  /// Clear out the writer and start again, if there's been previous contents written
+  async fn reset(&mut self) -> std::io::Result<()>;
+}
+
+#[async_trait]
+impl LoadDestination for tokio::fs::File {
+  async fn reset(&mut self) -> std::io::Result<()> {
+    self.rewind().await?;
+    self.set_len(0).await
+  }
+}
+
+#[async_trait]
+impl LoadDestination for Vec<u8> {
+  async fn reset(&mut self) -> std::io::Result<()> {
+    self.clear();
+    Ok(())
+  }
+}
 
 impl ByteStore {
   // TODO: Consider extracting these options to a struct with `impl Default`, similar to
@@ -132,18 +186,10 @@ impl ByteStore {
     WriteResult: Future<Output = Result<(), StoreError>>,
   {
     let write_buffer = tempfile::tempfile().map_err(|e| {
-      format!(
-        "Failed to create a temporary blob upload buffer for {digest:?}: {err}",
-        digest = digest,
-        err = e
-      )
+      format!("Failed to create a temporary blob upload buffer for {digest:?}: {e}")
     })?;
     let read_buffer = write_buffer.try_clone().map_err(|e| {
-      format!(
-        "Failed to create a read handle for the temporary upload buffer for {digest:?}: {err}",
-        digest = digest,
-        err = e
-      )
+      format!("Failed to create a read handle for the temporary upload buffer for {digest:?}: {e}")
     })?;
     write_to_buffer(write_buffer).await?;
 
@@ -153,11 +199,7 @@ impl ByteStore {
     // the code just above.
     let mmap = Arc::new(unsafe {
       let mapping = memmap::Mmap::map(&read_buffer).map_err(|e| {
-        format!(
-          "Failed to memory map the temporary file buffer for {digest:?}: {err}",
-          digest = digest,
-          err = e
-        )
+        format!("Failed to memory map the temporary file buffer for {digest:?}: {e}")
       })?;
       if let Err(err) = madvise::madvise(
         mapping.as_ptr(),
@@ -177,16 +219,10 @@ impl ByteStore {
     retry_call(
       mmap,
       |mmap| self.store_bytes_source(digest, move |range| Bytes::copy_from_slice(&mmap[range])),
-      |err| match err {
-        ByteStoreError::Grpc(status) => status_is_retryable(status),
-        _ => false,
-      },
+      ByteStoreError::retryable,
     )
     .await
-    .map_err(|err| match err {
-      ByteStoreError::Grpc(status) => status_to_str(status).into(),
-      ByteStoreError::Other(msg) => msg.into(),
-    })
+    .map_err(|e| e.to_string().into())
   }
 
   pub async fn store_bytes(&self, bytes: Bytes) -> Result<(), String> {
@@ -194,16 +230,10 @@ impl ByteStore {
     retry_call(
       bytes,
       |bytes| self.store_bytes_source(digest, move |range| bytes.slice(range)),
-      |err| match err {
-        ByteStoreError::Grpc(status) => status_is_retryable(status),
-        _ => false,
-      },
+      ByteStoreError::retryable,
     )
     .await
-    .map_err(|err| match err {
-      ByteStoreError::Grpc(status) => status_to_str(status),
-      ByteStoreError::Other(msg) => msg,
-    })
+    .map_err(|e| e.to_string())
   }
 
   async fn store_bytes_source<ByteSource>(
@@ -337,7 +367,11 @@ impl ByteStore {
     .await
   }
 
-  pub async fn load_bytes(&self, digest: Digest) -> Result<Option<Bytes>, String> {
+  async fn load_monomorphic(
+    &self,
+    digest: Digest,
+    destination: &mut dyn LoadDestination,
+  ) -> Result<bool, String> {
     let start = Instant::now();
     let store = self.clone();
     let instance_name = store.instance_name.clone().unwrap_or_default();
@@ -358,25 +392,16 @@ impl ByteStore {
     };
     let client = self.byte_stream_client.as_ref().clone();
 
+    let destination = Arc::new(Mutex::new(destination));
+
     let result_future = retry_call(
-      (client, request),
-      move |(mut client, request)| async move {
-        let mut start_opt = Some(Instant::now());
-        let stream_result = client.read(request).await;
+      (client, request, destination),
+      move |(mut client, request, destination)| {
+        async move {
+          let mut start_opt = Some(Instant::now());
+          let response = client.read(request).await?;
 
-        let mut stream = match stream_result {
-          Ok(response) => response.into_inner(),
-          Err(status) => {
-            return match status.code() {
-              Code::NotFound => Ok(None),
-              _ => Err(status),
-            }
-          }
-        };
-
-        let read_result_closure = async {
-          let mut buf = BytesMut::with_capacity(digest.size_bytes);
-          while let Some(response) = stream.next().await {
+          let mut stream = response.into_inner().inspect(|_| {
             // Record the observed time to receive the first response for this read.
             if let Some(start) = start_opt.take() {
               if let Some(workunit_store_handle) = workunit_store::get_workunit_store_handle() {
@@ -389,31 +414,31 @@ impl ByteStore {
                 }
               }
             }
+          });
 
-            buf.extend_from_slice(&(response?).data);
+          let mut writer = destination.lock().await;
+          writer.reset().await?;
+          while let Some(response) = stream.next().await {
+            writer.write_all(&(response?).data).await?;
           }
-          Ok(buf.freeze())
-        };
 
-        let read_result: Result<Bytes, tonic::Status> = read_result_closure.await;
-
-        match read_result {
-          Ok(bytes) => Ok(Some(bytes)),
-          Err(status) => match status.code() {
-            Code::NotFound => Ok(None),
-            _ => Err(status),
-          },
+          Ok(())
         }
+        .map(|read_result| match read_result {
+          Ok(()) => Ok(true),
+          Err(ByteStoreError::Grpc(status)) if status.code() == Code::NotFound => Ok(false),
+          Err(err) => Err(err),
+        })
       },
-      status_is_retryable,
+      ByteStoreError::retryable,
     );
 
     in_workunit!(
-      "load_bytes",
+      "load",
       Level::Trace,
       desc = Some(workunit_desc),
       |workunit| async move {
-        let result = result_future.await.map_err(status_to_str);
+        let result = result_future.await.map_err(|e| e.to_string());
         workunit.record_observation(
           ObservationMetric::RemoteStoreReadBlobTimeMicros,
           start.elapsed().as_micros() as u64,
@@ -428,6 +453,40 @@ impl ByteStore {
       },
     )
     .await
+  }
+
+  async fn load<W: LoadDestination>(
+    &self,
+    digest: Digest,
+    mut destination: W,
+  ) -> Result<Option<W>, String> {
+    // TODO(#18231): compute the digest as we write, to avoid needing a second pass to validate
+    if self.load_monomorphic(digest, &mut destination).await? {
+      Ok(Some(destination))
+    } else {
+      Ok(None)
+    }
+  }
+
+  /// Load the data for `digest` (if it exists in the remote store) into memory.
+  pub async fn load_bytes(&self, digest: Digest) -> Result<Option<Bytes>, String> {
+    let result = self
+      .load(digest, Vec::with_capacity(digest.size_bytes))
+      .await?;
+    Ok(result.map(Bytes::from))
+  }
+
+  /// Write the data for `digest` (if it exists in the remote store) into `file`.
+  pub async fn load_file(
+    &self,
+    digest: Digest,
+    file: tokio::fs::File,
+  ) -> Result<Option<tokio::fs::File>, String> {
+    let mut result = self.load(digest, file).await;
+    if let Ok(Some(ref mut file)) = result {
+      file.rewind().await.map_err(|e| e.to_string())?;
+    }
+    result
   }
 
   ///

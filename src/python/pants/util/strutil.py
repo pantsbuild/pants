@@ -6,7 +6,7 @@ from __future__ import annotations
 import re
 import shlex
 import textwrap
-from typing import Iterable
+from typing import Callable, Iterable
 
 
 def ensure_binary(text_or_binary: bytes | str) -> bytes:
@@ -290,3 +290,20 @@ def fmt_memory_size(value: int, *, units: Iterable[str] = _MEMORY_UNITS) -> str:
         unit_idx += 1
 
     return f"{int(amount)}{units[unit_idx]}"
+
+
+def strval(val: str | Callable[[], str]) -> str:
+    return val if isinstance(val, str) else val()
+
+
+def help_text(val: str | Callable[[], str]) -> str | Callable[[], str]:
+    """Convenience method for defining an optionally lazy-evaluated softwrapped help string.
+
+    This exists because `mypy` does not respect the type hints defined on base `Field` and `Target`
+    classes.
+    """
+    # This can go away when https://github.com/python/mypy/issues/14702 is fixed
+    if isinstance(val, str):
+        return softwrap(val)
+    else:
+        return lambda: softwrap(val())  # type: ignore[operator]

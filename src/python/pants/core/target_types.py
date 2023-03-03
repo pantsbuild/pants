@@ -11,9 +11,11 @@ from dataclasses import dataclass
 from pathlib import PurePath
 from typing import Generic, Optional, Sequence, TypeVar, Union, cast
 
+from pants.core.goals import package
 from pants.core.goals.package import (
     BuiltPackage,
     BuiltPackageArtifact,
+    EnvironmentAwarePackageRequest,
     OutputPathField,
     PackageFieldSet,
 )
@@ -32,7 +34,7 @@ from pants.engine.fs import (
     Snapshot,
 )
 from pants.engine.platform import Platform
-from pants.engine.rules import Get, MultiGet, collect_rules, rule, rule_helper
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     AllTargets,
@@ -61,7 +63,7 @@ from pants.engine.unions import UnionRule
 from pants.util.docutil import bin_name
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
-from pants.util.strutil import softwrap
+from pants.util.strutil import help_text, softwrap
 
 # -----------------------------------------------------------------------------------------------
 # `per_platform` object
@@ -198,7 +200,7 @@ class AssetSourceField(SingleSourceField):
     value: str | http_source | per_platform[http_source]  # type: ignore[assignment]
     # @TODO: Don't document http_source, link to it once https://github.com/pantsbuild/pants/issues/14832
     # is implemented.
-    help = softwrap(
+    help = help_text(
         """
         The source of this target.
 
@@ -283,7 +285,6 @@ class AssetSourceField(SingleSourceField):
         return os.path.join(self.address.spec_path, filename)
 
 
-@rule_helper
 async def _hydrate_asset_source(
     request: GenerateSourcesRequest, platform: Platform
 ) -> GeneratedSources:
@@ -329,7 +330,7 @@ class FileDependenciesField(Dependencies):
 class FileTarget(Target):
     alias = "file"
     core_fields = (*COMMON_TARGET_FIELDS, FileDependenciesField, FileSourceField)
-    help = softwrap(
+    help = help_text(
         """
         A single loose file that lives outside of code packages.
 
@@ -343,7 +344,6 @@ class FileTarget(Target):
 class GenerateFileSourceRequest(GenerateSourcesRequest):
     input = FileSourceField
     output = FileSourceField
-    exportable = False
 
 
 @rule
@@ -401,7 +401,7 @@ class RelocatedFilesSourcesField(MultipleSourcesField):
 class RelocatedFilesOriginalTargetsField(SpecialCasedDependencies):
     alias = "files_targets"
     required = True
-    help = softwrap(
+    help = help_text(
         """
         Addresses to the original `file` and `files` targets that you want to relocate, such as
         `['//:json_files']`.
@@ -415,7 +415,7 @@ class RelocatedFilesOriginalTargetsField(SpecialCasedDependencies):
 class RelocatedFilesSrcField(StringField):
     alias = "src"
     required = True
-    help = softwrap(
+    help = help_text(
         """
         The original prefix that you want to replace, such as `src/resources`.
 
@@ -428,7 +428,7 @@ class RelocatedFilesSrcField(StringField):
 class RelocatedFilesDestField(StringField):
     alias = "dest"
     required = True
-    help = softwrap(
+    help = help_text(
         """
         The new prefix that you want to add to the beginning of the path, such as `data`.
 
@@ -447,7 +447,7 @@ class RelocatedFiles(Target):
         RelocatedFilesSrcField,
         RelocatedFilesDestField,
     )
-    help = softwrap(
+    help = help_text(
         """
         Loose files with path manipulation applied.
 
@@ -549,7 +549,7 @@ class ResourceSourceField(AssetSourceField):
 class ResourceTarget(Target):
     alias = "resource"
     core_fields = (*COMMON_TARGET_FIELDS, ResourceDependenciesField, ResourceSourceField)
-    help = softwrap(
+    help = help_text(
         """
         A single resource file embedded in a code package and accessed in a
         location-independent manner.
@@ -564,7 +564,6 @@ class ResourceTarget(Target):
 class GenerateResourceSourceRequest(GenerateSourcesRequest):
     input = ResourceSourceField
     output = ResourceSourceField
-    exportable = False
 
 
 @rule
@@ -633,7 +632,7 @@ class GenericTargetDependenciesField(Dependencies):
 class GenericTarget(Target):
     alias = "target"
     core_fields = (*COMMON_TARGET_FIELDS, GenericTargetDependenciesField)
-    help = softwrap(
+    help = help_text(
         """
         A generic target with no specific type.
 
@@ -720,7 +719,7 @@ class TargetGeneratorSourcesHelperTarget(Target):
 
     alias = "_generator_sources_helper"
     core_fields = (*COMMON_TARGET_FIELDS, TargetGeneratorSourcesHelperSourcesField)
-    help = softwrap(
+    help = help_text(
         """
         A private helper target type used by some target generators.
 
@@ -737,7 +736,7 @@ class TargetGeneratorSourcesHelperTarget(Target):
 
 class ArchivePackagesField(SpecialCasedDependencies):
     alias = "packages"
-    help = softwrap(
+    help = help_text(
         f"""
         Addresses to any targets that can be built with `{bin_name()} package`, e.g.
         `["project:app"]`.\n\nPants will build the assets as if you had run `{bin_name()} package`.
@@ -751,7 +750,7 @@ class ArchivePackagesField(SpecialCasedDependencies):
 
 class ArchiveFilesField(SpecialCasedDependencies):
     alias = "files"
-    help = softwrap(
+    help = help_text(
         """
         Addresses to any `file`, `files`, or `relocated_files` targets to include in the
         archive, e.g. `["resources:logo"]`.
@@ -814,7 +813,7 @@ async def package_archive_target(field_set: ArchiveFieldSet) -> BuiltPackage:
         FieldSetsPerTarget, FieldSetsPerTargetRequest(PackageFieldSet, package_targets)
     )
     packages = await MultiGet(
-        Get(BuiltPackage, PackageFieldSet, field_set)
+        Get(BuiltPackage, EnvironmentAwarePackageRequest(field_set))
         for field_set in package_field_sets_per_target.field_sets
     )
 
@@ -871,7 +870,7 @@ class LockfileDependenciesField(Dependencies):
 class LockfileTarget(Target):
     alias = "_lockfile"
     core_fields = (*COMMON_TARGET_FIELDS, LockfileSourceField, LockfileDependenciesField)
-    help = softwrap(
+    help = help_text(
         """
         A target for lockfiles in order to include them in the dependency graph of other targets.
 
@@ -901,6 +900,7 @@ def rules():
     return (
         *collect_rules(),
         *archive_rules(),
+        *package.rules(),
         UnionRule(GenerateSourcesRequest, GenerateResourceSourceRequest),
         UnionRule(GenerateSourcesRequest, GenerateFileSourceRequest),
         UnionRule(GenerateSourcesRequest, RelocateFilesViaCodegenRequest),

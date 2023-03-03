@@ -974,7 +974,7 @@ async def get_exporting_owner(owned_dependency: OwnedDependency) -> ExportedTarg
     )
     exported_ancestor_iter = iter(exported_ancestor_tgts)
     for exported_ancestor in exported_ancestor_iter:
-        transitive_targets = await Get(
+        transitive_targets = await Get(  # noqa: PNT30: requires triage
             TransitiveTargets, TransitiveTargetsRequest([exported_ancestor.address])
         )
         if target in transitive_targets.closure:
@@ -984,7 +984,7 @@ async def get_exporting_owner(owned_dependency: OwnedDependency) -> ExportedTarg
             sibling_owners = []
             sibling = next(exported_ancestor_iter, None)
             while sibling and sibling.address.spec_path == owner.address.spec_path:
-                transitive_targets = await Get(
+                transitive_targets = await Get(  # noqa: PNT30: requires triage
                     TransitiveTargets, TransitiveTargetsRequest([sibling.address])
                 )
                 if target in transitive_targets.closure:

@@ -38,4 +38,4 @@ If the endpoint is using TLS, then the `remote_store_address` option would be sp
 Reference
 =========
 
-Run `./pants help-advanced global` or refer to [Global options](doc:reference-global). Most remote execution and caching options begin with the prefix `--remote`.
+Run `pants help-advanced global` or refer to [Global options](doc:reference-global). Most remote execution and caching options begin with the prefix `--remote`.

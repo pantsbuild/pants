@@ -116,7 +116,7 @@ impl CommandRunner {
       )
       .map(|s| {
         s.into_string()
-          .map_err(|e| format!("Error stringifying output paths: {:?}", e))
+          .map_err(|e| format!("Error stringifying output paths: {e:?}"))
       })
       .collect::<Result<Vec<_>, _>>()?;
 
@@ -130,7 +130,7 @@ impl CommandRunner {
 
     let path_stats = posix_fs
       .expand_globs(output_globs, SymlinkBehavior::Aware, None)
-      .map_err(|err| format!("Error expanding output globs: {}", err))
+      .map_err(|err| format!("Error expanding output globs: {err}"))
       .await?;
     Snapshot::from_path_stats(
       OneOffStoreFileByDigest::new(store, posix_fs, true),
@@ -228,10 +228,10 @@ pub enum ChildOutput {
 ///
 /// Collect the outputs of a child process.
 ///
-async fn collect_child_outputs<'a>(
+pub async fn collect_child_outputs<'a, 'b>(
   stdout: &'a mut BytesMut,
   stderr: &'a mut BytesMut,
-  mut stream: BoxStream<'static, Result<ChildOutput, String>>,
+  mut stream: BoxStream<'b, Result<ChildOutput, String>>,
 ) -> Result<i32, String> {
   let mut exit_code = 1;
 
@@ -257,7 +257,7 @@ impl super::CommandRunner for CommandRunner {
     _workunit: &mut RunningWorkunit,
     req: Process,
   ) -> Result<FallibleProcessResultWithPlatform, ProcessError> {
-    let req_debug_repr = format!("{:#?}", req);
+    let req_debug_repr = format!("{req:#?}");
     in_workunit!(
       "run_local_process",
       req.level,
@@ -312,7 +312,7 @@ impl super::CommandRunner for CommandRunner {
             //
             // Given that this is expected to be rare, we dump the entire process definition in the
             // error.
-            ProcessError::Unclassified(format!("Failed to execute: {}\n\n{}", req_debug_repr, msg))
+            ProcessError::Unclassified(format!("Failed to execute: {req_debug_repr}\n\n{msg}"))
           })
           .await;
 
@@ -408,7 +408,7 @@ impl CapturedWorkdir for CommandRunner {
                   e
                 ));
               } else {
-                break Err(format!("Error launching process: {:?}", e));
+                break Err(format!("Error launching process: {e:?}"));
               }
             }
             Ok(child) => break Ok(child),
@@ -416,7 +416,7 @@ impl CapturedWorkdir for CommandRunner {
         }
       } else {
         let _read_locked = self.spawn_lock.read().await;
-        fork_exec().map_err(|e| format!("Error launching process: {:?}", e))
+        fork_exec().map_err(|e| format!("Error launching process: {e:?}"))
       }
     }?;
 
@@ -449,7 +449,7 @@ impl CapturedWorkdir for CommandRunner {
 
     Ok(
       result_stream
-        .map_err(|e| format!("Failed to consume process outputs: {:?}", e))
+        .map_err(|e| format!("Failed to consume process outputs: {e:?}"))
         .boxed(),
     )
   }
@@ -457,7 +457,7 @@ impl CapturedWorkdir for CommandRunner {
 
 #[async_trait]
 pub trait CapturedWorkdir {
-  type WorkdirToken: Send;
+  type WorkdirToken: Clone + Send;
 
   async fn run_and_capture_workdir(
     &self,
@@ -479,6 +479,7 @@ pub trait CapturedWorkdir {
     // is that we eventually want to pass incremental results on down the line for streaming
     // process results to console logs, etc.
     let exit_code_result = {
+      let workdir_token = workdir_token.clone();
       let exit_code_future = collect_child_outputs(
         &mut stdout,
         &mut stderr,
@@ -503,6 +504,9 @@ pub trait CapturedWorkdir {
     };
 
     // Capture the process outputs.
+    self
+      .prepare_workdir_for_capture(&context, &workdir_path, workdir_token, &req)
+      .await?;
     let output_snapshot = if req.output_files.is_empty() && req.output_directories.is_empty() {
       store::Snapshot::empty()
     } else {
@@ -515,10 +519,7 @@ pub trait CapturedWorkdir {
       let posix_fs = Arc::new(
         fs::PosixFS::new(root, fs::GitignoreStyleExcludes::empty(), executor.clone()).map_err(
           |err| {
-            format!(
-              "Error making posix_fs to fetch local process execution output files: {}",
-              err
-            )
+            format!("Error making posix_fs to fetch local process execution output files: {err}")
           },
         )?,
       );
@@ -607,6 +608,20 @@ pub trait CapturedWorkdir {
     req: Process,
     exclusive_spawn: bool,
   ) -> Result<BoxStream<'r, Result<ChildOutput, String>>, String>;
+
+  ///
+  /// An optionally-implemented method which is called after the child process has completed, but
+  /// before capturing the sandbox. The default implementation does nothing.
+  ///
+  async fn prepare_workdir_for_capture(
+    &self,
+    _context: &Context,
+    _workdir_path: &Path,
+    _workdir_token: Self::WorkdirToken,
+    _req: &Process,
+  ) -> Result<(), String> {
+    Ok(())
+  }
 }
 
 ///
@@ -672,11 +687,11 @@ pub async fn prepare_workdir(
   };
   let named_caches_symlinks = {
     let symlinks = named_caches
-      .local_paths(&req.append_only_caches)
+      .paths(&req.append_only_caches)
+      .await
       .map_err(|err| {
         StoreError::Unclassified(format!(
-          "Failed to make named cache(s) for local execution: {:?}",
-          err
+          "Failed to make named cache(s) for local execution: {err:?}"
         ))
       })?;
     match named_caches_prefix {
@@ -684,7 +699,7 @@ pub async fn prepare_workdir(
         .into_iter()
         .map(|symlink| WorkdirSymlink {
           src: symlink.src,
-          dst: prefix.join(symlink.dst.strip_prefix(named_caches.base_dir()).unwrap()),
+          dst: prefix.join(symlink.dst.strip_prefix(named_caches.base_path()).unwrap()),
         })
         .collect::<Vec<_>>(),
       None => symlinks,
@@ -738,7 +753,7 @@ pub async fn prepare_workdir(
       move || {
         if let Some(jdk_home) = maybe_jdk_home {
           symlink(jdk_home, workdir_path2.join(".jdk"))
-            .map_err(|err| format!("Error making JDK symlink for local execution: {:?}", err))?
+            .map_err(|err| format!("Error making JDK symlink for local execution: {err:?}"))?
         }
 
         // The bazel remote execution API specifies that the parent directories for output files and
@@ -753,10 +768,7 @@ pub async fn prepare_workdir(
           .collect();
         for path in parent_paths_to_create {
           create_dir_all(path.clone()).map_err(|err| {
-            format!(
-              "Error making parent directory {:?} for local execution: {:?}",
-              path, err
-            )
+            format!("Error making parent directory {path:?} for local execution: {err:?}")
           })?;
         }
 
@@ -806,12 +818,7 @@ pub fn create_sandbox(
   let workdir = tempfile::Builder::new()
     .prefix("pants-sandbox-")
     .tempdir_in(base_directory)
-    .map_err(|err| {
-      format!(
-        "Error making tempdir for local process execution: {:?}",
-        err
-      )
-    })?;
+    .map_err(|err| format!("Error making tempdir for local process execution: {err:?}"))?;
 
   let mut sandbox = AsyncDropSandbox(executor, workdir.path().to_owned(), Some(workdir));
   if keep_sandboxes == KeepSandboxes::Always {
@@ -866,9 +873,9 @@ pub fn setup_run_sh_script(
   for (key, value) in env.iter() {
     let quoted_arg = bash::escape(value);
     let arg_str = str::from_utf8(&quoted_arg)
-      .map_err(|e| format!("{:?}", e))?
+      .map_err(|e| format!("{e:?}"))?
       .to_string();
-    let formatted_assignment = format!("{}={}", key, arg_str);
+    let formatted_assignment = format!("{key}={arg_str}");
     env_var_strings.push(formatted_assignment);
   }
   let stringified_env_vars: String = env_var_strings.join(" ");
@@ -878,7 +885,7 @@ pub fn setup_run_sh_script(
   for arg in argv.iter() {
     let quoted_arg = bash::escape(arg);
     let arg_str = str::from_utf8(&quoted_arg)
-      .map_err(|e| format!("{:?}", e))?
+      .map_err(|e| format!("{e:?}"))?
       .to_string();
     full_command_line.push(arg_str);
   }
@@ -891,7 +898,7 @@ pub fn setup_run_sh_script(
     };
     let quoted_cwd = bash::escape(cwd);
     str::from_utf8(&quoted_cwd)
-      .map_err(|e| format!("{:?}", e))?
+      .map_err(|e| format!("{e:?}"))?
       .to_string()
   };
 
@@ -899,11 +906,10 @@ pub fn setup_run_sh_script(
   let full_script = format!(
     "#!/bin/bash
 # This command line should execute the same process as pants did internally.
-export {}
-cd {}
-{}
+export {stringified_env_vars}
+cd {stringified_cwd}
+{stringified_command_line}
 ",
-    stringified_env_vars, stringified_cwd, stringified_command_line,
   );
 
   let full_file_path = sandbox_path.join("__run.sh");
@@ -913,7 +919,7 @@ cd {}
     .write(true)
     .mode(USER_EXECUTABLE_MODE) // Executable for user, read-only for others.
     .open(full_file_path)
-    .map_err(|e| format!("{:?}", e))?
+    .map_err(|e| format!("{e:?}"))?
     .write_all(full_script.as_bytes())
-    .map_err(|e| format!("{:?}", e))
+    .map_err(|e| format!("{e:?}"))
 }

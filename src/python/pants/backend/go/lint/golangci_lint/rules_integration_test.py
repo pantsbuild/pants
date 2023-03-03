@@ -13,7 +13,7 @@ from pants.backend.go.lint.golangci_lint import skip_field
 from pants.backend.go.lint.golangci_lint.rules import GolangciLintFieldSet, GolangciLintRequest
 from pants.backend.go.lint.golangci_lint.rules import rules as golangci_lint_rules
 from pants.backend.go.lint.golangci_lint.subsystem import GolangciLint
-from pants.backend.go.target_types import GoModTarget, GoPackageTarget, GoSdkTarget
+from pants.backend.go.target_types import GoModTarget, GoPackageTarget
 from pants.backend.go.util_rules import (
     assembly,
     build_pkg,
@@ -35,7 +35,7 @@ from pants.testutil.rule_runner import QueryRule, RuleRunner
 @pytest.fixture()
 def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
-        target_types=[GoModTarget, GoPackageTarget, GoSdkTarget],
+        target_types=[GoModTarget, GoPackageTarget],
         rules=[
             *assembly.rules(),
             *build_pkg.rules(),

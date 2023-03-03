@@ -177,7 +177,7 @@ def rules():
     return [*package_binary.rules()]
 ```
 
-Now, when you run `./pants package ::`, Pants should create packages for all your package target types in the `--pants-distdir` (defaults to `dist/`).
+Now, when you run `pants package ::`, Pants should create packages for all your package target types in the `--pants-distdir` (defaults to `dist/`).
 
 4. Add tests (optional)
 -----------------------

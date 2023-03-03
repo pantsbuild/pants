@@ -12,7 +12,8 @@ import pytest
 from pants.backend.go import target_type_rules
 from pants.backend.go.goals import package_binary
 from pants.backend.go.goals.package_binary import GoBinaryFieldSet
-from pants.backend.go.target_types import GoBinaryTarget, GoModTarget, GoPackageTarget, GoSdkTarget
+from pants.backend.go.target_types import GoBinaryTarget, GoModTarget, GoPackageTarget
+from pants.backend.go.testutil import gen_module_gomodproxy
 from pants.backend.go.util_rules import (
     assembly,
     build_pkg,
@@ -28,7 +29,7 @@ from pants.core.goals.package import BuiltPackage
 from pants.engine.addresses import Address
 from pants.engine.rules import QueryRule
 from pants.engine.target import Target
-from pants.testutil.rule_runner import RuleRunner
+from pants.testutil.rule_runner import RuleRunner, engine_error
 
 
 @pytest.fixture()
@@ -52,7 +53,6 @@ def rule_runner() -> RuleRunner:
             GoBinaryTarget,
             GoModTarget,
             GoPackageTarget,
-            GoSdkTarget,
         ],
     )
     rule_runner.set_options([], env_inherit={"PATH"})
@@ -97,6 +97,163 @@ def test_package_simple(rule_runner: RuleRunner) -> None:
             ),
         }
     )
+    binary_tgt = rule_runner.get_target(Address("", target_name="bin"))
+    built_package = build_package(rule_runner, binary_tgt)
+    assert len(built_package.artifacts) == 1
+    assert built_package.artifacts[0].relpath == "bin"
+
+    result = subprocess.run([os.path.join(rule_runner.build_root, "bin")], stdout=subprocess.PIPE)
+    assert result.returncode == 0
+    assert result.stdout == b"Hello world!\n"
+
+
+def test_package_third_party_requires_main(rule_runner: RuleRunner) -> None:
+    import_path = "pantsbuild.org/go-sample-for-test"
+    version = "v0.0.1"
+
+    fake_gomod = gen_module_gomodproxy(
+        version,
+        import_path,
+        (
+            (
+                "pkg/hello/hello.go",
+                dedent(
+                    """\
+        package hello
+        import "fmt"
+
+
+        func Hello() {
+            fmt.Println("Hello world!")
+        }
+        """
+                ),
+            ),
+            (
+                "cmd/hello/main.go",
+                dedent(
+                    f"""\
+        package main
+        import "{import_path}/pkg/hello"
+
+
+        func main() {{
+            hello.Hello()
+        }}
+        """
+                ),
+            ),
+        ),
+    )
+
+    fake_gomod.update(
+        {
+            "BUILD": dedent(
+                f"""\
+                go_mod(name='mod')
+                go_binary(name="bin", main='//:mod#{import_path}/pkg/hello')
+                """
+            ),
+            "go.mod": dedent(
+                f"""\
+                module go.example.com/foo
+                go 1.16
+
+                require (
+                \t{import_path} {version}
+                )
+                """
+            ),
+        }
+    )
+
+    rule_runner.write_files(fake_gomod)
+
+    rule_runner.set_options(
+        [
+            "--go-test-args=-v -bench=.",
+            f"--golang-subprocess-env-vars=GOPROXY=file://{rule_runner.build_root}/go-mod-proxy",
+            "--golang-subprocess-env-vars=GOSUMDB=off",
+        ],
+        env_inherit={"PATH"},
+    )
+
+    binary_tgt = rule_runner.get_target(Address("", target_name="bin"))
+    with engine_error(ValueError, contains="but uses package name `hello` instead of `main`"):
+        build_package(rule_runner, binary_tgt)
+
+
+def test_package_third_party_can_run(rule_runner: RuleRunner) -> None:
+    import_path = "pantsbuild.org/go-sample-for-test"
+    version = "v0.0.1"
+
+    fake_gomod = gen_module_gomodproxy(
+        version,
+        import_path,
+        (
+            (
+                "pkg/hello/hello.go",
+                dedent(
+                    """\
+        package hello
+        import "fmt"
+
+
+        func Hello() {
+            fmt.Println("Hello world!")
+        }
+        """
+                ),
+            ),
+            (
+                "cmd/hello/main.go",
+                dedent(
+                    f"""\
+        package main
+        import "{import_path}/pkg/hello"
+
+
+        func main() {{
+            hello.Hello()
+        }}
+        """
+                ),
+            ),
+        ),
+    )
+
+    fake_gomod.update(
+        {
+            "BUILD": dedent(
+                f"""\
+                go_mod(name='mod')
+                go_binary(name="bin", main='//:mod#{import_path}/cmd/hello')
+                """
+            ),
+            "go.mod": dedent(
+                f"""\
+                module go.example.com/foo
+                go 1.16
+
+                require (
+                \t{import_path} {version}
+                )
+                """
+            ),
+        }
+    )
+
+    rule_runner.write_files(fake_gomod)
+
+    rule_runner.set_options(
+        [
+            "--go-test-args=-v -bench=.",
+            f"--golang-subprocess-env-vars=GOPROXY=file://{rule_runner.build_root}/go-mod-proxy",
+            "--golang-subprocess-env-vars=GOSUMDB=off",
+        ],
+        env_inherit={"PATH"},
+    )
+
     binary_tgt = rule_runner.get_target(Address("", target_name="bin"))
     built_package = build_package(rule_runner, binary_tgt)
     assert len(built_package.artifacts) == 1

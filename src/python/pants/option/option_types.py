@@ -122,7 +122,7 @@ class _OptionBase(Generic[_OptT, _DefaultT]):
             to "#cores")
         :param fromfile: If True, allows the user to specify a string value (starting with "@")
             which represents a file to read the option's value from.
-        :param metvar: Sets what users see in `./pants help` as possible values for the flag.
+        :param metavar: Sets what users see in `./pants help` as possible values for the flag.
             The default is based on the option type (E.g. "<str>" or "<int>").
         :param mutually_exclusive_group: If specified disallows all other options using the same
             value to also be specified by the user.

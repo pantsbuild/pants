@@ -122,6 +122,7 @@ class BuildFileDefaultsParserState:
         *args: SetDefaultsT,
         all: SetDefaultsValueT | None = None,
         extend: bool = False,
+        ignore_unknown_fields: bool = False,
         **kwargs,
     ) -> None:
         defaults: dict[str, dict[str, Any]] = (
@@ -136,7 +137,7 @@ class BuildFileDefaultsParserState:
             )
 
         for arg in args:
-            self._process_defaults(defaults, arg)
+            self._process_defaults(defaults, arg, ignore_unknown_fields=ignore_unknown_fields)
 
         # Update with new defaults, dropping targets without any default values.
         for tgt, default in defaults.items():

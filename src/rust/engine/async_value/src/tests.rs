@@ -4,7 +4,6 @@ use crate::AsyncValue;
 
 use std::time::Duration;
 
-use tokio;
 use tokio::time::sleep;
 
 #[tokio::test]

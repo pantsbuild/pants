@@ -8,6 +8,7 @@ use grpc_util::tls;
 use hashing::Digest;
 use mock::StubCAS;
 use testutil::data::{TestData, TestDirectory};
+use tokio::io::AsyncReadExt;
 use workunit_store::WorkunitStore;
 
 use crate::remote::ByteStore;
@@ -25,6 +26,36 @@ async fn loads_file() {
       .unwrap(),
     Some(testdata.bytes())
   );
+}
+
+#[tokio::test]
+async fn loads_huge_file_via_temp_file() {
+  // 5MB of data
+  let testdata = TestData::new(&"12345".repeat(MEGABYTES));
+
+  let _ = WorkunitStore::setup_for_tests();
+  let cas = StubCAS::builder()
+    .chunk_size_bytes(MEGABYTES)
+    .file(&testdata)
+    .build();
+
+  let file = tokio::task::spawn_blocking(tempfile::tempfile)
+    .await
+    .unwrap()
+    .unwrap();
+  let file = tokio::fs::File::from_std(file);
+
+  let mut file = new_byte_store(&cas)
+    .load_file(testdata.digest(), file)
+    .await
+    .unwrap()
+    .unwrap();
+
+  let mut buf = String::new();
+  file.read_to_string(&mut buf).await.unwrap();
+  assert_eq!(buf.len(), testdata.len());
+  // (assert_eq! means failures unhelpfully print a 5MB string)
+  assert!(buf == testdata.string());
 }
 
 #[tokio::test]
@@ -74,8 +105,7 @@ async fn load_file_grpc_error() {
     .expect_err("Want error");
   assert!(
     error.contains("StubCAS is configured to always fail"),
-    "Bad error message, got: {}",
-    error
+    "Bad error message, got: {error}"
   )
 }
 
@@ -92,8 +122,7 @@ async fn load_directory_grpc_error() {
   .expect_err("Want error");
   assert!(
     error.contains("StubCAS is configured to always fail"),
-    "Bad error message, got: {}",
-    error
+    "Bad error message, got: {error}"
   )
 }
 
@@ -226,8 +255,7 @@ async fn write_file_errors() {
     .expect_err("Want error");
   assert!(
     error.contains("StubCAS is configured to always fail"),
-    "Bad error message, got: {}",
-    error
+    "Bad error message, got: {error}"
   );
 }
 
@@ -252,8 +280,7 @@ async fn write_connection_error() {
     .expect_err("Want error");
   assert!(
     error.contains("Unavailable: \"error trying to connect: dns error"),
-    "Bad error message, got: {}",
-    error
+    "Bad error message, got: {error}"
   );
 }
 
@@ -303,8 +330,7 @@ async fn list_missing_digests_error() {
     .expect_err("Want error");
   assert!(
     error.contains("StubCAS is configured to always fail"),
-    "Bad error message, got: {}",
-    error
+    "Bad error message, got: {error}"
   );
 }
 
@@ -325,14 +351,14 @@ fn new_byte_store(cas: &StubCAS) -> ByteStore {
 }
 
 pub async fn load_file_bytes(store: &ByteStore, digest: Digest) -> Result<Option<Bytes>, String> {
-  load_bytes(&store, digest).await
+  load_bytes(store, digest).await
 }
 
 pub async fn load_directory_proto_bytes(
   store: &ByteStore,
   digest: Digest,
 ) -> Result<Option<Bytes>, String> {
-  load_bytes(&store, digest).await
+  load_bytes(store, digest).await
 }
 
 async fn load_bytes(store: &ByteStore, digest: Digest) -> Result<Option<Bytes>, String> {

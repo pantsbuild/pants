@@ -80,6 +80,7 @@ def deploy(scope: str | None = None) -> None:
 
     local_path = "dist/deploy"
     s3_dest = "s3://binaries.pantsbuild.org"
+    s3_dest_region = "us-east-1"
     if scope:
         local_path = f"{local_path}/{scope}"
         s3_dest = f"{s3_dest}/{scope}"
@@ -87,6 +88,8 @@ def deploy(scope: str | None = None) -> None:
     _run(
         [
             "aws",
+            "--region",
+            s3_dest_region,
             "s3",
             "sync",
             # This instructs the sync command to ignore timestamps, which we must do to allow

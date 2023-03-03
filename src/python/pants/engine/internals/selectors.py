@@ -591,7 +591,7 @@ class Params:
 
 
 # A specification for how the native engine interacts with @rule coroutines:
-# - coroutines may await on any of `Get`, `MultiGet`, `Effect` or other coroutines decorated with `@rule_helper`.
+# - coroutines may await on any of `Get`, `MultiGet`, `Effect` or other coroutines.
 # - we will send back a single `Any` or a tuple of `Any` to the coroutine, depending upon the variant of `Get`.
 # - a coroutine will eventually return a single `Any`.
 RuleInput = Union[

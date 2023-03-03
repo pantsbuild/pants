@@ -41,7 +41,7 @@ from pants.engine.fs import (
     PathGlobs,
     Snapshot,
 )
-from pants.engine.rules import Get, MultiGet, collect_rules, rule, rule_helper
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import DependenciesRequest, ExplicitlyProvidedDependencies, Target, Targets
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
@@ -128,7 +128,6 @@ async def create_chart_from_artifact(fetched_artifact: FetchedHelmArtifact) -> H
     )
 
 
-@rule_helper
 async def _merge_subchart_digests(charts: Iterable[HelmChart]) -> Digest:
     prefixed_chart_digests = await MultiGet(
         Get(Digest, AddPrefix(chart.snapshot.digest, chart.name)) for chart in charts
@@ -137,7 +136,6 @@ async def _merge_subchart_digests(charts: Iterable[HelmChart]) -> Digest:
     return await Get(Digest, AddPrefix(merged_digests, "charts"))
 
 
-@rule_helper
 async def _get_subcharts(
     subtargets: Targets, *, description_of_origin: str
 ) -> tuple[HelmChart, ...]:

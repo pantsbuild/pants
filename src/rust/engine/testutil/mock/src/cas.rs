@@ -168,7 +168,7 @@ impl StubCASBuilder {
       always_errors: self.cas_always_errors,
       read_request_count: read_request_count.clone(),
       write_message_sizes: write_message_sizes.clone(),
-      required_auth_header: self.required_auth_token.map(|t| format!("Bearer {}", t)),
+      required_auth_header: self.required_auth_token.map(|t| format!("Bearer {t}")),
     };
 
     let action_map = Arc::new(Mutex::new(HashMap::new()));

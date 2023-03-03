@@ -24,7 +24,7 @@ def demo(...) -> Foo:
     ...
 ```
 
-You can use `logger.info`, `logger.warning`, `logger.error`, `logger.debug`, and `logger.trace`. You can then change your log level by setting the `-l`/`--level` option, e.g. `./pants -ldebug my-goal`.
+You can use `logger.info`, `logger.warning`, `logger.error`, `logger.debug`, and `logger.trace`. You can then change your log level by setting the `-l`/`--level` option, e.g. `pants -ldebug my-goal`.
 
 Changing the dynamic UI
 -----------------------
@@ -32,6 +32,6 @@ Changing the dynamic UI
 Streaming results (advanced)
 ----------------------------
 
-When you run `./pants fmt`, `./pants lint`, and `./pants test`, you may notice that we "stream" the results. As soon as an individual process finishes, we print the result, rather than waiting for all the processes to finish and dumping at the end.
+When you run `pants fmt`, `pants lint`, and `pants test`, you may notice that we "stream" the results. As soon as an individual process finishes, we print the result, rather than waiting for all the processes to finish and dumping at the end.
 
 We also set the log level dynamically. If something succeeds, we log the result at `INFO`, but if something fails, we use `WARN`.

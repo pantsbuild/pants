@@ -232,7 +232,9 @@ def run_pants(
 
 
 @contextmanager
-def setup_tmpdir(files: Mapping[str, str]) -> Iterator[str]:
+def setup_tmpdir(
+    files: Mapping[str, str], raw_files: Mapping[str, bytes] | None = None
+) -> Iterator[str]:
     """Create a temporary directory with the given files and return the tmpdir (relative to the
     build root).
 
@@ -240,15 +242,26 @@ def setup_tmpdir(files: Mapping[str, str]) -> Iterator[str]:
     with the tmpdir. The file content can use `{tmpdir}` to have it substituted with the actual
     tmpdir via a format string.
 
+    The `raw_files` parameter can be used to write binary files. These
+    files will not go through formatting in any way.
+
+
     This is useful to set up controlled test environments, such as setting up source files and
     BUILD files.
     """
+
+    raw_files = raw_files or {}
+
     with temporary_dir(root_dir=get_buildroot()) as tmpdir:
         rel_tmpdir = os.path.relpath(tmpdir, get_buildroot())
         for path, content in files.items():
             safe_file_dump(
                 os.path.join(tmpdir, path), content.format(tmpdir=rel_tmpdir), makedirs=True
             )
+
+        for path, data in raw_files.items():
+            safe_file_dump(os.path.join(tmpdir, path), data, makedirs=True, mode="wb")
+
         yield rel_tmpdir
 
 

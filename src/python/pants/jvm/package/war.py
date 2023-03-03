@@ -35,7 +35,7 @@ from pants.engine.fs import (
 )
 from pants.engine.internals.selectors import MultiGet
 from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import Get, collect_rules, rule, rule_helper
+from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import (
     DependenciesRequest,
     HydratedSources,
@@ -92,7 +92,6 @@ class RenderedWarContent:
     digest: Digest
 
 
-@rule_helper
 async def _apply_shading_rules_to_classpath(
     classpath: Classpath, shading_rules: Iterable[JvmShadingRule] | None
 ) -> Digest:

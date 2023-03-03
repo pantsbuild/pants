@@ -13,11 +13,11 @@ class BuildRoot(metaclass=SingletonMetaclass):
     """Represents the global workspace build root.
 
     By default a Pants workspace is defined by a root directory where one of multiple sentinel files
-    reside, such as `pants` or `BUILD_ROOT`. This path can also be manipulated through this
+    reside, such as `pants.toml` or `BUILD_ROOT`. This path can also be manipulated through this
     interface for re-location of the build root in tests.
     """
 
-    sentinel_files = ["pants", "BUILDROOT", "BUILD_ROOT"]
+    sentinel_files = ["pants.toml", "pants", "BUILDROOT", "BUILD_ROOT"]
 
     class NotFoundError(Exception):
         """Raised when unable to find the current workspace build root."""
@@ -46,7 +46,8 @@ class BuildRoot(metaclass=SingletonMetaclass):
     def path(self) -> str:
         """Returns the build root for the current workspace."""
         if self._root_dir is None:
-            # This env variable is for testing purpose.
+            # Do not remove/change this env var without coordinating with `pantsbuild/scie-pants` as
+            # it is being used when bootstrapping Pants.
             override_buildroot = os.environ.get("PANTS_BUILDROOT_OVERRIDE", None)
             if override_buildroot:
                 self._root_dir = override_buildroot

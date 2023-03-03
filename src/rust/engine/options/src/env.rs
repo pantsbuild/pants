@@ -29,7 +29,7 @@ impl Env {
       name
     )];
     if id.0 == Scope::Global {
-      names.push(format!("PANTS_{}", name));
+      names.push(format!("PANTS_{name}"));
     }
     if name.starts_with("PANTS_") {
       names.push(name);

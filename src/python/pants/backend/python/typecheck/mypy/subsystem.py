@@ -44,7 +44,7 @@ from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.lockfile_metadata import calculate_invalidation_digest
 from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.fs import EMPTY_DIGEST, Digest, DigestContents, FileContent
-from pants.engine.rules import Get, collect_rules, rule, rule_helper
+from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import (
     AllTargets,
     AllTargetsRequest,
@@ -156,13 +156,17 @@ class MyPy(PythonToolBase):
     extra_type_stubs = StrListOption(
         advanced=True,
         help=softwrap(
-            """
+            f"""
             Extra type stub requirements to install when running MyPy.
 
             Normally, type stubs can be installed as typical requirements, such as putting
             them in `requirements.txt` or using a `python_requirement` target.
             Alternatively, you can use this option so that the dependencies are solely
             used when running MyPy and are not runtime dependencies.
+
+            NOTE: Dependencies specified in this way are not visible to dependency inference,
+            and cannot be referenced as explicit dependencies. See {doc_url('python-check-goal')}
+            for more information about problems this can cause, and how to work around them.
 
             Expects a list of pip-style requirement strings, like
             `['types-requests==2.25.9']`.
@@ -217,8 +221,8 @@ class MyPy(PythonToolBase):
             requirements = PexRequirements(self.extra_type_stubs)
         else:
             tool_lockfile = Lockfile(
-                file_path=self.extra_type_stubs_lockfile,
-                file_path_description_of_origin=(
+                url=self.extra_type_stubs_lockfile,
+                url_description_of_origin=(
                     f"the option `[{self.options_scope}].extra_type_stubs_lockfile`"
                 ),
                 lockfile_hex_digest=calculate_invalidation_digest(self.extra_type_stubs),
@@ -344,7 +348,6 @@ async def mypy_first_party_plugins(
 # --------------------------------------------------------------------------------------
 
 
-@rule_helper
 async def _mypy_interpreter_constraints(
     mypy: MyPy, python_setup: PythonSetup
 ) -> InterpreterConstraints:
@@ -402,6 +405,7 @@ async def setup_mypy_extra_type_stubs_lockfile(
             interpreter_constraints=InterpreterConstraints(),
             resolve_name=request.resolve_name,
             lockfile_dest=mypy.extra_type_stubs_lockfile,
+            diff=False,
         )
 
     # While MyPy will run in partitions, we need a set of constraints that works with every
@@ -427,6 +431,7 @@ async def setup_mypy_extra_type_stubs_lockfile(
         interpreter_constraints=interpreter_constraints,
         resolve_name=request.resolve_name,
         lockfile_dest=mypy.extra_type_stubs_lockfile,
+        diff=False,
     )
 
 

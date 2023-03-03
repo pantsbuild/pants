@@ -30,9 +30,9 @@ fn create_local_runner() -> (Box<dyn CommandRunnerTrait>, Store, TempDir) {
   let store = Store::local_only(runtime.clone(), store_dir).unwrap();
   let runner = Box::new(crate::local::CommandRunner::new(
     store.clone(),
-    runtime.clone(),
+    runtime,
     base_dir.path().to_owned(),
-    NamedCaches::new(named_cache_dir),
+    NamedCaches::new_local(named_cache_dir),
     ImmutableInputs::new(store.clone(), base_dir.path()).unwrap(),
     KeepSandboxes::Never,
   ));
@@ -50,7 +50,7 @@ fn create_cached_runner(
   let cache = PersistentCache::new(
     cache_dir.path(),
     max_lmdb_size,
-    runtime.clone(),
+    runtime,
     DEFAULT_LEASE_TIME,
     1,
   )
@@ -96,13 +96,13 @@ async fn run_roundtrip(script_exit_code: i8, workunit: &mut RunningWorkunit) -> 
   let (process, script_path, _script_dir) = create_script(script_exit_code);
 
   let local_result = local
-    .run(Context::default(), workunit, process.clone().into())
+    .run(Context::default(), workunit, process.clone())
     .await;
 
   let (caching, _cache_dir) = create_cached_runner(local, store.clone());
 
   let uncached_result = caching
-    .run(Context::default(), workunit, process.clone().into())
+    .run(Context::default(), workunit, process.clone())
     .await;
 
   assert_eq!(local_result, uncached_result);
@@ -111,9 +111,7 @@ async fn run_roundtrip(script_exit_code: i8, workunit: &mut RunningWorkunit) -> 
   // fail due to a FileNotFound error. So, If the second run succeeds, that implies that the
   // cache was successfully used.
   std::fs::remove_file(&script_path).unwrap();
-  let maybe_cached_result = caching
-    .run(Context::default(), workunit, process.into())
-    .await;
+  let maybe_cached_result = caching.run(Context::default(), workunit, process).await;
 
   RoundtripResults {
     uncached: uncached_result,
@@ -147,7 +145,7 @@ async fn recover_from_missing_store_contents() {
 
   // Run once to cache the process.
   let first_result = caching
-    .run(Context::default(), &mut workunit, process.clone().into())
+    .run(Context::default(), &mut workunit, process.clone())
     .await
     .unwrap();
 
@@ -183,7 +181,7 @@ async fn recover_from_missing_store_contents() {
 
   // Ensure that we don't fail if we re-run.
   let second_result = caching
-    .run(Context::default(), &mut workunit, process.clone().into())
+    .run(Context::default(), &mut workunit, process.clone())
     .await
     .unwrap();
 

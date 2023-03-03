@@ -26,6 +26,7 @@ from pants.backend.python.target_types import (
     PexScriptField,
     PexShebangField,
     PexStripEnvField,
+    PexVenvHermeticScripts,
     PexVenvSitePackagesCopies,
     ResolvedPexEntryPoint,
     ResolvePexEntryPointRequest,
@@ -40,6 +41,7 @@ from pants.core.goals.package import (
 )
 from pants.core.goals.run import RunFieldSet, RunInSandboxBehavior
 from pants.core.target_types import FileSourceField
+from pants.core.util_rules.environments import EnvironmentField
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     TransitiveTargets,
@@ -81,6 +83,8 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
     include_sources: PexIncludeSourcesField
     include_tools: PexIncludeToolsField
     venv_site_packages_copies: PexVenvSitePackagesCopies
+    venv_hermetic_scripts: PexVenvHermeticScripts
+    environment: EnvironmentField
 
     @property
     def _execution_mode(self) -> PexExecutionMode:
@@ -106,6 +110,8 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
             args.append("--include-tools")
         if self.venv_site_packages_copies.value is True:
             args.append("--venv-site-packages-copies")
+        if self.venv_hermetic_scripts.value is False:
+            args.append("--non-hermetic-venv-scripts")
         return tuple(args)
 
 

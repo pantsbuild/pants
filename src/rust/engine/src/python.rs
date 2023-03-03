@@ -105,7 +105,7 @@ where
   T: Iterator,
   T::Item: fmt::Display,
 {
-  let mut items: Vec<_> = items.map(|p| format!("{}", p)).collect();
+  let mut items: Vec<_> = items.map(|p| format!("{p}")).collect();
   match items.len() {
     0 => "()".to_string(),
     1 => items.pop().unwrap(),
@@ -169,14 +169,14 @@ impl fmt::Debug for TypeId {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
     Python::with_gil(|py| {
       let name = self.as_py_type(py).name().unwrap();
-      write!(f, "{}", name)
+      write!(f, "{name}")
     })
   }
 }
 
 impl fmt::Display for TypeId {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-    write!(f, "{:?}", self)
+    write!(f, "{self:?}")
   }
 }
 
@@ -207,7 +207,7 @@ impl Function {
       let line_no: u64 = externs::getattr(obj, "__line_number__").unwrap();
       (module, name, line_no)
     });
-    format!("{}:{}:{}", module, line_no, name)
+    format!("{module}:{line_no}:{name}")
   }
 }
 
@@ -219,7 +219,7 @@ impl fmt::Debug for Function {
 
 impl fmt::Display for Function {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-    write!(f, "{:?}", self)
+    write!(f, "{self:?}")
   }
 }
 
@@ -253,7 +253,7 @@ impl fmt::Debug for Key {
 
 impl fmt::Display for Key {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-    write!(f, "{:?}", self)
+    write!(f, "{self:?}")
   }
 }
 
@@ -339,13 +339,13 @@ impl fmt::Debug for Value {
       let obj = (*self.0).as_ref(py);
       externs::val_to_str(obj)
     });
-    write!(f, "{}", repr)
+    write!(f, "{repr}")
   }
 }
 
 impl fmt::Display for Value {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-    write!(f, "{:?}", self)
+    write!(f, "{self:?}")
   }
 }
 
@@ -470,8 +470,7 @@ impl Failure {
           py_err.set_cause(py, Some(PyErr::from_value((*val.0).as_ref(py))));
           (
             format!(
-              "{}\nDuring handling of the above exception, another exception occurred:\n\n",
-              python_traceback
+              "{python_traceback}\nDuring handling of the above exception, another exception occurred:\n\n"
             ),
             engine_traceback,
           )
@@ -512,10 +511,7 @@ impl Failure {
   }
 
   pub fn native_traceback(msg: &str) -> String {
-    format!(
-      "Traceback (no traceback):\n  <pants native internals>\nException: {}",
-      msg
-    )
+    format!("Traceback (no traceback):\n  <pants native internals>\nException: {msg}")
   }
 }
 
@@ -547,7 +543,7 @@ impl fmt::Display for Failure {
           let obj = (*val.0).as_ref(py);
           externs::val_to_str(obj)
         });
-        write!(f, "{}", repr)
+        write!(f, "{repr}")
       }
     }
   }

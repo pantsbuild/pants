@@ -61,7 +61,7 @@ impl PyFailure {
     match &self.0 {
       Failure::Throw { val, .. } => val.into_py(py),
       f @ (Failure::Invalidated | Failure::MissingDigest { .. }) => {
-        EngineError::new_err(format!("{}", f))
+        EngineError::new_err(format!("{f}"))
       }
     }
   }
@@ -159,7 +159,7 @@ where
 {
   value
     .getattr(field)
-    .map_err(|e| format!("Could not get field `{}`: {:?}", field, e))?
+    .map_err(|e| format!("Could not get field `{field}`: {e:?}"))?
     .extract::<T>()
     .map_err(|e| {
       format!(
@@ -211,14 +211,10 @@ pub fn getattr_from_str_frozendict<'p, T: FromPyObject<'p>>(
     .collect()
 }
 
-pub fn getattr_as_optional_string(value: &PyAny, field: &str) -> Option<String> {
-  let v = value.getattr(field).unwrap();
-  if v.is_none() {
-    return None;
-  }
+pub fn getattr_as_optional_string(value: &PyAny, field: &str) -> PyResult<Option<String>> {
   // TODO: It's possible to view a python string as a `Cow<str>`, so we could avoid actually
   // cloning in some cases.
-  Some(v.extract().unwrap())
+  value.getattr(field)?.extract()
 }
 
 /// Call the equivalent of `str()` on an arbitrary Python object.
@@ -270,10 +266,9 @@ pub fn generator_send(
     (Some(arg), None) => arg.to_object(py),
     (None, Some(err)) => err.into_py(py),
     (None, None) => py.None(),
-    (Some(arg), Some(err)) => panic!(
-      "generator_send got both value and error: arg={:?}, err={:?}",
-      arg, err
-    ),
+    (Some(arg), Some(err)) => {
+      panic!("generator_send got both value and error: arg={arg:?}, err={err:?}")
+    }
   };
   let response = native_engine_generator_send
     .call1((generator.to_object(py), py_arg))
@@ -301,10 +296,7 @@ pub fn generator_send(
       .collect::<Result<Vec<_>, _>>()?;
     Ok(GeneratorResponse::GetMulti(gets))
   } else {
-    panic!(
-      "native_engine_generator_send returned unrecognized type: {:?}",
-      response
-    );
+    panic!("native_engine_generator_send returned unrecognized type: {response:?}");
   }
 }
 

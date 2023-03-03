@@ -43,6 +43,7 @@ from pants.backend.python.util_rules.pex_requirements import (
     PexRequirements as PexRequirements,  # Explicit re-export.
 )
 from pants.backend.python.util_rules.pex_requirements import (
+    Resolve,
     ResolvePexConfig,
     ResolvePexConfigRequest,
     validate_metadata,
@@ -57,7 +58,7 @@ from pants.engine.fs import EMPTY_DIGEST, AddPrefix, CreateDigest, Digest, FileC
 from pants.engine.internals.native_engine import Snapshot
 from pants.engine.internals.selectors import MultiGet
 from pants.engine.process import Process, ProcessCacheScope, ProcessResult
-from pants.engine.rules import Get, collect_rules, rule, rule_helper
+from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import HydratedSources, HydrateSourcesRequest, SourcesField, Targets
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
@@ -375,7 +376,6 @@ class _BuildPexPythonSetup:
     argv: list[str]
 
 
-@rule_helper
 async def _determine_pex_python_and_platforms(request: PexRequest) -> _BuildPexPythonSetup:
     # NB: If `--platform` is specified, this signals that the PEX should not be built locally.
     # `--interpreter-constraint` only makes sense in the context of building locally. These two
@@ -416,15 +416,14 @@ class _BuildPexRequirementsSetup:
     concurrency_available: int
 
 
-@rule_helper
 async def _setup_pex_requirements(
     request: PexRequest, python_setup: PythonSetup
 ) -> _BuildPexRequirementsSetup:
     resolve_name: str | None
     if isinstance(request.requirements, EntireLockfile):
         resolve_name = request.requirements.lockfile.resolve_name
-    elif isinstance(request.requirements.from_superset, LoadedLockfile):
-        resolve_name = request.requirements.from_superset.original_lockfile.resolve_name
+    elif isinstance(request.requirements.from_superset, Resolve):
+        resolve_name = request.requirements.from_superset.name
     else:
         # This implies that, currently, per-resolve options are only configurable for resolves.
         # However, if no resolve is specified, we will still load options that apply to every
@@ -436,26 +435,28 @@ async def _setup_pex_requirements(
     pip_resolver_args = [*resolve_config.pex_args(), "--resolver-version", "pip-2020-resolver"]
 
     if isinstance(request.requirements, EntireLockfile):
-        lockfile = await Get(LoadedLockfile, LoadedLockfileRequest(request.requirements.lockfile))
+        loaded_lockfile = await Get(
+            LoadedLockfile, LoadedLockfileRequest(request.requirements.lockfile)
+        )
         argv = (
-            ["--lock", lockfile.lockfile_path, *pex_lock_resolver_args]
-            if lockfile.is_pex_native
+            ["--lock", loaded_lockfile.lockfile_path, *pex_lock_resolver_args]
+            if loaded_lockfile.is_pex_native
             else
             # We use pip to resolve a requirements.txt pseudo-lockfile, possibly with hashes.
-            ["--requirement", lockfile.lockfile_path, "--no-transitive", *pip_resolver_args]
+            ["--requirement", loaded_lockfile.lockfile_path, "--no-transitive", *pip_resolver_args]
         )
-        if lockfile.metadata and request.requirements.complete_req_strings:
+        if loaded_lockfile.metadata and request.requirements.complete_req_strings:
             validate_metadata(
-                lockfile.metadata,
+                loaded_lockfile.metadata,
                 request.interpreter_constraints,
-                lockfile.original_lockfile,
+                loaded_lockfile.original_lockfile,
                 request.requirements.complete_req_strings,
                 python_setup,
                 resolve_config,
             )
 
         return _BuildPexRequirementsSetup(
-            [lockfile.lockfile_digest], argv, lockfile.requirement_estimate
+            [loaded_lockfile.lockfile_digest], argv, loaded_lockfile.requirement_estimate
         )
 
     # TODO: This is not the best heuristic for available concurrency, since the
@@ -471,8 +472,10 @@ async def _setup_pex_requirements(
             concurrency_available,
         )
 
-    if isinstance(request.requirements.from_superset, LoadedLockfile):
-        loaded_lockfile = request.requirements.from_superset
+    elif isinstance(request.requirements.from_superset, Resolve):
+        lockfile = await Get(Lockfile, Resolve, request.requirements.from_superset)
+        loaded_lockfile = await Get(LoadedLockfile, LoadedLockfileRequest(lockfile))
+
         # NB: This is also validated in the constructor.
         assert loaded_lockfile.is_pex_native
         if not request.requirements.req_strings:
@@ -500,7 +503,6 @@ async def _setup_pex_requirements(
         )
 
     # We use pip to perform a normal resolve.
-    assert request.requirements.from_superset is None
     digests = []
     argv = [*request.requirements.req_strings, *pip_resolver_args]
     if request.requirements.constraints_strings:
@@ -583,7 +585,7 @@ async def build_pex(
             subcommand=(),
             extra_args=argv,
             additional_input_digest=merged_digest,
-            description=_build_pex_description(request),
+            description=_build_pex_description(request, python_setup.resolves),
             output_files=output_files,
             output_directories=output_directories,
             concurrency_available=requirements_setup.concurrency_available,
@@ -611,16 +613,13 @@ async def build_pex(
     )
 
 
-def _build_pex_description(request: PexRequest) -> str:
+def _build_pex_description(request: PexRequest, resolve_to_lockfile: Mapping[str, str]) -> str:
     if request.description:
         return request.description
 
     if isinstance(request.requirements, EntireLockfile):
         lockfile = request.requirements.lockfile
-        if isinstance(lockfile, Lockfile):
-            desc_suffix = f"from {lockfile.file_path}"
-        else:
-            desc_suffix = f"from {lockfile.file_content.path}"
+        desc_suffix = f"from {lockfile.url}"
     else:
         if not request.requirements.req_strings:
             return f"Building {request.output_filename}"
@@ -633,8 +632,11 @@ def _build_pex_description(request: PexRequest) -> str:
                 {', '.join(request.requirements.req_strings)}
                 """
             )
-        elif isinstance(request.requirements.from_superset, LoadedLockfile):
-            lockfile_path = request.requirements.from_superset.lockfile_path
+        elif isinstance(request.requirements.from_superset, Resolve):
+            # At this point we know this is a valid user resolve, so we can assume
+            # it's available in the dict. Nonetheless we use get() so that any weird error
+            # here gives a bad message rather than an outright crash.
+            lockfile_path = resolve_to_lockfile.get(request.requirements.from_superset.name, "")
             return softwrap(
                 f"""
                 Building {pluralize(len(request.requirements.req_strings), 'requirement')}

@@ -7,6 +7,7 @@ import json
 import os.path
 import pkgutil
 import subprocess
+from dataclasses import dataclass
 from textwrap import dedent
 
 import pytest
@@ -264,3 +265,90 @@ def test_complete_platforms(rule_runner: RuleRunner) -> None:
             "p537-1.0.4-cp36-cp36m-macosx_10_13_x86_64.whl",
         ]
     ) == sorted(pex_info["distributions"])
+
+
+def test_non_hermetic_venv_scripts(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/py/project/app.py": dedent(
+                """\
+                import json
+                import os
+                import sys
+
+
+                json.dump(
+                    {
+                        "PYTHONPATH": os.environ.get("PYTHONPATH"),
+                        "sys.path": sys.path,
+                    },
+                    sys.stdout,
+                )
+                """
+            ),
+            "src/py/project/BUILD": dedent(
+                """\
+                python_sources(name="app")
+
+                pex_binary(
+                    name="hermetic",
+                    entry_point="app.py",
+                    execution_mode="venv",
+                    venv_hermetic_scripts=True,
+                    dependencies=[
+                        ":app",
+                    ],
+                )
+
+                pex_binary(
+                    name="non-hermetic",
+                    entry_point="app.py",
+                    execution_mode="venv",
+                    venv_hermetic_scripts=False,
+                    dependencies=[
+                        ":app",
+                    ],
+                )
+                """
+            ),
+        }
+    )
+
+    @dataclass(frozen=True)
+    class Results:
+        pythonpath: str | None
+        sys_path: list[str]
+
+    def execute_pex(address: Address, **extra_env) -> Results:
+        tgt = rule_runner.get_target(address)
+        field_set = PexBinaryFieldSet.create(tgt)
+        result = rule_runner.request(BuiltPackage, [field_set])
+        assert len(result.artifacts) == 1
+        rule_runner.write_digest(result.digest)
+        relpath = result.artifacts[0].relpath
+        assert relpath is not None
+        pex = os.path.join(rule_runner.build_root, relpath)
+        assert os.path.isfile(pex)
+        process = subprocess.run(
+            args=[pex],
+            env={**os.environ, **extra_env},
+            cwd=rule_runner.build_root,
+            stdout=subprocess.PIPE,
+            check=True,
+        )
+        data = json.loads(process.stdout)
+        return Results(pythonpath=data["PYTHONPATH"], sys_path=data["sys.path"])
+
+    bob_sys_path_entry = os.path.join(rule_runner.build_root, "bob")
+
+    hermetic_results = execute_pex(
+        Address("src/py/project", target_name="hermetic"), PYTHONPATH="bob"
+    )
+    assert "bob" == hermetic_results.pythonpath
+    assert bob_sys_path_entry not in hermetic_results.sys_path
+
+    non_hermetic_results = execute_pex(
+        Address("src/py/project", target_name="non-hermetic"), PYTHONPATH="bob"
+    )
+    assert "bob" == non_hermetic_results.pythonpath
+    assert bob_sys_path_entry in non_hermetic_results.sys_path

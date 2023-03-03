@@ -236,7 +236,7 @@ async def get_optional_source_roots(
 
     dir_to_root: dict[PurePath, OptionalSourceRoot] = {}
     for d in dirs:
-        root = await Get(OptionalSourceRoot, SourceRootRequest(d))
+        root = await Get(OptionalSourceRoot, SourceRootRequest(d))  # noqa: PNT30: requires triage
         dir_to_root[d] = root
 
     path_to_optional_root: dict[PurePath, OptionalSourceRoot] = {}

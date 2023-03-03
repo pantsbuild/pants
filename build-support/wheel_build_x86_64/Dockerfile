@@ -8,3 +8,8 @@ RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2
     ./aws/install && \
     rm -rf ./aws && \
     rm -f awscliv2.zip
+
+RUN groupadd -g 1000 gha && \
+    adduser -u 1000 -g 1000 gha
+
+USER gha

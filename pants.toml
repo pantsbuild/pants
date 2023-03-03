@@ -20,6 +20,7 @@ backend_packages.add = [
   "pants.backend.shell.lint.shfmt",
   "pants.backend.docker",
   "pants.backend.docker.lint.hadolint",
+  "pants.backend.experimental.adhoc",
   "pants.backend.experimental.go",
   "pants.backend.experimental.java",
   "pants.backend.experimental.java.lint.google_java_format",
@@ -75,6 +76,10 @@ unmatched_build_file_globs = "error"
 #   https://github.com/pantsbuild/pants/issues/16096.
 cache_content_behavior = "fetch"
 
+[DEFAULT]
+# Tell `scie-pants` to use our `./pants` bootstrap script.
+delegate_bootstrap = true
+
 [anonymous-telemetry]
 enabled = true
 repo_id = "7775F8D5-FC58-4DBC-9302-D00AE4A1505F"
@@ -91,7 +96,6 @@ root_patterns = [
   "test/*",
   "tests/*",
   "3rdparty/*",
-  "src/python/pants/backend/python/dependency_inference/scripts",
   "/build-support/bin",
   "/build-support/flake8",
   "/build-support/migration-support",
@@ -108,7 +112,7 @@ remote = "//:buildgrid_remote"
 
 [tailor]
 build_file_header = """\
-# Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 """
 ignore_paths = [
@@ -136,6 +140,7 @@ venv_use_symlinks = true
 interpreter_constraints = [">=3.7,<3.10"]
 macos_big_sur_compatibility = true
 enable_resolves = true
+pip_version = "23.0.1"
 
 [python.resolves]
 python-default = "3rdparty/python/user_reqs.lock"
@@ -212,6 +217,7 @@ template_by_globs = "@build-support/preambles/config.yaml"
 
 [generate-lockfiles]
 custom_command = "build-support/bin/generate_all_lockfiles.sh"
+diff = true
 
 [jvm]
 default_resolve = "jvm_testprojects"

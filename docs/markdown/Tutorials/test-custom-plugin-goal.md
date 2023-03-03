@@ -1,8 +1,8 @@
 ---
 title: "Testing plugins"
 slug: "test-custom-plugin-goal"
-excerpt: "How to write tests for your custom plugin code"
-hidden: true
+excerpt: "How to write tests for your custom plugin code."
+hidden: false
 createdAt: "2022-02-07T05:44:28.620Z"
 updatedAt: "2022-02-07T05:44:28.620Z"
 ---
@@ -18,7 +18,7 @@ To author a test suite, it may make sense to write a very high level test first 
 
 ## Testing with a complete Pants process
 
-Pants provides a convenient way to run a full Pants process as it would run on the command line. Writing such a test would be equal to having, say, a Shell script to confirm that the output of the `./pants project-version myapp:` command is `{"path": "myapp/VERSION", "version": "0.0.1"}`. Keep in mind that running custom scripts with this type of tests would require having a Pants repository set up (including the `pants.toml` configuration), creating `BUILD` metadata files and so on. When writing custom acceptance tests using `pants.testutil` package, you, in contrast, don't have to worry about that and can focus on testing your plugin logic in the very minimalistic environment containing only what's absolutely necessary to run your plugin code. 
+Pants provides a convenient way to run a full Pants process as it would run on the command line. Writing such a test would be equal to having, say, a Shell script to confirm that the output of the `pants project-version myapp:` command is `{"path": "myapp/VERSION", "version": "0.0.1"}`. Keep in mind that running custom scripts with this type of tests would require having a Pants repository set up (including the `pants.toml` configuration), creating `BUILD` metadata files and so on. When writing custom acceptance tests using `pants.testutil` package, you, in contrast, don't have to worry about that and can focus on testing your plugin logic in the very minimalistic environment containing only what's absolutely necessary to run your plugin code. 
 
 In the following code snippet, we define a set of files to be created (in a temporary directory that Pants manages for us), the backends to be used (Python and our custom plugin), and a Pants command to be run. By reading the `stdout` of a process, we can confirm the plugin works as expected (conveniently ignoring any unrelated warnings that Pants may have produced).
 
@@ -254,12 +254,12 @@ def test_get_git_version() -> None:
         mock_gets=[
             MockGet(
                 output_type=BinaryPaths,
-                input_type=BinaryPathRequest,
+                input_types=(BinaryPathRequest,),
                 mock=mock_binary_paths,
             ),
             MockGet(
                 output_type=ProcessResult,
-                input_type=Process,
+                input_types=(Process,),
                 mock=mock_process_git_describe,
             ),
         ],
@@ -272,7 +272,7 @@ You could write the helper functions returning the mock objects as lambdas, if y
 ```python
 MockGet(
     output_type=BinaryPaths,
-    input_type=BinaryPathRequest,
+    input_types=(BinaryPathRequest,),
     mock=lambda request: BinaryPaths(binary_name="git", paths=[BinaryPath("/usr/bin/git")]),
 ),
 ```
