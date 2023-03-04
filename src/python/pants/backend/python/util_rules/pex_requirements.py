@@ -502,6 +502,8 @@ def validate_metadata(
         metadata=metadata,
         validation=validation,
         lockfile=lockfile,
+        is_old_style_tool_lockfile=lockfile.resolve_name not in python_setup.resolves,
+        is_default_user_lockfile=lockfile.resolve_name == python_setup.default_resolve,
         user_interpreter_constraints=interpreter_constraints,
         user_requirements=user_requirements,
         maybe_constraints_file_path=(
@@ -557,12 +559,14 @@ def _invalid_lockfile_error(
     validation: LockfileMetadataValidation,
     lockfile: Lockfile,
     *,
+    is_old_style_tool_lockfile: bool,
+    is_default_user_lockfile: bool,
     user_requirements: set[PipRequirement],
     user_interpreter_constraints: InterpreterConstraints,
     maybe_constraints_file_path: str | None,
 ) -> Iterator[str]:
     resolve = lockfile.resolve_name
-    yield "You are using "
+    yield "\n\nYou are using "
     if lockfile.url.startswith("resource://"):
         yield f"the built-in `{resolve}` lockfile provided by Pants "
     else:
@@ -578,21 +582,40 @@ def _invalid_lockfile_error(
         for i in validation.failure_reasons
     ):
         yield softwrap(
-            f"""
+            """
             - The lockfile does not provide all the necessary requirements. You must
-            modify the input requirements and/or regenerate the lockfile (see below)`.
-
-            If `{resolve}` is a Python tool, the necessary requirements are specified by
-            `[{resolve}].version`, `[{resolve}].extra_requirements`, and/or
-            `[{resolve}].source_plugins`, and the custom lockfile destination is specified by
-            `[{resolve}].lockfile`.
-
-            Otherwise, the necessary requirements are specified by your code's dependencies,
-            and the lockfile destination is specified by `[python].resolves`.
-
-            See {doc_url('python-third-party-dependencies')} for details.
+            modify the input requirements and/or regenerate the lockfile (see below).
             """
         ) + "\n\n"
+        if is_old_style_tool_lockfile:
+            yield softwrap(
+                f"""
+            - The necessary requirements are specified by `[{resolve}].version`,
+            `[{resolve}].extra_requirements`, and/or `[{resolve}].source_plugins`.
+
+            - The custom lockfile destination is specified by `[{resolve}].lockfile`.
+            """
+            )
+        elif is_default_user_lockfile:
+            yield softwrap(
+                f"""
+            - The necessary requirements are specified by requirements targets marked with
+            `resolve="{resolve}"`, or those with no explicit resolve (since `{resolve}` is the
+            default for this repo).
+
+            - The lockfile destination is specified by the `{resolve}` key in `[python].resolves`.
+            """
+            )
+        else:
+            yield softwrap(
+                f"""
+                - The necessary requirements are specified by requirements targets marked with
+                `resolve="{resolve}"`.
+
+                - The lockfile destination is specified by the `{resolve}` key in
+                `[python].resolves`.
+                """
+            )
 
         if isinstance(metadata, PythonLockfileMetadataV2):
             # Note that by the time we have gotten to this error message, we should have already
@@ -600,36 +623,44 @@ def _invalid_lockfile_error(
             # pex_from_targets.py. This implies that we don't need to worry about users depending
             # on python_requirement targets that aren't in that code's resolve.
             not_in_lock = sorted(str(r) for r in user_requirements - metadata.requirements)
-            yield f"- The requirements not provided by the `{resolve}` resolve are: "
+            yield f"\n\n- The requirements not provided by the `{resolve}` resolve are:\n  "
             yield str(not_in_lock)
-            yield "\n\n"
 
     if InvalidPythonLockfileReason.INTERPRETER_CONSTRAINTS_MISMATCH in validation.failure_reasons:
+        yield "\n\n"
         yield softwrap(
             f"""
             - The inputs use interpreter constraints (`{user_interpreter_constraints}`) that
             are not a subset of those used to generate the lockfile
             (`{metadata.valid_for_interpreter_constraints}`).
-
-            If `{resolve}` is a Python tool, the input interpreter constraints may be
-            specified by `[{resolve}].interpreter_constraints` (if applicable).
-
-            Otherwise, the input interpreter constraints are specified by your code, using
+            """
+        )
+        if is_old_style_tool_lockfile:
+            yield softwrap(
+                """
+            - The input interpreter constraints may be specified by
+            `[{resolve}].interpreter_constraints` (if applicable).
+            """
+            )
+        else:
+            yield softwrap(
+                """
+            - The input interpreter constraints are specified by your code, using
             the `[python].interpreter_constraints` option and the `interpreter_constraints`
             target field.
 
-            To create a lockfile with new interpreter constraints, update the option
+            - To create a lockfile with new interpreter constraints, update the option
             `[python].resolves_to_interpreter_constraints`, and then generate the lockfile
             (see below).
-
-            See {doc_url('python-interpreter-compatibility')} for details.
             """
-        ) + "\n\n"
+            )
+        yield "\n\nSee {doc_url('python-interpreter-compatibility')} for details."
 
+    yield "\n\n"
     yield from _common_failure_reasons(validation.failure_reasons, maybe_constraints_file_path)
-
     yield "To regenerate your lockfile, "
     yield f"run `{bin_name()} generate-lockfiles --resolve={resolve}`."
+    yield f"\n\nSee {doc_url('python-third-party-dependencies')} for details.\n\n"
 
 
 def rules():
