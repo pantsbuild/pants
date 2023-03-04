@@ -18,6 +18,7 @@ from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import FieldSet, Target
 from pants.util.logging import LogLevel
+from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import pluralize
 
 
@@ -38,11 +39,30 @@ class GofmtRequest(FmtTargetsRequest):
     partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 
+class GoFmtUnsupportedArgsPassedError(Exception):
+    pass
+
+
+SupportedGoFmtArgs = FrozenOrderedSet(("-e", "-r", "-s"))
+
+
+async def _validate_gofmt_args(args: tuple[str, ...]):
+    """Validate that args passed to the gofmt are supported."""
+    if not set(args).issubset(SupportedGoFmtArgs):
+        raise GoFmtUnsupportedArgsPassedError(
+            f"Only {tuple(SupportedGoFmtArgs)} flags can be passed."
+        )
+
+
 @rule(desc="Format with gofmt")
-async def gofmt_fmt(request: GofmtRequest.Batch, goroot: GoRoot) -> FmtResult:
+async def gofmt_fmt(
+    request: GofmtRequest.Batch, gofmt: GofmtSubsystem, goroot: GoRoot
+) -> FmtResult:
+    await _validate_gofmt_args(gofmt.args)
     argv = (
         os.path.join(goroot.path, "bin/gofmt"),
         "-w",
+        *gofmt.args,
         # Filter out non-.go files, e.g. assembly sources, from the file list.
         *(f for f in request.files if f.endswith(".go")),
     )
