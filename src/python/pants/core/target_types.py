@@ -8,6 +8,7 @@ import os
 import urllib.parse
 from collections import defaultdict
 from dataclasses import dataclass
+from enum import Enum
 from pathlib import PurePath
 from typing import Generic, Optional, Sequence, TypeVar, Union, cast
 
@@ -29,7 +30,9 @@ from pants.engine.fs import (
     DownloadFile,
     FileDigest,
     FileEntry,
+    GlobMatchErrorBehavior,
     MergeDigests,
+    PathGlobs,
     RemovePrefix,
     Snapshot,
 )
@@ -48,6 +51,7 @@ from pants.engine.target import (
     HydrateSourcesRequest,
     InvalidFieldTypeException,
     MultipleSourcesField,
+    OptionalSingleSourceField,
     OverridesField,
     SingleSourceField,
     SourcesField,
@@ -60,6 +64,7 @@ from pants.engine.target import (
     generate_multiple_sources_field_help_message,
 )
 from pants.engine.unions import UnionRule
+from pants.option.global_options import UnmatchedBuildFileGlobs
 from pants.util.docutil import bin_name
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
@@ -858,9 +863,30 @@ async def package_archive_target(field_set: ArchiveFieldSet) -> BuiltPackage:
 # -----------------------------------------------------------------------------------------------
 
 
-class LockfileSourceField(SingleSourceField):
+class _IgnoreUnmatchedBuildFileGlobs(Enum):
+    ignore = "ignore"
+
+    @staticmethod
+    def as_unmatched_build_file_globs() -> UnmatchedBuildFileGlobs:
+        return cast(UnmatchedBuildFileGlobs, _IgnoreUnmatchedBuildFileGlobs.ignore)
+
+    def to_glob_match_error_behavior(self) -> GlobMatchErrorBehavior:
+        return GlobMatchErrorBehavior.ignore
+
+
+class LockfileSourceField(OptionalSingleSourceField):
+    """Source field for synthesized `_lockfile` targets.
+
+    It is special in that it always ignores any missing files, regardless of the global
+    `--unmatched-build-file-globs` option.
+    """
+
     uses_source_roots = False
     required = True
+    value: str
+
+    def path_globs(self, unmatched_build_file_globs: UnmatchedBuildFileGlobs) -> PathGlobs:  # type: ignore[misc]
+        return super().path_globs(_IgnoreUnmatchedBuildFileGlobs.as_unmatched_build_file_globs())
 
 
 class LockfileDependenciesField(Dependencies):
