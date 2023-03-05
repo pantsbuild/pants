@@ -1076,10 +1076,15 @@ def generate() -> dict[Path, str]:
     test_yaml = yaml.dump(
         {
             "name": test_workflow_name,
+            "concurrency": {
+                "group": "${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}",
+                "cancel-in-progress": True,
+            },
             "on": {"pull_request": {}, "push": {"branches-ignore": ["dependabot/**"]}},
             "jobs": pr_jobs,
             "env": global_env(),
         },
+        width=120,
         Dumper=NoAliasDumper,
     )
 
@@ -1092,37 +1097,6 @@ def generate() -> dict[Path, str]:
             "env": global_env(),
         },
         Dumper=NoAliasDumper,
-    )
-
-    cancel_yaml = yaml.dump(
-        {
-            # Note that this job runs in the context of the default branch, so its token
-            # has permission to cancel workflows (i.e., it is not the PR's read-only token).
-            "name": "Cancel",
-            "on": {
-                "workflow_run": {
-                    "workflows": [test_workflow_name],
-                    "types": ["requested"],
-                    # Never cancel branch builds for `main` and release branches.
-                    "branches-ignore": ["main", "2.*.x"],
-                }
-            },
-            "jobs": {
-                "cancel": {
-                    "runs-on": "ubuntu-latest",
-                    "if": IS_PANTS_OWNER,
-                    "steps": [
-                        {
-                            "uses": "styfle/cancel-workflow-action@0.9.1",
-                            "with": {
-                                "workflow_id": f"{gha_expr('github.event.workflow.id')}",
-                                "access_token": f"{gha_expr('github.token')}",
-                            },
-                        }
-                    ],
-                }
-            },
-        }
     )
 
     audit_yaml = yaml.dump(
@@ -1173,7 +1147,6 @@ def generate() -> dict[Path, str]:
     return {
         Path(".github/workflows/audit.yaml"): f"{HEADER}\n\n{audit_yaml}",
         Path(".github/workflows/cache_comparison.yaml"): f"{HEADER}\n\n{cache_comparison_yaml}",
-        Path(".github/workflows/cancel.yaml"): f"{HEADER}\n\n{cancel_yaml}",
         Path(".github/workflows/test.yaml"): f"{HEADER}\n\n{test_yaml}",
         Path(".github/workflows/test-cron.yaml"): f"{HEADER}\n\n{test_cron_yaml}",
         Path(".github/workflows/release.yaml"): f"{HEADER}\n\n{release_yaml}",

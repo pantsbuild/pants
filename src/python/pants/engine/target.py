@@ -1800,7 +1800,7 @@ class SequenceField(Generic[T], Field):
 
             @classmethod
             def compute_value(
-                cls, raw_value: Optional[Iterable[MyPluginObject]], *, address: Address
+                cls, raw_value: Optional[Iterable[MyPluginObject]], address: Address
             ) -> Optional[Tuple[MyPluginObject, ...]]:
                 return super().compute_value(raw_value, address=address)
     """

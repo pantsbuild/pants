@@ -6,24 +6,30 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass
-from typing import Iterable
+from typing import Iterable, Mapping
 
 from pants.backend.adhoc.target_types import (
     SystemBinaryExtraSearchPathsField,
     SystemBinaryFingerprintArgsField,
+    SystemBinaryFingerprintDependenciesField,
     SystemBinaryFingerprintPattern,
     SystemBinaryNameField,
 )
+from pants.build_graph.address import Address
 from pants.core.goals.run import RunFieldSet, RunInSandboxBehavior, RunRequest
+from pants.core.util_rules.adhoc_process_support import (
+    ResolvedExecutionDependencies,
+    ResolveExecutionDependenciesRequest,
+)
 from pants.core.util_rules.system_binaries import (
     SEARCH_PATHS,
     BinaryPath,
     BinaryPathRequest,
     BinaryPaths,
-    BinaryPathTest,
 )
-from pants.engine.internals.native_engine import EMPTY_DIGEST
-from pants.engine.internals.selectors import Get
+from pants.engine.internals.native_engine import EMPTY_DIGEST, Digest
+from pants.engine.internals.selectors import Get, MultiGet
+from pants.engine.process import FallibleProcessResult, Process
 from pants.engine.rules import collect_rules, rule
 from pants.util.logging import LogLevel
 
@@ -39,26 +45,24 @@ class SystemBinaryFieldSet(RunFieldSet):
         SystemBinaryExtraSearchPathsField,
         SystemBinaryFingerprintPattern,
         SystemBinaryFingerprintArgsField,
+        SystemBinaryFingerprintDependenciesField,
     )
 
     name: SystemBinaryNameField
     extra_search_paths: SystemBinaryExtraSearchPathsField
     fingerprint_pattern: SystemBinaryFingerprintPattern
     fingerprint_argv: SystemBinaryFingerprintArgsField
+    fingerprint_dependencies: SystemBinaryFingerprintDependenciesField
 
 
 async def _find_binary(
+    address: Address,
     binary_name: str,
     extra_search_paths: Iterable[str],
     fingerprint_pattern: str | None,
     fingerprint_args: tuple[str, ...] | None,
+    fingerprint_dependencies: tuple[str, ...] | None,
 ) -> BinaryPath:
-
-    test = (
-        BinaryPathTest(fingerprint_args or (), fingerprint_stdout=False)
-        if fingerprint_pattern
-        else None
-    )
 
     search_paths = tuple(extra_search_paths) + SEARCH_PATHS
 
@@ -67,13 +71,46 @@ async def _find_binary(
         BinaryPathRequest(
             binary_name=binary_name,
             search_path=search_paths,
-            test=test,
         ),
     )
 
-    for binary in binaries.paths:
+    fingerprint_args = fingerprint_args or ()
+
+    deps = await Get(
+        ResolvedExecutionDependencies,
+        ResolveExecutionDependenciesRequest(address, (), None, fingerprint_dependencies),
+    )
+    rds = deps.runnable_dependencies
+    env: dict[str, str] = {}
+    append_only_caches: Mapping[str, str] = {}
+    immutable_input_digests: Mapping[str, Digest] = {}
+    if rds:
+        env = {"PATH": rds.path_component}
+        env.update(**(rds.extra_env or {}))
+        append_only_caches = rds.append_only_caches
+        immutable_input_digests = rds.immutable_input_digests
+
+    tests: tuple[FallibleProcessResult, ...] = await MultiGet(
+        Get(
+            FallibleProcessResult,
+            Process(
+                description=f"Testing candidate for `{binary_name}` at `{path.path}`",
+                argv=(path.path,) + fingerprint_args,
+                input_digest=deps.digest,
+                env=env,
+                append_only_caches=append_only_caches,
+                immutable_input_digests=immutable_input_digests,
+            ),
+        )
+        for path in binaries.paths
+    )
+
+    for test, binary in zip(tests, binaries.paths):
+        if test.exit_code != 0:
+            continue
+
         if fingerprint_pattern:
-            fingerprint = binary.fingerprint.strip()
+            fingerprint = test.stdout.decode().strip()
             match = re.match(fingerprint_pattern, fingerprint)
             if not match:
                 continue
@@ -98,10 +135,12 @@ async def create_system_binary_run_request(field_set: SystemBinaryFieldSet) -> R
     extra_search_paths = field_set.extra_search_paths.value or ()
 
     path = await _find_binary(
+        field_set.address,
         field_set.name.value,
         extra_search_paths,
         field_set.fingerprint_pattern.value,
         field_set.fingerprint_argv.value,
+        field_set.fingerprint_dependencies.value,
     )
 
     return RunRequest(
