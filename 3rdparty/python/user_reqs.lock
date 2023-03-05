@@ -21,6 +21,7 @@
 //     "ijson==3.1.4",
 //     "importlib_resources==5.0.*",
 //     "mypy-typing-asserts==0.1.1",
+//     "node-semver==0.9.0",
 //     "packaging==21.3",
 //     "pex==2.1.129",
 //     "psutil==5.9.0",
@@ -1047,6 +1048,26 @@
           "requires_dists": [],
           "requires_python": "<4.0,>=3.7",
           "version": "0.1.1"
+        },
+        {
+          "artifacts": [
+            {
+              "algorithm": "sha256",
+              "hash": "8153270903772b1e59500ced6f0aca0f7bdb021651c27584e9283b7077b4916b",
+              "url": "https://files.pythonhosted.org/packages/1a/4b/180481021692a76dc91f46fa6a49cdef4c3e630c77a83b7fda3f4eb7aa04/node_semver-0.9.0-py3-none-any.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "04aa0b0016dbc06748d6378c42d8cf82a343415bd9fca6284f488041d08b33bb",
+              "url": "https://files.pythonhosted.org/packages/eb/c5/e823658f716b17ab1c52d68ed13a0e09c0130af052401a26b5738e4290cc/node-semver-0.9.0.tar.gz"
+            }
+          ],
+          "project_name": "node-semver",
+          "requires_dists": [
+            "pytest; extra == \"testing\""
+          ],
+          "requires_python": null,
+          "version": "0.9.0"
         },
         {
           "artifacts": [
@@ -2787,6 +2808,7 @@
     "ijson==3.1.4",
     "importlib_resources==5.0.*",
     "mypy-typing-asserts==0.1.1",
+    "node-semver==0.9.0",
     "packaging==21.3",
     "pex==2.1.129",
     "psutil==5.9.0",
