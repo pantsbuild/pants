@@ -69,7 +69,7 @@ from pants.util.ordered_set import FrozenOrderedSet
         ),
     ),
 )
-def test_preprocessed_interpreter_search_paths(
+def test_validated_search_paths(
     env_tgt_type: type[LocalEnvironmentTarget]
     | type[DockerEnvironmentTarget]
     | type[RemoteEnvironmentTarget],
