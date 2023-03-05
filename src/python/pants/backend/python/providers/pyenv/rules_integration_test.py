@@ -45,7 +45,7 @@ def run_run_request(
     target: Target,
 ) -> str:
     args = [
-        "--backend-packages=['pants.backend.python', 'pants.backend.python.providers.pyenv']",
+        "--backend-packages=['pants.backend.python', 'pants.backend.python.providers.experimental.pyenv']",
         "--source-root-patterns=['src']",
     ]
     rule_runner.set_options(args, env_inherit={"PATH", "PYENV_ROOT", "HOME"})
