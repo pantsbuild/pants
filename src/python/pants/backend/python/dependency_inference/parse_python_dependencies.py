@@ -192,6 +192,7 @@ async def parse_python_dependencies(
                 file,
             ],
             input_digest=input_digest,
+            append_only_caches=python_interpreter.append_only_caches,
             description=f"Determine Python dependencies for {request.source.address}",
             env=parser_script.env,
             level=LogLevel.DEBUG,

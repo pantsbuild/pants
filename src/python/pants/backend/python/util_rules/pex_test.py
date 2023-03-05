@@ -609,8 +609,8 @@ def test_venv_pex_resolve_info(rule_runner: RuleRunner, pex_type: type[Pex | Ven
 
 
 def test_determine_pex_python_and_platforms() -> None:
-    hardcoded_python = PythonExecutable("hardcoded/python")
-    discovered_python = PythonExecutable("discovered/python")
+    hardcoded_python = PythonExecutable("/hardcoded/python")
+    discovered_python = PythonExecutable("/discovered/python")
     ics = InterpreterConstraints(["==3.7"])
 
     def assert_setup(
