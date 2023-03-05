@@ -8,7 +8,6 @@ import os
 import urllib.parse
 from collections import defaultdict
 from dataclasses import dataclass
-from enum import Enum
 from pathlib import PurePath
 from typing import Generic, Optional, Sequence, TypeVar, Union, cast
 
@@ -30,7 +29,6 @@ from pants.engine.fs import (
     DownloadFile,
     FileDigest,
     FileEntry,
-    GlobMatchErrorBehavior,
     MergeDigests,
     PathGlobs,
     RemovePrefix,
@@ -863,17 +861,6 @@ async def package_archive_target(field_set: ArchiveFieldSet) -> BuiltPackage:
 # -----------------------------------------------------------------------------------------------
 
 
-class _IgnoreUnmatchedBuildFileGlobs(Enum):
-    ignore = "ignore"
-
-    @staticmethod
-    def as_unmatched_build_file_globs() -> UnmatchedBuildFileGlobs:
-        return cast(UnmatchedBuildFileGlobs, _IgnoreUnmatchedBuildFileGlobs.ignore)
-
-    def to_glob_match_error_behavior(self) -> GlobMatchErrorBehavior:
-        return GlobMatchErrorBehavior.ignore
-
-
 class LockfileSourceField(OptionalSingleSourceField):
     """Source field for synthesized `_lockfile` targets.
 
@@ -886,7 +873,7 @@ class LockfileSourceField(OptionalSingleSourceField):
     value: str
 
     def path_globs(self, unmatched_build_file_globs: UnmatchedBuildFileGlobs) -> PathGlobs:  # type: ignore[misc]
-        return super().path_globs(_IgnoreUnmatchedBuildFileGlobs.as_unmatched_build_file_globs())
+        return super().path_globs(UnmatchedBuildFileGlobs.ignore())
 
 
 class LockfileDependenciesField(Dependencies):

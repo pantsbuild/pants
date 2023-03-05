@@ -436,13 +436,15 @@ def test_invalid_http_source(kwargs, exc_match):
 
 
 @pytest.mark.parametrize(
-    "unmatched_build_file_globs", [UnmatchedBuildFileGlobs.warn, UnmatchedBuildFileGlobs.error]
+    "error_behavior", [GlobMatchErrorBehavior.warn, GlobMatchErrorBehavior.error]
 )
 def test_lockfile_glob_match_error_behavior(
-    unmatched_build_file_globs: UnmatchedBuildFileGlobs,
+    error_behavior: GlobMatchErrorBehavior,
 ) -> None:
     lockfile_source = LockfileSourceField("test.lock", Address("", target_name="lockfile-test"))
     assert (
         GlobMatchErrorBehavior.ignore
-        == lockfile_source.path_globs(unmatched_build_file_globs).glob_match_error_behavior
+        == lockfile_source.path_globs(
+            UnmatchedBuildFileGlobs(error_behavior)
+        ).glob_match_error_behavior
     )
