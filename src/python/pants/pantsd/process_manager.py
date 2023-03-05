@@ -470,6 +470,7 @@ class ProcessManager:
         self.purge_metadata()
         self.pre_fork(**pre_fork_opts or {})
         pid = os.fork()
+        os.environ.setdefault("PANTS_WORK_DIR", os.getcwd())
         if pid == 0:
             # fork's child execution
             try:
