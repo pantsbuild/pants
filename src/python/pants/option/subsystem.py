@@ -135,7 +135,7 @@ class Subsystem(metaclass=_SubsystemMeta):
             assert isinstance(v, OptionsInfo)
 
             return (
-                self.options.is_default(__name)
+                self.options.is_default(__name.lstrip("_"))
                 and resolve_environment_sensitive_option(v.flag_names[0], self) is None
             )
 

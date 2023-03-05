@@ -65,7 +65,7 @@ async def resolve_go_bootstrap(
             search_paths=tuple(golang_env_aware.raw_go_search_paths),
             option_origin=f"[{GolangSubsystem.options_scope}].go_search_paths",
             environment_key="golang_go_search_paths",
-            is_default=golang_env_aware._is_default("go_search_paths"),
+            is_default=golang_env_aware._is_default("_go_search_paths"),
             local_only=FrozenOrderedSet((AsdfPathString.STANDARD, AsdfPathString.LOCAL)),
         ),
     )
