@@ -13,7 +13,7 @@ from pex.variables import Variables
 
 from pants.base.build_environment import get_buildroot
 from pants.core.util_rules import asdf
-from pants.core.util_rules.asdf import AsdfToolPathsRequest, AsdfToolPathsResult
+from pants.core.util_rules.asdf import AsdfPathString, AsdfToolPathsResult
 from pants.core.util_rules.environments import EnvironmentTarget, LocalEnvironmentTarget
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest, PathEnvironmentVariable
 from pants.engine.rules import Get, _uncacheable_rule, collect_rules, rule
@@ -40,7 +40,7 @@ class PythonBootstrapSubsystem(Subsystem):
         search_path = StrListOption(
             default=["<PYENV>", "<PATH>"],
             help=softwrap(
-                """
+                f"""
                 A list of paths to search for Python interpreters.
 
                 Which interpreters are actually used from these paths is context-specific:
@@ -59,9 +59,8 @@ class PythonBootstrapSubsystem(Subsystem):
 
                 When the environment is a `local_environment` target:
 
-                * `<ASDF>`, all Python versions currently configured by ASDF \
-                    `(asdf shell, ${HOME}/.tool-versions)`, with a fallback to all installed versions
-                * `<ASDF_LOCAL>`, the ASDF interpreter with the version in BUILD_ROOT/.tool-versions
+                * `{AsdfPathString.STANDARD}`, {AsdfPathString.STANDARD.description("Python")}
+                * `{AsdfPathString.LOCAL}`, {AsdfPathString.LOCAL.description("interpreter")}
                 * `<PYENV>`, all Python versions under $(pyenv root)/versions
                 * `<PYENV_LOCAL>`, the Pyenv interpreter with the version in BUILD_ROOT/.python-version
                 * `<PEXRC>`, paths in the PEX_PYTHON_PATH variable in /etc/pexrc or ~/.pexrc
@@ -116,36 +115,24 @@ async def _expand_interpreter_search_paths(
 
     interpreter_search_paths, env_tgt = (request.interpreter_search_paths, request.env_tgt)
 
-    has_asdf_standard_path_token, has_asdf_local_path_token = _contains_asdf_path_tokens(
-        interpreter_search_paths
+    asdf_paths = await AsdfToolPathsResult.get_un_cachable_search_paths(
+        interpreter_search_paths,
+        env_tgt=env_tgt,
+        tool_name="python",
+        tool_description="Python interpreters",
+        paths_option_name="[python-bootstrap].search_path",
     )
 
-    if has_asdf_standard_path_token or has_asdf_local_path_token:
-        # `AsdfToolPathsResult` is uncacheable, so don't request it unless we actually need it.
-        asdf_paths = await Get(
-            AsdfToolPathsResult,
-            AsdfToolPathsRequest(
-                env_tgt=env_tgt,
-                tool_name="python",
-                tool_description="Python interpreters",
-                resolve_standard=has_asdf_standard_path_token,
-                resolve_local=has_asdf_local_path_token,
-                paths_option_name="[python-bootstrap].search_path",
-            ),
-        )
-
-        asdf_standard_tool_paths, asdf_local_tool_paths = (
-            asdf_paths.standard_tool_paths,
-            asdf_paths.local_tool_paths,
-        )
-    else:
-        asdf_local_tool_paths, asdf_standard_tool_paths = (), ()
+    asdf_standard_tool_paths, asdf_local_tool_paths = (
+        asdf_paths.standard_tool_paths,
+        asdf_paths.local_tool_paths,
+    )
 
     special_strings = {
         "<PEXRC>": _get_pex_python_paths,
         "<PATH>": lambda: path_env,
-        "<ASDF>": lambda: asdf_standard_tool_paths,
-        "<ASDF_LOCAL>": lambda: asdf_local_tool_paths,
+        AsdfPathString.STANDARD: lambda: asdf_standard_tool_paths,
+        AsdfPathString.LOCAL: lambda: asdf_local_tool_paths,
     }
 
     expanded: list[str] = []
@@ -189,18 +176,6 @@ def _get_pex_python_paths():
         return ppp.split(os.pathsep)
     else:
         return []
-
-
-def _contains_asdf_path_tokens(interpreter_search_paths: Iterable[str]) -> tuple[bool, bool]:
-    """Returns tuple of whether the path list contains standard or local ASDF path tokens."""
-    standard_path_token = False
-    local_path_token = False
-    for interpreter_search_path in interpreter_search_paths:
-        if interpreter_search_path == "<ASDF>":
-            standard_path_token = True
-        elif interpreter_search_path == "<ASDF_LOCAL>":
-            local_path_token = True
-    return standard_path_token, local_path_token
 
 
 @_uncacheable_rule
@@ -289,7 +264,13 @@ def _preprocessed_interpreter_search_paths(
     if env is None or isinstance(env, LocalEnvironmentTarget):
         return search_paths
 
-    not_allowed = {"<PYENV>", "<PYENV_LOCAL>", "<ASDF>", "<ASDF_LOCAL>", "<PEXRC>"}
+    not_allowed = {
+        "<PYENV>",
+        "<PYENV_LOCAL>",
+        AsdfPathString.STANDARD,
+        AsdfPathString.LOCAL,
+        "<PEXRC>",
+    }
 
     if is_default:
         # Strip out the not-allowed special strings from search_paths.

@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Iterable
+from typing import Callable, Iterable
 
 from pants.backend.go.subsystems.golang import GolangSubsystem
 from pants.core.util_rules import asdf
-from pants.core.util_rules.asdf import AsdfToolPathsRequest, AsdfToolPathsResult
+from pants.core.util_rules.asdf import AsdfPathString, AsdfToolPathsResult
 from pants.core.util_rules.environments import EnvironmentTarget, LocalEnvironmentTarget
 from pants.engine.env_vars import PathEnvironmentVariable
 from pants.engine.internals.selectors import Get
@@ -26,32 +26,19 @@ class GoBootstrap:
 async def _go_search_paths(
     env_tgt: EnvironmentTarget, golang_subsystem: GolangSubsystem, paths: Iterable[str]
 ) -> tuple[str, ...]:
-
-    resolve_standard, resolve_local = "<ASDF>" in paths, "<ASDF_LOCAL>" in paths
-
-    if resolve_standard or resolve_local:
-        # AsdfToolPathsResult is uncacheable, so only request it if absolutely necessary.
-        asdf_result = await Get(
-            AsdfToolPathsResult,
-            AsdfToolPathsRequest(
-                env_tgt=env_tgt,
-                tool_name=golang_subsystem.asdf_tool_name,
-                tool_description="Go distribution",
-                resolve_standard=resolve_standard,
-                resolve_local=resolve_local,
-                paths_option_name="[golang].go_search_paths",
-                bin_relpath=golang_subsystem.asdf_bin_relpath,
-            ),
-        )
-        asdf_standard_tool_paths = asdf_result.standard_tool_paths
-        asdf_local_tool_paths = asdf_result.local_tool_paths
-    else:
-        asdf_standard_tool_paths = ()
-        asdf_local_tool_paths = ()
-
-    special_strings = {
-        "<ASDF>": lambda: asdf_standard_tool_paths,
-        "<ASDF_LOCAL>": lambda: asdf_local_tool_paths,
+    asdf_result = await AsdfToolPathsResult.get_un_cachable_search_paths(
+        paths,
+        env_tgt=env_tgt,
+        tool_name=golang_subsystem.asdf_tool_name,
+        tool_description="Go distribution",
+        paths_option_name="[golang].go_search_paths",
+        bin_relpath=golang_subsystem.asdf_bin_relpath,
+    )
+    asdf_standard_tool_paths = asdf_result.standard_tool_paths
+    asdf_local_tool_paths = asdf_result.local_tool_paths
+    special_strings: dict[str, Callable[[], Iterable[str]]] = {
+        AsdfPathString.STANDARD: lambda: asdf_standard_tool_paths,
+        AsdfPathString.LOCAL: lambda: asdf_local_tool_paths,
     }
 
     expanded: list[str] = []
@@ -81,7 +68,7 @@ def _error_if_not_compatible_with_asdf(
     if env is None or isinstance(env, LocalEnvironmentTarget):
         return
 
-    not_allowed = {"<ASDF>", "<ASDF_LOCAL>"}
+    not_allowed = {AsdfPathString.STANDARD, AsdfPathString.LOCAL}
 
     any_not_allowed = set(_search_paths) & not_allowed
     if any_not_allowed:
