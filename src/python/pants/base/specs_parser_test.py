@@ -55,7 +55,7 @@ def file_glob(val: str) -> FileGlobSpec:
 def assert_spec_parsed(
     build_root: Path, spec_str: str, expected_spec: Spec, work_dir: str | None = None
 ) -> None:
-    parser = SpecsParser(str(build_root), work_dir)
+    parser = SpecsParser(root_dir=str(build_root), work_dir=work_dir)
     spec, is_ignore = parser.parse_spec(spec_str)
     assert isinstance(spec, type(expected_spec))
     assert spec == expected_spec

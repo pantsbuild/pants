@@ -16,7 +16,7 @@ from typing import Callable, cast
 import psutil
 
 from pants.base.build_environment import get_buildroot
-from pants.bin.pants_env_vars import DAEMON_ENTRYPOINT
+from pants.bin.pants_env_vars import DAEMON_ENTRYPOINT, WORK_DIR
 from pants.option.options import Options
 from pants.option.options_fingerprinter import OptionsFingerprinter
 from pants.option.scope import GLOBAL_SCOPE
@@ -470,7 +470,7 @@ class ProcessManager:
         self.purge_metadata()
         self.pre_fork(**pre_fork_opts or {})
         pid = os.fork()
-        os.environ.setdefault("PANTS_WORK_DIR", os.getcwd())
+        os.environ.setdefault(WORK_DIR, os.getcwd())
         if pid == 0:
             # fork's child execution
             try:

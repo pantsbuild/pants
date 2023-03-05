@@ -4,12 +4,14 @@
 from __future__ import annotations
 
 import logging
+import os
 import sys
 from dataclasses import dataclass
 
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE, ExitCode
 from pants.base.specs import Specs
 from pants.base.specs_parser import SpecsParser
+from pants.bin.pants_env_vars import WORK_DIR
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.core.util_rules.environments import determine_bootstrap_environment
 from pants.engine.env_vars import CompleteEnvironmentVars
@@ -237,14 +239,14 @@ class LocalPantsRunner:
             return PANTS_FAILED_EXIT_CODE
 
     def run(self, start_time: float) -> ExitCode:
-        global_options = self.options.for_global_scope()
-        spec_parser = SpecsParser(work_dir=global_options.work_dir)
+        spec_parser = SpecsParser(work_dir=os.getenv(WORK_DIR))
         specs = []
         for spec_str in self.options.specs:
             spec, is_ignore = spec_parser.parse_spec(spec_str)
             specs.append(f"-{spec}" if is_ignore else str(spec))
 
         self.run_tracker.start(run_start_time=start_time, specs=specs)
+        global_options = self.options.for_global_scope()
 
         streaming_reporter = StreamingWorkunitHandler(
             self.graph_session.scheduler_session,

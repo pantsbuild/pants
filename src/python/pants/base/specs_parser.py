@@ -44,7 +44,7 @@ class SpecsParser:
     class BadSpecError(Exception):
         """Indicates an unparseable command line selector."""
 
-    def __init__(self, root_dir: str | None = None, work_dir: str | None = None) -> None:
+    def __init__(self, *, root_dir: str | None = None, work_dir: str | None = None) -> None:
         self._root_dir = os.path.realpath(root_dir or get_buildroot())
         self._work_dir = (
             os.path.relpath(os.path.join(self._root_dir, work_dir), self._root_dir)
