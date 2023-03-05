@@ -71,6 +71,8 @@ function determine_python() {
     fi
     echo "${interpreter_path}" && return 0
   done
+  echo "pants: failed to find suitable Python interpreter, looking for: ${candidate_versions[*]}" >&2
+  return 1
 }
 
 function is_macos_arm() {
