@@ -7,18 +7,20 @@ import logging
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, Sequence
+from typing import Collection
 
 from pex.variables import Variables
 
 from pants.base.build_environment import get_buildroot
-from pants.core.util_rules import asdf
+from pants.core.util_rules import asdf, bootstrap
 from pants.core.util_rules.asdf import AsdfPathString, AsdfToolPathsResult
+from pants.core.util_rules.bootstrap import ValidatedSearchPaths, ValidateSearchPathsRequest
 from pants.core.util_rules.environments import EnvironmentTarget, LocalEnvironmentTarget
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest, PathEnvironmentVariable
 from pants.engine.rules import Get, _uncacheable_rule, collect_rules, rule
 from pants.option.option_types import StrListOption
 from pants.option.subsystem import Subsystem
+from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import help_text, softwrap
 
 logger = logging.getLogger(__name__)
@@ -93,7 +95,7 @@ class PythonBootstrap:
 
 @dataclass(frozen=True)
 class _ExpandInterpreterSearchPathsRequest:
-    interpreter_search_paths: Sequence[str]
+    interpreter_search_paths: Collection[str]
     env_tgt: EnvironmentTarget
 
 
@@ -240,69 +242,28 @@ def _get_pyenv_root(env: EnvironmentVars) -> str | None:
     return None
 
 
-def _preprocessed_interpreter_search_paths(
-    env_tgt: EnvironmentTarget,
-    _search_paths: Iterable[str],
-    is_default: bool,
-) -> tuple[str, ...]:
-    """Checks for special search path strings, and errors if any are invalid for the environment.
-
-    This will return:
-    * The search paths, unaltered, for local/undefined environments, OR
-    * The search paths, with invalid tokens removed, if the provided value was unaltered from the
-      default value in the options system
-      (see `PythonBootstrapSubsystem.EnvironmentAware.search_paths`)
-    * The search paths unaltered, if the search paths are all valid tokens for this environment
-
-    If the environment is non-local and there are invalid tokens for those environments, raise
-    `ValueError`.
-    """
-
-    env = env_tgt.val
-    search_paths = tuple(_search_paths)
-
-    if env is None or isinstance(env, LocalEnvironmentTarget):
-        return search_paths
-
-    not_allowed = {
-        "<PYENV>",
-        "<PYENV_LOCAL>",
-        AsdfPathString.STANDARD,
-        AsdfPathString.LOCAL,
-        "<PEXRC>",
-    }
-
-    if is_default:
-        # Strip out the not-allowed special strings from search_paths.
-        # An error will occur on the off chance the non-local environment expects pyenv
-        # but there's nothing we can do here to detect it.
-        return tuple(path for path in search_paths if path not in not_allowed)
-
-    any_not_allowed = set(search_paths) & not_allowed
-    if any_not_allowed:
-        env_type = type(env)
-        raise ValueError(
-            softwrap(
-                f"`[python-bootstrap].search_paths` is configured to use local Python discovery "
-                f"tools, which do not work in {env_type.__name__} runtime environments. To fix "
-                f"this, set the value of `python_bootstrap_search_path` in the `{env.alias}` "
-                f"defined at `{env.address}` to contain only hardcoded paths or the `<PATH>` "
-                "special string."
-            )
-        )
-
-    return search_paths
-
-
 @rule
 async def python_bootstrap(
     python_bootstrap_subsystem: PythonBootstrapSubsystem.EnvironmentAware,
 ) -> PythonBootstrap:
-
-    interpreter_search_paths = _preprocessed_interpreter_search_paths(
-        python_bootstrap_subsystem.env_tgt,
-        python_bootstrap_subsystem.search_path,
-        python_bootstrap_subsystem._is_default("search_path"),
+    interpreter_search_paths = await Get(
+        ValidatedSearchPaths,
+        ValidateSearchPathsRequest(
+            env_tgt=python_bootstrap_subsystem.env_tgt,
+            search_paths=tuple(python_bootstrap_subsystem.search_path),
+            option_origin=f"[{PythonBootstrapSubsystem.options_scope}].search_path",
+            environment_key="python_bootstrap_search_path",
+            is_default=python_bootstrap_subsystem._is_default("search_path"),
+            local_only=FrozenOrderedSet(
+                (
+                    "<PYENV>",
+                    "<PYENV_LOCAL>",
+                    AsdfPathString.STANDARD,
+                    AsdfPathString.LOCAL,
+                    "<PEXRC>",
+                )
+            ),
+        ),
     )
     interpreter_names = python_bootstrap_subsystem.names
 
@@ -324,4 +285,5 @@ def rules():
     return (
         *collect_rules(),
         *asdf.rules(),
+        *bootstrap.rules(),
     )
