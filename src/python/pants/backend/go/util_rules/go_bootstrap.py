@@ -98,7 +98,7 @@ def _error_if_not_compatible_with_asdf(
         env_type = type(env)
         raise ValueError(
             softwrap(
-                f"`[python-bootstrap].search_paths` is configured to use local Go discovery "
+                f"`[{GolangSubsystem.options_scope}].go_search_paths` is configured to use local Go discovery "
                 f"tools, which do not work in {env_type.__name__} runtime environments. To fix "
                 f"this, set the value of `golang_go_search_paths` in the `{env.alias}` "
                 f"defined at `{env.address}` to contain only hardcoded paths or the `<PATH>` "
