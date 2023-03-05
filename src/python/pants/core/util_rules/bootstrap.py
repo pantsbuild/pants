@@ -48,7 +48,7 @@ async def validate_search_paths(request: ValidateSearchPathsRequest) -> Validate
 
     if request.is_default:
         # Strip out the not-allowed special strings from search_paths.
-        # An error will occur on the off chance the non-local environment expects pyenv
+        # An error will occur on the off chance the non-local environment expects local_only tokens,
         # but there's nothing we can do here to detect it.
         return ValidatedSearchPaths(path for path in search_paths if path not in request.local_only)
 
