@@ -43,7 +43,7 @@ class PythonBootstrapSubsystem(Subsystem):
                 """
                 A list of paths to search for Python interpreters.
 
-                Which interpeters are actually used from these paths is context-specific:
+                Which interpreters are actually used from these paths is context-specific:
                 the Python backend selects interpreters using options on the `python` subsystem,
                 in particular, the `[python].interpreter_constraints` option.
 
