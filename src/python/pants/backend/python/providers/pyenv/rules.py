@@ -37,12 +37,12 @@ PYENV_NAMED_CACHE = ".pyenv"
 PYENV_APPEND_ONLY_CACHES = FrozenDict({"pyenv": PYENV_NAMED_CACHE})
 
 
-class PyenvSubsystem(TemplatedExternalTool):
-    options_scope = "pyenv"
+class PyenvPythonProviderSubsystem(TemplatedExternalTool):
+    options_scope = "pyenv-python-provider"
     name = "pyenv"
     help = softwrap(
         f"""
-        A subsystem for pyenv-provided-Python (https://github.com/pyenv/pyenv).
+        A subsystem for Pants-provided Python leveraging pyenv (https://github.com/pyenv/pyenv).
 
         Enabling this subsystem will switch Pants from trying to find an appropriate Python on your
         system to using pyenv to install the correct Python(s).
@@ -108,7 +108,7 @@ class PyenvInstallInfoRequest:
 @rule
 async def get_pyenv_install_info(
     _: PyenvInstallInfoRequest,
-    pyenv_subsystem: PyenvSubsystem,
+    pyenv_subsystem: PyenvPythonProviderSubsystem,
     platform: Platform,
     python_binary: PythonBinary,
 ) -> RunRequest:
@@ -201,7 +201,7 @@ async def get_python(
     request: PyenvPythonProvider,
     python_setup: PythonSetup,
     platform: Platform,
-    pyenv_subsystem: PyenvSubsystem,
+    pyenv_subsystem: PyenvPythonProviderSubsystem,
 ) -> PythonExecutable:
     env_vars, pyenv, pyenv_install = await MultiGet(
         Get(EnvironmentVars, EnvironmentVarsRequest(["PATH"])),
@@ -239,7 +239,7 @@ async def get_python(
     #   2. Pyenv compiles Python using whatever compiler the system is configured to use. Python
     #   then stores this information so that it can use the same compiler when compiling extension
     #   modules. Therefore caching the compiled Python is somewhat unsafe (especially for a remote
-    #   cache).
+    #   cache). See also https://github.com/pantsbuild/pants/issues/10769.
     result = await Get(
         ProcessResult,
         Process(
@@ -286,7 +286,7 @@ class RunPyenvInstallFieldSet(RunFieldSet):
 async def run_pyenv_install(
     _: RunPyenvInstallFieldSet,
     platform: Platform,
-    pyenv_subsystem: PyenvSubsystem,
+    pyenv_subsystem: PyenvPythonProviderSubsystem,
 ) -> RunRequest:
     run_request, pyenv = await MultiGet(
         Get(RunRequest, PyenvInstallInfoRequest()),
