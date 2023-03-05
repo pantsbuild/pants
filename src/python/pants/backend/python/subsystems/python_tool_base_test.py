@@ -35,7 +35,7 @@ def test_install_from_resolve_default() -> None:
         _DummyTool,
         lockfile="dummy.lock",
         install_from_resolve="dummy_resolve",
-        package_names=["foo", "bar", "baz"],
+        requirements=["foo", "bar", "baz"],
         version="",
         extra_requirements=[],
     )

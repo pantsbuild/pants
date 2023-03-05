@@ -38,8 +38,9 @@ class PythonToolRequirementsBase(Subsystem):
 
     # Subclasses may set to override the value computed from default_version and
     # default_extra_requirements.
-    # TODO: Once we get rid of those options, subclasses must set this.
-    default_package_names: Sequence[str] = []
+    # TODO: Once we get rid of those options, subclasses must set this to loose
+    #  requirements that reflect any minimum capabilities Pants assumes about the tool.
+    default_requirements: Sequence[str] = []
 
     default_interpreter_constraints: ClassVar[Sequence[str]] = []
     register_interpreter_constraints: ClassVar[bool] = False
@@ -62,7 +63,7 @@ class PythonToolRequirementsBase(Subsystem):
 
             This resolve must be defined in [python].resolves, as described in
             {doc_url("python-third-party-dependencies#user-lockfiles")}, and its lockfile must
-            provide the requirements named in the `package_names` option.
+            provide the requirements named in the `requirements` option.
 
             If unspecified, and the `lockfile` option is unset, the tool will be installed
             using the default lockfile shipped with Pants.
@@ -74,12 +75,12 @@ class PythonToolRequirementsBase(Subsystem):
         ),
     )
     # TODO: After we deprecate and remove the tool lockfile concept, we can remove the
-    #  version and extra_requirements options and directly list the default versionless
-    #  packages for each tool in this option's default. The versions will then come
-    #  either from the default lockfile we provide, or from a user lockfile.
-    package_names = StrListOption(
+    #  version and extra_requirements options and directly list loosely-constrained
+    #  requirements for each tool in this option's default. The specific versions will then
+    #  come either from the default lockfile we provide, or from a user lockfile.
+    requirements = StrListOption(
         advanced=True,
-        default=lambda cls: cls.default_package_names
+        default=lambda cls: cls.default_requirements
         or cls.unversioned_requirements(
             sorted([cls.default_version, *cls.default_extra_requirements])
         ),
@@ -204,7 +205,7 @@ class PythonToolRequirementsBase(Subsystem):
 
         if self.install_from_resolve:
             return PexRequirements(
-                self.package_names, from_superset=Resolve(self.install_from_resolve)
+                self.requirements, from_superset=Resolve(self.install_from_resolve)
             )
 
         hex_digest = calculate_invalidation_digest(requirements)

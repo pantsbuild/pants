@@ -590,21 +590,21 @@ def _invalid_lockfile_error(
         if is_old_style_tool_lockfile:
             yield softwrap(
                 f"""
-            - The necessary requirements are specified by `[{resolve}].version`,
-            `[{resolve}].extra_requirements`, and/or `[{resolve}].source_plugins`.
+                - The necessary requirements are specified by `[{resolve}].version`,
+                `[{resolve}].extra_requirements`, and/or `[{resolve}].source_plugins`.
 
-            - The custom lockfile destination is specified by `[{resolve}].lockfile`.
-            """
+                - The custom lockfile destination is specified by `[{resolve}].lockfile`.
+                """
             )
         elif is_default_user_lockfile:
             yield softwrap(
                 f"""
-            - The necessary requirements are specified by requirements targets marked with
-            `resolve="{resolve}"`, or those with no explicit resolve (since `{resolve}` is the
-            default for this repo).
+                - The necessary requirements are specified by requirements targets marked with
+                `resolve="{resolve}"`, or those with no explicit resolve (since `{resolve}` is the
+                default for this repo).
 
-            - The lockfile destination is specified by the `{resolve}` key in `[python].resolves`.
-            """
+                - The lockfile destination is specified by the `{resolve}` key in `[python].resolves`.
+                """
             )
         else:
             yield softwrap(
@@ -638,21 +638,21 @@ def _invalid_lockfile_error(
         if is_old_style_tool_lockfile:
             yield softwrap(
                 """
-            - The input interpreter constraints may be specified by
-            `[{resolve}].interpreter_constraints` (if applicable).
-            """
+                - The input interpreter constraints may be specified by
+                `[{resolve}].interpreter_constraints` (if applicable).
+                """
             )
         else:
             yield softwrap(
                 """
-            - The input interpreter constraints are specified by your code, using
-            the `[python].interpreter_constraints` option and the `interpreter_constraints`
-            target field.
+                - The input interpreter constraints are specified by your code, using
+                the `[python].interpreter_constraints` option and the `interpreter_constraints`
+                target field.
 
-            - To create a lockfile with new interpreter constraints, update the option
-            `[python].resolves_to_interpreter_constraints`, and then generate the lockfile
-            (see below).
-            """
+                - To create a lockfile with new interpreter constraints, update the option
+                `[python].resolves_to_interpreter_constraints`, and then generate the lockfile
+                (see below).
+                """
             )
         yield "\n\nSee {doc_url('python-interpreter-compatibility')} for details."
 
