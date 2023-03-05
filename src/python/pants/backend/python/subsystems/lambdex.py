@@ -22,7 +22,7 @@ class Lambdex(PythonToolBase):
     default_main = ConsoleScript("lambdex")
 
     register_interpreter_constraints = True
-    default_interpreter_constraints = ["CPython<4,>=3.7"]
+    default_interpreter_constraints = ["CPython>=3.7,<3.12"]
 
     register_lockfile = True
     default_lockfile_resource = ("pants.backend.python.subsystems", "lambdex.lock")
