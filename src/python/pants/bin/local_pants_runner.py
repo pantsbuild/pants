@@ -237,14 +237,14 @@ class LocalPantsRunner:
             return PANTS_FAILED_EXIT_CODE
 
     def run(self, start_time: float) -> ExitCode:
-        spec_parser = SpecsParser()
+        global_options = self.options.for_global_scope()
+        spec_parser = SpecsParser(work_dir=global_options.work_dir)
         specs = []
         for spec_str in self.options.specs:
             spec, is_ignore = spec_parser.parse_spec(spec_str)
             specs.append(f"-{spec}" if is_ignore else str(spec))
 
         self.run_tracker.start(run_start_time=start_time, specs=specs)
-        global_options = self.options.for_global_scope()
 
         streaming_reporter = StreamingWorkunitHandler(
             self.graph_session.scheduler_session,

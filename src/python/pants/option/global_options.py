@@ -1718,6 +1718,19 @@ class GlobalOptions(BootstrapOptions, Subsystem):
         default=[],
     )
 
+    work_dir = StrOption(
+        advanced=True,
+        default="",
+        help=softwrap(
+            """
+            Specs on the command line are relative to the `work_dir`.
+
+            Prefix specs with `//` to make them absolute from the build root. By default `work_dir`
+            is set to the current working directory when invoking `pants`.
+            """
+        ),
+    )
+
     @classmethod
     def validate_instance(cls, opts):
         """Validates an instance of global options for cases that are not prohibited via

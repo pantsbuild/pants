@@ -33,7 +33,7 @@ def calculate_specs(
     """Determine the specs for a given Pants run."""
     global_options = options.for_global_scope()
     unmatched_cli_globs = global_options.unmatched_cli_globs.to_glob_match_error_behavior()
-    specs = SpecsParser().parse_specs(
+    specs = SpecsParser(work_dir=global_options.work_dir).parse_specs(
         options.specs,
         description_of_origin="CLI arguments",
         unmatched_glob_behavior=unmatched_cli_globs,

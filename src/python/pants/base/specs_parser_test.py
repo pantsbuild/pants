@@ -52,8 +52,10 @@ def file_glob(val: str) -> FileGlobSpec:
     return FileGlobSpec(val)
 
 
-def assert_spec_parsed(build_root: Path, spec_str: str, expected_spec: Spec) -> None:
-    parser = SpecsParser(str(build_root))
+def assert_spec_parsed(
+    build_root: Path, spec_str: str, expected_spec: Spec, work_dir: str | None = None
+) -> None:
+    parser = SpecsParser(str(build_root), work_dir)
     spec, is_ignore = parser.parse_spec(spec_str)
     assert isinstance(spec, type(expected_spec))
     assert spec == expected_spec
@@ -241,3 +243,29 @@ def test_cmd_line_affordances_absolute_path(
 ) -> None:
     spec = os.path.join(tmp_path, spec_suffix)
     assert_spec_parsed(tmp_path, spec, expected)
+
+
+@pytest.mark.parametrize(
+    "work_dir, spec, expected",
+    [
+        ("a/b", "c", dir_literal("a/b/c")),
+        ("a/b", "../d", dir_literal("a/d")),
+        ("a/b", "//e", dir_literal("e")),
+    ],
+)
+def test_work_dir(tmp_path: Path, work_dir, spec: str, expected: Spec) -> None:
+    assert_spec_parsed(tmp_path, spec, expected, work_dir)
+    assert_spec_parsed(tmp_path, spec, expected, str(tmp_path / work_dir))
+
+
+def test_invalid_work_dir(tmp_path: Path) -> None:
+    with pytest.raises(SpecsParser.BadSpecError):
+        assert_spec_parsed(tmp_path, "../../foo", dir_literal("foo"), "a")
+    with pytest.raises(SpecsParser.BadSpecError):
+        assert_spec_parsed(tmp_path, "../../foo", dir_literal("foo"), str(tmp_path / "a"))
+    with pytest.raises(SpecsParser.BadSpecError):
+        assert_spec_parsed(tmp_path, "test_invalid_work_dir0/foo", dir_literal("foo"), "..")
+    with pytest.raises(SpecsParser.BadSpecError):
+        assert_spec_parsed(
+            tmp_path, "test_invalid_work_dir0/foo", dir_literal("foo"), str(tmp_path / "..")
+        )
