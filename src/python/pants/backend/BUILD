@@ -6,7 +6,7 @@ python_sources()
 
 # Setup rules about which parts of the codebase may depend on backend sources.
 
-DEFAULT_BACKEND_RULES = (
+DEFAULT_DEPENDENTS_RULES = (
     # Allow dependencies within/between backends.
     "/**",
     # Allow the pants bin plugins target to depend on backends.
@@ -39,7 +39,7 @@ __dependents_rules__(
             "[/python/lint/yapf/subsystem.py]",
         ),
         "src/python/pants/core/goals/update_build_files.py",
-        DEFAULT_BACKEND_RULES,
+        DEFAULT_DEPENDENTS_RULES,
     ),
     (
         (
@@ -48,70 +48,70 @@ __dependents_rules__(
             "[/python/util_rules/pex_requirements.py]",
         ),
         "src/python/pants/init/plugin_resolver.py",
-        DEFAULT_BACKEND_RULES,
+        DEFAULT_DEPENDENTS_RULES,
     ),
     (
         "[/python/util_rules/pex.py]",
         "src/python/pants/core/goals/update_build_files.py",
         "src/python/pants/init/plugin_resolver.py",
-        DEFAULT_BACKEND_RULES,
+        DEFAULT_DEPENDENTS_RULES,
     ),
     (
         "[/python/goals/setup_py.py]",
         "//pants-plugins/internal_plugins/releases/register.py",
-        DEFAULT_BACKEND_RULES,
+        DEFAULT_DEPENDENTS_RULES,
     ),
     (
         "[/project_info/filter_targets.py]",
         "src/python/pants/build_graph/build_configuration.py",
         "src/python/pants/engine/internals/specs_rules.py",
         "src/python/pants/engine/internals/mapper.py",
-        DEFAULT_BACKEND_RULES,
+        DEFAULT_DEPENDENTS_RULES,
     ),
     (
         "[/project_info/dependents.py]",
         "src/python/pants/vcs/changed.py",
-        DEFAULT_BACKEND_RULES,
+        DEFAULT_DEPENDENTS_RULES,
     ),
     (
         "[/project_info/peek.py]",
         "src/python/pants/explorer/server/graphql/**",
-        DEFAULT_BACKEND_RULES,
+        DEFAULT_DEPENDENTS_RULES,
     ),
     (
         "[/project_info]",
         "src/python/pants/init/extension_loader.py",
-        DEFAULT_BACKEND_RULES,
+        DEFAULT_DEPENDENTS_RULES,
     ),
     (
         "[/java/subsystems/java_infer.py]",
         "src/python/pants/jvm/dependency_inference/artifact_mapper.py",
-        DEFAULT_BACKEND_RULES,
+        DEFAULT_DEPENDENTS_RULES,
     ),
     (
         "[/java/subsystems/junit.py]",
         "src/python/pants/jvm/test/junit.py",
-        DEFAULT_BACKEND_RULES,
+        DEFAULT_DEPENDENTS_RULES,
     ),
     (
         "[/docker/target_types.py]",
         "src/python/pants/explorer/server/graphql/query/conftest.py",
-        DEFAULT_BACKEND_RULES,
+        DEFAULT_DEPENDENTS_RULES,
     ),
     (
         "[/codegen/export_codegen_goal.py]",
         "src/python/pants/core/register.py",
-        DEFAULT_BACKEND_RULES,
+        DEFAULT_DEPENDENTS_RULES,
     ),
     (
         "[/__init__.py]",
         "src/python/pants/help/help_info_extracter.py",
-        DEFAULT_BACKEND_RULES,
+        DEFAULT_DEPENDENTS_RULES,
     ),
     # Generic rule set:
     (
         # Applies for all targets in this subtree.
         "*",
-        DEFAULT_BACKEND_RULES,
+        DEFAULT_DEPENDENTS_RULES,
     ),
 )
