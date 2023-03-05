@@ -177,19 +177,24 @@ async def node_process_environment(nodejs: NodeJS, platform: Platform) -> NodeJS
     return NodeJSProcessEnvironment(binary_directory=nodejs_bin_dir, npm_config_cache="._npm")
 
 
-@rule(level=LogLevel.DEBUG)
-async def setup_node_tool_process(
-    request: NodeJSToolProcess,
-    nodejs: NodeJS,
-    platform: Platform,
-    environment: NodeJSProcessEnvironment,
-) -> Process:
-    # Ensure nodejs is installed
-    downloaded_nodejs = await Get(
+@dataclass(frozen=True)
+class NodejsBinaries:
+    digest: Digest
+
+
+@rule(level=LogLevel.INFO, desc="Determining nodejs binaries.")
+async def determine_nodejs_binaries(nodejs: NodeJS, platform: Platform) -> NodejsBinaries:
+    downloaded = await Get(
         DownloadedExternalTool, ExternalToolRequest, nodejs.get_request(platform)
     )
+    return NodejsBinaries(downloaded.digest)
 
-    immutable_input_digests = {environment.base_bin_dir: downloaded_nodejs.digest}
+
+@rule(level=LogLevel.DEBUG)
+async def setup_node_tool_process(
+    request: NodeJSToolProcess, binaries: NodejsBinaries, environment: NodeJSProcessEnvironment
+) -> Process:
+    immutable_input_digests = {environment.base_bin_dir: binaries.digest}
 
     return Process(
         argv=filter(None, request.args),
