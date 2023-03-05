@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import os
 from dataclasses import dataclass
 from typing import Iterable
 
@@ -11,7 +10,7 @@ from pants.backend.go.subsystems.golang import GolangSubsystem
 from pants.core.util_rules import asdf
 from pants.core.util_rules.asdf import AsdfToolPathsRequest, AsdfToolPathsResult
 from pants.core.util_rules.environments import EnvironmentTarget, LocalEnvironmentTarget
-from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
+from pants.engine.env_vars import PathEnvironmentVariable
 from pants.engine.internals.selectors import Get
 from pants.engine.rules import collect_rules, rule
 from pants.util.strutil import softwrap
@@ -58,22 +57,13 @@ async def _go_search_paths(
     expanded: list[str] = []
     for s in paths:
         if s == "<PATH>":
-            expanded.extend(await _environment_paths())
+            expanded.extend(await Get(PathEnvironmentVariable, {}))  # noqa: PNT30: Linear search
         elif s in special_strings:
             special_paths = special_strings[s]()
             expanded.extend(special_paths)
         else:
             expanded.append(s)
     return tuple(expanded)
-
-
-async def _environment_paths() -> list[str]:
-    """Returns a list of paths specified by the PATH env var."""
-    env = await Get(EnvironmentVars, EnvironmentVarsRequest(("PATH",)))
-    path = env.get("PATH")
-    if path:
-        return path.split(os.pathsep)
-    return []
 
 
 def _error_if_not_compatible_with_asdf(

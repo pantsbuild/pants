@@ -12,7 +12,6 @@ import pytest
 from pants.base.build_environment import get_pants_cachedir
 from pants.core.subsystems.python_bootstrap import (
     _ExpandInterpreterSearchPathsRequest,
-    _get_environment_paths,
     _get_pex_python_paths,
     _get_pyenv_root,
     _preprocessed_interpreter_search_paths,
@@ -93,11 +92,6 @@ def fake_pyenv_root(fake_versions, fake_local_version):
 
 def materialize_indices(sequence: Sequence[_T], indices: Iterable[int]) -> List[_T]:
     return [sequence[i] for i in indices]
-
-
-def test_get_environment_paths() -> None:
-    paths = _get_environment_paths(EnvironmentVars({"PATH": "foo/bar:baz:/qux/quux"}))
-    assert ["foo/bar", "baz", "/qux/quux"] == paths
 
 
 def test_get_pex_python_paths() -> None:

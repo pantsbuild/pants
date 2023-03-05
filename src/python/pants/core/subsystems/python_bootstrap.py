@@ -15,7 +15,7 @@ from pants.base.build_environment import get_buildroot
 from pants.core.util_rules import asdf
 from pants.core.util_rules.asdf import AsdfToolPathsRequest, AsdfToolPathsResult
 from pants.core.util_rules.environments import EnvironmentTarget, LocalEnvironmentTarget
-from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
+from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest, PathEnvironmentVariable
 from pants.engine.rules import Get, _uncacheable_rule, collect_rules, rule
 from pants.option.option_types import StrListOption
 from pants.option.subsystem import Subsystem
@@ -111,12 +111,10 @@ class _SearchPaths:
 
 @rule
 async def _expand_interpreter_search_paths(
-    request: _ExpandInterpreterSearchPathsRequest,
+    request: _ExpandInterpreterSearchPathsRequest, path_env: PathEnvironmentVariable
 ) -> _SearchPaths:
 
     interpreter_search_paths, env_tgt = (request.interpreter_search_paths, request.env_tgt)
-
-    env = await Get(EnvironmentVars, EnvironmentVarsRequest(("PATH",)))
 
     has_asdf_standard_path_token, has_asdf_local_path_token = _contains_asdf_path_tokens(
         interpreter_search_paths
@@ -145,7 +143,7 @@ async def _expand_interpreter_search_paths(
 
     special_strings = {
         "<PEXRC>": _get_pex_python_paths,
-        "<PATH>": lambda: _get_environment_paths(env),
+        "<PATH>": lambda: path_env,
         "<ASDF>": lambda: asdf_standard_tool_paths,
         "<ASDF_LOCAL>": lambda: asdf_local_tool_paths,
     }
@@ -178,14 +176,6 @@ async def _expand_interpreter_search_paths(
             )
         )
     return _SearchPaths(tuple(expanded))
-
-
-def _get_environment_paths(env: EnvironmentVars):
-    """Returns a list of paths specified by the PATH env var."""
-    pathstr = env.get("PATH")
-    if pathstr:
-        return pathstr.split(os.pathsep)
-    return []
 
 
 def _get_pex_python_paths():
