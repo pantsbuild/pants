@@ -39,7 +39,7 @@ readonly NATIVE_CLIENT_TARGET="${NATIVE_ROOT}/target/${MODE}/pants"
 function _build_native_code() {
   banner "Building native code..."
   # NB: See Cargo.toml with regard to the `extension-module` features.
-  "${REPO_ROOT}/cargo" build \
+  "${REPO_ROOT}/cargo" build -v \
     --features=extension-module \
     ${MODE_FLAG} \
     -p engine \

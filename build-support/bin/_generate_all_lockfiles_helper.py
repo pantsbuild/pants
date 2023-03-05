@@ -48,6 +48,7 @@ from pants.backend.scala.lint.scalafmt.subsystem import ScalafmtSubsystem
 from pants.backend.scala.subsystems.scalatest import Scalatest
 from pants.backend.terraform.dependency_inference import TerraformHcl2Parser
 from pants.backend.tools.yamllint.subsystem import Yamllint
+from pants.backend.tools.semgrep.subsystem import Semgrep
 from pants.jvm.resolve.jvm_tool import JvmToolBase
 from pants.util.strutil import softwrap
 
@@ -124,6 +125,7 @@ AllTools = (
     DefaultTool.python(Pylint, backend="pants.backend.python.lint.pylint", source_plugins=True),
     DefaultTool.python(PythonProtobufMypyPlugin, backend="pants.backend.codegen.protobuf.python"),
     DefaultTool.python(PyOxidizer),
+    DefaultTool.python(Semgrep, backend="pants.backend.experimental.tools.semgrep"),
     DefaultTool.python(Setuptools),
     DefaultTool.python(SetuptoolsSCM),
     DefaultTool.python(TerraformHcl2Parser, backend="pants.backend.experimental.terraform"),
@@ -233,6 +235,7 @@ def main() -> None:
         create_parser().print_help()
         return
     args = create_parser().parse_args()
+    assert args.tool
 
     if args.all:
         update_internal_lockfiles(specified=None)

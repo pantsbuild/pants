@@ -62,6 +62,7 @@ target(
         "src/python/pants/backend/experimental/scala/debug_goals",
         "src/python/pants/backend/experimental/scala/lint/scalafmt",
         "src/python/pants/backend/experimental/terraform",
+        "src/python/pants/backend/experimental/tools/semgrep",
         "src/python/pants/backend/experimental/tools/yamllint",
         "src/python/pants/backend/experimental/visibility",
         "src/python/pants/backend/google_cloud_function/python",
