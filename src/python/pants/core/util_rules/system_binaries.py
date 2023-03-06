@@ -8,19 +8,16 @@ import hashlib
 import logging
 import os
 import subprocess
-import sys
 from dataclasses import dataclass
 from enum import Enum
 from textwrap import dedent  # noqa: PNT20
 from typing import Iterable, Mapping, Sequence
 
-from pants.core.subsystems import python_bootstrap
-from pants.core.util_rules.environments import EnvironmentTarget, LocalEnvironmentTarget
-from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
+from pants.core.util_rules.environments import EnvironmentTarget
 from pants.engine.collection import DeduplicatedCollection
 from pants.engine.engine_aware import EngineAwareReturnType
-from pants.engine.fs import CreateDigest, DownloadFile, FileContent
-from pants.engine.internals.native_engine import Digest, FileDigest
+from pants.engine.fs import CreateDigest, FileContent
+from pants.engine.internals.native_engine import Digest
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.platform import Platform
 from pants.engine.process import FallibleProcessResult, Process, ProcessResult
@@ -252,16 +249,6 @@ class BashBinary(BinaryPath):
 class BashBinaryRequest:
     search_path: SearchPath = BashBinary.DEFAULT_SEARCH_PATH
 
-@dataclass(frozen=True)
-class PythonBuildStandaloneBinary:
-    """A Python interpreter for use by `@rule` code as an alternative to BashBinary scripts.
-
-    @TODO:...
-    """
-
-    path: str
-    immutable_input_digests: FrozenDict[str, Digest] = FrozenDict({})
-
 
 # Note that updating this will impact the `archive` target defined in `core/target_types.py`.
 class ArchiveFormat(Enum):
@@ -285,25 +272,6 @@ class UnzipBinary(BinaryPath):
         # The caller should validate that it's a valid `.zip` file.
         return (self.path, archive_path, "-d", extract_path)
 
-
-@dataclass(frozen=True)
-class GunzipBinary:
-    python_binary: PythonBuildStandaloneBinary
-
-    def extract_archive_argv(self, archive_path: str, extract_path: str) -> tuple[str, ...]:
-        archive_name = os.path.basename(archive_path)
-        dest_file_name = os.path.splitext(archive_name)[0]
-        dest_path = os.path.join(extract_path, dest_file_name)
-        script = dedent(
-            f"""
-            import gzip
-            import shutil
-            with gzip.GzipFile(filename={archive_path!r}, mode="rb") as source:
-                with open({dest_path!r}, "wb") as dest:
-                    shutil.copyfileobj(source, dest)
-            """
-        )
-        return (self.python_binary.path, "-c", script)
 
 
 @dataclass(frozen=True)
@@ -584,39 +552,6 @@ async def find_binary(request: BinaryPathRequest, env_target: EnvironmentTarget)
     )
 
 
-@rule(desc="Finding or downloading Python for scripts", level=LogLevel.TRACE)
-async def download_python_build_standalone(platform: Platform, env_tgt: EnvironmentTarget) -> PythonBuildStandaloneBinary:
-    if isinstance(env_tgt.val, LocalEnvironmentTarget):
-        return PythonBuildStandaloneBinary(sys.executable)
-
-    url_plat, fingerprint, bytelen = {
-        "linux_arm64": None,
-        "linux_x86_64": ("", "44254b934edc8a0d414f256775ee71e192785a6ffb8dd39aa81d9d232f46a741", 47148816),
-        "linux_x86_64": ("", "44254b934edc8a0d414f256775ee71e192785a6ffb8dd39aa81d9d232f46a741", 47148816),
-
-        # No PGO release for aarch64 it seems...
-        "linux_arm64": ("aarch64-unknown-linux-gnu-lto", "3d20f40654e4356bd42c4e70ec28f4b8d8dd559884467a4e1745c08729fb740a", 106653301),
-        "linux_x86_64": ("x86_64-unknown-linux-gnu-pgo+lto", "c5f7ad956c8870573763ed58b59d7f145830a93378234b815c068c893c0d5c1e", 42148524),
-        "macos_arm64": ("aarch64-apple-darwin-pgo+lto", "2508b8d4b725bb45c3e03d2ddd2b8441f1a74677cb6bd6076e692c0923135ded", 33272226),
-        "macos_x86_64": ("x86_64-apple-darwin-pgo+lto", "1153b4d3b03cf1e1d8ec93c098160586f665fcc2d162c0812140a716a688df58", 32847401),
-
-    }[platform]
-
-    python_build_standalone = await Get(DownloadedExternalTool, ExternalToolRequest(
-        DownloadFile(
-            f"https://github.com/indygreg/python-build-standalone/releases/download/20230116/cpython-3.10.9+20230116-{url_plat}-full.tar.zst",
-            FileDigest(
-                fingerprint=fingerprint,
-                serialized_bytes_length=bytelen,
-            )
-        ),
-        exe="pyoxy"
-    ))
-    # @TODO: rename the exe to `python3.10`, and maybe copy the license?
-
-    ...
-
-
 @rule(desc="Finding the `zip` binary", level=LogLevel.DEBUG)
 async def find_zip() -> ZipBinary:
     request = BinaryPathRequest(
@@ -639,9 +574,7 @@ async def find_unzip() -> UnzipBinary:
     return UnzipBinary(first_path.path, first_path.fingerprint)
 
 
-@rule
-def find_gunzip(pyoxy: PyOxyBinary) -> GunzipBinary:
-    return GunzipBinary(pyoxy)
+
 
 
 @rule(desc="Finding the `tar` binary", level=LogLevel.DEBUG)
@@ -756,11 +689,6 @@ class UnzipBinaryRequest:
     pass
 
 
-@dataclass(frozen=True)
-class GunzipBinaryRequest:
-    pass
-
-
 class CatBinaryRequest:
     pass
 
@@ -804,10 +732,6 @@ async def find_unzip_wrapper(_: UnzipBinaryRequest, unzip_binary: UnzipBinary) -
     return unzip_binary
 
 
-@rule
-async def find_gunzip_wrapper(_: GunzipBinaryRequest, gunzip: GunzipBinary) -> GunzipBinary:
-    return gunzip
-
 
 @rule
 async def find_tar_wrapper(_: TarBinaryRequest, tar_binary: TarBinary) -> TarBinary:
@@ -847,7 +771,7 @@ async def find_git_wrapper(_: GitBinaryRequest, git_binary: GitBinary) -> GitBin
 
 
 def rules():
-    return [*collect_rules(), *python_bootstrap.rules()]
+    return collect_rules()
 
 
 # -------------------------------------------------------------------------------------------

@@ -10,8 +10,9 @@ from typing import Mapping
 
 from pants.core.subsystems.python_bootstrap import PythonBootstrap
 from pants.core.util_rules import subprocess_environment, system_binaries
+from pants.core.util_rules.adhoc_binaries import PythonBuildStandaloneBinary
 from pants.core.util_rules.subprocess_environment import SubprocessEnvironmentVars
-from pants.core.util_rules.system_binaries import BinaryPath, PythonBinary
+from pants.core.util_rules.system_binaries import BinaryPath
 from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.rules import collect_rules, rule
 from pants.option.global_options import NamedCachesDirOption
@@ -90,20 +91,10 @@ class PexSubsystem(Subsystem):
 
 
 class PythonExecutable(BinaryPath, EngineAwareReturnType):
-    """The BinaryPath of a Python executable."""
+    """The BinaryPath of a Python executable to use for user code."""
 
     def message(self) -> str:
         return f"Selected {self.path} to run PEXes with."
-
-    @classmethod
-    def from_python_binary(cls, python_binary: PythonBinary) -> PythonExecutable:
-        """Converts from PythonBinary to PythonExecutable.
-
-        The PythonBinary type is a singleton representing the Python that is used for script
-        execution by `@rule`s. On the other hand, there may be multiple PythonExecutables, since
-        they are subject to a user's interpreter constraints.
-        """
-        return cls(path=python_binary.path, fingerprint=python_binary.fingerprint)
 
 
 @dataclass(frozen=True)
@@ -112,7 +103,7 @@ class PexEnvironment(EngineAwareReturnType):
     interpreter_search_paths: tuple[str, ...]
     subprocess_environment_dict: FrozenDict[str, str]
     named_caches_dir: PurePath
-    bootstrap_python: PythonExecutable | None = None
+    bootstrap_python: PythonBuildStandaloneBinary
     venv_use_symlinks: bool = False
 
     _PEX_ROOT_DIRNAME = "pex_root"
@@ -163,7 +154,7 @@ class PexEnvironment(EngineAwareReturnType):
 @rule(desc="Prepare environment for running PEXes", level=LogLevel.DEBUG)
 async def find_pex_python(
     python_bootstrap: PythonBootstrap,
-    python_binary: PythonBinary,
+    python_binary: PythonBuildStandaloneBinary,
     pex_subsystem: PexSubsystem,
     pex_environment_aware: PexSubsystem.EnvironmentAware,
     subprocess_env_vars: SubprocessEnvironmentVars,
@@ -174,7 +165,7 @@ async def find_pex_python(
         interpreter_search_paths=python_bootstrap.interpreter_search_paths,
         subprocess_environment_dict=subprocess_env_vars.vars,
         named_caches_dir=named_caches_dir.val,
-        bootstrap_python=PythonExecutable.from_python_binary(python_binary),
+        bootstrap_python=python_binary,
         venv_use_symlinks=pex_subsystem.venv_use_symlinks,
     )
 
