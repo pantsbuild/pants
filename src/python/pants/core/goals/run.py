@@ -132,8 +132,10 @@ class RunRequest:
         object.__setattr__(self, "digest", digest)
         object.__setattr__(self, "args", tuple(args))
         object.__setattr__(self, "extra_env", FrozenDict(extra_env or {}))
-        object.__setattr__(self, "immutable_input_digests", immutable_input_digests)
-        object.__setattr__(self, "append_only_caches", append_only_caches)
+        object.__setattr__(
+            self, "immutable_input_digests", FrozenDict(immutable_input_digests or {})
+        )
+        object.__setattr__(self, "append_only_caches", FrozenDict(append_only_caches or {}))
 
     def to_run_in_sandbox_request(self) -> RunInSandboxRequest:
         return RunInSandboxRequest(
