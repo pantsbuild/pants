@@ -5,27 +5,34 @@ from __future__ import annotations
 
 import os.path
 from dataclasses import dataclass, field
+from itertools import groupby
 from typing import ClassVar, Iterable, Mapping
+
+from nodesemver import min_satisfying
 
 from pants.core.util_rules.external_tool import (
     DownloadedExternalTool,
     ExternalToolRequest,
-    TemplatedExternalTool,
+    ExternalToolVersion,
+    TemplatedExternalToolOptionsMixin,
 )
 from pants.core.util_rules.external_tool import rules as external_tool_rules
-from pants.engine.fs import EMPTY_DIGEST, Digest
+from pants.core.util_rules.system_binaries import BinaryNotFoundError
+from pants.engine.fs import EMPTY_DIGEST, Digest, DownloadFile
+from pants.engine.internals.native_engine import FileDigest
 from pants.engine.platform import Platform
 from pants.engine.process import Process
 from pants.engine.rules import Get, Rule, collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.option.option_types import DictOption
+from pants.option.subsystem import Subsystem
 from pants.util.docutil import bin_name
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.strutil import softwrap
 
 
-class NodeJS(TemplatedExternalTool):
+class NodeJS(Subsystem, TemplatedExternalToolOptionsMixin):
     options_scope = "nodejs"
     help = "The NodeJS Javascript runtime (including npm and npx)."
 
@@ -68,16 +75,25 @@ class NodeJS(TemplatedExternalTool):
         advanced=True,
     )
 
-    def generate_url(self, plat: Platform) -> str:
+    def generate_url(self, version: str, plat: Platform) -> str:
         """NodeJS binaries are compressed as .gz for Mac, .xz for Linux."""
-        url = super().generate_url(plat)
+        platform = self.url_platform_mapping.get(plat.value, "")
+        url = self.url_template.format(version=version, platform=platform)
         extension = "gz" if plat.is_macos else "xz"
         return f"{url}.{extension}"
 
-    def generate_exe(self, plat: Platform) -> str:
+    def generate_exe(self, version: str, plat: Platform) -> str:
         assert self.default_url_platform_mapping is not None
         plat_str = self.default_url_platform_mapping[plat.value]
-        return f"./node-{self.version}-{plat_str}/bin/node"
+        return f"./node-{version}-{plat_str}/bin/node"
+
+    async def download_known_version(
+        self, known_version: ExternalToolVersion, platform: Platform
+    ) -> DownloadedExternalTool:
+        exe = self.generate_exe(known_version.version, platform)
+        url = self.generate_url(known_version.version, platform)
+        download_file = DownloadFile(url, FileDigest(known_version.sha256, known_version.filesize))
+        return await Get(DownloadedExternalTool, ExternalToolRequest(download_file, exe))
 
 
 class UserChosenNodeJSResolveAliases(FrozenDict[str, str]):
@@ -145,8 +161,14 @@ class NodeJSToolProcess:
 
 
 @dataclass(frozen=True)
+class NodejsBinaries:
+    binary_dir: str
+    digest: Digest | None = None
+
+
+@dataclass(frozen=True)
 class NodeJSProcessEnvironment:
-    binary_directory: str
+    binaries: NodejsBinaries
     npm_config_cache: str
 
     base_bin_dir: ClassVar[str] = "__node"
@@ -161,46 +183,78 @@ class NodeJSProcessEnvironment:
     def append_only_caches(self) -> Mapping[str, str]:
         return {"npm": self.npm_config_cache}
 
+    @property
+    def binary_directory(self) -> str:
+        return self.binaries.binary_dir
+
+    def immutable_digest(self) -> dict[str, Digest]:
+        return {self.base_bin_dir: self.binaries.digest} if self.binaries.digest else {}
+
 
 @rule(level=LogLevel.DEBUG)
-async def node_process_environment(nodejs: NodeJS, platform: Platform) -> NodeJSProcessEnvironment:
-    # Get reference to tool
-    assert nodejs.default_url_platform_mapping is not None
-    plat_str = nodejs.default_url_platform_mapping[platform.value]
-    nodejs_bin_dir = os.path.join(
-        "{chroot}",
-        NodeJSProcessEnvironment.base_bin_dir,
-        f"node-{nodejs.version}-{plat_str}",
-        "bin",
-    )
-
-    return NodeJSProcessEnvironment(binary_directory=nodejs_bin_dir, npm_config_cache="._npm")
+async def node_process_environment(binaries: NodejsBinaries) -> NodeJSProcessEnvironment:
+    return NodeJSProcessEnvironment(binaries=binaries, npm_config_cache="._npm")
 
 
 @dataclass(frozen=True)
-class NodejsBinaries:
-    digest: Digest
+class NodeJsBootstrap:
+    nodejs_search_paths: tuple[str, ...]
 
 
-@rule(level=LogLevel.INFO, desc="Determining nodejs binaries.")
-async def determine_nodejs_binaries(nodejs: NodeJS, platform: Platform) -> NodejsBinaries:
-    downloaded = await Get(
-        DownloadedExternalTool, ExternalToolRequest, nodejs.get_request(platform)
+@rule
+async def nodejs_bootstrap() -> NodeJsBootstrap:
+    return NodeJsBootstrap(nodejs_search_paths=())
+
+
+@rule(level=LogLevel.INFO, desc="Finding Node.js distribution binaries.")
+async def determine_nodejs_binaries(
+    nodejs: NodeJS, bootstrap: NodeJsBootstrap, platform: Platform
+) -> NodejsBinaries:
+    decoded_versions = groupby(
+        (ExternalToolVersion.decode(unparsed) for unparsed in nodejs.known_versions),
+        lambda version: version.version,
     )
-    return NodejsBinaries(downloaded.digest)
+
+    decoded_per_version = {
+        version: tuple(
+            known_version
+            for known_version in known_versions
+            if known_version.platform == platform.value
+        )
+        for version, known_versions in decoded_versions
+    }
+
+    satisfying_version = min_satisfying(decoded_per_version.keys(), nodejs.version)
+    if not satisfying_version:
+        raise BinaryNotFoundError(
+            softwrap(
+                f"""
+                Cannot find any `node` binaries satisfying the range '{nodejs.version}'.
+
+                To fix, add a `[nodejs].url_platform_mapping` version that satisfies the range.
+                """
+            )
+        )
+
+    known_version = decoded_per_version[satisfying_version][0]
+    downloaded = await nodejs.download_known_version(known_version, platform)
+    nodejs_bin_dir = os.path.join(
+        "{chroot}",
+        NodeJSProcessEnvironment.base_bin_dir,
+        os.path.dirname(downloaded.exe),
+    )
+    return NodejsBinaries(nodejs_bin_dir, downloaded.digest)
 
 
 @rule(level=LogLevel.DEBUG)
 async def setup_node_tool_process(
-    request: NodeJSToolProcess, binaries: NodejsBinaries, environment: NodeJSProcessEnvironment
+    request: NodeJSToolProcess, environment: NodeJSProcessEnvironment
 ) -> Process:
-    immutable_input_digests = {environment.base_bin_dir: binaries.digest}
-
     return Process(
         argv=filter(None, request.args),
         input_digest=request.input_digest,
         output_files=request.output_files,
-        immutable_input_digests=immutable_input_digests,
+        immutable_input_digests=environment.immutable_digest(),
         output_directories=request.output_directories,
         description=request.description,
         level=request.level,
