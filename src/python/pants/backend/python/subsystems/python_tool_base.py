@@ -5,7 +5,6 @@ from __future__ import annotations
 
 from typing import ClassVar, Iterable, Sequence
 
-from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.target_types import ConsoleScript, EntryPoint, MainSpecification
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import PexRequest
@@ -81,9 +80,7 @@ class PythonToolRequirementsBase(Subsystem):
     requirements = StrListOption(
         advanced=True,
         default=lambda cls: cls.default_requirements
-        or cls.unversioned_requirements(
-            sorted([cls.default_version, *cls.default_extra_requirements])
-        ),
+        or sorted([cls.default_version, *cls.default_extra_requirements]),
         help=lambda cls: softwrap(
             """\
             If install_from_resolve is specified, it will install these distribution packages,
@@ -139,18 +136,6 @@ class PythonToolRequirementsBase(Subsystem):
             """
         ),
     )
-
-    @classmethod
-    def project_name_from_requirement(cls, req: str) -> str:
-        """Returns just the project name for the given requirement string."""
-        return PipRequirement.parse(
-            req,
-            description_of_origin=f"{cls.options_scope}'s `version` or `extra_requirements` options",
-        ).project_name
-
-    @classmethod
-    def unversioned_requirements(cls, reqs: Iterable[str]) -> list[str]:
-        return [cls.project_name_from_requirement(req) for req in reqs]
 
     def __init__(self, *args, **kwargs):
         if self.default_interpreter_constraints and not self.register_interpreter_constraints:
