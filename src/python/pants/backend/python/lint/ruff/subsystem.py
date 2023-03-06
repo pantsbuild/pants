@@ -105,7 +105,7 @@ class Ruff(PythonToolBase):
             specified_option_name=f"[{self.options_scope}].config",
             discovery=self.config_discovery,
             check_existence=["ruff.toml", *(os.path.join(d, "ruff.toml") for d in ("", *dirs))],
-            check_content={"pyproject.toml": b"[tool.ruff]"},
+            check_content={"pyproject.toml": b"[tool.ruff"},
         )
 
 

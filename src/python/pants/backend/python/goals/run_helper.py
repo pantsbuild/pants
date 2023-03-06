@@ -27,6 +27,7 @@ from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.rules import Get, MultiGet
 from pants.engine.target import TransitiveTargets, TransitiveTargetsRequest
+from pants.util.frozendict import FrozenDict
 
 
 def _in_chroot(relpath: str) -> str:
@@ -112,12 +113,18 @@ async def _create_python_source_run_request(
         **complete_pex_environment.environment_dict(python_configured=venv_pex.python is not None),
         "PEX_EXTRA_SYS_PATH": os.pathsep.join(source_roots),
     }
+    append_only_caches = (
+        FrozenDict({}) if venv_pex.append_only_caches is None else venv_pex.append_only_caches
+    )
 
     return RunRequest(
         digest=merged_digest,
         args=[_in_chroot(venv_pex.pex.argv0)],
         extra_env=extra_env,
-        append_only_caches=complete_pex_environment.append_only_caches,
+        append_only_caches={
+            **complete_pex_environment.append_only_caches,
+            **append_only_caches,
+        },
     )
 
 
