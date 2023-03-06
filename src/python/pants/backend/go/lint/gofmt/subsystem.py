@@ -3,6 +3,9 @@
 
 from pants.option.option_types import ArgsListOption, SkipOption
 from pants.option.subsystem import Subsystem
+from pants.util.ordered_set import FrozenOrderedSet
+
+SUPPORTED_GOFMT_ARGS = FrozenOrderedSet(("-e", "-r", "-s"))
 
 
 class GofmtSubsystem(Subsystem):
@@ -11,4 +14,7 @@ class GofmtSubsystem(Subsystem):
     help = "Gofmt-specific options."
 
     skip = SkipOption("fmt", "lint")
-    args = ArgsListOption(example="-s")
+    args = ArgsListOption(
+        example="-s -e",
+        extra_help=f"Only the following style related options are supported: {tuple(SUPPORTED_GOFMT_ARGS)}.",
+    )

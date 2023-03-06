@@ -7,7 +7,7 @@ import os.path
 from dataclasses import dataclass
 
 from pants.backend.go.lint.gofmt.skip_field import SkipGofmtField
-from pants.backend.go.lint.gofmt.subsystem import GofmtSubsystem
+from pants.backend.go.lint.gofmt.subsystem import SUPPORTED_GOFMT_ARGS, GofmtSubsystem
 from pants.backend.go.target_types import GoPackageSourcesField
 from pants.backend.go.util_rules import goroot
 from pants.backend.go.util_rules.goroot import GoRoot
@@ -18,7 +18,6 @@ from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import FieldSet, Target
 from pants.util.logging import LogLevel
-from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import pluralize
 
 
@@ -43,14 +42,11 @@ class GoFmtUnsupportedArgsPassedError(Exception):
     pass
 
 
-SupportedGoFmtArgs = FrozenOrderedSet(("-e", "-r", "-s"))
-
-
 async def _validate_gofmt_args(args: tuple[str, ...]):
     """Validate that args passed to the gofmt are supported."""
-    if not set(args).issubset(SupportedGoFmtArgs):
+    if not set(args).issubset(SUPPORTED_GOFMT_ARGS):
         raise GoFmtUnsupportedArgsPassedError(
-            f"Only {tuple(SupportedGoFmtArgs)} flags can be passed."
+            f"Only {tuple(SUPPORTED_GOFMT_ARGS)} flags can be passed."
         )
 
 

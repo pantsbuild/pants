@@ -8,8 +8,9 @@ from textwrap import dedent
 import pytest
 
 from pants.backend.go import target_type_rules
-from pants.backend.go.lint.gofmt.rules import GofmtFieldSet, GofmtRequest, SupportedGoFmtArgs
+from pants.backend.go.lint.gofmt.rules import GofmtFieldSet, GofmtRequest
 from pants.backend.go.lint.gofmt.rules import rules as gofmt_rules
+from pants.backend.go.lint.gofmt.subsystem import SUPPORTED_GOFMT_ARGS
 from pants.backend.go.target_types import GoModTarget, GoPackageTarget
 from pants.backend.go.util_rules import (
     assembly,
@@ -185,7 +186,7 @@ def test_failing_gofmt_flags(rule_runner: RuleRunner) -> None:
         }
     )
     tgt = rule_runner.get_target(Address("", target_name="pkg"))
-    with pytest.raises(ExecutionError, match=str(tuple(SupportedGoFmtArgs))):
+    with pytest.raises(ExecutionError, match=str(tuple(SUPPORTED_GOFMT_ARGS))):
         run_gofmt(rule_runner, [tgt], extra_args=["--gofmt-args=-unsupported"])
 
     fmt_result = run_gofmt(
