@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, Iterable, Mapping, Sequence
 
 from pants.base.build_environment import get_buildroot, get_default_pants_config_file, pants_version
 from pants.base.exceptions import BuildConfigurationError
+from pants.bin.pants_env_vars import WORK_DIR
 from pants.engine.unions import UnionMembership
 from pants.option.alias import CliAlias
 from pants.option.config import Config
@@ -181,6 +182,11 @@ class OptionsBootstrapper:
             os.environ["__PANTS_BIN_NAME"] = munge_bin_name(
                 bootstrap_option_values.pants_bin_name, get_buildroot()
             )
+
+            # Provide the current working directory used when invoking `pants` in the environment as
+            # captured by `PantsLoader`.
+            if WORK_DIR in env:
+                os.environ[WORK_DIR] = env[WORK_DIR]
 
             env_tuples = tuple(
                 sorted(

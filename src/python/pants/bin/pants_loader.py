@@ -15,6 +15,7 @@ from pants.bin.pants_env_vars import (
     DAEMON_ENTRYPOINT,
     IGNORE_UNRECOGNIZED_ENCODING,
     RECURSION_LIMIT,
+    WORK_DIR,
 )
 from pants.bin.pants_runner import PantsRunner
 from pants.util.strutil import softwrap
@@ -101,9 +102,9 @@ class PantsLoader:
         cls.ensure_locale()
 
         sys.setrecursionlimit(int(os.environ.get(RECURSION_LIMIT, "10000")))
+        os.environ.setdefault(WORK_DIR, os.getcwd())
 
         entrypoint = os.environ.pop(DAEMON_ENTRYPOINT, None)
-
         if entrypoint:
             cls.run_alternate_entrypoint(entrypoint)
         else:
