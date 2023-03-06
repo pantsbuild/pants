@@ -6,7 +6,9 @@ from __future__ import annotations
 import re
 import shlex
 import textwrap
-from typing import Callable, Iterable
+from typing import Callable, Iterable, TypeVar
+
+from typing_extensions import ParamSpec
 
 
 def ensure_binary(text_or_binary: bytes | str) -> bytes:
@@ -307,3 +309,17 @@ def help_text(val: str | Callable[[], str]) -> str | Callable[[], str]:
         return softwrap(val)
     else:
         return lambda: softwrap(val())  # type: ignore[operator]
+
+
+P = ParamSpec("P")
+R = TypeVar("R")
+
+
+def docstring(doc: str | Callable[[], str]) -> Callable[[Callable[P, R]], Callable[P, R]]:
+    """Use this decorator to provide a dynamic doc-string to a function."""
+
+    def wrapper(func: Callable[P, R]) -> Callable[P, R]:
+        func.__doc__ = strval(doc)
+        return func
+
+    return wrapper

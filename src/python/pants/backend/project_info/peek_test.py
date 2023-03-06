@@ -1,7 +1,11 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from __future__ import annotations
+
+import dataclasses
 from textwrap import dedent
+from typing import Sequence
 
 import pytest
 
@@ -11,9 +15,14 @@ from pants.backend.visibility.rules import rules as visibility_rules
 from pants.base.specs import RawSpecs, RecursiveGlobSpec
 from pants.core.target_types import ArchiveTarget, FilesGeneratorTarget, FileTarget, GenericTarget
 from pants.engine.addresses import Address
+from pants.engine.fs import Digest, Snapshot
 from pants.engine.internals.dep_rules import DependencyRuleAction, DependencyRuleApplication
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
+
+
+def _snapshot(fingerprint: str, files: tuple[str, ...]) -> Snapshot:
+    return Snapshot._unsafe_create(Digest(fingerprint.ljust(64, "0"), 1), files, ())
 
 
 @pytest.mark.parametrize(
@@ -38,7 +47,10 @@ from pants.testutil.rule_runner import RuleRunner
                         },
                         Address("example", target_name="files_target"),
                     ),
-                    ("foo.txt", "bar.txt"),
+                    _snapshot(
+                        "2",
+                        ("foo.txt", "bar.txt"),
+                    ),
                     tuple(),
                 )
             ],
@@ -59,9 +71,10 @@ from pants.testutil.rule_runner import RuleRunner
                       }
                     },
                     "sources": [
-                      "foo.txt",
-                      "bar.txt"
+                      "bar.txt",
+                      "foo.txt"
                     ],
+                    "sources_fingerprint": "2000000000000000000000000000000000000000000000000000000000000000",
                     "sources_raw": [
                       "*.txt"
                     ]
@@ -77,7 +90,10 @@ from pants.testutil.rule_runner import RuleRunner
                     FilesGeneratorTarget(
                         {"sources": ["foo.txt"]}, Address("example", target_name="files_target")
                     ),
-                    ("foo.txt",),
+                    _snapshot(
+                        "1",
+                        ("foo.txt",),
+                    ),
                     tuple(),
                 )
             ],
@@ -95,6 +111,7 @@ from pants.testutil.rule_runner import RuleRunner
                     "sources": [
                       "foo.txt"
                     ],
+                    "sources_fingerprint": "1000000000000000000000000000000000000000000000000000000000000000",
                     "sources_raw": [
                       "foo.txt"
                     ],
@@ -112,7 +129,10 @@ from pants.testutil.rule_runner import RuleRunner
                         {"sources": ["*.txt"], "tags": ["zippable"]},
                         Address("example", target_name="files_target"),
                     ),
-                    tuple(),
+                    _snapshot(
+                        "0",
+                        (),
+                    ),
                     tuple(),
                 ),
                 TargetData(
@@ -138,6 +158,7 @@ from pants.testutil.rule_runner import RuleRunner
                     "target_type": "files",
                     "dependencies": [],
                     "sources": [],
+                    "sources_fingerprint": "0000000000000000000000000000000000000000000000000000000000000000",
                     "sources_raw": [
                       "*.txt"
                     ],
@@ -167,7 +188,7 @@ from pants.testutil.rule_runner import RuleRunner
             [
                 TargetData(
                     FilesGeneratorTarget({"sources": ["*.txt"]}, Address("foo", target_name="baz")),
-                    ("foo/a.txt",),
+                    _snapshot("", ("foo/a.txt",)),
                     ("foo/a.txt:baz",),
                     dependencies_rules=("does", "apply", "*"),
                     dependents_rules=("fall-through", "*"),
@@ -218,6 +239,7 @@ from pants.testutil.rule_runner import RuleRunner
                     "sources": [
                       "foo/a.txt"
                     ],
+                    "sources_fingerprint": "0000000000000000000000000000000000000000000000000000000000000000",
                     "sources_raw": [
                       "*.txt"
                     ]
@@ -254,6 +276,19 @@ def test_non_matching_build_target(rule_runner: RuleRunner) -> None:
     assert result.stdout == "[]\n"
 
 
+def _normalize_fingerprints(tds: Sequence[TargetData]) -> list[TargetData]:
+    """We're not here to test the computation of fingerprints."""
+    return [
+        dataclasses.replace(
+            td,
+            expanded_sources=None
+            if td.expanded_sources is None
+            else _snapshot("", td.expanded_sources.files),
+        )
+        for td in tds
+    ]
+
+
 def test_get_target_data(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -272,7 +307,8 @@ def test_get_target_data(rule_runner: RuleRunner) -> None:
         TargetDatas,
         [RawSpecs(recursive_globs=(RecursiveGlobSpec("foo"),), description_of_origin="tests")],
     )
-    assert list(tds) == [
+
+    assert _normalize_fingerprints(tds) == [
         TargetData(
             GenericTarget({"dependencies": [":baz"]}, Address("foo", target_name="bar")),
             None,
@@ -280,21 +316,21 @@ def test_get_target_data(rule_runner: RuleRunner) -> None:
         ),
         TargetData(
             FilesGeneratorTarget({"sources": ["*.txt"]}, Address("foo", target_name="baz")),
-            ("foo/a.txt", "foo/b.txt"),
+            _snapshot("", ("foo/a.txt", "foo/b.txt")),
             ("foo/a.txt:baz", "foo/b.txt:baz"),
         ),
         TargetData(
             FileTarget(
                 {"source": "a.txt"}, Address("foo", relative_file_path="a.txt", target_name="baz")
             ),
-            ("foo/a.txt",),
+            _snapshot("", ("foo/a.txt",)),
             (),
         ),
         TargetData(
             FileTarget(
                 {"source": "b.txt"}, Address("foo", relative_file_path="b.txt", target_name="baz")
             ),
-            ("foo/b.txt",),
+            _snapshot("", ("foo/b.txt",)),
             (),
         ),
     ]
@@ -325,10 +361,10 @@ def test_get_target_data_with_dep_rules(rule_runner: RuleRunner) -> None:
         TargetDatas,
         [RawSpecs(recursive_globs=(RecursiveGlobSpec("foo"),), description_of_origin="tests")],
     )
-    assert list(tds) == [
+    assert _normalize_fingerprints(tds) == [
         TargetData(
             FilesGeneratorTarget({"sources": ["*.txt"]}, Address("foo", target_name="baz")),
-            ("foo/a.txt",),
+            _snapshot("", ("foo/a.txt",)),
             ("foo/a.txt:baz",),
             dependencies_rules=("does", "apply", "*"),
             dependents_rules=("fall-through", "*"),
@@ -349,7 +385,7 @@ def test_get_target_data_with_dep_rules(rule_runner: RuleRunner) -> None:
             FileTarget(
                 {"source": "a.txt"}, Address("foo", relative_file_path="a.txt", target_name="baz")
             ),
-            ("foo/a.txt",),
+            _snapshot("", ("foo/a.txt",)),
             (),
             dependencies_rules=("does", "apply", "*"),
             dependents_rules=("fall-through", "*"),

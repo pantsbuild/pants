@@ -13,6 +13,7 @@ from typing_extensions import Protocol, runtime_checkable
 from pants.engine.addresses import Addresses
 from pants.engine.collection import Collection
 from pants.engine.console import Console
+from pants.engine.fs import Snapshot
 from pants.engine.goal import Goal, GoalSubsystem, Outputting
 from pants.engine.internals.build_files import _get_target_family_and_adaptor_for_dep_rules
 from pants.engine.internals.dep_rules import DependencyRuleApplication, DependencyRuleSet
@@ -79,7 +80,7 @@ def _normalize_value(val: Any) -> Any:
 class TargetData:
     target: Target
     # Sources may not be registered on the target, so we'll have nothing to expand.
-    expanded_sources: tuple[str, ...] | None
+    expanded_sources: Snapshot | None
     expanded_dependencies: tuple[str, ...]
 
     dependencies_rules: tuple[str, ...] | None = None
@@ -98,7 +99,8 @@ class TargetData:
 
         fields["dependencies"] = self.expanded_dependencies
         if self.expanded_sources is not None:
-            fields["sources"] = self.expanded_sources
+            fields["sources"] = self.expanded_sources.files
+            fields["sources_fingerprint"] = self.expanded_sources.digest.fingerprint
 
         if include_dep_rules:
             fields["_dependencies_rules"] = self.dependencies_rules
@@ -189,7 +191,7 @@ async def get_target_data(
         for tgt, deps in zip(sorted_targets, dependencies_per_target)
     ]
     expanded_sources_map = {
-        tgt.address: hs.snapshot.files
+        tgt.address: hs.snapshot
         for tgt, hs in zip(targets_with_sources, hydrated_sources_per_target)
     }
 

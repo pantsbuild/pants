@@ -9,7 +9,7 @@ DEFAULT_MODULE_MAPPING = {
     "ansicolors": ("colors",),
     "apache-airflow": ("airflow",),
     "atlassian-python-api": ("atlassian",),
-    "attrs": ("attr",),
+    "attrs": ("attr", "attrs"),
     # Azure
     "azure-common": ("azure.common",),
     "azure-core": ("azure.core",),
