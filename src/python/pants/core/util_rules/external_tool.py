@@ -75,51 +75,8 @@ class ExternalToolVersion:
         return cls(version, platform, sha256, int(filesize))
 
 
-class ExternalTool(Subsystem, metaclass=ABCMeta):
-    """Configuration for an invocable tool that we download from an external source.
-
-    Subclass this to configure a specific tool.
-
-
-    Idiomatic use:
-
-    class MyExternalTool(ExternalTool):
-        options_scope = "my-external-tool"
-        default_version = "1.2.3"
-        default_known_versions = [
-          "1.2.3|linux_arm64 |feed6789feed6789feed6789feed6789feed6789feed6789feed6789feed6789|112233",
-          "1.2.3|linux_x86_64|cafebabacafebabacafebabacafebabacafebabacafebabacafebabacafebaba|878986",
-          "1.2.3|macos_arm64 |deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef|222222",
-          "1.2.3|macos_x86_64|1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd|333333",
-        ]
-
-        version_constraints = ">=1.2.3, <2.0"
-
-        def generate_url(self, plat: Platform) -> str:
-            ...
-
-        def generate_exe(self, plat: Platform) -> str:
-            return "./path-to/binary
-
-    @rule
-    def my_rule(my_external_tool: MyExternalTool, platform: Platform) -> Foo:
-        downloaded_tool = await Get(
-            DownloadedExternalTool,
-            ExternalToolRequest,
-            my_external_tool.get_request(platform)
-        )
-        ...
-    """
-
-    # The default values for --version and --known-versions, and the supported versions.
-    # Subclasses must set appropriately.
-    default_version: str
-    default_known_versions: list[str]
-    version_constraints: str | None = None
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.check_version_constraints()
+class ExternalToolOptionsMixin:
+    """Common options for implementing subsystem providing an `ExternalToolRequest`."""
 
     @classproperty
     def name(cls):
@@ -128,6 +85,12 @@ class ExternalTool(Subsystem, metaclass=ABCMeta):
         Derived from the classname, but subclasses can override, e.g., with a classproperty.
         """
         return cls.__name__.lower()
+
+    # The default values for --version and --known-versions, and the supported versions.
+    # Subclasses must set appropriately.
+    default_version: str
+    default_known_versions: list[str]
+    version_constraints: str | None = None
 
     version = StrOption(
         default=lambda cls: cls.default_version,
@@ -164,6 +127,47 @@ class ExternalTool(Subsystem, metaclass=ABCMeta):
         """
         ),
     )
+
+
+class ExternalTool(Subsystem, ExternalToolOptionsMixin, metaclass=ABCMeta):
+    """Configuration for an invocable tool that we download from an external source.
+
+    Subclass this to configure a specific tool.
+
+
+    Idiomatic use:
+
+    class MyExternalTool(ExternalTool):
+        options_scope = "my-external-tool"
+        default_version = "1.2.3"
+        default_known_versions = [
+          "1.2.3|linux_arm64 |feed6789feed6789feed6789feed6789feed6789feed6789feed6789feed6789|112233",
+          "1.2.3|linux_x86_64|cafebabacafebabacafebabacafebabacafebabacafebabacafebabacafebaba|878986",
+          "1.2.3|macos_arm64 |deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef|222222",
+          "1.2.3|macos_x86_64|1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd|333333",
+        ]
+
+        version_constraints = ">=1.2.3, <2.0"
+
+        def generate_url(self, plat: Platform) -> str:
+            ...
+
+        def generate_exe(self, plat: Platform) -> str:
+            return "./path-to/binary
+
+    @rule
+    def my_rule(my_external_tool: MyExternalTool, platform: Platform) -> Foo:
+        downloaded_tool = await Get(
+            DownloadedExternalTool,
+            ExternalToolRequest,
+            my_external_tool.get_request(platform)
+        )
+        ...
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.check_version_constraints()
 
     use_unsupported_version = EnumOption(
         advanced=True,
@@ -275,20 +279,9 @@ class ExternalTool(Subsystem, metaclass=ABCMeta):
             raise UnsupportedVersion(" ".join(msg))
 
 
-class TemplatedExternalTool(ExternalTool):
-    """Extends the ExternalTool to allow url templating for custom/self-hosted source.
-
-    In addition to ExternalTool functionalities, it is needed to set, e.g.:
-
-    default_url_template = "https://tool.url/{version}/{platform}-mytool.zip"
-    default_url_platform_mapping = {
-        "macos_x86_64": "osx_intel",
-        "macos_arm64": "osx_arm",
-        "linux_x86_64": "linux",
-    }
-
-    The platform mapping dict is optional.
-    """
+class TemplatedExternalToolOptionsMixin(ExternalToolOptionsMixin):
+    """Common options for implementing a subsystem providing an `ExternalToolRequest` via a URL
+    template."""
 
     default_url_template: str
     default_url_platform_mapping: dict[str, str] | None = None
@@ -330,6 +323,22 @@ class TemplatedExternalTool(ExternalTool):
             """
         ),
     )
+
+
+class TemplatedExternalTool(ExternalTool, TemplatedExternalToolOptionsMixin):
+    """Extends the ExternalTool to allow url templating for custom/self-hosted source.
+
+    In addition to ExternalTool functionalities, it is needed to set, e.g.:
+
+    default_url_template = "https://tool.url/{version}/{platform}-mytool.zip"
+    default_url_platform_mapping = {
+        "macos_x86_64": "osx_intel",
+        "macos_arm64": "osx_arm",
+        "linux_x86_64": "linux",
+    }
+
+    The platform mapping dict is optional.
+    """
 
     def generate_url(self, plat: Platform):
         platform = self.url_platform_mapping.get(plat.value, "")
