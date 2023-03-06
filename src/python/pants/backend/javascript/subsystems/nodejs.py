@@ -6,10 +6,12 @@ from __future__ import annotations
 import os.path
 from dataclasses import dataclass, field
 from itertools import groupby
-from typing import ClassVar, Iterable, Mapping
+from typing import ClassVar, Iterable, Mapping, Collection
 
 from nodesemver import min_satisfying
 
+from pants.core.util_rules import asdf, search_paths, system_binaries
+from pants.core.util_rules.asdf import AsdfPathString, AsdfToolPathsResult
 from pants.core.util_rules.external_tool import (
     DownloadedExternalTool,
     ExternalToolRequest,
@@ -17,24 +19,33 @@ from pants.core.util_rules.external_tool import (
     TemplatedExternalToolOptionsMixin,
 )
 from pants.core.util_rules.external_tool import rules as external_tool_rules
-from pants.core.util_rules.system_binaries import BinaryNotFoundError
+from pants.core.util_rules.search_paths import ValidatedSearchPaths, ValidateSearchPathsRequest
+from pants.core.util_rules.system_binaries import (
+    BinaryNotFoundError,
+    BinaryPath,
+    BinaryPathRequest,
+    BinaryPaths,
+    BinaryPathTest,
+)
+from pants.engine.env_vars import PathEnvironmentVariable
 from pants.engine.fs import EMPTY_DIGEST, Digest, DownloadFile
 from pants.engine.internals.native_engine import FileDigest
 from pants.engine.platform import Platform
 from pants.engine.process import Process
 from pants.engine.rules import Get, Rule, collect_rules, rule
 from pants.engine.unions import UnionRule
-from pants.option.option_types import DictOption
+from pants.option.option_types import DictOption, StrListOption
 from pants.option.subsystem import Subsystem
 from pants.util.docutil import bin_name
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
+from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import softwrap
 
 
 class NodeJS(Subsystem, TemplatedExternalToolOptionsMixin):
     options_scope = "nodejs"
-    help = "The NodeJS Javascript runtime (including npm and npx)."
+    help = "The Node.js Javascript runtime (including npm and npx)."
 
     default_version = "v16.15.0"
     default_known_versions = [
@@ -94,6 +105,39 @@ class NodeJS(Subsystem, TemplatedExternalToolOptionsMixin):
         url = self.generate_url(known_version.version, platform)
         download_file = DownloadFile(url, FileDigest(known_version.sha256, known_version.filesize))
         return await Get(DownloadedExternalTool, ExternalToolRequest(download_file, exe))
+
+    class EnvironmentAware(Subsystem.EnvironmentAware):
+        env_vars_used_by_options = ("PATH",)
+
+        search_path = StrListOption(
+            default=["<PATH>"],
+            help=softwrap(
+                f"""
+                A list of paths to search for Node.js distributions.
+
+                This option take precedence over the templated url download,
+                if a version matching the configured version range is found
+                in these paths.
+
+                You can specify absolute paths to binaries
+                and/or to directories containing binaries. The order of entries does
+                not matter.
+
+                The following special strings are supported:
+
+                For all runtime environment types:
+
+                * `<PATH>`, the contents of the PATH env var
+
+                When the environment is a `local_environment` target:
+
+                * `{AsdfPathString.STANDARD}`, {AsdfPathString.STANDARD.description("Node.js")}
+                * `{AsdfPathString.LOCAL}`, {AsdfPathString.LOCAL.description("binaries")}
+                """
+            ),
+            advanced=True,
+            metavar="<binary-paths>",
+        )
 
 
 class UserChosenNodeJSResolveAliases(FrozenDict[str, str]):
@@ -201,18 +245,83 @@ class NodeJsBootstrap:
     nodejs_search_paths: tuple[str, ...]
 
 
+async def _nodejs_search_paths(env_tgt: EnvironmentTarget, paths: Collection[str]) -> tuple[str, ...]:
+    asdf_result = await AsdfToolPathsResult.get_un_cachable_search_paths(
+        paths,
+        env_tgt=env_tgt,
+        tool_name="nodejs",
+        tool_description="Node.js distribution",
+        paths_option_name="[nodejs].search_path",
+    )
+    asdf_standard_tool_paths = asdf_result.standard_tool_paths
+    asdf_local_tool_paths = asdf_result.local_tool_paths
+    special_strings: dict[str, Iterable[str]] = {
+        AsdfPathString.STANDARD: asdf_standard_tool_paths,
+        AsdfPathString.LOCAL: asdf_local_tool_paths,
+    }
+
+    expanded: list[str] = []
+    for s in paths:
+        if s == "<PATH>":
+            expanded.extend(await Get(PathEnvironmentVariable, {}))  # noqa: PNT30: Linear search
+        elif s in special_strings:
+            expanded.extend(special_strings[s])
+        else:
+            expanded.append(s)
+    return tuple(expanded)
+
+
 @rule
-async def nodejs_bootstrap() -> NodeJsBootstrap:
-    return NodeJsBootstrap(nodejs_search_paths=())
+async def nodejs_bootstrap(nodejs_env_aware: NodeJS.EnvironmentAware) -> NodeJsBootstrap:
+    search_paths = await Get(
+        ValidatedSearchPaths,
+        ValidateSearchPathsRequest(
+            env_tgt=nodejs_env_aware.env_tgt,
+            search_paths=tuple(nodejs_env_aware.search_path),
+            option_origin=f"[{NodeJS.options_scope}].search_path",
+            environment_key="nodejs_search_path",
+            is_default=nodejs_env_aware._is_default("search_path"),
+            local_only=FrozenOrderedSet((AsdfPathString.STANDARD, AsdfPathString.LOCAL)),
+        ),
+    )
+
+    expanded_paths = await _nodejs_search_paths(nodejs_env_aware.env_tgt, search_paths)
+
+    return NodeJsBootstrap(nodejs_search_paths=expanded_paths)
+
+
+class _BinaryPathsPerVersion(FrozenDict[str, tuple[BinaryPath, ...]]):
+    pass
+
+
+@rule(level=LogLevel.DEBUG, desc="Testing for Node.js binaries.")
+async def get_valid_nodejs_paths_by_version(bootstrap: NodeJsBootstrap) -> _BinaryPathsPerVersion:
+    paths = await Get(
+        BinaryPaths,
+        BinaryPathRequest(
+            search_path=bootstrap.nodejs_search_paths,
+            binary_name="node",
+            test=BinaryPathTest(
+                ["--version"], fingerprint_stdout=False
+            ),  # Hack to retain version info
+        ),
+    )
+
+    group_by_version = groupby((path for path in paths.paths), key=lambda path: path.fingerprint)
+    return _BinaryPathsPerVersion({version: tuple(paths) for version, paths in group_by_version})
 
 
 @rule(level=LogLevel.INFO, desc="Finding Node.js distribution binaries.")
 async def determine_nodejs_binaries(
-    nodejs: NodeJS, bootstrap: NodeJsBootstrap, platform: Platform
+    nodejs: NodeJS, platform: Platform, paths_per_version: _BinaryPathsPerVersion
 ) -> NodejsBinaries:
+    satisfying_version = min_satisfying(paths_per_version.keys(), nodejs.version)
+    if satisfying_version:
+        return NodejsBinaries(os.path.dirname(paths_per_version[satisfying_version][0].path))
+
     decoded_versions = groupby(
         (ExternalToolVersion.decode(unparsed) for unparsed in nodejs.known_versions),
-        lambda version: version.version,
+        lambda v: v.version,
     )
 
     decoded_per_version = {
@@ -231,7 +340,8 @@ async def determine_nodejs_binaries(
                 f"""
                 Cannot find any `node` binaries satisfying the range '{nodejs.version}'.
 
-                To fix, add a `[nodejs].url_platform_mapping` version that satisfies the range.
+                To fix, either list a `[{NodeJS.options_scope}].url_platform_mapping` version that satisfies the range,
+                or ensure `[{NodeJS.options_scope}].search_path` contains a path to binaries that satisfy the range.
                 """
             )
         )
@@ -268,4 +378,7 @@ def rules() -> Iterable[Rule | UnionRule]:
     return (
         *collect_rules(),
         *external_tool_rules(),
+        *asdf.rules(),
+        *system_binaries.rules(),
+        *search_paths.rules(),
     )

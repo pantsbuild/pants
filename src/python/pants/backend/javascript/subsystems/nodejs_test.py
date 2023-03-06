@@ -3,6 +3,10 @@
 
 from __future__ import annotations
 
+import stat
+from pathlib import Path
+from textwrap import dedent
+from typing import NoReturn
 from unittest.mock import Mock
 
 import pytest
@@ -10,7 +14,8 @@ import pytest
 from pants.backend.javascript.subsystems import nodejs
 from pants.backend.javascript.subsystems.nodejs import (
     NodeJS,
-    NodeJsBootstrap,
+    NodejsBinaries,
+    _BinaryPathsPerVersion,
     determine_nodejs_binaries,
 )
 from pants.backend.javascript.target_types import JSSourcesGeneratorTarget
@@ -21,10 +26,12 @@ from pants.core.util_rules.external_tool import (
     ExternalToolRequest,
     ExternalToolVersion,
 )
+from pants.core.util_rules.system_binaries import BinaryNotFoundError, BinaryPath
 from pants.engine.internals.native_engine import EMPTY_DIGEST
 from pants.engine.platform import Platform
 from pants.engine.process import ProcessResult
 from pants.testutil.rule_runner import MockGet, QueryRule, RuleRunner, run_rule_with_mocks
+from pants.util.contextutil import temporary_dir
 
 
 @pytest.fixture
@@ -36,6 +43,7 @@ def rule_runner() -> RuleRunner:
             *config_files.rules(),
             *target_types_rules.rules(),
             QueryRule(ProcessResult, [nodejs.NodeJSToolProcess]),
+            QueryRule(NodejsBinaries, ()),
         ],
         target_types=[JSSourcesGeneratorTarget],
     )
@@ -96,7 +104,7 @@ _SEMVER_3_0_0 = given_known_version("3.0.0")
         pytest.param(">2.1 || <2.1", _SEMVER_1_1_0, id="or_range"),
     ],
 )
-def test_node_version_from_semver(semver_range: str, expected: str):
+def test_node_version_from_semver_download(semver_range: str, expected: str) -> None:
     nodejs_subsystem = Mock(spec_set=NodeJS)
     nodejs_subsystem.version = semver_range
     nodejs_subsystem.known_versions = [
@@ -108,16 +116,110 @@ def test_node_version_from_semver(semver_range: str, expected: str):
     ]
     run_rule_with_mocks(
         determine_nodejs_binaries,
-        rule_args=(nodejs_subsystem, NodeJsBootstrap(()), Platform.linux_x86_64),
+        rule_args=(nodejs_subsystem, Platform.linux_x86_64, _BinaryPathsPerVersion()),
         mock_gets=[
             MockGet(
                 DownloadedExternalTool,
                 (ExternalToolRequest,),
                 mock=lambda *_: DownloadedExternalTool(EMPTY_DIGEST, "myexe"),
-            )
+            ),
         ],
     )
 
     nodejs_subsystem.download_known_version.assert_called_once_with(
         ExternalToolVersion.decode(expected), Platform.linux_x86_64
     )
+
+
+@pytest.mark.parametrize(
+    ("semver_range", "expected_path"),
+    [
+        pytest.param("1.x", "1/1/0", id="x_range"),
+        pytest.param("2.0 - 3.0", "2/1/0", id="hyphen"),
+        pytest.param(">2.2.0", "2/2/2", id="gt"),
+        pytest.param("2.2.x", "2/2/0", id="x_range_patch"),
+        pytest.param("~2.2.0", "2/2/0", id="thilde"),
+        pytest.param("^2.2.0", "2/2/0", id="caret"),
+        pytest.param("3.0.0", "3/0/0", id="exact"),
+        pytest.param("=3.0.0", "3/0/0", id="exact_equals"),
+        pytest.param("<3.0.0 >2.1", "2/2/0", id="and_range"),
+        pytest.param(">2.1 || <2.1", "1/1/0", id="or_range"),
+    ],
+)
+def test_node_version_from_semver_bootstrap(semver_range: str, expected_path: str) -> None:
+    nodejs_subsystem = Mock(spec_set=NodeJS)
+    nodejs_subsystem.version = semver_range
+    discoverable_versions = _BinaryPathsPerVersion(
+        {
+            "1.1.0": (BinaryPath("1/1/0/node"),),
+            "2.1.0": (BinaryPath("2/1/0/node"),),
+            "2.2.0": (BinaryPath("2/2/0/node"),),
+            "2.2.2": (BinaryPath("2/2/2/node"),),
+            "3.0.0": (BinaryPath("3/0/0/node"),),
+        }
+    )
+
+    def mock_download(*_) -> NoReturn:
+        raise AssertionError("Should not run.")
+
+    result = run_rule_with_mocks(
+        determine_nodejs_binaries,
+        rule_args=(nodejs_subsystem, Platform.linux_x86_64, discoverable_versions),
+        mock_gets=[
+            MockGet(DownloadedExternalTool, (ExternalToolRequest,), mock=mock_download),
+        ],
+    )
+
+    assert result.binary_dir == expected_path
+
+
+def test_finding_no_node_version_is_an_error() -> None:
+    nodejs_subsystem = Mock(spec_set=NodeJS)
+    nodejs_subsystem.version = "*"
+    nodejs_subsystem.known_versions = []
+    discoverable_versions = _BinaryPathsPerVersion()
+
+    def mock_download(*_) -> DownloadedExternalTool:
+        return DownloadedExternalTool(EMPTY_DIGEST, "myexe")
+
+    with pytest.raises(BinaryNotFoundError):
+        run_rule_with_mocks(
+            determine_nodejs_binaries,
+            rule_args=(nodejs_subsystem, Platform.linux_x86_64, discoverable_versions),
+            mock_gets=[
+                MockGet(DownloadedExternalTool, (ExternalToolRequest,), mock=mock_download),
+            ],
+        )
+
+
+def mock_nodejs(version: str) -> str:
+    """Return a bash script that emulates `node --version`."""
+    return dedent(
+        f"""\
+        #!/bin/bash
+
+        if [[ "$1" == '--version' ]]; then
+            echo '{version}'
+        fi
+        """
+    )
+
+
+def test_find_valid_binary(rule_runner: RuleRunner) -> None:
+    mock_binary = mock_nodejs("v3.0.0")
+    with temporary_dir() as tmpdir:
+        binary_dir = Path(tmpdir) / "bin"
+        binary_dir.mkdir()
+        binary_path = binary_dir / "node"
+        binary_path.write_text(mock_binary)
+        binary_path.chmod(binary_path.stat().st_mode | stat.S_IEXEC)
+
+        rule_runner.set_options(
+            [
+                f"--nodejs-search-path=['{binary_dir}']",
+                "--nodejs-version=>2",
+            ],
+            env_inherit={"PATH"},
+        )
+        result = rule_runner.request(NodejsBinaries, ())
+    assert result.binary_dir == str(binary_dir)
