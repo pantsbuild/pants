@@ -7,7 +7,11 @@ import os.path
 from dataclasses import dataclass
 
 from pants.backend.go.lint.gofmt.skip_field import SkipGofmtField
-from pants.backend.go.lint.gofmt.subsystem import SUPPORTED_GOFMT_ARGS, GofmtSubsystem
+from pants.backend.go.lint.gofmt.subsystem import (
+    SUPPORTED_GOFMT_ARGS,
+    SUPPORTED_GOFMT_ARGS_AS_HELP,
+    GofmtSubsystem,
+)
 from pants.backend.go.target_types import GoPackageSourcesField
 from pants.backend.go.util_rules import goroot
 from pants.backend.go.util_rules.goroot import GoRoot
@@ -46,7 +50,7 @@ async def _validate_gofmt_args(args: tuple[str, ...]):
     """Validate that args passed to the gofmt are supported."""
     if not set(args).issubset(SUPPORTED_GOFMT_ARGS):
         raise GoFmtUnsupportedArgsPassedError(
-            f"Only {tuple(SUPPORTED_GOFMT_ARGS)} flags can be passed."
+            f"Only the following style related options are supported: {SUPPORTED_GOFMT_ARGS_AS_HELP}."
         )
 
 
