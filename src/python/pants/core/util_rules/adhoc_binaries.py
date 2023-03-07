@@ -48,33 +48,34 @@ class PythonBuildStandaloneBinary:
 async def download_python_build_standalone(
     platform: Platform, env_tgt: EnvironmentTarget, tar_binary: TarBinary
 ) -> PythonBuildStandaloneBinary:
-    if isinstance(env_tgt.val, LocalEnvironmentTarget):
+    if env_tgt.val is None or isinstance(env_tgt.val, LocalEnvironmentTarget):
         return PythonBuildStandaloneBinary(sys.executable, EMPTY_DIGEST)
 
     url_plat, fingerprint, bytelen = {
         "linux_arm64": (
             "aarch64-unknown-linux-gnu",
-            "2003750f40cd09d4bf7a850342613992f8d9454f03b3c067989911fb37e7a4d1",
-            24505626,
+            "1ba520c0db431c84305677f56eb9a4254f5097430ed443e92fc8617f8fba973d",
+            23873387,
         ),
         "linux_x86_64": (
             "x86_64-unknown-linux-gnu",
-            "d196347aeb701a53fe2bb2b095abec38d27d0fa0443f8a1c2023a1bed6e18cdf",
-            27081922,
+            "7ba397787932393e65fc2fb9fcfabf54f2bb6751d5da2b45913cb25b2d493758",
+            26129729,
         ),
         "macos_arm64": (
             "aarch64-apple-darwin",
-            "018d05a779b2de7a476f3b3ff2d10f503d69d14efcedd0774e6dab8c22ef84ff",
-            17509509,
+            "d732d212d42315ac27c6da3e0b69636737a8d72086c980daf844344c010cab80",
+            17084463,
         ),
         "macos_x86_64": (
             "x86_64-apple-darwin",
-            "0e685f98dce0e5bc8da93c7081f4e6c10219792e223e4b5886730fd73a7ba4c6",
-            17474702,
+            "3948384af5e8d4ee7e5ccc648322b99c1c5cf4979954ed5e6b3382c69d6db71e",
+            17059474,
         ),
     }[platform.value]
 
-    filename = f"cpython-3.10.9+20230116-{url_plat}-install_only.tar.gz"
+    # NB: This should match the maximum version supported by the Pants package
+    filename = f"cpython-3.9.16+20230116-{url_plat}-install_only.tar.gz"
     python_archive = await Get(
         Digest,
         DownloadFile(
@@ -98,7 +99,7 @@ async def download_python_build_standalone(
         ),
     )
 
-    return PythonBuildStandaloneBinary("python/install/bin/python3", result.output_digest)
+    return PythonBuildStandaloneBinary("python/bin/python3", result.output_digest)
 
 
 @dataclass(frozen=True)
