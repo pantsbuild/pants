@@ -302,8 +302,7 @@ impl ExecuteProcess {
     let input_digests_fut: Result<_, String> = Python::with_gil(|py| {
       let value = (**value).as_ref(py);
       let input_files = lift_directory_digest(
-        externs::getattr(value, "input_digest")
-          .map_err(|err| format!("Error retrieving `input_digest`: {err}"))?,
+        externs::getattr(value, "input_digest")?
       )
       .map_err(|err| format!("Error parsing input_digest {err}"))?;
       let immutable_inputs =
@@ -311,8 +310,7 @@ impl ExecuteProcess {
           .into_iter()
           .map(|(path, digest)| Ok((RelativePath::new(path)?, lift_directory_digest(digest)?)))
           .collect::<Result<BTreeMap<_, _>, String>>()?;
-      let use_nailgun = externs::getattr::<Vec<String>>(value, "use_nailgun")
-        .map_err(|err| format!("Failed to get field `use_nailgun`: {err}"))?
+      let use_nailgun = externs::getattr::<Vec<String>>(value, "use_nailgun")?
         .into_iter()
         .map(RelativePath::new)
         .collect::<Result<BTreeSet<_>, _>>()?;
@@ -342,20 +340,17 @@ impl ExecuteProcess {
       .map(RelativePath::new)
       .transpose()?;
 
-    let output_files = externs::getattr::<Vec<String>>(value, "output_files")
-      .map_err(|err| format!("Failed to get field `output_files`: {err}"))?
+    let output_files = externs::getattr::<Vec<String>>(value, "output_files")?
       .into_iter()
       .map(RelativePath::new)
       .collect::<Result<_, _>>()?;
 
-    let output_directories = externs::getattr::<Vec<String>>(value, "output_directories")
-      .map_err(|err| format!("Failed to get field `output_directories`: {err}"))?
+    let output_directories = externs::getattr::<Vec<String>>(value, "output_directories")?
       .into_iter()
       .map(RelativePath::new)
       .collect::<Result<_, _>>()?;
 
-    let timeout_in_seconds: f64 = externs::getattr(value, "timeout_seconds")
-      .map_err(|err| format!("Failed to get field `timeout_seconds`: {err}"))?;
+    let timeout_in_seconds: f64 = externs::getattr(value, "timeout_seconds")?;
 
     let timeout = if timeout_in_seconds < 0.0 {
       None
@@ -363,11 +358,9 @@ impl ExecuteProcess {
       Some(Duration::from_millis((timeout_in_seconds * 1000.0) as u64))
     };
 
-    let description: String = externs::getattr(value, "description")
-      .map_err(|err| format!("Failed to get field `description`: {err}"))?;
+    let description: String = externs::getattr(value, "description")?;
 
-    let py_level = externs::getattr(value, "level")
-      .map_err(|err| format!("Failed to get field `level`: {err}"))?;
+    let py_level = externs::getattr(value, "level")?;
 
     let level = externs::val_to_log_level(py_level)?;
 
@@ -385,14 +378,11 @@ impl ExecuteProcess {
       externs::getattr_as_optional_string(value, "execution_slot_variable")
         .map_err(|e| format!("Failed to get `execution_slot_variable` for field: {e}"))?;
 
-    let concurrency_available: usize = externs::getattr(value, "concurrency_available")
-      .map_err(|e| format!("Failed to get `concurrency_available` for field: {e}"))?;
+    let concurrency_available: usize = externs::getattr(value, "concurrency_available")?;
 
     let cache_scope: ProcessCacheScope = {
-      let cache_scope_enum = externs::getattr(value, "cache_scope")
-        .map_err(|e| format!("Failed to get `cache_scope` for field: {e}"))?;
-      externs::getattr::<String>(cache_scope_enum, "name")
-        .map_err(|e| format!("Failed to get `name` for field: {e}"))?
+      let cache_scope_enum = externs::getattr(value, "cache_scope")?;
+      externs::getattr::<String>(cache_scope_enum, "name")?
         .try_into()?
     };
 
