@@ -75,7 +75,7 @@ async def download_python_build_standalone(
         ),
     }[platform.value]
 
-    filename = f"cpython-3.10.9+20230116-{url_plat}-full.tar.zst"
+    filename = f"cpython-3.10.9+20230116-{url_plat}-full.tar.gz"
     python_archive = await Get(
         Digest,
         DownloadFile(
