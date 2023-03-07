@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Callable, Collection, Iterable
+from typing import Collection
 
 from pants.backend.go.subsystems.golang import GolangSubsystem
 from pants.core.util_rules import asdf, search_paths
@@ -35,11 +35,9 @@ async def _go_search_paths(
         paths_option_name="[golang].go_search_paths",
         bin_relpath=golang_subsystem.asdf_bin_relpath,
     )
-    asdf_standard_tool_paths = asdf_result.standard_tool_paths
-    asdf_local_tool_paths = asdf_result.local_tool_paths
-    special_strings: dict[str, Callable[[], Iterable[str]]] = {
-        AsdfPathString.STANDARD: lambda: asdf_standard_tool_paths,
-        AsdfPathString.LOCAL: lambda: asdf_local_tool_paths,
+    special_strings = {
+        AsdfPathString.STANDARD.value: asdf_result.standard_tool_paths,
+        AsdfPathString.LOCAL.value: asdf_result.local_tool_paths,
     }
 
     expanded: list[str] = []
@@ -47,7 +45,7 @@ async def _go_search_paths(
         if s == "<PATH>":
             expanded.extend(await Get(PathEnvironmentVariable, {}))  # noqa: PNT30: Linear search
         elif s in special_strings:
-            special_paths = special_strings[s]()
+            special_paths = special_strings[s]
             expanded.extend(special_paths)
         else:
             expanded.append(s)
