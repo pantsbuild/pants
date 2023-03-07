@@ -111,6 +111,16 @@ async def setup_goroot(
                 f"{version_result}"
             )
 
+        if compatible_go_version(compiler_version=version, target_version="1.20"):
+            invalid_versions.append(
+                (
+                    binary_path.path,
+                    version,
+                    "Go v1.20 and later versions are not compatible with this version of Pants.",
+                )
+            )
+            continue
+
         if compatible_go_version(
             compiler_version=version, target_version=golang_subsystem.minimum_expected_version
         ):
@@ -135,24 +145,31 @@ async def setup_goroot(
             "(set by `[golang].expected_minimum_version`). Ignoring."
         )
 
-        invalid_versions.append((binary_path.path, version))
+        invalid_versions.append(
+            (
+                binary_path.path,
+                version,
+                "This version is earlier than the configured minimum expected version.",
+            )
+        )
 
     invalid_versions_str = bullet_list(
-        f"{path}: {version}" for path, version in sorted(invalid_versions)
+        f"{path}: {version} ({message})" for path, version, message in sorted(invalid_versions)
     )
     raise BinaryNotFoundError(
         softwrap(
             f"""
-            Cannot find a `go` binary compatible with the minimum version of
-            {golang_subsystem.minimum_expected_version} (set by `[golang].minimum_expected_version`).
+            Cannot find a `go` binary which is both compatible with the minimum version of
+            {golang_subsystem.minimum_expected_version} (set by `[golang].minimum_expected_version`)
+            and is not Go v1.20 or a later version.
 
             Found these `go` binaries, but they had incompatible versions:
 
             {invalid_versions_str}
 
             To fix, please install the expected version or newer (https://golang.org/doc/install)
-            and ensure that it is discoverable via the option `[golang].go_search_paths`, or change
-            `[golang].expected_minimum_version`.
+            (but excluding Go v1.20 or later). Then ensure that it is discoverable via the option
+            `[golang].go_search_paths`, or change `[golang].expected_minimum_version`.
             """
         )
     )

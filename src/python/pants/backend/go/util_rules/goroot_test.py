@@ -108,4 +108,21 @@ def test_no_valid_versions(rule_runner: RuleRunner) -> None:
         get_goroot(rule_runner, [("go", invalid1), ("go", invalid2)])
     exc = e.value.wrapped_exceptions[0]
     assert isinstance(exc, BinaryNotFoundError)
-    assert "Cannot find a `go` binary compatible with the minimum version" in str(exc)
+    assert "Cannot find a `go` binary which is both compatible with the minimum version" in str(exc)
+
+
+def test_skips_go_1_20_and_later(rule_runner: RuleRunner) -> None:
+    valid = mock_go_binary(
+        version_output=f"go version go{EXPECTED_VERSION}.1 darwin/arm64",
+        env_output={"GOROOT": "/valid/go"},
+    )
+    unsupported_version = mock_go_binary(
+        version_output="go version go1.20.1 darwin/arm64", env_output={"GOROOT": "/unsupported/go"}
+    )
+    assert get_goroot(rule_runner, [("go", unsupported_version), ("go", valid)]).path == "/valid/go"
+
+    with pytest.raises(ExecutionError) as e:
+        get_goroot(rule_runner, [("go", unsupported_version)])
+    exc = e.value.wrapped_exceptions[0]
+    assert isinstance(exc, BinaryNotFoundError)
+    assert "Go v1.20 and later versions are not compatible with this version of Pants." in str(exc)
