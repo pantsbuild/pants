@@ -194,6 +194,11 @@ Go to the [documentation dashboard](https://dash.readme.com/). In the top left d
 
 Also, update the [Changelog](doc:changelog) page with the new release series at the top of the table. It's okay if there are no "highlights" yet.
 
+### Sync the `docs/` content
+
+On the relevant release branch, run `npx rdme docs docs/markdown --version v<pants major>.<pants minor>` with your key from <https://dash.readme.com/project/pants/v2.8/api-key>
+E.G: `npx rdme docs docs/markdown --version v2.8`.
+
 ### Regenerate the references
 
 On the relevant release branch, run `pants run build-support/bin/generate_docs.py -- --sync --api-key <key>` with your key from <https://dash.readme.com/project/pants/v2.8/api-key>.
