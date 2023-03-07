@@ -14,6 +14,7 @@ from pants.core.util_rules.adhoc_binaries import PythonBuildStandaloneBinary
 from pants.core.util_rules.subprocess_environment import SubprocessEnvironmentVars
 from pants.core.util_rules.system_binaries import BinaryPath
 from pants.engine.engine_aware import EngineAwareReturnType
+from pants.engine.internals.native_engine import Digest
 from pants.engine.rules import collect_rules, rule
 from pants.option.global_options import NamedCachesDirOption
 from pants.option.option_types import BoolOption, IntOption, StrListOption
@@ -95,14 +96,17 @@ class PythonExecutable(BinaryPath, EngineAwareReturnType):
     """The BinaryPath of a Python executable for user code, along with some extras."""
 
     append_only_caches: FrozenDict[str, str] = FrozenDict({})
+    immutable_input_digests: FrozenDict[str, str] = FrozenDict({})
 
     def __init__(
         self,
         path: str,
         fingerprint: str | None = None,
         append_only_caches: Mapping[str, str] = FrozenDict({}),
+        immutable_input_digests: Mapping[str, str] = FrozenDict({}),
     ) -> None:
         object.__setattr__(self, "append_only_caches", FrozenDict(append_only_caches))
+        object.__setattr__(self, "immutable_input_digests", FrozenDict(immutable_input_digests))
         super().__init__(path, fingerprint)
         self.__post_init__()
 
@@ -137,20 +141,6 @@ class PexEnvironment(EngineAwareReturnType):
 
     _PEX_ROOT_DIRNAME = "pex_root"
 
-    def level(self) -> LogLevel:
-        return LogLevel.DEBUG if self.bootstrap_python else LogLevel.WARN
-
-    def message(self) -> str:
-        if not self.bootstrap_python:
-            return softwrap(
-                """
-                No bootstrap Python executable could be found from the option
-                `interpreter_search_paths` in the `[python]` scope. Will attempt to run
-                PEXes directly.
-                """
-            )
-        return f"Selected {self.bootstrap_python.path} to bootstrap PEXes with."
-
     def in_sandbox(self, *, working_directory: str | None) -> CompletePexEnvironment:
         pex_root = PurePath(".cache") / self._PEX_ROOT_DIRNAME
         return CompletePexEnvironment(
@@ -158,6 +148,7 @@ class PexEnvironment(EngineAwareReturnType):
             pex_root=pex_root,
             _working_directory=PurePath(working_directory) if working_directory else None,
             append_only_caches=FrozenDict({self._PEX_ROOT_DIRNAME: str(pex_root)}),
+            immutable_input_digests=self.bootstrap_python.immutable_input_digests,
         )
 
     def in_workspace(self) -> CompletePexEnvironment:
@@ -172,6 +163,7 @@ class PexEnvironment(EngineAwareReturnType):
             pex_root=pex_root,
             _working_directory=None,
             append_only_caches=FrozenDict(),
+            immutable_input_digests=self.bootstrap_python.immutable_input_digests,
         )
 
     def venv_site_packages_copies_option(self, use_copies: bool) -> str:
@@ -205,8 +197,7 @@ class CompletePexEnvironment:
     pex_root: PurePath
     _working_directory: PurePath | None
     append_only_caches: FrozenDict[str, str]
-
-    _PEX_ROOT_DIRNAME = "pex_root"
+    immutable_input_digests: FrozenDict[str, Digest]
 
     @property
     def interpreter_search_paths(self) -> tuple[str, ...]:
@@ -220,14 +211,9 @@ class CompletePexEnvironment:
             if self._working_directory
             else pex_filepath
         )
-        python = python or self._pex_environment.bootstrap_python
-        if python:
-            return (python.path, pex_relpath, *args)
-        if os.path.basename(pex_relpath) == pex_relpath:
-            return (f"./{pex_relpath}", *args)
-        return (pex_relpath, *args)
+        return (self._pex_environment.bootstrap_python.path, pex_relpath, *args)
 
-    def environment_dict(self, *, python_configured: bool) -> Mapping[str, str]:
+    def environment_dict(self, *, python: PythonExecutable | None = None) -> Mapping[str, str]:
         """The environment to use for running anything with PEX.
 
         If the Process is run with a pre-selected Python interpreter, set `python_configured=True`
@@ -243,10 +229,10 @@ class CompletePexEnvironment:
             ),
             **self._pex_environment.subprocess_environment_dict,
         )
-        # NB: We only set `PEX_PYTHON_PATH` if the Python interpreter has not already been
-        # pre-selected by Pants. Otherwise, Pex would inadvertently try to find another interpreter
-        # when running PEXes. (Creating a PEX will ignore this env var in favor of `--python-path`.)
-        if not python_configured:
+        if python:
+            assert isinstance(python.path, str)
+            d["PEX_PYTHON"] = python.path
+        else:
             d["PEX_PYTHON_PATH"] = create_path_env_var(self.interpreter_search_paths)
         return d
 

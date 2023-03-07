@@ -110,7 +110,7 @@ async def _create_python_source_run_request(
         *chrooted_source_roots,
     ]
     extra_env = {
-        **complete_pex_environment.environment_dict(python_configured=venv_pex.python is not None),
+        **complete_pex_environment.environment_dict(python=None),
         "PEX_EXTRA_SYS_PATH": os.pathsep.join(source_roots),
     }
     append_only_caches = (
@@ -125,6 +125,7 @@ async def _create_python_source_run_request(
             **complete_pex_environment.append_only_caches,
             **append_only_caches,
         },
+        immutable_input_digests=complete_pex_environment.immutable_input_digests,
     )
 
 
@@ -202,4 +203,5 @@ async def _create_python_source_run_dap_request(
         args=args,
         extra_env=extra_env,
         append_only_caches=regular_run_request.append_only_caches,
+        immutable_input_digests=regular_run_request.immutable_input_digests,
     )

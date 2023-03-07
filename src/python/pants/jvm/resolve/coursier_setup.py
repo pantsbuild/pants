@@ -159,7 +159,7 @@ class Coursier:
     coursier: DownloadedExternalTool
     _digest: Digest
     repos: FrozenOrderedSet[str]
-    immutable_input_digests: FrozenDict[str, Digest]
+    _immutable_input_digests: FrozenDict[str, Digest]
 
     bin_dir: ClassVar[str] = "__coursier"
     fetch_wrapper_script: ClassVar[str] = f"{bin_dir}/coursier_fetch_wrapper_script.sh"
@@ -207,7 +207,7 @@ class Coursier:
 
     @property
     def immutable_input_digests(self) -> dict[str, Digest]:
-        return {self.bin_dir: self._digest, **self.immutable_input_digests}
+        return {self.bin_dir: self._digest, **self._immutable_input_digests}
 
 
 @dataclass(frozen=True)
@@ -305,7 +305,7 @@ async def setup_coursier(
             ),
         ),
         repos=FrozenOrderedSet(coursier_subsystem.repos),
-        immutable_input_digests=python.immutable_input_digests,
+        _immutable_input_digests=python.immutable_input_digests,
     )
 
 
