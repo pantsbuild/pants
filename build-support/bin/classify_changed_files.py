@@ -32,9 +32,12 @@ _rust_globs = [
     "build-support/bin/rust/*",
 ]
 _release_globs = [
+    # Any changes to these files should trigger wheel building. Notes too, as they are included in
+    # the wheel.
     "pants.toml",
     "src/python/pants/VERSION",
     "src/python/pants/init/BUILD",
+    "src/python/pants/notes/*",
     "build-support/bin/release.sh",
     "build-support/bin/_release_helper.py",
 ]
