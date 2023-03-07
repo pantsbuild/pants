@@ -40,7 +40,7 @@ from pants.core.target_types import (
 )
 from pants.core.target_types import rules as target_type_rules
 from pants.core.util_rules import (
-    adhoc_binaries_rules,
+    adhoc_binaries,
     archive,
     config_files,
     external_tool,
@@ -83,7 +83,7 @@ def rules():
         *test.rules(),
         *bsp_rules(),
         # util_rules
-        *adhoc_binaries_rules.rules(),
+        *adhoc_binaries.rules(),
         *anonymous_telemetry.rules(),
         *archive.rules(),
         *config_files.rules(),

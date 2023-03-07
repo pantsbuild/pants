@@ -230,7 +230,6 @@ class CompletePexEnvironment:
             **self._pex_environment.subprocess_environment_dict,
         )
         if python:
-            assert isinstance(python.path, str)
             d["PEX_PYTHON"] = python.path
         else:
             d["PEX_PYTHON_PATH"] = create_path_env_var(self.interpreter_search_paths)

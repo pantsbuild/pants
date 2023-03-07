@@ -15,7 +15,7 @@ from pants.backend.python.util_rules.pex_environment import (
     PexSubsystem,
     PythonExecutable,
 )
-from pants.core.util_rules import adhoc_binaries_rules, external_tool
+from pants.core.util_rules import adhoc_binaries, external_tool
 from pants.core.util_rules.adhoc_binaries import PythonBuildStandaloneBinary
 from pants.core.util_rules.external_tool import (
     DownloadedExternalTool,
@@ -217,5 +217,5 @@ def rules():
         *collect_rules(),
         *external_tool.rules(),
         *pex_environment.rules(),
-        *adhoc_binaries_rules.rules(),
+        *adhoc_binaries.rules(),
     ]
