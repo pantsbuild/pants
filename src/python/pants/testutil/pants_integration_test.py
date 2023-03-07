@@ -91,7 +91,11 @@ def run_pants_with_workdir_without_waiting(
     shell: bool = False,
     set_pants_ignore: bool = True,
 ) -> PantsJoinHandle:
-    args = ["--no-pantsrc", f"--pants-workdir={workdir}", "--pants-ignore=+['.python-build-standalone']"]
+    args = [
+        "--no-pantsrc",
+        f"--pants-workdir={workdir}",
+        "--pants-ignore=+['.python-build-standalone']",
+    ]
     if set_pants_ignore:
         # FIXME: For some reason, Pants's CI adds this file and it is not ignored by default. Why?
         args.append("--pants-ignore=+['.coverage.*']")
