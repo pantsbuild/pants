@@ -52,34 +52,33 @@ async def download_python_build_standalone(
         return PythonBuildStandaloneBinary(sys.executable, EMPTY_DIGEST)
 
     url_plat, fingerprint, bytelen = {
-        # No PGO release for aarch64 it seems
         "linux_arm64": (
-            "aarch64-unknown-linux-gnu-lto",
-            "c811df664ca233815f7b4bfec4648192b74599e2639554ba634d8891bb60a0ca",
-            154120974,
+            "aarch64-unknown-linux-gnu",
+            "2003750f40cd09d4bf7a850342613992f8d9454f03b3c067989911fb37e7a4d1",
+            24505626,
         ),
         "linux_x86_64": (
-            "x86_64-unknown-linux-gnu-pgo+lto",
-            "9cbad5f74dc958f65e7d0c3d159ba3ff5e1cab94b861d3f6e281c8a64fbbca48",
-            81272463,
+            "x86_64-unknown-linux-gnu",
+            "d196347aeb701a53fe2bb2b095abec38d27d0fa0443f8a1c2023a1bed6e18cdf",
+            27081922,
         ),
         "macos_arm64": (
-            "aarch64-apple-darwin-pgo+lto",
-            "603af4d150bf3158961684e00104e273c0aab419b142760ff542aeee8bde32f9",
-            66451944,
+            "aarch64-apple-darwin",
+            "018d05a779b2de7a476f3b3ff2d10f503d69d14efcedd0774e6dab8c22ef84ff",
+            17509509,
         ),
         "macos_x86_64": (
-            "x86_64-apple-darwin-pgo+lto",
-            "5b4d4d425414cd4a8750b544ab05d284e5acd837d83f1c661320b8aea3762393",
-            65449500,
+            "x86_64-apple-darwin",
+            "0e685f98dce0e5bc8da93c7081f4e6c10219792e223e4b5886730fd73a7ba4c6",
+            17474702,
         ),
     }[platform.value]
 
-    filename = f"cpython-3.10.9+20230116-{url_plat}-full.tar.gz"
+    filename = f"cpython-3.10.9+20230116-{url_plat}-install_only.tar.gz"
     python_archive = await Get(
         Digest,
         DownloadFile(
-            f"https://github.com/thejcannon/python-build-standalone/releases/download/20230116/{filename}",
+            f"https://github.com/indygreg/python-build-standalone/releases/download/20230116/{filename}",
             FileDigest(
                 fingerprint=fingerprint,
                 serialized_bytes_length=bytelen,
