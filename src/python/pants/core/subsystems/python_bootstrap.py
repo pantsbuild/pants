@@ -12,10 +12,10 @@ from typing import Collection
 from pex.variables import Variables
 
 from pants.base.build_environment import get_buildroot
-from pants.core.util_rules import asdf, bootstrap
+from pants.core.util_rules import asdf, search_paths
 from pants.core.util_rules.asdf import AsdfPathString, AsdfToolPathsResult
-from pants.core.util_rules.bootstrap import ValidatedSearchPaths, ValidateSearchPathsRequest
 from pants.core.util_rules.environments import EnvironmentTarget, LocalEnvironmentTarget
+from pants.core.util_rules.search_paths import ValidatedSearchPaths, ValidateSearchPathsRequest
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest, PathEnvironmentVariable
 from pants.engine.rules import Get, _uncacheable_rule, collect_rules, rule
 from pants.option.option_types import StrListOption
@@ -285,5 +285,5 @@ def rules():
     return (
         *collect_rules(),
         *asdf.rules(),
-        *bootstrap.rules(),
+        *search_paths.rules(),
     )

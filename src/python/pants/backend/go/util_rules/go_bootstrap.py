@@ -7,10 +7,10 @@ from dataclasses import dataclass
 from typing import Callable, Collection, Iterable
 
 from pants.backend.go.subsystems.golang import GolangSubsystem
-from pants.core.util_rules import asdf, bootstrap
+from pants.core.util_rules import asdf, search_paths
 from pants.core.util_rules.asdf import AsdfPathString, AsdfToolPathsResult
-from pants.core.util_rules.bootstrap import ValidatedSearchPaths, ValidateSearchPathsRequest
 from pants.core.util_rules.environments import EnvironmentTarget
+from pants.core.util_rules.search_paths import ValidatedSearchPaths, ValidateSearchPathsRequest
 from pants.engine.env_vars import PathEnvironmentVariable
 from pants.engine.internals.selectors import Get
 from pants.engine.rules import collect_rules, rule
@@ -96,5 +96,5 @@ def rules():
     return (
         *collect_rules(),
         *asdf.rules(),
-        *bootstrap.rules(),
+        *search_paths.rules(),
     )

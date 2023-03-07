@@ -6,7 +6,6 @@ import pytest
 
 from pants.build_graph.address import Address
 from pants.core.util_rules.asdf import AsdfPathString
-from pants.core.util_rules.bootstrap import ValidateSearchPathsRequest, validate_search_paths
 from pants.core.util_rules.environments import (
     DockerEnvironmentTarget,
     DockerImageField,
@@ -14,6 +13,7 @@ from pants.core.util_rules.environments import (
     LocalEnvironmentTarget,
     RemoteEnvironmentTarget,
 )
+from pants.core.util_rules.search_paths import ValidateSearchPathsRequest, validate_search_paths
 from pants.testutil.rule_runner import run_rule_with_mocks
 from pants.util.ordered_set import FrozenOrderedSet
 
