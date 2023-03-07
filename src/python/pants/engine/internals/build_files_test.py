@@ -298,7 +298,7 @@ def test_prelude_type_hint_code() -> None:
             " tags: Union[List[str], NoneType] = None,"
             " extra_build_args: Union[List[str], NoneType] = None,"
             " source: Union[str, NoneType] = None,"
-            " target_stage : Union[str, NoneType] = None,"
+            " target_stage: Union[str, NoneType] = None,"
             " instructions: Union[List[str], NoneType] = None,"
             " repository: Union[str, NoneType] = None,"
             " context_root: Union[str, NoneType] = None,"
