@@ -22,6 +22,7 @@ class SetuptoolsSCM(PythonToolBase):
 
     default_version = "setuptools-scm==6.4.2"
     default_main = EntryPoint("setuptools_scm")
+    default_requirements = ["setuptools-scm"]
 
     register_interpreter_constraints = True
     default_interpreter_constraints = ["CPython>=3.7,<4"]
