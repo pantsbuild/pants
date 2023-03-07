@@ -895,6 +895,6 @@ impl<N: Node> Entry<N> {
       }
       None => "<None>".to_string(),
     };
-    format!("{} == {}", self.node, state).replace('"', "\\\"")
+    format!("{} == {}", self.node, state)
   }
 }

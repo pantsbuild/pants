@@ -555,7 +555,10 @@ class TestRuleGraph:
             dedent(
                 f"""\
                 digraph {{
-                  // queries: Query(A for SubA)
+                  /*
+                  queries:
+                       Query(A for SubA)
+                  */
                   // root entries
                 {fmt_non_param_edge(A, SubA)}
                 {fmt_non_param_edge(A, SubA, RuleFormatRequest(a_from_suba))}
@@ -581,7 +584,11 @@ class TestRuleGraph:
             dedent(
                 f"""\
                 digraph {{
-                  // queries: Query(A for SubA), Query(B for A)
+                  /*
+                  queries:
+                    Query(A for SubA),
+                    Query(B for A)
+                  */
                   // root entries
                 {fmt_non_param_edge(A, SubA)}
                 {fmt_non_param_edge(A, SubA, RuleFormatRequest(a_from_suba))}
@@ -606,7 +613,10 @@ class TestRuleGraph:
             dedent(
                 f"""\
                 digraph {{
-                  // queries: Query(A for SubA)
+                  /*
+                  queries:
+                    Query(A for SubA)
+                  */
                   // root entries
                 {fmt_non_param_edge(A, SubA)}
                 {fmt_non_param_edge(A, SubA, RuleFormatRequest(a_from_suba))}
@@ -632,7 +642,10 @@ class TestRuleGraph:
             dedent(
                 f"""\
                 digraph {{
-                  // queries: Query(A for SubA)
+                  /*
+                  queries:
+                    Query(A for SubA)
+                  */
                   // root entries
                 {fmt_non_param_edge(A, SubA)}
                 {fmt_non_param_edge(A, SubA, RuleFormatRequest(a_from_suba_and_b))}
@@ -671,7 +684,10 @@ class TestRuleGraph:
             dedent(
                 f"""\
                 digraph {{
-                  // queries: Query(A for SubA)
+                  /*
+                  queries:
+                    Query(A for SubA)
+                  */
                   // root entries
                 {fmt_non_param_edge(A, SubA)}
                 {fmt_non_param_edge(A, SubA, return_func=RuleFormatRequest(a, gets=[("B", "C")]))}
@@ -700,7 +716,10 @@ class TestRuleGraph:
             dedent(
                 f"""\
                 digraph {{
-                  // queries: Query(A for SubA)
+                  /*
+                  queries:
+                    Query(A for SubA)
+                  */
                   // root entries
                 {fmt_non_param_edge(A, SubA)}
                 {fmt_non_param_edge(A, SubA, RuleFormatRequest(a_from_b))}
@@ -733,7 +752,10 @@ class TestRuleGraph:
             dedent(
                 f"""\
                 digraph {{
-                  // queries: Query(A for SubA)
+                  /*
+                  queries:
+                    Query(A for SubA)
+                  */
                   // root entries
                 {fmt_non_param_edge(A, ())}
                 {fmt_non_param_edge(a, (), rule_type=GraphVertexType.singleton)}
@@ -762,7 +784,10 @@ class TestRuleGraph:
             dedent(
                 f"""\
                 digraph {{
-                  // queries: Query(A for SubA)
+                  /*
+                  queries:
+                    Query(A for SubA)
+                  */
                   // root entries
                 {fmt_non_param_edge(A, ())}
                 {fmt_non_param_edge(a, (), rule_type=GraphVertexType.singleton)}
@@ -866,7 +891,10 @@ class TestRuleGraph:
             dedent(
                 f"""\
                 digraph {{
-                  // queries: Query(A for SubA)
+                  /*
+                  queries:
+                    Query(A for SubA)
+                  */
                   // root entries
                 {fmt_non_param_edge(A, SubA)}
                 {fmt_non_param_edge(A, SubA, RuleFormatRequest(a_from_suba))}
@@ -900,7 +928,10 @@ class TestRuleGraph:
             dedent(
                 f"""\
                 digraph {{
-                  // queries: Query(A for SubA)
+                  /*
+                  queries:
+                    Query(A for SubA)
+                  */
                   // root entries
                 {fmt_non_param_edge(B, SubA)}
                 {fmt_non_param_edge(B, SubA, RuleFormatRequest(b_from_a))}
@@ -938,7 +969,12 @@ class TestRuleGraph:
             dedent(
                 f"""\
                 digraph {{
-                  // queries: Query(A for SubA), Query(B for SubA), Query(C for SubA)
+                  /*
+                  queries:
+                    Query(A for SubA),
+                    Query(B for SubA),
+                    Query(C for SubA)
+                  */
                   // root entries
                 {fmt_non_param_edge(A, SubA)}
                 {fmt_non_param_edge(A, SubA, RuleFormatRequest(a_from_suba))}
@@ -972,7 +1008,10 @@ class TestRuleGraph:
             dedent(
                 f"""\
                 digraph {{
-                  // queries: Query(A for SubA)
+                  /*
+                  queries:
+                    Query(A for SubA)
+                  */
                   // root entries
                 {fmt_non_param_edge(A, ())}
                 {fmt_non_param_edge(RuleFormatRequest(a, gets=[("B", "D")]), (), rule_type=GraphVertexType.singleton)}
