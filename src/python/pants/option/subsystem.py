@@ -135,6 +135,7 @@ class Subsystem(metaclass=_SubsystemMeta):
             assert isinstance(v, OptionsInfo)
 
             return (
+                # vars beginning with `_` are exposed as option names with the leading `_` stripped
                 self.options.is_default(__name.lstrip("_"))
                 and resolve_environment_sensitive_option(v.flag_names[0], self) is None
             )
