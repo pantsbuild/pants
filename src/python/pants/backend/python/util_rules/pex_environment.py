@@ -131,7 +131,7 @@ class PythonExecutable(BinaryPath, EngineAwareReturnType):
 
 
 @dataclass(frozen=True)
-class PexEnvironment(EngineAwareReturnType):
+class PexEnvironment:
     path: tuple[str, ...]
     interpreter_search_paths: tuple[str, ...]
     subprocess_environment_dict: FrozenDict[str, str]
