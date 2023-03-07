@@ -561,7 +561,7 @@ fn interactive_process(
       prepare_workdir(
         tempdir.path().to_owned(),
         &process,
-        process.input_digests.input_files.clone(),
+        process.input_digests.inputs.clone(),
         context.core.store(),
         context.core.executor.clone(),
         &context.core.named_caches,

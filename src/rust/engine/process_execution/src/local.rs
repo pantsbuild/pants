@@ -281,7 +281,7 @@ impl super::CommandRunner for CommandRunner {
         let exclusive_spawn = prepare_workdir(
           workdir.path().to_owned(),
           &req,
-          req.input_digests.input_files.clone(),
+          req.input_digests.inputs.clone(),
           self.store.clone(),
           self.executor.clone(),
           &self.named_caches,

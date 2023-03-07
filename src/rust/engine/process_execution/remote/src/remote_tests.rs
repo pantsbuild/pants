@@ -1,7 +1,6 @@
 // Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 use std::collections::{BTreeMap, BTreeSet, HashSet};
-use std::convert::TryInto;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
@@ -909,15 +908,9 @@ async fn successful_with_only_call_to_execute() {
   let mock_server = {
     let EntireExecuteRequest {
       execute_request, ..
-    } = process_execution::make_execute_request(
-      &execute_request.clone().try_into().unwrap(),
-      None,
-      None,
-      &store,
-      None,
-    )
-    .await
-    .unwrap();
+    } = process_execution::make_execute_request(&execute_request, None, None, &store, None)
+      .await
+      .unwrap();
 
     mock::execution_server::TestServer::new(
       mock::execution_server::MockExecution::new(vec![ExpectedAPICall::Execute {
@@ -960,15 +953,9 @@ async fn successful_after_reconnect_with_wait_execution() {
   let mock_server = {
     let EntireExecuteRequest {
       execute_request, ..
-    } = process_execution::make_execute_request(
-      &execute_request.clone().try_into().unwrap(),
-      None,
-      None,
-      &store,
-      None,
-    )
-    .await
-    .unwrap();
+    } = process_execution::make_execute_request(&execute_request, None, None, &store, None)
+      .await
+      .unwrap();
 
     mock::execution_server::TestServer::new(
       mock::execution_server::MockExecution::new(vec![
@@ -1015,15 +1002,9 @@ async fn successful_after_reconnect_from_retryable_error() {
   let mock_server = {
     let EntireExecuteRequest {
       execute_request, ..
-    } = process_execution::make_execute_request(
-      &execute_request.clone().try_into().unwrap(),
-      None,
-      None,
-      &store,
-      None,
-    )
-    .await
-    .unwrap();
+    } = process_execution::make_execute_request(&execute_request, None, None, &store, None)
+      .await
+      .unwrap();
 
     let execute_request_2 = execute_request.clone();
 
@@ -1080,15 +1061,9 @@ async fn creates_executing_workunit() {
   let mock_server = {
     let EntireExecuteRequest {
       execute_request, ..
-    } = process_execution::make_execute_request(
-      &execute_request.clone().try_into().unwrap(),
-      None,
-      None,
-      &store,
-      None,
-    )
-    .await
-    .unwrap();
+    } = process_execution::make_execute_request(&execute_request, None, None, &store, None)
+      .await
+      .unwrap();
 
     mock::execution_server::TestServer::new(
       mock::execution_server::MockExecution::new(vec![ExpectedAPICall::Execute {
@@ -1260,15 +1235,9 @@ async fn server_sending_triggering_timeout_with_deadline_exceeded() {
   let mock_server = {
     let EntireExecuteRequest {
       execute_request, ..
-    } = process_execution::make_execute_request(
-      &execute_request.clone().try_into().unwrap(),
-      None,
-      None,
-      &store,
-      None,
-    )
-    .await
-    .unwrap();
+    } = process_execution::make_execute_request(&execute_request, None, None, &store, None)
+      .await
+      .unwrap();
 
     mock::execution_server::TestServer::new(
       mock::execution_server::MockExecution::new(vec![ExpectedAPICall::Execute {
@@ -1314,15 +1283,9 @@ async fn sends_headers() {
   let mock_server = {
     let EntireExecuteRequest {
       execute_request, ..
-    } = process_execution::make_execute_request(
-      &execute_request.clone().try_into().unwrap(),
-      None,
-      None,
-      &store,
-      None,
-    )
-    .await
-    .unwrap();
+    } = process_execution::make_execute_request(&execute_request, None, None, &store, None)
+      .await
+      .unwrap();
 
     mock::execution_server::TestServer::new(
       mock::execution_server::MockExecution::new(vec![ExpectedAPICall::Execute {
@@ -1516,15 +1479,9 @@ async fn ensure_inline_stdio_is_stored() {
 
     let EntireExecuteRequest {
       execute_request, ..
-    } = process_execution::make_execute_request(
-      &echo_roland_request().try_into().unwrap(),
-      None,
-      None,
-      &store,
-      None,
-    )
-    .await
-    .unwrap();
+    } = process_execution::make_execute_request(&echo_roland_request(), None, None, &store, None)
+      .await
+      .unwrap();
 
     mock::execution_server::TestServer::new(
       mock::execution_server::MockExecution::new(vec![ExpectedAPICall::Execute {
@@ -1603,7 +1560,7 @@ async fn bad_result_bytes() {
     mock::execution_server::TestServer::new(
       mock::execution_server::MockExecution::new(vec![ExpectedAPICall::Execute {
         execute_request: process_execution::make_execute_request(
-          &execute_request.clone().try_into().unwrap(),
+          &execute_request,
           None,
           None,
           &store,
@@ -1651,15 +1608,9 @@ async fn initial_response_error() {
 
     let EntireExecuteRequest {
       execute_request, ..
-    } = process_execution::make_execute_request(
-      &execute_request.clone().try_into().unwrap(),
-      None,
-      None,
-      &store,
-      None,
-    )
-    .await
-    .unwrap();
+    } = process_execution::make_execute_request(&execute_request, None, None, &store, None)
+      .await
+      .unwrap();
 
     mock::execution_server::TestServer::new(
       mock::execution_server::MockExecution::new(vec![ExpectedAPICall::Execute {
@@ -1706,15 +1657,9 @@ async fn initial_response_missing_response_and_error() {
 
     let EntireExecuteRequest {
       execute_request, ..
-    } = process_execution::make_execute_request(
-      &execute_request.clone().try_into().unwrap(),
-      None,
-      None,
-      &store,
-      None,
-    )
-    .await
-    .unwrap();
+    } = process_execution::make_execute_request(&execute_request, None, None, &store, None)
+      .await
+      .unwrap();
 
     mock::execution_server::TestServer::new(
       mock::execution_server::MockExecution::new(vec![ExpectedAPICall::Execute {
@@ -1752,15 +1697,9 @@ async fn fails_after_retry_limit_exceeded() {
   let mock_server = {
     let EntireExecuteRequest {
       execute_request, ..
-    } = process_execution::make_execute_request(
-      &execute_request.clone().try_into().unwrap(),
-      None,
-      None,
-      &store,
-      None,
-    )
-    .await
-    .unwrap();
+    } = process_execution::make_execute_request(&execute_request, None, None, &store, None)
+      .await
+      .unwrap();
 
     mock::execution_server::TestServer::new(
       mock::execution_server::MockExecution::new(vec![
@@ -1816,15 +1755,9 @@ async fn fails_after_retry_limit_exceeded_with_stream_close() {
     let op_name = "foo-bar".to_owned();
     let EntireExecuteRequest {
       execute_request, ..
-    } = process_execution::make_execute_request(
-      &execute_request.clone().try_into().unwrap(),
-      None,
-      None,
-      &store,
-      None,
-    )
-    .await
-    .unwrap();
+    } = process_execution::make_execute_request(&execute_request, None, None, &store, None)
+      .await
+      .unwrap();
 
     mock::execution_server::TestServer::new(
       mock::execution_server::MockExecution::new(vec![
@@ -1899,15 +1832,9 @@ async fn execute_missing_file_uploads_if_known() {
 
     let EntireExecuteRequest {
       execute_request, ..
-    } = process_execution::make_execute_request(
-      &cat_roland_request().try_into().unwrap(),
-      None,
-      None,
-      &store,
-      None,
-    )
-    .await
-    .unwrap();
+    } = process_execution::make_execute_request(&cat_roland_request(), None, None, &store, None)
+      .await
+      .unwrap();
 
     mock::execution_server::TestServer::new(
       mock::execution_server::MockExecution::new(vec![
@@ -1922,7 +1849,7 @@ async fn execute_missing_file_uploads_if_known() {
         },
         ExpectedAPICall::Execute {
           execute_request: process_execution::make_execute_request(
-            &cat_roland_request().try_into().unwrap(),
+            &cat_roland_request(),
             None,
             None,
             &store,
