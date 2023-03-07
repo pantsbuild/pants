@@ -1024,8 +1024,7 @@ impl DownloadedFile {
       let url_str: String = externs::getattr(py_download_file, "url")
         .map_err(|e| format!("Failed to get `url` for field: {e}"))?;
       let auth_headers = externs::getattr_from_str_frozendict(py_download_file, "auth_headers");
-      let py_file_digest: PyFileDigest = externs::getattr(py_download_file, "expected_digest")
-        .map_err(|e| format!("Failed to get `expected_digest` for field: {e}"))?;
+      let py_file_digest: PyFileDigest = externs::getattr(py_download_file, "expected_digest")?;
       let res: NodeResult<(String, Digest, BTreeMap<String, String>)> =
         Ok((url_str, py_file_digest.0, auth_headers));
       res
