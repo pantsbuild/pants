@@ -55,23 +55,23 @@ async def download_python_build_standalone(
         # No PGO release for aarch64 it seems
         "linux_arm64": (
             "aarch64-unknown-linux-gnu-lto",
-            "3d20f40654e4356bd42c4e70ec28f4b8d8dd559884467a4e1745c08729fb740a",
-            106653301,
+            "c811df664ca233815f7b4bfec4648192b74599e2639554ba634d8891bb60a0ca",
+            154120974,
         ),
         "linux_x86_64": (
             "x86_64-unknown-linux-gnu-pgo+lto",
-            "c5f7ad956c8870573763ed58b59d7f145830a93378234b815c068c893c0d5c1e",
-            42148524,
+            "9cbad5f74dc958f65e7d0c3d159ba3ff5e1cab94b861d3f6e281c8a64fbbca48",
+            81272463,
         ),
         "macos_arm64": (
             "aarch64-apple-darwin-pgo+lto",
-            "2508b8d4b725bb45c3e03d2ddd2b8441f1a74677cb6bd6076e692c0923135ded",
-            33272226,
+            "603af4d150bf3158961684e00104e273c0aab419b142760ff542aeee8bde32f9",
+            66451944,
         ),
         "macos_x86_64": (
             "x86_64-apple-darwin-pgo+lto",
-            "1153b4d3b03cf1e1d8ec93c098160586f665fcc2d162c0812140a716a688df58",
-            32847401,
+            "5b4d4d425414cd4a8750b544ab05d284e5acd837d83f1c661320b8aea3762393",
+            65449500,
         ),
     }[platform.value]
 
@@ -79,7 +79,7 @@ async def download_python_build_standalone(
     python_archive = await Get(
         Digest,
         DownloadFile(
-            f"https://github.com/indygreg/python-build-standalone/releases/download/20230116/{filename}",
+            f"https://github.com/thejcannon/python-build-standalone/releases/download/20230116/{filename}",
             FileDigest(
                 fingerprint=fingerprint,
                 serialized_bytes_length=bytelen,
