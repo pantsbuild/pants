@@ -188,6 +188,8 @@ $ git push upstream 2.9.x
 Step 2: Update this docs site
 -----------------------------
 
+Note that this step can currently only be performed by a subset of maintainers due to a paid maximum number of seats. If you do not have a readme.com account, contact someone in the `#maintainers-confidential` channel in Slack to help out.
+
 ### `dev0` - set up the new version
 
 Go to the [documentation dashboard](https://dash.readme.com/). In the top left dropdown, where it says the current version, click "Manage versions". Click "Add new version" and use a "v" with the minor release number, e.g. "v2.9". Fork from the prior release. Mark this new version as public by clicking on "Is public?"
@@ -196,13 +198,13 @@ Also, update the [Changelog](doc:changelog) page with the new release series at 
 
 ### Sync the `docs/` content
 
-See the `docs/NOTES.md` for instructions setting up the the necessary tooling your first time.
-On the relevant release branch, run `npx rdme docs docs/markdown --version v<pants major>.<pants minor>` with your key from <https://dash.readme.com/project/pants/v2.8/api-key>
-E.G: `npx rdme docs docs/markdown --version v2.8`.
+See the `docs/NOTES.md` for instructions setting up the the necessary Node tooling your first time.
+You'll need to 1st login as outlined there via some variant of `npx rdme login --project pants ...`.
+On the relevant release branch, run `npx rdme docs docs/markdown --version v<pants major>.<pants minor>`; e.g: `npx rdme docs docs/markdown --version v2.8`.
 
 ### Regenerate the references
 
-On the relevant release branch, run `pants run build-support/bin/generate_docs.py -- --sync --api-key <key>` with your key from <https://dash.readme.com/project/pants/v2.8/api-key>.
+Still on the relevant release branch, run `pants run build-support/bin/generate_docs.py -- --sync --api-key <key>` with your key from <https://dash.readme.com/project/pants/v2.8/api-key>.
 
 ### `stable` releases - Update the default docsite
 
