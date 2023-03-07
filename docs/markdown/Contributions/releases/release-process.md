@@ -196,6 +196,7 @@ Also, update the [Changelog](doc:changelog) page with the new release series at 
 
 ### Sync the `docs/` content
 
+See the `docs/NOTES.md` for instructions setting up the the necessary tooling your first time.
 On the relevant release branch, run `npx rdme docs docs/markdown --version v<pants major>.<pants minor>` with your key from <https://dash.readme.com/project/pants/v2.8/api-key>
 E.G: `npx rdme docs docs/markdown --version v2.8`.
 
