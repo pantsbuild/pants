@@ -301,10 +301,8 @@ impl ExecuteProcess {
   ) -> Result<InputDigests, StoreError> {
     let input_digests_fut: Result<_, String> = Python::with_gil(|py| {
       let value = (**value).as_ref(py);
-      let input_files = lift_directory_digest(
-        externs::getattr(value, "input_digest")?
-      )
-      .map_err(|err| format!("Error parsing input_digest {err}"))?;
+      let input_files = lift_directory_digest(externs::getattr(value, "input_digest")?)
+        .map_err(|err| format!("Error parsing input_digest {err}"))?;
       let immutable_inputs =
         externs::getattr_from_str_frozendict::<&PyAny>(value, "immutable_input_digests")
           .into_iter()
@@ -382,8 +380,7 @@ impl ExecuteProcess {
 
     let cache_scope: ProcessCacheScope = {
       let cache_scope_enum = externs::getattr(value, "cache_scope")?;
-      externs::getattr::<String>(cache_scope_enum, "name")?
-        .try_into()?
+      externs::getattr::<String>(cache_scope_enum, "name")?.try_into()?
     };
 
     let remote_cache_speculation_delay = std::time::Duration::from_millis(
