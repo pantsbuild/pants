@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Callable, Iterable
+from typing import Callable, Collection, Iterable
 
 from pants.backend.go.subsystems.golang import GolangSubsystem
 from pants.core.util_rules import asdf, bootstrap
@@ -25,7 +25,7 @@ class GoBootstrap:
 
 
 async def _go_search_paths(
-    env_tgt: EnvironmentTarget, golang_subsystem: GolangSubsystem, paths: Iterable[str]
+    env_tgt: EnvironmentTarget, golang_subsystem: GolangSubsystem, paths: Collection[str]
 ) -> tuple[str, ...]:
     asdf_result = await AsdfToolPathsResult.get_un_cachable_search_paths(
         paths,

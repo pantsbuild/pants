@@ -8,7 +8,7 @@ from collections import OrderedDict
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path, PurePath
-from typing import Iterable
+from typing import Collection
 
 from pants.base.build_environment import get_buildroot
 from pants.base.build_root import BuildRoot
@@ -26,7 +26,7 @@ class AsdfPathString(str, Enum):
     LOCAL = "<ASDF_LOCAL>"
 
     @staticmethod
-    def contains_strings(search_paths: Iterable[str]) -> tuple[bool, bool]:
+    def contains_strings(search_paths: Collection[str]) -> tuple[bool, bool]:
         return AsdfPathString.STANDARD in search_paths, AsdfPathString.LOCAL in search_paths
 
     def description(self, tool: str) -> str:
@@ -62,7 +62,7 @@ class AsdfToolPathsResult:
     @classmethod
     async def get_un_cachable_search_paths(
         cls,
-        search_paths: Iterable[str],
+        search_paths: Collection[str],
         env_tgt: EnvironmentTarget,
         tool_name: str,
         tool_description: str,
