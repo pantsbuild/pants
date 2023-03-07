@@ -559,6 +559,7 @@ fn nailgun_server_create(
         exe.cmd.command,
         PyTuple::new(py, exe.cmd.args),
         exe.cmd.env.into_iter().collect::<HashMap<String, String>>(),
+        exe.cmd.working_dir,
         PySessionCancellationLatch(exe.cancelled),
         exe.stdin_fd as i64,
         exe.stdout_fd as i64,

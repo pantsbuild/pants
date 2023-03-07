@@ -44,16 +44,16 @@ class SpecsParser:
     class BadSpecError(Exception):
         """Indicates an unparseable command line selector."""
 
-    def __init__(self, *, root_dir: str | None = None, work_dir: str | None = None) -> None:
+    def __init__(self, *, root_dir: str | None = None, working_dir: str | None = None) -> None:
         self._root_dir = os.path.realpath(root_dir or get_buildroot())
-        self._work_dir = (
-            os.path.relpath(os.path.join(self._root_dir, work_dir), self._root_dir)
-            if work_dir
+        self._working_dir = (
+            os.path.relpath(os.path.join(self._root_dir, working_dir), self._root_dir)
+            if working_dir
             else ""
         )
-        if self._work_dir.startswith(".."):
+        if self._working_dir.startswith(".."):
             raise self.BadSpecError(
-                f"Work directory {self._work_dir} escapes build root {self._root_dir}"
+                f"Work directory {self._working_dir} escapes build root {self._root_dir}"
             )
 
     def _normalize_spec_path(self, path: str) -> str:
@@ -67,8 +67,8 @@ class SpecsParser:
         else:
             if path.startswith("//"):
                 path = path[2:]
-            elif self._work_dir:
-                path = os.path.join(self._work_dir, path)
+            elif self._working_dir:
+                path = os.path.join(self._working_dir, path)
             path = os.path.join(self._root_dir, path)
 
         normalized = os.path.relpath(path, self._root_dir)

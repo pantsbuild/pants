@@ -2,12 +2,10 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import logging
-import os
 from typing import cast
 
 from pants.base.specs import AddressLiteralSpec, FileLiteralSpec, RawSpecs, Specs
 from pants.base.specs_parser import SpecsParser
-from pants.bin.pants_env_vars import WORK_DIR
 from pants.core.util_rules.environments import determine_bootstrap_environment
 from pants.core.util_rules.system_binaries import GitBinary, GitBinaryRequest
 from pants.engine.addresses import AddressInput
@@ -31,11 +29,12 @@ def calculate_specs(
     options_bootstrapper: OptionsBootstrapper,
     options: Options,
     session: SchedulerSession,
+    working_dir: str,
 ) -> Specs:
     """Determine the specs for a given Pants run."""
     global_options = options.for_global_scope()
     unmatched_cli_globs = global_options.unmatched_cli_globs.to_glob_match_error_behavior()
-    specs = SpecsParser(work_dir=os.getenv(WORK_DIR)).parse_specs(
+    specs = SpecsParser(working_dir=working_dir).parse_specs(
         options.specs,
         description_of_origin="CLI arguments",
         unmatched_glob_behavior=unmatched_cli_globs,
