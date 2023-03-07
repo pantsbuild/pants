@@ -237,6 +237,57 @@ def test_prelude_references_builtin_symbols() -> None:
     result.symbols["make_a_target"]()
 
 
+def test_prelude_type_hint_code() -> None:
+    # Issue 18435
+    prelude_content = dedent(
+        """\
+        def ecr_docker_image(
+            *,
+            name: Optional[str] = None,
+            dependencies: Optional[List[str]] = None,
+            image_tags: Optional[List[str]] = None,
+            git_tag_prefix: Optional[str] = None,
+            latest_tag_prefix: Optional[str] = None,
+            buildcache_tag: str = "buildcache",
+            image_labels: Optional[Mapping[str, str]] = None,
+            tags: Optional[List[str]] = None,
+            extra_build_args: Optional[List[str]] = None,
+            source: Optional[str] = None,
+            target_stage: Optional[str] = None,
+            instructions: Optional[List[str]] = None,
+            repository: Optional[str] = None,
+            context_root: Optional[str] = None,
+            push_in_pants_ci: bool = True,
+            push_latest: bool = False,
+        ) -> int:
+            return 42
+        """
+    )
+    result = run_prelude_parsing_rule(prelude_content)
+    ecr_docker_image = result.info["ecr_docker_image"]
+    assert (
+        "(*,"
+        " name: Optional[str] = None,"
+        " dependencies: Optional[List[str]] = None,"
+        " image_tags: Optional[List[str]] = None,"
+        " git_tag_prefix: Optional[str] = None,"
+        " latest_tag_prefix: Optional[str] = None,"
+        " buildcache_tag: str = 'buildcache',"
+        " image_labels: Optional[Mapping[str, str]] = None,"
+        " tags: Optional[List[str]] = None,"
+        " extra_build_args: Optional[List[str]] = None,"
+        " source: Optional[str] = None,"
+        " target_stage: Optional[str] = None,"
+        " instructions: Optional[List[str]] = None,"
+        " repository: Optional[str] = None,"
+        " context_root: Optional[str] = None,"
+        " push_in_pants_ci: bool = True,"
+        " push_latest: bool = False"
+        ") -> int"
+    ) == ecr_docker_image.signature
+    assert 42 == ecr_docker_image.value()
+
+
 def test_prelude_docstrings() -> None:
     macro_docstring = "This is the doc-string for `macro_func`."
     prelude_content = dedent(
