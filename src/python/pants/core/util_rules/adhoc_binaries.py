@@ -90,7 +90,7 @@ async def download_python_build_standalone(
     result = await Get(
         ProcessResult,
         Process(
-            argv=[tar_binary.path, "-I", "zstd", "-xvf", filename],
+            argv=[tar_binary.path, "-xvf", filename],
             input_digest=python_archive,
             env={"PATH": os.pathsep.join(SEARCH_PATHS)},
             description="Extract Python",
