@@ -31,13 +31,8 @@ class PythonBuildStandaloneBinary:
 
     SYMLINK_DIRNAME = ".python-build-standalone"
 
-    _path: str
-    """The path to the Python binary inside the immutable input symlink."""
+    path: str
     _digest: Digest
-
-    @property
-    def path(self) -> str:
-        return f"{PythonBuildStandaloneBinary.SYMLINK_DIRNAME}/{self._path}"
 
     @property
     def immutable_input_digests(self) -> FrozenDict[str, Digest]:
@@ -99,7 +94,9 @@ async def download_python_build_standalone(
         ),
     )
 
-    return PythonBuildStandaloneBinary("python/bin/python3", result.output_digest)
+    return PythonBuildStandaloneBinary(
+        f"{PythonBuildStandaloneBinary.SYMLINK_DIRNAME}/python/bin/python3", result.output_digest
+    )
 
 
 @dataclass(frozen=True)
