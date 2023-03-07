@@ -40,10 +40,11 @@ async def _go_search_paths(
         AsdfPathString.LOCAL.value: asdf_result.local_tool_paths,
     }
 
+    path_variables = await Get(PathEnvironmentVariable, {})
     expanded: list[str] = []
     for s in paths:
         if s == "<PATH>":
-            expanded.extend(await Get(PathEnvironmentVariable, {}))  # noqa: PNT30: Linear search
+            expanded.extend(path_variables)
         elif s in special_strings:
             special_paths = special_strings[s]
             expanded.extend(special_paths)
