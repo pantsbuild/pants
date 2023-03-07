@@ -9,7 +9,10 @@ from classify_changed_files import Affected, classify
     ["changed_files", "expected"],
     (
         [["docs/path/to/some/doc", "docs/path/to/some/other/doc"], {Affected.docs}],
-        [["README.md", "path/to/some/dir/README.md"], {Affected.docs}],
+        [
+            ["README.md", "path/to/some/dir/README.md", "src/python/pants/notes/2.16.x.md"],
+            {Affected.docs},
+        ],
         [["src/rust/engine/path/to/file.rs"], {Affected.rust}],
         [["src/python/pants/VERSION"], {Affected.release}],
         [["build-support/bin/generate_github_workflows.py"], {Affected.ci_config}],
