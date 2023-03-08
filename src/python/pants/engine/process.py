@@ -188,8 +188,7 @@ class ProcessResultMetadata:
     """Metadata for a ProcessResult, which is not included in its definition of equality."""
 
     class Source(Enum):
-        RAN_LOCALLY = "ran_locally"
-        RAN_REMOTELY = "ran_remotely"
+        RAN = "ran"
         HIT_LOCALLY = "hit_locally"
         HIT_REMOTELY = "hit_remotely"
         MEMOIZED = "memoized"

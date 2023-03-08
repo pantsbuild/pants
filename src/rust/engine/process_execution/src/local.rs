@@ -527,7 +527,7 @@ pub trait CapturedWorkdir {
     let elapsed = start_time.elapsed();
     let result_metadata = ProcessResultMetadata::new(
       Some(elapsed.into()),
-      ProcessResultSource::RanLocally,
+      ProcessResultSource::Ran,
       req.execution_environment,
       context.run_id,
     );

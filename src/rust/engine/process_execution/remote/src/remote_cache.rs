@@ -348,14 +348,13 @@ impl CommandRunner {
     cache_result: Option<FallibleProcessResultWithPlatform>,
     local_execution_future: BoxFuture<'_, Result<FallibleProcessResultWithPlatform, ProcessError>>,
   ) -> Result<(FallibleProcessResultWithPlatform, bool), ProcessError> {
-    if let Some(cached_response) = cache_result {
-      let lookup_elapsed = cache_lookup_start.elapsed();
-      workunit.increment_counter(Metric::RemoteCacheSpeculationRemoteCompletedFirst, 1);
-      if let Some(time_saved) = cached_response
+    if let Some(mut cached_response) = cache_result {
+      cached_response
         .metadata
-        .time_saved_from_cache(lookup_elapsed)
-      {
-        let time_saved = time_saved.as_millis() as u64;
+        .update_cache_hit_elapsed(cache_lookup_start.elapsed());
+      workunit.increment_counter(Metric::RemoteCacheSpeculationRemoteCompletedFirst, 1);
+      if let Some(time_saved) = cached_response.metadata.saved_by_cache {
+        let time_saved = std::time::Duration::from(time_saved).as_millis() as u64;
         workunit.increment_counter(Metric::RemoteCacheTotalTimeSavedMs, time_saved);
         workunit.record_observation(ObservationMetric::RemoteCacheTimeSavedMs, time_saved);
       }

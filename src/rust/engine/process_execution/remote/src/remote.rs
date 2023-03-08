@@ -630,7 +630,7 @@ impl CommandRunner {
             if execute_response.cached_result {
               ProcessResultSource::HitRemotely
             } else {
-              ProcessResultSource::RanRemotely
+              ProcessResultSource::Ran
             },
             environment,
           )
@@ -1045,7 +1045,7 @@ async fn populate_fallible_execution_result_for_timeout(
     output_directory: EMPTY_DIRECTORY_DIGEST.clone(),
     metadata: ProcessResultMetadata::new(
       Some(elapsed.into()),
-      ProcessResultSource::RanRemotely,
+      ProcessResultSource::Ran,
       environment,
       context.run_id,
     ),

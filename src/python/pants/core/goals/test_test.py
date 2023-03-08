@@ -90,6 +90,8 @@ def make_process_result_metadata(
     source: str,
     *,
     environment_name: str | None = None,
+    docker_image: str | None = None,
+    remote_execution: bool = False,
     total_elapsed_ms: int = 999,
     source_run_id: int = 0,
 ) -> ProcessResultMetadata:
@@ -99,8 +101,8 @@ def make_process_result_metadata(
             environment_name=environment_name,
             # TODO: None of the following are currently consumed in these tests.
             platform=Platform.create_for_localhost().value,
-            docker_image=None,
-            remote_execution=False,
+            docker_image=docker_image,
+            remote_execution=remote_execution,
             remote_execution_extra_platform_properties=[],
         ),
         source,
@@ -442,10 +444,12 @@ def _assert_test_summary(
 
 def test_format_summary_remote(rule_runner: RuleRunner) -> None:
     _assert_test_summary(
-        "✓ //:dummy_address succeeded in 0.05s (ran remotely).",
+        "✓ //:dummy_address succeeded in 0.05s (ran in remote environment `ubuntu`).",
         exit_code=0,
         run_id=0,
-        result_metadata=ProcessResultMetadata(50, "ran_remotely", 0),
+        result_metadata=make_process_result_metadata(
+            "ran", environment_name="ubuntu", remote_execution=True, total_elapsed_ms=50
+        ),
     )
 
 
@@ -454,7 +458,9 @@ def test_format_summary_local(rule_runner: RuleRunner) -> None:
         "✓ //:dummy_address succeeded in 0.05s.",
         exit_code=0,
         run_id=0,
-        result_metadata=ProcessResultMetadata(50, "ran_locally", 0),
+        result_metadata=make_process_result_metadata(
+            "ran", environment_name=None, total_elapsed_ms=50
+        ),
     )
 
 
@@ -463,7 +469,18 @@ def test_format_summary_memoized(rule_runner: RuleRunner) -> None:
         "✓ //:dummy_address succeeded in 0.05s (memoized).",
         exit_code=0,
         run_id=1234,
-        result_metadata=ProcessResultMetadata(50, "ran_locally", 0),
+        result_metadata=make_process_result_metadata("ran", total_elapsed_ms=50),
+    )
+
+
+def test_format_summary_memoized_remote(rule_runner: RuleRunner) -> None:
+    _assert_test_summary(
+        "✓ //:dummy_address succeeded in 0.05s (memoized for remote environment `ubuntu`).",
+        exit_code=0,
+        run_id=1234,
+        result_metadata=make_process_result_metadata(
+            "ran", environment_name="ubuntu", remote_execution=True, total_elapsed_ms=50
+        ),
     )
 
 

@@ -468,6 +468,14 @@ impl ProcessExecutionStrategy {
       Self::Docker(image) => format!("docker_execution: {image}"),
     }
   }
+
+  pub fn strategy_type(&self) -> &'static str {
+    match self {
+      Self::Local => "local",
+      Self::RemoteExecution(_) => "remote",
+      Self::Docker(_) => "docker",
+    }
+  }
 }
 
 #[derive(DeepSizeOf, Debug, Clone, Hash, PartialEq, Eq, Serialize)]
@@ -713,16 +721,27 @@ pub struct FallibleProcessResultWithPlatform {
   pub metadata: ProcessResultMetadata,
 }
 
-/// Metadata for a ProcessResult corresponding to the REAPI `ExecutedActionMetadata` proto. This
-/// conversion is lossy, but the interesting parts are preserved.
 #[derive(Clone, Debug, DeepSizeOf, Eq, PartialEq)]
 pub struct ProcessResultMetadata {
-  /// The time from starting to completion, including preparing the chroot and cleanup.
+  /// The execution time of this process when it ran.
+  ///
   /// Corresponds to `worker_start_timestamp` and `worker_completed_timestamp` from
   /// `ExecutedActionMetadata`.
   ///
   /// NB: This is optional because the REAPI does not guarantee that it is returned.
   pub total_elapsed: Option<Duration>,
+  /// How much faster a cache hit was than running the process again.
+  ///
+  /// This includes the overhead of setting up and cleaning up the process for execution, and it
+  /// should include all overhead for the cache lookup.
+  ///
+  /// If the cache hit was slower than the original process, we return 0. Note that the cache hit
+  /// may still have been faster than rerunning the process a second time, e.g. if speculation
+  /// is used and the cache hit completed before the rerun; still, we cannot know how long the
+  /// second run would have taken, so the best we can do is report 0.
+  ///
+  /// If the original process's execution time was not recorded, this may be None.
+  pub saved_by_cache: Option<Duration>,
   /// The source of the result.
   pub source: ProcessResultSource,
   /// The environment that the process ran in.
@@ -741,6 +760,7 @@ impl ProcessResultMetadata {
   ) -> Self {
     Self {
       total_elapsed,
+      saved_by_cache: None,
       source,
       environment,
       source_run_id,
@@ -762,36 +782,18 @@ impl ProcessResultMetadata {
         .ok(),
       _ => None,
     };
-    Self {
-      total_elapsed,
-      source,
-      environment,
-      source_run_id,
-    }
+
+    Self::new(total_elapsed, source, environment, source_run_id)
   }
 
-  /// How much faster a cache hit was than running the process again.
-  ///
-  /// This includes the overhead of setting up and cleaning up the process for execution, and it
-  /// should include all overhead for the cache lookup.
-  ///
-  /// If the cache hit was slower than the original process, we return 0. Note that the cache hit
-  /// may still have been faster than rerunning the process a second time, e.g. if speculation
-  /// is used and the cache hit completed before the rerun; still, we cannot know how long the
-  /// second run would have taken, so the best we can do is report 0.
-  ///
-  /// If the original process's execution time was not recorded, we return None because we
-  /// cannot make a meaningful comparison.
-  pub fn time_saved_from_cache(
-    &self,
-    cache_lookup: std::time::Duration,
-  ) -> Option<std::time::Duration> {
-    self.total_elapsed.and_then(|original_process| {
-      let original_process: std::time::Duration = original_process.into();
-      original_process
-        .checked_sub(cache_lookup)
-        .or_else(|| Some(std::time::Duration::new(0, 0)))
-    })
+  pub fn update_cache_hit_elapsed(&mut self, cache_hit_elapsed: std::time::Duration) {
+    self.saved_by_cache = self.total_elapsed.map(|total_elapsed| {
+      let total_elapsed: std::time::Duration = total_elapsed.into();
+      total_elapsed
+        .checked_sub(cache_hit_elapsed)
+        .unwrap_or_else(|| std::time::Duration::new(0, 0))
+        .into()
+    });
   }
 }
 
@@ -823,8 +825,7 @@ impl From<ProcessResultMetadata> for ExecutedActionMetadata {
 
 #[derive(Clone, Copy, Debug, DeepSizeOf, Eq, PartialEq)]
 pub enum ProcessResultSource {
-  RanLocally,
-  RanRemotely,
+  Ran,
   HitLocally,
   HitRemotely,
 }
@@ -832,8 +833,7 @@ pub enum ProcessResultSource {
 impl From<ProcessResultSource> for &'static str {
   fn from(prs: ProcessResultSource) -> &'static str {
     match prs {
-      ProcessResultSource::RanLocally => "ran_locally",
-      ProcessResultSource::RanRemotely => "ran_remotely",
+      ProcessResultSource::Ran => "ran",
       ProcessResultSource::HitLocally => "hit_locally",
       ProcessResultSource::HitRemotely => "hit_remotely",
     }

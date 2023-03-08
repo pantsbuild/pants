@@ -79,6 +79,16 @@ impl PyProcessExecutionEnvironment {
   }
 
   #[getter]
+  fn name(&self) -> Option<&str> {
+    self.environment.name.as_deref()
+  }
+
+  #[getter]
+  fn environment_type(&self) -> &str {
+    self.environment.strategy.strategy_type()
+  }
+
+  #[getter]
   fn platform(&self) -> String {
     self.environment.platform.into()
   }
@@ -92,9 +102,9 @@ impl PyProcessExecutionEnvironment {
   }
 
   #[getter]
-  fn docker_image(&self) -> Option<String> {
+  fn docker_image(&self) -> Option<&str> {
     match &self.environment.strategy {
-      ProcessExecutionStrategy::Docker(image) => Some(image.to_owned()),
+      ProcessExecutionStrategy::Docker(image) => Some(image),
       _ => None,
     }
   }
