@@ -30,6 +30,7 @@ from pants.engine.fs import (
     FileDigest,
     FileEntry,
     MergeDigests,
+    PathGlobs,
     RemovePrefix,
     Snapshot,
 )
@@ -48,6 +49,7 @@ from pants.engine.target import (
     HydrateSourcesRequest,
     InvalidFieldTypeException,
     MultipleSourcesField,
+    OptionalSingleSourceField,
     OverridesField,
     SingleSourceField,
     SourcesField,
@@ -60,6 +62,7 @@ from pants.engine.target import (
     generate_multiple_sources_field_help_message,
 )
 from pants.engine.unions import UnionRule
+from pants.option.global_options import UnmatchedBuildFileGlobs
 from pants.util.docutil import bin_name
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
@@ -858,9 +861,19 @@ async def package_archive_target(field_set: ArchiveFieldSet) -> BuiltPackage:
 # -----------------------------------------------------------------------------------------------
 
 
-class LockfileSourceField(SingleSourceField):
+class LockfileSourceField(OptionalSingleSourceField):
+    """Source field for synthesized `_lockfile` targets.
+
+    It is special in that it always ignores any missing files, regardless of the global
+    `--unmatched-build-file-globs` option.
+    """
+
     uses_source_roots = False
     required = True
+    value: str
+
+    def path_globs(self, unmatched_build_file_globs: UnmatchedBuildFileGlobs) -> PathGlobs:  # type: ignore[misc]
+        return super().path_globs(UnmatchedBuildFileGlobs.ignore())
 
 
 class LockfileDependenciesField(Dependencies):
