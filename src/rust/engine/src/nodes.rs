@@ -329,7 +329,7 @@ impl ExecuteProcess {
   fn lift_process_fields(
     value: &PyAny,
     input_digests: InputDigests,
-    process_config: externs::process::PyProcessConfigFromEnvironment,
+    process_config: externs::process::PyProcessExecutionEnvironment,
   ) -> Result<Process, StoreError> {
     let env = externs::getattr_from_str_frozendict(value, "env");
 
@@ -411,7 +411,7 @@ impl ExecuteProcess {
   pub async fn lift(
     store: &Store,
     value: Value,
-    process_config: externs::process::PyProcessConfigFromEnvironment,
+    process_config: externs::process::PyProcessExecutionEnvironment,
   ) -> Result<Self, StoreError> {
     let input_digests = Self::lift_process_input_digests(store, &value).await?;
     let process = Python::with_gil(|py| {

@@ -26,8 +26,8 @@ use workunit_store::{
 use crate::remote::apply_headers;
 use process_execution::{
   check_cache_content, populate_fallible_execution_result, CacheContentBehavior, Context,
-  FallibleProcessResultWithPlatform, Platform, Process, ProcessCacheScope, ProcessError,
-  ProcessResultSource,
+  FallibleProcessResultWithPlatform, Process, ProcessCacheScope, ProcessError,
+  ProcessExecutionEnvironment, ProcessResultSource,
 };
 use process_execution::{make_execute_request, EntireExecuteRequest};
 use tonic::{Code, Request, Status};
@@ -281,7 +281,7 @@ impl CommandRunner {
         action_digest,
         &request.description,
         self.instance_name.clone(),
-        request.execution_environment.platform,
+        request.execution_environment.clone(),
         &context,
         self.action_cache_client.clone(),
         self.store.clone(),
@@ -576,7 +576,7 @@ async fn check_action_cache(
   action_digest: Digest,
   command_description: &str,
   instance_name: Option<String>,
-  platform: Platform,
+  environment: ProcessExecutionEnvironment,
   context: &Context,
   action_cache_client: Arc<ActionCacheClient<LayeredService>>,
   store: Store,
@@ -610,9 +610,9 @@ async fn check_action_cache(
           store.clone(),
           context.run_id,
           &action_result,
-          platform,
           false,
           ProcessResultSource::HitRemotely,
+          environment,
         )
         .await
         .map_err(|e| Status::unavailable(format!("Output roots could not be loaded: {e}")))?;

@@ -17,7 +17,7 @@ from pants.engine.environment import ChosenLocalEnvironmentName as ChosenLocalEn
 from pants.engine.environment import EnvironmentName as EnvironmentName
 from pants.engine.internals.docker import DockerResolveImageRequest, DockerResolveImageResult
 from pants.engine.internals.graph import WrappedTargetForBootstrap
-from pants.engine.internals.native_engine import ProcessConfigFromEnvironment
+from pants.engine.internals.native_engine import ProcessExecutionEnvironment
 from pants.engine.internals.scheduler import SchedulerSession
 from pants.engine.internals.selectors import Params
 from pants.engine.platform import Platform
@@ -881,7 +881,7 @@ async def extract_process_config_from_environment(
     platform: Platform,
     global_options: GlobalOptions,
     environments_subsystem: EnvironmentsSubsystem,
-) -> ProcessConfigFromEnvironment:
+) -> ProcessExecutionEnvironment:
     docker_image = None
     remote_execution = False
     raw_remote_execution_extra_platform_properties: tuple[str, ...] = ()
@@ -920,7 +920,7 @@ async def extract_process_config_from_environment(
                     )
                 )
 
-    return ProcessConfigFromEnvironment(
+    return ProcessExecutionEnvironment(
         environment_name=tgt.name,
         platform=platform.value,
         docker_image=docker_image,

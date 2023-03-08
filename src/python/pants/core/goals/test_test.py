@@ -57,7 +57,13 @@ from pants.engine.fs import (
     Workspace,
 )
 from pants.engine.internals.session import RunId
-from pants.engine.process import InteractiveProcess, InteractiveProcessResult, ProcessResultMetadata
+from pants.engine.platform import Platform
+from pants.engine.process import (
+    InteractiveProcess,
+    InteractiveProcessResult,
+    ProcessExecutionEnvironment,
+    ProcessResultMetadata,
+)
 from pants.engine.target import (
     BoolField,
     MultipleSourcesField,
@@ -78,6 +84,28 @@ from pants.testutil.rule_runner import (
     run_rule_with_mocks,
 )
 from pants.util.logging import LogLevel
+
+
+def make_process_result_metadata(
+    source: str,
+    *,
+    environment_name: str | None = None,
+    total_elapsed_ms: int = 999,
+    source_run_id: int = 0,
+) -> ProcessResultMetadata:
+    return ProcessResultMetadata(
+        total_elapsed_ms,
+        ProcessExecutionEnvironment(
+            environment_name=environment_name,
+            # TODO: None of the following are currently consumed in these tests.
+            platform=Platform.create_for_localhost().value,
+            docker_image=None,
+            remote_execution=False,
+            remote_execution_extra_platform_properties=[],
+        ),
+        source,
+        source_run_id,
+    )
 
 
 class MockMultipleSourcesField(MultipleSourcesField):
@@ -148,9 +176,7 @@ class MockTestRequest(TestRequest):
             addresses=tuple(addresses),
             coverage_data=MockCoverageData(addresses),
             output_setting=ShowOutput.ALL,
-            result_metadata=None
-            if cls.skipped(addresses)
-            else ProcessResultMetadata(999, "ran_locally", 0),
+            result_metadata=None if cls.skipped(addresses) else make_process_result_metadata("ran"),
         )
 
 
@@ -543,7 +569,7 @@ def assert_streaming_output(
     output_setting: ShowOutput = ShowOutput.ALL,
     expected_level: LogLevel,
     expected_message: str,
-    result_metadata: ProcessResultMetadata = ProcessResultMetadata(999, "dummy", 0),
+    result_metadata: ProcessResultMetadata = make_process_result_metadata("dummy"),
 ) -> None:
     result = TestResult(
         exit_code=exit_code,

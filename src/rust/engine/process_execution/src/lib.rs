@@ -700,6 +700,8 @@ impl Process {
 ///
 /// The result of running a process.
 ///
+/// TODO: Rename to `FallibleProcessResult`: see #18450.
+///
 #[derive(DeepSizeOf, Derivative, Clone, Debug, Eq)]
 #[derivative(PartialEq, Hash)]
 pub struct FallibleProcessResultWithPlatform {
@@ -707,7 +709,6 @@ pub struct FallibleProcessResultWithPlatform {
   pub stderr_digest: Digest,
   pub exit_code: i32,
   pub output_directory: DirectoryDigest,
-  pub platform: Platform,
   #[derivative(PartialEq = "ignore", Hash = "ignore")]
   pub metadata: ProcessResultMetadata,
 }
@@ -722,9 +723,10 @@ pub struct ProcessResultMetadata {
   ///
   /// NB: This is optional because the REAPI does not guarantee that it is returned.
   pub total_elapsed: Option<Duration>,
-  /// The environment that
   /// The source of the result.
   pub source: ProcessResultSource,
+  /// The environment that the process ran in.
+  pub environment: ProcessExecutionEnvironment,
   /// The RunId of the Session in which the `ProcessResultSource` was accurate. In further runs
   /// within the same process, the source of the process implicitly becomes memoization.
   pub source_run_id: RunId,
@@ -734,11 +736,13 @@ impl ProcessResultMetadata {
   pub fn new(
     total_elapsed: Option<Duration>,
     source: ProcessResultSource,
+    environment: ProcessExecutionEnvironment,
     source_run_id: RunId,
   ) -> Self {
     Self {
       total_elapsed,
       source,
+      environment,
       source_run_id,
     }
   }
@@ -746,6 +750,7 @@ impl ProcessResultMetadata {
   pub fn new_from_metadata(
     metadata: ExecutedActionMetadata,
     source: ProcessResultSource,
+    environment: ProcessExecutionEnvironment,
     source_run_id: RunId,
   ) -> Self {
     let total_elapsed = match (
@@ -760,6 +765,7 @@ impl ProcessResultMetadata {
     Self {
       total_elapsed,
       source,
+      environment,
       source_run_id,
     }
   }
@@ -1304,9 +1310,9 @@ pub async fn populate_fallible_execution_result(
   store: Store,
   run_id: RunId,
   action_result: &remexec::ActionResult,
-  platform: Platform,
   treat_tree_digest_as_final_directory_hack: bool,
   source: ProcessResultSource,
+  environment: ProcessExecutionEnvironment,
 ) -> Result<FallibleProcessResultWithPlatform, StoreError> {
   let (stdout_digest, stderr_digest, output_directory) = future::try_join3(
     extract_stdout(&store, action_result),
@@ -1319,16 +1325,18 @@ pub async fn populate_fallible_execution_result(
   )
   .await?;
 
+  let metadata = if let Some(metadata) = action_result.execution_metadata.clone() {
+    ProcessResultMetadata::new_from_metadata(metadata, source, environment, run_id)
+  } else {
+    ProcessResultMetadata::new(None, source, environment, run_id)
+  };
+
   Ok(FallibleProcessResultWithPlatform {
     stdout_digest,
     stderr_digest,
     exit_code: action_result.exit_code,
     output_directory,
-    platform,
-    metadata: action_result.execution_metadata.clone().map_or(
-      ProcessResultMetadata::new(None, source, run_id),
-      |metadata| ProcessResultMetadata::new_from_metadata(metadata, source, run_id),
-    ),
+    metadata,
   })
 }
 

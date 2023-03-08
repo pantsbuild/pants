@@ -43,8 +43,8 @@ use workunit_store::{
 
 use process_execution::{
   make_execute_request, populate_fallible_execution_result, Context, EntireExecuteRequest,
-  FallibleProcessResultWithPlatform, Platform, Process, ProcessError, ProcessResultMetadata,
-  ProcessResultSource,
+  FallibleProcessResultWithPlatform, Process, ProcessError, ProcessExecutionEnvironment,
+  ProcessResultMetadata, ProcessResultSource,
 };
 
 #[derive(Debug)]
@@ -568,7 +568,7 @@ impl CommandRunner {
   pub(crate) async fn extract_execute_response(
     &self,
     run_id: RunId,
-    platform: Platform,
+    environment: ProcessExecutionEnvironment,
     operation_or_status: OperationOrStatus,
   ) -> Result<FallibleProcessResultWithPlatform, ExecutionError> {
     trace!("Got operation response: {:?}", operation_or_status);
@@ -626,13 +626,13 @@ impl CommandRunner {
             self.store.clone(),
             run_id,
             action_result,
-            platform,
             false,
             if execute_response.cached_result {
               ProcessResultSource::HitRemotely
             } else {
               ProcessResultSource::RanRemotely
             },
+            environment,
           )
           .await
           .map_err(|e| ExecutionError::Fatal(e.into()));
@@ -833,7 +833,7 @@ impl CommandRunner {
       match self
         .extract_execute_response(
           context.run_id,
-          process.execution_environment.platform,
+          process.execution_environment.clone(),
           actionable_result,
         )
         .await
@@ -876,7 +876,7 @@ impl CommandRunner {
               &process.description,
               process.timeout,
               start_time.elapsed(),
-              process.execution_environment.platform,
+              process.execution_environment,
             )
             .await?;
             return Ok(result);
@@ -1028,7 +1028,7 @@ async fn populate_fallible_execution_result_for_timeout(
   description: &str,
   timeout: Option<Duration>,
   elapsed: Duration,
-  platform: Platform,
+  environment: ProcessExecutionEnvironment,
 ) -> Result<FallibleProcessResultWithPlatform, String> {
   let timeout_msg = if let Some(timeout) = timeout {
     format!("user timeout of {timeout:?} after {elapsed:?}")
@@ -1043,10 +1043,10 @@ async fn populate_fallible_execution_result_for_timeout(
     stderr_digest: hashing::EMPTY_DIGEST,
     exit_code: -libc::SIGTERM,
     output_directory: EMPTY_DIRECTORY_DIGEST.clone(),
-    platform,
     metadata: ProcessResultMetadata::new(
       Some(elapsed.into()),
       ProcessResultSource::RanRemotely,
+      environment,
       context.run_id,
     ),
   })

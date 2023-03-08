@@ -11,19 +11,19 @@ use pyo3::prelude::*;
 use process_execution::{Platform, ProcessExecutionEnvironment, ProcessExecutionStrategy};
 
 pub(crate) fn register(m: &PyModule) -> PyResult<()> {
-  m.add_class::<PyProcessConfigFromEnvironment>()?;
+  m.add_class::<PyProcessExecutionEnvironment>()?;
 
   Ok(())
 }
 
-#[pyclass(name = "ProcessConfigFromEnvironment")]
+#[pyclass(name = "ProcessExecutionEnvironment")]
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct PyProcessConfigFromEnvironment {
+pub struct PyProcessExecutionEnvironment {
   pub environment: ProcessExecutionEnvironment,
 }
 
 #[pymethods]
-impl PyProcessConfigFromEnvironment {
+impl PyProcessExecutionEnvironment {
   #[new]
   fn __new__(
     environment_name: Option<String>,
@@ -60,14 +60,14 @@ impl PyProcessConfigFromEnvironment {
 
   fn __repr__(&self) -> String {
     format!(
-      "ProcessConfigFromEnvironment(environment={:?})",
+      "ProcessExecutionEnvironment(environment={:?})",
       self.environment,
     )
   }
 
   fn __richcmp__(
     &self,
-    other: &PyProcessConfigFromEnvironment,
+    other: &PyProcessExecutionEnvironment,
     op: CompareOp,
     py: Python,
   ) -> PyObject {

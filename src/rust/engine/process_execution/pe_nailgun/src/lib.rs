@@ -42,8 +42,7 @@ use workunit_store::{in_workunit, Metric, RunningWorkunit};
 
 use process_execution::local::{prepare_workdir, CapturedWorkdir, ChildOutput};
 use process_execution::{
-  Context, FallibleProcessResultWithPlatform, InputDigests, NamedCaches, Platform, Process,
-  ProcessError,
+  Context, FallibleProcessResultWithPlatform, InputDigests, NamedCaches, Process, ProcessError,
 };
 
 #[cfg(test)]
@@ -228,7 +227,6 @@ impl process_execution::CommandRunner for CommandRunner {
             nailgun_process.workdir_path().to_owned(),
             (nailgun_process.name().to_owned(), nailgun_process.address()),
             exclusive_spawn,
-            Platform::current().unwrap(),
           )
           .await;
 

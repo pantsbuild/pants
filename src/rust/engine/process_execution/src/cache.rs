@@ -19,7 +19,7 @@ use workunit_store::{
 
 use crate::{
   check_cache_content, CacheContentBehavior, Context, FallibleProcessResultWithPlatform, Platform,
-  Process, ProcessCacheScope, ProcessError, ProcessResultSource,
+  Process, ProcessCacheScope, ProcessError, ProcessExecutionEnvironment, ProcessResultSource,
 };
 
 // TODO: Consider moving into protobuf as a CacheValue type.
@@ -95,6 +95,7 @@ impl crate::CommandRunner for CommandRunner {
     if self.cache_read {
       let context2 = context.clone();
       let key2 = key.clone();
+      let environment = req.execution_environment.clone();
       let cache_read_result = in_workunit!(
         "local_cache_read",
         Level::Trace,
@@ -102,7 +103,7 @@ impl crate::CommandRunner for CommandRunner {
         |workunit| async move {
           workunit.increment_counter(Metric::LocalCacheRequests, 1);
 
-          match self.lookup(&context2, &key2).await {
+          match self.lookup(&context2, &key2, environment).await {
             Ok(Some(result)) if result.exit_code == 0 || write_failures_to_cache => {
               let lookup_elapsed = cache_lookup_start.elapsed();
               workunit.increment_counter(Metric::LocalCacheRequestsCached, 1);
@@ -181,6 +182,7 @@ impl CommandRunner {
     &self,
     context: &Context,
     action_key: &CacheKey,
+    environment: ProcessExecutionEnvironment,
   ) -> Result<Option<FallibleProcessResultWithPlatform>, StoreError> {
     use remexec::ExecuteResponse;
 
@@ -198,15 +200,16 @@ impl CommandRunner {
     };
 
     // Deserialize the cache entry if it existed.
-    let result = if let Some((execute_response, platform)) = maybe_execute_response {
+    // TODO: The platform in the cache value is unused. See #18450.
+    let result = if let Some((execute_response, _platform)) = maybe_execute_response {
       if let Some(ref action_result) = execute_response.result {
         crate::populate_fallible_execution_result(
           self.file_store.clone(),
           context.run_id,
           action_result,
-          platform,
           true,
           ProcessResultSource::HitLocally,
+          environment,
         )
         .await?
       } else {
@@ -269,7 +272,7 @@ impl CommandRunner {
       .map_err(|err| format!("Error serializing execute process result to cache: {err}"))?;
 
     let bytes_to_store = bincode::serialize(&PlatformAndResponseBytes {
-      platform: result.platform,
+      platform: result.metadata.environment.platform,
       response_bytes,
     })
     .map(Bytes::from)
