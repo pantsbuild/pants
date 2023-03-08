@@ -197,9 +197,7 @@ def test_skip(rule_runner: RuleRunner) -> None:
     assert not result
 
 
-@pytest.mark.skipif(
-    not (has_python_version("3.7")), reason="Missing requisite Python"
-)
+@pytest.mark.skipif(not (has_python_version("3.7")), reason="Missing requisite Python")
 def test_3rdparty_plugin(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
