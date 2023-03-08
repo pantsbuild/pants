@@ -470,6 +470,15 @@ impl ProcessExecutionStrategy {
   }
 }
 
+#[derive(DeepSizeOf, Debug, Clone, Hash, PartialEq, Eq, Serialize)]
+pub struct ProcessExecutionEnvironment {
+  /// The name of the environment the process is running in, or None if it is running in the
+  /// default (local) environment.
+  pub name: Option<String>,
+  pub platform: Platform,
+  pub strategy: ProcessExecutionStrategy,
+}
+
 ///
 /// A process to be executed.
 ///
@@ -560,11 +569,9 @@ pub struct Process {
   ///
   pub jdk_home: Option<PathBuf>,
 
-  pub platform: Platform,
-
   pub cache_scope: ProcessCacheScope,
 
-  pub execution_strategy: ProcessExecutionStrategy,
+  pub execution_environment: ProcessExecutionEnvironment,
 
   pub remote_cache_speculation_delay: std::time::Duration,
 }
@@ -579,6 +586,9 @@ impl Process {
   /// Process struct wholesale. We can reconsider this if we end up with more production callsites
   /// that require partial options.
   ///
+  /// NB: Some of the default values used in this constructor only make sense in tests.
+  ///
+  #[cfg(test)]
   pub fn new(argv: Vec<String>) -> Process {
     Process {
       argv,
@@ -596,7 +606,10 @@ impl Process {
       execution_slot_variable: None,
       concurrency_available: 0,
       cache_scope: ProcessCacheScope::Successful,
-      execution_strategy: ProcessExecutionStrategy::Local,
+      execution_environment: ProcessExecutionEnvironment {
+        name: "__local__".to_owned(),
+        strategy: ProcessExecutionStrategy::Local,
+      },
       remote_cache_speculation_delay: std::time::Duration::from_millis(0),
     }
   }
@@ -645,21 +658,31 @@ impl Process {
   }
 
   ///
-  /// Set the execution strategy to Docker, with the specified image.
+  /// Set the execution environment to Docker, with the specified name and image.
   ///
-  pub fn docker(mut self, image: String) -> Process {
-    self.execution_strategy = ProcessExecutionStrategy::Docker(image);
+  pub fn docker(mut self, platform: Platform, image: String) -> Process {
+    self.execution_environment = ProcessExecutionEnvironment {
+      name: None,
+      platform,
+      strategy: ProcessExecutionStrategy::Docker(image),
+    };
     self
   }
 
   ///
-  /// Set the execution strategy to remote execution with the provided platform properties.
+  /// Set the execution environment to remote execution with the specified name and platform
+  /// properties.
   ///
-  pub fn remote_execution_platform_properties(
+  pub fn remote_execution(
     mut self,
+    platform: Platform,
     properties: Vec<(String, String)>,
   ) -> Process {
-    self.execution_strategy = ProcessExecutionStrategy::RemoteExecution(properties);
+    self.execution_environment = ProcessExecutionEnvironment {
+      name: None,
+      platform,
+      strategy: ProcessExecutionStrategy::RemoteExecution(properties),
+    };
     self
   }
 
@@ -699,6 +722,7 @@ pub struct ProcessResultMetadata {
   ///
   /// NB: This is optional because the REAPI does not guarantee that it is returned.
   pub total_elapsed: Option<Duration>,
+  /// The environment that
   /// The source of the result.
   pub source: ProcessResultSource,
   /// The RunId of the Session in which the `ProcessResultSource` was accurate. In further runs
@@ -1099,8 +1123,8 @@ pub async fn make_execute_request(
       });
   }
 
-  let mut platform_properties = match req.execution_strategy.clone() {
-    ProcessExecutionStrategy::RemoteExecution(properties) => properties,
+  let mut platform_properties = match &req.execution_environment.strategy {
+    ProcessExecutionStrategy::RemoteExecution(properties) => properties.clone(),
     _ => vec![],
   };
 
@@ -1117,7 +1141,7 @@ pub async fn make_execute_request(
     .environment_variables
     .push(remexec::command::EnvironmentVariable {
       name: CACHE_KEY_EXECUTION_STRATEGY.to_string(),
-      value: req.execution_strategy.cache_value(),
+      value: req.execution_environment.strategy.cache_value(),
     });
 
   if matches!(
@@ -1139,7 +1163,7 @@ pub async fn make_execute_request(
       .environment_variables
       .push(remexec::command::EnvironmentVariable {
         name: CACHE_KEY_TARGET_PLATFORM_ENV_VAR_NAME.to_string(),
-        value: req.platform.into(),
+        value: req.execution_environment.platform.into(),
       });
   }
 

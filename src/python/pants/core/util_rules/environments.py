@@ -463,6 +463,7 @@ class AllEnvironmentTargets(FrozenDict[str, Target]):
 
 @dataclass(frozen=True)
 class EnvironmentTarget:
+    name: str | None
     val: Target | None
 
     def executable_search_path_cache_scope(
@@ -799,7 +800,7 @@ async def get_target_for_environment_name(
     env_name: EnvironmentName, environments_subsystem: EnvironmentsSubsystem
 ) -> EnvironmentTarget:
     if env_name.val is None:
-        return EnvironmentTarget(None)
+        return EnvironmentTarget(None, None)
     if env_name.val not in environments_subsystem.names:
         raise AssertionError(
             softwrap(
@@ -840,7 +841,7 @@ async def get_target_for_environment_name(
                 """
             )
         )
-    return EnvironmentTarget(tgt)
+    return EnvironmentTarget(env_name.val, tgt)
 
 
 async def _maybe_add_docker_image_id(image_name: str, platform: Platform, address: Address) -> str:
@@ -920,6 +921,7 @@ async def extract_process_config_from_environment(
                 )
 
     return ProcessConfigFromEnvironment(
+        environment_name=tgt.name,
         platform=platform.value,
         docker_image=docker_image,
         remote_execution=remote_execution,

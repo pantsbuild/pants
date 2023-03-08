@@ -831,7 +831,11 @@ impl CommandRunner {
       };
 
       match self
-        .extract_execute_response(context.run_id, process.platform, actionable_result)
+        .extract_execute_response(
+          context.run_id,
+          process.execution_environment.platform,
+          actionable_result,
+        )
         .await
       {
         Ok(result) => return Ok(result),
@@ -872,7 +876,7 @@ impl CommandRunner {
               &process.description,
               process.timeout,
               start_time.elapsed(),
-              process.platform,
+              process.execution_environment.platform,
             )
             .await?;
             return Ok(result);

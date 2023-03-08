@@ -336,7 +336,7 @@ impl<'a> process_execution::CommandRunner for CommandRunner<'a> {
 
         // Obtain ID of the base container in which to run the execution for this process.
         let (container_id, named_caches) = {
-          let ProcessExecutionStrategy::Docker(image) = &req.execution_strategy else {
+          let ProcessExecutionStrategy::Docker(image) = &req.execution_environment.strategy else {
             return Err(ProcessError::Unclassified(
                 "The Docker execution strategy was not set on the Process, but \
                  the Docker CommandRunner was used.".to_owned()))
@@ -344,7 +344,11 @@ impl<'a> process_execution::CommandRunner for CommandRunner<'a> {
 
           self
             .container_cache
-            .container_for_image(image, &req.platform, &context.build_id)
+            .container_for_image(
+              image,
+              &req.execution_environment.platform,
+              &context.build_id,
+            )
             .await?
         };
 
@@ -414,7 +418,7 @@ impl<'a> process_execution::CommandRunner for CommandRunner<'a> {
             workdir.path().to_owned(),
             (container_id, working_dir),
             exclusive_spawn,
-            req.platform,
+            req.execution_environment.platform,
           )
           .map_err(|msg| {
             // Processes that experience no infrastructure issues should result in an "Ok" return,

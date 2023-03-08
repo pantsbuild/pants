@@ -598,6 +598,7 @@ class RuleRunner:
                 self.scheduler.py_session,
                 request,
                 ProcessConfigFromEnvironment(
+                    environment_name=None,
                     platform=Platform.create_for_localhost().value,
                     docker_image=None,
                     remote_execution=False,

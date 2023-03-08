@@ -400,11 +400,10 @@ impl ExecuteProcess {
       level,
       append_only_caches,
       jdk_home,
-      platform: process_config.platform,
       execution_slot_variable,
       concurrency_available,
       cache_scope,
-      execution_strategy: process_config.execution_strategy,
+      execution_environment: process_config.environment,
       remote_cache_speculation_delay,
     })
   }

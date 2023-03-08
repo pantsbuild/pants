@@ -182,6 +182,7 @@ class ProcessConfigFromEnvironment:
     def __init__(
         self,
         *,
+        environment_name: str | None,
         platform: str,
         docker_image: str | None,
         remote_execution: bool,

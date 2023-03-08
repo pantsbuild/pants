@@ -281,7 +281,7 @@ impl CommandRunner {
         action_digest,
         &request.description,
         self.instance_name.clone(),
-        request.platform,
+        request.execution_environment.platform,
         &context,
         self.action_cache_client.clone(),
         self.store.clone(),

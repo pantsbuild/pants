@@ -535,7 +535,7 @@ fn interactive_process(
           .unwrap();
         (py_interactive_process.extract().unwrap(), py_process, process_config)
       });
-      match process_config.execution_strategy {
+      match process_config.environment.strategy {
         ProcessExecutionStrategy::Docker(_) | ProcessExecutionStrategy::RemoteExecution(_) => Err("InteractiveProcess should not set docker_image or remote_execution".to_owned()),
         _ => Ok(())
       }?;

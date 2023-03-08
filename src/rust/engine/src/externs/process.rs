@@ -8,7 +8,7 @@ use pyo3::basic::CompareOp;
 use pyo3::exceptions::{PyAssertionError, PyValueError};
 use pyo3::prelude::*;
 
-use process_execution::{Platform, ProcessExecutionStrategy};
+use process_execution::{Platform, ProcessExecutionEnvironment, ProcessExecutionStrategy};
 
 pub(crate) fn register(m: &PyModule) -> PyResult<()> {
   m.add_class::<PyProcessConfigFromEnvironment>()?;
@@ -17,23 +17,23 @@ pub(crate) fn register(m: &PyModule) -> PyResult<()> {
 }
 
 #[pyclass(name = "ProcessConfigFromEnvironment")]
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct PyProcessConfigFromEnvironment {
-  pub platform: Platform,
-  pub execution_strategy: ProcessExecutionStrategy,
+  pub environment: ProcessExecutionEnvironment,
 }
 
 #[pymethods]
 impl PyProcessConfigFromEnvironment {
   #[new]
   fn __new__(
+    environment_name: Option<String>,
     platform: String,
     docker_image: Option<String>,
     remote_execution: bool,
     remote_execution_extra_platform_properties: Vec<(String, String)>,
   ) -> PyResult<Self> {
     let platform = Platform::try_from(platform).map_err(PyValueError::new_err)?;
-    let execution_strategy = match (docker_image, remote_execution) {
+    let strategy = match (docker_image, remote_execution) {
       (None, true) => Ok(ProcessExecutionStrategy::RemoteExecution(
         remote_execution_extra_platform_properties,
       )),
@@ -44,23 +44,24 @@ impl PyProcessConfigFromEnvironment {
       )),
     }?;
     Ok(Self {
-      platform,
-      execution_strategy,
+      environment: ProcessExecutionEnvironment {
+        name: environment_name,
+        platform,
+        strategy,
+      },
     })
   }
 
   fn __hash__(&self) -> u64 {
     let mut s = DefaultHasher::new();
-    self.platform.hash(&mut s);
-    self.execution_strategy.hash(&mut s);
+    self.environment.hash(&mut s);
     s.finish()
   }
 
   fn __repr__(&self) -> String {
     format!(
-      "ProcessConfigFromEnvironment(platform={}, execution_strategy={:?})",
-      String::from(self.platform),
-      self.execution_strategy,
+      "ProcessConfigFromEnvironment(environment={:?})",
+      self.environment,
     )
   }
 
@@ -79,29 +80,29 @@ impl PyProcessConfigFromEnvironment {
 
   #[getter]
   fn platform(&self) -> String {
-    self.platform.into()
+    self.environment.platform.into()
   }
 
   #[getter]
   fn remote_execution(&self) -> bool {
     matches!(
-      self.execution_strategy,
+      self.environment.strategy,
       ProcessExecutionStrategy::RemoteExecution(_)
     )
   }
 
   #[getter]
   fn docker_image(&self) -> Option<String> {
-    match self.execution_strategy.clone() {
-      ProcessExecutionStrategy::Docker(image) => Some(image),
+    match &self.environment.strategy {
+      ProcessExecutionStrategy::Docker(image) => Some(image.to_owned()),
       _ => None,
     }
   }
 
   #[getter]
   fn remote_execution_extra_platform_properties(&self) -> Vec<(String, String)> {
-    match self.execution_strategy.clone() {
-      ProcessExecutionStrategy::RemoteExecution(properties) => properties,
+    match &self.environment.strategy {
+      ProcessExecutionStrategy::RemoteExecution(properties) => properties.to_owned(),
       _ => vec![],
     }
   }
