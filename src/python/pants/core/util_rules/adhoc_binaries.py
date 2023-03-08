@@ -39,13 +39,24 @@ class PythonBuildStandaloneBinary:
         return FrozenDict({PythonBuildStandaloneBinary.SYMLINK_DIRNAME: self._digest})
 
 
-@rule(desc="Finding or downloading Python for scripts", level=LogLevel.TRACE)
-async def download_python_build_standalone(
-    platform: Platform, env_tgt: EnvironmentTarget, tar_binary: TarBinary
-) -> PythonBuildStandaloneBinary:
+class _DownloadPythonBuildStandaloneBinaryRequest:
+    pass
+
+
+@rule
+async def get_python_for_scripts(env_tgt: EnvironmentTarget) -> PythonBuildStandaloneBinary:
     if env_tgt.val is None or isinstance(env_tgt.val, LocalEnvironmentTarget):
         return PythonBuildStandaloneBinary(sys.executable, EMPTY_DIGEST)
 
+    result = await Get(PythonBuildStandaloneBinary, _DownloadPythonBuildStandaloneBinaryRequest())
+
+    return result
+
+
+@rule(desc="Downloading Python for scripts", level=LogLevel.TRACE)
+async def download_python_binary(
+    _: _DownloadPythonBuildStandaloneBinaryRequest, platform: Platform, tar_binary: TarBinary
+) -> PythonBuildStandaloneBinary:
     url_plat, fingerprint, bytelen = {
         "linux_arm64": (
             "aarch64-unknown-linux-gnu",
