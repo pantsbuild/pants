@@ -132,7 +132,7 @@ def test_uses_correct_python_version(rule_runner: RuleRunner) -> None:
             "BUILD": dedent(
                 """\
                 python_sources(name="py2", interpreter_constraints=["==2.7.*"])
-                python_sources(name="py3", interpreter_constraints=[">=3.6"])
+                python_sources(name="py3", interpreter_constraints=[">=3.7"])
                 """
             ),
         }
@@ -168,7 +168,7 @@ def test_uses_correct_python_version(rule_runner: RuleRunner) -> None:
     assert "f.py (syntax error while parsing AST from file)" in batched_py2_result.stdout
 
     assert batched_py3_result.exit_code == 0
-    assert batched_py3_result.partition_description == "['CPython>=3.6']"
+    assert batched_py3_result.partition_description == "['CPython>=3.7']"
     assert "No issues identified." in batched_py3_result.stdout
 
 
@@ -198,7 +198,7 @@ def test_skip(rule_runner: RuleRunner) -> None:
 
 
 @pytest.mark.skipif(
-    not (has_python_version("3.6") or has_python_version("3.7")), reason="Missing requisite Python"
+    not (has_python_version("3.7")), reason="Missing requisite Python"
 )
 def test_3rdparty_plugin(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
@@ -206,7 +206,7 @@ def test_3rdparty_plugin(rule_runner: RuleRunner) -> None:
             "f.py": "aws_key = 'JalrXUtnFEMI/K7MDENG/bPxRfiCYzEXAMPLEKEY'\n",
             # NB: `bandit-aws` does not currently work with Python 3.8. See
             #  https://github.com/pantsbuild/pants/issues/10545.
-            "BUILD": "python_sources(name='t', interpreter_constraints=['>=3.6,<3.8'])",
+            "BUILD": "python_sources(name='t', interpreter_constraints=['>=3.7,<3.8'])",
         }
     )
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))

@@ -205,7 +205,7 @@ timeout_default = 60
 interpreter_constraints = [">=3.7,<3.10"]
 extra_requirements.add = [
   "mypy-typing-asserts",
-  "strawberry-graphql==0.159.0",
+  "strawberry-graphql==0.159.1",
 ]
 lockfile = "3rdparty/python/mypy.lock"
 
