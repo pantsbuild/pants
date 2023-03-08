@@ -181,7 +181,9 @@ def plugin_resolution(
             touch(configpath)
         args = [f"--pants-config-files=['{configpath}']"]
 
-        options_bootstrapper = OptionsBootstrapper.create(env=env, args=args, allow_pantsrc=False)
+        options_bootstrapper = OptionsBootstrapper.create(
+            env=env, args=args, allow_pantsrc=False, working_dir=""
+        )
         complete_env = CompleteEnvironmentVars(
             {**{k: os.environ[k] for k in ["PATH", "HOME", "PYENV_ROOT"] if k in os.environ}, **env}
         )

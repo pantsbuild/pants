@@ -109,6 +109,7 @@ class Parser:
         env: Mapping[str, str],
         config: Config,
         scope_info: ScopeInfo,
+        working_dir: str,
     ) -> None:
         """Create a Parser instance.
 
@@ -120,6 +121,7 @@ class Parser:
         self._config = config
         self._scope_info = scope_info
         self._scope = self._scope_info.scope
+        self._working_dir = working_dir
 
         # All option args registered with this parser.  Used to prevent conflicts.
         self._known_args: set[str] = set()
@@ -560,6 +562,50 @@ class Parser:
         def to_value_type(val_str):
             return self.to_value_type(val_str, type_arg, member_type)
 
+        # Helper function to check various validity constraints on final option values.
+        def check_scalar_value(val):
+            if val is None:
+                return
+            choices = kwargs.get("choices")
+            if choices is None and "type" in kwargs:
+                if inspect.isclass(type_arg) and issubclass(type_arg, Enum):
+                    choices = list(type_arg)
+            if choices is not None and val not in choices:
+                raise ParseError(
+                    softwrap(
+                        f"""
+                        `{val}` is not an allowed value for option {dest} in {self._scope_str()}.
+                        Must be one of: {choices}
+                        """
+                    )
+                )
+            elif type_arg == file_option:
+                check_file_exists(val)
+            elif type_arg == dir_option:
+                check_dir_exists(val)
+
+        def check_file_exists(val) -> Path:
+            error_prefix = f"File value `{val}` for option `{dest}` in `{self._scope_str()}`"
+            try:
+                buildroot = get_buildroot()
+                paths = (Path(val), Path(buildroot, val), Path(buildroot, self._working_dir, val))
+            except TypeError:
+                raise ParseError(f"{error_prefix} cannot be parsed as a file path.")
+            for path in paths:
+                if path.is_file():
+                    return path
+            raise ParseError(f"{error_prefix} does not exist.")
+
+        def check_dir_exists(val) -> None:
+            error_prefix = f"Directory value `{val}` for option `{dest}` in `{self._scope_str()}`"
+            try:
+                buildroot = get_buildroot()
+                paths = (Path(val), Path(buildroot, val), Path(buildroot, self._working_dir, val))
+            except TypeError:
+                raise ParseError(f"{error_prefix} cannot be parsed as a directory path.")
+            if not any(path.is_dir() for path in paths):
+                raise ParseError(f"{error_prefix} does not exist.")
+
         # Helper function to expand a fromfile=True value string, if needed.
         # May return a string or a dict/list decoded from a json/yaml file.
         def expand(val_or_str):
@@ -573,14 +619,14 @@ class Parser:
                 else:
                     fromfile = val_or_str[1:]
                     try:
-                        contents = Path(get_buildroot(), fromfile).read_text()
+                        contents = check_file_exists(fromfile).read_text()
                         if fromfile.endswith(".json"):
                             return json.loads(contents)
                         elif fromfile.endswith(".yml") or fromfile.endswith(".yaml"):
                             return yaml.safe_load(contents)
                         else:
                             return contents.strip()
-                    except (OSError, ValueError, yaml.YAMLError) as e:
+                    except (OSError, ValueError, yaml.YAMLError, ParseError) as e:
                         raise FromfileError(
                             f"Failed to read {dest} in {self._scope_str()} from file {fromfile}: {e!r}"
                         )
@@ -687,48 +733,6 @@ class Parser:
             historic_ranked_vals = ranked_vals
 
         value_history = OptionValueHistory(tuple(historic_ranked_vals))
-
-        # Helper function to check various validity constraints on final option values.
-        def check_scalar_value(val):
-            if val is None:
-                return
-            choices = kwargs.get("choices")
-            if choices is None and "type" in kwargs:
-                if inspect.isclass(type_arg) and issubclass(type_arg, Enum):
-                    choices = list(type_arg)
-            if choices is not None and val not in choices:
-                raise ParseError(
-                    softwrap(
-                        f"""
-                        `{val}` is not an allowed value for option {dest} in {self._scope_str()}.
-                        Must be one of: {choices}
-                        """
-                    )
-                )
-            elif type_arg == file_option:
-                check_file_exists(val)
-            elif type_arg == dir_option:
-                check_dir_exists(val)
-
-        def check_file_exists(val) -> None:
-            error_prefix = f"File value `{val}` for option `{dest}` in `{self._scope_str()}`"
-            try:
-                path = Path(val)
-                path_with_buildroot = Path(get_buildroot(), val)
-            except TypeError:
-                raise ParseError(f"{error_prefix} cannot be parsed as a file path.")
-            if not path.is_file() and not path_with_buildroot.is_file():
-                raise ParseError(f"{error_prefix} does not exist.")
-
-        def check_dir_exists(val) -> None:
-            error_prefix = f"Directory value `{val}` for option `{dest}` in `{self._scope_str()}`"
-            try:
-                path = Path(val)
-                path_with_buildroot = Path(get_buildroot(), val)
-            except TypeError:
-                raise ParseError(f"{error_prefix} cannot be parsed as a directory path.")
-            if not path.is_dir() and not path_with_buildroot.is_dir():
-                raise ParseError(f"{error_prefix} does not exist.")
 
         # Validate the final value.
         final_val = value_history.final_value

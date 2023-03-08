@@ -147,7 +147,10 @@ def test_invalidation_globs() -> None:
     # empty entry (i.e.: a relative path for the current directory) doesn't cause an error.
     suffix = "something-ridiculous"
     ob = OptionsBootstrapper.create(
-        env={}, args=[f"--pythonpath=../{suffix}", "--pythonpath="], allow_pantsrc=False
+        env={},
+        args=[f"--pythonpath=../{suffix}", "--pythonpath="],
+        allow_pantsrc=False,
+        working_dir="",
     )
     globs = GlobalOptions.compute_pantsd_invalidation_globs(
         get_buildroot(), ob.bootstrap_options.for_global_scope()

@@ -40,13 +40,15 @@ class OptionsBootstrapper:
     args: tuple[str, ...]
     config: Config
     alias: CliAlias
+    working_dir: str
 
     def __repr__(self) -> str:
         env = {pair[0]: pair[1] for pair in self.env_tuples}
         # Bootstrap args are included in `args`. We also drop the first argument, which is the path
         # to `pants_loader.py`.
         args = list(self.args[1:])
-        return f"OptionsBootstrapper(args={args}, env={env}, config={self.config})"
+        info = f"working_dir={self.working_dir}, args={args}, env={env}, config={self.config}"
+        return f"OptionsBootstrapper({info})"
 
     @staticmethod
     def get_config_file_paths(env, args) -> list[str]:
@@ -90,13 +92,17 @@ class OptionsBootstrapper:
 
     @staticmethod
     def parse_bootstrap_options(
-        env: Mapping[str, str], args: Sequence[str], config: Config
+        env: Mapping[str, str],
+        args: Sequence[str],
+        config: Config,
+        working_dir: str,
     ) -> Options:
         bootstrap_options = Options.create(
             env=env,
             config=config,
             known_scope_infos=[GlobalOptions.get_scope_info()],
             args=args,
+            working_dir=working_dir,
         )
 
         for options_info in collect_options_info(BootstrapOptions):
@@ -109,7 +115,12 @@ class OptionsBootstrapper:
 
     @classmethod
     def create(
-        cls, env: Mapping[str, str], args: Sequence[str], *, allow_pantsrc: bool
+        cls,
+        env: Mapping[str, str],
+        args: Sequence[str],
+        *,
+        allow_pantsrc: bool,
+        working_dir: str,
     ) -> OptionsBootstrapper:
         """Parses the minimum amount of configuration necessary to create an OptionsBootstrapper.
 
@@ -140,7 +151,10 @@ class OptionsBootstrapper:
             pre_bootstrap_config = Config.load(config_files_products, env=env)
 
             initial_bootstrap_options = cls.parse_bootstrap_options(
-                env, bargs, pre_bootstrap_config
+                env,
+                bargs,
+                pre_bootstrap_config,
+                working_dir,
             )
             bootstrap_option_values = initial_bootstrap_options.for_global_scope()
 
@@ -193,6 +207,7 @@ class OptionsBootstrapper:
                 args=args,
                 config=post_bootstrap_config,
                 alias=alias,
+                working_dir=working_dir,
             )
 
     @classmethod
@@ -231,7 +246,9 @@ class OptionsBootstrapper:
         Because this can be computed from the in-memory representation of these values, it is not part
         of the object's identity.
         """
-        return self.parse_bootstrap_options(self.env, self.bootstrap_args, self.config)
+        return self.parse_bootstrap_options(
+            self.env, self.bootstrap_args, self.config, self.working_dir
+        )
 
     def get_bootstrap_options(self) -> Options:
         """Returns an Options instance that only knows about the bootstrap options."""
@@ -252,6 +269,7 @@ class OptionsBootstrapper:
             args=self.args,
             bootstrap_option_values=bootstrap_option_values,
             allow_unknown_options=allow_unknown_options,
+            working_dir=self.working_dir,
         )
 
         distinct_subsystem_classes: set[type[Subsystem]] = set()

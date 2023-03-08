@@ -63,6 +63,7 @@ class TestOptionHelpFormatter:
             env={},
             config=Config.load([]),
             scope_info=GlobalOptions.get_scope_info(),
+            working_dir="",
         )
 
     @classmethod

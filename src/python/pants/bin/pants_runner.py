@@ -62,7 +62,10 @@ class PantsRunner:
         self.scrub_pythonpath()
 
         options_bootstrapper = OptionsBootstrapper.create(
-            env=self.env, args=self.args, allow_pantsrc=True
+            env=self.env,
+            args=self.args,
+            allow_pantsrc=True,
+            working_dir=os.getcwd(),
         )
         with warnings.catch_warnings(record=True):
             bootstrap_options = options_bootstrapper.bootstrap_options
@@ -98,7 +101,7 @@ class PantsRunner:
             )
             runner = LocalPantsRunner.create(
                 env=CompleteEnvironmentVars(self.env),
-                working_dir=os.getcwd(),
+                working_dir=options_bootstrapper.working_dir,
                 options_bootstrapper=options_bootstrapper,
             )
             return runner.run(start_time)

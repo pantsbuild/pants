@@ -217,7 +217,7 @@ def launch_new_pantsd_instance():
     """An external entrypoint that spawns a new pantsd instance."""
 
     options_bootstrapper = OptionsBootstrapper.create(
-        env=os.environ, args=sys.argv, allow_pantsrc=True
+        env=os.environ, args=sys.argv, allow_pantsrc=True, working_dir=""
     )
     daemon = PantsDaemon.create(options_bootstrapper)
     daemon.run_sync()

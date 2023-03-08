@@ -108,6 +108,7 @@ class Options:
         args: Sequence[str],
         bootstrap_option_values: OptionValueContainer | None = None,
         allow_unknown_options: bool = False,
+        working_dir: str = "",
     ) -> Options:
         """Create an Options instance.
 
@@ -147,7 +148,9 @@ class Options:
                             [line for line in [line.strip() for line in f] if line]
                         )
 
-        parser_by_scope = {si.scope: Parser(env, config, si) for si in complete_known_scope_infos}
+        parser_by_scope = {
+            si.scope: Parser(env, config, si, working_dir) for si in complete_known_scope_infos
+        }
         known_scope_to_info = {s.scope: s for s in complete_known_scope_infos}
         return cls(
             builtin_goal=split_args.builtin_goal,

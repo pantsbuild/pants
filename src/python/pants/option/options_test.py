@@ -529,6 +529,7 @@ class OptionsTest(unittest.TestCase):
         config: dict[str, dict[str, Any]] | None = None,
         config2: dict[str, dict[str, Any]] | None = None,
         bootstrap_option_values=None,
+        working_dir: str = "",
     ) -> Options:
         args = ["./pants", *shlex.split(flags)]
         options = Options.create(
@@ -537,6 +538,7 @@ class OptionsTest(unittest.TestCase):
             known_scope_infos=OptionsTest._known_scope_infos,
             args=args,
             bootstrap_option_values=bootstrap_option_values,
+            working_dir=working_dir,
         )
         self._register(options)
         return options
@@ -1153,7 +1155,7 @@ class OptionsTest(unittest.TestCase):
             # Note that we prevent loading a real pants.toml during get_bootstrap_options().
             flags = f'--spec-files={tmp.name} --pants-config-files="[]" compile morx:tgt fleem:tgt'
             bootstrapper = OptionsBootstrapper.create(
-                env={}, args=shlex.split(f"./pants {flags}"), allow_pantsrc=False
+                env={}, args=shlex.split(f"./pants {flags}"), allow_pantsrc=False, working_dir=""
             )
             bootstrap_options = bootstrapper.bootstrap_options.for_global_scope()
             options = self._parse(flags=flags, bootstrap_option_values=bootstrap_options)
@@ -1527,6 +1529,13 @@ class OptionsTest(unittest.TestCase):
             with pushd(tempdir):
                 options = self._parse(flags=f"fromfile --dictvalue=@{dirname}/config")
                 assert {"a": "multiline\n"} == options.for_scope("fromfile")["dictvalue"]
+
+    def test_fromfile_relative_to_working_dir(self) -> None:
+        with temporary_dir(root_dir=get_buildroot()) as tempdir:
+            tempfile = Path(tempdir, "config")
+            tempfile.write_text("{'a': 'multiline\\n'}")
+            options = self._parse(flags="fromfile --dictvalue=@config", working_dir=str(tempdir))
+            assert {"a": "multiline\n"} == options.for_scope("fromfile")["dictvalue"]
 
     def test_fromfile_error(self) -> None:
         options = self._parse(flags="fromfile --string=@/does/not/exist")
