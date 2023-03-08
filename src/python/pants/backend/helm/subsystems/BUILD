@@ -13,7 +13,7 @@ python_tests(name="tests")
 python_requirement(
     name="yamlpath",
     requirements=[
-        "yamlpath>=3.6,<3.7",
+        "yamlpath>=3.7,<4",
         "ruamel.yaml>=0.15.96,!=0.17.0,!=0.17.1,!=0.17.2,!=0.17.5,<=0.17.21",
     ],
     resolve="helm-post-renderer",

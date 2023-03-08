@@ -28,6 +28,7 @@ class IPython(PythonToolBase):
 
     default_version = "ipython>=7.34,<8"  # ipython 8 does not support Python 3.7.
     default_main = ConsoleScript("ipython")
+    default_requirements = ["ipython>=7.34,<9"]
 
     register_lockfile = True
     default_lockfile_resource = ("pants.backend.python.subsystems", "ipython.lock")

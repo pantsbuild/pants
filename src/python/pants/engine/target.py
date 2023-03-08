@@ -917,7 +917,7 @@ class CoarsenedTargets(Collection[CoarsenedTarget]):
             l._eq_helper(r, equal_items) for l, r in zip(self, other)
         )
 
-    __hash__ = Tuple.__hash__
+    __hash__ = Tuple.__hash__  # type: ignore[assignment]
 
 
 @dataclass(frozen=True)

@@ -55,7 +55,6 @@ class CreateArchive:
 
 @rule(desc="Creating an archive file", level=LogLevel.DEBUG)
 async def create_archive(request: CreateArchive) -> Digest:
-
     # #16091 -- if an arg list is really long, archive utilities tend to get upset.
     # passing a list of filenames into the utilities fixes this.
     FILE_LIST_FILENAME = "__pants_archive_filelist__"

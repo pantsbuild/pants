@@ -60,7 +60,6 @@ def exercise_alternate_entrypoint_scrubbing():
 
 
 def test_alternate_entrypoint_scrubbing() -> None:
-
     pants_run = run_pants(
         command=["help"],
         extra_env={

@@ -209,7 +209,6 @@ class Coursier:
 
 @dataclass(frozen=True)
 class CoursierFetchProcess:
-
     args: Tuple[str, ...]
     input_digest: Digest
     output_directories: Tuple[str, ...]
@@ -223,7 +222,6 @@ async def invoke_coursier_wrapper(
     coursier: Coursier,
     request: CoursierFetchProcess,
 ) -> Process:
-
     return Process(
         argv=coursier.args(
             request.args,

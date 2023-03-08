@@ -628,7 +628,6 @@ async def generate_lockfiles_goal(
 
 
 def _preferred_environment(request: GenerateLockfile, default: EnvironmentName) -> EnvironmentName:
-
     if not isinstance(request, GenerateLockfileWithEnvironments):
         return default  # This request has not been migrated to use environments.
 

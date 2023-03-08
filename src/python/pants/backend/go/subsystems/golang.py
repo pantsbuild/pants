@@ -24,7 +24,6 @@ class GolangSubsystem(Subsystem):
     help = "Options for Golang support."
 
     class EnvironmentAware(Subsystem.EnvironmentAware):
-
         env_vars_used_by_options = ("PATH",)
 
         _go_search_paths = StrListOption(

@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+from typing import ClassVar
+
 from pants.core.util_rules.environments import EnvironmentField
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
@@ -24,7 +26,7 @@ class AdhocToolDependenciesField(Dependencies):
 
 
 class AdhocToolRunnableField(StringField):
-    alias = "runnable"
+    alias: ClassVar[str] = "runnable"
     required = True
     help = help_text(
         lambda: f"""
@@ -38,7 +40,7 @@ class AdhocToolRunnableField(StringField):
 
 
 class AdhocToolOutputFilesField(StringSequenceField):
-    alias = "output_files"
+    alias: ClassVar[str] = "output_files"
     required = False
     default = ()
     help = help_text(
@@ -57,7 +59,7 @@ class AdhocToolOutputFilesField(StringSequenceField):
 
 
 class AdhocToolOutputDirectoriesField(StringSequenceField):
-    alias = "output_directories"
+    alias: ClassVar[str] = "output_directories"
     required = False
     default = ()
     help = help_text(
@@ -77,7 +79,7 @@ class AdhocToolOutputDirectoriesField(StringSequenceField):
 
 class AdhocToolOutputDependenciesField(AdhocToolDependenciesField):
     supports_transitive_excludes = True
-    alias = "output_dependencies"
+    alias: ClassVar[str] = "output_dependencies"
     deprecated_alias = "dependencies"
     deprecated_alias_removal_version = "2.17.0.dev0"
 
@@ -93,7 +95,7 @@ class AdhocToolOutputDependenciesField(AdhocToolDependenciesField):
 
 
 class AdhocToolExecutionDependenciesField(SpecialCasedDependencies):
-    alias = "execution_dependencies"
+    alias: ClassVar[str] = "execution_dependencies"
     required = False
     default = None
 
@@ -114,7 +116,7 @@ class AdhocToolExecutionDependenciesField(SpecialCasedDependencies):
 
 
 class AdhocToolRunnableDependenciesField(SpecialCasedDependencies):
-    alias = "runnable_dependencies"
+    alias: ClassVar[str] = "runnable_dependencies"
     required = False
     default = None
 
@@ -134,13 +136,13 @@ class AdhocToolRunnableDependenciesField(SpecialCasedDependencies):
 
 class AdhocToolSourcesField(MultipleSourcesField):
     # We solely register this field for codegen to work.
-    alias = "_sources"
+    alias: ClassVar[str] = "_sources"
     uses_source_roots = False
     expected_num_files = 0
 
 
 class AdhocToolArgumentsField(StringSequenceField):
-    alias = "args"
+    alias: ClassVar[str] = "args"
     default = ()
     help = help_text(
         lambda: f"Extra arguments to pass into the `{AdhocToolRunnableField.alias}` field."
@@ -148,7 +150,7 @@ class AdhocToolArgumentsField(StringSequenceField):
 
 
 class AdhocToolStdoutFilenameField(StringField):
-    alias = "stdout"
+    alias: ClassVar[str] = "stdout"
     default = None
     help = help_text(
         lambda: f"""
@@ -159,7 +161,7 @@ class AdhocToolStdoutFilenameField(StringField):
 
 
 class AdhocToolStderrFilenameField(StringField):
-    alias = "stderr"
+    alias: ClassVar[str] = "stderr"
     default = None
     help = help_text(
         lambda: f"""
@@ -170,14 +172,14 @@ class AdhocToolStderrFilenameField(StringField):
 
 
 class AdhocToolTimeoutField(IntField):
-    alias = "timeout"
+    alias: ClassVar[str] = "timeout"
     default = 30
     help = "Command execution timeout (in seconds)."
     valid_numbers = ValidNumbers.positive_only
 
 
 class AdhocToolExtraEnvVarsField(StringSequenceField):
-    alias = "extra_env_vars"
+    alias: ClassVar[str] = "extra_env_vars"
     help = help_text(
         """
         Additional environment variables to provide to the process.
@@ -189,13 +191,13 @@ class AdhocToolExtraEnvVarsField(StringSequenceField):
 
 
 class AdhocToolLogOutputField(BoolField):
-    alias = "log_output"
+    alias: ClassVar[str] = "log_output"
     default = False
     help = "Set to true if you want the output logged to the console."
 
 
 class AdhocToolWorkdirField(StringField):
-    alias = "workdir"
+    alias: ClassVar[str] = "workdir"
     default = "."
     help = help_text(
         """
@@ -212,7 +214,7 @@ class AdhocToolWorkdirField(StringField):
 
 
 class AdhocToolOutputRootDirField(StringField):
-    alias = "root_output_directory"
+    alias: ClassVar[str] = "root_output_directory"
     default = "/"
     help = help_text(
         """Adjusts the location of files output by this target, when consumed as a dependency.
@@ -228,7 +230,7 @@ class AdhocToolOutputRootDirField(StringField):
 
 
 class AdhocToolTarget(Target):
-    alias = "adhoc_tool"
+    alias: ClassVar[str] = "adhoc_tool"
     deprecated_alias = "experimental_run_in_sandbox"
     deprecated_alias_removal_version = "2.17.0.dev0"
     core_fields = (
@@ -275,13 +277,13 @@ class AdhocToolTarget(Target):
 
 
 class SystemBinaryNameField(StringField):
-    alias = "binary_name"
+    alias: ClassVar[str] = "binary_name"
     required = True
     help = "The name of the binary to find."
 
 
 class SystemBinaryExtraSearchPathsField(StringSequenceField):
-    alias = "extra_search_paths"
+    alias: ClassVar[str] = "extra_search_paths"
     default = ()
     help = help_text(
         """
@@ -292,7 +294,7 @@ class SystemBinaryExtraSearchPathsField(StringSequenceField):
 
 
 class SystemBinaryFingerprintPattern(StringField):
-    alias = "fingerprint"
+    alias: ClassVar[str] = "fingerprint"
     required = False
     default = None
     help = help_text(
@@ -304,7 +306,7 @@ class SystemBinaryFingerprintPattern(StringField):
 
 
 class SystemBinaryFingerprintArgsField(StringSequenceField):
-    alias = "fingerprint_args"
+    alias: ClassVar[str] = "fingerprint_args"
     default = ()
     help = help_text(
         "Specifies arguments that will be used to run the binary during the search process."
@@ -312,7 +314,7 @@ class SystemBinaryFingerprintArgsField(StringSequenceField):
 
 
 class SystemBinaryFingerprintDependenciesField(AdhocToolRunnableDependenciesField):
-    alias = "fingerprint_dependencies"
+    alias: ClassVar[str] = "fingerprint_dependencies"
     help = help_text(
         """
         Specifies any runnable dependencies that need to be available on the `PATH` when the binary
@@ -323,7 +325,7 @@ class SystemBinaryFingerprintDependenciesField(AdhocToolRunnableDependenciesFiel
 
 
 class SystemBinaryTarget(Target):
-    alias = "system_binary"
+    alias: ClassVar[str] = "system_binary"
     core_fields = (
         *COMMON_TARGET_FIELDS,
         SystemBinaryNameField,

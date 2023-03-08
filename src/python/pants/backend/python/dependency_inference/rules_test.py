@@ -932,7 +932,6 @@ class TestFindOtherOwners:
         assert not r.value
 
     def test_other_owners_found_in_single_resolve(self, _imports_rule_runner: RuleRunner):
-
         _imports_rule_runner.write_files(
             {
                 "other/BUILD": dedent(
@@ -960,7 +959,6 @@ class TestFindOtherOwners:
         ]
 
     def test_other_owners_found_in_multiple_resolves(self, _imports_rule_runner: RuleRunner):
-
         _imports_rule_runner.write_files(
             {
                 "other/BUILD": dedent(

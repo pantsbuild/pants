@@ -34,8 +34,9 @@ class ClangFormat(PythonToolBase):
         """
     )
 
-    default_version = "clang-format==14.0.3"
+    default_version = "clang-format>=14.0.3,<16"
     default_main = ConsoleScript("clang-format")
+    default_requirements = [default_version]
 
     register_interpreter_constraints = True
     default_interpreter_constraints = ["CPython>=3.7,<4"]

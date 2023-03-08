@@ -148,7 +148,6 @@ async def pyright_typecheck_partition(
     pyright: Pyright,
     pex_environment: PexEnvironment,
 ) -> CheckResult:
-
     root_sources_get = Get(
         SourceFiles,
         SourceFilesRequest(fs.sources for fs in partition.field_sets),
@@ -241,7 +240,6 @@ async def pyright_determine_partitions(
     pyright: Pyright,
     python_setup: PythonSetup,
 ) -> PyrightPartitions:
-
     resolve_and_interpreter_constraints_to_field_sets = (
         _partition_by_interpreter_constraints_and_resolve(request.field_sets, python_setup)
     )

@@ -303,7 +303,6 @@ class JvmArtifactResolveField(JvmResolveField):
 
 @dataclass(frozen=True)
 class JvmArtifactFieldSet(JvmRunnableSourceFieldSet):
-
     group: JvmArtifactGroupField
     artifact: JvmArtifactArtifactField
     version: JvmArtifactVersionField

@@ -115,7 +115,7 @@ def test_attribute_lookup() -> None:
 
 
 def test_get_no_index_call_no_subject_call_allowed() -> None:
-    async def rule():
+    async def rule() -> None:
         get_type: type = Get  # noqa: F841
 
     assert_awaitables(rule, [])
