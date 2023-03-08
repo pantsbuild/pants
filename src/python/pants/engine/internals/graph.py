@@ -88,11 +88,7 @@ from pants.engine.target import (
     _generate_file_level_targets,
 )
 from pants.engine.unions import UnionMembership, UnionRule
-from pants.option.global_options import (
-    GlobalOptions,
-    OwnersNotFoundBehavior,
-    UnmatchedBuildFileGlobs,
-)
+from pants.option.global_options import GlobalOptions, UnmatchedBuildFileGlobs
 from pants.util.docutil import bin_name, doc_url
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
@@ -742,7 +738,7 @@ async def coarsened_targets(
 
 def _log_or_raise_unmatched_owners(
     file_paths: Sequence[PurePath],
-    owners_not_found_behavior: OwnersNotFoundBehavior,
+    owners_not_found_behavior: GlobMatchErrorBehavior,
     ignore_option: str | None = None,
 ) -> None:
     option_msg = (
@@ -768,7 +764,7 @@ def _log_or_raise_unmatched_owners(
         f"{doc_url('create-initial-build-files')}.{option_msg}"
     )
 
-    if owners_not_found_behavior == OwnersNotFoundBehavior.warn:
+    if owners_not_found_behavior == GlobMatchErrorBehavior.warn:
         logger.warning(msg)
     else:
         raise ResolveError(msg)
@@ -783,7 +779,7 @@ class OwnersRequest:
     """
 
     sources: tuple[str, ...]
-    owners_not_found_behavior: OwnersNotFoundBehavior = OwnersNotFoundBehavior.ignore
+    owners_not_found_behavior: GlobMatchErrorBehavior = GlobMatchErrorBehavior.ignore
     filter_by_global_options: bool = False
     match_if_owning_build_file_included_in_sources: bool = False
 
@@ -891,7 +887,7 @@ async def find_owners(
 
     if (
         unmatched_sources
-        and owners_request.owners_not_found_behavior != OwnersNotFoundBehavior.ignore
+        and owners_request.owners_not_found_behavior != GlobMatchErrorBehavior.ignore
     ):
         _log_or_raise_unmatched_owners(
             [PurePath(path) for path in unmatched_sources], owners_request.owners_not_found_behavior
@@ -909,7 +905,7 @@ async def find_owners(
 def extract_unmatched_build_file_globs(
     global_options: GlobalOptions,
 ) -> UnmatchedBuildFileGlobs:
-    return global_options.unmatched_build_file_globs
+    return UnmatchedBuildFileGlobs(global_options.unmatched_build_file_globs)
 
 
 class AmbiguousCodegenImplementationsException(Exception):

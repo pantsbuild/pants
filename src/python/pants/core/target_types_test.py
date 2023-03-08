@@ -24,6 +24,7 @@ from pants.core.target_types import (
     FileSourceField,
     FileTarget,
     HTTPSource,
+    LockfileSourceField,
     RelocatedFiles,
     RelocateFilesViaCodegenRequest,
     ResourceTarget,
@@ -32,13 +33,14 @@ from pants.core.target_types import rules as target_type_rules
 from pants.core.util_rules import archive, source_files, system_binaries
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
-from pants.engine.fs import EMPTY_SNAPSHOT, DigestContents, FileContent
+from pants.engine.fs import EMPTY_SNAPSHOT, DigestContents, FileContent, GlobMatchErrorBehavior
 from pants.engine.target import (
     GeneratedSources,
     SourcesField,
     TransitiveTargets,
     TransitiveTargetsRequest,
 )
+from pants.option.global_options import UnmatchedBuildFileGlobs
 from pants.testutil.rule_runner import QueryRule, RuleRunner, mock_console
 
 
@@ -427,3 +429,18 @@ def test_http_source_filename(url, expected):
 def test_invalid_http_source(kwargs, exc_match):
     with exc_match:
         HTTPSource(**kwargs)
+
+
+@pytest.mark.parametrize(
+    "error_behavior", [GlobMatchErrorBehavior.warn, GlobMatchErrorBehavior.error]
+)
+def test_lockfile_glob_match_error_behavior(
+    error_behavior: GlobMatchErrorBehavior,
+) -> None:
+    lockfile_source = LockfileSourceField("test.lock", Address("", target_name="lockfile-test"))
+    assert (
+        GlobMatchErrorBehavior.ignore
+        == lockfile_source.path_globs(
+            UnmatchedBuildFileGlobs(error_behavior)
+        ).glob_match_error_behavior
+    )
