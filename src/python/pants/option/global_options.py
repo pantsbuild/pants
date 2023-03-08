@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
 from pathlib import Path, PurePath
-from typing import Any, Callable, Type, cast
+from typing import Any, Callable, Type, TypeVar, cast
 
 from pants.base.build_environment import (
     get_buildroot,
@@ -73,36 +73,40 @@ class DynamicUIRenderer(Enum):
     experimental_prodash = "experimental-prodash"
 
 
-class UnmatchedBuildFileGlobs(Enum):
+_G = TypeVar("_G", bound="_GlobMatchErrorBehaviorOptionBase")
+
+
+@dataclass(frozen=True)
+class _GlobMatchErrorBehaviorOptionBase:
+    """This class exists to have dedicated types per global option of the `GlobMatchErrorBehavior`
+    so we can extract the relevant option in a rule to limit the scope of downstream rules to avoid
+    depending on the entire global options data."""
+
+    error_behavior: GlobMatchErrorBehavior
+
+    @classmethod
+    def ignore(cls: type[_G]) -> _G:
+        return cls(GlobMatchErrorBehavior.ignore)
+
+    @classmethod
+    def warn(cls: type[_G]) -> _G:
+        return cls(GlobMatchErrorBehavior.warn)
+
+    @classmethod
+    def error(cls: type[_G]) -> _G:
+        return cls(GlobMatchErrorBehavior.error)
+
+
+class UnmatchedBuildFileGlobs(_GlobMatchErrorBehaviorOptionBase):
     """What to do when globs do not match in BUILD files."""
 
-    warn = "warn"
-    error = "error"
 
-    def to_glob_match_error_behavior(self) -> GlobMatchErrorBehavior:
-        return GlobMatchErrorBehavior(self.value)
-
-
-class UnmatchedCliGlobs(Enum):
+class UnmatchedCliGlobs(_GlobMatchErrorBehaviorOptionBase):
     """What to do when globs do not match in CLI args."""
 
-    ignore = "ignore"
-    warn = "warn"
-    error = "error"
 
-    def to_glob_match_error_behavior(self) -> GlobMatchErrorBehavior:
-        return GlobMatchErrorBehavior(self.value)
-
-
-class OwnersNotFoundBehavior(Enum):
+class OwnersNotFoundBehavior(_GlobMatchErrorBehaviorOptionBase):
     """What to do when a file argument cannot be mapped to an owning target."""
-
-    ignore = "ignore"
-    warn = "warn"
-    error = "error"
-
-    def to_glob_match_error_behavior(self) -> GlobMatchErrorBehavior:
-        return GlobMatchErrorBehavior(self.value)
 
 
 @enum.unique
@@ -1577,7 +1581,7 @@ class GlobalOptions(BootstrapOptions, Subsystem):
     )
 
     unmatched_build_file_globs = EnumOption(
-        default=UnmatchedBuildFileGlobs.warn,
+        default=GlobMatchErrorBehavior.warn,
         help=softwrap(
             """
             What to do when files and globs specified in BUILD files, such as in the
@@ -1591,7 +1595,7 @@ class GlobalOptions(BootstrapOptions, Subsystem):
         advanced=True,
     )
     unmatched_cli_globs = EnumOption(
-        default=UnmatchedCliGlobs.error,
+        default=GlobMatchErrorBehavior.error,
         help=softwrap(
             """
             What to do when command line arguments, e.g. files and globs like `dir::`, cannot be
