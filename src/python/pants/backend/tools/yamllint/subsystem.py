@@ -24,14 +24,12 @@ class Yamllint(PythonToolBase):
     options_scope = "yamllint"
     help = "A linter for YAML files (https://yamllint.readthedocs.io)"
 
-    # 1.29.0 doesn't support Python 3.6, which we're requiring for some reason.
-    # TODO: Why are we supporting 3.6 by default in just this one case?
-    default_version = "yamllint==1.28.0"
+    default_version = "yamllint==1.29.0"
     default_main = ConsoleScript("yamllint")
     default_requirements = ["yamllint>=1.28.0,<2"]
 
     register_interpreter_constraints = True
-    default_interpreter_constraints = ["CPython>=3.6,<4"]
+    default_interpreter_constraints = ["CPython>=3.7,<4"]
 
     register_lockfile = True
     default_lockfile_resource = ("pants.backend.tools.yamllint", "yamllint.lock")
