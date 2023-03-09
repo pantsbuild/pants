@@ -23,7 +23,6 @@ from pants.util.ordered_set import FrozenOrderedSet
 
 @pytest.fixture
 def rule_runner() -> RuleRunner:
-
     ruff_lockfile_sentinel = _get_generated_lockfile_sentinel(subsystem_rules(), Ruff)
 
     return RuleRunner(
