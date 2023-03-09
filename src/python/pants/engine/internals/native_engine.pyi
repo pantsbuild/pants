@@ -246,6 +246,7 @@ class RawFdRunner(Protocol):
         command: str,
         args: tuple[str, ...],
         env: dict[str, str],
+        working_dir: str,
         cancellation_latch: PySessionCancellationLatch,
         stdin_fileno: int,
         stdout_fileno: int,

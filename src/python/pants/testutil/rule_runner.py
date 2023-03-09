@@ -418,7 +418,7 @@ class RuleRunner:
             [GlobalOptions.get_scope_info(), goal.subsystem_cls.get_scope_info()],
             self.union_membership,
         ).specs
-        specs = SpecsParser(self.build_root).parse_specs(
+        specs = SpecsParser(root_dir=self.build_root).parse_specs(
             raw_specs, description_of_origin="RuleRunner.run_goal_rule()"
         )
 

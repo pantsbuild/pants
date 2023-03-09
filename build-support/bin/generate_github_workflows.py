@@ -1077,7 +1077,7 @@ def generate() -> dict[Path, str]:
         {
             "name": test_workflow_name,
             "concurrency": {
-                "group": "${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}",
+                "group": "${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}",
                 "cancel-in-progress": True,
             },
             "on": {"pull_request": {}, "push": {"branches-ignore": ["dependabot/**"]}},

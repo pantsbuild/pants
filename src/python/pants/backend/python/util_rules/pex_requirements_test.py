@@ -49,6 +49,8 @@ def create_python_setup(
         invalid_lockfile_behavior=behavior,
         resolves_generate_lockfiles=enable_resolves,
         interpreter_versions_universe=PythonSetup.default_interpreter_universe,
+        resolves={"a": "lock.txt"},
+        default_resolve="a",
     )
 
 
@@ -189,7 +191,7 @@ def test_validate_lockfiles(
         if_=invalid_reqs,
     )
     contains(
-        "The requirements not provided by the `a` resolve are: ['bad-req']",
+        "The requirements not provided by the `a` resolve are:\n  ['bad-req']",
         if_=invalid_reqs,
     )
 

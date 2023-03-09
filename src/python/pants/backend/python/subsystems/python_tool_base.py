@@ -14,6 +14,7 @@ from pants.backend.python.util_rules.pex_requirements import (
     LoadedLockfileRequest,
     Lockfile,
     PexRequirements,
+    Resolve,
 )
 from pants.core.goals.generate_lockfiles import DEFAULT_TOOL_LOCKFILE, NO_TOOL_LOCKFILE
 from pants.core.util_rules.lockfile_metadata import calculate_invalidation_digest
@@ -22,7 +23,7 @@ from pants.engine.internals.selectors import Get
 from pants.option.errors import OptionsError
 from pants.option.option_types import BoolOption, StrListOption, StrOption
 from pants.option.subsystem import Subsystem
-from pants.util.docutil import bin_name
+from pants.util.docutil import bin_name, doc_url
 from pants.util.strutil import softwrap
 
 
@@ -34,11 +35,16 @@ class PythonToolRequirementsBase(Subsystem):
     # Subclasses do not need to override.
     default_extra_requirements: ClassVar[Sequence[str]] = []
 
+    # Subclasses may set to override the value computed from default_version and
+    # default_extra_requirements.
+    # TODO: Once we get rid of those options, subclasses must set this to loose
+    #  requirements that reflect any minimum capabilities Pants assumes about the tool.
+    default_requirements: Sequence[str] = []
+
     default_interpreter_constraints: ClassVar[Sequence[str]] = []
     register_interpreter_constraints: ClassVar[bool] = False
 
-    # If this tool does not mix with user requirements (e.g. Flake8 and Isort, but not Pylint and
-    # Pytest), you should set this to True.
+    # If this tool does not mix with user requirements you should set this to True.
     #
     # You also need to subclass `GeneratePythonToolLockfileSentinel` and create a rule that goes
     # from it -> GeneratePythonLockfile by calling `GeneratePythonLockfile.from_python_tool()`.
@@ -47,6 +53,41 @@ class PythonToolRequirementsBase(Subsystem):
     default_lockfile_resource: ClassVar[tuple[str, str] | None] = None
     default_lockfile_url: ClassVar[str | None] = None
 
+    install_from_resolve = StrOption(
+        advanced=True,
+        default=None,
+        help=lambda cls: softwrap(
+            f"""\
+            If specified, install the tool using the lockfile for this named resolve.
+
+            This resolve must be defined in [python].resolves, as described in
+            {doc_url("python-third-party-dependencies#user-lockfiles")}, and its lockfile must
+            provide the requirements named in the `requirements` option.
+
+            If unspecified, and the `lockfile` option is unset, the tool will be installed
+            using the default lockfile shipped with Pants.
+
+            If unspecified, and the `lockfile` option is set, the tool will use the custom
+            `{cls.options_scope}` "tool lockfile" generated from the `version` and
+            `extra_requirements` options. But note that this mechanism will soon be deprecated.
+            """
+        ),
+    )
+    # TODO: After we deprecate and remove the tool lockfile concept, we can remove the
+    #  version and extra_requirements options and directly list loosely-constrained
+    #  requirements for each tool in this option's default. The specific versions will then
+    #  come either from the default lockfile we provide, or from a user lockfile.
+    requirements = StrListOption(
+        advanced=True,
+        default=lambda cls: cls.default_requirements
+        or sorted([cls.default_version, *cls.default_extra_requirements]),
+        help=lambda cls: softwrap(
+            """\
+            If install_from_resolve is specified, it will install these distribution packages,
+            using the versions from the specified resolve.
+            """
+        ),
+    )
     version = StrOption(
         advanced=True,
         default=lambda cls: cls.default_version,
@@ -146,6 +187,11 @@ class PythonToolRequirementsBase(Subsystem):
 
         if not self.uses_lockfile:
             return PexRequirements(requirements)
+
+        if self.install_from_resolve:
+            return PexRequirements(
+                self.requirements, from_superset=Resolve(self.install_from_resolve)
+            )
 
         hex_digest = calculate_invalidation_digest(requirements)
 

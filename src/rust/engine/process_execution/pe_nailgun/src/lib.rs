@@ -209,7 +209,7 @@ impl process_execution::CommandRunner for CommandRunner {
         let exclusive_spawn = prepare_workdir(
           nailgun_process.workdir_path().to_owned(),
           &client_req,
-          client_req.input_digests.input_files.clone(),
+          client_req.input_digests.inputs.clone(),
           self.store.clone(),
           self.executor.clone(),
           &self.named_caches,

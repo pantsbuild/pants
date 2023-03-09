@@ -279,8 +279,7 @@ pub struct InputDigests {
   /// The input files for the process execution, which will be materialized as mutable inputs in a
   /// sandbox for the process.
   ///
-  /// TODO: Rename to `inputs` for symmetry with `immutable_inputs`.
-  pub input_files: DirectoryDigest,
+  pub inputs: DirectoryDigest,
 
   /// Immutable input digests to make available in the input root.
   ///
@@ -306,7 +305,7 @@ pub struct InputDigests {
 impl InputDigests {
   pub async fn new(
     store: &Store,
-    input_files: DirectoryDigest,
+    inputs: DirectoryDigest,
     immutable_inputs: BTreeMap<RelativePath, DirectoryDigest>,
     use_nailgun: BTreeSet<RelativePath>,
   ) -> Result<Self, StoreError> {
@@ -330,14 +329,14 @@ impl InputDigests {
         }
       })
       .collect::<Vec<_>>();
-    complete_digests.push(input_files.clone());
+    complete_digests.push(inputs.clone());
 
     let (complete, nailgun) =
       try_join!(store.merge(complete_digests), store.merge(nailgun_digests),)?;
     Ok(Self {
-      complete: complete,
-      nailgun: nailgun,
-      input_files,
+      complete,
+      nailgun,
+      inputs,
       immutable_inputs,
       use_nailgun,
     })
@@ -370,17 +369,17 @@ impl InputDigests {
       .collect();
     let input_files_digests = from
       .iter()
-      .map(|input_digests| input_digests.input_files.clone())
+      .map(|input_digests| input_digests.inputs.clone())
       .collect();
-    let (complete, nailgun, input_files) = try_join!(
+    let (complete, nailgun, inputs) = try_join!(
       store.merge(complete_digests),
       store.merge(nailgun_digests),
       store.merge(input_files_digests),
     )?;
     Ok(Self {
-      complete: complete,
-      nailgun: nailgun,
-      input_files: input_files,
+      complete,
+      nailgun,
+      inputs,
       immutable_inputs: merged_immutable_inputs,
       use_nailgun: Itertools::concat(
         from
@@ -392,11 +391,11 @@ impl InputDigests {
     })
   }
 
-  pub fn with_input_files(input_files: DirectoryDigest) -> Self {
+  pub fn with_input_files(inputs: DirectoryDigest) -> Self {
     Self {
-      complete: input_files.clone(),
+      complete: inputs.clone(),
       nailgun: EMPTY_DIRECTORY_DIGEST.clone(),
-      input_files,
+      inputs,
       immutable_inputs: BTreeMap::new(),
       use_nailgun: BTreeSet::new(),
     }
@@ -420,7 +419,7 @@ impl InputDigests {
         // TODO: See method doc.
         complete: EMPTY_DIRECTORY_DIGEST.clone(),
         nailgun: EMPTY_DIRECTORY_DIGEST.clone(),
-        input_files: self.input_files.clone(),
+        inputs: self.inputs.clone(),
         immutable_inputs: client,
         use_nailgun: BTreeSet::new(),
       },
@@ -428,7 +427,7 @@ impl InputDigests {
       InputDigests {
         complete: self.nailgun.clone(),
         nailgun: EMPTY_DIRECTORY_DIGEST.clone(),
-        input_files: EMPTY_DIRECTORY_DIGEST.clone(),
+        inputs: EMPTY_DIRECTORY_DIGEST.clone(),
         immutable_inputs: server,
         use_nailgun: BTreeSet::new(),
       },
@@ -441,7 +440,7 @@ impl Default for InputDigests {
     Self {
       complete: EMPTY_DIRECTORY_DIGEST.clone(),
       nailgun: EMPTY_DIRECTORY_DIGEST.clone(),
-      input_files: EMPTY_DIRECTORY_DIGEST.clone(),
+      inputs: EMPTY_DIRECTORY_DIGEST.clone(),
       immutable_inputs: BTreeMap::new(),
       use_nailgun: BTreeSet::new(),
     }
