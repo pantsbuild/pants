@@ -65,9 +65,9 @@ class PythonBootstrapSubsystem(Subsystem):
         },
         help=softwrap(
             """
-            A map from platform to the information needed to download Python Build Standlone.
+            A map from platform to the information needed to download Python Build Standalone.
 
-            Python Build Standlone is used to run Python-implemented Pants tools/scripts in
+            Python Build Standalone is used to run Python-implemented Pants tools/scripts in
             docker environments (so that Python doesn't need to be installed).
 
             The version of Python provided should match the default value's version, which is

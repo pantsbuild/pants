@@ -27,7 +27,7 @@ class PythonBuildStandaloneBinary:
 
     This interpreter is provided by Python Build Standalone https://gregoryszorc.com/docs/python-build-standalone/main/,
     which has a few caveats. Namely it doesn't play nicely with third-party sdists. Meaning Pants'
-    scripts being run by PythonBuildStandalone should avoid third-party sdists.
+    scripts being run by Python Build Standalone should avoid third-party sdists.
     """
 
     SYMLINK_DIRNAME = ".python-build-standalone"
