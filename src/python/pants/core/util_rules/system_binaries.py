@@ -24,6 +24,8 @@ from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.platform import Platform
 from pants.engine.process import FallibleProcessResult, Process, ProcessResult
 from pants.engine.rules import collect_rules, rule
+from pants.option.option_types import StrListOption
+from pants.option.subsystem import Subsystem
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import OrderedSet
@@ -36,7 +38,21 @@ logger = logging.getLogger(__name__)
 # -------------------------------------------------------------------------------------------
 
 # TODO(#14492): This should be configurable via `[system-binaries]` subsystem, likely per-binary.
-SEARCH_PATHS = ("/usr/bin", "/bin", "/usr/local/bin", "/opt/homebrew/bin")
+SEARCH_PATHS_GET_RID_OF_ME = ("/usr/bin", "/bin", "/usr/local/bin", "/opt/homebrew/bin")
+
+
+class SystemBinariesSubsystem(Subsystem):
+    options_scope = "system-binaries"
+    help = "TODO"
+
+    class EnvironmentAware(Subsystem.EnvironmentAware):
+        _default_search_path = StrListOption(
+            "--default-search-paths",
+            default=[*SEARCH_PATHS_GET_RID_OF_ME],
+            advanced=True,
+            metavar="<binary-paths>",
+            help="TODO",
+        )
 
 
 @dataclass(frozen=True)
@@ -92,7 +108,7 @@ class BinaryPathRequest:
     path.
     """
 
-    search_path: SearchPath
+    search_path: SearchPath | None
     binary_name: str
     check_file_entries: bool
     test: BinaryPathTest | None
@@ -100,12 +116,12 @@ class BinaryPathRequest:
     def __init__(
         self,
         *,
-        search_path: Iterable[str],
+        search_path: Iterable[str] | None = None,
         binary_name: str,
         check_file_entries: bool = False,
         test: BinaryPathTest | None = None,
     ) -> None:
-        object.__setattr__(self, "search_path", SearchPath(search_path))
+        object.__setattr__(self, "search_path", SearchPath(search_path) if search_path else None)
         object.__setattr__(self, "binary_name", binary_name)
         object.__setattr__(self, "check_file_entries", check_file_entries)
         object.__setattr__(self, "test", test)
@@ -158,9 +174,10 @@ class BinaryNotFoundError(EnvironmentError):
             beyond installing the program. For example, "Alternatively, you can set the option
             `--python-bootstrap-search-path` to change the paths searched."
         """
+        # TODO fix this error message
         msg = softwrap(
             f"""
-            Cannot find `{request.binary_name}` on `{sorted(request.search_path)}`.
+            Cannot find `{request.binary_name}` on `{sorted(request.search_path or [])}`.
             Please ensure that it is installed
             """
         )
@@ -244,12 +261,10 @@ class BinaryShims:
 class BashBinary(BinaryPath):
     """The `bash` binary."""
 
-    DEFAULT_SEARCH_PATH = SearchPath(("/usr/bin", "/bin", "/usr/local/bin"))
-
 
 @dataclass(frozen=True)
 class BashBinaryRequest:
-    search_path: SearchPath = BashBinary.DEFAULT_SEARCH_PATH
+    pass
 
 
 class PythonBinary(BinaryPath):
@@ -469,7 +484,6 @@ def _create_shim(bash: str, binary: str) -> bytes:
 async def find_bash(bash_request: BashBinaryRequest) -> BashBinary:
     request = BinaryPathRequest(
         binary_name="bash",
-        search_path=bash_request.search_path,
         test=BinaryPathTest(args=["--version"]),
     )
     paths = await Get(BinaryPaths, BinaryPathRequest, request)
@@ -486,7 +500,11 @@ async def get_bash() -> BashBinary:
 
 
 @rule
-async def find_binary(request: BinaryPathRequest, env_target: EnvironmentTarget) -> BinaryPaths:
+async def find_binary(
+    request: BinaryPathRequest,
+    env_target: EnvironmentTarget,
+    system_binaries: SystemBinariesSubsystem.EnvironmentAware,
+) -> BinaryPaths:
     # If we are not already locating bash, recurse to locate bash to use it as an absolute path in
     # our shebang. This avoids mixing locations that we would search for bash into the search paths
     # of the request we are servicing.
@@ -495,7 +513,7 @@ async def find_binary(request: BinaryPathRequest, env_target: EnvironmentTarget)
     if request.binary_name == "bash":
         shebang = "#!/usr/bin/env bash"
     else:
-        bash = await Get(BashBinary, BashBinaryRequest())
+        bash = await get_bash()
         shebang = f"#!{bash.path}"
 
     script_path = "./find_binary.sh"
@@ -533,11 +551,17 @@ async def find_binary(request: BinaryPathRequest, env_target: EnvironmentTarget)
         CreateDigest([FileContent(script_path, script_content.encode(), is_executable=True)]),
     )
 
+    # TODO: This should support more granular search paths
+    def search_path_for_binary(binary_name: str) -> SearchPath:
+        return SearchPath(system_binaries._default_search_path)
+
     # Some subtle notes about executing this script:
     #
     #  - We run the script with `ProcessResult` instead of `FallibleProcessResult` so that we
     #      can catch bugs in the script itself, given an earlier silent failure.
-    search_path = create_path_env_var(request.search_path)
+    search_path = create_path_env_var(
+        request.search_path if request.search_path else search_path_for_binary(request.binary_name)
+    )
     result = await Get(
         ProcessResult,
         Process(
@@ -659,9 +683,7 @@ async def find_python(python_bootstrap: PythonBootstrap) -> PythonBinary:
 
 @rule(desc="Finding the `zip` binary", level=LogLevel.DEBUG)
 async def find_zip() -> ZipBinary:
-    request = BinaryPathRequest(
-        binary_name="zip", search_path=SEARCH_PATHS, test=BinaryPathTest(args=["-v"])
-    )
+    request = BinaryPathRequest(binary_name="zip", test=BinaryPathTest(args=["-v"]))
     paths = await Get(BinaryPaths, BinaryPathRequest, request)
     first_path = paths.first_path_or_raise(request, rationale="create `.zip` archives")
     return ZipBinary(first_path.path, first_path.fingerprint)
@@ -669,9 +691,7 @@ async def find_zip() -> ZipBinary:
 
 @rule(desc="Finding the `unzip` binary", level=LogLevel.DEBUG)
 async def find_unzip() -> UnzipBinary:
-    request = BinaryPathRequest(
-        binary_name="unzip", search_path=SEARCH_PATHS, test=BinaryPathTest(args=["-v"])
-    )
+    request = BinaryPathRequest(binary_name="unzip", test=BinaryPathTest(args=["-v"]))
     paths = await Get(BinaryPaths, BinaryPathRequest, request)
     first_path = paths.first_path_or_raise(
         request, rationale="download the tools Pants needs to run"
@@ -686,9 +706,7 @@ def find_gunzip(python: PythonBinary) -> GunzipBinary:
 
 @rule(desc="Finding the `tar` binary", level=LogLevel.DEBUG)
 async def find_tar(platform: Platform) -> TarBinary:
-    request = BinaryPathRequest(
-        binary_name="tar", search_path=SEARCH_PATHS, test=BinaryPathTest(args=["--version"])
-    )
+    request = BinaryPathRequest(binary_name="tar", test=BinaryPathTest(args=["--version"]))
     paths = await Get(BinaryPaths, BinaryPathRequest, request)
     first_path = paths.first_path_or_raise(
         request, rationale="download the tools Pants needs to run"
@@ -698,7 +716,7 @@ async def find_tar(platform: Platform) -> TarBinary:
 
 @rule(desc="Finding the `cat` binary", level=LogLevel.DEBUG)
 async def find_cat() -> CatBinary:
-    request = BinaryPathRequest(binary_name="cat", search_path=SEARCH_PATHS)
+    request = BinaryPathRequest(binary_name="cat")
     paths = await Get(BinaryPaths, BinaryPathRequest, request)
     first_path = paths.first_path_or_raise(request, rationale="outputing content from files")
     return CatBinary(first_path.path, first_path.fingerprint)
@@ -706,7 +724,7 @@ async def find_cat() -> CatBinary:
 
 @rule(desc="Finding the `mkdir` binary", level=LogLevel.DEBUG)
 async def find_mkdir() -> MkdirBinary:
-    request = BinaryPathRequest(binary_name="mkdir", search_path=SEARCH_PATHS)
+    request = BinaryPathRequest(binary_name="mkdir")
     paths = await Get(BinaryPaths, BinaryPathRequest, request)
     first_path = paths.first_path_or_raise(request, rationale="create directories")
     return MkdirBinary(first_path.path, first_path.fingerprint)
@@ -714,7 +732,7 @@ async def find_mkdir() -> MkdirBinary:
 
 @rule(desc="Finding the `touch` binary", level=LogLevel.DEBUG)
 async def find_touch() -> TouchBinary:
-    request = BinaryPathRequest(binary_name="touch", search_path=SEARCH_PATHS)
+    request = BinaryPathRequest(binary_name="touch")
     paths = await Get(BinaryPaths, BinaryPathRequest, request)
     first_path = paths.first_path_or_raise(request, rationale="touch file")
     return TouchBinary(first_path.path, first_path.fingerprint)
@@ -722,7 +740,7 @@ async def find_touch() -> TouchBinary:
 
 @rule(desc="Finding the `cp` binary", level=LogLevel.DEBUG)
 async def find_cp() -> CpBinary:
-    request = BinaryPathRequest(binary_name="cp", search_path=SEARCH_PATHS)
+    request = BinaryPathRequest(binary_name="cp")
     paths = await Get(BinaryPaths, BinaryPathRequest, request)
     first_path = paths.first_path_or_raise(request, rationale="copy files")
     return CpBinary(first_path.path, first_path.fingerprint)
@@ -730,7 +748,7 @@ async def find_cp() -> CpBinary:
 
 @rule(desc="Finding the `mv` binary", level=LogLevel.DEBUG)
 async def find_mv() -> MvBinary:
-    request = BinaryPathRequest(binary_name="mv", search_path=SEARCH_PATHS)
+    request = BinaryPathRequest(binary_name="mv")
     paths = await Get(BinaryPaths, BinaryPathRequest, request)
     first_path = paths.first_path_or_raise(request, rationale="move files")
     return MvBinary(first_path.path, first_path.fingerprint)
@@ -738,7 +756,7 @@ async def find_mv() -> MvBinary:
 
 @rule(desc="Finding the `chmod` binary", level=LogLevel.DEBUG)
 async def find_chmod() -> ChmodBinary:
-    request = BinaryPathRequest(binary_name="chmod", search_path=SEARCH_PATHS)
+    request = BinaryPathRequest(binary_name="chmod")
     paths = await Get(BinaryPaths, BinaryPathRequest, request)
     first_path = paths.first_path_or_raise(
         request, rationale="change file modes or Access Control Lists"
@@ -748,7 +766,7 @@ async def find_chmod() -> ChmodBinary:
 
 @rule(desc="Finding the `diff` binary", level=LogLevel.DEBUG)
 async def find_diff() -> DiffBinary:
-    request = BinaryPathRequest(binary_name="diff", search_path=SEARCH_PATHS)
+    request = BinaryPathRequest(binary_name="diff")
     paths = await Get(BinaryPaths, BinaryPathRequest, request)
     first_path = paths.first_path_or_raise(request, rationale="compare files line by line")
     return DiffBinary(first_path.path, first_path.fingerprint)
@@ -756,7 +774,7 @@ async def find_diff() -> DiffBinary:
 
 @rule(desc="Finding the `open` binary", level=LogLevel.DEBUG)
 async def find_open() -> OpenBinary:
-    request = BinaryPathRequest(binary_name="open", search_path=SEARCH_PATHS)
+    request = BinaryPathRequest(binary_name="open")
     paths = await Get(BinaryPaths, BinaryPathRequest, request)
     first_path = paths.first_path_or_raise(request, rationale="open URLs with default browser")
     return OpenBinary(first_path.path, first_path.fingerprint)
@@ -764,7 +782,7 @@ async def find_open() -> OpenBinary:
 
 @rule(desc="Finding the `readlink` binary", level=LogLevel.DEBUG)
 async def find_readlink() -> ReadlinkBinary:
-    request = BinaryPathRequest(binary_name="readlink", search_path=SEARCH_PATHS)
+    request = BinaryPathRequest(binary_name="readlink")
     paths = await Get(BinaryPaths, BinaryPathRequest, request)
     first_path = paths.first_path_or_raise(request, rationale="defererence symlinks")
     return ReadlinkBinary(first_path.path, first_path.fingerprint)
@@ -772,7 +790,7 @@ async def find_readlink() -> ReadlinkBinary:
 
 @rule(desc="Finding the `git` binary", level=LogLevel.DEBUG)
 async def find_git() -> GitBinary:
-    request = BinaryPathRequest(binary_name="git", search_path=SEARCH_PATHS)
+    request = BinaryPathRequest(binary_name="git")
     paths = await Get(BinaryPaths, BinaryPathRequest, request)
     first_path = paths.first_path_or_raise(
         request, rationale="track changes to files in your build environment"
@@ -902,7 +920,7 @@ class MaybeGitBinary:
 
 @rule(desc="Finding the `git` binary", level=LogLevel.DEBUG)
 async def maybe_find_git() -> MaybeGitBinary:
-    request = BinaryPathRequest(binary_name="git", search_path=SEARCH_PATHS)
+    request = BinaryPathRequest(binary_name="git")
     paths = await Get(BinaryPaths, BinaryPathRequest, request)
     first_path = paths.first_path
     if not first_path:
