@@ -94,7 +94,7 @@ async def evaluate_preludes(
     )
     globals: dict[str, Any] = {
         **{name: getattr(builtins, name) for name in dir(builtins) if name.endswith("Error")},
-        **{name: getattr(typing, name) for name in dir(typing)},
+        **{name: getattr(typing, name) for name in typing.__all__},
         # Ensure the globals for each prelude includes the builtin symbols (E.g. `python_sources`)
         # and any build file aliases (e.g. from plugins)
         **parser.symbols,
