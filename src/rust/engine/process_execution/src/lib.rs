@@ -590,13 +590,12 @@ impl Process {
   /// be used to set values.
   ///
   /// We use the more ergonomic (but possibly slightly slower) "move self for each builder method"
-  /// pattern, so this method is only enabled for test usage: production usage should construct the
+  /// pattern, so this method should only be used in tests: production usage should construct the
   /// Process struct wholesale. We can reconsider this if we end up with more production callsites
   /// that require partial options.
   ///
   /// NB: Some of the default values used in this constructor only make sense in tests.
   ///
-  #[cfg(test)]
   pub fn new(argv: Vec<String>) -> Process {
     Process {
       argv,
@@ -610,12 +609,12 @@ impl Process {
       level: log::Level::Info,
       append_only_caches: BTreeMap::new(),
       jdk_home: None,
-      platform: Platform::current().unwrap(),
       execution_slot_variable: None,
       concurrency_available: 0,
       cache_scope: ProcessCacheScope::Successful,
       execution_environment: ProcessExecutionEnvironment {
-        name: "__local__".to_owned(),
+        name: None,
+        platform: Platform::current().unwrap(),
         strategy: ProcessExecutionStrategy::Local,
       },
       remote_cache_speculation_delay: std::time::Duration::from_millis(0),
@@ -666,29 +665,24 @@ impl Process {
   }
 
   ///
-  /// Set the execution environment to Docker, with the specified name and image.
+  /// Set the execution environment to Docker, with the specified image.
   ///
-  pub fn docker(mut self, platform: Platform, image: String) -> Process {
+  pub fn docker(mut self, image: String) -> Process {
     self.execution_environment = ProcessExecutionEnvironment {
       name: None,
-      platform,
+      platform: Platform::current().unwrap(),
       strategy: ProcessExecutionStrategy::Docker(image),
     };
     self
   }
 
   ///
-  /// Set the execution environment to remote execution with the specified name and platform
-  /// properties.
+  /// Set the execution environment to remote execution with the specified platform properties.
   ///
-  pub fn remote_execution(
-    mut self,
-    platform: Platform,
-    properties: Vec<(String, String)>,
-  ) -> Process {
+  pub fn remote_execution(mut self, properties: Vec<(String, String)>) -> Process {
     self.execution_environment = ProcessExecutionEnvironment {
       name: None,
-      platform,
+      platform: Platform::current().unwrap(),
       strategy: ProcessExecutionStrategy::RemoteExecution(properties),
     };
     self
