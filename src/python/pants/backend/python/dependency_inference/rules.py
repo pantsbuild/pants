@@ -475,7 +475,7 @@ async def infer_python_dependencies_via_source(
 
     inferred_deps = import_deps | asset_deps
 
-    _ = await _handle_unowned_imports(
+    await _handle_unowned_imports(
         request.field_set.address,
         python_infer_subsystem.unowned_dependency_behavior,
         python_setup,

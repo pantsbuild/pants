@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import importlib.resources
 import re
 from textwrap import dedent
 
@@ -410,6 +411,9 @@ def test_works_with_python27(rule_runner: RuleRunner) -> None:
     """
     rule_runner.write_files(
         {
+            "older_mypy_for_testing.lock": importlib.resources.read_text(
+                __name__.rpartition(".")[0], "older_mypy_for_testing.lock"
+            ),
             "BUILD": dedent(
                 """\
                 # Both requirements are a) typed and b) compatible with Py2 and Py3. However, `x690`
@@ -440,7 +444,12 @@ def test_works_with_python27(rule_runner: RuleRunner) -> None:
         }
     )
     tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))
-    result = run_mypy(rule_runner, [tgt])
+    result = run_mypy(
+        rule_runner,
+        [tgt],
+        # --py2 support requires mypy < 0.980.
+        extra_args=["--mypy-version=mypy==0.961", "--mypy-lockfile=older_mypy_for_testing.lock"],
+    )
     assert len(result) == 1
     assert result[0].exit_code == 1
     assert f"{PACKAGE}/f.py:5: error: Unsupported operand types" in result[0].stdout
@@ -505,6 +514,9 @@ def test_uses_correct_python_version(rule_runner: RuleRunner) -> None:
     """
     rule_runner.write_files(
         {
+            "older_mypy_for_testing.lock": importlib.resources.read_text(
+                __name__.rpartition(".")[0], "older_mypy_for_testing.lock"
+            ),
             f"{PACKAGE}/py2/__init__.py": dedent(
                 """\
                 def add(x, y):
@@ -537,7 +549,12 @@ def test_uses_correct_python_version(rule_runner: RuleRunner) -> None:
     py2_tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="uses_py2.py"))
     py3_tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="uses_py3.py"))
 
-    result = run_mypy(rule_runner, [py2_tgt, py3_tgt])
+    result = run_mypy(
+        rule_runner,
+        [py2_tgt, py3_tgt],
+        # --py2 support requires mypy < 0.980.
+        extra_args=["--mypy-version=mypy==0.961", "--mypy-lockfile=older_mypy_for_testing.lock"],
+    )
     assert len(result) == 2
     py2_result, py3_result = sorted(result, key=lambda res: res.partition_description or "")
 

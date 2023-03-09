@@ -26,8 +26,9 @@ class PyOxidizer(PythonToolBase):
         """
     )
 
-    default_version = "pyoxidizer==0.18.0"
+    default_version = "pyoxidizer>=0.18.0,<1"
     default_main = ConsoleScript("pyoxidizer")
+    default_requirements = [default_version]
 
     register_interpreter_constraints = True
     default_interpreter_constraints = ["CPython>=3.8,<4"]

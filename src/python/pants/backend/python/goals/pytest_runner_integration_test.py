@@ -293,7 +293,7 @@ def test_uses_correct_python_version(rule_runner: RuleRunner) -> None:
             f"{PACKAGE}/BUILD": dedent(
                 """\
                 python_tests(name='py2', interpreter_constraints=['==2.7.*'])
-                python_tests(name='py3', interpreter_constraints=['>=3.6.*'])
+                python_tests(name='py3', interpreter_constraints=['>=3.6.0'])
                 """
             ),
         }

@@ -47,7 +47,6 @@ async def _resolve_asdf_tool_paths(
     env: EnvironmentVars,
     local: bool,
 ) -> tuple[str, ...]:
-
     if not (isinstance(env_tgt.val, LocalEnvironmentTarget) or env_tgt.val is None):
         return ()
 

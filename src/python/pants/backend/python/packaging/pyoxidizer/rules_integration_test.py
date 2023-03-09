@@ -91,6 +91,7 @@ def test_end_to_end() -> None:
             f"{tmpdir}/hellotest:bin",
         ]
         run_result = run_pants(run_args)
+        print(run_result)
         assert run_result.exit_code == 42
         assert run_result.stdout == "Hello world!\n"
 

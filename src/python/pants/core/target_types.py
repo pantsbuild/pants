@@ -686,7 +686,6 @@ class AllAssetTargetsByPath:
 def map_assets_by_path(
     all_asset_targets: AllAssetTargets,
 ) -> AllAssetTargetsByPath:
-
     resources_by_path: defaultdict[PurePath, set[Target]] = defaultdict(set)
     for resource_tgt in all_asset_targets.resources:
         resources_by_path[PurePath(resource_tgt[ResourceSourceField].file_path)].add(resource_tgt)

@@ -44,6 +44,7 @@ class DockerfileParser(PythonToolRequirementsBase):
     help = "Used to parse Dockerfile build specs to infer their dependencies."
 
     default_version = "dockerfile==3.2.0"
+    default_requirements = ["dockerfile>=3.2.0,<4"]
 
     register_interpreter_constraints = True
     default_interpreter_constraints = ["CPython>=3.7,<4"]

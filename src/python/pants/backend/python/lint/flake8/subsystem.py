@@ -66,8 +66,9 @@ class Flake8(PythonToolBase):
     name = "Flake8"
     help = "The Flake8 Python linter (https://flake8.pycqa.org/)."
 
-    default_version = "flake8>=5.0.4,<5.1"
+    default_version = "flake8>=5.0.4,<7"
     default_main = ConsoleScript("flake8")
+    default_requirements = [default_version]
 
     register_lockfile = True
     default_lockfile_resource = ("pants.backend.python.lint.flake8", "flake8.lock")

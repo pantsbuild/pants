@@ -386,7 +386,6 @@ _JVM_HEAP_SIZE_UNITS = ["", "k", "m", "g"]
 async def jvm_process(
     bash: BashBinary, request: JvmProcess, jvm: JvmSubsystem, global_options: GlobalOptions
 ) -> Process:
-
     jdk = request.jdk
 
     immutable_input_digests = {

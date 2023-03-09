@@ -18,8 +18,9 @@ class Lambdex(PythonToolBase):
     options_scope = "lambdex"
     help = "A tool for turning .pex files into Function-as-a-Service artifacts (https://github.com/pantsbuild/lambdex)."
 
-    default_version = "lambdex==0.1.9"
+    default_version = "lambdex>=0.1.9"
     default_main = ConsoleScript("lambdex")
+    default_requirements = [default_version]
 
     register_interpreter_constraints = True
     default_interpreter_constraints = ["CPython>=3.7,<3.12"]

@@ -160,7 +160,12 @@ async def run_pylint(
     # Ensure that the empty report dir exists.
     report_directory_digest_get = Get(Digest, CreateDigest([Directory(REPORT_DIR)]))
 
-    (pylint_pex, requirements_pex, sources, report_directory,) = await MultiGet(
+    (
+        pylint_pex,
+        requirements_pex,
+        sources,
+        report_directory,
+    ) = await MultiGet(
         pylint_pex_get,
         requirements_pex_get,
         sources_get,

@@ -34,6 +34,7 @@ class Setuptools(PythonToolRequirementsBase):
 
     default_version = "setuptools>=63.1.0,<64.0"
     default_extra_requirements = ["wheel>=0.35.1,<0.38"]
+    default_requirements = [default_version, *default_extra_requirements]
 
     register_lockfile = True
     default_lockfile_resource = ("pants.backend.python.subsystems", "setuptools.lock")

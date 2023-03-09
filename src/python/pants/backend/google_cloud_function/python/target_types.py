@@ -279,7 +279,6 @@ class GoogleCloudFunctionTypes(Enum):
 
 
 class PythonGoogleCloudFunctionType(StringField):
-
     alias = "type"
     required = True
     valid_choices = GoogleCloudFunctionTypes

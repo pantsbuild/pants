@@ -669,7 +669,6 @@ def coarsened_targets_request(addresses: Addresses) -> CoarsenedTargetsRequest:
 async def coarsened_targets(
     request: CoarsenedTargetsRequest, local_environment_name: ChosenLocalEnvironmentName
 ) -> CoarsenedTargets:
-
     dependency_mapping = await Get(
         _DependencyMapping,
         _DependencyMappingRequest(
@@ -867,7 +866,7 @@ async def find_owners(
             # primary ownership, but the target still should match the file. We can't use
             # `tgt.get()` because this is a mixin, and there technically may be >1 field.
             secondary_owner_fields = tuple(
-                field
+                field  # type: ignore[misc]
                 for field in candidate_tgt.field_values.values()
                 if isinstance(field, SecondaryOwnerMixin)
             )

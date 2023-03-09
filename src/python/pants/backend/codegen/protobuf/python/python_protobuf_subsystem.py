@@ -74,6 +74,7 @@ class PythonProtobufMypyPlugin(PythonToolRequirementsBase):
     help = "Configuration of the mypy-protobuf type stub generation plugin."
 
     default_version = "mypy-protobuf==3.4.0"
+    default_requirements = ["mypy-protobuf>=3.4.0,<4"]
 
     register_interpreter_constraints = True
     default_interpreter_constraints = ["CPython>=3.7,<4"]
