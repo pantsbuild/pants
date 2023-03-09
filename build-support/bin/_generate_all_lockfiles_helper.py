@@ -217,6 +217,10 @@ def update_default_lockfiles(specified: list[str] | None) -> None:
         "--concurrent",
         f"--python-interpreter-constraints={repr(PythonSetup.default_interpreter_constraints)}",
         *itertools.chain.from_iterable(tool.args for tool in AllTools),
+        # `generate_all_lockfiles.sh` will have overridden this option to solve the chicken
+        # and egg problem from https://github.com/pantsbuild/pants/issues/12457. We must
+        # restore it here so that the lockfile gets generated properly.
+        "--python-enable-resolves",
         "generate-lockfiles",
     ]
     if specified:

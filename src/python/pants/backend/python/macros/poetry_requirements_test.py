@@ -108,7 +108,6 @@ def test_handle_str(test, exp) -> None:
 
 
 def test_add_markers() -> None:
-
     attr_mark = PyprojectAttr({"markers": "platform_python_implementation == 'CPython'"})
     assert (
         add_markers("foo==1.0.0", attr_mark, "somepath")

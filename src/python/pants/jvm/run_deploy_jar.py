@@ -24,7 +24,6 @@ logger = logging.getLogger(__name__)
 async def create_deploy_jar_run_request(
     field_set: DeployJarFieldSet,
 ) -> RunRequest:
-
     jdk = await Get(JdkEnvironment, JdkRequest, JdkRequest.from_field(field_set.jdk_version))
 
     main_class = field_set.main_class.value

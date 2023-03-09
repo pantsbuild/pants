@@ -668,7 +668,6 @@ def coarsened_targets_request(addresses: Addresses) -> CoarsenedTargetsRequest:
 async def coarsened_targets(
     request: CoarsenedTargetsRequest, local_environment_name: ChosenLocalEnvironmentName
 ) -> CoarsenedTargets:
-
     dependency_mapping = await Get(
         _DependencyMapping,
         _DependencyMappingRequest(

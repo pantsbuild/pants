@@ -6,15 +6,13 @@ from __future__ import annotations
 import os.path
 from typing import Iterable
 
-from pants.backend.python.goals import lockfile
 from pants.backend.python.goals.export import ExportPythonTool, ExportPythonToolSentinel
-from pants.backend.python.goals.lockfile import (
-    GeneratePythonLockfile,
-    GeneratePythonToolLockfileSentinel,
+from pants.backend.python.subsystems.python_tool_base import (
+    ExportToolOption,
+    LockfileRules,
+    PythonToolBase,
 )
-from pants.backend.python.subsystems.python_tool_base import ExportToolOption, PythonToolBase
 from pants.backend.python.target_types import ConsoleScript
-from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
@@ -28,9 +26,10 @@ class Yapf(PythonToolBase):
     name = "yapf"
     help = "A formatter for Python files (https://github.com/google/yapf)."
 
-    default_version = "yapf==0.32.0"
+    default_version = "yapf>=0.32.0,<1"
     default_extra_requirements = ["toml"]
     default_main = ConsoleScript("yapf")
+    default_requirements = [default_version, *default_extra_requirements]
 
     register_interpreter_constraints = True
     default_interpreter_constraints = ["CPython>=3.7,<4"]
@@ -39,6 +38,7 @@ class Yapf(PythonToolBase):
     default_lockfile_resource = ("pants.backend.python.lint.yapf", "yapf.lock")
     default_lockfile_path = "src/python/pants/backend/python/lint/yapf/yapf.lock"
     default_lockfile_url = git_url(default_lockfile_path)
+    lockfile_rules_type = LockfileRules.SIMPLE
 
     skip = SkipOption("fmt", "lint")
     args = ArgsListOption(
@@ -102,15 +102,6 @@ class Yapf(PythonToolBase):
         )
 
 
-class YapfLockfileSentinel(GeneratePythonToolLockfileSentinel):
-    resolve_name = Yapf.options_scope
-
-
-@rule
-def setup_yapf_lockfile(_: YapfLockfileSentinel, yapf: Yapf) -> GeneratePythonLockfile:
-    return GeneratePythonLockfile.from_tool(yapf)
-
-
 class YapfExportSentinel(ExportPythonToolSentinel):
     pass
 
@@ -125,7 +116,5 @@ def yapf_export(_: YapfExportSentinel, yapf: Yapf) -> ExportPythonTool:
 def rules():
     return (
         *collect_rules(),
-        *lockfile.rules(),
-        UnionRule(GenerateToolLockfileSentinel, YapfLockfileSentinel),
         UnionRule(ExportPythonToolSentinel, YapfExportSentinel),
     )

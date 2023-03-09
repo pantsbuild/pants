@@ -363,7 +363,7 @@ def _rule_helper_decorator(func: Callable[P, R], _public: bool = False) -> Calla
         raise ValueError("@rule_helpers must be async.")
 
     setattr(func, "rule_helper", func)
-    return func
+    return func  # type: ignore[return-value]
 
 
 @overload

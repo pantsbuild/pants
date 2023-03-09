@@ -51,8 +51,9 @@ class Black(PythonToolBase):
     name = "Black"
     help = "The Black Python code formatter (https://black.readthedocs.io/)."
 
-    default_version = "black==22.6.0"
+    default_version = "black>=22.6.0,<24"
     default_main = ConsoleScript("black")
+    default_requirements = [default_version]
 
     register_interpreter_constraints = True
     default_interpreter_constraints = ["CPython>=3.7,<4"]
@@ -131,10 +132,10 @@ async def setup_black_lockfile(
     _: BlackLockfileSentinel, black: Black, python_setup: PythonSetup
 ) -> GeneratePythonLockfile:
     if not black.uses_custom_lockfile:
-        return GeneratePythonLockfile.from_tool(black)
+        return black.to_lockfile_request()
 
     constraints = await _black_interpreter_constraints(black, python_setup)
-    return GeneratePythonLockfile.from_tool(black, constraints)
+    return black.to_lockfile_request(interpreter_constraints=constraints)
 
 
 class BlackExportSentinel(ExportPythonToolSentinel):

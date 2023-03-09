@@ -265,7 +265,6 @@ class RuleRunner:
         inherent_environment: EnvironmentName | None = EnvironmentName(None),
         is_bootstrap: bool = False,
     ) -> None:
-
         bootstrap_args = [*bootstrap_args]
 
         root_dir: Path | None = None
@@ -541,6 +540,14 @@ class RuleRunner:
             )
         return tuple(paths)
 
+    def read_file(self, file: str | PurePath, mode: str = "r") -> str | bytes:
+        """Read a file that was written to the build root, useful for testing."""
+        path = os.path.join(self.build_root, file)
+        with safe_open(path, mode=mode) as fp:
+            if "b" in mode:
+                return bytes(fp.read())
+            return str(fp.read())
+
     def make_snapshot(self, files: Mapping[str, str | bytes]) -> Snapshot:
         """Makes a snapshot from a map of file name to file content.
 
@@ -691,7 +698,7 @@ def run_rule_with_mocks(
 
     res = rule(*(rule_args or ()))
     if not isinstance(res, (CoroutineType, GeneratorType)):
-        return res  # type: ignore[return-value]
+        return res  # type: ignore[misc,return-value]
 
     def get(res: Get | Effect):
         provider = next(
@@ -728,7 +735,7 @@ def run_rule_with_mocks(
             elif type(res) in (tuple, list):
                 rule_input = [get(g) for g in res]  # type: ignore[attr-defined]
             else:
-                return res  # type: ignore[return-value]
+                return res  # type: ignore[misc,return-value]
         except StopIteration as e:
             return e.value  # type: ignore[no-any-return]
 

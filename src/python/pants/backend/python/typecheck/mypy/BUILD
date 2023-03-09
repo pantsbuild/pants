@@ -3,6 +3,8 @@
 
 resource(name="lockfile", source="mypy.lock")
 
+resource(name="older_lockfile_for_testing", source="older_mypy_for_testing.lock")
+
 python_sources(
     overrides={"subsystem.py": {"dependencies": [":lockfile"]}},
 )
@@ -17,6 +19,7 @@ python_tests(
         },
         "subsystem_test.py": {"timeout": 180},
         "rules_integration_test.py": {
+            "dependencies": [":older_lockfile_for_testing"],
             "tags": ["platform_specific_behavior"],
             "timeout": 480,
         },

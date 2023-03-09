@@ -67,7 +67,7 @@ class MutableTrieNode:
         "first_party",
     ]  # don't use a `dict` to store attrs
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.children: dict[str, MutableTrieNode] = {}
         self.recursive: bool = False
         self.addresses: dict[SymbolNamespace, OrderedSet[Address]] = defaultdict(OrderedSet)
