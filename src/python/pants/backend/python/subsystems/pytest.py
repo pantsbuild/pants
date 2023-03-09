@@ -218,10 +218,10 @@ async def setup_pytest_lockfile(
     _: PytestLockfileSentinel, pytest: PyTest, python_setup: PythonSetup
 ) -> GeneratePythonLockfile:
     if not pytest.uses_custom_lockfile:
-        return GeneratePythonLockfile.from_tool(pytest)
+        return pytest.to_lockfile_request()
 
     constraints = await _find_all_unique_interpreter_constraints(python_setup, PythonTestFieldSet)
-    return GeneratePythonLockfile.from_tool(pytest, constraints)
+    return pytest.to_lockfile_request(constraints)
 
 
 class PytestExportSentinel(ExportPythonToolSentinel):

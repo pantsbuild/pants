@@ -541,6 +541,14 @@ class RuleRunner:
             )
         return tuple(paths)
 
+    def read_file(self, file: str | PurePath, mode: str = "r") -> str | bytes:
+        """Read a file that was written to the build root, useful for testing."""
+        path = os.path.join(self.build_root, file)
+        with safe_open(path, mode=mode) as fp:
+            if "b" in mode:
+                return bytes(fp.read())
+            return str(fp.read())
+
     def make_snapshot(self, files: Mapping[str, str | bytes]) -> Snapshot:
         """Makes a snapshot from a map of file name to file content.
 

@@ -3,15 +3,13 @@
 
 from __future__ import annotations
 
-from pants.backend.python.goals import lockfile
 from pants.backend.python.goals.export import ExportPythonTool, ExportPythonToolSentinel
-from pants.backend.python.goals.lockfile import (
-    GeneratePythonLockfile,
-    GeneratePythonToolLockfileSentinel,
+from pants.backend.python.subsystems.python_tool_base import (
+    ExportToolOption,
+    LockfileRules,
+    PythonToolBase,
 )
-from pants.backend.python.subsystems.python_tool_base import ExportToolOption, PythonToolBase
 from pants.backend.python.target_types import ConsoleScript
-from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.option.option_types import ArgsListOption, SkipOption
@@ -35,21 +33,11 @@ class PyUpgrade(PythonToolBase):
     default_lockfile_resource = ("pants.backend.python.lint.pyupgrade", "pyupgrade.lock")
     default_lockfile_path = "src/python/pants/backend/python/lint/pyupgrade/pyupgrade.lock"
     default_lockfile_url = git_url(default_lockfile_path)
+    lockfile_rules_type = LockfileRules.SIMPLE
 
     skip = SkipOption("fmt", "lint")
     args = ArgsListOption(example="--py39-plus --keep-runtime-typing")
     export = ExportToolOption()
-
-
-class PyUpgradeLockfileSentinel(GeneratePythonToolLockfileSentinel):
-    resolve_name = PyUpgrade.options_scope
-
-
-@rule
-def setup_pyupgrade_lockfile(
-    _: PyUpgradeLockfileSentinel, pyupgrade: PyUpgrade
-) -> GeneratePythonLockfile:
-    return GeneratePythonLockfile.from_tool(pyupgrade)
 
 
 class PyUpgradeExportSentinel(ExportPythonToolSentinel):
@@ -68,7 +56,5 @@ def pyupgrade_export(_: PyUpgradeExportSentinel, pyupgrade: PyUpgrade) -> Export
 def rules():
     return (
         *collect_rules(),
-        *lockfile.rules(),
-        UnionRule(GenerateToolLockfileSentinel, PyUpgradeLockfileSentinel),
         UnionRule(ExportPythonToolSentinel, PyUpgradeExportSentinel),
     )
