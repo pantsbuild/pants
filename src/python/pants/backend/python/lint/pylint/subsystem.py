@@ -72,8 +72,9 @@ class Pylint(PythonToolBase):
     name = "Pylint"
     help = "The Pylint linter for Python code (https://www.pylint.org/)."
 
-    default_version = "pylint>=2.13.0,<2.15"
+    default_version = "pylint>=2.13.0,<3"
     default_main = ConsoleScript("pylint")
+    default_requirements = [default_version]
 
     register_lockfile = True
     default_lockfile_resource = ("pants.backend.python.lint.pylint", "pylint.lock")

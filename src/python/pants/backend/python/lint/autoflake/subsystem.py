@@ -21,8 +21,9 @@ class Autoflake(PythonToolBase):
     name = "Autoflake"
     help = "The Autoflake Python code formatter (https://github.com/myint/autoflake)."
 
-    default_version = "autoflake==1.4"
+    default_version = "autoflake>=1.4,<3"
     default_main = ConsoleScript("autoflake")
+    default_requirements = [default_version]
 
     register_interpreter_constraints = True
     default_interpreter_constraints = ["CPython>=3.7,<4"]

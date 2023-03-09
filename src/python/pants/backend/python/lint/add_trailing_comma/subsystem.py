@@ -21,8 +21,9 @@ class AddTrailingComma(PythonToolBase):
     name = "add-trailing-comma"
     help = "The add-trailing-comma Python code formatter (https://github.com/asottile/add-trailing-comma)."
 
-    default_version = "add-trailing-comma==2.2.3"
+    default_version = "add-trailing-comma>=2.2.3,<3"
     default_main = ConsoleScript("add-trailing-comma")
+    default_requirements = [default_version]
 
     register_interpreter_constraints = True
     default_interpreter_constraints = ["CPython>=3.7,<4"]

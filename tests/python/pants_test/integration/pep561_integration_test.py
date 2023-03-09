@@ -9,7 +9,6 @@ from pants.testutil.pants_integration_test import PantsResult, run_pants, setup_
 
 
 def typecheck_file(path: str, filename: str) -> PantsResult:
-
     return run_pants(
         [
             "--backend-packages=pants.backend.python",

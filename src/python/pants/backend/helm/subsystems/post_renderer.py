@@ -46,10 +46,11 @@ class HelmPostRendererSubsystem(PythonToolRequirementsBase):
     options_scope = "helm-post-renderer"
     help = "Used perform modifications to the final output produced by Helm charts when they've been fully rendered."
 
-    default_version = "yamlpath>=3.6,<3.7"
+    default_version = "yamlpath>=3.7.0,<4"
     default_extra_requirements = [
         "ruamel.yaml>=0.15.96,!=0.17.0,!=0.17.1,!=0.17.2,!=0.17.5,<=0.17.21"
     ]
+    default_requirements = ["yamlpath>=3.6.0,<4", *default_extra_requirements]
 
     register_interpreter_constraints = True
     default_interpreter_constraints = ["CPython>=3.7,<3.10"]

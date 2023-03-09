@@ -265,7 +265,6 @@ class RuleRunner:
         inherent_environment: EnvironmentName | None = EnvironmentName(None),
         is_bootstrap: bool = False,
     ) -> None:
-
         bootstrap_args = [*bootstrap_args]
 
         root_dir: Path | None = None
@@ -699,7 +698,7 @@ def run_rule_with_mocks(
 
     res = rule(*(rule_args or ()))
     if not isinstance(res, (CoroutineType, GeneratorType)):
-        return res  # type: ignore[return-value]
+        return res  # type: ignore[misc,return-value]
 
     def get(res: Get | Effect):
         provider = next(
@@ -736,7 +735,7 @@ def run_rule_with_mocks(
             elif type(res) in (tuple, list):
                 rule_input = [get(g) for g in res]  # type: ignore[attr-defined]
             else:
-                return res  # type: ignore[return-value]
+                return res  # type: ignore[misc,return-value]
         except StopIteration as e:
             return e.value  # type: ignore[no-any-return]
 

@@ -89,8 +89,13 @@ class PythonToolRequirementsBase(Subsystem):
         or sorted([cls.default_version, *cls.default_extra_requirements]),
         help=lambda cls: softwrap(
             """\
-            If install_from_resolve is specified, it will install these distribution packages,
-            using the versions from the specified resolve.
+            If install_from_resolve is specified, it will install these requirements,
+            at the versions locked by the specified resolve's lockfile.
+
+            The default version ranges provided here are versions that Pants is expected to be
+            compatible with. If you need a version outside these ranges you can loosen this
+            restriction by setting this option to a wider range, but you may encounter errors
+            if Pants is not compatible with the version you choose.
             """
         ),
     )

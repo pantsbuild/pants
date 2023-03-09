@@ -137,7 +137,7 @@ class _OptionBase(Generic[_OptT, _DefaultT]):
         self._flag_names = (flag_name,) if flag_name else None
         self._default = default
         self._help = help
-        self._register_if = register_if or (lambda cls: True)  # type: ignore[assignment]
+        self._register_if = register_if or (lambda cls: True)
         self._extra_kwargs = {
             k: v
             for k, v in {

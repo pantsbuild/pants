@@ -303,7 +303,6 @@ def test_preferred_environment(
     not_in_output: str | None,
     caplog,
 ):
-
     resolve_name = "boop"
     resolve_dest = "beep"
     if not env_names:

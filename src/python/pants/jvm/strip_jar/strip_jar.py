@@ -48,7 +48,6 @@ async def strip_jar(
     jdk: InternalJdk,
     request: StripJarRequest,
 ) -> Digest:
-
     filenames = list(request.filenames)
 
     if len(filenames) == 0:

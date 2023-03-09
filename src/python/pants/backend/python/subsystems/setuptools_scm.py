@@ -13,9 +13,9 @@ class SetuptoolsSCM(PythonToolBase):
         "A tool for generating versions from VCS metadata (https://github.com/pypa/setuptools_scm)."
     )
 
-    default_version = "setuptools-scm==6.4.2"
+    default_version = "setuptools-scm==7.1.0"
     default_main = EntryPoint("setuptools_scm")
-    default_requirements = ["setuptools-scm"]
+    default_requirements = ["setuptools-scm>=6.4.2,<8"]
 
     register_interpreter_constraints = True
     default_interpreter_constraints = ["CPython>=3.7,<4"]

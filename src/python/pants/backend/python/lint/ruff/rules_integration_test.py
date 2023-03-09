@@ -100,7 +100,7 @@ def test_failing(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({"f.py": BAD_FILE, "BUILD": "python_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
     result = run_ruff(rule_runner, [tgt])
-    assert result.stdout == "Found 1 error(s) (1 fixed, 0 remaining).\n"
+    assert result.stdout == "Found 1 error (1 fixed, 0 remaining).\n"
     assert result.stderr == ""
     assert result.did_change
     assert result.output == get_snapshot(rule_runner, {"f.py": GOOD_FILE})

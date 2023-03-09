@@ -54,11 +54,11 @@ class Bandit(PythonToolBase):
     default_extra_requirements = [
         "setuptools",
         # GitPython 3.1.20 was yanked because it breaks Python 3.8+, but Poetry's lockfile
-        # generation still tries to use it. Upgrade this to the newest version once released or
-        # when switching away from Poetry.
-        "GitPython==3.1.18",
+        # generation still tries to use it.
+        "GitPython>=3.1.24",
     ]
     default_main = ConsoleScript("bandit")
+    default_requirements = [default_version, *default_extra_requirements]
 
     register_lockfile = True
     default_lockfile_resource = ("pants.backend.python.lint.bandit", "bandit.lock")

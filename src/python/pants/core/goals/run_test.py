@@ -208,6 +208,7 @@ class SecondaryOwnerField(SecondaryOwnerMixin, Field):
     alias = "borrowed"
     default = None
 
+    @property
     def filespec(self) -> Filespec:
         return Filespec(includes=[])
 

@@ -419,11 +419,11 @@ class TestRuleGraph:
     def test_ruleset_with_ambiguity(self) -> None:
         @rule
         def a_from_b_and_c(b: B, c: C) -> A:
-            pass
+            return A()
 
         @rule
         def a_from_c_and_b(c: C, b: B) -> A:
-            pass
+            return A()
 
         rules = [a_from_b_and_c, a_from_c_and_b, QueryRule(A, (B, C))]
         with pytest.raises(Exception) as cm:
@@ -445,7 +445,7 @@ class TestRuleGraph:
     def test_ruleset_with_valid_root(self) -> None:
         @rule
         def a_from_b(b: B) -> A:
-            pass
+            return A()
 
         rules = [a_from_b, QueryRule(A, (B,))]
         create_scheduler(rules)
@@ -453,7 +453,7 @@ class TestRuleGraph:
     def test_ruleset_with_unreachable_root(self) -> None:
         @rule
         def a_from_b(b: B) -> A:
-            pass
+            return A()
 
         rules = [a_from_b, QueryRule(A, ())]
         with pytest.raises(Exception) as cm:
@@ -478,11 +478,11 @@ class TestRuleGraph:
 
         @rule
         def a_from_c(c: C) -> A:
-            pass
+            return A()
 
         @rule
         def b_from_d(d: D) -> B:
-            pass
+            return B()
 
         @rule
         async def d_from_a_and_suba(a: A, suba: SubA) -> D:  # type: ignore[return]
@@ -547,7 +547,7 @@ class TestRuleGraph:
     def test_smallest_full_test(self) -> None:
         @rule
         def a_from_suba(suba: SubA) -> A:
-            pass
+            return A()
 
         rules = [a_from_suba, QueryRule(A, (SubA,))]
         fullgraph = self.create_full_graph(rules)
@@ -572,11 +572,11 @@ class TestRuleGraph:
     def test_smallest_full_test_multiple_root_subject_types(self) -> None:
         @rule
         def a_from_suba(suba: SubA) -> A:
-            pass
+            return A()
 
         @rule
         def b_from_a(a: A) -> B:
-            pass
+            return B()
 
         rules = [a_from_suba, QueryRule(A, (SubA,)), b_from_a, QueryRule(B, (A,))]
         fullgraph = self.create_full_graph(rules)
@@ -605,7 +605,7 @@ class TestRuleGraph:
     def test_single_rule_depending_on_subject_selection(self) -> None:
         @rule
         def a_from_suba(suba: SubA) -> A:
-            pass
+            return A()
 
         rules = [a_from_suba, QueryRule(A, (SubA,))]
         subgraph = self.create_subgraph(A, rules, SubA())
@@ -630,11 +630,11 @@ class TestRuleGraph:
     def test_multiple_selects(self) -> None:
         @rule
         def a_from_suba_and_b(suba: SubA, b: B) -> A:
-            pass
+            return A()
 
         @rule
         def b() -> B:
-            pass
+            return B()
 
         rules = [a_from_suba_and_b, b, QueryRule(A, (SubA,))]
         subgraph = self.create_subgraph(A, rules, SubA())
@@ -672,11 +672,11 @@ class TestRuleGraph:
 
         @rule
         def b_from_suba(suba: SubA) -> B:
-            pass
+            return B()
 
         @rule
         def suba_from_c(c: C) -> SubA:
-            pass
+            return SubA()
 
         rules = [a, b_from_suba, suba_from_c, QueryRule(A, (SubA,))]
         subgraph = self.create_subgraph(A, rules, SubA())
@@ -704,11 +704,11 @@ class TestRuleGraph:
     def test_one_level_of_recursion(self) -> None:
         @rule
         def a_from_b(b: B) -> A:
-            pass
+            return A()
 
         @rule
         def b_from_suba(suba: SubA) -> B:
-            pass
+            return B()
 
         rules = [a_from_b, b_from_suba, QueryRule(A, (SubA,))]
         subgraph = self.create_subgraph(A, rules, SubA())
@@ -736,11 +736,11 @@ class TestRuleGraph:
     def test_noop_removal_in_subgraph(self) -> None:
         @rule
         def a_from_c(c: C) -> A:
-            pass
+            return A()
 
         @rule
         def a() -> A:
-            pass
+            return A()
 
         @rule
         def b_singleton() -> B:
@@ -772,11 +772,11 @@ class TestRuleGraph:
     def test_noop_removal_full_single_subject_type(self) -> None:
         @rule
         def a_from_c(c: C) -> A:
-            pass
+            return A()
 
         @rule
         def a() -> A:
-            pass
+            return A()
 
         rules = [a_from_c, a, QueryRule(A, (SubA,))]
         fullgraph = self.create_full_graph(rules, validate=False)
@@ -804,11 +804,11 @@ class TestRuleGraph:
     def test_root_tuple_removed_when_no_matches(self) -> None:
         @rule
         def a_from_c(c: C) -> A:
-            pass
+            return A()
 
         @rule
         def b_from_d_and_a(d: D, a: A) -> B:
-            pass
+            return B()
 
         rules = [
             a_from_c,
@@ -843,15 +843,15 @@ class TestRuleGraph:
 
         @rule
         def b_from_c(c: C) -> B:
-            pass
+            return B()
 
         @rule
         def a_from_b(b: B) -> A:
-            pass
+            return A()
 
         @rule
         def a() -> A:
-            pass
+            return A()
 
         rules = [
             b_from_c,
@@ -912,15 +912,15 @@ class TestRuleGraph:
     def test_depends_on_multiple_one_noop(self) -> None:
         @rule
         def a_from_c(c: C) -> A:
-            pass
+            return A()
 
         @rule
         def a_from_suba(suba: SubA) -> A:
-            pass
+            return A()
 
         @rule
         def b_from_a(a: A) -> B:
-            pass
+            return B()
 
         rules = [a_from_c, a_from_suba, b_from_a, QueryRule(A, (SubA,))]
         subgraph = self.create_subgraph(B, rules, SubA(), validate=False)
@@ -946,15 +946,15 @@ class TestRuleGraph:
     def test_multiple_depend_on_same_rule(self) -> None:
         @rule
         def a_from_suba(suba: SubA) -> A:
-            pass
+            return A()
 
         @rule
         def b_from_a(a: A) -> B:
-            pass
+            return B()
 
         @rule
         def c_from_a(a: A) -> C:
-            pass
+            return C()
 
         rules = [
             a_from_suba,
@@ -1000,7 +1000,7 @@ class TestRuleGraph:
 
         @rule
         async def b_from_d(d: D) -> B:
-            pass
+            return B()
 
         rules = [a, b_from_d, QueryRule(A, (SubA,))]
         subgraph = self.create_subgraph(A, rules, SubA())
@@ -1078,11 +1078,11 @@ def test_invalid_rule_helper_name() -> None:
 
         @rule_helper
         async def foo() -> A:
-            pass
+            return A()
 
     @rule_helper(_public=True)
     async def bar() -> A:
-        pass
+        return A()
 
 
 def test_cant_be_both_rule_and_rule_helper() -> None:
@@ -1091,14 +1091,14 @@ def test_cant_be_both_rule_and_rule_helper() -> None:
         @rule_helper
         @rule
         async def _func1() -> A:
-            pass
+            return A()
 
     with pytest.raises(ValueError, match="Cannot use both @rule and @rule_helper"):
 
         @rule
         @rule_helper
         async def _func2() -> A:
-            pass
+            return A()
 
 
 def test_synchronous_rule_helper() -> None:
@@ -1106,4 +1106,4 @@ def test_synchronous_rule_helper() -> None:
 
         @rule_helper
         def _foo() -> A:
-            pass
+            return A()

@@ -16,8 +16,9 @@ class DebugPy(PythonToolBase):
     name = options_scope
     help = "An implementation of the Debug Adapter Protocol for Python (https://github.com/microsoft/debugpy)."
 
-    default_version = "debugpy==1.6.0"
+    default_version = "debugpy>=1.6.5,<1.7"
     default_main = EntryPoint("debugpy")
+    default_requirements = [default_version]
 
     register_interpreter_constraints = True
     default_interpreter_constraints = ["CPython>=3.7"]

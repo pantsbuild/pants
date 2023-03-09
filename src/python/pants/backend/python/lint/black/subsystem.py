@@ -51,8 +51,9 @@ class Black(PythonToolBase):
     name = "Black"
     help = "The Black Python code formatter (https://black.readthedocs.io/)."
 
-    default_version = "black==22.6.0"
+    default_version = "black>=22.6.0,<24"
     default_main = ConsoleScript("black")
+    default_requirements = [default_version]
 
     register_interpreter_constraints = True
     default_interpreter_constraints = ["CPython>=3.7,<4"]

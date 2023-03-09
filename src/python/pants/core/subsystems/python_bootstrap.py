@@ -114,7 +114,6 @@ class _SearchPaths:
 async def _expand_interpreter_search_paths(
     request: _ExpandInterpreterSearchPathsRequest, path_env: PathEnvironmentVariable
 ) -> _SearchPaths:
-
     interpreter_search_paths, env_tgt = (request.interpreter_search_paths, request.env_tgt)
 
     asdf_paths = await AsdfToolPathsResult.get_un_cachable_search_paths(

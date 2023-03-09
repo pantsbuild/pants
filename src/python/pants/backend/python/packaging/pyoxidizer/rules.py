@@ -226,7 +226,8 @@ async def run_pyoxidizer_binary(field_set: PyOxidizerFieldSet) -> RunRequest:
             return False
 
         artifact_path = PurePath(artifact_relpath)
-        return artifact_path.parent.name == "install"
+        # COPYING.txt is the default name later versions of pyoxidizer use to write an SBOM.
+        return artifact_path.parent.name == "install" and artifact_path.name != "COPYING.txt"
 
     binary = await Get(BuiltPackage, PackageFieldSet, field_set)
     executable_binaries = [

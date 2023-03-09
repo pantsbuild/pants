@@ -281,8 +281,9 @@ def test_get_all_help_info():
     Bar.register_options_on_scope(options, UnionMembership({}))
 
     @rule
-    def rule_info_test(foo: Foo) -> Target:
+    def rule_info_test(foo: Foo) -> Target:  # type: ignore[empty-body]
         """This rule is for testing info extraction only."""
+        ...
 
     def fake_consumed_scopes_mapper(scope: str) -> Tuple[str, ...]:
         return ("somescope", f"used_by_{scope or 'GLOBAL_SCOPE'}")

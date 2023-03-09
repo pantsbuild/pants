@@ -36,6 +36,7 @@ class HelmKubeParserSubsystem(PythonToolRequirementsBase):
     help = "Analyses K8S manifests rendered by Helm."
 
     default_version = "hikaru==0.11.0b"
+    default_requirements = ["hikaru>=0.11.0b,<1"]
 
     register_interpreter_constraints = True
     default_interpreter_constraints = ["CPython>=3.7,<3.10"]

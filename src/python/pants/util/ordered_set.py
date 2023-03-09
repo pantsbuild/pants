@@ -29,9 +29,7 @@ class _AbstractOrderedSet(AbstractSet[T]):
         # Using a dictionary, rather than using the recipe's original `self |= iterable`, results
         # in a ~20% performance increase for the constructor.
         #
-        # NB: Dictionaries are ordered in Python 3.6+. While this was not formalized until Python
-        # 3.7, Python 3.6 uses this behavior; Pants requires CPython 3.6+ to run, so this
-        # assumption is safe for us to rely on.
+        # NB: Dictionaries are ordered in Python 3.7+.
         self._items: dict[T, None] = {v: None for v in iterable or ()}
 
     def __len__(self) -> int:
@@ -198,7 +196,7 @@ class OrderedSet(_AbstractOrderedSet[T], MutableSet[T]):
             self._items[item] = None
 
 
-class FrozenOrderedSet(_AbstractOrderedSet[T_co], Hashable):
+class FrozenOrderedSet(_AbstractOrderedSet[T_co], Hashable):  # type: ignore[type-var]
     """A frozen (i.e. immutable) set that retains its order.
 
     This is safe to use with the V2 engine.

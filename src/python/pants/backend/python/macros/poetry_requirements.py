@@ -328,7 +328,6 @@ def parse_single_dependency(
     attributes: str | Mapping[str, str | Sequence] | Sequence[Mapping[str, str | Sequence]],
     pyproject_toml: PyProjectToml,
 ) -> Iterator[PipRequirement]:
-
     if isinstance(attributes, str):
         # E.g. `foo = "~1.1~'.
         yield PipRequirement.parse(

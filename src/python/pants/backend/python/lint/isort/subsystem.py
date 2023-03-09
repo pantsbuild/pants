@@ -28,6 +28,7 @@ class Isort(PythonToolBase):
 
     default_version = "isort[pyproject,colors]>=5.9.3,<6.0"
     default_main = ConsoleScript("isort")
+    default_requirements = [default_version]
 
     register_interpreter_constraints = True
     default_interpreter_constraints = ["CPython>=3.7,<4"]
