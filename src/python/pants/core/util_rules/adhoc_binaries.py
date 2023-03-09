@@ -8,6 +8,7 @@ import sys
 from dataclasses import dataclass
 from textwrap import dedent  # noqa: PNT20
 
+from pants.core.subsystems.python_bootstrap import PythonBootstrapSubsystem  # noqa: PNT20
 from pants.core.util_rules.environments import EnvironmentTarget, LocalEnvironmentTarget
 from pants.core.util_rules.system_binaries import SEARCH_PATHS, TarBinary
 from pants.engine.fs import DownloadFile
@@ -39,6 +40,12 @@ class PythonBuildStandaloneBinary:
         return FrozenDict({PythonBuildStandaloneBinary.SYMLINK_DIRNAME: self._digest})
 
 
+# NB: These private types are solely so we can test the docker-path using the local
+# environment.
+class _PythonBuildStandaloneBinary(PythonBuildStandaloneBinary):
+    pass
+
+
 class _DownloadPythonBuildStandaloneBinaryRequest:
     pass
 
@@ -48,44 +55,27 @@ async def get_python_for_scripts(env_tgt: EnvironmentTarget) -> PythonBuildStand
     if env_tgt.val is None or isinstance(env_tgt.val, LocalEnvironmentTarget):
         return PythonBuildStandaloneBinary(sys.executable, EMPTY_DIGEST)
 
-    result = await Get(PythonBuildStandaloneBinary, _DownloadPythonBuildStandaloneBinaryRequest())
+    result = await Get(_PythonBuildStandaloneBinary, _DownloadPythonBuildStandaloneBinaryRequest())
 
-    return result
+    return PythonBuildStandaloneBinary(result.path, result._digest)
 
 
 @rule(desc="Downloading Python for scripts", level=LogLevel.TRACE)
 async def download_python_binary(
-    _: _DownloadPythonBuildStandaloneBinaryRequest, platform: Platform, tar_binary: TarBinary
-) -> PythonBuildStandaloneBinary:
-    url_plat, fingerprint, bytelen = {
-        "linux_arm64": (
-            "aarch64-unknown-linux-gnu",
-            "1ba520c0db431c84305677f56eb9a4254f5097430ed443e92fc8617f8fba973d",
-            23873387,
-        ),
-        "linux_x86_64": (
-            "x86_64-unknown-linux-gnu",
-            "7ba397787932393e65fc2fb9fcfabf54f2bb6751d5da2b45913cb25b2d493758",
-            26129729,
-        ),
-        "macos_arm64": (
-            "aarch64-apple-darwin",
-            "d732d212d42315ac27c6da3e0b69636737a8d72086c980daf844344c010cab80",
-            17084463,
-        ),
-        "macos_x86_64": (
-            "x86_64-apple-darwin",
-            "3948384af5e8d4ee7e5ccc648322b99c1c5cf4979954ed5e6b3382c69d6db71e",
-            17059474,
-        ),
-    }[platform.value]
+    _: _DownloadPythonBuildStandaloneBinaryRequest,
+    platform: Platform,
+    tar_binary: TarBinary,
+    python_bootstrap: PythonBootstrapSubsystem,
+) -> _PythonBuildStandaloneBinary:
+    url, fingerprint, bytelen = python_bootstrap.internal_python_build_standalone_info[
+        platform.value
+    ]
 
-    # NB: This should match the maximum version supported by the Pants package
-    filename = f"cpython-3.9.16+20230116-{url_plat}-install_only.tar.gz"
+    filename = url.rsplit("/", 1)[-1]
     python_archive = await Get(
         Digest,
         DownloadFile(
-            f"https://github.com/indygreg/python-build-standalone/releases/download/20230116/{filename}",
+            url,
             FileDigest(
                 fingerprint=fingerprint,
                 serialized_bytes_length=bytelen,
@@ -105,7 +95,7 @@ async def download_python_binary(
         ),
     )
 
-    return PythonBuildStandaloneBinary(
+    return _PythonBuildStandaloneBinary(
         f"{PythonBuildStandaloneBinary.SYMLINK_DIRNAME}/python/bin/python3", result.output_digest
     )
 

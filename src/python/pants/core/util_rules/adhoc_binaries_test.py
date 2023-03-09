@@ -8,15 +8,14 @@ import pytest
 from pants.build_graph.address import Address
 from pants.core.target_types import FileTarget
 from pants.core.util_rules import adhoc_binaries
-from pants.core.util_rules.environments import (
-    EnvironmentName,
-    EnvironmentTarget,
-    LocalEnvironmentTarget,
+from pants.core.util_rules.adhoc_binaries import (
+    PythonBuildStandaloneBinary,
+    _DownloadPythonBuildStandaloneBinaryRequest,
+    _PythonBuildStandaloneBinary,
 )
-from pants.engine.platform import Platform
+from pants.core.util_rules.environments import EnvironmentTarget, LocalEnvironmentTarget
+from pants.engine.internals.native_engine import EMPTY_DIGEST
 from pants.testutil.rule_runner import MockGet, QueryRule, RuleRunner, run_rule_with_mocks
-
-SENTINEL = object()
 
 
 @pytest.fixture
@@ -25,15 +24,12 @@ def rule_runner() -> RuleRunner:
         rules=[
             *adhoc_binaries.rules(),
             QueryRule(
-                adhoc_binaries.PythonBuildStandaloneBinary,
-                [EnvironmentName, adhoc_binaries._DownloadPythonBuildStandaloneBinaryRequest],
+                _PythonBuildStandaloneBinary,
+                [_DownloadPythonBuildStandaloneBinaryRequest],
             ),
         ],
         target_types=[LocalEnvironmentTarget, FileTarget],
     )
-
-
-PLATFORM = Platform.linux_x86_64
 
 
 @pytest.mark.parametrize("env_tgt", [None, LocalEnvironmentTarget({}, address=Address(""))])
@@ -43,13 +39,13 @@ def test_local(env_tgt) -> None:
         rule_args=[EnvironmentTarget(env_tgt)],
         mock_gets=[
             MockGet(
-                output_type=adhoc_binaries.PythonBuildStandaloneBinary,
-                input_types=(adhoc_binaries._DownloadPythonBuildStandaloneBinaryRequest,),
+                output_type=_PythonBuildStandaloneBinary,
+                input_types=(_DownloadPythonBuildStandaloneBinaryRequest,),
                 mock=lambda _: pytest.fail(),
             )
         ],
     )
-    assert result.path == sys.executable
+    assert result == adhoc_binaries.PythonBuildStandaloneBinary(sys.executable, EMPTY_DIGEST)
 
 
 def test_docker_uses_helper() -> None:
@@ -58,13 +54,13 @@ def test_docker_uses_helper() -> None:
         rule_args=[EnvironmentTarget(FileTarget({"source": ""}, address=Address("")))],
         mock_gets=[
             MockGet(
-                output_type=adhoc_binaries.PythonBuildStandaloneBinary,
-                input_types=(adhoc_binaries._DownloadPythonBuildStandaloneBinaryRequest,),
-                mock=lambda _: SENTINEL,
+                output_type=_PythonBuildStandaloneBinary,
+                input_types=(_DownloadPythonBuildStandaloneBinaryRequest,),
+                mock=lambda _: _PythonBuildStandaloneBinary("", EMPTY_DIGEST),
             )
         ],
     )
-    assert result is SENTINEL
+    assert result == PythonBuildStandaloneBinary("", EMPTY_DIGEST)
 
 
 def test_docker_helper(rule_runner):
@@ -75,7 +71,8 @@ def test_docker_helper(rule_runner):
     )
     rule_runner.set_options(["--environments-preview-names={'local': '//:local'}"])
     pbs = rule_runner.request(
-        adhoc_binaries.PythonBuildStandaloneBinary,
-        [adhoc_binaries._DownloadPythonBuildStandaloneBinaryRequest()],
+        _PythonBuildStandaloneBinary,
+        [_DownloadPythonBuildStandaloneBinaryRequest()],
     )
-    assert pbs.path == None
+    assert not pbs.path.startswith("/")
+    assert pbs._digest is not None
