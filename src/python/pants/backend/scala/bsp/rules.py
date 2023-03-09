@@ -213,7 +213,10 @@ async def bsp_resolve_scala_metadata(
     jdk_requests = [JdkRequest.from_field(version) for version in jdk_versions]
     jdk_request = max(jdk_requests, key=_jdk_request_sort_key(jvm))
 
-    jdk, readlink, = await MultiGet(
+    (
+        jdk,
+        readlink,
+    ) = await MultiGet(
         Get(JdkEnvironment, JdkRequest, jdk_request),
         Get(ReadlinkBinary, ReadlinkBinaryRequest()),
     )

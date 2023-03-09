@@ -45,6 +45,7 @@ class Pydocstyle(PythonToolBase):
 
     default_version = "pydocstyle[toml]>=6.1.1,<7.0"
     default_main = ConsoleScript("pydocstyle")
+    default_requirements = [default_version]
 
     register_interpreter_constraints = True
     default_interpreter_constraints = ["CPython>=3.7,<4"]
@@ -119,10 +120,10 @@ async def setup_pydocstyle_lockfile(
     _: PydocstyleLockfileSentinel, pydocstyle: Pydocstyle, python_setup: PythonSetup
 ) -> GeneratePythonLockfile:
     if not pydocstyle.uses_custom_lockfile:
-        return GeneratePythonLockfile.from_tool(pydocstyle)
+        return pydocstyle.to_lockfile_request()
 
     constraints = await _find_all_unique_interpreter_constraints(python_setup, PydocstyleFieldSet)
-    return GeneratePythonLockfile.from_tool(pydocstyle, constraints)
+    return pydocstyle.to_lockfile_request(constraints)
 
 
 class PydocstyleExportSentinel(ExportPythonToolSentinel):

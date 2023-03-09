@@ -148,7 +148,6 @@ async def merge_extra_sandbox_contents(request: MergeExtraSandboxContents) -> Ex
 
 @rule
 async def add_extra_contents_to_prcess(request: AddExtraSandboxContentsToProcess) -> Process:
-
     proc = request.process
     extras = request.contents
     new_digest = await Get(
@@ -182,7 +181,6 @@ async def add_extra_contents_to_prcess(request: AddExtraSandboxContentsToProcess
 async def _resolve_runnable_dependencies(
     bash: BashBinary, deps: tuple[str, ...] | None, owning: Address, origin: str
 ) -> tuple[Digest, RunnableDependencies | None]:
-
     if not deps:
         return EMPTY_DIGEST, None
 
@@ -263,7 +261,6 @@ async def resolve_execution_environment(
     request: ResolveExecutionDependenciesRequest,
     bash: BashBinary,
 ) -> ResolvedExecutionDependencies:
-
     target_address = request.address
     raw_execution_dependencies = request.execution_dependencies
     raw_regular_dependencies = request.dependencies
@@ -472,7 +469,6 @@ async def prepare_adhoc_process(
 
 
 def _output_at_build_root(process: Process, bash: BashBinary) -> Process:
-
     working_directory = process.working_directory or ""
 
     output_directories = process.output_directories

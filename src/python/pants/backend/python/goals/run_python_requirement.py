@@ -90,7 +90,6 @@ def _invert_module_mapping(
 async def _resolve_entry_point(
     module_mapping: InvertedModuleMapping, field_set: PythonRequirementFieldSet
 ) -> EntryPoint:
-
     modules = field_set.modules.value
     reqs = field_set.requirements.value
     entry_point_raw = field_set.entry_point.value
@@ -133,7 +132,6 @@ async def create_python_requirement_run_request(
     python_setup: PythonSetup,
     module_mapping: ThirdPartyPythonModuleMapping,
 ) -> RunRequest:
-
     addresses = [field_set.address]
 
     resolve = field_set.resolve.value

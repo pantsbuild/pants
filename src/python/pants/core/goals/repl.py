@@ -104,7 +104,6 @@ async def run_repl(
     union_membership: UnionMembership,
     complete_env: CompleteEnvironmentVars,
 ) -> Repl:
-
     await _warn_on_non_local_environments(specified_targets, "the `repl` goal")
 
     # TODO: When we support multiple languages, detect the default repl to use based

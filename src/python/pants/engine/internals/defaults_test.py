@@ -247,7 +247,7 @@ def test_set_defaults(
     registered_target_types: RegisteredTargetTypes,
     union_membership: UnionMembership,
 ) -> None:
-    with (scenario.expected_error or no_exception()):
+    with scenario.expected_error or no_exception():
         defaults = BuildFileDefaultsParserState.create(
             scenario.path,
             BuildFileDefaults(

@@ -236,7 +236,6 @@ async def _interactive_shell_command(
     shell_command: Target,
     bash: BashBinary,
 ) -> Process:
-
     description = f"the `{shell_command.alias}` at `{shell_command.address}`"
     shell_name = shell_command.address.spec
     working_directory = shell_command[RunShellCommandWorkdirField].value

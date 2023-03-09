@@ -8,10 +8,8 @@ import os.path
 from collections import defaultdict
 from dataclasses import dataclass
 from operator import itemgetter
-from typing import Iterable
 
 from pants.backend.python.pip_requirement import PipRequirement
-from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import PythonRequirementResolveField, PythonRequirementsField
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
@@ -53,39 +51,6 @@ from pants.util.ordered_set import FrozenOrderedSet
 class GeneratePythonLockfile(GenerateLockfile):
     requirements: FrozenOrderedSet[str]
     interpreter_constraints: InterpreterConstraints
-
-    @classmethod
-    def from_tool(
-        cls,
-        subsystem: PythonToolRequirementsBase,
-        interpreter_constraints: InterpreterConstraints | None = None,
-        extra_requirements: Iterable[str] = (),
-    ) -> GeneratePythonLockfile:
-        """Create a request for a dedicated lockfile for the tool.
-
-        If the tool determines its interpreter constraints by using the constraints of user code,
-        rather than the option `--interpreter-constraints`, you must pass the arg
-        `interpreter_constraints`.
-        """
-        if not subsystem.uses_custom_lockfile:
-            return cls(
-                requirements=FrozenOrderedSet(),
-                interpreter_constraints=InterpreterConstraints(),
-                resolve_name=subsystem.options_scope,
-                lockfile_dest=subsystem.lockfile,
-                diff=False,
-            )
-        return cls(
-            requirements=FrozenOrderedSet((*subsystem.all_requirements, *extra_requirements)),
-            interpreter_constraints=(
-                interpreter_constraints
-                if interpreter_constraints is not None
-                else subsystem.interpreter_constraints
-            ),
-            resolve_name=subsystem.options_scope,
-            lockfile_dest=subsystem.lockfile,
-            diff=False,
-        )
 
     @property
     def requirements_hex_digest(self) -> str:

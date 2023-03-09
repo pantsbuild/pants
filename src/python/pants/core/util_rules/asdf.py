@@ -69,7 +69,6 @@ class AsdfToolPathsResult:
         paths_option_name: str,
         bin_relpath: str = "bin",
     ) -> AsdfToolPathsResult:
-
         resolve_standard, resolve_local = AsdfPathString.contains_strings(search_paths)
 
         if resolve_standard or resolve_local:
@@ -99,7 +98,6 @@ async def _resolve_asdf_tool_paths(
     env: EnvironmentVars,
     local: bool,
 ) -> tuple[str, ...]:
-
     if not (isinstance(env_tgt.val, LocalEnvironmentTarget) or env_tgt.val is None):
         return ()
 

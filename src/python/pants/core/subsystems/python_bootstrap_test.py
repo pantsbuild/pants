@@ -165,7 +165,6 @@ def test_expand_interpreter_search_paths(rule_runner: RuleRunner) -> None:
             expected_pyenv_paths,
             expected_pyenv_local_paths,
         ):
-
             rule_runner.set_session_values(
                 {
                     CompleteEnvironmentVars: CompleteEnvironmentVars(

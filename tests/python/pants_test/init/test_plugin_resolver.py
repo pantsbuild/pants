@@ -258,7 +258,6 @@ def _do_test_exact_requirements(rule_runner: RuleRunner, sdist: bool) -> None:
         with plugin_resolution(
             rule_runner, chroot=chroot, plugins=[Plugin("jake", "1.2.3"), Plugin("jane", "3.4.5")]
         ) as results2:
-
             working_set2, _, _ = results2
 
             assert list(working_set) == list(working_set2)
@@ -302,7 +301,6 @@ def _do_test_exact_requirements_interpreter_change(rule_runner: RuleRunner, sdis
         plugins=[Plugin("jake", "1.2.3"), Plugin("jane", "3.4.5")],
         sdist=sdist,
     ) as results:
-
         working_set, chroot, repo_dir = results
 
         safe_rmtree(repo_dir)
@@ -330,6 +328,5 @@ def _do_test_exact_requirements_interpreter_change(rule_runner: RuleRunner, sdis
             chroot=chroot,
             plugins=[Plugin("jake", "1.2.3"), Plugin("jane", "3.4.5")],
         ) as results2:
-
             working_set2, _, _ = results2
             assert list(working_set) == list(working_set2)

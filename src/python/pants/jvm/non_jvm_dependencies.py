@@ -46,7 +46,6 @@ class NoopClasspathEntryRequest(ClasspathEntryRequest):
 async def noop_classpath_entry(
     request: NoopClasspathEntryRequest,
 ) -> FallibleClasspathEntry:
-
     return FallibleClasspathEntry(
         f"Empty classpath for no-op classpath target {request.component}",
         CompileResult.SUCCEEDED,

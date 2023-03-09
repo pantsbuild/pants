@@ -303,7 +303,6 @@ class JvmArtifactResolveField(JvmResolveField):
 
 @dataclass(frozen=True)
 class JvmArtifactFieldSet(JvmRunnableSourceFieldSet):
-
     group: JvmArtifactGroupField
     artifact: JvmArtifactArtifactField
     version: JvmArtifactVersionField
@@ -414,7 +413,7 @@ class JvmShadingRule(ABC):
         return set(errors)
 
     def __repr__(self) -> str:
-        fields = [f"{fld.name}={repr(getattr(self, fld.name))}" for fld in dataclasses.fields(self)]
+        fields = [f"{fld.name}={repr(getattr(self, fld.name))}" for fld in dataclasses.fields(self)]  # type: ignore[arg-type]
         return f"{self.alias}({', '.join(fields)})"
 
 

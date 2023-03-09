@@ -414,7 +414,7 @@ async def _warn_on_non_local_environments(specified_targets: Iterable[Target], s
         if env_tgt.val is not None and not isinstance(env_tgt.val, LocalEnvironmentTarget)
     ]
 
-    for (env_name, tgts, env_tgt) in error_cases:
+    for env_name, tgts, env_tgt in error_cases:
         # "Blah was called with target `//foo` which specifies…"
         # "Blah was called with targets `//foo`, `//bar` which specify…"
         # "Blah was called with targets including `//foo`, `//bar`, `//baz` (and others) which specify…"
