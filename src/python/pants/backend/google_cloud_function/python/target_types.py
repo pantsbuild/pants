@@ -34,7 +34,6 @@ from pants.engine.target import (
     InferredDependencies,
     InvalidFieldException,
     InvalidTargetException,
-    SecondaryOwnerMixin,
     StringField,
     Target,
 )
@@ -45,7 +44,7 @@ from pants.util.docutil import doc_url
 from pants.util.strutil import help_text
 
 
-class PythonGoogleCloudFunctionHandlerField(StringField, AsyncFieldMixin, SecondaryOwnerMixin):
+class PythonGoogleCloudFunctionHandlerField(StringField, AsyncFieldMixin):
     alias = "handler"
     required = True
     value: str

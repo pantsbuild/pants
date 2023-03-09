@@ -8,7 +8,7 @@ import os.path
 from dataclasses import dataclass
 from pathlib import PurePath
 from textwrap import dedent
-from typing import Iterable, List, Set, Tuple, Type, cast
+from typing import Iterable, List, Set, Tuple, Type
 
 import pytest
 
@@ -53,7 +53,6 @@ from pants.engine.target import (
     InvalidFieldException,
     MultipleSourcesField,
     OverridesField,
-    SecondaryOwnerMixin,
     SingleSourceField,
     SourcesPaths,
     SourcesPathsRequest,
@@ -67,7 +66,6 @@ from pants.engine.target import (
     TransitiveTargetsRequest,
 )
 from pants.engine.unions import UnionMembership, UnionRule
-from pants.source.filespec import Filespec
 from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error
 from pants.util.ordered_set import FrozenOrderedSet
 
@@ -684,20 +682,6 @@ def test_find_all_targets(transitive_targets_rule_runner: RuleRunner) -> None:
     assert {t.address for t in all_unexpanded} == {*expected, Address("", target_name="generator")}
 
 
-class MockSecondaryOwnerField(StringField, AsyncFieldMixin, SecondaryOwnerMixin):
-    alias = "secondary_owner_field"
-    required = True
-
-    @property
-    def filespec(self) -> Filespec:
-        return {"includes": [os.path.join(self.address.spec_path, cast(str, self.value))]}
-
-
-class MockSecondaryOwnerTarget(Target):
-    alias = "secondary_owner"
-    core_fields = (MockSecondaryOwnerField,)
-
-
 @pytest.fixture
 def owners_rule_runner() -> RuleRunner:
     return RuleRunner(
@@ -708,7 +692,6 @@ def owners_rule_runner() -> RuleRunner:
             MockTarget,
             MockTargetGenerator,
             MockGeneratedTarget,
-            MockSecondaryOwnerTarget,
         ],
         # NB: The `graph` module masks the environment is most/all positions. We disable the
         # inherent environment so that the positions which do require the environment are
