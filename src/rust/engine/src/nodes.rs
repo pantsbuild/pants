@@ -32,7 +32,8 @@ use fs::{
   RelativePath, StrictGlobMatching, SymlinkBehavior, SymlinkEntry, Vfs,
 };
 use process_execution::{
-  self, CacheName, InputDigests, Process, ProcessCacheScope, ProcessResultSource,
+  self, CacheName, InputDigests, Process, ProcessCacheScope, ProcessExecutionStrategy,
+  ProcessResultSource,
 };
 
 use crate::externs::engine_aware::{EngineAwareParameter, EngineAwareReturnType};
@@ -330,7 +331,7 @@ impl ExecuteProcess {
   fn lift_process_fields(
     value: &PyAny,
     input_digests: InputDigests,
-    process_config: externs::process::PyProcessConfigFromEnvironment,
+    process_config: externs::process::PyProcessExecutionEnvironment,
   ) -> Result<Process, StoreError> {
     let env = externs::getattr_from_str_frozendict(value, "env");
 
@@ -402,19 +403,18 @@ impl ExecuteProcess {
       level,
       append_only_caches,
       jdk_home,
-      platform: process_config.platform,
       execution_slot_variable,
       concurrency_available,
       cache_scope,
-      execution_strategy: process_config.execution_strategy,
-      remote_cache_speculation_delay: remote_cache_speculation_delay,
+      execution_environment: process_config.environment,
+      remote_cache_speculation_delay,
     })
   }
 
   pub async fn lift(
     store: &Store,
     value: Value,
-    process_config: externs::process::PyProcessConfigFromEnvironment,
+    process_config: externs::process::PyProcessExecutionEnvironment,
   ) -> Result<Self, StoreError> {
     let input_digests = Self::lift_process_input_digests(store, &value).await?;
     let process = Python::with_gil(|py| {
@@ -459,24 +459,47 @@ impl ExecuteProcess {
       .map_err(|e| throw(format!("Failed to serialize process: {e}")))?;
     workunit.update_metadata(|initial| {
       initial.map(|(initial, level)| {
+        let mut user_metadata = Vec::with_capacity(7);
+        user_metadata.push((
+          "definition".to_string(),
+          UserMetadataItem::String(definition),
+        ));
+        user_metadata.push((
+          "source".to_string(),
+          UserMetadataItem::String(format!("{:?}", res.metadata.source)),
+        ));
+        user_metadata.push((
+          "exit_code".to_string(),
+          UserMetadataItem::Int(res.exit_code as i64),
+        ));
+        user_metadata.push((
+          "environment_type".to_string(),
+          UserMetadataItem::String(res.metadata.environment.strategy.strategy_type().to_owned()),
+        ));
+        if let Some(environment_name) = res.metadata.environment.name.clone() {
+          user_metadata.push((
+            "environment_name".to_string(),
+            UserMetadataItem::String(environment_name),
+          ));
+        }
+        if let Some(total_elapsed) = res.metadata.total_elapsed {
+          user_metadata.push((
+            "total_elapsed_ms".to_string(),
+            UserMetadataItem::Int(Duration::from(total_elapsed).as_millis() as i64),
+          ));
+        }
+        if let Some(saved_by_cache) = res.metadata.saved_by_cache {
+          user_metadata.push((
+            "saved_by_cache_ms".to_string(),
+            UserMetadataItem::Int(Duration::from(saved_by_cache).as_millis() as i64),
+          ));
+        }
+
         (
           WorkunitMetadata {
             stdout: Some(res.stdout_digest),
             stderr: Some(res.stderr_digest),
-            user_metadata: vec![
-              (
-                "definition".to_string(),
-                UserMetadataItem::String(definition),
-              ),
-              (
-                "source".to_string(),
-                UserMetadataItem::String(format!("{:?}", res.metadata.source)),
-              ),
-              (
-                "exit_code".to_string(),
-                UserMetadataItem::Int(res.exit_code as i64),
-              ),
-            ],
+            user_metadata,
             ..initial
           },
           level,
@@ -485,15 +508,15 @@ impl ExecuteProcess {
     });
     if let Some(total_elapsed) = res.metadata.total_elapsed {
       let total_elapsed = Duration::from(total_elapsed).as_millis() as u64;
-      match res.metadata.source {
-        ProcessResultSource::RanLocally => {
+      match (res.metadata.source, &res.metadata.environment.strategy) {
+        (ProcessResultSource::Ran, ProcessExecutionStrategy::Local) => {
           workunit.increment_counter(Metric::LocalProcessTotalTimeRunMs, total_elapsed);
           context
             .session
             .workunit_store()
             .record_observation(ObservationMetric::LocalProcessTimeRunMs, total_elapsed);
         }
-        ProcessResultSource::RanRemotely => {
+        (ProcessResultSource::Ran, ProcessExecutionStrategy::RemoteExecution { .. }) => {
           workunit.increment_counter(Metric::RemoteProcessTotalTimeRunMs, total_elapsed);
           context
             .session

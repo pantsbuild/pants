@@ -42,7 +42,7 @@ from pants.engine.environment import EnvironmentName
 from pants.engine.fs import Digest, PathGlobs, PathGlobsAndRoot, Snapshot, Workspace
 from pants.engine.goal import Goal
 from pants.engine.internals import native_engine
-from pants.engine.internals.native_engine import ProcessConfigFromEnvironment, PyExecutor
+from pants.engine.internals.native_engine import ProcessExecutionEnvironment, PyExecutor
 from pants.engine.internals.scheduler import ExecutionError, Scheduler, SchedulerSession
 from pants.engine.internals.selectors import Effect, Get, Params
 from pants.engine.internals.session import SessionValues
@@ -589,7 +589,8 @@ class RuleRunner:
             return native_engine.session_run_interactive_process(
                 self.scheduler.py_session,
                 request,
-                ProcessConfigFromEnvironment(
+                ProcessExecutionEnvironment(
+                    environment_name=None,
                     platform=Platform.create_for_localhost().value,
                     docker_image=None,
                     remote_execution=False,

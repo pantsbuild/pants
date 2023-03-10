@@ -251,7 +251,10 @@ impl Core {
       exec_strategy_opts.local_keep_sandboxes,
     )?);
     let runner = Box::new(SwitchedCommandRunner::new(docker_runner, runner, |req| {
-      matches!(req.execution_strategy, ProcessExecutionStrategy::Docker(_))
+      matches!(
+        req.execution_environment.strategy,
+        ProcessExecutionStrategy::Docker(_)
+      )
     }));
 
     let mut runner: Box<dyn CommandRunner> = Box::new(bounded::CommandRunner::new(
@@ -289,7 +292,7 @@ impl Core {
         runner,
         |req| {
           matches!(
-            req.execution_strategy,
+            req.execution_environment.strategy,
             ProcessExecutionStrategy::RemoteExecution(_)
           )
         },

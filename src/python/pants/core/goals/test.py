@@ -934,7 +934,7 @@ async def run_tests(
 
 _SOURCE_MAP = {
     ProcessResultMetadata.Source.MEMOIZED: "memoized",
-    ProcessResultMetadata.Source.RAN_REMOTELY: "ran remotely",
+    ProcessResultMetadata.Source.RAN: "ran",
     ProcessResultMetadata.Source.HIT_LOCALLY: "cached locally",
     ProcessResultMetadata.Source.HIT_REMOTELY: "cached remotely",
 }
@@ -952,8 +952,19 @@ def _format_test_summary(result: TestResult, run_id: RunId, console: Console) ->
         sigil = console.sigil_failed()
         status = "failed"
 
-    source = _SOURCE_MAP.get(result.result_metadata.source(run_id))
-    source_print = f" ({source})" if source else ""
+    environment = result.result_metadata.execution_environment.name
+    environment_type = result.result_metadata.execution_environment.environment_type
+    source = result.result_metadata.source(run_id)
+    source_str = _SOURCE_MAP[source]
+    if environment:
+        preposition = "in" if source == ProcessResultMetadata.Source.RAN else "for"
+        source_desc = (
+            f" ({source_str} {preposition} {environment_type} environment `{environment}`)"
+        )
+    elif source == ProcessResultMetadata.Source.RAN:
+        source_desc = ""
+    else:
+        source_desc = f" ({source_str})"
 
     elapsed_print = ""
     total_elapsed_ms = result.result_metadata.total_elapsed_ms
@@ -961,7 +972,7 @@ def _format_test_summary(result: TestResult, run_id: RunId, console: Console) ->
         elapsed_secs = total_elapsed_ms / 1000
         elapsed_print = f"in {elapsed_secs:.2f}s"
 
-    suffix = f" {elapsed_print}{source_print}"
+    suffix = f" {elapsed_print}{source_desc}"
     return f"{sigil} {result.description} {status}{suffix}."
 
 

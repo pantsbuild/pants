@@ -128,7 +128,8 @@ def test_get_pyenv_paths(rule_runner: RuleRunner) -> None:
         rule_runner.set_session_values(
             {CompleteEnvironmentVars: CompleteEnvironmentVars({"PYENV_ROOT": pyenv_root})}
         )
-        tgt = EnvironmentTarget(LocalEnvironmentTarget({}, Address("flem")))
+        env_name = "name"
+        tgt = EnvironmentTarget(env_name, LocalEnvironmentTarget({}, Address("flem")))
         paths = rule_runner.request(
             _SearchPaths,
             [_PyEnvPathsRequest(tgt, False)],
@@ -162,6 +163,7 @@ def test_expand_interpreter_search_paths(rule_runner: RuleRunner) -> None:
             ),
         }
     )
+    env_name = "name"
     with setup_pexrc_with_pex_python_path(["/pexrc/path1:/pexrc/path2"]):
         with fake_asdf_root(
             all_python_versions, asdf_home_versions, asdf_local_versions, tool_name="python"
@@ -208,7 +210,7 @@ def test_expand_interpreter_search_paths(rule_runner: RuleRunner) -> None:
                 [
                     _ExpandInterpreterSearchPathsRequest(
                         paths,
-                        EnvironmentTarget(LocalEnvironmentTarget({}, Address("flem"))),
+                        EnvironmentTarget(env_name, LocalEnvironmentTarget({}, Address("flem"))),
                     )
                 ],
             )
@@ -295,7 +297,8 @@ def test_preprocessed_interpreter_search_paths(
             DockerImageField.alias: "my_img",
         }
 
-    env_tgt = EnvironmentTarget(env_tgt_type(extra_kwargs, address=Address("flem")))
+    env_name = "name"
+    env_tgt = EnvironmentTarget(env_name, env_tgt_type(extra_kwargs, address=Address("flem")))
     if expected is not ValueError:
         assert expected == _preprocessed_interpreter_search_paths(env_tgt, search_paths, is_default)
     else:
