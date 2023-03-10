@@ -209,7 +209,6 @@ _e = lambda path, env: make_target(path, path, env)
 def test_warnings_for_non_local_target_environments(
     targets: Iterable[Target], err_present: Iterable[str], err_absent: Iterable[str]
 ) -> None:
-
     rule_runner = RuleRunner(
         rules=[
             UnionRule(ExportRequest, MockExportRequest),

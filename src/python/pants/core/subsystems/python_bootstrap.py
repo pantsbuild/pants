@@ -113,7 +113,6 @@ class _SearchPaths:
 async def _expand_interpreter_search_paths(
     request: _ExpandInterpreterSearchPathsRequest,
 ) -> _SearchPaths:
-
     interpreter_search_paths, env_tgt = (request.interpreter_search_paths, request.env_tgt)
 
     env = await Get(EnvironmentVars, EnvironmentVarsRequest(("PATH",)))
@@ -327,7 +326,6 @@ def _preprocessed_interpreter_search_paths(
 async def python_bootstrap(
     python_bootstrap_subsystem: PythonBootstrapSubsystem.EnvironmentAware,
 ) -> PythonBootstrap:
-
     interpreter_search_paths = _preprocessed_interpreter_search_paths(
         python_bootstrap_subsystem.env_tgt,
         python_bootstrap_subsystem.search_path,

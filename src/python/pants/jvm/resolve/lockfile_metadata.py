@@ -31,7 +31,6 @@ class LockfileContext(Enum):
 
 @dataclass(frozen=True)
 class JVMLockfileMetadata(LockfileMetadata):
-
     scope = LockfileScope.JVM
 
     @staticmethod

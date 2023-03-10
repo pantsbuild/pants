@@ -98,7 +98,6 @@ def test_deprecation_and_ignore_warnings(use_pantsd: bool) -> None:
 
 
 def test_pants_symlink_workdirs(tmp_path: Path) -> None:
-
     symlink_workdir = tmp_path / ".pants.d"
     physical_workdir_base = tmp_path / "workdirs"
     physical_workdir = physical_workdir_base / safe_filename_from_path(symlink_workdir.as_posix())

@@ -115,8 +115,9 @@ class CoverageSubsystem(PythonToolBase):
     options_scope = "coverage-py"
     help = "Configuration for Python test coverage measurement."
 
-    default_version = "coverage[toml]>=6.5,<6.6"
+    default_version = "coverage[toml]>=6.5,<8"
     default_main = ConsoleScript("coverage")
+    default_requirements = [default_version]
 
     register_interpreter_constraints = True
     default_interpreter_constraints = ["CPython>=3.7,<4"]

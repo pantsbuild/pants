@@ -97,7 +97,7 @@ class UnaddressableObjectError(MappingError):
 
 
 class ParseState(threading.local):
-    def __init__(self):
+    def __init__(self) -> None:
         self._defaults: BuildFileDefaultsParserState | None = None
         self._dependents_rules: BuildFileDependencyRulesParserState | None = None
         self._dependencies_rules: BuildFileDependencyRulesParserState | None = None

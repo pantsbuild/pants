@@ -27,7 +27,6 @@ class GoBootstrap:
 async def _go_search_paths(
     env_tgt: EnvironmentTarget, golang_subsystem: GolangSubsystem, paths: Iterable[str]
 ) -> tuple[str, ...]:
-
     resolve_standard, resolve_local = "<ASDF>" in paths, "<ASDF_LOCAL>" in paths
 
     if resolve_standard or resolve_local:
@@ -113,7 +112,6 @@ def _error_if_not_compatible_with_asdf(
 async def resolve_go_bootstrap(
     golang_subsystem: GolangSubsystem, golang_env_aware: GolangSubsystem.EnvironmentAware
 ) -> GoBootstrap:
-
     _error_if_not_compatible_with_asdf(
         golang_env_aware.env_tgt, golang_env_aware.raw_go_search_paths
     )

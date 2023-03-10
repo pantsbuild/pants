@@ -164,7 +164,10 @@ async def analyze_kotlin_source_dependencies(
     parser_lockfile_request = await Get(
         GenerateJvmLockfileFromTool, KotlinParserToolLockfileSentinel()
     )
-    (tool_classpath, prefixed_source_files_digest,) = await MultiGet(
+    (
+        tool_classpath,
+        prefixed_source_files_digest,
+    ) = await MultiGet(
         Get(
             ToolClasspath,
             ToolClasspathRequest(lockfile=parser_lockfile_request),

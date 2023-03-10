@@ -9,7 +9,7 @@
 //     "CPython<3.12,>=3.7"
 //   ],
 //   "generated_with_requirements": [
-//     "lambdex==0.1.9"
+//     "lambdex>=0.1.9"
 //   ],
 //   "manylinux": "manylinux2014",
 //   "requirement_constraints": [],
@@ -79,7 +79,7 @@
   "pip_version": "23.0.1",
   "prefer_older_binary": false,
   "requirements": [
-    "lambdex==0.1.9"
+    "lambdex>=0.1.9"
   ],
   "requires_python": [
     "<3.12,>=3.7"

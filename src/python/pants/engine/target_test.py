@@ -735,15 +735,15 @@ def test_string_field_valid_choices() -> None:
 
 @pytest.mark.parametrize("field_cls", [IntField, FloatField])
 def test_int_float_fields_valid_numbers(field_cls: type) -> None:
-    class AllNums(field_cls):  # type: ignore[valid-type,misc]
+    class AllNums(field_cls):
         alias = "all_nums"
         valid_numbers = ValidNumbers.all
 
-    class PositiveAndZero(field_cls):  # type: ignore[valid-type,misc]
+    class PositiveAndZero(field_cls):
         alias = "positive_and_zero"
         valid_numbers = ValidNumbers.positive_and_zero
 
-    class PositiveOnly(field_cls):  # type: ignore[valid-type,misc]
+    class PositiveOnly(field_cls):
         alias = "positive_only"
         valid_numbers = ValidNumbers.positive_only
 

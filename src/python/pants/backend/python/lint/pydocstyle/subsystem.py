@@ -45,6 +45,7 @@ class Pydocstyle(PythonToolBase):
 
     default_version = "pydocstyle[toml]>=6.1.1,<7.0"
     default_main = ConsoleScript("pydocstyle")
+    default_requirements = [default_version]
 
     register_interpreter_constraints = True
     default_interpreter_constraints = ["CPython>=3.7,<4"]

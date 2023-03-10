@@ -26,7 +26,7 @@ class TwineSubsystem(PythonToolBase):
     name = "Twine"
     help = "The utility for publishing Python distributions to PyPI and other Python repositories."
 
-    default_version = "twine>=3.7.1,<3.8"
+    default_version = "twine>=4,<5"
     default_main = ConsoleScript("twine")
 
     # This explicit dependency resolves a weird behavior in poetry, where it would include a sys
@@ -34,6 +34,7 @@ class TwineSubsystem(PythonToolBase):
     # requirements.
     # See: https://github.com/pantsbuild/pants/pull/13594#issuecomment-968154931
     default_extra_requirements = ["colorama>=0.4.3"]
+    default_requirements = ["twine>=3.7.1,<5", *default_extra_requirements]
 
     register_interpreter_constraints = True
     default_interpreter_constraints = ["CPython>=3.7,<4"]
