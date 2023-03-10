@@ -297,7 +297,8 @@ def test_preprocessed_interpreter_search_paths(
             DockerImageField.alias: "my_img",
         }
 
-    env_tgt = EnvironmentTarget(env_tgt_type(extra_kwargs, address=Address("flem")))
+    env_name = "name"
+    env_tgt = EnvironmentTarget(env_name, env_tgt_type(extra_kwargs, address=Address("flem")))
     if expected is not ValueError:
         assert expected == _preprocessed_interpreter_search_paths(env_tgt, search_paths, is_default)
     else:
