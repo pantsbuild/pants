@@ -175,6 +175,14 @@ impl TryFrom<&str> for Fingerprint {
   }
 }
 
+#[derive(Eq, PartialEq, Ord, PartialOrd)]
+pub struct AgedFingerprint {
+  // expired_seconds_ago must be the first field for the Ord implementation.
+  pub expired_seconds_ago: u64,
+  pub fingerprint: Fingerprint,
+  pub size_bytes: usize,
+}
+
 ///
 /// A Digest is a fingerprint, as well as the size in bytes of the plaintext for which that is the
 /// fingerprint.

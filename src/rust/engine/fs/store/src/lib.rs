@@ -1065,12 +1065,12 @@ impl Store {
     Ok(())
   }
 
-  pub fn garbage_collect(
+  pub async fn garbage_collect(
     &self,
     target_size_bytes: usize,
     shrink_behavior: ShrinkBehavior,
   ) -> Result<(), String> {
-    match self.local.shrink(target_size_bytes, shrink_behavior) {
+    match self.local.shrink(target_size_bytes, shrink_behavior).await {
       Ok(size) => {
         if size > target_size_bytes {
           log::warn!(
@@ -1558,8 +1558,8 @@ impl Store {
     res.boxed()
   }
 
-  pub fn all_local_digests(&self, entry_type: EntryType) -> Result<Vec<Digest>, String> {
-    self.local.all_digests(entry_type)
+  pub async fn all_local_digests(&self, entry_type: EntryType) -> Result<Vec<Digest>, String> {
+    self.local.all_digests(entry_type).await
   }
 }
 

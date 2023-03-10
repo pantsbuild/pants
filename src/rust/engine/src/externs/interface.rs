@@ -1453,9 +1453,11 @@ fn garbage_collect_store(
   let core = &py_scheduler.0.core;
   core.executor.enter(|| {
     py.allow_threads(|| {
-      core
-        .store()
-        .garbage_collect(target_size_bytes, store::ShrinkBehavior::Fast)
+      core.executor.block_on(
+        core
+          .store()
+          .garbage_collect(target_size_bytes, store::ShrinkBehavior::Fast),
+      )
     })
     .map_err(PyException::new_err)
   })

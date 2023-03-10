@@ -6,16 +6,17 @@ use std::collections::{BinaryHeap, HashSet};
 use std::fmt::Debug;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use std::time::{self, Duration, Instant};
+use std::time::{Duration, Instant, SystemTime};
 
 use async_trait::async_trait;
 use bytes::Bytes;
 use futures::future::{self, join_all, try_join, try_join_all};
-use hashing::{async_copy_and_hash, async_verified_copy, Digest, Fingerprint, EMPTY_DIGEST};
-use lmdb::Error::NotFound;
-use lmdb::{self, Cursor, Transaction};
-use sharded_lmdb::{ShardedLmdb, VersionedFingerprint};
+use hashing::{
+  async_copy_and_hash, async_verified_copy, AgedFingerprint, Digest, Fingerprint, EMPTY_DIGEST,
+};
+use sharded_lmdb::ShardedLmdb;
 use std::os::unix::fs::PermissionsExt;
+use task_executor::Executor;
 use tempfile::NamedTempFile;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use workunit_store::ObservationMetric;
@@ -27,7 +28,7 @@ use workunit_store::ObservationMetric;
 const LARGE_FILE_SIZE_LIMIT: usize = 512 * 1024;
 
 #[derive(Debug, Clone)]
-pub struct TempImmutableLargeFile {
+pub(crate) struct TempImmutableLargeFile {
   tmp_path: PathBuf,
   final_path: PathBuf,
 }
@@ -87,7 +88,20 @@ trait UnderlyingByteStore {
     mut f: F,
   ) -> Result<Option<T>, String>;
 
-  fn all_digests(&self) -> Result<Vec<Digest>, String>;
+  async fn aged_fingerprints(&self) -> Result<Vec<AgedFingerprint>, String>;
+
+  async fn all_digests(&self) -> Result<Vec<Digest>, String> {
+    let fingerprints = self.aged_fingerprints().await?;
+    Ok(
+      fingerprints
+        .into_iter()
+        .map(|fingerprint| Digest {
+          hash: fingerprint.fingerprint,
+          size_bytes: fingerprint.size_bytes,
+        })
+        .collect(),
+    )
+  }
 }
 
 #[async_trait]
@@ -142,24 +156,8 @@ impl UnderlyingByteStore for ShardedLmdb {
     self.load_bytes_with(fingerprint, f).await
   }
 
-  fn all_digests(&self) -> Result<Vec<Digest>, String> {
-    let mut digests = vec![];
-    for (env, database, _lease_database) in &self.all_lmdbs() {
-      let txn = env
-        .begin_ro_txn()
-        .map_err(|err| format!("Error beginning transaction to garbage collect: {err}"))?;
-      let mut cursor = txn
-        .open_ro_cursor(*database)
-        .map_err(|err| format!("Failed to open lmdb read cursor: {err}"))?;
-      for key_res in cursor.iter() {
-        let (key, bytes) =
-          key_res.map_err(|err| format!("Failed to advance lmdb read cursor: {err}"))?;
-        let v = VersionedFingerprint::from_bytes_unsafe(key);
-        let fingerprint = v.get_fingerprint();
-        digests.push(Digest::new(fingerprint, bytes.len()));
-      }
-    }
-    Ok(digests)
+  async fn aged_fingerprints(&self) -> Result<Vec<AgedFingerprint>, String> {
+    self.all_fingerprints().await
   }
 }
 
@@ -167,6 +165,8 @@ impl UnderlyingByteStore for ShardedLmdb {
 #[derive(Debug, Clone)]
 pub(crate) struct ShardedFSDB {
   root: PathBuf,
+  executor: Executor,
+  lease_time: Duration,
 }
 
 impl ShardedFSDB {
@@ -189,11 +189,17 @@ impl ShardedFSDB {
     let path2 = path.clone();
     // Make the tempdir in the same dir as the final file so that materializing the final file doesn't
     // have to worry about parent dirs.
-    let named_temp_file =
-      tokio::task::spawn_blocking(move || NamedTempFile::new_in(path.parent().unwrap()))
-        .await
-        .map_err(|e| e.to_string())?
-        .map_err(|e| e.to_string())?;
+    let named_temp_file = self
+      .executor
+      .spawn_blocking(
+        move || {
+          NamedTempFile::new_in(path.parent().unwrap())
+            .map_err(|e| format!("Failed to create temp file: {e}"))
+        },
+        |e| Err(format!("temp file creation task failed: {e}")),
+      )
+      .await
+      .map_err(|e| e.to_string())?;
     let (_, path) = named_temp_file.keep().map_err(|e| e.to_string())?;
     Ok(TempImmutableLargeFile {
       tmp_path: path,
@@ -229,8 +235,18 @@ impl UnderlyingByteStore for ShardedFSDB {
     Ok(HashSet::from_iter(existing))
   }
 
-  async fn lease(&self, _fingerprint: Fingerprint) -> Result<(), String> {
-    todo!();
+  async fn lease(&self, fingerprint: Fingerprint) -> Result<(), String> {
+    let path = self.get_path(fingerprint);
+    self
+      .executor
+      .spawn_blocking(
+        move || {
+          fs_set_times::set_mtime(&path, fs_set_times::SystemTimeSpec::SymbolicNow)
+            .map_err(|e| format!("Failed to extend mtime of {path:?}: {e}"))
+        },
+        |e| Err(format!("`lease` task failed: {e}")),
+      )
+      .await
   }
 
   async fn remove(&self, fingerprint: Fingerprint) -> Result<bool, String> {
@@ -318,28 +334,59 @@ impl UnderlyingByteStore for ShardedFSDB {
     }
   }
 
-  fn all_digests(&self) -> Result<Vec<Digest>, String> {
-    let maybe_shards = std::fs::read_dir(self.root.clone());
-    let mut digests = vec![];
-    if let Ok(shards) = maybe_shards {
-      for entry in shards {
-        let shard = entry.map_err(|e| format!("Error iterating dir {:?}: {e}.", self.root))?;
-        let large_files = std::fs::read_dir(shard.path())
-          .map_err(|e| format!("Failed to read shard directory: {e}."))?;
-        for entry in large_files {
-          let large_file = entry
-            .map_err(|e| format!("Error iterating dir {:?}: {e}", shard.path().file_name()))?;
-          let path = large_file.path();
-          let hash = path.file_name().unwrap().to_str().unwrap();
-          let length = large_file.metadata().map_err(|e| e.to_string())?.len();
-          digests.push(Digest::new(
-            Fingerprint::from_hex_string(hash).unwrap(),
-            length as usize,
-          ));
-        }
-      }
-    }
-    Ok(digests)
+  async fn aged_fingerprints(&self) -> Result<Vec<AgedFingerprint>, String> {
+    // NB: The ShardLmdb implementation stores a lease time in the future, and then compares the
+    // current time to the stored lease time for a fingerprint to determine how long ago it
+    // expired. Rather than setting `mtimes` in the future, this implementation instead considers a
+    // file to be expired if it's mtime is outside of the lease time window.
+    let root = self.root.clone();
+    let expiration_time = SystemTime::now() - self.lease_time;
+    self
+      .executor
+      .spawn_blocking(
+        move || {
+          let maybe_shards = std::fs::read_dir(&root);
+          let mut fingerprints = vec![];
+          if let Ok(shards) = maybe_shards {
+            for entry in shards {
+              let shard = entry.map_err(|e| format!("Error iterating dir {root:?}: {e}."))?;
+              let large_files = std::fs::read_dir(shard.path())
+                .map_err(|e| format!("Failed to read shard directory: {e}."))?;
+              for entry in large_files {
+                let large_file = entry.map_err(|e| {
+                  format!("Error iterating dir {:?}: {e}", shard.path().file_name())
+                })?;
+                let path = large_file.path();
+                let hash = path.file_name().unwrap().to_str().unwrap();
+                let (length, mtime) = large_file
+                  .metadata()
+                  .and_then(|metadata| {
+                    let length = metadata.len();
+                    let mtime = metadata.modified()?;
+                    Ok((length, mtime))
+                  })
+                  .map_err(|e| format!("Could not access metadata for {path:?}: {e}"))?;
+
+                let expired_seconds_ago = expiration_time
+                  .duration_since(mtime)
+                  .map(|t| t.as_secs())
+                  // 0 indicates unexpired.
+                  .unwrap_or(0);
+
+                fingerprints.push(AgedFingerprint {
+                  expired_seconds_ago,
+                  fingerprint: Fingerprint::from_hex_string(hash)
+                    .map_err(|e| format!("Invalid file store entry at {path:?}: {e}"))?,
+                  size_bytes: length as usize,
+                });
+              }
+            }
+          }
+          Ok(fingerprints)
+        },
+        |e| Err(format!("`aged_fingerprints` task failed: {e}")),
+      )
+      .await
   }
 }
 
@@ -396,7 +443,9 @@ impl ByteStore {
         )
         .map(Arc::new),
         file_fsdb: ShardedFSDB {
+          executor: executor.clone(),
           root: fsdb_files_root,
+          lease_time: options.lease_time,
         },
         executor,
       }),
@@ -437,14 +486,18 @@ impl ByteStore {
   ) -> Result<(), String> {
     // NB: Lease extension happens periodically in the background, so this code needn't be parallel.
     for (digest, entry_type) in digests {
-      let dbs = match entry_type {
-        EntryType::File => self.inner.file_lmdb.clone(),
-        EntryType::Directory => self.inner.directory_lmdb.clone(),
-      };
-      dbs?
-        .lease(digest.hash)
-        .await
-        .map_err(|err| format!("Error leasing digest {digest:?}: {err}"))?;
+      if entry_type == EntryType::File && ByteStore::should_use_fsdb(digest.size_bytes) {
+        self.inner.file_fsdb.lease(digest.hash).await?;
+      } else {
+        let dbs = match entry_type {
+          EntryType::File => self.inner.file_lmdb.clone(),
+          EntryType::Directory => self.inner.directory_lmdb.clone(),
+        };
+        dbs?
+          .lease(digest.hash)
+          .await
+          .map_err(|err| format!("Error leasing digest {digest:?}: {err}"))?;
+      }
     }
     Ok(())
   }
@@ -457,7 +510,7 @@ impl ByteStore {
   ///
   /// TODO: Use LMDB database statistics when lmdb-rs exposes them.
   ///
-  pub fn shrink(
+  pub async fn shrink(
     &self,
     target_bytes: usize,
     shrink_behavior: ShrinkBehavior,
@@ -465,48 +518,63 @@ impl ByteStore {
     let mut used_bytes: usize = 0;
     let mut fingerprints_by_expired_ago = BinaryHeap::new();
 
-    self.aged_fingerprints(
-      EntryType::File,
-      &mut used_bytes,
-      &mut fingerprints_by_expired_ago,
-    )?;
-    self.aged_fingerprints(
-      EntryType::Directory,
-      &mut used_bytes,
-      &mut fingerprints_by_expired_ago,
-    )?;
+    fingerprints_by_expired_ago.extend(
+      self
+        .inner
+        .file_lmdb
+        .clone()?
+        .aged_fingerprints()
+        .await?
+        .into_iter()
+        .map(|fingerprint| {
+          used_bytes += fingerprint.size_bytes;
+          (fingerprint, EntryType::File)
+        }),
+    );
+    fingerprints_by_expired_ago.extend(
+      self
+        .inner
+        .directory_lmdb
+        .clone()?
+        .aged_fingerprints()
+        .await?
+        .into_iter()
+        .map(|fingerprint| {
+          used_bytes += fingerprint.size_bytes;
+          (fingerprint, EntryType::Directory)
+        }),
+    );
+    fingerprints_by_expired_ago.extend(
+      self
+        .inner
+        .file_fsdb
+        .aged_fingerprints()
+        .await?
+        .into_iter()
+        .map(|fingerprint| {
+          used_bytes += fingerprint.size_bytes;
+          (fingerprint, EntryType::File)
+        }),
+    );
+
     while used_bytes > target_bytes {
-      let aged_fingerprint = fingerprints_by_expired_ago
+      let (aged_fingerprint, entry_type) = fingerprints_by_expired_ago
         .pop()
         .expect("lmdb corruption detected, sum of size of blobs exceeded stored blobs");
       if aged_fingerprint.expired_seconds_ago == 0 {
         // Ran out of expired blobs - everything remaining is leased and cannot be collected.
         return Ok(used_bytes);
       }
-      let lmdbs = match aged_fingerprint.entry_type {
-        EntryType::File => self.inner.file_lmdb.clone(),
-        EntryType::Directory => self.inner.directory_lmdb.clone(),
-      };
-      let (env, database, lease_database) = lmdbs.clone()?.get(&aged_fingerprint.fingerprint);
-      {
-        env
-          .begin_rw_txn()
-          .and_then(|mut txn| {
-            let key =
-              VersionedFingerprint::new(aged_fingerprint.fingerprint, ShardedLmdb::SCHEMA_VERSION);
-            txn.del(database, &key, None)?;
-
-            txn
-              .del(lease_database, &key, None)
-              .or_else(|err| match err {
-                NotFound => Ok(()),
-                err => Err(err),
-              })?;
-            used_bytes -= aged_fingerprint.size_bytes;
-            txn.commit()
-          })
-          .map_err(|err| format!("Error garbage collecting: {err}"))?;
-      }
+      self
+        .remove(
+          entry_type,
+          Digest {
+            hash: aged_fingerprint.fingerprint,
+            size_bytes: aged_fingerprint.size_bytes,
+          },
+        )
+        .await?;
+      used_bytes -= aged_fingerprint.size_bytes;
     }
 
     if shrink_behavior == ShrinkBehavior::Compact {
@@ -514,66 +582,6 @@ impl ByteStore {
     }
 
     Ok(used_bytes)
-  }
-
-  fn aged_fingerprints(
-    &self,
-    entry_type: EntryType,
-    used_bytes: &mut usize,
-    fingerprints_by_expired_ago: &mut BinaryHeap<AgedFingerprint>,
-  ) -> Result<(), String> {
-    let database = match entry_type {
-      EntryType::File => self.inner.file_lmdb.clone(),
-      EntryType::Directory => self.inner.directory_lmdb.clone(),
-    };
-
-    for (env, database, lease_database) in &database?.all_lmdbs() {
-      let txn = env
-        .begin_ro_txn()
-        .map_err(|err| format!("Error beginning transaction to garbage collect: {err}"))?;
-      let mut cursor = txn
-        .open_ro_cursor(*database)
-        .map_err(|err| format!("Failed to open lmdb read cursor: {err}"))?;
-      for key_res in cursor.iter() {
-        let (key, bytes) =
-          key_res.map_err(|err| format!("Failed to advance lmdb read cursor: {err}"))?;
-        *used_bytes += bytes.len();
-
-        // Random access into the lease_database is slower than iterating, but hopefully garbage
-        // collection is rare enough that we can get away with this, rather than do two passes
-        // here (either to populate leases into pre-populated AgedFingerprints, or to read sizes
-        // when we delete from lmdb to track how much we've freed).
-        let lease_until_unix_timestamp = txn
-          .get(*lease_database, &key)
-          .map(|b| {
-            let mut array = [0_u8; 8];
-            array.copy_from_slice(b);
-            u64::from_le_bytes(array)
-          })
-          .unwrap_or_else(|e| match e {
-            NotFound => 0,
-            e => panic!("Error reading lease, probable lmdb corruption: {e:?}"),
-          });
-
-        let leased_until = time::UNIX_EPOCH + Duration::from_secs(lease_until_unix_timestamp);
-
-        let expired_seconds_ago = time::SystemTime::now()
-          .duration_since(leased_until)
-          .map(|t| t.as_secs())
-          // 0 indicates unleased.
-          .unwrap_or(0);
-
-        let v = VersionedFingerprint::from_bytes_unsafe(key);
-        let fingerprint = v.get_fingerprint();
-        fingerprints_by_expired_ago.push(AgedFingerprint {
-          expired_seconds_ago,
-          fingerprint,
-          size_bytes: bytes.len(),
-          entry_type,
-        });
-      }
-    }
-    Ok(())
   }
 
   pub async fn remove(&self, entry_type: EntryType, digest: Digest) -> Result<bool, String> {
@@ -784,14 +792,14 @@ impl ByteStore {
     Ok(result)
   }
 
-  pub fn all_digests(&self, entry_type: EntryType) -> Result<Vec<Digest>, String> {
+  pub async fn all_digests(&self, entry_type: EntryType) -> Result<Vec<Digest>, String> {
     let lmdb = match entry_type {
       EntryType::File => self.inner.file_lmdb.clone(),
       EntryType::Directory => self.inner.directory_lmdb.clone(),
     }?;
     let mut digests = vec![];
-    digests.extend(lmdb.all_digests()?);
-    digests.extend(self.inner.file_fsdb.all_digests()?);
+    digests.extend(lmdb.all_digests().await?);
+    digests.extend(self.inner.file_fsdb.all_digests().await?);
     Ok(digests)
   }
 
@@ -802,13 +810,4 @@ impl ByteStore {
   pub(crate) fn get_file_fsdb(&self) -> ShardedFSDB {
     self.inner.file_fsdb.clone()
   }
-}
-
-#[derive(Eq, PartialEq, Ord, PartialOrd)]
-struct AgedFingerprint {
-  // expired_seconds_ago must be the first field for the Ord implementation.
-  expired_seconds_ago: u64,
-  fingerprint: Fingerprint,
-  size_bytes: usize,
-  entry_type: EntryType,
 }
