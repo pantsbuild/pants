@@ -68,12 +68,22 @@ def _restore_env(env: Mapping[str, str]) -> None:
 
 
 @contextmanager
-def hermetic_environment_as(**kwargs: str | None) -> Iterator[None]:
-    """Set the environment to the supplied values from an empty state."""
+def hermetic_environment_as(*preserve: str, **override: str | None) -> Iterator[None]:
+    """Mutate the environment of this process, restoring it on exit.
+
+    The given `preserve` environment variable names will have their current values preserved, while
+    the given `override` environment variables will override any values which are already set.
+    """
     old_environment = os.environ.copy()
+    preserve_set = set(preserve)
+    new_environment: dict[str, str | None] = {
+        k: v for k, v in old_environment.items() if k in preserve_set
+    }
+    new_environment.update(override)
+
     _purge_env()
     try:
-        with environment_as(**kwargs):
+        with environment_as(**new_environment):
             yield
     finally:
         _purge_env()

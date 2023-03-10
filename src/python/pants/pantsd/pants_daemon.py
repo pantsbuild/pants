@@ -35,6 +35,16 @@ from pants.util.strutil import ensure_text
 
 _SHUTDOWN_TIMEOUT_SECS = 3
 
+_PRESERVED_ENV_VARS = [
+    # Controls backtrace behavior for rust code.
+    "RUST_BACKTRACE",
+    # The environment variables consumed by the `bollard` crate as of
+    # https://github.com/fussybeaver/bollard/commit/a12c6b21b737e5ea9e6efe5f0128d02dc594f9aa
+    "DOCKER_HOST",
+    "DOCKER_CONFIG",
+    "DOCKER_CERT_PATH",
+]
+
 
 class PantsDaemon(PantsDaemonProcessManager):
     """A daemon that manages PantsService instances."""
@@ -179,9 +189,9 @@ class PantsDaemon(PantsDaemonProcessManager):
         # Switch log output to the daemon's log stream, and empty `env` and `argv` to encourage all
         # further usage of those variables to happen via engine APIs and options.
         self._close_stdio(pants_log_path(PurePath(global_bootstrap_options.pants_workdir)))
-        with initialize_stdio(global_bootstrap_options), argv_as(
-            tuple()
-        ), hermetic_environment_as():
+        with initialize_stdio(global_bootstrap_options), argv_as(tuple()), hermetic_environment_as(
+            *_PRESERVED_ENV_VARS
+        ):
             # Install signal and panic handling.
             ExceptionSink.install(
                 log_location=init_workdir(global_bootstrap_options), pantsd_instance=True
