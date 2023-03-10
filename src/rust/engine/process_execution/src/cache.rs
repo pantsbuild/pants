@@ -19,7 +19,7 @@ use workunit_store::{
 
 use crate::{
   check_cache_content, CacheContentBehavior, Context, FallibleProcessResultWithPlatform, Platform,
-  Process, ProcessCacheScope, ProcessError, ProcessResultSource,
+  Process, ProcessCacheScope, ProcessError, ProcessExecutionEnvironment, ProcessResultSource,
 };
 
 // TODO: Consider moving into protobuf as a CacheValue type.
@@ -75,7 +75,6 @@ impl crate::CommandRunner for CommandRunner {
     workunit: &mut RunningWorkunit,
     req: Process,
   ) -> Result<FallibleProcessResultWithPlatform, ProcessError> {
-    let cache_lookup_start = Instant::now();
     let write_failures_to_cache = req.cache_scope == ProcessCacheScope::Always;
     let key = CacheKey {
       digest: Some(
@@ -95,6 +94,7 @@ impl crate::CommandRunner for CommandRunner {
     if self.cache_read {
       let context2 = context.clone();
       let key2 = key.clone();
+      let environment = req.execution_environment.clone();
       let cache_read_result = in_workunit!(
         "local_cache_read",
         Level::Trace,
@@ -102,12 +102,11 @@ impl crate::CommandRunner for CommandRunner {
         |workunit| async move {
           workunit.increment_counter(Metric::LocalCacheRequests, 1);
 
-          match self.lookup(&context2, &key2).await {
+          match self.lookup(&context2, &key2, environment).await {
             Ok(Some(result)) if result.exit_code == 0 || write_failures_to_cache => {
-              let lookup_elapsed = cache_lookup_start.elapsed();
               workunit.increment_counter(Metric::LocalCacheRequestsCached, 1);
-              if let Some(time_saved) = result.metadata.time_saved_from_cache(lookup_elapsed) {
-                let time_saved = time_saved.as_millis() as u64;
+              if let Some(time_saved) = result.metadata.saved_by_cache {
+                let time_saved = std::time::Duration::from(time_saved).as_millis() as u64;
                 workunit.increment_counter(Metric::LocalCacheTotalTimeSavedMs, time_saved);
                 context2
                   .workunit_store
@@ -181,7 +180,9 @@ impl CommandRunner {
     &self,
     context: &Context,
     action_key: &CacheKey,
+    environment: ProcessExecutionEnvironment,
   ) -> Result<Option<FallibleProcessResultWithPlatform>, StoreError> {
+    let cache_lookup_start = Instant::now();
     use remexec::ExecuteResponse;
 
     // See whether there is a cache entry.
@@ -198,15 +199,16 @@ impl CommandRunner {
     };
 
     // Deserialize the cache entry if it existed.
-    let result = if let Some((execute_response, platform)) = maybe_execute_response {
+    // TODO: The platform in the cache value is unused. See #18450.
+    let mut result = if let Some((execute_response, _platform)) = maybe_execute_response {
       if let Some(ref action_result) = execute_response.result {
         crate::populate_fallible_execution_result(
           self.file_store.clone(),
           context.run_id,
           action_result,
-          platform,
           true,
           ProcessResultSource::HitLocally,
+          environment,
         )
         .await?
       } else {
@@ -221,6 +223,10 @@ impl CommandRunner {
     };
 
     if check_cache_content(&result, &self.file_store, self.cache_content_behavior).await? {
+      // NB: We set the cache hit elapsed time as late as possible (after having validated the cache content).
+      result
+        .metadata
+        .update_cache_hit_elapsed(cache_lookup_start.elapsed());
       Ok(Some(result))
     } else {
       Ok(None)
@@ -269,7 +275,7 @@ impl CommandRunner {
       .map_err(|err| format!("Error serializing execute process result to cache: {err}"))?;
 
     let bytes_to_store = bincode::serialize(&PlatformAndResponseBytes {
-      platform: result.platform,
+      platform: result.metadata.environment.platform,
       response_bytes,
     })
     .map(Bytes::from)

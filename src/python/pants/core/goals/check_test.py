@@ -24,7 +24,11 @@ from pants.engine.addresses import Address
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import EMPTY_DIGEST, EMPTY_FILE_DIGEST, Workspace
 from pants.engine.platform import Platform
-from pants.engine.process import FallibleProcessResult, ProcessResultMetadata
+from pants.engine.process import (
+    FallibleProcessResult,
+    ProcessExecutionEnvironment,
+    ProcessResultMetadata,
+)
 from pants.engine.target import FieldSet, MultipleSourcesField, Target, Targets
 from pants.engine.unions import UnionMembership
 from pants.testutil.option_util import create_options_bootstrapper, create_subsystem
@@ -280,8 +284,18 @@ def test_from_fallible_process_result_output_prepping(
             stderr=b"stderr \033[0;31m/var/pants-sandbox-123/red/path.py\033[0m \033[1mbold\033[0m",
             stderr_digest=EMPTY_FILE_DIGEST,
             output_digest=EMPTY_DIGEST,
-            platform=Platform.create_for_localhost(),
-            metadata=ProcessResultMetadata(0, "ran_locally", 0),
+            metadata=ProcessResultMetadata(
+                0,
+                ProcessExecutionEnvironment(
+                    environment_name=None,
+                    platform=Platform.create_for_localhost().value,
+                    docker_image=None,
+                    remote_execution=False,
+                    remote_execution_extra_platform_properties=[],
+                ),
+                "ran_locally",
+                0,
+            ),
         ),
         strip_chroot_path=strip_chroot_path,
         strip_formatting=strip_formatting,

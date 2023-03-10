@@ -39,7 +39,7 @@ use tokio_util::codec::{BytesCodec, FramedRead};
 use workunit_store::{in_workunit, Level, Metric, RunningWorkunit};
 
 use crate::{
-  Context, FallibleProcessResultWithPlatform, NamedCaches, Platform, Process, ProcessError,
+  Context, FallibleProcessResultWithPlatform, NamedCaches, Process, ProcessError,
   ProcessResultMetadata, ProcessResultSource,
 };
 
@@ -60,7 +60,6 @@ pub struct CommandRunner {
   named_caches: NamedCaches,
   immutable_inputs: ImmutableInputs,
   keep_sandboxes: KeepSandboxes,
-  platform: Platform,
   spawn_lock: RwLock<()>,
 }
 
@@ -80,13 +79,8 @@ impl CommandRunner {
       named_caches,
       immutable_inputs,
       keep_sandboxes,
-      platform: Platform::current().unwrap(),
       spawn_lock: RwLock::new(()),
     }
-  }
-
-  fn platform(&self) -> Platform {
-    self.platform
   }
 
   async fn construct_output_snapshot(
@@ -301,7 +295,6 @@ impl super::CommandRunner for CommandRunner {
             workdir.path().to_owned(),
             (),
             exclusive_spawn,
-            self.platform(),
           )
           .map_err(|msg| {
             // Processes that experience no infrastructure issues should result in an "Ok" return,
@@ -468,7 +461,6 @@ pub trait CapturedWorkdir {
     workdir_path: PathBuf,
     workdir_token: Self::WorkdirToken,
     exclusive_spawn: bool,
-    platform: Platform,
   ) -> Result<FallibleProcessResultWithPlatform, String> {
     let start_time = Instant::now();
     let mut stdout = BytesMut::with_capacity(8192);
@@ -535,7 +527,8 @@ pub trait CapturedWorkdir {
     let elapsed = start_time.elapsed();
     let result_metadata = ProcessResultMetadata::new(
       Some(elapsed.into()),
-      ProcessResultSource::RanLocally,
+      ProcessResultSource::Ran,
+      req.execution_environment,
       context.run_id,
     );
 
@@ -550,7 +543,6 @@ pub trait CapturedWorkdir {
           stderr_digest,
           exit_code,
           output_directory: output_snapshot.into(),
-          platform,
           metadata: result_metadata,
         })
       }
@@ -574,7 +566,6 @@ pub trait CapturedWorkdir {
           stderr_digest,
           exit_code: -libc::SIGTERM,
           output_directory: EMPTY_DIRECTORY_DIGEST.clone(),
-          platform,
           metadata: result_metadata,
         })
       }

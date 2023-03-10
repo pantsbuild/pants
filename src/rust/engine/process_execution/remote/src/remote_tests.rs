@@ -28,7 +28,7 @@ use fs::{DirectoryDigest, RelativePath, SymlinkBehavior, EMPTY_DIRECTORY_DIGEST}
 use process_execution::{
   CacheName, CommandRunner as CommandRunnerTrait, Context, EntireExecuteRequest,
   FallibleProcessResultWithPlatform, InputDigests, Platform, Process, ProcessCacheScope,
-  ProcessError, ProcessExecutionStrategy,
+  ProcessError, ProcessExecutionEnvironment, ProcessExecutionStrategy,
 };
 use std::any::type_name;
 use std::io::Cursor;
@@ -70,6 +70,14 @@ enum StderrType {
   Digest(Digest),
 }
 
+fn make_environment(platform: Platform) -> ProcessExecutionEnvironment {
+  ProcessExecutionEnvironment {
+    name: None,
+    platform,
+    strategy: ProcessExecutionStrategy::RemoteExecution(vec![]),
+  }
+}
+
 #[tokio::test]
 async fn make_execute_request() {
   let executor = task_executor::Executor::new();
@@ -92,11 +100,10 @@ async fn make_execute_request() {
     level: log::Level::Info,
     append_only_caches: BTreeMap::new(),
     jdk_home: None,
-    platform: Platform::Linux_x86_64,
     execution_slot_variable: None,
     concurrency_available: 0,
     cache_scope: ProcessCacheScope::Always,
-    execution_strategy: ProcessExecutionStrategy::RemoteExecution(vec![]),
+    execution_environment: make_environment(Platform::Linux_x86_64),
     remote_cache_speculation_delay: std::time::Duration::from_millis(0),
   };
 
@@ -185,14 +192,17 @@ async fn make_execute_request_with_instance_name() {
     level: log::Level::Info,
     append_only_caches: BTreeMap::new(),
     jdk_home: None,
-    platform: Platform::Linux_x86_64,
     execution_slot_variable: None,
     concurrency_available: 0,
     cache_scope: ProcessCacheScope::Always,
-    execution_strategy: ProcessExecutionStrategy::RemoteExecution(vec![(
-      "target_platform".to_owned(),
-      "apple-2e".to_owned(),
-    )]),
+    execution_environment: ProcessExecutionEnvironment {
+      name: None,
+      platform: Platform::Linux_x86_64,
+      strategy: ProcessExecutionStrategy::RemoteExecution(vec![(
+        "target_platform".to_owned(),
+        "apple-2e".to_owned(),
+      )]),
+    },
     remote_cache_speculation_delay: std::time::Duration::from_millis(0),
   };
 
@@ -294,11 +304,10 @@ async fn make_execute_request_with_cache_key_gen_version() {
     level: log::Level::Info,
     append_only_caches: BTreeMap::new(),
     jdk_home: None,
-    platform: Platform::Linux_x86_64,
     execution_slot_variable: None,
     concurrency_available: 0,
     cache_scope: ProcessCacheScope::Always,
-    execution_strategy: ProcessExecutionStrategy::RemoteExecution(vec![]),
+    execution_environment: make_environment(Platform::Linux_x86_64),
     remote_cache_speculation_delay: std::time::Duration::from_millis(0),
   };
 
@@ -381,7 +390,7 @@ async fn make_execute_request_with_jdk() {
 
   let input_directory = TestDirectory::containing_roland();
   let mut req = Process::new(owned_string_vec(&["/bin/echo", "yo"]));
-  req.platform = Platform::Linux_x86_64;
+  req.execution_environment.platform = Platform::Linux_x86_64;
   req.jdk_home = Some(PathBuf::from("/tmp"));
   req.description = "some description".to_owned();
   req.input_digests = InputDigests::with_input_files(input_directory.directory_digest());
@@ -455,14 +464,13 @@ async fn make_execute_request_with_jdk_and_extra_platform_properties() {
   let store = Store::local_only(executor, store_dir).unwrap();
 
   let input_directory = TestDirectory::containing_roland();
-  let mut req = Process::new(owned_string_vec(&["/bin/echo", "yo"]))
-    .remote_execution_platform_properties(vec![
-      ("FIRST".to_owned(), "foo".to_owned()),
-      ("Multi".to_owned(), "uno".to_owned()),
-      ("last".to_owned(), "bar".to_owned()),
-      ("Multi".to_owned(), "dos".to_owned()),
-    ]);
-  req.platform = Platform::Linux_x86_64;
+  let mut req = Process::new(owned_string_vec(&["/bin/echo", "yo"])).remote_execution(vec![
+    ("FIRST".to_owned(), "foo".to_owned()),
+    ("Multi".to_owned(), "uno".to_owned()),
+    ("last".to_owned(), "bar".to_owned()),
+    ("Multi".to_owned(), "dos".to_owned()),
+  ]);
+  req.execution_environment.platform = Platform::Linux_x86_64;
   req.input_digests = InputDigests::with_input_files(input_directory.directory_digest());
   req.description = "some description".to_owned();
   req.jdk_home = Some(PathBuf::from("/tmp"));
@@ -569,11 +577,10 @@ async fn make_execute_request_with_timeout() {
     level: log::Level::Info,
     append_only_caches: BTreeMap::new(),
     jdk_home: None,
-    platform: Platform::Linux_x86_64,
     execution_slot_variable: None,
     concurrency_available: 0,
     cache_scope: ProcessCacheScope::Always,
-    execution_strategy: ProcessExecutionStrategy::RemoteExecution(vec![]),
+    execution_environment: make_environment(Platform::Linux_x86_64),
     remote_cache_speculation_delay: std::time::Duration::from_millis(0),
   };
 
@@ -669,11 +676,10 @@ async fn make_execute_request_with_append_only_caches() {
       CacheName::new(String::from("xyzzy")).unwrap() => RelativePath::new(Path::new(".cache/xyzzy")).unwrap(),
     },
     jdk_home: None,
-    platform: Platform::Linux_x86_64,
     execution_slot_variable: None,
     concurrency_available: 0,
     cache_scope: ProcessCacheScope::Always,
-    execution_strategy: ProcessExecutionStrategy::RemoteExecution(vec![]),
+    execution_environment: make_environment(Platform::Linux_x86_64),
     remote_cache_speculation_delay: std::time::Duration::from_millis(0),
   };
 
@@ -824,11 +830,10 @@ async fn make_execute_request_using_immutable_inputs() {
     level: log::Level::Info,
     append_only_caches: BTreeMap::new(),
     jdk_home: None,
-    platform: Platform::Linux_x86_64,
     execution_slot_variable: None,
     concurrency_available: 0,
     cache_scope: ProcessCacheScope::Always,
-    execution_strategy: ProcessExecutionStrategy::RemoteExecution(vec![]),
+    execution_environment: make_environment(Platform::Linux_x86_64),
     remote_cache_speculation_delay: std::time::Duration::from_millis(0),
   };
 
@@ -1387,7 +1392,6 @@ async fn extract_response_with_digest_stdout() {
   assert_eq!(result.stderr_bytes, testdata_empty.bytes());
   assert_eq!(result.original.exit_code, 0);
   assert_eq!(result.original.output_directory, *EMPTY_DIRECTORY_DIGEST);
-  assert_eq!(result.original.platform, Platform::Linux_x86_64);
 }
 
 #[tokio::test]
@@ -1415,35 +1419,6 @@ async fn extract_response_with_digest_stderr() {
   assert_eq!(result.stderr_bytes, testdata.bytes());
   assert_eq!(result.original.exit_code, 0);
   assert_eq!(result.original.output_directory, *EMPTY_DIRECTORY_DIGEST);
-  assert_eq!(result.original.platform, Platform::Linux_x86_64);
-}
-
-#[tokio::test]
-async fn extract_response_with_digest_stdout_osx_remote() {
-  let _ = WorkunitStore::setup_for_tests();
-  let op_name = "gimme-foo".to_string();
-  let testdata = TestData::roland();
-  let testdata_empty = TestData::empty();
-  let result = extract_execute_response(
-    make_successful_operation(
-      &op_name,
-      StdoutType::Digest(testdata.digest()),
-      StderrType::Raw(testdata_empty.string()),
-      0,
-    )
-    .op
-    .unwrap()
-    .unwrap(),
-    Platform::Macos_x86_64,
-  )
-  .await
-  .unwrap();
-
-  assert_eq!(result.stdout_bytes, testdata.bytes());
-  assert_eq!(result.stderr_bytes, testdata_empty.bytes());
-  assert_eq!(result.original.exit_code, 0);
-  assert_eq!(result.original.output_directory, *EMPTY_DIRECTORY_DIGEST);
-  assert_eq!(result.original.platform, Platform::Macos_x86_64);
 }
 
 #[tokio::test]
@@ -1523,7 +1498,6 @@ async fn ensure_inline_stdio_is_stored() {
   assert_eq!(result.stdout_bytes, test_stdout.bytes());
   assert_eq!(result.stderr_bytes, test_stderr.bytes());
   assert_eq!(result.original.exit_code, 0);
-  assert_eq!(result.original.platform, Platform::Linux_x86_64);
 
   let local_store =
     Store::local_only(runtime.clone(), store_dir_path).expect("Error creating local store");
@@ -1904,7 +1878,6 @@ async fn execute_missing_file_uploads_if_known() {
   assert_eq!(result.stdout_bytes, roland.bytes());
   assert_eq!(result.stderr_bytes, "".as_bytes());
   assert_eq!(result.original.exit_code, 0);
-  assert_eq!(result.original.platform, Platform::Linux_x86_64);
 
   {
     let blobs = cas.blobs.lock();
@@ -2009,7 +1982,6 @@ async fn extract_execute_response_success() {
     result.original.output_directory,
     TestDirectory::nested().directory_digest()
   );
-  assert_eq!(result.original.platform, Platform::Linux_x86_64);
 }
 
 #[tokio::test]
@@ -2167,7 +2139,7 @@ async fn remote_workunits_are_stored() {
   command_runner
     .extract_execute_response(
       RunId(0),
-      Platform::Linux_x86_64,
+      make_environment(Platform::Linux_x86_64),
       OperationOrStatus::Operation(operation),
     )
     .await
@@ -2721,7 +2693,7 @@ fn make_store(store_dir: &Path, cas: &mock::StubCAS, executor: task_executor::Ex
 
 async fn extract_execute_response(
   operation: Operation,
-  remote_platform: Platform,
+  platform: Platform,
 ) -> Result<RemoteTestResult, ExecutionError> {
   let cas = mock::StubCAS::builder()
     .file(&TestData::roland())
@@ -2734,7 +2706,7 @@ async fn extract_execute_response(
   let original = command_runner
     .extract_execute_response(
       RunId(0),
-      remote_platform,
+      make_environment(platform),
       OperationOrStatus::Operation(operation),
     )
     .await?;
@@ -2813,7 +2785,7 @@ fn assert_contains(haystack: &str, needle: &str) {
 fn cat_roland_request() -> Process {
   let argv = owned_string_vec(&["/bin/cat", "roland.ext"]);
   let mut process = Process::new(argv);
-  process.platform = Platform::Linux_x86_64;
+  process.execution_environment.platform = Platform::Linux_x86_64;
   process.input_digests =
     InputDigests::with_input_files(TestDirectory::containing_roland().directory_digest());
   process.timeout = one_second();
@@ -2823,7 +2795,7 @@ fn cat_roland_request() -> Process {
 
 fn echo_roland_request() -> Process {
   let mut req = Process::new(owned_string_vec(&["/bin/echo", "meoooow"]));
-  req.platform = Platform::Linux_x86_64;
+  req.execution_environment.platform = Platform::Linux_x86_64;
   req.timeout = one_second();
   req.description = "unleash a roaring meow".to_string();
   req

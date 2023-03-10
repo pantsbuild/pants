@@ -47,7 +47,7 @@ use workunit_store::{
 };
 
 use crate::externs::fs::{possible_store_missing_digest, PyFileDigest};
-use crate::externs::process::PyProcessConfigFromEnvironment;
+use crate::externs::process::PyProcessExecutionEnvironment;
 use crate::{
   externs, nodes, Context, Core, ExecutionRequest, ExecutionStrategyOptions, ExecutionTermination,
   Failure, Function, Intrinsic, Intrinsics, Key, LocalStoreOptions, Params, RemotingOptions, Rule,
@@ -221,7 +221,7 @@ impl PyTypes {
       process: TypeId::new(process),
       process_result: TypeId::new(process_result),
       process_config_from_environment: TypeId::new(
-        py.get_type::<externs::process::PyProcessConfigFromEnvironment>(),
+        py.get_type::<externs::process::PyProcessExecutionEnvironment>(),
       ),
       process_result_metadata: TypeId::new(process_result_metadata),
       coroutine: TypeId::new(coroutine),
@@ -993,7 +993,7 @@ fn session_run_interactive_process(
   py: Python,
   py_session: &PySession,
   interactive_process: PyObject,
-  process_config_from_environment: PyProcessConfigFromEnvironment,
+  process_config_from_environment: PyProcessExecutionEnvironment,
 ) -> PyO3Result<PyObject> {
   let core = py_session.0.core();
   let context = Context::new(core.clone(), py_session.0.clone());
