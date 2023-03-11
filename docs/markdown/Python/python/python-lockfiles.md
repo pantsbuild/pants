@@ -6,7 +6,9 @@ hidden: false
 createdAt: "2023-03-11T01:50:46.369Z"
 updatedAt: "2023-03-11T01:50:46.369Z"
 ---
-Third-party dependencies are typically specified via a range of allowed versions, known as "requirements", in a file such as requirements.txt or pyproject.toml. A dependency resolution tool like Pip or Poetry then takes these initial requirements and attempts to find and download a consistent set of transitive dependencies that are mutually compatible with each other and with the target Python interpreter version.
+Third-party dependencies are typically specified via ranges of allowed versions, known as "requirements", one for each dependency, in a file such as requirements.txt or pyproject.toml. Examples of requirement strings include `mypy>1.0.0`, `Django>=3.1.0,<4`, `pytest==7.1.1`.
+
+A dependency resolution tool like [Pip](https://pip.pypa.io/en/stable/) then takes these initial requirements and attempts to find and download a consistent set of transitive dependencies that are mutually compatible with each other and with the target Python interpreter version.
 
 When used naively, this dependency resolution process is unstable: if you run a resolve, and then some time later run another resolve on the same inputs, you may end up with a different resulting set of dependencies. This is because new versions of direct or transitive dependencies may have been published (or, in rare cases, yanked) between the two runs.
 
@@ -38,9 +40,7 @@ First, you'll need to turn on the resolves functionality for the repo:
 enable_resolves = true
 ```
 
-
-
-Initially, Pants will assume a single resolve named `python-default` which references a lockfile at `3rdparty/python/default.lock`. You can change the name of the default resolve, and/or the location of its lockfile, via:
+Initially, Pants will assume a single resolve named `python-default` which uses the repo's [default interpreter constraints](doc:reference-python#interpreter_constraints) and references a lockfile at `3rdparty/python/default.lock`. You can change the name of the default resolve, and/or the location of its lockfile, via:
 
 ```toml pants.toml
 [python]
@@ -51,8 +51,6 @@ default_resolve = "myresolve"
 myresolve = "path/to/mylockfile"
 ```
 
-
-
 You generate the lockfile as follows:
 
 ```shell Bash
@@ -60,8 +58,6 @@ $ pants generate-lockfiles
 19:00:39.26 [INFO] Completed: Generate lockfile for python-default
 19:00:39.29 [INFO] Wrote lockfile for the resolve `python-default` to 3rdparty/python/default.lock
 ```
-
-
 
 The inputs used to generate a lockfile are third-party dependencies in your repo, expressed via [`python_requirement` targets](doc:python-third-party-dependencies) , or the `python_requirements` / `poetry_requirements` generator targets. In this case, since you haven't yet explicitly mapped your requirement targets to a resolve, they will all map to `python-default`, and so all serve as inputs to the default lockfile.
 
@@ -81,8 +77,6 @@ data_science = "3rdparty/python/data_science.lock"
 webapps_django3 = "3rdparty/python/webapps_django3.lock"
 webapps_django4 = "3rdparty/python/webapps_django4.lock"
 ```
-
-
 
 Then, you partition your requirements targets across these resolves using the `resolve` field, and possibly the [parametrize](doc:targets#parametrizing-targets) mechanism:
 
@@ -110,8 +104,6 @@ poetry_requirements(
 )
 ```
 
-
-
 Any requirements targets that don't specify an explicit `resolve=` will be associated with the default resolve.
 
 As before, you run `pants generate-lockfiles` to generate the lockfiles. You can use the `--resolve` flag to generate just a subset of lockfiles. E.g.,
@@ -123,8 +115,6 @@ $ pants generate-lockfiles --resolve=webapps_django3 --resolve=webapps_django4
 19:00:40.02 [INFO] Wrote lockfile for the resolve `webapps_django3` to 3rdparty/python/webapps_django3.lock
 19:00:40.17 [INFO] Wrote lockfile for the resolve `webapps_django4` to 3rdparty/python/webapps_django4.lock
 ```
-
-
 
 Finally, you update your first-party code targets, such as `python_sources`, `python_tests`, and `pex_binary` to set their `resolve=` field (which, as before, defaults to the default resolve).
 
@@ -141,9 +131,7 @@ python_tests(
 )
 ```
 
-
-
-If a first-party target is compatible with multiple resolves, such as utility code, you can use the [parametrize](doc:targets#parametrizing-targets) mechanism with the `resolve=` field.
+If a first-party target is compatible with multiple resolves, e.g., shared utility code, you can use the [parametrize](doc:targets#parametrizing-targets) mechanism with the `resolve=` field.
 
 > 📘 Transitive dependencies must use the same resolve
 >
@@ -155,7 +143,7 @@ To reiterate an important distinction: The `resolve=` field on a third-party req
 
 ### Interpreter constraints
 
-A lockfile will contain dependencies for all requested Python versions. By default these are the global constraints specified by the [\[python\].interpreter_constraints](doc:reference-python#interpreter_constraints) option. You can override this per-lockfile using the [\[python\].resolves_to_interpreter_constraints](doc:reference-python#resolves_to_interpreter_constraints) option.
+A lockfile will contain dependencies for all requested Python versions. By default, these are the global constraints specified by the [\[python\].interpreter_constraints](doc:reference-python#interpreter_constraints) option. You can override this per-lockfile using the [\[python\].resolves_to_interpreter_constraints](doc:reference-python#resolves_to_interpreter_constraints) option.
 
 ### Modifying lockfile generation behavior
 
@@ -170,6 +158,13 @@ You can use the key `__default__` to set the value for all resolves at once.
 ### Updating lockfiles
 
 If you modify the third-party requirements of a resolve then you must regenerate its lockfile by running the `generate-lockfiles` goal. Pants will display an error if a lockfile is no longer compatible with its updated requirements.
+
+You can have Pants display a useful summary of what changed between the old and new versions of the generated lockfile, by setting:
+
+```toml pants.toml
+[generate-lockfiles]
+diff = true
+```
 
 In theory, when you generate a lockfile, you should want to audit it for bugs, compliance and security concerns. In practice this is intractable to do manually. We would like to integrate with automated auditing tools and services in the future, so watch this space for updates, or feel free to [reach out on Slack](doc:the-pants-community) if this is important to you and you'd like to work on it.
 
@@ -199,8 +194,6 @@ pytest = "3rdparty/python/pytest.lock"
 resolve = "pytest"
 ```
 
-
-
 Then set up the resolve's inputs:
 
 ```python 3rdparty/python/BUILD
@@ -216,8 +209,6 @@ pytest-xdist>=2.5,<3
 pytest-myplugin>=1.2.0,<2
 ```
 
-
-
 And generate its custom lockfile:
 
 ```shell Bash
@@ -225,8 +216,6 @@ $ pants generate-lockfiles --resolve=pytest
 19:00:39.26 [INFO] Completed: Generate lockfile for pytest
 19:00:39.29 [INFO] Wrote lockfile for the resolve `pytest` to 3rdparty/python/pytest.lock
 ```
-
-
 
 Note that some tools, such as Flake8 and Bandit, must run on a Python interpreter that is compatible with the code they operate on. In this case you must ensure that the interpreter constraints for the tool's resolve are the same as those for the code in question.
 
@@ -236,14 +225,12 @@ In some cases a tool also provides a runtime library. For example, `pytest` is r
 
 Rather than repeat the same requirement in two different resolves, you can point the tool at an existing resolve that you also use for your code:
 
-```Text pants.toml
+```toml pants.toml
 [pytest]
 resolve=python-default
 ```
 
-
-
-Of course you have to make sure that this resolve does in fact provide appropriate versions of the tool.
+Of course, you have to make sure that this resolve does in fact provide appropriate versions of the tool.
 
 You can have a single resolve for all your tools, or even a single resolve for all your tools and code! This may be useful if you want to [export](doc:reference-export) a virtualenv that includes all your dependencies and all the tools you use.
 
