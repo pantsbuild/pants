@@ -1,9 +1,10 @@
 ---
 title: "Plugin helpers"
-slug: "plugins-helpers"
+slug: "plugin-helpers"
 excerpt: "Helpers which make writing plugins easier."
-hidden: false
+hidden: true
 createdAt: "2023-01-07T22:23:00.000Z"
+updatedAt: "2023-01-07T22:23:00.000Z"
 ---
 Pants has helpers to make writing plugins easier.
 
