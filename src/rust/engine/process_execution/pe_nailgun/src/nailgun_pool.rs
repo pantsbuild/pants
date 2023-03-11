@@ -369,7 +369,7 @@ impl NailgunProcess {
       workdir.path().to_owned(),
       &startup_options,
       startup_options.input_digests.inputs.clone(),
-      &store,
+      store,
       named_caches,
       immutable_inputs,
       None,
