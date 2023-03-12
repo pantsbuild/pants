@@ -92,7 +92,7 @@ class _OptionBase(Generic[_OptT, _DefaultT]):
         metavar: str | None = None,
         mutually_exclusive_group: str | None = None,
         removal_version: str | None = None,
-        removal_hint: str | None = None,
+        removal_hint: _HelpT | None = None,
         deprecation_start_version: str | None = None,
         # Internal bells/whistles
         daemon: bool | None = None,
@@ -170,11 +170,19 @@ class _OptionBase(Generic[_OptT, _DefaultT]):
         return cast("_OptT", val)
 
     def get_flag_options(self, subsystem_cls) -> dict:
+        rh = "removal_hint"
+        if rh in self._extra_kwargs:
+            extra_kwargs: dict[str, Any] = {
+                **self._extra_kwargs,
+                rh: _eval_maybe_dynamic(self._extra_kwargs[rh], subsystem_cls),
+            }
+        else:
+            extra_kwargs = self._extra_kwargs
         return dict(
             help=_eval_maybe_dynamic(self._help, subsystem_cls),
             default=_eval_maybe_dynamic(self._default, subsystem_cls),
             type=self.get_option_type(subsystem_cls),
-            **self._extra_kwargs,
+            **extra_kwargs,
         )
 
     @overload
@@ -231,7 +239,7 @@ class _ListOptionBase(
         metavar: str | None = None,
         mutually_exclusive_group: str | None = None,
         removal_version: str | None = None,
-        removal_hint: str | None = None,
+        removal_hint: _HelpT | None = None,
         deprecation_start_version: str | None = None,
         # Internal bells/whistles
         daemon: bool | None = None,
@@ -448,7 +456,7 @@ class EnumOption(_OptionBase[_OptT, _DefaultT]):
         metavar: str | None = None,
         mutually_exclusive_group: str | None = None,
         removal_version: str | None = None,
-        removal_hint: str | None = None,
+        removal_hint: _HelpT | None = None,
         deprecation_start_version: str | None = None,
         # Internal bells/whistles
         daemon: bool | None = None,
@@ -473,7 +481,7 @@ class EnumOption(_OptionBase[_OptT, _DefaultT]):
         metavar: str | None = None,
         mutually_exclusive_group: str | None = None,
         removal_version: str | None = None,
-        removal_hint: str | None = None,
+        removal_hint: _HelpT | None = None,
         deprecation_start_version: str | None = None,
         # Internal bells/whistles
         daemon: bool | None = None,
@@ -498,7 +506,7 @@ class EnumOption(_OptionBase[_OptT, _DefaultT]):
         metavar: str | None = None,
         mutually_exclusive_group: str | None = None,
         removal_version: str | None = None,
-        removal_hint: str | None = None,
+        removal_hint: _HelpT | None = None,
         deprecation_start_version: str | None = None,
         # Internal bells/whistles
         daemon: bool | None = None,
@@ -591,7 +599,7 @@ class EnumListOption(_ListOptionBase[_OptT], Generic[_OptT]):
         metavar: str | None = None,
         mutually_exclusive_group: str | None = None,
         removal_version: str | None = None,
-        removal_hint: str | None = None,
+        removal_hint: _HelpT | None = None,
         deprecation_start_version: str | None = None,
         # Internal bells/whistles
         daemon: bool | None = None,
@@ -616,7 +624,7 @@ class EnumListOption(_ListOptionBase[_OptT], Generic[_OptT]):
         metavar: str | None = None,
         mutually_exclusive_group: str | None = None,
         removal_version: str | None = None,
-        removal_hint: str | None = None,
+        removal_hint: _HelpT | None = None,
         deprecation_start_version: str | None = None,
         # Internal bells/whistles
         daemon: bool | None = None,
@@ -640,7 +648,7 @@ class EnumListOption(_ListOptionBase[_OptT], Generic[_OptT]):
         metavar: str | None = None,
         mutually_exclusive_group: str | None = None,
         removal_version: str | None = None,
-        removal_hint: str | None = None,
+        removal_hint: _HelpT | None = None,
         deprecation_start_version: str | None = None,
         # Internal bells/whistles
         daemon: bool | None = None,
@@ -750,7 +758,7 @@ class DictOption(_OptionBase["dict[str, _ValueT]", "dict[str, _ValueT]"], Generi
         metavar: str | None = None,
         mutually_exclusive_group: str | None = None,
         removal_version: str | None = None,
-        removal_hint: str | None = None,
+        removal_hint: _HelpT | None = None,
         deprecation_start_version: str | None = None,
         # Internal bells/whistles
         daemon: bool | None = None,
