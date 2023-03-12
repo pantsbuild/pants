@@ -3,7 +3,6 @@ title: "Running Pants from sources"
 slug: "running-pants-from-sources"
 hidden: false
 createdAt: "2021-08-10T00:24:00.100Z"
-updatedAt: "2022-04-27T00:04:50.041Z"
 ---
 Running Pants from sources in its own repo
 ------------------------------------------

@@ -4,7 +4,6 @@ slug: "python-lockfiles"
 excerpt: "Securely locking down your third-party dependencies."
 hidden: false
 createdAt: "2023-03-11T01:50:46.369Z"
-updatedAt: "2023-03-11T01:50:46.369Z"
 ---
 Third-party dependencies are typically specified via ranges of allowed versions, known as "requirements", one for each dependency, in a file such as requirements.txt or pyproject.toml. Examples of requirement strings include `mypy>1.0.0`, `Django>=3.1.0,<4`, `pytest==7.1.1`.
 

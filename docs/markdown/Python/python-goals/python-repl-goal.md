@@ -4,7 +4,6 @@ slug: "python-repl-goal"
 excerpt: "Open a REPL for interactive development."
 hidden: false
 createdAt: "2020-03-16T16:19:56.329Z"
-updatedAt: "2022-02-09T01:01:10.431Z"
 ---
 Pants will load a [REPL](https://en.wikipedia.org/wiki/REPL) with all of your specified source code and any of its third-party dependencies, which allows you to import those values.
 

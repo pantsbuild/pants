@@ -4,7 +4,6 @@ slug: "rules-api-file-system"
 excerpt: "How to safely interact with the file system in your plugin."
 hidden: false
 createdAt: "2020-07-01T04:40:26.783Z"
-updatedAt: "2022-04-26T22:22:28.000Z"
 ---
 It is not safe to use functions like `open` or the non-pure operations of `pathlib.Path` like you normally might: this will break caching because they do not hook up to Pants's file watcher. 
 

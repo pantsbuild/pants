@@ -4,7 +4,6 @@ slug: "rules-api-process"
 excerpt: "How to safely run subprocesses in your plugin."
 hidden: false
 createdAt: "2020-05-07T22:38:44.131Z"
-updatedAt: "2022-04-26T22:24:24.966Z"
 ---
 It is not safe to use `subprocess.run()` like you normally would because this can break caching and will not leverage Pants's parallelism. Instead, Pants has safe alternatives with `Process` and `InteractiveProcess`.
 
