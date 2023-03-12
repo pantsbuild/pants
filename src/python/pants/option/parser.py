@@ -9,6 +9,7 @@ import inspect
 import json
 import re
 import typing
+import shlex
 from collections import defaultdict
 from dataclasses import dataclass
 from enum import Enum
@@ -550,6 +551,14 @@ class Parser:
             val, source = self._option_parser.parse_from_string_list(
                 option_id, default or [], lambda x: member_type(x)
             )
+            if member_type == shell_str:
+                val = [i for member in val for i in shlex.split(member)]
+            if kwargs.get("passthrough") and passthru_arg_strs:
+                # NB: Passthrough arguments are either of type `str` or `shell_str`
+                # (see self._validate): the former never need interpretation, and the latter do not
+                # need interpretation when they have been provided directly via `sys.argv` as the
+                # passthrough args have been.
+                val.extend(passthru_arg_strs)
         elif type_arg == dict:
 
             def parse_dict_literal(x):
