@@ -199,7 +199,7 @@ def test_lockfile_dependency(rule_runner: RuleRunner) -> None:
     rule_runner.set_options(["--python-enable-resolves"])
     reqs_addr = Address("", target_name="reqs", relative_file_path="requirements.txt")
     lock_addr = Address(
-        "3rdparty/python", target_name="python-default", relative_file_path="default.lock"
+        "3rdparty/python", target_name="_python-default_lockfile", relative_file_path="default.lock"
     )
     assert_python_requirements(
         rule_runner,
