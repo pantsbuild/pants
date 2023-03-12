@@ -4,7 +4,6 @@ slug: "protobuf-python"
 excerpt: "How to generate Python from Protocol Buffers."
 hidden: false
 createdAt: "2020-05-05T16:51:05.928Z"
-updatedAt: "2022-04-20T22:38:04.497Z"
 ---
 When your Python code imports Protobuf generated files, Pants will detect the imports and run the Protoc compiler to generate those files.
 

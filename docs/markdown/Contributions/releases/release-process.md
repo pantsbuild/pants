@@ -4,7 +4,6 @@ slug: "release-process"
 excerpt: "How to release a new version of `pantsbuild.pants` and its plugins."
 hidden: false
 createdAt: "2020-05-16T22:36:48.334Z"
-updatedAt: "2022-06-08T18:06:57.112Z"
 ---
 This page covers the nitty-gritty of executing a release, and is probably only interesting for maintainers. If you're interested in when and why Pants is released, please see the [Release strategy](doc:release-strategy) page.
 

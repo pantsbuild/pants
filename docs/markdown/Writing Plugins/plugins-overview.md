@@ -4,7 +4,6 @@ slug: "plugins-overview"
 excerpt: "An intro to the Pants engine's core concepts."
 hidden: false
 createdAt: "2020-05-07T22:38:39.922Z"
-updatedAt: "2022-05-16T19:56:56.104Z"
 ---
 Pants is designed for extensibility: you can extend Pants by writing custom _plugins_, using a standard Plugin API. In fact, all of Pants's built-in functionality uses the same API!
 

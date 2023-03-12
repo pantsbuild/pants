@@ -4,7 +4,6 @@ slug: "plugins-repl-goal"
 excerpt: "How to add a new implementation to the `repl` goal."
 hidden: false
 createdAt: "2020-08-22T05:58:07.646Z"
-updatedAt: "2022-02-14T23:43:47.610Z"
 ---
 The `repl` goal opens up an interactive Read-Eval-Print Loop that runs in the foreground.
 

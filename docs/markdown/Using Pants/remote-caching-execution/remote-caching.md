@@ -3,7 +3,6 @@ title: "Remote caching"
 slug: "remote-caching"
 hidden: false
 createdAt: "2021-03-19T21:40:24.451Z"
-updatedAt: "2022-04-26T19:47:08.373Z"
 ---
 What is remote caching?
 =======================

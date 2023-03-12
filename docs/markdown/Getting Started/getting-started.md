@@ -3,7 +3,6 @@ title: "Getting started"
 slug: "getting-started"
 hidden: false
 createdAt: "2020-07-29T02:02:59.962Z"
-updatedAt: "2022-04-30T00:03:27.945Z"
 ---
 Thanks for your interest in trying out Pants! 
 

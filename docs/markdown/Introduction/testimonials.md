@@ -4,7 +4,6 @@ slug: "testimonials"
 excerpt: "Pants is helping many software teams. Here's what some of them have to say."
 hidden: false
 createdAt: "2021-04-18T19:21:56.778Z"
-updatedAt: "2022-02-18T02:14:28.299Z"
 ---
 <figure>
  <figcaption>

@@ -3,7 +3,6 @@ title: "Prerequisites"
 slug: "prerequisites"
 hidden: false
 createdAt: "2021-10-17T18:21:38.905Z"
-updatedAt: "2022-04-11T21:13:21.965Z"
 ---
 To run Pants, you need:
 

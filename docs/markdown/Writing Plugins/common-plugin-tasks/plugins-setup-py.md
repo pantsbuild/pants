@@ -4,7 +4,6 @@ slug: "plugins-setup-py"
 excerpt: "How to add your own logic to `python_artifact()`."
 hidden: false
 createdAt: "2020-09-02T00:21:52.821Z"
-updatedAt: "2022-05-10T00:41:52.802Z"
 ---
 Pants can build [Python distributions](doc:python-distributions), such as wheels and sdists, from information you provide in a [`python_distribution`](doc:reference-python_distribution) target. 
 

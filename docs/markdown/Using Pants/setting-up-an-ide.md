@@ -3,7 +3,6 @@ title: "Setting up an IDE"
 slug: "setting-up-an-ide"
 hidden: false
 createdAt: "2021-05-02T06:21:57.663Z"
-updatedAt: "2022-03-14T22:23:16.110Z"
 ---
 If you use a code-aware editor or IDE, such as PyCharm or VSCode, you may want to set it up to understand your code layout and dependencies. This will allow it to perform code navigation, auto-completion and other features that rely on code comprehension.
 

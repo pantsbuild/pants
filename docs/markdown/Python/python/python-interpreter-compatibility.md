@@ -4,7 +4,6 @@ slug: "python-interpreter-compatibility"
 excerpt: "How to configure which Python version(s) your project should use."
 hidden: false
 createdAt: "2020-04-30T20:06:44.249Z"
-updatedAt: "2022-04-23T21:58:23.364Z"
 ---
 Setting the default Python version
 ----------------------------------

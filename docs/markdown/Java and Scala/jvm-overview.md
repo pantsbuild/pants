@@ -4,7 +4,6 @@ slug: "jvm-overview"
 excerpt: "Pants's support for Java and Scala."
 hidden: false
 createdAt: "2022-01-10T20:58:57.450Z"
-updatedAt: "2022-06-01T20:31:40.944Z"
 ---
 > 🚧 Java and Scala support is beta stage
 > 

@@ -4,7 +4,6 @@ slug: "plugins-fmt-goal"
 excerpt: "How to add a new formatter to the `fmt` and `lint` goals."
 hidden: false
 createdAt: "2020-07-01T04:52:28.820Z"
-updatedAt: "2022-04-27T18:37:11.334Z"
 ---
 In Pants, every formatter is also a linter, meaning that if you can run a tool with `pants fmt`, you can run the same tool in check-only mode with `pants lint`. Start by skimming [Add a linter](doc:plugins-lint-goal) to familiarize yourself with how linters work.
 
