@@ -4,7 +4,6 @@ slug: "python-third-party-dependencies"
 excerpt: "How to use third-party Python libraries in your project."
 hidden: false
 createdAt: "2020-04-30T20:06:43.633Z"
-updatedAt: "2022-07-25T15:27:26.087Z"
 ---
 Pants handles dependencies with more precision than traditional Python workflows. Traditionally, you have a single heavyweight [virtual environment](https://docs.python.org/3/tutorial/venv.html) that includes a large set of dependencies, whether or not you actually need them for your current task. 
 

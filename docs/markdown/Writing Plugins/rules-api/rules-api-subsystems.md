@@ -4,7 +4,6 @@ slug: "rules-api-subsystems"
 excerpt: "How to add options to your plugin."
 hidden: false
 createdAt: "2020-07-01T04:55:36.180Z"
-updatedAt: "2022-04-26T22:11:07.667Z"
 ---
 Defining options
 ----------------

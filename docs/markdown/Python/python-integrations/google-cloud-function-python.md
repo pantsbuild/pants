@@ -4,7 +4,6 @@ slug: "google-cloud-function-python"
 excerpt: "Create a Cloud Function with Python."
 hidden: false
 createdAt: "2021-11-09T20:29:58.330Z"
-updatedAt: "2022-01-29T16:47:46.951Z"
 ---
 Pants can create a Google Cloud Function-compatible zip file from your Python code, allowing you to develop your functions in your repository.
 

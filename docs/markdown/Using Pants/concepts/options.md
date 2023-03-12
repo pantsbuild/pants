@@ -4,7 +4,6 @@ slug: "options"
 excerpt: "A deep dive into how options may be configured."
 hidden: false
 createdAt: "2020-02-21T17:44:27.231Z"
-updatedAt: "2022-03-18T23:55:37.347Z"
 ---
 Option scopes
 =============

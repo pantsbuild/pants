@@ -3,7 +3,6 @@ title: "How does Pants work?"
 slug: "how-does-pants-work"
 hidden: false
 createdAt: "2020-07-29T02:58:23.473Z"
-updatedAt: "2022-02-10T19:45:06.305Z"
 ---
 The Pants Engine
 ----------------

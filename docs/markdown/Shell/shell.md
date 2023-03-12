@@ -4,7 +4,6 @@ slug: "shell"
 excerpt: "Pants's support for Shellcheck, shfmt, and shUnit2."
 hidden: false
 createdAt: "2021-04-14T04:21:15.028Z"
-updatedAt: "2022-05-03T23:52:45.915Z"
 ---
 Pants integrates with these tools to empower you to follow best practices with your Shell scripts:
 

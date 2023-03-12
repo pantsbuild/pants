@@ -4,7 +4,6 @@ slug: "kotlin"
 excerpt: "Kotlin support for Pants."
 hidden: false
 createdAt: "2022-07-26T02:02:59.962Z"
-updatedAt: "2022-07-26T02:02:59.962Z"
 ---
 
 > 🚧 Kotlin support is alpha stage

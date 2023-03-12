@@ -3,7 +3,6 @@ title: "Deployments"
 slug: "helm-deployments"
 hidden: false
 createdAt: "2022-07-19T13:16:00.000Z"
-updatedAt: "2022-07-19T13:16:00.000Z"
 ---
 > 🚧 Helm deployment support is in alpha stage
 > 
