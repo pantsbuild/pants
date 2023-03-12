@@ -3,7 +3,6 @@ title: "Tips and debugging"
 slug: "rules-api-tips"
 hidden: false
 createdAt: "2020-05-08T04:15:06.256Z"
-updatedAt: "2022-02-10T19:52:27.560Z"
 ---
 > 📘 Reminder: ask for help
 > 

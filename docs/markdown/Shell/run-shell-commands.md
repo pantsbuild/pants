@@ -4,7 +4,6 @@ slug: "run-shell-commands"
 excerpt: "How to execute arbitrary scripts and programs"
 hidden: false
 createdAt: "2021-10-04T12:37:58.934Z"
-updatedAt: "2022-02-08T21:13:55.807Z"
 ---
 The [`shell_command`](doc:reference-shell_command) target allows you to run any command during a Pants execution, for the purpose of modifying or creating files to be used by other targets, or its (idempotent: see below) side-effects when accessing services over the network.
 

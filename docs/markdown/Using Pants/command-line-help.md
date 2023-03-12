@@ -4,7 +4,6 @@ slug: "command-line-help"
 excerpt: "How to dynamically get more information on Pants's internals."
 hidden: false
 createdAt: "2020-02-27T01:32:45.818Z"
-updatedAt: "2021-11-09T20:48:14.737Z"
 ---
 Run `pants help` to get basic help, including a list of commands you can run to get more specific help:
 

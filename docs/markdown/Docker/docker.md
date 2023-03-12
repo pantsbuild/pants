@@ -4,7 +4,6 @@ slug: "docker"
 excerpt: "How to build Docker images containing artifacts built by Pants"
 hidden: false
 createdAt: "2021-09-03T15:28:55.877Z"
-updatedAt: "2022-05-13T12:34:06.323Z"
 ---
 Docker images typically bundle build artifacts, such as PEX files, wheels, loose files, and so on, with other runtime requirements, such as a Python interpreter.
 

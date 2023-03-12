@@ -4,7 +4,6 @@ slug: "create-a-new-goal"
 excerpt: "Getting started writing plugins for Pants by creating a new goal."
 hidden: false
 createdAt: "2022-02-07T05:44:28.620Z"
-updatedAt: "2022-02-07T05:44:28.620Z"
 ---
 In this tutorial, you'll learn the basics needed to get started writing a plugin. You will create a new goal, `project-version`, which will tell you the version (retrieved from the `VERSION` text file) of a particular project in your monorepository. You will learn how to create a new custom target to refer to the `VERSION` file, how to author a new goal, and, most importantly, how to connect rules and targets. 
 

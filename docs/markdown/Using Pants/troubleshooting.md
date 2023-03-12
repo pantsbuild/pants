@@ -4,7 +4,6 @@ slug: "troubleshooting"
 excerpt: "Frequently asked questions (FAQs) and known issues you may encounter."
 hidden: false
 createdAt: "2020-04-10T19:42:28.637Z"
-updatedAt: "2022-05-25T14:34:36.454Z"
 ---
 > 👍 We love giving help!
 > 

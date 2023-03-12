@@ -4,7 +4,6 @@ slug: "using-pants-in-ci"
 excerpt: "Suggestions for how to use Pants to speed up your CI (continuous integration)."
 hidden: false
 createdAt: "2021-05-24T23:02:54.908Z"
-updatedAt: "2022-07-25T23:50:56.628Z"
 ---
 > 📘 Examples
 > 

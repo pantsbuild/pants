@@ -4,7 +4,6 @@ slug: "plugin-upgrade-guide"
 excerpt: "How to adjust for changes made to the Plugin API."
 hidden: false
 createdAt: "2020-10-12T16:19:01.543Z"
-updatedAt: "2022-07-25T20:02:17.695Z"
 ---
 
 2.16

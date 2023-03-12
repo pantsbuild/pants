@@ -3,7 +3,6 @@ title: "Manual installation"
 slug: "manual-installation"
 hidden: false
 createdAt: "2022-07-12T00:00:00.000Z"
-updatedAt: "2022-07-12T00:00:00.000Z"
 ---
 
 > 🚧 This page describes an old, deprecated method for installing Pants. 

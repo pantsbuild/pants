@@ -4,7 +4,6 @@ slug: "advanced-target-selection"
 excerpt: "Alternative techniques to tell Pants which files/targets to run on."
 hidden: false
 createdAt: "2020-05-11T20:10:29.560Z"
-updatedAt: "2022-07-25T23:44:44.463Z"
 ---
 See [Goal arguments](doc:goals#goal-arguments) for the normal techniques for telling Pants what to
 run on. 
