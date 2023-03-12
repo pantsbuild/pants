@@ -5,13 +5,14 @@ from __future__ import annotations
 
 import json
 import shlex
+import tempfile
 import unittest.mock
-from contextlib import contextmanager
+from contextlib import contextmanager, ExitStack
 from enum import Enum
 from functools import partial
 from pathlib import Path
 from textwrap import dedent
-from typing import Any, Callable, Dict, cast
+from typing import Any, Callable, Dict, cast, Sequence
 
 import pytest
 import toml
@@ -19,6 +20,7 @@ import yaml
 from packaging.version import Version
 
 from pants.base.build_environment import get_buildroot
+from pants.engine.internals.native_engine import PyOptionParser
 from pants.base.deprecated import CodeRemovedError, warn_or_error
 from pants.base.hash_utils import CoercingEncoder
 from pants.engine.fs import FileContent
@@ -70,20 +72,34 @@ def subsystem(scope: str) -> ScopeInfo:
 
 
 def create_options(
-    scopes: list[str],
-    register_fn: Callable[[Options], None],
+    scopes: list[str] | list[ScopeInfo],
+    register_fn: Callable[[Options], None] = lambda _: None,
     args: list[str] | None = None,
     *,
     env: dict[str, str] | None = None,
-    config: dict[str, dict[str, Any]] | None = None,
+    configs: Sequence[dict[str, dict[str, Any]]] = (),
     extra_scope_infos: list[ScopeInfo] | None = None,
 ) -> Options:
-    options = Options.create(
-        env=env or {},
-        config=Config.load([FileContent("pants.toml", toml.dumps(config or {}).encode())]),
-        known_scope_infos=[*(ScopeInfo(scope) for scope in scopes), *(extra_scope_infos or ())],
-        args=["./pants", *(args or ())],
-    )
+    
+    def dump_config(stack: ExitStack, config: dict[str, dict[str, Any]]) -> str:
+        file = stack.enter_context(tempfile.NamedTemporaryFile("w"))
+        toml.dump(config or {}, file)
+        file.flush()
+        return file.name
+
+    with ExitStack() as stack:
+        config_filenames = [dump_config(stack, config) for config in configs]
+        config_file_options = [f"--pants-config-files={filename}" for filename in config_filenames]
+
+        args = ["./pants", *config_file_options, *(args or ())]
+        option_parser = PyOptionParser(env or {}, args)
+        options = Options.create(
+            known_scope_infos=[
+                *((ScopeInfo(scope) if isinstance(scope, str) else scope) for scope in scopes),
+                *(extra_scope_infos or ())],
+            args=args,
+            option_parser=option_parser,
+        )
     register_fn(options)
     return options
 
@@ -208,7 +224,7 @@ def test_bool_config(val: bool) -> None:
         "implicit_false_default_true",
     )
     opts = create_options(
-        [GLOBAL_SCOPE], register_bool_opts, config={"GLOBAL": {opt: val for opt in opt_names}}
+        [GLOBAL_SCOPE], register_bool_opts, configs=[{"GLOBAL": {opt: val for opt in opt_names}}]
     ).for_global_scope()
     for opt in opt_names:
         assert opts[opt] is val, f"option {opt} has value {opts[opt]} but expected {val}"
@@ -220,7 +236,7 @@ def test_bool_invalid_value(val: Any) -> None:
         opts.register(GLOBAL_SCOPE, "--opt", type=bool)
 
     with pytest.raises(BooleanConversionError):
-        create_options([GLOBAL_SCOPE], register, config={"GLOBAL": {"opt": val}}).for_global_scope()
+        create_options([GLOBAL_SCOPE], register, configs=[{"GLOBAL": {"opt": val}}]).for_global_scope()
 
 
 # ----------------------------------------------------------------------------------------
@@ -344,11 +360,11 @@ def test_deprecated_options(caplog) -> None:
         *,
         expected: str | bool,
         env: dict[str, str] | None = None,
-        config: dict[str, dict[str, str]] | None = None,
+        configs: Sequence[dict[str, dict[str, str]]] = (),
     ) -> None:
         caplog.clear()
         warn_or_error.clear()  # type: ignore[attr-defined]
-        opts = create_options([GLOBAL_SCOPE, "scope"], register, args, env=env, config=config)
+        opts = create_options([GLOBAL_SCOPE, "scope"], register, args, env=env, configs=configs)
         assert opts.for_scope(scope)[opt] == expected
         assert len(caplog.records) == 1
         assert "is scheduled to be removed in version" in caplog.text
@@ -367,8 +383,8 @@ def test_deprecated_options(caplog) -> None:
     assert_deprecated(GLOBAL_SCOPE, "old1", [], env={"PANTS_GLOBAL_OLD1": "x"}, expected="x")
     assert_deprecated("scope", "old2", [], env={"PANTS_SCOPE_OLD2": "x"}, expected="x")
 
-    assert_deprecated(GLOBAL_SCOPE, "old1", [], config={"GLOBAL": {"old1": "x"}}, expected="x")
-    assert_deprecated("scope", "old2", [], config={"scope": {"old2": "x"}}, expected="x")
+    assert_deprecated(GLOBAL_SCOPE, "old1", [], configs=[{"GLOBAL": {"old1": "x"}}], expected="x")
+    assert_deprecated("scope", "old2", [], configs=[{"scope": {"old2": "x"}}], expected="x")
 
     # Make sure the warnings don't come out for regular options.
     caplog.clear()
@@ -451,7 +467,7 @@ def test_scope_deprecation(caplog) -> None:
         register,
         ["--new1-baz=vv"],
         extra_scope_infos=[Subsystem1.get_scope_info(), Subsystem2.get_scope_info()],
-        config={
+        configs=[{
             Subsystem1.options_scope: {"foo": "xx"},
             Subsystem1.deprecated_options_scope: {
                 "foo": "yy",
@@ -459,7 +475,7 @@ def test_scope_deprecation(caplog) -> None:
                 "baz": "ww",
                 "qux": "uu",
             },
-        },
+        }],
     )
 
     caplog.clear()
@@ -496,7 +512,7 @@ def test_scope_deprecation_default_config_section(caplog) -> None:
         register,
         [],
         extra_scope_infos=[Subsystem1.get_scope_info()],
-        config={"DEFAULT": {"foo": "aa"}, Subsystem1.options_scope: {"foo": "xx"}},
+        configs=[{"DEFAULT": {"foo": "aa"}, Subsystem1.options_scope: {"foo": "xx"}}],
     )
     caplog.clear()
     assert opts.for_scope(Subsystem1.options_scope).foo == "xx"
@@ -509,18 +525,6 @@ def test_scope_deprecation_default_config_section(caplog) -> None:
 
 
 class OptionsTest(unittest.TestCase):
-    @staticmethod
-    def _create_config(
-        config: dict[str, dict[str, str]] | None = None,
-        config2: dict[str, dict[str, str]] | None = None,
-    ) -> Config:
-        return Config.load(
-            [
-                FileContent("test_config.toml", toml.dumps(config or {}).encode()),
-                FileContent("test_config2.toml", toml.dumps(config2 or {}).encode()),
-            ]
-        )
-
     def _parse(
         self,
         *,
@@ -530,15 +534,18 @@ class OptionsTest(unittest.TestCase):
         config2: dict[str, dict[str, Any]] | None = None,
         bootstrap_option_values=None,
     ) -> Options:
-        args = ["./pants", *shlex.split(flags)]
-        options = Options.create(
-            env=env or {},
-            config=self._create_config(config, config2),
-            known_scope_infos=OptionsTest._known_scope_infos,
+        assert bootstrap_option_values is None, "TODO"
+        args = shlex.split(flags)
+        options = create_options(
+            OptionsTest._known_scope_infos,
+            self._register,
             args=args,
-            bootstrap_option_values=bootstrap_option_values,
+            env=env,
+            configs=[
+                *([config] if config is not None else []),
+                *([config2] if config2 is not None else []),
+            ]
         )
-        self._register(options)
         return options
 
     _known_scope_infos = [
@@ -599,8 +606,8 @@ class OptionsTest(unittest.TestCase):
         register_global("--int-choices", choices=[42, 99], type=list, member_type=int)
 
         # Custom types.
-        register_global("--listy", type=list, member_type=int, default="[1, 2, 3]")
-        register_global("--dicty", type=dict, default='{"a": "b"}')
+        register_global("--listy", type=list, member_type=int, default=[1, 2, 3])
+        register_global("--dicty", type=dict, default={"a": "b"})
         register_global(
             "--dict-listy", type=list, member_type=dict, default='[{"a": 1, "b": 2}, {"c": 3}]'
         )
@@ -690,10 +697,8 @@ class OptionsTest(unittest.TestCase):
 
     def test_env_var_of_type_int(self) -> None:
         create_options_object = partial(
-            Options.create,
-            config=self._create_config(),
-            known_scope_infos=OptionsTest._known_scope_infos,
-            args=shlex.split("./pants"),
+            create_options,
+            scopes=OptionsTest._known_scope_infos,
         )
         options = create_options_object(env={"PANTS_FOO_BAR": "123"})
         options.register(GLOBAL_SCOPE, "--foo-bar", type=int)
@@ -1091,14 +1096,14 @@ class OptionsTest(unittest.TestCase):
 
     def test_validation(self) -> None:
         def assertError(expected_error, *args, **kwargs):
-            with pytest.raises(expected_error):
-                options = Options.create(
-                    args=["./pants"],
-                    env={},
-                    config=self._create_config(),
-                    known_scope_infos=[global_scope()],
-                )
+            def register(options: Options) -> None:
                 options.register(GLOBAL_SCOPE, *args, **kwargs)
+            with pytest.raises(expected_error):
+                options = create_options(
+                    scopes=[global_scope()],
+                    register_fn=register,
+                    env={},
+                )
                 options.for_global_scope()
 
         assertError(NoOptionNames)
@@ -1124,14 +1129,13 @@ class OptionsTest(unittest.TestCase):
         check(flag="--implicit-valuey=explicit", expected="explicit")
 
     def test_shadowing(self) -> None:
-        options = Options.create(
-            env={},
-            config=self._create_config(),
-            known_scope_infos=[global_scope(), task("bar"), intermediate("foo"), task("foo.bar")],
-            args=["./pants"],
+        def register(options: Options) -> None:
+            options.register("", "--opt1")
+            options.register("foo", "-o", "--opt2")
+        options = create_options(
+            scopes=[global_scope(), task("bar"), intermediate("foo"), task("foo.bar")],
+            register_fn=register,
         )
-        options.register("", "--opt1")
-        options.register("foo", "-o", "--opt2")
 
     def test_is_known_scope(self) -> None:
         options = self._parse()
@@ -1162,14 +1166,12 @@ class OptionsTest(unittest.TestCase):
 
     def test_passthru_args_subsystems_and_goals(self):
         # Test that passthrough args are applied.
-        options = Options.create(
-            env={},
-            config=self._create_config(),
-            known_scope_infos=[global_scope(), task("test"), subsystem("passconsumer")],
-            args=["./pants", "test", "target", "--", "bar", "--baz", "@dont_fromfile_expand_me"],
-        )
-        options.register(
-            "passconsumer", "--passthing", passthrough=True, type=list, member_type=str
+        options = create_options(
+            scopes=[global_scope(), task("test"), subsystem("passconsumer")],
+            register_fn=lambda o: o.register(
+                "passconsumer", "--passthing", passthrough=True, type=list, member_type=str
+            ),
+            args=["test", "target", "--", "bar", "--baz", "@dont_fromfile_expand_me"],
         )
 
         assert ["bar", "--baz", "@dont_fromfile_expand_me"] == options.for_scope(
@@ -1178,11 +1180,9 @@ class OptionsTest(unittest.TestCase):
 
     def test_at_most_one_goal_with_passthru_args(self):
         with pytest.raises(Options.AmbiguousPassthroughError) as exc:
-            Options.create(
-                env={},
-                config=self._create_config(),
-                known_scope_infos=[global_scope(), task("test"), task("fmt")],
-                args=["./pants", "test", "fmt", "target", "--", "bar", "--baz"],
+            create_options(
+                scopes=[global_scope(), task("test"), task("fmt")],
+                args=["test", "fmt", "target", "--", "bar", "--baz"],
             )
         assert (
             "Specifying multiple goals (in this case: ['test', 'fmt']) along with passthrough args"
@@ -1191,14 +1191,16 @@ class OptionsTest(unittest.TestCase):
 
     def test_passthru_args_not_interpreted(self):
         # Test that passthrough args are not interpreted.
-        options = Options.create(
-            env={},
-            config=self._create_config(
-                {"consumer": {"shlexed": ["from config"], "string": ["from config"]}}
-            ),
-            known_scope_infos=[global_scope(), task("test"), subsystem("consumer")],
+        def register(options: Options) -> None:
+            options.register(
+                "consumer", "--shlexed", passthrough=True, type=list, member_type=shell_str
+            )
+            options.register("consumer", "--string", passthrough=True, type=list, member_type=str)
+
+        options = create_options(
+            scopes=[global_scope(), task("test"), subsystem("consumer")],
+            register_fn=register,
             args=[
-                "./pants",
                 "--consumer-shlexed=a",
                 "--consumer-string=b",
                 "test",
@@ -1206,11 +1208,10 @@ class OptionsTest(unittest.TestCase):
                 "[bar]",
                 "multi token from passthrough",
             ],
+            configs=[
+                {"consumer": {"shlexed": ["from config"], "string": ["from config"]}}
+            ],
         )
-        options.register(
-            "consumer", "--shlexed", passthrough=True, type=list, member_type=shell_str
-        )
-        options.register("consumer", "--string", passthrough=True, type=list, member_type=str)
 
         assert [
             "from",
@@ -1560,11 +1561,8 @@ class OptionsTest(unittest.TestCase):
         assert global_options.store_true_flag
 
     def test_double_registration(self) -> None:
-        options = Options.create(
-            env={},
-            config=self._create_config(),
-            known_scope_infos=OptionsTest._known_scope_infos,
-            args=shlex.split("./pants"),
+        options = create_options(
+            scopes=OptionsTest._known_scope_infos,
         )
         options.register(GLOBAL_SCOPE, "--foo-bar")
         with pytest.raises(OptionAlreadyRegistered):
