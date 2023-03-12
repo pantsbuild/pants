@@ -163,7 +163,7 @@ impl Scheduler {
       let mut entry = sizes.entry(k.workunit_name()).or_insert_with(|| (0, 0));
       entry.0 += 1;
       entry.1 += {
-        std::mem::size_of_val(&k)
+        std::mem::size_of_val(k)
           + k.deep_size_of_children(&mut deep_context)
           + std::mem::size_of_val(&v)
           + v.deep_size_of_children(&mut deep_context)
