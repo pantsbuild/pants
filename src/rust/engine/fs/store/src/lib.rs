@@ -77,7 +77,9 @@ const GIGABYTES: usize = 1024 * MEGABYTES;
 // NB: These numbers were chosen after micro-benchmarking the code on one machine at the time of
 // writing. They were chosen using a rough equation from the microbenchmarks that are optimized
 // for somewhere between 2 and 3 uses of the corresponding entry to "break even".
-const IMMUTABLE_FILE_SIZE_LIMIT: usize = 512 * KILOBYTES;
+// TODO: Temporarily disabled until #18162 and/or #18153 are resolved, since hardlinks do not play
+// well with Docker on macOS.
+const IMMUTABLE_FILE_SIZE_LIMIT: usize = usize::MAX - 1;
 
 mod local;
 #[cfg(test)]
