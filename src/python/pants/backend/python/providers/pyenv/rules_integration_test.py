@@ -37,6 +37,7 @@ def rule_runner() -> RuleRunner:
             PythonSourcesGeneratorTarget,
             PyenvInstall,
         ],
+        preserve_tmpdirs=True,
     )
 
 
@@ -113,7 +114,7 @@ def test_venv_pex_reconstruction(rule_runner):
                 print(venv_location)
                 """
             ),
-            "src/BUILD": "python_sources()",
+            "src/BUILD": "python_sources(interpreter_constraints=['==3.9.*'])",
         }
     )
 

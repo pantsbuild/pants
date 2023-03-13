@@ -137,6 +137,8 @@ venv_use_symlinks = true
 # `python_distrobution` targets, currently:
 # + src/python/pants:pants-packaged
 # + src/python/pants/testutil:testutil_wheel
+# And update the PythonBuildStandalone version/URL:
+# + src/python/pants/core/subsystems/python_bootstrap.py
 interpreter_constraints = [">=3.7,<3.10"]
 macos_big_sur_compatibility = true
 enable_resolves = true

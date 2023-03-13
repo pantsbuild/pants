@@ -18,24 +18,68 @@ from pants.core.util_rules.environments import EnvironmentTarget, LocalEnvironme
 from pants.core.util_rules.search_paths import ValidatedSearchPaths, ValidateSearchPathsRequest
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest, PathEnvironmentVariable
 from pants.engine.rules import Get, _uncacheable_rule, collect_rules, rule
-from pants.option.option_types import StrListOption
+from pants.option.option_types import DictOption, StrListOption
 from pants.option.subsystem import Subsystem
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import help_text, softwrap
 
 logger = logging.getLogger(__name__)
 
+_PBS_URL_TEMPLATE = "https://github.com/indygreg/python-build-standalone/releases/download/20230116/cpython-3.9.16+20230116-{}-install_only.tar.gz"
+
 
 class PythonBootstrapSubsystem(Subsystem):
     options_scope = "python-bootstrap"
     help = help_text(
         """
-        Options used to locate Python interpreters used by all Pants backends.
+        Options used to locate Python interpreters
 
         This subsystem controls where and how Pants will locate Python, but beyond that it does
         not control which Python interpreter versions are actually used for your code: see the
         `python` subsystem for that.
         """
+    )
+
+    internal_python_build_standalone_info = DictOption(
+        default={
+            "linux_arm64": (
+                _PBS_URL_TEMPLATE.format("aarch64-unknown-linux-gnu"),
+                "1ba520c0db431c84305677f56eb9a4254f5097430ed443e92fc8617f8fba973d",
+                23873387,
+            ),
+            "linux_x86_64": (
+                _PBS_URL_TEMPLATE.format("x86_64-unknown-linux-gnu"),
+                "7ba397787932393e65fc2fb9fcfabf54f2bb6751d5da2b45913cb25b2d493758",
+                26129729,
+            ),
+            "macos_arm64": (
+                _PBS_URL_TEMPLATE.format("aarch64-apple-darwin"),
+                "d732d212d42315ac27c6da3e0b69636737a8d72086c980daf844344c010cab80",
+                17084463,
+            ),
+            "macos_x86_64": (
+                _PBS_URL_TEMPLATE.format("x86_64-apple-darwin"),
+                "3948384af5e8d4ee7e5ccc648322b99c1c5cf4979954ed5e6b3382c69d6db71e",
+                17059474,
+            ),
+        },
+        help=softwrap(
+            """
+            A map from platform to the information needed to download Python Build Standalone.
+
+            Python Build Standalone is used to run Python-implemented Pants tools/scripts in
+            docker environments (so that Python doesn't need to be installed).
+
+            The version of Python provided should match the default value's version, which is
+            the highest Python Major/Minor version compatible with the Pants package's
+            interpreter constraints. Additionally, the downloaded file should be extractable by
+            `tar` using `-xvf` (most likely a `.tar.gz` file).
+
+            The schema is <string platform key>: (<string url>, <string fingerprint>, <int bytelen>)
+            for each possible platform.
+            """
+        ),
+        advanced=True,
     )
 
     class EnvironmentAware(Subsystem.EnvironmentAware):
