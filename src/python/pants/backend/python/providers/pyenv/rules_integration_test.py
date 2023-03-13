@@ -114,7 +114,7 @@ def test_venv_pex_reconstruction(rule_runner):
                 print(venv_location)
                 """
             ),
-            "src/BUILD": f"python_sources(interpreter_constraints=['==3.9.*'])",
+            "src/BUILD": "python_sources(interpreter_constraints=['==3.9.*'])",
         }
     )
 
