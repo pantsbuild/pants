@@ -36,7 +36,7 @@ def rule_runner() -> RuleRunner:
 def test_local(env_tgt) -> None:
     result = run_rule_with_mocks(
         adhoc_binaries.get_python_for_scripts,
-        rule_args=[EnvironmentTarget(env_tgt)],
+        rule_args=[EnvironmentTarget("local", env_tgt)],
         mock_gets=[
             MockGet(
                 output_type=_PythonBuildStandaloneBinary,
@@ -51,7 +51,7 @@ def test_local(env_tgt) -> None:
 def test_docker_uses_helper() -> None:
     result = run_rule_with_mocks(
         adhoc_binaries.get_python_for_scripts,
-        rule_args=[EnvironmentTarget(FileTarget({"source": ""}, address=Address("")))],
+        rule_args=[EnvironmentTarget("docker", FileTarget({"source": ""}, address=Address("")))],
         mock_gets=[
             MockGet(
                 output_type=_PythonBuildStandaloneBinary,
