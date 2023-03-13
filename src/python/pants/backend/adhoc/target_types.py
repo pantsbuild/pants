@@ -81,7 +81,7 @@ class AdhocToolOutputDependenciesField(AdhocToolDependenciesField):
     supports_transitive_excludes = True
     alias: ClassVar[str] = "output_dependencies"
     deprecated_alias = "dependencies"
-    deprecated_alias_removal_version = "2.17.0.dev0"
+    deprecated_alias_removal_version = "2.17.0.dev1"
 
     help = help_text(
         lambda: f"""
@@ -89,7 +89,7 @@ class AdhocToolOutputDependenciesField(AdhocToolDependenciesField):
 
         To enable legacy use cases, if `{AdhocToolExecutionDependenciesField.alias}` is `None`,
         these dependencies will be materialized in the execution sandbox. This behavior is
-        deprecated, and will be removed in version 2.17.0.dev0.
+        deprecated, and will be removed in version 2.17.0.dev1.
         """
     )
 
@@ -232,7 +232,7 @@ class AdhocToolOutputRootDirField(StringField):
 class AdhocToolTarget(Target):
     alias: ClassVar[str] = "adhoc_tool"
     deprecated_alias = "experimental_run_in_sandbox"
-    deprecated_alias_removal_version = "2.17.0.dev0"
+    deprecated_alias_removal_version = "2.17.0.dev1"
     core_fields = (
         *COMMON_TARGET_FIELDS,
         AdhocToolRunnableField,

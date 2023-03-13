@@ -73,7 +73,7 @@ class AdhocProcessResult:
 class ResolveExecutionDependenciesRequest:
     address: Address
     execution_dependencies: tuple[str, ...] | None
-    dependencies: tuple[str, ...] | None  # can go away after 2.17.0.dev0 per deprecation
+    dependencies: tuple[str, ...] | None  # can go away after 2.17.0.dev1 per deprecation
     runnable_dependencies: tuple[str, ...] | None
 
 
@@ -284,7 +284,7 @@ async def resolve_execution_environment(
         # dependencies.
         execution_dependencies = Addresses((target_address,))
         warn_or_error(
-            "2.17.0.dev0",
+            "2.17.0.dev1",
             "Using `dependencies` to specify execution-time dependencies for `shell_command` ",
             (
                 "To clear this warning, use the `output_dependencies` and `execution_dependencies`"

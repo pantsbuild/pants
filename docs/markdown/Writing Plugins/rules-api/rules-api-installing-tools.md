@@ -4,7 +4,6 @@ slug: "rules-api-installing-tools"
 excerpt: "Various methods for Pants to access the tools your plugin needs."
 hidden: false
 createdAt: "2020-07-23T20:40:30.771Z"
-updatedAt: "2022-04-26T22:33:52.117Z"
 ---
 `BinaryPaths`: Find already installed binaries
 ----------------------------------------------

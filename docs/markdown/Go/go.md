@@ -4,7 +4,6 @@ slug: "go"
 excerpt: "Pants's support for Golang."
 hidden: false
 createdAt: "2021-10-08T18:16:00.142Z"
-updatedAt: "2022-07-25T23:52:25.735Z"
 ---
 > 🚧 Go support is beta stage
 >

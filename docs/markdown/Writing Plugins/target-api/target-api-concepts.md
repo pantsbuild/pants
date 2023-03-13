@@ -4,7 +4,6 @@ slug: "target-api-concepts"
 excerpt: "The core concepts of Targets and Fields."
 hidden: false
 createdAt: "2020-05-07T22:38:43.975Z"
-updatedAt: "2021-11-16T02:52:06.072Z"
 ---
 The Target API defines how you interact with targets in your plugin. For example, you would use the Target API to read the `source` / `sources` field of a target to know which files to run on.
 

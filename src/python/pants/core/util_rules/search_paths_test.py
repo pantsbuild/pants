@@ -82,7 +82,8 @@ def test_validated_search_paths(
         extra_kwargs = {
             DockerImageField.alias: "my_img",
         }
-    env_tgt = EnvironmentTarget(env_tgt_type(extra_kwargs, address=Address("flem")))
+    env_name = "name"
+    env_tgt = EnvironmentTarget(env_name, env_tgt_type(extra_kwargs, address=Address("flem")))
     local_only = FrozenOrderedSet(
         {
             "<PYENV>",

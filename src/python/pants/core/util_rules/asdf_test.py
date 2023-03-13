@@ -171,8 +171,10 @@ def test_get_asdf_paths(
             extra_kwargs = {
                 DockerImageField.alias: "my_img",
             }
+        env_name = "name"
         env_tgt = EnvironmentTarget(
-            env_tgt_type(extra_kwargs, Address("flem")) if env_tgt_type is not None else None
+            env_name,
+            env_tgt_type(extra_kwargs, Address("flem")) if env_tgt_type is not None else None,
         )
 
         # Check the "all installed" fallback

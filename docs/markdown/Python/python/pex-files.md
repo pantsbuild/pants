@@ -3,7 +3,6 @@ title: "Pex files"
 slug: "pex-files"
 hidden: false
 createdAt: "2020-03-21T20:47:00.042Z"
-updatedAt: "2022-02-09T01:33:52.341Z"
 ---
 When working with Python code, Pants makes frequent use of the [Pex](https://github.com/pantsbuild/pex) (Python EXecutable) format. So, you'll see Pex referenced frequently in this documentation.
 

@@ -24,7 +24,7 @@ use futures::future::{BoxFuture, FutureExt, TryFutureExt};
 use futures::try_join;
 use indexmap::IndexMap;
 use pyo3::types::PyString;
-use pyo3::{PyAny, PyRef, Python, ToPyObject};
+use pyo3::{IntoPy, PyAny, PyRef, Python, ToPyObject};
 use tokio::process;
 
 use docker::docker::{ImagePullPolicy, ImagePullScope, DOCKER, IMAGE_PULL_CACHE};
@@ -162,15 +162,14 @@ fn process_request_to_process_result(
   mut args: Vec<Value>,
 ) -> BoxFuture<'static, NodeResult<Value>> {
   async move {
-    let process_config: externs::process::PyProcessConfigFromEnvironment =
-      Python::with_gil(|py| {
-        args
-          .pop()
-          .unwrap()
-          .as_ref()
-          .extract(py)
-          .map_err(|e| format!("{e}"))
-      })?;
+    let process_config: externs::process::PyProcessExecutionEnvironment = Python::with_gil(|py| {
+      args
+        .pop()
+        .unwrap()
+        .as_ref()
+        .extract(py)
+        .map_err(|e| format!("{e}"))
+    })?;
     let process_request =
       ExecuteProcess::lift(&context.core.store(), args.pop().unwrap(), process_config)
         .map_err(|e| e.enrich("Error lifting Process"))
@@ -188,7 +187,6 @@ fn process_request_to_process_result(
         .map_err(|e| e.enrich("Bytes from stderr"))
     )?;
 
-    let platform_name: String = result.platform.into();
     let gil = Python::acquire_gil();
     let py = gil.python();
     Ok(externs::unsafe_call(
@@ -203,11 +201,6 @@ fn process_request_to_process_result(
         Snapshot::store_directory_digest(py, result.output_directory)?,
         externs::unsafe_call(
           py,
-          context.core.types.platform,
-          &[externs::store_utf8(py, &platform_name)],
-        ),
-        externs::unsafe_call(
-          py,
           context.core.types.process_result_metadata,
           &[
             result
@@ -215,6 +208,12 @@ fn process_request_to_process_result(
               .total_elapsed
               .map(|d| externs::store_u64(py, Duration::from(d).as_millis() as u64))
               .unwrap_or_else(|| Value::from(py.None())),
+            Value::from(
+              externs::process::PyProcessExecutionEnvironment {
+                environment: result.metadata.environment,
+              }
+              .into_py(py),
+            ),
             externs::store_utf8(py, result.metadata.source.into()),
             externs::store_u64(py, result.metadata.source_run_id.0.into()),
           ],
@@ -526,7 +525,7 @@ fn interactive_process(
       let types = &context.core.types;
       let interactive_process_result = types.interactive_process_result;
 
-      let (py_interactive_process, py_process, process_config): (Value, Value, externs::process::PyProcessConfigFromEnvironment) = Python::with_gil(|py| {
+      let (py_interactive_process, py_process, process_config): (Value, Value, externs::process::PyProcessExecutionEnvironment) = Python::with_gil(|py| {
         let py_interactive_process = (*args[0]).as_ref(py);
         let py_process: Value = externs::getattr(py_interactive_process, "process").unwrap();
         let process_config = (*args[1])
@@ -535,7 +534,7 @@ fn interactive_process(
           .unwrap();
         (py_interactive_process.extract().unwrap(), py_process, process_config)
       });
-      match process_config.execution_strategy {
+      match process_config.environment.strategy {
         ProcessExecutionStrategy::Docker(_) | ProcessExecutionStrategy::RemoteExecution(_) => Err("InteractiveProcess should not set docker_image or remote_execution".to_owned()),
         _ => Ok(())
       }?;
@@ -562,8 +561,7 @@ fn interactive_process(
         tempdir.path().to_owned(),
         &process,
         process.input_digests.inputs.clone(),
-        context.core.store(),
-        context.core.executor.clone(),
+        &context.core.store(),
         &context.core.named_caches,
         &context.core.immutable_inputs,
         None,

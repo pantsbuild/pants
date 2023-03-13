@@ -25,7 +25,8 @@ use crate::remote_cache::RemoteCacheWarningsBehavior;
 use process_execution::{
   make_execute_request, CacheContentBehavior, CommandRunner as CommandRunnerTrait, Context,
   EntireExecuteRequest, FallibleProcessResultWithPlatform, Platform, Process, ProcessCacheScope,
-  ProcessError, ProcessResultMetadata, ProcessResultSource,
+  ProcessError, ProcessExecutionEnvironment, ProcessExecutionStrategy, ProcessResultMetadata,
+  ProcessResultSource,
 };
 
 const CACHE_READ_TIMEOUT: Duration = Duration::from_secs(5);
@@ -50,8 +51,16 @@ impl MockLocalCommandRunner {
         stderr_digest: EMPTY_DIGEST,
         exit_code,
         output_directory: EMPTY_DIRECTORY_DIGEST.clone(),
-        platform: Platform::current().unwrap(),
-        metadata: ProcessResultMetadata::new(None, ProcessResultSource::RanLocally, RunId(0)),
+        metadata: ProcessResultMetadata::new(
+          None,
+          ProcessResultSource::Ran,
+          ProcessExecutionEnvironment {
+            name: None,
+            platform: Platform::current().unwrap(),
+            strategy: ProcessExecutionStrategy::Local,
+          },
+          RunId(0),
+        ),
       }),
       call_counter,
       delay: Duration::from_millis(delay_ms),
@@ -753,8 +762,16 @@ async fn make_action_result_basic() {
     stderr_digest: TestData::robin().digest(),
     output_directory: DirectoryDigest::from_persisted_digest(directory_digest),
     exit_code: 102,
-    platform: Platform::Linux_x86_64,
-    metadata: ProcessResultMetadata::new(None, ProcessResultSource::RanLocally, RunId(0)),
+    metadata: ProcessResultMetadata::new(
+      None,
+      ProcessResultSource::Ran,
+      ProcessExecutionEnvironment {
+        name: None,
+        platform: Platform::Linux_x86_64,
+        strategy: ProcessExecutionStrategy::Local,
+      },
+      RunId(0),
+    ),
   };
 
   let (action_result, digests) = runner

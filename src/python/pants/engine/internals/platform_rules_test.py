@@ -44,12 +44,14 @@ def test_current_platform() -> None:
         expected: Platform,
     ) -> None:
         global_options = create_subsystem(GlobalOptions, remote_execution=remote_execution)
+        name = "name"
         env_subsystem = create_subsystem(
             EnvironmentsSubsystem,
-            names={"name": "addr"} if envs_enabled else {},
+            names={name: "addr"} if envs_enabled else {},
         )
         result = run_rule_with_mocks(
-            current_platform, rule_args=[EnvironmentTarget(env_tgt), global_options, env_subsystem]
+            current_platform,
+            rule_args=[EnvironmentTarget(name, env_tgt), global_options, env_subsystem],
         )
         assert result == expected
 
@@ -104,9 +106,10 @@ def test_complete_env_vars() -> None:
         expected_env: str,
     ) -> None:
         global_options = create_subsystem(GlobalOptions, remote_execution=remote_execution)
+        name = "name"
         env_subsystem = create_subsystem(
             EnvironmentsSubsystem,
-            names={"name": "addr"} if envs_enabled else {},
+            names={name: "addr"} if envs_enabled else {},
         )
 
         def mock_env_process(process: Process) -> ProcessResult:
@@ -120,7 +123,7 @@ def test_complete_env_vars() -> None:
                 SessionValues(
                     {CompleteEnvironmentVars: CompleteEnvironmentVars({"LOCAL": "true"})}
                 ),
-                EnvironmentTarget(env_tgt),
+                EnvironmentTarget(name, env_tgt),
                 global_options,
                 env_subsystem,
             ],

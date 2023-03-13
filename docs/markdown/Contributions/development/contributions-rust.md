@@ -4,7 +4,6 @@ slug: "contributions-rust"
 excerpt: "Hacking on the Pants engine in Rust."
 hidden: false
 createdAt: "2020-05-16T23:11:31.121Z"
-updatedAt: "2022-02-08T20:56:52.599Z"
 ---
 We welcome contributions to Rust! We use Rust to implement the Pants engine in a performant, safe, and ergonomic way.
 

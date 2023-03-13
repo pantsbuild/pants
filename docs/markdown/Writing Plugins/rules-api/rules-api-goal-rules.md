@@ -4,7 +4,6 @@ slug: "rules-api-goal-rules"
 excerpt: "How to create new goals."
 hidden: false
 createdAt: "2020-05-07T22:38:43.975Z"
-updatedAt: "2022-07-25T14:45:07.539Z"
 ---
 For many [plugin tasks](doc:common-plugin-tasks), you will be extending existing goals, such as adding a new linter to the `lint` goal. However, you may instead want to create a new goal, such as a `publish` goal. This page explains how to create a new goal.
 

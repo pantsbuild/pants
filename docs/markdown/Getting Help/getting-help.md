@@ -4,7 +4,6 @@ slug: "getting-help"
 excerpt: "How to engage with the Pants community."
 hidden: false
 createdAt: "2020-03-23T21:37:03.235Z"
-updatedAt: "2023-01-04T23:16:37.806Z"
 ---
 The [Pants community](doc:the-pants-community) is friendly, welcoming, and passionate about improving the craft of software engineering. If you need help with anything Pants-related, you've come to the right place.  We'd love to hear from you!
 

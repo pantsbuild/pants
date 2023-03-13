@@ -282,7 +282,7 @@ class ShellCommandOutputsField(StringSequenceField):
         """
     )
     removal_hint = "To fix, use `output_files` and `output_directories` instead."
-    removal_version = "2.17.0.dev0"
+    removal_version = "2.17.0.dev1"
 
 
 class ShellCommandOutputFilesField(AdhocToolOutputFilesField):

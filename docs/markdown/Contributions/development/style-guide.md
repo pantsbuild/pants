@@ -4,7 +4,6 @@ slug: "style-guide"
 excerpt: "Some conventions we encourage."
 hidden: false
 createdAt: "2020-05-17T04:29:11.796Z"
-updatedAt: "2022-04-26T23:57:26.701Z"
 ---
 Reminder: running the autoformatters and linters
 ------------------------------------------------

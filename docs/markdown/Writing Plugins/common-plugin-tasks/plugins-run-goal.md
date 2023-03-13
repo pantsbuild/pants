@@ -4,7 +4,6 @@ slug: "plugins-run-goal"
 excerpt: "How to add a new implementation to the `run` goal."
 hidden: true
 createdAt: "2020-07-01T04:55:11.390Z"
-updatedAt: "2021-07-20T16:18:29.478Z"
 ---
 The `run` goal runs a single interactive process in the foreground, such as running a script or a program.
 
