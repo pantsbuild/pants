@@ -117,7 +117,7 @@ class LocalDistsPexRequest:
         addresses: Iterable[Address],
         *,
         internal_only: bool,
-        interpreter_constraints: InterpreterConstraints = InterpreterConstraints(),
+        interpreter_constraints: InterpreterConstraints,
         sources: PythonSourceFiles = PythonSourceFiles.empty(),
     ) -> None:
         object.__setattr__(self, "addresses", Addresses(addresses))

@@ -15,8 +15,10 @@ from pants.backend.python.goals.setup_py import rules as setup_py_rules
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.subsystems.setuptools import rules as setuptools_rules
 from pants.backend.python.target_types import PythonDistribution, PythonSourcesGeneratorTarget
-from pants.backend.python.util_rules import local_dists
+from pants.backend.python.util_rules import local_dists, pex_from_targets
+from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.local_dists import LocalDistsPex, LocalDistsPexRequest
+from pants.backend.python.util_rules.pex_from_targets import InterpreterConstraintsRequest
 from pants.backend.python.util_rules.python_sources import PythonSourceFiles
 from pants.build_graph.address import Address
 from pants.core.util_rules.source_files import SourceFiles
@@ -32,6 +34,8 @@ def rule_runner() -> RuleRunner:
             *setup_py_rules(),
             *setuptools_rules(),
             *target_types_rules.rules(),
+            *pex_from_targets.rules(),
+            QueryRule(InterpreterConstraints, (InterpreterConstraintsRequest,)),
             QueryRule(LocalDistsPex, (LocalDistsPexRequest,)),
         ],
         target_types=[PythonSourcesGeneratorTarget, PythonDistribution],
@@ -79,8 +83,15 @@ def test_build_local_dists(rule_runner: RuleRunner) -> None:
     )
     sources_snapshot = rule_runner.request(Snapshot, [sources_digest])
     sources = PythonSourceFiles(SourceFiles(sources_snapshot, tuple()), ("srcroot",))
+    addresses = [Address("foo", target_name="dist")]
+    interpreter_constraints = rule_runner.request(
+        InterpreterConstraints, [InterpreterConstraintsRequest(addresses)]
+    )
     request = LocalDistsPexRequest(
-        [Address("foo", target_name="dist")], internal_only=True, sources=sources
+        addresses,
+        internal_only=True,
+        sources=sources,
+        interpreter_constraints=interpreter_constraints,
     )
     result = rule_runner.request(LocalDistsPex, [request])
 
