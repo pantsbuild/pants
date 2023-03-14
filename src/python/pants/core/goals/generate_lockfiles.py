@@ -272,9 +272,9 @@ class LockfileDiffPrinter(MaybeColor):
 
     def get_bump_attrs(self, prev: PackageVersion, curr: PackageVersion) -> dict[str, str]:
         for key, attrs in self._BUMPS:
-            if key and getattr(prev, key, None) != getattr(curr, key, None):
-                break
-        return attrs
+            if key is None or getattr(prev, key, None) != getattr(curr, key, None):
+                return attrs
+        return {}  # Should never happen, but let's be safe.
 
 
 DEFAULT_TOOL_LOCKFILE = "<default>"
@@ -314,77 +314,30 @@ class _ResolveProviderType(Enum):
 @dataclass(frozen=True, order=True)
 class _ResolveProvider:
     option_name: str
-    type_: _ResolveProviderType
 
 
 class AmbiguousResolveNamesError(Exception):
     def __init__(self, ambiguous_name: str, providers: set[_ResolveProvider]) -> None:
-        tool_providers = []
-        user_providers = []
-        for provider in sorted(providers):
-            if provider.type_ == _ResolveProviderType.TOOL:
-                tool_providers.append(provider.option_name)
-            else:
-                user_providers.append(provider.option_name)
+        msg = softwrap(
+            f"""
+            The same resolve name `{ambiguous_name}` is used by multiple options, which
+            causes ambiguity: {providers}
 
-        if tool_providers:
-            if not user_providers:
-                raise AssertionError(
-                    softwrap(
-                        f"""
-                        {len(tool_providers)} tools have the same options_scope: {ambiguous_name}.
-                        If you're writing a plugin, rename your `GenerateToolLockfileSentinel`s so
-                        that there is no ambiguity. Otherwise, please open a bug at
-                        https://github.com/pantsbuild/pants/issues/new.
-                        """
-                    )
-                )
-            if len(user_providers) == 1:
-                msg = softwrap(
-                    f"""
-                    A resolve name from the option `{user_providers[0]}` collides with the
-                    name of a tool resolve: {ambiguous_name}
-
-                    To fix, please update `{user_providers[0]}` to use a different resolve name.
-                    """
-                )
-            else:
-                msg = softwrap(
-                    f"""
-                    Multiple options define the resolve name `{ambiguous_name}`, but it is
-                    already claimed by a tool: {user_providers}
-
-                    To fix, please update these options so that none of them use
-                    `{ambiguous_name}`.
-                    """
-                )
-        else:
-            assert len(user_providers) > 1
-            msg = softwrap(
-                f"""
-                The same resolve name `{ambiguous_name}` is used by multiple options, which
-                causes ambiguity: {user_providers}
-
-                To fix, please update these options so that `{ambiguous_name}` is not used more
-                than once.
-                """
-            )
+            To fix, please update these options so that `{ambiguous_name}` is not used more
+            than once.
+            """
+        )
         super().__init__(msg)
 
 
 def _check_ambiguous_resolve_names(
     all_known_user_resolve_names: Iterable[KnownUserResolveNames],
-    all_tool_sentinels: Iterable[type[GenerateToolLockfileSentinel]],
 ) -> None:
     resolve_name_to_providers = defaultdict(set)
-    for sentinel in all_tool_sentinels:
-        resolve_name_to_providers[sentinel.resolve_name].add(
-            _ResolveProvider(sentinel.resolve_name, _ResolveProviderType.TOOL)
-        )
     for known_user_resolve_names in all_known_user_resolve_names:
         for resolve_name in known_user_resolve_names.names:
             resolve_name_to_providers[resolve_name].add(
-                _ResolveProvider(known_user_resolve_names.option_name, _ResolveProviderType.USER)
+                _ResolveProvider(known_user_resolve_names.option_name)
             )
 
     for resolve_name, providers in resolve_name_to_providers.items():
@@ -401,11 +354,21 @@ def determine_resolves_to_generate(
 
     Return a tuple of `(user_resolves, tool_lockfile_sentinels)`.
     """
-    _check_ambiguous_resolve_names(all_known_user_resolve_names, all_tool_sentinels)
+    # Let user resolve names silently shadow tools with the same name.
+    # This is necessary since we now support installing a tool from a named resolve,
+    # and it's not reasonable to ban the name of the tool as the resolve name, when it
+    # is the most obvious choice for that...
+    # This is likely only an issue if you were going to, e.g., have a named resolve called flake8
+    # but not use it as the resolve for the flake8 tool, which seems pretty unlikely.
+    all_known_user_resolve_name_strs = set(
+        itertools.chain.from_iterable(akurn.names for akurn in all_known_user_resolve_names)
+    )
+    all_tool_sentinels = [
+        ts for ts in all_tool_sentinels if ts.resolve_name not in all_known_user_resolve_name_strs
+    ]
 
-    resolve_names_to_sentinels = {
-        sentinel.resolve_name: sentinel for sentinel in all_tool_sentinels
-    }
+    # Resolve names must be globally unique, so check for ambiguity across backends.
+    _check_ambiguous_resolve_names(all_known_user_resolve_names)
 
     if not requested_resolve_names:
         return [
@@ -423,9 +386,9 @@ def determine_resolves_to_generate(
             )
 
     specified_sentinels = []
-    for resolve, sentinel in resolve_names_to_sentinels.items():
-        if resolve in requested_resolve_names:
-            requested_resolve_names.discard(resolve)
+    for sentinel in all_tool_sentinels:
+        if sentinel.resolve_name in requested_resolve_names:
+            requested_resolve_names.discard(sentinel.resolve_name)
             specified_sentinels.append(sentinel)
 
     if requested_resolve_names:
@@ -436,7 +399,7 @@ def determine_resolves_to_generate(
                     known_resolve_names.names
                     for known_resolve_names in all_known_user_resolve_names
                 ),
-                *resolve_names_to_sentinels.keys(),
+                *(sentinel.resolve_name for sentinel in all_tool_sentinels),
             },
             description_of_origin="the option `--generate-lockfiles-resolve`",
         )

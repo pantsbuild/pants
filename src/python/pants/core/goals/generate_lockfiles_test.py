@@ -101,22 +101,23 @@ def test_determine_tool_sentinels_to_generate() -> None:
     with pytest.raises(UnrecognizedResolveNamesError):
         assert_chosen({"fake"}, expected_user_resolves=[], expected_tools=[])
 
-    # Error if same resolve name used for tool lockfiles and user lockfiles.
     class AmbiguousTool(GenerateToolLockfileSentinel):
         resolve_name = "ambiguous"
 
-    with pytest.raises(AmbiguousResolveNamesError):
-        determine_resolves_to_generate(
-            [
-                KnownUserResolveNames(
-                    ("ambiguous",),
-                    "[lang].resolves",
-                    requested_resolve_names_cls=Lang1Requested,
-                )
-            ],
-            [AmbiguousTool],
-            set(),
-        )
+    # Let a user resolve shadow a tool resolve with the same name.
+    assert determine_resolves_to_generate(
+        [
+            KnownUserResolveNames(
+                ("ambiguous",),
+                "[lang].resolves",
+                requested_resolve_names_cls=Lang1Requested,
+            )
+        ],
+        [AmbiguousTool],
+        set(),
+    ) == ([Lang1Requested(["ambiguous"])], [])
+
+    # Error if same resolve name used for multiple user lockfiles.
     with pytest.raises(AmbiguousResolveNamesError):
         determine_resolves_to_generate(
             [
