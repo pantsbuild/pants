@@ -66,6 +66,11 @@ _orgs = (
         "https://files.readme.io/b63d33d-esl-small.png",
     ),
     Org(
+        "ExoFlare",
+        "https://www.exoflare.com/open-source/?utm_source=pants&utm_campaign=open_source",
+        "https://files.readme.io/31bb960-exoflare-small.png",
+    ),
+    Org(
         "Foursquare",
         "https://foursquare.com/",
         "https://files.readme.io/aa53b52-foursquare-small.png",
