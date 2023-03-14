@@ -153,6 +153,7 @@ def test_find_python_interpreter_constraints_from_lockfile() -> None:
             lockfile=lckfile,
             interpreter_constraints=ics,
             version="v",
+            requirements=["v"],
             install_from_resolve=None,
             extra_requirements=[],
         )
