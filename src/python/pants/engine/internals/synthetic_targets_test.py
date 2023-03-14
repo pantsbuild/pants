@@ -309,10 +309,10 @@ def test_target_name_collision_issue_17343(rule_runner: RuleRunner) -> None:
             "src/issues/17343/BUILD": softwrap(
                 """
                 python_requirements(
-                  name="python-default",
+                  name="_python-default_lockfile",
                   overrides={
                     "humbug": {
-                      "dependencies": ["python-default#setuptools"],
+                      "dependencies": ["_python-default_lockfile#setuptools"],
                     },
                   },
                 )
@@ -330,7 +330,9 @@ def test_target_name_collision_issue_17343(rule_runner: RuleRunner) -> None:
 
     tgt = assert_target(
         rule_runner,
-        Address("src/issues/17343", target_name="python-default", generated_name="setuptools"),
+        Address(
+            "src/issues/17343", target_name="_python-default_lockfile", generated_name="setuptools"
+        ),
         alias="python_requirement",
     )
 

@@ -259,6 +259,10 @@ class PythonSyntheticLockfileTargetsRequest(SyntheticTargetsRequest):
     path: str = SyntheticTargetsRequest.SINGLE_REQUEST_FOR_ALL_TARGETS
 
 
+def synthetic_lockfile_target_name(resolve: str) -> str:
+    return f"_{resolve}_lockfile"
+
+
 @rule
 async def python_lockfile_synthetic_targets(
     request: PythonSyntheticLockfileTargetsRequest,
@@ -277,7 +281,9 @@ async def python_lockfile_synthetic_targets(
             (
                 os.path.join(spec_path, "BUILD.python-lockfiles"),
                 tuple(
-                    TargetAdaptor("_lockfiles", name=name, sources=[lockfile])
+                    TargetAdaptor(
+                        "_lockfiles", name=synthetic_lockfile_target_name(name), sources=[lockfile]
+                    )
                     for _, lockfile, name in lockfiles
                 ),
             )
