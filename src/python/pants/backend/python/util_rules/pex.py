@@ -622,7 +622,6 @@ async def build_pex(
     result = await Get(
         ProcessResult,
         PexCliProcess(
-            python=pex_python_setup.python,
             subcommand=(),
             extra_args=argv,
             additional_input_digest=merged_digest,
@@ -751,7 +750,7 @@ class VenvScriptWriter:
         env_vars = (
             f"{name}={shlex.quote(value)}"
             for name, value in self.complete_pex_env.environment_dict(
-                python_configured=True
+                python=self.pex.python
             ).items()
         )
 
@@ -759,7 +758,7 @@ class VenvScriptWriter:
         venv_dir = shlex.quote(str(self.venv_dir))
         execute_pex_args = " ".join(
             f"$(adjust_relative_paths {shlex.quote(arg)})"
-            for arg in self.complete_pex_env.create_argv(self.pex.name, python=self.pex.python)
+            for arg in self.complete_pex_env.create_argv(self.pex.name)
         )
 
         script = dedent(
@@ -1034,9 +1033,9 @@ class PexProcess:
 async def setup_pex_process(request: PexProcess, pex_environment: PexEnvironment) -> Process:
     pex = request.pex
     complete_pex_env = pex_environment.in_sandbox(working_directory=request.working_directory)
-    argv = complete_pex_env.create_argv(pex.name, *request.argv, python=pex.python)
+    argv = complete_pex_env.create_argv(pex.name, *request.argv)
     env = {
-        **complete_pex_env.environment_dict(python_configured=pex.python is not None),
+        **complete_pex_env.environment_dict(python=pex.python),
         **request.extra_env,
     }
     input_digest = (
@@ -1060,6 +1059,7 @@ async def setup_pex_process(request: PexProcess, pex_environment: PexEnvironment
             **complete_pex_env.append_only_caches,
             **append_only_caches,
         },
+        immutable_input_digests=pex_environment.bootstrap_python.immutable_input_digests,
         timeout_seconds=request.timeout_seconds,
         execution_slot_variable=request.execution_slot_variable,
         concurrency_available=request.concurrency_available,
@@ -1153,6 +1153,7 @@ async def setup_venv_pex_process(
         output_files=request.output_files,
         output_directories=request.output_directories,
         append_only_caches=append_only_caches,
+        immutable_input_digests=pex_environment.bootstrap_python.immutable_input_digests,
         timeout_seconds=request.timeout_seconds,
         execution_slot_variable=request.execution_slot_variable,
         concurrency_available=request.concurrency_available,

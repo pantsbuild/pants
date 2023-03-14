@@ -233,10 +233,9 @@ async def do_export(
                             "--collisions-ok",
                             output_path,
                         ],
-                        python=requirements_pex.python,
                     ),
                     {
-                        **complete_pex_env.environment_dict(python_configured=True),
+                        **complete_pex_env.environment_dict(python=requirements_pex.python),
                         "PEX_MODULE": "pex.tools",
                     },
                 ),

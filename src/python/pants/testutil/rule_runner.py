@@ -35,6 +35,7 @@ from pants.base.build_root import BuildRoot
 from pants.base.specs_parser import SpecsParser
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.core.util_rules import adhoc_binaries
 from pants.engine.addresses import Address
 from pants.engine.console import Console
 from pants.engine.env_vars import CompleteEnvironmentVars
@@ -294,6 +295,7 @@ class RuleRunner:
         all_rules = (
             *self.rules,
             *source_root.rules(),
+            *adhoc_binaries.rules(),
             QueryRule(WrappedTarget, [WrappedTargetRequest]),
             QueryRule(AllTargets, []),
             QueryRule(UnionMembership, []),
