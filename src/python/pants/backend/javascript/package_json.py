@@ -504,7 +504,7 @@ async def all_package_json_names(all_pkg_jsons: AllPackageJson) -> AllPackageJso
 @rule
 async def package_json_for_source(source_field: PackageJsonSourceField) -> PackageJson:
     [pkg_json] = await Get(
-        PackageJsonForGlobs, PathGlobs, source_field.path_globs(UnmatchedBuildFileGlobs.error)
+        PackageJsonForGlobs, PathGlobs, source_field.path_globs(UnmatchedBuildFileGlobs.error())
     )
     return pkg_json
 
