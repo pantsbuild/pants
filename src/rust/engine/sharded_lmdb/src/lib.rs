@@ -34,7 +34,7 @@ use std::sync::Arc;
 use std::time::{self, Duration};
 
 use bytes::{BufMut, Bytes};
-use hashing::{Digest, Fingerprint, WriterHasher, FINGERPRINT_SIZE};
+use hashing::{sync_verified_copy, Digest, Fingerprint, WriterHasher, FINGERPRINT_SIZE};
 use lmdb::{
   self, Database, DatabaseFlags, Environment, EnvironmentCopyFlags, EnvironmentFlags,
   RwTransaction, Transaction, WriteFlags,
@@ -398,14 +398,14 @@ impl ShardedLmdb {
   ///
   pub async fn store_bytes(
     &self,
-    fingerprint: Option<Fingerprint>,
+    fingerprint: Fingerprint,
     bytes: Bytes,
     initial_lease: bool,
   ) -> Result<Fingerprint, String> {
-    let fingerprints = self
+    self
       .store_bytes_batch(vec![(fingerprint, bytes)], initial_lease)
       .await?;
-    Ok(fingerprints[0])
+    Ok(fingerprint)
   }
 
   ///
@@ -416,9 +416,9 @@ impl ShardedLmdb {
   ///
   pub async fn store_bytes_batch(
     &self,
-    items: Vec<(Option<Fingerprint>, Bytes)>,
+    items: Vec<(Fingerprint, Bytes)>,
     initial_lease: bool,
-  ) -> Result<Vec<Fingerprint>, String> {
+  ) -> Result<(), String> {
     let store = self.clone();
     self
       .executor
@@ -427,8 +427,7 @@ impl ShardedLmdb {
           // Group the items by the Environment that they will be applied to.
           let mut items_by_env = HashMap::new();
           let mut fingerprints = Vec::new();
-          for (maybe_fingerprint, bytes) in items {
-            let fingerprint = maybe_fingerprint.unwrap_or_else(|| Digest::of_bytes(&bytes).hash);
+          for (fingerprint, bytes) in items {
             let effective_key = VersionedFingerprint::new(fingerprint, ShardedLmdb::SCHEMA_VERSION);
             let (env_id, _, env, db, lease_database) = store.get_raw(&fingerprint.0);
 
@@ -475,7 +474,7 @@ impl ShardedLmdb {
               })?;
           }
 
-          Ok(fingerprints)
+          Ok(())
         },
         |e| Err(format!("`store_bytes_batch` task failed: {e}")),
       )
@@ -483,9 +482,8 @@ impl ShardedLmdb {
   }
 
   ///
-  /// Stores the given Read instance under its computed digest. This method performs two passes
-  /// over the source to 1) hash it, 2) store it. If !data_is_immutable, the second pass will
-  /// re-hash the data to confirm that it hasn't changed.
+  /// Stores the given Read instance under its computed digest in two passes. If !data_is_immutable,
+  /// we will re-hash the data to confirm that it hasn't changed.
   ///
   /// If the Read instance gets longer between Reads, we will not detect that here, but any
   /// captured data will still be valid.
@@ -532,24 +530,10 @@ impl ShardedLmdb {
                   )?
                   .writer();
                 let mut read = data_provider().map_err(|e| format!("Failed to read: {e}"))?;
-                let should_retry = if data_is_immutable {
-                  // Trust that the data hasn't changed, and only validate its length.
-                  let copied = io::copy(&mut read, &mut writer).map_err(|e| {
-                    format!("Failed to copy from {read:?} or store in {env:?}: {e:?}")
-                  })?;
-
-                  // Should retry if the file got shorter between reads.
-                  copied as usize != digest.size_bytes
-                } else {
-                  // Confirm that the data hasn't changed.
-                  let mut hasher = WriterHasher::new(writer);
-                  let _ = io::copy(&mut read, &mut hasher).map_err(|e| {
-                    format!("Failed to copy from {read:?} or store in {env:?}: {e:?}")
-                  })?;
-
-                  // Should retry if the Digest changed between reads.
-                  digest != hasher.finish().0
-                };
+                let should_retry =
+                  !sync_verified_copy(digest, data_is_immutable, &mut read, &mut writer).map_err(
+                    |e| format!("Failed to copy from {read:?} or store in {env:?}: {e:?}"),
+                  )?;
 
                 if should_retry {
                   let msg = format!("Input {read:?} changed while reading.");

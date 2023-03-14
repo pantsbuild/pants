@@ -4,7 +4,6 @@ slug: "python-test-goal"
 excerpt: "Run tests with Pytest."
 hidden: false
 createdAt: "2020-03-16T16:19:56.071Z"
-updatedAt: "2022-05-12T05:33:10.060Z"
 ---
 Pants uses the [Pytest](https://docs.pytest.org/en/latest/) test runner to run Python tests. You may write your tests in Pytest-style, unittest-style, or mix and match both.
 
@@ -244,7 +243,7 @@ Pants includes built-in support for `pytest-xdist`, which can be enabled by sett
 
 ```toml pants.toml
 [pytest]
-xdist_enabled = True
+xdist_enabled = true
 ```
 
 This will cause Pants to pass `-n <concurrency>` when running `pytest`. When this is set, `pytest` will parallelize the tests _within_ your `python_test` file, instead of running them sequentially. If multiple `python_test`s are batched into the same process, `pytest-xdist` will parallelize the tests within _all_ of the files - this can help you regain the benefits of Pants' native concurrency when running batched tests.
@@ -499,15 +498,15 @@ use_coverage = true
 > interpreter_constraints = [">=3.8"]
 > ```
 >
-> However, if your repository has some Python 2-only code and some Python 3-only code, you will not be able to choose an interpreter that works with both versions. So, you will need to set up a `.coveragerc` config file and set `ignore_errors = True` under `[report]`, like this:
+> However, if your repository has some Python 2-only code and some Python 3-only code, you will not be able to choose an interpreter that works with both versions. So, you will need to set up a `.coveragerc` config file and set `ignore_errors = true` under `[report]`, like this:
 >
 > ```
 > # .coveragerc
 > [report]
-> ignore_errors = True
+> ignore_errors = true
 > ```
 >
-> `ignore_errors = True` means that those files will simply be left off of the final coverage report.
+> `ignore_errors = true` means that those files will simply be left off of the final coverage report.
 >
 > (Pants should autodiscover the config file `.coveragerc`. See [coverage-py](https://www.pantsbuild.org/docs/reference-coverage-py#section-config-discovery).)
 >
@@ -549,12 +548,12 @@ You can change the output dir with the `output_dir` option in the `[coverage-py]
 
 You may want to set `[coverage-py].fail_under` to cause Pants to gracefully fail if coverage is too low, e.g. `fail_under = 70`.
 
-You may use a Coverage config file, e.g. `.coveragerc` or `pyproject.toml`. Pants will autodiscover the config file for you, and you can also set `[coverage-py].config` in your `pants.toml` to point to a non-standard location. You must include `relative_files = True` in the `[run]` section for Pants to work.
+You may use a Coverage config file, e.g. `.coveragerc` or `pyproject.toml`. Pants will autodiscover the config file for you, and you can also set `[coverage-py].config` in your `pants.toml` to point to a non-standard location. You must include `relative_files = true` in the `[run]` section for Pants to work.
 
 ```text .coveragerc
 [run]
-relative_files = True
-branch = True
+relative_files = true
+branch = true
 ```
 
 When generating HTML, XML, and JSON reports, you can automatically open the reports through the option `--test-open-coverage`.

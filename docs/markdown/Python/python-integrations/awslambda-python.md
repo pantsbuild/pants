@@ -4,7 +4,6 @@ slug: "awslambda-python"
 excerpt: "Create a Lambda with Python code."
 hidden: false
 createdAt: "2020-05-05T16:51:03.851Z"
-updatedAt: "2022-05-12T16:58:25.667Z"
 ---
 Pants can create a Lambda-compatible zip file from your Python code, allowing you to develop your Lambdas in your repository instead of using the online Cloud9 editor.
 
@@ -99,12 +98,10 @@ For example:
 ```dockerfile project/Dockerfile
 FROM public.ecr.aws/lambda/python:3.8
 
-WORKDIR /build
 RUN yum install unzip -y
-COPY project/lambda.zip /build
-RUN unzip /build/lambda.zip -d /app
-WORKDIR /app
-CMD ["/app/lambdex_handler.handler"]
+COPY project/lambda.zip .
+RUN unzip lambda.zip -d "${LAMBDA_TASK_ROOT}"
+CMD ["lambdex_handler.handler"]
 ```
 ```python project/BUILD
 python_sources()

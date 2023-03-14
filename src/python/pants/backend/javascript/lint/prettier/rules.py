@@ -39,7 +39,6 @@ class PrettierFmtRequest(FmtTargetsRequest):
 
 @rule(level=LogLevel.DEBUG)
 async def prettier_fmt(request: PrettierFmtRequest.Batch, prettier: Prettier) -> FmtResult:
-
     # Look for any/all of the Prettier configuration files
     config_files = await Get(
         ConfigFiles,

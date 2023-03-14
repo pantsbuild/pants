@@ -42,7 +42,7 @@ use std::fmt::{self, Debug, Display};
 use std::fs::hard_link;
 use std::fs::OpenOptions;
 use std::future::Future;
-use std::io::{self, Read, Write};
+use std::io::{self, Read, Seek, Write};
 use std::os::unix::fs::{symlink, OpenOptionsExt, PermissionsExt};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Weak};
@@ -58,7 +58,7 @@ use fs::{
 };
 use futures::future::{self, BoxFuture, Either, FutureExt, TryFutureExt};
 use grpc_util::prost::MessageExt;
-use hashing::Digest;
+use hashing::{Digest, Fingerprint};
 use parking_lot::Mutex;
 use prost::Message;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
@@ -77,7 +77,9 @@ const GIGABYTES: usize = 1024 * MEGABYTES;
 // NB: These numbers were chosen after micro-benchmarking the code on one machine at the time of
 // writing. They were chosen using a rough equation from the microbenchmarks that are optimized
 // for somewhere between 2 and 3 uses of the corresponding entry to "break even".
-const IMMUTABLE_FILE_SIZE_LIMIT: usize = 512 * KILOBYTES;
+// TODO: Temporarily disabled until #18162 and/or #18153 are resolved, since hardlinks do not play
+// well with Docker on macOS.
+const IMMUTABLE_FILE_SIZE_LIMIT: usize = usize::MAX - 1;
 
 mod local;
 #[cfg(test)]
@@ -237,30 +239,62 @@ impl RemoteStore {
   }
 
   /// Download the digest to the local byte store from this remote store. The function `f_remote`
-  /// can be used to validate the bytes.
-  async fn download_digest_to_local<
-    FRemote: Fn(Bytes) -> Result<(), String> + Send + Sync + 'static,
-  >(
+  /// can be used to validate the bytes (NB. if provided, the whole value will be buffered into
+  /// memory to provide the `Bytes` argument, and thus `f_remote` should only be used for small digests).
+  async fn download_digest_to_local(
     &self,
     local_store: local::ByteStore,
     digest: Digest,
     entry_type: EntryType,
-    f_remote: FRemote,
+    f_remote: Option<&(dyn Fn(Bytes) -> Result<(), String> + Send + Sync + 'static)>,
   ) -> Result<(), StoreError> {
     let remote_store = self.store.clone();
+    let create_missing = || {
+      StoreError::MissingDigest(
+        "Was not present in either the local or remote store".to_owned(),
+        digest,
+      )
+    };
     self
       .maybe_download(digest, async move {
-        let bytes = remote_store.load_bytes(digest).await?.ok_or_else(|| {
-          StoreError::MissingDigest(
-            "Was not present in either the local or remote store".to_owned(),
-            digest,
-          )
-        })?;
+        let stored_digest = if digest.size_bytes <= IMMUTABLE_FILE_SIZE_LIMIT || f_remote.is_some()
+        {
+          // (if there's a function to call, always just buffer fully into memory)
+          let bytes = remote_store
+            .load_bytes(digest)
+            .await?
+            .ok_or_else(create_missing)?;
+          if let Some(f_remote) = f_remote {
+            f_remote(bytes.clone())?;
+          }
+          let digest = Digest::of_bytes(&bytes);
+          local_store
+            .store_bytes(entry_type, digest.hash, bytes, true)
+            .await?;
+          digest
+        } else {
+          assert!(f_remote.is_none());
+          // TODO(#18048): choose a file that can be plopped into the local store directly, when
+          // large files are stored there
+          let file = tokio::task::spawn_blocking(tempfile::tempfile)
+            .await
+            .map_err(|e| e.to_string())??;
+          let file = tokio::fs::File::from_std(file);
 
-        f_remote(bytes.clone())?;
-        let stored_digest = local_store
-          .store_bytes(entry_type, None, bytes, true)
-          .await?;
+          let file = remote_store
+            .load_file(digest, file)
+            .await?
+            .ok_or_else(create_missing)?;
+
+          let file = file.into_std().await;
+          local_store
+            .store(entry_type, true, true, move || {
+              let mut file = file.try_clone()?;
+              file.rewind()?;
+              Ok(file)
+            })
+            .await?
+        };
         if digest == stored_digest {
           Ok(())
         } else {
@@ -414,10 +448,12 @@ impl Store {
     bytes: Bytes,
     initial_lease: bool,
   ) -> Result<Digest, String> {
+    let digest = Digest::of_bytes(&bytes);
     self
       .local
-      .store_bytes(EntryType::File, None, bytes, initial_lease)
-      .await
+      .store_bytes(EntryType::File, digest.hash, bytes, initial_lease)
+      .await?;
+    Ok(digest)
   }
 
   ///
@@ -428,9 +464,9 @@ impl Store {
   ///
   pub async fn store_file_bytes_batch(
     &self,
-    items: Vec<(Option<Digest>, Bytes)>,
+    items: Vec<(Fingerprint, Bytes)>,
     initial_lease: bool,
-  ) -> Result<Vec<Digest>, String> {
+  ) -> Result<(), String> {
     self
       .local
       .store_bytes_batch(EntryType::File, items, initial_lease)
@@ -510,12 +546,7 @@ impl Store {
   ) -> Result<T, StoreError> {
     // No transformation or verification is needed for files.
     self
-      .load_bytes_with(
-        EntryType::File,
-        digest,
-        move |v: &[u8]| Ok(f(v)),
-        |_: Bytes| Ok(()),
-      )
+      .load_bytes_with(EntryType::File, digest, move |v: &[u8]| Ok(f(v)), None)
       .await
   }
 
@@ -535,7 +566,7 @@ impl Store {
         if cfg!(debug_assertions) {
           protos::verify_directory_canonical(d.digest(), &directory).unwrap();
         }
-        directories.push((Some(d.digest()), directory.to_bytes()))
+        directories.push((d.digest().hash, directory.to_bytes()))
       }
       directory::Entry::File(_) => (),
       directory::Entry::Symlink(_) => (),
@@ -543,11 +574,13 @@ impl Store {
 
     // Then store them as a batch.
     let local = self.local.clone();
-    let digests = local
+    let root = &directories[0];
+    let top_digest = Digest::new(root.0, root.1.len());
+    local
       .store_bytes_batch(EntryType::Directory, directories, initial_lease)
       .await?;
 
-    Ok(DirectoryDigest::new(digests[0], tree))
+    Ok(DirectoryDigest::new(top_digest, tree))
   }
 
   ///
@@ -561,10 +594,12 @@ impl Store {
     initial_lease: bool,
   ) -> Result<Digest, String> {
     let local = self.local.clone();
-    let digest = local
+    let bytes = directory.to_bytes();
+    let digest = Digest::of_bytes(&bytes);
+    local
       .store_bytes(
         EntryType::Directory,
-        None,
+        digest.hash,
         directory.to_bytes(),
         initial_lease,
       )
@@ -687,13 +722,13 @@ impl Store {
         },
         // Eagerly verify that CAS-returned Directories are canonical, so that we don't write them
         // into our local store.
-        move |bytes: Bytes| {
+        Some(&move |bytes| {
           let directory = remexec::Directory::decode(bytes).map_err(|e| {
             format!("CAS returned Directory proto for {digest:?} which was not valid: {e:?}")
           })?;
           protos::verify_directory_canonical(digest, &directory)?;
           Ok(())
-        },
+        }),
       )
       .await
   }
@@ -721,13 +756,12 @@ impl Store {
   async fn load_bytes_with<
     T: Send + 'static,
     FLocal: Fn(&[u8]) -> Result<T, String> + Clone + Send + Sync + 'static,
-    FRemote: Fn(Bytes) -> Result<(), String> + Send + Sync + 'static,
   >(
     &self,
     entry_type: EntryType,
     digest: Digest,
     f_local: FLocal,
-    f_remote: FRemote,
+    f_remote: Option<&(dyn Fn(Bytes) -> Result<(), String> + Send + Sync + 'static)>,
   ) -> Result<T, StoreError> {
     if let Some(bytes_res) = self
       .local
@@ -997,7 +1031,7 @@ impl Store {
         .into_iter()
         .map(|file_digest| async move {
           if let Err(e) = remote
-            .download_digest_to_local(self.local.clone(), file_digest, EntryType::File, |_| Ok(()))
+            .download_digest_to_local(self.local.clone(), file_digest, EntryType::File, None)
             .await
           {
             log::debug!("Missing file digest from remote store: {:?}", file_digest);

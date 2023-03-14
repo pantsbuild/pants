@@ -18,7 +18,7 @@ from pants.option.option_types import (
     StrOption,
 )
 from pants.util.memo import memoized_method
-from pants.util.strutil import bullet_list, softwrap
+from pants.util.strutil import bullet_list, help_text, softwrap
 
 _VALID_PASSTHROUGH_FLAGS = [
     "--atomic",
@@ -58,7 +58,7 @@ class InvalidHelmPassthroughArgs(Exception):
         )
 
 
-registries_help = softwrap(
+registries_help = help_text(
     f"""
     Configure Helm OCI registries. The schema for a registry entry is as follows:
 

@@ -142,7 +142,7 @@ def test_find_python_interpreter_constraints_from_lockfile() -> None:
     )
 
     def assert_ics(
-        lockfile: str,
+        lckfile: str,
         expected: list[str],
         *,
         ics: RankedValue = RankedValue(Rank.HARDCODED, Black.default_interpreter_constraints),
@@ -150,9 +150,11 @@ def test_find_python_interpreter_constraints_from_lockfile() -> None:
     ) -> None:
         black = create_subsystem(
             Black,
-            lockfile=lockfile,
+            lockfile=lckfile,
             interpreter_constraints=ics,
             version="v",
+            requirements=["v"],
+            install_from_resolve=None,
             extra_requirements=[],
         )
         loaded_lock = LoadedLockfile(
@@ -163,7 +165,7 @@ def test_find_python_interpreter_constraints_from_lockfile() -> None:
             is_pex_native=True,
             as_constraints_strings=None,
             original_lockfile=Lockfile(
-                "black.lock", file_path_description_of_origin="foo", resolve_name="black"
+                "black.lock", url_description_of_origin="foo", resolve_name="black"
             ),
         )
         result = run_rule_with_mocks(

@@ -89,7 +89,7 @@ async def py_constraints(
     if py_constraints_subsystem.summary:
         if not py_constraints_subsystem.summary_use_new_header:
             warn_or_error(
-                "2.17.0.dev0",
+                "2.17.0.dev1",
                 "the old, misleading, `# Dependees` header",
                 "Set --summary-use-new-header to true to start using the new `# Dependents` header.",
             )

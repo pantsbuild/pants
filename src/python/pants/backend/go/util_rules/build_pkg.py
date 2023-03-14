@@ -44,7 +44,7 @@ from pants.engine.fs import (
     PathGlobs,
 )
 from pants.engine.process import FallibleProcessResult, Process, ProcessResult
-from pants.engine.rules import Get, MultiGet, collect_rules, rule, rule_helper
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.resources import read_resource
@@ -314,7 +314,6 @@ class GoCompileActionIdResult:
 
 
 # TODO(#16831): Merge this rule helper and the AssemblyPostCompilationRequest.
-@rule_helper
 async def _add_objects_to_archive(
     input_digest: Digest,
     pkg_archive_path: str,
@@ -421,7 +420,6 @@ async def check_for_golang_assembly(
 #
 # See https://github.com/golang/go/blob/1c05968c9a5d6432fc6f30196528f8f37287dd3d/src/cmd/go/internal/work/exec.go#L867-L892
 # for particulars.
-@rule_helper
 async def _maybe_copy_headers_to_platform_independent_names(
     input_digest: Digest,
     dir_path: str,
@@ -467,7 +465,6 @@ async def _maybe_copy_headers_to_platform_independent_names(
 
 # Gather transitive prebuilt object files for Cgo. Traverse the provided dependencies and lifts `.syso`
 # object files into a single `Digest`.
-@rule_helper
 async def _gather_transitive_prebuilt_object_files(
     build_request: BuildGoPackageRequest,
 ) -> tuple[Digest, frozenset[str]]:

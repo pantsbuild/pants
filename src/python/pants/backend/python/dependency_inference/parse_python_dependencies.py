@@ -13,9 +13,10 @@ from pants.backend.python.util_rules.pex_environment import PythonExecutable
 from pants.core.util_rules.source_files import SourceFilesRequest
 from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
 from pants.engine.collection import DeduplicatedCollection
+from pants.engine.environment import EnvironmentName
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import Get, MultiGet, collect_rules, rule, rule_helper
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
@@ -55,7 +56,7 @@ class ParsePythonDependenciesRequest:
     interpreter_constraints: InterpreterConstraints
 
 
-@union(in_scope_types=[])
+@union(in_scope_types=[EnvironmentName])
 class PythonDependencyVisitorRequest:
     pass
 
@@ -75,23 +76,30 @@ class ParserScript:
     env: FrozenDict[str, str]
 
 
-_scripts_module = "pants.backend.python.dependency_inference.scripts"
+_scripts_package = "pants.backend.python.dependency_inference.scripts"
 
 
-@rule_helper
-async def _get_script_digest(relpaths: Iterable[str]) -> Digest:
-    scripts = [read_resource(_scripts_module, relpath) for relpath in relpaths]
+async def get_scripts_digest(scripts_package: str, filenames: Iterable[str]) -> Digest:
+    scripts = [read_resource(scripts_package, filename) for filename in filenames]
     assert all(script is not None for script in scripts)
-    path_prefix = _scripts_module.replace(".", os.path.sep)
-    digest = await Get(
-        Digest,
-        CreateDigest(
-            [
-                FileContent(os.path.join(path_prefix, relpath), script)
-                for relpath, script in zip(relpaths, scripts)
-            ]
-        ),
-    )
+    path_prefix = scripts_package.replace(".", os.path.sep)
+    contents = [
+        FileContent(os.path.join(path_prefix, relpath), script)
+        for relpath, script in zip(filenames, scripts)
+    ]
+
+    # Python 2 requires all the intermediate __init__.py to exist in the sandbox.
+    package = scripts_package
+    while package:
+        contents.append(
+            FileContent(
+                os.path.join(package.replace(".", os.path.sep), "__init__.py"),
+                read_resource(package, "__init__.py"),
+            )
+        )
+        package = package.rpartition(".")[0]
+
+    digest = await Get(Digest, CreateDigest(contents))
     return digest
 
 
@@ -102,29 +110,15 @@ async def get_parser_script(union_membership: UnionMembership) -> ParserScript:
         Get(PythonDependencyVisitor, PythonDependencyVisitorRequest, dvrt())
         for dvrt in dep_visitor_request_types
     )
-    utils = await _get_script_digest(
+    utils = await get_scripts_digest(
+        _scripts_package,
         [
             "dependency_visitor_base.py",
             "main.py",
-        ]
+        ],
     )
 
-    # Python 2 requires all the intermediate __init__.py to exist in the sandbox.
-    init_contents = []
-    module = _scripts_module
-    while module:
-        init_contents.append(
-            FileContent(
-                os.path.join(module.replace(".", os.path.sep), "__init__.py"),
-                read_resource(module, "__init__.py"),
-            )
-        )
-        module = module.rpartition(".")[0]
-    init_scaffolding = await Get(Digest, CreateDigest(init_contents))
-
-    digest = await Get(
-        Digest, MergeDigests([utils, init_scaffolding, *(dv.digest for dv in dep_visitors)])
-    )
+    digest = await Get(Digest, MergeDigests([utils, *(dv.digest for dv in dep_visitors)]))
     env = {
         "VISITOR_CLASSNAMES": "|".join(dv.classname for dv in dep_visitors),
         "PYTHONPATH": ".",
@@ -154,10 +148,10 @@ class GeneralPythonDependencyVisitorRequest(PythonDependencyVisitorRequest):
 @rule
 async def general_parser_script(
     python_infer_subsystem: PythonInferSubsystem,
-    request: GeneralPythonDependencyVisitorRequest,
+    _: GeneralPythonDependencyVisitorRequest,
 ) -> PythonDependencyVisitor:
-    script_digest = await _get_script_digest(["general_dependency_visitor.py"])
-    classname = f"{_scripts_module}.general_dependency_visitor.GeneralDependencyVisitor"
+    script_digest = await get_scripts_digest(_scripts_package, ["general_dependency_visitor.py"])
+    classname = f"{_scripts_package}.general_dependency_visitor.GeneralDependencyVisitor"
     return PythonDependencyVisitor(
         digest=script_digest,
         classname=classname,
@@ -198,6 +192,7 @@ async def parse_python_dependencies(
                 file,
             ],
             input_digest=input_digest,
+            append_only_caches=python_interpreter.append_only_caches,
             description=f"Determine Python dependencies for {request.source.address}",
             env=parser_script.env,
             level=LogLevel.DEBUG,

@@ -10,13 +10,12 @@ from dataclasses import dataclass
 from pathlib import PurePath
 
 from pants.core.util_rules import system_binaries
+from pants.core.util_rules.adhoc_binaries import GunzipBinary, GunzipBinaryRequest
 from pants.core.util_rules.system_binaries import SEARCH_PATHS
 from pants.core.util_rules.system_binaries import ArchiveFormat as ArchiveFormat
 from pants.core.util_rules.system_binaries import (
     BashBinary,
     BashBinaryRequest,
-    GunzipBinary,
-    GunzipBinaryRequest,
     TarBinary,
     TarBinaryRequest,
     UnzipBinary,
@@ -35,6 +34,7 @@ from pants.engine.fs import (
 )
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.strutil import softwrap
 
@@ -55,7 +55,6 @@ class CreateArchive:
 
 @rule(desc="Creating an archive file", level=LogLevel.DEBUG)
 async def create_archive(request: CreateArchive) -> Digest:
-
     # #16091 -- if an arg list is really long, archive utilities tend to get upset.
     # passing a list of filenames into the utilities fixes this.
     FILE_LIST_FILENAME = "__pants_archive_filelist__"
@@ -169,13 +168,14 @@ async def maybe_extract_archive(request: MaybeExtractArchiveRequest) -> Extracte
         return ExtractedArchive(request.digest)
 
     merge_digest_get = Get(Digest, MergeDigests((request.digest, output_dir_digest)))
+    env = {}
+    immutable_input_digests: FrozenDict[str, Digest] = FrozenDict({})
     if is_zip:
         input_digest, unzip_binary = await MultiGet(
             merge_digest_get,
             Get(UnzipBinary, UnzipBinaryRequest()),
         )
         argv = unzip_binary.extract_archive_argv(archive_path, extract_archive_dir)
-        env = {}
     elif is_tar:
         input_digest, tar_binary = await MultiGet(
             merge_digest_get,
@@ -192,7 +192,7 @@ async def maybe_extract_archive(request: MaybeExtractArchiveRequest) -> Extracte
             Get(GunzipBinary, GunzipBinaryRequest()),
         )
         argv = gunzip.extract_archive_argv(archive_path, extract_archive_dir)
-        env = {}
+        immutable_input_digests = gunzip.python_binary.immutable_input_digests
 
     result = await Get(
         ProcessResult,
@@ -203,6 +203,7 @@ async def maybe_extract_archive(request: MaybeExtractArchiveRequest) -> Extracte
             description=f"Extract {archive_path}",
             level=LogLevel.DEBUG,
             output_directories=(extract_archive_dir,),
+            immutable_input_digests=immutable_input_digests,
         ),
     )
     resulting_digest = await Get(Digest, RemovePrefix(result.output_digest, extract_archive_dir))

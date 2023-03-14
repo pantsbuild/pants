@@ -15,7 +15,8 @@ from pants.backend.python.util_rules.pex_environment import (
     PexSubsystem,
     PythonExecutable,
 )
-from pants.core.util_rules import external_tool
+from pants.core.util_rules import adhoc_binaries, external_tool
+from pants.core.util_rules.adhoc_binaries import PythonBuildStandaloneBinary
 from pants.core.util_rules.external_tool import (
     DownloadedExternalTool,
     ExternalToolRequest,
@@ -38,9 +39,9 @@ class PexCli(TemplatedExternalTool):
     name = "pex"
     help = "The PEX (Python EXecutable) tool (https://github.com/pantsbuild/pex)."
 
-    default_version = "v2.1.121"
+    default_version = "v2.1.129"
     default_url_template = "https://github.com/pantsbuild/pex/releases/download/{version}/pex"
-    version_constraints = ">=2.1.121,<3.0"
+    version_constraints = ">=2.1.124,<3.0"
 
     @classproperty
     def default_known_versions(cls):
@@ -49,8 +50,8 @@ class PexCli(TemplatedExternalTool):
                 (
                     cls.default_version,
                     plat,
-                    "55cc5edd65be46758ed58d466f2ed88b70c2c22f144f0ecf9ac372b451ad304c",
-                    "4072726",
+                    "717388fdf97eb6dad98fbe651debddfd05630aa6ce80557b8430efa9490fb7ec",
+                    "4082068",
                 )
             )
             for plat in ["macos_arm64", "macos_x86_64", "linux_x86_64", "linux_arm64"]
@@ -61,7 +62,6 @@ class PexCli(TemplatedExternalTool):
 class PexCliProcess:
     subcommand: tuple[str, ...]
     extra_args: tuple[str, ...]
-    set_resolve_args: bool
     description: str = dataclasses.field(compare=False)
     additional_input_digest: Optional[Digest]
     extra_env: Optional[FrozenDict[str, str]]
@@ -78,7 +78,6 @@ class PexCliProcess:
         subcommand: Iterable[str],
         extra_args: Iterable[str],
         description: str,
-        set_resolve_args: bool = True,
         additional_input_digest: Optional[Digest] = None,
         extra_env: Optional[Mapping[str, str]] = None,
         output_files: Optional[Iterable[str]] = None,
@@ -90,7 +89,6 @@ class PexCliProcess:
     ) -> None:
         object.__setattr__(self, "subcommand", tuple(subcommand))
         object.__setattr__(self, "extra_args", tuple(extra_args))
-        object.__setattr__(self, "set_resolve_args", set_resolve_args)
         object.__setattr__(self, "description", description)
         object.__setattr__(self, "additional_input_digest", additional_input_digest)
         object.__setattr__(self, "extra_env", FrozenDict(extra_env) if extra_env else None)
@@ -125,6 +123,7 @@ async def setup_pex_cli_process(
     request: PexCliProcess,
     pex_pex: PexPEX,
     pex_env: PexEnvironment,
+    bootstrap_python: PythonBuildStandaloneBinary,
     python_native_code: PythonNativeCodeSubsystem.EnvironmentAware,
     global_options: GlobalOptions,
     pex_subsystem: PexSubsystem,
@@ -164,11 +163,13 @@ async def setup_pex_cli_process(
 
     verbosity_args = [f"-{'v' * pex_subsystem.verbosity}"] if pex_subsystem.verbosity > 0 else []
 
-    resolve_args = (
-        [*cert_args, "--python-path", create_path_env_var(pex_env.interpreter_search_paths)]
-        if request.set_resolve_args
-        else []
-    )
+    # NB: We should always pass `--python-path`, as that tells Pex where to look for interpreters
+    # when `--python` isn't an absolute path.
+    resolve_args = [
+        *cert_args,
+        "--python-path",
+        create_path_env_var(pex_env.interpreter_search_paths),
+    ]
     # All old-style pex runs take the --pip-version flag, but only certain subcommands of the
     # `pex3` console script do. So if invoked with a subcommand, the caller must selectively
     # set --pip-version only on subcommands that take it.
@@ -187,9 +188,9 @@ async def setup_pex_cli_process(
     ]
 
     complete_pex_env = pex_env.in_sandbox(working_directory=None)
-    normalized_argv = complete_pex_env.create_argv(pex_pex.exe, *args, python=request.python)
+    normalized_argv = complete_pex_env.create_argv(pex_pex.exe, *args)
     env = {
-        **complete_pex_env.environment_dict(python_configured=request.python is not None),
+        **complete_pex_env.environment_dict(python=request.python),
         **python_native_code.subprocess_env_vars,
         **(request.extra_env or {}),
         # If a subcommand is used, we need to use the `pex3` console script.
@@ -204,6 +205,7 @@ async def setup_pex_cli_process(
         output_files=request.output_files,
         output_directories=request.output_directories,
         append_only_caches=complete_pex_env.append_only_caches,
+        immutable_input_digests=bootstrap_python.immutable_input_digests,
         level=request.level,
         concurrency_available=request.concurrency_available,
         cache_scope=request.cache_scope,
@@ -215,4 +217,5 @@ def rules():
         *collect_rules(),
         *external_tool.rules(),
         *pex_environment.rules(),
+        *adhoc_binaries.rules(),
     ]

@@ -172,9 +172,9 @@ class TestDirutilTest:
         path: str
 
     def assert_tree(self, root: str, *expected: Dir | File | Symlink):
-        def collect_tree() -> Iterator[
-            TestDirutilTest.Dir | TestDirutilTest.File | TestDirutilTest.Symlink
-        ]:
+        def collect_tree() -> (
+            Iterator[TestDirutilTest.Dir | TestDirutilTest.File | TestDirutilTest.Symlink]
+        ):
             for path, dirnames, filenames in os.walk(root, followlinks=False):
                 relpath = os.path.relpath(path, root)
                 if relpath == os.curdir:

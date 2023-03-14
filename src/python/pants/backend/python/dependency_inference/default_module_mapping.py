@@ -5,10 +5,11 @@
 #  https://www.python.org/dev/peps/pep-0503/#normalized-names.
 DEFAULT_MODULE_MAPPING = {
     "absl-py": ("absl",),
+    "acryl-datahub": ("datahub",),
     "ansicolors": ("colors",),
     "apache-airflow": ("airflow",),
     "atlassian-python-api": ("atlassian",),
-    "attrs": ("attr",),
+    "attrs": ("attr", "attrs"),
     # Azure
     "azure-common": ("azure.common",),
     "azure-core": ("azure.core",),
@@ -182,6 +183,7 @@ DEFAULT_MODULE_MAPPING = {
     "python-lsp-jsonrpc": ("pylsp_jsonrpc",),
     "python-magic": ("magic",),
     "python-pptx": ("pptx",),
+    "python-slugify": ("slugify",),
     "python-socketio": ("socketio",),
     "python-statsd": ("statsd",),
     "pyyaml": ("yaml",),

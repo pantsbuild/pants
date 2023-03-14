@@ -15,11 +15,11 @@ from pants.engine.target import (
     Target,
 )
 from pants.util.docutil import bin_name, doc_url
-from pants.util.strutil import softwrap
+from pants.util.strutil import help_text
 
 
 class PyOxidizerOutputPathField(OutputPathField):
-    help = softwrap(
+    help = help_text(
         f"""
         Where the built directory tree should be located.
 
@@ -43,7 +43,7 @@ class PyOxidizerOutputPathField(OutputPathField):
 class PyOxidizerBinaryNameField(OutputPathField):
     alias = "binary_name"
     default = None
-    help = softwrap(
+    help = help_text(
         """
         The name of the binary that will be output by PyOxidizer. If not set, this will default
         to the name of this target.
@@ -54,7 +54,7 @@ class PyOxidizerBinaryNameField(OutputPathField):
 class PyOxidizerEntryPointField(StringField):
     alias = "entry_point"
     default = None
-    help = softwrap(
+    help = help_text(
         """
         Set the entry point, i.e. what gets run when executing `./my_app`, to a module.
         This represents the content of PyOxidizer's `python_config.run_module` and leaving this
@@ -71,7 +71,7 @@ class PyOxidizerEntryPointField(StringField):
 class PyOxidizerDependenciesField(Dependencies):
     required = True
     supports_transitive_excludes = True
-    help = softwrap(
+    help = help_text(
         f"""
         The addresses of `python_distribution` target(s) to include in the binary, e.g.
         `['src/python/project:dist']`.
@@ -97,7 +97,7 @@ class PyOxidizerDependenciesField(Dependencies):
 
 class PyOxidizerUnclassifiedResources(StringSequenceField):
     alias = "filesystem_resources"
-    help = softwrap(
+    help = help_text(
         """
         Adds support for listing dependencies that MUST be installed to the filesystem (e.g. Numpy).
         See https://pyoxidizer.readthedocs.io/en/stable/pyoxidizer_packaging_additional_files.html#installing-unclassified-files-on-the-filesystem
@@ -110,7 +110,7 @@ class PyOxidizerUnclassifiedResources(StringSequenceField):
 class PyOxidizerConfigSourceField(OptionalSingleSourceField):
     alias = "template"
     expected_file_extensions = (".bzlt",)
-    help = softwrap(
+    help = help_text(
         """
         If set, will use your custom configuration rather than using Pants's default template.
 
@@ -141,7 +141,7 @@ class PyOxidizerTarget(Target):
         PyOxidizerUnclassifiedResources,
         EnvironmentField,
     )
-    help = softwrap(
+    help = help_text(
         f"""
         A single-file Python executable with a Python interpreter embedded, built via PyOxidizer.
 

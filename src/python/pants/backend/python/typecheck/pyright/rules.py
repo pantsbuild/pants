@@ -40,7 +40,7 @@ from pants.engine.fs import CreateDigest, DigestContents, FileContent
 from pants.engine.internals.native_engine import Digest, MergeDigests
 from pants.engine.internals.selectors import MultiGet
 from pants.engine.process import FallibleProcessResult, Process
-from pants.engine.rules import Get, Rule, collect_rules, rule, rule_helper
+from pants.engine.rules import Get, Rule, collect_rules, rule
 from pants.engine.target import CoarsenedTargets, CoarsenedTargetsRequest, FieldSet, Target
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
@@ -84,7 +84,6 @@ class PyrightPartitions(Collection[PyrightPartition]):
     pass
 
 
-@rule_helper
 async def _patch_config_file(
     config_files: ConfigFiles, venv_dir: str, source_roots: Iterable[str]
 ) -> Digest:
@@ -149,7 +148,6 @@ async def pyright_typecheck_partition(
     pyright: Pyright,
     pex_environment: PexEnvironment,
 ) -> CheckResult:
-
     root_sources_get = Get(
         SourceFiles,
         SourceFilesRequest(fs.sources for fs in partition.field_sets),
@@ -243,7 +241,6 @@ async def pyright_determine_partitions(
     pyright: Pyright,
     python_setup: PythonSetup,
 ) -> PyrightPartitions:
-
     resolve_and_interpreter_constraints_to_field_sets = (
         _partition_by_interpreter_constraints_and_resolve(request.field_sets, python_setup)
     )

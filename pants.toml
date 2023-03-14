@@ -20,6 +20,7 @@ backend_packages.add = [
   "pants.backend.shell.lint.shfmt",
   "pants.backend.docker",
   "pants.backend.docker.lint.hadolint",
+  "pants.backend.experimental.adhoc",
   "pants.backend.experimental.go",
   "pants.backend.experimental.java",
   "pants.backend.experimental.java.lint.google_java_format",
@@ -138,12 +139,18 @@ venv_use_symlinks = true
 # `python_distrobution` targets, currently:
 # + src/python/pants:pants-packaged
 # + src/python/pants/testutil:testutil_wheel
+# And update the PythonBuildStandalone version/URL:
+# + src/python/pants/core/subsystems/python_bootstrap.py
 interpreter_constraints = [">=3.7,<3.10"]
 macos_big_sur_compatibility = true
 enable_resolves = true
+pip_version = "23.0.1"
 
 [python.resolves]
 python-default = "3rdparty/python/user_reqs.lock"
+flake8 = "3rdparty/python/flake8.lock"
+mypy = "3rdparty/python/mypy.lock"
+pytest = "3rdparty/python/pytest.lock"
 helm-post-renderer = "src/python/pants/backend/helm/subsystems/post_renderer.lock"
 helm-k8s-parser = "src/python/pants/backend/helm/subsystems/k8s_parser.lock"
 
@@ -161,13 +168,14 @@ args = ["--wrap-summaries=100", "--wrap-descriptions=100"]
 
 [flake8]
 config = "build-support/flake8/.flake8"
-extra_requirements.add = [
-  "flake8-2020>=1.7.0,<2",
+requirements.add = [
+  "flake8-2020",
   "flake8-no-implicit-concat",
-  "flake8-comprehensions>=3.10.0,<4.0",
+  "flake8-comprehensions",
 ]
-lockfile = "3rdparty/python/flake8.lock"
+
 source_plugins = ["build-support/flake8"]
+install_from_resolve = "flake8"
 
 [shellcheck]
 args = ["--external-sources"]
@@ -178,15 +186,15 @@ args = ["-i 2", "-ci", "-sr"]
 
 [pytest]
 args = ["--no-header"]
-extra_requirements.add = [
+requirements.add = [
   "ipdb",
   "pytest-asyncio",
   "pytest-html",
   "pytest-icdiff",
   "pygments",
 ]
-lockfile = "3rdparty/python/pytest.lock"
 execution_slot_var = "TEST_EXECUTION_SLOT"
+install_from_resolve = "pytest"
 
 [test]
 extra_env_vars = [
@@ -203,11 +211,12 @@ timeout_default = 60
 
 [mypy]
 interpreter_constraints = [">=3.7,<3.10"]
-extra_requirements.add = [
+requirements.add = [
   "mypy-typing-asserts",
-  "strawberry-graphql>=0.95.1,<0.96",
+  "strawberry-graphql",
 ]
-lockfile = "3rdparty/python/mypy.lock"
+install_from_resolve = "mypy"
+
 
 [coverage-py]
 interpreter_constraints = [">=3.7,<3.10"]
@@ -301,3 +310,4 @@ master = "src/python/pants/notes/master.rst"
 "2.14.x" = "src/python/pants/notes/2.14.x.md"
 "2.15.x" = "src/python/pants/notes/2.15.x.md"
 "2.16.x" = "src/python/pants/notes/2.16.x.md"
+"2.17.x" = "src/python/pants/notes/2.17.x.md"

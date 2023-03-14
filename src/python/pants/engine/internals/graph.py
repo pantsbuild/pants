@@ -35,7 +35,7 @@ from pants.engine.internals.parametrize import (  # noqa: F401
     _TargetParametrizationsRequest as _TargetParametrizationsRequest,
 )
 from pants.engine.internals.target_adaptor import TargetAdaptor, TargetAdaptorRequest
-from pants.engine.rules import Get, MultiGet, collect_rules, rule, rule_helper
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     AllTargets,
     AllTargetsRequest,
@@ -88,11 +88,7 @@ from pants.engine.target import (
     _generate_file_level_targets,
 )
 from pants.engine.unions import UnionMembership, UnionRule
-from pants.option.global_options import (
-    GlobalOptions,
-    OwnersNotFoundBehavior,
-    UnmatchedBuildFileGlobs,
-)
+from pants.option.global_options import GlobalOptions, UnmatchedBuildFileGlobs
 from pants.util.docutil import bin_name, doc_url
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
@@ -171,7 +167,6 @@ def warn_deprecated_field_type(field_type: type[Field]) -> None:
     )
 
 
-@rule_helper
 async def _determine_target_adaptor_and_type(
     address: Address, registered_target_types: RegisteredTargetTypes, *, description_of_origin: str
 ) -> tuple[TargetAdaptor, type[Target]]:
@@ -586,7 +581,7 @@ async def transitive_dependency_mapping(request: _DependencyMappingRequest) -> _
     while queued:
         direct_dependencies: tuple[Collection[Target], ...]
         if request.expanded_targets:
-            direct_dependencies = await MultiGet(
+            direct_dependencies = await MultiGet(  # noqa: PNT30: this is inherently sequential
                 Get(
                     Targets,
                     DependenciesRequest(
@@ -597,7 +592,7 @@ async def transitive_dependency_mapping(request: _DependencyMappingRequest) -> _
                 for tgt in queued
             )
         else:
-            direct_dependencies = await MultiGet(
+            direct_dependencies = await MultiGet(  # noqa: PNT30: this is inherently sequential
                 Get(
                     UnexpandedTargets,
                     DependenciesRequest(
@@ -674,7 +669,6 @@ def coarsened_targets_request(addresses: Addresses) -> CoarsenedTargetsRequest:
 async def coarsened_targets(
     request: CoarsenedTargetsRequest, local_environment_name: ChosenLocalEnvironmentName
 ) -> CoarsenedTargets:
-
     dependency_mapping = await Get(
         _DependencyMapping,
         _DependencyMappingRequest(
@@ -742,7 +736,7 @@ async def coarsened_targets(
 
 def _log_or_raise_unmatched_owners(
     file_paths: Sequence[PurePath],
-    owners_not_found_behavior: OwnersNotFoundBehavior,
+    owners_not_found_behavior: GlobMatchErrorBehavior,
     ignore_option: str | None = None,
 ) -> None:
     option_msg = (
@@ -768,7 +762,7 @@ def _log_or_raise_unmatched_owners(
         f"{doc_url('create-initial-build-files')}.{option_msg}"
     )
 
-    if owners_not_found_behavior == OwnersNotFoundBehavior.warn:
+    if owners_not_found_behavior == GlobMatchErrorBehavior.warn:
         logger.warning(msg)
     else:
         raise ResolveError(msg)
@@ -783,7 +777,7 @@ class OwnersRequest:
     """
 
     sources: tuple[str, ...]
-    owners_not_found_behavior: OwnersNotFoundBehavior = OwnersNotFoundBehavior.ignore
+    owners_not_found_behavior: GlobMatchErrorBehavior = GlobMatchErrorBehavior.ignore
     filter_by_global_options: bool = False
     match_if_owning_build_file_included_in_sources: bool = False
 
@@ -854,7 +848,7 @@ async def find_owners(
             candidate_tgts = deleted_candidate_tgts
             sources_set = deleted_files
 
-        build_file_addresses = await MultiGet(
+        build_file_addresses = await MultiGet(  # noqa: PNT30: requires triage
             Get(
                 BuildFileAddress,
                 BuildFileAddressRequest(
@@ -872,7 +866,7 @@ async def find_owners(
             # primary ownership, but the target still should match the file. We can't use
             # `tgt.get()` because this is a mixin, and there technically may be >1 field.
             secondary_owner_fields = tuple(
-                field
+                field  # type: ignore[misc]
                 for field in candidate_tgt.field_values.values()
                 if isinstance(field, SecondaryOwnerMixin)
             )
@@ -891,7 +885,7 @@ async def find_owners(
 
     if (
         unmatched_sources
-        and owners_request.owners_not_found_behavior != OwnersNotFoundBehavior.ignore
+        and owners_request.owners_not_found_behavior != GlobMatchErrorBehavior.ignore
     ):
         _log_or_raise_unmatched_owners(
             [PurePath(path) for path in unmatched_sources], owners_request.owners_not_found_behavior
@@ -909,7 +903,7 @@ async def find_owners(
 def extract_unmatched_build_file_globs(
     global_options: GlobalOptions,
 ) -> UnmatchedBuildFileGlobs:
-    return global_options.unmatched_build_file_globs
+    return UnmatchedBuildFileGlobs(global_options.unmatched_build_file_globs)
 
 
 class AmbiguousCodegenImplementationsException(Exception):
@@ -1133,7 +1127,6 @@ async def determine_explicitly_provided_dependencies(
     )
 
 
-@rule_helper
 async def _fill_parameters(
     field_alias: str,
     consumer_tgt: Target,

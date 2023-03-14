@@ -36,6 +36,7 @@ from pants.backend.python.util_rules.pex_requirements import (
     LoadedLockfileRequest,
     Lockfile,
     PexRequirements,
+    Resolve,
 )
 from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
@@ -47,7 +48,7 @@ from pants.core.goals.generate_lockfiles import NoCompatibleResolveException
 from pants.engine.addresses import Address, Addresses
 from pants.engine.collection import DeduplicatedCollection
 from pants.engine.fs import Digest, DigestContents, GlobMatchErrorBehavior, MergeDigests, PathGlobs
-from pants.engine.rules import Get, MultiGet, collect_rules, rule, rule_helper
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import Target, TransitiveTargets, TransitiveTargetsRequest
 from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
@@ -279,8 +280,8 @@ async def choose_python_resolve(
     return ChosenPythonResolve(
         name=chosen_resolve,
         lockfile=Lockfile(
-            file_path=python_setup.resolves[chosen_resolve],
-            file_path_description_of_origin=(
+            url=python_setup.resolves[chosen_resolve],
+            url_description_of_origin=(
                 f"the resolve `{chosen_resolve}` (from `[python].resolves`)"
             ),
             resolve_name=chosen_resolve,
@@ -384,7 +385,6 @@ class _ConstraintsRepositoryPexRequest:
     repository_pex_request: _RepositoryPexRequest
 
 
-@rule_helper
 async def _determine_requirements_for_pex_from_targets(
     request: PexFromTargetsRequest, python_setup: PythonSetup
 ) -> PexRequirements | PexRequest:
@@ -428,8 +428,7 @@ async def _determine_requirements_for_pex_from_targets(
         chosen_resolve = await Get(
             ChosenPythonResolve, ChosenPythonResolveRequest(request.addresses)
         )
-        loaded_lockfile = await Get(LoadedLockfile, LoadedLockfileRequest(chosen_resolve.lockfile))
-        return dataclasses.replace(requirements, from_superset=loaded_lockfile)
+        return dataclasses.replace(requirements, from_superset=Resolve(chosen_resolve.name))
 
     # Else, request the repository PEX and possibly subset it.
     repository_pex_request = await Get(
@@ -568,7 +567,7 @@ async def get_repository_pex(
         PexRequest(
             description=softwrap(
                 f"""
-                Installing {chosen_resolve.lockfile.file_path} for the resolve
+                Installing {chosen_resolve.lockfile.url} for the resolve
                 `{chosen_resolve.name}`
                 """
             ),

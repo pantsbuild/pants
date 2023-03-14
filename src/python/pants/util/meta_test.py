@@ -73,7 +73,6 @@ class WithShadowingInstanceMethod(OverridingValueInit):
 
 
 class OverridingMethodDefSuper(WithProp):
-
     _other_value = "o0"
 
     @classproperty

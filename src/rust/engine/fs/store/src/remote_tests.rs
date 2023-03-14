@@ -8,6 +8,7 @@ use grpc_util::tls;
 use hashing::Digest;
 use mock::StubCAS;
 use testutil::data::{TestData, TestDirectory};
+use tokio::io::AsyncReadExt;
 use workunit_store::WorkunitStore;
 
 use crate::remote::ByteStore;
@@ -25,6 +26,36 @@ async fn loads_file() {
       .unwrap(),
     Some(testdata.bytes())
   );
+}
+
+#[tokio::test]
+async fn loads_huge_file_via_temp_file() {
+  // 5MB of data
+  let testdata = TestData::new(&"12345".repeat(MEGABYTES));
+
+  let _ = WorkunitStore::setup_for_tests();
+  let cas = StubCAS::builder()
+    .chunk_size_bytes(MEGABYTES)
+    .file(&testdata)
+    .build();
+
+  let file = tokio::task::spawn_blocking(tempfile::tempfile)
+    .await
+    .unwrap()
+    .unwrap();
+  let file = tokio::fs::File::from_std(file);
+
+  let mut file = new_byte_store(&cas)
+    .load_file(testdata.digest(), file)
+    .await
+    .unwrap()
+    .unwrap();
+
+  let mut buf = String::new();
+  file.read_to_string(&mut buf).await.unwrap();
+  assert_eq!(buf.len(), testdata.len());
+  // (assert_eq! means failures unhelpfully print a 5MB string)
+  assert!(buf == testdata.string());
 }
 
 #[tokio::test]

@@ -70,7 +70,7 @@ _known_packages = [
 
 _expected_owners = {"benjyw", "John.Sirois", "stuhood"}
 
-_expected_maintainers = {"EricArellano", "illicitonion", "wisechengyi"}
+_expected_maintainers = {"EricArellano", "illicitonion", "wisechengyi", "kaos"}
 
 
 # Disable the Pants repository-internal internal_plugins.test_lockfile_fixtures plugin because
@@ -790,8 +790,6 @@ def build_pex(fetch: bool) -> None:
         extra_pex_args = [
             "--python-shebang",
             "/usr/bin/env python",
-            "--interpreter-constraint",
-            "CPython>=3.7,<3.10",
             *(
                 f"--platform={plat}-{abi}"
                 for plat in ("linux_x86_64", "macosx_11.0_x86_64")

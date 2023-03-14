@@ -91,10 +91,13 @@ def run_pants_with_workdir_without_waiting(
     shell: bool = False,
     set_pants_ignore: bool = True,
 ) -> PantsJoinHandle:
-    args = ["--no-pantsrc", f"--pants-workdir={workdir}"]
+    args = [
+        "--no-pantsrc",
+        f"--pants-workdir={workdir}",
+    ]
     if set_pants_ignore:
-        # FIXME: For some reason, Pants's CI adds this file and it is not ignored by default. Why?
-        args.append("--pants-ignore=+['.coverage.*']")
+        # FIXME: For some reason, Pants's CI adds the coverage file and it is not ignored by default. Why?
+        args.append("--pants-ignore=+['.coverage.*', '.python-build-standalone']")
 
     pantsd_in_command = "--no-pantsd" in command or "--pantsd" in command
     pantsd_in_config = config and "GLOBAL" in config and "pantsd" in config["GLOBAL"]
@@ -232,7 +235,9 @@ def run_pants(
 
 
 @contextmanager
-def setup_tmpdir(files: Mapping[str, str]) -> Iterator[str]:
+def setup_tmpdir(
+    files: Mapping[str, str], raw_files: Mapping[str, bytes] | None = None
+) -> Iterator[str]:
     """Create a temporary directory with the given files and return the tmpdir (relative to the
     build root).
 
@@ -240,15 +245,26 @@ def setup_tmpdir(files: Mapping[str, str]) -> Iterator[str]:
     with the tmpdir. The file content can use `{tmpdir}` to have it substituted with the actual
     tmpdir via a format string.
 
+    The `raw_files` parameter can be used to write binary files. These
+    files will not go through formatting in any way.
+
+
     This is useful to set up controlled test environments, such as setting up source files and
     BUILD files.
     """
+
+    raw_files = raw_files or {}
+
     with temporary_dir(root_dir=get_buildroot()) as tmpdir:
         rel_tmpdir = os.path.relpath(tmpdir, get_buildroot())
         for path, content in files.items():
             safe_file_dump(
                 os.path.join(tmpdir, path), content.format(tmpdir=rel_tmpdir), makedirs=True
             )
+
+        for path, data in raw_files.items():
+            safe_file_dump(os.path.join(tmpdir, path), data, makedirs=True, mode="wb")
+
         yield rel_tmpdir
 
 

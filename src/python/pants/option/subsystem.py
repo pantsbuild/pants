@@ -7,7 +7,7 @@ import functools
 import inspect
 import re
 from abc import ABCMeta
-from typing import TYPE_CHECKING, Any, ClassVar, Iterable, TypeVar, cast
+from typing import TYPE_CHECKING, Any, Callable, ClassVar, Iterable, TypeVar, cast
 
 from pants import ox
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
@@ -66,7 +66,7 @@ class Subsystem(metaclass=_SubsystemMeta):
     """
 
     options_scope: str
-    help: ClassVar[str]
+    help: ClassVar[str | Callable[[], str]]
 
     # Subclasses may override these to specify a deprecated former name for this Subsystem's scope.
     # Option values can be read from the deprecated scope, but a deprecation warning will be issued.
@@ -135,7 +135,8 @@ class Subsystem(metaclass=_SubsystemMeta):
             assert isinstance(v, OptionsInfo)
 
             return (
-                self.options.is_default(__name)
+                # vars beginning with `_` are exposed as option names with the leading `_` stripped
+                self.options.is_default(__name.lstrip("_"))
                 and resolve_environment_sensitive_option(v.flag_names[0], self) is None
             )
 

@@ -4,7 +4,6 @@ slug: "create-a-new-goal"
 excerpt: "Getting started writing plugins for Pants by creating a new goal."
 hidden: false
 createdAt: "2022-02-07T05:44:28.620Z"
-updatedAt: "2022-02-07T05:44:28.620Z"
 ---
 In this tutorial, you'll learn the basics needed to get started writing a plugin. You will create a new goal, `project-version`, which will tell you the version (retrieved from the `VERSION` text file) of a particular project in your monorepository. You will learn how to create a new custom target to refer to the `VERSION` file, how to author a new goal, and, most importantly, how to connect rules and targets. 
 
@@ -12,8 +11,7 @@ You can follow along this tutorial in your own repository; you only need to be o
 
 ### Registering a plugin
 
-We'll be writing an [in-repo plugin](https://www.pantsbuild.org/docs/plugins-overview#in-repo-plugins), and expect 
-you to have the `pants-plugins/project_version` directory as well as the `pants.toml` file with this configuration:
+We'll be writing an [in-repo plugin](https://www.pantsbuild.org/docs/plugins-overview#in-repo-plugins), and expect you to have the `pants-plugins/project_version` directory as well as the `pants.toml` file with this configuration:
 
 ```toml pants.toml
 # Specifying the path to our plugin's top-level folder using the `pythonpath` option:
@@ -82,7 +80,7 @@ source
 ...
 ```
 
-You can now also add a target to a `myapp/BUILD` file:
+You can now also add a target to the `myapp/BUILD` file:
 
 ```python
 version_file(
@@ -163,7 +161,8 @@ To make a target passed as an argument accessible in the goal rule, we pass the 
 ```python
 @goal_rule
 async def goal_show_project_version(console: Console, targets: Targets) -> ProjectVersionGoal:
-    # since we don't know what targets will be passed (e.g. `::`), we want to keep only `version_file` targets
+    # since we don't know what targets will be passed (e.g. `::`),
+    # we want to keep only `version_file` targets
     targets = [tgt for tgt in targets if tgt.alias == ProjectVersionTarget.alias]
     for target in targets:
         console.print_stdout(target.address.metadata())
@@ -232,12 +231,14 @@ Understanding that calling `Get()` is what causes a particular `@rule` to be exe
 Compare this `Get()` call with the rule signature:
 
 ```python
-# requesting an object of type "ProjectVersionFileView", passing an object of type "ProjectVersionTarget" in the variable "target"
+# requesting an object of type "ProjectVersionFileView", 
+# passing an object of type "ProjectVersionTarget" in the variable "target"
 Get(ProjectVersionFileView, ProjectVersionTarget, target)
 ```
 
 ```python
-# it requires an object of type "ProjectVersionTarget" and will return an object of type "ProjectVersionFileView"
+# it requires an object of type "ProjectVersionTarget" and 
+# will return an object of type "ProjectVersionFileView"
 @rule
 async def get_project_version_file_view(target: ProjectVersionTarget) -> ProjectVersionFileView: ...
 ```
@@ -245,21 +246,21 @@ async def get_project_version_file_view(target: ProjectVersionTarget) -> Project
 > 📘 Understanding the requests and rules signatures
 > In our basic usage, there's a 1:1 match between the `Get(output: B, input: A, obj)` request and the `@rule(input: A) -> B` function signature. This doesn't have to be the case! When you make a request (providing an input type and asking for an output type), Pants looks at all the [rules in the graph](https://www.pantsbuild.org/docs/rules-api-concepts#the-rule-graph) to find a way from the input to the output using all the available rules. 
 
-> Let's consider a following scenario where you have a few `@rule`s and a `Get()` request:
+Let's consider a following scenario where you have a few `@rule`s and a `Get()` request:
 
-> ```python
-> @rule
-> async def rule1(A) -> B: ...
-> 
-> @rule
-> async def rule2(B) -> C: ...
-> 
-> @goal_rule
-> async def main(...):
->     result = await Get(C, A, obj)
-> ```
+```python
+@rule
+async def rule1(A) -> B: ...
 
-> With the following suite of rules, Pants will "figure out" that in order to return `C`, it's necessary to call `rule1` first to get `B` and then once there's `B`, call `rule2` to get C. This means you can focus on writing individual rules and leave the hard work of finding out the right order of calls that will need happen to Pants!   
+@rule
+async def rule2(B) -> C: ...
+
+@goal_rule
+async def main(...):
+    result = await Get(C, A, obj)
+```
+
+With the following suite of rules, Pants will "figure out" that in order to return `C`, it's necessary to call `rule1` first to get `B` and then once there's `B`, call `rule2` to get C. This means you can focus on writing individual rules and leave the hard work of finding out the right order of calls that will need happen to Pants!   
 
 The `project-version` Pants goal now shows some useful information -- the target path along with a dummy version. This means our `@rule` was run!
 

@@ -19,7 +19,7 @@ use workunit_store::{RunningWorkunit, WorkunitStore};
 
 use crate::{
   local, local::KeepSandboxes, CacheName, CommandRunner as CommandRunnerTrait, Context,
-  FallibleProcessResultWithPlatform, InputDigests, NamedCaches, Platform, Process, ProcessError,
+  FallibleProcessResultWithPlatform, InputDigests, NamedCaches, Process, ProcessError,
   RelativePath,
 };
 
@@ -76,7 +76,6 @@ async fn capture_exit_code_signal() {
   assert_eq!(result.stderr_bytes, "".as_bytes());
   assert_eq!(result.original.exit_code, -15);
   assert_eq!(result.original.output_directory, *EMPTY_DIRECTORY_DIGEST);
-  assert_eq!(result.original.platform, Platform::current().unwrap());
 }
 
 #[tokio::test]
@@ -169,7 +168,6 @@ async fn output_files_one() {
     result.original.output_directory,
     TestDirectory::containing_roland().directory_digest()
   );
-  assert_eq!(result.original.platform, Platform::current().unwrap());
 }
 
 #[tokio::test]
@@ -197,7 +195,6 @@ async fn output_dirs() {
     result.original.output_directory,
     TestDirectory::recursive().directory_digest()
   );
-  assert_eq!(result.original.platform, Platform::current().unwrap());
 }
 
 #[tokio::test]
@@ -224,7 +221,6 @@ async fn output_files_many() {
     result.original.output_directory,
     TestDirectory::recursive().directory_digest()
   );
-  assert_eq!(result.original.platform, Platform::current().unwrap());
 }
 
 #[tokio::test]
@@ -250,7 +246,6 @@ async fn output_files_execution_failure() {
     result.original.output_directory,
     TestDirectory::containing_roland().directory_digest()
   );
-  assert_eq!(result.original.platform, Platform::current().unwrap());
 }
 
 #[tokio::test]
@@ -277,7 +272,6 @@ async fn output_files_partial_output() {
     result.original.output_directory,
     TestDirectory::containing_roland().directory_digest()
   );
-  assert_eq!(result.original.platform, Platform::current().unwrap());
 }
 
 #[tokio::test]
@@ -301,7 +295,6 @@ async fn output_overlapping_file_and_dir() {
     result.original.output_directory,
     TestDirectory::nested().directory_digest()
   );
-  assert_eq!(result.original.platform, Platform::current().unwrap());
 }
 
 #[tokio::test]
@@ -321,7 +314,6 @@ async fn append_only_cache_created() {
   assert_eq!(result.stderr_bytes, "".as_bytes());
   assert_eq!(result.original.exit_code, 0);
   assert_eq!(result.original.output_directory, *EMPTY_DIRECTORY_DIGEST);
-  assert_eq!(result.original.platform, Platform::current().unwrap());
 }
 
 #[tokio::test]
@@ -345,7 +337,6 @@ async fn jdk_symlink() {
   assert_eq!(result.stderr_bytes, "".as_bytes());
   assert_eq!(result.original.exit_code, 0);
   assert_eq!(result.original.output_directory, *EMPTY_DIRECTORY_DIGEST);
-  assert_eq!(result.original.platform, Platform::current().unwrap());
 }
 
 #[tokio::test]
@@ -536,7 +527,6 @@ async fn all_containing_directories_for_outputs_are_created() {
     result.original.output_directory,
     TestDirectory::nested_dir_and_file().directory_digest()
   );
-  assert_eq!(result.original.platform, Platform::current().unwrap());
 }
 
 #[tokio::test]
@@ -559,7 +549,6 @@ async fn output_empty_dir() {
     result.original.output_directory,
     TestDirectory::containing_falcons_dir().directory_digest()
   );
-  assert_eq!(result.original.platform, Platform::current().unwrap());
 }
 
 #[tokio::test]
@@ -635,7 +624,6 @@ async fn working_directory() {
     result.original.output_directory,
     TestDirectory::containing_roland().directory_digest()
   );
-  assert_eq!(result.original.platform, Platform::current().unwrap());
 }
 
 #[tokio::test]
@@ -747,8 +735,7 @@ async fn prepare_workdir_exclusive_relative() {
     work_dir.path().to_owned(),
     &process,
     TestDirectory::recursive().directory_digest(),
-    store,
-    executor,
+    &store,
     &named_caches,
     &immutable_inputs,
     None,
@@ -757,7 +744,7 @@ async fn prepare_workdir_exclusive_relative() {
   .await
   .unwrap();
 
-  assert_eq!(exclusive_spawn, true);
+  assert!(exclusive_spawn);
 }
 
 pub(crate) fn named_caches_and_immutable_inputs(
@@ -769,7 +756,7 @@ pub(crate) fn named_caches_and_immutable_inputs(
 
   (
     root,
-    NamedCaches::new(named_cache_dir),
+    NamedCaches::new_local(named_cache_dir),
     ImmutableInputs::new(store, &root_path).unwrap(),
   )
 }

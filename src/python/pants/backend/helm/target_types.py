@@ -34,7 +34,7 @@ from pants.engine.target import (
     generate_multiple_sources_field_help_message,
 )
 from pants.util.docutil import bin_name
-from pants.util.strutil import softwrap
+from pants.util.strutil import help_text
 from pants.util.value_interpolation import InterpolationContext, InterpolationError
 
 logger = logging.getLogger(__name__)
@@ -47,7 +47,7 @@ logger = logging.getLogger(__name__)
 class HelmRegistriesField(StringSequenceField):
     alias = "registries"
     default = (ALL_DEFAULT_HELM_REGISTRIES,)
-    help = softwrap(
+    help = help_text(
         """
         List of addresses or configured aliases to any OCI registries to use for the
         built chart.
@@ -82,7 +82,7 @@ class HelmRegistriesField(StringSequenceField):
 class HelmSkipLintField(BoolField):
     alias = "skip_lint"
     default = False
-    help = softwrap(
+    help = help_text(
         f"""
         If set to true, do not run any linting in this Helm chart when running `{bin_name()}
         lint`.
@@ -93,7 +93,7 @@ class HelmSkipLintField(BoolField):
 class HelmSkipPushField(BoolField):
     alias = "skip_push"
     default = False
-    help = softwrap(
+    help = help_text(
         f"""
         If set to true, do not push this Helm chart to registries when running `{bin_name()}
         publish`.
@@ -138,7 +138,7 @@ class HelmChartDependenciesField(Dependencies):
 
 
 class HelmChartOutputPathField(OutputPathField):
-    help = softwrap(
+    help = help_text(
         f"""
         Where the built directory tree should be located.
 
@@ -168,7 +168,7 @@ class HelmChartLintStrictField(TriBoolField):
 
 class HelmChartRepositoryField(StringField):
     alias = "repository"
-    help = softwrap(
+    help = help_text(
         """
         Repository to use in the Helm registry where this chart is going to be published.
 
@@ -317,7 +317,7 @@ class HelmUnitTestTestsGeneratorTarget(TargetFilesGenerator):
 
 class HelmArtifactRegistryField(StringField):
     alias = "registry"
-    help = softwrap(
+    help = help_text(
         """
         Either registry alias (prefixed by `@`) configured in `[helm.registries]` for the
         Helm artifact or the full OCI registry URL.
@@ -327,7 +327,7 @@ class HelmArtifactRegistryField(StringField):
 
 class HelmArtifactRepositoryField(StringField):
     alias = "repository"
-    help = softwrap(
+    help = help_text(
         f"""
         Either a HTTP(S) URL to a classic repository, or a path inside an OCI registry (when
         `{HelmArtifactRegistryField.alias}` is provided).
@@ -414,7 +414,7 @@ class HelmDeploymentSourcesField(MultipleSourcesField):
 class HelmDeploymentValuesField(DictStringToStringField):
     alias = "values"
     required = False
-    help = softwrap(
+    help = help_text(
         """
         Individual values to use when rendering a given deployment.
 
@@ -466,7 +466,7 @@ class HelmDeploymentTimeoutField(IntField):
 
 class HelmDeploymentPostRenderersField(SpecialCasedDependencies):
     alias = "post_renderers"
-    help = softwrap(
+    help = help_text(
         """
         List of runnable targets to be used to post-process the helm chart after being rendered by Helm.
 

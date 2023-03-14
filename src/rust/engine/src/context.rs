@@ -26,14 +26,16 @@ use graph::{self, EntryId, Graph, InvalidationResult, NodeContext};
 use hashing::Digest;
 use log::info;
 use parking_lot::Mutex;
-use process_execution::docker::{DOCKER, IMAGE_PULL_CACHE};
+// use docker::docker::{self, DOCKER, IMAGE_PULL_CACHE};
+use docker::docker;
 use process_execution::switched::SwitchedCommandRunner;
 use process_execution::{
-  self, bounded, docker, local, nailgun, remote, remote_cache, CacheContentBehavior, CommandRunner,
-  NamedCaches, ProcessExecutionStrategy, RemoteCacheWarningsBehavior,
+  self, bounded, local, CacheContentBehavior, CommandRunner, NamedCaches, ProcessExecutionStrategy,
 };
 use protos::gen::build::bazel::remote::execution::v2::ServerCapabilities;
 use regex::Regex;
+use remote::remote_cache::RemoteCacheWarningsBehavior;
+use remote::{self, remote_cache};
 use rule_graph::RuleGraph;
 use store::{self, ImmutableInputs, Store};
 use task_executor::Executor;
@@ -219,7 +221,7 @@ impl Core {
         exec_strategy_opts.local_parallelism * 2
       };
 
-      let nailgun_runner = nailgun::CommandRunner::new(
+      let nailgun_runner = pe_nailgun::CommandRunner::new(
         local_execution_root_dir.to_path_buf(),
         local_runner_store.clone(),
         executor.clone(),
@@ -242,15 +244,17 @@ impl Core {
     let docker_runner = Box::new(docker::CommandRunner::new(
       local_runner_store.clone(),
       executor.clone(),
-      &DOCKER,
-      &IMAGE_PULL_CACHE,
+      &docker::DOCKER,
+      &docker::IMAGE_PULL_CACHE,
       local_execution_root_dir.to_path_buf(),
-      named_caches.clone(),
       immutable_inputs.clone(),
       exec_strategy_opts.local_keep_sandboxes,
     )?);
     let runner = Box::new(SwitchedCommandRunner::new(docker_runner, runner, |req| {
-      matches!(req.execution_strategy, ProcessExecutionStrategy::Docker(_))
+      matches!(
+        req.execution_environment.strategy,
+        ProcessExecutionStrategy::Docker(_)
+      )
     }));
 
     let mut runner: Box<dyn CommandRunner> = Box::new(bounded::CommandRunner::new(
@@ -263,7 +267,7 @@ impl Core {
       // We always create the remote execution runner if it is globally enabled, but it may not
       // actually be used thanks to the `SwitchedCommandRunner` below. Only one of local execution
       // or remote execution will be used for any particular process.
-      let remote_execution_runner = Box::new(remote::CommandRunner::new(
+      let remote_execution_runner = Box::new(remote::remote::CommandRunner::new(
         // We unwrap because global_options.py will have already validated this is defined.
         remoting_opts.execution_address.as_ref().unwrap(),
         instance_name,
@@ -288,7 +292,7 @@ impl Core {
         runner,
         |req| {
           matches!(
-            req.execution_strategy,
+            req.execution_environment.strategy,
             ProcessExecutionStrategy::RemoteExecution(_)
           )
         },
@@ -535,7 +539,7 @@ impl Core {
     };
 
     let immutable_inputs = ImmutableInputs::new(store.clone(), &local_execution_root_dir)?;
-    let named_caches = NamedCaches::new(named_caches_dir);
+    let named_caches = NamedCaches::new_local(named_caches_dir);
     let command_runners = Self::make_command_runners(
       &full_store,
       &store,
@@ -584,7 +588,7 @@ impl Core {
 
     let watcher = if watch_filesystem {
       let w = InvalidationWatcher::new(executor.clone(), build_root.clone(), ignorer.clone())?;
-      w.start(&graph);
+      w.start(&graph)?;
       Some(w)
     } else {
       None

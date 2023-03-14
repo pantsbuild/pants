@@ -4,7 +4,6 @@ slug: "python-third-party-dependencies"
 excerpt: "How to use third-party Python libraries in your project."
 hidden: false
 createdAt: "2020-04-30T20:06:43.633Z"
-updatedAt: "2022-07-25T15:27:26.087Z"
 ---
 Pants handles dependencies with more precision than traditional Python workflows. Traditionally, you have a single heavyweight [virtual environment](https://docs.python.org/3/tutorial/venv.html) that includes a large set of dependencies, whether or not you actually need them for your current task. 
 
@@ -128,7 +127,7 @@ python_requirement(
 )
 ```
 
-Note that Pants does not consume your `poetry.lock` file. Instead, see the [section on lockfiles](#lockfiles) below.
+Note that Pants does not consume your `poetry.lock` file. Instead, see the [page on lockfiles](doc:python-lockfiles).
 
 How dependencies are chosen
 ---------------------------
@@ -181,193 +180,14 @@ If the dependency is a type stub, and the default does not work, set `type_stub_
 
 It's invalid in Python to have conflicting versions of the same requirement, e.g. `Django==2` and `Django==3`. Instead, Pants supports "multiple resolves" (i.e. multiple lockfiles), as explained in the below section on lockfiles.
 
-When you have multiple targets for the same dependency and they belong to the same resolve ("lockfile"), dependency inference will not work due to ambiguity. If you're using lockfiles—which we strongly recommend—the solution is to set the `resolve` field for problematic `python_requirement` targets so that each resolve has only one requirement and there is no ambiguity.  
+When you have multiple targets for the same dependency and they belong to the same [resolve](doc:python-lockfiles), dependency inference will not work due to ambiguity. If you're using lockfiles—which we strongly recommend—the solution is to set the `resolve` field for problematic `python_requirement` targets so that each resolve has only one requirement and there is no ambiguity.  
 
 This ambiguity is often a problem when you have 2+ `requirements.txt` or `pyproject.toml` files in your project, such as `project1/requirements.txt` and `project2/requirements.txt` both specifying `django`. You may want to set up each `poetry_requirements`/`python_requirements` target generator to use a distinct resolve so that there is no overlap. Alternatively, if the versions are the same, you may want to consolidate the requirements into a common file.
 
 Lockfiles
 ---------
 
-We strongly recommend using lockfiles because they make your builds [more stable](https://classic.yarnpkg.com/blog/2016/11/24/lockfiles-for-all/) so that new releases of dependencies will not break your project. They also reduce the risk of [supply chain attacks](https://docs.microsoft.com/en-us/windows/security/threat-protection/intelligence/supply-chain-malware).
-
-Pants has two types of lockfiles:
-
-- User lockfiles, for your own code such as packaging binaries and running tests.
-- Tool lockfiles, to install tools that Pants runs like Pytest and Flake8.
-
-With both types of lockfiles, Pants can generate the lockfile for you with the `generate-lockfiles` goal.
-
-### User lockfiles
-
-First, set `[python].enable_resolves` in `pants.toml`:
-
-```toml
-[python]
-enable_resolves = true
-```
-
-By default, Pants will write the lockfile to `3rdparty/python/default.lock`. If you want a different location, change `[python].resolves` like this:
-
-```toml
-[python]
-enable_resolves = true
-
-[python.resolves]
-python-default = "lockfile_path.lock" 
-```
-
-Then, use `pants generate-lockfiles` to generate the lockfile.
-
-```
-❯ pants generate-lockfiles
-19:00:39.26 [INFO] Completed: Generate lockfile for python-default
-19:00:39.29 [INFO] Wrote lockfile for the resolve `python-default` to 3rdparty/python/default.lock
-```
-
-> 📘 FYI: user lockfiles improve performance
-> 
-> As explained at the top of these docs, Pants only uses the subset of the "universe" of your
-> dependencies that is actually needed for a build, such as running tests and packaging a wheel
-> file. This gives fine-grained caching and has other benefits like built packages
-> (e.g. PEX binaries) only including their true dependencies.
-> 
-> Without lockfiles, Pants must "resolve" the unique dependencies for each task, which involves
-> often-slow steps like choosing which versions of transitive dependencies to install.
->
-> Instead, with lockfiles, Pants already did the resolve beforehand, so only installs the specific
-> subset of the lockfile relevant to the task.
-
-#### Multiple lockfiles
-
-While it's often desirable to have a single lockfile for the whole repository for simplicity and consistency, sometimes you may need multiple. This is necessary, for example, when you have conflicting versions of requirements, such as one project using Django 2 and other projects using Django 3.
-
-Start by defining multiple "resolves", which are logical names for lockfile paths. For example:
-
-```toml
-[python]
-enable_resolves = true
-default_resolve = "web-app"
-
-[python.resolves]
-data-science = "3rdparty/python/data_science.lock"
-web-app = "3rdparty/python/web_app.lock"
-```
-
-Then, teach Pants which resolves every `python_requirement` target belongs to through the `resolve` field. It will default to `[python].default_resolve`.
-
-```python BUILD
-python_requirement(
-    name="ansicolors",
-    requirements=["ansicolors==1.18"],
-    resolve="web-app",
-)
-
-# Often, you will want to set `resolve` on the 
-# `poetry_requirements` and `python_requirements`
-# target generators.
-poetry_requirements(
-    name="poetry",
-    resolve="data-science",
-    # You can use `overrides` if you only want to change
-    # some targets.
-    overrides={"requests": {"resolve": "web-app"}},
-)
-```
-
-If you want the same requirement to show up in multiple resolves, use the [`parametrize`](doc:targets) mechanism.
-
-```python BUILD
-# The same requirement in multiple resolves:
-python_requirement(
-    name="ansicolors_web-app",
-    requirements=["ansicolors==1.18"],
-    resolve=parametrize("web-app", "data-science")
-)
-
-# You can parametrize target generators, including 
-# via the `overrides` field:
-poetry_requirements(
-    name="poetry",
-    resolve="data-science",
-    overrides={
-        "requests": {
-            "resolve": parametrize("web-app", "data-science")
-        }
-    },
-)
-```
-
-Then, run `pants generate-lockfiles` to generate the lockfiles. If the results aren't what you'd expect, adjust the prior step.
-
-Finally, update your first-party targets like `python_source` / `python_sources`, `python_test` / `python_tests`, and `pex_binary` to set their `resolve` field. As before, the `resolve` field defaults to `[python].default_resolve`.
-
-```python project/BUILD
-python_sources(
-    resolve="web-app",
-)
-
-python_tests(
-    name="tests",
-    resolve="web-app",
-    # You can use `overrides` to change certain generated targets
-    overrides={"test_utils.py": {"resolve": "data-science"}},
-)
-
-pex_binary(
-    name="main",
-    entry_point="main.py",
-    resolve="web-app",
-)
-```
-
-If a first-party target is compatible with multiple resolves—such as some utility code—you can either use the [`parametrize` mechanism](doc:targets) with the `resolve` field or create distinct targets for the same entity.
-
-All transitive dependencies of a target must use the same resolve. Pants's dependency inference already handles this for you by only inferring dependencies on targets that share the same resolve. If you incorrectly add a target from a different resolve to the `dependencies` field, Pants will error with a helpful message when building your code with goals like `test`, `package`, and `run`.
-
-### Tool lockfiles
-
-Pants distributes a lockfile with each tool by default. However, if you change the tool's `version` and `extra_requirements`—or you change its interpreter constraints to not be compatible with our default lockfile—you will need to use a custom lockfile. Set the `lockfile` option in `pants.toml` for that tool, and then run `pants generate-lockfiles`.
-
-```toml
-[flake8]
-version = "flake8==3.8.0"
-lockfile = "3rdparty/flake8_lockfile.txt"  # This can be any path you'd like.
-
-[pytest]
-extra_requirements.add = ["pytest-icdiff"]
-lockfile = "3rdparty/pytest_lockfile.txt"
-```
-
-```
-❯  pants generate-lockfiles
-19:00:39.26 [INFO] Completed: Generate lockfile for flake8
-19:00:39.27 [INFO] Completed: Generate lockfile for pytest
-19:00:39.29 [INFO] Wrote lockfile for the resolve `flake8` to 3rdparty/flake8_lockfile.txt
-19:00:39.30 [INFO] Wrote lockfile for the resolve `pytest` to 3rdparty/pytest_lockfile.txt
-```
-
-You can also run `pants generate-lockfiles --resolve=tool`, e.g. `--resolve=flake8`, to only generate that tool's lockfile rather than generating all lockfiles.
-
-Some tools, such as Flake8 and Bandit, need to run on an interpreter compatible with the code they operate on. In this case the tool may not have its own `interpreter_constraints` option, and its lockfile must be compatible with your code's interpreter constraints.
-
-To disable lockfiles entirely for a tool, set `[tool].lockfile = "<none>"` for that tool. Although we do not recommend this!
-
-### Manually generating lockfiles
-
-Rather than using `generate-lockfiles` to generate PEX-style lockfiles, you can manually generate lockfiles. This can be helpful, for example, when adopting Pants in a repository already using Poetry by running `poetry export --dev`.
-
-Manually generated lockfiles must either use Pex's JSON format or use pip's `requirements.txt`-style format (ideally with `--hash` entries for better supply chain security).
-For example:
-
-```text 3rdparty/user_lock.txt
-freezegun==1.2.0 \
-  --hash=sha256:93e90676da3... \
-  --hash=sha256:e19563d0b05...
-```
-
-For manually-generated user lockfiles, set `[python].resolves` to the path of your lockfile(s). Also set `[python].resolves_generate_lockfiles` to `False` so that Pants does not expect its  metadata header. Warning: it will likely be slower to install manually generated user lockfiles than Pex ones because Pants cannot as efficiently extract the subset of requirements used for a particular task; see the option [`[python].run_against_entire_lockfile`](doc:reference-python). 
-
-For manually-generated tool lockfiles, set `[tool].lockfile` to the path of your lockfile, e.g. `[black].lockfile`. Also set `[python].invalid_lockfile_behavior = "error"` so that Pants does not expect metadata headers. Note that this option will disable the check for all lockfiles, including user lockfiles, which may not be desirable. Feel free to open a [GitHub issue](https://github.com/pantsbuild/pants/issues/new) if you want more precise control.
+We strongly recommend using [lockfiles](doc:python-lockfiles) to ensure secure, repeatable dependency resolution. See [here](doc:python-lockfiles) for details on how to do so.
 
 Advanced usage
 --------------
@@ -547,12 +367,12 @@ Both approaches require using absolute paths, and the files must exist on your m
 
 #### Working around absolute paths
 
-If you need to share the lockfile on different machines, and you cannot use the same absolute path, then you can use the option `[python-repos].path_mappings` along with `[python-repos].find_links`. (`path_mappings` is not intended for PEP 440 direct requirements.)
+If you need to share a lockfile on different machines, and you cannot use the same absolute path, then you can use the option `[python-repos].path_mappings` along with `[python-repos].find_links`. (`path_mappings` is not intended for PEP 440 direct requirements.)
 
 The `path_mappings` option allows you to substitute a portion of the absolute path with a logical name, which can be set to a different value than your teammates. For example, the path
 `file:///Users/pantsbuild/prebuilt_wheels/django-3.1.1-py3-none-any.whl` could become `file://${WHEELS_DIR}/django-3.1.1-py3-none-any.whl`, where each Pants user defines what `WHEELS_DIR` should be on their machine.
 
-This feature only works when using Pex lockfiles via `[python].resolves` and for tool lockfiles like Pytest and Black.
+This feature only works when using Pex lockfiles via `[python].resolves`.
 
 `[python-repos].path_mappings` expects values in the form `NAME|PATH`, e.g. `WHEELS_DIR|/Users/pantsbuild/prebuilt_wheels`. Also, still use an absolute path for `[python-repos].find_links`.
 

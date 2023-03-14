@@ -15,14 +15,13 @@ from typing import Any, Iterable, Mapping
 import yaml
 
 from pants.backend.helm.utils.yaml import FrozenYamlIndex
-from pants.backend.python.goals import lockfile
-from pants.backend.python.goals.lockfile import GeneratePythonLockfile
-from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
+from pants.backend.python.subsystems.python_tool_base import (
+    LockfileRules,
+    PythonToolRequirementsBase,
+)
 from pants.backend.python.target_types import EntryPoint
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
-from pants.backend.python.util_rules.pex_requirements import GeneratePythonToolLockfileSentinel
-from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.goals.run import RunFieldSet, RunRequest
 from pants.core.util_rules.system_binaries import CatBinary
 from pants.engine.addresses import UnparsedAddressInputs
@@ -30,9 +29,8 @@ from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnTyp
 from pants.engine.fs import CreateDigest, Digest, FileContent
 from pants.engine.internals.native_engine import MergeDigests
 from pants.engine.process import Process
-from pants.engine.rules import Get, MultiGet, collect_rules, rule, rule_helper
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import FieldSetsPerTarget, FieldSetsPerTargetRequest, Targets
-from pants.engine.unions import UnionRule
 from pants.util.docutil import git_url
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
@@ -48,10 +46,11 @@ class HelmPostRendererSubsystem(PythonToolRequirementsBase):
     options_scope = "helm-post-renderer"
     help = "Used perform modifications to the final output produced by Helm charts when they've been fully rendered."
 
-    default_version = "yamlpath>=3.6,<3.7"
+    default_version = "yamlpath>=3.7.0,<4"
     default_extra_requirements = [
         "ruamel.yaml>=0.15.96,!=0.17.0,!=0.17.1,!=0.17.2,!=0.17.5,<=0.17.21"
     ]
+    default_requirements = ["yamlpath>=3.6.0,<4", *default_extra_requirements]
 
     register_interpreter_constraints = True
     default_interpreter_constraints = ["CPython>=3.7,<3.10"]
@@ -62,17 +61,7 @@ class HelmPostRendererSubsystem(PythonToolRequirementsBase):
         f"src/python/{_HELM_POSTRENDERER_PACKAGE.replace('.', '/')}/post_renderer.lock"
     )
     default_lockfile_url = git_url(default_lockfile_path)
-
-
-class HelmPostRendererLockfileSentinel(GeneratePythonToolLockfileSentinel):
-    resolve_name = HelmPostRendererSubsystem.options_scope
-
-
-@rule
-def setup_postrenderer_lockfile_request(
-    _: HelmPostRendererLockfileSentinel, post_renderer: HelmPostRendererSubsystem
-) -> GeneratePythonLockfile:
-    return GeneratePythonLockfile.from_tool(post_renderer)
+    lockfile_rules_type = LockfileRules.SIMPLE
 
 
 _HELM_POST_RENDERER_TOOL = "__pants_helm_post_renderer.py"
@@ -168,7 +157,6 @@ class HelmPostRenderer(EngineAwareReturnType):
         }
 
 
-@rule_helper
 async def _resolve_post_renderers(
     address_inputs: UnparsedAddressInputs,
 ) -> Iterable[RunRequest]:
@@ -317,6 +305,4 @@ def rules():
     return [
         *collect_rules(),
         *pex.rules(),
-        *lockfile.rules(),
-        UnionRule(GenerateToolLockfileSentinel, HelmPostRendererLockfileSentinel),
     ]

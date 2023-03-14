@@ -15,7 +15,7 @@ from pants.backend.python.lint.ruff.subsystem import RuffFieldSet
 from pants.backend.python.lint.ruff.subsystem import rules as ruff_subsystem_rules
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import PythonSourcesGeneratorTarget
-from pants.core.goals.fmt import FmtResult
+from pants.core.goals.fix import FixResult
 from pants.core.util_rules import config_files
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
@@ -38,7 +38,7 @@ def rule_runner() -> RuleRunner:
             *ruff_subsystem_rules(),
             *config_files.rules(),
             *target_types_rules.rules(),
-            QueryRule(FmtResult, [RuffRequest.Batch]),
+            QueryRule(FixResult, [RuffRequest.Batch]),
             QueryRule(SourceFiles, (SourceFilesRequest,)),
         ],
         target_types=[PythonSourcesGeneratorTarget],
@@ -50,7 +50,7 @@ def run_ruff(
     targets: list[Target],
     *,
     extra_args: list[str] | None = None,
-) -> FmtResult:
+) -> FixResult:
     args = ["--backend-packages=pants.backend.python.lint.ruff", *(extra_args or ())]
     rule_runner.set_options(args, env_inherit={"PATH", "PYENV_ROOT", "HOME"})
 
@@ -66,7 +66,7 @@ def run_ruff(
             snapshot=input_sources.snapshot,
         ),
     ]
-    result = rule_runner.request(FmtResult, req_inputs)
+    result = rule_runner.request(FixResult, req_inputs)
 
     return result
 
@@ -100,7 +100,7 @@ def test_failing(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({"f.py": BAD_FILE, "BUILD": "python_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
     result = run_ruff(rule_runner, [tgt])
-    assert result.stdout == "Found 1 error(s) (1 fixed, 0 remaining).\n"
+    assert result.stdout == "Found 1 error (1 fixed, 0 remaining).\n"
     assert result.stderr == ""
     assert result.did_change
     assert result.output == get_snapshot(rule_runner, {"f.py": GOOD_FILE})

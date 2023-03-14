@@ -42,7 +42,7 @@ from pants.engine.process import (
     InteractiveProcessResult,
     ProcessResultMetadata,
 )
-from pants.engine.rules import Effect, Get, MultiGet, collect_rules, goal_rule, rule, rule_helper
+from pants.engine.rules import Effect, Get, MultiGet, collect_rules, goal_rule, rule
 from pants.engine.target import (
     FieldSet,
     FieldSetsPerTarget,
@@ -65,7 +65,7 @@ from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized
 from pants.util.meta import classproperty
-from pants.util.strutil import softwrap
+from pants.util.strutil import help_text, softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -650,7 +650,7 @@ class TestTimeoutField(IntField, metaclass=ABCMeta):
     alias = "timeout"
     required = False
     valid_numbers = ValidNumbers.positive_only
-    help = softwrap(
+    help = help_text(
         """
         A timeout (in seconds) used by each test file belonging to this target.
 
@@ -676,7 +676,7 @@ class TestTimeoutField(IntField, metaclass=ABCMeta):
 
 class TestExtraEnvVarsField(StringSequenceField, metaclass=ABCMeta):
     alias = "extra_env_vars"
-    help = softwrap(
+    help = help_text(
         """
          Additional environment variables to include in test processes.
 
@@ -688,7 +688,6 @@ class TestExtraEnvVarsField(StringSequenceField, metaclass=ABCMeta):
     )
 
 
-@rule_helper
 async def _get_test_batches(
     core_request_types: Iterable[type[TestRequest]],
     targets_to_field_sets: TargetRootsToFieldSets,
@@ -731,7 +730,6 @@ async def _get_test_batches(
     ]
 
 
-@rule_helper
 async def _run_debug_tests(
     batches: Iterable[TestRequest.Batch],
     test_subsystem: TestSubsystem,
@@ -936,7 +934,7 @@ async def run_tests(
 
 _SOURCE_MAP = {
     ProcessResultMetadata.Source.MEMOIZED: "memoized",
-    ProcessResultMetadata.Source.RAN_REMOTELY: "ran remotely",
+    ProcessResultMetadata.Source.RAN: "ran",
     ProcessResultMetadata.Source.HIT_LOCALLY: "cached locally",
     ProcessResultMetadata.Source.HIT_REMOTELY: "cached remotely",
 }
@@ -954,8 +952,19 @@ def _format_test_summary(result: TestResult, run_id: RunId, console: Console) ->
         sigil = console.sigil_failed()
         status = "failed"
 
-    source = _SOURCE_MAP.get(result.result_metadata.source(run_id))
-    source_print = f" ({source})" if source else ""
+    environment = result.result_metadata.execution_environment.name
+    environment_type = result.result_metadata.execution_environment.environment_type
+    source = result.result_metadata.source(run_id)
+    source_str = _SOURCE_MAP[source]
+    if environment:
+        preposition = "in" if source == ProcessResultMetadata.Source.RAN else "for"
+        source_desc = (
+            f" ({source_str} {preposition} {environment_type} environment `{environment}`)"
+        )
+    elif source == ProcessResultMetadata.Source.RAN:
+        source_desc = ""
+    else:
+        source_desc = f" ({source_str})"
 
     elapsed_print = ""
     total_elapsed_ms = result.result_metadata.total_elapsed_ms
@@ -963,7 +972,7 @@ def _format_test_summary(result: TestResult, run_id: RunId, console: Console) ->
         elapsed_secs = total_elapsed_ms / 1000
         elapsed_print = f"in {elapsed_secs:.2f}s"
 
-    suffix = f" {elapsed_print}{source_print}"
+    suffix = f" {elapsed_print}{source_desc}"
     return f"{sigil} {result.description} {status}{suffix}."
 
 
@@ -1010,7 +1019,7 @@ def _unsupported_debug_adapter_rules(cls: type[TestRequest]) -> Iterable:
 
 class RuntimePackageDependenciesField(SpecialCasedDependencies):
     alias = "runtime_package_dependencies"
-    help = softwrap(
+    help = help_text(
         f"""
         Addresses to targets that can be built with the `{bin_name()} package` goal and whose
         resulting artifacts should be included in the test run.

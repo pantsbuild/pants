@@ -52,7 +52,7 @@ def test_shell_command_as_test(rule_runner: RuleRunner) -> None:
                 """\
                 shell_sources(name="src")
 
-                experimental_shell_command(
+                shell_command(
                   name="msg-gen",
                   command="echo message > msg.txt",
                   tools=["echo"],

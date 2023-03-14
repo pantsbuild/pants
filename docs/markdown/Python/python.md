@@ -3,7 +3,6 @@ title: "Python overview"
 slug: "python"
 hidden: false
 createdAt: "2020-07-29T01:27:07.529Z"
-updatedAt: "2022-05-03T23:52:11.823Z"
 ---
 The Python ecosystem has a great many tools for various features. Pants installs, configures, and invokes those tools for you, while taking care of orchestrating the workflow, caching results, and running concurrently.
 

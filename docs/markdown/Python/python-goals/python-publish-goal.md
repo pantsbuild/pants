@@ -4,7 +4,6 @@ slug: "python-publish-goal"
 excerpt: "How to distribute packages to a PyPi repository"
 hidden: true
 createdAt: "2021-10-05T08:10:25.568Z"
-updatedAt: "2022-01-11T16:09:21.278Z"
 ---
 The `publish` goal is currently in the experimental Python backend. Activate with this config:
 

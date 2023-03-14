@@ -4,7 +4,6 @@ slug: "release-process"
 excerpt: "How to release a new version of `pantsbuild.pants` and its plugins."
 hidden: false
 createdAt: "2020-05-16T22:36:48.334Z"
-updatedAt: "2022-06-08T18:06:57.112Z"
 ---
 This page covers the nitty-gritty of executing a release, and is probably only interesting for maintainers. If you're interested in when and why Pants is released, please see the [Release strategy](doc:release-strategy) page.
 
@@ -188,15 +187,21 @@ $ git push upstream 2.9.x
 Step 2: Update this docs site
 -----------------------------
 
+Note that this step can currently only be performed by a subset of maintainers due to a paid maximum number of seats. If you do not have a readme.com account, contact someone in the `#maintainers-confidential` channel in Slack to help out.
+
 ### `dev0` - set up the new version
 
 Go to the [documentation dashboard](https://dash.readme.com/). In the top left dropdown, where it says the current version, click "Manage versions". Click "Add new version" and use a "v" with the minor release number, e.g. "v2.9". Fork from the prior release. Mark this new version as public by clicking on "Is public?"
 
-Also, update the [Changelog](doc:changelog) page with the new release series at the top of the table. It's okay if there are no "highlights" yet.
+### Sync the `docs/` content
+
+See the `docs/NOTES.md` for instructions setting up the the necessary Node tooling your first time.
+You'll need to 1st login as outlined there via some variant of `npx rdme login --2fa --project pants ...`.
+On the relevant release branch, run `npx rdme docs docs/markdown --version v<pants major>.<pants minor>`; e.g: `npx rdme docs docs/markdown --version v2.8`.
 
 ### Regenerate the references
 
-On the relevant release branch, run `pants run build-support/bin/generate_docs.py -- --sync --api-key <key>` with your key from <https://dash.readme.com/project/pants/v2.8/api-key>.
+Still on the relevant release branch, run `pants run build-support/bin/generate_docs.py -- --sync --api-key <key>` with your key from <https://dash.readme.com/project/pants/v2.8/api-key>.
 
 ### `stable` releases - Update the default docsite
 

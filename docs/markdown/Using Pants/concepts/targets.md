@@ -4,7 +4,6 @@ slug: "targets"
 excerpt: "Metadata for your code."
 hidden: false
 createdAt: "2020-02-25T17:44:15.007Z"
-updatedAt: "2022-04-29T23:51:48.029Z"
 ---
 Most goals require metadata about your code. For example, to run a test, you need to know about all the transitive dependencies of that test. You may also want to set a timeout on that test.
 
@@ -39,11 +38,12 @@ pex_binary(
 )
 ```
 
-Each target type has different _fields_, or individual metadata values. Run `pants help $target` to see which fields a particular target type has, e.g. `pants help file`. Most fields are optional and use sensible defaults.
+Each target type has different _fields_, or individual metadata values. Run `pants help $target` to see which fields a particular target type has, e.g. `pants help file`. Most fields are optional and use sensible defaults. See [Field default values](doc:targets#field-default-values) for how you may override a fields default value.
 
 All target types have a `name` field, which is used to identify the target. Target names must be unique within a directory.
 
 You can autoformat `BUILD` files by enabling a `BUILD` file formatter by adding it to `[GLOBAL].backend_packages` in `pants.toml` (such as `pants.backend.build_files.fmt.black` [or others](doc:enabling-backends)). Then to format, run `pants fmt '**/BUILD'` or `pants fmt ::` (formats everything).
+
 
 Environment variables
 ---------------------
@@ -183,7 +183,7 @@ Use the `all` keyword argument to provide default field values that should apply
 
 The `extend=True` keyword argument allows to add to any existing default field values set by a previous `__defaults__` call rather than replacing them.
 
-Default fields and values are validated against their target types, except when provided using the `all` keyword, in which case only values for fields applicable to each target are validated.
+Default fields and values are validated against their target types, except when provided using the `all` keyword, in which case only values for fields applicable to each target are validated. Use `ignore_unknown_fields=True` to ignore invalid fields.
 
 This means, that it is legal to provide a default value for `all` targets, even if it is only a subset of targets that actually supports that particular field.
 
@@ -215,6 +215,36 @@ To reset any modified defaults, simply override with the empty dict:
 ```python src/example/nodefaults/BUILD
     __defaults__(all={})
 ```
+
+Supporting optional plugin fields
+---------------------------------
+
+Normally Pants presents an error message when attempting to provide a default value for a field that doesn't exist for the target. However, some fields comes from plugins, and to support disabling a plugin without having to remove any default values referencing any plugin fields it was providing, there is a `ignore_unknown_fields` option to use:
+
+```python example/BUILD
+    __defaults__(
+      {
+        # Defaults...
+      },
+      ignore_unknown_fields=True,
+    )
+```
+
+Extending field defaults
+------------------------
+
+To add to a default value rather than replacing it, the current default value for a target field is available in the BUILD file using `<target>.<field>.default`. This allows you to augment a field's default value with much more precision. As an example, if you want to make the default sources for a `python_sources` target to work recursively you may specify a target augmenting the default sources field:
+
+```python BUILD
+python_sources(
+  name="my-one-top-level-target",
+  sources=[
+    f"{pattern[0] if pattern.startswith("!") else ""}**/{pattern.lstrip("!")}"
+    for pattern in python_sources.sources.default
+  ]
+)
+```
+
 
 Target generation
 =================

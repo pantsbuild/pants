@@ -163,7 +163,7 @@ impl Scheduler {
       let mut entry = sizes.entry(k.workunit_name()).or_insert_with(|| (0, 0));
       entry.0 += 1;
       entry.1 += {
-        std::mem::size_of_val(&k)
+        std::mem::size_of_val(k)
           + k.deep_size_of_children(&mut deep_context)
           + std::mem::size_of_val(&v)
           + v.deep_size_of_children(&mut deep_context)
@@ -213,19 +213,20 @@ impl Scheduler {
         .core
         .graph
         .poll(root.into(), last_observed, poll_delay, context)
-        .await?;
+        .await;
       (result, Some(last_observed))
     } else {
-      let result = context.core.graph.create(root.into(), context).await?;
+      let result = context.core.graph.create(root.into(), context).await;
       (result, None)
     };
 
-    Ok((
-      result
-        .try_into()
-        .unwrap_or_else(|e| panic!("A Node implementation was ambiguous: {e:?}")),
+    (
+      result.map(|v| {
+        v.try_into()
+          .unwrap_or_else(|e| panic!("A Node implementation was ambiguous: {e:?}"))
+      }),
       last_observed,
-    ))
+    )
   }
 
   ///
@@ -260,19 +261,13 @@ impl Scheduler {
       results
         .iter()
         .zip(roots.iter())
-        .map(|(result, root)| {
-          let last_observed = result
-            .as_ref()
-            .ok()
-            .and_then(|(_value, last_observed)| *last_observed);
-          (root.clone(), last_observed)
-        })
-        .collect::<Vec<_>>(),
+        .map(|(result, root)| (root.clone(), result.1))
+        .collect(),
     );
 
     results
       .into_iter()
-      .map(|res| res.map(|(value, _last_observed)| value))
+      .map(|(res, _last_observed)| res)
       .collect()
   }
 

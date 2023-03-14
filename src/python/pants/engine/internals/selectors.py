@@ -43,10 +43,10 @@ class GetParseError(ValueError):
             if isinstance(expr, ast.Call):
                 # Check if it's a top-level function call.
                 if hasattr(expr.func, "id"):
-                    return f"{expr.func.id}()"  # type: ignore[attr-defined]
+                    return f"{expr.func.id}()"
                 # Check if it's a method call.
                 if hasattr(expr.func, "attr") and hasattr(expr.func, "value"):
-                    return f"{expr.func.value.id}.{expr.func.attr}()"  # type: ignore[attr-defined]
+                    return f"{expr.func.value.id}.{expr.func.attr}()"
 
             # Fall back to the name of the ast node's class.
             return str(type(expr))
@@ -591,7 +591,7 @@ class Params:
 
 
 # A specification for how the native engine interacts with @rule coroutines:
-# - coroutines may await on any of `Get`, `MultiGet`, `Effect` or other coroutines decorated with `@rule_helper`.
+# - coroutines may await on any of `Get`, `MultiGet`, `Effect` or other coroutines.
 # - we will send back a single `Any` or a tuple of `Any` to the coroutine, depending upon the variant of `Get`.
 # - a coroutine will eventually return a single `Any`.
 RuleInput = Union[

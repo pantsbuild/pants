@@ -16,7 +16,7 @@ from pants.engine.target import (
     TargetGenerator,
 )
 from pants.engine.unions import UnionMembership, UnionRule
-from pants.util.strutil import softwrap
+from pants.util.strutil import help_text
 from pants.version import MAJOR_MINOR, PANTS_SEMVER
 
 
@@ -28,7 +28,7 @@ class PantsRequirementsTestutilField(BoolField):
 
 class PantsRequirementsTargetGenerator(TargetGenerator):
     alias = "pants_requirements"
-    help = softwrap(
+    help = help_text(
         f"""
         Generate `python_requirement` targets for Pants itself to use with Pants plugins.
 

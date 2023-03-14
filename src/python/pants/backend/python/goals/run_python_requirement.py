@@ -34,7 +34,7 @@ from pants.backend.python.util_rules.pex_from_targets import PexFromTargetsReque
 from pants.build_graph.address import Address
 from pants.core.goals.run import RunFieldSet, RunInSandboxBehavior, RunRequest
 from pants.engine.internals.selectors import Get
-from pants.engine.rules import collect_rules, rule, rule_helper
+from pants.engine.rules import collect_rules, rule
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized
@@ -87,11 +87,9 @@ def _invert_module_mapping(
     return FrozenDict((address, tuple(modules)) for address, modules in d.items())
 
 
-@rule_helper
 async def _resolve_entry_point(
     module_mapping: InvertedModuleMapping, field_set: PythonRequirementFieldSet
 ) -> EntryPoint:
-
     modules = field_set.modules.value
     reqs = field_set.requirements.value
     entry_point_raw = field_set.entry_point.value
@@ -134,7 +132,6 @@ async def create_python_requirement_run_request(
     python_setup: PythonSetup,
     module_mapping: ThirdPartyPythonModuleMapping,
 ) -> RunRequest:
-
     addresses = [field_set.address]
 
     resolve = field_set.resolve.value
@@ -163,7 +160,7 @@ async def create_python_requirement_run_request(
     input_digest = venv_pex.digest
 
     extra_env = {
-        **complete_pex_environment.environment_dict(python_configured=venv_pex.python is not None),
+        **complete_pex_environment.environment_dict(python=None),
     }
 
     return RunRequest(

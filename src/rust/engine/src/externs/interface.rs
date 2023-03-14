@@ -29,7 +29,7 @@ use log::{self, debug, error, warn, Log};
 use logging::logger::PANTS_LOGGER;
 use logging::{Logger, PythonLogLevel};
 use petgraph::graph::{DiGraph, Graph};
-use process_execution::{CacheContentBehavior, RemoteCacheWarningsBehavior};
+use process_execution::CacheContentBehavior;
 use pyo3::exceptions::{PyException, PyIOError, PyKeyboardInterrupt, PyValueError};
 use pyo3::prelude::{
   pyclass, pyfunction, pymethods, pymodule, wrap_pyfunction, PyModule, PyObject,
@@ -38,6 +38,7 @@ use pyo3::prelude::{
 use pyo3::types::{PyBytes, PyDict, PyList, PyTuple, PyType};
 use pyo3::{create_exception, IntoPy, PyAny, PyRef};
 use regex::Regex;
+use remote::remote_cache::RemoteCacheWarningsBehavior;
 use rule_graph::{self, DependencyKey, RuleGraph};
 use task_executor::Executor;
 use workunit_store::{
@@ -46,7 +47,7 @@ use workunit_store::{
 };
 
 use crate::externs::fs::{possible_store_missing_digest, PyFileDigest};
-use crate::externs::process::PyProcessConfigFromEnvironment;
+use crate::externs::process::PyProcessExecutionEnvironment;
 use crate::{
   externs, nodes, Context, Core, ExecutionRequest, ExecutionStrategyOptions, ExecutionTermination,
   Failure, Function, Intrinsic, Intrinsics, Key, LocalStoreOptions, Params, RemotingOptions, Rule,
@@ -220,7 +221,7 @@ impl PyTypes {
       process: TypeId::new(process),
       process_result: TypeId::new(process_result),
       process_config_from_environment: TypeId::new(
-        py.get_type::<externs::process::PyProcessConfigFromEnvironment>(),
+        py.get_type::<externs::process::PyProcessExecutionEnvironment>(),
       ),
       process_result_metadata: TypeId::new(process_result_metadata),
       coroutine: TypeId::new(coroutine),
@@ -558,6 +559,7 @@ fn nailgun_server_create(
         exe.cmd.command,
         PyTuple::new(py, exe.cmd.args),
         exe.cmd.env.into_iter().collect::<HashMap<String, String>>(),
+        exe.cmd.working_dir,
         PySessionCancellationLatch(exe.cancelled),
         exe.stdin_fd as i64,
         exe.stdout_fd as i64,
@@ -991,7 +993,7 @@ fn session_run_interactive_process(
   py: Python,
   py_session: &PySession,
   interactive_process: PyObject,
-  process_config_from_environment: PyProcessConfigFromEnvironment,
+  process_config_from_environment: PyProcessExecutionEnvironment,
 ) -> PyO3Result<PyObject> {
   let core = py_session.0.core();
   let context = Context::new(core.clone(), py_session.0.clone());
@@ -1494,11 +1496,11 @@ fn capture_snapshots(
     let path_globs_and_roots = values
       .into_iter()
       .map(|value| {
-        let root: PathBuf = externs::getattr(value, "root").unwrap();
+        let root: PathBuf = externs::getattr(value, "root")?;
         let path_globs =
-          nodes::Snapshot::lift_prepared_path_globs(externs::getattr(value, "path_globs").unwrap());
+          nodes::Snapshot::lift_prepared_path_globs(externs::getattr(value, "path_globs")?);
         let digest_hint = {
-          let maybe_digest: &PyAny = externs::getattr(value, "digest_hint").unwrap();
+          let maybe_digest: &PyAny = externs::getattr(value, "digest_hint")?;
           if maybe_digest.is_none() {
             None
           } else {

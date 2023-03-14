@@ -34,16 +34,7 @@ from pants.engine.internals.specs_rules import (
     TooManyTargetsException,
 )
 from pants.engine.process import InteractiveProcess, InteractiveProcessResult
-from pants.engine.rules import (
-    Effect,
-    Get,
-    Rule,
-    _uncacheable_rule,
-    collect_rules,
-    goal_rule,
-    rule,
-    rule_helper,
-)
+from pants.engine.rules import Effect, Get, Rule, _uncacheable_rule, collect_rules, goal_rule, rule
 from pants.engine.target import (
     BoolField,
     FieldSet,
@@ -58,7 +49,7 @@ from pants.option.global_options import GlobalOptions
 from pants.option.option_types import ArgsListOption, BoolOption
 from pants.util.frozendict import FrozenDict
 from pants.util.memo import memoized
-from pants.util.strutil import softwrap
+from pants.util.strutil import help_text, softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -111,7 +102,7 @@ class RunFieldSet(FieldSet, metaclass=ABCMeta):
 class RestartableField(BoolField):
     alias = "restartable"
     default = False
-    help = softwrap(
+    help = help_text(
         """
         If true, runs of this target with the `run` goal may be interrupted and
         restarted when its input files change.
@@ -141,8 +132,10 @@ class RunRequest:
         object.__setattr__(self, "digest", digest)
         object.__setattr__(self, "args", tuple(args))
         object.__setattr__(self, "extra_env", FrozenDict(extra_env or {}))
-        object.__setattr__(self, "immutable_input_digests", immutable_input_digests)
-        object.__setattr__(self, "append_only_caches", append_only_caches)
+        object.__setattr__(
+            self, "immutable_input_digests", FrozenDict(immutable_input_digests or {})
+        )
+        object.__setattr__(self, "append_only_caches", FrozenDict(append_only_caches or {}))
 
     def to_run_in_sandbox_request(self) -> RunInSandboxRequest:
         return RunInSandboxRequest(
@@ -177,7 +170,7 @@ class RunInSandboxRequest(RunRequest):
 
 class RunSubsystem(GoalSubsystem):
     name = "run"
-    help = softwrap(
+    help = help_text(
         """
         Runs a binary target.
 
@@ -231,7 +224,6 @@ def _partition(
     return tuple(filter(pred, t2)), tuple(filterfalse(pred, t1))
 
 
-@rule_helper
 async def _find_what_to_run(
     goal_description: str,
 ) -> tuple[RunFieldSet, Target]:
@@ -343,7 +335,6 @@ def _unsupported_debug_adapter_rules(cls: type[RunFieldSet]) -> Iterable:
     return collect_rules(locals())
 
 
-@rule_helper
 async def _run_request(request: RunFieldSet) -> RunInSandboxRequest:
     run_request = await Get(RunRequest, RunFieldSet, request)
     return run_request.to_run_in_sandbox_request()

@@ -4,7 +4,6 @@ slug: "rules-api-and-target-api"
 excerpt: "How to use the Target API in rules."
 hidden: false
 createdAt: "2020-05-07T22:38:40.217Z"
-updatedAt: "2022-07-25T17:50:52.879Z"
 ---
 Start by reading the [Concepts](doc:target-api-concepts) of the Target API.
 

@@ -3,7 +3,6 @@ title: "Deployments"
 slug: "helm-deployments"
 hidden: false
 createdAt: "2022-07-19T13:16:00.000Z"
-updatedAt: "2022-07-19T13:16:00.000Z"
 ---
 > 🚧 Helm deployment support is in alpha stage
 > 
@@ -102,12 +101,12 @@ image: example.com/registry/my-app:latest
 apiVersion: v1
 kind: Pod
 metadata:
-  name: my_pod
+  name: my-pod
   labels:
     chart: "{{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}"
 spec:
   containers:
-    - name: my_app
+    - name: my-app
       # Uses the `image` value entry from the deployment inputs
       image: {{ .Values.image }}
 ```
@@ -279,7 +278,7 @@ data:
 type: Opaque
 ```
 ```python src/deploy/BUILD
-experimental_run_shell_command(
+run_shell_command(
   name="vals",
   command="vals eval -f -",
 )
@@ -290,7 +289,7 @@ helm_deployment(
 )
 ```
 
-In the previous example we define a `experimental_shell_command` target that will invoke the `vals eval` command (`vals` needs to be installed in the local machine) as part of the Helm post-rendering machinery, which will result on the `ref+vault` reference being replaced by the actual value stored in Vault at the given path.
+In the previous example we define a `run_shell_command` target that will invoke the `vals eval` command (`vals` needs to be installed in the local machine) as part of the Helm post-rendering machinery, which will result on the `ref+vault` reference being replaced by the actual value stored in Vault at the given path.
 
 > 📘 Using multiple post-renderers
 >

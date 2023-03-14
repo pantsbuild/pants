@@ -23,6 +23,7 @@ from pants.core.goals.tailor import (
     TailorSubsystem,
     UniquelyNamedPutativeTargets,
     default_sources_for_target_type,
+    has_source_or_sources_field,
     make_content_str,
 )
 from pants.core.util_rules import source_files
@@ -148,6 +149,12 @@ def test_default_sources_for_target_type() -> None:
     assert default_sources_for_target_type(FortranLibraryTarget) == FortranLibrarySources.default
     assert default_sources_for_target_type(FortranTestsTarget) == FortranTestsSources.default
     assert default_sources_for_target_type(FortranModule) == tuple()
+
+
+def test_has_source_or_sources_field() -> None:
+    assert has_source_or_sources_field(FortranLibraryTarget)
+    assert has_source_or_sources_field(FortranTestsTarget)
+    assert not has_source_or_sources_field(FortranModule)
 
 
 def test_make_content_str() -> None:

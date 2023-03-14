@@ -154,7 +154,6 @@ async def compile_avro_source(
         overridden_input_digest: Digest | None = None,
         overridden_output_dir: str | None = None,
     ) -> JvmProcess:
-
         return JvmProcess(
             jdk=jdk,
             argv=(

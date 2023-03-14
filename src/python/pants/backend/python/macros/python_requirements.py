@@ -32,7 +32,7 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.util.logging import LogLevel
-from pants.util.strutil import softwrap
+from pants.util.strutil import help_text, softwrap
 
 
 def parse_pyproject_toml(pyproject_toml: str, *, rel_path: str) -> Iterator[PipRequirement]:
@@ -70,7 +70,7 @@ class PythonRequirementsSourceField(SingleSourceField):
 
 class PythonRequirementsTargetGenerator(TargetGenerator):
     alias = "python_requirements"
-    help = softwrap(
+    help = help_text(
         """
         Generate a `python_requirement` for each entry in a requirements.txt-style or PEP 621
         compliant pyproject.toml file. The choice of parser for the `source` field is determined

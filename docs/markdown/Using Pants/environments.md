@@ -3,7 +3,6 @@ title: "Environments: Cross-Platform or Remote Builds"
 slug: "environments"
 hidden: false
 createdAt: "2022-10-03T21:39:51.235Z"
-updatedAt: "2022-10-03T21:39:51.235Z"
 ---
 Environments
 ============

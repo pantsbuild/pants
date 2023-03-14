@@ -20,17 +20,16 @@ use crate::tasks::Intrinsic;
 use crate::types::Types;
 use crate::Failure;
 
-use bytes::Bytes;
 use futures::future::{BoxFuture, FutureExt, TryFutureExt};
 use futures::try_join;
 use indexmap::IndexMap;
 use pyo3::types::PyString;
-use pyo3::{PyAny, PyRef, Python, ToPyObject};
+use pyo3::{IntoPy, PyAny, PyRef, Python, ToPyObject};
 use tokio::process;
 
+use docker::docker::{ImagePullPolicy, ImagePullScope, DOCKER, IMAGE_PULL_CACHE};
 use fs::{DigestTrie, DirectoryDigest, RelativePath, TypedPath};
 use hashing::{Digest, EMPTY_DIGEST};
-use process_execution::docker::{ImagePullPolicy, ImagePullScope, DOCKER, IMAGE_PULL_CACHE};
 use process_execution::local::{
   apply_chroot, create_sandbox, prepare_workdir, setup_run_sh_script, KeepSandboxes,
 };
@@ -163,15 +162,14 @@ fn process_request_to_process_result(
   mut args: Vec<Value>,
 ) -> BoxFuture<'static, NodeResult<Value>> {
   async move {
-    let process_config: externs::process::PyProcessConfigFromEnvironment =
-      Python::with_gil(|py| {
-        args
-          .pop()
-          .unwrap()
-          .as_ref()
-          .extract(py)
-          .map_err(|e| format!("{e}"))
-      })?;
+    let process_config: externs::process::PyProcessExecutionEnvironment = Python::with_gil(|py| {
+      args
+        .pop()
+        .unwrap()
+        .as_ref()
+        .extract(py)
+        .map_err(|e| format!("{e}"))
+    })?;
     let process_request =
       ExecuteProcess::lift(&context.core.store(), args.pop().unwrap(), process_config)
         .map_err(|e| e.enrich("Error lifting Process"))
@@ -189,7 +187,6 @@ fn process_request_to_process_result(
         .map_err(|e| e.enrich("Bytes from stderr"))
     )?;
 
-    let platform_name: String = result.platform.into();
     let gil = Python::acquire_gil();
     let py = gil.python();
     Ok(externs::unsafe_call(
@@ -204,11 +201,6 @@ fn process_request_to_process_result(
         Snapshot::store_directory_digest(py, result.output_directory)?,
         externs::unsafe_call(
           py,
-          context.core.types.platform,
-          &[externs::store_utf8(py, &platform_name)],
-        ),
-        externs::unsafe_call(
-          py,
           context.core.types.process_result_metadata,
           &[
             result
@@ -216,6 +208,12 @@ fn process_request_to_process_result(
               .total_elapsed
               .map(|d| externs::store_u64(py, Duration::from(d).as_millis() as u64))
               .unwrap_or_else(|| Value::from(py.None())),
+            Value::from(
+              externs::process::PyProcessExecutionEnvironment {
+                environment: result.metadata.environment,
+              }
+              .into_py(py),
+            ),
             externs::store_utf8(py, result.metadata.source.into()),
             externs::store_u64(py, result.metadata.source_run_id.0.into()),
           ],
@@ -441,13 +439,13 @@ fn create_digest_to_digest(
 
   let mut typed_paths: Vec<TypedPath> = Vec::with_capacity(items.len());
   let mut file_digests: HashMap<PathBuf, Digest> = HashMap::with_capacity(items.len());
-  let mut bytes_to_store: Vec<(Option<Digest>, Bytes)> = Vec::with_capacity(new_file_count);
+  let mut items_to_store = Vec::with_capacity(new_file_count);
 
   for item in &items {
     match item {
       CreateDigestItem::FileContent(path, bytes, is_executable) => {
         let digest = Digest::of_bytes(bytes);
-        bytes_to_store.push((Some(digest), bytes.clone()));
+        items_to_store.push((digest.hash, bytes.clone()));
         typed_paths.push(TypedPath::File {
           path,
           is_executable: *is_executable,
@@ -475,8 +473,7 @@ fn create_digest_to_digest(
   let store = context.core.store();
   let trie = DigestTrie::from_unique_paths(typed_paths, &file_digests).unwrap();
   async move {
-    // The digests returned here are already in the `file_digests` map.
-    let _ = store.store_file_bytes_batch(bytes_to_store, true).await?;
+    store.store_file_bytes_batch(items_to_store, true).await?;
     let gil = Python::acquire_gil();
     let value = Snapshot::store_directory_digest(gil.python(), trie.into())?;
     Ok(value)
@@ -528,7 +525,7 @@ fn interactive_process(
       let types = &context.core.types;
       let interactive_process_result = types.interactive_process_result;
 
-      let (py_interactive_process, py_process, process_config): (Value, Value, externs::process::PyProcessConfigFromEnvironment) = Python::with_gil(|py| {
+      let (py_interactive_process, py_process, process_config): (Value, Value, externs::process::PyProcessExecutionEnvironment) = Python::with_gil(|py| {
         let py_interactive_process = (*args[0]).as_ref(py);
         let py_process: Value = externs::getattr(py_interactive_process, "process").unwrap();
         let process_config = (*args[1])
@@ -537,7 +534,7 @@ fn interactive_process(
           .unwrap();
         (py_interactive_process.extract().unwrap(), py_process, process_config)
       });
-      match process_config.execution_strategy {
+      match process_config.environment.strategy {
         ProcessExecutionStrategy::Docker(_) | ProcessExecutionStrategy::RemoteExecution(_) => Err("InteractiveProcess should not set docker_image or remote_execution".to_owned()),
         _ => Ok(())
       }?;
@@ -563,9 +560,8 @@ fn interactive_process(
       prepare_workdir(
         tempdir.path().to_owned(),
         &process,
-        process.input_digests.input_files.clone(),
-        context.core.store(),
-        context.core.executor.clone(),
+        process.input_digests.inputs.clone(),
+        &context.core.store(),
         &context.core.named_caches,
         &context.core.immutable_inputs,
         None,

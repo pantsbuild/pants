@@ -58,11 +58,13 @@ class LocalPantsRunner:
     executor: PyExecutor
     union_membership: UnionMembership
     is_pantsd_run: bool
+    working_dir: str
 
     @classmethod
     def create(
         cls,
         env: CompleteEnvironmentVars,
+        working_dir: str,
         options_bootstrapper: OptionsBootstrapper,
         options_initializer: OptionsInitializer | None = None,
         scheduler: GraphScheduler | None = None,
@@ -119,7 +121,7 @@ class LocalPantsRunner:
             bootstrap_options = options.bootstrap_option_values()
             assert bootstrap_options is not None
             scheduler = EngineInitializer.setup_graph(
-                bootstrap_options, build_config, dynamic_remote_options
+                bootstrap_options, build_config, dynamic_remote_options, executor
             )
         with options_initializer.handle_unknown_flags(options_bootstrapper, env, raise_=True):
             global_options = options.for_global_scope()
@@ -150,6 +152,7 @@ class LocalPantsRunner:
             options_bootstrapper=options_bootstrapper,
             options=options,
             session=graph_session.scheduler_session,
+            working_dir=working_dir,
         )
 
         return cls(
@@ -163,6 +166,7 @@ class LocalPantsRunner:
             executor=executor,
             union_membership=union_membership,
             is_pantsd_run=is_pantsd_run,
+            working_dir=working_dir,
         )
 
     def _perform_run(self, goals: tuple[str, ...]) -> ExitCode:
@@ -237,7 +241,7 @@ class LocalPantsRunner:
             return PANTS_FAILED_EXIT_CODE
 
     def run(self, start_time: float) -> ExitCode:
-        spec_parser = SpecsParser()
+        spec_parser = SpecsParser(working_dir=self.working_dir)
         specs = []
         for spec_str in self.options.specs:
             spec, is_ignore = spec_parser.parse_spec(spec_str)

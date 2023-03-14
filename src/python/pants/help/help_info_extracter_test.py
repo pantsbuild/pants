@@ -7,6 +7,7 @@ from typing import Any, Iterable, List, Optional, Tuple, Union
 from pants.base.build_environment import get_buildroot
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.engine.goal import GoalSubsystem
+from pants.engine.internals.parser import BuildFileSymbolInfo, BuildFileSymbolsInfo
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import IntField, RegisteredTargetTypes, StringField, Target
 from pants.engine.unions import UnionMembership
@@ -20,6 +21,7 @@ from pants.option.ranked_value import Rank, RankedValue
 from pants.option.scope import GLOBAL_SCOPE
 from pants.option.subsystem import Subsystem
 from pants.util.logging import LogLevel
+from pants.util.strutil import help_text
 
 
 class LogLevelSimple(Enum):
@@ -229,7 +231,7 @@ def test_grouping():
 def test_get_all_help_info():
     class Global(Subsystem):
         options_scope = GLOBAL_SCOPE
-        help = "Global options."
+        help = help_text("Global options.")
 
         opt1 = IntOption(default=42, help="Option 1")
         # This is special in having a short option `-l`. Make sure it works.
@@ -254,7 +256,7 @@ def test_get_all_help_info():
     class QuxField(StringField):
         alias = "qux"
         default = "blahblah"
-        help = "A qux string."
+        help = lambda: "A qux string."
 
     class QuuxField(IntField):
         alias = "quux"
@@ -279,8 +281,9 @@ def test_get_all_help_info():
     Bar.register_options_on_scope(options, UnionMembership({}))
 
     @rule
-    def rule_info_test(foo: Foo) -> Target:
+    def rule_info_test(foo: Foo) -> Target:  # type: ignore[empty-body]
         """This rule is for testing info extraction only."""
+        ...
 
     def fake_consumed_scopes_mapper(scope: str) -> Tuple[str, ...]:
         return ("somescope", f"used_by_{scope or 'GLOBAL_SCOPE'}")
@@ -295,6 +298,7 @@ def test_get_all_help_info():
         UnionMembership({}),
         fake_consumed_scopes_mapper,
         RegisteredTargetTypes({BazLibrary.alias: BazLibrary}),
+        BuildFileSymbolsInfo.from_info((BuildFileSymbolInfo("dummy", rule_info_test),)),
         bc_builder.create(),
     )
 
@@ -613,6 +617,17 @@ def test_get_all_help_info():
                 "enabled": True,
                 "name": "plugin.dist",
                 "provider": "dummy-plugin",
+            },
+        },
+        "name_to_build_file_info": {
+            "dummy": {
+                "name": "dummy",
+                "is_target": False,
+                "signature": (
+                    "(foo: pants.help.help_info_extracter_test.test_get_all_help_info.<locals>.Foo)"
+                    " -> pants.engine.target.Target"
+                ),
+                "documentation": "This rule is for testing info extraction only.",
             },
         },
     }

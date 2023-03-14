@@ -35,7 +35,7 @@ from pants.engine.environment import EnvironmentName
 from pants.engine.internals.native_engine import AddPrefix, Digest, MergeDigests
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import ProcessResult
-from pants.engine.rules import collect_rules, rule, rule_helper
+from pants.engine.rules import collect_rules, rule
 from pants.engine.target import Target
 from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.option.option_types import BoolOption, EnumOption
@@ -123,7 +123,6 @@ class ExportPluginOptions:
     )
 
 
-@rule_helper
 async def _get_full_python_version(pex_or_venv_pex: Pex | VenvPex) -> str:
     # Get the full python version (including patch #).
     is_venv_pex = isinstance(pex_or_venv_pex, VenvPex)
@@ -234,10 +233,9 @@ async def do_export(
                             "--collisions-ok",
                             output_path,
                         ],
-                        python=requirements_pex.python,
                     ),
                     {
-                        **complete_pex_env.environment_dict(python_configured=True),
+                        **complete_pex_env.environment_dict(python=requirements_pex.python),
                         "PEX_MODULE": "pex.tools",
                     },
                 ),
@@ -266,8 +264,8 @@ async def export_virtualenv_for_resolve(
     if lockfile_path:
         # It's a user resolve.
         lockfile = Lockfile(
-            file_path=lockfile_path,
-            file_path_description_of_origin=f"the resolve `{resolve}`",
+            url=lockfile_path,
+            url_description_of_origin=f"the resolve `{resolve}`",
             resolve_name=resolve,
         )
 

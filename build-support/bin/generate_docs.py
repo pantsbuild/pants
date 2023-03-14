@@ -134,7 +134,7 @@ class DocUrlRewriter:
 class TitleFinder(HTMLParser):
     """Grabs the page title out of a docsite page."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         self._in_title: bool = False
         self._title: str | None = None
@@ -262,6 +262,7 @@ def run_pants_help_all() -> dict[str, Any]:
         "pants.backend.experimental.scala",
         "pants.backend.experimental.scala.lint.scalafmt",
         "pants.backend.experimental.terraform",
+        "pants.backend.experimental.tools.yamllint",
         "pants.backend.google_cloud_function.python",
         "pants.backend.plugin_development",
         "pants.backend.python",
@@ -558,6 +559,7 @@ class ReferenceGenerator:
 
         The individual reference pages are nested under these parent pages.
         """
+
         # Docs appear on the site in creation order.  If we only create new docs
         # that don't already exist then they will appear at the end, instead of in
         # alphabetical order. So we first delete all previous docs, then recreate them.
