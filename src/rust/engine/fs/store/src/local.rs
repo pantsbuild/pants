@@ -320,8 +320,7 @@ impl UnderlyingByteStore for ShardedFSDB {
     fingerprint: Fingerprint,
     mut f: F,
   ) -> Result<Option<T>, String> {
-    let tempfile = self.get_tempfile(fingerprint).await?;
-    if let Ok(mut file) = tempfile.open().await {
+    if let Ok(mut file) = tokio::fs::File::open(self.get_path(fingerprint)).await {
       // @TODO: Use mmap instead of copying into user-space
       let mut contents: Vec<u8> = vec![];
       file
