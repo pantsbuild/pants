@@ -67,7 +67,7 @@ use serde_derive::Serialize;
 use sharded_lmdb::DEFAULT_LEASE_TIME;
 #[cfg(target_os = "macos")]
 use tokio::fs::copy;
-#[cfg(target_os = "linux")]
+#[cfg(not(target_os = "macos"))]
 use tokio::fs::hard_link;
 use tokio::fs::symlink;
 use tryfuture::try_future;
@@ -1450,7 +1450,7 @@ impl Store {
     // #18162.
     #[cfg(target_os = "macos")]
     copy(target, destination).await?;
-    #[cfg(target_os = "linux")]
+    #[cfg(not(target_os = "macos"))]
     hard_link(target, destination).await?;
     Ok(())
   }
