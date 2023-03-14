@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import ClassVar, Iterable, Sequence
 
 from pants.backend.python.target_types import ConsoleScript, EntryPoint, MainSpecification
@@ -24,7 +25,10 @@ from pants.option.errors import OptionsError
 from pants.option.option_types import BoolOption, StrListOption, StrOption
 from pants.option.subsystem import Subsystem
 from pants.util.docutil import bin_name, doc_url
+from pants.util.memo import memoized_property
 from pants.util.strutil import softwrap
+
+logger = logging.getLogger(__name__)
 
 
 class PythonToolRequirementsBase(Subsystem):
@@ -69,7 +73,7 @@ class PythonToolRequirementsBase(Subsystem):
 
             If unspecified, and the `lockfile` option is set, the tool will use the custom
             `{cls.options_scope}` "tool lockfile" generated from the `version` and
-            `extra_requirements` options. But note that this mechanism will soon be deprecated.
+            `extra_requirements` options. But note that this mechanism is deprecated.
             """
         ),
     )
@@ -116,6 +120,23 @@ class PythonToolRequirementsBase(Subsystem):
         register_if=lambda cls: cls.register_lockfile,
         default=DEFAULT_TOOL_LOCKFILE,
         advanced=True,
+        removal_version="2.18.0.dev0",
+        removal_hint=lambda cls: softwrap(
+            f"""\
+            Custom tool versions are now installed from named resolves, as
+            described at {doc_url("python-lockfiles")}.
+
+            1. If you have an existing resolve that includes the requirements for this tool,
+                you can set `[{cls.options_scope}].install_from_resolve = "<resolve name>".
+                This may be the case if the tool also provides a runtime library, and you want
+                to specify the version in just one place.
+            2. If not, you can set up a new resolve as described at the link above.
+
+            Either way, the resolve you choose should provide the requirements currently set
+            by the `requirements` option for this tool, which you can see
+            by running `pants help-advanced {cls.options_scope}`.
+            """
+        ),
         help=lambda cls: softwrap(
             f"""
             Path to a lockfile used for installing the tool.
@@ -217,12 +238,21 @@ class PythonToolRequirementsBase(Subsystem):
         )
         return EntireLockfile(lockfile, complete_req_strings=tuple(requirements))
 
-    @property
+    @memoized_property
     def lockfile(self) -> str:
         f"""The path to a lockfile or special strings '{NO_TOOL_LOCKFILE}' and '{DEFAULT_TOOL_LOCKFILE}'.
 
         This assumes you have set the class property `register_lockfile = True`.
         """
+        if self._lockfile not in {NO_TOOL_LOCKFILE, DEFAULT_TOOL_LOCKFILE}:
+            # Augment the deprecation message for the option with useful information
+            # about the remedy. We will only display this note if the invocation actually
+            # tries to use the tool, whereas the deprecations will display on options parsing,
+            # so this is just a best-effort attempt to be helpful when we can.
+            logger.warning(
+                f"Note: the resolve you use for the {self.options_scope} tool must "
+                f"provide these requirements:" + "\n\n" + "\n".join(self.requirements) + "\n"
+            )
         return self._lockfile
 
     @property
