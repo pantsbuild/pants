@@ -97,20 +97,6 @@ class NodePackageScriptsField(SequenceField[NodeBuildScript]):
     default = ()
 
 
-class PackageJsonTarget(TargetGenerator):
-    alias = "package_json"
-    core_fields = (
-        *COMMON_TARGET_FIELDS,
-        PackageJsonSourceField,
-        NodePackageScriptsField,
-        NodePackageDependenciesField,
-    )
-    help = "A package.json file."
-
-    copied_fields = COMMON_TARGET_FIELDS
-    moved_fields = (PackageJsonSourceField, NodePackageDependenciesField)
-
-
 class NodePackageVersionField(StringField):
     alias = "version"
     help = softwrap(
@@ -183,6 +169,19 @@ class NodePackageTarget(Target):
         NodePackageVersionField,
         NodePackageDependenciesField,
     )
+
+
+class PackageJsonTarget(TargetGenerator):
+    alias = "package_json"
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        PackageJsonSourceField,
+        NodePackageScriptsField,
+    )
+    help = "A package.json file."
+
+    copied_fields = COMMON_TARGET_FIELDS
+    moved_fields = (NodePackageDependenciesField,)
 
 
 class NodeBuildScriptEntryPointField(StringField):

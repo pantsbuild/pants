@@ -138,7 +138,7 @@ def test_infers_main_package_json_field_js_source_dependency(rule_runner: RuleRu
         }
     )
 
-    pkg_tgt = rule_runner.get_target(Address("src/js"))
+    pkg_tgt = rule_runner.get_target(Address("src/js", generated_name="ham"))
     addresses = rule_runner.request(
         InferredDependencies,
         [InferNodePackageDependenciesRequest(NodePackageInferenceFieldSet.create(pkg_tgt))],
@@ -157,7 +157,7 @@ def test_infers_browser_package_json_field_js_source_dependency(rule_runner: Rul
         }
     )
 
-    pkg_tgt = rule_runner.get_target(Address("src/js"))
+    pkg_tgt = rule_runner.get_target(Address("src/js", generated_name="ham"))
     addresses = rule_runner.request(
         InferredDependencies,
         [InferNodePackageDependenciesRequest(NodePackageInferenceFieldSet.create(pkg_tgt))],
@@ -176,7 +176,7 @@ def test_infers_bin_package_json_field_js_source_dependency(rule_runner: RuleRun
         }
     )
 
-    pkg_tgt = rule_runner.get_target(Address("src/js"))
+    pkg_tgt = rule_runner.get_target(Address("src/js", generated_name="ham"))
     addresses = rule_runner.request(
         InferredDependencies,
         [InferNodePackageDependenciesRequest(NodePackageInferenceFieldSet.create(pkg_tgt))],
@@ -200,7 +200,7 @@ def test_infers_exports_package_json_field_js_source_dependency(
         }
     )
 
-    pkg_tgt = rule_runner.get_target(Address("src/js"))
+    pkg_tgt = rule_runner.get_target(Address("src/js", generated_name="ham"))
     addresses = rule_runner.request(
         InferredDependencies,
         [InferNodePackageDependenciesRequest(NodePackageInferenceFieldSet.create(pkg_tgt))],
@@ -222,7 +222,7 @@ def test_infers_exports_package_json_field_js_source_dependency_with_stars(
         }
     )
 
-    pkg_tgt = rule_runner.get_target(Address("src/js"))
+    pkg_tgt = rule_runner.get_target(Address("src/js", generated_name="ham"))
     addresses = rule_runner.request(
         InferredDependencies,
         [InferNodePackageDependenciesRequest(NodePackageInferenceFieldSet.create(pkg_tgt))],
@@ -246,7 +246,7 @@ def test_infers_exports_package_json_field_js_source_dependency_with_stars_inter
         }
     )
 
-    pkg_tgt = rule_runner.get_target(Address("src/js"))
+    pkg_tgt = rule_runner.get_target(Address("src/js", generated_name="ham"))
     addresses = rule_runner.request(
         InferredDependencies,
         [InferNodePackageDependenciesRequest(NodePackageInferenceFieldSet.create(pkg_tgt))],
