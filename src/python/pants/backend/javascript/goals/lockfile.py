@@ -71,9 +71,9 @@ async def determine_package_json_user_resolves(
             softwrap(
                 f"""
                 No nodejs {projects} could be found for {lockfiles}, but
-                are configured under [nodejs].resolves.
+                some are configured under [nodejs].resolves.
 
-                Ensure that a package.json file you intend to manage with pants have
+                Ensure that a package.json file you intend to manage with pants has
                 a corresponding BUILD file containing a `{PackageJsonTarget.alias}` target
                 by running `{bin_name()} {TailorGoal.name} ::`.
 
