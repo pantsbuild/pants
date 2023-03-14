@@ -178,7 +178,16 @@ class PackageJsonTarget(TargetGenerator):
         PackageJsonSourceField,
         NodePackageScriptsField,
     )
-    help = "A package.json file."
+    help = softwrap(
+        f"""
+        A package.json file describing a nodejs package. (https://nodejs.org/api/packages.html#introduction)
+
+        Generates a `{NodePackageTarget.alias}` target for the package.
+
+        Generates `{NodeThirdPartyPackageTarget.alias}` targets for each specified
+        3rd party dependency (e.g. in the package.json#devDependencies field).
+        """
+    )
 
     copied_fields = COMMON_TARGET_FIELDS
     moved_fields = (NodePackageDependenciesField,)
