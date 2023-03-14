@@ -52,8 +52,9 @@ class Black(PythonToolBase):
     help = "The Black Python code formatter (https://black.readthedocs.io/)."
 
     default_version = "black>=22.6.0,<24"
+    default_extra_requirements = ['typing-extensions>=3.10.0.0; python_version < "3.10"']
     default_main = ConsoleScript("black")
-    default_requirements = [default_version]
+    default_requirements = [default_version, *default_extra_requirements]
 
     register_interpreter_constraints = True
     default_interpreter_constraints = ["CPython>=3.7,<4"]
@@ -62,7 +63,6 @@ class Black(PythonToolBase):
     default_lockfile_resource = ("pants.backend.python.lint.black", "black.lock")
     default_lockfile_path = "src/python/pants/backend/python/lint/black/black.lock"
     default_lockfile_url = git_url(default_lockfile_path)
-    default_extra_requirements = ['typing-extensions>=3.10.0.0; python_version < "3.10"']
 
     skip = SkipOption("fmt", "lint")
     args = ArgsListOption(example="--target-version=py37 --quiet")

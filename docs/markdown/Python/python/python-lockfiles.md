@@ -183,14 +183,23 @@ It is strongly recommended that these tools be installed from a hermetic lockfil
 
 The only time you need to think about this is if you want to customize the tool requirements that Pants uses. This might be the case if you want to modify the version of a tool or add extra requirements (e.g., tool plugins).
 
-If you want a tool to be installed from some resolve, instead of from the built-in lockfile, you set the resolve on the tool's config section:
+If you want a tool to be installed from some resolve, instead of from the built-in lockfile, you set `install_from_resolve` on the tool's config section, and enumerate any non-default requirements you need from that resolve:
 
 ```toml pants.toml
 [python.resolves]
 pytest = "3rdparty/python/pytest.lock"
 
 [pytest]
-resolve = "pytest"
+install_from_resolve = "pytest"
+
+requirements.add = [
+  # No need to provide version constraints, as you control those in pytest-requirements.txt.
+  "pytest-myplugin",
+]
+# Note that the default tool requirements are constrained to versions that Pants expects
+# to be compatible with (you can see this value with `pants help-advanced <name of tool>`).
+# If you want to use a version outside this range, you can override `requirements` entirely,
+# instead of adding to it. In that case we can't guarantee compatibility.
 ```
 
 Then set up the resolve's inputs:
@@ -202,9 +211,11 @@ python_requirements(
 )
 ```
 ```Text 3rdparty/python/pytest-requirements.txt
+# The default requirements (possibly with custom versions).
 pytest==7.1.1
 pytest-cov>=2.12,!=2.12.1,<3.1
 pytest-xdist>=2.5,<3
+# Our extra requirement.
 pytest-myplugin>=1.2.0,<2
 ```
 
