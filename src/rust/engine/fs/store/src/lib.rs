@@ -39,11 +39,10 @@ pub use crate::snapshot_ops::{SnapshotOps, SubsetParams};
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::fmt::{self, Debug, Display};
-use std::fs::hard_link;
 use std::fs::OpenOptions;
 use std::future::Future;
 use std::io::{self, Read, Seek, Write};
-use std::os::unix::fs::{symlink, OpenOptionsExt, PermissionsExt};
+use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Weak};
 use std::time::{Duration, Instant};
@@ -66,6 +65,11 @@ use protos::require_digest;
 use remexec::{ServerCapabilities, Tree};
 use serde_derive::Serialize;
 use sharded_lmdb::DEFAULT_LEASE_TIME;
+#[cfg(target_os = "macos")]
+use tokio::fs::copy;
+#[cfg(target_os = "linux")]
+use tokio::fs::hard_link;
+use tokio::fs::symlink;
 use tryfuture::try_future;
 use workunit_store::{in_workunit, Level, Metric};
 
@@ -73,13 +77,11 @@ const KILOBYTES: usize = 1024;
 const MEGABYTES: usize = 1024 * KILOBYTES;
 const GIGABYTES: usize = 1024 * MEGABYTES;
 
-/// How big a file must be to become an immutable input symlink.
+/// How big a file must be to become an immutable input hardlink.
 // NB: These numbers were chosen after micro-benchmarking the code on one machine at the time of
 // writing. They were chosen using a rough equation from the microbenchmarks that are optimized
 // for somewhere between 2 and 3 uses of the corresponding entry to "break even".
-// TODO: Temporarily disabled until #18162 and/or #18153 are resolved, since hardlinks do not play
-// well with Docker on macOS.
-const IMMUTABLE_FILE_SIZE_LIMIT: usize = usize::MAX - 1;
+const IMMUTABLE_FILE_SIZE_LIMIT: usize = 512 * KILOBYTES;
 
 mod local;
 #[cfg(test)]
@@ -1431,7 +1433,7 @@ impl Store {
     destination: PathBuf,
     target: String,
   ) -> Result<(), StoreError> {
-    symlink(target, destination)?;
+    symlink(target, destination).await?;
     Ok(())
   }
 
@@ -1440,7 +1442,16 @@ impl Store {
     destination: PathBuf,
     target: String,
   ) -> Result<(), StoreError> {
-    hard_link(target, destination)?;
+    // On macOS, copy uses a copy-on-write syscall (fclonefileat) which creates a disconnected
+    // clone. It is more defensive than a hardlink, but has the same requirement that the source
+    // and destination filesystem are the same.
+    //
+    // It also has the benefit of playing nicely with Docker for macOS file virtualization: see
+    // #18162.
+    #[cfg(target_os = "macos")]
+    copy(target, destination).await?;
+    #[cfg(target_os = "linux")]
+    hard_link(target, destination).await?;
     Ok(())
   }
 
