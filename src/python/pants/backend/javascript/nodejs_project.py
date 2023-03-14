@@ -9,8 +9,8 @@ from typing import Iterable
 
 from pants.backend.javascript import package_json
 from pants.backend.javascript.package_json import AllPackageJson, PackageJson
-from pants.engine.collection import Collection, DeduplicatedCollection
-from pants.engine.internals.native_engine import Digest, MergeDigests
+from pants.engine.collection import Collection
+from pants.engine.internals.native_engine import MergeDigests
 from pants.engine.rules import Rule, collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.util.ordered_set import FrozenOrderedSet
@@ -18,33 +18,9 @@ from pants.util.strutil import softwrap
 
 
 @dataclass(frozen=True)
-class PackageJsonWorkspace:
-    """Exists to not invalidate AllNodeJsProjects when irrelevant parts of PackageJson has
-    changed."""
-
-    name: str
-    root_dir: str
-    digest: Digest
-    workspaces: tuple[str, ...]
-
-    @classmethod
-    def from_package_json(cls, pkg_json: PackageJson) -> PackageJsonWorkspace:
-        return PackageJsonWorkspace(
-            name=pkg_json.name,
-            root_dir=pkg_json.root_dir,
-            digest=pkg_json.digest,
-            workspaces=pkg_json.workspaces,
-        )
-
-
-class PackageJsonWorkspaces(DeduplicatedCollection[PackageJsonWorkspace]):
-    pass
-
-
-@dataclass(frozen=True)
 class NodeJSProject:
     root_dir: str
-    workspaces: FrozenOrderedSet[PackageJsonWorkspace]
+    workspaces: FrozenOrderedSet[PackageJson]
 
     def is_parent(self, project: NodeJSProject) -> bool:
         return self.root_dir != project.root_dir and any(
@@ -84,22 +60,13 @@ class ProjectPaths:
     def full_globs(self) -> Iterable[str]:
         return (os.path.join(self.root, project) for project in self.project_globs)
 
-    def matches_glob(self, pkg_json: PackageJsonWorkspace) -> bool:
+    def matches_glob(self, pkg_json: PackageJson) -> bool:
         path = PurePath(pkg_json.root_dir)
         return any(path.match(glob) for glob in self.full_globs())
 
 
 @rule
-async def parse_workspaces_from_package_json(
-    all_package_json: AllPackageJson,
-) -> PackageJsonWorkspaces:
-    return PackageJsonWorkspaces(
-        PackageJsonWorkspace.from_package_json(pkg_json) for pkg_json in all_package_json
-    )
-
-
-@rule
-async def find_node_js_projects(package_workspaces: PackageJsonWorkspaces) -> AllNodeJSProjects:
+async def find_node_js_projects(package_workspaces: AllPackageJson) -> AllNodeJSProjects:
     project_paths = (
         ProjectPaths(pkg.root_dir, ["", *pkg.workspaces]) for pkg in package_workspaces
     )
