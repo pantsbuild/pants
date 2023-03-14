@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import shutil
 from textwrap import dedent
 
 import pytest
@@ -12,7 +11,11 @@ from pants.backend.python import target_types_rules
 from pants.backend.python.dependency_inference import rules as dependency_inference_rules
 from pants.backend.python.goals.run_python_source import PythonSourceFieldSet
 from pants.backend.python.goals.run_python_source import rules as run_rules
-from pants.backend.python.providers.pyenv.rules import rules as pyenv_rules
+from pants.backend.python.providers.pyenv.custom_install.rules import RunPyenvInstallFieldSet
+from pants.backend.python.providers.pyenv.custom_install.rules import (
+    rules as pyenv_custom_install_rules,
+)
+from pants.backend.python.providers.pyenv.custom_install.target_types import PyenvInstall
 from pants.backend.python.target_types import PythonSourcesGeneratorTarget
 from pants.build_graph.address import Address
 from pants.core.goals.run import RunRequest
@@ -23,17 +26,27 @@ from pants.testutil.rule_runner import RuleRunner, mock_console
 
 
 @pytest.fixture
-def rule_runner() -> RuleRunner:
+def named_caches_dir(tmp_path):
+    return f"{tmp_path}/named_cache"
+
+
+@pytest.fixture
+def rule_runner(named_caches_dir) -> RuleRunner:
     return RuleRunner(
         rules=[
             *run_rules(),
-            *pyenv_rules(),
+            *pyenv_custom_install_rules(),
             *dependency_inference_rules.rules(),
             *target_types_rules.rules(),
             QueryRule(RunRequest, (PythonSourceFieldSet,)),
+            QueryRule(RunRequest, (RunPyenvInstallFieldSet,)),
         ],
         target_types=[
             PythonSourcesGeneratorTarget,
+            PyenvInstall,
+        ],
+        bootstrap_args=[
+            f"--named-caches-dir={named_caches_dir}",
         ],
     )
 
@@ -43,10 +56,35 @@ def run_run_request(
     target: Target,
 ) -> str:
     args = [
-        "--backend-packages=['pants.backend.python', 'pants.backend.python.providers.experimental.pyenv']",
+        (
+            "--backend-packages=["
+            + "'pants.backend.python',"
+            + "'pants.backend.python.providers.experimental.pyenv',"
+            + "'pants.backend.python.providers.experimental.pyenv.custom_install',"
+            + "]"
+        ),
         "--source-root-patterns=['src']",
     ]
+    # Run the install
+    install_target = rule_runner.get_target(
+        Address(target_name="pants-pyenv-install", spec_path="")
+    )
     rule_runner.set_options(args, env_inherit={"PATH", "PYENV_ROOT", "HOME"})
+    run_request = rule_runner.request(RunRequest, [RunPyenvInstallFieldSet.create(install_target)])
+    run_process = InteractiveProcess(
+        argv=run_request.args + ("3.9.16",),
+        env=run_request.extra_env,
+        input_digest=run_request.digest,
+        run_in_workspace=True,
+        immutable_input_digests=run_request.immutable_input_digests,
+        append_only_caches=run_request.append_only_caches,
+    )
+    with mock_console(rule_runner.options_bootstrapper) as mocked_console:
+        rule_runner.run_interactive_process(run_process)
+        print(mocked_console[1].get_stdout().strip())
+        print(mocked_console[1].get_stderr().strip())
+        assert "pyenv/versions/3.9.16/bin/python" in mocked_console[1].get_stdout().strip()
+
     run_request = rule_runner.request(RunRequest, [PythonSourceFieldSet.create(target)])
     run_process = InteractiveProcess(
         argv=run_request.args,
@@ -61,8 +99,7 @@ def run_run_request(
         return mocked_console[1].get_stdout().strip()
 
 
-@pytest.mark.parametrize("py_version", ["2.7", "3.9"])
-def test_using_pyenv(rule_runner, py_version):
+def test_custom_install(rule_runner, named_caches_dir):
     rule_runner.write_files(
         {
             "src/app.py": dedent(
@@ -75,48 +112,12 @@ def test_using_pyenv(rule_runner, py_version):
                 print(sys.version.replace("\\n", " "))
                 """
             ),
-            "src/BUILD": f"python_sources(interpreter_constraints=['=={py_version}.*'])",
+            "src/BUILD": "python_sources(interpreter_constraints=['==3.9.16'])",
         }
     )
 
     target = rule_runner.get_target(Address("src", relative_file_path="app.py"))
     stdout = run_run_request(rule_runner, target)
-    named_caches_dir = (
-        rule_runner.options_bootstrapper.bootstrap_options.for_global_scope().named_caches_dir
-    )
     prefix_dir, version = stdout.splitlines()
     assert prefix_dir.startswith(f"{named_caches_dir}/pyenv")
-    assert py_version in version
-
-
-def test_venv_pex_reconstruction(rule_runner):
-    """A VenvPex refers to the location of the venv so it doesn't have to re-construct if it exists.
-
-    Part of this location is a hash of the interpreter. Without careful consideration it can be easy
-    for this hash to drift from build-time to run-time. This test validates the assumption that the
-    venv could be reconstructed exactly if the underlying directory was wiped clean.
-    """
-    rule_runner.write_files(
-        {
-            "src/app.py": dedent(
-                """\
-                import pathlib
-                import sys
-
-                in_venv_python_path = pathlib.Path(sys.executable)
-                venv_link = in_venv_python_path.parent.parent
-                venv_location = venv_link.resolve()
-                print(venv_location)
-                """
-            ),
-            "src/BUILD": "python_sources(interpreter_constraints=['==3.9.*'])",
-        }
-    )
-
-    target = rule_runner.get_target(Address("src", relative_file_path="app.py"))
-    stdout1 = run_run_request(rule_runner, target)
-    assert "pex_root/venvs/" in stdout1
-    venv_location = stdout1
-    shutil.rmtree(venv_location)
-    stdout2 = run_run_request(rule_runner, target)
-    assert stdout1 == stdout2
+    assert "3.9.16" in version
