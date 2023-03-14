@@ -9,8 +9,11 @@ from typing import Iterable
 
 from pants.backend.javascript import package_json
 from pants.backend.javascript.package_json import AllPackageJson, PackageJson
+from pants.core.util_rules import stripped_source_files
+from pants.core.util_rules.stripped_source_files import StrippedFileName, StrippedFileNameRequest
 from pants.engine.collection import Collection
 from pants.engine.internals.native_engine import MergeDigests
+from pants.engine.internals.selectors import Get
 from pants.engine.rules import Rule, collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.util.ordered_set import FrozenOrderedSet
@@ -21,6 +24,7 @@ from pants.util.strutil import softwrap
 class NodeJSProject:
     root_dir: str
     workspaces: FrozenOrderedSet[PackageJson]
+    default_resolve_name: str
 
     def is_parent(self, project: NodeJSProject) -> bool:
         return self.root_dir != project.root_dir and any(
@@ -29,10 +33,6 @@ class NodeJSProject:
 
     def including_workspaces_from(self, child: NodeJSProject) -> NodeJSProject:
         return replace(self, workspaces=self.workspaces | child.workspaces)
-
-    @property
-    def resolve_name(self) -> str:
-        return self.root_dir.replace(os.path.sep, ".")
 
     def get_project_digest(self) -> MergeDigests:
         return MergeDigests(ws.digest for ws in self.workspaces)
@@ -65,6 +65,11 @@ class ProjectPaths:
         return any(path.match(glob) for glob in self.full_globs())
 
 
+async def _get_default_resolve_name(path: str) -> str:
+    stripped = await Get(StrippedFileName, StrippedFileNameRequest(path))
+    return stripped.value.replace(os.path.sep, ".")
+
+
 @rule
 async def find_node_js_projects(package_workspaces: AllPackageJson) -> AllNodeJSProjects:
     project_paths = (
@@ -75,6 +80,7 @@ async def find_node_js_projects(package_workspaces: AllPackageJson) -> AllNodeJS
         NodeJSProject(
             paths.root,
             FrozenOrderedSet(pkg for pkg in package_workspaces if paths.matches_glob(pkg)),
+            await _get_default_resolve_name(paths.root),
         )
         for paths in project_paths
     }
@@ -122,4 +128,4 @@ def _ensure_one_parent(project_to_parents: dict[NodeJSProject, list[NodeJSProjec
 
 
 def rules() -> Iterable[Rule | UnionRule]:
-    return [*package_json.rules(), *collect_rules()]
+    return [*package_json.rules(), *stripped_source_files.rules(), *collect_rules()]

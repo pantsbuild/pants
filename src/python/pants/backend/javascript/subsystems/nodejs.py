@@ -53,12 +53,13 @@ class NodeJS(TemplatedExternalTool):
 
             Specifying a resolve name is optional. If unspecified,
             the default resolve name is calculated by taking the path
-            from the build root to the directory containing the lockfile
+            from the source root to the directory containing the lockfile
             and replacing '{os.path.sep}' with '.' in that path.
 
             Example:
-            An npm lockfile located at `js/package/package-lock.json'
-            will result in a resolve named `js.package`.
+            An npm lockfile located at `src/js/package/package-lock.json'
+            will result in a resolve named `js.package`, assuming src/js
+            is a source root.
 
             Run `{bin_name()} generate-lockfiles` to
             generate the lockfile(s).

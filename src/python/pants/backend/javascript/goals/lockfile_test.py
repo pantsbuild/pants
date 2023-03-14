@@ -76,7 +76,7 @@ def test_resolves_are_dotted_package_paths(rule_runner: RuleRunner) -> None:
     resolves = rule_runner.request(
         KnownUserResolveNames, (projects, KnownPackageJsonUserResolveNamesRequest())
     )
-    assert set(resolves.names) == {"src.js.foo", "src.js.bar"}
+    assert set(resolves.names) == {"js.foo", "js.bar"}
 
 
 def test_user_can_override_resolve_aliases(rule_runner: RuleRunner) -> None:
@@ -93,7 +93,7 @@ def test_user_can_override_resolve_aliases(rule_runner: RuleRunner) -> None:
     resolves = rule_runner.request(
         KnownUserResolveNames, (projects, KnownPackageJsonUserResolveNamesRequest())
     )
-    assert set(resolves.names) == {"user:1", "src.js.bar"}
+    assert set(resolves.names) == {"user:1", "js.bar"}
 
 
 def test_user_override_non_existing_resolve_is_an_error(rule_runner: RuleRunner) -> None:
@@ -119,7 +119,7 @@ def test_user_override_non_existing_resolve_is_an_error(rule_runner: RuleRunner)
             "my-resolve",
             id="Aliased resolve",
         ),
-        pytest.param([""], "src.js", id="Default resolve"),
+        pytest.param([""], "js", id="Default resolve"),
     ],
 )
 def test_generates_lockfile_with_expected_resolve_name(
@@ -157,7 +157,7 @@ def test_generates_lockfile_for_package_json_project(rule_runner: RuleRunner) ->
         GenerateLockfileResult,
         (
             GeneratePackageLockJsonFile(
-                resolve_name="src.js",
+                resolve_name="js",
                 lockfile_dest="src/js/package-lock.json",
                 project=project,
                 diff=False,
@@ -191,7 +191,7 @@ def test_generates_lockfile_for_package_json_workspace(rule_runner: RuleRunner) 
         GenerateLockfileResult,
         (
             GeneratePackageLockJsonFile(
-                resolve_name="src.js",
+                resolve_name="js",
                 lockfile_dest="src/js/package-lock.json",
                 project=project,
                 diff=False,

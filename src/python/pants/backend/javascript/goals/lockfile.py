@@ -54,7 +54,7 @@ async def determine_package_json_user_resolves(
 ) -> KnownUserResolveNames:
     names = FrozenOrderedSet(
         user_chosen_resolves.get(
-            os.path.join(project.root_dir, "package-lock.json"), project.resolve_name
+            os.path.join(project.root_dir, "package-lock.json"), project.default_resolve_name
         )
         for project in all_projects
     )
@@ -98,7 +98,7 @@ async def setup_user_lockfile_requests(
 ) -> UserGenerateLockfiles:
     def get_name(project: NodeJSProject) -> str:
         return user_chosen_resolves.get(
-            os.path.join(project.root_dir, "package-lock.json"), project.resolve_name
+            os.path.join(project.root_dir, "package-lock.json"), project.default_resolve_name
         )
 
     projects_by_name = {get_name(project): project for project in all_projects}

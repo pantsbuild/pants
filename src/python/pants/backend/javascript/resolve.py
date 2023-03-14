@@ -32,7 +32,7 @@ class ChosenNodeResolve:
 
     @property
     def resolve_name(self) -> str:
-        return self.project.resolve_name
+        return self.project.default_resolve_name
 
     @property
     def file_path(self) -> str:
