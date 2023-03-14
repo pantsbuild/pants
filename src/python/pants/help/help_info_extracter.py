@@ -593,7 +593,8 @@ class HelpInfoExtracter:
     def compute_metavar(kwargs):
         """Compute the metavar to display in help for an option registered with these kwargs."""
 
-        stringify = lambda t: HelpInfoExtracter.stringify_type(t)
+        def stringify(t):
+            return HelpInfoExtracter.stringify_type(t)
 
         metavar = kwargs.get("metavar")
         if not metavar:
