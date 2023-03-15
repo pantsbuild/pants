@@ -42,7 +42,7 @@ class SemgrepConfigFiles:
 async def gather_config_files(
     request: SemgrepConfigFilesRequest, semgrep: Semgrep
 ) -> SemgrepConfigFiles:
-    config_files_snapshot = await Get(Snapshot, PathGlobs(globs=semgrep.config))
+    config_files_snapshot = await Get(Snapshot, PathGlobs(globs=[f"**/{name}" for name in semgrep.config_names]))
     return SemgrepConfigFiles(snapshot=config_files_snapshot)
 
 

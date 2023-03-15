@@ -36,10 +36,10 @@ class Semgrep(PythonToolBase):
 
     export = ExportToolOption()
 
-    config = StrListOption(
-        "--config",
-        default=[".semgrep.yml", ".semgrep/*.yml", ".semgrep/*.yaml", ".semgrepignore"],
-        help="Globs of configuration files applicable to semgrep, including rules and ignores"
+    config_names = StrListOption(
+        "--config-names",
+        default=[".semgrep.yml", ".semgrep/"],
+        help="File and directory names that contain that contain semgrep rule configurations"
     )
 
     file_glob_include = StrListOption(
