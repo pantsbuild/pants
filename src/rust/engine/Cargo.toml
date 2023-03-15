@@ -174,7 +174,7 @@ pe_nailgun = { path = "process_execution/pe_nailgun" }
 [dev-dependencies]
 testutil = { path = "./testutil" }
 fs = { path = "./fs" }
-env_logger = "0.9.0"
+env_logger = "0.10.0"
 
 [build-dependencies]
 pyo3-build-config = "0.17"
