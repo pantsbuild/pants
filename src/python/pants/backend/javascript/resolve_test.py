@@ -45,9 +45,9 @@ def test_gets_expected_resolve_for_standalone_packages(
     a_result = rule_runner.request(ChosenNodeResolve, [RequestNodeResolve(a_tgt.address)])
     b_result = rule_runner.request(ChosenNodeResolve, [RequestNodeResolve(b_tgt.address)])
 
-    assert a_result.resolve_name == "src.js.a"
+    assert a_result.resolve_name == "js.a"
     assert a_result.file_path == "src/js/a/package-lock.json"
-    assert b_result.resolve_name == "src.js.b"
+    assert b_result.resolve_name == "js.b"
     assert b_result.file_path == "src/js/b/package-lock.json"
 
 
@@ -72,5 +72,5 @@ def test_gets_expected_resolve_for_workspace_packages(
     child_result = rule_runner.request(ChosenNodeResolve, [RequestNodeResolve(child_tgt.address)])
 
     assert child_result == result
-    assert child_result.resolve_name == "src.js"
+    assert child_result.resolve_name == "js"
     assert child_result.file_path == "src/js/package-lock.json"
