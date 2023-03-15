@@ -290,6 +290,8 @@ impl UnderlyingByteStore for ShardedFSDB {
       let (mut reader, mut writer) = try_join(tokio::fs::File::open(src.clone()), dest.open())
         .await
         .map_err(|e| e.to_string())?;
+      // TODO: Consider using `fclonefileat` on macOS, which would skip actual copying (read+write), and
+      // instead just require verifying the resulting content after the syscall (read only).
       let should_retry =
         !async_verified_copy(expected_digest, src_is_immutable, &mut reader, &mut writer)
           .await
@@ -321,7 +323,7 @@ impl UnderlyingByteStore for ShardedFSDB {
     mut f: F,
   ) -> Result<Option<T>, String> {
     if let Ok(mut file) = tokio::fs::File::open(self.get_path(fingerprint)).await {
-      // @TODO: Use mmap instead of copying into user-space
+      // TODO: Use mmap instead of copying into user-space.
       let mut contents: Vec<u8> = vec![];
       file
         .read_to_end(&mut contents)

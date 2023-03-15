@@ -277,20 +277,45 @@ impl Digest {
   }
 }
 
+/// A thin wrapper around a Sha256 hasher to preserve the length as well.
+pub struct Hasher {
+  hasher: Sha256,
+  byte_count: usize,
+}
+
+impl Hasher {
+  pub fn new() -> Self {
+    Self {
+      hasher: Sha256::default(),
+      byte_count: 0,
+    }
+  }
+
+  pub fn update(&mut self, buf: &[u8]) {
+    self.hasher.update(buf);
+    self.byte_count += buf.len();
+  }
+
+  pub fn finish(self) -> Digest {
+    Digest::new(
+      Fingerprint::from_bytes(self.hasher.finalize()),
+      self.byte_count,
+    )
+  }
+}
+
 ///
 /// A Write instance that fingerprints all data that passes through it.
 ///
 pub struct WriterHasher<T> {
-  hasher: Sha256,
-  byte_count: usize,
+  hasher: Hasher,
   inner: T,
 }
 
 impl<T> WriterHasher<T> {
   pub fn new(inner: T) -> WriterHasher<T> {
     WriterHasher {
-      hasher: Sha256::default(),
-      byte_count: 0,
+      hasher: Hasher::new(),
       inner: inner,
     }
   }
@@ -299,13 +324,7 @@ impl<T> WriterHasher<T> {
   /// Returns the result of fingerprinting this stream, and Drops the stream.
   ///
   pub fn finish(self) -> (Digest, T) {
-    (
-      Digest::new(
-        Fingerprint::from_bytes(self.hasher.finalize()),
-        self.byte_count,
-      ),
-      self.inner,
-    )
+    (self.hasher.finish(), self.inner)
   }
 }
 
@@ -314,7 +333,6 @@ impl<W: Write> Write for WriterHasher<W> {
     let written = self.inner.write(buf)?;
     // Hash the bytes that were successfully written.
     self.hasher.update(&buf[0..written]);
-    self.byte_count += written;
     Ok(written)
   }
 
@@ -334,7 +352,6 @@ impl<AW: ?Sized + AsyncWrite + Unpin> AsyncWrite for WriterHasher<&mut AW> {
     if let Poll::Ready(Ok(written)) = result {
       // Hash the bytes that were successfully written.
       self.hasher.update(&buf[0..written]);
-      self.byte_count += written;
     }
     result
   }

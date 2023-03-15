@@ -514,7 +514,8 @@ impl Store {
     digest: Digest,
     f: F,
   ) -> Result<T, StoreError> {
-    // No transformation or verification is needed for files.
+    // No transformation or verification (beyond verifying their digest, which the
+    // `remote::ByteStore` will do) is needed for files.
     self
       .load_bytes_with(EntryType::File, digest, move |v: &[u8]| Ok(f(v)), None)
       .await
