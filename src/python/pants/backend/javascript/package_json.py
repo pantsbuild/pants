@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import os.path
 from dataclasses import dataclass, field
-from typing import Any, Iterable, Mapping
+from typing import Any, ClassVar, Iterable, Mapping
 
 from typing_extensions import Literal
 
@@ -62,6 +62,8 @@ class NodeBuildScript:
     output_directories: tuple[str, ...] = ()
     output_files: tuple[str, ...] = ()
     extra_caches: tuple[str, ...] = ()
+
+    alias: ClassVar[str] = "node_build_script"
 
     @classmethod
     def create(
@@ -246,7 +248,7 @@ class NodeBuildScriptExtraCaches(StringSequenceField):
     required = False
     default = ()
     help = help_text(
-        """
+        f"""
         Specify directories that pants should treat as caches for the build script.
 
         These directories will not be available as sources, but are available to
@@ -254,8 +256,8 @@ class NodeBuildScriptExtraCaches(StringSequenceField):
 
         Example usage:
         # BUILD
-        package_json(
-            scripts=node_build_script(
+        {PackageJsonTarget.alias}(
+            scripts={NodeBuildScript.alias}(
                 entry_point="build",
                 output_directories=["dist"],
                 extra_caches=[".parcel-cache"],
@@ -263,14 +265,14 @@ class NodeBuildScriptExtraCaches(StringSequenceField):
         )
 
         # package.json
-        {
+        {{
             ...
-            "scripts": {
+            "scripts": {{
                 "build": "parcel build --dist-dir=dist --cache-dir=.parcel-cache"
                 ...
-            }
+            }}
             ...
-        }
+        }}
         """
     )
 
@@ -628,4 +630,4 @@ def rules() -> Iterable[Rule | UnionRule]:
 
 
 def build_file_aliases() -> BuildFileAliases:
-    return BuildFileAliases(objects={"node_build_script": NodeBuildScript.create})
+    return BuildFileAliases(objects={NodeBuildScript.alias: NodeBuildScript.create})
