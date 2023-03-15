@@ -9,7 +9,7 @@ publish = false
 protos = { path = "../protos" }
 clap = { version = "3", features = ["derive"] }
 dirs-next = "2"
-env_logger = "0.9.0"
+env_logger = "0.10.0"
 fs = { path = "../fs" }
 futures = "0.3"
 grpc_util = { path = "../grpc_util" }
