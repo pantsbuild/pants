@@ -56,9 +56,10 @@ trait UnderlyingByteStore {
     &self,
     fingerprints: Vec<Fingerprint>,
   ) -> Result<HashSet<Fingerprint>, String>;
+
   async fn exists(&self, fingerprint: Fingerprint) -> Result<bool, String> {
-    let missing = self.exists_batch(vec![fingerprint]).await?;
-    Ok(missing.contains(&fingerprint))
+    let exists = self.exists_batch(vec![fingerprint]).await?;
+    Ok(exists.contains(&fingerprint))
   }
 
   async fn lease(&self, fingerprint: Fingerprint) -> Result<(), String>;
@@ -198,8 +199,7 @@ impl ShardedFSDB {
         },
         |e| Err(format!("temp file creation task failed: {e}")),
       )
-      .await
-      .map_err(|e| e.to_string())?;
+      .await?;
     let (_, path) = named_temp_file.keep().map_err(|e| e.to_string())?;
     Ok(TempImmutableLargeFile {
       tmp_path: path,
@@ -586,14 +586,10 @@ impl ByteStore {
   pub async fn remove(&self, entry_type: EntryType, digest: Digest) -> Result<bool, String> {
     match entry_type {
       EntryType::Directory => self.inner.directory_lmdb.clone()?.remove(digest.hash).await,
-      EntryType::File => {
-        let (lmdb_result, fsdb_result) = try_join(
-          self.inner.file_lmdb.clone()?.remove(digest.hash),
-          self.inner.file_fsdb.remove(digest.hash),
-        )
-        .await?;
-        Ok(lmdb_result || fsdb_result)
+      EntryType::File if ByteStore::should_use_fsdb(digest.size_bytes) => {
+        self.inner.file_fsdb.remove(digest.hash).await
       }
+      EntryType::File => self.inner.file_lmdb.clone()?.remove(digest.hash).await,
     }
   }
 
@@ -626,11 +622,28 @@ impl ByteStore {
     items: Vec<(Fingerprint, Bytes)>,
     initial_lease: bool,
   ) -> Result<(), String> {
-    let dbs = match entry_type {
+    let mut fsdb_items = vec![];
+    let mut lmdb_items = vec![];
+    for (fingerprint, bytes) in items {
+      if entry_type == EntryType::File && ByteStore::should_use_fsdb(bytes.len()) {
+        fsdb_items.push((fingerprint, bytes));
+      } else {
+        lmdb_items.push((fingerprint, bytes));
+      }
+    }
+
+    let lmdb_dbs = match entry_type {
       EntryType::Directory => self.inner.directory_lmdb.clone(),
       EntryType::File => self.inner.file_lmdb.clone(),
     };
-    dbs?.store_bytes_batch(items, initial_lease).await?;
+    try_join(
+      self
+        .inner
+        .file_fsdb
+        .store_bytes_batch(fsdb_items, initial_lease),
+      lmdb_dbs?.store_bytes_batch(lmdb_items, initial_lease),
+    )
+    .await?;
 
     Ok(())
   }
@@ -712,11 +725,12 @@ impl ByteStore {
 
     existing.extend(existing_lmdb_digests);
 
-    let missing = digests
-      .into_iter()
-      .filter(|digest| *digest != EMPTY_DIGEST && !existing.contains(&digest.hash))
-      .collect::<HashSet<_>>();
-    Ok(missing)
+    Ok(
+      digests
+        .into_iter()
+        .filter(|digest| *digest != EMPTY_DIGEST && !existing.contains(&digest.hash))
+        .collect(),
+    )
   }
 
   ///

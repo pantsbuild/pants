@@ -655,8 +655,13 @@ async fn all_digests() {
   let large_testdata = TestData::new("123456789".repeat(1000 * 512).as_str());
   let digest2 = prime_store_with_file_bytes(&store, large_testdata.bytes()).await;
   assert_eq!(
-    Ok(vec![digest1, digest2]),
-    store.all_digests(EntryType::File).await
+    vec![digest1, digest2].into_iter().collect::<HashSet<_>>(),
+    store
+      .all_digests(EntryType::File)
+      .await
+      .unwrap()
+      .into_iter()
+      .collect::<HashSet<_>>(),
   );
 }
 

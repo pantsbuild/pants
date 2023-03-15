@@ -482,7 +482,11 @@ impl ByteStore {
     digest: Digest,
     file: tokio::fs::File,
   ) -> Result<Option<tokio::fs::File>, String> {
-    self.load(digest, file).await
+    let mut result = self.load(digest, file).await;
+    if let Ok(Some(ref mut file)) = result {
+      file.rewind().await.map_err(|e| e.to_string())?;
+    }
+    result
   }
 
   ///

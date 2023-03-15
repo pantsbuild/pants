@@ -303,7 +303,12 @@ impl ShardedLmdb {
           let (env, db, lease_database) = store.get(&fingerprint);
           let del_res = env.begin_rw_txn().and_then(|mut txn| {
             txn.del(db, &effective_key, None)?;
-            txn.del(lease_database, &effective_key, None)?;
+            txn
+              .del(lease_database, &effective_key, None)
+              .or_else(|err| match err {
+                lmdb::Error::NotFound => Ok(()),
+                err => Err(err),
+              })?;
             txn.commit()
           });
 
