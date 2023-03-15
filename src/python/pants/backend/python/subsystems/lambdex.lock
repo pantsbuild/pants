@@ -6,10 +6,10 @@
 // {
 //   "version": 3,
 //   "valid_for_interpreter_constraints": [
-//     "CPython<3.10,>=3.7"
+//     "CPython<3.12,>=3.7"
 //   ],
 //   "generated_with_requirements": [
-//     "lambdex==0.1.9"
+//     "lambdex>=0.1.9"
 //   ],
 //   "manylinux": "manylinux2014",
 //   "requirement_constraints": [],
@@ -54,13 +54,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "e53b385a2606c6ec7a95af27c84740553541f75c16d8fa8a91dfe379ab503858",
-              "url": "https://files.pythonhosted.org/packages/19/5d/8ab564f1d70552678a5af52f49d19906f0e15744aa16a1b2f58331718882/pex-2.1.123-py2.py3-none-any.whl"
+              "hash": "29287e819f18e0c0585918970f8aab0adc83d5560dbd19f4092179da41dcff5e",
+              "url": "https://files.pythonhosted.org/packages/9e/c9/8a8bef8dd4d1103dbebcfa084037da93c666565d2c4edf00cfb22f931a6a/pex-2.1.129-py2.py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "5cf8c7aa5f21ae0c6626e0ffc217bffb052e01def38ff75bf739095fd784288a",
-              "url": "https://files.pythonhosted.org/packages/66/2f/794f1fcc40b597514f1d4f92f1f409fd219e7cfaf45667f37910b9579866/pex-2.1.123.tar.gz"
+              "hash": "3fefc6e609f68ccc9f63a59b99dc98e328fed3613d310bab6ec5bc91da86d302",
+              "url": "https://files.pythonhosted.org/packages/f5/73/405ff3209045171b104a7e30dbe6926e7aa437f68758805ea0a50356f00c/pex-2.1.129.tar.gz"
             }
           ],
           "project_name": "pex",
@@ -68,21 +68,21 @@
             "subprocess32>=3.2.7; extra == \"subprocess\" and python_version < \"3\""
           ],
           "requires_python": "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,<3.12,>=2.7",
-          "version": "2.1.123"
+          "version": "2.1.129"
         }
       ],
       "platform_tag": null
     }
   ],
   "path_mappings": {},
-  "pex_version": "2.1.123",
-  "pip_version": "23.0",
+  "pex_version": "2.1.129",
+  "pip_version": "23.0.1",
   "prefer_older_binary": false,
   "requirements": [
-    "lambdex==0.1.9"
+    "lambdex>=0.1.9"
   ],
   "requires_python": [
-    "<3.10,>=3.7"
+    "<3.12,>=3.7"
   ],
   "resolver_version": "pip-2020-resolver",
   "style": "universal",

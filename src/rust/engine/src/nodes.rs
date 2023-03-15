@@ -32,7 +32,8 @@ use fs::{
   RelativePath, StrictGlobMatching, SymlinkBehavior, SymlinkEntry, Vfs,
 };
 use process_execution::{
-  self, CacheName, InputDigests, Process, ProcessCacheScope, ProcessResultSource,
+  self, CacheName, InputDigests, Process, ProcessCacheScope, ProcessExecutionStrategy,
+  ProcessResultSource,
 };
 
 use crate::externs::engine_aware::{EngineAwareParameter, EngineAwareReturnType};
@@ -301,15 +302,14 @@ impl ExecuteProcess {
   ) -> Result<InputDigests, StoreError> {
     let input_digests_fut: Result<_, String> = Python::with_gil(|py| {
       let value = (**value).as_ref(py);
-      let input_files = lift_directory_digest(externs::getattr(value, "input_digest").unwrap())
+      let input_files = lift_directory_digest(externs::getattr(value, "input_digest")?)
         .map_err(|err| format!("Error parsing input_digest {err}"))?;
       let immutable_inputs =
         externs::getattr_from_str_frozendict::<&PyAny>(value, "immutable_input_digests")
           .into_iter()
           .map(|(path, digest)| Ok((RelativePath::new(path)?, lift_directory_digest(digest)?)))
           .collect::<Result<BTreeMap<_, _>, String>>()?;
-      let use_nailgun = externs::getattr::<Vec<String>>(value, "use_nailgun")
-        .unwrap()
+      let use_nailgun = externs::getattr::<Vec<String>>(value, "use_nailgun")?
         .into_iter()
         .map(RelativePath::new)
         .collect::<Result<BTreeSet<_>, _>>()?;
@@ -330,7 +330,7 @@ impl ExecuteProcess {
   fn lift_process_fields(
     value: &PyAny,
     input_digests: InputDigests,
-    process_config: externs::process::PyProcessConfigFromEnvironment,
+    process_config: externs::process::PyProcessExecutionEnvironment,
   ) -> Result<Process, StoreError> {
     let env = externs::getattr_from_str_frozendict(value, "env");
 
@@ -339,19 +339,17 @@ impl ExecuteProcess {
       .map(RelativePath::new)
       .transpose()?;
 
-    let output_files = externs::getattr::<Vec<String>>(value, "output_files")
-      .unwrap()
+    let output_files = externs::getattr::<Vec<String>>(value, "output_files")?
       .into_iter()
       .map(RelativePath::new)
       .collect::<Result<_, _>>()?;
 
-    let output_directories = externs::getattr::<Vec<String>>(value, "output_directories")
-      .unwrap()
+    let output_directories = externs::getattr::<Vec<String>>(value, "output_directories")?
       .into_iter()
       .map(RelativePath::new)
       .collect::<Result<_, _>>()?;
 
-    let timeout_in_seconds: f64 = externs::getattr(value, "timeout_seconds").unwrap();
+    let timeout_in_seconds: f64 = externs::getattr(value, "timeout_seconds")?;
 
     let timeout = if timeout_in_seconds < 0.0 {
       None
@@ -359,8 +357,10 @@ impl ExecuteProcess {
       Some(Duration::from_millis((timeout_in_seconds * 1000.0) as u64))
     };
 
-    let description: String = externs::getattr(value, "description").unwrap();
-    let py_level = externs::getattr(value, "level").unwrap();
+    let description: String = externs::getattr(value, "description")?;
+
+    let py_level = externs::getattr(value, "level")?;
+
     let level = externs::val_to_log_level(py_level)?;
 
     let append_only_caches =
@@ -377,17 +377,16 @@ impl ExecuteProcess {
       externs::getattr_as_optional_string(value, "execution_slot_variable")
         .map_err(|e| format!("Failed to get `execution_slot_variable` for field: {e}"))?;
 
-    let concurrency_available: usize = externs::getattr(value, "concurrency_available").unwrap();
+    let concurrency_available: usize = externs::getattr(value, "concurrency_available")?;
 
     let cache_scope: ProcessCacheScope = {
-      let cache_scope_enum = externs::getattr(value, "cache_scope").unwrap();
-      externs::getattr::<String>(cache_scope_enum, "name")
-        .unwrap()
-        .try_into()?
+      let cache_scope_enum = externs::getattr(value, "cache_scope")?;
+      externs::getattr::<String>(cache_scope_enum, "name")?.try_into()?
     };
 
     let remote_cache_speculation_delay = std::time::Duration::from_millis(
-      externs::getattr::<i32>(value, "remote_cache_speculation_delay_millis").unwrap() as u64,
+      externs::getattr::<i32>(value, "remote_cache_speculation_delay_millis")
+        .map_err(|e| format!("Failed to get `name` for field: {e}"))? as u64,
     );
 
     Ok(Process {
@@ -402,19 +401,18 @@ impl ExecuteProcess {
       level,
       append_only_caches,
       jdk_home,
-      platform: process_config.platform,
       execution_slot_variable,
       concurrency_available,
       cache_scope,
-      execution_strategy: process_config.execution_strategy,
-      remote_cache_speculation_delay: remote_cache_speculation_delay,
+      execution_environment: process_config.environment,
+      remote_cache_speculation_delay,
     })
   }
 
   pub async fn lift(
     store: &Store,
     value: Value,
-    process_config: externs::process::PyProcessConfigFromEnvironment,
+    process_config: externs::process::PyProcessExecutionEnvironment,
   ) -> Result<Self, StoreError> {
     let input_digests = Self::lift_process_input_digests(store, &value).await?;
     let process = Python::with_gil(|py| {
@@ -459,24 +457,47 @@ impl ExecuteProcess {
       .map_err(|e| throw(format!("Failed to serialize process: {e}")))?;
     workunit.update_metadata(|initial| {
       initial.map(|(initial, level)| {
+        let mut user_metadata = Vec::with_capacity(7);
+        user_metadata.push((
+          "definition".to_string(),
+          UserMetadataItem::String(definition),
+        ));
+        user_metadata.push((
+          "source".to_string(),
+          UserMetadataItem::String(format!("{:?}", res.metadata.source)),
+        ));
+        user_metadata.push((
+          "exit_code".to_string(),
+          UserMetadataItem::Int(res.exit_code as i64),
+        ));
+        user_metadata.push((
+          "environment_type".to_string(),
+          UserMetadataItem::String(res.metadata.environment.strategy.strategy_type().to_owned()),
+        ));
+        if let Some(environment_name) = res.metadata.environment.name.clone() {
+          user_metadata.push((
+            "environment_name".to_string(),
+            UserMetadataItem::String(environment_name),
+          ));
+        }
+        if let Some(total_elapsed) = res.metadata.total_elapsed {
+          user_metadata.push((
+            "total_elapsed_ms".to_string(),
+            UserMetadataItem::Int(Duration::from(total_elapsed).as_millis() as i64),
+          ));
+        }
+        if let Some(saved_by_cache) = res.metadata.saved_by_cache {
+          user_metadata.push((
+            "saved_by_cache_ms".to_string(),
+            UserMetadataItem::Int(Duration::from(saved_by_cache).as_millis() as i64),
+          ));
+        }
+
         (
           WorkunitMetadata {
             stdout: Some(res.stdout_digest),
             stderr: Some(res.stderr_digest),
-            user_metadata: vec![
-              (
-                "definition".to_string(),
-                UserMetadataItem::String(definition),
-              ),
-              (
-                "source".to_string(),
-                UserMetadataItem::String(format!("{:?}", res.metadata.source)),
-              ),
-              (
-                "exit_code".to_string(),
-                UserMetadataItem::Int(res.exit_code as i64),
-              ),
-            ],
+            user_metadata,
             ..initial
           },
           level,
@@ -485,15 +506,15 @@ impl ExecuteProcess {
     });
     if let Some(total_elapsed) = res.metadata.total_elapsed {
       let total_elapsed = Duration::from(total_elapsed).as_millis() as u64;
-      match res.metadata.source {
-        ProcessResultSource::RanLocally => {
+      match (res.metadata.source, &res.metadata.environment.strategy) {
+        (ProcessResultSource::Ran, ProcessExecutionStrategy::Local) => {
           workunit.increment_counter(Metric::LocalProcessTotalTimeRunMs, total_elapsed);
           context
             .session
             .workunit_store()
             .record_observation(ObservationMetric::LocalProcessTimeRunMs, total_elapsed);
         }
-        ProcessResultSource::RanRemotely => {
+        (ProcessResultSource::Ran, ProcessExecutionStrategy::RemoteExecution { .. }) => {
           workunit.increment_counter(Metric::RemoteProcessTotalTimeRunMs, total_elapsed);
           context
             .session
@@ -773,17 +794,27 @@ impl Snapshot {
   }
 
   pub fn lift_path_globs(item: &PyAny) -> Result<PathGlobs, String> {
-    let globs: Vec<String> = externs::getattr(item, "globs").unwrap();
+    let globs: Vec<String> = externs::getattr(item, "globs")
+      .map_err(|e| format!("Failed to get `globs` for field: {e}"))?;
+
     let description_of_origin = externs::getattr_as_optional_string(item, "description_of_origin")
       .map_err(|e| format!("Failed to get `description_of_origin` for field: {e}"))?;
 
-    let glob_match_error_behavior = externs::getattr(item, "glob_match_error_behavior").unwrap();
-    let failure_behavior: String = externs::getattr(glob_match_error_behavior, "value").unwrap();
+    let glob_match_error_behavior = externs::getattr(item, "glob_match_error_behavior")
+      .map_err(|e| format!("Failed to get `glob_match_error_behavior` for field: {e}"))?;
+
+    let failure_behavior: String = externs::getattr(glob_match_error_behavior, "value")
+      .map_err(|e| format!("Failed to get `value` for field: {e}"))?;
+
     let strict_glob_matching =
       StrictGlobMatching::create(failure_behavior.as_str(), description_of_origin)?;
 
-    let conjunction_obj = externs::getattr(item, "conjunction").unwrap();
-    let conjunction_string: String = externs::getattr(conjunction_obj, "value").unwrap();
+    let conjunction_obj = externs::getattr(item, "conjunction")
+      .map_err(|e| format!("Failed to get `conjunction` for field: {e}"))?;
+
+    let conjunction_string: String = externs::getattr(conjunction_obj, "value")
+      .map_err(|e| format!("Failed to get `value` for field: {e}"))?;
+
     let conjunction = GlobExpansionConjunction::create(&conjunction_string)?;
     Ok(PathGlobs::new(globs, strict_glob_matching, conjunction))
   }
@@ -1013,10 +1044,10 @@ impl DownloadedFile {
     let (url_str, expected_digest, auth_headers) = Python::with_gil(|py| {
       let py_download_file_val = self.0.to_value();
       let py_download_file = (*py_download_file_val).as_ref(py);
-      let url_str: String = externs::getattr(py_download_file, "url").unwrap();
+      let url_str: String = externs::getattr(py_download_file, "url")
+        .map_err(|e| format!("Failed to get `url` for field: {e}"))?;
       let auth_headers = externs::getattr_from_str_frozendict(py_download_file, "auth_headers");
-      let py_file_digest: PyFileDigest =
-        externs::getattr(py_download_file, "expected_digest").unwrap();
+      let py_file_digest: PyFileDigest = externs::getattr(py_download_file, "expected_digest")?;
       let res: NodeResult<(String, Digest, BTreeMap<String, String>)> =
         Ok((url_str, py_file_digest.0, auth_headers));
       res

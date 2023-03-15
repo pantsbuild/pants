@@ -1778,7 +1778,7 @@ class SequenceField(Generic[T], Field):
 
             @classmethod
             def compute_value(
-                cls, raw_value: Optional[Iterable[MyPluginObject]], *, address: Address
+                cls, raw_value: Optional[Iterable[MyPluginObject]], address: Address
             ) -> Optional[Tuple[MyPluginObject, ...]]:
                 return super().compute_value(raw_value, address=address)
     """
@@ -2073,7 +2073,7 @@ class SourcesField(AsyncFieldMixin, Field):
         # Use fields default error behavior if defined, if we use default globs else the provided
         # error behavior.
         error_behavior = (
-            unmatched_build_file_globs.to_glob_match_error_behavior()
+            unmatched_build_file_globs.error_behavior
             if conjunction == GlobExpansionConjunction.all_match
             or self.default_glob_match_error_behavior is None
             else self.default_glob_match_error_behavior
@@ -2888,7 +2888,7 @@ class OverridesField(AsyncFieldMixin, Field):
         return tuple(
             PathGlobs(
                 [relativize_glob(glob)],
-                glob_match_error_behavior=unmatched_build_file_globs.to_glob_match_error_behavior(),
+                glob_match_error_behavior=unmatched_build_file_globs.error_behavior,
                 description_of_origin=f"the `overrides` field for {address}",
             )
             for glob in overrides_keys

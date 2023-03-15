@@ -97,6 +97,8 @@ class PantsRunner:
                 log_location=init_workdir(global_bootstrap_options), pantsd_instance=False
             )
             runner = LocalPantsRunner.create(
-                env=CompleteEnvironmentVars(self.env), options_bootstrapper=options_bootstrapper
+                env=CompleteEnvironmentVars(self.env),
+                working_dir=os.getcwd(),
+                options_bootstrapper=options_bootstrapper,
             )
             return runner.run(start_time)

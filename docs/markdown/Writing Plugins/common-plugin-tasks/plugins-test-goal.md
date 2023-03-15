@@ -4,7 +4,6 @@ slug: "plugins-test-goal"
 excerpt: "How to add a new test runner to the `test` goal."
 hidden: false
 createdAt: "2020-07-23T23:20:54.816Z"
-updatedAt: "2021-12-07T23:14:31.220Z"
 ---
 
 

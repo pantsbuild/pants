@@ -4,7 +4,6 @@ slug: "initial-configuration"
 excerpt: "Creating the configuration necessary to run Pants."
 hidden: false
 createdAt: "2020-02-21T17:44:29.297Z"
-updatedAt: "2022-05-02T20:58:57.689Z"
 ---
 To get started in a new repository, follow these steps, and then visit one of the language-specific overview pages.
 

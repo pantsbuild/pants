@@ -12,6 +12,24 @@ python_requirements(
     },
 )
 
+python_requirements(
+    name="flake8",
+    source="flake8-requirements.txt",
+    resolve="flake8",
+)
+
+python_requirements(
+    name="mypy",
+    source="mypy-requirements.txt",
+    resolve="mypy",
+)
+
+python_requirements(
+    name="pytest",
+    source="pytest-requirements.txt",
+    resolve="pytest",
+)
+
 # Useful when using IntelliJ/PyCharm remote debugging. Importing `pydevd_pycharm` at
 # the breakpoint will cause dep inference to add this dep on the remote debugger client.
 python_requirement(name="pydevd-pycharm", requirements=["pydevd-pycharm==203.5419.8"])

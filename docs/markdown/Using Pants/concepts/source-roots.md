@@ -4,7 +4,6 @@ slug: "source-roots"
 excerpt: "Configuring Pants to understand your imports."
 hidden: false
 createdAt: "2020-02-21T17:44:27.655Z"
-updatedAt: "2022-02-08T22:56:49.862Z"
 ---
 > 📘 Go and Shell can skip this page
 > 

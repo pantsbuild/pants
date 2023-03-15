@@ -52,7 +52,7 @@ PANTS_RULES_MODULE_KEY = "__pants_rules__"
 def SubsystemRule(subsystem: Type[Subsystem]) -> Rule:
     """Returns a TaskRule that constructs an instance of the subsystem."""
     warn_or_error(
-        removal_version="2.17.0.dev0",
+        removal_version="2.17.0.dev1",
         entity=f"using `SubsystemRule({subsystem.__name__})`",
         hint=f"Use `*{subsystem.__name__}.rules()` instead.",
     )
@@ -363,7 +363,7 @@ def _rule_helper_decorator(func: Callable[P, R], _public: bool = False) -> Calla
         raise ValueError("@rule_helpers must be async.")
 
     setattr(func, "rule_helper", func)
-    return func
+    return func  # type: ignore[return-value]
 
 
 @overload

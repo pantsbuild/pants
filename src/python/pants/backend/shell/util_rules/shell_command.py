@@ -20,6 +20,7 @@ from pants.backend.shell.target_types import (
     ShellCommandOutputFilesField,
     ShellCommandOutputRootDirField,
     ShellCommandOutputsField,
+    ShellCommandRunnableDependenciesField,
     ShellCommandSourcesField,
     ShellCommandTarget,
     ShellCommandTimeoutField,
@@ -32,6 +33,8 @@ from pants.core.target_types import FileSourceField
 from pants.core.util_rules.adhoc_process_support import (
     AdhocProcessRequest,
     AdhocProcessResult,
+    ExtraSandboxContents,
+    MergeExtraSandboxContents,
     ResolvedExecutionDependencies,
     ResolveExecutionDependenciesRequest,
 )
@@ -40,6 +43,7 @@ from pants.core.util_rules.environments import EnvironmentNameRequest
 from pants.core.util_rules.system_binaries import BashBinary, BinaryShims, BinaryShimsRequest
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import Digest, Snapshot
+from pants.engine.internals.native_engine import EMPTY_DIGEST
 from pants.engine.process import Process
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import (
@@ -88,6 +92,7 @@ async def _prepare_process_request_from_target(
             shell_command.address,
             shell_command.get(ShellCommandExecutionDependenciesField).value,
             shell_command.get(ShellCommandOutputDependenciesField).value,
+            shell_command.get(ShellCommandRunnableDependenciesField).value,
         ),
     )
     dependencies_digest = execution_environment.digest
@@ -107,8 +112,36 @@ async def _prepare_process_request_from_target(
         ),
     )
 
-    immutable_input_digests = resolved_tools.immutable_input_digests
-    supplied_env_var_values = {"PATH": resolved_tools.path_component}
+    runnable_dependencies = execution_environment.runnable_dependencies
+    extra_sandbox_contents = []
+
+    extra_sandbox_contents.append(
+        ExtraSandboxContents(
+            EMPTY_DIGEST,
+            resolved_tools.path_component,
+            FrozenDict(resolved_tools.immutable_input_digests or {}),
+            FrozenDict(),
+            FrozenDict(),
+        )
+    )
+
+    if runnable_dependencies:
+        extra_sandbox_contents.append(
+            ExtraSandboxContents(
+                EMPTY_DIGEST,
+                f"{{chroot}}/{runnable_dependencies.path_component}",
+                runnable_dependencies.immutable_input_digests,
+                runnable_dependencies.append_only_caches,
+                runnable_dependencies.extra_env,
+            )
+        )
+
+    merged_extras = await Get(
+        ExtraSandboxContents, MergeExtraSandboxContents(tuple(extra_sandbox_contents))
+    )
+    extra_env = dict(merged_extras.extra_env)
+    if merged_extras.path:
+        extra_env["PATH"] = merged_extras.path
 
     return AdhocProcessRequest(
         description=description,
@@ -121,9 +154,9 @@ async def _prepare_process_request_from_target(
         output_files=output_files,
         output_directories=output_directories,
         fetch_env_vars=shell_command.get(ShellCommandExtraEnvVarsField).value or (),
-        append_only_caches=None,
-        supplied_env_var_values=FrozenDict(supplied_env_var_values),
-        immutable_input_digests=FrozenDict(immutable_input_digests),
+        append_only_caches=FrozenDict.frozen(merged_extras.append_only_caches),
+        supplied_env_var_values=FrozenDict(extra_env),
+        immutable_input_digests=FrozenDict.frozen(merged_extras.immutable_input_digests),
         log_on_process_errors=_LOG_ON_PROCESS_ERRORS,
         log_output=shell_command[ShellCommandLogOutputField].value,
     )
@@ -203,7 +236,6 @@ async def _interactive_shell_command(
     shell_command: Target,
     bash: BashBinary,
 ) -> Process:
-
     description = f"the `{shell_command.alias}` at `{shell_command.address}`"
     shell_name = shell_command.address.spec
     working_directory = shell_command[RunShellCommandWorkdirField].value
@@ -225,6 +257,7 @@ async def _interactive_shell_command(
             shell_command.address,
             shell_command.get(ShellCommandExecutionDependenciesField).value,
             shell_command.get(ShellCommandOutputDependenciesField).value,
+            shell_command.get(ShellCommandRunnableDependenciesField).value,
         ),
     )
     dependencies_digest = execution_environment.digest

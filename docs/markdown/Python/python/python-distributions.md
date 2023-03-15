@@ -4,7 +4,6 @@ slug: "python-distributions"
 excerpt: "Packaging your code into an sdist or a wheel."
 hidden: false
 createdAt: "2020-03-16T16:19:55.626Z"
-updatedAt: "2022-05-10T00:44:24.595Z"
 ---
 A standard packaging format for Python code is the _distribution_: an archive that is published to a package index such as [PyPI](https://pypi.org/), and can be installed by [pip](https://packaging.python.org/key_projects/#pip). The two standard distribution archive types are [sdists](https://packaging.python.org/overview/#python-source-distributions) and [wheels](https://packaging.python.org/overview/#python-binary-distributions).
 
@@ -95,9 +94,17 @@ Although alternatives exist, and PEP 517 enables them, Setuptools is still by fa
 
 You can either author `setup.py` yourself (which is necessary if building native extensions), or have Pants generate one for you (see below).
 
-By default Pants will generate a `setup.py` for every `python_distribution` target, unless you set `generate_setup = False` on the target. But you can flip this behavior by setting `generate_setup_default = false` in the `[setup-py-generation]` section of your `pants.toml` config file. In that case Pants will only generate a `setup.py` for `python_distribution` targets that have `generate_setup = True` set on them.
+By default, Pants will generate a `setup.py` for every `python_distribution` target, unless you set `generate_setup = False` on the target. But you can flip this behavior by setting `generate_setup_default = false` in the `[setup-py-generation]` section of your `pants.toml` config file. In that case Pants will only generate a `setup.py` for `python_distribution` targets that have `generate_setup = True` set on them.
 
 So if you expect to use handwritten `setup.py` scripts for most distributions in your repo, you probably want to set `generate-setup-default = false` and override it as needed. If you expect to mostly use generated `setup.py` scripts, you can set `generate-setup-default = true` (or just not set it, since that is the default).
+
+> 📘 3rdparty requirements in `setup.py`
+>
+> If you use a handwritten `setup.py`, the generated distribution will have requirements on the packages you list in the `install_requires` key, as expected. But Pants will not automatically use those as dependencies of the underlying sources, e.g., when running tests. They are strictly used when generating a distribution.
+>
+> Instead, the "universe" of possible requirements of your source files must be specified as described [here](doc:python-third-party-dependencies), and Pants will use dependency inference to select an appropriate subset as needed.
+>
+> If Pants generates a `setup.py` for you then the `install_requires` value will be generated from the actual requirements of your source files.
 
 Using a generated `setup.py`
 ----------------------------

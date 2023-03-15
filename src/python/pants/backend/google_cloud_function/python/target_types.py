@@ -220,6 +220,7 @@ class PythonGoogleCloudFunctionRuntimes(Enum):
     PYTHON_38 = "python38"
     PYTHON_39 = "python39"
     PYTHON_310 = "python310"
+    PYTHON_311 = "python311"
 
 
 class PythonGoogleCloudFunctionRuntime(StringField):
@@ -278,7 +279,6 @@ class GoogleCloudFunctionTypes(Enum):
 
 
 class PythonGoogleCloudFunctionType(StringField):
-
     alias = "type"
     required = True
     valid_choices = GoogleCloudFunctionTypes

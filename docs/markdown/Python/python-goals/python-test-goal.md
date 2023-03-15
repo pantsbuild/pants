@@ -4,7 +4,6 @@ slug: "python-test-goal"
 excerpt: "Run tests with Pytest."
 hidden: false
 createdAt: "2020-03-16T16:19:56.071Z"
-updatedAt: "2022-05-12T05:33:10.060Z"
 ---
 Pants uses the [Pytest](https://docs.pytest.org/en/latest/) test runner to run Python tests. You may write your tests in Pytest-style, unittest-style, or mix and match both.
 

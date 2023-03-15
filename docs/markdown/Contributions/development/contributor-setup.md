@@ -4,7 +4,6 @@ slug: "contributor-setup"
 excerpt: "How to set up Pants for local development."
 hidden: false
 createdAt: "2020-05-16T22:54:22.684Z"
-updatedAt: "2022-04-26T23:55:48.923Z"
 ---
 Step 1: Fork and clone `pantsbuild/pants`
 -----------------------------------------

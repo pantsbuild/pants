@@ -137,7 +137,6 @@ async def mypy_typecheck_partition(
     mv: MvBinary,
     global_options: GlobalOptions,
 ) -> CheckResult:
-
     # MyPy requires 3.5+ to run, but uses the typed-ast library to work with 2.7, 3.4, 3.5, 3.6,
     # and 3.7. However, typed-ast does not understand 3.8+, so instead we must run MyPy with
     # Python 3.8+ when relevant. We only do this if <3.8 can't be used, as we don't want a
@@ -180,7 +179,12 @@ async def mypy_typecheck_partition(
         ),
     )
 
-    (roots_sources, mypy_pex, extra_type_stubs_pex, requirements_pex,) = await MultiGet(
+    (
+        roots_sources,
+        mypy_pex,
+        extra_type_stubs_pex,
+        requirements_pex,
+    ) = await MultiGet(
         roots_sources_get,
         mypy_pex_get,
         extra_type_stubs_pex_get,

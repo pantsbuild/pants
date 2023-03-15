@@ -4,7 +4,6 @@ slug: "awslambda-python"
 excerpt: "Create a Lambda with Python code."
 hidden: false
 createdAt: "2020-05-05T16:51:03.851Z"
-updatedAt: "2022-05-12T16:58:25.667Z"
 ---
 Pants can create a Lambda-compatible zip file from your Python code, allowing you to develop your Lambdas in your repository instead of using the online Cloud9 editor.
 

@@ -8,6 +8,7 @@ import pytest
 
 from pants.util.strutil import (
     bullet_list,
+    docstring,
     ensure_binary,
     ensure_text,
     first_paragraph,
@@ -374,3 +375,17 @@ _TEST_MEMORY_SIZES_PARAMS = [
 @pytest.mark.parametrize("mem_size, expected", _TEST_MEMORY_SIZES_PARAMS)
 def test_fmt_memory_sizes(mem_size: int, expected: str) -> None:
     assert fmt_memory_size(mem_size) == expected
+
+
+def test_docstring_decorator() -> None:
+    @docstring(f"calc 1 + 1 = {1 + 1}")
+    def document_me():
+        pass
+
+    assert document_me.__doc__ == "calc 1 + 1 = 2"
+
+    def show_why_this_is_needed() -> None:
+        f"""calc 1 + 1 = {1 + 1}"""
+
+    with pytest.raises(AssertionError):
+        assert show_why_this_is_needed.__doc__ == "calc 1 + 1 = 2"

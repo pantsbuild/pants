@@ -72,7 +72,6 @@ async def compile_scala_source(
     scalac: Scalac,
     request: CompileScalaSourceRequest,
 ) -> FallibleClasspathEntry:
-
     # Request classpath entries for our direct dependencies.
     dependency_cpers = await Get(FallibleClasspathEntries, ClasspathDependenciesRequest(request))
     direct_dependency_classpath_entries = dependency_cpers.if_all_succeeded()

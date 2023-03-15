@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Callable
+from typing import Any, Callable, Mapping
 
 from pants.base.parse_context import ParseContext
 from pants.util.frozendict import FrozenDict
@@ -109,14 +109,14 @@ class BuildFileAliases:
         if not isinstance(other, BuildFileAliases):
             raise TypeError(f"Can only merge other BuildFileAliases, given {other}")
 
-        def merge(*items):
-            merged: dict = {}
-            for item in items:
-                merged.update(item)
+        def _merge(item1: Mapping[str, Any], item2: Mapping[str, Any]) -> dict[str, Any]:
+            merged: dict[str, Any] = {}
+            merged.update(item1)
+            merged.update(item2)
             return merged
 
-        objects = merge(self.objects, other.objects)
-        context_aware_object_factories = merge(
+        objects = _merge(self.objects, other.objects)
+        context_aware_object_factories = _merge(
             self.context_aware_object_factories, other.context_aware_object_factories
         )
         return BuildFileAliases(

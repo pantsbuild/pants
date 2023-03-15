@@ -51,8 +51,10 @@ class Black(PythonToolBase):
     name = "Black"
     help = "The Black Python code formatter (https://black.readthedocs.io/)."
 
-    default_version = "black==22.6.0"
+    default_version = "black>=22.6.0,<24"
+    default_extra_requirements = ['typing-extensions>=3.10.0.0; python_version < "3.10"']
     default_main = ConsoleScript("black")
+    default_requirements = [default_version, *default_extra_requirements]
 
     register_interpreter_constraints = True
     default_interpreter_constraints = ["CPython>=3.7,<4"]
@@ -61,7 +63,6 @@ class Black(PythonToolBase):
     default_lockfile_resource = ("pants.backend.python.lint.black", "black.lock")
     default_lockfile_path = "src/python/pants/backend/python/lint/black/black.lock"
     default_lockfile_url = git_url(default_lockfile_path)
-    default_extra_requirements = ['typing-extensions>=3.10.0.0; python_version < "3.10"']
 
     skip = SkipOption("fmt", "lint")
     args = ArgsListOption(example="--target-version=py37 --quiet")
@@ -131,10 +132,10 @@ async def setup_black_lockfile(
     _: BlackLockfileSentinel, black: Black, python_setup: PythonSetup
 ) -> GeneratePythonLockfile:
     if not black.uses_custom_lockfile:
-        return GeneratePythonLockfile.from_tool(black)
+        return black.to_lockfile_request()
 
     constraints = await _black_interpreter_constraints(black, python_setup)
-    return GeneratePythonLockfile.from_tool(black, constraints)
+    return black.to_lockfile_request(interpreter_constraints=constraints)
 
 
 class BlackExportSentinel(ExportPythonToolSentinel):

@@ -38,7 +38,7 @@ use fs::{DirectoryDigest, Permissions, RelativePath};
 use hashing::{Digest, Fingerprint};
 use process_execution::{
   local::KeepSandboxes, CacheContentBehavior, Context, InputDigests, NamedCaches, Platform,
-  ProcessCacheScope, ProcessExecutionStrategy,
+  ProcessCacheScope, ProcessExecutionEnvironment, ProcessExecutionStrategy,
 };
 use prost::Message;
 use protos::gen::build::bazel::remote::execution::v2::{Action, Command};
@@ -392,16 +392,22 @@ async fn make_request(
   store: &Store,
   args: &Opt,
 ) -> Result<(process_execution::Process, ProcessMetadata), String> {
-  let (execution_strategy, platform) = if args.server.is_some() {
+  let execution_environment = if args.server.is_some() {
     let strategy = ProcessExecutionStrategy::RemoteExecution(collection_from_keyvalues(
       args.command.extra_platform_property.iter(),
     ));
-    (strategy, Platform::Linux_x86_64)
+    ProcessExecutionEnvironment {
+      name: None,
+      // TODO: Make configurable.
+      platform: Platform::Linux_x86_64,
+      strategy,
+    }
   } else {
-    (
-      ProcessExecutionStrategy::Local,
-      Platform::current().unwrap(),
-    )
+    ProcessExecutionEnvironment {
+      name: None,
+      platform: Platform::current().unwrap(),
+      strategy: ProcessExecutionStrategy::Local,
+    }
   };
 
   match (
@@ -412,15 +418,13 @@ async fn make_request(
     args.buildbarn_url.as_ref(),
   ) {
     (Some(input_digest), Some(input_digest_length), None, None, None) => {
-      make_request_from_flat_args(store, args, Digest::new(input_digest, input_digest_length), execution_strategy, platform).await
-
+      make_request_from_flat_args(store, args, Digest::new(input_digest, input_digest_length), execution_environment).await
     }
     (None, None, Some(action_fingerprint), Some(action_digest_length), None) => {
       extract_request_from_action_digest(
         store,
         Digest::new(action_fingerprint, action_digest_length),
-        execution_strategy,
-        platform,
+        execution_environment,
         args.remote_instance_name.clone(),
         args.command.cache_key_gen_version.clone(),
       ).await
@@ -429,8 +433,7 @@ async fn make_request(
       extract_request_from_buildbarn_url(
         store,
         buildbarn_url,
-        execution_strategy,
-        platform,
+        execution_environment,
         args.command.cache_key_gen_version.clone()
       ).await
     }
@@ -447,8 +450,7 @@ async fn make_request_from_flat_args(
   store: &Store,
   args: &Opt,
   input_files: Digest,
-  execution_strategy: ProcessExecutionStrategy,
-  platform: Platform,
+  execution_environment: ProcessExecutionEnvironment,
 ) -> Result<(process_execution::Process, ProcessMetadata), String> {
   let output_files = args
     .command
@@ -495,11 +497,10 @@ async fn make_request_from_flat_args(
     level: Level::Info,
     append_only_caches: BTreeMap::new(),
     jdk_home: args.command.jdk.clone(),
-    platform,
     execution_slot_variable: None,
     concurrency_available: args.command.concurrency_available.unwrap_or(0),
     cache_scope: ProcessCacheScope::Always,
-    execution_strategy,
+    execution_environment,
     remote_cache_speculation_delay: Duration::from_millis(0),
   };
   let metadata = ProcessMetadata {
@@ -513,8 +514,7 @@ async fn make_request_from_flat_args(
 async fn extract_request_from_action_digest(
   store: &Store,
   action_digest: Digest,
-  execution_strategy: ProcessExecutionStrategy,
-  platform: Platform,
+  execution_environment: ProcessExecutionEnvironment,
   instance_name: Option<String>,
   cache_key_gen_version: Option<String>,
 ) -> Result<(process_execution::Process, ProcessMetadata), String> {
@@ -588,9 +588,8 @@ async fn extract_request_from_action_digest(
     level: Level::Error,
     append_only_caches: BTreeMap::new(),
     jdk_home: None,
-    platform,
     cache_scope: ProcessCacheScope::Always,
-    execution_strategy,
+    execution_environment,
     remote_cache_speculation_delay: Duration::from_millis(0),
   };
 
@@ -605,8 +604,7 @@ async fn extract_request_from_action_digest(
 async fn extract_request_from_buildbarn_url(
   store: &Store,
   buildbarn_url: &str,
-  execution_strategy: ProcessExecutionStrategy,
-  platform: Platform,
+  execution_environment: ProcessExecutionEnvironment,
   cache_key_gen_version: Option<String>,
 ) -> Result<(process_execution::Process, ProcessMetadata), String> {
   let url_parts: Vec<&str> = buildbarn_url.trim_end_matches('/').split('/').collect();
@@ -653,8 +651,7 @@ async fn extract_request_from_buildbarn_url(
   extract_request_from_action_digest(
     store,
     action_digest,
-    execution_strategy,
-    platform,
+    execution_environment,
     Some(instance.to_owned()),
     cache_key_gen_version,
   )

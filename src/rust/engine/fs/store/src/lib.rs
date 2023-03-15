@@ -42,7 +42,7 @@ use std::fmt::{self, Debug, Display};
 use std::fs::OpenOptions;
 use std::future::Future;
 use std::io::{self, Write};
-use std::os::unix::fs::{symlink, OpenOptionsExt, PermissionsExt};
+use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Weak};
 use std::time::{Duration, Instant};
@@ -66,7 +66,11 @@ use protos::require_digest;
 use remexec::{ServerCapabilities, Tree};
 use serde_derive::Serialize;
 use sharded_lmdb::DEFAULT_LEASE_TIME;
-//use tokio::io::AsyncWriteExt;
+#[cfg(target_os = "macos")]
+use tokio::fs::copy;
+#[cfg(not(target_os = "macos"))]
+use tokio::fs::hard_link;
+use tokio::fs::symlink;
 use tryfuture::try_future;
 use workunit_store::{in_workunit, Level, Metric};
 
@@ -1395,7 +1399,25 @@ impl Store {
     destination: PathBuf,
     target: String,
   ) -> Result<(), StoreError> {
-    symlink(target, destination)?;
+    symlink(target, destination).await?;
+    Ok(())
+  }
+
+  pub async fn materialize_hardlink(
+    &self,
+    destination: PathBuf,
+    target: String,
+  ) -> Result<(), StoreError> {
+    // On macOS, copy uses a copy-on-write syscall (fclonefileat) which creates a disconnected
+    // clone. It is more defensive than a hardlink, but has the same requirement that the source
+    // and destination filesystem are the same.
+    //
+    // It also has the benefit of playing nicely with Docker for macOS file virtualization: see
+    // #18162.
+    #[cfg(target_os = "macos")]
+    copy(target, destination).await?;
+    #[cfg(not(target_os = "macos"))]
+    hard_link(target, destination).await?;
     Ok(())
   }
 

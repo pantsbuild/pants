@@ -4,7 +4,6 @@ slug: "target-api-new-targets"
 excerpt: "How to add a custom target type."
 hidden: false
 createdAt: "2020-05-07T22:38:40.570Z"
-updatedAt: "2021-11-16T03:24:52.165Z"
 ---
 When to create a new target type?
 ---------------------------------

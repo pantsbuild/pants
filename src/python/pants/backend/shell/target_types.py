@@ -15,6 +15,7 @@ from pants.backend.adhoc.target_types import (
     AdhocToolOutputDirectoriesField,
     AdhocToolOutputFilesField,
     AdhocToolOutputRootDirField,
+    AdhocToolRunnableDependenciesField,
     AdhocToolTimeoutField,
     AdhocToolWorkdirField,
 )
@@ -281,7 +282,7 @@ class ShellCommandOutputsField(StringSequenceField):
         """
     )
     removal_hint = "To fix, use `output_files` and `output_directories` instead."
-    removal_version = "2.17.0.dev0"
+    removal_version = "2.17.0.dev1"
 
 
 class ShellCommandOutputFilesField(AdhocToolOutputFilesField):
@@ -297,6 +298,10 @@ class ShellCommandOutputDependenciesField(AdhocToolOutputDependenciesField):
 
 
 class ShellCommandExecutionDependenciesField(AdhocToolExecutionDependenciesField):
+    pass
+
+
+class ShellCommandRunnableDependenciesField(AdhocToolRunnableDependenciesField):
     pass
 
 
@@ -369,6 +374,7 @@ class ShellCommandTarget(Target):
         *COMMON_TARGET_FIELDS,
         ShellCommandOutputDependenciesField,
         ShellCommandExecutionDependenciesField,
+        ShellCommandRunnableDependenciesField,
         ShellCommandCommandField,
         ShellCommandLogOutputField,
         ShellCommandOutputsField,
@@ -414,6 +420,7 @@ class ShellCommandRunTarget(Target):
     core_fields = (
         *COMMON_TARGET_FIELDS,
         ShellCommandExecutionDependenciesField,
+        ShellCommandRunnableDependenciesField,
         ShellCommandCommandField,
         RunShellCommandWorkdirField,
     )

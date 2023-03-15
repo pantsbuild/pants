@@ -29,7 +29,7 @@ hashing = { path = "../../hashing" }
 bytes = "1.2"
 
 [dev-dependencies]
-env_logger = "0.9.0"
+env_logger = "0.10.0"
 maplit = "1.0.1"
 mock = { path = "../../testutil/mock" }
 parking_lot = "0.12"

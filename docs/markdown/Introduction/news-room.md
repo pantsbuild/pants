@@ -3,7 +3,6 @@ title: "News room"
 slug: "news-room"
 hidden: false
 createdAt: "2021-12-10T19:04:25.950Z"
-updatedAt: "2022-02-18T18:34:12.286Z"
 ---
 Press
 -----

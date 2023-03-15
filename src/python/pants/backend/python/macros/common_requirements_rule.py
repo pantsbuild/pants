@@ -10,6 +10,7 @@ from typing import Callable, Iterable, cast
 
 from packaging.utils import canonicalize_name as canonicalize_project_name
 
+from pants.backend.python.goals.lockfile import synthetic_lockfile_target_name
 from pants.backend.python.macros.common_fields import (
     ModuleMappingField,
     TypeStubsModuleMappingField,
@@ -83,7 +84,7 @@ async def _generate_requirements(
     if lockfile:
         lockfile_address = Address(
             os.path.dirname(lockfile),
-            target_name=resolve,
+            target_name=synthetic_lockfile_target_name(resolve),
         )
         target_adaptor = await Get(
             TargetAdaptor,
@@ -93,7 +94,7 @@ async def _generate_requirements(
             ),
         )
         if target_adaptor.type_alias == "_lockfiles":
-            req_deps.append(f"{lockfile}:{resolve}")
+            req_deps.append(f"{lockfile}:{synthetic_lockfile_target_name(resolve)}")
         else:
             logger.warning(
                 softwrap(

@@ -192,6 +192,7 @@ class PythonFilesGeneratorSettingsRequest(TargetFilesGeneratorSettingsRequest):
 # `pex_binary` and `pex_binaries` target
 # -----------------------------------------------------------------------------------------------
 
+
 # See `target_types_rules.py` for a dependency injection rule.
 class PexBinaryDependenciesField(Dependencies):
     supports_transitive_excludes = True
@@ -650,6 +651,21 @@ class PexVenvSitePackagesCopies(BoolField):
     )
 
 
+class PexVenvHermeticScripts(BoolField):
+    alias = "venv_hermetic_scripts"
+    default = True
+    help = help_text(
+        """
+        If execution_mode is "venv", emit a hermetic venv `pex` script and hermetic console scripts.
+
+        The venv `pex` script and the venv console scripts are constructed to be hermetic by
+        default; Python is executed with `-sE` to restrict the `sys.path` to the PEX venv contents
+        only. Setting this field to `False` elides the Python `-sE` restrictions and can be used to
+        interoperate with frameworks that use `PYTHONPATH` manipulation to run code.
+        """
+    )
+
+
 _PEX_BINARY_COMMON_FIELDS = (
     EnvironmentField,
     InterpreterConstraintsField,
@@ -669,6 +685,7 @@ _PEX_BINARY_COMMON_FIELDS = (
     PexIncludeSourcesField,
     PexIncludeToolsField,
     PexVenvSitePackagesCopies,
+    PexVenvHermeticScripts,
     RestartableField,
 )
 

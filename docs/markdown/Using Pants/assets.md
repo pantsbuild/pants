@@ -4,7 +4,6 @@ slug: "assets"
 excerpt: "How to include assets such as images and config files in your project."
 hidden: false
 createdAt: "2020-09-28T23:07:26.956Z"
-updatedAt: "2022-01-29T16:32:14.551Z"
 ---
 There are two ways to include asset files in your project: `resource` and `file` targets.
 
