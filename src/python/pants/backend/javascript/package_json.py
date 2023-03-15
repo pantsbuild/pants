@@ -44,7 +44,7 @@ from pants.engine.target import (
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.option.global_options import UnmatchedBuildFileGlobs
 from pants.util.frozendict import FrozenDict
-from pants.util.strutil import softwrap
+from pants.util.strutil import help_text, softwrap
 
 
 class NodePackageDependenciesField(Dependencies):
@@ -83,7 +83,7 @@ class NodePackageScriptsField(SequenceField[NodeBuildScript]):
     alias = "scripts"
     expected_element_type = NodeBuildScript
 
-    help = softwrap(
+    help = help_text(
         """
         Custom node package manager scripts that should be known
         and ran as part of relevant goals.
@@ -99,7 +99,7 @@ class NodePackageScriptsField(SequenceField[NodeBuildScript]):
 
 class NodePackageVersionField(StringField):
     alias = "version"
-    help = softwrap(
+    help = help_text(
         """
         Version of the Node package, as specified in the package.json.
 
@@ -112,7 +112,7 @@ class NodePackageVersionField(StringField):
 
 class NodeThirdPartyPackageVersionField(NodePackageVersionField):
     alias = "version"
-    help = softwrap(
+    help = help_text(
         """
         Version of the Node package, as specified in the package.json.
 
@@ -125,7 +125,7 @@ class NodeThirdPartyPackageVersionField(NodePackageVersionField):
 
 class NodePackageNameField(StringField):
     alias = "package"
-    help = softwrap(
+    help = help_text(
         """
         Name of the Node package, as specified in the package.json.
 
@@ -178,7 +178,7 @@ class PackageJsonTarget(TargetGenerator):
         PackageJsonSourceField,
         NodePackageScriptsField,
     )
-    help = softwrap(
+    help = help_text(
         f"""
         A package.json file describing a nodejs package. (https://nodejs.org/api/packages.html#introduction)
 
@@ -210,7 +210,7 @@ class NodeBuildScriptOutputFilesField(StringSequenceField):
     alias = "output_files"
     required = False
     default = ()
-    help = softwrap(
+    help = help_text(
         """
         Specify the build script's output files to capture, relative to the package.json.
 
@@ -227,7 +227,7 @@ class NodeBuildScriptOutputDirectoriesField(StringSequenceField):
     alias = "output_directories"
     required = False
     default = ()
-    help = softwrap(
+    help = help_text(
         """
         Specify full directories (including recursive descendants) of output to capture from the
         build script, relative to the package.json.
@@ -245,7 +245,7 @@ class NodeBuildScriptExtraCaches(StringSequenceField):
     alias = "extra_caches"
     required = False
     default = ()
-    help = softwrap(
+    help = help_text(
         """
         Specify directories that pants should treat as caches for the build script.
 
@@ -288,7 +288,7 @@ class NodeBuildScriptTarget(Target):
 
     alias = "_node_build_script"
 
-    help = softwrap(
+    help = help_text(
         """
         A package.json script that is invoked by the configured package manager
         to produce `resource` targets.
