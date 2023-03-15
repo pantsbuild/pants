@@ -14,7 +14,13 @@ This allows you to iterate rapidly when working in the Pants repo: You can edit 
 Running Pants from sources in other repos
 -----------------------------------------
 
-Sometimes you may want to try out your Pants changes on code in some other repo. You can do so with a special `./pants_from_sources` script that you copy into that repo. 
+Sometimes you may want to try out your Pants changes on code in some other repo. If you're using the `pants` launcher binary, you can set the env var `PANTS_SOURCE` to point to your local clone of the pantsbuild/pants repo:
+
+```
+PANTS_SOURCE=../pants pants test ::
+```
+
+Or, if you're using a `./pants` runner script, you can instead use a special `./pants_from_sources` script that you copy into the repo.
 
 This script expects to find a clone of the Pants repo, named `pants`, as a sibling directory of the one you're running in, and it will use the sources in that sibling to run Pants in the other repo, using that repo's config file and so on.
 
