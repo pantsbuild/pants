@@ -3,12 +3,10 @@
 
 from __future__ import annotations
 
-import os
 import stat
-from contextlib import contextmanager
 from pathlib import Path
 from textwrap import dedent
-from typing import Generator, NoReturn
+from typing import NoReturn
 from unittest.mock import Mock
 
 import pytest
@@ -23,9 +21,7 @@ from pants.backend.javascript.subsystems.nodejs import (
 )
 from pants.backend.javascript.target_types import JSSourcesGeneratorTarget
 from pants.backend.python import target_types_rules
-from pants.build_graph.address import Address
 from pants.core.util_rules import config_files, source_files
-from pants.core.util_rules.environments import EnvironmentTarget, LocalEnvironmentTarget
 from pants.core.util_rules.external_tool import (
     DownloadedExternalTool,
     ExternalToolRequest,
@@ -36,7 +32,7 @@ from pants.core.util_rules.search_paths import (
     VersionManagerSearchPathsRequest,
 )
 from pants.core.util_rules.system_binaries import BinaryNotFoundError, BinaryPath
-from pants.engine.env_vars import CompleteEnvironmentVars, EnvironmentVars, EnvironmentVarsRequest
+from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.internals.native_engine import EMPTY_DIGEST
 from pants.engine.platform import Platform
 from pants.engine.process import ProcessResult
@@ -258,58 +254,3 @@ def test_get_nvm_root(env: dict[str, str], expected_directory: str | None) -> No
         mock_gets=[MockGet(EnvironmentVars, (EnvironmentVarsRequest,), mock_environment_vars)],
     )
     assert result == expected_directory
-
-
-@contextmanager
-def fake_nvm_root(
-    fake_versions: list[str], fake_local_version: str
-) -> Generator[tuple[str, tuple[str, ...], tuple[str]], None, None]:
-    with temporary_dir() as nvm_root:
-        fake_version_dirs = tuple(
-            os.path.join(nvm_root, "versions", "node", v, "bin") for v in fake_versions
-        )
-        for d in fake_version_dirs:
-            os.makedirs(d)
-        fake_local_version_dirs = (
-            os.path.join(nvm_root, "versions", "node", fake_local_version, "bin"),
-        )
-        yield nvm_root, fake_version_dirs, fake_local_version_dirs
-
-
-def test_get_local_nvm_paths(rule_runner: RuleRunner) -> None:
-    local_nvm_version = "3.5.5"
-    all_nvm_versions = ["2.7.14", local_nvm_version]
-    rule_runner.write_files({".nvmrc": f"{local_nvm_version}\n"})
-    with fake_nvm_root(all_nvm_versions, local_nvm_version) as (
-        nvm_root,
-        expected_paths,
-        expected_local_paths,
-    ):
-        rule_runner.set_session_values(
-            {CompleteEnvironmentVars: CompleteEnvironmentVars({"NVM_DIR": nvm_root})}
-        )
-        env_name = "name"
-        tgt = EnvironmentTarget(env_name, LocalEnvironmentTarget({}, Address("flem")))
-        paths = rule_runner.request(
-            VersionManagerSearchPaths,
-            [
-                VersionManagerSearchPathsRequest(
-                    tgt, nvm_root, "versions/node", "[nodejs].search_path", (".nvmrc",), None
-                )
-            ],
-        )
-        local_paths = rule_runner.request(
-            VersionManagerSearchPaths,
-            [
-                VersionManagerSearchPathsRequest(
-                    tgt,
-                    nvm_root,
-                    "versions/node",
-                    "[nodejs].search_path",
-                    (".nvmrc",),
-                    "<NVM_LOCAL>",
-                )
-            ],
-        )
-    assert set(expected_paths) == set(paths)
-    assert set(expected_local_paths) == set(local_paths)

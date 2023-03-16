@@ -2,9 +2,14 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
+import os
+from contextlib import contextmanager
+from typing import Generator
+
 import pytest
 
 from pants.build_graph.address import Address
+from pants.core.util_rules import search_paths
 from pants.core.util_rules.asdf import AsdfPathString
 from pants.core.util_rules.environments import (
     DockerEnvironmentTarget,
@@ -13,9 +18,26 @@ from pants.core.util_rules.environments import (
     LocalEnvironmentTarget,
     RemoteEnvironmentTarget,
 )
-from pants.core.util_rules.search_paths import ValidateSearchPathsRequest, validate_search_paths
-from pants.testutil.rule_runner import run_rule_with_mocks
+from pants.core.util_rules.search_paths import (
+    ValidateSearchPathsRequest,
+    VersionManagerSearchPaths,
+    VersionManagerSearchPathsRequest,
+    validate_search_paths,
+)
+from pants.engine.rules import QueryRule
+from pants.testutil.rule_runner import RuleRunner, run_rule_with_mocks
+from pants.util.contextutil import temporary_dir
 from pants.util.ordered_set import FrozenOrderedSet
+
+
+@pytest.fixture
+def rule_runner() -> RuleRunner:
+    return RuleRunner(
+        rules=[
+            *search_paths.rules(),
+            QueryRule(VersionManagerSearchPaths, (VersionManagerSearchPathsRequest,)),
+        ],
+    )
 
 
 @pytest.mark.parametrize(
@@ -115,3 +137,53 @@ def test_validated_search_paths(
                     )
                 ],
             )
+
+
+@contextmanager
+def fake_tool_root(
+    fake_versions: list[str], fake_local_version: str
+) -> Generator[tuple[str, tuple[str, ...], tuple[str]], None, None]:
+    with temporary_dir() as tool_root:
+        fake_version_dirs = tuple(
+            os.path.join(tool_root, "versions", v, "bin") for v in fake_versions
+        )
+        for d in fake_version_dirs:
+            os.makedirs(d)
+        fake_local_version_dirs = (os.path.join(tool_root, "versions", fake_local_version, "bin"),)
+        yield tool_root, fake_version_dirs, fake_local_version_dirs
+
+
+def test_get_local_tool_paths(rule_runner: RuleRunner) -> None:
+    local_version = "3.5.5"
+    all_versions = ["2.7.14", local_version]
+    rule_runner.write_files({".version-file": f"{local_version}\n"})
+    with fake_tool_root(all_versions, local_version) as (
+        tool_root,
+        expected_paths,
+        expected_local_paths,
+    ):
+        env_name = "name"
+        tgt = EnvironmentTarget(env_name, LocalEnvironmentTarget({}, Address("flem")))
+        paths = rule_runner.request(
+            VersionManagerSearchPaths,
+            [
+                VersionManagerSearchPathsRequest(
+                    tgt, tool_root, "versions", "[mock].search_path", (".version-file",), None
+                )
+            ],
+        )
+        local_paths = rule_runner.request(
+            VersionManagerSearchPaths,
+            [
+                VersionManagerSearchPathsRequest(
+                    tgt,
+                    tool_root,
+                    "versions",
+                    "[mock].search_path",
+                    (".version-file",),
+                    "<TOOL_LOCAL>",
+                )
+            ],
+        )
+    assert set(expected_paths) == set(paths)
+    assert set(expected_local_paths) == set(local_paths)

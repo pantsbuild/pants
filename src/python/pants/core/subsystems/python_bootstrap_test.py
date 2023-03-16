@@ -112,50 +112,6 @@ def test_get_pyenv_root(env: dict[str, str], expected: str | None) -> None:
     assert result == expected
 
 
-def test_get_pyenv_paths(rule_runner: RuleRunner) -> None:
-    local_pyenv_version = "3.5.5"
-    all_pyenv_versions = ["2.7.14", local_pyenv_version]
-    rule_runner.write_files({".python-version": f"{local_pyenv_version}\n"})
-    with fake_pyenv_root(all_pyenv_versions, local_pyenv_version) as (
-        pyenv_root,
-        expected_paths,
-        expected_local_paths,
-    ):
-        rule_runner.set_session_values(
-            {CompleteEnvironmentVars: CompleteEnvironmentVars({"PYENV_ROOT": pyenv_root})}
-        )
-        env_name = "name"
-        tgt = EnvironmentTarget(env_name, LocalEnvironmentTarget({}, Address("flem")))
-        paths = rule_runner.request(
-            VersionManagerSearchPaths,
-            [
-                VersionManagerSearchPathsRequest(
-                    tgt,
-                    pyenv_root,
-                    "versions",
-                    "[python-bootstrap].search_path",
-                    (".python-version",),
-                    None,
-                )
-            ],
-        )
-        local_paths = rule_runner.request(
-            VersionManagerSearchPaths,
-            [
-                VersionManagerSearchPathsRequest(
-                    tgt,
-                    pyenv_root,
-                    "versions",
-                    "[python-bootstrap].search_path",
-                    (".python-version",),
-                    "<PYENV_LOCAL>",
-                )
-            ],
-        )
-    assert set(expected_paths) == set(paths)
-    assert set(expected_local_paths) == set(local_paths)
-
-
 def test_expand_interpreter_search_paths(rule_runner: RuleRunner) -> None:
     local_pyenv_version = "3.5.5"
     all_python_versions = ["2.7.14", local_pyenv_version, "3.7.10", "3.9.4", "3.9.5"]
