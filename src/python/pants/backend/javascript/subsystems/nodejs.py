@@ -146,6 +146,7 @@ class NodeJS(Subsystem, TemplatedExternalToolOptionsMixin):
                 * `{AsdfPathString.LOCAL}`, {AsdfPathString.LOCAL.description("binaries")}
                 * `<NVM>`, all NodeJS versions under $NVM_DIR/versions/node
                 * `<NVM_LOCAL>`, the nvm installation with the version in BUILD_ROOT/.nvmrc
+                Note that the version in the .nvmrc file has to be on the form "vX.Y.Z".
                 """
             ),
             advanced=True,
