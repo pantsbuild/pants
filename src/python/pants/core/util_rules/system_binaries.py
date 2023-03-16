@@ -11,7 +11,7 @@ import subprocess
 from dataclasses import dataclass
 from enum import Enum
 from textwrap import dedent  # noqa: PNT20
-from typing import Iterable, Mapping, Sequence
+from typing import Iterable, Mapping, Sequence, Tuple
 
 from pants.core.subsystems import python_bootstrap
 from pants.core.subsystems.python_bootstrap import PythonBootstrap
@@ -24,7 +24,7 @@ from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.platform import Platform
 from pants.engine.process import FallibleProcessResult, Process, ProcessResult
 from pants.engine.rules import collect_rules, rule
-from pants.option.option_types import StrListOption
+from pants.option.option_types import DictOption, StrListOption
 from pants.option.subsystem import Subsystem
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
@@ -51,6 +51,13 @@ class SystemBinariesSubsystem(Subsystem):
             default=[*SEARCH_PATHS_GET_RID_OF_ME],
             advanced=True,
             metavar="<binary-paths>",
+            help="TODO",
+        )
+
+        _search_paths = DictOption[Tuple[str, ...]](
+            "search-paths",
+            default={},
+            advanced=True,
             help="TODO",
         )
 
@@ -553,6 +560,8 @@ async def find_binary(
 
     # TODO: This should support more granular search paths
     def search_path_for_binary(binary_name: str) -> SearchPath:
+        if binary_name in system_binaries._search_paths:
+            return SearchPath(system_binaries._search_paths[binary_name])
         return SearchPath(system_binaries._default_search_path)
 
     # Some subtle notes about executing this script:

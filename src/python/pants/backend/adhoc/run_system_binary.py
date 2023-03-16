@@ -26,6 +26,7 @@ from pants.core.util_rules.system_binaries import (
     BinaryPath,
     BinaryPathRequest,
     BinaryPaths,
+    SystemBinariesSubsystem,
 )
 from pants.engine.internals.native_engine import EMPTY_DIGEST, Digest
 from pants.engine.internals.selectors import Get, MultiGet
@@ -129,7 +130,7 @@ async def _find_binary(
 
 
 @rule(level=LogLevel.DEBUG)
-async def create_system_binary_run_request(field_set: SystemBinaryFieldSet) -> RunRequest:
+async def create_system_binary_run_request(field_set: SystemBinaryFieldSet, system_binaries: SystemBinariesSubsystem.EnvironmentAware) -> RunRequest:
 
     assert field_set.name.value is not None
     extra_search_paths = field_set.extra_search_paths.value or ()
