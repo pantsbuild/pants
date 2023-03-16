@@ -4,6 +4,7 @@ use super::{EntryType, ShrinkBehavior};
 
 use std::collections::{BinaryHeap, HashSet};
 use std::fmt::Debug;
+use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime};
@@ -405,6 +406,7 @@ struct InnerStore {
   directory_lmdb: Result<Arc<ShardedLmdb>, String>,
   file_fsdb: ShardedFSDB,
   executor: task_executor::Executor,
+  filesystem_device: u64,
 }
 
 impl ByteStore {
@@ -424,6 +426,16 @@ impl ByteStore {
     let lmdb_files_root = root.join("files");
     let lmdb_directories_root = root.join("directories");
     let fsdb_files_root = root.join("immutable").join("files");
+
+    let filesystem_device = root
+      .metadata()
+      .map_err(|e| {
+        format!(
+          "Failed to get metadata for store root {}: {e}",
+          root.display()
+        )
+      })?
+      .dev();
 
     Ok(ByteStore {
       inner: Arc::new(InnerStore {
@@ -449,12 +461,17 @@ impl ByteStore {
           lease_time: options.lease_time,
         },
         executor,
+        filesystem_device,
       }),
     })
   }
 
   pub fn executor(&self) -> &task_executor::Executor {
     &self.inner.executor
+  }
+
+  pub fn filesystem_device(&self) -> u64 {
+    self.inner.filesystem_device
   }
 
   pub async fn entry_type(&self, fingerprint: Fingerprint) -> Result<Option<EntryType>, String> {

@@ -42,7 +42,7 @@ use std::fmt::{self, Debug, Display};
 use std::fs::OpenOptions;
 use std::future::Future;
 use std::io::{self, Write};
-use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
+use std::os::unix::fs::{MetadataExt, OpenOptionsExt, PermissionsExt};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Weak};
 use std::time::{Duration, Instant};
@@ -406,6 +406,11 @@ impl Store {
   // This default suffix is also hard-coded into the Python options code in global_options.py
   pub fn default_path() -> PathBuf {
     default_cache_path().join("lmdb_store")
+  }
+
+  /// Return the device ID that the local Store is hosted on.
+  pub fn local_filesystem_device(&self) -> u64 {
+    self.local.filesystem_device()
   }
 
   ///
@@ -1229,6 +1234,35 @@ impl Store {
       mutable_path_ancestors.extend(relpath.ancestors().map(|p| destination.join(p)));
     }
 
+    // Create the root, and determine what filesystem it and the store are on.
+    let materializing_to_same_filesystem = {
+      let store_filesystem_device = self.local_filesystem_device();
+      self
+        .local
+        .executor()
+        .spawn_blocking(
+          {
+            let destination = destination.clone();
+            move || {
+              fs::safe_create_dir_all(&destination)?;
+              let dest_device = destination
+                .metadata()
+                .map_err(|e| {
+                  format!(
+                    "Failed to get metadata for destination {}: {e}",
+                    destination.display()
+                  )
+                })?
+                .dev();
+              Ok(dest_device == store_filesystem_device)
+            }
+          },
+          |e| Err(format!("Directory creation task failed: {e}")),
+        )
+        .await
+        .map_err(|e| format!("Failed to create directory {}: {e}", destination.display()))?
+    };
+
     self
       .materialize_directory_children(
         destination.clone(),
@@ -1252,28 +1286,18 @@ impl Store {
   ) -> BoxFuture<'a, Result<(), StoreError>> {
     let store = self.clone();
     async move {
-      let destination2 = destination.clone();
-      store
-        .local
-        .executor()
-        .spawn_blocking(
-          move || {
-            if is_root {
-              fs::safe_create_dir_all(&destination2)
-            } else {
-              fs::safe_create_dir(&destination2)
-            }
-          },
-          |e| Err(format!("Directory creation task failed: {e}")),
-        )
-        .map_err(|e| {
-          format!(
-            "Failed to create directory {}: {}",
-            destination.display(),
-            e
+      if !is_root {
+        let destination2 = destination.clone();
+        store
+          .local
+          .executor()
+          .spawn_blocking(
+            move || fs::safe_create_dir(&destination2),
+            |e| Err(format!("Directory creation task failed: {e}")),
           )
-        })
-        .await?;
+          .map_err(|e| format!("Failed to create directory {}: {e}", destination.display(),))
+          .await?;
+      }
 
       if let Some(children) = parent_to_child.get(&destination) {
         let mut child_futures = Vec::new();
