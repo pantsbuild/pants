@@ -4,7 +4,11 @@
 import pytest
 
 from pants.backend.javascript.goals import tailor
-from pants.backend.javascript.goals.tailor import PutativeJSTargetsRequest
+from pants.backend.javascript.goals.tailor import (
+    PutativeJSTargetsRequest,
+    PutativePackageJsonTargetsRequest,
+)
+from pants.backend.javascript.package_json import PackageJsonTarget
 from pants.backend.javascript.target_types import JSSourcesGeneratorTarget
 from pants.core.goals.tailor import AllOwnedSources, PutativeTarget, PutativeTargets
 from pants.engine.rules import QueryRule
@@ -17,12 +21,13 @@ def rule_runner() -> RuleRunner:
         rules=[
             *tailor.rules(),
             QueryRule(PutativeTargets, (PutativeJSTargetsRequest, AllOwnedSources)),
+            QueryRule(PutativeTargets, (PutativePackageJsonTargetsRequest, AllOwnedSources)),
         ],
-        target_types=[JSSourcesGeneratorTarget],
+        target_types=[JSSourcesGeneratorTarget, PackageJsonTarget],
     )
 
 
-def test_find_putative_targets(rule_runner: RuleRunner) -> None:
+def test_find_putative_js_targets(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "src/owned/BUILD": "javascript_sources()\n",
@@ -51,4 +56,31 @@ def test_find_putative_targets(rule_runner: RuleRunner) -> None:
             ]
         )
         == putative_targets
+    )
+
+
+def test_find_putative_package_json_targets(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/owned/BUILD": "package_json()\n",
+            "src/owned/package.json": "",
+            "src/unowned/package.json": "",
+        }
+    )
+    putative_targets = rule_runner.request(
+        PutativeTargets,
+        [
+            PutativePackageJsonTargetsRequest(("src/owned", "src/unowned")),
+            AllOwnedSources(["src/owned/package.json"]),
+        ],
+    )
+    assert putative_targets == PutativeTargets(
+        [
+            PutativeTarget.for_target_type(
+                PackageJsonTarget,
+                "src/unowned",
+                "unowned",
+                ["package.json"],
+            ),
+        ]
     )

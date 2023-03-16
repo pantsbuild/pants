@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from typing import Iterable
 
 from pants.backend.javascript.lint.prettier.subsystem import Prettier
-from pants.backend.javascript.subsystems.nodejs import NpxProcess
+from pants.backend.javascript.subsystems.nodejs import NodeJSToolProcess
 from pants.backend.javascript.target_types import JSSourceField
 from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
@@ -59,7 +59,8 @@ async def prettier_fmt(request: PrettierFmtRequest.Batch, prettier: Prettier) ->
 
     result = await Get(
         ProcessResult,
-        NpxProcess(
+        NodeJSToolProcess,
+        NodeJSToolProcess.npx(
             npm_package=prettier.version,
             args=(
                 "--write",

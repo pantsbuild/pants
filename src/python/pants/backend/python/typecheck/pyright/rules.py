@@ -10,7 +10,7 @@ from typing import Iterable
 
 import toml
 
-from pants.backend.javascript.subsystems.nodejs import NpxProcess
+from pants.backend.javascript.subsystems.nodejs import NodeJSToolProcess
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
     InterpreterConstraintsField,
@@ -212,7 +212,8 @@ async def pyright_typecheck_partition(
     complete_pex_env = pex_environment.in_workspace()
     process = await Get(
         Process,
-        NpxProcess(
+        NodeJSToolProcess,
+        NodeJSToolProcess.npx(
             npm_package=pyright.version,
             args=(
                 f"--venv-path={complete_pex_env.pex_root}",  # Used with `venv` in config
