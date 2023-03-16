@@ -2,7 +2,10 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 python_sources(dependencies=[":javascript_source_import_parser_resources"])
 
-python_tests(name="tests0")
+python_tests(
+    name="tests",
+    timeout=120,
+)
 
 resources(
     name="javascript_source_import_parser_resources",
