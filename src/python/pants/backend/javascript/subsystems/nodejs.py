@@ -329,7 +329,9 @@ async def nodejs_bootstrap(nodejs_env_aware: NodeJS.EnvironmentAware) -> NodeJsB
             option_origin=f"[{NodeJS.options_scope}].search_path",
             environment_key="nodejs_search_path",
             is_default=nodejs_env_aware._is_default("search_path"),
-            local_only=FrozenOrderedSet((AsdfPathString.STANDARD, AsdfPathString.LOCAL)),
+            local_only=FrozenOrderedSet(
+                (AsdfPathString.STANDARD, AsdfPathString.LOCAL, "<NVM>", "<NVM_LOCAL>")
+            ),
         ),
     )
 
