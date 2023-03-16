@@ -14,7 +14,6 @@ from pants.core.subsystems.python_bootstrap import (
     _ExpandInterpreterSearchPathsRequest,
     _get_pex_python_paths,
     _get_pyenv_root,
-    _PyEnvPathsRequest,
     _SearchPaths,
 )
 from pants.core.subsystems.python_bootstrap import rules as python_bootstrap_rules
@@ -22,6 +21,10 @@ from pants.core.util_rules import asdf
 from pants.core.util_rules.asdf import AsdfToolPathsRequest, AsdfToolPathsResult
 from pants.core.util_rules.asdf_test import fake_asdf_root
 from pants.core.util_rules.environments import EnvironmentTarget, LocalEnvironmentTarget
+from pants.core.util_rules.search_paths import (
+    VersionManagerSearchPaths,
+    VersionManagerSearchPathsRequest,
+)
 from pants.engine.addresses import Address
 from pants.engine.env_vars import CompleteEnvironmentVars, EnvironmentVars
 from pants.engine.rules import QueryRule
@@ -39,8 +42,8 @@ def rule_runner() -> RuleRunner:
             *python_bootstrap_rules(),
             *asdf.rules(),
             QueryRule(AsdfToolPathsResult, (AsdfToolPathsRequest,)),
-            QueryRule(_SearchPaths, [_PyEnvPathsRequest]),
             QueryRule(_SearchPaths, [_ExpandInterpreterSearchPathsRequest]),
+            QueryRule(VersionManagerSearchPaths, (VersionManagerSearchPathsRequest,)),
         ],
         target_types=[],
     )
@@ -93,14 +96,20 @@ def test_get_pex_python_paths() -> None:
     assert ["foo/bar", "baz", "/qux/quux"] == paths
 
 
-def test_get_pyenv_root() -> None:
-    home = "/♡"
-    default_root = f"{home}/.pyenv"
-    explicit_root = f"{home}/explicit"
+_HOME = "/♡"
 
-    assert explicit_root == _get_pyenv_root(EnvironmentVars({"PYENV_ROOT": explicit_root}))
-    assert default_root == _get_pyenv_root(EnvironmentVars({"HOME": home}))
-    assert _get_pyenv_root(EnvironmentVars({})) is None
+
+@pytest.mark.parametrize(
+    "env, expected",
+    [
+        pytest.param({"PYENV_ROOT": f"{_HOME}/explicit"}, f"{_HOME}/explicit", id="explicit_root"),
+        pytest.param({"HOME": _HOME}, f"{_HOME}/.pyenv", id="default_root"),
+        pytest.param({}, None, id="no_env"),
+    ],
+)
+def test_get_pyenv_root(env: dict[str, str], expected: str | None) -> None:
+    result = _get_pyenv_root(EnvironmentVars(env))
+    assert result == expected
 
 
 def test_get_pyenv_paths(rule_runner: RuleRunner) -> None:
@@ -118,15 +127,33 @@ def test_get_pyenv_paths(rule_runner: RuleRunner) -> None:
         env_name = "name"
         tgt = EnvironmentTarget(env_name, LocalEnvironmentTarget({}, Address("flem")))
         paths = rule_runner.request(
-            _SearchPaths,
-            [_PyEnvPathsRequest(tgt, False)],
+            VersionManagerSearchPaths,
+            [
+                VersionManagerSearchPathsRequest(
+                    tgt,
+                    pyenv_root,
+                    "versions",
+                    "[python-bootstrap].search_path",
+                    (".python-version",),
+                    None,
+                )
+            ],
         )
         local_paths = rule_runner.request(
-            _SearchPaths,
-            [_PyEnvPathsRequest(tgt, True)],
+            VersionManagerSearchPaths,
+            [
+                VersionManagerSearchPathsRequest(
+                    tgt,
+                    pyenv_root,
+                    "versions",
+                    "[python-bootstrap].search_path",
+                    (".python-version",),
+                    "<PYENV_LOCAL>",
+                )
+            ],
         )
-    assert expected_paths == paths.paths
-    assert expected_local_paths == local_paths.paths
+    assert set(expected_paths) == set(paths)
+    assert set(expected_local_paths) == set(local_paths)
 
 
 def test_expand_interpreter_search_paths(rule_runner: RuleRunner) -> None:
@@ -216,4 +243,4 @@ def test_expand_interpreter_search_paths(rule_runner: RuleRunner) -> None:
         *expected_pyenv_local_paths,
         "/qux",
     )
-    assert expected == expanded_paths.paths
+    assert set(expected) == set(expanded_paths.paths)

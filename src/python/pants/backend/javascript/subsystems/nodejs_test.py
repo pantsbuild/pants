@@ -19,8 +19,6 @@ from pants.backend.javascript.subsystems.nodejs import (
     NodejsBinaries,
     _BinaryPathsPerVersion,
     _get_nvm_root,
-    _NvmPathsRequest,
-    _NvmSearchPaths,
     determine_nodejs_binaries,
 )
 from pants.backend.javascript.target_types import JSSourcesGeneratorTarget
@@ -32,6 +30,10 @@ from pants.core.util_rules.external_tool import (
     DownloadedExternalTool,
     ExternalToolRequest,
     ExternalToolVersion,
+)
+from pants.core.util_rules.search_paths import (
+    VersionManagerSearchPaths,
+    VersionManagerSearchPathsRequest,
 )
 from pants.core.util_rules.system_binaries import BinaryNotFoundError, BinaryPath
 from pants.engine.env_vars import CompleteEnvironmentVars, EnvironmentVars, EnvironmentVarsRequest
@@ -52,7 +54,7 @@ def rule_runner() -> RuleRunner:
             *target_types_rules.rules(),
             QueryRule(ProcessResult, [nodejs.NodeJSToolProcess]),
             QueryRule(NodejsBinaries, ()),
-            QueryRule(_NvmSearchPaths, (_NvmPathsRequest,)),
+            QueryRule(VersionManagerSearchPaths, (VersionManagerSearchPathsRequest,)),
         ],
         target_types=[JSSourcesGeneratorTarget],
     )
@@ -289,12 +291,25 @@ def test_get_local_nvm_paths(rule_runner: RuleRunner) -> None:
         env_name = "name"
         tgt = EnvironmentTarget(env_name, LocalEnvironmentTarget({}, Address("flem")))
         paths = rule_runner.request(
-            _NvmSearchPaths,
-            [_NvmPathsRequest(tgt, False)],
+            VersionManagerSearchPaths,
+            [
+                VersionManagerSearchPathsRequest(
+                    tgt, nvm_root, "versions/node", "[nodejs].search_path", (".nvmrc",), None
+                )
+            ],
         )
         local_paths = rule_runner.request(
-            _NvmSearchPaths,
-            [_NvmPathsRequest(tgt, True)],
+            VersionManagerSearchPaths,
+            [
+                VersionManagerSearchPathsRequest(
+                    tgt,
+                    nvm_root,
+                    "versions/node",
+                    "[nodejs].search_path",
+                    (".nvmrc",),
+                    "<NVM_LOCAL>",
+                )
+            ],
         )
     assert set(expected_paths) == set(paths)
     assert set(expected_local_paths) == set(local_paths)

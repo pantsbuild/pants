@@ -8,15 +8,13 @@ import logging
 import os.path
 from dataclasses import dataclass, field
 from itertools import groupby
-from pathlib import Path
 from typing import ClassVar, Collection, Iterable, Mapping
 
 from nodesemver import min_satisfying
 
-from pants.base.build_environment import get_buildroot
 from pants.core.util_rules import asdf, search_paths, system_binaries
 from pants.core.util_rules.asdf import AsdfPathString, AsdfToolPathsResult
-from pants.core.util_rules.environments import EnvironmentTarget, LocalEnvironmentTarget
+from pants.core.util_rules.environments import EnvironmentTarget
 from pants.core.util_rules.external_tool import (
     DownloadedExternalTool,
     ExternalToolRequest,
@@ -24,7 +22,12 @@ from pants.core.util_rules.external_tool import (
     TemplatedExternalToolOptionsMixin,
 )
 from pants.core.util_rules.external_tool import rules as external_tool_rules
-from pants.core.util_rules.search_paths import ValidatedSearchPaths, ValidateSearchPathsRequest
+from pants.core.util_rules.search_paths import (
+    ValidatedSearchPaths,
+    ValidateSearchPathsRequest,
+    VersionManagerSearchPaths,
+    VersionManagerSearchPathsRequest,
+)
 from pants.core.util_rules.system_binaries import (
     BinaryNotFoundError,
     BinaryPath,
@@ -32,14 +35,13 @@ from pants.core.util_rules.system_binaries import (
     BinaryPaths,
     BinaryPathTest,
 )
-from pants.engine.collection import DeduplicatedCollection
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest, PathEnvironmentVariable
 from pants.engine.fs import EMPTY_DIGEST, Digest, DownloadFile
 from pants.engine.internals.native_engine import FileDigest
 from pants.engine.internals.selectors import MultiGet
 from pants.engine.platform import Platform
 from pants.engine.process import Process
-from pants.engine.rules import Get, Rule, _uncacheable_rule, collect_rules, rule
+from pants.engine.rules import Get, Rule, collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.option.option_types import DictOption, StrListOption
 from pants.option.subsystem import Subsystem
@@ -256,12 +258,6 @@ class NodeJsBootstrap:
     nodejs_search_paths: tuple[str, ...]
 
 
-@dataclass(frozen=True)
-class _NvmPathsRequest:
-    env_tgt: EnvironmentTarget
-    local: bool
-
-
 async def _get_nvm_root() -> str | None:
     """See https://github.com/nvm-sh/nvm#installing-and-updating."""
 
@@ -275,52 +271,6 @@ async def _get_nvm_root() -> str | None:
     return None
 
 
-class _NvmSearchPaths(DeduplicatedCollection[str]):
-    pass
-
-
-@_uncacheable_rule
-async def _get_nvm_paths(request: _NvmPathsRequest) -> _NvmSearchPaths:
-    if not (request.env_tgt.val is None or isinstance(request.env_tgt.val, LocalEnvironmentTarget)):
-        return _NvmSearchPaths()
-
-    nvm_local = request.local
-    nvm_dir = await _get_nvm_root()
-    if not nvm_dir:
-        return _NvmSearchPaths()
-    nvm_path = Path(nvm_dir)
-    if not nvm_path.exists():
-        return _NvmSearchPaths()
-
-    node_versions_path = nvm_path / "versions" / "node"
-    if not node_versions_path.is_dir():
-        return _NvmSearchPaths()
-
-    if nvm_local:
-        local_version_file = Path(get_buildroot(), ".nvmrc")
-        if not local_version_file.exists():
-            _logger.warning(
-                softwrap(
-                    f"""
-                    No `.nvmrc` file found in the build root,
-                    but <NVM_LOCAL> was set in `[{NodeJS.options_scope}].search_path`.
-                    """
-                )
-            )
-            return _NvmSearchPaths()
-
-        local_version = local_version_file.read_text().strip()
-        path = Path(node_versions_path, local_version, "bin")
-        if path.is_dir():
-            return _NvmSearchPaths([str(path)])
-        return _NvmSearchPaths()
-
-    versions_in_dir = (
-        node_versions_path / version / "bin" for version in sorted(node_versions_path.iterdir())
-    )
-    return _NvmSearchPaths(str(version) for version in versions_in_dir if version.is_dir())
-
-
 async def _nodejs_search_paths(
     env_tgt: EnvironmentTarget, paths: Collection[str]
 ) -> tuple[str, ...]:
@@ -329,7 +279,7 @@ async def _nodejs_search_paths(
         env_tgt=env_tgt,
         tool_name="nodejs",
         tool_description="Node.js distribution",
-        paths_option_name="[nodejs].search_path",
+        paths_option_name=f"[{NodeJS.options_scope}].search_path",
     )
     asdf_standard_tool_paths = asdf_result.standard_tool_paths
     asdf_local_tool_paths = asdf_result.local_tool_paths
@@ -337,10 +287,20 @@ async def _nodejs_search_paths(
         AsdfPathString.STANDARD: asdf_standard_tool_paths,
         AsdfPathString.LOCAL: asdf_local_tool_paths,
     }
-
+    nvm_dir = await _get_nvm_root()
     expanded: list[str] = []
     nvm_path_results = await MultiGet(
-        Get(_NvmSearchPaths, _NvmPathsRequest(env_tgt, s == "<NVM_LOCAL>"))
+        Get(
+            VersionManagerSearchPaths,
+            VersionManagerSearchPathsRequest(
+                env_tgt,
+                nvm_dir,
+                "versions/node",
+                f"[{NodeJS.options_scope}].search_path",
+                (".nvmrc",),
+                s if s == "<NVM_LOCAL>" else None,
+            ),
+        )
         for s in paths
         if s == "<NVM>" or s == "<NVM_LOCAL>"
     )
