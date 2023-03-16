@@ -8,7 +8,7 @@ import logging
 import os.path
 from dataclasses import dataclass, field
 from itertools import groupby
-from typing import ClassVar, Collection, Iterable, Mapping
+from typing import ClassVar, Collection, Iterable, Mapping, Sequence
 
 from nodesemver import min_satisfying
 
@@ -337,7 +337,7 @@ async def nodejs_bootstrap(nodejs_env_aware: NodeJS.EnvironmentAware) -> NodeJsB
     return NodeJsBootstrap(nodejs_search_paths=expanded_paths)
 
 
-class _BinaryPathsPerVersion(FrozenDict[str, tuple[BinaryPath, ...]]):
+class _BinaryPathsPerVersion(FrozenDict[str, Sequence[BinaryPath]]):
     pass
 
 
