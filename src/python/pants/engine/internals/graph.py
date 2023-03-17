@@ -10,7 +10,7 @@ import logging
 import os.path
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Iterable, Iterator, NamedTuple, Sequence, Type, cast
+from typing import Any, Iterable, Iterator, NamedTuple, Sequence, Type, cast
 
 from pants.base.deprecated import warn_or_error
 from pants.base.specs import AncestorGlobSpec, RawSpecsWithoutFileOwners, RecursiveGlobSpec
@@ -188,98 +188,48 @@ async def _determine_target_adaptor_and_type(
     return target_adaptor, target_type
 
 
+@dataclass(frozen=True)
+class _Overrides:
+    overrides: dict[str, dict[str, Any]]
+
+
+@dataclass(frozen=True)
+class _TargetGeneratorOverridesRequest:
+    target_generator: TargetGenerator
+
+
 @rule
 async def resolve_target_parametrizations(
     request: _TargetParametrizationsRequest,
     registered_target_types: RegisteredTargetTypes,
     union_membership: UnionMembership,
     target_types_to_generate_requests: TargetTypesToGenerateTargetsRequests,
-    unmatched_build_file_globs: UnmatchedBuildFileGlobs,
 ) -> _TargetParametrizations:
     address = request.address
     target_adaptor, target_type = await _determine_target_adaptor_and_type(
         address, registered_target_types, description_of_origin=request.description_of_origin
     )
 
-    target = None
     parametrizations: list[_TargetParametrization] = []
     generate_request: type[GenerateTargetsRequest] | None = None
     if issubclass(target_type, TargetGenerator):
         generate_request = target_types_to_generate_requests.request_for(target_type)
-    if generate_request:
-        # Split out the `propagated_fields` before construction.
+    if generate_request and issubclass(target_type, TargetGenerator):
         generator_fields = dict(target_adaptor.kwargs)
-        template_fields = {}
-        if issubclass(target_type, TargetGenerator):
-            copied_fields = (
-                *target_type.copied_fields,
-                *target_type._find_plugin_fields(union_membership),
-            )
-            for field_type in copied_fields:
-                field_value = generator_fields.get(field_type.alias, None)
-                if field_value is not None:
-                    template_fields[field_type.alias] = field_value
-            for field_type in target_type.moved_fields:
-                field_value = generator_fields.pop(field_type.alias, None)
-                if field_value is not None:
-                    template_fields[field_type.alias] = field_value
-
-        field_type_aliases = target_type._get_field_aliases_to_field_types(
-            target_type.class_field_types(union_membership)
-        ).keys()
-        generator_fields_parametrized = {
-            name
-            for name, field in generator_fields.items()
-            if isinstance(field, Parametrize) and name in field_type_aliases
-        }
-        if generator_fields_parametrized:
-            noun = pluralize(len(generator_fields_parametrized), "field", include_count=False)
-            generator_fields_parametrized_text = ", ".join(
-                repr(f) for f in generator_fields_parametrized
-            )
-            raise InvalidFieldException(
-                f"Only fields which will be moved to generated targets may be parametrized, "
-                f"so target generator {address} (with type {target_type.alias}) cannot "
-                f"parametrize the {generator_fields_parametrized_text} {noun}."
-            )
-
+        generators = _parametrized_target_generators_with_templates(
+            address,
+            target_adaptor,
+            target_type,
+            generator_fields,
+            union_membership,
+        )
         base_generator = target_type(
             generator_fields,
             address,
             name_explicitly_set=target_adaptor.name_explicitly_set,
             union_membership=union_membership,
         )
-
-        overrides = {}
-        if base_generator.has_field(OverridesField):
-            overrides_field = base_generator[OverridesField]
-            overrides_flattened = overrides_field.flatten()
-            if issubclass(target_type, TargetFilesGenerator):
-                override_globs = OverridesField.to_path_globs(
-                    address, overrides_flattened, unmatched_build_file_globs
-                )
-                override_paths = await MultiGet(
-                    Get(Paths, PathGlobs, path_globs) for path_globs in override_globs
-                )
-                overrides = OverridesField.flatten_paths(
-                    address,
-                    zip(override_paths, override_globs, overrides_flattened.values()),
-                )
-            else:
-                overrides = overrides_field.flatten()
-
-        generators = [
-            (
-                target_type(
-                    generator_fields,
-                    address,
-                    name_explicitly_set=target_adaptor.name is not None,
-                    union_membership=union_membership,
-                ),
-                template,
-            )
-            for address, template in Parametrize.expand(address, template_fields)
-        ]
+        overrides = await Get(_Overrides, _TargetGeneratorOverridesRequest(base_generator))
         all_generated = await MultiGet(
             Get(
                 GeneratedTargets,
@@ -290,7 +240,7 @@ async def resolve_target_parametrizations(
                     template=template,
                     overrides={
                         name: dict(Parametrize.expand(generator.address, override))
-                        for name, override in overrides.items()
+                        for name, override in overrides.overrides.items()
                     },
                 ),
             )
@@ -301,41 +251,129 @@ async def resolve_target_parametrizations(
             for generated_batch, (generator, _) in zip(all_generated, generators)
         )
     else:
-        first, *rest = Parametrize.expand(address, target_adaptor.kwargs)
-        if rest:
-            # The target was parametrized, and so the original Target does not exist.
-            generated = FrozenDict(
-                (
-                    parameterized_address,
-                    target_type(
-                        parameterized_fields,
-                        parameterized_address,
-                        name_explicitly_set=target_adaptor.name_explicitly_set,
-                        union_membership=union_membership,
-                    ),
-                )
-                for parameterized_address, parameterized_fields in (first, *rest)
-            )
-            parametrizations.append(_TargetParametrization(None, generated))
-        else:
-            # The target was not parametrized.
-            target = target_type(
-                target_adaptor.kwargs,
-                address,
-                name_explicitly_set=target_adaptor.name_explicitly_set,
-                union_membership=union_membership,
-            )
-            parametrizations.append(_TargetParametrization(target, FrozenDict()))
-
-    # TODO: Move to Target constructor.
-    for field_type in target.field_types if target else ():
-        if (
-            field_type.deprecated_alias is not None
-            and field_type.deprecated_alias in target_adaptor.kwargs
-        ):
-            warn_deprecated_field_type(field_type)
+        parametrizations.append(
+            _target_parametrizations(address, target_adaptor, target_type, union_membership)
+        )
 
     return _TargetParametrizations(parametrizations)
+
+
+def _target_parametrizations(
+    address: Address,
+    target_adaptor: TargetAdaptor,
+    target_type: type[Target],
+    union_membership: UnionMembership,
+) -> _TargetParametrization:
+    first, *rest = Parametrize.expand(address, target_adaptor.kwargs)
+    if rest:
+        # The target was parametrized, and so the original Target does not exist.
+        generated = FrozenDict(
+            (
+                parameterized_address,
+                target_type(
+                    parameterized_fields,
+                    parameterized_address,
+                    name_explicitly_set=target_adaptor.name_explicitly_set,
+                    union_membership=union_membership,
+                ),
+            )
+            for parameterized_address, parameterized_fields in (first, *rest)
+        )
+        return _TargetParametrization(None, generated)
+    else:
+        # The target was not parametrized.
+        target = target_type(
+            target_adaptor.kwargs,
+            address,
+            name_explicitly_set=target_adaptor.name_explicitly_set,
+            union_membership=union_membership,
+        )
+        for field_type in target.field_types:
+            if (
+                field_type.deprecated_alias is not None
+                and field_type.deprecated_alias in target_adaptor.kwargs
+            ):
+                warn_deprecated_field_type(field_type)
+        return _TargetParametrization(target, FrozenDict())
+
+
+@rule
+async def _target_generator_overrides(
+    req: _TargetGeneratorOverridesRequest, unmatched_build_file_globs: UnmatchedBuildFileGlobs
+) -> _Overrides:
+    target_generator = req.target_generator
+    address = target_generator.address
+    if target_generator.has_field(OverridesField):
+        overrides_field = target_generator[OverridesField]
+        overrides_flattened = overrides_field.flatten()
+        if isinstance(target_generator, TargetFilesGenerator):
+            override_globs = OverridesField.to_path_globs(
+                address, overrides_flattened, unmatched_build_file_globs
+            )
+            override_paths = await MultiGet(
+                Get(Paths, PathGlobs, path_globs) for path_globs in override_globs
+            )
+            return _Overrides(
+                OverridesField.flatten_paths(
+                    address, zip(override_paths, override_globs, overrides_flattened.values())
+                )
+            )
+        else:
+            return _Overrides(overrides_field.flatten())
+    return _Overrides({})
+
+
+def _parametrized_target_generators_with_templates(
+    address: Address,
+    target_adaptor: TargetAdaptor,
+    target_type: type[TargetGenerator],
+    generator_fields: dict[str, Any],
+    union_membership: UnionMembership,
+) -> list[tuple[TargetGenerator, dict[str, Any]]]:
+    # Split out the `propagated_fields` before construction.
+    template_fields = {}
+    copied_fields = (
+        *target_type.copied_fields,
+        *target_type._find_plugin_fields(union_membership),
+    )
+    for field_type in copied_fields:
+        field_value = generator_fields.get(field_type.alias, None)
+        if field_value is not None:
+            template_fields[field_type.alias] = field_value
+    for field_type in target_type.moved_fields:
+        field_value = generator_fields.pop(field_type.alias, None)
+        if field_value is not None:
+            template_fields[field_type.alias] = field_value
+    field_type_aliases = target_type._get_field_aliases_to_field_types(
+        target_type.class_field_types(union_membership)
+    ).keys()
+    generator_fields_parametrized = {
+        name
+        for name, field in generator_fields.items()
+        if isinstance(field, Parametrize) and name in field_type_aliases
+    }
+    if generator_fields_parametrized:
+        noun = pluralize(len(generator_fields_parametrized), "field", include_count=False)
+        generator_fields_parametrized_text = ", ".join(
+            repr(f) for f in generator_fields_parametrized
+        )
+        raise InvalidFieldException(
+            f"Only fields which will be moved to generated targets may be parametrized, "
+            f"so target generator {address} (with type {target_type.alias}) cannot "
+            f"parametrize the {generator_fields_parametrized_text} {noun}."
+        )
+    return [
+        (
+            target_type(
+                generator_fields,
+                address,
+                name_explicitly_set=target_adaptor.name is not None,
+                union_membership=union_membership,
+            ),
+            template,
+        )
+        for address, template in Parametrize.expand(address, template_fields)
+    ]
 
 
 @rule(_masked_types=[EnvironmentName])
