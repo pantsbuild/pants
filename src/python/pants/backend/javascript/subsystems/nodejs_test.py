@@ -4,10 +4,11 @@
 from __future__ import annotations
 
 import stat
+from asyncio import Future
 from pathlib import Path
 from textwrap import dedent
 from typing import NoReturn
-from unittest.mock import Mock
+from unittest.mock import MagicMock, Mock
 
 import pytest
 
@@ -89,6 +90,15 @@ def given_known_version(version: str) -> str:
     return f"{version}|linux_x86_64|1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd|333333"
 
 
+@pytest.fixture
+def mock_nodejs_subsystem() -> Mock:
+    nodejs_subsystem = Mock(spec=NodeJS)
+    future: Future[DownloadedExternalTool] = Future()
+    future.set_result(DownloadedExternalTool(EMPTY_DIGEST, ""))
+    nodejs_subsystem.download_known_version = MagicMock(return_value=future)
+    return nodejs_subsystem
+
+
 _SEMVER_1_1_0 = given_known_version("1.1.0")
 _SEMVER_2_1_0 = given_known_version("2.1.0")
 _SEMVER_2_2_0 = given_known_version("2.2.0")
@@ -111,8 +121,10 @@ _SEMVER_3_0_0 = given_known_version("3.0.0")
         pytest.param(">2.1 || <2.1", _SEMVER_1_1_0, id="or_range"),
     ],
 )
-def test_node_version_from_semver_download(semver_range: str, expected: str) -> None:
-    nodejs_subsystem = Mock(spec_set=NodeJS)
+def test_node_version_from_semver_download(
+    mock_nodejs_subsystem: Mock, semver_range: str, expected: str
+) -> None:
+    nodejs_subsystem = mock_nodejs_subsystem
     nodejs_subsystem.version = semver_range
     nodejs_subsystem.known_versions = [
         _SEMVER_1_1_0,
@@ -153,8 +165,10 @@ def test_node_version_from_semver_download(semver_range: str, expected: str) -> 
         pytest.param(">2.1 || <2.1", "1/1/0", id="or_range"),
     ],
 )
-def test_node_version_from_semver_bootstrap(semver_range: str, expected_path: str) -> None:
-    nodejs_subsystem = Mock(spec_set=NodeJS)
+def test_node_version_from_semver_bootstrap(
+    mock_nodejs_subsystem: Mock, semver_range: str, expected_path: str
+) -> None:
+    nodejs_subsystem = mock_nodejs_subsystem
     nodejs_subsystem.version = semver_range
     discoverable_versions = _BinaryPathsPerVersion(
         {
@@ -180,8 +194,8 @@ def test_node_version_from_semver_bootstrap(semver_range: str, expected_path: st
     assert result.binary_dir == expected_path
 
 
-def test_finding_no_node_version_is_an_error() -> None:
-    nodejs_subsystem = Mock(spec_set=NodeJS)
+def test_finding_no_node_version_is_an_error(mock_nodejs_subsystem: Mock) -> None:
+    nodejs_subsystem = mock_nodejs_subsystem
     nodejs_subsystem.version = "*"
     nodejs_subsystem.known_versions = []
     discoverable_versions = _BinaryPathsPerVersion()
