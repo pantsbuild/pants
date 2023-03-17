@@ -1,8 +1,6 @@
 [GLOBAL]
 print_stacktrace = true
 
-# Temp change to force wheel build
-
 # Enable our custom loose-source plugins.
 pythonpath = ["%(buildroot)s/pants-plugins"]
 backend_packages.add = [
