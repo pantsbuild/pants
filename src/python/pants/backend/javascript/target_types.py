@@ -56,3 +56,43 @@ class JSSourcesGeneratorTarget(TargetFilesGenerator):
     moved_fields = (JSDependenciesField,)
     help = "Generate a `javascript_source` target for each file in the `sources` field."
 
+
+class JSTestDependenciesField(Dependencies):
+    pass
+
+
+class JSTestSourceField(SingleSourceField):
+    expected_file_extensions = JS_FILE_EXTENSIONS
+
+
+class JSTestGeneratorSourcesField(MultipleSourcesField):
+    expected_file_extensions = JS_FILE_EXTENSIONS
+
+
+class JSTestSourceTarget(Target):
+    alias = "javascript_test"
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        JSTestDependenciesField,
+        JSTestSourceField,
+    )
+    help = "A single Javascript test file."
+
+
+class JSTestSourcesGeneratorSourcesField(JSGeneratorSourcesField):
+    default = tuple(f"*.test{ext}" for ext in JS_FILE_EXTENSIONS)
+    help = generate_multiple_sources_field_help_message(
+        "Example: `sources=['utils.test.js', 'subdir/*.test.mjs', '!ignore_me.test.js']`"
+    )
+
+
+class JSTestSourcesGeneratorTarget(TargetFilesGenerator):
+    alias = "javascript_tests"
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        JSTestSourcesGeneratorSourcesField,
+    )
+    generated_target_cls = JSTestSourceTarget
+    copied_fields = COMMON_TARGET_FIELDS
+    moved_fields = (JSTestDependenciesField,)
+    help = "Generate a `javascript_test` target for each file in the `sources` field."
