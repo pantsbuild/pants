@@ -219,7 +219,6 @@ class ResolvedTargetGeneratorRequests:
 
 @dataclass(frozen=True)
 class ResolveTargetGeneratorRequests:
-    target_type: type[TargetGenerator]
     address: Address
     description_of_origin: str = dataclasses.field(hash=False, compare=False)
 
@@ -234,15 +233,15 @@ async def resolve_generator_target_requests(
         _AdaptorAndType, _RequestAdaptorAndType(req.address, req.description_of_origin)
     )
     target_adaptor = adaptor_and_type.adaptor
-    target_type = req.target_type
-    generate_request = target_types_to_generate_requests.request_for(req.target_type)
+    target_type = adaptor_and_type.target_type
+    generate_request = target_types_to_generate_requests.request_for(target_type)
     if not generate_request:
         return ResolvedTargetGeneratorRequests()
     generator_fields = dict(target_adaptor.kwargs)
     generators = _parametrized_target_generators_with_templates(
         req.address,
         target_adaptor,
-        req.target_type,
+        target_type,
         generator_fields,
         union_membership,
     )
@@ -285,7 +284,7 @@ async def resolve_target_parametrizations(
     if issubclass(target_type, TargetGenerator):
         requests = await Get(
             ResolvedTargetGeneratorRequests,
-            ResolveTargetGeneratorRequests(target_type, address, request.description_of_origin),
+            ResolveTargetGeneratorRequests(address, request.description_of_origin),
         )
     if requests and requests.requests:
         all_generated = await MultiGet(
@@ -471,14 +470,17 @@ class WrappedTargetForBootstrap:
 @rule
 async def resolve_target_for_bootstrapping(
     request: WrappedTargetRequest,
-    registered_target_types: RegisteredTargetTypes,
     union_membership: UnionMembership,
 ) -> WrappedTargetForBootstrap:
-    target_adaptor, target_type = await _determine_target_adaptor_and_type(
-        request.address,
-        registered_target_types,
-        description_of_origin=request.description_of_origin,
+    adaptor_and_type = await Get(
+        _AdaptorAndType,
+        _RequestAdaptorAndType(
+            request.address,
+            description_of_origin=request.description_of_origin,
+        ),
     )
+    target_adaptor = adaptor_and_type.adaptor
+    target_type = adaptor_and_type.target_type
     target = target_type(
         target_adaptor.kwargs,
         request.address,
