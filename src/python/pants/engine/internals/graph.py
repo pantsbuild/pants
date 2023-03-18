@@ -27,6 +27,7 @@ from pants.engine.collection import Collection
 from pants.engine.environment import ChosenLocalEnvironmentName, EnvironmentName
 from pants.engine.fs import EMPTY_SNAPSHOT, GlobMatchErrorBehavior, PathGlobs, Paths, Snapshot
 from pants.engine.internals import native_engine
+from pants.engine.internals.mapper import AddressFamilies
 from pants.engine.internals.native_engine import AddressParseException
 from pants.engine.internals.parametrize import Parametrize, _TargetParametrization
 from pants.engine.internals.parametrize import (  # noqa: F401
@@ -223,6 +224,37 @@ class ResolveTargetGeneratorRequests:
     description_of_origin: str = dataclasses.field(hash=False, compare=False)
 
 
+@dataclass(frozen=True)
+class ResolveAllTargetGeneratorRequests:
+    description_of_origin: str = dataclasses.field(hash=False, compare=False)
+    of_type: type[TargetGenerator] | None = None
+
+
+@rule
+async def resolve_all_generator_target_requests(
+    req: ResolveAllTargetGeneratorRequests,
+) -> ResolvedTargetGeneratorRequests:
+    address_families = await Get(
+        AddressFamilies,
+        RawSpecsWithoutFileOwners(
+            recursive_globs=(RecursiveGlobSpec(""),),
+            description_of_origin="the `ResolveAllTargetGeneratorRequests` rule",
+        ),
+    )
+    results = await MultiGet(
+        Get(
+            ResolvedTargetGeneratorRequests,
+            ResolveTargetGeneratorRequests(address, req.description_of_origin),
+        )
+        for family in address_families
+        for address, target_adaptor in family.addresses_to_target_adaptors.items()
+        if not req.of_type or target_adaptor.type_alias == req.of_type.alias
+    )
+    return ResolvedTargetGeneratorRequests(
+        tuple(itertools.chain.from_iterable(result.requests for result in results))
+    )
+
+
 @rule
 async def resolve_generator_target_requests(
     req: ResolveTargetGeneratorRequests,
@@ -234,6 +266,9 @@ async def resolve_generator_target_requests(
     )
     target_adaptor = adaptor_and_type.adaptor
     target_type = adaptor_and_type.target_type
+    if not issubclass(target_type, TargetGenerator):
+        return ResolvedTargetGeneratorRequests()
+
     generate_request = target_types_to_generate_requests.request_for(target_type)
     if not generate_request:
         return ResolvedTargetGeneratorRequests()
