@@ -28,11 +28,6 @@ class JSGeneratorSourcesField(MultipleSourcesField):
     expected_file_extensions = JS_FILE_EXTENSIONS
 
 
-# -----------------------------------------------------------------------------------------------
-# `js_source` and `js_sources` targets
-# -----------------------------------------------------------------------------------------------
-
-
 class JSSourceTarget(Target):
     alias = "javascript_source"
     core_fields = (
@@ -60,3 +55,4 @@ class JSSourcesGeneratorTarget(TargetFilesGenerator):
     copied_fields = COMMON_TARGET_FIELDS
     moved_fields = (JSDependenciesField,)
     help = "Generate a `javascript_source` target for each file in the `sources` field."
+
