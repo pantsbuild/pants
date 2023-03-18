@@ -236,37 +236,37 @@ async def resolve_generator_target_requests(
     target_adaptor = adaptor_and_type.adaptor
     target_type = req.target_type
     generate_request = target_types_to_generate_requests.request_for(req.target_type)
-    if generate_request:
-        generator_fields = dict(target_adaptor.kwargs)
-        generators = _parametrized_target_generators_with_templates(
-            req.address,
-            target_adaptor,
-            req.target_type,
-            generator_fields,
-            union_membership,
-        )
-        base_generator = target_type(
-            generator_fields,
-            req.address,
-            name_explicitly_set=target_adaptor.name_explicitly_set,
-            union_membership=union_membership,
-        )
-        overrides = await Get(_Overrides, _TargetGeneratorOverridesRequest(base_generator))
-        return ResolvedTargetGeneratorRequests(
-            requests=tuple(
-                generate_request(
-                    generator,
-                    template_address=generator.address,
-                    template=template,
-                    overrides={
-                        name: dict(Parametrize.expand(generator.address, override))
-                        for name, override in overrides.overrides.items()
-                    },
-                )
-                for generator, template in generators
+    if not generate_request:
+        return ResolvedTargetGeneratorRequests()
+    generator_fields = dict(target_adaptor.kwargs)
+    generators = _parametrized_target_generators_with_templates(
+        req.address,
+        target_adaptor,
+        req.target_type,
+        generator_fields,
+        union_membership,
+    )
+    base_generator = target_type(
+        generator_fields,
+        req.address,
+        name_explicitly_set=target_adaptor.name_explicitly_set,
+        union_membership=union_membership,
+    )
+    overrides = await Get(_Overrides, _TargetGeneratorOverridesRequest(base_generator))
+    return ResolvedTargetGeneratorRequests(
+        requests=tuple(
+            generate_request(
+                generator,
+                template_address=generator.address,
+                template=template,
+                overrides={
+                    name: dict(Parametrize.expand(generator.address, override))
+                    for name, override in overrides.overrides.items()
+                },
             )
+            for generator, template in generators
         )
-    return ResolvedTargetGeneratorRequests()
+    )
 
 
 @rule
