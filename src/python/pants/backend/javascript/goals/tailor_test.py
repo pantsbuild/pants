@@ -7,9 +7,13 @@ from pants.backend.javascript.goals import tailor
 from pants.backend.javascript.goals.tailor import (
     PutativeJSTargetsRequest,
     PutativePackageJsonTargetsRequest,
+    _ClassifiedSources,
 )
 from pants.backend.javascript.package_json import PackageJsonTarget
-from pants.backend.javascript.target_types import JSSourcesGeneratorTarget
+from pants.backend.javascript.target_types import (
+    JSSourcesGeneratorTarget,
+    JSTestSourcesGeneratorTarget,
+)
 from pants.core.goals.tailor import AllOwnedSources, PutativeTarget, PutativeTargets
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
@@ -27,16 +31,61 @@ def rule_runner() -> RuleRunner:
     )
 
 
-def test_find_putative_js_targets(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files(
-        {
-            "src/owned/BUILD": "javascript_sources()\n",
-            "src/owned/OwnedFile.js": "",
-            "src/unowned/UnownedFile1.js": "",
-            "src/unowned/UnownedFile2.mjs": "",
-            "src/unowned/UnownedFile3.cjs": "",
-        }
-    )
+@pytest.mark.parametrize(
+    "files,putative_map",
+    [
+        pytest.param(
+            {
+                "src/owned/BUILD": "javascript_sources()\n",
+                "src/owned/OwnedFile.js": "",
+                "src/unowned/UnownedFile1.js": "",
+                "src/unowned/UnownedFile2.mjs": "",
+                "src/unowned/UnownedFile3.cjs": "",
+            },
+            [
+                _ClassifiedSources(
+                    JSSourcesGeneratorTarget,
+                    ["UnownedFile1.js", "UnownedFile2.mjs", "UnownedFile3.cjs"],
+                )
+            ],
+            id="only_javascript_sources",
+        ),
+        pytest.param(
+            {
+                "src/owned/BUILD": "javascript_sources()\n",
+                "src/owned/OwnedFile.js": "",
+                "src/unowned/UnownedFile1.test.js": "",
+                "src/unowned/UnownedFile2.test.mjs": "",
+                "src/unowned/UnownedFile3.test.cjs": "",
+            },
+            [
+                _ClassifiedSources(
+                    JSTestSourcesGeneratorTarget,
+                    ["UnownedFile1.test.js", "UnownedFile2.test.mjs", "UnownedFile3.test.cjs"],
+                    "tests",
+                )
+            ],
+            id="only_javascript_tests",
+        ),
+        pytest.param(
+            {
+                "src/owned/BUILD": "javascript_sources()\n",
+                "src/owned/OwnedFile.js": "",
+                "src/unowned/UnownedFile1.js": "",
+                "src/unowned/UnownedFile1.test.js": "",
+            },
+            [
+                _ClassifiedSources(JSTestSourcesGeneratorTarget, ["UnownedFile1.test.js"], "tests"),
+                _ClassifiedSources(JSSourcesGeneratorTarget, ["UnownedFile1.js"]),
+            ],
+            id="both_tests_and_source",
+        ),
+    ],
+)
+def test_find_putative_js_targets(
+    rule_runner: RuleRunner, files: dict, putative_map: list[_ClassifiedSources]
+) -> None:
+    rule_runner.write_files(files)
     putative_targets = rule_runner.request(
         PutativeTargets,
         [
@@ -44,19 +93,15 @@ def test_find_putative_js_targets(rule_runner: RuleRunner) -> None:
             AllOwnedSources(["src/owned/OwnedFile.js"]),
         ],
     )
-    assert (
-        PutativeTargets(
-            [
-                PutativeTarget.for_target_type(
-                    JSSourcesGeneratorTarget,
-                    "src/unowned",
-                    "unowned",
-                    ["UnownedFile1.js", "UnownedFile2.mjs", "UnownedFile3.cjs"],
-                ),
-            ]
-        )
-        == putative_targets
+    expected_targets = PutativeTargets(
+        [
+            PutativeTarget.for_target_type(
+                source_class.target_type, "src/unowned", source_class.name, source_class.files
+            )
+            for source_class in putative_map
+        ]
     )
+    assert putative_targets == expected_targets
 
 
 def test_find_putative_package_json_targets(rule_runner: RuleRunner) -> None:
