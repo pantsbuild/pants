@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import functools
 import itertools
 import json
@@ -167,25 +168,38 @@ def warn_deprecated_field_type(field_type: type[Field]) -> None:
     )
 
 
+@dataclass(frozen=True)
+class _AdaptorAndType:
+    adaptor: TargetAdaptor
+    target_type: type[Target]
+
+
+@dataclass(frozen=True)
+class _RequestAdaptorAndType:
+    address: Address
+    description_of_origin: str
+
+
+@rule
 async def _determine_target_adaptor_and_type(
-    address: Address, registered_target_types: RegisteredTargetTypes, *, description_of_origin: str
-) -> tuple[TargetAdaptor, type[Target]]:
+    req: _RequestAdaptorAndType, registered_target_types: RegisteredTargetTypes
+) -> _AdaptorAndType:
     target_adaptor = await Get(
         TargetAdaptor,
-        TargetAdaptorRequest(address, description_of_origin=description_of_origin),
+        TargetAdaptorRequest(req.address, description_of_origin=req.description_of_origin),
     )
     target_type = registered_target_types.aliases_to_types.get(target_adaptor.type_alias, None)
     if target_type is None:
         raise UnrecognizedTargetTypeException(
-            target_adaptor.type_alias, registered_target_types, address
+            target_adaptor.type_alias, registered_target_types, req.address
         )
     if (
         target_type.deprecated_alias is not None
         and target_type.deprecated_alias == target_adaptor.type_alias
-        and not address.is_generated_target
+        and not req.address.is_generated_target
     ):
         warn_deprecated_target_type(target_type)
-    return target_adaptor, target_type
+    return _AdaptorAndType(target_adaptor, target_type)
 
 
 @dataclass(frozen=True)
@@ -198,42 +212,48 @@ class _TargetGeneratorOverridesRequest:
     target_generator: TargetGenerator
 
 
+@dataclass(frozen=True)
+class ResolvedTargetGeneratorRequests:
+    requests: tuple[GenerateTargetsRequest, ...] = tuple()
+
+
+@dataclass(frozen=True)
+class ResolveTargetGeneratorRequests:
+    target_type: type[TargetGenerator]
+    address: Address
+    description_of_origin: str = dataclasses.field(hash=False, compare=False)
+
+
 @rule
-async def resolve_target_parametrizations(
-    request: _TargetParametrizationsRequest,
-    registered_target_types: RegisteredTargetTypes,
+async def resolve_generator_target_requests(
+    req: ResolveTargetGeneratorRequests,
     union_membership: UnionMembership,
     target_types_to_generate_requests: TargetTypesToGenerateTargetsRequests,
-) -> _TargetParametrizations:
-    address = request.address
-    target_adaptor, target_type = await _determine_target_adaptor_and_type(
-        address, registered_target_types, description_of_origin=request.description_of_origin
+) -> ResolvedTargetGeneratorRequests:
+    adaptor_and_type = await Get(
+        _AdaptorAndType, _RequestAdaptorAndType(req.address, req.description_of_origin)
     )
-
-    parametrizations: list[_TargetParametrization] = []
-    generate_request: type[GenerateTargetsRequest] | None = None
-    if issubclass(target_type, TargetGenerator):
-        generate_request = target_types_to_generate_requests.request_for(target_type)
-    if generate_request and issubclass(target_type, TargetGenerator):
+    target_adaptor = adaptor_and_type.adaptor
+    target_type = req.target_type
+    generate_request = target_types_to_generate_requests.request_for(req.target_type)
+    if generate_request:
         generator_fields = dict(target_adaptor.kwargs)
         generators = _parametrized_target_generators_with_templates(
-            address,
+            req.address,
             target_adaptor,
-            target_type,
+            req.target_type,
             generator_fields,
             union_membership,
         )
         base_generator = target_type(
             generator_fields,
-            address,
+            req.address,
             name_explicitly_set=target_adaptor.name_explicitly_set,
             union_membership=union_membership,
         )
         overrides = await Get(_Overrides, _TargetGeneratorOverridesRequest(base_generator))
-        all_generated = await MultiGet(
-            Get(
-                GeneratedTargets,
-                GenerateTargetsRequest,
+        return ResolvedTargetGeneratorRequests(
+            requests=tuple(
                 generate_request(
                     generator,
                     template_address=generator.address,
@@ -242,13 +262,39 @@ async def resolve_target_parametrizations(
                         name: dict(Parametrize.expand(generator.address, override))
                         for name, override in overrides.overrides.items()
                     },
-                ),
+                )
+                for generator, template in generators
             )
-            for generator, template in generators
+        )
+    return ResolvedTargetGeneratorRequests()
+
+
+@rule
+async def resolve_target_parametrizations(
+    request: _TargetParametrizationsRequest, union_membership: UnionMembership
+) -> _TargetParametrizations:
+    address = request.address
+    adaptor_and_type = await Get(
+        _AdaptorAndType, _RequestAdaptorAndType(request.address, request.description_of_origin)
+    )
+    target_adaptor = adaptor_and_type.adaptor
+    target_type = adaptor_and_type.target_type
+
+    parametrizations: list[_TargetParametrization] = []
+    requests: ResolvedTargetGeneratorRequests | None = None
+    if issubclass(target_type, TargetGenerator):
+        requests = await Get(
+            ResolvedTargetGeneratorRequests,
+            ResolveTargetGeneratorRequests(target_type, address, request.description_of_origin),
+        )
+    if requests and requests.requests:
+        all_generated = await MultiGet(
+            Get(GeneratedTargets, GenerateTargetsRequest, generate_request)
+            for generate_request in requests.requests
         )
         parametrizations.extend(
-            _TargetParametrization(generator, generated_batch)
-            for generated_batch, (generator, _) in zip(all_generated, generators)
+            _TargetParametrization(generate_request.generator, generated_batch)
+            for generated_batch, generate_request in zip(all_generated, requests.requests)
         )
     else:
         parametrizations.append(
