@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
+import dataclasses
 import os
 from dataclasses import dataclass
 from typing import Any, Iterable
@@ -28,7 +29,7 @@ from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.internals import graph, platform_rules
 from pants.engine.internals.native_engine import Digest, MergeDigests
 from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.process import FallibleProcessResult
+from pants.engine.process import FallibleProcessResult, Process, ProcessCacheScope
 from pants.engine.rules import Rule, collect_rules, rule
 from pants.engine.target import (
     Dependencies,
@@ -88,8 +89,8 @@ async def run_javascript_tests(
         return os.path.relpath(file, installation.project_env.package_dir())
 
     test_script = installation.project_env.ensure_target()[NodePackageTestScriptField].value
-    result = await Get(
-        FallibleProcessResult,
+    process = await Get(
+        Process,
         NodeJsProjectEnvironmentProcess(
             installation.project_env,
             args=(
@@ -105,7 +106,9 @@ async def run_javascript_tests(
             timeout_seconds=field_set.timeout.calculate_from_global_options(test),
         ),
     )
-
+    if test.force:
+        process = dataclasses.replace(process, cache_scope=ProcessCacheScope.PER_SESSION)
+    result = await Get(FallibleProcessResult, Process, process)
     return TestResult.from_fallible_process_result(result, field_set.address, test.output)
 
 
