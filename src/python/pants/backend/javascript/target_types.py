@@ -74,11 +74,11 @@ class JSSourcesGeneratorTarget(TargetFilesGenerator):
     help = "Generate a `javascript_source` target for each file in the `sources` field."
 
 
-class JSTestDependenciesField(Dependencies):
+class JSTestDependenciesField(JSDependenciesField):
     pass
 
 
-class JSTestSourceField(SingleSourceField):
+class JSTestSourceField(JSSourceField):
     expected_file_extensions = JS_FILE_EXTENSIONS
 
 
