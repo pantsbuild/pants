@@ -10,10 +10,7 @@ from pants.backend.javascript.goals.tailor import (
     _ClassifiedSources,
 )
 from pants.backend.javascript.package_json import PackageJsonTarget
-from pants.backend.javascript.target_types import (
-    JSSourcesGeneratorTarget,
-    JSTestSourcesGeneratorTarget,
-)
+from pants.backend.javascript.target_types import JSSourcesGeneratorTarget, JSTestsGeneratorTarget
 from pants.core.goals.tailor import AllOwnedSources, PutativeTarget, PutativeTargets
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
@@ -60,7 +57,7 @@ def rule_runner() -> RuleRunner:
             },
             [
                 _ClassifiedSources(
-                    JSTestSourcesGeneratorTarget,
+                    JSTestsGeneratorTarget,
                     ["UnownedFile1.test.js", "UnownedFile2.test.mjs", "UnownedFile3.test.cjs"],
                     "tests",
                 )
@@ -75,7 +72,7 @@ def rule_runner() -> RuleRunner:
                 "src/unowned/UnownedFile1.test.js": "",
             },
             [
-                _ClassifiedSources(JSTestSourcesGeneratorTarget, ["UnownedFile1.test.js"], "tests"),
+                _ClassifiedSources(JSTestsGeneratorTarget, ["UnownedFile1.test.js"], "tests"),
                 _ClassifiedSources(JSSourcesGeneratorTarget, ["UnownedFile1.js"]),
             ],
             id="both_tests_and_source",

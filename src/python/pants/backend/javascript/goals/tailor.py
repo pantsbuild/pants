@@ -13,8 +13,8 @@ from pants.backend.javascript.package_json import PackageJsonTarget
 from pants.backend.javascript.target_types import (
     JS_FILE_EXTENSIONS,
     JSSourcesGeneratorTarget,
-    JSTestSourcesGeneratorSourcesField,
-    JSTestSourcesGeneratorTarget,
+    JSTestsGeneratorSourcesField,
+    JSTestsGeneratorTarget,
 )
 from pants.core.goals.tailor import (
     AllOwnedSources,
@@ -50,14 +50,14 @@ class _ClassifiedSources:
 
 def classify_source_files(paths: Iterable[str]) -> Iterable[_ClassifiedSources]:
     sources_files = set(paths)
-    test_file_glob = JSTestSourcesGeneratorSourcesField.default
+    test_file_glob = JSTestsGeneratorSourcesField.default
     test_files = {
         path for path in paths if any(PurePath(path).match(glob) for glob in test_file_glob)
     }
     if sources_files:
         yield _ClassifiedSources(JSSourcesGeneratorTarget, files=sources_files - test_files)
     if test_files:
-        yield _ClassifiedSources(JSTestSourcesGeneratorTarget, test_files, "tests")
+        yield _ClassifiedSources(JSTestsGeneratorTarget, test_files, "tests")
 
 
 async def _get_unowned_files_for_globs(
