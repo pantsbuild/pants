@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from pants.backend.javascript import package_json
 from pants.backend.javascript.goals import test
 from pants.backend.javascript.goals.test import JSTestFieldSet, JSTestRequest
 from pants.backend.javascript.package_json import PackageJsonTarget
@@ -34,6 +35,7 @@ def rule_runner() -> RuleRunner:
             JSTestsGeneratorTarget,
             JSTestTarget,
         ],
+        objects=dict(package_json.build_file_aliases().objects),
     )
     return rule_runner
 
@@ -47,25 +49,44 @@ _SOURCE_TO_TEST = textwrap.dedent(
 )
 
 
-def given_package_json(*, test_script: str, runner: dict[str, str]) -> str:
+def given_package_json(*, test_script: dict[str, str], runner: dict[str, str]) -> str:
     return json.dumps(
         {
             "name": "pkg",
             "version": "0.0.1",
             "type": "module",
-            "scripts": {"test": test_script},
+            "scripts": {**test_script},
             "devDependencies": runner,
             "main": "./src/index.mjs",
         }
     )
 
 
-def test_jest_tests_are_successful(rule_runner: RuleRunner) -> None:
+@pytest.mark.parametrize(
+    "test_script,package_json_target",
+    [
+        pytest.param(
+            {"test": "NODE_OPTIONS=--experimental-vm-modules jest"}, "package_json()", id="default"
+        ),
+        pytest.param(
+            {"jest-test": "NODE_OPTIONS=--experimental-vm-modules jest"},
+            textwrap.dedent(
+                """\
+                package_json(scripts=[node_test_script(entry_point="jest-test")])
+                """
+            ),
+            id="custom_test_script",
+        ),
+    ],
+)
+def test_jest_tests_are_successful(
+    rule_runner: RuleRunner, test_script: dict[str, str], package_json_target: str
+) -> None:
     rule_runner.write_files(
         {
-            "foo/BUILD": "package_json()",
+            "foo/BUILD": package_json_target,
             "foo/package.json": given_package_json(
-                test_script="NODE_OPTIONS=--experimental-vm-modules jest", runner={"jest": "^29.5"}
+                test_script=test_script, runner={"jest": "^29.5"}
             ),
             "foo/package-lock.json": (
                 Path(__file__).parent / "jest_resources/package-lock.json"
@@ -103,7 +124,7 @@ def test_mocha_tests_are_successful(rule_runner: RuleRunner) -> None:
         {
             "foo/BUILD": "package_json()",
             "foo/package.json": given_package_json(
-                test_script="mocha", runner={"mocha": "^10.2.0"}
+                test_script={"test": "mocha"}, runner={"mocha": "^10.2.0"}
             ),
             "foo/package-lock.json": (
                 Path(__file__).parent / "mocha_resources/package-lock.json"

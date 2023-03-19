@@ -12,6 +12,7 @@ from pants.backend.javascript.install_node_package import (
     InstalledNodePackageRequest,
 )
 from pants.backend.javascript.nodejs_project_environment import NodeJsProjectEnvironmentProcess
+from pants.backend.javascript.package_json import NodePackageTestScriptField
 from pants.backend.javascript.subsystems.nodejstest import NodeJSTest
 from pants.backend.javascript.target_types import (
     JSSourceField,
@@ -86,11 +87,17 @@ async def run_javascript_tests(
     def relative_package_dir(file: str) -> str:
         return os.path.relpath(file, installation.project_env.package_dir())
 
+    test_script = installation.project_env.ensure_target()[NodePackageTestScriptField].value
     result = await Get(
         FallibleProcessResult,
         NodeJsProjectEnvironmentProcess(
             installation.project_env,
-            args=("test", "--", *sorted(map(relative_package_dir, field_set_source_files.files))),
+            args=(
+                "run",
+                test_script.entry_point,
+                "--",
+                *sorted(map(relative_package_dir, field_set_source_files.files)),
+            ),
             description=f"Running npm test for {field_set.address.spec}.",
             input_digest=merged_digest,
             level=LogLevel.INFO,
