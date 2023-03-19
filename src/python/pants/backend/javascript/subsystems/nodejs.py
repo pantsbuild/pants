@@ -176,6 +176,8 @@ class NodeJSToolProcess:
     output_directories: tuple[str, ...] = ()
     working_directory: str | None = None
     append_only_caches: FrozenDict[str, str] = field(default_factory=FrozenDict)
+    timeout_seconds: int | None = None
+    extra_env: Mapping[str, str] = field(default_factory=FrozenDict)
 
     @classmethod
     def npm(
@@ -188,6 +190,8 @@ class NodeJSToolProcess:
         output_directories: tuple[str, ...] = (),
         working_directory: str | None = None,
         append_only_caches: FrozenDict[str, str] | None = None,
+        timeout_seconds: int | None = None,
+        extra_env: Mapping[str, str] | None = None,
     ) -> NodeJSToolProcess:
         return cls(
             args=("npm", *args),
@@ -198,6 +202,8 @@ class NodeJSToolProcess:
             output_directories=output_directories,
             working_directory=working_directory,
             append_only_caches=append_only_caches or FrozenDict(),
+            timeout_seconds=timeout_seconds,
+            extra_env=extra_env or FrozenDict(),
         )
 
     @classmethod
@@ -419,9 +425,10 @@ async def setup_node_tool_process(
         output_directories=request.output_directories,
         description=request.description,
         level=request.level,
-        env=environment.to_env_dict(),
+        env={**environment.to_env_dict(), **request.extra_env},
         working_directory=request.working_directory,
         append_only_caches={**request.append_only_caches, **environment.append_only_caches},
+        timeout_seconds=request.timeout_seconds,
     )
 
 

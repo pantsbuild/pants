@@ -90,6 +90,8 @@ class NodeJsProjectEnvironmentProcess:
     output_files: tuple[str, ...] = ()
     output_directories: tuple[str, ...] = ()
     per_package_caches: FrozenDict[str, str] = field(default_factory=FrozenDict)
+    timeout_seconds: int | None = None
+    extra_env: FrozenDict[str, str] = field(default_factory=FrozenDict)
 
 
 @rule(desc="Assembling nodejs project environment")
@@ -143,6 +145,8 @@ async def setup_nodejs_project_environment_process(req: NodeJsProjectEnvironment
             output_files=output_files,
             output_directories=output_directories,
             append_only_caches=per_package_caches,
+            timeout_seconds=req.timeout_seconds,
+            extra_env=req.extra_env,
         ),
     )
 

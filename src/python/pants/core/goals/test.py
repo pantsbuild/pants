@@ -687,6 +687,9 @@ class TestExtraEnvVarsField(StringSequenceField, metaclass=ABCMeta):
         """
     )
 
+    def sorted(self) -> tuple[str, ...]:
+        return tuple(sorted(self.value or ()))
+
 
 async def _get_test_batches(
     core_request_types: Iterable[type[TestRequest]],
