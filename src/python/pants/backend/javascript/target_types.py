@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from pants.core.goals.test import TestExtraEnvVarsField, TestTimeoutField
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     Dependencies,
@@ -81,12 +82,22 @@ class JSTestSourceField(SingleSourceField):
     expected_file_extensions = JS_FILE_EXTENSIONS
 
 
+class JSTestTimeoutField(TestTimeoutField):
+    pass
+
+
+class JSTestExtraEnvVarsField(TestExtraEnvVarsField):
+    pass
+
+
 class JSTestTarget(Target):
     alias = "javascript_test"
     core_fields = (
         *COMMON_TARGET_FIELDS,
         JSTestDependenciesField,
         JSTestSourceField,
+        JSTestTimeoutField,
+        JSTestExtraEnvVarsField,
     )
     help = "A single Javascript test file."
 
@@ -120,5 +131,5 @@ class JSTestsGeneratorTarget(TargetFilesGenerator):
     )
     generated_target_cls = JSTestTarget
     copied_fields = COMMON_TARGET_FIELDS
-    moved_fields = (JSTestDependenciesField,)
+    moved_fields = (JSTestDependenciesField, JSTestTimeoutField, JSTestExtraEnvVarsField)
     help = "Generate a `javascript_test` target for each file in the `sources` field."
