@@ -46,7 +46,7 @@ class VersionManagerSearchPaths(DeduplicatedCollection[str]):
 async def get_un_cachable_version_manager_paths(
     request: VersionManagerSearchPathsRequest,
 ) -> VersionManagerSearchPaths:
-    """Inspects the directory of a version manager tool to find installations."""
+    """Inspects the directory of a version manager tool like pyenv or nvm to find installations."""
     if not (request.env_tgt.val is None or isinstance(request.env_tgt.val, LocalEnvironmentTarget)):
         return VersionManagerSearchPaths()
 
