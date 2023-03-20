@@ -41,7 +41,7 @@ The tool will be run with values from `args` specified as arguments. By default,
 
 `adhoc_tool` has three dependencies fields:
 
-* `output_dependencies`, which defines dependencies that are required to effectively consume the output of the tool, _e.g._ runtime libraries for generated code bindings. These are returned when resolving the transitive dependencies of any (transitive) dependents of the `adhoc_tool` target.
+* `output_dependencies`, which defines dependencies that are required to effectively consume the output of the tool, _e.g._ runtime libraries for generated code bindings. Any targets that consume the output of the `adhoc_tool` target will also (transitively) depend on these.
 * `execution_dependencies`, which define data dependencies required for the tool to produce its output. These are not considered when resolving transitive dependencies that include this `adhoc_tool` target.
 * `runnable_dependencies`, which define runnables that the `adhoc_tool` needs to execute as a subprocess. These are also not considered when resolving transitive dependencies. The discussion of `system_binary` later in this page shows one key use of `runnable_dependencies`.
 
