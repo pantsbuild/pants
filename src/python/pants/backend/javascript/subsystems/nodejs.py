@@ -361,7 +361,7 @@ async def get_valid_nodejs_paths_by_version(bootstrap: NodeJSBootstrap) -> _Bina
     return _BinaryPathsPerVersion({version: tuple(paths) for version, paths in group_by_version})
 
 
-@rule(level=LogLevel.INFO, desc="Finding Node.js distribution binaries.")
+@rule(level=LogLevel.DEBUG, desc="Finding Node.js distribution binaries.")
 async def determine_nodejs_binaries(
     nodejs: NodeJS, platform: Platform, paths_per_version: _BinaryPathsPerVersion
 ) -> NodeJSBinaries:
