@@ -170,6 +170,7 @@ def test_node_version_from_semver_bootstrap(
 ) -> None:
     nodejs_subsystem = mock_nodejs_subsystem
     nodejs_subsystem.version = semver_range
+    nodejs_subsystem.known_versions = []
     discoverable_versions = _BinaryPathsPerVersion(
         {
             "1.1.0": (BinaryPath("1/1/0/node"),),
@@ -238,6 +239,7 @@ def test_find_valid_binary(rule_runner: RuleRunner) -> None:
         rule_runner.set_options(
             [
                 f"--nodejs-search-path=['{binary_dir}']",
+                "--nodejs-known-versions=[]",
                 "--nodejs-version=>2",
             ],
             env_inherit={"PATH"},

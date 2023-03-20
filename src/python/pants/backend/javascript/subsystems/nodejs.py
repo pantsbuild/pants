@@ -49,7 +49,7 @@ from pants.util.docutil import bin_name
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
-from pants.util.strutil import softwrap
+from pants.util.strutil import help_text, softwrap
 
 _logger = logging.getLogger(__name__)
 
@@ -122,13 +122,14 @@ class NodeJS(Subsystem, TemplatedExternalToolOptionsMixin):
 
         search_path = StrListOption(
             default=["<PATH>"],
-            help=softwrap(
+            help=lambda cls: help_text(
                 f"""
                 A list of paths to search for Node.js distributions.
 
-                This option take precedence over the templated url download,
-                if a version matching the configured version range is found
-                in these paths.
+                This option is only used if a templated url download
+                specified via [{cls.subsystem.options_scope}].known_versions
+                does not contain a version matching the configured
+                [{cls.subsystem.options_scope}].version range.
 
                 You can specify absolute paths to binaries
                 and/or to directories containing binaries. The order of entries does
@@ -365,10 +366,6 @@ async def get_valid_nodejs_paths_by_version(bootstrap: NodeJSBootstrap) -> _Bina
 async def determine_nodejs_binaries(
     nodejs: NodeJS, platform: Platform, paths_per_version: _BinaryPathsPerVersion
 ) -> NodeJSBinaries:
-    satisfying_version = min_satisfying(paths_per_version.keys(), nodejs.version)
-    if satisfying_version:
-        return NodeJSBinaries(os.path.dirname(paths_per_version[satisfying_version][0].path))
-
     decoded_versions = groupby(
         (ExternalToolVersion.decode(unparsed) for unparsed in nodejs.known_versions),
         lambda v: v.version,
@@ -384,26 +381,30 @@ async def determine_nodejs_binaries(
     }
 
     satisfying_version = min_satisfying(decoded_per_version.keys(), nodejs.version)
+    if satisfying_version:
+        known_version = decoded_per_version[satisfying_version][0]
+        downloaded = await nodejs.download_known_version(known_version, platform)
+        nodejs_bin_dir = os.path.join(
+            "{chroot}",
+            NodeJSProcessEnvironment.base_bin_dir,
+            os.path.dirname(downloaded.exe),
+        )
+
+        return NodeJSBinaries(nodejs_bin_dir, downloaded.digest)
+
+    satisfying_version = min_satisfying(paths_per_version.keys(), nodejs.version)
     if not satisfying_version:
         raise BinaryNotFoundError(
             softwrap(
                 f"""
                 Cannot find any `node` binaries satisfying the range '{nodejs.version}'.
 
-                To fix, either list a `[{NodeJS.options_scope}].url_platform_mapping` version that satisfies the range,
+                To fix, either list a `[{NodeJS.options_scope}].known_versions` version that satisfies the range,
                 or ensure `[{NodeJS.options_scope}].search_path` contains a path to binaries that satisfy the range.
                 """
             )
         )
-
-    known_version = decoded_per_version[satisfying_version][0]
-    downloaded = await nodejs.download_known_version(known_version, platform)
-    nodejs_bin_dir = os.path.join(
-        "{chroot}",
-        NodeJSProcessEnvironment.base_bin_dir,
-        os.path.dirname(downloaded.exe),
-    )
-    return NodeJSBinaries(nodejs_bin_dir, downloaded.digest)
+    return NodeJSBinaries(os.path.dirname(paths_per_version[satisfying_version][0].path))
 
 
 @rule(level=LogLevel.DEBUG)
