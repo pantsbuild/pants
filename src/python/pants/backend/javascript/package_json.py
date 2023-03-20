@@ -104,6 +104,7 @@ class NodeTestScript(NodeScript):
     coverage_args: tuple[str, ...] = ()
     coverage_output_files: tuple[str, ...] = ()
     coverage_output_directories: tuple[str, ...] = ()
+    coverage_entry_point: str | None = None
     extra_caches: tuple[str, ...] = ()
 
     alias: ClassVar[str] = "node_test_script"
@@ -121,6 +122,7 @@ class NodeTestScript(NodeScript):
         coverage_args: Iterable[str] = (),
         coverage_output_files: Iterable[str] = (),
         coverage_output_directories: Iterable[str] = (),
+        coverage_entry_point: str | None = None,
     ) -> NodeTestScript:
         """The test script for this package, mapped from the `scripts` section of a package.json
         file. The pointed to script should accept a variadic number of ([ARG]...) path arguments.
@@ -135,7 +137,19 @@ class NodeTestScript(NodeScript):
             coverage_args=tuple(coverage_args),
             coverage_output_files=tuple(coverage_output_files),
             coverage_output_directories=tuple(coverage_output_directories),
+            coverage_entry_point=coverage_entry_point,
         )
+
+    def supports_coverage(self) -> bool:
+        return bool(self.coverage_entry_point) or bool(self.coverage_args)
+
+    def coverage_globs(self) -> PathGlobs:
+        return self.coverage_globs_for(self.coverage_output_files, self.coverage_output_directories)
+
+    @classmethod
+    def coverage_globs_for(cls, files: tuple[str, ...], directories: tuple[str, ...]) -> PathGlobs:
+        dir_globs = (os.path.join(directory, "*") for directory in directories)
+        return PathGlobs((*files, *dir_globs))
 
 
 class NodePackageScriptsField(SequenceField[NodeScript]):
@@ -621,6 +635,19 @@ class GenerateNodePackageTargets(GenerateTargetsRequest):
     generate_from = PackageJsonTarget
 
 
+def _script_missing_error(entry_point: str, scripts: Iterable[str], address: Address) -> ValueError:
+    return ValueError(
+        softwrap(
+            f"""
+            {entry_point} was not found in package.json#scripts section
+            of the `{PackageJsonTarget.alias}` target with address {address}.
+
+            Available scripts are: {', '.join(scripts)}.
+            """
+        )
+    )
+
+
 @rule
 async def generate_node_package_targets(
     request: GenerateNodePackageTargets,
@@ -698,16 +725,13 @@ async def generate_node_package_targets(
                 )
             )
         else:
-            raise ValueError(
-                softwrap(
-                    f"""
-                    {build_script.entry_point} was not found in package.json#scripts section
-                    of the `{PackageJsonTarget.alias}` target with address {request.generator.address}.
-
-                    Available scripts are: {', '.join(scripts)}.
-                    """
-                )
+            raise _script_missing_error(
+                build_script.entry_point, scripts, request.generator.address
             )
+
+    coverage_script = package_target[NodePackageTestScriptField].value.coverage_entry_point
+    if coverage_script and coverage_script not in scripts:
+        raise _script_missing_error(coverage_script, scripts, request.generator.address)
 
     return GeneratedTargets(
         request.generator, [package_target, file_tgt, *third_party_tgts, *build_script_tgts]

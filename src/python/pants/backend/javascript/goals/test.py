@@ -14,7 +14,7 @@ from pants.backend.javascript.install_node_package import (
     InstalledNodePackageRequest,
 )
 from pants.backend.javascript.nodejs_project_environment import NodeJsProjectEnvironmentProcess
-from pants.backend.javascript.package_json import NodePackageTestScriptField
+from pants.backend.javascript.package_json import NodePackageTestScriptField, NodeTestScript
 from pants.backend.javascript.subsystems.nodejstest import NodeJSTest
 from pants.backend.javascript.target_types import (
     JSSourceField,
@@ -39,9 +39,9 @@ from pants.core.util_rules import source_files
 from pants.core.util_rules.distdir import DistDir
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
-from pants.engine.fs import DigestSubset, PathGlobs
+from pants.engine.fs import DigestSubset
 from pants.engine.internals import graph, platform_rules
-from pants.engine.internals.native_engine import Digest, MergeDigests, RemovePrefix, Snapshot
+from pants.engine.internals.native_engine import Digest, MergeDigests, Snapshot
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import FallibleProcessResult, Process, ProcessCacheScope
 from pants.engine.rules import Rule, collect_rules, rule
@@ -60,6 +60,8 @@ from pants.util.logging import LogLevel
 class JSCoverageData(CoverageData):
     snapshot: Snapshot
     address: Address
+    output_files: tuple[str, ...]
+    output_directories: tuple[str, ...]
 
 
 class JSCoverageDataCollection(CoverageDataCollection[JSCoverageData]):
@@ -113,14 +115,16 @@ async def run_javascript_tests(
         return os.path.relpath(file, installation.project_env.package_dir())
 
     test_script = installation.project_env.ensure_target()[NodePackageTestScriptField].value
+    entry_point = test_script.entry_point
 
     coverage_args: tuple[str, ...] = ()
     output_files: list[str] = []
     output_directories: list[str] = []
-    if test.use_coverage and test_script.coverage_args:
+    if test.use_coverage and test_script.supports_coverage():
         coverage_args = test_script.coverage_args
         output_files.extend(test_script.coverage_output_files)
         output_directories.extend(test_script.coverage_output_directories)
+        entry_point = test_script.coverage_entry_point or entry_point
 
     process = await Get(
         Process,
@@ -128,7 +132,7 @@ async def run_javascript_tests(
             installation.project_env,
             args=(
                 "run",
-                test_script.entry_point,
+                entry_point,
                 "--",
                 *sorted(map(relative_package_dir, field_set_source_files.files)),
                 *coverage_args,
@@ -152,18 +156,15 @@ async def run_javascript_tests(
             Snapshot,
             DigestSubset(
                 result.output_digest,
-                PathGlobs(
-                    [
-                        *test_script.coverage_output_files,
-                        *(
-                            os.path.join(directory, "*")
-                            for directory in test_script.coverage_output_directories
-                        ),
-                    ]
-                ),
+                test_script.coverage_globs(),
             ),
         )
-        coverage_data = JSCoverageData(coverage_snapshot, field_set.address)
+        coverage_data = JSCoverageData(
+            coverage_snapshot,
+            field_set.address,
+            output_files=test_script.coverage_output_files,
+            output_directories=test_script.coverage_output_directories,
+        )
 
     return TestResult.from_fallible_process_result(
         result, field_set.address, test.output, coverage_data=coverage_data
@@ -177,19 +178,27 @@ async def collect_coverage_reports(
     nodejs_test: NodeJSTest,
 ) -> CoverageReports:
     gets_per_data = [
-        (report, Get(Snapshot, DigestSubset(report.snapshot.digest, PathGlobs([file]))))
+        (
+            file,
+            report,
+            Get(
+                Snapshot,
+                DigestSubset(
+                    report.snapshot.digest,
+                    NodeTestScript.coverage_globs_for((file,), report.output_directories),
+                ),
+            ),
+        )
         for report in coverage_reports
-        for file in report.snapshot.files
+        for file in report.output_files
     ]
-    snapshots = await MultiGet(get for report, get in gets_per_data)
-    none_prefixed = await MultiGet(
-        Get(Snapshot, RemovePrefix(snapshot.digest, os.path.dirname(snapshot.files[0])))
-        for snapshot in snapshots
-    )
+    snapshots = await MultiGet(get for file, report, get in gets_per_data)
     return CoverageReports(
         tuple(
-            _get_report(nodejs_test, dist_dir, snapshot, data.address)
-            for data, snapshot in zip((report for report, get in gets_per_data), none_prefixed)
+            _get_report(nodejs_test, dist_dir, snapshot, data.address, file)
+            for (file, data), snapshot in zip(
+                ((file, report) for file, report, get in gets_per_data), snapshots
+            )
         )
     )
 
@@ -199,9 +208,10 @@ def _get_report(
     dist_dir: DistDir,
     snapshot: Snapshot,
     address: Address,
+    file: str,
 ) -> FilesystemCoverageReport:
     # It is up to the user to configure the output coverage reports.
-    file_path = PurePath(snapshot.files[0])
+    file_path = PurePath(file)
     output_dir = nodejs_test.render_coverage_output_dir(dist_dir, address)
     return FilesystemCoverageReport(
         coverage_insufficient=False,

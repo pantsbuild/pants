@@ -221,3 +221,30 @@ def test_specifying_multiple_custom_test_scripts_is_an_error(
     )
     with pytest.raises(ExecutionError):
         rule_runner.get_target(Address("src/js", generated_name="ham"))
+
+
+def test_specifying_missing_custom_coverage_entry_point_script_is_an_error(
+    rule_runner: RuleRunner,
+) -> None:
+    rule_runner.write_files(
+        {
+            "src/js/BUILD": dedent(
+                """\
+                package_json(
+                    scripts=[
+                        node_test_script(entry_point="test", coverage_entry_point="test:coverage"),
+                    ]
+                )
+                """
+            ),
+            "src/js/package.json": json.dumps(
+                {
+                    "name": "ham",
+                    "version": "0.0.1",
+                    "scripts": {"test": "mocha", "test:cov": "nyc test"},
+                }
+            ),
+        }
+    )
+    with pytest.raises(ExecutionError):
+        rule_runner.get_target(Address("src/js", generated_name="ham"))
