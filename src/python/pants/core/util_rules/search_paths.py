@@ -2,14 +2,20 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Iterable
 
+from pants.base.build_environment import get_buildroot
 from pants.core.util_rules.environments import EnvironmentTarget, LocalEnvironmentTarget
-from pants.engine.rules import Rule, collect_rules, rule
+from pants.engine.collection import DeduplicatedCollection
+from pants.engine.rules import Rule, _uncacheable_rule, collect_rules, rule
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import softwrap
+
+_logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -20,6 +26,74 @@ class ValidateSearchPathsRequest:
     environment_key: str
     is_default: bool
     local_only: FrozenOrderedSet[str]
+
+
+@dataclass(frozen=True)
+class VersionManagerSearchPathsRequest:
+    env_tgt: EnvironmentTarget
+    root_dir: str | None
+    tool_path: str
+    option: str
+    version_files: tuple[str, ...] = tuple()
+    local_token: str | None = None
+
+
+class VersionManagerSearchPaths(DeduplicatedCollection[str]):
+    pass
+
+
+@_uncacheable_rule
+async def get_un_cachable_version_manager_paths(
+    request: VersionManagerSearchPathsRequest,
+) -> VersionManagerSearchPaths:
+    """Inspects the directory of a version manager tool like pyenv or nvm to find installations."""
+    if not (request.env_tgt.val is None or isinstance(request.env_tgt.val, LocalEnvironmentTarget)):
+        return VersionManagerSearchPaths()
+
+    manager_root_dir = request.root_dir
+    if not manager_root_dir:
+        return VersionManagerSearchPaths()
+    root_path = Path(manager_root_dir)
+    if not root_path.exists():
+        return VersionManagerSearchPaths()
+
+    tool_versions_path = root_path / request.tool_path
+    if not tool_versions_path.is_dir():
+        return VersionManagerSearchPaths()
+
+    if request.local_token and request.version_files:
+        local_version_files = [Path(get_buildroot(), file) for file in request.version_files]
+        first_version_file = next((file for file in local_version_files if file.exists()), None)
+        if not first_version_file:
+            file_string = ", ".join(f"`{file}`" for file in local_version_files)
+            no_file = (
+                f"No {file_string}" if len(local_version_files) == 1 else f"None of {file_string}"
+            )
+            _logger.warning(
+                softwrap(
+                    f"""
+                    {no_file} found in the build root,
+                    but {request.local_token} was set in `{request.option}`.
+                    """
+                )
+            )
+            return VersionManagerSearchPaths()
+
+        _logger.info(
+            f"Reading {first_version_file} to determine desired version for {request.option}."
+        )
+        local_version = first_version_file.read_text().strip()
+        path = Path(tool_versions_path, local_version, "bin")
+        if path.is_dir():
+            return VersionManagerSearchPaths([str(path)])
+        return VersionManagerSearchPaths()
+
+    versions_in_dir = (
+        tool_versions_path / version / "bin" for version in sorted(tool_versions_path.iterdir())
+    )
+    return VersionManagerSearchPaths(
+        str(version) for version in versions_in_dir if version.is_dir()
+    )
 
 
 class ValidatedSearchPaths(FrozenOrderedSet):

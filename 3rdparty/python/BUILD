@@ -6,6 +6,7 @@ python_requirements(
         "strawberry-graphql": ["strawberry"],
         "beautifulsoup4": ["bs4"],
         "python-gnupg": ["gnupg"],
+        "node-semver": ["nodesemver"],
     },
     overrides={
         "humbug": {"dependencies": ["#setuptools"]},
