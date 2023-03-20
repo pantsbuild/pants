@@ -165,7 +165,7 @@ async def user_chosen_resolve_aliases(nodejs: NodeJS) -> UserChosenNodeJSResolve
 
 @dataclass(frozen=True)
 class NodeJSToolProcess:
-    """A request for a tool installed with NodeJs."""
+    """A request for a tool installed with NodeJS."""
 
     args: tuple[str, ...]
     description: str
@@ -219,14 +219,14 @@ class NodeJSToolProcess:
 
 
 @dataclass(frozen=True)
-class NodejsBinaries:
+class NodeJSBinaries:
     binary_dir: str
     digest: Digest | None = None
 
 
 @dataclass(frozen=True)
 class NodeJSProcessEnvironment:
-    binaries: NodejsBinaries
+    binaries: NodeJSBinaries
     npm_config_cache: str
 
     base_bin_dir: ClassVar[str] = "__node"
@@ -250,12 +250,12 @@ class NodeJSProcessEnvironment:
 
 
 @rule(level=LogLevel.DEBUG)
-async def node_process_environment(binaries: NodejsBinaries) -> NodeJSProcessEnvironment:
+async def node_process_environment(binaries: NodeJSBinaries) -> NodeJSProcessEnvironment:
     return NodeJSProcessEnvironment(binaries=binaries, npm_config_cache="._npm")
 
 
 @dataclass(frozen=True)
-class NodeJsBootstrap:
+class NodeJSBootstrap:
     nodejs_search_paths: tuple[str, ...]
 
 
@@ -320,7 +320,7 @@ async def _nodejs_search_paths(
 
 
 @rule
-async def nodejs_bootstrap(nodejs_env_aware: NodeJS.EnvironmentAware) -> NodeJsBootstrap:
+async def nodejs_bootstrap(nodejs_env_aware: NodeJS.EnvironmentAware) -> NodeJSBootstrap:
     search_paths = await Get(
         ValidatedSearchPaths,
         ValidateSearchPathsRequest(
@@ -337,7 +337,7 @@ async def nodejs_bootstrap(nodejs_env_aware: NodeJS.EnvironmentAware) -> NodeJsB
 
     expanded_paths = await _nodejs_search_paths(nodejs_env_aware.env_tgt, search_paths)
 
-    return NodeJsBootstrap(nodejs_search_paths=expanded_paths)
+    return NodeJSBootstrap(nodejs_search_paths=expanded_paths)
 
 
 class _BinaryPathsPerVersion(FrozenDict[str, Sequence[BinaryPath]]):
@@ -345,7 +345,7 @@ class _BinaryPathsPerVersion(FrozenDict[str, Sequence[BinaryPath]]):
 
 
 @rule(level=LogLevel.DEBUG, desc="Testing for Node.js binaries.")
-async def get_valid_nodejs_paths_by_version(bootstrap: NodeJsBootstrap) -> _BinaryPathsPerVersion:
+async def get_valid_nodejs_paths_by_version(bootstrap: NodeJSBootstrap) -> _BinaryPathsPerVersion:
     paths = await Get(
         BinaryPaths,
         BinaryPathRequest(
@@ -364,10 +364,10 @@ async def get_valid_nodejs_paths_by_version(bootstrap: NodeJsBootstrap) -> _Bina
 @rule(level=LogLevel.INFO, desc="Finding Node.js distribution binaries.")
 async def determine_nodejs_binaries(
     nodejs: NodeJS, platform: Platform, paths_per_version: _BinaryPathsPerVersion
-) -> NodejsBinaries:
+) -> NodeJSBinaries:
     satisfying_version = min_satisfying(paths_per_version.keys(), nodejs.version)
     if satisfying_version:
-        return NodejsBinaries(os.path.dirname(paths_per_version[satisfying_version][0].path))
+        return NodeJSBinaries(os.path.dirname(paths_per_version[satisfying_version][0].path))
 
     decoded_versions = groupby(
         (ExternalToolVersion.decode(unparsed) for unparsed in nodejs.known_versions),
@@ -403,7 +403,7 @@ async def determine_nodejs_binaries(
         NodeJSProcessEnvironment.base_bin_dir,
         os.path.dirname(downloaded.exe),
     )
-    return NodejsBinaries(nodejs_bin_dir, downloaded.digest)
+    return NodeJSBinaries(nodejs_bin_dir, downloaded.digest)
 
 
 @rule(level=LogLevel.DEBUG)

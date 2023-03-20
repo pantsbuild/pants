@@ -15,7 +15,7 @@ import pytest
 from pants.backend.javascript.subsystems import nodejs
 from pants.backend.javascript.subsystems.nodejs import (
     NodeJS,
-    NodejsBinaries,
+    NodeJSBinaries,
     _BinaryPathsPerVersion,
     _get_nvm_root,
     determine_nodejs_binaries,
@@ -50,7 +50,7 @@ def rule_runner() -> RuleRunner:
             *config_files.rules(),
             *target_types_rules.rules(),
             QueryRule(ProcessResult, [nodejs.NodeJSToolProcess]),
-            QueryRule(NodejsBinaries, ()),
+            QueryRule(NodeJSBinaries, ()),
             QueryRule(VersionManagerSearchPaths, (VersionManagerSearchPathsRequest,)),
         ],
         target_types=[JSSourcesGeneratorTarget],
@@ -242,7 +242,7 @@ def test_find_valid_binary(rule_runner: RuleRunner) -> None:
             ],
             env_inherit={"PATH"},
         )
-        result = rule_runner.request(NodejsBinaries, ())
+        result = rule_runner.request(NodeJSBinaries, ())
     assert result.binary_dir == str(binary_dir)
 
 
