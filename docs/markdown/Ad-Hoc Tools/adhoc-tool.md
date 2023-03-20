@@ -59,7 +59,7 @@ Finally, if you want to capture `stdout` or `stderr` from your tool, you can use
 
 ### Chaining processes together
 
-_(Our [JavaScript demo](https://github.org/pantsbuild/example-adhoc/tree/main/javascript)) demonstrates a string of `adhoc_tool` targets that's used to produce a resource file._
+_(Our [JavaScript demo](https://github.com/pantsbuild/example-adhoc/tree/main/javascript) demonstrates a string of `adhoc_tool` targets that's used to produce a resource file.)_
 
 To get the best cache efficiency, it can make sense to break your `adhoc_tool` into smaller incremental steps. For example, if your process needs to fetch dependencies and then build a library based on those dependencies and some first-party source files, having one `adhoc_tool` for each of those steps means that the dependency-fetching stage will only be re-run when your requirements change, and not when the first-party source files change.
 
