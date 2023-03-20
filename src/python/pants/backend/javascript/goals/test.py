@@ -5,6 +5,7 @@ from __future__ import annotations
 import dataclasses
 import os
 from dataclasses import dataclass
+from pathlib import PurePath
 from typing import Any, Iterable
 
 from pants.backend.javascript import install_node_package, nodejs_project_environment
@@ -21,13 +22,26 @@ from pants.backend.javascript.target_types import (
     JSTestSourceField,
     JSTestTimeoutField,
 )
-from pants.core.goals.test import TestExtraEnv, TestFieldSet, TestRequest, TestResult, TestSubsystem
+from pants.build_graph.address import Address
+from pants.core.goals.test import (
+    CoverageData,
+    CoverageDataCollection,
+    CoverageReports,
+    FilesystemCoverageReport,
+    TestExtraEnv,
+    TestFieldSet,
+    TestRequest,
+    TestResult,
+    TestSubsystem,
+)
 from pants.core.target_types import AssetSourceField
 from pants.core.util_rules import source_files
+from pants.core.util_rules.distdir import DistDir
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
+from pants.engine.fs import DigestSubset, PathGlobs
 from pants.engine.internals import graph, platform_rules
-from pants.engine.internals.native_engine import Digest, MergeDigests
+from pants.engine.internals.native_engine import Digest, MergeDigests, RemovePrefix, Snapshot
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import FallibleProcessResult, Process, ProcessCacheScope
 from pants.engine.rules import Rule, collect_rules, rule
@@ -40,6 +54,16 @@ from pants.engine.target import (
 from pants.engine.unions import UnionRule
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
+
+
+@dataclass(frozen=True)
+class JSCoverageData(CoverageData):
+    snapshot: Snapshot
+    address: Address
+
+
+class JSCoverageDataCollection(CoverageDataCollection[JSCoverageData]):
+    element_type = JSCoverageData
 
 
 @dataclass(frozen=True)
@@ -89,6 +113,15 @@ async def run_javascript_tests(
         return os.path.relpath(file, installation.project_env.package_dir())
 
     test_script = installation.project_env.ensure_target()[NodePackageTestScriptField].value
+
+    coverage_args: tuple[str, ...] = ()
+    output_files: list[str] = []
+    output_directories: list[str] = []
+    if test.use_coverage and test_script.coverage_args:
+        coverage_args = test_script.coverage_args
+        output_files.extend(test_script.coverage_output_files)
+        output_directories.extend(test_script.coverage_output_directories)
+
     process = await Get(
         Process,
         NodeJsProjectEnvironmentProcess(
@@ -98,18 +131,85 @@ async def run_javascript_tests(
                 test_script.entry_point,
                 "--",
                 *sorted(map(relative_package_dir, field_set_source_files.files)),
+                *coverage_args,
             ),
             description=f"Running npm test for {field_set.address.spec}.",
             input_digest=merged_digest,
             level=LogLevel.INFO,
             extra_env=FrozenDict(**test_extra_env.env, **target_env_vars),
             timeout_seconds=field_set.timeout.calculate_from_global_options(test),
+            output_files=tuple(output_files),
+            output_directories=tuple(output_directories),
         ),
     )
     if test.force:
         process = dataclasses.replace(process, cache_scope=ProcessCacheScope.PER_SESSION)
+
     result = await Get(FallibleProcessResult, Process, process)
-    return TestResult.from_fallible_process_result(result, field_set.address, test.output)
+    coverage_data: JSCoverageData | None = None
+    if test.use_coverage:
+        coverage_snapshot = await Get(
+            Snapshot,
+            DigestSubset(
+                result.output_digest,
+                PathGlobs(
+                    [
+                        *test_script.coverage_output_files,
+                        *(
+                            os.path.join(directory, "*")
+                            for directory in test_script.coverage_output_directories
+                        ),
+                    ]
+                ),
+            ),
+        )
+        coverage_data = JSCoverageData(coverage_snapshot, field_set.address)
+
+    return TestResult.from_fallible_process_result(
+        result, field_set.address, test.output, coverage_data=coverage_data
+    )
+
+
+@rule(desc="Collecting coverage reports.")
+async def collect_coverage_reports(
+    coverage_reports: JSCoverageDataCollection,
+    dist_dir: DistDir,
+    nodejs_test: NodeJSTest,
+) -> CoverageReports:
+    gets_per_data = [
+        (report, Get(Snapshot, DigestSubset(report.snapshot.digest, PathGlobs([file]))))
+        for report in coverage_reports
+        for file in report.snapshot.files
+    ]
+    snapshots = await MultiGet(get for report, get in gets_per_data)
+    none_prefixed = await MultiGet(
+        Get(Snapshot, RemovePrefix(snapshot.digest, os.path.dirname(snapshot.files[0])))
+        for snapshot in snapshots
+    )
+    return CoverageReports(
+        tuple(
+            _get_report(nodejs_test, dist_dir, snapshot, data.address)
+            for data, snapshot in zip((report for report, get in gets_per_data), none_prefixed)
+        )
+    )
+
+
+def _get_report(
+    nodejs_test: NodeJSTest,
+    dist_dir: DistDir,
+    snapshot: Snapshot,
+    address: Address,
+) -> FilesystemCoverageReport:
+    # It is up to the user to configure the output coverage reports.
+    file_path = PurePath(snapshot.files[0])
+    output_dir = nodejs_test.render_coverage_output_dir(dist_dir, address)
+    return FilesystemCoverageReport(
+        coverage_insufficient=False,
+        result_snapshot=snapshot,
+        directory_to_materialize_to=output_dir,
+        report_file=output_dir / file_path,
+        report_type=file_path.suffix,
+    )
 
 
 def rules() -> Iterable[Rule | UnionRule]:
@@ -120,5 +220,6 @@ def rules() -> Iterable[Rule | UnionRule]:
         *install_node_package.rules(),
         *source_files.rules(),
         *JSTestRequest.rules(),
+        UnionRule(CoverageDataCollection, JSCoverageDataCollection),
         *collect_rules(),
     ]

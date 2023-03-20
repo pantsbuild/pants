@@ -3,12 +3,13 @@
 import json
 import textwrap
 from pathlib import Path
+from typing import cast
 
 import pytest
 
 from pants.backend.javascript import package_json
 from pants.backend.javascript.goals import test
-from pants.backend.javascript.goals.test import JSTestFieldSet, JSTestRequest
+from pants.backend.javascript.goals.test import JSCoverageData, JSTestFieldSet, JSTestRequest
 from pants.backend.javascript.package_json import PackageJsonTarget
 from pants.backend.javascript.target_types import (
     JSSourcesGeneratorTarget,
@@ -151,3 +152,56 @@ def test_mocha_tests_are_successful(rule_runner: RuleRunner) -> None:
     )
     assert result.exit_code == 0
     assert "1 passing" in result.stdout
+
+
+def test_jest_test_with_coverage_reporting(rule_runner: RuleRunner) -> None:
+    rule_runner.set_options(args=["--test-use-coverage", "True"])
+    rule_runner.write_files(
+        {
+            "foo/BUILD": textwrap.dedent(
+                """\
+                package_json(
+                    scripts=[
+                        node_test_script(
+                            coverage_args=['--coverage', '--coverage-directory=.coverage/'],
+                            coverage_output_files=['.coverage/clover.xml'],
+                        )
+                    ]
+                )
+                """
+            ),
+            "foo/package.json": given_package_json(
+                test_script={"test": "NODE_OPTIONS=--experimental-vm-modules jest"},
+                runner={"jest": "^29.5"},
+            ),
+            "foo/package-lock.json": (
+                Path(__file__).parent / "jest_resources/package-lock.json"
+            ).read_text(),
+            "foo/src/BUILD": "javascript_sources()",
+            "foo/src/index.mjs": _SOURCE_TO_TEST,
+            "foo/src/tests/BUILD": "javascript_tests(name='tests')",
+            "foo/src/tests/index.test.js": textwrap.dedent(
+                """\
+                /**
+                 * @jest-environment node
+                 */
+
+                import { expect } from "@jest/globals"
+
+                import { add } from "../index.mjs"
+
+                test('adds 1 + 2 to equal 3', () => {
+                    expect(add(1, 2)).toBe(3);
+                });
+                """
+            ),
+        }
+    )
+    tgt = rule_runner.get_target(Address("foo/src/tests", relative_file_path="index.test.js"))
+    result = rule_runner.request(
+        TestResult, [JSTestRequest.Batch("", (JSTestFieldSet.create(tgt),), None)]
+    )
+    assert result.coverage_data
+
+    rule_runner.write_digest(cast(JSCoverageData, result.coverage_data).snapshot.digest)
+    assert Path(rule_runner.build_root, ".coverage/clover.xml").exists()
