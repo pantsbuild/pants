@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import importlib.resources
 import logging
+import json
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Iterable, Iterator
 from urllib.parse import urlparse
@@ -177,6 +178,18 @@ def get_metadata(
             )
     return metadata
 
+def get_constraints_strings_from_pex_lock_file(lockfile_bytes: bytes) -> FrozenOrderedSet[str]:
+    lockfile_string = strip_comments_from_pex_json_lockfile(lockfile_bytes)
+    lockfile_json = json.loads(lockfile_string)
+    locked_requirements = lockfile_json['locked_resolves'][0]['locked_requirements']
+    constraints_strings = []
+    for package_blob in locked_requirements:
+        package_name = package_blob['project_name']
+        version = package_blob['version']
+        constraints_strings.append(f"{package_name}=={version}")
+    return FrozenOrderedSet(sorted(constraints_strings))
+
+
 
 @rule
 async def load_lockfile(
@@ -229,7 +242,7 @@ async def load_lockfile(
             CreateDigest([FileContent(lockfile_path, stripped_lock_bytes)]),
         )
         requirement_estimate = _pex_lockfile_requirement_count(lock_bytes)
-        constraints_strings = None
+        constraints_strings = get_constraints_strings_from_pex_lock_file(lock_bytes)
     else:
         header_delimiter = "#"
         lock_string = lock_bytes.decode()

@@ -8,6 +8,7 @@ backend_packages.add = [
   "pants.backend.build_files.fmt.black",
   "pants.backend.python",
   "pants.backend.experimental.python.packaging.pyoxidizer",
+  "pants.backend.experimental.audit",
   "pants.backend.python.lint.autoflake",
   "pants.backend.python.lint.black",
   "pants.backend.python.lint.docformatter",
