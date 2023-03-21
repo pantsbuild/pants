@@ -266,7 +266,7 @@ def add_markers(base: str, attributes: PyprojectAttr, fp) -> str:
     if not markers_lookup and not python_lookup:
         return base
 
-    result = f"{base};("
+    result = f"{base} ;("
 
     if markers_lookup:
         result += f"{markers_lookup})"
