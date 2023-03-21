@@ -1626,6 +1626,7 @@ fn write_digest(
   py_session: &PySession,
   digest: &PyAny,
   path_prefix: String,
+  clear_destination: Option<bool>,
 ) -> PyO3Result<()> {
   let core = &py_scheduler.0.core;
   core.executor.enter(|| {
@@ -1633,11 +1634,18 @@ fn write_digest(
     py_session.0.workunit_store().init_thread_state(None);
 
     let lifted_digest = nodes::lift_directory_digest(digest).map_err(PyValueError::new_err)?;
+    let clear_destination = clear_destination.unwrap_or(false);
 
     // Python will have already validated that path_prefix is a relative path.
     let mut destination = PathBuf::new();
     destination.push(core.build_root.clone());
     destination.push(path_prefix);
+
+    if clear_destination {
+     let _result = std::fs::remove_dir_all(&destination).map_err(|e| {
+       PyException::new_err(format!("Failed to clear {}: {e}", destination.display()))
+     });
+    }
 
     block_in_place_and_wait(py, || async move {
       core
