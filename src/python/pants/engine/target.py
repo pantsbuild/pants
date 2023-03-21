@@ -2967,7 +2967,7 @@ def generate_file_based_overrides_field_help_message(
     return "\n".join(
         [
             softwrap(
-                """
+                f"""
                 Override the field values for generated `{generated_target_name}` targets.
 
                 Expects a dictionary of relative file paths and globs to a dictionary for the
