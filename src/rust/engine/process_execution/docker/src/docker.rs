@@ -3,6 +3,7 @@
 use std::collections::{BTreeMap, HashMap};
 use std::ffi::OsStr;
 use std::fmt;
+use std::net::ToSocketAddrs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -196,7 +197,12 @@ async fn credentials_for_image(
   executor: &Executor,
   image: &str,
 ) -> Result<Option<DockerCredentials>, String> {
-  let Some((server, _)) = image.split_once("/") else {
+  // An image name has an optional domain component before the first `/`. While the grammar (linked
+  // below) seems to imply that the domain can be statically differentiated from the path, it's not
+  // clear how. So to confirm that it is a domain, we attempt to DNS resolve it.
+  //
+  // https://github.com/distribution/distribution/blob/e5d5810851d1f17a5070e9b6f940d8af98ea3c29/reference/reference.go#L4-L26
+  let Some((server, _)) = image.split_once('/') else {
     return Ok(None)
   };
   let server = server.to_owned();
@@ -204,6 +210,14 @@ async fn credentials_for_image(
   executor
     .spawn_blocking(
       move || {
+        // Resolve the server as a DNS name to confirm that it is actually a registry.
+        let Ok(_) = (server.as_ref(), 80).to_socket_addrs().or_else(|_| server.to_socket_addrs()) else {
+          return Ok(None)
+        };
+
+        // TODO: https://github.com/keirlawson/docker_credential/issues/7 means that this will only
+        // work for credential helpers and credentials encoded directly in the docker config,
+        // rather than for general credStore implementations.
         let credential = docker_credential::get_credential(&server)
           .map_err(|e| format!("Failed to retrieve credentials for server `{server}`: {e}"))?;
 
