@@ -602,14 +602,18 @@ class SchedulerSession:
     def ensure_directory_digest_persisted(self, digest: Digest) -> None:
         native_engine.ensure_directory_digest_persisted(self.py_scheduler, digest)
 
-    def write_digest(self, digest: Digest, *, path_prefix: str | None = None) -> None:
+    def write_digest(
+        self, digest: Digest, *, path_prefix: str | None = None, clear_destination: bool = False
+    ) -> None:
         """Write a digest to disk, relative to the build root."""
         if path_prefix and PurePath(path_prefix).is_absolute():
             raise ValueError(
                 f"The `path_prefix` {path_prefix} must be a relative path, as the engine writes "
                 "the digest relative to the build root."
             )
-        native_engine.write_digest(self.py_scheduler, self.py_session, digest, path_prefix or "")
+        native_engine.write_digest(
+            self.py_scheduler, self.py_session, digest, path_prefix or "", clear_destination
+        )
 
     def lease_files_in_graph(self) -> None:
         native_engine.lease_files_in_graph(self.py_scheduler, self.py_session)

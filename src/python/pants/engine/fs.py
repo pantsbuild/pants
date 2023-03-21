@@ -282,7 +282,12 @@ class Workspace(SideEffecting):
     _enforce_effects: bool = True
 
     def write_digest(
-        self, digest: Digest, *, path_prefix: Optional[str] = None, side_effecting: bool = True
+        self,
+        digest: Digest,
+        *,
+        path_prefix: Optional[str] = None,
+        clear_destination: bool = False,
+        side_effecting: bool = True,
     ) -> None:
         """Write a digest to disk, relative to the build root.
 
@@ -294,7 +299,9 @@ class Workspace(SideEffecting):
         """
         if side_effecting:
             self.side_effected()
-        self._scheduler.write_digest(digest, path_prefix=path_prefix)
+        self._scheduler.write_digest(
+            digest, path_prefix=path_prefix, clear_destination=clear_destination
+        )
 
 
 @dataclass(frozen=True)

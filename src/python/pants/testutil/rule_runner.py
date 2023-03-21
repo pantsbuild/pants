@@ -585,13 +585,19 @@ class RuleRunner:
             [WrappedTargetRequest(address, description_of_origin="RuleRunner.get_target()")],
         ).target
 
-    def write_digest(self, digest: Digest, *, path_prefix: str | None = None) -> None:
+    def write_digest(
+        self, digest: Digest, *, path_prefix: str | None = None, clear_destination: bool = False
+    ) -> None:
         """Write a digest to disk, relative to the test's build root.
 
         Access the written files by using `os.path.join(rule_runner.build_root, <relpath>)`.
         """
         native_engine.write_digest(
-            self.scheduler.py_scheduler, self.scheduler.py_session, digest, path_prefix or ""
+            self.scheduler.py_scheduler,
+            self.scheduler.py_session,
+            digest,
+            path_prefix or "",
+            clear_destination,
         )
 
     def run_interactive_process(self, request: InteractiveProcess) -> InteractiveProcessResult:

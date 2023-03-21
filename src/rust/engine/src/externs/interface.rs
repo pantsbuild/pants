@@ -1626,6 +1626,7 @@ fn write_digest(
   py_session: &PySession,
   digest: &PyAny,
   path_prefix: String,
+  clear_destination: bool,
 ) -> PyO3Result<()> {
   let core = &py_scheduler.0.core;
   core.executor.enter(|| {
@@ -1638,6 +1639,12 @@ fn write_digest(
     let mut destination = PathBuf::new();
     destination.push(core.build_root.clone());
     destination.push(path_prefix);
+
+    if clear_destination {
+      std::fs::remove_dir_all(&destination).map_err(|e| {
+        PyException::new_err(format!("Failed to clear {}: {e}", destination.display()))
+      })?;
+    }
 
     block_in_place_and_wait(py, || async move {
       core
