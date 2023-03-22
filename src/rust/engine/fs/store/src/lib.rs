@@ -40,6 +40,7 @@ pub use crate::snapshot_ops::{SnapshotOps, SubsetParams};
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::fmt::{self, Debug, Display};
 use std::fs::OpenOptions;
+use std::fs::Permissions as FSPermissions;
 use std::future::Future;
 use std::io::{self, Write};
 use std::os::unix::fs::{MetadataExt, OpenOptionsExt, PermissionsExt};
@@ -1394,31 +1395,51 @@ impl Store {
     perms: Permissions,
     is_executable: bool,
   ) -> Result<(), StoreError> {
-    self
-      .load_file_bytes_with(digest, move |bytes| {
-        let mut f = OpenOptions::new()
-          .create(true)
-          .write(true)
-          .truncate(true)
-          .mode(match perms {
-            Permissions::ReadOnly if is_executable => 0o555,
-            Permissions::ReadOnly => 0o444,
-            Permissions::Writable if is_executable => 0o755,
-            Permissions::Writable => 0o644,
-          })
-          .open(&destination)
+    let mode = match perms {
+      Permissions::ReadOnly if is_executable => 0o555,
+      Permissions::ReadOnly => 0o444,
+      Permissions::Writable if is_executable => 0o755,
+      Permissions::Writable => 0o644,
+    };
+    match self.local.load_from_fs(digest).await? {
+      Some(path) => {
+        tokio::fs::copy(path.clone(), destination.clone())
+          .await
           .map_err(|e| {
             format!(
-              "Error opening file {} for writing: {:?}",
-              destination.display(),
-              e
+              "Error copying bytes from {} to {}: {e}",
+              path.display(),
+              destination.display()
             )
           })?;
-        f.write_all(bytes)
-          .map_err(|e| format!("Error writing file {}: {:?}", destination.display(), e))?;
+        tokio::fs::set_permissions(destination, FSPermissions::from_mode(mode))
+          .await
+          .map_err(|e| format!("Error setting permissions on {}: {e}", path.display()))?;
         Ok(())
-      })
-      .await?
+      }
+      None => {
+        self
+          .load_file_bytes_with(digest, move |bytes| {
+            let mut f = OpenOptions::new()
+              .create(true)
+              .write(true)
+              .truncate(true)
+              .mode(mode)
+              .open(&destination)
+              .map_err(|e| {
+                format!(
+                  "Error opening file {} for writing: {:?}",
+                  destination.display(),
+                  e
+                )
+              })?;
+            f.write_all(bytes)
+              .map_err(|e| format!("Error writing file {}: {:?}", destination.display(), e))?;
+            Ok(())
+          })
+          .await?
+      }
+    }
   }
 
   pub async fn materialize_symlink(
