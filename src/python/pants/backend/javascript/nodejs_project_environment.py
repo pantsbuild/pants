@@ -54,7 +54,9 @@ class NodeJsProjectEnvironment:
     def node_modules_directories(self) -> Iterable[str]:
         yield "node_modules"
         if self.package and not self.project.single_workspace:
-            yield os.path.join(self.relative_workspace_directory(), "node_modules")
+            yield os.path.join(
+                os.path.relpath(os.path.curdir, self.relative_workspace_directory()), "node_modules"
+            )
 
     @property
     def target(self) -> Target | None:
