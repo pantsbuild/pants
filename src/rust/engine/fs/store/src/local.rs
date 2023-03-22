@@ -427,6 +427,8 @@ impl ByteStore {
     let lmdb_directories_root = root.join("directories");
     let fsdb_files_root = root.join("immutable").join("files");
 
+    fs::safe_create_dir_all(path.as_ref())?;
+
     let filesystem_device = root
       .metadata()
       .map_err(|e| {
