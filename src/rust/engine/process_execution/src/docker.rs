@@ -1,11 +1,13 @@
 use std::collections::{BTreeMap, HashMap};
 use std::ffi::OsStr;
 use std::fmt;
+use std::net::ToSocketAddrs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use async_oncecell::OnceCell;
 use async_trait::async_trait;
+use bollard::auth::DockerCredentials;
 use bollard::container::{CreateContainerOptions, LogOutput, RemoveContainerOptions};
 use bollard::exec::StartExecResults;
 use bollard::image::CreateImageOptions;
@@ -146,6 +148,7 @@ impl ImagePullCache {
   pub async fn pull_image(
     &self,
     docker: &Docker,
+    executor: &Executor,
     image: &str,
     platform: &Platform,
     image_pull_scope: ImagePullScope,
@@ -167,7 +170,13 @@ impl ImagePullCache {
     };
 
     image_cell
-      .get_or_try_init(pull_image(docker, image, platform, image_pull_policy))
+      .get_or_try_init(pull_image(
+        docker,
+        executor,
+        image,
+        platform,
+        image_pull_policy,
+      ))
       .await?;
 
     Ok(())
@@ -182,10 +191,63 @@ pub enum ImagePullPolicy {
   OnlyIfLatestOrMissing,
 }
 
+async fn credentials_for_image(
+  executor: &Executor,
+  image: &str,
+) -> Result<Option<DockerCredentials>, String> {
+  // An image name has an optional domain component before the first `/`. While the grammar (linked
+  // below) seems to imply that the domain can be statically differentiated from the path, it's not
+  // clear how. So to confirm that it is a domain, we attempt to DNS resolve it.
+  //
+  // https://github.com/distribution/distribution/blob/e5d5810851d1f17a5070e9b6f940d8af98ea3c29/reference/reference.go#L4-L26
+  let server = if let Some((server, _)) = image.split_once('/') {
+    server
+  } else {
+    return Ok(None);
+  };
+  let server = server.to_owned();
+
+  executor
+    .spawn_blocking(move || {
+      // Resolve the server as a DNS name to confirm that it is actually a registry.
+      if (server.as_ref(), 80)
+        .to_socket_addrs()
+        .or_else(|_| server.to_socket_addrs())
+        .is_err()
+      {
+        return Ok(None);
+      }
+
+      // TODO: https://github.com/keirlawson/docker_credential/issues/7 means that this will only
+      // work for credential helpers and credentials encoded directly in the docker config,
+      // rather than for general credStore implementations.
+      let credential = docker_credential::get_credential(&server)
+        .map_err(|e| format!("Failed to retrieve credentials for server `{server}`: {e}"))?;
+
+      let bollard_credentials = match credential {
+        docker_credential::DockerCredential::IdentityToken(token) => DockerCredentials {
+          identitytoken: Some(token),
+          ..DockerCredentials::default()
+        },
+        docker_credential::DockerCredential::UsernamePassword(username, password) => {
+          DockerCredentials {
+            username: Some(username),
+            password: Some(password),
+            ..DockerCredentials::default()
+          }
+        }
+      };
+
+      Ok(Some(bollard_credentials))
+    })
+    .await
+}
+
 /// Pull an image given its name and the image pull policy. This method is debounced by
 /// the "image pull cache" in the `CommandRunner`.
 async fn pull_image(
   docker: &Docker,
+  executor: &Executor,
   image: &str,
   platform: &Platform,
   policy: ImagePullPolicy,
@@ -243,13 +305,17 @@ async fn pull_image(
         "Pulling Docker image `{image}` because {pull_reason}."
       )),
       |_workunit| async move {
+        let credentials = credentials_for_image(executor, image)
+          .await
+          .map_err(|e| format!("Failed to pull Docker image `{image}`: {e}"))?;
+
         let create_image_options = CreateImageOptions::<String> {
           from_image: image.to_string(),
           platform: docker_platform_identifier(platform).to_string(),
           ..CreateImageOptions::default()
         };
 
-        let mut result_stream = docker.create_image(Some(create_image_options), None, None);
+        let mut result_stream = docker.create_image(Some(create_image_options), None, credentials);
         while let Some(msg) = result_stream.next().await {
           log::trace!("pull {}: {:?}", image, msg);
           match msg {
@@ -257,9 +323,7 @@ async fn pull_image(
               CreateImageInfo {
                 error: Some(error), ..
               } => {
-                let error_msg = format!("Failed to pull Docker image `{image}`: {error}");
-                log::error!("{error_msg}");
-                return Err(error_msg);
+                return Err(format!("Failed to pull Docker image `{image}`: {error}"));
               }
               CreateImageInfo {
                 status: Some(status),
@@ -298,8 +362,13 @@ impl<'a> CommandRunner<'a> {
     immutable_inputs: ImmutableInputs,
     keep_sandboxes: KeepSandboxes,
   ) -> Result<Self, String> {
-    let container_cache =
-      ContainerCache::new(docker, image_pull_cache, &work_dir_base, &immutable_inputs)?;
+    let container_cache = ContainerCache::new(
+      docker,
+      image_pull_cache,
+      executor.clone(),
+      &work_dir_base,
+      &immutable_inputs,
+    )?;
 
     Ok(CommandRunner {
       store,
@@ -673,6 +742,7 @@ type CachedContainer = Arc<OnceCell<(String, NamedCaches)>>;
 struct ContainerCache<'a> {
   docker: &'a DockerOnceCell,
   image_pull_cache: &'a ImagePullCache,
+  executor: Executor,
   work_dir_base: String,
   immutable_inputs_base_dir: String,
   /// Cache that maps image name / platform to a cached container.
@@ -683,6 +753,7 @@ impl<'a> ContainerCache<'a> {
   pub fn new(
     docker: &'a DockerOnceCell,
     image_pull_cache: &'a ImagePullCache,
+    executor: Executor,
     work_dir_base: &Path,
     immutable_inputs: &ImmutableInputs,
   ) -> Result<Self, String> {
@@ -712,6 +783,7 @@ impl<'a> ContainerCache<'a> {
     Ok(Self {
       docker,
       image_pull_cache,
+      executor,
       work_dir_base,
       immutable_inputs_base_dir,
       containers: Mutex::default(),
@@ -722,6 +794,7 @@ impl<'a> ContainerCache<'a> {
   /// (named) caches.
   async fn make_container(
     docker: Docker,
+    executor: Executor,
     image_name: String,
     platform: Platform,
     image_pull_scope: ImagePullScope,
@@ -733,6 +806,7 @@ impl<'a> ContainerCache<'a> {
     image_pull_cache
       .pull_image(
         &docker,
+        &executor,
         &image_name,
         &platform,
         image_pull_scope,
@@ -872,8 +946,8 @@ impl<'a> ContainerCache<'a> {
     platform: &Platform,
     build_generation: &str,
   ) -> Result<(String, NamedCaches), String> {
-    let docker = self.docker.get().await?;
-    let docker = docker.clone();
+    let docker = self.docker.get().await?.clone();
+    let executor = self.executor.clone();
 
     let container_id_cell = {
       let mut containers = self.containers.lock();
@@ -891,6 +965,7 @@ impl<'a> ContainerCache<'a> {
       .get_or_try_init(async move {
         let container_id = Self::make_container(
           docker.clone(),
+          executor,
           image_name.to_string(),
           *platform,
           image_pull_scope,
