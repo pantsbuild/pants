@@ -181,30 +181,28 @@ impl ShardedFSDB {
     &self,
     fingerprint: Fingerprint,
   ) -> Result<TempImmutableLargeFile, String> {
-    let path = self.get_path(fingerprint);
-    if !path.parent().unwrap().exists() {
-      // Throwaway the result as a way of not worrying about race conditions between multiple
-      // threads/processes creating the same parent dirs. If there was an error we'll fail later.
-      let _ = tokio::fs::create_dir_all(path.parent().unwrap()).await;
-    }
+    let dest_path = self.get_path(fingerprint);
+    tokio::fs::create_dir_all(dest_path.parent().unwrap())
+      .await
+      .map_err(|e| format! {"Failed to create local store subdirectory {dest_path:?}: {e}"})?;
 
-    let path2 = path.clone();
-    // Make the tempdir in the same dir as the final file so that materializing the final file doesn't
+    let dest_path2 = dest_path.clone();
+    // Make the tempfile in the same dir as the final file so that materializing the final file doesn't
     // have to worry about parent dirs.
     let named_temp_file = self
       .executor
       .spawn_blocking(
         move || {
-          NamedTempFile::new_in(path.parent().unwrap())
+          NamedTempFile::new_in(dest_path2.parent().unwrap())
             .map_err(|e| format!("Failed to create temp file: {e}"))
         },
         |e| Err(format!("temp file creation task failed: {e}")),
       )
       .await?;
-    let (_, path) = named_temp_file.keep().map_err(|e| e.to_string())?;
+    let (_, tmp_path) = named_temp_file.keep().map_err(|e| e.to_string())?;
     Ok(TempImmutableLargeFile {
-      tmp_path: path,
-      final_path: path2,
+      tmp_path,
+      final_path: dest_path,
     })
   }
 }
@@ -340,7 +338,7 @@ impl UnderlyingByteStore for ShardedFSDB {
     // NB: The ShardLmdb implementation stores a lease time in the future, and then compares the
     // current time to the stored lease time for a fingerprint to determine how long ago it
     // expired. Rather than setting `mtimes` in the future, this implementation instead considers a
-    // file to be expired if it's mtime is outside of the lease time window.
+    // file to be expired if its mtime is outside of the lease time window.
     let root = self.root.clone();
     let expiration_time = SystemTime::now() - self.lease_time;
     self
@@ -506,7 +504,7 @@ impl ByteStore {
   ) -> Result<(), String> {
     // NB: Lease extension happens periodically in the background, so this code needn't be parallel.
     for (digest, entry_type) in digests {
-      if entry_type == EntryType::File && ByteStore::should_use_fsdb(digest.size_bytes) {
+      if ByteStore::should_use_fsdb(entry_type, digest.size_bytes) {
         self.inner.file_fsdb.lease(digest.hash).await?;
       } else {
         let dbs = match entry_type {
@@ -607,7 +605,7 @@ impl ByteStore {
   pub async fn remove(&self, entry_type: EntryType, digest: Digest) -> Result<bool, String> {
     match entry_type {
       EntryType::Directory => self.inner.directory_lmdb.clone()?.remove(digest.hash).await,
-      EntryType::File if ByteStore::should_use_fsdb(digest.size_bytes) => {
+      EntryType::File if ByteStore::should_use_fsdb(entry_type, digest.size_bytes) => {
         self.inner.file_fsdb.remove(digest.hash).await
       }
       EntryType::File => self.inner.file_lmdb.clone()?.remove(digest.hash).await,
@@ -646,7 +644,7 @@ impl ByteStore {
     let mut fsdb_items = vec![];
     let mut lmdb_items = vec![];
     for (fingerprint, bytes) in items {
-      if entry_type == EntryType::File && ByteStore::should_use_fsdb(bytes.len()) {
+      if ByteStore::should_use_fsdb(entry_type, bytes.len()) {
         fsdb_items.push((fingerprint, bytes));
       } else {
         lmdb_items.push((fingerprint, bytes));
@@ -687,7 +685,7 @@ impl ByteStore {
       .await
       .map_err(|e| format!("Failed to hash {src:?}: {e}"))?;
 
-    if entry_type == EntryType::File && ByteStore::should_use_fsdb(digest.size_bytes) {
+    if ByteStore::should_use_fsdb(entry_type, digest.size_bytes) {
       self
         .inner
         .file_fsdb
@@ -721,7 +719,7 @@ impl ByteStore {
     let mut fsdb_digests = vec![];
     let mut lmdb_digests = vec![];
     for digest in digests.iter() {
-      if entry_type == EntryType::File && ByteStore::should_use_fsdb(digest.size_bytes) {
+      if ByteStore::should_use_fsdb(entry_type, digest.size_bytes) {
         fsdb_digests.push(digest);
       }
       // Avoid I/O for this case. This allows some client-provided operations (like
@@ -798,7 +796,7 @@ impl ByteStore {
       }
     };
 
-    let result = if entry_type == EntryType::File && ByteStore::should_use_fsdb(digest.size_bytes) {
+    let result = if ByteStore::should_use_fsdb(entry_type, digest.size_bytes) {
       self
         .inner
         .file_fsdb
@@ -837,8 +835,8 @@ impl ByteStore {
     Ok(digests)
   }
 
-  pub(crate) fn should_use_fsdb(len: usize) -> bool {
-    len >= LARGE_FILE_SIZE_LIMIT
+  pub(crate) fn should_use_fsdb(entry_type: EntryType, len: usize) -> bool {
+    entry_type == EntryType::File && len >= LARGE_FILE_SIZE_LIMIT
   }
 
   pub(crate) fn get_file_fsdb(&self) -> ShardedFSDB {

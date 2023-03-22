@@ -254,9 +254,8 @@ impl RemoteStore {
     };
     self
       .maybe_download(digest, async move {
-        let store_into_fsdb = f_remote.is_none()
-          && entry_type == EntryType::File
-          && ByteStore::should_use_fsdb(digest.size_bytes);
+        let store_into_fsdb =
+          f_remote.is_none() && ByteStore::should_use_fsdb(entry_type, digest.size_bytes);
         if store_into_fsdb {
           let tempfile = local_store
             .get_file_fsdb()
@@ -1307,7 +1306,7 @@ impl Store {
           let path = destination.join(child.name().as_ref());
           let store = store.clone();
           child_futures.push(async move {
-            let can_be_immutable = !mutable_paths.contains(&path) && !force_mutable && can_hardlink;
+            let can_be_immutable = !force_mutable && can_hardlink && !mutable_paths.contains(&path);
 
             match child {
               directory::Entry::File(f) => {
@@ -1369,12 +1368,12 @@ impl Store {
     is_executable: bool,
     can_be_immutable: bool,
   ) -> Result<(), StoreError> {
-    let hardlink_dest = if can_be_immutable {
+    let hardlink_tgt = if can_be_immutable {
       self.local.load_from_fs(digest).await?
     } else {
       None
     };
-    match hardlink_dest {
+    match hardlink_tgt {
       Some(path) => {
         self
           .materialize_hardlink(destination, path.to_str().unwrap().to_string())
