@@ -45,7 +45,7 @@ async def ruff_fix(request: RuffRequest.Batch, ruff: Ruff) -> FixResult:
             ruff_pex,
             argv=("--fix", *conf_args, *ruff.args, *request.files),
             input_digest=input_digest,
-            output_directories=request.files,
+            output_files=request.files,
             description=f"Run ruff on {pluralize(len(request.elements), 'file')}.",
             level=LogLevel.DEBUG,
         ),
