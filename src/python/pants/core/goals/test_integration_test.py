@@ -44,4 +44,6 @@ def test_environment_usage() -> None:
         run().assert_success()
 
         # A debug run should fail (TODO: currently, see #17182).
-        run("--debug").assert_failure()
+        debug_run = run("--debug")
+        debug_run.assert_failure()
+        assert "Only local environments support running processes interactively" in debug_run.stderr
