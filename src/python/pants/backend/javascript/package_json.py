@@ -7,7 +7,7 @@ import json
 import os.path
 from abc import ABC
 from dataclasses import dataclass, field
-from typing import Any, ClassVar, Iterable, Mapping, Optional
+from typing import Any, ClassVar, Iterable, Mapping, Optional, Tuple
 
 from typing_extensions import Literal
 
@@ -192,7 +192,7 @@ class NodePackageScriptsField(SequenceField[NodeScript]):
     @classmethod
     def compute_value(
         cls, raw_value: Optional[Iterable[Any]], address: Address
-    ) -> Optional[tuple[NodeScript, ...]]:
+    ) -> Optional[Tuple[NodeScript, ...]]:
         values = super().compute_value(raw_value, address)
         test_scripts = [value for value in values or () if isinstance(value, NodeTestScript)]
         if len(test_scripts) > 1:
