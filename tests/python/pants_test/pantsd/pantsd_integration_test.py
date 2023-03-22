@@ -354,8 +354,8 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
             ctx.runner(["help"])
             ctx.checker.assert_started()
 
-            # Let any fs events quiesce.
-            time.sleep(10)
+            # See comment in `test_pantsd_invalidation_pants_toml_file`.
+            time.sleep(15)
             ctx.checker.assert_running()
 
             def full_pants_log():
