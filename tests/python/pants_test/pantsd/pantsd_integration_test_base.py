@@ -38,7 +38,7 @@ def attempts(
     msg: str,
     *,
     delay: float = 0.5,
-    timeout: float = 60,
+    timeout: float = 30,
     backoff: float = 1.2,
 ) -> Iterator[None]:
     """A generator that yields a number of times before failing.
