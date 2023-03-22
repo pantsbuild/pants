@@ -117,6 +117,7 @@ DEFAULT_MODULE_MAPPING = {
     "opensearch-py": ("opensearchpy",),
     # opentelemetry
     "opentelemetry-api": ("opentelemetry",),
+    "opentelemetry-exporter-otlp": ("opentelemetry.exporter",),
     "opentelemetry-exporter-otlp-proto-grpc": ("opentelemetry.exporter.otlp.proto.grpc",),
     "opentelemetry-exporter-otlp-proto-http": ("opentelemetry.exporter.otlp.proto.http",),
     "opentelemetry-instrumentation-aiohttp-client": (
@@ -200,6 +201,7 @@ DEFAULT_MODULE_MAPPING = {
     "snowflake-connector-python": ("snowflake.connector",),
     "strawberry-graphql": ("strawberry",),
     "streamlit-aggrid": ("st_aggrid",),
+    "tensorboard": ("torch.utils.tensorboard",),
     "websocket-client": ("websocket",),
 }
 
