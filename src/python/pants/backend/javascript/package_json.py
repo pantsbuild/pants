@@ -707,7 +707,7 @@ async def generate_node_package_targets(
     package_target = NodePackageTarget(
         {
             **request.template,
-            NodePackageNameField.alias: pkg_json.name.replace("@", "__"),
+            NodePackageNameField.alias: pkg_json.name,
             NodePackageVersionField.alias: pkg_json.version,
             NodePackageDependenciesField.alias: [
                 file_tgt.address.spec,
