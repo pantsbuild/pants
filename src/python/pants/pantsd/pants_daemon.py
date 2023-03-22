@@ -44,6 +44,10 @@ _PRESERVED_ENV_VARS = [
     "DOCKER_HOST",
     "DOCKER_CONFIG",
     "DOCKER_CERT_PATH",
+    # Environment variables consumed (indirectly) by the `docker_credential` crate as of
+    # https://github.com/keirlawson/docker_credential/commit/0c42d0f3c76a7d5f699d4d1e8b9747f799cf6116
+    "HOME",
+    "PATH",
 ]
 
 
