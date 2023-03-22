@@ -114,6 +114,7 @@ DEFAULT_MODULE_MAPPING = {
     "mail-parser": ("mailparser",),
     "mysql-connector-python": ("mysql.connector",),
     "opencv-python": ("cv2",),
+    "opensearch-py": ("opensearchpy",),
     # opentelemetry
     "opentelemetry-api": ("opentelemetry",),
     "opentelemetry-exporter-otlp-proto-grpc": ("opentelemetry.exporter.otlp.proto.grpc",),
@@ -199,7 +200,7 @@ DEFAULT_MODULE_MAPPING = {
     "snowflake-connector-python": ("snowflake.connector",),
     "strawberry-graphql": ("strawberry",),
     "streamlit-aggrid": ("st_aggrid",),
-    "opensearch-py": ("opensearchpy",),
+    "websocket-client": ("websocket",),
 }
 
 DEFAULT_TYPE_STUB_MODULE_MAPPING = {
