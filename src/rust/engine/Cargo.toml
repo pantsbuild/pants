@@ -177,4 +177,4 @@ fs = { path = "./fs" }
 env_logger = "0.10.0"
 
 [build-dependencies]
-pyo3-build-config = "0.17"
+pyo3-build-config = "0.18"
