@@ -99,10 +99,6 @@ async def create_archive(request: CreateArchive) -> Digest:
             output_dir_digest = await Get(Digest, CreateDigest([Directory(output_dir)]))
             input_digests.append(output_dir_digest)
 
-    # @TODO: Excludelist from immutable input symlinking everything, as `tar` is symlink-aware
-    # See https://github.com/pantsbuild/pants/issues/17712.
-    # (Currently we ask tar to collect using -h)
-
     input_digest = await Get(Digest, MergeDigests([*files_digests, *input_digests]))
 
     result = await Get(

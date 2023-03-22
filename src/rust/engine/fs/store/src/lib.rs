@@ -1268,6 +1268,7 @@ impl Store {
         destination.clone(),
         true,
         force_mutable,
+        materializing_to_same_filesystem,
         &parent_to_child,
         &mutable_path_ancestors,
         perms,
@@ -1280,6 +1281,7 @@ impl Store {
     destination: PathBuf,
     is_root: bool,
     force_mutable: bool,
+    can_hardlink: bool,
     parent_to_child: &'a HashMap<PathBuf, Vec<directory::Entry>>,
     mutable_paths: &'a BTreeSet<PathBuf>,
     perms: Permissions,
@@ -1305,12 +1307,12 @@ impl Store {
           let path = destination.join(child.name().as_ref());
           let store = store.clone();
           child_futures.push(async move {
-            let can_be_immutable = !mutable_paths.contains(&path) && !force_mutable;
+            let can_be_immutable = !mutable_paths.contains(&path) && !force_mutable && can_hardlink;
 
             match child {
               directory::Entry::File(f) => {
                 store
-                  .materialize_file_maybe_symlink(
+                  .materialize_file_maybe_hardlink(
                     path,
                     f.digest(),
                     perms,
@@ -1330,6 +1332,7 @@ impl Store {
                     path.clone(),
                     false,
                     mutable_paths.contains(&path) || force_mutable,
+                    can_hardlink,
                     parent_to_child,
                     mutable_paths,
                     perms,
@@ -1358,7 +1361,7 @@ impl Store {
     .boxed()
   }
 
-  async fn materialize_file_maybe_symlink(
+  async fn materialize_file_maybe_hardlink(
     &self,
     destination: PathBuf,
     digest: Digest,
@@ -1366,15 +1369,15 @@ impl Store {
     is_executable: bool,
     can_be_immutable: bool,
   ) -> Result<(), StoreError> {
-    let symlink_dest = if can_be_immutable {
+    let hardlink_dest = if can_be_immutable {
       self.local.load_from_fs(digest).await?
     } else {
       None
     };
-    match symlink_dest {
+    match hardlink_dest {
       Some(path) => {
         self
-          .materialize_symlink(destination, path.to_str().unwrap().to_string())
+          .materialize_hardlink(destination, path.to_str().unwrap().to_string())
           .await
       }
       None => {

@@ -214,7 +214,6 @@ impl process_execution::CommandRunner for CommandRunner {
           &self.immutable_inputs,
           None,
           None,
-          true,
         )
         .await?;
 

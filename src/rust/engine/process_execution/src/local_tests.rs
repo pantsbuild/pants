@@ -740,7 +740,6 @@ async fn prepare_workdir_exclusive_relative() {
     &immutable_inputs,
     None,
     None,
-    true,
   )
   .await
   .unwrap();
