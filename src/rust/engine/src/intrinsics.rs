@@ -699,6 +699,7 @@ fn docker_resolve_image(
     IMAGE_PULL_CACHE
       .pull_image(
         docker,
+        &context.core.executor,
         &image_name,
         &platform,
         image_pull_scope,
