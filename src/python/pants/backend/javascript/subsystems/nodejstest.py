@@ -84,7 +84,7 @@ class NodeJSTest(Subsystem):
 
             - `{distdir}` is replaced with the Pants `distdir`.
 
-            - `{target_spec}` is replaced with the address of the applicable `go_package` target with `/`
+            - `{target_spec}` is replaced with the address of the applicable `javascript_test` target with `/`
             characters replaced with dots (`.`).
             """
         ),
