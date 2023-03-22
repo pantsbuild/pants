@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
+import itertools
 import json
 import os.path
 from abc import ABC
@@ -11,6 +12,7 @@ from typing import Any, ClassVar, Iterable, Mapping, Optional
 from typing_extensions import Literal
 
 from pants.backend.project_info import dependencies
+from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.base.specs import AncestorGlobSpec, RawSpecs
 from pants.build_graph.address import Address
 from pants.build_graph.build_file_aliases import BuildFileAliases
@@ -21,7 +23,7 @@ from pants.core.target_types import (
 from pants.core.util_rules import stripped_source_files
 from pants.engine import fs
 from pants.engine.collection import Collection, DeduplicatedCollection
-from pants.engine.fs import DigestContents, FileContent, PathGlobs
+from pants.engine.fs import DigestContents, FileContent, GlobExpansionConjunction, PathGlobs
 from pants.engine.internals import graph
 from pants.engine.internals.native_engine import Digest, Snapshot
 from pants.engine.internals.selectors import Get, MultiGet
@@ -143,13 +145,31 @@ class NodeTestScript(NodeScript):
     def supports_coverage(self) -> bool:
         return bool(self.coverage_entry_point) or bool(self.coverage_args)
 
-    def coverage_globs(self) -> PathGlobs:
-        return self.coverage_globs_for(self.coverage_output_files, self.coverage_output_directories)
+    def coverage_globs(self, working_directory: str) -> PathGlobs:
+        return self.coverage_globs_for(
+            working_directory,
+            self.coverage_output_files,
+            self.coverage_output_directories,
+            GlobMatchErrorBehavior.ignore,
+        )
 
     @classmethod
-    def coverage_globs_for(cls, files: tuple[str, ...], directories: tuple[str, ...]) -> PathGlobs:
+    def coverage_globs_for(
+        cls,
+        working_directory: str,
+        files: tuple[str, ...],
+        directories: tuple[str, ...],
+        error_behaviour: GlobMatchErrorBehavior,
+        conjunction: GlobExpansionConjunction = GlobExpansionConjunction.any_match,
+        description_of_origin: str | None = None,
+    ) -> PathGlobs:
         dir_globs = (os.path.join(directory, "*") for directory in directories)
-        return PathGlobs((*files, *dir_globs))
+        return PathGlobs(
+            (os.path.join(working_directory, glob) for glob in itertools.chain(files, dir_globs)),
+            conjunction=conjunction,
+            glob_match_error_behavior=error_behaviour,
+            description_of_origin=description_of_origin,
+        )
 
 
 class NodePackageScriptsField(SequenceField[NodeScript]):

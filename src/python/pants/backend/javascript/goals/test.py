@@ -22,6 +22,7 @@ from pants.backend.javascript.target_types import (
     JSTestSourceField,
     JSTestTimeoutField,
 )
+from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.build_graph.address import Address
 from pants.core.goals.test import (
     CoverageData,
@@ -39,7 +40,7 @@ from pants.core.util_rules import source_files
 from pants.core.util_rules.distdir import DistDir
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
-from pants.engine.fs import DigestSubset
+from pants.engine.fs import DigestSubset, GlobExpansionConjunction
 from pants.engine.internals import graph, platform_rules
 from pants.engine.internals.native_engine import Digest, MergeDigests, Snapshot
 from pants.engine.internals.selectors import Get, MultiGet
@@ -62,6 +63,7 @@ class JSCoverageData(CoverageData):
     address: Address
     output_files: tuple[str, ...]
     output_directories: tuple[str, ...]
+    working_directory: str
 
 
 class JSCoverageDataCollection(CoverageDataCollection[JSCoverageData]):
@@ -156,7 +158,7 @@ async def run_javascript_tests(
             Snapshot,
             DigestSubset(
                 result.output_digest,
-                test_script.coverage_globs(),
+                test_script.coverage_globs(installation.project_env.relative_workspace_directory()),
             ),
         )
         coverage_data = JSCoverageData(
@@ -164,6 +166,7 @@ async def run_javascript_tests(
             field_set.address,
             output_files=test_script.coverage_output_files,
             output_directories=test_script.coverage_output_directories,
+            working_directory=installation.project_env.relative_workspace_directory(),
         )
 
     return TestResult.from_fallible_process_result(
@@ -185,7 +188,14 @@ async def collect_coverage_reports(
                 Snapshot,
                 DigestSubset(
                     report.snapshot.digest,
-                    NodeTestScript.coverage_globs_for((file,), report.output_directories),
+                    NodeTestScript.coverage_globs_for(
+                        report.working_directory,
+                        (file,),
+                        report.output_directories,
+                        GlobMatchErrorBehavior.error,
+                        GlobExpansionConjunction.all_match,
+                        description_of_origin="the JS coverage report collection rule",
+                    ),
                 ),
             ),
         )
