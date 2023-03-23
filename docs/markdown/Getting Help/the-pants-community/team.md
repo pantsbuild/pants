@@ -58,6 +58,7 @@ Pants open source project has had many team members in over a decade. The curren
 | **Shantanu Kumar**      |                                                                                                          |
 | **Tansy Arron-Walker**  | "Writing my first task in the new engine was really exciting!"                                           |
 | **Thales Menato**       | "Making sure Pants can run even under heavily secured work environments!"                                |
+| **Tobias Nilsson**       | "Implementing Javascript dependency inference and nodejs workspaces the Pants way"                                |
 
 ***
 
