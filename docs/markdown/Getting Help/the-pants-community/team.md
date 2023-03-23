@@ -4,6 +4,7 @@ slug: "team"
 excerpt: ""
 hidden: false
 createdAt: "2022-08-15T22:36:48.659Z"
+updatedAt: "2023-03-23T00:28:12.217Z"
 ---
 Pants open source project has had many team members in over a decade. The current team is comprised of elected Contributors and Maintainers, who are nominated based on [criteria](doc:the-pants-community#how-is-the-community-structured) including demonstrated commitment to the project and a track record of contributions to the project and community.
 
@@ -58,6 +59,7 @@ Pants open source project has had many team members in over a decade. The curren
 | **Shantanu Kumar**      |                                                                                                          |
 | **Tansy Arron-Walker**  | "Writing my first task in the new engine was really exciting!"                                           |
 | **Thales Menato**       | "Making sure Pants can run even under heavily secured work environments!"                                |
+| **Tobias Nilsson**       | "Implementing Javascript dependency inference and nodejs workspaces the Pants way"                                |
 
 ***
 
