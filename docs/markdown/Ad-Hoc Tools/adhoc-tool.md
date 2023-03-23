@@ -79,7 +79,7 @@ There are several targets included in Pants with the prefix `experimental_wrap_a
 
 ## Using externally-managed tools
 
-_(Our [JavaScript demo](https://github.org/pantsbuild/example-adhoc/tree/main/javascript)) demonstrates the use of externally-managed binaries._
+_Our [JavaScript demo](https://github.com/pantsbuild/example-adhoc/tree/main/javascript) demonstrates the use of externally-managed binaries._
 
 Some build processes need to make use of tools that can't be modeled within a Pants codebase. The `system_binary` target lets you make use of a binary that is installed on the system. `system_binary` targets may be specified as `runnable` or `runnable_dependency` values for `adhoc_tool`.
 
