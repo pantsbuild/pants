@@ -1403,15 +1403,13 @@ impl Store {
     };
     match self.local.load_from_fs(digest).await? {
       Some(path) => {
-        tokio::fs::copy(&path, &destination)
-          .await
-          .map_err(|e| {
-            format!(
-              "Error copying bytes from {} to {}: {e}",
-              path.display(),
-              destination.display()
-            )
-          })?;
+        tokio::fs::copy(&path, &destination).await.map_err(|e| {
+          format!(
+            "Error copying bytes from {} to {}: {e}",
+            path.display(),
+            destination.display()
+          )
+        })?;
         tokio::fs::set_permissions(destination, FSPermissions::from_mode(mode))
           .await
           .map_err(|e| format!("Error setting permissions on {}: {e}", path.display()))?;
