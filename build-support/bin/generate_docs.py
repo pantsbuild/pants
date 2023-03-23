@@ -242,6 +242,7 @@ def run_pants_help_all() -> dict[str, Any]:
         "pants.backend.codegen.thrift.apache.python",
         "pants.backend.docker",
         "pants.backend.docker.lint.hadolint",
+        "pants.backend.experimental.adhoc",
         "pants.backend.experimental.codegen.protobuf.go",
         "pants.backend.experimental.codegen.protobuf.java",
         "pants.backend.experimental.codegen.protobuf.scala",
