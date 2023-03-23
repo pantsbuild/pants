@@ -4,10 +4,9 @@ from textwrap import dedent
 
 import pytest
 
-from pants.build_graph.address import Address, AddressInput, ResolveError
+from pants.build_graph.address import Address, ResolveError
 from pants.core import register
 from pants.core.target_types import GenericTarget
-from pants.engine.addresses import Address
 from pants.testutil.rule_runner import RuleRunner, engine_error
 from pants.version import PANTS_SEMVER
 
@@ -29,13 +28,16 @@ def test_get_with_version():
     assert tgt is not None
 
 
+# NOTE: We Stringify PANTS_SEMVER in parametrize to ensure the generated test name is understandable.
+
+
 @pytest.mark.parametrize(
     "comparator,comparand",
     [
         (">", "2.0"),
-        (">=", PANTS_SEMVER),
-        ("==", PANTS_SEMVER),
-        ("<=", PANTS_SEMVER),
+        (">=", str(PANTS_SEMVER)),
+        ("==", str(PANTS_SEMVER)),
+        ("<=", str(PANTS_SEMVER)),
         ("<", "3.0"),
         ("!=", "1.0"),
     ],
@@ -61,12 +63,12 @@ def test_get_version_comparable(comparator, comparand):
 @pytest.mark.parametrize(
     "comparator,comparand",
     [
-        (">", "2.0"),
-        (">=", PANTS_SEMVER),
-        ("==", PANTS_SEMVER),
-        ("<=", PANTS_SEMVER),
-        ("<", "3.0"),
-        ("!=", "1.0"),
+        (">", "3.0"),
+        (">=", "3.0"),
+        ("==", "3.0"),
+        ("<=", "1.0"),
+        ("<", "1.0"),
+        ("!=", str(PANTS_SEMVER)),
     ],
 )
 def test_get_version_not_comparable(comparator, comparand):
@@ -76,8 +78,7 @@ def test_get_version_not_comparable(comparator, comparand):
         {
             "BUILD": dedent(
                 f"""\
-                condition = PANTS_VERSION {comparator} "{comparand}"
-                if not condition:
+                if PANTS_VERSION {comparator} "{comparand}":
                     target(name=f'test{{PANTS_VERSION}}')
                 """
             ),
