@@ -12,7 +12,7 @@ Configure your default Python interpreter compatibility constraints in `pants.to
 
 ```toml pants.toml
 [python]
-interpreter_constraints = ["CPython==3.8.*"]
+interpreter_constraints = ["CPython==3.9.*"]
 ```
 
 The value can be any valid Requirement-style strings. You can use multiple strings to OR constraints, and use commas within each string to AND constraints. For example:
