@@ -14,6 +14,7 @@ async-oncecell = "0.2"
 # TODO: Waiting on https://github.com/Aeledfyr/deepsize/pull/{30,31,32}.
 deepsize = { git = "https://github.com/stuhood/deepsize.git", rev = "5c8bee5443fcafe4aaa9274490d354412d0955c1" }
 fs = { path = ".." }
+fs-set-times = "0.19"
 futures = "0.3"
 glob = "0.3.0"
 grpc_util = { path = "../../grpc_util" }

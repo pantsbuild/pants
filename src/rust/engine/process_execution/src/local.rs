@@ -760,8 +760,8 @@ pub async fn prepare_workdir(
       .materialize_directory(
         workdir_path,
         complete_input_digest,
+        false,
         &mutable_paths,
-        Some(immutable_inputs),
         Permissions::Writable,
       )
       .await?;

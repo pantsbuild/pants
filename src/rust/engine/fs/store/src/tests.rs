@@ -22,8 +22,7 @@ use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use workunit_store::WorkunitStore;
 
 use crate::{
-  EntryType, FileContent, ImmutableInputs, Snapshot, Store, StoreError, StoreFileByDigest,
-  UploadSummary, MEGABYTES,
+  EntryType, FileContent, Snapshot, Store, StoreError, StoreFileByDigest, UploadSummary, MEGABYTES,
 };
 
 pub(crate) const STORE_BATCH_API_SIZE_LIMIT: usize = 4 * 1024 * 1024;
@@ -202,10 +201,11 @@ async fn load_file_falls_back_and_backfills_for_huge_file() {
     .file(&testdata)
     .build();
 
-  assert!(
-    load_file_bytes(&new_store(dir.path(), &cas.address()), testdata.digest()).await
-      == Ok(testdata.bytes()),
-    "Read from CAS"
+  assert_eq!(
+    load_file_bytes(&new_store(dir.path(), &cas.address()), testdata.digest())
+      .await
+      .unwrap(),
+    testdata.bytes()
   );
   assert_eq!(1, cas.read_request_count());
   assert!(
@@ -1131,8 +1131,8 @@ async fn materialize_missing_directory() {
     .materialize_directory(
       materialize_dir.path().to_owned(),
       TestDirectory::recursive().directory_digest(),
+      false,
       &BTreeSet::new(),
-      None,
       Permissions::Writable,
     )
     .await
@@ -1165,8 +1165,8 @@ async fn materialize_directory(perms: Permissions, executable_file: bool) {
     .materialize_directory(
       materialize_dir.path().to_owned(),
       recursive_testdir.directory_digest(),
+      false,
       &BTreeSet::new(),
-      None,
       perms,
     )
     .await
@@ -1630,8 +1630,8 @@ async fn explicitly_overwrites_already_existing_file() {
     .materialize_directory(
       dir_to_write_to.path().to_owned(),
       contents_dir.directory_digest(),
+      false,
       &BTreeSet::new(),
-      None,
       Permissions::Writable,
     )
     .await
@@ -1688,8 +1688,6 @@ async fn big_file_immutable_link() {
 
   let store_dir = TempDir::new().unwrap();
   let store = new_local_store(store_dir.path());
-  let immutable_inputs_dir = TempDir::new().unwrap();
-  let immutable_inputs = ImmutableInputs::new(store.clone(), immutable_inputs_dir.path()).unwrap();
   store
     .record_directory(&nested_directory, false)
     .await
@@ -1707,11 +1705,11 @@ async fn big_file_immutable_link() {
     .materialize_directory(
       materialize_dir.path().to_owned(),
       directory_digest,
+      false,
       &BTreeSet::from([
         RelativePath::new("output_file").unwrap(),
         RelativePath::new("output_dir").unwrap(),
       ]),
-      Some(&immutable_inputs),
       Permissions::Writable,
     )
     .await
