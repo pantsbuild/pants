@@ -535,7 +535,16 @@ fn interactive_process(
         (py_interactive_process.extract().unwrap(), py_process, process_config)
       });
       match process_config.environment.strategy {
-        ProcessExecutionStrategy::Docker(_) | ProcessExecutionStrategy::RemoteExecution(_) => Err("InteractiveProcess should not set docker_image or remote_execution".to_owned()),
+        ProcessExecutionStrategy::Docker(_) | ProcessExecutionStrategy::RemoteExecution(_) => {
+          // TODO: #17182 covers adding support for running processes interactively in Docker.
+          Err(
+            format!(
+              "Only local environments support running processes \
+               interactively, but a {} environment was used.",
+              process_config.environment.strategy.strategy_type(),
+            )
+          )
+        },
         _ => Ok(())
       }?;
       let mut process = ExecuteProcess::lift(&context.core.store(), py_process, process_config).await?.process;
