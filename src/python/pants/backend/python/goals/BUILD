@@ -14,6 +14,7 @@ python_tests(
             "timeout": 480,
         },
         "export_integration_test.py": {"timeout": 300},
+        "export_test.py": {"timeout": 90},
         "lockfile_test.py": {"timeout": 120},
         "package_pex_binary_integration_test.py": {
             "dependencies": [":platforms"],
