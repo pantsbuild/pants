@@ -7,6 +7,7 @@ backend_packages.add = [
   "pants.backend.build_files.fix.deprecations",
   "pants.backend.build_files.fmt.black",
   "pants.backend.python",
+  "pants.backend.experimental.adhoc",
   "pants.backend.experimental.python.packaging.pyoxidizer",
   "pants.backend.python.lint.autoflake",
   "pants.backend.python.lint.black",
