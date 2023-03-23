@@ -9,7 +9,7 @@ from abc import ABC, ABCMeta
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import PurePath
-from typing import Any, ClassVar, Iterable, Optional, TypeVar, cast
+from typing import Any, ClassVar, Iterable, Optional, Sequence, TypeVar, cast
 
 from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
 from pants.core.goals.package import BuiltPackage, EnvironmentAwarePackageRequest, PackageFieldSet
@@ -715,28 +715,26 @@ async def _get_test_batches(
 @rule_helper
 async def _run_debug_tests(
     batches: Iterable[TestRequest.Batch],
+    environment_names: Sequence[EnvironmentName],
     test_subsystem: TestSubsystem,
     debug_adapter: DebugAdapterSubsystem,
-    local_environment_name: ChosenLocalEnvironmentName,
 ) -> Test:
-    # TODO: Because these are interactive, they are always pinned to the local environment.
-    # See https://github.com/pantsbuild/pants/issues/17182
     debug_requests = await MultiGet(
         (
             Get(
                 TestDebugRequest,
-                {batch: TestRequest.Batch, local_environment_name.val: EnvironmentName},
+                {batch: TestRequest.Batch, environment_name: EnvironmentName},
             )
             if not test_subsystem.debug_adapter
             else Get(
                 TestDebugAdapterRequest,
-                {batch: TestRequest.Batch, local_environment_name.val: EnvironmentName},
+                {batch: TestRequest.Batch, environment_name: EnvironmentName},
             )
         )
-        for batch in batches
+        for batch, environment_name in zip(batches, environment_names)
     )
     exit_code = 0
-    for debug_request in debug_requests:
+    for debug_request, environment_name in zip(debug_requests, environment_names):
         if test_subsystem.debug_adapter:
             logger.info(
                 softwrap(
@@ -751,7 +749,7 @@ async def _run_debug_tests(
             InteractiveProcessResult,
             {
                 debug_request.process: InteractiveProcess,
-                local_environment_name.val: EnvironmentName,
+                environment_name: EnvironmentName,
             },
         )
         if debug_result.exit_code != 0:
@@ -800,11 +798,6 @@ async def run_tests(
         test_subsystem,
     )
 
-    if test_subsystem.debug or test_subsystem.debug_adapter:
-        return await _run_debug_tests(
-            test_batches, test_subsystem, debug_adapter, local_environment_name
-        )
-
     environment_names = await MultiGet(
         Get(
             EnvironmentName,
@@ -813,6 +806,11 @@ async def run_tests(
         )
         for batch in test_batches
     )
+
+    if test_subsystem.debug or test_subsystem.debug_adapter:
+        return await _run_debug_tests(
+            test_batches, environment_names, test_subsystem, debug_adapter
+        )
 
     results = await MultiGet(
         Get(TestResult, {batch: TestRequest.Batch, environment_name: EnvironmentName})
