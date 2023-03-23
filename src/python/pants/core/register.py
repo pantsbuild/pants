@@ -59,6 +59,7 @@ from pants.engine.internals.parametrize import Parametrize
 from pants.goal import anonymous_telemetry, stats_aggregator
 from pants.source import source_root
 from pants.vcs import git
+from pants.version import PANTS_SEMVER
 
 wrap_as_resources = wrap_source_rule_and_target(ResourceSourceField, "resources")
 
@@ -121,6 +122,7 @@ def target_types():
 def build_file_aliases():
     return BuildFileAliases(
         objects={
+            "PANTS_VERSION": PANTS_SEMVER,
             "http_source": http_source,
             "per_platform": per_platform,
             "parametrize": Parametrize,
