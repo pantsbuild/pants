@@ -1403,7 +1403,7 @@ impl Store {
     };
     match self.local.load_from_fs(digest).await? {
       Some(path) => {
-        tokio::fs::copy(path.clone(), destination.clone())
+        tokio::fs::copy(&path, &destination)
           .await
           .map_err(|e| {
             format!(
