@@ -49,13 +49,12 @@ async def pypi_audit(request: PypiAuditRequest, python_setup: PythonSetup) -> Au
         lockfile_audit_result = audit_constraints_strings(
             loaded_lockfile.as_constraints_strings, session
         )
-        raise ValueError(lockfile_audit_result)
         audit_results_by_lockfile[lockfile_path] = lockfile_audit_result
 
     return AuditResults(
         results=tuple(
-            AuditResult(lockfile=lockfile, report=resolve)
-            for resolve, lockfile in lockfile_paths
+            AuditResult(lockfile=lockfile, report=audit_results_by_lockfile[lockfile])
+            for _, lockfile in lockfile_paths
         ),
         auditor_name="pypi_auditor",
     )

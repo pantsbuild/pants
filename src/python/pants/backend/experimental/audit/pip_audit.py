@@ -24,7 +24,6 @@ def audit_constraints_strings(constraints_strings, session):
 
 
 def audit_constraints_string(package_name: str, version: str, session: requests.Session):
-
     url = f"https://pypi.org/pypi/{package_name}/{str(version)}/json"
     response = session.get(url=url)
     response.raise_for_status()
