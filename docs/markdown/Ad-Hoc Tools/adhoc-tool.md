@@ -56,7 +56,7 @@ Generally, `adhoc_tool` targets are run to produce outputs that can be supplied 
 
 Files are captured relative to the build root by default: this is useful when passing results to further `adhoc_tool` targets defined in the same `BUILD` file. If this behavior is not right for you, for example, if you are producing an artifact for packaging, you can change the root of the outputs using the `root_output_directory` field.
 
-Finally, if you want to capture `stdout` or `stderr` from your tool, you can use the `stdout` or `stderr` fields. These specify filenames where those streams will be dumped once the process completes. Note that these files are specified in addition to those from the `output_files` field, and an error will occur if the filename occurs in the outputs arising from `output_files` or `output_directoreis` and the contents of that file are different.
+Finally, if you want to capture `stdout` or `stderr` from your tool, you can use the `stdout` or `stderr` fields. These specify filenames where those streams will be dumped once the process completes. Note that these files are specified in addition to those from the `output_files` field, and an error will occur if the filename occurs in the outputs arising from `output_files` or `output_directories` and the contents of that file are different.
 
 
 ## Chaining processes together
