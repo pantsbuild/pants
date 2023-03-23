@@ -34,7 +34,7 @@ adhoc_tool(
 
 The tool will be run with values from `args` specified as arguments. By default, the process' working directory will be the directory where the `BUILD` file is defined. This can be adjusted using the `workdir` field.
 
-When run by `adhoc_tool`, Pants assumes that the inputs provided to the process -- that is, the values of the `adhoc_tool`'s fields, and the contents of the dependencies -- fully describe the output. Output values will be [cached](doc:how-does-pants-work#caching) by Pants, and future invocations with identical inputs will be retrieved from the cache instead of being re-executed. If your process has behavior that is not fully defined by its inputs, Pants' behavior may be unexpected or inconsistent.
+When run by `adhoc_tool`, Pants assumes that the inputs provided to the process -- that is, the values of the `adhoc_tool`'s fields, and the contents of the runnable and execution dependencies -- fully describe the output. Output values will be [cached](doc:how-does-pants-work#caching) by Pants, and future invocations with identical inputs will be retrieved from the cache instead of being re-executed. If your process has behavior that is not fully defined by its inputs, Pants' behavior may be unexpected or inconsistent.
 
 
 ## Specifying dependencies
