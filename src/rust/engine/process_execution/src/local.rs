@@ -850,7 +850,11 @@ pub fn setup_run_sh_script(
     let formatted_assignment = format!("{key}={arg_str}");
     env_var_strings.push(formatted_assignment);
   }
-  let stringified_env_vars: String = env_var_strings.join(" ");
+  let stringified_env_var_export: String = if env_var_strings.is_empty() {
+    "".to_owned()
+  } else {
+    "export ".to_owned() + &env_var_strings.join(" ")
+  };
 
   // Shell-quote every command-line argument, as necessary.
   let mut full_command_line: Vec<String> = vec![];
@@ -878,7 +882,7 @@ pub fn setup_run_sh_script(
   let full_script = format!(
     "#!/bin/bash
 # This command line should execute the same process as pants did internally.
-export {stringified_env_vars}
+{stringified_env_var_export}
 cd {stringified_cwd}
 {stringified_command_line}
 ",
