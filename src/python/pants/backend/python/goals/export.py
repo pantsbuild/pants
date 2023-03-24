@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import logging
 import os
 import uuid
@@ -34,7 +35,7 @@ from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.environment import EnvironmentName
 from pants.engine.internals.native_engine import AddPrefix, Digest, MergeDigests
 from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.process import ProcessResult
+from pants.engine.process import ProcessCacheScope, ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import Target
 from pants.engine.unions import UnionMembership, UnionRule, union
@@ -177,10 +178,21 @@ async def do_export(
         export_format = export_subsys.options.py_resolve_format
 
     if export_format == PythonResolveExportFormat.symlinked_immutable_virtualenv:
-        requirements_venv_pex = await Get(VenvPex, PexRequest, req.pex_request)
+        # NB: The symlink performance hack leaks an internal named cache location as output (via
+        #  the symlink target). If the user partially or fully deletes the named cache, the symlink
+        #  target might point to a malformed venv, or it might not exist at all.
+        #  To prevent returning a symlink to a busted or nonexistent venv from a cached process
+        #  (or a memoized rule) we force the process to rerun per-session.
+        #  This does mean re-running the process superfluously when the named cache is intact, but
+        #  that is generally fast, since all wheels are already cached, and it's best to be safe.
+        requirements_venv_pex = await Get(
+            VenvPex,
+            PexRequest,
+            dataclasses.replace(req.pex_request, cache_scope=ProcessCacheScope.PER_SESSION),
+        )
         py_version = await _get_full_python_version(requirements_venv_pex)
-        # Note that for symlinking we ignore qualify_path_with_python_version and always qualify, since
-        # we need some name for the symlink anyway.
+        # Note that for symlinking we ignore qualify_path_with_python_version and always qualify,
+        # since we need some name for the symlink anyway.
         dest = f"{dest_prefix}/{py_version}"
         description = (
             f"symlink to immutable virtualenv for {req.resolve_name or 'requirements'} "
