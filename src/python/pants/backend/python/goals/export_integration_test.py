@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import os
 import platform
+import shutil
 from dataclasses import dataclass
 from textwrap import dedent
 from typing import List, Mapping, MutableMapping
@@ -13,6 +14,7 @@ import pytest
 
 from pants.backend.python.goals.export import PythonResolveExportFormat
 from pants.testutil.pants_integration_test import run_pants, setup_tmpdir
+from pants.util.contextutil import temporary_dir
 
 SOURCES = {
     "3rdparty/BUILD": dedent(
@@ -41,15 +43,8 @@ class _ToolConfig:
 
 EXPORTED_TOOLS: List[_ToolConfig] = [
     _ToolConfig(name="add-trailing-comma", version="2.2.3", experimental=True),
-    _ToolConfig(name="autoflake", version="1.3.1", experimental=True),
     _ToolConfig(name="bandit", version="1.6.2", takes_ics=False),
     _ToolConfig(name="black", version="22.3.0"),
-    _ToolConfig(name="docformatter", version="1.3.1"),
-    _ToolConfig(name="flake8", version="4.0.1", takes_ics=False),
-    _ToolConfig(name="isort", version="5.10.1"),
-    _ToolConfig(name="pylint", version="2.13.1", takes_ics=False),
-    _ToolConfig(name="pyupgrade", version="2.31.1", experimental=True),
-    _ToolConfig(name="yapf", version="0.32.0"),
     _ToolConfig(name="mypy", version="0.940", backend_prefix="typecheck"),
     _ToolConfig(name="pytest", version="7.1.0", backend_prefix=None, takes_ics=False),
 ]
@@ -100,8 +95,9 @@ def build_config(tmpdir: str, py_resolve_format: PythonResolveExportFormat) -> M
 )
 def test_export(py_resolve_format: PythonResolveExportFormat) -> None:
     with setup_tmpdir(SOURCES) as tmpdir:
+        resolve_names = ["a", "b", *(tool.name for tool in EXPORTED_TOOLS)]
         run_pants(
-            ["generate-lockfiles", "export", f"{tmpdir}/::"],
+            ["generate-lockfiles", "export", *(f"--resolve={name}" for name in resolve_names)],
             config=build_config(tmpdir, py_resolve_format),
         ).assert_success()
 
@@ -133,9 +129,7 @@ def test_export(py_resolve_format: PythonResolveExportFormat) -> None:
         ), f"expected dist-info for ansicolors '{expected_ansicolors_dir}' does not exist"
 
     for tool_config in EXPORTED_TOOLS:
-        export_dir = os.path.join(export_prefix, "tools", tool_config.name)
-        if py_resolve_format == PythonResolveExportFormat.symlinked_immutable_virtualenv:
-            export_dir = os.path.join(export_dir, platform.python_version())
+        export_dir = os.path.join(export_prefix, tool_config.name, platform.python_version())
         assert os.path.isdir(export_dir), f"expected export dir '{export_dir}' does not exist"
 
         # NOTE: Not every tool implements --version so this is the best we can do.
@@ -147,3 +141,42 @@ def test_export(py_resolve_format: PythonResolveExportFormat) -> None:
         assert os.path.isdir(
             expected_tool_dir
         ), f"expected dist-info for {tool_config.name} '{expected_tool_dir}' does not exist"
+
+
+def test_symlinked_venv_resilience() -> None:
+    with temporary_dir() as named_caches:
+        pex_root = os.path.join(os.path.realpath(named_caches), "pex_root")
+        with setup_tmpdir(SOURCES) as tmpdir:
+            run_pants(
+                [
+                    f"--named-caches-dir={named_caches}",
+                    "generate-lockfiles",
+                    "export",
+                    "--resolve=a",
+                ],
+                config=build_config(
+                    tmpdir, PythonResolveExportFormat.symlinked_immutable_virtualenv
+                ),
+            ).assert_success()
+
+            def check():
+                export_dir = os.path.join(
+                    "dist", "export", "python", "virtualenvs", "a", platform.python_version()
+                )
+                assert os.path.islink(export_dir)
+                export_dir_tgt = os.readlink(export_dir)
+                assert os.path.isdir(export_dir_tgt)
+                assert os.path.commonpath([pex_root, export_dir_tgt]) == pex_root
+
+            check()
+
+            shutil.rmtree(pex_root)
+
+            run_pants(
+                [f"--named-caches-dir={named_caches}", "export", "--resolve=a"],
+                config=build_config(
+                    tmpdir, PythonResolveExportFormat.symlinked_immutable_virtualenv
+                ),
+            ).assert_success()
+
+            check()

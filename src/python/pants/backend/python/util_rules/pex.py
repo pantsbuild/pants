@@ -164,6 +164,7 @@ class PexRequest(EngineAwareParameter):
     additional_args: tuple[str, ...]
     pex_path: tuple[Pex, ...]
     description: str | None = dataclasses.field(compare=False)
+    cache_scope: ProcessCacheScope
 
     def __init__(
         self,
@@ -184,6 +185,7 @@ class PexRequest(EngineAwareParameter):
         additional_args: Iterable[str] = (),
         pex_path: Iterable[Pex] = (),
         description: str | None = None,
+        cache_scope: ProcessCacheScope = ProcessCacheScope.SUCCESSFUL,
     ) -> None:
         """A request to create a PEX from its inputs.
 
@@ -220,6 +222,7 @@ class PexRequest(EngineAwareParameter):
         :param pex_path: Pex files to add to the PEX_PATH.
         :param description: A human-readable description to render in the dynamic UI when building
             the Pex.
+        :param cache_scope: The cache scope for the underlying pex cli invocation process.
         """
         object.__setattr__(self, "output_filename", output_filename)
         object.__setattr__(self, "internal_only", internal_only)
@@ -241,6 +244,7 @@ class PexRequest(EngineAwareParameter):
         object.__setattr__(self, "additional_args", tuple(additional_args))
         object.__setattr__(self, "pex_path", tuple(pex_path))
         object.__setattr__(self, "description", description)
+        object.__setattr__(self, "cache_scope", cache_scope)
 
         self.__post_init__()
 
@@ -629,6 +633,7 @@ async def build_pex(
             output_files=output_files,
             output_directories=output_directories,
             concurrency_available=requirements_setup.concurrency_available,
+            cache_scope=request.cache_scope,
         ),
     )
 
