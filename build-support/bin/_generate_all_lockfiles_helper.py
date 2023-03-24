@@ -39,7 +39,6 @@ from pants.backend.python.subsystems.ipython import IPython
 from pants.backend.python.subsystems.lambdex import Lambdex
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
-from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.subsystems.setuptools import Setuptools
 from pants.backend.python.subsystems.setuptools_scm import SetuptoolsSCM
 from pants.backend.python.subsystems.twine import TwineSubsystem
@@ -199,7 +198,7 @@ def update_internal_lockfiles(specified: list[str] | None) -> None:
     args = [
         "./pants",
         "--concurrent",
-        f"--python-interpreter-constraints={repr(PythonSetup.default_interpreter_constraints)}",
+        "--python-interpreter-constraints=['CPython>=3.7,<4']",
         # `generate_all_lockfiles.sh` will have overridden this option to solve the chicken
         # and egg problem from https://github.com/pantsbuild/pants/issues/12457. We must
         # restore it here so that the lockfile gets generated properly.
@@ -215,7 +214,7 @@ def update_default_lockfiles(specified: list[str] | None) -> None:
     args = [
         "./pants",
         "--concurrent",
-        f"--python-interpreter-constraints={repr(PythonSetup.default_interpreter_constraints)}",
+        "--python-interpreter-constraints=['CPython>=3.7,<4']",
         *itertools.chain.from_iterable(tool.args for tool in AllTools),
         # `generate_all_lockfiles.sh` will have overridden this option to solve the chicken
         # and egg problem from https://github.com/pantsbuild/pants/issues/12457. We must

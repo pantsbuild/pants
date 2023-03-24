@@ -20,7 +20,6 @@ from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.core.goals.generate_lockfiles import GenerateLockfileResult, UserGenerateLockfiles
 from pants.engine.fs import DigestContents
-from pants.engine.rules import SubsystemRule
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import strip_prefix
@@ -198,7 +197,7 @@ def test_multiple_resolves() -> None:
     rule_runner = RuleRunner(
         rules=[
             setup_user_lockfile_requests,
-            SubsystemRule(PythonSetup),
+            *PythonSetup.rules(),
             QueryRule(UserGenerateLockfiles, [RequestedPythonUserResolveNames]),
         ],
         target_types=[PythonRequirementTarget],
@@ -236,9 +235,7 @@ def test_multiple_resolves() -> None:
     assert set(result) == {
         GeneratePythonLockfile(
             requirements=FrozenOrderedSet(["a"]),
-            interpreter_constraints=InterpreterConstraints(
-                PythonSetup.default_interpreter_constraints
-            ),
+            interpreter_constraints=InterpreterConstraints(["CPython>=3.7,<4"]),
             resolve_name="a",
             lockfile_dest="a.lock",
             diff=False,

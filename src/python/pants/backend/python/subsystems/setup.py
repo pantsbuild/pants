@@ -10,7 +10,6 @@ from typing import Iterable, List, Optional, TypeVar, cast
 
 from packaging.utils import canonicalize_name
 
-from pants.base.deprecated import warn_or_error
 from pants.core.goals.generate_lockfiles import UnrecognizedResolveNamesError
 from pants.option.option_types import (
     BoolOption,
@@ -60,7 +59,7 @@ class PythonSetup(Subsystem):
     options_scope = "python"
     help = "Options for Pants's Python backend."
 
-    default_interpreter_constraints = ["CPython>=3.7,<4"]
+    default_interpreter_constraints = None
     default_interpreter_universe = ["2.7", "3.5", "3.6", "3.7", "3.8", "3.9", "3.10", "3.11"]
 
     _interpreter_constraints = StrListOption(
@@ -83,26 +82,17 @@ class PythonSetup(Subsystem):
 
     @memoized_property
     def interpreter_constraints(self) -> tuple[str, ...]:
-        # TODO: In 2.17.0.dev1 we should set the default above to None and tweak the message here
-        #  appropriately.
-        if self.options.is_default("interpreter_constraints"):
-            warn_or_error(
-                "2.17.0.dev1",
-                "the factory default interpreter constraints value",
+        if self._interpreter_constraints is None:
+            raise ValueError(
                 softwrap(
                     f"""\
-                    You're relying on the default interpreter constraints that ship with Pants
-                    ({self._interpreter_constraints}). This default is deprecated, in favor of
-                    explicitly specifying the interpreter versions your code is actually intended to
-                    run against.
+                    The `[python].interpreter_constraints` option should be set in `pants.toml` in order to
+                    constrain the version of Python that is used with your code.
 
-                    You specify interpreter constraints using the `interpreter_constraints` option in
-                    the `[python]` section of pants.toml. We recommend constraining to a single interpreter
-                    minor version if you can, e.g., `interpreter_constraints = ['==3.11.*']`, or at
-                    least a small number of interpreter minor versions, e.g., `interpreter_constraints
-                    = ['>=3.10,<3.12']`. See {doc_url("python-interpreter-compatibility")} for details.
-
-                    Set explicit interpreter constraints now to get rid of this warning.
+                    We recommend constraining to a single interpreter minor version if you can, e.g.,
+                    `interpreter_constraints = ['==3.11.*']`, or at least a small number of interpreter minor
+                    versions, e.g., `interpreter_constraints = ['>=3.10,<3.12']`. See
+                    {doc_url("python-interpreter-compatibility")} for details.
                     """
                 ),
             )
