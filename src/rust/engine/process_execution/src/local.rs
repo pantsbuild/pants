@@ -876,11 +876,10 @@ pub fn setup_run_sh_script(
 
   let stringified_command_line: String = full_command_line.join(" ");
   let full_script = format!(
-    "#!/bin/bash
+    "#!/usr/bin/env bash
 # This command line should execute the same process as pants did internally.
-export {stringified_env_vars}
 cd {stringified_cwd}
-{stringified_command_line}
+env -i {stringified_env_vars} {stringified_command_line}
 ",
   );
 
