@@ -7,20 +7,8 @@ import itertools
 import logging
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import (
-    Any,
-    Callable,
-    Iterable,
-    Iterator,
-    NamedTuple,
-    Sequence,
-    Tuple,
-    Type,
-    TypeVar,
-    cast,
-)
+from typing import Any, Callable, Iterable, Iterator, NamedTuple, Sequence, Tuple, Type, TypeVar
 
-import colors
 from typing_extensions import Protocol
 
 from pants.base.specs import Specs
@@ -67,12 +55,9 @@ class FixResult(EngineAwareReturnType):
         process_result: ProcessResult | FallibleProcessResult,
         *,
         strip_chroot_path: bool = False,
-        strip_formatting: bool = False,
     ) -> FixResult:
         def prep_output(s: bytes) -> str:
-            chroot = strip_v2_chroot_path(s) if strip_chroot_path else s.decode()
-            formatting = cast(str, colors.strip_color(chroot)) if strip_formatting else chroot
-            return formatting
+            return strip_v2_chroot_path(s) if strip_chroot_path else s.decode()
 
         return FixResult(
             input=request.snapshot,

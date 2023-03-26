@@ -235,7 +235,6 @@ def main() -> None:
         create_parser().print_help()
         return
     args = create_parser().parse_args()
-    assert args.tool
 
     if args.all:
         update_internal_lockfiles(specified=None)
