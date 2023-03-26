@@ -68,6 +68,7 @@ async def partition(request: SemgrepRequest.PartitionRequest, semgrep: Semgrep) 
         includes=semgrep.file_glob_include, excludes=semgrep.file_glob_exclude
     ).matches(request.files)
 
+    # TODO: partition by config
     return Partitions.single_partition(matching_files)
 
 
