@@ -34,7 +34,6 @@ backend_packages.add = [
   "pants.backend.experimental.scala.debug_goals",
   "pants.backend.experimental.visibility",
   "pants.backend.tools.preamble",
-  "pants.backend.experimental.tools.semgrep",
   "pants.explorer.server",
   "internal_plugins.releases",
   "internal_plugins.test_lockfile_fixtures",
@@ -312,6 +311,3 @@ master = "src/python/pants/notes/master.rst"
 "2.15.x" = "src/python/pants/notes/2.15.x.md"
 "2.16.x" = "src/python/pants/notes/2.16.x.md"
 "2.17.x" = "src/python/pants/notes/2.17.x.md"
-
-[semgrep]
-include = ["**/*.py"]
