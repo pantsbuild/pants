@@ -96,9 +96,9 @@ async def lint(
         Digest, MergeDigests((input_files.digest, config_files.snapshot.digest, settings))
     )
 
-    # TODO: support running this under the fix goal if with --autofix if there's rules that have
-    # fixes... but not all rules have fixes, so we need to be running with --error/checking exit
-    # codes, which FixResult doesn't currently support.
+    # TODO: https://github.com/pantsbuild/pants/issues/18430 support running this with --autofix
+    # under the fix goal... but not all rules have fixes, so we need to be running with
+    # --error/checking exit codes, which FixResult doesn't currently support.
     result = await Get(
         FallibleProcessResult,
         VenvPexProcess(
