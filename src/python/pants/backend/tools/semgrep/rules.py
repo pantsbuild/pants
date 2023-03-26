@@ -6,13 +6,11 @@ from dataclasses import dataclass
 from typing import Any, Iterable
 
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
-from pants.core.goals.fix import FixFilesRequest, FixResult
 from pants.core.goals.lint import LintFilesRequest, LintResult
 from pants.core.util_rules.partitions import PartitionerType, Partitions
 from pants.engine.fs import (
     CreateDigest,
     Digest,
-    DigestSubset,
     FileContent,
     GlobMatchErrorBehavior,
     MergeDigests,
@@ -24,7 +22,7 @@ from pants.engine.rules import Get, MultiGet, Rule, collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.option.global_options import GlobalOptions
 from pants.util.logging import LogLevel
-from pants.util.strutil import pluralize, softwrap
+from pants.util.strutil import pluralize
 
 from .subsystem import Semgrep
 
