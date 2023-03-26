@@ -47,12 +47,13 @@ class SemgrepConfigFiles:
 async def gather_config_files(
     request: SemgrepConfigFilesRequest, semgrep: Semgrep
 ) -> SemgrepConfigFiles:
+    globs = [f"**/{glob}" for glob in semgrep.config_globs]
     config_files_snapshot = await Get(
         Snapshot,
         PathGlobs(
-            globs=[f"**/{name}" for name in semgrep.config_names],
+            globs=globs,
             glob_match_error_behavior=GlobMatchErrorBehavior.error,
-            description_of_origin="the option `--semgrep-config-names`",
+            description_of_origin="the option `--semgrep-config-globs`",
         ),
     )
     return SemgrepConfigFiles(snapshot=config_files_snapshot)
