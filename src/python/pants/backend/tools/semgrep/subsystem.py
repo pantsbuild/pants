@@ -39,7 +39,7 @@ class Semgrep(PythonToolBase):
     config_names = StrListOption(
         "--config-names",
         default=[".semgrep.yml", ".semgrep/"],
-        help="File and directory names that contain that contain semgrep rule configurations"
+        help="File and directory names that contain that contain semgrep rule configurations",
     )
 
     file_glob_include = StrListOption(
@@ -63,9 +63,7 @@ class SemgrepLockfileSentinel(GeneratePythonToolLockfileSentinel):
 
 
 @rule
-def setup_semgrep_lockfile(
-    _: SemgrepLockfileSentinel, semgrep: Semgrep
-) -> GeneratePythonLockfile:
+def setup_semgrep_lockfile(_: SemgrepLockfileSentinel, semgrep: Semgrep) -> GeneratePythonLockfile:
     return GeneratePythonLockfile.from_tool(semgrep)
 
 

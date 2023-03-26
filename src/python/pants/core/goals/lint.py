@@ -8,8 +8,8 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any, Callable, ClassVar, Iterable, Iterator, Sequence, TypeVar, cast
 
-from typing_extensions import Protocol, final
 import colors
+from typing_extensions import Protocol, final
 
 from pants.base.specs import Specs
 from pants.core.goals.multi_tool_goal_helper import (

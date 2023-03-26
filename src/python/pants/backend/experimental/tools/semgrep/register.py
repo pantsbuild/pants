@@ -1,7 +1,8 @@
 # Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-"""Lightweight static analysis for many languages. Find bug variants with patterns that look like source code.
+"""Lightweight static analysis for many languages. Find bug variants with patterns that look like
+source code.
 
 See https://semgrep.dev/ for details.
 """

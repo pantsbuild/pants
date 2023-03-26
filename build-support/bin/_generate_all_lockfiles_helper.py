@@ -47,8 +47,8 @@ from pants.backend.python.typecheck.mypy.subsystem import MyPy
 from pants.backend.scala.lint.scalafmt.subsystem import ScalafmtSubsystem
 from pants.backend.scala.subsystems.scalatest import Scalatest
 from pants.backend.terraform.dependency_inference import TerraformHcl2Parser
-from pants.backend.tools.yamllint.subsystem import Yamllint
 from pants.backend.tools.semgrep.subsystem import Semgrep
+from pants.backend.tools.yamllint.subsystem import Yamllint
 from pants.jvm.resolve.jvm_tool import JvmToolBase
 from pants.util.strutil import softwrap
 
