@@ -9,7 +9,15 @@ from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProc
 from pants.core.goals.fix import FixFilesRequest, FixResult
 from pants.core.goals.lint import LintFilesRequest, LintResult
 from pants.core.util_rules.partitions import PartitionerType, Partitions
-from pants.engine.fs import CreateDigest, Digest, DigestSubset, FileContent, MergeDigests, PathGlobs
+from pants.engine.fs import (
+    CreateDigest,
+    Digest,
+    DigestSubset,
+    FileContent,
+    GlobMatchErrorBehavior,
+    MergeDigests,
+    PathGlobs,
+)
 from pants.engine.internals.native_engine import FilespecMatcher, Snapshot
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, Rule, collect_rules, rule
@@ -42,7 +50,12 @@ async def gather_config_files(
     request: SemgrepConfigFilesRequest, semgrep: Semgrep
 ) -> SemgrepConfigFiles:
     config_files_snapshot = await Get(
-        Snapshot, PathGlobs(globs=[f"**/{name}" for name in semgrep.config_names])
+        Snapshot,
+        PathGlobs(
+            globs=[f"**/{name}" for name in semgrep.config_names],
+            glob_match_error_behavior=GlobMatchErrorBehavior.error,
+            description_of_origin="the option `--semgrep-config-names`",
+        ),
     )
     return SemgrepConfigFiles(snapshot=config_files_snapshot)
 
