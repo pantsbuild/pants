@@ -82,9 +82,9 @@ class AdhocToolOutputDependenciesField(AdhocToolDependenciesField):
     alias: ClassVar[str] = "output_dependencies"
 
     help = help_text(
-        lambda: f"""
-        Any dependencies that need to be present as transitive dependencies whenever the outputs
-        of this target are consumed as dependencies.
+        lambda: """
+        Any dependencies that need to be present (as transitive dependencies) whenever the outputs
+        of this target are consumed (including as dependencies).
         """
     )
 
@@ -100,7 +100,7 @@ class AdhocToolExecutionDependenciesField(SpecialCasedDependencies):
 
         Dependencies specified here are those required to make the command complete successfully
         (e.g. file inputs, packages compiled from other targets, etc), but NOT required to make
-        the output side-effects useful. Dependencies that are required to use the side-effects
+        the outputs of the command useful. Dependencies that are required to use the outputs
         produced by this command should be specified using the
         `{AdhocToolOutputDependenciesField.alias}` field.
 

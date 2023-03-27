@@ -8,7 +8,6 @@ from pants.backend.adhoc.target_types import (
     AdhocToolArgumentsField,
     AdhocToolExecutionDependenciesField,
     AdhocToolLogOutputField,
-    AdhocToolOutputDependenciesField,
     AdhocToolOutputDirectoriesField,
     AdhocToolOutputFilesField,
     AdhocToolOutputRootDirField,
@@ -103,7 +102,6 @@ async def run_in_sandbox_request(
         ResolveExecutionDependenciesRequest(
             target.address,
             target.get(AdhocToolExecutionDependenciesField).value,
-            target.get(AdhocToolOutputDependenciesField).value,
             target.get(AdhocToolRunnableDependenciesField).value,
         ),
     )
