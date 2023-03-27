@@ -56,7 +56,7 @@ use fs::{
   FileEntry, Link, PathStat, Permissions, RelativePath, SymlinkBehavior, SymlinkEntry,
   EMPTY_DIRECTORY_DIGEST,
 };
-use futures::future::{self, BoxFuture, Either, FutureExt, TryFutureExt};
+use futures::future::{self, BoxFuture, Either, FutureExt};
 use grpc_util::prost::MessageExt;
 use hashing::{Digest, Fingerprint};
 use local::ByteStore;
@@ -1244,7 +1244,9 @@ impl Store {
           {
             let destination = destination.clone();
             move || {
-              fs::safe_create_dir_all(&destination)?;
+              std::fs::create_dir_all(&destination).map_err(|e| {
+                format!("Failed to create directory {}: {e}", destination.display())
+              })?;
               let dest_device = destination
                 .metadata()
                 .map_err(|e| {
@@ -1259,8 +1261,7 @@ impl Store {
           },
           |e| Err(format!("Directory creation task failed: {e}")),
         )
-        .await
-        .map_err(|e| format!("Failed to create directory {}: {e}", destination.display()))?
+        .await?
     };
 
     self
@@ -1289,16 +1290,9 @@ impl Store {
     let store = self.clone();
     async move {
       if !is_root {
-        let destination2 = destination.clone();
-        store
-          .local
-          .executor()
-          .spawn_blocking(
-            move || fs::safe_create_dir(&destination2),
-            |e| Err(format!("Directory creation task failed: {e}")),
-          )
-          .map_err(|e| format!("Failed to create directory {}: {e}", destination.display(),))
-          .await?;
+        tokio::fs::create_dir(&destination)
+          .await
+          .map_err(|e| format!("Failed to create directory {}: {e}", destination.display()))?;
       }
 
       if let Some(children) = parent_to_child.get(&destination) {

@@ -833,40 +833,5 @@ pub fn increase_limits() -> Result<String, String> {
   }
 }
 
-///
-/// Like std::fs::create_dir_all, except handles concurrent calls among multiple
-/// threads or processes. Originally lifted from rustc.
-///
-pub fn safe_create_dir_all_ioerror(path: &Path) -> Result<(), io::Error> {
-  match fs::create_dir(path) {
-    Ok(()) => return Ok(()),
-    Err(ref e) if e.kind() == io::ErrorKind::AlreadyExists => return Ok(()),
-    Err(ref e) if e.kind() == io::ErrorKind::NotFound => {}
-    Err(e) => return Err(e),
-  }
-  match path.parent() {
-    Some(p) => safe_create_dir_all_ioerror(p)?,
-    None => return Ok(()),
-  }
-  match fs::create_dir(path) {
-    Ok(()) => Ok(()),
-    Err(ref e) if e.kind() == io::ErrorKind::AlreadyExists => Ok(()),
-    Err(e) => Err(e),
-  }
-}
-
-pub fn safe_create_dir_all(path: &Path) -> Result<(), String> {
-  safe_create_dir_all_ioerror(path)
-    .map_err(|e| format!("Failed to create dir {path:?} due to {e:?}"))
-}
-
-pub fn safe_create_dir(path: &Path) -> Result<(), String> {
-  match fs::create_dir(path) {
-    Ok(()) => Ok(()),
-    Err(ref e) if e.kind() == io::ErrorKind::AlreadyExists => Ok(()),
-    Err(err) => Err(format!("{err}")),
-  }
-}
-
 #[cfg(test)]
 mod tests;

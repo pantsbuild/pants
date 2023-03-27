@@ -20,7 +20,7 @@ use crate::types::Types;
 
 use async_oncecell::OnceCell;
 use cache::PersistentCache;
-use fs::{safe_create_dir_all_ioerror, GitignoreStyleExcludes, PosixFS};
+use fs::{GitignoreStyleExcludes, PosixFS};
 use futures::FutureExt;
 use graph::{self, EntryId, Graph, InvalidationResult, NodeContext};
 use hashing::Digest;
@@ -495,7 +495,7 @@ impl Core {
       None
     };
 
-    safe_create_dir_all_ioerror(&local_store_options.store_dir).map_err(|e| {
+    std::fs::create_dir_all(&local_store_options.store_dir).map_err(|e| {
       format!(
         "Error making directory {:?}: {:?}",
         local_store_options.store_dir, e
