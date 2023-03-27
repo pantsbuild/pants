@@ -80,16 +80,11 @@ class AdhocToolOutputDirectoriesField(StringSequenceField):
 class AdhocToolOutputDependenciesField(AdhocToolDependenciesField):
     supports_transitive_excludes = True
     alias: ClassVar[str] = "output_dependencies"
-    deprecated_alias = "dependencies"
-    deprecated_alias_removal_version = "2.17.0.dev1"
 
     help = help_text(
-        lambda: f"""
-        Any dependencies that the output artifacts require in order to be effectively consumed.
-
-        To enable legacy use cases, if `{AdhocToolExecutionDependenciesField.alias}` is `None`,
-        these dependencies will be materialized in the execution sandbox. This behavior is
-        deprecated, and will be removed in version 2.17.0.dev1.
+        lambda: """
+        Any dependencies that need to be present (as transitive dependencies) whenever the outputs
+        of this target are consumed (including as dependencies).
         """
     )
 
@@ -105,7 +100,7 @@ class AdhocToolExecutionDependenciesField(SpecialCasedDependencies):
 
         Dependencies specified here are those required to make the command complete successfully
         (e.g. file inputs, packages compiled from other targets, etc), but NOT required to make
-        the output side-effects useful. Dependencies that are required to use the side-effects
+        the outputs of the command useful. Dependencies that are required to use the outputs
         produced by this command should be specified using the
         `{AdhocToolOutputDependenciesField.alias}` field.
 
@@ -231,8 +226,6 @@ class AdhocToolOutputRootDirField(StringField):
 
 class AdhocToolTarget(Target):
     alias: ClassVar[str] = "adhoc_tool"
-    deprecated_alias = "experimental_run_in_sandbox"
-    deprecated_alias_removal_version = "2.17.0.dev1"
     core_fields = (
         *COMMON_TARGET_FIELDS,
         AdhocToolRunnableField,
