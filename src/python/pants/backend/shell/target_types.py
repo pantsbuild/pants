@@ -269,22 +269,6 @@ class ShellCommandCommandField(StringField):
     help = "Shell command to execute.\n\nThe command is executed as 'bash -c <command>' by default."
 
 
-class ShellCommandOutputsField(StringSequenceField):
-    alias = "outputs"
-    help = help_text(
-        """
-        Specify the shell command output files and directories, relative to the value of `workdir`.
-
-        Use a trailing slash on directory names, i.e. `my_dir/`.
-
-        Relative paths (including `..`) may be used, as long as the path does not ascend further
-        than the build root.
-        """
-    )
-    removal_hint = "To fix, use `output_files` and `output_directories` instead."
-    removal_version = "2.17.0.dev1"
-
-
 class ShellCommandOutputFilesField(AdhocToolOutputFilesField):
     pass
 
@@ -377,7 +361,6 @@ class ShellCommandTarget(Target):
         ShellCommandRunnableDependenciesField,
         ShellCommandCommandField,
         ShellCommandLogOutputField,
-        ShellCommandOutputsField,
         ShellCommandOutputFilesField,
         ShellCommandOutputDirectoriesField,
         ShellCommandSourcesField,
