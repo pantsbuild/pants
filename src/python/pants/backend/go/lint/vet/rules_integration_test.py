@@ -28,7 +28,6 @@ from pants.core.goals.lint import LintResult, Partitions
 from pants.core.util_rules import source_files
 from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, Digest, FileContent
-from pants.engine.rules import SubsystemRule
 from pants.engine.target import Target
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
@@ -52,7 +51,7 @@ def rule_runner() -> RuleRunner:
             *assembly.rules(),
             QueryRule(Partitions, [GoVetRequest.PartitionRequest]),
             QueryRule(LintResult, [GoVetRequest.Batch]),
-            SubsystemRule(GoVetSubsystem),
+            *GoVetSubsystem.rules(),
         ],
     )
     rule_runner.set_options([], env_inherit={"PATH"})

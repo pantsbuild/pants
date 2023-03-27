@@ -44,7 +44,6 @@ from pants.backend.python.goals.setup_py import (
     validate_commands,
 )
 from pants.backend.python.macros.python_artifact import PythonArtifact
-from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.subsystems.setuptools import PythonDistributionFieldSet
 from pants.backend.python.target_types import (
     PexBinary,
@@ -62,7 +61,7 @@ from pants.core.target_types import rules as core_target_types_rules
 from pants.engine.addresses import Address
 from pants.engine.fs import Snapshot
 from pants.engine.internals.scheduler import ExecutionError
-from pants.engine.rules import SubsystemRule, rule
+from pants.engine.rules import rule
 from pants.engine.target import InvalidFieldException
 from pants.engine.unions import UnionRule
 from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error
@@ -118,7 +117,7 @@ def chroot_rule_runner() -> RuleRunner:
             *python_sources.rules(),
             *target_types_rules.rules(),
             setup_kwargs_plugin,
-            SubsystemRule(SetupPyGeneration),
+            *SetupPyGeneration.rules(),
             UnionRule(SetupKwargsRequest, PluginSetupKwargsRequest),
             QueryRule(DistBuildChroot, (DistBuildChrootRequest,)),
             QueryRule(DistBuildSources, (DistBuildChrootRequest,)),
@@ -135,9 +134,7 @@ def assert_chroot(
     interpreter_constraints: InterpreterConstraints | None = None,
 ) -> None:
     if interpreter_constraints is None:
-        interpreter_constraints = InterpreterConstraints(
-            PythonSetup.default_interpreter_constraints
-        )
+        interpreter_constraints = InterpreterConstraints(["CPython>=3.7,<4"])
 
     tgt = rule_runner.get_target(addr)
     req = DistBuildChrootRequest(
@@ -164,7 +161,7 @@ def assert_chroot_error(rule_runner: RuleRunner, addr: Address, exc_cls: type[Ex
             [
                 DistBuildChrootRequest(
                     ExportedTarget(tgt),
-                    InterpreterConstraints(PythonSetup.default_interpreter_constraints),
+                    InterpreterConstraints(["CPython>=3.7,<4"]),
                 )
             ],
         )
@@ -782,7 +779,7 @@ def test_get_sources() -> None:
             [
                 DistBuildChrootRequest(
                     ExportedTarget(owner_tgt),
-                    InterpreterConstraints(PythonSetup.default_interpreter_constraints),
+                    InterpreterConstraints(["CPython>=3.7,<4"]),
                 )
             ],
         )
@@ -866,7 +863,7 @@ def test_get_requirements() -> None:
             get_owned_dependencies,
             get_exporting_owner,
             *target_types_rules.rules(),
-            SubsystemRule(SetupPyGeneration),
+            *SetupPyGeneration.rules(),
             QueryRule(ExportedTargetRequirements, (DependencyOwner,)),
         ]
     )
@@ -944,7 +941,7 @@ def test_get_requirements_with_exclude() -> None:
             get_owned_dependencies,
             get_exporting_owner,
             *target_types_rules.rules(),
-            SubsystemRule(SetupPyGeneration),
+            *SetupPyGeneration.rules(),
             QueryRule(ExportedTargetRequirements, (DependencyOwner,)),
         ]
     )
@@ -989,7 +986,7 @@ def test_get_requirements_with_override_dependency_issue_17593() -> None:
             get_owned_dependencies,
             get_exporting_owner,
             *target_types_rules.rules(),
-            SubsystemRule(SetupPyGeneration),
+            *SetupPyGeneration.rules(),
             QueryRule(ExportedTargetRequirements, (DependencyOwner,)),
         ]
     )
@@ -1409,7 +1406,7 @@ def test_no_dist_type_selected() -> None:
             *dists.rules(),
             *python_sources.rules(),
             *target_types_rules.rules(),
-            SubsystemRule(SetupPyGeneration),
+            *SetupPyGeneration.rules(),
             QueryRule(BuiltPackage, (PythonDistributionFieldSet,)),
         ],
         target_types=[PythonDistribution],

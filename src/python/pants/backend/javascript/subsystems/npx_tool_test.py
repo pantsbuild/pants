@@ -23,7 +23,7 @@ def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             *nodejs.rules(),
-            *CowsayTool.rules(),  # type: ignore[call-arg]
+            *CowsayTool.rules(),
             QueryRule(CowsayTool, []),
         ],
     )

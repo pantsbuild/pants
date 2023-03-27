@@ -83,11 +83,11 @@ class PythonSetup(Subsystem):
 
     @memoized_property
     def interpreter_constraints(self) -> tuple[str, ...]:
-        # TODO: In 2.17.0.dev1 we should set the default above to None and tweak the message here
+        # TODO: In 2.17.0.dev2 we should set the default above to None and tweak the message here
         #  appropriately.
         if self.options.is_default("interpreter_constraints"):
             warn_or_error(
-                "2.17.0.dev1",
+                "2.17.0.dev2",
                 "the factory default interpreter constraints value",
                 softwrap(
                     f"""\
