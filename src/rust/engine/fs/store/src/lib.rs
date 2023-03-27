@@ -236,6 +236,20 @@ impl RemoteStore {
       .map(|&()| ())
   }
 
+  async fn remote_writer(
+    remote_store: &remote::ByteStore,
+    digest: Digest,
+    file: tokio::fs::File,
+  ) -> Result<tokio::fs::File, String> {
+    remote_store.load_file(digest, file).await?.ok_or_else(|| {
+      StoreError::MissingDigest(
+        "Was not present in either the local or remote store".to_owned(),
+        digest,
+      )
+      .to_string()
+    })
+  }
+
   /// Download the digest to the local byte store from this remote store. The function `f_remote`
   /// can be used to validate the bytes (NB. if provided, the whole value will be buffered into
   /// memory to provide the `Bytes` argument, and thus `f_remote` should only be used for small digests).
@@ -247,31 +261,25 @@ impl RemoteStore {
     f_remote: Option<&(dyn Fn(Bytes) -> Result<(), String> + Send + Sync + 'static)>,
   ) -> Result<(), StoreError> {
     let remote_store = self.store.clone();
-    let create_missing = || {
-      StoreError::MissingDigest(
-        "Was not present in either the local or remote store".to_owned(),
-        digest,
-      )
-    };
     self
       .maybe_download(digest, async move {
         let store_into_fsdb =
           f_remote.is_none() && ByteStore::should_use_fsdb(entry_type, digest.size_bytes);
         if store_into_fsdb {
-          let tempfile = local_store
+          local_store
             .get_file_fsdb()
-            .get_tempfile(digest.hash)
+            .write_using(digest.hash, |file| {
+              Self::remote_writer(&remote_store, digest, file)
+            })
             .await?;
-          remote_store
-            .load_file(digest, tempfile.open().await?)
-            .await?
-            .ok_or_else(create_missing)?;
-          tempfile.persist().await?;
         } else {
-          let bytes = remote_store
-            .load_bytes(digest)
-            .await?
-            .ok_or_else(create_missing)?;
+          let bytes = remote_store.load_bytes(digest).await?.ok_or_else(|| {
+            StoreError::MissingDigest(
+              "Was not present in either the local or remote store".to_owned(),
+              digest,
+            )
+            .to_string()
+          })?;
           if let Some(f_remote) = f_remote {
             f_remote(bytes.clone())?;
           }
