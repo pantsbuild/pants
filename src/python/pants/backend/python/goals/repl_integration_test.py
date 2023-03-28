@@ -114,7 +114,7 @@ def test_eagerly_validate_roots_have_common_resolve(rule_runner: RuleRunner) -> 
             )
         }
     )
-    with engine_error(NoCompatibleResolveException, contains="./pants peek"):
+    with engine_error(NoCompatibleResolveException, contains="pants peek"):
         run_repl(
             rule_runner,
             ["//:t1", "//:t2"],

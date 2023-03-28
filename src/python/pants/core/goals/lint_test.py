@@ -400,8 +400,8 @@ def test_summary(rule_runner: RuleRunner) -> None:
         ✓ SuccessfulFormatter succeeded.
         ✓ SuccessfulLinter succeeded.
 
-        (One or more formatters failed. Run `./pants fmt` to fix.)
-        (One or more fixers failed. Run `./pants fix` to fix.)
+        (One or more formatters failed. Run `pants fmt` to fix.)
+        (One or more fixers failed. Run `pants fix` to fix.)
         """
     )
 
@@ -428,8 +428,8 @@ def test_summary(rule_runner: RuleRunner) -> None:
         ✕ FailingLinter failed.
         ✓ FilesLinter succeeded.
 
-        (One or more formatters failed. Run `./pants fmt` to fix.)
-        (One or more fixers failed. Run `./pants fix` to fix.)
+        (One or more formatters failed. Run `pants fmt` to fix.)
+        (One or more fixers failed. Run `pants fix` to fix.)
         """
     )
 
@@ -467,7 +467,7 @@ def test_summary(rule_runner: RuleRunner) -> None:
         ✓ SuccessfulFormatter succeeded.
         ✓ SuccessfulLinter succeeded.
 
-        (One or more formatters failed. Run `./pants fmt` to fix.)
+        (One or more formatters failed. Run `pants fmt` to fix.)
         """
     )
 
@@ -488,7 +488,7 @@ def test_summary(rule_runner: RuleRunner) -> None:
         ✓ SuccessfulFixer succeeded.
         ✓ SuccessfulLinter succeeded.
 
-        (One or more fixers failed. Run `./pants fix` to fix.)
+        (One or more fixers failed. Run `pants fix` to fix.)
         """
     )
 
