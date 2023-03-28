@@ -152,6 +152,17 @@ pub(crate) struct ShardedFSDB {
   dest_initializer: Arc<Mutex<HashMap<Fingerprint, Arc<OnceCell<()>>>>>,
 }
 
+enum VerifiedCopyError {
+  CopyFailure(String),
+  DoesntMatch,
+}
+
+impl From<String> for VerifiedCopyError {
+  fn from(err: String) -> Self {
+    Self::CopyFailure(err)
+  }
+}
+
 impl ShardedFSDB {
   pub(crate) fn get_path(&self, fingerprint: Fingerprint) -> PathBuf {
     let hex = fingerprint.to_hex();
@@ -174,28 +185,30 @@ impl ShardedFSDB {
     expected_digest: Digest,
     src_is_immutable: bool,
     mut reader: R,
-  ) -> Result<tokio::fs::File, String>
+  ) -> Result<tokio::fs::File, VerifiedCopyError>
   where
     R: AsyncRead + Unpin,
   {
     let matches = async_verified_copy(expected_digest, src_is_immutable, &mut reader, &mut file)
       .await
-      .map_err(|e| format!("Failed to copy bytes: {e}"))?;
+      .map_err(|e| VerifiedCopyError::CopyFailure(format!("Failed to copy bytes: {e}")))?;
     if matches {
       Ok(file)
     } else {
-      Err("Bytes didn't match when copying.".to_string())
+      Err(VerifiedCopyError::DoesntMatch)
     }
   }
 
-  pub(crate) async fn write_using<F, Fut>(
+  pub(crate) async fn write_using<E, F, Fut>(
     &self,
     fingerprint: Fingerprint,
     writer_func: F,
-  ) -> Result<(), String>
+  ) -> Result<(), E>
   where
     F: FnOnce(tokio::fs::File) -> Fut,
-    Fut: Future<Output = Result<tokio::fs::File, String>>,
+    Fut: Future<Output = Result<tokio::fs::File, E>>,
+    // NB: The error type must be convertible from a string
+    E: std::convert::From<std::string::String>,
   {
     let cell = self
       .dest_initializer
@@ -334,14 +347,18 @@ impl UnderlyingByteStore for ShardedFSDB {
       // TODO: Consider using `fclonefileat` on macOS or checking for same filesystem+rename on Linux,
       // which would skip actual copying (read+write), and instead just require verifying the
       // resulting content after the syscall (read only).
-      let should_retry = self
+      let copy_result = self
         .write_using(expected_digest.hash, |file| {
           Self::verified_copier(file, expected_digest, src_is_immutable, reader)
         })
-        .await
-        .is_err();
+        .await;
+      let should_retry = match copy_result {
+        Ok(()) => Ok(false),
+        Err(VerifiedCopyError::CopyFailure(s)) => Err(s),
+        Err(VerifiedCopyError::DoesntMatch) => Ok(true),
+      };
 
-      if should_retry {
+      if should_retry? {
         attempts += 1;
         let msg = format!("Input {src:?} changed while reading.");
         log::debug!("{}", msg);

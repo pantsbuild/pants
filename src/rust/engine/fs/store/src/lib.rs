@@ -240,13 +240,12 @@ impl RemoteStore {
     remote_store: &remote::ByteStore,
     digest: Digest,
     file: tokio::fs::File,
-  ) -> Result<tokio::fs::File, String> {
+  ) -> Result<tokio::fs::File, StoreError> {
     remote_store.load_file(digest, file).await?.ok_or_else(|| {
       StoreError::MissingDigest(
         "Was not present in either the local or remote store".to_owned(),
         digest,
       )
-      .to_string()
     })
   }
 
