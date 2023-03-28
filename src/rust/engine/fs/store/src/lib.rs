@@ -1290,7 +1290,10 @@ impl Store {
     let store = self.clone();
     async move {
       if !is_root {
-        tokio::fs::create_dir(&destination)
+        // NB: Although we know that all parent directories already exist, we use `create_dir_all`
+        // because it succeeds even if _this_ directory already exists (which it might, if we're
+        // materializing atop an existing directory structure).
+        tokio::fs::create_dir_all(&destination)
           .await
           .map_err(|e| format!("Failed to create directory {}: {e}", destination.display()))?;
       }
