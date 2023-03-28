@@ -782,7 +782,7 @@ class BootstrapOptions:
     )
     pants_bin_name = StrOption(
         advanced=True,
-        default="./pants",  # noqa: PANTSBIN
+        default="pants",  # noqa: PANTSBIN
         help="The name of the script or binary used to invoke Pants. "
         "Useful when printing help messages.",
     )
@@ -810,7 +810,7 @@ class BootstrapOptions:
         advanced=True,
         metavar="<dir>",
         default=lambda _: os.path.join(get_buildroot(), "dist"),
-        help="Write end products, such as the results of `./pants package`, to this dir.",  # noqa: PANTSBIN
+        help="Write end products, such as the results of `pants package`, to this dir.",  # noqa: PANTSBIN
     )
     pants_subprocessdir = StrOption(
         advanced=True,
