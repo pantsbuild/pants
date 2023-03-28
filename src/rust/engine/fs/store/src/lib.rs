@@ -277,7 +277,6 @@ impl RemoteStore {
               "Was not present in either the local or remote store".to_owned(),
               digest,
             )
-            .to_string()
           })?;
           if let Some(f_remote) = f_remote {
             f_remote(bytes.clone())?;
