@@ -203,9 +203,7 @@ class CompletePexEnvironment:
     def interpreter_search_paths(self) -> tuple[str, ...]:
         return self._pex_environment.interpreter_search_paths
 
-    def create_argv(
-        self, pex_filepath: str, *args: str, python: PythonExecutable | None = None
-    ) -> tuple[str, ...]:
+    def create_argv(self, pex_filepath: str, *args: str) -> tuple[str, ...]:
         pex_relpath = (
             os.path.relpath(pex_filepath, self._working_directory)
             if self._working_directory
@@ -213,7 +211,9 @@ class CompletePexEnvironment:
         )
         return (self._pex_environment.bootstrap_python.path, pex_relpath, *args)
 
-    def environment_dict(self, *, python: PythonExecutable | None = None) -> Mapping[str, str]:
+    def environment_dict(
+        self, *, python: PythonExecutable | PythonBuildStandaloneBinary | None = None
+    ) -> Mapping[str, str]:
         """The environment to use for running anything with PEX.
 
         If the Process is run with a pre-selected Python interpreter, set `python_configured=True`
