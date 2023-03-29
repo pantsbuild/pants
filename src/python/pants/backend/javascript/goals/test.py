@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import dataclasses
-import os
 from dataclasses import dataclass
 from pathlib import PurePath
 from typing import Any, Iterable
@@ -53,6 +52,7 @@ from pants.engine.target import (
     TransitiveTargetsRequest,
 )
 from pants.engine.unions import UnionRule
+from pants.util.dirutil import fast_relpath
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 
@@ -114,7 +114,7 @@ async def run_javascript_tests(
     merged_digest = await Get(Digest, MergeDigests([sources.snapshot.digest, installation.digest]))
 
     def relative_package_dir(file: str) -> str:
-        return os.path.relpath(file, installation.project_env.package_dir())
+        return fast_relpath(file, installation.project_env.package_dir())
 
     test_script = installation.project_env.ensure_target()[NodePackageTestScriptField].value
     entry_point = test_script.entry_point
