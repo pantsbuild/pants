@@ -917,7 +917,7 @@ dependencies = [
  "process_execution",
  "protos",
  "pyo3",
- "pyo3-build-config 0.17.2",
+ "pyo3-build-config 0.18.2",
  "rand 0.8.5",
  "regex",
  "remote",
@@ -2667,9 +2667,9 @@ dependencies = [
 
 [[package]]
 name = "pyo3-build-config"
-version = "0.17.2"
+version = "0.18.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bf0708c9ed01692635cbf056e286008e5a2927ab1a5e48cdd3aeb1ba5a6fef47"
+checksum = "98a42e7f42e917ce6664c832d5eee481ad514c98250c49e0b03b20593e2c7ed0"
 dependencies = [
  "once_cell",
  "target-lexicon",
