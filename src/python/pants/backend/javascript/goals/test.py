@@ -136,7 +136,7 @@ async def run_javascript_tests(
                 "run",
                 entry_point,
                 "--",
-                *sorted(map(relative_package_dir, field_set_source_files.files)),
+                *sorted(relative_package_dir(file) for file in field_set_source_files.files),
                 *coverage_args,
             ),
             description=f"Running npm test for {field_set.address.spec}.",
