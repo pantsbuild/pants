@@ -50,7 +50,7 @@ class NodeJSTest(Subsystem):
         str,
         help_text(
             f"""
-        Options for package.json scripts configured tests.
+        Options for package.json script configured tests.
 
         Your preferred test runner is configured via the `package.json#scripts.test`
         field.
