@@ -202,12 +202,12 @@ async def collect_coverage_reports(
         for report in coverage_reports
         for file in report.output_files
     ]
-    snapshots = await MultiGet(get for file, report, get in gets_per_data)
+    snapshots = await MultiGet(get for _, _, get in gets_per_data)
     return CoverageReports(
         tuple(
             _get_report(nodejs_test, dist_dir, snapshot, data.address, file)
             for (file, data), snapshot in zip(
-                ((file, report) for file, report, get in gets_per_data), snapshots
+                ((file, report) for file, report, _ in gets_per_data), snapshots
             )
         )
     )
