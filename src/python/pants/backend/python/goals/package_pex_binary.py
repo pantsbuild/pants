@@ -8,6 +8,7 @@ from typing import Tuple
 from pants.backend.python.target_types import (
     PexArgsField,
     PexBinaryDefaults,
+    PexBinaryDependenciesField,
     PexCompletePlatformsField,
     PexEmitWarningsField,
     PexEntryPointField,
@@ -44,6 +45,8 @@ from pants.core.target_types import FileSourceField
 from pants.core.util_rules.environments import EnvironmentField
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
+    DependenciesRequest,
+    Targets,
     TransitiveTargets,
     TransitiveTargetsRequest,
     targets_with_sources_types,
@@ -62,6 +65,8 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
     run_in_sandbox_behavior = RunInSandboxBehavior.RUN_REQUEST_HERMETIC
 
     required_fields = (PexEntryPointField,)
+
+    dependencies: PexBinaryDependenciesField
 
     entry_point: PexEntryPointField
     script: PexScriptField
@@ -121,22 +126,34 @@ async def package_pex_binary(
     pex_binary_defaults: PexBinaryDefaults,
     union_membership: UnionMembership,
 ) -> BuiltPackage:
-    resolved_entry_point, transitive_targets = await MultiGet(
-        Get(ResolvedPexEntryPoint, ResolvePexEntryPointRequest(field_set.entry_point)),
-        Get(TransitiveTargets, TransitiveTargetsRequest([field_set.address])),
+    resolved_pex_entry_point_get = Get(
+        ResolvedPexEntryPoint, ResolvePexEntryPointRequest(field_set.entry_point)
     )
+
+    if field_set.include_sources.value:
+        resolved_entry_point, transitive_targets = await MultiGet(
+            resolved_pex_entry_point_get,
+            Get(TransitiveTargets, TransitiveTargetsRequest([field_set.address])),
+        )
+        dep_targets = tuple(transitive_targets.dependencies)
+        depends = "transitively depends"
+    else:
+        resolved_entry_point, dependencies_targets = await MultiGet(
+            resolved_pex_entry_point_get,
+            Get(Targets, DependenciesRequest(field_set.dependencies)),
+        )
+        dep_targets = tuple(dependencies_targets)
+        depends = "depends"
 
     # Warn if users depend on `files` targets, which won't be included in the PEX and is a common
     # gotcha.
-    file_tgts = targets_with_sources_types(
-        [FileSourceField], transitive_targets.dependencies, union_membership
-    )
+    file_tgts = targets_with_sources_types([FileSourceField], dep_targets, union_membership)
     if file_tgts:
         files_addresses = sorted(tgt.address.spec for tgt in file_tgts)
         logger.warning(
             softwrap(
                 f"""
-                The `pex_binary` target {field_set.address} transitively depends on the below `files`
+                The `pex_binary` target {field_set.address} {depends} on the below `files`
                 targets, but Pants will not include them in the PEX. Filesystem APIs like `open()`
                 are not able to load files within the binary itself; instead, they read from the
                 current working directory.
