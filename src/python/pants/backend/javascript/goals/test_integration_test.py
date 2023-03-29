@@ -118,8 +118,8 @@ def test_jest_tests_are_successful(
     result = rule_runner.request(
         TestResult, [JSTestRequest.Batch("", (JSTestFieldSet.create(tgt),), None)]
     )
-    assert result.exit_code == 0
     assert "Test Suites: 1 passed, 1 total" in result.stderr
+    assert result.exit_code == 0
 
 
 def test_mocha_tests_are_successful(rule_runner: RuleRunner) -> None:
@@ -152,8 +152,8 @@ def test_mocha_tests_are_successful(rule_runner: RuleRunner) -> None:
     result = rule_runner.request(
         TestResult, [JSTestRequest.Batch("", (JSTestFieldSet.create(tgt),), None)]
     )
-    assert result.exit_code == 0
     assert "1 passing" in result.stdout
+    assert result.exit_code == 0
 
 
 def test_jest_test_with_coverage_reporting(rule_runner: RuleRunner) -> None:
