@@ -2,24 +2,26 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 use super::{EntryType, ShrinkBehavior};
 
-use std::collections::{BinaryHeap, HashSet};
-use std::fmt::Debug;
+use core::future::Future;
+use std::collections::{BinaryHeap, HashMap, HashSet};
 use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime};
 
+use async_oncecell::OnceCell;
 use async_trait::async_trait;
 use bytes::Bytes;
 use futures::future::{self, join_all, try_join, try_join_all};
 use hashing::{
   async_copy_and_hash, async_verified_copy, AgedFingerprint, Digest, Fingerprint, EMPTY_DIGEST,
 };
+use parking_lot::Mutex;
 use sharded_lmdb::ShardedLmdb;
 use std::os::unix::fs::PermissionsExt;
 use task_executor::Executor;
 use tempfile::NamedTempFile;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::io::{AsyncRead, AsyncReadExt, AsyncWriteExt};
 use workunit_store::ObservationMetric;
 
 /// How big a file must be to be stored as a file on disk.
@@ -27,28 +29,6 @@ use workunit_store::ObservationMetric;
 // writing. They were chosen using a rough equation from the microbenchmarks that are optimized
 // for somewhere between 2 and 3 uses of the corresponding entry to "break even".
 const LARGE_FILE_SIZE_LIMIT: usize = 512 * 1024;
-
-#[derive(Debug, Clone)]
-pub(crate) struct TempImmutableLargeFile {
-  tmp_path: PathBuf,
-  final_path: PathBuf,
-}
-
-impl TempImmutableLargeFile {
-  pub async fn open(&self) -> tokio::io::Result<tokio::fs::File> {
-    tokio::fs::File::create(self.tmp_path.clone()).await
-  }
-
-  pub async fn persist(&self) -> Result<(), String> {
-    tokio::fs::rename(self.tmp_path.clone(), self.final_path.clone())
-      .await
-      .map_err(|e| format!("Error while renaming: {e}."))?;
-    tokio::fs::set_permissions(&self.final_path, std::fs::Permissions::from_mode(0o555))
-      .await
-      .map_err(|e| e.to_string())?;
-    Ok(())
-  }
-}
 
 /// Trait for the underlying storage, which is either a ShardedLMDB or a ShardedFS.
 #[async_trait]
@@ -169,6 +149,18 @@ pub(crate) struct ShardedFSDB {
   root: PathBuf,
   executor: Executor,
   lease_time: Duration,
+  dest_initializer: Arc<Mutex<HashMap<Fingerprint, Arc<OnceCell<()>>>>>,
+}
+
+enum VerifiedCopyError {
+  CopyFailure(String),
+  DoesntMatch,
+}
+
+impl From<String> for VerifiedCopyError {
+  fn from(err: String) -> Self {
+    Self::CopyFailure(err)
+  }
 }
 
 impl ShardedFSDB {
@@ -177,33 +169,100 @@ impl ShardedFSDB {
     self.root.join(hex.get(0..2).unwrap()).join(hex)
   }
 
-  pub(crate) async fn get_tempfile(
+  async fn bytes_writer(
+    mut file: tokio::fs::File,
+    bytes: &Bytes,
+  ) -> Result<tokio::fs::File, String> {
+    file
+      .write_all(bytes)
+      .await
+      .map_err(|e| format!("Failed to write bytes: {e}"))?;
+    Ok(file)
+  }
+
+  async fn verified_copier<R>(
+    mut file: tokio::fs::File,
+    expected_digest: Digest,
+    src_is_immutable: bool,
+    mut reader: R,
+  ) -> Result<tokio::fs::File, VerifiedCopyError>
+  where
+    R: AsyncRead + Unpin,
+  {
+    let matches = async_verified_copy(expected_digest, src_is_immutable, &mut reader, &mut file)
+      .await
+      .map_err(|e| VerifiedCopyError::CopyFailure(format!("Failed to copy bytes: {e}")))?;
+    if matches {
+      Ok(file)
+    } else {
+      Err(VerifiedCopyError::DoesntMatch)
+    }
+  }
+
+  pub(crate) async fn write_using<E, F, Fut>(
     &self,
     fingerprint: Fingerprint,
-  ) -> Result<TempImmutableLargeFile, String> {
-    let dest_path = self.get_path(fingerprint);
-    tokio::fs::create_dir_all(dest_path.parent().unwrap())
-      .await
-      .map_err(|e| format! {"Failed to create local store subdirectory {dest_path:?}: {e}"})?;
+    writer_func: F,
+  ) -> Result<(), E>
+  where
+    F: FnOnce(tokio::fs::File) -> Fut,
+    Fut: Future<Output = Result<tokio::fs::File, E>>,
+    // NB: The error type must be convertible from a string
+    E: std::convert::From<std::string::String>,
+  {
+    let cell = self
+      .dest_initializer
+      .lock()
+      .entry(fingerprint)
+      .or_default()
+      .clone();
+    cell
+      .get_or_try_init(async {
+        let dest_path = self.get_path(fingerprint);
+        tokio::fs::create_dir_all(dest_path.parent().unwrap())
+          .await
+          .map_err(|e| format! {"Failed to create local store subdirectory {dest_path:?}: {e}"})?;
 
-    let dest_path2 = dest_path.clone();
-    // Make the tempfile in the same dir as the final file so that materializing the final file doesn't
-    // have to worry about parent dirs.
-    let named_temp_file = self
-      .executor
-      .spawn_blocking(
-        move || {
-          NamedTempFile::new_in(dest_path2.parent().unwrap())
-            .map_err(|e| format!("Failed to create temp file: {e}"))
-        },
-        |e| Err(format!("temp file creation task failed: {e}")),
-      )
-      .await?;
-    let (_, tmp_path) = named_temp_file.keep().map_err(|e| e.to_string())?;
-    Ok(TempImmutableLargeFile {
-      tmp_path,
-      final_path: dest_path,
-    })
+        let dest_path2 = dest_path.clone();
+        // Make the tempfile in the same dir as the final file so that materializing the final file doesn't
+        // have to worry about parent dirs.
+        let named_temp_file = self
+          .executor
+          .spawn_blocking(
+            move || {
+              NamedTempFile::new_in(dest_path2.parent().unwrap())
+                .map_err(|e| format!("Failed to create temp file: {e}"))
+            },
+            |e| Err(format!("temp file creation task failed: {e}")),
+          )
+          .await?;
+        let (std_file, tmp_path) = named_temp_file
+          .keep()
+          .map_err(|e| format!("Failed to keep temp file: {e}"))?;
+
+        match writer_func(std_file.into()).await {
+          Ok(mut tokio_file) => {
+            tokio_file
+              .shutdown()
+              .await
+              .map_err(|e| format!("Failed to shutdown {tmp_path:?}: {e}"))?;
+
+            tokio::fs::set_permissions(&tmp_path, std::fs::Permissions::from_mode(0o555))
+              .await
+              .map_err(|e| format!("Failed to set permissions on {:?}: {e}", tmp_path))?;
+            tokio::fs::rename(tmp_path.clone(), dest_path.clone())
+              .await
+              .map_err(|e| format!("Error while renaming: {e}."))?;
+            Ok(())
+          }
+          Err(e) => {
+            let _ = tokio::fs::remove_file(tmp_path).await;
+            Err(e)
+          }
+        }
+      })
+      .await
+      .cloned()
   }
 }
 
@@ -262,13 +321,9 @@ impl UnderlyingByteStore for ShardedFSDB {
     _initial_lease: bool,
   ) -> Result<(), String> {
     try_join_all(items.iter().map(|(fingerprint, bytes)| async move {
-      let tempfile = self.get_tempfile(*fingerprint).await?;
-      let mut dest = tempfile
-        .open()
-        .await
-        .map_err(|e| format!("Failed to open {tempfile:?}: {e}"))?;
-      dest.write_all(bytes).await.map_err(|e| e.to_string())?;
-      tempfile.persist().await?;
+      self
+        .write_using(*fingerprint, |file| Self::bytes_writer(file, bytes))
+        .await?;
       Ok::<(), String>(())
     }))
     .await?;
@@ -283,20 +338,27 @@ impl UnderlyingByteStore for ShardedFSDB {
     expected_digest: Digest,
     src: PathBuf,
   ) -> Result<(), String> {
-    let dest = self.get_tempfile(expected_digest.hash).await?;
     let mut attempts = 0;
     loop {
-      let (mut reader, mut writer) = try_join(tokio::fs::File::open(src.clone()), dest.open())
+      let reader = tokio::fs::File::open(src.clone())
         .await
-        .map_err(|e| e.to_string())?;
-      // TODO: Consider using `fclonefileat` on macOS, which would skip actual copying (read+write), and
-      // instead just require verifying the resulting content after the syscall (read only).
-      let should_retry =
-        !async_verified_copy(expected_digest, src_is_immutable, &mut reader, &mut writer)
-          .await
-          .map_err(|e| e.to_string())?;
+        .map_err(|e| format!("Failed to open {src:?}: {e}"))?;
 
-      if should_retry {
+      // TODO: Consider using `fclonefileat` on macOS or checking for same filesystem+rename on Linux,
+      // which would skip actual copying (read+write), and instead just require verifying the
+      // resulting content after the syscall (read only).
+      let copy_result = self
+        .write_using(expected_digest.hash, |file| {
+          Self::verified_copier(file, expected_digest, src_is_immutable, reader)
+        })
+        .await;
+      let should_retry = match copy_result {
+        Ok(()) => Ok(false),
+        Err(VerifiedCopyError::CopyFailure(s)) => Err(s),
+        Err(VerifiedCopyError::DoesntMatch) => Ok(true),
+      };
+
+      if should_retry? {
         attempts += 1;
         let msg = format!("Input {src:?} changed while reading.");
         log::debug!("{}", msg);
@@ -304,8 +366,6 @@ impl UnderlyingByteStore for ShardedFSDB {
           return Err(format!("Failed to store {src:?}."));
         }
       } else {
-        writer.flush().await.map_err(|e| e.to_string())?;
-        dest.persist().await?;
         break;
       }
     }
@@ -460,6 +520,7 @@ impl ByteStore {
           executor: executor.clone(),
           root: fsdb_files_root,
           lease_time: options.lease_time,
+          dest_initializer: Arc::new(Mutex::default()),
         },
         executor,
         filesystem_device,
