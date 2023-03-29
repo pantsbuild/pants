@@ -144,8 +144,13 @@ async def run_javascript_tests(
             level=LogLevel.INFO,
             extra_env=FrozenDict(**test_extra_env.env, **target_env_vars),
             timeout_seconds=field_set.timeout.calculate_from_global_options(test),
-            output_files=tuple(output_files),
-            output_directories=tuple(output_directories),
+            output_files=tuple(
+                installation.join_relative_workspace_directory(file) for file in output_files or ()
+            ),
+            output_directories=tuple(
+                installation.join_relative_workspace_directory(directory)
+                for directory in output_directories or ()
+            ),
         ),
     )
     if test.force:
@@ -205,7 +210,7 @@ async def collect_coverage_reports(
     snapshots = await MultiGet(get for _, _, get in gets_per_data)
     return CoverageReports(
         tuple(
-            _get_report(nodejs_test, dist_dir, snapshot, data.address, file)
+            _get_report(nodejs_test, dist_dir, snapshot, data.address, file, data.working_directory)
             for (file, data), snapshot in zip(
                 ((file, report) for file, report, _ in gets_per_data), snapshots
             )
@@ -219,6 +224,7 @@ def _get_report(
     snapshot: Snapshot,
     address: Address,
     file: str,
+    working_directory: str,
 ) -> FilesystemCoverageReport:
     # It is up to the user to configure the output coverage reports.
     file_path = PurePath(file)
@@ -227,7 +233,7 @@ def _get_report(
         coverage_insufficient=False,
         result_snapshot=snapshot,
         directory_to_materialize_to=output_dir,
-        report_file=output_dir / file_path,
+        report_file=output_dir / working_directory / file_path,
         report_type=file_path.suffix,
     )
 
