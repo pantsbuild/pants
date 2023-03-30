@@ -2,14 +2,17 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
+import itertools
 import json
 import os.path
+from abc import ABC
 from dataclasses import dataclass, field
-from typing import Any, ClassVar, Iterable, Mapping
+from typing import Any, ClassVar, Iterable, Mapping, Optional, Tuple
 
 from typing_extensions import Literal
 
 from pants.backend.project_info import dependencies
+from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.base.specs import AncestorGlobSpec, RawSpecs
 from pants.build_graph.address import Address
 from pants.build_graph.build_file_aliases import BuildFileAliases
@@ -20,7 +23,7 @@ from pants.core.target_types import (
 from pants.core.util_rules import stripped_source_files
 from pants.engine import fs
 from pants.engine.collection import Collection, DeduplicatedCollection
-from pants.engine.fs import DigestContents, FileContent, PathGlobs
+from pants.engine.fs import DigestContents, FileContent, GlobExpansionConjunction, PathGlobs
 from pants.engine.internals import graph
 from pants.engine.internals.native_engine import Digest, Snapshot
 from pants.engine.internals.selectors import Get, MultiGet
@@ -32,6 +35,8 @@ from pants.engine.target import (
     DependenciesRequest,
     GeneratedTargets,
     GenerateTargetsRequest,
+    InvalidFieldException,
+    ScalarField,
     SequenceField,
     SingleSourceField,
     SourcesField,
@@ -56,8 +61,13 @@ class PackageJsonSourceField(SingleSourceField):
     required = False
 
 
+class NodeScript(ABC):
+    entry_point: str
+    alias: ClassVar[str]
+
+
 @dataclass(frozen=True)
-class NodeBuildScript:
+class NodeBuildScript(NodeScript):
     entry_point: str
     output_directories: tuple[str, ...] = ()
     output_files: tuple[str, ...] = ()
@@ -73,6 +83,12 @@ class NodeBuildScript:
         output_files: Iterable[str] = (),
         extra_caches: Iterable[str] = (),
     ) -> NodeBuildScript:
+        """A build script, mapped from the `scripts` section of a package.json file.
+
+        Either the `output_directories` or the `output_files` argument has to be set to capture the
+        output artifacts of the build.
+        """
+
         return cls(
             entry_point=entry_point,
             output_directories=tuple(output_directories),
@@ -81,9 +97,84 @@ class NodeBuildScript:
         )
 
 
-class NodePackageScriptsField(SequenceField[NodeBuildScript]):
+@dataclass(frozen=True)
+class NodeTestScript(NodeScript):
+    entry_point: str = "test"
+    report_args: tuple[str, ...] = ()
+    report_output_files: tuple[str, ...] = ()
+    report_output_directories: tuple[str, ...] = ()
+    coverage_args: tuple[str, ...] = ()
+    coverage_output_files: tuple[str, ...] = ()
+    coverage_output_directories: tuple[str, ...] = ()
+    coverage_entry_point: str | None = None
+    extra_caches: tuple[str, ...] = ()
+
+    alias: ClassVar[str] = "node_test_script"
+
+    def __str__(self) -> str:
+        return f'{self.alias}(entry_point="{self.entry_point}", ...)'
+
+    @classmethod
+    def create(
+        cls,
+        entry_point: str = "test",
+        report_args: Iterable[str] = (),
+        report_output_files: Iterable[str] = (),
+        report_output_directories: Iterable[str] = (),
+        coverage_args: Iterable[str] = (),
+        coverage_output_files: Iterable[str] = (),
+        coverage_output_directories: Iterable[str] = (),
+        coverage_entry_point: str | None = None,
+    ) -> NodeTestScript:
+        """The test script for this package, mapped from the `scripts` section of a package.json
+        file. The pointed to script should accept a variadic number of ([ARG]...) path arguments.
+
+        This entry point is the "test" script, by default.
+        """
+        return cls(
+            entry_point=entry_point,
+            report_args=tuple(report_args),
+            report_output_files=tuple(report_output_files),
+            report_output_directories=tuple(report_output_directories),
+            coverage_args=tuple(coverage_args),
+            coverage_output_files=tuple(coverage_output_files),
+            coverage_output_directories=tuple(coverage_output_directories),
+            coverage_entry_point=coverage_entry_point,
+        )
+
+    def supports_coverage(self) -> bool:
+        return bool(self.coverage_entry_point) or bool(self.coverage_args)
+
+    def coverage_globs(self, working_directory: str) -> PathGlobs:
+        return self.coverage_globs_for(
+            working_directory,
+            self.coverage_output_files,
+            self.coverage_output_directories,
+            GlobMatchErrorBehavior.ignore,
+        )
+
+    @classmethod
+    def coverage_globs_for(
+        cls,
+        working_directory: str,
+        files: tuple[str, ...],
+        directories: tuple[str, ...],
+        error_behaviour: GlobMatchErrorBehavior,
+        conjunction: GlobExpansionConjunction = GlobExpansionConjunction.any_match,
+        description_of_origin: str | None = None,
+    ) -> PathGlobs:
+        dir_globs = (os.path.join(directory, "*") for directory in directories)
+        return PathGlobs(
+            (os.path.join(working_directory, glob) for glob in itertools.chain(files, dir_globs)),
+            conjunction=conjunction,
+            glob_match_error_behavior=error_behaviour,
+            description_of_origin=description_of_origin,
+        )
+
+
+class NodePackageScriptsField(SequenceField[NodeScript]):
     alias = "scripts"
-    expected_element_type = NodeBuildScript
+    expected_element_type = NodeScript
 
     help = help_text(
         """
@@ -97,6 +188,45 @@ class NodePackageScriptsField(SequenceField[NodeBuildScript]):
         '[node_build_script(entry_point="build", output_directories=["./dist/"], ...])'
     )
     default = ()
+
+    @classmethod
+    def compute_value(
+        cls, raw_value: Optional[Iterable[Any]], address: Address
+    ) -> Optional[Tuple[NodeScript, ...]]:
+        values = super().compute_value(raw_value, address)
+        test_scripts = [value for value in values or () if isinstance(value, NodeTestScript)]
+        if len(test_scripts) > 1:
+            entry_points = ", ".join(str(script) for script in test_scripts)
+            raise InvalidFieldException(
+                softwrap(
+                    f"""
+                    You can only specify one `{NodeTestScript.alias}` per `{PackageJsonTarget.alias}`,
+                    but the {cls.alias} contains {entry_points}.
+                    """
+                )
+            )
+        return values
+
+    def build_scripts(self) -> Iterable[NodeBuildScript]:
+        for script in self.value or ():
+            if isinstance(script, NodeBuildScript):
+                yield script
+
+    def get_test_script(self) -> NodeTestScript:
+        for script in self.value or ():
+            if isinstance(script, NodeTestScript):
+                return script
+        return NodeTestScript()
+
+
+class NodePackageTestScriptField(ScalarField[NodeTestScript]):
+    alias = "_node_test_script"
+    expected_type = NodeTestScript
+    expected_type_description = (
+        'node_test_script(entry_point="test", coverage_args="--coverage=true")'
+    )
+    default = NodeTestScript()
+    value: NodeTestScript
 
 
 class NodePackageVersionField(StringField):
@@ -170,6 +300,7 @@ class NodePackageTarget(Target):
         NodePackageNameField,
         NodePackageVersionField,
         NodePackageDependenciesField,
+        NodePackageTestScriptField,
     )
 
 
@@ -524,6 +655,19 @@ class GenerateNodePackageTargets(GenerateTargetsRequest):
     generate_from = PackageJsonTarget
 
 
+def _script_missing_error(entry_point: str, scripts: Iterable[str], address: Address) -> ValueError:
+    return ValueError(
+        softwrap(
+            f"""
+            {entry_point} was not found in package.json#scripts section
+            of the `{PackageJsonTarget.alias}` target with address {address}.
+
+            Available scripts are: {', '.join(scripts)}.
+            """
+        )
+    )
+
+
 @rule
 async def generate_node_package_targets(
     request: GenerateNodePackageTargets,
@@ -563,20 +707,23 @@ async def generate_node_package_targets(
     package_target = NodePackageTarget(
         {
             **request.template,
-            NodePackageNameField.alias: pkg_json.name.replace("@", "__"),
+            NodePackageNameField.alias: pkg_json.name,
             NodePackageVersionField.alias: pkg_json.version,
             NodePackageDependenciesField.alias: [
                 file_tgt.address.spec,
                 *(tgt.address.spec for tgt in third_party_tgts),
                 *request.template.get("dependencies", []),
             ],
+            NodePackageTestScriptField.alias: request.generator[
+                NodePackageScriptsField
+            ].get_test_script(),
         },
         request.generator.address.create_generated(pkg_json.name.replace("@", "__")),
         union_membership,
     )
     scripts = PackageJsonScripts.from_package_json(pkg_json).scripts
     build_script_tgts = []
-    for build_script in request.generator[NodePackageScriptsField].value:
+    for build_script in request.generator[NodePackageScriptsField].build_scripts():
         if build_script.entry_point in scripts:
             build_script_tgts.append(
                 NodeBuildScriptTarget(
@@ -598,16 +745,13 @@ async def generate_node_package_targets(
                 )
             )
         else:
-            raise ValueError(
-                softwrap(
-                    f"""
-                    {build_script.entry_point} was not found in package.json#scripts section
-                    of the `{PackageJsonTarget.alias}` target with address {request.generator.address}.
-
-                    Available scripts are: {', '.join(scripts)}.
-                    """
-                )
+            raise _script_missing_error(
+                build_script.entry_point, scripts, request.generator.address
             )
+
+    coverage_script = package_target[NodePackageTestScriptField].value.coverage_entry_point
+    if coverage_script and coverage_script not in scripts:
+        raise _script_missing_error(coverage_script, scripts, request.generator.address)
 
     return GeneratedTargets(
         request.generator, [package_target, file_tgt, *third_party_tgts, *build_script_tgts]
@@ -630,4 +774,9 @@ def rules() -> Iterable[Rule | UnionRule]:
 
 
 def build_file_aliases() -> BuildFileAliases:
-    return BuildFileAliases(objects={NodeBuildScript.alias: NodeBuildScript.create})
+    return BuildFileAliases(
+        objects={
+            NodeBuildScript.alias: NodeBuildScript.create,
+            NodeTestScript.alias: NodeTestScript.create,
+        }
+    )

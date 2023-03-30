@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import itertools
+import os.path
 from dataclasses import dataclass
 from typing import Iterable
 
@@ -49,6 +50,9 @@ class InstalledNodePackage:
     @property
     def project_dir(self) -> str:
         return self.project_env.root_dir
+
+    def join_relative_workspace_directory(self, path: str) -> str:
+        return os.path.join(self.project_env.relative_workspace_directory(), path)
 
 
 @dataclass(frozen=True)
