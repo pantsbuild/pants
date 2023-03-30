@@ -6,6 +6,7 @@ import requests
 from dataclasses import dataclass
 from pants.backend.experimental.audit.audit import AuditRequest, AuditResult, AuditResults
 from pants.backend.experimental.audit.pip_audit import audit_constraints_strings
+from pants.backend.experimental.audit.format_results import format_results
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.util_rules.pex_requirements import (
     LoadedLockfile,
@@ -49,7 +50,7 @@ async def pypi_audit(request: PypiAuditRequest, python_setup: PythonSetup) -> Au
         lockfile_audit_result = audit_constraints_strings(
             loaded_lockfile.as_constraints_strings, session
         )
-        audit_results_by_lockfile[lockfile_path] = lockfile_audit_result
+        audit_results_by_lockfile[lockfile_path] = format_results(lockfile_audit_result)
 
     return AuditResults(
         results=tuple(

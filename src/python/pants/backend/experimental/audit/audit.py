@@ -103,13 +103,14 @@ async def audit(
         )
         for request_type in request_types
     )
-    console.print_stdout(str(requests))
 
     # Run each audit request
     all_results = await MultiGet(
         Get(AuditResults, {request: AuditRequest}) for request in requests
     )
-
+    for results in all_results:
+        for result in results.results:
+            console.print_stdout(result.report)
     # results_by_tool: dict[str, list[AuditResult]] = defaultdict(list)
     # for results in all_results:
     #     results_by_tool[results.auditor_name].extend(results.results)

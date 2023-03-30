@@ -21,7 +21,7 @@ def tabulate(rows: Iterable[Iterable[Any]]) -> tuple[list[str], list[int]]:
     table = [" ".join(map(str.ljust, row, sizes)).rstrip() for row in rows]
     return table, sizes
 
-def format_result(
+def format_results(
     result: dict[str, list[dict[str:Any]]],
 ) -> str:
     """
@@ -29,12 +29,12 @@ def format_result(
     results.
     """
     vuln_data: list[list[Any]] = []
-    header = ["Dependency", "ID", "Fix Versions"]
+    header = ["Dependency", "ID", "Fix Versions", "Link"]
     vuln_data.append(header)
     for dep, vulns in result.items():
         for vuln in vulns:
             vuln_data.append([
-                dep, vuln['id'], vuln['fix_versions']
+                dep, vuln['id'], vuln['fixed_in'], vuln['link']
             ])
     columns_string = ""
 
