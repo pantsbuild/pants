@@ -20,6 +20,7 @@ from pants.backend.python.subsystems import setuptools
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.subsystems.setuptools import Setuptools
 from pants.backend.python.target_types import (
+    EntryPoint,
     PexLayout,
     PythonRequirementTarget,
     PythonSourcesGeneratorTarget,
@@ -861,10 +862,12 @@ def test_lockfile_requirements_selection(
         [Address("", target_name="lib")],
         output_filename="demo.pex",
         internal_only=internal_only,
+        main=EntryPoint("a"),
     )
     rule_runner.set_options(options, env_inherit={"PATH"})
     result = rule_runner.request(PexRequest, [request])
     assert result.layout == (PexLayout.PACKED if internal_only else PexLayout.ZIPAPP)
+    assert result.main == EntryPoint("a")
 
     if run_against_entire_lockfile and internal_only:
         # With `run_against_entire_lockfile`, all internal requests result in the full set
