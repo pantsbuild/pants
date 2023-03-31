@@ -36,7 +36,7 @@ use tokio_util::codec::{BytesCodec, FramedRead};
 use workunit_store::{in_workunit, Level, Metric, RunningWorkunit};
 
 use crate::{
-  Context, FallibleProcessResultWithPlatform, NamedCaches, Process, ProcessError,
+  Context, FallibleProcessResultWithPlatform, ManagedChild, NamedCaches, Process, ProcessError,
   ProcessResultMetadata, ProcessResultSource,
 };
 
@@ -222,6 +222,10 @@ impl super::CommandRunner for CommandRunner {
         .await?;
 
         workunit.increment_counter(Metric::LocalExecutionRequests, 1);
+        // NB: The constraint on `CapturedWorkdir` is that any child processes spawned here have
+        // exited (or been killed in their `Drop` handlers), so this function can rely on the usual
+        // Drop order of local variables to assume that the sandbox is cleaned up after the process
+        // is.
         let res = self
           .run_and_capture_workdir(
             req.clone(),
@@ -317,7 +321,7 @@ impl CapturedWorkdir for CommandRunner {
     //
     // See: https://github.com/golang/go/issues/22315 for an excellent description of this generic
     // unix problem.
-    let mut fork_exec = move || command.spawn();
+    let mut fork_exec = move || ManagedChild::spawn(&mut command, None);
     let mut child = {
       if exclusive_spawn {
         let _write_locked = self.spawn_lock.write().await;
@@ -521,6 +525,11 @@ pub trait CapturedWorkdir {
 
   ///
   /// Spawn the given process in a working directory prepared with its expected input digest.
+  ///
+  /// NB: The implementer of this method must guarantee that the spawned process has completely
+  /// exited when the returned BoxStream is Dropped. Otherwise it might be possible for the process
+  /// to observe the working directory that it is running in being torn down. In most cases, this
+  /// requires Drop handlers to synchronously wait for their child processes to exit.
   ///
   /// If the process to be executed has an `argv[0]` that points into its input digest then
   /// `exclusive_spawn` will be `true` and the spawn implementation should account for the

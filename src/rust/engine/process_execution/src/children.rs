@@ -26,9 +26,9 @@ pub struct ManagedChild {
 
 impl ManagedChild {
   pub fn spawn(
-    mut command: Command,
+    command: &mut Command,
     graceful_shutdown_timeout: Option<time::Duration>,
-  ) -> Result<Self, String> {
+  ) -> std::io::Result<Self> {
     // Set `kill_on_drop` to encourage `tokio` to `wait` the process via its own "reaping"
     // mechanism:
     //   see https://docs.rs/tokio/1.14.0/tokio/process/struct.Command.html#method.kill_on_drop
@@ -48,9 +48,7 @@ impl ManagedChild {
     };
 
     // Then spawn.
-    let child = command
-      .spawn()
-      .map_err(|e| format!("Error executing interactive process: {e}"))?;
+    let child = command.spawn()?;
     Ok(Self {
       child,
       graceful_shutdown_timeout,

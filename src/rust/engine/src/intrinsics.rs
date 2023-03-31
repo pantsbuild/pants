@@ -632,7 +632,9 @@ fn interactive_process(
                 .try_clone_as_file()
                 .map_err(|e| format!("Couldn't clone stderr: {e}"))?,
             ));
-          let mut subprocess = ManagedChild::spawn(command, Some(context.core.graceful_shutdown_timeout))?;
+          let mut subprocess =
+              ManagedChild::spawn(&mut command, Some(context.core.graceful_shutdown_timeout))
+                .map_err(|e| format!("Error executing interactive process: {e}"))?;
           tokio::select! {
             _ = session.cancelled() => {
               // The Session was cancelled: attempt to kill the process group / process, and
