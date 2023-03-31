@@ -117,6 +117,18 @@ def pluralize(count: int, item_type: str, include_count: bool = True) -> str:
         return text
 
 
+def comma_separated_list(items: Iterable[str]) -> str:
+    items = list(items)
+    if len(items) == 0:
+        return ""
+    if len(items) == 1:
+        return items[0]
+    if len(items) == 2:
+        return f"{items[0]} and {items[1]}"
+    # For 3+ items, employ the oxford comma.
+    return f"{', '.join(items[0:-1])}, and {items[-1]}"
+
+
 def strip_prefix(string: str, prefix: str) -> str:
     """Returns a copy of the string from which the multi-character prefix has been stripped.
 
