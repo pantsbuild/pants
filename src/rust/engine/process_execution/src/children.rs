@@ -154,7 +154,7 @@ impl ManagedChild {
     // NB: Since the SIGKILL was successfully delivered above, the only things that could cause the
     // child not to eventually exit would be if it had become a zombie (which shouldn't be possible,
     // because we are its parent process, and we are still alive).
-    let _ = self.wait_for_child_exit_sync(time::Duration::MAX)?;
+    let _ = self.wait_for_child_exit_sync(time::Duration::from_secs(1800))?;
     self.killed = true;
     Ok(())
   }
