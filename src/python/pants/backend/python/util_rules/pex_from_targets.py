@@ -26,6 +26,7 @@ from pants.backend.python.util_rules.pex import (
     CompletePlatforms,
     OptionalPex,
     OptionalPexRequest,
+    Pex,
     PexPlatforms,
     PexRequest,
 )
@@ -373,9 +374,9 @@ class _ConstraintsRepositoryPexRequest:
 @rule_helper
 async def _determine_requirements_for_pex_from_targets(
     request: PexFromTargetsRequest, python_setup: PythonSetup
-) -> PexRequirements | PexRequest:
+) -> tuple[PexRequirements | EntireLockfile, Iterable[Pex]]:
     if not request.include_requirements:
-        return PexRequirements()
+        return PexRequirements(), ()
 
     requirements = await Get(PexRequirements, _PexRequirementsRequest(request.addresses))
     pex_native_subsetting_supported = False
@@ -409,13 +410,13 @@ async def _determine_requirements_for_pex_from_targets(
 
     if not should_request_repository_pex:
         if not pex_native_subsetting_supported:
-            return requirements
+            return requirements, ()
 
         chosen_resolve = await Get(
             ChosenPythonResolve, ChosenPythonResolveRequest(request.addresses)
         )
         loaded_lockfile = await Get(LoadedLockfile, LoadedLockfileRequest(chosen_resolve.lockfile))
-        return dataclasses.replace(requirements, from_superset=loaded_lockfile)
+        return dataclasses.replace(requirements, from_superset=loaded_lockfile), ()
 
     # Else, request the repository PEX and possibly subset it.
     repository_pex_request = await Get(
@@ -440,22 +441,23 @@ async def _determine_requirements_for_pex_from_targets(
                     """
                 )
             )
-        return repository_pex_request.maybe_pex_request
 
     repository_pex = await Get(OptionalPex, OptionalPexRequest, repository_pex_request)
-    return dataclasses.replace(requirements, from_superset=repository_pex.maybe_pex)
+    if should_return_entire_lockfile:
+        assert repository_pex_request.maybe_pex_request is not None
+        assert repository_pex.maybe_pex is not None
+        return repository_pex_request.maybe_pex_request.requirements, [repository_pex.maybe_pex]
+
+    return dataclasses.replace(requirements, from_superset=repository_pex.maybe_pex), ()
 
 
 @rule(level=LogLevel.DEBUG)
 async def create_pex_from_targets(
     request: PexFromTargetsRequest, python_setup: PythonSetup
 ) -> PexRequest:
-    requirements_or_pex_request = await _determine_requirements_for_pex_from_targets(
+    requirements, additional_pexes = await _determine_requirements_for_pex_from_targets(
         request, python_setup
     )
-    if isinstance(requirements_or_pex_request, PexRequest):
-        return requirements_or_pex_request
-    requirements = requirements_or_pex_request
 
     interpreter_constraints = await Get(
         InterpreterConstraints,
@@ -519,6 +521,7 @@ async def create_pex_from_targets(
         additional_inputs=additional_inputs,
         additional_args=additional_args,
         description=description,
+        pex_path=additional_pexes,
     )
 
 
