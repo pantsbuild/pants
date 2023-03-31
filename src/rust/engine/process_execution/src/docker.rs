@@ -539,6 +539,10 @@ impl<'a> super::CommandRunner for CommandRunner<'a> {
 impl<'a> CapturedWorkdir for CommandRunner<'a> {
   type WorkdirToken = (String, String);
 
+  // TODO: This method currently violates the `Drop` constraint of `CapturedWorkdir`, because the
+  // Docker container is not necessarily killed when the returned value is Dropped.
+  //
+  // see https://github.com/pantsbuild/pants/issues/18210
   async fn run_in_workdir<'s, 'c, 'w, 'r>(
     &'s self,
     _context: &'c Context,
