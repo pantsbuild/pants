@@ -121,7 +121,7 @@ impl ManagedChild {
   /// as long as the operating system responds to `SIGKILL` in a bounded amount of time.
   ///
   /// TODO: Async drop might eventually allow for making this blocking more explicit.
-  /// https://rust-lang.github.io/async-fundamentals-initiative/roadmap/async_drop.html
+  /// <https://rust-lang.github.io/async-fundamentals-initiative/roadmap/async_drop.html>
   pub fn attempt_shutdown_sync(&mut self) -> Result<(), String> {
     if let Some(graceful_shutdown_timeout) = self.graceful_shutdown_timeout {
       // If we fail to send SIGINT, then we will also fail to send SIGKILL, so we return eagerly
