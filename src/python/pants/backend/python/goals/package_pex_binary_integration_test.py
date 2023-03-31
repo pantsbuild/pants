@@ -13,11 +13,14 @@ from textwrap import dedent
 import pytest
 
 from pants.backend.python import target_types_rules
-from pants.backend.python.goals import package_pex_binary
+from pants.backend.python.goals import package_pex_binary, setup_py
 from pants.backend.python.goals.package_pex_binary import PexBinaryFieldSet
+from pants.backend.python.macros.python_artifact import PythonArtifact
+from pants.backend.python.subsystems.setuptools import PythonDistributionFieldSet
 from pants.backend.python.target_types import (
     PexBinary,
     PexLayout,
+    PythonDistribution,
     PythonRequirementTarget,
     PythonSourcesGeneratorTarget,
 )
@@ -43,17 +46,21 @@ def rule_runner() -> RuleRunner:
             *pex_from_targets.rules(),
             *target_types_rules.rules(),
             *core_target_types_rules(),
+            *setup_py.rules(),
             QueryRule(BuiltPackage, [PexBinaryFieldSet]),
+            QueryRule(BuiltPackage, [PythonDistributionFieldSet]),
         ],
         target_types=[
             FileTarget,
             FilesGeneratorTarget,
             PexBinary,
+            PythonDistribution,
             PythonRequirementTarget,
             PythonSourcesGeneratorTarget,
             RelocatedFiles,
             ResourcesGeneratorTarget,
         ],
+        objects={"python_artifact": PythonArtifact},
     )
     rule_runner.set_options([], env_inherit={"PATH", "PYENV_ROOT", "HOME"})
     return rule_runner
@@ -99,6 +106,61 @@ def test_warn_files_targets(rule_runner: RuleRunner, caplog) -> None:
     assert "assets/f.txt:files" in caplog.text
     assert "assets:relocated" in caplog.text
     assert "assets:resources" not in caplog.text
+
+    assert len(result.artifacts) == 1
+    assert result.artifacts[0].relpath == "src.py.project/project.pex"
+
+
+def test_include_sources_avoids_files_targets_warning(rule_runner: RuleRunner, caplog) -> None:
+    rule_runner.write_files(
+        {
+            "assets/f.txt": "",
+            "assets/BUILD": dedent(
+                """\
+                files(name='files', sources=['f.txt'])
+                relocated_files(
+                    name='relocated',
+                    files_targets=[':files'],
+                    src='assets',
+                    dest='new_assets',
+                )
+                """
+            ),
+            "src/py/project/__init__.py": "",
+            "src/py/project/app.py": "print('hello')",
+            "src/py/project/BUILD": dedent(
+                """\
+                python_sources(
+                    name='sources',
+                )
+
+                python_distribution(
+                    name='wheel',
+                    dependencies=[
+                        ':sources',
+                        'assets:relocated',
+                    ],
+                    provides=python_artifact(
+                        name='my-dist',
+                        version='1.2.3',
+                    ),
+                )
+
+                pex_binary(
+                    dependencies=[':wheel'],
+                    entry_point="none",
+                    include_sources=False,
+                )
+                """
+            ),
+        }
+    )
+    tgt = rule_runner.get_target(Address("src/py/project"))
+    field_set = PexBinaryFieldSet.create(tgt)
+
+    assert not caplog.records
+    result = rule_runner.request(BuiltPackage, [field_set])
+    assert not caplog.records
 
     assert len(result.artifacts) == 1
     assert result.artifacts[0].relpath == "src.py.project/project.pex"
