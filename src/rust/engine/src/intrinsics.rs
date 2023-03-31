@@ -585,53 +585,55 @@ fn interactive_process(
         task_side_effected()?;
     }
 
-    let exit_status = session.clone()
-      .with_console_ui_disabled(async move {
-        // Once any UI is torn down, grab exclusive access to the console.
-        let (term_stdin, term_stdout, term_stderr) =
-          stdio::get_destination().exclusive_start(Box::new(|_| {
-            // A stdio handler that will immediately trigger logging.
-            Err(())
-          }))?;
-        // NB: Command's stdio methods take ownership of a file-like to use, so we use
-        // `TryCloneAsFile` here to `dup` our thread-local stdio.
-        command
-          .stdin(Stdio::from(
-            term_stdin
-              .try_clone_as_file()
-              .map_err(|e| format!("Couldn't clone stdin: {}", e))?,
-          ))
-          .stdout(Stdio::from(
-            term_stdout
-              .try_clone_as_file()
-              .map_err(|e| format!("Couldn't clone stdout: {}", e))?,
-          ))
-          .stderr(Stdio::from(
-            term_stderr
-              .try_clone_as_file()
-              .map_err(|e| format!("Couldn't clone stderr: {}", e))?,
-          ));
-        let mut subprocess = ManagedChild::spawn(command, context.core.graceful_shutdown_timeout)?;
-        tokio::select! {
-          _ = session.cancelled() => {
-            // The Session was cancelled: attempt to kill the process group / process, and
-            // then wait for it to exit (to avoid zombies).
-            if let Err(e) = subprocess.graceful_shutdown_sync() {
-              // Failed to kill the PGID: try the non-group form.
-              log::warn!("Failed to kill spawned process group ({}). Will try killing only the top process.\n\
-                         This is unexpected: please file an issue about this problem at \
-                         [https://github.com/pantsbuild/pants/issues/new]", e);
-              subprocess.kill().map_err(|e| format!("Failed to interrupt child process: {}", e)).await?;
-            };
-            subprocess.wait().await.map_err(|e| e.to_string())
+      let exit_status = session.clone()
+        .with_console_ui_disabled(async move {
+          // Once any UI is torn down, grab exclusive access to the console.
+          let (term_stdin, term_stdout, term_stderr) =
+            stdio::get_destination().exclusive_start(Box::new(|_| {
+              // A stdio handler that will immediately trigger logging.
+              Err(())
+            }))?;
+          // NB: Command's stdio methods take ownership of a file-like to use, so we use
+          // `TryCloneAsFile` here to `dup` our thread-local stdio.
+          command
+            .stdin(Stdio::from(
+              term_stdin
+                .try_clone_as_file()
+                .map_err(|e| format!("Couldn't clone stdin: {e}"))?,
+            ))
+            .stdout(Stdio::from(
+              term_stdout
+                .try_clone_as_file()
+                .map_err(|e| format!("Couldn't clone stdout: {e}"))?,
+            ))
+            .stderr(Stdio::from(
+              term_stderr
+                .try_clone_as_file()
+                .map_err(|e| format!("Couldn't clone stderr: {e}"))?,
+            ));
+          let mut subprocess =
+              ManagedChild::spawn(&mut command, Some(context.core.graceful_shutdown_timeout))
+                .map_err(|e| format!("Error executing interactive process: {e}"))?;
+          tokio::select! {
+            _ = session.cancelled() => {
+              // The Session was cancelled: attempt to kill the process group / process, and
+              // then wait for it to exit (to avoid zombies).
+              if let Err(e) = subprocess.attempt_shutdown_sync() {
+                // Failed to kill the PGID: try the non-group form.
+                log::warn!("Failed to kill spawned process group ({}). Will try killing only the top process.\n\
+                          This is unexpected: please file an issue about this problem at \
+                          [https://github.com/pantsbuild/pants/issues/new]", e);
+                subprocess.kill().map_err(|e| format!("Failed to interrupt child process: {e}")).await?;
+              };
+              subprocess.wait().await.map_err(|e| e.to_string())
+            }
+            exit_status = subprocess.wait() => {
+              // The process exited.
+              exit_status.map_err(|e| e.to_string())
+            }
           }
-          exit_status = subprocess.wait() => {
-            // The process exited.
-            exit_status.map_err(|e| e.to_string())
-          }
-        }
-      })
-      .await?;
+        })
+        .await?;
 
     let code = exit_status.code().unwrap_or(-1);
     if keep_sandboxes == KeepSandboxes::OnFailure && code != 0 {
