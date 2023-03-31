@@ -1,7 +1,6 @@
 // Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 use std::ops::{Deref, DerefMut};
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::{thread, time};
 
 use nix::sys::signal;
@@ -20,7 +19,7 @@ const GRACEFUL_SHUTDOWN_POLL_TIME: time::Duration = time::Duration::from_millis(
 pub struct ManagedChild {
   child: Child,
   graceful_shutdown_timeout: time::Duration,
-  killed: AtomicBool,
+  killed: bool,
 }
 
 impl ManagedChild {
@@ -53,7 +52,7 @@ impl ManagedChild {
     Ok(Self {
       child,
       graceful_shutdown_timeout,
-      killed: AtomicBool::new(false),
+      killed: false,
     })
   }
 
@@ -122,7 +121,7 @@ impl ManagedChild {
     match self.wait_for_child_exit_sync(self.graceful_shutdown_timeout) {
       Ok(true) => {
         // process was gracefully shutdown
-        self.killed.store(true, Ordering::SeqCst);
+        self.killed = true;
         Ok(())
       }
       Ok(false) => {
@@ -142,7 +141,7 @@ impl ManagedChild {
   /// Kill the process's unique PGID or return an error if we don't have a PID or cannot kill.
   fn kill_pgid(&mut self) -> Result<(), String> {
     self.signal_pg(signal::Signal::SIGKILL)?;
-    self.killed.store(true, Ordering::SeqCst);
+    self.killed = true;
     Ok(())
   }
 }
@@ -164,7 +163,7 @@ impl DerefMut for ManagedChild {
 /// Implements drop by killing the process group.
 impl Drop for ManagedChild {
   fn drop(&mut self) {
-    if !self.killed.load(Ordering::SeqCst) {
+    if !self.killed {
       let _ = self.graceful_shutdown_sync();
     }
   }
