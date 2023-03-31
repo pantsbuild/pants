@@ -59,6 +59,11 @@ class GenNoExportRequest(GenerateSourcesRequest):
     exportable = False
 
 
+class Gen1DuplicatedRequest(GenerateSourcesRequest):
+    input = Gen1Sources
+    output = ResourceSourceField
+
+
 @rule
 async def gen1(_: Gen1Request) -> GeneratedSources:
     result = await Get(Snapshot, CreateDigest([FileContent("assets/README.md", b"Hello!")]))
@@ -76,6 +81,12 @@ async def gen_no_export(_: GenNoExportRequest) -> GeneratedSources:
     assert False, "Should not ever get here as `GenNoExportRequest.exportable==False`"
 
 
+@rule
+async def gen1_duplicated(_: Gen1DuplicatedRequest) -> GeneratedSources:
+    result = await Get(Snapshot, CreateDigest([FileContent("assets/DUPLICATED.md", b"Hello!")]))
+    return GeneratedSources(result)
+
+
 @pytest.fixture
 def rule_runner() -> RuleRunner:
     return RuleRunner(
@@ -84,9 +95,11 @@ def rule_runner() -> RuleRunner:
             gen1,
             gen2,
             gen_no_export,
+            gen1_duplicated,
             UnionRule(GenerateSourcesRequest, Gen1Request),
             UnionRule(GenerateSourcesRequest, Gen2Request),
             UnionRule(GenerateSourcesRequest, GenNoExportRequest),
+            UnionRule(GenerateSourcesRequest, Gen1DuplicatedRequest),
             *distdir.rules(),
         ],
         target_types=[Gen1Target, Gen2Target],
@@ -108,4 +121,5 @@ def test_export_codegen(rule_runner: RuleRunner) -> None:
     assert result.exit_code == 0
     parent_dir = Path(rule_runner.build_root, "dist", "codegen")
     assert (parent_dir / "assets" / "README.md").read_text() == "Hello!"
+    assert (parent_dir / "assets" / "DUPLICATED.md").read_text() == "Hello!"
     assert (parent_dir / "src" / "haskell" / "app.hs").read_text() == "10 * 4"
