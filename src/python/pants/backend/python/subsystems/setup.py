@@ -92,11 +92,11 @@ class PythonSetup(Subsystem):
                     You specify these interpreter constraints using the `interpreter_constraints`
                     option in the `[python]` section of pants.toml.
 
-                    We recommend constraining to a single interpreter minor version if you can, 
+                    We recommend constraining to a single interpreter minor version if you can,
                     e.g., `interpreter_constraints = ['==3.11.*']`, or at least a small number of
                     interpreter minor versions, e.g., `interpreter_constraints = ['>=3.10,<3.12']`.
-                    
-                    Individual targets can override these default interpreter constraints, 
+
+                    Individual targets can override these default interpreter constraints,
                     if different parts of your codebase run against different python interpreter
                     versions in a single repo.
 
