@@ -629,12 +629,14 @@ fn interactive_process(
                 .try_clone_as_file()
                 .map_err(|e| format!("Couldn't clone stderr: {}", e))?,
             ));
-          let mut subprocess = ManagedChild::spawn(command, context.core.graceful_shutdown_timeout)?;
+          let mut subprocess =
+              ManagedChild::spawn(&mut command, Some(context.core.graceful_shutdown_timeout))
+                .map_err(|e| format!("Error executing interactive process: {e}"))?;
           tokio::select! {
             _ = session.cancelled() => {
               // The Session was cancelled: attempt to kill the process group / process, and
               // then wait for it to exit (to avoid zombies).
-              if let Err(e) = subprocess.graceful_shutdown_sync() {
+              if let Err(e) = subprocess.attempt_shutdown_sync() {
                 // Failed to kill the PGID: try the non-group form.
                 log::warn!("Failed to kill spawned process group ({}). Will try killing only the top process.\n\
                           This is unexpected: please file an issue about this problem at \
