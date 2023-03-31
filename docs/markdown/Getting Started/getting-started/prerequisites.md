@@ -42,9 +42,7 @@ System-specific notes
 
 > 📘 Apple Silicon (M1/M2) support
 >
-> If you have Python code, you may need to [set your interpreter constraints](doc:python-interpreter-compatibility) to Python 3.9+, as many tools, such as Black, will not install correctly when using earlier Python versions.
->
-> When running in Docker you will need to set `--no-watch-filesystem --no-pantsd`. (Although we don't recommend permanently setting this, as these options are crucial for performance when iterating.)
+> If running Pants inside a Docker container on an Apple Silicon machine you will need to set `--no-watch-filesystem --no-pantsd`. (Although we don't recommend permanently setting this, as these options are crucial for performance when iterating.)
 
 ### Microsoft Windows
 
