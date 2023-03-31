@@ -654,7 +654,7 @@ def _invalid_lockfile_error(
                 (see below).
                 """
             )
-        yield "\n\nSee {doc_url('python-interpreter-compatibility')} for details."
+        yield f"\n\nSee {doc_url('python-interpreter-compatibility')} for details."
 
     yield "\n\n"
     yield from _common_failure_reasons(validation.failure_reasons, maybe_constraints_file_path)
