@@ -250,8 +250,16 @@ class HelpPrinter(MaybeColor):
 
         for name, description in sorted(goal_descriptions.items()):
             print(format_goal(name, first_paragraph(description)))
-        specific_help_cmd = f"{bin_name()} help $goal"
-        print(f"Use `{self.maybe_green(specific_help_cmd)}` to get help for a specific goal.\n")
+        specific_help_cmd = f"{bin_name()} help <goal>"
+        print(
+            softwrap(
+                f"""
+                Use `{self.maybe_green(specific_help_cmd)}` to get help for a specific goal. If
+                you expect to see more goals listed, you may need to activate backends; run
+                `{bin_name()} help backends`.
+                """
+            )
+        )
 
     def _print_all_subsystems(self) -> None:
         self._print_title("Subsystems")

@@ -50,8 +50,10 @@ from pants.option.global_options import (
 )
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.subsystem import Subsystem
+from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
+from pants.util.strutil import softwrap
 from pants.vcs.changed import rules as changed_rules
 from pants.vcs.git import rules as git_rules
 
@@ -138,11 +140,8 @@ class GraphSession:
 
         for goal in goals:
             goal_product = self.goal_map[goal]
-            # NB: We no-op for goals that have no implementation because no relevant backends are
-            # registered. We might want to reconsider the behavior to instead warn or error when
-            # trying to run something like `./pants run` without any backends registered.
             if not goal_product.subsystem_cls.activated(union_membership):
-                continue
+                raise GoalNotActivatedException(goal)
             # NB: Keep this in sync with the property `goal_param_types`.
             params = Params(specs, self.console, workspace, env_name)
             logger.debug(f"requesting {goal_product} to satisfy execution of `{goal}` goal")
@@ -357,3 +356,19 @@ class EngineInitializer:
         )
 
         return GraphScheduler(scheduler, goal_map)
+
+
+class GoalNotActivatedException(Exception):
+    def __init__(self, goal_name: str) -> None:
+        super().__init__(
+            softwrap(
+                f"""
+                No relevant backends activate the `{goal_name}` goal, so the goal would do
+                nothing.
+
+                This usually means that you have not yet set the option 
+                `[GLOBAL].backend_packages` in `pants.toml`, which is how Pants knows 
+                which languages and tools to support. Run `{bin_name()} help backends`.
+                """
+            )
+        )
