@@ -7,18 +7,23 @@ import logging
 import os
 import shlex
 from dataclasses import dataclass
-from typing import Iterable, Mapping
+from typing import Iterable
 
+# TODO: move this to a util_rules file
+from pants.backend.python.goals.setup_py import create_dist_build_request
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.subsystems.setuptools import PythonDistributionFieldSet
-from pants.backend.python.util_rules.dists import BuildBackendError, BuildSystem, distutils_repr
+from pants.backend.python.util_rules.dists import (
+    BuildBackendError,
+    DistBuildRequest,
+    distutils_repr,
+)
 from pants.backend.python.util_rules.dists import rules as dists_rules
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import Pex, PexRequest, VenvPex, VenvPexProcess
 from pants.backend.python.util_rules.pex_requirements import EntireLockfile, PexRequirements
 from pants.backend.python.util_rules.python_sources import PythonSourceFiles
 from pants.build_graph.address import Address
-from pants.core.goals.package import BuiltPackage, PackageFieldSet
 from pants.core.util_rules import system_binaries
 from pants.core.util_rules.source_files import SourceFiles
 from pants.core.util_rules.system_binaries import BashBinary, UnzipBinary
@@ -41,6 +46,7 @@ from pants.engine.target import (
     WrappedTarget,
     WrappedTargetRequest,
 )
+from pants.engine.unions import UnionMembership
 from pants.util.dirutil import fast_relpath_optional
 from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
@@ -65,14 +71,24 @@ async def isolate_local_dist_pep660_wheels(
     dist_field_set: PythonDistributionFieldSet,
     bash: BashBinary,
     unzip_binary: UnzipBinary,
+    python_setup: PythonSetup,
+    union_membership: UnionMembership,
 ) -> LocalDistPEP660Wheels:
-    # TODO: BuiltPackage is not the right thing to get here...
-    dist = await Get(BuiltPackage, PackageFieldSet, dist_field_set)
-    wheels_snapshot = await Get(Snapshot, DigestSubset(dist.digest, PathGlobs(["**/*.whl"])))
+    dist_build_request = await create_dist_build_request(
+        field_set=dist_field_set,
+        python_setup=python_setup,
+        union_membership=union_membership,
+        # editable wheel ignores build_wheel+build_sdist args
+        validate_wheel_sdist=False,
+    )
+    pep660_result = await Get(PEP660BuildResult, DistBuildRequest, dist_build_request)
 
-    # We ignore everything except the wheels, which should be PEP 660 Editable Wheels.
-    artifacts = {(a.relpath or "") for a in dist.artifacts}
-    wheels = [wheel for wheel in wheels_snapshot.files if wheel in artifacts]
+    # the output digest should only contain wheels, but filter to be safe.
+    wheels_snapshot = await Get(
+        Snapshot, DigestSubset(pep660_result.output, PathGlobs(["**/*.whl"]))
+    )
+
+    wheels = tuple(wheels_snapshot.files)
 
     if not wheels:
         tgt = await Get(
@@ -107,12 +123,12 @@ async def isolate_local_dist_pep660_wheels(
                 """,
             ],
             input_digest=wheels_snapshot.digest,
-            description=f"List contents of artifacts produced by {dist_field_set.address}",
+            description=f"List contents of editable artifacts produced by {dist_field_set.address}",
         ),
     )
     provided_files = set(wheels_listing_result.stdout.decode().splitlines())
 
-    return LocalDistPEP660Wheels(tuple(wheels), wheels_snapshot.digest, frozenset(provided_files))
+    return LocalDistPEP660Wheels(wheels, wheels_snapshot.digest, frozenset(provided_files))
 
 
 @dataclass(frozen=True)
@@ -246,23 +262,7 @@ async def build_editable_local_dists(
     return LocalDistsPEP660Pex(editable_dists_pex, subtracted_sources)
 
 
-@dataclass(frozen=True)
-class PEP660BuildRequest:  # Based on DistBuildRequest
-    """A request to build PEP660 wheels via a PEP 517 build backend."""
-
-    build_system: BuildSystem
-
-    interpreter_constraints: InterpreterConstraints
-    input: Digest
-    working_directory: str  # Relpath within the input digest.
-    build_time_source_roots: tuple[str, ...]  # Source roots for 1st party build-time deps.
-    output_path: str  # Location of the output directory within dist dir.
-
-    target_address_spec: str | None = None  # Only needed for logging etc.
-    wheel_config_settings: FrozenDict[str, tuple[str, ...]] | None = None
-
-    extra_build_time_requirements: tuple[Pex, ...] = tuple()
-    extra_build_time_env: Mapping[str, str] | None = None
+# We just use DistBuildRequest directly instead of adding a PEP660BuildRequest
 
 
 @dataclass(frozen=True)
@@ -311,7 +311,7 @@ print("editable: {{editable_path}}".format(editable_path=editable_path))
 
 def interpolate_backend_shim(
     dist_dir: str,
-    request: PEP660BuildRequest,
+    request: DistBuildRequest,
     get_editable_requires: bool = False,
     build_editable: bool = False,
 ) -> bytes:
@@ -336,7 +336,7 @@ def interpolate_backend_shim(
 
 @rule
 async def run_pep660_build(
-    request: PEP660BuildRequest, python_setup: PythonSetup
+    request: DistBuildRequest, python_setup: PythonSetup
 ) -> PEP660BuildResult:
     # Note that this pex has no entrypoint. We use it to run our generated shim, which
     # in turn imports from and invokes the build backend.
