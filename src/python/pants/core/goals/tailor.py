@@ -278,6 +278,10 @@ class TailorSubsystem(GoalSubsystem):
         """
     )
 
+    @classmethod
+    def activated(cls, union_membership: UnionMembership) -> bool:
+        return PutativeTargetsRequest in union_membership
+
     check = BoolOption(
         default=False,
         help=softwrap(
@@ -576,20 +580,6 @@ async def tailor(
     specs: Specs,
     build_file_options: BuildFileOptions,
 ) -> TailorGoal:
-    if PutativeTargetsRequest not in union_membership:
-        logger.warning(
-            softwrap(
-                f"""\
-                No backends activated that implement `tailor`, so the goal will do nothing.
-                
-                This usually means that you have not yet set the option `[GLOBAL].backend_packages` 
-                in `pants.toml`, which is how Pants knows which languages and tools to support.
-                See {doc_url('enabling-backends')}
-                """
-            )
-        )
-        return TailorGoal(exit_code=0)
-
     tailor_subsystem.validate_build_file_name(build_file_options.patterns)
     if not specs:
         if not specs.includes.from_change_detection:
