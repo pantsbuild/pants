@@ -73,13 +73,10 @@ impl GitignoreStyleExcludes {
   pub fn gitignore_file_paths(build_root: &Path) -> Vec<PathBuf> {
     let mut result = vec![];
 
-    match ignore::gitignore::gitconfig_excludes_path() {
-      Some(global_ignore_path) => {
-        if Path::is_file(&global_ignore_path) {
-          result.push(global_ignore_path);
-        }
+    if let Some(global_ignore_path) = ignore::gitignore::gitconfig_excludes_path() {
+      if Path::is_file(&global_ignore_path) {
+        result.push(global_ignore_path);
       }
-      None => (),
     }
 
     let gitignore_path = build_root.join(".gitignore");
