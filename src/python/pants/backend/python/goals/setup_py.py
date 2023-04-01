@@ -411,19 +411,25 @@ class DistBuildEnvironment:
     extra_build_time_inputs: Digest
 
 
-@rule
-async def package_python_dist(
+async def create_dist_build_request(
     field_set: PythonDistributionFieldSet,
     python_setup: PythonSetup,
     union_membership: UnionMembership,
-) -> BuiltPackage:
+    validate_wheel_sdist: bool = True,
+) -> DistBuildRequest:
+    """Create a DistBuildRequest for a `python_distribution`.
+
+    This is a separate helper function so that editable wheel builds can share setup logic with the
+    standard wheel/sdist builds.
+    """
+
     transitive_targets = await Get(TransitiveTargets, TransitiveTargetsRequest([field_set.address]))
     exported_target = ExportedTarget(transitive_targets.roots[0])
 
     dist_tgt = exported_target.target
     wheel = dist_tgt.get(WheelField).value
     sdist = dist_tgt.get(SDistField).value
-    if not wheel and not sdist:
+    if validate_wheel_sdist and not wheel and not sdist:
         raise NoDistTypeSelected(
             softwrap(
                 f"""
@@ -509,24 +515,37 @@ async def package_python_dist(
         output_path is not None
     ), "output_path should take a default string value if the user has not provided it."
 
-    setup_py_result = await Get(
-        DistBuildResult,
-        DistBuildRequest(
-            build_system=build_system,
-            interpreter_constraints=interpreter_constraints,
-            build_wheel=wheel,
-            build_sdist=sdist,
-            input=prefixed_input,
-            working_directory=working_directory,
-            build_time_source_roots=source_roots,
-            target_address_spec=exported_target.target.address.spec,
-            wheel_config_settings=wheel_config_settings,
-            sdist_config_settings=sdist_config_settings,
-            extra_build_time_requirements=extra_build_time_requirements,
-            extra_build_time_env=extra_build_time_env,
-            output_path=output_path,
-        ),
+    return DistBuildRequest(
+        build_system=build_system,
+        interpreter_constraints=interpreter_constraints,
+        build_wheel=wheel,
+        build_sdist=sdist,
+        input=prefixed_input,
+        working_directory=working_directory,
+        build_time_source_roots=source_roots,
+        target_address_spec=exported_target.target.address.spec,
+        wheel_config_settings=wheel_config_settings,
+        sdist_config_settings=sdist_config_settings,
+        extra_build_time_requirements=extra_build_time_requirements,
+        extra_build_time_env=extra_build_time_env,
+        output_path=output_path,
     )
+
+
+@rule
+async def package_python_dist(
+    field_set: PythonDistributionFieldSet,
+    python_setup: PythonSetup,
+    union_membership: UnionMembership,
+) -> BuiltPackage:
+    dist_build_request = await create_dist_build_request(
+        field_set=field_set,
+        python_setup=python_setup,
+        union_membership=union_membership,
+        # raises an error if both dist_tgt.wheel and dist_tgt.sdist are False
+        validate_wheel_sdist=True,
+    )
+    setup_py_result = await Get(DistBuildResult, DistBuildRequest, dist_build_request)
     dist_snapshot = await Get(Snapshot, Digest, setup_py_result.output)
     return BuiltPackage(
         setup_py_result.output,
