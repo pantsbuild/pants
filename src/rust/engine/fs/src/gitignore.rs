@@ -66,12 +66,22 @@ impl GitignoreStyleExcludes {
     }))
   }
 
-  /// Return the absolute file paths to `<repo>/.gitignore` and `<repo>/.git/info/exclude`, in
-  /// that order.
+  /// Return the absolute file paths to the global gitignore, `<repo>/.gitignore`, and
+  /// `<repo>/.git/info/exclude`, in that order.
   ///
   /// Will only add the files if they exist.
   pub fn gitignore_file_paths(build_root: &Path) -> Vec<PathBuf> {
     let mut result = vec![];
+
+    match ignore::gitignore::gitconfig_excludes_path() {
+      Some(global_ignore_path) => {
+        if Path::is_file(&global_ignore_path) {
+          result.push(global_ignore_path);
+        }
+      }
+      None => (),
+    }
+
     let gitignore_path = build_root.join(".gitignore");
     if Path::is_file(&gitignore_path) {
       result.push(gitignore_path);
@@ -211,23 +221,42 @@ mod tests {
   fn test_gitignore_file_paths() {
     let root = tempfile::TempDir::new().unwrap();
     let root_path = root.path();
-    assert!(GitignoreStyleExcludes::gitignore_file_paths(root_path).is_empty());
 
-    make_file(&root_path.join(".gitignore"), b"", 0o700);
+    // The behavior of gitignore_file_paths depends on whether the machine has a global config
+    // file or not. We do not want to muck around with people's global config, so instead we
+    // update what we expect from the test.
+    let global_config_path = ignore::gitignore::gitconfig_excludes_path();
+
+    let expected = match global_config_path.clone() {
+      Some(global_fp) => vec![global_fp],
+      None => vec![],
+    };
     assert_eq!(
       GitignoreStyleExcludes::gitignore_file_paths(root_path),
-      vec![root_path.join(".gitignore")]
+      expected
+    );
+
+    let gitignore_path = root_path.join(".gitignore");
+    make_file(&gitignore_path, b"", 0o700);
+    let expected = match global_config_path.clone() {
+      Some(global_fp) => vec![global_fp, gitignore_path.clone()],
+      None => vec![gitignore_path.clone()],
+    };
+    assert_eq!(
+      GitignoreStyleExcludes::gitignore_file_paths(root_path),
+      expected
     );
 
     let git_info_exclude_path = root_path.join(".git/info/exclude");
     fs::create_dir_all(git_info_exclude_path.parent().unwrap()).unwrap();
     make_file(&git_info_exclude_path, b"", 0o700);
+    let expected = match global_config_path.clone() {
+      Some(global_fp) => vec![global_fp, gitignore_path.clone(), git_info_exclude_path],
+      None => vec![gitignore_path.clone(), git_info_exclude_path],
+    };
     assert_eq!(
       GitignoreStyleExcludes::gitignore_file_paths(root_path),
-      vec![
-        root_path.join(".gitignore"),
-        root_path.join(".git/info/exclude")
-      ]
+      expected
     );
   }
 }
