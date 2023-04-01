@@ -11,7 +11,6 @@ from pants.engine.target import (
     SingleSourceField,
     Target,
     TargetFilesGenerator,
-    TargetFilesGeneratorSettingsRequest,
     generate_multiple_sources_field_help_message,
 )
 
@@ -40,10 +39,6 @@ class SemgrepRuleSource(Target):
     help = "A single source file containing Semgrep rules"
 
 
-class SemgrepRuleGeneratorSettingsRequest(TargetFilesGeneratorSettingsRequest):
-    pass
-
-
 class SemgrepRuleSourcesGeneratorTarget(TargetFilesGenerator):
     alias = "semgrep_rule_sources"
     core_fields = (
@@ -53,5 +48,4 @@ class SemgrepRuleSourcesGeneratorTarget(TargetFilesGenerator):
     generated_target_cls = SemgrepRuleSource
     copied_fields = COMMON_TARGET_FIELDS
     moved_fields = ()
-    settings_request_cls = SemgrepRuleGeneratorSettingsRequest
     help = "Generate a `semgrep_rule_source` target for each file in the `sources` field."

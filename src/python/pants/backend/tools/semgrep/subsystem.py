@@ -57,7 +57,7 @@ class Semgrep(PythonToolBase):
 
     skip = SkipOption("lint")
 
-    tailor_source_targets = BoolOption(
+    tailor_rule_targets = BoolOption(
         default=True,
         help="If true, add `semgrep_rule_sources` targets with the `tailor` goal.",
         advanced=True,
