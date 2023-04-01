@@ -4,7 +4,6 @@ slug: "python-package-goal"
 excerpt: "Create a deployable artifact."
 hidden: false
 createdAt: "2020-03-16T16:19:56.574Z"
-updatedAt: "2022-02-09T01:17:29.094Z"
 ---
 The `package` goal creates an artifact that can be deployed or distributed.
 

@@ -3,7 +3,6 @@ title: "Helm Overview"
 slug: "helm-overview"
 hidden: false
 createdAt: "2022-05-13T16:06:59.247Z"
-updatedAt: "2022-07-25T15:00:11.338Z"
 ---
 > 🚧 Helm support is in alpha stage
 > 

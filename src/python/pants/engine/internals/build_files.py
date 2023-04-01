@@ -9,6 +9,7 @@ import itertools
 import logging
 import os.path
 import sys
+import typing
 from dataclasses import dataclass
 from pathlib import PurePath
 from typing import Any, Sequence, cast
@@ -93,6 +94,7 @@ async def evaluate_preludes(
     )
     globals: dict[str, Any] = {
         **{name: getattr(builtins, name) for name in dir(builtins) if name.endswith("Error")},
+        **{name: getattr(typing, name) for name in typing.__all__},
         # Ensure the globals for each prelude includes the builtin symbols (E.g. `python_sources`)
         # and any build file aliases (e.g. from plugins)
         **parser.symbols,

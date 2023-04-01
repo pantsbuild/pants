@@ -81,7 +81,6 @@ def find_paths_breadth_first(
 
 @goal_rule
 async def paths(console: Console, paths_subsystem: PathsSubsystem) -> PathsGoal:
-
     path_from = paths_subsystem.from_
     path_to = paths_subsystem.to
 

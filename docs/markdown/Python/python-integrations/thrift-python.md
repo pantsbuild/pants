@@ -4,7 +4,6 @@ slug: "thrift-python"
 excerpt: "How to generate Python from Thrift."
 hidden: false
 createdAt: "2022-02-04T18:42:02.513Z"
-updatedAt: "2022-03-05T00:21:17.402Z"
 ---
 When your Python code imports Thrift generated files, Pants will detect the imports and run the Apache Thrift compiler to generate those files.
 

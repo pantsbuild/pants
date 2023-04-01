@@ -20,7 +20,7 @@ use crate::types::Types;
 
 use async_oncecell::OnceCell;
 use cache::PersistentCache;
-use fs::{safe_create_dir_all_ioerror, GitignoreStyleExcludes, PosixFS};
+use fs::{GitignoreStyleExcludes, PosixFS};
 use futures::FutureExt;
 use graph::{self, EntryId, Graph, InvalidationResult, NodeContext};
 use hashing::Digest;
@@ -251,7 +251,10 @@ impl Core {
       exec_strategy_opts.local_keep_sandboxes,
     )?);
     let runner = Box::new(SwitchedCommandRunner::new(docker_runner, runner, |req| {
-      matches!(req.execution_strategy, ProcessExecutionStrategy::Docker(_))
+      matches!(
+        req.execution_environment.strategy,
+        ProcessExecutionStrategy::Docker(_)
+      )
     }));
 
     let mut runner: Box<dyn CommandRunner> = Box::new(bounded::CommandRunner::new(
@@ -289,7 +292,7 @@ impl Core {
         runner,
         |req| {
           matches!(
-            req.execution_strategy,
+            req.execution_environment.strategy,
             ProcessExecutionStrategy::RemoteExecution(_)
           )
         },
@@ -492,7 +495,7 @@ impl Core {
       None
     };
 
-    safe_create_dir_all_ioerror(&local_store_options.store_dir).map_err(|e| {
+    std::fs::create_dir_all(&local_store_options.store_dir).map_err(|e| {
       format!(
         "Error making directory {:?}: {:?}",
         local_store_options.store_dir, e

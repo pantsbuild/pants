@@ -145,6 +145,6 @@ class ExternalCCSubsystem(TemplatedExternalTool, CCOptions):
 def rules() -> Iterable[Rule | UnionRule]:
     return (
         *collect_rules(),
-        *CCSubsystem.rules(),  # type: ignore[call-arg]
-        *ExternalCCSubsystem.rules(),  # type: ignore[call-arg]
+        *CCSubsystem.rules(),
+        *ExternalCCSubsystem.rules(),
     )

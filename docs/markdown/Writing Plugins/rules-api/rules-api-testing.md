@@ -4,7 +4,6 @@ slug: "rules-api-testing"
 excerpt: "How to verify your plugin works."
 hidden: false
 createdAt: "2020-07-01T17:25:36.570Z"
-updatedAt: "2021-12-07T21:22:03.170Z"
 ---
 There are four main approaches to testing your plugin, ranging in terms of scope (unit vs. integration test). You may mix-and-match between these approaches.
 

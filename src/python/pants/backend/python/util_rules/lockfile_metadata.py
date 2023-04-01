@@ -32,7 +32,6 @@ class InvalidPythonLockfileReason(Enum):
 
 @dataclass(frozen=True)
 class PythonLockfileMetadata(LockfileMetadata):
-
     scope = LockfileScope.PYTHON
 
     valid_for_interpreter_constraints: InterpreterConstraints
@@ -94,7 +93,6 @@ class PythonLockfileMetadata(LockfileMetadata):
 @_python_lockfile_metadata(1)
 @dataclass(frozen=True)
 class PythonLockfileMetadataV1(PythonLockfileMetadata):
-
     requirements_invalidation_digest: str
 
     @classmethod

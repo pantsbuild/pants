@@ -17,7 +17,7 @@ use grpc_util::retry::{retry_call, status_is_retryable};
 use grpc_util::{
   headers_to_http_header_map, layered_service, status_ref_to_str, status_to_str, LayeredService,
 };
-use hashing::Digest;
+use hashing::{Digest, Hasher};
 use log::Level;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use protos::gen::google::bytestream::byte_stream_client::ByteStreamClient;
@@ -417,9 +417,21 @@ impl ByteStore {
           });
 
           let mut writer = destination.lock().await;
+          let mut hasher = Hasher::new();
           writer.reset().await?;
           while let Some(response) = stream.next().await {
-            writer.write_all(&(response?).data).await?;
+            let response = response?;
+            writer.write_all(&response.data).await?;
+            hasher.update(&response.data);
+          }
+          writer.shutdown().await?;
+
+          let actual_digest = hasher.finish();
+          if actual_digest != digest {
+            // Return an `internal` status to attempt retry.
+            return Err(ByteStoreError::Grpc(Status::internal(format!(
+              "Remote CAS gave wrong digest: expected {digest:?}, got {actual_digest:?}"
+            ))));
           }
 
           Ok(())
@@ -460,7 +472,6 @@ impl ByteStore {
     digest: Digest,
     mut destination: W,
   ) -> Result<Option<W>, String> {
-    // TODO(#18231): compute the digest as we write, to avoid needing a second pass to validate
     if self.load_monomorphic(digest, &mut destination).await? {
       Ok(Some(destination))
     } else {
@@ -482,11 +493,7 @@ impl ByteStore {
     digest: Digest,
     file: tokio::fs::File,
   ) -> Result<Option<tokio::fs::File>, String> {
-    let mut result = self.load(digest, file).await;
-    if let Ok(Some(ref mut file)) = result {
-      file.rewind().await.map_err(|e| e.to_string())?;
-    }
-    result
+    self.load(digest, file).await
   }
 
   ///

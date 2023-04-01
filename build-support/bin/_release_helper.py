@@ -70,7 +70,7 @@ _known_packages = [
 
 _expected_owners = {"benjyw", "John.Sirois", "stuhood"}
 
-_expected_maintainers = {"EricArellano", "illicitonion", "wisechengyi"}
+_expected_maintainers = {"EricArellano", "illicitonion", "wisechengyi", "kaos"}
 
 
 # Disable the Pants repository-internal internal_plugins.test_lockfile_fixtures plugin because

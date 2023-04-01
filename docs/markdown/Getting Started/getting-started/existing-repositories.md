@@ -4,7 +4,6 @@ slug: "existing-repositories"
 excerpt: "How to incrementally add Pants to an existing repository."
 hidden: false
 createdAt: "2020-09-28T23:03:33.586Z"
-updatedAt: "2022-03-12T22:33:31.603Z"
 ---
 Recommended steps
 -----------------

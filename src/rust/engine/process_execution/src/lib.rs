@@ -279,8 +279,7 @@ pub struct InputDigests {
   /// The input files for the process execution, which will be materialized as mutable inputs in a
   /// sandbox for the process.
   ///
-  /// TODO: Rename to `inputs` for symmetry with `immutable_inputs`.
-  pub input_files: DirectoryDigest,
+  pub inputs: DirectoryDigest,
 
   /// Immutable input digests to make available in the input root.
   ///
@@ -306,7 +305,7 @@ pub struct InputDigests {
 impl InputDigests {
   pub async fn new(
     store: &Store,
-    input_files: DirectoryDigest,
+    inputs: DirectoryDigest,
     immutable_inputs: BTreeMap<RelativePath, DirectoryDigest>,
     use_nailgun: BTreeSet<RelativePath>,
   ) -> Result<Self, StoreError> {
@@ -330,14 +329,14 @@ impl InputDigests {
         }
       })
       .collect::<Vec<_>>();
-    complete_digests.push(input_files.clone());
+    complete_digests.push(inputs.clone());
 
     let (complete, nailgun) =
       try_join!(store.merge(complete_digests), store.merge(nailgun_digests),)?;
     Ok(Self {
-      complete: complete,
-      nailgun: nailgun,
-      input_files,
+      complete,
+      nailgun,
+      inputs,
       immutable_inputs,
       use_nailgun,
     })
@@ -370,17 +369,17 @@ impl InputDigests {
       .collect();
     let input_files_digests = from
       .iter()
-      .map(|input_digests| input_digests.input_files.clone())
+      .map(|input_digests| input_digests.inputs.clone())
       .collect();
-    let (complete, nailgun, input_files) = try_join!(
+    let (complete, nailgun, inputs) = try_join!(
       store.merge(complete_digests),
       store.merge(nailgun_digests),
       store.merge(input_files_digests),
     )?;
     Ok(Self {
-      complete: complete,
-      nailgun: nailgun,
-      input_files: input_files,
+      complete,
+      nailgun,
+      inputs,
       immutable_inputs: merged_immutable_inputs,
       use_nailgun: Itertools::concat(
         from
@@ -392,11 +391,11 @@ impl InputDigests {
     })
   }
 
-  pub fn with_input_files(input_files: DirectoryDigest) -> Self {
+  pub fn with_input_files(inputs: DirectoryDigest) -> Self {
     Self {
-      complete: input_files.clone(),
+      complete: inputs.clone(),
       nailgun: EMPTY_DIRECTORY_DIGEST.clone(),
-      input_files,
+      inputs,
       immutable_inputs: BTreeMap::new(),
       use_nailgun: BTreeSet::new(),
     }
@@ -420,7 +419,7 @@ impl InputDigests {
         // TODO: See method doc.
         complete: EMPTY_DIRECTORY_DIGEST.clone(),
         nailgun: EMPTY_DIRECTORY_DIGEST.clone(),
-        input_files: self.input_files.clone(),
+        inputs: self.inputs.clone(),
         immutable_inputs: client,
         use_nailgun: BTreeSet::new(),
       },
@@ -428,7 +427,7 @@ impl InputDigests {
       InputDigests {
         complete: self.nailgun.clone(),
         nailgun: EMPTY_DIRECTORY_DIGEST.clone(),
-        input_files: EMPTY_DIRECTORY_DIGEST.clone(),
+        inputs: EMPTY_DIRECTORY_DIGEST.clone(),
         immutable_inputs: server,
         use_nailgun: BTreeSet::new(),
       },
@@ -441,7 +440,7 @@ impl Default for InputDigests {
     Self {
       complete: EMPTY_DIRECTORY_DIGEST.clone(),
       nailgun: EMPTY_DIRECTORY_DIGEST.clone(),
-      input_files: EMPTY_DIRECTORY_DIGEST.clone(),
+      inputs: EMPTY_DIRECTORY_DIGEST.clone(),
       immutable_inputs: BTreeMap::new(),
       use_nailgun: BTreeSet::new(),
     }
@@ -469,6 +468,23 @@ impl ProcessExecutionStrategy {
       Self::Docker(image) => format!("docker_execution: {image}"),
     }
   }
+
+  pub fn strategy_type(&self) -> &'static str {
+    match self {
+      Self::Local => "local",
+      Self::RemoteExecution(_) => "remote",
+      Self::Docker(_) => "docker",
+    }
+  }
+}
+
+#[derive(DeepSizeOf, Debug, Clone, Hash, PartialEq, Eq, Serialize)]
+pub struct ProcessExecutionEnvironment {
+  /// The name of the environment the process is running in, or None if it is running in the
+  /// default (local) environment.
+  pub name: Option<String>,
+  pub platform: Platform,
+  pub strategy: ProcessExecutionStrategy,
 }
 
 ///
@@ -561,11 +577,9 @@ pub struct Process {
   ///
   pub jdk_home: Option<PathBuf>,
 
-  pub platform: Platform,
-
   pub cache_scope: ProcessCacheScope,
 
-  pub execution_strategy: ProcessExecutionStrategy,
+  pub execution_environment: ProcessExecutionEnvironment,
 
   pub remote_cache_speculation_delay: std::time::Duration,
 }
@@ -576,9 +590,11 @@ impl Process {
   /// be used to set values.
   ///
   /// We use the more ergonomic (but possibly slightly slower) "move self for each builder method"
-  /// pattern, so this method is only enabled for test usage: production usage should construct the
+  /// pattern, so this method should only be used in tests: production usage should construct the
   /// Process struct wholesale. We can reconsider this if we end up with more production callsites
   /// that require partial options.
+  ///
+  /// NB: Some of the default values used in this constructor only make sense in tests.
   ///
   pub fn new(argv: Vec<String>) -> Process {
     Process {
@@ -593,11 +609,14 @@ impl Process {
       level: log::Level::Info,
       append_only_caches: BTreeMap::new(),
       jdk_home: None,
-      platform: Platform::current().unwrap(),
       execution_slot_variable: None,
       concurrency_available: 0,
       cache_scope: ProcessCacheScope::Successful,
-      execution_strategy: ProcessExecutionStrategy::Local,
+      execution_environment: ProcessExecutionEnvironment {
+        name: None,
+        platform: Platform::current().unwrap(),
+        strategy: ProcessExecutionStrategy::Local,
+      },
       remote_cache_speculation_delay: std::time::Duration::from_millis(0),
     }
   }
@@ -646,21 +665,26 @@ impl Process {
   }
 
   ///
-  /// Set the execution strategy to Docker, with the specified image.
+  /// Set the execution environment to Docker, with the specified image.
   ///
   pub fn docker(mut self, image: String) -> Process {
-    self.execution_strategy = ProcessExecutionStrategy::Docker(image);
+    self.execution_environment = ProcessExecutionEnvironment {
+      name: None,
+      platform: Platform::current().unwrap(),
+      strategy: ProcessExecutionStrategy::Docker(image),
+    };
     self
   }
 
   ///
-  /// Set the execution strategy to remote execution with the provided platform properties.
+  /// Set the execution environment to remote execution with the specified platform properties.
   ///
-  pub fn remote_execution_platform_properties(
-    mut self,
-    properties: Vec<(String, String)>,
-  ) -> Process {
-    self.execution_strategy = ProcessExecutionStrategy::RemoteExecution(properties);
+  pub fn remote_execution(mut self, properties: Vec<(String, String)>) -> Process {
+    self.execution_environment = ProcessExecutionEnvironment {
+      name: None,
+      platform: Platform::current().unwrap(),
+      strategy: ProcessExecutionStrategy::RemoteExecution(properties),
+    };
     self
   }
 
@@ -678,6 +702,8 @@ impl Process {
 ///
 /// The result of running a process.
 ///
+/// TODO: Rename to `FallibleProcessResult`: see #18450.
+///
 #[derive(DeepSizeOf, Derivative, Clone, Debug, Eq)]
 #[derivative(PartialEq, Hash)]
 pub struct FallibleProcessResultWithPlatform {
@@ -685,23 +711,35 @@ pub struct FallibleProcessResultWithPlatform {
   pub stderr_digest: Digest,
   pub exit_code: i32,
   pub output_directory: DirectoryDigest,
-  pub platform: Platform,
   #[derivative(PartialEq = "ignore", Hash = "ignore")]
   pub metadata: ProcessResultMetadata,
 }
 
-/// Metadata for a ProcessResult corresponding to the REAPI `ExecutedActionMetadata` proto. This
-/// conversion is lossy, but the interesting parts are preserved.
 #[derive(Clone, Debug, DeepSizeOf, Eq, PartialEq)]
 pub struct ProcessResultMetadata {
-  /// The time from starting to completion, including preparing the chroot and cleanup.
+  /// The execution time of this process when it ran.
+  ///
   /// Corresponds to `worker_start_timestamp` and `worker_completed_timestamp` from
   /// `ExecutedActionMetadata`.
   ///
   /// NB: This is optional because the REAPI does not guarantee that it is returned.
   pub total_elapsed: Option<Duration>,
+  /// How much faster a cache hit was than running the process again.
+  ///
+  /// This includes the overhead of setting up and cleaning up the process for execution, and it
+  /// should include all overhead for the cache lookup.
+  ///
+  /// If the cache hit was slower than the original process, we return 0. Note that the cache hit
+  /// may still have been faster than rerunning the process a second time, e.g. if speculation
+  /// is used and the cache hit completed before the rerun; still, we cannot know how long the
+  /// second run would have taken, so the best we can do is report 0.
+  ///
+  /// If the original process's execution time was not recorded, this may be None.
+  pub saved_by_cache: Option<Duration>,
   /// The source of the result.
   pub source: ProcessResultSource,
+  /// The environment that the process ran in.
+  pub environment: ProcessExecutionEnvironment,
   /// The RunId of the Session in which the `ProcessResultSource` was accurate. In further runs
   /// within the same process, the source of the process implicitly becomes memoization.
   pub source_run_id: RunId,
@@ -711,11 +749,14 @@ impl ProcessResultMetadata {
   pub fn new(
     total_elapsed: Option<Duration>,
     source: ProcessResultSource,
+    environment: ProcessExecutionEnvironment,
     source_run_id: RunId,
   ) -> Self {
     Self {
       total_elapsed,
+      saved_by_cache: None,
       source,
+      environment,
       source_run_id,
     }
   }
@@ -723,6 +764,7 @@ impl ProcessResultMetadata {
   pub fn new_from_metadata(
     metadata: ExecutedActionMetadata,
     source: ProcessResultSource,
+    environment: ProcessExecutionEnvironment,
     source_run_id: RunId,
   ) -> Self {
     let total_elapsed = match (
@@ -734,35 +776,18 @@ impl ProcessResultMetadata {
         .ok(),
       _ => None,
     };
-    Self {
-      total_elapsed,
-      source,
-      source_run_id,
-    }
+
+    Self::new(total_elapsed, source, environment, source_run_id)
   }
 
-  /// How much faster a cache hit was than running the process again.
-  ///
-  /// This includes the overhead of setting up and cleaning up the process for execution, and it
-  /// should include all overhead for the cache lookup.
-  ///
-  /// If the cache hit was slower than the original process, we return 0. Note that the cache hit
-  /// may still have been faster than rerunning the process a second time, e.g. if speculation
-  /// is used and the cache hit completed before the rerun; still, we cannot know how long the
-  /// second run would have taken, so the best we can do is report 0.
-  ///
-  /// If the original process's execution time was not recorded, we return None because we
-  /// cannot make a meaningful comparison.
-  pub fn time_saved_from_cache(
-    &self,
-    cache_lookup: std::time::Duration,
-  ) -> Option<std::time::Duration> {
-    self.total_elapsed.and_then(|original_process| {
-      let original_process: std::time::Duration = original_process.into();
-      original_process
-        .checked_sub(cache_lookup)
-        .or_else(|| Some(std::time::Duration::new(0, 0)))
-    })
+  pub fn update_cache_hit_elapsed(&mut self, cache_hit_elapsed: std::time::Duration) {
+    self.saved_by_cache = self.total_elapsed.map(|total_elapsed| {
+      let total_elapsed: std::time::Duration = total_elapsed.into();
+      total_elapsed
+        .checked_sub(cache_hit_elapsed)
+        .unwrap_or_else(|| std::time::Duration::new(0, 0))
+        .into()
+    });
   }
 }
 
@@ -794,8 +819,7 @@ impl From<ProcessResultMetadata> for ExecutedActionMetadata {
 
 #[derive(Clone, Copy, Debug, DeepSizeOf, Eq, PartialEq)]
 pub enum ProcessResultSource {
-  RanLocally,
-  RanRemotely,
+  Ran,
   HitLocally,
   HitRemotely,
 }
@@ -803,8 +827,7 @@ pub enum ProcessResultSource {
 impl From<ProcessResultSource> for &'static str {
   fn from(prs: ProcessResultSource) -> &'static str {
     match prs {
-      ProcessResultSource::RanLocally => "ran_locally",
-      ProcessResultSource::RanRemotely => "ran_remotely",
+      ProcessResultSource::Ran => "ran",
       ProcessResultSource::HitLocally => "hit_locally",
       ProcessResultSource::HitRemotely => "hit_remotely",
     }
@@ -1100,8 +1123,8 @@ pub async fn make_execute_request(
       });
   }
 
-  let mut platform_properties = match req.execution_strategy.clone() {
-    ProcessExecutionStrategy::RemoteExecution(properties) => properties,
+  let mut platform_properties = match &req.execution_environment.strategy {
+    ProcessExecutionStrategy::RemoteExecution(properties) => properties.clone(),
     _ => vec![],
   };
 
@@ -1118,7 +1141,7 @@ pub async fn make_execute_request(
     .environment_variables
     .push(remexec::command::EnvironmentVariable {
       name: CACHE_KEY_EXECUTION_STRATEGY.to_string(),
-      value: req.execution_strategy.cache_value(),
+      value: req.execution_environment.strategy.cache_value(),
     });
 
   if matches!(
@@ -1140,7 +1163,7 @@ pub async fn make_execute_request(
       .environment_variables
       .push(remexec::command::EnvironmentVariable {
         name: CACHE_KEY_TARGET_PLATFORM_ENV_VAR_NAME.to_string(),
-        value: req.platform.into(),
+        value: req.execution_environment.platform.into(),
       });
   }
 
@@ -1281,9 +1304,9 @@ pub async fn populate_fallible_execution_result(
   store: Store,
   run_id: RunId,
   action_result: &remexec::ActionResult,
-  platform: Platform,
   treat_tree_digest_as_final_directory_hack: bool,
   source: ProcessResultSource,
+  environment: ProcessExecutionEnvironment,
 ) -> Result<FallibleProcessResultWithPlatform, StoreError> {
   let (stdout_digest, stderr_digest, output_directory) = future::try_join3(
     extract_stdout(&store, action_result),
@@ -1296,16 +1319,18 @@ pub async fn populate_fallible_execution_result(
   )
   .await?;
 
+  let metadata = if let Some(metadata) = action_result.execution_metadata.clone() {
+    ProcessResultMetadata::new_from_metadata(metadata, source, environment, run_id)
+  } else {
+    ProcessResultMetadata::new(None, source, environment, run_id)
+  };
+
   Ok(FallibleProcessResultWithPlatform {
     stdout_digest,
     stderr_digest,
     exit_code: action_result.exit_code,
     output_directory,
-    platform,
-    metadata: action_result.execution_metadata.clone().map_or(
-      ProcessResultMetadata::new(None, source, run_id),
-      |metadata| ProcessResultMetadata::new_from_metadata(metadata, source, run_id),
-    ),
+    metadata,
   })
 }
 

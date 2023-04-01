@@ -19,9 +19,13 @@ from pants.core.util_rules.environments import (
     RemoteEnvironmentTarget,
     RemotePlatformField,
 )
-from pants.engine.env_vars import CompleteEnvironmentVars
+from pants.engine.env_vars import CompleteEnvironmentVars, EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.environment import EnvironmentName
-from pants.engine.internals.platform_rules import complete_environment_vars, current_platform
+from pants.engine.internals.platform_rules import (
+    complete_environment_vars,
+    current_platform,
+    environment_path_variable,
+)
 from pants.engine.internals.session import SessionValues
 from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessResult
@@ -40,12 +44,14 @@ def test_current_platform() -> None:
         expected: Platform,
     ) -> None:
         global_options = create_subsystem(GlobalOptions, remote_execution=remote_execution)
+        name = "name"
         env_subsystem = create_subsystem(
             EnvironmentsSubsystem,
-            names={"name": "addr"} if envs_enabled else {},
+            names={name: "addr"} if envs_enabled else {},
         )
         result = run_rule_with_mocks(
-            current_platform, rule_args=[EnvironmentTarget(env_tgt), global_options, env_subsystem]
+            current_platform,
+            rule_args=[EnvironmentTarget(name, env_tgt), global_options, env_subsystem],
         )
         assert result == expected
 
@@ -100,9 +106,10 @@ def test_complete_env_vars() -> None:
         expected_env: str,
     ) -> None:
         global_options = create_subsystem(GlobalOptions, remote_execution=remote_execution)
+        name = "name"
         env_subsystem = create_subsystem(
             EnvironmentsSubsystem,
-            names={"name": "addr"} if envs_enabled else {},
+            names={name: "addr"} if envs_enabled else {},
         )
 
         def mock_env_process(process: Process) -> ProcessResult:
@@ -116,7 +123,7 @@ def test_complete_env_vars() -> None:
                 SessionValues(
                     {CompleteEnvironmentVars: CompleteEnvironmentVars({"LOCAL": "true"})}
                 ),
-                EnvironmentTarget(env_tgt),
+                EnvironmentTarget(name, env_tgt),
                 global_options,
                 env_subsystem,
             ],
@@ -150,6 +157,33 @@ def test_complete_env_vars() -> None:
             remote_execution=re,
             expected_env="REMOTE",
         )
+
+
+@pytest.mark.parametrize(
+    ("env", "expected_entries"),
+    [
+        pytest.param(
+            {"PATH": "foo/bar:baz:/qux/quux"}, ["foo/bar", "baz", "/qux/quux"], id="populated_PATH"
+        ),
+        pytest.param({"PATH": ""}, [], id="empty_PATH"),
+        pytest.param({}, [], id="unset_PATH"),
+    ],
+)
+def test_get_environment_paths(env: dict[str, str], expected_entries: list[str]) -> None:
+    def mock_environment_vars_subset(_req: EnvironmentVarsRequest) -> EnvironmentVars:
+        return EnvironmentVars(env)
+
+    paths = run_rule_with_mocks(
+        environment_path_variable,
+        mock_gets=[
+            MockGet(
+                output_type=EnvironmentVars,
+                input_types=(CompleteEnvironmentVars, EnvironmentVarsRequest),
+                mock=mock_environment_vars_subset,
+            )
+        ],
+    )
+    assert list(paths) == expected_entries
 
 
 def test_docker_complete_env_vars() -> None:

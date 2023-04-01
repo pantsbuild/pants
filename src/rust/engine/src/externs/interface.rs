@@ -47,7 +47,7 @@ use workunit_store::{
 };
 
 use crate::externs::fs::{possible_store_missing_digest, PyFileDigest};
-use crate::externs::process::PyProcessConfigFromEnvironment;
+use crate::externs::process::PyProcessExecutionEnvironment;
 use crate::{
   externs, nodes, Context, Core, ExecutionRequest, ExecutionStrategyOptions, ExecutionTermination,
   Failure, Function, Intrinsic, Intrinsics, Key, LocalStoreOptions, Params, RemotingOptions, Rule,
@@ -221,7 +221,7 @@ impl PyTypes {
       process: TypeId::new(process),
       process_result: TypeId::new(process_result),
       process_config_from_environment: TypeId::new(
-        py.get_type::<externs::process::PyProcessConfigFromEnvironment>(),
+        py.get_type::<externs::process::PyProcessExecutionEnvironment>(),
       ),
       process_result_metadata: TypeId::new(process_result_metadata),
       coroutine: TypeId::new(coroutine),
@@ -559,6 +559,7 @@ fn nailgun_server_create(
         exe.cmd.command,
         PyTuple::new(py, exe.cmd.args),
         exe.cmd.env.into_iter().collect::<HashMap<String, String>>(),
+        exe.cmd.working_dir,
         PySessionCancellationLatch(exe.cancelled),
         exe.stdin_fd as i64,
         exe.stdout_fd as i64,
@@ -992,7 +993,7 @@ fn session_run_interactive_process(
   py: Python,
   py_session: &PySession,
   interactive_process: PyObject,
-  process_config_from_environment: PyProcessConfigFromEnvironment,
+  process_config_from_environment: PyProcessExecutionEnvironment,
 ) -> PyO3Result<PyObject> {
   let core = py_session.0.core();
   let context = Context::new(core.clone(), py_session.0.clone());
@@ -1453,9 +1454,11 @@ fn garbage_collect_store(
   let core = &py_scheduler.0.core;
   core.executor.enter(|| {
     py.allow_threads(|| {
-      core
-        .store()
-        .garbage_collect(target_size_bytes, store::ShrinkBehavior::Fast)
+      core.executor.block_on(
+        core
+          .store()
+          .garbage_collect(target_size_bytes, store::ShrinkBehavior::Fast),
+      )
     })
     .map_err(PyException::new_err)
   })
@@ -1625,6 +1628,7 @@ fn write_digest(
   py_session: &PySession,
   digest: &PyAny,
   path_prefix: String,
+  clear_destination: bool,
 ) -> PyO3Result<()> {
   let core = &py_scheduler.0.core;
   core.executor.enter(|| {
@@ -1638,14 +1642,20 @@ fn write_digest(
     destination.push(core.build_root.clone());
     destination.push(path_prefix);
 
+    if clear_destination {
+      std::fs::remove_dir_all(&destination).map_err(|e| {
+        PyException::new_err(format!("Failed to clear {}: {e}", destination.display()))
+      })?;
+    }
+
     block_in_place_and_wait(py, || async move {
       core
         .store()
         .materialize_directory(
           destination.clone(),
           lifted_digest,
+          true, // Force everything we write to be mutable
           &BTreeSet::new(),
-          None,
           fs::Permissions::Writable,
         )
         .await

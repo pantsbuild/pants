@@ -4,7 +4,6 @@ slug: "python-check-goal"
 excerpt: "How to use MyPy."
 hidden: false
 createdAt: "2020-06-30T15:53:37.799Z"
-updatedAt: "2022-02-09T00:27:23.086Z"
 ---
 Activating MyPy
 ---------------

@@ -4,7 +4,6 @@ slug: "rules-api-logging"
 excerpt: "How to add logging and influence the dynamic UI."
 hidden: false
 createdAt: "2020-09-12T03:38:10.345Z"
-updatedAt: "2020-09-16T03:17:03.975Z"
 ---
 Even though a [`@goal_rule`](doc:rules-api-goals) is the only type of rule that can print to `stdout` (via the special `Console` type), any rule can log to stderr and change how the rule appears in the dynamic UI.
 

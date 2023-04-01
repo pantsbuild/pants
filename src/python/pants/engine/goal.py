@@ -110,7 +110,7 @@ class Goal:
     f"""Indicates that a Goal has been migrated to compute EnvironmentNames to build targets in.
 
     All goals in `pantsbuild/pants` should be migrated before the 2.15.x branch is cut, but end
-    user goals have until `2.17.0.dev0` to migrate.
+    user goals have until `2.17.0.dev3` to migrate.
 
     See {doc_url('plugin-upgrade-guide')}.
     """
@@ -120,7 +120,7 @@ class Goal:
     def _selects_environments(cls) -> bool:
         deprecated_conditional(
             lambda: cls.environment_behavior == Goal.EnvironmentBehavior.UNMIGRATED,
-            "2.17.0.dev0",
+            "2.17.0.dev3",
             f"Setting `Goal.environment_behavior=EnvironmentBehavior.UNMIGRATED` for `Goal` "
             f"`{cls.name}`",
             hint=f"See {doc_url('plugin-upgrade-guide')}\n",

@@ -4,7 +4,6 @@ slug: "test-custom-plugin-goal"
 excerpt: "How to write tests for your custom plugin code."
 hidden: false
 createdAt: "2022-02-07T05:44:28.620Z"
-updatedAt: "2022-02-07T05:44:28.620Z"
 ---
 # Introduction
 

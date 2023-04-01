@@ -4,7 +4,6 @@ slug: "run-shell-commands"
 excerpt: "How to execute arbitrary scripts and programs"
 hidden: false
 createdAt: "2021-10-04T12:37:58.934Z"
-updatedAt: "2022-02-08T21:13:55.807Z"
 ---
 The [`shell_command`](doc:reference-shell_command) target allows you to run any command during a Pants execution, for the purpose of modifying or creating files to be used by other targets, or its (idempotent: see below) side-effects when accessing services over the network.
 
@@ -12,7 +11,7 @@ The [`shell_command`](doc:reference-shell_command) target allows you to run any 
 shell_command(
     command="./my-script.sh download some-archive.tar.gz",
     tools=["curl", "env", "bash", "mkdir", "tar"],
-    outputs=["files/"],
+    output_directories=["files"],
     dependencies=[":shell-scripts", ":images"]
 )
 
@@ -44,9 +43,11 @@ In case there are resulting files that should be captured and passed to any cons
 > 
 > The shell command may be cancelled or retried any number of times, so it is important that any side effects are idempotent. That is, it should not matter if it is run several times, or only partially.
 
-> 🚧 Feedback wanted
-> 
-> We are gathering feedback on this target before we promote it from its experimental status. Please reach out to us on [Slack](doc:getting-help) or [GitHub](https://github.com/pantsbuild/pants) with your ideas or issues.
+
+> 📘 Running other Pants targets as commands
+>
+> See the [`adhoc_tool`](doc:adhoc-tool) documentation for discussion of how to run source files, third-party tools, and version-matched system binaries from within the Pants sandbox.
+
 
 The `run_shell_command` target
 -------------------------------------------

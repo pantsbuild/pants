@@ -4,7 +4,6 @@ slug: "python-run-goal"
 excerpt: "Run a `pex_binary` target."
 hidden: false
 createdAt: "2020-03-16T16:19:56.403Z"
-updatedAt: "2022-01-29T16:45:29.511Z"
 ---
 To run an executable/script, use `pants run` on one of the following target types:
 

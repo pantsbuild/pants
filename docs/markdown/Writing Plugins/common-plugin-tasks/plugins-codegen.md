@@ -4,7 +4,6 @@ slug: "plugins-codegen"
 excerpt: "How to add a new code generator to Pants."
 hidden: false
 createdAt: "2020-07-01T04:52:54.817Z"
-updatedAt: "2022-05-07T23:43:05.454Z"
 ---
 Pants supports code generators that convert a protocol language like Protobuf into other languages, such as Python or Java. The same protocol source may be used to generate multiple distinct languages.
 

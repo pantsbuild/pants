@@ -4,7 +4,6 @@ slug: "jupyter"
 excerpt: "A Jupyter plugin to load Pants targets into Jupyter Notebooks."
 hidden: false
 createdAt: "2021-03-25T20:26:11.111Z"
-updatedAt: "2021-06-28T21:28:01.221Z"
 ---
 The [pants-jupyter-plugin](https://github.com/pantsbuild/pants-jupyter-plugin/) project provides a Jupyter plugin that can be used to load Pants targets directly into a notebook.
 

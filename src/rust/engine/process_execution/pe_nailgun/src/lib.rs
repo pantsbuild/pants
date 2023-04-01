@@ -42,8 +42,7 @@ use workunit_store::{in_workunit, Metric, RunningWorkunit};
 
 use process_execution::local::{prepare_workdir, CapturedWorkdir, ChildOutput};
 use process_execution::{
-  Context, FallibleProcessResultWithPlatform, InputDigests, NamedCaches, Platform, Process,
-  ProcessError,
+  Context, FallibleProcessResultWithPlatform, InputDigests, NamedCaches, Process, ProcessError,
 };
 
 #[cfg(test)]
@@ -209,9 +208,8 @@ impl process_execution::CommandRunner for CommandRunner {
         let exclusive_spawn = prepare_workdir(
           nailgun_process.workdir_path().to_owned(),
           &client_req,
-          client_req.input_digests.input_files.clone(),
-          self.store.clone(),
-          self.executor.clone(),
+          client_req.input_digests.inputs.clone(),
+          &self.store,
           &self.named_caches,
           &self.immutable_inputs,
           None,
@@ -228,7 +226,6 @@ impl process_execution::CommandRunner for CommandRunner {
             nailgun_process.workdir_path().to_owned(),
             (nailgun_process.name().to_owned(), nailgun_process.address()),
             exclusive_spawn,
-            Platform::current().unwrap(),
           )
           .await;
 

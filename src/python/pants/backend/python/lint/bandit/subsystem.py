@@ -54,11 +54,11 @@ class Bandit(PythonToolBase):
     default_extra_requirements = [
         "setuptools",
         # GitPython 3.1.20 was yanked because it breaks Python 3.8+, but Poetry's lockfile
-        # generation still tries to use it. Upgrade this to the newest version once released or
-        # when switching away from Poetry.
-        "GitPython==3.1.18",
+        # generation still tries to use it.
+        "GitPython>=3.1.24",
     ]
     default_main = ConsoleScript("bandit")
+    default_requirements = [default_version, *default_extra_requirements]
 
     register_lockfile = True
     default_lockfile_resource = ("pants.backend.python.lint.bandit", "bandit.lock")
@@ -100,10 +100,10 @@ async def setup_bandit_lockfile(
     _: BanditLockfileSentinel, bandit: Bandit, python_setup: PythonSetup
 ) -> GeneratePythonLockfile:
     if not bandit.uses_custom_lockfile:
-        return GeneratePythonLockfile.from_tool(bandit)
+        return bandit.to_lockfile_request()
 
     constraints = await _find_all_unique_interpreter_constraints(python_setup, BanditFieldSet)
-    return GeneratePythonLockfile.from_tool(bandit, constraints)
+    return bandit.to_lockfile_request(interpreter_constraints=constraints)
 
 
 class BanditExportSentinel(ExportPythonToolSentinel):

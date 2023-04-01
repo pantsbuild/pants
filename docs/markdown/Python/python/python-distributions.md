@@ -4,7 +4,6 @@ slug: "python-distributions"
 excerpt: "Packaging your code into an sdist or a wheel."
 hidden: false
 createdAt: "2020-03-16T16:19:55.626Z"
-updatedAt: "2022-05-10T00:44:24.595Z"
 ---
 A standard packaging format for Python code is the _distribution_: an archive that is published to a package index such as [PyPI](https://pypi.org/), and can be installed by [pip](https://packaging.python.org/key_projects/#pip). The two standard distribution archive types are [sdists](https://packaging.python.org/overview/#python-source-distributions) and [wheels](https://packaging.python.org/overview/#python-binary-distributions).
 

@@ -57,7 +57,7 @@ def _normalize_entry_points(
 class PythonArtifact:
     """Represents a Python setup.py-based project."""
 
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs) -> None:
         """
         :param kwargs: Passed to `setuptools.setup
           <https://setuptools.pypa.io/en/latest/setuptools.html>`_.

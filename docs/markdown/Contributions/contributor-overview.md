@@ -4,7 +4,6 @@ slug: "contributor-overview"
 excerpt: "The flow for making changes to Pants."
 hidden: false
 createdAt: "2020-05-16T22:54:21.867Z"
-updatedAt: "2022-06-04T12:23:09.473Z"
 ---
 We welcome contributions of all types: from fixing typos to bug fixes to new features. For further questions about any of the below, please refer to the [community overview](doc:the-pants-community).
 

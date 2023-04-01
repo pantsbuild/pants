@@ -4,7 +4,6 @@ slug: "upgrade-tips"
 excerpt: "How we recommend staying up-to-date with Pants."
 hidden: false
 createdAt: "2020-05-16T22:53:24.499Z"
-updatedAt: "2022-01-13T04:03:33.172Z"
 ---
 > 📘 Reminder: change the `pants_version` to upgrade
 >

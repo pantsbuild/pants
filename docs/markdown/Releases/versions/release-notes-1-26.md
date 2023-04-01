@@ -3,7 +3,6 @@ title: "1.26.x"
 slug: "release-notes-1-26"
 hidden: true
 createdAt: "2020-05-02T04:58:34.851Z"
-updatedAt: "2020-07-15T19:28:06.332Z"
 ---
 Some highlights:
 

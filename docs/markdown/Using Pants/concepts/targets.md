@@ -4,7 +4,6 @@ slug: "targets"
 excerpt: "Metadata for your code."
 hidden: false
 createdAt: "2020-02-25T17:44:15.007Z"
-updatedAt: "2022-04-29T23:51:48.029Z"
 ---
 Most goals require metadata about your code. For example, to run a test, you need to know about all the transitive dependencies of that test. You may also want to set a timeout on that test.
 

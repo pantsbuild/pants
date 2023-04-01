@@ -20,13 +20,24 @@ class Affected(enum.Enum):
     other = "other"
 
 
-_docs_globs = ["README.md", "**/README.md", "docs/*", "build-support/bin/generate_user_list.py"]
-_rust_globs = ["src/rust/engine/*", "rust-toolchain", "build-support/bin/rust/*"]
+_docs_globs = [
+    "*.md",
+    "**/*.md",
+    "docs/*",
+    "build-support/bin/generate_user_list.py",
+]
+_rust_globs = [
+    "src/rust/engine/*",
+    "rust-toolchain",
+    "build-support/bin/rust/*",
+]
 _release_globs = [
+    # Any changes to these files should trigger wheel building. Notes too, as they are included in
+    # the wheel.
     "pants.toml",
     "src/python/pants/VERSION",
-    "src/python/pants/notes/*",
     "src/python/pants/init/BUILD",
+    "src/python/pants/notes/*",
     "build-support/bin/release.sh",
     "build-support/bin/_release_helper.py",
 ]

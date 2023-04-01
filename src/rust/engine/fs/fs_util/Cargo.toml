@@ -9,7 +9,7 @@ publish = false
 protos = { path = "../../protos" }
 bytes = "1.2"
 clap = "3"
-env_logger = "0.9.0"
+env_logger = "0.10.0"
 grpc_util = { path = "../../grpc_util" }
 fs = { path = ".." }
 futures = "0.3"

@@ -11,6 +11,7 @@ async-trait = "0.1"
 async-lock = "2.5"
 bollard = { git = "https://github.com/fussybeaver/bollard.git", rev = "2d66d11b44aeff0373ece3d64a44b243e5152973" }
 bollard-stubs = { git = "https://github.com/fussybeaver/bollard.git", rev = "2d66d11b44aeff0373ece3d64a44b243e5152973" }
+docker_credential = "1.2"
 fs = { path = "../../fs" }
 futures = "0.3"
 log = "0.4"
@@ -29,7 +30,7 @@ hashing = { path = "../../hashing" }
 bytes = "1.2"
 
 [dev-dependencies]
-env_logger = "0.9.0"
+env_logger = "0.10.0"
 maplit = "1.0.1"
 mock = { path = "../../testutil/mock" }
 parking_lot = "0.12"
