@@ -63,14 +63,23 @@ impl GitignoreStyleExcludes {
     }))
   }
 
-  /// Return the absolute file path to the top-level `.gitignore`.
+  /// Return the absolute file paths to `<repo>/.gitignore` and `<repo>/.git/info/exclude`, in
+  /// that order.
   ///
-  /// Will only add the file if it exists.
+  /// Will only add the files if they exist.
   pub fn gitignore_file_paths(build_root: &Path) -> Vec<PathBuf> {
     let mut result = vec![];
     let gitignore_path = build_root.join(".gitignore");
     if Path::is_file(&gitignore_path) {
       result.push(gitignore_path);
+    }
+
+    // Unlike Git, we hardcode `.git` and don't look for `$GIT_DIR`. See
+    // https://github.com/BurntSushi/ripgrep/blob/041544853c86dde91c49983e5ddd0aa799bd2831/crates/ignore/src/dir.rs#L786-L794
+    // for why.
+    let exclude_path = build_root.join(".git/info/exclude");
+    if Path::is_file(&exclude_path) {
+      result.push(exclude_path)
     }
     result
   }
@@ -205,6 +214,17 @@ mod tests {
     assert_eq!(
       GitignoreStyleExcludes::gitignore_file_paths(root_path),
       vec![root_path.join(".gitignore")]
+    );
+
+    let git_info_exclude_path = root_path.join(".git/info/exclude");
+    fs::create_dir_all(git_info_exclude_path.parent().unwrap()).unwrap();
+    make_file(&git_info_exclude_path, b"", 0o700);
+    assert_eq!(
+      GitignoreStyleExcludes::gitignore_file_paths(root_path),
+      vec![
+        root_path.join(".gitignore"),
+        root_path.join(".git/info/exclude")
+      ]
     );
   }
 }
