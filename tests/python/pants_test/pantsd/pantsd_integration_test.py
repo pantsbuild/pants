@@ -355,7 +355,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
             ctx.checker.assert_started()
 
             # See comment in `test_pantsd_invalidation_pants_toml_file`.
-            time.sleep(15)
+            time.sleep(30)
             ctx.checker.assert_running()
 
             def full_pants_log():
@@ -384,7 +384,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
             # This accounts for the amount of time it takes for the SchedulerService to begin watching
             # these files. That happens asynchronously after `pantsd` startup, and may take a long
             # time in a heavily loaded test environment.
-            time.sleep(15)
+            time.sleep(30)
 
             # Delete tmp_pants_toml
             os.unlink(tmp_pants_toml)
