@@ -208,6 +208,7 @@ DEFAULT_MODULE_MAPPING = {
 DEFAULT_TYPE_STUB_MODULE_MAPPING = {
     "djangorestframework-types": ("rest_framework",),
     "lark-stubs": ("lark",),
+    "types-beautifulsoup4": ("bs4",),
     "types-enum34": ("enum34",),
     "types-pillow": ("PIL",),
     "types-protobuf": ("google.protobuf",),
