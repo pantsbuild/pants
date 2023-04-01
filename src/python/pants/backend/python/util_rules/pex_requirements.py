@@ -38,7 +38,7 @@ from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.unions import UnionMembership
 from pants.util.docutil import bin_name, doc_url
 from pants.util.ordered_set import FrozenOrderedSet
-from pants.util.strutil import softwrap
+from pants.util.strutil import comma_separated_list, pluralize, softwrap
 
 if TYPE_CHECKING:
     from pants.backend.python.util_rules.pex import Pex
@@ -474,18 +474,19 @@ def validate_metadata(
     interpreter_constraints: InterpreterConstraints,
     lockfile: Lockfile,
     consumed_req_strings: Iterable[str],
+    validate_consumed_req_strings: bool,
     python_setup: PythonSetup,
     resolve_config: ResolvePexConfig,
 ) -> None:
     """Given interpreter constraints and requirements to be consumed, validate lockfile metadata."""
 
     # TODO(#12314): Improve the exception if invalid strings
-    user_requirements = {PipRequirement.parse(i) for i in consumed_req_strings}
+    user_requirements = [PipRequirement.parse(i) for i in consumed_req_strings]
     validation = metadata.is_valid_for(
         expected_invalidation_digest=lockfile.lockfile_hex_digest,
         user_interpreter_constraints=interpreter_constraints,
         interpreter_universe=python_setup.interpreter_versions_universe,
-        user_requirements=user_requirements,
+        user_requirements=user_requirements if validate_consumed_req_strings else {},
         manylinux=resolve_config.manylinux,
         requirement_constraints=(
             resolve_config.constraints_file.constraints
@@ -561,12 +562,21 @@ def _invalid_lockfile_error(
     *,
     is_old_style_tool_lockfile: bool,
     is_default_user_lockfile: bool,
-    user_requirements: set[PipRequirement],
+    user_requirements: list[PipRequirement],
     user_interpreter_constraints: InterpreterConstraints,
     maybe_constraints_file_path: str | None,
 ) -> Iterator[str]:
     resolve = lockfile.resolve_name
-    yield "\n\nYou are using "
+    consumed_msg_parts = [f"`{str(r)}`" for r in user_requirements[0:2]]
+    if len(user_requirements) > 2:
+        consumed_msg_parts.append(
+            (
+                f"{len(user_requirements) - 2} other "
+                f"{pluralize(len(user_requirements) - 2, 'requirement', include_count=False)}"
+            )
+        )
+
+    yield f"\n\nYou are consuming {comma_separated_list(consumed_msg_parts)} from "
     if lockfile.url.startswith("resource://"):
         yield f"the built-in `{resolve}` lockfile provided by Pants "
     else:
@@ -622,7 +632,7 @@ def _invalid_lockfile_error(
             # validated that the transitive closure is using the same resolve, via
             # pex_from_targets.py. This implies that we don't need to worry about users depending
             # on python_requirement targets that aren't in that code's resolve.
-            not_in_lock = sorted(str(r) for r in user_requirements - metadata.requirements)
+            not_in_lock = sorted(str(r) for r in set(user_requirements) - metadata.requirements)
             yield f"\n\n- The requirements not provided by the `{resolve}` resolve are:\n  "
             yield str(not_in_lock)
 
@@ -637,14 +647,14 @@ def _invalid_lockfile_error(
         )
         if is_old_style_tool_lockfile:
             yield softwrap(
-                """
+                """\n\n
                 - The input interpreter constraints may be specified by
                 `[{resolve}].interpreter_constraints` (if applicable).
                 """
             )
         else:
             yield softwrap(
-                """
+                """\n\n
                 - The input interpreter constraints are specified by your code, using
                 the `[python].interpreter_constraints` option and the `interpreter_constraints`
                 target field.

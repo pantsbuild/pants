@@ -30,6 +30,7 @@ from pants.core.util_rules.lockfile_metadata import (
 from pants.engine.internals.native_engine import EMPTY_DIGEST
 from pants.testutil.option_util import create_subsystem
 from pants.util.ordered_set import FrozenOrderedSet
+from pants.util.strutil import comma_separated_list
 
 METADATA = PythonLockfileMetadataV3(
     InterpreterConstraints(["==3.8.*"]),
@@ -164,8 +165,9 @@ def test_validate_lockfiles(
         runtime_interpreter_constraints,
         lockfile,
         req_strings,
-        create_python_setup(InvalidLockfileBehavior.warn),
-        ResolvePexConfig(
+        validate_consumed_req_strings=True,
+        python_setup=create_python_setup(InvalidLockfileBehavior.warn),
+        resolve_config=ResolvePexConfig(
             indexes=(),
             find_links=(),
             manylinux="not-manylinux" if invalid_manylinux else None,
@@ -185,7 +187,11 @@ def test_validate_lockfiles(
     def contains(msg: str, if_: bool = True) -> None:
         assert (msg in caplog.text) is if_
 
-    contains("You are using the `a` lockfile at lock.txt with incompatible inputs")
+    reqs_desc = comma_separated_list(f"`{rs}`" for rs in req_strings)
+    contains(
+        f"You are consuming {reqs_desc} from the `a` lockfile at lock.txt "
+        "with incompatible inputs"
+    )
     contains(
         "The lockfile does not provide all the necessary requirements",
         if_=invalid_reqs,

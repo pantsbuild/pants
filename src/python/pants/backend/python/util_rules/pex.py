@@ -487,12 +487,13 @@ async def _setup_pex_requirements(
                 loaded_lockfile.metadata,
                 request.interpreter_constraints,
                 loaded_lockfile.original_lockfile,
+                request.requirements.complete_req_strings,
                 # We're using the entire lockfile, so there is no Pex subsetting operation we
                 # can delegate requirement validation to.  So we do our naive string-matching
                 # validation.
-                request.requirements.complete_req_strings,
-                python_setup,
-                resolve_config,
+                validate_consumed_req_strings=True,
+                python_setup=python_setup,
+                resolve_config=resolve_config,
             )
 
         return _BuildPexRequirementsSetup(
@@ -526,14 +527,15 @@ async def _setup_pex_requirements(
                 loaded_lockfile.metadata,
                 request.interpreter_constraints,
                 loaded_lockfile.original_lockfile,
+                consumed_req_strings=request.requirements.req_strings,
                 # Don't validate user requirements when subsetting a resolve, as Pex's
                 # validation during the subsetting is far more precise than our naive string
                 # comparison. For example, if a lockfile was generated with `foo==1.2.3`
                 # and we want to resolve `foo>=1.0.0` or just `foo` out of it, Pex will do
                 # so successfully, while our naive validation would fail.
-                [],
-                python_setup,
-                resolve_config,
+                validate_consumed_req_strings=False,
+                python_setup=python_setup,
+                resolve_config=resolve_config,
             )
 
         return _BuildPexRequirementsSetup(
