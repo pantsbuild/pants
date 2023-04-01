@@ -103,20 +103,26 @@ mod tests {
     let root = tempfile::TempDir::new().unwrap();
     let root_path = root.path();
 
-    let bytes = "content".as_bytes();
-    make_file(&root_path.join("non-ignored"), bytes, 0o700);
-    make_file(&root_path.join("ignored-file.tmp"), bytes, 0o700);
-    make_file(&root_path.join("important.x"), bytes, 0o700);
-    make_file(&root_path.join("unimportant.x"), bytes, 0o700);
+    for fp in [
+      "non-ignored",
+      "ignored-file.tmp",
+      "important.x",
+      "unimportant.x",
+    ] {
+      make_file(&root_path.join(fp), b"content", 0o700);
+    }
 
-    let gitignore_content = "*.tmp\n!*.x";
     let gitignore_path = root_path.join(".gitignore");
-    make_file(&gitignore_path, gitignore_content.as_bytes(), 0o700);
-    let executor = task_executor::Executor::new();
-    let ignorer =
-      GitignoreStyleExcludes::create_with_gitignore_file(vec![], Some(gitignore_path.clone()))
-        .unwrap();
-    let posix_fs = Arc::new(PosixFS::new(root.as_ref(), ignorer, executor).unwrap());
+    make_file(&gitignore_path, b"*.tmp\n!*.x", 0o700);
+
+    let create_posix_fx = |patterns| {
+      let ignorer =
+        GitignoreStyleExcludes::create_with_gitignore_file(patterns, Some(gitignore_path.clone()))
+          .unwrap();
+      Arc::new(PosixFS::new(root.as_ref(), ignorer, task_executor::Executor::new()).unwrap())
+    };
+
+    let posix_fs = create_posix_fx(vec![]);
 
     let stats = read_mock_files(
       vec![
@@ -129,23 +135,21 @@ mod tests {
     )
     .await;
 
-    assert!(!posix_fs.is_ignored(&stats[0]));
     assert!(posix_fs.is_ignored(&stats[1]));
-    assert!(!posix_fs.is_ignored(&stats[2]));
-    assert!(!posix_fs.is_ignored(&stats[3]));
+    for fp in [&stats[0], &stats[2], &stats[3]] {
+      assert!(!posix_fs.is_ignored(fp));
+    }
 
     // Test that .gitignore files work in tandem with explicit ignores.
-    let executor = task_executor::Executor::new();
-    let ignorer = GitignoreStyleExcludes::create_with_gitignore_file(
-      vec!["unimportant.x".to_string()],
-      Some(gitignore_path),
-    )
-    .unwrap();
-    let posix_fs_2 = Arc::new(PosixFS::new(root.as_ref(), ignorer, executor).unwrap());
-
-    assert!(!posix_fs_2.is_ignored(&stats[0]));
-    assert!(posix_fs_2.is_ignored(&stats[1]));
-    assert!(!posix_fs_2.is_ignored(&stats[2]));
-    assert!(posix_fs_2.is_ignored(&stats[3]));
+    //
+    // Patterns override file paths: note how the gitignore says `!*.x` but that gets
+    // overridden here.
+    let posix_fs2 = create_posix_fx(vec!["unimportant.x".to_owned()]);
+    for fp in [&stats[1], &stats[3]] {
+      assert!(posix_fs2.is_ignored(fp));
+    }
+    for fp in [&stats[0], &stats[2]] {
+      assert!(!posix_fs2.is_ignored(fp));
+    }
   }
 }
