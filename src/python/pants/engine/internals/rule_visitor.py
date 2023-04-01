@@ -197,12 +197,12 @@ class _AwaitableCollector(ast.NodeVisitor):
         get_args = call_node.args
         parse_error = partial(GetParseError, get_args=get_args, source_file_name=self.source_file)
 
-        if len(get_args) not in (2, 3):
+        if len(get_args) < 1 or len(get_args) > 3:
             # TODO: fix parse error message formatting... (TODO: create ticket)
             raise parse_error(
                 self._format(
                     call_node,
-                    f"Expected either two or three arguments, but got {len(get_args)} arguments.",
+                    f"Expected one to three arguments, but got {len(get_args)} arguments.",
                 )
             )
 
@@ -211,7 +211,9 @@ class _AwaitableCollector(ast.NodeVisitor):
 
         input_nodes = get_args[1:]
         input_types: List[Any]
-        if len(input_nodes) == 1:
+        if not input_nodes:
+            input_types = []
+        elif len(input_nodes) == 1:
             input_constructor = input_nodes[0]
             if isinstance(input_constructor, ast.Call):
                 cls_or_func = self._lookup(input_constructor.func)
