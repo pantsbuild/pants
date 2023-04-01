@@ -21,26 +21,30 @@ pub struct GitignoreStyleExcludes {
 
 impl GitignoreStyleExcludes {
   pub fn create(patterns: Vec<String>) -> Result<Arc<Self>, String> {
-    Self::create_with_gitignore_file(patterns, None)
+    Self::create_with_gitignore_files(patterns, vec![])
   }
 
   pub fn empty() -> Arc<Self> {
     EMPTY_IGNORE.clone()
   }
 
-  pub fn create_with_gitignore_file(
+  /// Create with patterns and possibly multiple files.
+  ///
+  /// Later paths in `gitignore_paths` take precedence. `patterns` takes precedence over all
+  /// `gitignore_paths`.
+  pub fn create_with_gitignore_files(
     patterns: Vec<String>,
-    gitignore_path: Option<PathBuf>,
+    gitignore_paths: Vec<PathBuf>,
   ) -> Result<Arc<Self>, String> {
-    if patterns.is_empty() && gitignore_path.is_none() {
+    if patterns.is_empty() && gitignore_paths.is_empty() {
       return Ok(EMPTY_IGNORE.clone());
     }
 
     let mut ignore_builder = GitignoreBuilder::new("");
 
-    if let Some(path) = gitignore_path {
-      if let Some(err) = ignore_builder.add(path) {
-        return Err(format!("Error adding .gitignore path: {err:?}"));
+    for path in gitignore_paths {
+      if let Some(err) = ignore_builder.add(&path) {
+        return Err(format!("Error adding the path {}: {err:?}", path.display()));
       }
     }
     for pattern in &patterns {
@@ -54,9 +58,21 @@ impl GitignoreStyleExcludes {
       .map_err(|e| format!("Could not build ignore patterns: {e:?}"))?;
 
     Ok(Arc::new(Self {
-      patterns: patterns,
+      patterns,
       gitignore,
     }))
+  }
+
+  /// Return the absolute file path to the top-level `.gitignore`.
+  ///
+  /// Will only add the file if it exists.
+  pub fn gitignore_file_paths(build_root: &Path) -> Vec<PathBuf> {
+    let mut result = vec![];
+    let gitignore_path = build_root.join(".gitignore");
+    if Path::is_file(&gitignore_path) {
+      result.push(gitignore_path);
+    }
+    result
   }
 
   pub(crate) fn exclude_patterns(&self) -> &[String] {
@@ -85,6 +101,7 @@ impl GitignoreStyleExcludes {
 
 #[cfg(test)]
 mod tests {
+  use std::fs;
   use std::path::PathBuf;
   use std::sync::Arc;
 
@@ -113,16 +130,18 @@ mod tests {
     }
 
     let gitignore_path = root_path.join(".gitignore");
+    let git_info_exclude_path = root_path.join(".git/info/exclude");
     make_file(&gitignore_path, b"*.tmp\n!*.x", 0o700);
+    fs::create_dir_all(git_info_exclude_path.parent().unwrap()).unwrap();
+    make_file(&git_info_exclude_path, b"unimportant.x", 0o700);
 
-    let create_posix_fx = |patterns| {
+    let create_posix_fx = |patterns, gitignore_paths| {
       let ignorer =
-        GitignoreStyleExcludes::create_with_gitignore_file(patterns, Some(gitignore_path.clone()))
-          .unwrap();
+        GitignoreStyleExcludes::create_with_gitignore_files(patterns, gitignore_paths).unwrap();
       Arc::new(PosixFS::new(root.as_ref(), ignorer, task_executor::Executor::new()).unwrap())
     };
 
-    let posix_fs = create_posix_fx(vec![]);
+    let posix_fs = create_posix_fx(vec![], vec![gitignore_path.clone()]);
 
     let stats = read_mock_files(
       vec![
@@ -144,12 +163,48 @@ mod tests {
     //
     // Patterns override file paths: note how the gitignore says `!*.x` but that gets
     // overridden here.
-    let posix_fs2 = create_posix_fx(vec!["unimportant.x".to_owned()]);
+    let posix_fs2 = create_posix_fx(
+      vec!["unimportant.x".to_owned()],
+      vec![gitignore_path.clone()],
+    );
     for fp in [&stats[1], &stats[3]] {
       assert!(posix_fs2.is_ignored(fp));
     }
     for fp in [&stats[0], &stats[2]] {
       assert!(!posix_fs2.is_ignored(fp));
     }
+
+    // Test that later gitignore files override earlier ones.
+    let posix_fs3 = create_posix_fx(
+      vec![],
+      vec![gitignore_path.clone(), git_info_exclude_path.clone()],
+    );
+    for fp in [&stats[1], &stats[3]] {
+      assert!(posix_fs3.is_ignored(fp));
+    }
+    for fp in [&stats[0], &stats[2]] {
+      assert!(!posix_fs3.is_ignored(fp));
+    }
+    let posix_fs4 = create_posix_fx(
+      vec![],
+      vec![git_info_exclude_path.clone(), gitignore_path.clone()],
+    );
+    assert!(posix_fs4.is_ignored(&stats[1]));
+    for fp in [&stats[0], &stats[2], &stats[3]] {
+      assert!(!posix_fs4.is_ignored(fp));
+    }
+  }
+
+  #[test]
+  fn test_gitignore_file_paths() {
+    let root = tempfile::TempDir::new().unwrap();
+    let root_path = root.path();
+    assert!(GitignoreStyleExcludes::gitignore_file_paths(root_path).is_empty());
+
+    make_file(&root_path.join(".gitignore"), b"", 0o700);
+    assert_eq!(
+      GitignoreStyleExcludes::gitignore_file_paths(root_path),
+      vec![root_path.join(".gitignore")]
+    );
   }
 }
