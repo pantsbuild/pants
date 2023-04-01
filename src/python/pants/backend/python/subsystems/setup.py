@@ -83,6 +83,12 @@ class PythonSetup(Subsystem):
     @memoized_property
     def interpreter_constraints(self) -> tuple[str, ...]:
         if not self._interpreter_constraints:
+            # TODO: This is a hacky affordance for Pants's own tests, dozens of which were
+            #  written when Pants provided default ICs, and implicitly rely on that assumption.
+            #  We'll probably want to find and modify all those tests to set an explicit IC, but
+            #  that will take time.
+            if "PYTEST_CURRENT_TEST" in os.environ:
+                return (">=3.7,<4",)
             raise OptionsError(
                 softwrap(
                     f"""\
