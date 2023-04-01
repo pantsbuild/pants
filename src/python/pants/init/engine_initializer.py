@@ -366,8 +366,8 @@ class GoalNotActivatedException(Exception):
                 No relevant backends activate the `{goal_name}` goal, so the goal would do
                 nothing.
 
-                This usually means that you have not yet set the option 
-                `[GLOBAL].backend_packages` in `pants.toml`, which is how Pants knows 
+                This usually means that you have not yet set the option
+                `[GLOBAL].backend_packages` in `pants.toml`, which is how Pants knows
                 which languages and tools to support. Run `{bin_name()} help backends`.
                 """
             )
