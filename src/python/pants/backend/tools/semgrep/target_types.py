@@ -22,19 +22,19 @@ class SemgrepRuleSourceField(SingleSourceField):
 
 class SemgrepRuleGeneratingSourcesField(MultipleSourcesField):
     expected_file_extensions: ClassVar[tuple[str, ...]] = (".yml", ".yaml")
-    default = [
+    default = (
         ".semgrep.yml",
         ".semgrep.yaml",
         ".semgrep/*.yml",
         ".semgrep/*.yaml",
-    ]
+    )
     help = generate_multiple_sources_field_help_message(
         "Example: `sources=['.semgrep.yml', '.semgrep.yaml', '.semgrep/*.yml', '.semgrep/*.yaml',]`"
     )
 
 
 class SemgrepRuleSource(Target):
-    alias = ("semgrep_rule_source",)
+    alias = "semgrep_rule_source"
     core_fields = (*COMMON_TARGET_FIELDS, SemgrepRuleSourceField)
 
     help = "A single source file containing Semgrep rules"
@@ -44,7 +44,7 @@ class SemgrepRuleGeneratorSettingsRequest(TargetFilesGeneratorSettingsRequest):
     pass
 
 
-class PythonSourcesGeneratorTarget(TargetFilesGenerator):
+class SemgrepRuleSourcesGeneratorTarget(TargetFilesGenerator):
     alias = "semgrep_rule_sources"
     core_fields = (
         *COMMON_TARGET_FIELDS,

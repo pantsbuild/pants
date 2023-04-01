@@ -14,7 +14,7 @@ from pants.backend.python.util_rules.pex_requirements import GeneratePythonToolL
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.engine.rules import Rule, collect_rules, rule
 from pants.engine.unions import UnionRule
-from pants.option.option_types import ArgsListOption, SkipOption, StrListOption
+from pants.option.option_types import ArgsListOption, BoolOption, SkipOption, StrListOption
 from pants.util.docutil import git_url
 
 
@@ -55,7 +55,13 @@ class Semgrep(PythonToolBase):
 
     args = ArgsListOption(example="--verbose")
 
-    skip = SkipOption("fix")
+    skip = SkipOption("lint")
+
+    tailor_source_targets = BoolOption(
+        default=True,
+        help="If true, add `semgrep_rule_sources` targets with the `tailor` goal.",
+        advanced=True,
+    )
 
 
 class SemgrepLockfileSentinel(GeneratePythonToolLockfileSentinel):
@@ -64,7 +70,7 @@ class SemgrepLockfileSentinel(GeneratePythonToolLockfileSentinel):
 
 @rule
 def setup_semgrep_lockfile(_: SemgrepLockfileSentinel, semgrep: Semgrep) -> GeneratePythonLockfile:
-    return GeneratePythonLockfile.from_tool(semgrep)
+    return semgrep.to_lockfile_request()
 
 
 class SemgrepExportSentinel(ExportPythonToolSentinel):
