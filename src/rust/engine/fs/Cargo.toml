@@ -27,6 +27,7 @@ rlimit = "0.8"
 serde = "1.0.136"
 task_executor = { path = "../task_executor" }
 tokio = { version = "1.21", features = ["fs"] }
+walkdir = "2"
 workunit_store = { path = "../workunit_store" }
 
 [dev-dependencies]

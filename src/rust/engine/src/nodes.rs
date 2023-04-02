@@ -660,9 +660,10 @@ fn unmatched_globs_additional_context() -> Option<String> {
     "troubleshooting#pants-cannot-find-a-file-in-your-project",
   );
   Some(format!(
-    "\n\nDo the file(s) exist? If so, check if the file(s) are in your `.gitignore` or the global \
-    `pants_ignore` option, which may result in Pants not being able to see the file(s) even though \
-    they exist on disk. Refer to {url}."
+    "\n\nDo the file(s) exist? If so, check if the file(s) are in your `.gitignore`s, \
+    `.git/info/exclude`, your global gitignore, or the `[GLOBAL].pants_ignore` option; that can \
+    result in Pants not being able to see the file(s) even though they exist on disk. Refer \
+    to {url}."
   ))
 }
 

@@ -920,8 +920,6 @@ class BootstrapOptions:
             Patterns from `[GLOBAL].pants_ignore` take precedence over these files' rules. For
             example, you can use `!my_pattern` in `pants_ignore` to have Pants operate on files
             that are gitignored.
-
-            Warning: this does not yet support reading nested gitignore files.
             """
         ),
     )
