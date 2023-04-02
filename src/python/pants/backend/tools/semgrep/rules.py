@@ -56,7 +56,8 @@ async def partition(
             d[SemgrepRuleSourceField] for d in deps if d.has_field(SemgrepRuleSourceField)
         )
 
-        by_config[semgrep_configs].append(field_set)
+        if semgrep_configs:
+            by_config[semgrep_configs].append(field_set)
 
     # TODO: partition by config
     return Partitions(
