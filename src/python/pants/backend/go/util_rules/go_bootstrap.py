@@ -40,7 +40,7 @@ async def _go_search_paths(
         AsdfPathString.LOCAL.value: asdf_result.local_tool_paths,
     }
 
-    path_variables = await Get(PathEnvironmentVariable, {})
+    path_variables = await Get(PathEnvironmentVariable)
     expanded: list[str] = []
     for s in paths:
         if s == "<PATH>":
