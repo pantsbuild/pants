@@ -428,8 +428,12 @@ def test_tailor_rule_write_mode(rule_runner: RuleRunner) -> None:
             "conflict/BUILD": "fortran_library(sources=['f1.f90'])",
         }
     )
+    # Ensure the test invocation of Pants doesn't restart itself after it writes the tailored files,
+    # and then chokes on the invalid BUILD symbol.
     result = rule_runner.run_goal_rule(
-        TailorGoal, args=["--alias-mapping={'fortran_library': 'my_fortran_lib'}", "::"]
+        TailorGoal,
+        global_args=["--no-watch-filesystem", "--no-pantsd"],
+        args=["--tailor-alias-mapping={'fortran_library': 'my_fortran_lib'}", "::"],
     )
     assert result.exit_code == 0
     assert result.stdout == dedent(
