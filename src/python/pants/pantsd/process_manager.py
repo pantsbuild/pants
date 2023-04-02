@@ -3,9 +3,11 @@
 
 from __future__ import annotations
 
+import datetime
 import logging
 import os
 import signal
+import subprocess
 import sys
 import time
 import traceback
@@ -381,6 +383,20 @@ class ProcessManager:
         """
         try:
             process = self._as_process()
+            if process:
+                print(
+                    f"{str(datetime.datetime.now())} 111111111111 "
+                    f"Process state: id={process.pid}, status={process.status()}, "
+                    f"process_name={self.process_name}, "
+                    f"computed process_name={self._get_process_name(process)}"
+                )
+                if process.status() == psutil.STATUS_SLEEPING:
+                    cp = subprocess.run(
+                        ["strace", "-p", f"{process.pid}"], capture_output=True, timeout=1
+                    )
+                    print(f"XXXXXXX {cp.returncode} {cp.stdout} | {cp.stderr}")
+            else:
+                print(f"{str(datetime.datetime.now())} 22222222222 Process is None, somehow")
             return not (
                 # Can happen if we don't find our pid.
                 (not process)
