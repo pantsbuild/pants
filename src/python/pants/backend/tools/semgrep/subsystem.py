@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Iterable
 
 from pants.backend.python.goals import lockfile
@@ -13,9 +14,22 @@ from pants.backend.python.target_types import ConsoleScript
 from pants.backend.python.util_rules.pex_requirements import GeneratePythonToolLockfileSentinel
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.engine.rules import Rule, collect_rules, rule
+from pants.engine.target import Dependencies, FieldSet, SingleSourceField, Target
 from pants.engine.unions import UnionRule
 from pants.option.option_types import ArgsListOption, BoolOption, SkipOption, StrListOption
 from pants.util.docutil import git_url
+
+
+@dataclass(frozen=True)
+class SemgrepFieldSet(FieldSet):
+    required_fields = (SingleSourceField, Dependencies)
+    source: SingleSourceField
+    dependencies: Dependencies
+
+    @classmethod
+    def opt_out(cls, tgt: Target) -> bool:
+        # FIXME: global skip_semgrep field?
+        return False
 
 
 class Semgrep(PythonToolBase):

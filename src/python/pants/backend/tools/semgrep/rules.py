@@ -2,74 +2,67 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
+from collections import defaultdict
 from dataclasses import dataclass
-from typing import Any, Iterable
+from typing import Iterable
 
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
-from pants.core.goals.lint import LintFilesRequest, LintResult
-from pants.core.util_rules.partitions import PartitionerType, Partitions
-from pants.engine.fs import (
-    CreateDigest,
-    Digest,
-    FileContent,
-    GlobMatchErrorBehavior,
-    MergeDigests,
-    PathGlobs,
-)
-from pants.engine.internals.native_engine import FilespecMatcher, Snapshot
+from pants.core.goals.lint import LintResult, LintTargetsRequest
+from pants.core.util_rules.partitions import Partition, Partitions
+from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
+from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, Rule, collect_rules, rule
+from pants.engine.target import DependenciesRequest, Targets
 from pants.engine.unions import UnionRule
 from pants.option.global_options import GlobalOptions
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 
-from .subsystem import Semgrep
+from .subsystem import Semgrep, SemgrepFieldSet
+from .target_types import SemgrepRuleSourceField
 
 
-class SemgrepRequest(LintFilesRequest):
+class SemgrepRequest(LintTargetsRequest):
+    field_set_type = SemgrepFieldSet
     tool_subsystem = Semgrep
 
-    partitioner_type = PartitionerType.CUSTOM
-
 
 @dataclass(frozen=True)
-class SemgrepConfigFilesRequest:
-    pass
+class PartitionMetadata:
+    config_files: frozenset[SemgrepRuleSourceField]
 
-
-@dataclass(frozen=True)
-class SemgrepConfigFiles:
-    snapshot: Snapshot
+    @property
+    def description(self) -> str:
+        return ", ".join(sorted(field.value for field in self.config_files))
 
 
 @rule
-async def gather_config_files(
-    request: SemgrepConfigFilesRequest, semgrep: Semgrep
-) -> SemgrepConfigFiles:
-    globs = [f"**/{glob}" for glob in semgrep.config_globs]
-    config_files_snapshot = await Get(
-        Snapshot,
-        PathGlobs(
-            globs=globs,
-            glob_match_error_behavior=GlobMatchErrorBehavior.error,
-            description_of_origin="the option `--semgrep-config-globs`",
-        ),
-    )
-    return SemgrepConfigFiles(snapshot=config_files_snapshot)
-
-
-@rule
-async def partition(request: SemgrepRequest.PartitionRequest, semgrep: Semgrep) -> Partitions:
+async def partition(
+    request: SemgrepRequest.PartitionRequest[SemgrepFieldSet], semgrep: Semgrep
+) -> Partitions:
     if semgrep.skip:
         return Partitions()
 
-    matching_files = FilespecMatcher(
-        includes=semgrep.file_glob_include, excludes=semgrep.file_glob_exclude
-    ).matches(request.files)
+    dependencies = await MultiGet(
+        Get(Targets, DependenciesRequest(field_set.dependencies))
+        for field_set in request.field_sets
+    )
+
+    by_config = defaultdict(list)
+
+    for field_set, deps in zip(request.field_sets, dependencies):
+        semgrep_configs = frozenset(
+            d[SemgrepRuleSourceField] for d in deps if d.has_field(SemgrepRuleSourceField)
+        )
+
+        by_config[semgrep_configs].append(field_set)
 
     # TODO: partition by config
-    return Partitions.single_partition(matching_files)
+    return Partitions(
+        Partition(tuple(field_sets), PartitionMetadata(configs))
+        for configs, field_sets in by_config.items()
+    )
 
 
 # We have a hard-coded settings file to side-step
@@ -82,19 +75,19 @@ _DEFAULT_SETTINGS = FileContent(
 
 @rule(desc="Lint with Semgrep", level=LogLevel.DEBUG)
 async def lint(
-    request: SemgrepRequest.Batch[str, Any],
+    request: SemgrepRequest.Batch[SemgrepFieldSet, PartitionMetadata],
     semgrep: Semgrep,
     global_options: GlobalOptions,
 ) -> LintResult:
     config_files, semgrep_pex, input_files, settings = await MultiGet(
-        Get(SemgrepConfigFiles, SemgrepConfigFilesRequest()),
+        Get(SourceFiles, SourceFilesRequest(request.partition_metadata.config_files)),
         Get(VenvPex, PexRequest, semgrep.to_pex_request()),
-        Get(Snapshot, PathGlobs(globs=request.elements)),
+        Get(SourceFiles, SourceFilesRequest(field_set.source for field_set in request.elements)),
         Get(Digest, CreateDigest([_DEFAULT_SETTINGS])),
     )
 
     input_digest = await Get(
-        Digest, MergeDigests((input_files.digest, config_files.snapshot.digest, settings))
+        Digest, MergeDigests((input_files.snapshot.digest, config_files.snapshot.digest, settings))
     )
 
     # TODO: https://github.com/pantsbuild/pants/issues/18430 support running this with --autofix
