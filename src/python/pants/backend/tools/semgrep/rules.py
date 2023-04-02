@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
+import logging
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import Iterable
@@ -10,17 +11,19 @@ from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProc
 from pants.core.goals.lint import LintResult, LintTargetsRequest
 from pants.core.util_rules.partitions import Partition, Partitions
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests
+from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests, PathGlobs, Snapshot
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, Rule, collect_rules, rule
 from pants.engine.target import DependenciesRequest, Targets
 from pants.engine.unions import UnionRule
 from pants.option.global_options import GlobalOptions
 from pants.util.logging import LogLevel
-from pants.util.strutil import pluralize
+from pants.util.strutil import pluralize, softwrap
 
 from .subsystem import Semgrep, SemgrepFieldSet
 from .target_types import SemgrepRuleSourceField
+
+logger = logging.getLogger(__name__)
 
 
 class SemgrepRequest(LintTargetsRequest):
@@ -49,8 +52,8 @@ async def partition(
         for field_set in request.field_sets
     )
 
+    # partition by the sets of configs that apply to each input
     by_config = defaultdict(list)
-
     for field_set, deps in zip(request.field_sets, dependencies):
         semgrep_configs = frozenset(
             d[SemgrepRuleSourceField] for d in deps if d.has_field(SemgrepRuleSourceField)
@@ -59,11 +62,37 @@ async def partition(
         if semgrep_configs:
             by_config[semgrep_configs].append(field_set)
 
-    # TODO: partition by config
     return Partitions(
         Partition(tuple(field_sets), PartitionMetadata(configs))
         for configs, field_sets in by_config.items()
     )
+
+
+@dataclass
+class SemgrepIgnoreFiles:
+    digest: Digest
+
+
+@rule
+async def find_semgrep_ignore_files() -> SemgrepIgnoreFiles:
+    # if .semgrep gets support for nested ignore files, these should be involved in config
+    # partitioning too
+    ignore_name = ".semgrepignore"
+    ignore_files = await Get(Snapshot, PathGlobs([f"**/{ignore_name}"]))
+    non_root_ignores = sorted(name for name in ignore_files.files if name != ignore_name)
+    if non_root_ignores:
+        # https://github.com/returntocorp/semgrep/issues/5669
+        logger.warning(
+            softwrap(
+                f"""
+                Semgrep does not support {ignore_name} files anywhere other than its working
+                directory, which is the build root when running under pants. These files will be
+                ignored: {', '.join(non_root_ignores)}
+                """
+            )
+        )
+
+    return SemgrepIgnoreFiles(digest=ignore_files.digest)
 
 
 # We have a hard-coded settings file to side-step
@@ -78,6 +107,7 @@ _DEFAULT_SETTINGS = FileContent(
 async def lint(
     request: SemgrepRequest.Batch[SemgrepFieldSet, PartitionMetadata],
     semgrep: Semgrep,
+    ignore_files: SemgrepIgnoreFiles,
     global_options: GlobalOptions,
 ) -> LintResult:
     config_files, semgrep_pex, input_files, settings = await MultiGet(
@@ -88,7 +118,15 @@ async def lint(
     )
 
     input_digest = await Get(
-        Digest, MergeDigests((input_files.snapshot.digest, config_files.snapshot.digest, settings))
+        Digest,
+        MergeDigests(
+            (
+                input_files.snapshot.digest,
+                config_files.snapshot.digest,
+                settings,
+                ignore_files.digest,
+            )
+        ),
     )
 
     # TODO: https://github.com/pantsbuild/pants/issues/18430 support running this with --autofix
