@@ -693,7 +693,7 @@ async def resolve_environment_name(
     global_options: GlobalOptions,
 ) -> EnvironmentName:
     if request.raw_value == LOCAL_ENVIRONMENT_MATCHER:
-        local_env_name = await Get(ChosenLocalEnvironmentName, {})
+        local_env_name = await Get(ChosenLocalEnvironmentName)
         return local_env_name.val
     if request.raw_value not in environments_subsystem.names:
         raise UnrecognizedEnvironmentError(
