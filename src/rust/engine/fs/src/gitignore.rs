@@ -73,10 +73,10 @@ impl GitignoreStyleExcludes {
   pub fn gitignore_file_paths(build_root: &Path) -> Vec<PathBuf> {
     let mut result = vec![];
 
-    if let Some(global_ignore_path) = ignore::gitignore::gitconfig_excludes_path() {
-      if Path::is_file(&global_ignore_path) {
-        result.push(global_ignore_path);
-      }
+    if let Some(global_ignore_path) =
+      ignore::gitignore::gitconfig_excludes_path().filter(|fp| fp.is_file())
+    {
+      result.push(global_ignore_path);
     }
 
     let gitignore_path = build_root.join(".gitignore");
@@ -222,7 +222,7 @@ mod tests {
     // The behavior of gitignore_file_paths depends on whether the machine has a global config
     // file or not. We do not want to muck around with people's global config, so instead we
     // update what we expect from the test.
-    let global_config_path = ignore::gitignore::gitconfig_excludes_path();
+    let global_config_path = ignore::gitignore::gitconfig_excludes_path().filter(|fp| fp.is_file());
 
     let expected = match global_config_path.clone() {
       Some(global_fp) => vec![global_fp],
