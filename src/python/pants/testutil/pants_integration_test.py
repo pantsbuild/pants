@@ -119,11 +119,10 @@ def run_pants_with_workdir_without_waiting(
 
     # The python backend requires setting ICs explicitly.
     # We do this centrally here for convenience.
-    if (
-        any("pants.backend.python" in arg for arg in command) and not
-        any("--python-interpreter-constraints" in arg for arg in command)
+    if any("pants.backend.python" in arg for arg in command) and not any(
+        "--python-interpreter-constraints" in arg for arg in command
     ):
-        args.append(f"--python-interpreter-constraints=['>=3.7,<3.10']")
+        args.append("--python-interpreter-constraints=['>=3.7,<3.10']")
 
     pants_script = [sys.executable, "-m", "pants"]
 
