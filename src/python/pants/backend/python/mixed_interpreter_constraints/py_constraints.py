@@ -16,7 +16,6 @@ from pants.engine.goal import Goal, GoalSubsystem, Outputting
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
 from pants.engine.target import (
     AllTargets,
-    AllTargetsRequest,
     RegisteredTargetTypes,
     TransitiveTargets,
     TransitiveTargetsRequest,
@@ -80,7 +79,7 @@ async def py_constraints(
             )
             return PyConstraintsGoal(exit_code=1)
 
-        all_targets = await Get(AllTargets, AllTargetsRequest())
+        all_targets = await Get(AllTargets)
         all_python_targets = tuple(
             t for t in all_targets if t.has_field(InterpreterConstraintsField)
         )

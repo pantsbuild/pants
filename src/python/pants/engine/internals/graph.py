@@ -450,8 +450,20 @@ async def resolve_targets(
     return Targets(expanded_targets)
 
 
+@rule(_masked_types=[EnvironmentName])
+def find_all_targets_deprecated(_: AllTargetsRequest, all_targets: AllTargets) -> AllTargets:
+    return all_targets
+
+
+@rule(_masked_types=[EnvironmentName])
+def find_all_unexpanded_targets_deprecated(
+    _: AllTargetsRequest, all_targets: AllUnexpandedTargets
+) -> AllUnexpandedTargets:
+    return all_targets
+
+
 @rule(desc="Find all targets in the project", level=LogLevel.DEBUG, _masked_types=[EnvironmentName])
-async def find_all_targets(_: AllTargetsRequest) -> AllTargets:
+async def find_all_targets() -> AllTargets:
     tgts = await Get(
         Targets,
         RawSpecsWithoutFileOwners(
@@ -461,8 +473,12 @@ async def find_all_targets(_: AllTargetsRequest) -> AllTargets:
     return AllTargets(tgts)
 
 
-@rule(desc="Find all targets in the project", level=LogLevel.DEBUG, _masked_types=[EnvironmentName])
-async def find_all_unexpanded_targets(_: AllTargetsRequest) -> AllUnexpandedTargets:
+@rule(
+    desc="Find all (unexpanded) targets in the project",
+    level=LogLevel.DEBUG,
+    _masked_types=[EnvironmentName],
+)
+async def find_all_unexpanded_targets() -> AllUnexpandedTargets:
     tgts = await Get(
         UnexpandedTargets,
         RawSpecsWithoutFileOwners(
@@ -470,16 +486,6 @@ async def find_all_unexpanded_targets(_: AllTargetsRequest) -> AllUnexpandedTarg
         ),
     )
     return AllUnexpandedTargets(tgts)
-
-
-@rule(_masked_types=[EnvironmentName])
-async def find_all_targets_singleton() -> AllTargets:
-    return await Get(AllTargets, AllTargetsRequest())
-
-
-@rule(_masked_types=[EnvironmentName])
-async def find_all_unexpanded_targets_singleton() -> AllUnexpandedTargets:
-    return await Get(AllUnexpandedTargets, AllTargetsRequest())
 
 
 # -----------------------------------------------------------------------------------------------
