@@ -8,6 +8,7 @@ import pytest
 
 from pants.util.strutil import (
     bullet_list,
+    comma_separated_list,
     docstring,
     ensure_binary,
     ensure_text,
@@ -31,6 +32,13 @@ def test_pluralize() -> None:
     assert "0 bosses" == pluralize(0, "boss")
     assert "1 dependency" == pluralize(1, "dependency")
     assert "2 dependencies" == pluralize(2, "dependency")
+
+
+def test_comma_separated_list() -> None:
+    assert "" == comma_separated_list([])
+    assert "foo" == comma_separated_list(["foo"])
+    assert "salt and pepper" == comma_separated_list(["salt", "pepper"])
+    assert "snap, crackle, and pop" == comma_separated_list(["snap", "crackle", "pop"])
 
 
 def test_ensure_text() -> None:
