@@ -77,6 +77,11 @@ class Semgrep(PythonToolBase):
         advanced=True,
     )
 
+    acknowledge_nested_semgrepignore_files_are_not_used = BoolOption(
+        default=False,
+        help="Set to true suppress the warning about `.semgrepignore` files not at the build root not being used",
+    )
+
 
 class SemgrepLockfileSentinel(GeneratePythonToolLockfileSentinel):
     resolve_name = Semgrep.options_scope

@@ -34,18 +34,55 @@ class SemgrepRequest(LintTargetsRequest):
 @dataclass(frozen=True)
 class PartitionMetadata:
     config_files: frozenset[SemgrepRuleSourceField]
+    ignore_files: Snapshot
 
     @property
     def description(self) -> str:
         return ", ".join(sorted(field.value for field in self.config_files))
 
 
+_IGNORE_FILE_NAME = ".semgrepignore"
+
+
+def warn_about_ignore_files_if_required(ignore_files: Snapshot, semgrep: Semgrep) -> None:
+    non_root_files = sorted(name for name in ignore_files.files if name != _IGNORE_FILE_NAME)
+    if non_root_files and not semgrep.acknowledge_nested_semgrepignore_files_are_not_used:
+        # https://github.com/returntocorp/semgrep/issues/5669
+        logger.warning(
+            softwrap(
+                f"""
+                Semgrep does not obey {_IGNORE_FILE_NAME} outside the working directory, which is
+                the build root when run by pants. These files may not have the desired effect:
+                {', '.join(non_root_files)}
+
+                Set `acknowledge_nested_semgrepignore_files_are_not_used = true` in the `[semgrep]`
+                section of pants.toml to silence this warning.
+                """
+            )
+        )
+
+
+@dataclass
+class SemgrepIgnoreFiles:
+    snapshot: Snapshot
+
+
+@rule
+async def all_semgrep_ignore_files() -> SemgrepIgnoreFiles:
+    snapshot = await Get(Snapshot, PathGlobs([f"**/{_IGNORE_FILE_NAME}"]))
+    return SemgrepIgnoreFiles(snapshot)
+
+
 @rule
 async def partition(
-    request: SemgrepRequest.PartitionRequest[SemgrepFieldSet], semgrep: Semgrep
+    request: SemgrepRequest.PartitionRequest[SemgrepFieldSet],
+    semgrep: Semgrep,
+    ignore_files: SemgrepIgnoreFiles,
 ) -> Partitions:
     if semgrep.skip:
         return Partitions()
+
+    warn_about_ignore_files_if_required(ignore_files.snapshot, semgrep)
 
     dependencies = await MultiGet(
         Get(Targets, DependenciesRequest(field_set.dependencies))
@@ -63,36 +100,9 @@ async def partition(
             by_config[semgrep_configs].append(field_set)
 
     return Partitions(
-        Partition(tuple(field_sets), PartitionMetadata(configs))
+        Partition(tuple(field_sets), PartitionMetadata(configs, ignore_files.snapshot))
         for configs, field_sets in by_config.items()
     )
-
-
-@dataclass
-class SemgrepIgnoreFiles:
-    digest: Digest
-
-
-@rule
-async def find_semgrep_ignore_files() -> SemgrepIgnoreFiles:
-    # if .semgrep gets support for nested ignore files, these should be involved in config
-    # partitioning too
-    ignore_name = ".semgrepignore"
-    ignore_files = await Get(Snapshot, PathGlobs([f"**/{ignore_name}"]))
-    non_root_ignores = sorted(name for name in ignore_files.files if name != ignore_name)
-    if non_root_ignores:
-        # https://github.com/returntocorp/semgrep/issues/5669
-        logger.warning(
-            softwrap(
-                f"""
-                Semgrep does not support {ignore_name} files anywhere other than its working
-                directory, which is the build root when running under pants. These files will be
-                ignored: {', '.join(non_root_ignores)}
-                """
-            )
-        )
-
-    return SemgrepIgnoreFiles(digest=ignore_files.digest)
 
 
 # We have a hard-coded settings file to side-step
@@ -107,7 +117,6 @@ _DEFAULT_SETTINGS = FileContent(
 async def lint(
     request: SemgrepRequest.Batch[SemgrepFieldSet, PartitionMetadata],
     semgrep: Semgrep,
-    ignore_files: SemgrepIgnoreFiles,
     global_options: GlobalOptions,
 ) -> LintResult:
     config_files, semgrep_pex, input_files, settings = await MultiGet(
@@ -124,7 +133,7 @@ async def lint(
                 input_files.snapshot.digest,
                 config_files.snapshot.digest,
                 settings,
-                ignore_files.digest,
+                request.partition_metadata.ignore_files.digest,
             )
         ),
     )
@@ -143,7 +152,9 @@ async def lint(
                 "{pants_concurrency}",
                 "--error",
                 *semgrep.args,
-                *input_files.files,
+                # we don't pass the target files, because semgrep does its own file traversal, and
+                # letting it do so is the only way for .semgrepignore files to be obeyed
+                # https://github.com/returntocorp/semgrep/issues/4978
             ),
             extra_env={
                 "SEMGREP_FORCE_COLOR": "true",
