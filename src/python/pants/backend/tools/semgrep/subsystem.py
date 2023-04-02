@@ -50,23 +50,6 @@ class Semgrep(PythonToolBase):
 
     export = ExportToolOption()
 
-    config_globs = StrListOption(
-        "--config-globs",
-        default=[".semgrep.yml", ".semgrep/*.yml"],
-        help="File globs that contain semgrep rule configurations",
-    )
-
-    file_glob_include = StrListOption(
-        "--include",
-        help="Glob for which files to lint.",
-    )
-
-    file_glob_exclude = StrListOption(
-        "--exclude",
-        default=[],
-        help="Glob for which files to exclude from linting.",
-    )
-
     args = ArgsListOption(example="--verbose")
 
     skip = SkipOption("lint")
