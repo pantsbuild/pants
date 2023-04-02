@@ -197,7 +197,7 @@ class _AwaitableCollector(ast.NodeVisitor):
         get_args = call_node.args
         parse_error = partial(GetParseError, get_args=get_args, source_file_name=self.source_file)
 
-        if len(get_args) < 1 or len(get_args) > 3:
+        if len(get_args) not in (1, 2, 3):
             # TODO: fix parse error message formatting... (TODO: create ticket)
             raise parse_error(
                 self._format(
