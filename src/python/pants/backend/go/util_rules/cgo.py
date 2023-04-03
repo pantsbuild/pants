@@ -329,7 +329,7 @@ async def make_cgo_compile_wrapper_script() -> CGoCompilerWrapperScript:
 
 
 @rule
-def cgo_wrapper_compile_script_requesut(
+def cgo_wrapper_compile_script_request(
     _: CGoCompilerWrapperScriptRequest, script: CGoCompilerWrapperScript
 ) -> CGoCompilerWrapperScript:
     return script
