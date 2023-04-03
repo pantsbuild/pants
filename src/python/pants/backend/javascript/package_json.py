@@ -625,6 +625,9 @@ async def read_package_jsons(globs: PathGlobs) -> PackageJsonForGlobs:
 
 @rule
 async def all_package_json() -> AllPackageJson:
+    # Avoids using `AllTargets` due to a circular rule dependency.
+    # `generate_node_package_targets` requires knowledge of all
+    # first party package names.
     description_of_origin = "The `AllPackageJson` rule"
     requests = await Get(
         ResolvedTargetGeneratorRequests,
