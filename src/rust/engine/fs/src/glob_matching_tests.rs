@@ -26,9 +26,9 @@ fn path_globs_create_distinguishes_between_includes_and_excludes() {
     PathGlob::spread_filespecs(include_globs).expect("Include globs failed to expand")
   );
   assert_eq!(
-    pg.exclude.patterns,
+    pg.exclude.exclude_patterns(),
     GitignoreStyleExcludes::create(parsed_exclude_globs)
       .expect("Exclude globs failed to expand")
-      .patterns
+      .exclude_patterns()
   );
 }
