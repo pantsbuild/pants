@@ -145,6 +145,7 @@ def test_packages_files_as_resource_in_workspace(rule_runner: RuleRunner) -> Non
             "src/js/package.json": json.dumps(
                 {"name": "spam", "version": "0.0.1", "workspaces": ["a"]}
             ),
+            "src/js/BUILD": "package_json()",
             "src/js/a/BUILD": dedent(
                 """\
                 package_json(
