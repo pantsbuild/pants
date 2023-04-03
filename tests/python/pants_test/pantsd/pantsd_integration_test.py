@@ -57,6 +57,7 @@ compilation_failure_dir_layout = {
 }
 
 
+@pytest.mark.skip(reason="flaky test, see #18664")
 class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
     hermetic = False
 
