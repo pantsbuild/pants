@@ -204,11 +204,6 @@ async def _determine_target_adaptor_and_type(
 
 
 @dataclass(frozen=True)
-class _Overrides:
-    overrides: dict[str, dict[str, Any]]
-
-
-@dataclass(frozen=True)
 class _TargetGeneratorOverridesRequest:
     target_generator: TargetGenerator
 
@@ -260,6 +255,7 @@ async def resolve_generator_target_requests(
     req: ResolveTargetGeneratorRequests,
     union_membership: UnionMembership,
     target_types_to_generate_requests: TargetTypesToGenerateTargetsRequests,
+    unmatched_build_file_globs: UnmatchedBuildFileGlobs,
 ) -> ResolvedTargetGeneratorRequests:
     adaptor_and_type = await Get(
         _AdaptorAndType, _RequestAdaptorAndType(req.address, req.description_of_origin)
@@ -286,7 +282,7 @@ async def resolve_generator_target_requests(
         name_explicitly_set=target_adaptor.name_explicitly_set,
         union_membership=union_membership,
     )
-    overrides = await Get(_Overrides, _TargetGeneratorOverridesRequest(base_generator))
+    overrides = await _target_generator_overrides(base_generator, unmatched_build_file_globs)
     return ResolvedTargetGeneratorRequests(
         requests=tuple(
             generate_request(
@@ -295,7 +291,7 @@ async def resolve_generator_target_requests(
                 template=template,
                 overrides={
                     name: dict(Parametrize.expand(generator.address, override))
-                    for name, override in overrides.overrides.items()
+                    for name, override in overrides.items()
                 },
             )
             for generator, template in generators
@@ -377,30 +373,26 @@ def _target_parametrizations(
         return _TargetParametrization(target, FrozenDict())
 
 
-@rule
 async def _target_generator_overrides(
-    req: _TargetGeneratorOverridesRequest, unmatched_build_file_globs: UnmatchedBuildFileGlobs
-) -> _Overrides:
-    target_generator = req.target_generator
+    target_generator: TargetGenerator, unmatched_build_file_globs: UnmatchedBuildFileGlobs
+) -> dict[str, dict[str, Any]]:
     address = target_generator.address
     if target_generator.has_field(OverridesField):
         overrides_field = target_generator[OverridesField]
         overrides_flattened = overrides_field.flatten()
-        if isinstance(target_generator, TargetFilesGenerator):
-            override_globs = OverridesField.to_path_globs(
-                address, overrides_flattened, unmatched_build_file_globs
-            )
-            override_paths = await MultiGet(
-                Get(Paths, PathGlobs, path_globs) for path_globs in override_globs
-            )
-            return _Overrides(
-                OverridesField.flatten_paths(
-                    address, zip(override_paths, override_globs, overrides_flattened.values())
-                )
-            )
-        else:
-            return _Overrides(overrides_field.flatten())
-    return _Overrides({})
+    else:
+        overrides_flattened = {}
+    if isinstance(target_generator, TargetFilesGenerator):
+        override_globs = OverridesField.to_path_globs(
+            address, overrides_flattened, unmatched_build_file_globs
+        )
+        override_paths = await MultiGet(
+            Get(Paths, PathGlobs, path_globs) for path_globs in override_globs
+        )
+        return OverridesField.flatten_paths(
+            address, zip(override_paths, override_globs, overrides_flattened.values())
+        )
+    return overrides_flattened
 
 
 def _parametrized_target_generators_with_templates(
