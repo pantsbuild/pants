@@ -250,6 +250,28 @@ async def resolve_all_generator_target_requests(
     )
 
 
+async def _target_generator_overrides(
+    target_generator: TargetGenerator, unmatched_build_file_globs: UnmatchedBuildFileGlobs
+) -> dict[str, dict[str, Any]]:
+    address = target_generator.address
+    if target_generator.has_field(OverridesField):
+        overrides_field = target_generator[OverridesField]
+        overrides_flattened = overrides_field.flatten()
+    else:
+        overrides_flattened = {}
+    if isinstance(target_generator, TargetFilesGenerator):
+        override_globs = OverridesField.to_path_globs(
+            address, overrides_flattened, unmatched_build_file_globs
+        )
+        override_paths = await MultiGet(
+            Get(Paths, PathGlobs, path_globs) for path_globs in override_globs
+        )
+        return OverridesField.flatten_paths(
+            address, zip(override_paths, override_globs, overrides_flattened.values())
+        )
+    return overrides_flattened
+
+
 @rule
 async def resolve_generator_target_requests(
     req: ResolveTargetGeneratorRequests,
@@ -371,28 +393,6 @@ def _target_parametrizations(
             ):
                 warn_deprecated_field_type(field_type)
         return _TargetParametrization(target, FrozenDict())
-
-
-async def _target_generator_overrides(
-    target_generator: TargetGenerator, unmatched_build_file_globs: UnmatchedBuildFileGlobs
-) -> dict[str, dict[str, Any]]:
-    address = target_generator.address
-    if target_generator.has_field(OverridesField):
-        overrides_field = target_generator[OverridesField]
-        overrides_flattened = overrides_field.flatten()
-    else:
-        overrides_flattened = {}
-    if isinstance(target_generator, TargetFilesGenerator):
-        override_globs = OverridesField.to_path_globs(
-            address, overrides_flattened, unmatched_build_file_globs
-        )
-        override_paths = await MultiGet(
-            Get(Paths, PathGlobs, path_globs) for path_globs in override_globs
-        )
-        return OverridesField.flatten_paths(
-            address, zip(override_paths, override_globs, overrides_flattened.values())
-        )
-    return overrides_flattened
 
 
 def _parametrized_target_generators_with_templates(
