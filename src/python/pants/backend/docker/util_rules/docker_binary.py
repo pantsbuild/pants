@@ -17,7 +17,6 @@ from pants.core.util_rules.system_binaries import (
     BinaryShims,
     BinaryShimsRequest,
 )
-from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.fs import Digest
 from pants.engine.process import Process, ProcessCacheScope
 from pants.engine.rules import Get, collect_rules, rule
@@ -129,8 +128,7 @@ async def find_docker(
     docker_options: DockerOptions,
     docker_options_env_aware: DockerOptions.EnvironmentAware,
 ) -> DockerBinary:
-    env = await Get(EnvironmentVars, EnvironmentVarsRequest(["PATH"]))
-    search_path = docker_options_env_aware.executable_search_path(env)
+    search_path = docker_options_env_aware.executable_search_path
     request = BinaryPathRequest(
         binary_name="docker",
         search_path=search_path,
