@@ -98,8 +98,9 @@ async def assemble_resources_jar(
                 "-c",
                 " ".join(
                     [
+                        "TZ=UTC",
                         touch.path,
-                        "-d 1980-01-01T00:00:00Z",
+                        "-t 198001010000.00",
                         input_filenames,
                         "&&",
                         "TZ=UTC",
