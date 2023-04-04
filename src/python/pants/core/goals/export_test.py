@@ -166,7 +166,8 @@ def test_run_export_rule() -> None:
             assert fp.read() == b"BAR"
 
 
-_e = lambda path, env: make_target(path, path, env)
+def _e(path, env):
+    return make_target(path, path, env)
 
 
 @pytest.mark.parametrize(

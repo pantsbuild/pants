@@ -1985,7 +1985,7 @@ class SourcesField(AsyncFieldMixin, Field):
         """
         if self.expected_file_extensions is not None:
             bad_files = [
-                fp for fp in files if not PurePath(fp).suffix in self.expected_file_extensions
+                fp for fp in files if PurePath(fp).suffix not in self.expected_file_extensions
             ]
             if bad_files:
                 expected = (
