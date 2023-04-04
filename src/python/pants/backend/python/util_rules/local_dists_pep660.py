@@ -294,6 +294,7 @@ dist_dir = "{dist_dir}"
 build_dir = "build"
 pth_file_path = "{pth_file_path}"
 wheel_config_settings = {wheel_config_settings_str}
+tags = "{tags}"
 
 # Python 2.7 doesn't have the exist_ok arg on os.makedirs().
 for d in (dist_dir, build_dir):
@@ -306,7 +307,7 @@ for d in (dist_dir, build_dir):
 prepare_metadata = getattr(
     backend,
     "prepare_metadata_for_build_editable",  # PEP 660
-    getattr(backend, "prepare_metadata_for_build_wheel", None)  # PEP 517
+    getattr(backend, "prepare_metadata_for_build_wheel", None),  # PEP 517
 )
 if prepare_metadata is not None:
     metadata_path = prepare_metadata(build_dir, wheel_config_settings)
@@ -319,7 +320,6 @@ else:
         dist_info_files = [n for n in whl.namelist() if ".dist-info/" in n]
         whl.extractall(build_dir, dist_info_files)
         metadata_path = os.path.dirname(dist_info_files[0])
-    os.unlink(full_wheel_path)
 
 for file in os.listdir(os.path.join(build_dir, metadata_path)):
     # PEP 660 excludes RECORD and RECORD.* (signatures)
@@ -329,23 +329,17 @@ for file in os.listdir(os.path.join(build_dir, metadata_path)):
 pkg, version = metadata_path.replace(".dist_info", "").split("-")
 pth_file_dest = pkg + "__pants__.pth"
 
-build_tag = "0.editable"  # copy of what setuptools uses
-lang_tag = "py3"
-abi_tag = "none"
-platform_tag = "any"
-wheel_path = "{}-{}-{}-{}-{}-{}.whl".format(
-    pkg, version, build_tag, lang_tag, abi_tag, platform_tag
-)
-with zipfile.ZipFile(os.path.join(dist_dir, wheel_name), "w") as whl:
+wheel_path = "{}-{}-{}.whl".format(pkg, version, tags)
+with zipfile.ZipFile(os.path.join(dist_dir, wheel_path), "w") as whl:
     whl.write(pth_file_path, pth_file_dest)
-    # based on wheel.wheelfile.WheelFile.write_files (MIT license)
+    # based on wheel.wheelfile.WheelFile.write_files (by @argonholm MIT license)
     for root, dirnames, filenames in os.walk(metadata_path):
         dirnames.sort()
         for name in sorted(filenames):
             path = os.path.normpath(os.path.join(root, name))
             if os.path.isfile(path):
-                arcname = os.path.join(metadata_path, path)
-                self.write(path, arcname)
+                arcname = os.path.join(metadata_path, path).replace(os.path.sep, "/")
+                whl.write(path, arcname)
 
 print("editable_path: {{editable_path}}".format(editable_path=wheel_path))
 """
@@ -365,11 +359,19 @@ def interpolate_backend_wrapper(
         # We assume/hope that other backends accept lists as well.
         return distutils_repr(None if cs is None else {k: list(v) for k, v in cs.items()})
 
+    build_tag = "0.editable"  # copy of what setuptools uses
+    # tag the editable wheel as widely compatible
+    lang_tag, abi_tag, platform_tag = "py3", "none", "any"
+    if request.interpreter_constraints.includes_python2():
+        # assume everything has py3 support.
+        lang_tag = "py2.py3"
+
     return _BACKEND_WRAPPER_BOILERPLATE.format(
         build_backend_module=module_path,
         build_backend_object=backend_object,
         dist_dir=dist_dir,
         pth_file_path=pth_file_path,
+        tags="-".join([build_tag, lang_tag, abi_tag, platform_tag]),
         wheel_config_settings_str=config_settings_repr(request.wheel_config_settings),
     ).encode()
 
