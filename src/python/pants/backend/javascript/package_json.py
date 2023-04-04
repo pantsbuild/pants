@@ -25,6 +25,10 @@ from pants.engine import fs
 from pants.engine.collection import Collection, DeduplicatedCollection
 from pants.engine.fs import DigestContents, FileContent, GlobExpansionConjunction, PathGlobs
 from pants.engine.internals import graph
+from pants.engine.internals.graph import (
+    ResolveAllTargetGeneratorRequests,
+    ResolvedTargetGeneratorRequests,
+)
 from pants.engine.internals.native_engine import Digest, Snapshot
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import Rule, collect_rules, rule
@@ -621,7 +625,31 @@ async def read_package_jsons(globs: PathGlobs) -> PackageJsonForGlobs:
 
 @rule
 async def all_package_json() -> AllPackageJson:
-    return AllPackageJson(await Get(PackageJsonForGlobs, PathGlobs(["**/package.json"])))
+    # Avoids using `AllTargets` due to a circular rule dependency.
+    # `generate_node_package_targets` requires knowledge of all
+    # first party package names.
+    description_of_origin = "The `AllPackageJson` rule"
+    requests = await Get(
+        ResolvedTargetGeneratorRequests,
+        ResolveAllTargetGeneratorRequests(
+            description_of_origin=description_of_origin, of_type=PackageJsonTarget
+        ),
+    )
+    globs = [
+        glob
+        for req in requests.requests
+        for glob in req.generator[PackageJsonSourceField]
+        .path_globs(UnmatchedBuildFileGlobs.error())
+        .globs
+    ]
+    return AllPackageJson(
+        await Get(
+            PackageJsonForGlobs,
+            PathGlobs(
+                globs, GlobMatchErrorBehavior.error, description_of_origin=description_of_origin
+            ),
+        )
+    )
 
 
 class AllPackageJsonNames(DeduplicatedCollection[str]):

@@ -66,6 +66,7 @@ def test_parses_project_with_workspaces(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "src/js/package.json": given_package_with_workspaces("egg", "1.0.0", "foo", "bar"),
+            "src/js/BUILD": "package_json()",
             "src/js/foo/BUILD": "package_json()",
             "src/js/foo/package.json": given_package("ham", "0.0.1"),
             "src/js/bar/BUILD": "package_json()",
@@ -81,6 +82,7 @@ def test_parses_project_with_nested_workspaces(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "src/js/package.json": given_package_with_workspaces("egg", "1.0.0", "foo"),
+            "src/js/BUILD": "package_json()",
             "src/js/foo/BUILD": "package_json()",
             "src/js/foo/package.json": given_package_with_workspaces("ham", "0.0.1", "bar"),
             "src/js/foo/bar/BUILD": "package_json()",
@@ -96,6 +98,7 @@ def test_workspaces_with_multiple_owners_is_an_error(rule_runner: RuleRunner) ->
     rule_runner.write_files(
         {
             "src/js/package.json": given_package_with_workspaces("egg", "1.0.0", "foo/bar"),
+            "src/js/BUILD": "package_json()",
             "src/js/foo/BUILD": "package_json()",
             "src/js/foo/package.json": given_package_with_workspaces("ham", "0.0.1", "bar"),
             "src/js/foo/bar/BUILD": "package_json()",

@@ -10,6 +10,8 @@ from typing import Iterable, Mapping, TypeVar
 from pants.backend.project_info.filter_targets import FilterSubsystem
 from pants.base.exceptions import MappingError
 from pants.build_graph.address import Address, BuildFileAddress
+from pants.engine.addresses import Addresses
+from pants.engine.collection import Collection
 from pants.engine.env_vars import EnvironmentVars
 from pants.engine.internals.defaults import BuildFileDefaults, BuildFileDefaultsParserState
 from pants.engine.internals.dep_rules import (
@@ -232,3 +234,12 @@ class SpecsFilter:
         """Check that the target matches the provided `--tag` and `--exclude-target-regexp`
         options."""
         return self.tags_filter(target) and self.filter_subsystem_filter(target)
+
+
+class AddressFamilies(Collection[AddressFamily]):
+    def addresses(self) -> Addresses:
+        return Addresses(self._base_addresses())
+
+    def _base_addresses(self) -> Iterable[Address]:
+        for family in self:
+            yield from family.addresses_to_target_adaptors
