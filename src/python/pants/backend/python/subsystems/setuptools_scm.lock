@@ -9,7 +9,7 @@
 //     "CPython<4,>=3.7"
 //   ],
 //   "generated_with_requirements": [
-//     "setuptools-scm==7.1.0"
+//     "setuptools-scm<8,>=6.4.2"
 //   ],
 //   "manylinux": "manylinux2014",
 //   "requirement_constraints": [],
@@ -31,13 +31,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "7efb448ec9a5e313a57655d35aa54cd3e01b7e1fbcf72dce1bf06119420f5bad",
-              "url": "https://files.pythonhosted.org/packages/26/a7/9da7d5b23fc98ab3d424ac2c65613d63c1f401efb84ad50f2fa27b2caab4/importlib_metadata-6.0.0-py3-none-any.whl"
+              "hash": "ff80f3b5394912eb1b108fcfd444dc78b7f1f3e16b16188054bd01cb9cb86f09",
+              "url": "https://files.pythonhosted.org/packages/f8/7d/e3adad613703c86d62aa991b45d6f090cf59975078a8c8100b50a0c86948/importlib_metadata-6.1.0-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "e354bedeb60efa6affdcc8ae121b73544a7aa74156d047311948f6d711cd378d",
-              "url": "https://files.pythonhosted.org/packages/90/07/6397ad02d31bddf1841c9ad3ec30a693a3ff208e09c2ef45c9a8a5f85156/importlib_metadata-6.0.0.tar.gz"
+              "hash": "43ce9281e097583d758c2c708c4376371261a02c34682491a8e98352365aad20",
+              "url": "https://files.pythonhosted.org/packages/e2/d8/3d431bade4598ad9e33be9da41d15e6607b878008e922d122659ab01b077/importlib_metadata-6.1.0.tar.gz"
             }
           ],
           "project_name": "importlib-metadata",
@@ -66,7 +66,7 @@
             "zipp>=0.5"
           ],
           "requires_python": ">=3.7",
-          "version": "6.0.0"
+          "version": "6.1.0"
         },
         {
           "artifacts": [
@@ -90,13 +90,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "1c39d42bda4cb89f7fdcad52b6762e3c309ec8f8715b27c684176b7d71283242",
-              "url": "https://files.pythonhosted.org/packages/99/02/d6ac140d446e939959e80b7e0c55774fa7a22376847ff5fe191674fd1862/setuptools-67.5.1-py3-none-any.whl"
+              "hash": "e728ca814a823bf7bf60162daf9db95b93d532948c4c0bea762ce62f60189078",
+              "url": "https://files.pythonhosted.org/packages/0b/fc/8781442def77b0aa22f63f266d4dadd486ebc0c5371d6290caf4320da4b7/setuptools-67.6.1-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "15136a251127da2d2e77ac7a1bc231eb504654f7e3346d93613a13f2e2787535",
-              "url": "https://files.pythonhosted.org/packages/a4/3a/d60ed296ff8bbc6157ce818765c4c02df8b02fe70c310b7d29127962c5ae/setuptools-67.5.1.tar.gz"
+              "hash": "257de92a9d50a60b8e22abfcbb771571fde0dbf3ec234463212027a4eeecbe9a",
+              "url": "https://files.pythonhosted.org/packages/cb/46/22ec35f286a77e6b94adf81b4f0d59f402ed981d4251df0ba7b992299146/setuptools-67.6.1.tar.gz"
             }
           ],
           "project_name": "setuptools",
@@ -148,7 +148,7 @@
             "wheel; extra == \"testing-integration\""
           ],
           "requires_python": ">=3.7",
-          "version": "67.5.1"
+          "version": "67.6.1"
         },
         {
           "artifacts": [
@@ -255,11 +255,11 @@
     }
   ],
   "path_mappings": {},
-  "pex_version": "2.1.126",
+  "pex_version": "2.1.131",
   "pip_version": "23.0.1",
   "prefer_older_binary": false,
   "requirements": [
-    "setuptools-scm==7.1.0"
+    "setuptools-scm<8,>=6.4.2"
   ],
   "requires_python": [
     "<4,>=3.7"

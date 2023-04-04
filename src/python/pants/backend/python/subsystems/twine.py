@@ -27,7 +27,7 @@ class TwineSubsystem(PythonToolBase):
     # requirements.
     # See: https://github.com/pantsbuild/pants/pull/13594#issuecomment-968154931
     default_extra_requirements = ["colorama>=0.4.3"]
-    default_requirements = ["twine>=3.7.1,<5", *default_extra_requirements]
+    default_requirements = [default_version, *default_extra_requirements]
 
     register_interpreter_constraints = True
     default_interpreter_constraints = ["CPython>=3.7,<4"]

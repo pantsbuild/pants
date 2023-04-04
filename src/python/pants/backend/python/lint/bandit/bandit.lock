@@ -10,7 +10,7 @@
 //   ],
 //   "generated_with_requirements": [
 //     "GitPython>=3.1.24",
-//     "bandit<1.8,>=1.7.0",
+//     "bandit<2,>=1.7.0",
 //     "setuptools"
 //   ],
 //   "manylinux": "manylinux2014",
@@ -33,13 +33,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "412d3f259dab4077d0e7f0c11f50f650cc7d10db905d98f6520a95a18049658a",
-              "url": "https://files.pythonhosted.org/packages/da/eb/ff828f4ec32c85e10d9c344e6b7f11bcacfb5d70f2fd16bea6fc1ae6df06/bandit-1.7.4-py3-none-any.whl"
+              "hash": "75665181dc1e0096369112541a056c59d1c5f66f9bb74a8d686c3c362b83f549",
+              "url": "https://files.pythonhosted.org/packages/02/37/e06b8f1e2d45a2fe43ec80c4591d963b7bc1f351e6e1b8c094350d03b973/bandit-1.7.5-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "2d63a8c573417bae338962d4b9b06fbc6080f74ecd955a092849e1e65c717bd2",
-              "url": "https://files.pythonhosted.org/packages/39/36/a37a2f6f8d0ed8c3bc616616ed5019e1df2680bd8b7df49ceae80fd457de/bandit-1.7.4.tar.gz"
+              "hash": "bdfc739baa03b880c2d15d0431b31c658ffc348e907fe197e54e0389dd59e11e",
+              "url": "https://files.pythonhosted.org/packages/5e/67/997278e785edf155bd57163ae7030f979a0907857365cb30815d93b5354b/bandit-1.7.5.tar.gz"
             }
           ],
           "project_name": "bandit",
@@ -53,15 +53,16 @@
             "fixtures>=3.0.0; extra == \"test\"",
             "flake8>=4.0.0; extra == \"test\"",
             "pylint==1.9.4; extra == \"test\"",
+            "rich",
             "stestr>=2.5.0; extra == \"test\"",
             "stevedore>=1.20.0",
             "testscenarios>=0.5.0; extra == \"test\"",
             "testtools>=2.3.0; extra == \"test\"",
-            "toml; extra == \"test\"",
-            "toml; extra == \"toml\""
+            "tomli>=1.1.0; python_version < \"3.11\" and extra == \"test\"",
+            "tomli>=1.1.0; python_version < \"3.11\" and extra == \"toml\""
           ],
           "requires_python": ">=3.7",
-          "version": "1.7.4"
+          "version": "1.7.5"
         },
         {
           "artifacts": [
@@ -108,13 +109,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "7efb448ec9a5e313a57655d35aa54cd3e01b7e1fbcf72dce1bf06119420f5bad",
-              "url": "https://files.pythonhosted.org/packages/26/a7/9da7d5b23fc98ab3d424ac2c65613d63c1f401efb84ad50f2fa27b2caab4/importlib_metadata-6.0.0-py3-none-any.whl"
+              "hash": "ff80f3b5394912eb1b108fcfd444dc78b7f1f3e16b16188054bd01cb9cb86f09",
+              "url": "https://files.pythonhosted.org/packages/f8/7d/e3adad613703c86d62aa991b45d6f090cf59975078a8c8100b50a0c86948/importlib_metadata-6.1.0-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "e354bedeb60efa6affdcc8ae121b73544a7aa74156d047311948f6d711cd378d",
-              "url": "https://files.pythonhosted.org/packages/90/07/6397ad02d31bddf1841c9ad3ec30a693a3ff208e09c2ef45c9a8a5f85156/importlib_metadata-6.0.0.tar.gz"
+              "hash": "43ce9281e097583d758c2c708c4376371261a02c34682491a8e98352365aad20",
+              "url": "https://files.pythonhosted.org/packages/e2/d8/3d431bade4598ad9e33be9da41d15e6607b878008e922d122659ab01b077/importlib_metadata-6.1.0.tar.gz"
             }
           ],
           "project_name": "importlib-metadata",
@@ -143,7 +144,69 @@
             "zipp>=0.5"
           ],
           "requires_python": ">=3.7",
-          "version": "6.0.0"
+          "version": "6.1.0"
+        },
+        {
+          "artifacts": [
+            {
+              "algorithm": "sha256",
+              "hash": "5a35f8d1870171d9acc47b99612dc146129b631baf04970128b568f190d0cc30",
+              "url": "https://files.pythonhosted.org/packages/bf/25/2d88e8feee8e055d015343f9b86e370a1ccbec546f2865c98397aaef24af/markdown_it_py-2.2.0-py3-none-any.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "7c9a5e412688bc771c67432cbfebcdd686c93ce6484913dccf06cb5a0bea35a1",
+              "url": "https://files.pythonhosted.org/packages/e4/c0/59bd6d0571986f72899288a95d9d6178d0eebd70b6650f1bb3f0da90f8f7/markdown-it-py-2.2.0.tar.gz"
+            }
+          ],
+          "project_name": "markdown-it-py",
+          "requires_dists": [
+            "attrs; extra == \"rtd\"",
+            "commonmark~=0.9; extra == \"compare\"",
+            "coverage; extra == \"testing\"",
+            "gprof2dot; extra == \"profiling\"",
+            "linkify-it-py<3,>=1; extra == \"linkify\"",
+            "markdown~=3.4; extra == \"compare\"",
+            "mdit-py-plugins; extra == \"plugins\"",
+            "mdurl~=0.1",
+            "mistletoe~=1.0; extra == \"compare\"",
+            "mistune~=2.0; extra == \"compare\"",
+            "myst-parser; extra == \"rtd\"",
+            "panflute~=2.3; extra == \"compare\"",
+            "pre-commit~=3.0; extra == \"code_style\"",
+            "psutil; extra == \"benchmarking\"",
+            "pytest-benchmark; extra == \"benchmarking\"",
+            "pytest-cov; extra == \"testing\"",
+            "pytest-regressions; extra == \"testing\"",
+            "pytest; extra == \"benchmarking\"",
+            "pytest; extra == \"testing\"",
+            "pyyaml; extra == \"rtd\"",
+            "sphinx-copybutton; extra == \"rtd\"",
+            "sphinx-design; extra == \"rtd\"",
+            "sphinx; extra == \"rtd\"",
+            "sphinx_book_theme; extra == \"rtd\"",
+            "typing_extensions>=3.7.4; python_version < \"3.8\""
+          ],
+          "requires_python": ">=3.7",
+          "version": "2.2.0"
+        },
+        {
+          "artifacts": [
+            {
+              "algorithm": "sha256",
+              "hash": "84008a41e51615a49fc9966191ff91509e3c40b939176e643fd50a5c2196b8f8",
+              "url": "https://files.pythonhosted.org/packages/b3/38/89ba8ad64ae25be8de66a6d463314cf1eb366222074cfda9ee839c56a4b4/mdurl-0.1.2-py3-none-any.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "bb413d29f5eea38f31dd4754dd7377d4465116fb207585f97bf925588687c1ba",
+              "url": "https://files.pythonhosted.org/packages/d6/54/cfe61301667036ec958cb99bd3efefba235e65cdeb9c84d24a8293ba1d90/mdurl-0.1.2.tar.gz"
+            }
+          ],
+          "project_name": "mdurl",
+          "requires_dists": [],
+          "requires_python": ">=3.7",
+          "version": "0.1.2"
         },
         {
           "artifacts": [
@@ -162,6 +225,26 @@
           "requires_dists": [],
           "requires_python": ">=2.6",
           "version": "5.11.1"
+        },
+        {
+          "artifacts": [
+            {
+              "algorithm": "sha256",
+              "hash": "fa7bd7bd2771287c0de303af8bfdfc731f51bd2c6a47ab69d117138893b82717",
+              "url": "https://files.pythonhosted.org/packages/0b/42/d9d95cc461f098f204cd20c85642ae40fbff81f74c300341b8d0e0df14e0/Pygments-2.14.0-py3-none-any.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "b3ed06a9e8ac9a9aae5a6f5dbe78a8a58655d17b43b93c078f094ddc476ae297",
+              "url": "https://files.pythonhosted.org/packages/da/6a/c427c06913204e24de28de5300d3f0e809933f376e0b7df95194b2bb3f71/Pygments-2.14.0.tar.gz"
+            }
+          ],
+          "project_name": "pygments",
+          "requires_dists": [
+            "importlib-metadata; python_version < \"3.8\" and extra == \"plugins\""
+          ],
+          "requires_python": ">=3.6",
+          "version": "2.14.0"
         },
         {
           "artifacts": [
@@ -295,13 +378,36 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "1c39d42bda4cb89f7fdcad52b6762e3c309ec8f8715b27c684176b7d71283242",
-              "url": "https://files.pythonhosted.org/packages/99/02/d6ac140d446e939959e80b7e0c55774fa7a22376847ff5fe191674fd1862/setuptools-67.5.1-py3-none-any.whl"
+              "hash": "540c7d6d26a1178e8e8b37e9ba44573a3cd1464ff6348b99ee7061b95d1c6333",
+              "url": "https://files.pythonhosted.org/packages/42/5c/f44fc88bad850c4a20711a3349ec0e8bc50fece8d8b32c962d2aab70ea2b/rich-13.3.3-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "15136a251127da2d2e77ac7a1bc231eb504654f7e3346d93613a13f2e2787535",
-              "url": "https://files.pythonhosted.org/packages/a4/3a/d60ed296ff8bbc6157ce818765c4c02df8b02fe70c310b7d29127962c5ae/setuptools-67.5.1.tar.gz"
+              "hash": "dc84400a9d842b3a9c5ff74addd8eb798d155f36c1c91303888e0a66850d2a15",
+              "url": "https://files.pythonhosted.org/packages/9a/50/672a8d347f92bc752b04c338bbf932fbd0104fbc416c82cc91aa5f7b4b0b/rich-13.3.3.tar.gz"
+            }
+          ],
+          "project_name": "rich",
+          "requires_dists": [
+            "ipywidgets<9,>=7.5.1; extra == \"jupyter\"",
+            "markdown-it-py<3.0.0,>=2.2.0",
+            "pygments<3.0.0,>=2.13.0",
+            "typing-extensions<5.0,>=4.0.0; python_version < \"3.9\""
+          ],
+          "requires_python": ">=3.7.0",
+          "version": "13.3.3"
+        },
+        {
+          "artifacts": [
+            {
+              "algorithm": "sha256",
+              "hash": "e728ca814a823bf7bf60162daf9db95b93d532948c4c0bea762ce62f60189078",
+              "url": "https://files.pythonhosted.org/packages/0b/fc/8781442def77b0aa22f63f266d4dadd486ebc0c5371d6290caf4320da4b7/setuptools-67.6.1-py3-none-any.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "257de92a9d50a60b8e22abfcbb771571fde0dbf3ec234463212027a4eeecbe9a",
+              "url": "https://files.pythonhosted.org/packages/cb/46/22ec35f286a77e6b94adf81b4f0d59f402ed981d4251df0ba7b992299146/setuptools-67.6.1.tar.gz"
             }
           ],
           "project_name": "setuptools",
@@ -353,7 +459,7 @@
             "wheel; extra == \"testing-integration\""
           ],
           "requires_python": ">=3.7",
-          "version": "67.5.1"
+          "version": "67.6.1"
         },
         {
           "artifacts": [
@@ -454,12 +560,12 @@
     }
   ],
   "path_mappings": {},
-  "pex_version": "2.1.126",
+  "pex_version": "2.1.131",
   "pip_version": "23.0.1",
   "prefer_older_binary": false,
   "requirements": [
     "GitPython>=3.1.24",
-    "bandit<1.8,>=1.7.0",
+    "bandit<2,>=1.7.0",
     "setuptools"
   ],
   "requires_python": [

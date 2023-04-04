@@ -9,7 +9,7 @@
 //     "CPython<4,>=3.7"
 //   ],
 //   "generated_with_requirements": [
-//     "isort[colors,pyproject]<6.0,>=5.9.3"
+//     "isort[colors,pyproject]<6,>=5.9.3"
 //   ],
 //   "manylinux": "manylinux2014",
 //   "requirement_constraints": [],
@@ -75,11 +75,11 @@
     }
   ],
   "path_mappings": {},
-  "pex_version": "2.1.126",
+  "pex_version": "2.1.131",
   "pip_version": "23.0.1",
   "prefer_older_binary": false,
   "requirements": [
-    "isort[colors,pyproject]<6.0,>=5.9.3"
+    "isort[colors,pyproject]<6,>=5.9.3"
   ],
   "requires_python": [
     "<4,>=3.7"

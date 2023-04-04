@@ -26,7 +26,7 @@ class Isort(PythonToolBase):
     name = "isort"
     help = "The Python import sorter tool (https://pycqa.github.io/isort/)."
 
-    default_version = "isort[pyproject,colors]>=5.9.3,<6.0"
+    default_version = "isort[pyproject,colors]>=5.9.3,<6"
     default_main = ConsoleScript("isort")
     default_requirements = [default_version]
 

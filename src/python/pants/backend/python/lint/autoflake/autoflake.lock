@@ -31,13 +31,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "143b0843667734af53532c443e950c787316b9b1155b2273558260b44836e8e4",
-              "url": "https://files.pythonhosted.org/packages/7b/68/13f71734e97fb6fc24baf2ec9e4971ead3a3d54bfc1a44f143ce6a2b53e8/autoflake-2.0.1-py3-none-any.whl"
+              "hash": "a82d8efdcbbb7129a8a23238c529fb9d9919c562e26bb7963ea6890fbfff7d02",
+              "url": "https://files.pythonhosted.org/packages/34/47/702047c981cb6376d08bdedfd99341ab418697a0145366b02007292680d8/autoflake-2.0.2-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "1ce520131b7f396915242fe91e57221f4d42408529bbe3ae93adafed286591e0",
-              "url": "https://files.pythonhosted.org/packages/93/6d/9d77459da32a30304405c6939d456f7dd0c263bddf419fc24a753dbce6da/autoflake-2.0.1.tar.gz"
+              "hash": "e0164421ff13f805f08a023e249d84200bd00463d213b490906bfefa67e83830",
+              "url": "https://files.pythonhosted.org/packages/86/da/db0b6087baec5a92df5162188e302cac4a2f9b2739cb9f757e14b2f8cf92/autoflake-2.0.2.tar.gz"
             }
           ],
           "project_name": "autoflake",
@@ -46,7 +46,7 @@
             "tomli>=2.0.1; python_version < \"3.11\""
           ],
           "requires_python": ">=3.7",
-          "version": "2.0.1"
+          "version": "2.0.2"
         },
         {
           "artifacts": [
@@ -89,7 +89,7 @@
     }
   ],
   "path_mappings": {},
-  "pex_version": "2.1.126",
+  "pex_version": "2.1.131",
   "pip_version": "23.0.1",
   "prefer_older_binary": false,
   "requirements": [

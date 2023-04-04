@@ -77,13 +77,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "d763de3c74bc18a79c039a7ec732e0a1985b0c79309ceb51e56401ad0a2cd44e",
-              "url": "https://files.pythonhosted.org/packages/70/7a/b05834d94f67b0a00e24157ded4ac9cbaa39e1fae1db779782f310569984/flake8_comprehensions-3.10.1-py3-none-any.whl"
+              "hash": "d1e27f4099900c61fb156cbb7461e0e49702385fd388326e1a892d04b069c48e",
+              "url": "https://files.pythonhosted.org/packages/71/f8/e51d5d1c9c56c32eaa2e5cce0604f21ad34cc5b9072cf8c439c7ad18a111/flake8_comprehensions-3.11.1-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "412052ac4a947f36b891143430fef4859705af11b2572fbb689f90d372cf26ab",
-              "url": "https://files.pythonhosted.org/packages/9d/54/1c08a18028002d139f3ad551670b0abeb9f4bdae9108821b66b644978585/flake8-comprehensions-3.10.1.tar.gz"
+              "hash": "31d6386c125e325d7c84290d71f5354295dbbf5a8d47259708fa349aa0969523",
+              "url": "https://files.pythonhosted.org/packages/3c/6d/fcf98e1e87206c802d3d6359688d7a3c728f3cc6161e89d792388db1daac/flake8_comprehensions-3.11.1.tar.gz"
             }
           ],
           "project_name": "flake8-comprehensions",
@@ -92,7 +92,7 @@
             "importlib-metadata; python_version < \"3.8\""
           ],
           "requires_python": ">=3.7",
-          "version": "3.10.1"
+          "version": "3.11.1"
         },
         {
           "artifacts": [
@@ -300,7 +300,7 @@
     }
   ],
   "path_mappings": {},
-  "pex_version": "2.1.126",
+  "pex_version": "2.1.131",
   "pip_version": "23.0.1",
   "prefer_older_binary": false,
   "requirements": [
