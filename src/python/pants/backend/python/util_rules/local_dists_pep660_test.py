@@ -179,9 +179,3 @@ def test_build_editable_local_dists(rule_runner: RuleRunner) -> None:
             assert "foo-9.8.7.dist-info/WHEEL" in whl_files
             assert "foo-9.8.7.dist-info/direct_url__pants__.json" in whl_files
             assert "foo-9.8.7.dist-info/entry_points.txt" in whl_files
-
-    # Check that all sources are not in the editable wheel
-    assert result.remaining_sources.source_files.files == (
-        "srcroot/foo/bar.py",
-        "srcroot/foo/qux.py",
-    )

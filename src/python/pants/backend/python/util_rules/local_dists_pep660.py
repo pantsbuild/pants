@@ -26,7 +26,6 @@ from pants.backend.python.util_rules.python_sources import PythonSourceFiles
 from pants.base.build_root import BuildRoot
 from pants.build_graph.address import Address
 from pants.core.util_rules import system_binaries
-from pants.core.util_rules.source_files import SourceFiles
 from pants.core.util_rules.system_binaries import BashBinary, UnzipBinary
 from pants.engine.addresses import Addresses
 from pants.engine.fs import (
@@ -48,7 +47,6 @@ from pants.engine.target import (
     WrappedTargetRequest,
 )
 from pants.engine.unions import UnionMembership
-from pants.util.dirutil import fast_relpath_optional
 from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
@@ -467,9 +465,6 @@ class LocalDistsPEP660Pex:  # based on LocalDistsPex
     """
 
     pex: Pex
-    # The sources from the request, but with any files provided by the local dists subtracted out.
-    # In general, this will have a list of all of the dists' sources.
-    remaining_sources: PythonSourceFiles
 
 
 @rule(desc="Building editable local distributions (PEP 660)")
@@ -490,13 +485,11 @@ async def build_editable_local_dists(  # based on build_local_dists
         for target in applicable_targets
     )
 
-    provided_files: set[str] = set()
     wheels: list[str] = []
     wheels_digests = []
     for local_dist_wheels in local_dists_wheels:
         wheels.extend(local_dist_wheels.pep660_wheel_paths)
         wheels_digests.append(local_dist_wheels.pep660_wheels_digest)
-        provided_files.update(local_dist_wheels.provided_files)
 
     wheels_digest = await Get(Digest, MergeDigests(wheels_digests))
 
@@ -512,36 +505,7 @@ async def build_editable_local_dists(  # based on build_local_dists
         ),
     )
 
-    if not wheels:
-        # The source calculations below are not (always) cheap, so we skip them if no wheels were
-        # produced. See https://github.com/pantsbuild/pants/issues/14561 for one possible approach
-        # to sharing the cost of these calculations.
-        return LocalDistsPEP660Pex(editable_dists_pex, request.sources)
-
-    # TODO: maybe DRY the logic duplicated here and in build_local_dists
-    # We check source roots in reverse lexicographic order,
-    # so we'll find the innermost root that matches.
-    source_roots = sorted(request.sources.source_roots, reverse=True)
-    remaining_sources = set(request.sources.source_files.files)
-    unrooted_files_set = set(request.sources.source_files.unrooted_files)
-    for source in request.sources.source_files.files:
-        if source not in unrooted_files_set:
-            for source_root in source_roots:
-                source_relpath = fast_relpath_optional(source, source_root)
-                if source_relpath is not None and source_relpath in provided_files:
-                    remaining_sources.remove(source)
-    remaining_sources_snapshot = await Get(
-        Snapshot,
-        DigestSubset(
-            request.sources.source_files.snapshot.digest, PathGlobs(sorted(remaining_sources))
-        ),
-    )
-    subtracted_sources = PythonSourceFiles(
-        SourceFiles(remaining_sources_snapshot, request.sources.source_files.unrooted_files),
-        request.sources.source_roots,
-    )
-
-    return LocalDistsPEP660Pex(editable_dists_pex, subtracted_sources)
+    return LocalDistsPEP660Pex(editable_dists_pex)
 
 
 def rules():
