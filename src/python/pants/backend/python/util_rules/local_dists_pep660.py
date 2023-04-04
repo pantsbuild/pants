@@ -22,7 +22,6 @@ from pants.backend.python.util_rules.dists import rules as dists_rules
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import Pex, PexRequest, VenvPex, VenvPexProcess
 from pants.backend.python.util_rules.pex_requirements import PexRequirements
-from pants.backend.python.util_rules.python_sources import PythonSourceFiles
 from pants.base.build_root import BuildRoot
 from pants.build_graph.address import Address
 from pants.core.util_rules import system_binaries
@@ -424,20 +423,15 @@ class LocalDistsPEP660PexRequest:  # based on LocalDistsPexRequest
 
     addresses: Addresses
     interpreter_constraints: InterpreterConstraints
-    # The result will return these with the sources provided by the dists subtracted out.
-    # This will help the caller prevent sources from appearing twice on sys.path.
-    sources: PythonSourceFiles
 
     def __init__(
         self,
         addresses: Iterable[Address],
         *,
         interpreter_constraints: InterpreterConstraints,
-        sources: PythonSourceFiles = PythonSourceFiles.empty(),
     ) -> None:
         object.__setattr__(self, "addresses", Addresses(addresses))
         object.__setattr__(self, "interpreter_constraints", interpreter_constraints)
-        object.__setattr__(self, "sources", sources)
 
 
 @dataclass(frozen=True)

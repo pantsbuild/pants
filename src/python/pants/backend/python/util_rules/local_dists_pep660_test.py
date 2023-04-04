@@ -25,10 +25,8 @@ from pants.backend.python.util_rules.local_dists_pep660 import (
 )
 from pants.backend.python.util_rules.pex_from_targets import InterpreterConstraintsRequest
 from pants.backend.python.util_rules.pex_requirements import PexRequirements
-from pants.backend.python.util_rules.python_sources import PythonSourceFiles
 from pants.build_graph.address import Address
-from pants.core.util_rules.source_files import SourceFiles
-from pants.engine.fs import CreateDigest, Digest, DigestContents, FileContent, Snapshot
+from pants.engine.fs import CreateDigest, Digest, DigestContents, FileContent
 from pants.testutil.python_interpreter_selection import (
     skip_unless_python27_present,
     skip_unless_python39_present,
@@ -136,24 +134,12 @@ def test_build_editable_local_dists(rule_runner: RuleRunner) -> None:
             ),
         }
     )
-    rule_runner.set_options([], env_inherit={"PATH"})
-    sources_digest = rule_runner.request(
-        Digest,
-        [
-            CreateDigest(
-                [FileContent("srcroot/foo/bar.py", b""), FileContent("srcroot/foo/qux.py", b"")]
-            )
-        ],
-    )
-    sources_snapshot = rule_runner.request(Snapshot, [sources_digest])
-    sources = PythonSourceFiles(SourceFiles(sources_snapshot, tuple()), ("srcroot",))
     addresses = [Address("foo", target_name="dist")]
     interpreter_constraints = rule_runner.request(
         InterpreterConstraints, [InterpreterConstraintsRequest(addresses)]
     )
     request = LocalDistsPEP660PexRequest(
         addresses,
-        sources=sources,
         interpreter_constraints=interpreter_constraints,
     )
     result = rule_runner.request(LocalDistsPEP660Pex, [request])
