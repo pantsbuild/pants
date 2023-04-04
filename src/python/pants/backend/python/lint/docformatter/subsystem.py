@@ -20,9 +20,9 @@ class Docformatter(PythonToolBase):
     name = "docformatter"
     help = "The Python docformatter tool (https://github.com/myint/docformatter)."
 
-    default_version = "docformatter>=1.4,<2"
+    default_version = "docformatter>=1.4,<1.5"
     default_main = ConsoleScript("docformatter")
-    default_requirements = [default_version]
+    default_requirements = ["docformatter>=1.4,<1.6"]
 
     register_interpreter_constraints = True
     default_interpreter_constraints = ["CPython>=3.7,<4"]
