@@ -121,6 +121,25 @@ def test_does_not_generate_third_party_node_package_target_for_first_party_packa
     ]
 
 
+def test_does_not_consider_package_json_without_a_target(
+    rule_runner: RuleRunner,
+) -> None:
+    rule_runner.write_files(
+        {
+            "src/js/a/BUILD": "package_json()",
+            "src/js/a/package.json": json.dumps(
+                {"name": "ham", "version": "0.0.1", "dependencies": {"chalk": "^5.2.0"}}
+            ),
+            "src/js/b/package.json": json.dumps(
+                {"name": "spam", "version": "0.0.1", "dependencies": {"ham": "0.0.1"}}
+            ),
+        }
+    )
+    all_packages = rule_runner.request(AllPackageJson, ())
+    assert len(all_packages) == 1
+    assert all_packages[0].name == "ham"
+
+
 def test_generates_build_script_targets(
     rule_runner: RuleRunner,
 ) -> None:

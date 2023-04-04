@@ -9,7 +9,7 @@ use testutil::make_file;
 use crate::{
   DigestTrie, Dir, DirectoryListing, File, GitignoreStyleExcludes, GlobExpansionConjunction,
   GlobMatching, Link, PathGlobs, PathStat, PosixFS, Stat, StrictGlobMatching, SymlinkBehavior,
-  TypedPath, Vfs,
+  TypedPath,
 };
 
 #[tokio::test]
@@ -392,62 +392,4 @@ fn new_posixfs_symlink_oblivious<P: AsRef<Path>>(dir: P) -> PosixFS {
     SymlinkBehavior::Oblivious,
   )
   .unwrap()
-}
-
-async fn read_mock_files(input: Vec<PathBuf>, posix_fs: &Arc<PosixFS>) -> Vec<Stat> {
-  input
-    .into_iter()
-    .map(|p| posix_fs.stat_sync(p).unwrap().unwrap())
-    .collect()
-}
-
-#[tokio::test]
-async fn test_basic_gitignore_functionality() {
-  let root = tempfile::TempDir::new().unwrap();
-  let root_path = root.path();
-
-  let bytes = "content".as_bytes();
-  make_file(&root_path.join("non-ignored"), bytes, 0o700);
-  make_file(&root_path.join("ignored-file.tmp"), bytes, 0o700);
-  make_file(&root_path.join("important.x"), bytes, 0o700);
-  make_file(&root_path.join("unimportant.x"), bytes, 0o700);
-
-  let gitignore_content = "*.tmp\n!*.x";
-  let gitignore_path = root_path.join(".gitignore");
-  make_file(&gitignore_path, gitignore_content.as_bytes(), 0o700);
-  let executor = task_executor::Executor::new();
-  let ignorer =
-    GitignoreStyleExcludes::create_with_gitignore_file(vec![], Some(gitignore_path.clone()))
-      .unwrap();
-  let posix_fs = Arc::new(PosixFS::new(root.as_ref(), ignorer, executor).unwrap());
-
-  let stats = read_mock_files(
-    vec![
-      PathBuf::from("non-ignored"),
-      PathBuf::from("ignored-file.tmp"),
-      PathBuf::from("important.x"),
-      PathBuf::from("unimportant.x"),
-    ],
-    &posix_fs,
-  )
-  .await;
-
-  assert!(!posix_fs.is_ignored(&stats[0]));
-  assert!(posix_fs.is_ignored(&stats[1]));
-  assert!(!posix_fs.is_ignored(&stats[2]));
-  assert!(!posix_fs.is_ignored(&stats[3]));
-
-  // Test that .gitignore files work in tandem with explicit ignores.
-  let executor = task_executor::Executor::new();
-  let ignorer = GitignoreStyleExcludes::create_with_gitignore_file(
-    vec!["unimportant.x".to_string()],
-    Some(gitignore_path),
-  )
-  .unwrap();
-  let posix_fs_2 = Arc::new(PosixFS::new(root.as_ref(), ignorer, executor).unwrap());
-
-  assert!(!posix_fs_2.is_ignored(&stats[0]));
-  assert!(posix_fs_2.is_ignored(&stats[1]));
-  assert!(!posix_fs_2.is_ignored(&stats[2]));
-  assert!(posix_fs_2.is_ignored(&stats[3]));
 }

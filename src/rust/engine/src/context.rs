@@ -572,18 +572,14 @@ impl Core {
       .map_err(|err| format!("Error building HTTP client: {err}"))?;
     let rule_graph = RuleGraph::new(tasks.rules().clone(), tasks.queries().clone())?;
 
-    let gitignore_file = if use_gitignore {
-      let gitignore_path = build_root.join(".gitignore");
-      if Path::is_file(&gitignore_path) {
-        Some(gitignore_path)
-      } else {
-        None
-      }
+    let gitignore_files = if use_gitignore {
+      GitignoreStyleExcludes::gitignore_file_paths(&build_root)
     } else {
-      None
+      vec![]
     };
+
     let ignorer =
-      GitignoreStyleExcludes::create_with_gitignore_file(ignore_patterns, gitignore_file)
+      GitignoreStyleExcludes::create_with_gitignore_files(ignore_patterns, gitignore_files)
         .map_err(|e| format!("Could not parse build ignore patterns: {e:?}"))?;
 
     let watcher = if watch_filesystem {
