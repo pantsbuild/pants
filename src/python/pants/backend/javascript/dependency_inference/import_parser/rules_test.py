@@ -25,7 +25,7 @@ from pants.testutil.rule_runner import RuleRunner
 
 @pytest.fixture
 def rule_runner() -> RuleRunner:
-    return RuleRunner(
+    rule_runner = RuleRunner(
         rules=[
             *import_parser_rules(),
             QueryRule(JSImportStrings, (ParseJsImportStrings,)),
@@ -33,6 +33,8 @@ def rule_runner() -> RuleRunner:
         ],
         target_types=[JSSourceTarget, JSSourcesGeneratorTarget],
     )
+    rule_runner.set_options([], env_inherit={"PATH"})
+    return rule_runner
 
 
 def test_installs_parser_modules(rule_runner: RuleRunner) -> None:

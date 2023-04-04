@@ -43,7 +43,7 @@ from pants.util.contextutil import temporary_dir
 
 @pytest.fixture
 def rule_runner() -> RuleRunner:
-    return RuleRunner(
+    rule_runner = RuleRunner(
         rules=[
             *nodejs.rules(),
             *source_files.rules(),
@@ -55,6 +55,8 @@ def rule_runner() -> RuleRunner:
         ],
         target_types=[JSSourcesGeneratorTarget],
     )
+    rule_runner.set_options([], env_inherit={"PATH"})
+    return rule_runner
 
 
 def test_npx_process(rule_runner: RuleRunner):
