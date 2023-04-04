@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from pathlib import PurePath
 from typing import Generic, Optional, Sequence, TypeVar, Union, cast
 
+from pants.base.deprecated import warn_or_error
 from pants.core.goals import package
 from pants.core.goals.package import (
     BuiltPackage,
@@ -652,7 +653,12 @@ class GenericTarget(Target):
 
 @dataclass(frozen=True)
 class AllAssetTargetsRequest:
-    pass
+    def __post_init__(self) -> None:
+        warn_or_error(
+            "2.18.0.dev0",
+            "using `Get(AllAssetTargets, AllAssetTargetsRequest)",
+            "Instead, simply use `Get(AllAssetTargets)` or put `AllAssetTargets` in the rule signature",
+        )
 
 
 @dataclass(frozen=True)
@@ -662,10 +668,7 @@ class AllAssetTargets:
 
 
 @rule(desc="Find all assets in project")
-def find_all_assets(
-    all_targets: AllTargets,
-    _: AllAssetTargetsRequest,
-) -> AllAssetTargets:
+def find_all_assets(all_targets: AllTargets) -> AllAssetTargets:
     resources = []
     files = []
     for tgt in all_targets:
@@ -674,6 +677,13 @@ def find_all_assets(
         if tgt.has_field(FileSourceField):
             files.append(tgt)
     return AllAssetTargets(tuple(resources), tuple(files))
+
+
+@rule
+def find_all_assets_request(
+    _: AllAssetTargetsRequest, all_asset_targets: AllAssetTargets
+) -> AllAssetTargets:
+    return all_asset_targets
 
 
 @dataclass(frozen=True)

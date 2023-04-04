@@ -10,12 +10,7 @@ from pants.backend.codegen.protobuf.target_types import (
 )
 from pants.core.goals.fmt import FmtResult, FmtTargetsRequest, Partitions
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
-from pants.core.util_rules.system_binaries import (
-    BinaryShims,
-    BinaryShimsRequest,
-    DiffBinary,
-    DiffBinaryRequest,
-)
+from pants.core.util_rules.system_binaries import BinaryShims, BinaryShimsRequest, DiffBinary
 from pants.engine.fs import Digest, MergeDigests
 from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessResult
@@ -62,9 +57,8 @@ async def partition_buf(
 
 @rule(desc="Format with buf format", level=LogLevel.DEBUG)
 async def run_buf_format(
-    request: BufFormatRequest.Batch, buf: BufSubsystem, platform: Platform
+    request: BufFormatRequest.Batch, buf: BufSubsystem, diff_binary: DiffBinary, platform: Platform
 ) -> FmtResult:
-    diff_binary = await Get(DiffBinary, DiffBinaryRequest())
     download_buf_get = Get(DownloadedExternalTool, ExternalToolRequest, buf.get_request(platform))
     binary_shims_get = Get(
         BinaryShims,
