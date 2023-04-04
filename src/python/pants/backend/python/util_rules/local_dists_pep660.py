@@ -58,216 +58,11 @@ from pants.util.strutil import softwrap
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
-class LocalDistPEP660Wheels:  # Based on LocalDistWheels
-    """Contains the PEP 660 "editable" wheels isolated from a single local Python distribution."""
-
-    pep660_wheel_paths: tuple[str, ...]
-    pep660_wheels_digest: Digest
-    provided_files: frozenset[str]
-
-
-@rule
-async def isolate_local_dist_pep660_wheels(
-    dist_field_set: PythonDistributionFieldSet,
-    bash: BashBinary,
-    unzip_binary: UnzipBinary,
-    python_setup: PythonSetup,
-    union_membership: UnionMembership,
-) -> LocalDistPEP660Wheels:
-    dist_build_request = await create_dist_build_request(
-        field_set=dist_field_set,
-        python_setup=python_setup,
-        union_membership=union_membership,
-        # editable wheel ignores build_wheel+build_sdist args
-        validate_wheel_sdist=False,
-    )
-    pep660_result = await Get(PEP660BuildResult, DistBuildRequest, dist_build_request)
-
-    # the output digest should only contain wheels, but filter to be safe.
-    wheels_snapshot = await Get(
-        Snapshot, DigestSubset(pep660_result.output, PathGlobs(["**/*.whl"]))
-    )
-
-    wheels = tuple(wheels_snapshot.files)
-
-    if not wheels:
-        tgt = await Get(
-            WrappedTarget,
-            WrappedTargetRequest(dist_field_set.address, description_of_origin="<infallible>"),
-        )
-        logger.warning(
-            softwrap(
-                f"""
-                Encountered a dependency on the {tgt.target.alias} target at {dist_field_set.address},
-                but this target does not produce a Python wheel artifact. Therefore this target's
-                code will be used directly from sources, without a distribution being built,
-                and any native extensions in it will not be built.
-
-                See {doc_url('python-distributions')} for details on how to set up a
-                {tgt.target.alias} target to produce a wheel.
-                """
-            )
-        )
-
-    wheels_listing_result = await Get(
-        ProcessResult,
-        Process(
-            argv=[
-                bash.path,
-                "-c",
-                f"""
-                set -ex
-                for f in {' '.join(shlex.quote(f) for f in wheels)}; do
-                  {unzip_binary.path} -Z1 "$f"
-                done
-                """,
-            ],
-            input_digest=wheels_snapshot.digest,
-            description=f"List contents of editable artifacts produced by {dist_field_set.address}",
-        ),
-    )
-    provided_files = set(wheels_listing_result.stdout.decode().splitlines())
-
-    return LocalDistPEP660Wheels(wheels, wheels_snapshot.digest, frozenset(provided_files))
-
-
-@dataclass(frozen=True)
-class LocalDistsPEP660PexRequest:
-    """Request to build a PEX populated by PEP660 wheels of local dists.
-
-    Like LocalDistsPexRequest, the local dists come from the dependency closure of a set of
-    addresses. Unlike LocalDistsPexRequest, the editable wheel files must not be exported or made
-    available to the end-user (according to PEP 660). Instead, the PEP660Pex serves as an
-    intermediate, internal-only, PEX that can be used to install these wheels in a virtualenv. It
-    follows then, that this PEX should probably not be exported for use by end-users.
-    """
-
-    addresses: Addresses
-    interpreter_constraints: InterpreterConstraints
-    # The result will return these with the sources provided by the dists subtracted out.
-    # This will help the caller prevent sources from appearing twice on sys.path.
-    sources: PythonSourceFiles
-
-    def __init__(
-        self,
-        addresses: Iterable[Address],
-        *,
-        interpreter_constraints: InterpreterConstraints,
-        sources: PythonSourceFiles = PythonSourceFiles.empty(),
-    ) -> None:
-        object.__setattr__(self, "addresses", Addresses(addresses))
-        object.__setattr__(self, "interpreter_constraints", interpreter_constraints)
-        object.__setattr__(self, "sources", sources)
-
-
-@dataclass(frozen=True)
-class LocalDistsPEP660Pex:
-    """A PEX file populated by PEP660 wheels of local dists.
-
-    Can be consumed from another PEX, e.g., by adding to PEX_PATH.
-
-    The PEX will contain installs of PEP660 wheels generate4d from local dists. Installing PEP660
-    wheels creates an "editable" install such that the sys.path gets adjusted to include source
-    directories that are NOT part of the PEX. As such, this PEX is decidedly not hermetic or
-    portable and should only be used to facilitate building virtualenvs for development.
-
-    PEP660 wheels have .dist-info metadata and the .pth files (or similar) that adjust sys.path.
-
-    The PEX will only contain metadata for local dists and not any dependencies. For Pants generated
-    `setup.py` / `pyproject.toml`, the dependencies will be included in the standard resolve process
-    that the locally-built dists PEX is adjoined to via PEX_PATH. For hand-made `setup.py` /
-    `pyproject.toml` with 3rdparty dependencies not hand-mirrored into BUILD file dependencies, this
-    will lead to issues. See https://github.com/pantsbuild/pants/issues/13587#issuecomment-974863636
-    for one way to fix this corner which is intentionally punted on for now.
-
-    Lists the files provided by the dists on sys.path, so they can be subtracted from
-    sources digests, to prevent the same file ending up on sys.path twice.
-    """
-
-    pex: Pex
-    # The sources from the request, but with any files provided by the local dists subtracted out.
-    # In general, this will have a list of all of the dists' sources.
-    remaining_sources: PythonSourceFiles
-
-
-@rule(desc="Building editable local distributions (PEP 660)")
-async def build_editable_local_dists(
-    request: LocalDistsPEP660PexRequest,
-) -> LocalDistsPEP660Pex:
-    transitive_targets = await Get(TransitiveTargets, TransitiveTargetsRequest(request.addresses))
-    applicable_targets = [
-        tgt for tgt in transitive_targets.closure if PythonDistributionFieldSet.is_applicable(tgt)
-    ]
-
-    local_dists_wheels = await MultiGet(
-        Get(
-            LocalDistPEP660Wheels,
-            PythonDistributionFieldSet,
-            PythonDistributionFieldSet.create(target),
-        )
-        for target in applicable_targets
-    )
-
-    provided_files: set[str] = set()
-    wheels: list[str] = []
-    wheels_digests = []
-    for local_dist_wheels in local_dists_wheels:
-        wheels.extend(local_dist_wheels.pep660_wheel_paths)
-        wheels_digests.append(local_dist_wheels.pep660_wheels_digest)
-        provided_files.update(local_dist_wheels.provided_files)
-
-    wheels_digest = await Get(Digest, MergeDigests(wheels_digests))
-
-    editable_dists_pex = await Get(
-        Pex,
-        PexRequest(
-            output_filename="editable_local_dists.pex",
-            requirements=PexRequirements(wheels),
-            interpreter_constraints=request.interpreter_constraints,
-            additional_inputs=wheels_digest,
-            internal_only=True,
-            additional_args=["--intransitive"],
-        ),
-    )
-
-    if not wheels:
-        # The source calculations below are not (always) cheap, so we skip them if no wheels were
-        # produced. See https://github.com/pantsbuild/pants/issues/14561 for one possible approach
-        # to sharing the cost of these calculations.
-        return LocalDistsPEP660Pex(editable_dists_pex, request.sources)
-
-    # TODO: maybe DRY the logic duplicated here and in build_local_dists
-    # We check source roots in reverse lexicographic order,
-    # so we'll find the innermost root that matches.
-    source_roots = sorted(request.sources.source_roots, reverse=True)
-    remaining_sources = set(request.sources.source_files.files)
-    unrooted_files_set = set(request.sources.source_files.unrooted_files)
-    for source in request.sources.source_files.files:
-        if source not in unrooted_files_set:
-            for source_root in source_roots:
-                source_relpath = fast_relpath_optional(source, source_root)
-                if source_relpath is not None and source_relpath in provided_files:
-                    remaining_sources.remove(source)
-    remaining_sources_snapshot = await Get(
-        Snapshot,
-        DigestSubset(
-            request.sources.source_files.snapshot.digest, PathGlobs(sorted(remaining_sources))
-        ),
-    )
-    subtracted_sources = PythonSourceFiles(
-        SourceFiles(remaining_sources_snapshot, request.sources.source_files.unrooted_files),
-        request.sources.source_roots,
-    )
-
-    return LocalDistsPEP660Pex(editable_dists_pex, subtracted_sources)
-
-
 # We just use DistBuildRequest directly instead of adding a PEP660BuildRequest
 
 
 @dataclass(frozen=True)
-class PEP660BuildResult:  # Based on DistBuildResult
+class PEP660BuildResult:  # based on DistBuildResult
     output: Digest
     # Relpaths in the output digest.
     editable_wheel_path: str | None
@@ -345,7 +140,7 @@ print("editable_path: {{editable_path}}".format(editable_path=wheel_path))
 """
 
 
-def interpolate_backend_wrapper(
+def interpolate_backend_wrapper(  # based on interpolate_backend_shim
     dist_dir: str,
     pth_file_path: str,
     request: DistBuildRequest,
@@ -377,7 +172,7 @@ def interpolate_backend_wrapper(
 
 
 @rule
-async def run_pep660_build(
+async def run_pep660_build(  # based on run_pep517_build
     request: DistBuildRequest, python_setup: PythonSetup, build_root: BuildRoot
 ) -> PEP660BuildResult:
     # Create the .pth files to add the relevant source root to PYTHONPATH
@@ -483,6 +278,211 @@ async def run_pep660_build(
             )
         )
     return PEP660BuildResult(output_digest, editable_wheel_path=editable_path)
+
+
+@dataclass(frozen=True)
+class LocalDistPEP660Wheels:  # based on LocalDistWheels
+    """Contains the PEP 660 "editable" wheels isolated from a single local Python distribution."""
+
+    pep660_wheel_paths: tuple[str, ...]
+    pep660_wheels_digest: Digest
+    provided_files: frozenset[str]
+
+
+@rule
+async def isolate_local_dist_pep660_wheels(  # based on isolate_local_dist_wheels
+    dist_field_set: PythonDistributionFieldSet,
+    bash: BashBinary,
+    unzip_binary: UnzipBinary,
+    python_setup: PythonSetup,
+    union_membership: UnionMembership,
+) -> LocalDistPEP660Wheels:
+    dist_build_request = await create_dist_build_request(
+        field_set=dist_field_set,
+        python_setup=python_setup,
+        union_membership=union_membership,
+        # editable wheel ignores build_wheel+build_sdist args
+        validate_wheel_sdist=False,
+    )
+    pep660_result = await Get(PEP660BuildResult, DistBuildRequest, dist_build_request)
+
+    # the output digest should only contain wheels, but filter to be safe.
+    wheels_snapshot = await Get(
+        Snapshot, DigestSubset(pep660_result.output, PathGlobs(["**/*.whl"]))
+    )
+
+    wheels = tuple(wheels_snapshot.files)
+
+    if not wheels:
+        tgt = await Get(
+            WrappedTarget,
+            WrappedTargetRequest(dist_field_set.address, description_of_origin="<infallible>"),
+        )
+        logger.warning(
+            softwrap(
+                f"""
+                Encountered a dependency on the {tgt.target.alias} target at {dist_field_set.address},
+                but this target does not produce a Python wheel artifact. Therefore this target's
+                code will be used directly from sources, without a distribution being built,
+                and any native extensions in it will not be built.
+
+                See {doc_url('python-distributions')} for details on how to set up a
+                {tgt.target.alias} target to produce a wheel.
+                """
+            )
+        )
+
+    wheels_listing_result = await Get(
+        ProcessResult,
+        Process(
+            argv=[
+                bash.path,
+                "-c",
+                f"""
+                set -ex
+                for f in {' '.join(shlex.quote(f) for f in wheels)}; do
+                  {unzip_binary.path} -Z1 "$f"
+                done
+                """,
+            ],
+            input_digest=wheels_snapshot.digest,
+            description=f"List contents of editable artifacts produced by {dist_field_set.address}",
+        ),
+    )
+    provided_files = set(wheels_listing_result.stdout.decode().splitlines())
+
+    return LocalDistPEP660Wheels(wheels, wheels_snapshot.digest, frozenset(provided_files))
+
+
+@dataclass(frozen=True)
+class LocalDistsPEP660PexRequest:  # based on LocalDistsPexRequest
+    """Request to build a PEX populated by PEP660 wheels of local dists.
+
+    Like LocalDistsPexRequest, the local dists come from the dependency closure of a set of
+    addresses. Unlike LocalDistsPexRequest, the editable wheel files must not be exported or made
+    available to the end-user (according to PEP 660). Instead, the PEP660Pex serves as an
+    intermediate, internal-only, PEX that can be used to install these wheels in a virtualenv. It
+    follows then, that this PEX should probably not be exported for use by end-users.
+    """
+
+    addresses: Addresses
+    interpreter_constraints: InterpreterConstraints
+    # The result will return these with the sources provided by the dists subtracted out.
+    # This will help the caller prevent sources from appearing twice on sys.path.
+    sources: PythonSourceFiles
+
+    def __init__(
+        self,
+        addresses: Iterable[Address],
+        *,
+        interpreter_constraints: InterpreterConstraints,
+        sources: PythonSourceFiles = PythonSourceFiles.empty(),
+    ) -> None:
+        object.__setattr__(self, "addresses", Addresses(addresses))
+        object.__setattr__(self, "interpreter_constraints", interpreter_constraints)
+        object.__setattr__(self, "sources", sources)
+
+
+@dataclass(frozen=True)
+class LocalDistsPEP660Pex:  # based on LocalDistsPex
+    """A PEX file populated by PEP660 wheels of local dists.
+
+    Can be consumed from another PEX, e.g., by adding to PEX_PATH.
+
+    The PEX will contain installs of PEP660 wheels generate4d from local dists. Installing PEP660
+    wheels creates an "editable" install such that the sys.path gets adjusted to include source
+    directories that are NOT part of the PEX. As such, this PEX is decidedly not hermetic or
+    portable and should only be used to facilitate building virtualenvs for development.
+
+    PEP660 wheels have .dist-info metadata and the .pth files (or similar) that adjust sys.path.
+
+    The PEX will only contain metadata for local dists and not any dependencies. For Pants generated
+    `setup.py` / `pyproject.toml`, the dependencies will be included in the standard resolve process
+    that the locally-built dists PEX is adjoined to via PEX_PATH. For hand-made `setup.py` /
+    `pyproject.toml` with 3rdparty dependencies not hand-mirrored into BUILD file dependencies, this
+    will lead to issues. See https://github.com/pantsbuild/pants/issues/13587#issuecomment-974863636
+    for one way to fix this corner which is intentionally punted on for now.
+
+    Lists the files provided by the dists on sys.path, so they can be subtracted from
+    sources digests, to prevent the same file ending up on sys.path twice.
+    """
+
+    pex: Pex
+    # The sources from the request, but with any files provided by the local dists subtracted out.
+    # In general, this will have a list of all of the dists' sources.
+    remaining_sources: PythonSourceFiles
+
+
+@rule(desc="Building editable local distributions (PEP 660)")
+async def build_editable_local_dists(  # based on build_local_dists
+    request: LocalDistsPEP660PexRequest,
+) -> LocalDistsPEP660Pex:
+    transitive_targets = await Get(TransitiveTargets, TransitiveTargetsRequest(request.addresses))
+    applicable_targets = [
+        tgt for tgt in transitive_targets.closure if PythonDistributionFieldSet.is_applicable(tgt)
+    ]
+
+    local_dists_wheels = await MultiGet(
+        Get(
+            LocalDistPEP660Wheels,
+            PythonDistributionFieldSet,
+            PythonDistributionFieldSet.create(target),
+        )
+        for target in applicable_targets
+    )
+
+    provided_files: set[str] = set()
+    wheels: list[str] = []
+    wheels_digests = []
+    for local_dist_wheels in local_dists_wheels:
+        wheels.extend(local_dist_wheels.pep660_wheel_paths)
+        wheels_digests.append(local_dist_wheels.pep660_wheels_digest)
+        provided_files.update(local_dist_wheels.provided_files)
+
+    wheels_digest = await Get(Digest, MergeDigests(wheels_digests))
+
+    editable_dists_pex = await Get(
+        Pex,
+        PexRequest(
+            output_filename="editable_local_dists.pex",
+            requirements=PexRequirements(wheels),
+            interpreter_constraints=request.interpreter_constraints,
+            additional_inputs=wheels_digest,
+            internal_only=True,
+            additional_args=["--intransitive"],
+        ),
+    )
+
+    if not wheels:
+        # The source calculations below are not (always) cheap, so we skip them if no wheels were
+        # produced. See https://github.com/pantsbuild/pants/issues/14561 for one possible approach
+        # to sharing the cost of these calculations.
+        return LocalDistsPEP660Pex(editable_dists_pex, request.sources)
+
+    # TODO: maybe DRY the logic duplicated here and in build_local_dists
+    # We check source roots in reverse lexicographic order,
+    # so we'll find the innermost root that matches.
+    source_roots = sorted(request.sources.source_roots, reverse=True)
+    remaining_sources = set(request.sources.source_files.files)
+    unrooted_files_set = set(request.sources.source_files.unrooted_files)
+    for source in request.sources.source_files.files:
+        if source not in unrooted_files_set:
+            for source_root in source_roots:
+                source_relpath = fast_relpath_optional(source, source_root)
+                if source_relpath is not None and source_relpath in provided_files:
+                    remaining_sources.remove(source)
+    remaining_sources_snapshot = await Get(
+        Snapshot,
+        DigestSubset(
+            request.sources.source_files.snapshot.digest, PathGlobs(sorted(remaining_sources))
+        ),
+    )
+    subtracted_sources = PythonSourceFiles(
+        SourceFiles(remaining_sources_snapshot, request.sources.source_files.unrooted_files),
+        request.sources.source_roots,
+    )
+
+    return LocalDistsPEP660Pex(editable_dists_pex, subtracted_sources)
 
 
 def rules():
