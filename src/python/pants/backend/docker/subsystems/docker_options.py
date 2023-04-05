@@ -33,7 +33,6 @@ class DockerOptions(Subsystem):
     help = "Options for interacting with Docker."
 
     class EnvironmentAware(ExecutableSearchPathsOptionMixin, Subsystem.EnvironmentAware):
-        env_vars_used_by_options = ("PATH",)
         _env_vars = ShellStrListOption(
             help=softwrap(
                 """

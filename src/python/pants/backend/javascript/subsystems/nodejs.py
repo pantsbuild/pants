@@ -121,8 +121,6 @@ class NodeJS(Subsystem, TemplatedExternalToolOptionsMixin):
         return await Get(DownloadedExternalTool, ExternalToolRequest(download_file, exe))
 
     class EnvironmentAware(ExecutableSearchPathsOptionMixin, Subsystem.EnvironmentAware):
-        env_vars_used_by_options = ("PATH",)
-
         search_path = StrListOption(
             default=["<PATH>"],
             help=lambda cls: help_text(

@@ -6,7 +6,7 @@ import logging
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable
+from typing import Any, ClassVar, Iterable
 
 from pants.base.build_environment import get_buildroot
 from pants.core.util_rules.environments import EnvironmentTarget, LocalEnvironmentTarget
@@ -147,6 +147,20 @@ async def validate_search_paths(request: ValidateSearchPathsRequest) -> Validate
 
 
 class ExecutableSearchPathsOptionMixin:
+    env_vars_used_by_options: ClassVar[tuple[str, ...]] = ("PATH",)
+
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        if "PATH" not in cls.env_vars_used_by_options:
+            raise ValueError(
+                softwrap(
+                    f"""
+                    {ExecutableSearchPathsOptionMixin.__name__} depends on the PATH environment variable.
+
+                    Please add it to the {cls.__name__}.env_vars_used_by_options.
+                    """
+                )
+            )
+
     executable_search_paths_help: str
     _options_env: EnvironmentVars
 

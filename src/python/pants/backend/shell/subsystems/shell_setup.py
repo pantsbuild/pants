@@ -29,8 +29,6 @@ class ShellSetup(Subsystem):
     )
 
     class EnvironmentAware(ExecutableSearchPathsOptionMixin, Subsystem.EnvironmentAware):
-        env_vars_used_by_options = ("PATH",)
-
         executable_search_paths_help = softwrap(
             """
             The PATH value that will be used to find shells
