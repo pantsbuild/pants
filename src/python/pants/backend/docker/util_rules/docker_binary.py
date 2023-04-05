@@ -9,6 +9,7 @@ from typing import Mapping
 
 from pants.backend.docker.subsystems.docker_options import DockerOptions
 from pants.backend.docker.util_rules.docker_build_args import DockerBuildArgs
+from pants.base.deprecated import warn_or_error
 from pants.core.util_rules.system_binaries import (
     BinaryPath,
     BinaryPathRequest,
@@ -120,14 +121,21 @@ class DockerBinary(BinaryPath):
 
 @dataclass(frozen=True)
 class DockerBinaryRequest:
-    pass
+    def __post_init__(self) -> None:
+        warn_or_error(
+            "2.18.0.dev0",
+            "using `Get(DockerBinary, DockerBinaryRequest)",
+            "Instead, simply use `Get(DockerBinary)` or put `DockerBinary` in the rule signature",
+        )
+
+
+async def find_docker(_: DockerBinaryRequest, docker: DockerBinary) -> DockerBinary:
+    return docker
 
 
 @rule(desc="Finding the `docker` binary and related tooling", level=LogLevel.DEBUG)
-async def find_docker(
-    docker_request: DockerBinaryRequest,
-    docker_options: DockerOptions,
-    docker_options_env_aware: DockerOptions.EnvironmentAware,
+async def get_docker(
+    docker_options: DockerOptions, docker_options_env_aware: DockerOptions.EnvironmentAware
 ) -> DockerBinary:
     env = await Get(EnvironmentVars, EnvironmentVarsRequest(["PATH"]))
     search_path = docker_options_env_aware.executable_search_path(env)
@@ -160,11 +168,6 @@ async def find_docker(
         extra_env=extra_env,
         extra_input_digests=extra_input_digests,
     )
-
-
-@rule
-async def get_docker() -> DockerBinary:
-    return await Get(DockerBinary, DockerBinaryRequest())
 
 
 def rules():

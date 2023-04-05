@@ -44,7 +44,7 @@ from pants.backend.python.util_rules.ancestor_files import AncestorFiles, Ancest
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.core import target_types
-from pants.core.target_types import AllAssetTargets, AllAssetTargetsByPath, AllAssetTargetsRequest
+from pants.core.target_types import AllAssetTargetsByPath
 from pants.core.util_rules import stripped_source_files
 from pants.engine.addresses import Address, Addresses
 from pants.engine.internals.graph import Owners, OwnersRequest
@@ -430,8 +430,7 @@ async def resolve_parsed_dependencies(
         resolve_results = {}
 
     if parsed_assets:
-        all_asset_targets = await Get(AllAssetTargets, AllAssetTargetsRequest())
-        assets_by_path = await Get(AllAssetTargetsByPath, AllAssetTargets, all_asset_targets)
+        assets_by_path = await Get(AllAssetTargetsByPath)
         asset_deps = _get_inferred_asset_deps(
             request.field_set.address,
             request.field_set.source.file_path,
