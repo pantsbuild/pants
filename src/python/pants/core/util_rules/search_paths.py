@@ -150,7 +150,7 @@ class ExecutableSearchPathsOptionMixin:
     executable_search_paths_help: str
     _options_env: EnvironmentVars
 
-    executable_search_paths = StrListOption(
+    _executable_search_paths = StrListOption(
         default=["<PATH>"],
         help=lambda cls: help_text(
             f"""
@@ -165,7 +165,7 @@ class ExecutableSearchPathsOptionMixin:
     @memoized_property
     def executable_search_path(self) -> tuple[str, ...]:
         def iter_path_entries():
-            for entry in self.executable_search_paths:
+            for entry in self._executable_search_paths:
                 if entry == "<PATH>":
                     path = self._options_env.get("PATH")
                     if path:
