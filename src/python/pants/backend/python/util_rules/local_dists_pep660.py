@@ -10,7 +10,13 @@ from collections import defaultdict
 from dataclasses import dataclass
 
 # TODO: move this to a util_rules file
-from pants.backend.python.goals.setup_py import create_dist_build_request
+from pants.backend.python.goals import setup_py
+from pants.backend.python.goals.setup_py import (
+    DependencyOwner,
+    ExportedTarget,
+    OwnedDependencies,
+    create_dist_build_request,
+)
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.subsystems.setuptools import PythonDistributionFieldSet
 from pants.backend.python.target_types import PythonProvidesField, PythonResolveField
@@ -38,7 +44,7 @@ from pants.engine.fs import (
 )
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import AllTargets, Target, WrappedTarget, WrappedTargetRequest
+from pants.engine.target import AllTargets, Target, Targets, WrappedTarget, WrappedTargetRequest
 from pants.engine.unions import UnionMembership
 from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
@@ -406,25 +412,52 @@ async def isolate_local_dist_pep660_wheels(  # based on isolate_local_dist_wheel
 
 @dataclass(frozen=True)
 class AllPythonDistributionTargets:
-    targets: FrozenDict[str | None, tuple[Target, ...]]
+    targets: Targets
 
 
 @rule(desc="Find all Python Distribution targets in project", level=LogLevel.DEBUG)
 def find_all_python_distributions(
     all_targets: AllTargets,
-    python_setup: PythonSetup,
 ) -> AllPythonDistributionTargets:
-    dists = defaultdict(list)
-    for tgt in all_targets:
-        # this is the field used in PythonDistributionFieldSet
-        if tgt.has_field(PythonProvidesField):
-            resolve = (
-                tgt.get(PythonResolveField).normalized_value(python_setup)
-                if python_setup.enable_resolves
-                else None
-            )
-            dists[resolve].append(tgt)
     return AllPythonDistributionTargets(
+        # 'provides' is the field used in PythonDistributionFieldSet
+        Targets(tgt for tgt in all_targets if tgt.has_field(PythonProvidesField))
+    )
+
+
+@dataclass(frozen=True)
+class ResolveSortedPythonDistributionTargets:
+    targets: FrozenDict[str | None, tuple[Target, ...]]
+
+
+@rule(
+    desc="Associate resolves with all Python Distribution targets in project", level=LogLevel.DEBUG
+)
+async def sort_all_python_distributions_by_resolve(
+    all_dists: AllPythonDistributionTargets,
+    python_setup: PythonSetup,
+) -> ResolveSortedPythonDistributionTargets:
+    dists = defaultdict(list)
+
+    if not python_setup.enable_resolves:
+        resolve = None
+        return ResolveSortedPythonDistributionTargets(
+            FrozenDict({resolve: tuple(all_dists.targets)})
+        )
+
+    dist_owned_deps = await MultiGet(
+        Get(OwnedDependencies, DependencyOwner(ExportedTarget(tgt))) for tgt in all_dists.targets
+    )
+
+    for dist, owned_deps in zip(all_dists.targets, dist_owned_deps):
+        resolve = None
+        # assumption: all owned deps are in the same resolve
+        for dep in owned_deps:
+            if dep.target.has_field(PythonResolveField):
+                resolve = dep.target[PythonResolveField].normalized_value(python_setup)
+                break
+        dists[resolve].append(dist)
+    return ResolveSortedPythonDistributionTargets(
         FrozenDict({resolve: tuple(targets) for resolve, targets in dists.items()})
     )
 
@@ -474,7 +507,7 @@ class LocalDistsPEP660Pex:  # based on LocalDistsPex
 @rule(desc="Building editable local distributions (PEP 660)")
 async def build_editable_local_dists(  # based on build_local_dists
     request: LocalDistsPEP660PexRequest,
-    all_dists: AllPythonDistributionTargets,
+    all_dists: ResolveSortedPythonDistributionTargets,
     python_setup: PythonSetup,
 ) -> LocalDistsPEP660Pex:
     resolve = request.resolve if python_setup.enable_resolves else None
@@ -516,5 +549,6 @@ def rules():
     return (
         *collect_rules(),
         *dists_rules(),
+        *setup_py.rules(),
         *system_binaries.rules(),
     )

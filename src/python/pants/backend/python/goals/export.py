@@ -12,7 +12,6 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, DefaultDict, Iterable, cast
 
-from pants.backend.python.goals.setup_py import rules as setup_py_rules
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import PexLayout, PythonResolveField
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
@@ -533,7 +532,6 @@ def rules():
     return [
         *collect_rules(),
         *local_dists_pep660_rules(),
-        *setup_py_rules(),
         Export.subsystem_cls.register_plugin_options(ExportPluginOptions),
         UnionRule(ExportRequest, ExportVenvsRequest),
     ]
