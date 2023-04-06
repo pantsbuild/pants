@@ -50,7 +50,7 @@ class Bandit(PythonToolBase):
 
     # When upgrading, check if Bandit has started using PEP 517 (a `pyproject.toml` file). If so,
     # remove `setuptools` from `default_extra_requirements`.
-    default_version = "bandit>=1.7.0,<1.8"
+    default_version = "bandit>=1.7.0,<2"
     default_extra_requirements = [
         "setuptools",
         # GitPython 3.1.20 was yanked because it breaks Python 3.8+, but Poetry's lockfile
