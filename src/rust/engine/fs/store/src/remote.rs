@@ -29,7 +29,7 @@ use remexec::{
 use tokio::io::{AsyncSeekExt, AsyncWrite, AsyncWriteExt};
 use tokio::sync::Mutex;
 use tonic::{Code, Request, Status};
-use workunit_store::{in_workunit, ObservationMetric};
+use workunit_store::{in_workunit, ObservationMetric, Metric};
 
 use crate::StoreError;
 
@@ -37,7 +37,6 @@ use crate::StoreError;
 pub struct ByteStore {
   instance_name: Option<String>,
   chunk_size_bytes: usize,
-  _upload_timeout: Duration,
   _rpc_attempts: usize,
   byte_stream_client: Arc<ByteStreamClient<LayeredService>>,
   cas_client: Arc<ContentAddressableStorageClient<LayeredService>>,
@@ -131,9 +130,9 @@ impl ByteStore {
     tls_config: grpc_util::tls::Config,
     mut headers: BTreeMap<String, String>,
     chunk_size_bytes: usize,
-    upload_timeout: Duration,
     rpc_retries: usize,
     rpc_concurrency_limit: usize,
+    rpc_timeout: Duration,
     capabilities_cell_opt: Option<Arc<OnceCell<ServerCapabilities>>>,
     batch_api_size_limit: usize,
   ) -> Result<ByteStore, String> {
@@ -150,7 +149,7 @@ impl ByteStore {
       tonic::transport::Channel::balance_list(vec![endpoint].into_iter()),
       rpc_concurrency_limit,
       http_headers,
-      None,
+      Some((rpc_timeout, Metric::RemoteStoreRequestTimeouts)),
     );
 
     let byte_stream_client = Arc::new(ByteStreamClient::new(channel.clone()));
@@ -162,7 +161,6 @@ impl ByteStore {
     Ok(ByteStore {
       instance_name,
       chunk_size_bytes,
-      _upload_timeout: upload_timeout,
       _rpc_attempts: rpc_retries + 1,
       byte_stream_client,
       cas_client,
