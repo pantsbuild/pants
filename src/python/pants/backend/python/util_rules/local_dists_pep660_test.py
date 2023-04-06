@@ -20,13 +20,12 @@ from pants.backend.python.util_rules.dists import BuildSystem, DistBuildRequest
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.local_dists_pep660 import (
     AllPythonDistributionTargets,
-    LocalDistsPEP660Pex,
-    LocalDistsPEP660PexRequest,
+    EditableLocalDists,
+    EditableLocalDistsRequest,
     PEP660BuildResult,
 )
 from pants.backend.python.util_rules.pex_from_targets import InterpreterConstraintsRequest
 from pants.backend.python.util_rules.pex_requirements import PexRequirements
-from pants.build_graph.address import Address
 from pants.engine.fs import CreateDigest, Digest, DigestContents, FileContent
 from pants.testutil.python_interpreter_selection import (
     skip_unless_python27_present,
@@ -47,7 +46,7 @@ def rule_runner() -> RuleRunner:
             *pex_from_targets.rules(),
             QueryRule(InterpreterConstraints, (InterpreterConstraintsRequest,)),
             QueryRule(AllPythonDistributionTargets, ()),
-            QueryRule(LocalDistsPEP660Pex, (LocalDistsPEP660PexRequest,)),
+            QueryRule(EditableLocalDists, (EditableLocalDistsRequest,)),
             QueryRule(PEP660BuildResult, (DistBuildRequest,)),
         ],
         target_types=[PythonSourcesGeneratorTarget, PythonDistribution],
@@ -136,36 +135,27 @@ def test_build_editable_local_dists(rule_runner: RuleRunner) -> None:
             ),
         }
     )
-    # all_dists = rule_runner.request(AllPythonDistributionTargets, ())
-    # assert not all_dists
-    addresses = [Address("foo", target_name="dist")]
-    interpreter_constraints = rule_runner.request(
-        InterpreterConstraints, [InterpreterConstraintsRequest(addresses)]
-    )
-    request = LocalDistsPEP660PexRequest(
-        interpreter_constraints=interpreter_constraints,
+    request = EditableLocalDistsRequest(
         resolve=None,  # resolves is disabled
     )
-    result = rule_runner.request(LocalDistsPEP660Pex, [request])
+    result = rule_runner.request(EditableLocalDists, [request])
 
-    assert result.pex is not None
-    contents = rule_runner.request(DigestContents, [result.pex.digest])
-    whl_content = None
-    for content in contents:
-        if content.path == "editable_local_dists.pex/.deps/foo-9.8.7-0.editable-py3-none-any.whl":
-            whl_content = content
+    assert result.optional_digest is not None
+    contents = rule_runner.request(DigestContents, [result.optional_digest])
+    assert len(contents) == 1
+    whl_content = contents[0]
     assert whl_content
+    assert whl_content.path == "foo-9.8.7-0.editable-py3-none-any.whl"
     with io.BytesIO(whl_content.content) as fp:
         with zipfile.ZipFile(fp, "r") as whl:
             whl_files = whl.namelist()
             # Check that sources are not present in editable wheel
             assert "foo/bar.py" not in whl_files
             assert "foo/qux.py" not in whl_files
-            # Once installed, wheel does not have RECORD
-            assert "foo-9.8.7.dist-info/RECORD" not in whl_files
             # Check that pth and metadata files are present in editable wheel
             assert "foo__pants__.pth" in whl_files
             assert "foo-9.8.7.dist-info/METADATA" in whl_files
+            assert "foo-9.8.7.dist-info/RECORD" in whl_files
             assert "foo-9.8.7.dist-info/WHEEL" in whl_files
             assert "foo-9.8.7.dist-info/direct_url__pants__.json" in whl_files
             assert "foo-9.8.7.dist-info/entry_points.txt" in whl_files

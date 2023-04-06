@@ -26,9 +26,7 @@ from pants.backend.python.util_rules.dists import (
     distutils_repr,
 )
 from pants.backend.python.util_rules.dists import rules as dists_rules
-from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.pex import Pex, PexRequest, VenvPex, VenvPexProcess
-from pants.backend.python.util_rules.pex_requirements import PexRequirements
+from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.base.build_root import BuildRoot
 from pants.core.util_rules import system_binaries
 from pants.core.util_rules.system_binaries import BashBinary, UnzipBinary
@@ -463,58 +461,47 @@ async def sort_all_python_distributions_by_resolve(
 
 
 @dataclass(frozen=True)
-class LocalDistsPEP660PexRequest:  # based on LocalDistsPexRequest
-    """Request to build a PEX populated by PEP660 wheels of local dists.
+class EditableLocalDistsRequest:
+    """Request toild generate PEP660 wheels of local dists in the given resolve.
 
-    Like LocalDistsPexRequest, the local dists come from the dependency closure of a set of
-    addresses. Unlike LocalDistsPexRequest, the editable wheel files must not be exported or made
-    available to the end-user (according to PEP 660). Instead, the PEP660Pex serves as an
-    intermediate, internal-only, PEX that can be used to install these wheels in a virtualenv. It
-    follows then, that this PEX should probably not be exported for use by end-users.
+    The editable wheel files must not be exported or made available to the end-user (according to
+    PEP 660). Instead, the PEP660 editable wheels serve as intermediate, internal-only,
+    representation of what should be installed in the exported virtualenv to create the editable
+    installs of local python_distributions.
     """
 
-    interpreter_constraints: InterpreterConstraints
     resolve: str | None  # None if resolves is not enabled
 
 
 @dataclass(frozen=True)
-class LocalDistsPEP660Pex:  # based on LocalDistsPex
-    """A PEX file populated by PEP660 wheels of local dists.
+class EditableLocalDists:
+    """A Digest populated by editable (PEP660) wheels of local dists.
 
-    Can be consumed from another PEX, e.g., by adding to PEX_PATH.
+    According to PEP660, these wheels should not be exported to users and must be discarded
+    after install. Anything that uses this should ensure that these wheels get installed and
+    then deleted.
 
-    The PEX will contain installs of PEP660 wheels generate4d from local dists. Installing PEP660
-    wheels creates an "editable" install such that the sys.path gets adjusted to include source
-    directories that are NOT part of the PEX. As such, this PEX is decidedly not hermetic or
-    portable and should only be used to facilitate building virtualenvs for development.
+    Installing PEP660 wheels creates an "editable" install such that the sys.path gets
+    adjusted to include source directories from the build root (not from the sandbox).
+    This is decidedly not hermetic or portable and should only be used locally.
 
     PEP660 wheels have .dist-info metadata and the .pth files (or similar) that adjust sys.path.
-
-    The PEX will only contain metadata for local dists and not any dependencies. For Pants generated
-    `setup.py` / `pyproject.toml`, the dependencies will be included in the standard resolve process
-    that the locally-built dists PEX is adjoined to via PEX_PATH. For hand-made `setup.py` /
-    `pyproject.toml` with 3rdparty dependencies not hand-mirrored into BUILD file dependencies, this
-    will lead to issues. See https://github.com/pantsbuild/pants/issues/13587#issuecomment-974863636
-    for one way to fix this corner which is intentionally punted on for now.
-
-    Lists the files provided by the dists on sys.path, so they can be subtracted from
-    sources digests, to prevent the same file ending up on sys.path twice.
     """
 
-    pex: Pex | None
+    optional_digest: Digest | None
 
 
 @rule(desc="Building editable local distributions (PEP 660)")
 async def build_editable_local_dists(  # based on build_local_dists
-    request: LocalDistsPEP660PexRequest,
+    request: EditableLocalDistsRequest,
     all_dists: ResolveSortedPythonDistributionTargets,
     python_setup: PythonSetup,
-) -> LocalDistsPEP660Pex:
+) -> EditableLocalDists:
     resolve = request.resolve if python_setup.enable_resolves else None
     resolve_dists = all_dists.targets.get(resolve, ())
 
     if not resolve_dists:
-        return LocalDistsPEP660Pex(None)
+        return EditableLocalDists(None)
 
     local_dists_wheels = await MultiGet(
         Get(
@@ -533,19 +520,7 @@ async def build_editable_local_dists(  # based on build_local_dists
 
     wheels_digest = await Get(Digest, MergeDigests(wheels_digests))
 
-    editable_dists_pex = await Get(
-        Pex,
-        PexRequest(
-            output_filename="editable_local_dists.pex",
-            requirements=PexRequirements(wheels),
-            interpreter_constraints=request.interpreter_constraints,
-            additional_inputs=wheels_digest,
-            internal_only=True,
-            additional_args=["--intransitive"],
-        ),
-    )
-
-    return LocalDistsPEP660Pex(editable_dists_pex)
+    return EditableLocalDists(wheels_digest)
 
 
 def rules():

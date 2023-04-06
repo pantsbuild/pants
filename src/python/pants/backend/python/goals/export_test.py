@@ -208,7 +208,11 @@ def test_export_venv_new_codepath(
             assert ppc1.argv[3] == "{digest_root}"
             assert ppc1.extra_env == FrozenDict()
         else:
-            assert len(result.post_processing_cmds) == 2
+            if resolve == "flake8":
+                assert len(result.post_processing_cmds) == 2
+            else:
+                # editable wheels are installed for a user resolve
+                assert len(result.post_processing_cmds) == 5
 
             ppc0 = result.post_processing_cmds[0]
             # The first arg is the full path to the python interpreter, which we
@@ -233,7 +237,7 @@ def test_export_venv_new_codepath(
             assert ppc0.extra_env["PEX_MODULE"] == "pex.tools"
             assert ppc0.extra_env.get("PEX_ROOT") is not None
 
-            ppc1 = result.post_processing_cmds[1]
+            ppc1 = result.post_processing_cmds[-1]
             assert ppc1.argv == ("rm", "-rf", tmpdir)
             assert ppc1.extra_env == FrozenDict()
 
