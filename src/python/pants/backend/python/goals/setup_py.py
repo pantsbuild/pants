@@ -257,7 +257,7 @@ class SetupKwargs:
         object.__setattr__(
             self,
             "_pickled_bytes",
-            pickle.dumps({k: v for k, v in sorted(kwargs.items())}, protocol=4),
+            pickle.dumps(dict(sorted(kwargs.items())), protocol=4),
         )
 
     @memoized_property

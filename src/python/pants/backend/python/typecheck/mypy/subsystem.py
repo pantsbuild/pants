@@ -47,7 +47,6 @@ from pants.engine.fs import EMPTY_DIGEST, Digest, DigestContents, FileContent
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import (
     AllTargets,
-    AllTargetsRequest,
     FieldSet,
     Target,
     TransitiveTargets,
@@ -415,7 +414,7 @@ async def setup_mypy_extra_type_stubs_lockfile(
     #
     # This first finds the ICs of each partition. Then, it ORs all unique resulting interpreter
     # constraints. The net effect is that every possible Python interpreter used will be covered.
-    all_tgts = await Get(AllTargets, AllTargetsRequest())
+    all_tgts = await Get(AllTargets)
     all_field_sets = [
         MyPyFieldSet.create(tgt) for tgt in all_tgts if MyPyFieldSet.is_applicable(tgt)
     ]

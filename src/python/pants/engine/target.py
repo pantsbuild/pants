@@ -1021,6 +1021,13 @@ class AllTargetsRequest:
     Use with either `AllUnexpandedTargets` or `AllTargets`.
     """
 
+    def __post_init__(self) -> None:
+        warn_or_error(
+            "2.18.0.dev0",
+            "using `Get(AllTargets, AllTargetsRequest)",
+            "Instead, simply use `Get(AllTargets)` or put `AllTargets` in the rule signature",
+        )
+
 
 # -----------------------------------------------------------------------------------------------
 # Target generation
@@ -1978,7 +1985,7 @@ class SourcesField(AsyncFieldMixin, Field):
         """
         if self.expected_file_extensions is not None:
             bad_files = [
-                fp for fp in files if not PurePath(fp).suffix in self.expected_file_extensions
+                fp for fp in files if PurePath(fp).suffix not in self.expected_file_extensions
             ]
             if bad_files:
                 expected = (

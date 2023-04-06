@@ -13,6 +13,7 @@ from enum import Enum
 from textwrap import dedent  # noqa: PNT20
 from typing import Iterable, Mapping, Sequence
 
+from pants.base.deprecated import warn_or_error
 from pants.core.subsystems import python_bootstrap
 from pants.core.subsystems.python_bootstrap import PythonBootstrap
 from pants.core.util_rules.environments import EnvironmentTarget
@@ -251,6 +252,13 @@ class BashBinary(BinaryPath):
 class BashBinaryRequest:
     search_path: SearchPath = BashBinary.DEFAULT_SEARCH_PATH
 
+    def __post_init__(self) -> None:
+        warn_or_error(
+            "2.18.0.dev0",
+            "using `Get(BashBinary, BashBinaryRequest)",
+            "Instead, simply use `Get(BashBinary)` or put `BashBinary` in the rule signature.",
+        )
+
 
 class PythonBinary(BinaryPath):
     """A Python3 interpreter for use by `@rule` code as an alternative to BashBinary scripts.
@@ -466,10 +474,15 @@ def _create_shim(bash: str, binary: str) -> bytes:
 
 
 @rule(desc="Finding the `bash` binary", level=LogLevel.DEBUG)
-async def find_bash(bash_request: BashBinaryRequest) -> BashBinary:
+async def find_bash(_: BashBinaryRequest, bash_binary: BashBinary) -> BashBinary:
+    return bash_binary
+
+
+@rule(desc="Finding the `bash` binary", level=LogLevel.DEBUG)
+async def get_bash() -> BashBinary:
     request = BinaryPathRequest(
         binary_name="bash",
-        search_path=bash_request.search_path,
+        search_path=BashBinary.DEFAULT_SEARCH_PATH,
         test=BinaryPathTest(args=["--version"]),
     )
     paths = await Get(BinaryPaths, BinaryPathRequest, request)
@@ -477,12 +490,6 @@ async def find_bash(bash_request: BashBinaryRequest) -> BashBinary:
     if not first_path:
         raise BinaryNotFoundError.from_request(request)
     return BashBinary(first_path.path, first_path.fingerprint)
-
-
-@rule
-async def get_bash() -> BashBinary:
-    # Expose bash to external consumers.
-    return await Get(BashBinary, BashBinaryRequest())
 
 
 @rule
@@ -495,7 +502,7 @@ async def find_binary(request: BinaryPathRequest, env_target: EnvironmentTarget)
     if request.binary_name == "bash":
         shebang = "#!/usr/bin/env bash"
     else:
-        bash = await Get(BashBinary, BashBinaryRequest())
+        bash = await Get(BashBinary)
         shebang = f"#!{bash.path}"
 
     script_path = "./find_binary.sh"
@@ -781,57 +788,106 @@ async def find_git() -> GitBinary:
 
 
 # -------------------------------------------------------------------------------------------
-# Rules for lazy requests
-# TODO(#12946): Get rid of this when it becomes possible to use `Get()` with only one arg.
+# (Deprecated). Rules for lazy requests
 # -------------------------------------------------------------------------------------------
 
 
 @dataclass(frozen=True)
 class ZipBinaryRequest:
-    pass
+    def __post_init__(self) -> None:
+        warn_or_error(
+            "2.18.0.dev0",
+            "using `Get(ZipBinary, ZipBinaryRequest)",
+            "Instead, simply use `Get(ZipBinary)` or put `ZipBinary` in the rule signature",
+        )
 
 
 @dataclass(frozen=True)
 class UnzipBinaryRequest:
-    pass
+    def __post_init__(self) -> None:
+        warn_or_error(
+            "2.18.0.dev0",
+            "using `Get(UnzipBinary, UnzipBinaryRequest)",
+            "Instead, simply use `Get(UnipBinary)` or put `UnzipBinary` in the rule signature",
+        )
 
 
 @dataclass(frozen=True)
 class GunzipBinaryRequest:
-    pass
+    def __post_init__(self) -> None:
+        warn_or_error(
+            "2.18.0.dev0",
+            "using `Get(GunzipBinary, GunzipBinaryRequest)",
+            "Instead, simply use `Get(GunzipBinary)` or put `GunzipBinary` in the rule signature",
+        )
 
 
 class CatBinaryRequest:
-    pass
+    def __post_init__(self) -> None:
+        warn_or_error(
+            "2.18.0.dev0",
+            "using `Get(CatBinary, CatBinaryRequest)",
+            "Instead, simply use `Get(CatBinary)` or put `CatBinary` in the rule signature",
+        )
 
 
 class TarBinaryRequest:
-    pass
+    def __post_init__(self) -> None:
+        warn_or_error(
+            "2.18.0.dev0",
+            "using `Get(TarBinary, TarBinaryRequest)",
+            "Instead, simply use `Get(TarBinary)` or put `TarBinary` in the rule signature",
+        )
 
 
 @dataclass(frozen=True)
 class MkdirBinaryRequest:
-    pass
+    def __post_init__(self) -> None:
+        warn_or_error(
+            "2.18.0.dev0",
+            "using `Get(MkdirBinary, MkdirBinaryRequest)",
+            "Instead, simply use `Get(MkdirBinary)` or put `MkdirBinary` in the rule signature",
+        )
 
 
 @dataclass(frozen=True)
 class ChmodBinaryRequest:
-    pass
+    def __post_init__(self) -> None:
+        warn_or_error(
+            "2.18.0.dev0",
+            "using `Get(ChmodBinary, ChmodBinaryRequest)",
+            "Instead, simply use `Get(ChmodBinary)` or put `ChmodBinary` in the rule signature",
+        )
 
 
 @dataclass(frozen=True)
 class DiffBinaryRequest:
-    pass
+    def __post_init__(self) -> None:
+        warn_or_error(
+            "2.18.0.dev0",
+            "using `Get(DiffBinary, DiffBinaryRequest)",
+            "Instead, simply use `Get(DiffBinary)` or put `DiffBinary` in the rule signature",
+        )
 
 
 @dataclass(frozen=True)
 class ReadlinkBinaryRequest:
-    pass
+    def __post_init__(self) -> None:
+        warn_or_error(
+            "2.18.0.dev0",
+            "using `Get(ReadlinkBinary, ReadlinkBinaryRequest)",
+            "Instead, simply use `Get(ReadlinkBinary)` or put `ReadlinkBinary` in the rule signature",
+        )
 
 
 @dataclass(frozen=True)
 class GitBinaryRequest:
-    pass
+    def __post_init__(self) -> None:
+        warn_or_error(
+            "2.18.0.dev0",
+            "using `Get(GitBinary, GitBinaryRequest)",
+            "Instead, simply use `Get(GitBinary)` or put `GitBinary` in the rule signature",
+        )
 
 
 @rule

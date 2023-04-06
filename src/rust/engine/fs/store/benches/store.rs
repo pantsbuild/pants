@@ -321,7 +321,7 @@ fn tempdir_containing(max_files: usize, file_target_size: usize) -> (TempDir, Ve
     // We use the (repeated) path as the content as well.
     let abs_path = tempdir.path().join(path.path());
     if let Some(parent) = abs_path.parent() {
-      fs::safe_create_dir_all(parent).unwrap();
+      std::fs::create_dir_all(parent).unwrap();
     }
     let mut f = BufWriter::new(std::fs::File::create(abs_path).unwrap());
     let bytes = path.path().as_os_str().as_bytes();

@@ -47,7 +47,6 @@ def test_deprecation_and_ignore_warnings(use_pantsd: bool) -> None:
         """\
         from pants.option.subsystem import Subsystem
         from pants.option.option_types import StrOption
-        from pants.engine.rules import SubsystemRule
 
         class Options(Subsystem):
             help = "Options just for a test."
@@ -61,7 +60,7 @@ def test_deprecation_and_ignore_warnings(use_pantsd: bool) -> None:
             )
 
         def rules():
-            return [SubsystemRule(Options)]
+            return [*Options.rules()]
         """
     )
     with setup_tmpdir(

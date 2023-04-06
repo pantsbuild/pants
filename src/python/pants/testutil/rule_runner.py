@@ -256,6 +256,7 @@ class RuleRunner:
         rules: Iterable | None = None,
         target_types: Iterable[type[Target]] | None = None,
         objects: dict[str, Any] | None = None,
+        aliases: Iterable[BuildFileAliases] | None = None,
         context_aware_object_factories: dict[str, Any] | None = None,
         isolated_local_store: bool = False,
         preserve_tmpdirs: bool = False,
@@ -306,6 +307,10 @@ class RuleRunner:
                 objects=objects, context_aware_object_factories=context_aware_object_factories
             )
         )
+        aliases = aliases or ()
+        for build_file_aliases in aliases:
+            build_config_builder.register_aliases(build_file_aliases)
+
         build_config_builder.register_rules("_dummy_for_test_", all_rules)
         build_config_builder.register_target_types("_dummy_for_test_", target_types or ())
         self.build_config = build_config_builder.create()

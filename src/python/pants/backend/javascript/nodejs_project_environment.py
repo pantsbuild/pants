@@ -24,6 +24,7 @@ from pants.engine.process import Process
 from pants.engine.rules import Rule, collect_rules, rule
 from pants.engine.target import Target
 from pants.engine.unions import UnionRule
+from pants.util.dirutil import fast_relpath
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 
@@ -71,7 +72,7 @@ class NodeJsProjectEnvironment:
 
     def relative_workspace_directory(self) -> str:
         target = self.ensure_target()
-        from_root_to_workspace = os.path.relpath(target.residence_dir, self.root_dir)
+        from_root_to_workspace = fast_relpath(target.residence_dir, self.root_dir)
         return from_root_to_workspace
 
     def ensure_target(self) -> Target:
@@ -90,6 +91,8 @@ class NodeJsProjectEnvironmentProcess:
     output_files: tuple[str, ...] = ()
     output_directories: tuple[str, ...] = ()
     per_package_caches: FrozenDict[str, str] = field(default_factory=FrozenDict)
+    timeout_seconds: int | None = None
+    extra_env: FrozenDict[str, str] = field(default_factory=FrozenDict)
 
 
 @rule(desc="Assembling nodejs project environment")
@@ -114,17 +117,10 @@ async def setup_nodejs_project_environment_process(req: NodeJsProjectEnvironment
     if not req.env.project.single_workspace and req.env.target:
         target = req.env.ensure_target()
         args = ("--workspace", target[NodePackageNameField].value, *req.args)
-        from_root_to_workspace = req.env.relative_workspace_directory()
-        output_files = tuple(
-            os.path.join(from_root_to_workspace, file) for file in req.output_files
-        )
-        output_directories = tuple(
-            os.path.join(from_root_to_workspace, directory) for directory in req.output_directories
-        )
     else:
         args = tuple(req.args)
-        output_files = req.output_files
-        output_directories = req.output_directories
+    output_files = req.output_files
+    output_directories = req.output_directories
     per_package_caches = FrozenDict(
         {
             key: os.path.join(req.env.package_dir(), value)
@@ -143,6 +139,8 @@ async def setup_nodejs_project_environment_process(req: NodeJsProjectEnvironment
             output_files=output_files,
             output_directories=output_directories,
             append_only_caches=per_package_caches,
+            timeout_seconds=req.timeout_seconds,
+            extra_env=req.extra_env,
         ),
     )
 

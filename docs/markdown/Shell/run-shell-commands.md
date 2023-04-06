@@ -11,7 +11,7 @@ The [`shell_command`](doc:reference-shell_command) target allows you to run any 
 shell_command(
     command="./my-script.sh download some-archive.tar.gz",
     tools=["curl", "env", "bash", "mkdir", "tar"],
-    outputs=["files/"],
+    output_directories=["files"],
     dependencies=[":shell-scripts", ":images"]
 )
 

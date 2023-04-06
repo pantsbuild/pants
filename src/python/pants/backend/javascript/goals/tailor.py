@@ -3,12 +3,19 @@
 
 from __future__ import annotations
 
+import dataclasses
 import os
 from dataclasses import dataclass
-from typing import Iterable
+from pathlib import PurePath
+from typing import Collection, Iterable
 
 from pants.backend.javascript.package_json import PackageJsonTarget
-from pants.backend.javascript.target_types import JS_FILE_EXTENSIONS, JSSourcesGeneratorTarget
+from pants.backend.javascript.target_types import (
+    JS_FILE_EXTENSIONS,
+    JSSourcesGeneratorTarget,
+    JSTestsGeneratorSourcesField,
+    JSTestsGeneratorTarget,
+)
 from pants.core.goals.tailor import (
     AllOwnedSources,
     PutativeTarget,
@@ -34,10 +41,23 @@ class PutativePackageJsonTargetsRequest(PutativeTargetsRequest):
     pass
 
 
-def classify_source_files(paths: Iterable[str]) -> dict[type[Target], set[str]]:
-    """Returns a dict of target type -> files that belong to targets of that type."""
+@dataclass(frozen=True)
+class _ClassifiedSources:
+    target_type: type[Target]
+    files: Collection[str]
+    name: str | None = None
+
+
+def classify_source_files(paths: Iterable[str]) -> Iterable[_ClassifiedSources]:
     sources_files = set(paths)
-    return {JSSourcesGeneratorTarget: sources_files}
+    test_file_glob = JSTestsGeneratorSourcesField.default
+    test_files = {
+        path for path in paths if any(PurePath(path).match(glob) for glob in test_file_glob)
+    }
+    if sources_files:
+        yield _ClassifiedSources(JSSourcesGeneratorTarget, files=sources_files - test_files)
+    if test_files:
+        yield _ClassifiedSources(JSTestsGeneratorTarget, test_files, "tests")
 
 
 async def _get_unowned_files_for_globs(
@@ -61,16 +81,13 @@ async def find_putative_js_targets(
     )
     classified_unowned_js_files = classify_source_files(unowned_js_files)
 
-    putative_targets = []
-    for tgt_type, paths in classified_unowned_js_files.items():
-        for dirname, filenames in group_by_dir(paths).items():
-            putative_targets.append(
-                PutativeTarget.for_target_type(
-                    tgt_type, path=dirname, name=None, triggering_sources=sorted(filenames)
-                )
-            )
-
-    return PutativeTargets(putative_targets)
+    return PutativeTargets(
+        PutativeTarget.for_target_type(
+            tgt_type, path=dirname, name=name, triggering_sources=sorted(filenames)
+        )
+        for tgt_type, paths, name in map(dataclasses.astuple, classified_unowned_js_files)
+        for dirname, filenames in group_by_dir(paths).items()
+    )
 
 
 @rule(level=LogLevel.DEBUG, desc=_LOG_DESCRIPTION_TEMPLATE.format("package.json targets"))

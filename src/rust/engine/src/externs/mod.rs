@@ -10,7 +10,7 @@ use std::convert::TryInto;
 use std::fmt;
 
 use lazy_static::lazy_static;
-use pyo3::exceptions::{PyException, PyTypeError};
+use pyo3::exceptions::{PyAssertionError, PyException, PyTypeError};
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict, PyTuple, PyType};
 use pyo3::{create_exception, import_exception, intern};
@@ -350,7 +350,7 @@ impl PyGeneratorResponseGet {
   fn __new__(
     py: Python,
     product: &PyAny,
-    input_arg0: &PyAny,
+    input_arg0: Option<&PyAny>,
     input_arg1: Option<&PyAny>,
   ) -> PyResult<Self> {
     let product = product.cast_as::<PyType>().map_err(|_| {
@@ -362,63 +362,75 @@ impl PyGeneratorResponseGet {
     })?;
     let output = TypeId::new(product);
 
-    let (input_types, inputs) = if let Some(input_arg1) = input_arg1 {
-      let declared_type = input_arg0.cast_as::<PyType>().map_err(|_| {
-        let input_arg0_type = input_arg0.get_type();
-        PyTypeError::new_err(format!(
-          "Invalid Get. Because you are using the longhand form Get(OutputType, InputType, \
-          input), the second argument must be a type, but given `{input_arg0}` of type \
-          {input_arg0_type}."
+    let (input_types, inputs) = match (input_arg0, input_arg1) {
+      (None, None) => (smallvec![], smallvec![]),
+      (None, Some(_)) => {
+        return Err(PyAssertionError::new_err(
+          "input_arg1 set, but input_arg0 was None. This should not happen with PyO3.",
         ))
-      })?;
-
-      if input_arg1.is_instance_of::<PyType>()? {
-        return Err(PyTypeError::new_err(format!(
-          "Invalid Get. Because you are using the longhand form \
-          Get(OutputType, InputType, input), the third argument should be \
-          an object, rather than a type, but given {input_arg1}."
-        )));
       }
-
-      let actual_type = input_arg1.get_type();
-      if !declared_type.is(actual_type) && !is_union(py, declared_type)? {
-        return Err(PyTypeError::new_err(format!(
-          "Invalid Get. The third argument `{input_arg1}` must have the exact same type as the \
-          second argument, {declared_type}, but had the type {actual_type}."
-        )));
-      }
-
-      (
-        smallvec![TypeId::new(declared_type)],
-        smallvec![INTERNS.key_insert(py, input_arg1.into())?],
-      )
-    } else if input_arg0.is_instance_of::<PyType>()? {
-      return Err(PyTypeError::new_err(format!(
-        "Invalid Get. Because you are using the shorthand form \
-          Get(OutputType, InputType(constructor args)), the second argument should be \
-          a constructor call, rather than a type, but given {input_arg0}."
-      )));
-    } else if let Ok(d) = input_arg0.cast_as::<PyDict>() {
-      let mut input_types = SmallVec::new();
-      let mut inputs = SmallVec::new();
-      for (value, declared_type) in d.iter() {
-        input_types.push(TypeId::new(declared_type.cast_as::<PyType>().map_err(
-          |_| {
-            PyTypeError::new_err(
+      (Some(input_arg0), None) => {
+        if input_arg0.is_instance_of::<PyType>()? {
+          return Err(PyTypeError::new_err(format!(
+            "Invalid Get. Because you are using the shorthand form \
+            Get(OutputType, InputType(constructor args)), the second argument should be \
+            a constructor call, rather than a type, but given {input_arg0}."
+          )));
+        }
+        if let Ok(d) = input_arg0.cast_as::<PyDict>() {
+          let mut input_types = SmallVec::new();
+          let mut inputs = SmallVec::new();
+          for (value, declared_type) in d.iter() {
+            input_types.push(TypeId::new(declared_type.cast_as::<PyType>().map_err(
+              |_| {
+                PyTypeError::new_err(
               "Invalid Get. Because the second argument was a dict, we expected the keys of the \
             dict to be the Get inputs, and the values of the dict to be the declared \
             types of those inputs.",
             )
-          },
-        )?));
-        inputs.push(INTERNS.key_insert(py, value.into())?);
+              },
+            )?));
+            inputs.push(INTERNS.key_insert(py, value.into())?);
+          }
+          (input_types, inputs)
+        } else {
+          (
+            smallvec![TypeId::new(input_arg0.get_type())],
+            smallvec![INTERNS.key_insert(py, input_arg0.into())?],
+          )
+        }
       }
-      (input_types, inputs)
-    } else {
-      (
-        smallvec![TypeId::new(input_arg0.get_type())],
-        smallvec![INTERNS.key_insert(py, input_arg0.into())?],
-      )
+      (Some(input_arg0), Some(input_arg1)) => {
+        let declared_type = input_arg0.cast_as::<PyType>().map_err(|_| {
+          let input_arg0_type = input_arg0.get_type();
+          PyTypeError::new_err(format!(
+            "Invalid Get. Because you are using the longhand form Get(OutputType, InputType, \
+          input), the second argument must be a type, but given `{input_arg0}` of type \
+          {input_arg0_type}."
+          ))
+        })?;
+
+        if input_arg1.is_instance_of::<PyType>()? {
+          return Err(PyTypeError::new_err(format!(
+            "Invalid Get. Because you are using the longhand form \
+          Get(OutputType, InputType, input), the third argument should be \
+          an object, rather than a type, but given {input_arg1}."
+          )));
+        }
+
+        let actual_type = input_arg1.get_type();
+        if !declared_type.is(actual_type) && !is_union(py, declared_type)? {
+          return Err(PyTypeError::new_err(format!(
+            "Invalid Get. The third argument `{input_arg1}` must have the exact same type as the \
+          second argument, {declared_type}, but had the type {actual_type}."
+          )));
+        }
+
+        (
+          smallvec![TypeId::new(declared_type)],
+          smallvec![INTERNS.key_insert(py, input_arg1.into())?],
+        )
+      }
     };
 
     Ok(Self(RefCell::new(Some(Get {

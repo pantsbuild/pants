@@ -406,6 +406,8 @@ class PyGeneratorResponseGet(Generic[_Output]):
     inputs: Sequence[Any]
 
     @overload
+    def __init__(self, output_type: type[_Output]) -> None: ...
+    @overload
     def __init__(
         self,
         output_type: type[_Output],

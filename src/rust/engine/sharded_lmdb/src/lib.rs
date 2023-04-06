@@ -220,7 +220,7 @@ impl ShardedLmdb {
     let mut envs = Vec::with_capacity(shard_count as usize);
     for b in 0..shard_count {
       let dir = root_path.join(format!("{b:x}"));
-      fs::safe_create_dir_all(&dir)
+      std::fs::create_dir_all(&dir)
         .map_err(|err| format!("Error making directory for store at {dir:?}: {err:?}"))?;
       let fingerprint_prefix = b.rotate_left(shard_shift as u32);
       envs.push((

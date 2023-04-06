@@ -341,7 +341,7 @@ class ProjectVersionGitTagMismatch(ValueError):
 @goal_rule
 async def goal_show_project_version(...) -> ProjectVersionGoal:
     ...
-    git_repo_version = await Get(GitTagVersion, {})
+    git_repo_version = await Get(GitTagVersion)
     ...
     if git_repo_version != result.version:
         raise ProjectVersionGitTagMismatch(
@@ -544,7 +544,7 @@ async def goal_show_project_version(
         Get(ProjectVersionFileView, ProjectVersionTarget, target) for target in targets
     )
     if project_version_subsystem.match_git:
-        git_repo_version = await Get(GitTagVersion, {})
+        git_repo_version = await Get(GitTagVersion)
 
     for result in results:
         try:

@@ -7,7 +7,7 @@ import pytest
 
 from pants.backend.python.dependency_inference import parse_python_dependencies
 from pants.backend.python.framework.django import dependency_inference, detect_apps
-from pants.backend.python.framework.django.detect_apps import DjangoApps, DjangoAppsRequest
+from pants.backend.python.framework.django.detect_apps import DjangoApps
 from pants.backend.python.target_types import PythonSourceTarget
 from pants.backend.python.util_rules import pex
 from pants.core.util_rules import stripped_source_files
@@ -35,7 +35,7 @@ def rule_runner() -> RuleRunner:
             *pex.rules(),
             *dependency_inference.rules(),
             *detect_apps.rules(),
-            QueryRule(DjangoApps, [DjangoAppsRequest, EnvironmentName]),
+            QueryRule(DjangoApps, [EnvironmentName]),
         ],
         target_types=[PythonSourceTarget],
     )
@@ -112,7 +112,7 @@ def assert_apps_detected(
     )
     result = rule_runner.request(
         DjangoApps,
-        [DjangoAppsRequest()],
+        [],
     )
     assert result == DjangoApps(
         FrozenDict({"app1": "path.to.app1", "app2_label": "another.path.app2", "app3": "some.app3"})

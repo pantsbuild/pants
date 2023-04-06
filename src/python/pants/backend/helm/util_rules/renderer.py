@@ -347,6 +347,7 @@ async def setup_render_helm_deployment_process(
             *(("--skip-crds",) if request.field_set.skip_crds.value else ()),
             *(("--no-hooks",) if request.field_set.no_hooks.value else ()),
             *(("--output-dir", output_dir) if output_dir else ()),
+            *(("--enable-dns",) if request.field_set.enable_dns.value else ()),
             *(
                 ("--post-renderer", os.path.join(".", request.post_renderer.exe))
                 if request.post_renderer

@@ -780,7 +780,7 @@ class BootstrapOptions:
     )
     pants_bin_name = StrOption(
         advanced=True,
-        default="./pants",  # noqa: PANTSBIN
+        default="pants",  # noqa: PANTSBIN
         help=softwrap(
             """
             The name of the script or binary used to invoke Pants.
@@ -812,7 +812,7 @@ class BootstrapOptions:
         advanced=True,
         metavar="<dir>",
         default=lambda _: os.path.join(get_buildroot(), "dist"),
-        help="Write end products, such as the results of `./pants package`, to this dir.",  # noqa: PANTSBIN
+        help="Write end products, such as the results of `pants package`, to this dir.",  # noqa: PANTSBIN
     )
     pants_subprocessdir = StrOption(
         advanced=True,
@@ -899,8 +899,10 @@ class BootstrapOptions:
             """
             Paths to ignore for all filesystem operations performed by pants
             (e.g. BUILD file scanning, glob matching, etc).
+
             Patterns use the gitignore syntax (https://git-scm.com/docs/gitignore).
             The `pants_distdir` and `pants_workdir` locations are automatically ignored.
+
             `pants_ignore` can be used in tandem with `pants_ignore_use_gitignore`; any rules
             specified here are applied after rules specified in a .gitignore file.
             """
@@ -911,9 +913,15 @@ class BootstrapOptions:
         default=True,
         help=softwrap(
             """
-            Make use of a root .gitignore file when determining whether to ignore filesystem
-            operations performed by Pants. If used together with `--pants-ignore`, any exclude/include
-            patterns specified there apply after .gitignore rules.
+            Include patterns from `.gitignore`, `.git/info/exclude`, and the global gitignore
+            files in the option `[GLOBAL].pants_ignore`, which is used for Pants to ignore
+            filesystem operations on those patterns.
+
+            Patterns from `[GLOBAL].pants_ignore` take precedence over these files' rules. For
+            example, you can use `!my_pattern` in `pants_ignore` to have Pants operate on files
+            that are gitignored.
+
+            Warning: this does not yet support reading nested gitignore files.
             """
         ),
     )

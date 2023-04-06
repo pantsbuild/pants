@@ -363,7 +363,7 @@ impl FilespecMatcher {
   }
 
   pub fn exclude_globs(&self) -> &[String] {
-    self.excludes.patterns.as_slice()
+    self.excludes.exclude_patterns()
   }
 }
 
