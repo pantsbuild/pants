@@ -3,12 +3,17 @@
 
 from __future__ import annotations
 
-import collections
+import collections, collections.abc
 import json
 from dataclasses import asdict, dataclass, is_dataclass
 from typing import Any, Iterable, Mapping
 
 from typing_extensions import Protocol, runtime_checkable
+from pants.core.goals.deploy import DeployFieldSet
+from pants.core.goals.package import PackageFieldSet
+from pants.core.goals.publish import PublishFieldSet
+from pants.core.goals.run import RunFieldSet
+from pants.core.goals.test import TestFieldSet
 
 from pants.engine.addresses import Addresses
 from pants.engine.collection import Collection
@@ -17,7 +22,7 @@ from pants.engine.fs import Snapshot
 from pants.engine.goal import Goal, GoalSubsystem, Outputting
 from pants.engine.internals.build_files import _get_target_family_and_adaptor_for_dep_rules
 from pants.engine.internals.dep_rules import DependencyRuleApplication, DependencyRuleSet
-from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
+from pants.engine.rules import Get, MultiGet, Rule, collect_rules, goal_rule, rule
 from pants.engine.target import (
     Dependencies,
     DependenciesRequest,
@@ -26,13 +31,19 @@ from pants.engine.target import (
     Field,
     HydratedSources,
     HydrateSourcesRequest,
+    NoApplicableTargetsBehavior,
     SourcesField,
     Target,
+    TargetRootsToFieldSets,
+    TargetRootsToFieldSetsRequest,
     Targets,
     UnexpandedTargets,
 )
 from pants.option.option_types import BoolOption
 from pants.util.strutil import softwrap
+
+import logging
+logger = logging.getLogger(__name__)
 
 
 @runtime_checkable
@@ -64,6 +75,16 @@ class PeekSubsystem(Outputting, GoalSubsystem):
         ),
     )
 
+    include_goals = BoolOption(
+        default=False,
+        help=softwrap(
+            """
+            Whether to include the goals that apply to the target and its dependencies. These are the
+            embedded in JSON as `goals`.
+            """
+        ),
+    )
+
 
 class Peek(Goal):
     subsystem_cls = PeekSubsystem
@@ -87,6 +108,8 @@ class TargetData:
     dependents_rules: tuple[str, ...] | None = None
     applicable_dep_rules: tuple[DependencyRuleApplication, ...] | None = None
 
+    goals: tuple[str, ...] | None = None
+
     def to_dict(self, exclude_defaults: bool = False, include_dep_rules: bool = False) -> dict:
         nothing = object()
         fields = {
@@ -106,6 +129,9 @@ class TargetData:
             fields["_dependencies_rules"] = self.dependencies_rules
             fields["_dependents_rules"] = self.dependents_rules
             fields["_applicable_dep_rules"] = self.applicable_dep_rules
+
+        if self.goals is not None:
+            fields["goals"] = self.goals
 
         return {
             "address": self.target.address.spec,
@@ -164,6 +190,7 @@ async def get_target_data(
     # NB: We must preserve target generators, not replace with their generated targets.
     targets: UnexpandedTargets,
     subsys: PeekSubsystem,
+    
 ) -> TargetDatas:
     sorted_targets = sorted(targets, key=lambda tgt: tgt.address)
 
@@ -232,6 +259,23 @@ async def get_target_data(
             for application in all_applicable_dep_rules
         }
 
+    packagable_target_aliases = None
+    testable_target_aliases = None
+    if subsys.include_goals:
+        peekable_field_sets = [PackageFieldSet, TestFieldSet]
+        target_roots_to_field_sets_get = [Get(
+            TargetRootsToFieldSets,
+            TargetRootsToFieldSetsRequest(
+                field_set_superclass=fs,
+                goal_description="",
+                no_applicable_targets_behavior=NoApplicableTargetsBehavior.ignore,
+            ),
+        ) for fs in peekable_field_sets]
+
+        package_targets_to_field_sets, test_targets_to_field_sets = await MultiGet(target_roots_to_field_sets_get)
+        packagable_target_aliases = frozenset([tgt.alias for tgt in package_targets_to_field_sets.targets])
+        testable_target_aliases = frozenset([tgt.alias for tgt in test_targets_to_field_sets.targets])
+
     return TargetDatas(
         TargetData(
             tgt,
@@ -244,13 +288,30 @@ async def get_target_data(
         for tgt, expanded_deps in zip(sorted_targets, expanded_dependencies)
     )
 
-
 @goal_rule
 async def peek(
     console: Console,
     subsys: PeekSubsystem,
     targets: UnexpandedTargets,
 ) -> Peek:
+
+    # if subsys.include_goals:
+    #     # Getting key errors from Deploy, Publish
+    #     # Getting AttributeError: 'PythonRequirementsField' object has no attribute 'default' for Run
+    #     peekable_field_sets = [PackageFieldSet, TestFieldSet]
+    #     target_roots_to_field_sets_get = [Get(
+    #         TargetRootsToFieldSets,
+    #         TargetRootsToFieldSetsRequest(
+    #             field_set_superclass=fs,
+    #             goal_description="",
+    #             no_applicable_targets_behavior=NoApplicableTargetsBehavior.ignore,
+    #         ),
+    #     ) for fs in peekable_field_sets]
+
+    #     package_targets_to_field_sets, test_targets_to_field_sets = await MultiGet(target_roots_to_field_sets_get)
+    #     packagable_target_aliases = frozenset([tgt.alias for tgt in package_targets_to_field_sets.targets])
+    #     testable_target_aliases = frozenset([tgt.alias for tgt in test_targets_to_field_sets.targets])
+
     tds = await Get(TargetDatas, UnexpandedTargets, targets)
     output = render_json(tds, subsys.exclude_defaults, subsys.include_dep_rules)
     with subsys.output(console) as write_stdout:
@@ -258,5 +319,5 @@ async def peek(
     return Peek(exit_code=0)
 
 
-def rules():
+def rules() -> Iterable[Rule]:
     return collect_rules()
