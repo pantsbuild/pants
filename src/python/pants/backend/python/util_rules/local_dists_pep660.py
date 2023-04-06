@@ -6,13 +6,14 @@ from __future__ import annotations
 import logging
 import os
 import shlex
+from collections import defaultdict
 from dataclasses import dataclass
-from typing import Iterable
 
 # TODO: move this to a util_rules file
 from pants.backend.python.goals.setup_py import create_dist_build_request
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.subsystems.setuptools import PythonDistributionFieldSet
+from pants.backend.python.target_types import PythonProvidesField, PythonResolveField
 from pants.backend.python.util_rules.dists import (
     BuildBackendError,
     DistBuildRequest,
@@ -23,10 +24,8 @@ from pants.backend.python.util_rules.interpreter_constraints import InterpreterC
 from pants.backend.python.util_rules.pex import Pex, PexRequest, VenvPex, VenvPexProcess
 from pants.backend.python.util_rules.pex_requirements import PexRequirements
 from pants.base.build_root import BuildRoot
-from pants.build_graph.address import Address
 from pants.core.util_rules import system_binaries
 from pants.core.util_rules.system_binaries import BashBinary, UnzipBinary
-from pants.engine.addresses import Addresses
 from pants.engine.fs import (
     CreateDigest,
     Digest,
@@ -39,12 +38,7 @@ from pants.engine.fs import (
 )
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import (
-    TransitiveTargets,
-    TransitiveTargetsRequest,
-    WrappedTarget,
-    WrappedTargetRequest,
-)
+from pants.engine.target import AllTargets, Target, WrappedTarget, WrappedTargetRequest
 from pants.engine.unions import UnionMembership
 from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
@@ -411,6 +405,31 @@ async def isolate_local_dist_pep660_wheels(  # based on isolate_local_dist_wheel
 
 
 @dataclass(frozen=True)
+class AllPythonDistributionTargets:
+    targets: FrozenDict[str | None, tuple[Target, ...]]
+
+
+@rule(desc="Find all Python Distribution targets in project", level=LogLevel.DEBUG)
+def find_all_python_distributions(
+    all_targets: AllTargets,
+    python_setup: PythonSetup,
+) -> AllPythonDistributionTargets:
+    dists = defaultdict(list)
+    for tgt in all_targets:
+        # this is the field used in PythonDistributionFieldSet
+        if tgt.has_field(PythonProvidesField):
+            resolve = (
+                tgt.get(PythonResolveField).normalized_value(python_setup)
+                if python_setup.enable_resolves
+                else None
+            )
+            dists[resolve].append(tgt)
+    return AllPythonDistributionTargets(
+        FrozenDict({resolve: tuple(targets) for resolve, targets in dists.items()})
+    )
+
+
+@dataclass(frozen=True)
 class LocalDistsPEP660PexRequest:  # based on LocalDistsPexRequest
     """Request to build a PEX populated by PEP660 wheels of local dists.
 
@@ -421,17 +440,8 @@ class LocalDistsPEP660PexRequest:  # based on LocalDistsPexRequest
     follows then, that this PEX should probably not be exported for use by end-users.
     """
 
-    addresses: Addresses
     interpreter_constraints: InterpreterConstraints
-
-    def __init__(
-        self,
-        addresses: Iterable[Address],
-        *,
-        interpreter_constraints: InterpreterConstraints,
-    ) -> None:
-        object.__setattr__(self, "addresses", Addresses(addresses))
-        object.__setattr__(self, "interpreter_constraints", interpreter_constraints)
+    resolve: str | None  # None if resolves is not enabled
 
 
 @dataclass(frozen=True)
@@ -464,11 +474,11 @@ class LocalDistsPEP660Pex:  # based on LocalDistsPex
 @rule(desc="Building editable local distributions (PEP 660)")
 async def build_editable_local_dists(  # based on build_local_dists
     request: LocalDistsPEP660PexRequest,
+    all_dists: AllPythonDistributionTargets,
+    python_setup: PythonSetup,
 ) -> LocalDistsPEP660Pex:
-    transitive_targets = await Get(TransitiveTargets, TransitiveTargetsRequest(request.addresses))
-    applicable_targets = [
-        tgt for tgt in transitive_targets.closure if PythonDistributionFieldSet.is_applicable(tgt)
-    ]
+    resolve = request.resolve if python_setup.enable_resolves else None
+    resolve_dists = all_dists.targets.get(resolve, ())
 
     local_dists_wheels = await MultiGet(
         Get(
@@ -476,7 +486,7 @@ async def build_editable_local_dists(  # based on build_local_dists
             PythonDistributionFieldSet,
             PythonDistributionFieldSet.create(target),
         )
-        for target in applicable_targets
+        for target in resolve_dists
     )
 
     wheels: list[str] = []

@@ -12,9 +12,15 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, DefaultDict, Iterable, cast
 
+from pants.backend.python.goals.setup_py import rules as setup_py_rules
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import PexLayout, PythonResolveField
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
+from pants.backend.python.util_rules.local_dists_pep660 import (
+    LocalDistsPEP660Pex,
+    LocalDistsPEP660PexRequest,
+)
+from pants.backend.python.util_rules.local_dists_pep660 import rules as local_dists_pep660_rules
 from pants.backend.python.util_rules.pex import Pex, PexProcess, PexRequest, VenvPex, VenvPexProcess
 from pants.backend.python.util_rules.pex_cli import PexPEX
 from pants.backend.python.util_rules.pex_environment import PexEnvironment
@@ -150,6 +156,8 @@ class VenvExportRequest:
     dest_prefix: str
     resolve_name: str
     qualify_path_with_python_version: bool
+    # this can only be used for mutable venvs in the new code path
+    editable_dists_pex_request: LocalDistsPEP660PexRequest | None = None
 
 
 @rule
@@ -225,35 +233,64 @@ async def do_export(
             f"(using Python {py_version})"
         )
 
-        merged_digest = await Get(Digest, MergeDigests([pex_pex.digest, requirements_pex.digest]))
+        digests = [pex_pex.digest, requirements_pex.digest]
+        if req.editable_dists_pex_request is not None:
+            editable_local_dists = await Get(
+                LocalDistsPEP660Pex, LocalDistsPEP660PexRequest, req.editable_dists_pex_request
+            )
+            digests.append(editable_local_dists.pex.digest)
+
+        merged_digest = await Get(Digest, MergeDigests(digests))
         tmpdir_prefix = f".{uuid.uuid4().hex}.tmp"
         tmpdir_under_digest_root = os.path.join("{digest_root}", tmpdir_prefix)
         merged_digest_under_tmpdir = await Get(Digest, AddPrefix(merged_digest, tmpdir_prefix))
 
-        return ExportResult(
-            description,
-            dest,
-            digest=merged_digest_under_tmpdir,
-            post_processing_cmds=[
+        post_processing_cmds: list[PostProcessingCommand] = [
+            PostProcessingCommand(
+                complete_pex_env.create_argv(
+                    os.path.join(tmpdir_under_digest_root, pex_pex.exe),
+                    *[
+                        os.path.join(tmpdir_under_digest_root, requirements_pex.name),
+                        "venv",
+                        "--pip",
+                        "--collisions-ok",
+                        output_path,
+                    ],
+                ),
+                {
+                    **complete_pex_env.environment_dict(python=requirements_pex.python),
+                    "PEX_MODULE": "pex.tools",
+                },
+            ),
+            # Remove the requirements and pex pexes, to avoid confusion.
+            PostProcessingCommand(["rm", "-rf", tmpdir_under_digest_root]),
+        ]
+
+        if req.editable_dists_pex_request is not None:
+            post_processing_cmds.insert(
+                1,
                 PostProcessingCommand(
                     complete_pex_env.create_argv(
                         os.path.join(tmpdir_under_digest_root, pex_pex.exe),
                         *[
-                            os.path.join(tmpdir_under_digest_root, requirements_pex.name),
+                            os.path.join(tmpdir_under_digest_root, editable_local_dists.pex.name),
                             "venv",
-                            "--pip",
                             "--collisions-ok",
                             output_path,
                         ],
                     ),
                     {
-                        **complete_pex_env.environment_dict(python=requirements_pex.python),
+                        **complete_pex_env.environment_dict(python=editable_local_dists.pex.python),
                         "PEX_MODULE": "pex.tools",
                     },
                 ),
-                # Remove the requirements and pex pexes, to avoid confusion.
-                PostProcessingCommand(["rm", "-rf", tmpdir_under_digest_root]),
-            ],
+            )
+
+        return ExportResult(
+            description,
+            dest,
+            digest=merged_digest_under_tmpdir,
+            post_processing_cmds=post_processing_cmds,
             resolve=req.resolve_name or None,
         )
     else:
@@ -271,6 +308,7 @@ async def export_virtualenv_for_resolve(
     python_setup: PythonSetup,
     union_membership: UnionMembership,
 ) -> MaybeExportResult:
+    editable_dists_pex_request: LocalDistsPEP660PexRequest | None = None
     resolve = request.resolve
     lockfile_path = python_setup.resolves.get(resolve)
     if lockfile_path:
@@ -295,6 +333,11 @@ async def export_virtualenv_for_resolve(
             interpreter_constraints=interpreter_constraints,
             # Packed layout should lead to the best performance in this use case.
             layout=PexLayout.PACKED,
+        )
+
+        editable_dists_pex_request = LocalDistsPEP660PexRequest(
+            interpreter_constraints=interpreter_constraints,
+            resolve=resolve,
         )
     else:
         # It's a tool resolve.
@@ -337,6 +380,7 @@ async def export_virtualenv_for_resolve(
             dest_prefix,
             resolve,
             qualify_path_with_python_version=True,
+            editable_dists_pex_request=editable_dists_pex_request,
         ),
     )
     return MaybeExportResult(export_result)
@@ -488,6 +532,8 @@ async def export_virtualenvs(
 def rules():
     return [
         *collect_rules(),
+        *local_dists_pep660_rules(),
+        *setup_py_rules(),
         Export.subsystem_cls.register_plugin_options(ExportPluginOptions),
         UnionRule(ExportRequest, ExportVenvsRequest),
     ]

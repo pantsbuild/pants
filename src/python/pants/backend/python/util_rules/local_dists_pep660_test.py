@@ -19,6 +19,7 @@ from pants.backend.python.util_rules import local_dists_pep660, pex_from_targets
 from pants.backend.python.util_rules.dists import BuildSystem, DistBuildRequest
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.local_dists_pep660 import (
+    AllPythonDistributionTargets,
     LocalDistsPEP660Pex,
     LocalDistsPEP660PexRequest,
     PEP660BuildResult,
@@ -45,6 +46,7 @@ def rule_runner() -> RuleRunner:
             *target_types_rules.rules(),
             *pex_from_targets.rules(),
             QueryRule(InterpreterConstraints, (InterpreterConstraintsRequest,)),
+            QueryRule(AllPythonDistributionTargets, ()),
             QueryRule(LocalDistsPEP660Pex, (LocalDistsPEP660PexRequest,)),
             QueryRule(PEP660BuildResult, (DistBuildRequest,)),
         ],
@@ -134,13 +136,15 @@ def test_build_editable_local_dists(rule_runner: RuleRunner) -> None:
             ),
         }
     )
+    # all_dists = rule_runner.request(AllPythonDistributionTargets, ())
+    # assert not all_dists
     addresses = [Address("foo", target_name="dist")]
     interpreter_constraints = rule_runner.request(
         InterpreterConstraints, [InterpreterConstraintsRequest(addresses)]
     )
     request = LocalDistsPEP660PexRequest(
-        addresses,
         interpreter_constraints=interpreter_constraints,
+        resolve=None,  # resolves is disabled
     )
     result = rule_runner.request(LocalDistsPEP660Pex, [request])
 
