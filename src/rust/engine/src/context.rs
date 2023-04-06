@@ -169,9 +169,9 @@ impl Core {
         grpc_util::tls::Config::new_without_mtls(root_ca_certs.clone()),
         remoting_opts.store_headers.clone(),
         remoting_opts.store_chunk_bytes,
+        remoting_opts.store_rpc_timeout,
         remoting_opts.store_rpc_retries,
         remoting_opts.store_rpc_concurrency,
-        remoting_opts.store_rpc_timeout,
         capabilities_cell_opt,
         remoting_opts.store_batch_api_size_limit,
       )

@@ -29,7 +29,7 @@ use remexec::{
 use tokio::io::{AsyncSeekExt, AsyncWrite, AsyncWriteExt};
 use tokio::sync::Mutex;
 use tonic::{Code, Request, Status};
-use workunit_store::{in_workunit, ObservationMetric, Metric};
+use workunit_store::{in_workunit, Metric, ObservationMetric};
 
 use crate::StoreError;
 
@@ -130,9 +130,9 @@ impl ByteStore {
     tls_config: grpc_util::tls::Config,
     mut headers: BTreeMap<String, String>,
     chunk_size_bytes: usize,
+    rpc_timeout: Duration,
     rpc_retries: usize,
     rpc_concurrency_limit: usize,
-    rpc_timeout: Duration,
     capabilities_cell_opt: Option<Arc<OnceCell<ServerCapabilities>>>,
     batch_api_size_limit: usize,
   ) -> Result<ByteStore, String> {
