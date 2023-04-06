@@ -208,46 +208,34 @@ def test_export_venv_new_codepath(
             assert ppc1.argv[3] == "{digest_root}"
             assert ppc1.extra_env == FrozenDict()
         else:
-            assert len(result.post_processing_cmds) in [2, 3]
+            assert len(result.post_processing_cmds) == 2
 
-            pex_ppcs = result.post_processing_cmds[:1]
-            if len(result.post_processing_cmds) == 3:
-                pex_ppcs = result.post_processing_cmds[:2]
-            for index, ppc in enumerate(pex_ppcs):
-                # The first arg is the full path to the python interpreter, which we
-                # don't easily know here, so we ignore it in this comparison.
+            ppc0 = result.post_processing_cmds[0]
+            # The first arg is the full path to the python interpreter, which we
+            # don't easily know here, so we ignore it in this comparison.
 
-                # The second arg is expected to be tmpdir/./pex.
-                tmpdir, pex_pex_name = os.path.split(os.path.normpath(ppc.argv[1]))
-                assert pex_pex_name == "pex"
-                assert re.match(r"\{digest_root\}/\.[0-9a-f]{32}\.tmp", tmpdir)
+            # The second arg is expected to be tmpdir/./pex.
+            tmpdir, pex_pex_name = os.path.split(os.path.normpath(ppc0.argv[1]))
+            assert pex_pex_name == "pex"
+            assert re.match(r"\{digest_root\}/\.[0-9a-f]{32}\.tmp", tmpdir)
 
-                # The third arg is expected to be tmpdir/{resolve}.pex.
-                req_pex_dir, req_pex_name = os.path.split(ppc.argv[2])
-                assert req_pex_dir == tmpdir
+            # The third arg is expected to be tmpdir/{resolve}.pex.
+            req_pex_dir, req_pex_name = os.path.split(ppc0.argv[2])
+            assert req_pex_dir == tmpdir
+            assert req_pex_name == f"{resolve}.pex"
 
-                if index == 0:
-                    assert req_pex_name == f"{resolve}.pex"
-                    assert ppc.argv[3:] == (
-                        "venv",
-                        "--pip",
-                        "--collisions-ok",
-                        "{digest_root}",
-                    )
-                elif index == 1:
-                    assert req_pex_name == "editable_local_dists.pex"
-                    assert ppc.argv[3:] == (
-                        "venv",
-                        "--collisions-ok",
-                        "{digest_root}",
-                    )
+            assert ppc0.argv[3:] == (
+                "venv",
+                "--pip",
+                "--collisions-ok",
+                "{digest_root}",
+            )
+            assert ppc0.extra_env["PEX_MODULE"] == "pex.tools"
+            assert ppc0.extra_env.get("PEX_ROOT") is not None
 
-                assert ppc.extra_env["PEX_MODULE"] == "pex.tools"
-                assert ppc.extra_env.get("PEX_ROOT") is not None
-
-            ppc_last = result.post_processing_cmds[-1]
-            assert ppc_last.argv == ("rm", "-rf", tmpdir)
-            assert ppc_last.extra_env == FrozenDict()
+            ppc1 = result.post_processing_cmds[1]
+            assert ppc1.argv == ("rm", "-rf", tmpdir)
+            assert ppc1.extra_env == FrozenDict()
 
     reldirs = [result.reldir for result in all_results]
     assert reldirs == [

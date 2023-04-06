@@ -501,7 +501,7 @@ class LocalDistsPEP660Pex:  # based on LocalDistsPex
     sources digests, to prevent the same file ending up on sys.path twice.
     """
 
-    pex: Pex
+    pex: Pex | None
 
 
 @rule(desc="Building editable local distributions (PEP 660)")
@@ -512,6 +512,9 @@ async def build_editable_local_dists(  # based on build_local_dists
 ) -> LocalDistsPEP660Pex:
     resolve = request.resolve if python_setup.enable_resolves else None
     resolve_dists = all_dists.targets.get(resolve, ())
+
+    if not resolve_dists:
+        return LocalDistsPEP660Pex(None)
 
     local_dists_wheels = await MultiGet(
         Get(
