@@ -803,3 +803,29 @@ def test_missing_tool_called(
         )
 
     assert "requires the names of any external commands" in caplog.text
+
+
+def test_env_vars(rule_runner: RuleRunner) -> None:
+    envvar_value = "clang"
+    rule_runner.write_files(
+        {
+            "src/BUILD": dedent(
+                f"""\
+                shell_command(
+                  name="envvars",
+                  tools=[],
+                  command='echo $ENVVAR > out.log',
+                  output_files=["out.log"],
+                  extra_env_vars=["ENVVAR={envvar_value}"],
+                  root_output_directory=".",
+                )
+                """
+            ),
+        }
+    )
+
+    assert_shell_command_result(
+        rule_runner,
+        Address("src", target_name="envvars"),
+        expected_contents={"out.log": f"{envvar_value}\n"},
+    )
