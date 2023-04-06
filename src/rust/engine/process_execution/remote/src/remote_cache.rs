@@ -80,7 +80,7 @@ impl CommandRunner {
     warnings_behavior: RemoteCacheWarningsBehavior,
     cache_content_behavior: CacheContentBehavior,
     concurrency_limit: usize,
-    read_timeout: Duration,
+    rpc_timeout: Duration,
     append_only_caches_base_path: Option<String>,
   ) -> Result<Self, String> {
     let tls_client_config = if action_cache_address.starts_with("https://") {
@@ -99,7 +99,7 @@ impl CommandRunner {
       tonic::transport::Channel::balance_list(vec![endpoint].into_iter()),
       concurrency_limit,
       http_headers,
-      Some((read_timeout, Metric::RemoteCacheRequestTimeouts)),
+      Some((rpc_timeout, Metric::RemoteCacheRequestTimeouts)),
     );
     let action_cache_client = Arc::new(ActionCacheClient::new(channel));
 

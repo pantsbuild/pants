@@ -501,14 +501,14 @@ class ExecutionOptions:
     remote_store_address: str | None
     remote_store_headers: dict[str, str]
     remote_store_chunk_bytes: Any
-    remote_store_chunk_upload_timeout_seconds: int
     remote_store_rpc_retries: int
     remote_store_rpc_concurrency: int
     remote_store_batch_api_size_limit: int
+    remote_store_rpc_timeout_millis: int
 
     remote_cache_warnings: RemoteCacheWarningsBehavior
     remote_cache_rpc_concurrency: int
-    remote_cache_read_timeout_millis: int
+    remote_cache_rpc_timeout_millis: int
 
     remote_execution_address: str | None
     remote_execution_headers: dict[str, str]
@@ -523,6 +523,15 @@ class ExecutionOptions:
         bootstrap_options: OptionValueContainer,
         dynamic_remote_options: DynamicRemoteOptions,
     ) -> ExecutionOptions:
+        remote_cache_rpc_timeout_millis = resolve_conflicting_options(
+            old_option="remote_cache_read_timeout_millis",
+            new_option="remote_cache_rpc_timeout_millis",
+            old_scope="",
+            new_scope="",
+            old_container=bootstrap_options,
+            new_container=bootstrap_options,
+        )
+
         return cls(
             # Remote execution strategy.
             remote_execution=dynamic_remote_options.execution,
@@ -546,14 +555,14 @@ class ExecutionOptions:
             remote_store_address=dynamic_remote_options.store_address,
             remote_store_headers=dynamic_remote_options.store_headers,
             remote_store_chunk_bytes=bootstrap_options.remote_store_chunk_bytes,
-            remote_store_chunk_upload_timeout_seconds=bootstrap_options.remote_store_chunk_upload_timeout_seconds,
             remote_store_rpc_retries=bootstrap_options.remote_store_rpc_retries,
             remote_store_rpc_concurrency=dynamic_remote_options.store_rpc_concurrency,
             remote_store_batch_api_size_limit=bootstrap_options.remote_store_batch_api_size_limit,
+            remote_store_rpc_timeout_millis=bootstrap_options.remote_store_rpc_timeout_millis,
             # Remote cache setup.
             remote_cache_warnings=bootstrap_options.remote_cache_warnings,
             remote_cache_rpc_concurrency=dynamic_remote_options.cache_rpc_concurrency,
-            remote_cache_read_timeout_millis=bootstrap_options.remote_cache_read_timeout_millis,
+            remote_cache_rpc_timeout_millis=remote_cache_rpc_timeout_millis,
             # Remote execution setup.
             remote_execution_address=dynamic_remote_options.execution_address,
             remote_execution_headers=dynamic_remote_options.execution_headers,
@@ -632,14 +641,14 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
         "user-agent": f"pants/{VERSION}",
     },
     remote_store_chunk_bytes=1024 * 1024,
-    remote_store_chunk_upload_timeout_seconds=60,
     remote_store_rpc_retries=2,
     remote_store_rpc_concurrency=128,
     remote_store_batch_api_size_limit=4194304,
+    remote_store_rpc_timeout_millis=30000,
     # Remote cache setup.
     remote_cache_warnings=RemoteCacheWarningsBehavior.backoff,
     remote_cache_rpc_concurrency=128,
-    remote_cache_read_timeout_millis=1500,
+    remote_cache_rpc_timeout_millis=1500,
     # Remote execution setup.
     remote_execution_address=None,
     remote_execution_headers={
@@ -1164,7 +1173,6 @@ class BootstrapOptions:
     )
     process_cleanup = BoolOption(
         default=(DEFAULT_EXECUTION_OPTIONS.keep_sandboxes == KeepSandboxes.never),
-        deprecation_start_version="2.15.0.dev1",
         removal_version="3.0.0.dev0",
         removal_hint="Use the `keep_sandboxes` option instead.",
         help=softwrap(
@@ -1435,7 +1443,9 @@ class BootstrapOptions:
     )
     remote_store_chunk_upload_timeout_seconds = IntOption(
         advanced=True,
-        default=DEFAULT_EXECUTION_OPTIONS.remote_store_chunk_upload_timeout_seconds,
+        default=60,
+        removal_version="2.19.0.dev0",
+        removal_hint="Unused: use the `remote_store_rpc_timeout_millis` option instead.",
         help="Timeout (in seconds) for uploads of individual chunks to the remote file store.",
     )
     remote_store_rpc_retries = IntOption(
@@ -1447,6 +1457,11 @@ class BootstrapOptions:
         advanced=True,
         default=DEFAULT_EXECUTION_OPTIONS.remote_store_rpc_concurrency,
         help="The number of concurrent requests allowed to the remote store service.",
+    )
+    remote_store_rpc_timeout_millis = IntOption(
+        advanced=True,
+        default=DEFAULT_EXECUTION_OPTIONS.remote_store_rpc_timeout_millis,
+        help="Timeout value for remote store RPCs (not including streaming requests) in milliseconds.",
     )
     remote_store_batch_api_size_limit = IntOption(
         advanced=True,
@@ -1472,8 +1487,15 @@ class BootstrapOptions:
     )
     remote_cache_read_timeout_millis = IntOption(
         advanced=True,
-        default=DEFAULT_EXECUTION_OPTIONS.remote_cache_read_timeout_millis,
+        default=DEFAULT_EXECUTION_OPTIONS.remote_cache_rpc_timeout_millis,
+        removal_version="2.19.0.dev0",
+        removal_hint="Use the `remote_cache_rpc_timeout_millis` option instead.",
         help="Timeout value for remote cache lookups in milliseconds.",
+    )
+    remote_cache_rpc_timeout_millis = IntOption(
+        advanced=True,
+        default=DEFAULT_EXECUTION_OPTIONS.remote_cache_rpc_timeout_millis,
+        help="Timeout value for remote cache RPCs in milliseconds.",
     )
     remote_execution_address = StrOption(
         advanced=True,
