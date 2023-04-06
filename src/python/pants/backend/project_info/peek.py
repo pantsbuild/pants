@@ -6,10 +6,9 @@ from __future__ import annotations
 import collections, collections.abc
 import json
 from dataclasses import asdict, dataclass, is_dataclass
-from typing import Any, Final, Iterable, Mapping, Type
+from typing import Any, Iterable, Mapping, Type
 
 from typing_extensions import Protocol, runtime_checkable
-from pants.core.goals.check import CheckRequest
 from pants.core.goals.deploy import DeployFieldSet
 from pants.core.goals.package import PackageFieldSet
 from pants.core.goals.publish import PublishFieldSet
@@ -31,8 +30,6 @@ from pants.engine.target import (
     DependenciesRuleApplicationRequest,
     Field,
     FieldSet,
-    FieldSetsPerTarget,
-    FieldSetsPerTargetRequest,
     HydratedSources,
     HydrateSourcesRequest,
     NoApplicableTargetsBehavior,
@@ -190,7 +187,6 @@ def describe_ruleset(ruleset: DependencyRuleSet | None) -> tuple[str, ...] | Non
         return None
     return ruleset.peek()
 
-
 async def _create_target_alias_to_goals_map(include_goals: bool) -> Mapping[str, tuple[str, ...]]:
     """
     Returns a mapping from a target alias to the goals that can operate on that target.
@@ -334,24 +330,6 @@ async def peek(
     subsys: PeekSubsystem,
     targets: UnexpandedTargets,
 ) -> Peek:
-
-    # if subsys.include_goals:
-    #     # Getting key errors from Deploy, Publish
-    #     # Getting AttributeError: 'PythonRequirementsField' object has no attribute 'default' for Run
-    #     peekable_field_sets = [PackageFieldSet, TestFieldSet]
-    #     target_roots_to_field_sets_get = [Get(
-    #         TargetRootsToFieldSets,
-    #         TargetRootsToFieldSetsRequest(
-    #             field_set_superclass=fs,
-    #             goal_description="",
-    #             no_applicable_targets_behavior=NoApplicableTargetsBehavior.ignore,
-    #         ),
-    #     ) for fs in peekable_field_sets]
-
-    #     package_targets_to_field_sets, test_targets_to_field_sets = await MultiGet(target_roots_to_field_sets_get)
-    #     packagable_target_aliases = frozenset([tgt.alias for tgt in package_targets_to_field_sets.targets])
-    #     testable_target_aliases = frozenset([tgt.alias for tgt in test_targets_to_field_sets.targets])
-
     tds = await Get(TargetDatas, UnexpandedTargets, targets)
     output = render_json(tds, subsys.exclude_defaults, subsys.include_dep_rules)
     with subsys.output(console) as write_stdout:
