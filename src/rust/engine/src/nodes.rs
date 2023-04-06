@@ -1146,8 +1146,9 @@ impl Task {
                 // `type(input) != input_type`.
                 throw(format!(
                   "{get} was not detected in your @rule body at rule compile time. \
-                  Was the `Get` constructor called in a separate function, or perhaps \
-                  dynamically? If so, it must be inlined into the @rule body.",
+                  Was the `Get` constructor called in a non async-function, or \
+                  was it inside an async function defined after the @rule? \
+                  Make sure the `Get` is defined before or inside the @rule body.",
                 ))
               }
             })?;

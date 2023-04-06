@@ -73,12 +73,12 @@ class Ruff(PythonToolBase):
     config = FileOption(
         default=None,
         advanced=True,
-        help=lambda cls: softwrap(
+        help=softwrap(
             f"""
             Path to the `pyproject.toml` or `ruff.toml` file to use for configuration
             (https://github.com/charliermarsh/ruff#configuration).
 
-            Setting this option will disable `[{cls.options_scope}].config_discovery`. Use
+            Setting this option will disable `[{options_scope}].config_discovery`. Use
             this option if the config is located in a non-standard location.
             """
         ),
@@ -86,12 +86,12 @@ class Ruff(PythonToolBase):
     config_discovery = BoolOption(
         default=True,
         advanced=True,
-        help=lambda cls: softwrap(
+        help=softwrap(
             f"""
             If true, Pants will include any relevant config files during
             runs (`pyproject.toml`, and `ruff.toml`).
 
-            Use `[{cls.options_scope}].config` instead if your config is in a
+            Use `[{options_scope}].config` instead if your config is in a
             non-standard location.
             """
         ),
