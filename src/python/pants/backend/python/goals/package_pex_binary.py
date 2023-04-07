@@ -118,8 +118,11 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
 @dataclass(frozen=True)
 class PexFromTargetsRequestForBuiltPackage:
     """An intermediate class that gives consumers access to the data used to create a
-    `PexFromTargetsRequest` to fulfil a `BuiltPackage` request. This class is used directly by
-    `run_pex_binary`, but should be handled transparently by direct `BuiltPackage` requests."""
+    `PexFromTargetsRequest` to fulfil a `BuiltPackage` request.
+
+    This class is used directly by `run_pex_binary`, but should be handled transparently by direct
+    `BuiltPackage` requests.
+    """
 
     request: PexFromTargetsRequest
 

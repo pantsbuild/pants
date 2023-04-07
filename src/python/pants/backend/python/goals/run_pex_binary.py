@@ -8,7 +8,6 @@ from pants.backend.python.goals.package_pex_binary import (
     PexFromTargetsRequestForBuiltPackage,
 )
 from pants.backend.python.target_types import PexLayout
-from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex_environment import PythonExecutable
 from pants.backend.python.util_rules.pex_from_targets import InterpreterConstraintsRequest
 from pants.core.goals.package import BuiltPackage
@@ -24,12 +23,11 @@ async def create_pex_binary_run_request(field_set: PexBinaryFieldSet) -> RunRequ
 
     # We need a Python executable to fulfil `adhoc_tool`/`runnable_dependency` requests
     # as sandboxed processes will not have a `python` available on the `PATH`.
-    interpreter_constraints = await Get(
-        InterpreterConstraints,
+    python = await Get(
+        PythonExecutable,
         InterpreterConstraintsRequest,
         pex_request.request.to_interpreter_constraints_request(),
     )
-    python = await Get(PythonExecutable, InterpreterConstraints, interpreter_constraints)
 
     relpath = built_pex.artifacts[0].relpath
     assert relpath is not None
