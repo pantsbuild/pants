@@ -109,7 +109,6 @@ def test_sort_all_python_distributions_by_resolve(rule_runner: RuleRunner) -> No
             "--python-invalid-lockfile-behavior=ignore",
             # Turn off python synthetic lockfile targets to make the test simpler.
             "--no-python-enable-lockfile-targets",
-            "--export-py-editables-in-resolves=['a', 'b']",
         ],
         env_inherit={"PATH", "PYENV_ROOT", "HOME"},
     )
