@@ -370,7 +370,7 @@ async def export_virtualenv_for_resolve(
             )
         )
 
-        if resolve in export_subsys.py_editables_in_resolve:
+        if resolve in export_subsys.options.py_editables_in_resolves:
             editable_local_dists = await Get(
                 EditableLocalDists, EditableLocalDistsRequest(resolve=resolve)
             )
