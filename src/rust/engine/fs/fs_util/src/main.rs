@@ -423,10 +423,7 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
             // leave this hanging forever.
             //
             // Make fs_util have a very long deadline (because it's not configurable,
-            // like it is inside pants) until we switch to Tower (where we can more
-            // carefully control specific components of timeouts).
-            //
-            // See https://github.com/pantsbuild/pants/pull/6433 for more context.
+            // like it is inside pants).
             Duration::from_secs(30 * 60),
             top_match
               .value_of_t::<usize>("rpc-attempts")
