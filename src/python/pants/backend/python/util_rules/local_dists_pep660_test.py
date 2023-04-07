@@ -11,7 +11,6 @@ from textwrap import dedent
 import pytest
 
 from pants.backend.python import target_types_rules
-from pants.backend.python.goals.setup_py import rules as setup_py_rules
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.subsystems.setuptools import rules as setuptools_rules
 from pants.backend.python.target_types import PythonDistribution, PythonSourcesGeneratorTarget
@@ -19,14 +18,16 @@ from pants.backend.python.util_rules import local_dists_pep660, pex_from_targets
 from pants.backend.python.util_rules.dists import BuildSystem, DistBuildRequest
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.local_dists_pep660 import (
-    AllPythonDistributionTargets,
     EditableLocalDists,
     EditableLocalDistsRequest,
     PEP660BuildResult,
+    ResolveSortedPythonDistributionTargets,
 )
 from pants.backend.python.util_rules.pex_from_targets import InterpreterConstraintsRequest
 from pants.backend.python.util_rules.pex_requirements import PexRequirements
+from pants.build_graph.address import Address
 from pants.engine.fs import CreateDigest, Digest, DigestContents, FileContent
+from pants.engine.internals.parametrize import Parametrize
 from pants.testutil.python_interpreter_selection import (
     skip_unless_python27_present,
     skip_unless_python39_present,
@@ -40,17 +41,16 @@ def rule_runner() -> RuleRunner:
     ret = RuleRunner(
         rules=[
             *local_dists_pep660.rules(),
-            *setup_py_rules(),
             *setuptools_rules(),
             *target_types_rules.rules(),
             *pex_from_targets.rules(),
             QueryRule(InterpreterConstraints, (InterpreterConstraintsRequest,)),
-            QueryRule(AllPythonDistributionTargets, ()),
+            QueryRule(ResolveSortedPythonDistributionTargets, ()),
             QueryRule(EditableLocalDists, (EditableLocalDistsRequest,)),
             QueryRule(PEP660BuildResult, (DistBuildRequest,)),
         ],
         target_types=[PythonSourcesGeneratorTarget, PythonDistribution],
-        objects={"python_artifact": PythonArtifact},
+        objects={"python_artifact": PythonArtifact, "parametrize": Parametrize},
     )
     ret.set_options(
         [],
@@ -98,6 +98,60 @@ def test_works_with_python2(rule_runner: RuleRunner) -> None:
 @skip_unless_python39_present
 def test_works_with_python39(rule_runner: RuleRunner) -> None:
     do_test_backend_wrapper(rule_runner, constraints="CPython==3.9.*")
+
+
+def test_sort_all_python_distributions_by_resolve(rule_runner: RuleRunner) -> None:
+    rule_runner.set_options(
+        [
+            "--python-enable-resolves=True",
+            "--python-resolves={'a': 'lock.txt', 'b': 'lock.txt'}",
+            # Turn off lockfile validation to make the test simpler.
+            "--python-invalid-lockfile-behavior=ignore",
+            # Turn off python synthetic lockfile targets to make the test simpler.
+            "--no-python-enable-lockfile-targets",
+            "--export-py-editables-in-resolves=['a', 'b']",
+        ],
+        env_inherit={"PATH", "PYENV_ROOT", "HOME"},
+    )
+    rule_runner.write_files(
+        {
+            "foo/BUILD": dedent(
+                """
+                python_sources(resolve=parametrize("a", "b"))
+
+                python_distribution(
+                    name="dist",
+                    dependencies=[":foo@resolve=a"],
+                    provides=python_artifact(name="foo", version="9.8.7"),
+                    sdist=False,
+                    generate_setup=False,
+                )
+                """
+            ),
+            "foo/bar.py": "BAR = 42",
+            "foo/setup.py": dedent(
+                """
+                from setuptools import setup
+
+                setup(
+                    name="foo",
+                    version="9.8.7",
+                    packages=["foo"],
+                    package_dir={"foo": "."},
+                    entry_points={"foo.plugins": ["bar = foo.bar.BAR"]},
+                )
+                """
+            ),
+            "lock.txt": "",
+        }
+    )
+    dist = rule_runner.get_target(Address("foo", target_name="dist"))
+    result = rule_runner.request(ResolveSortedPythonDistributionTargets, ())
+    assert len(result.targets) == 1
+    assert "b" not in result.targets
+    assert "a" in result.targets
+    assert len(result.targets["a"]) == 1
+    assert dist == result.targets["a"][0]
 
 
 def test_build_editable_local_dists(rule_runner: RuleRunner) -> None:
