@@ -462,7 +462,7 @@ async def sort_all_python_distributions_by_resolve(
 
 @dataclass(frozen=True)
 class EditableLocalDistsRequest:
-    """Request toild generate PEP660 wheels of local dists in the given resolve.
+    """Request to generate PEP660 wheels of local dists in the given resolve.
 
     The editable wheel files must not be exported or made available to the end-user (according to
     PEP 660). Instead, the PEP660 editable wheels serve as intermediate, internal-only,
