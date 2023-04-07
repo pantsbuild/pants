@@ -3,8 +3,14 @@
 
 import os
 
-from pants.backend.python.goals.package_pex_binary import PexBinaryFieldSet
+from pants.backend.python.goals.package_pex_binary import (
+    PexBinaryFieldSet,
+    PexFromTargetsRequestForBuiltPackage,
+)
 from pants.backend.python.target_types import PexLayout
+from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
+from pants.backend.python.util_rules.pex_environment import PythonExecutable
+from pants.backend.python.util_rules.pex_from_targets import InterpreterConstraintsRequest
 from pants.core.goals.package import BuiltPackage
 from pants.core.goals.run import RunRequest
 from pants.engine.rules import Get, collect_rules, rule
@@ -13,7 +19,18 @@ from pants.util.logging import LogLevel
 
 @rule(level=LogLevel.DEBUG)
 async def create_pex_binary_run_request(field_set: PexBinaryFieldSet) -> RunRequest:
-    built_pex = await Get(BuiltPackage, PexBinaryFieldSet, field_set)
+    pex_request = await Get(PexFromTargetsRequestForBuiltPackage, PexBinaryFieldSet, field_set)
+    built_pex = await Get(BuiltPackage, PexFromTargetsRequestForBuiltPackage, pex_request)
+
+    # We need a Python executable to fulfil `adhoc_tool`/`runnable_dependency` requests
+    # as sandboxed processes will not have a `python` available on the `PATH`.
+    interpreter_constraints = await Get(
+        InterpreterConstraints,
+        InterpreterConstraintsRequest,
+        pex_request.request.to_interpreter_constraints_request(),
+    )
+    python = await Get(PythonExecutable, InterpreterConstraints, interpreter_constraints)
+
     relpath = built_pex.artifacts[0].relpath
     assert relpath is not None
     if field_set.layout.value != PexLayout.ZIPAPP.value:
@@ -21,7 +38,7 @@ async def create_pex_binary_run_request(field_set: PexBinaryFieldSet) -> RunRequ
 
     return RunRequest(
         digest=built_pex.digest,
-        args=[os.path.join("{chroot}", relpath)],
+        args=[python.path, os.path.join("{chroot}", relpath)],
     )
 
 

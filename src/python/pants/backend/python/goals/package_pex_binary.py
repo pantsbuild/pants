@@ -115,12 +115,21 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
         return tuple(args)
 
 
+@dataclass(frozen=True)
+class PexFromTargetsRequestForBuiltPackage:
+    """An intermediate class that gives consumers access to the data used to create a
+    `PexFromTargetsRequest` to fulfil a `BuiltPackage` request. This class is used directly by
+    `run_pex_binary`, but should be handled transparently by direct `BuiltPackage` requests."""
+
+    request: PexFromTargetsRequest
+
+
 @rule(level=LogLevel.DEBUG)
 async def package_pex_binary(
     field_set: PexBinaryFieldSet,
     pex_binary_defaults: PexBinaryDefaults,
     union_membership: UnionMembership,
-) -> BuiltPackage:
+) -> PexFromTargetsRequestForBuiltPackage:
     resolved_pex_entry_point_get = Get(
         ResolvedPexEntryPoint, ResolvePexEntryPointRequest(field_set.entry_point)
     )
@@ -163,25 +172,32 @@ async def package_pex_binary(
         CompletePlatforms, PexCompletePlatformsField, field_set.complete_platforms
     )
 
-    pex = await Get(
-        Pex,
-        PexFromTargetsRequest(
-            addresses=[field_set.address],
-            internal_only=False,
-            main=resolved_entry_point.val or field_set.script.value,
-            inject_args=field_set.args.value or [],
-            inject_env=field_set.env.value or FrozenDict[str, str](),
-            platforms=PexPlatforms.create_from_platforms_field(field_set.platforms),
-            complete_platforms=complete_platforms,
-            output_filename=output_filename,
-            layout=PexLayout(field_set.layout.value),
-            additional_args=field_set.generate_additional_args(pex_binary_defaults),
-            include_requirements=field_set.include_requirements.value,
-            include_source_files=field_set.include_sources.value,
-            include_local_dists=True,
-        ),
+    request = PexFromTargetsRequest(
+        addresses=[field_set.address],
+        internal_only=False,
+        main=resolved_entry_point.val or field_set.script.value,
+        inject_args=field_set.args.value or [],
+        inject_env=field_set.env.value or FrozenDict[str, str](),
+        platforms=PexPlatforms.create_from_platforms_field(field_set.platforms),
+        complete_platforms=complete_platforms,
+        output_filename=output_filename,
+        layout=PexLayout(field_set.layout.value),
+        additional_args=field_set.generate_additional_args(pex_binary_defaults),
+        include_requirements=field_set.include_requirements.value,
+        include_source_files=field_set.include_sources.value,
+        include_local_dists=True,
     )
-    return BuiltPackage(pex.digest, (BuiltPackageArtifact(output_filename),))
+
+    return PexFromTargetsRequestForBuiltPackage(request)
+
+
+@rule
+async def built_pacakge_for_pex_from_targets_request(
+    request: PexFromTargetsRequestForBuiltPackage,
+) -> BuiltPackage:
+    pft_request = request.request
+    pex = await Get(Pex, PexFromTargetsRequest, pft_request)
+    return BuiltPackage(pex.digest, (BuiltPackageArtifact(pft_request.output_filename),))
 
 
 def rules():
