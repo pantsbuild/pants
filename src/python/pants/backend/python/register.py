@@ -12,13 +12,13 @@ from pants.backend.python.goals import (
     coverage_py,
     export,
     lockfile,
+    package_dists,
     package_pex_binary,
     pytest_runner,
     repl,
     run_pex_binary,
     run_python_requirement,
     run_python_source,
-    setup_py,
     tailor,
 )
 from pants.backend.python.macros import (
@@ -80,7 +80,7 @@ def rules():
         *run_pex_binary.rules(),
         *run_python_requirement.rules(),
         *run_python_source.rules(),
-        *setup_py.rules(),
+        *package_dists.rules(),
         *tailor.rules(),
         *local_dists.rules(),
         *export.rules(),

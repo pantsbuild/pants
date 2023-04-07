@@ -13,7 +13,7 @@ from textwrap import dedent
 import pytest
 
 from pants.backend.python import target_types_rules
-from pants.backend.python.goals import package_pex_binary, setup_py
+from pants.backend.python.goals import package_dists, package_pex_binary
 from pants.backend.python.goals.package_pex_binary import PexBinaryFieldSet
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.subsystems.setuptools import PythonDistributionFieldSet
@@ -46,7 +46,7 @@ def rule_runner() -> RuleRunner:
             *pex_from_targets.rules(),
             *target_types_rules.rules(),
             *core_target_types_rules(),
-            *setup_py.rules(),
+            *package_dists.rules(),
             QueryRule(BuiltPackage, [PexBinaryFieldSet]),
             QueryRule(BuiltPackage, [PythonDistributionFieldSet]),
         ],

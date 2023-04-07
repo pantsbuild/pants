@@ -22,7 +22,7 @@ from pants.backend.codegen.protobuf.target_types import ProtobufSourcesGenerator
 from pants.backend.codegen.protobuf.target_types import rules as protobuf_target_types_rules
 from pants.backend.python import target_types_rules
 from pants.backend.python.dependency_inference import rules as dependency_inference_rules
-from pants.backend.python.goals import setup_py
+from pants.backend.python.goals import package_dists
 from pants.backend.python.goals.run_python_source import PythonSourceFieldSet
 from pants.backend.python.goals.run_python_source import rules as run_rules
 from pants.backend.python.macros.python_artifact import PythonArtifact
@@ -51,7 +51,7 @@ def rule_runner() -> RuleRunner:
             *target_types_rules.rules(),
             *local_dists.rules(),
             *pex_from_targets.rules(),
-            *setup_py.rules(),
+            *package_dists.rules(),
             *protobuf_subsystem_rules(),
             *protobuf_target_types_rules(),
             *protobuf_python_rules(),
