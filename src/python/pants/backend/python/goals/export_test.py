@@ -11,11 +11,17 @@ from pants.backend.python import target_types_rules
 from pants.backend.python.goals import export
 from pants.backend.python.goals.export import ExportVenvsRequest, PythonResolveExportFormat
 from pants.backend.python.lint.flake8 import subsystem as flake8_subsystem
-from pants.backend.python.target_types import PythonRequirementTarget
+from pants.backend.python.macros.python_artifact import PythonArtifact
+from pants.backend.python.target_types import (
+    PythonDistribution,
+    PythonRequirementTarget,
+    PythonSourcesGeneratorTarget,
+)
 from pants.backend.python.util_rules import pex_from_targets
 from pants.base.specs import RawSpecs, RecursiveGlobSpec
 from pants.core.goals.export import ExportResults
 from pants.core.util_rules import distdir
+from pants.engine.internals.parametrize import Parametrize
 from pants.engine.rules import QueryRule
 from pants.engine.target import Targets
 from pants.testutil.rule_runner import RuleRunner
@@ -34,7 +40,8 @@ def rule_runner() -> RuleRunner:
             QueryRule(Targets, [RawSpecs]),
             QueryRule(ExportResults, [ExportVenvsRequest]),
         ],
-        target_types=[PythonRequirementTarget],
+        target_types=[PythonRequirementTarget, PythonSourcesGeneratorTarget, PythonDistribution],
+        objects={"python_artifact": PythonArtifact, "parametrize": Parametrize},
     )
 
 
@@ -170,8 +177,15 @@ def test_export_venv_new_codepath(
     current_interpreter = f"{vinfo.major}.{vinfo.minor}.{vinfo.micro}"
     rule_runner.write_files(
         {
+            "src/foo/__init__.py": "from colors import *",
             "src/foo/BUILD": dedent(
                 """\
+                python_sources(name='foo', resolve=parametrize('a', 'b'))
+                python_distribution(
+                    name='dist',
+                    provides=python_artifact(name='foo', version='1.2.3'),
+                    dependencies=[':foo@resolve=a'],
+                )
                 python_requirement(name='req1', requirements=['ansicolors==1.1.8'], resolve='a')
                 python_requirement(name='req2', requirements=['ansicolors==1.1.8'], resolve='b')
                 """
@@ -184,12 +198,16 @@ def test_export_venv_new_codepath(
     rule_runner.set_options(
         [
             f"--python-interpreter-constraints=['=={current_interpreter}']",
+            "--python-enable-resolves=True",
             "--python-resolves={'a': 'lock.txt', 'b': 'lock.txt'}",
             "--export-resolve=a",
             "--export-resolve=b",
             "--export-resolve=flake8",
             # Turn off lockfile validation to make the test simpler.
             "--python-invalid-lockfile-behavior=ignore",
+            # Turn off python synthetic lockfile targets to make the test simpler.
+            "--no-python-enable-lockfile-targets",
+            "--export-py-editables-in-resolves=['a', 'b']",
             format_flag,
         ],
         env_inherit={"PATH", "PYENV_ROOT"},
@@ -208,11 +226,13 @@ def test_export_venv_new_codepath(
             assert ppc1.argv[3] == "{digest_root}"
             assert ppc1.extra_env == FrozenDict()
         else:
-            if resolve == "flake8":
-                assert len(result.post_processing_cmds) == 2
-            else:
-                # editable wheels are installed for a user resolve
+            if resolve == "a":
+                # editable wheels are installed for a user resolve that has dists
                 assert len(result.post_processing_cmds) == 5
+            else:
+                # tool resolves (flake8) and user resolves w/o dists (b)
+                # do not run the commands to do editable installs
+                assert len(result.post_processing_cmds) == 2
 
             ppc0 = result.post_processing_cmds[0]
             # The first arg is the full path to the python interpreter, which we

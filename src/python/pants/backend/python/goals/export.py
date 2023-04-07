@@ -44,7 +44,7 @@ from pants.engine.process import ProcessCacheScope, ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import Target
 from pants.engine.unions import UnionMembership, UnionRule, union
-from pants.option.option_types import BoolOption, EnumOption
+from pants.option.option_types import BoolOption, EnumOption, StrListOption
 from pants.util.docutil import bin_name
 from pants.util.strutil import path_safe, softwrap
 
@@ -126,6 +126,30 @@ class ExportPluginOptions:
         "take significantly less time to export than a standalone, mutable virtualenv will.",
         removal_version="2.20.0.dev0",
         removal_hint="Set the `[export].py_resolve_format` option to 'symlinked_immutable_virtualenv'",
+    )
+
+    py_editables_in_resolves = StrListOption(
+        # TODO: Is there a way to get [python].resolves in a memoized_property here?
+        #       If so, then we can validate that all resolves here are defined there.
+        help=softwrap(
+            """
+            When exporting a mutable virtualenv for a resolve, do PEP-660 editable installs
+            of all 'python_distribution' targets that own code in the exported resolve.
+
+            If a resolve name is not in this list, 'python_distribution' targets will not
+            be installed in the virtualenv. This defaults to an empty list for backwards
+            compatibility and to prevent unnecessary work to generate and install the
+            PEP-660 editable wheels.
+
+            This only applies when '[python].enable_resolves' is true and when exporting a
+            'mutable_virtualenv' ('symlinked_immutable_virtualenv' exports are not "full"
+            virtualenvs because they must not be edited, and do not include 'pip').
+
+            NOTE: If you are using legacy exports (not using the '--resolve' option), then
+            this option has no effect. Legacy exports will not include any editable installs.
+            """
+        ),
+        advanced=True,
     )
 
 
@@ -240,13 +264,13 @@ async def do_export(
             PostProcessingCommand(
                 complete_pex_env.create_argv(
                     os.path.join(tmpdir_under_digest_root, pex_pex.exe),
-                    *[
+                    *(
                         os.path.join(tmpdir_under_digest_root, requirements_pex.name),
                         "venv",
                         "--pip",
                         "--collisions-ok",
                         output_path,
-                    ],
+                    ),
                 ),
                 {
                     **complete_pex_env.environment_dict(python=requirements_pex.python),
@@ -257,10 +281,10 @@ async def do_export(
             PostProcessingCommand(["rm", "-rf", tmpdir_under_digest_root]),
         ]
 
-        if req.editable_local_dists_digest:
+        if req.editable_local_dists_digest is not None:
             # insert editable wheel post processing commands
             wheels_snapshot = await Get(Snapshot, Digest, req.editable_local_dists_digest)
-            py_minor_version = ".".join(py_version.split(".")[:2])
+            py_minor_version = ".".join(py_version.split(".", 2)[:2])
             lib_dir = os.path.join(output_path, "lib", f"python{py_minor_version}", "site-packages")
             dist_info_dirs = [
                 os.path.join(lib_dir, "-".join(f.split("-")[:2]) + ".dist-info")
@@ -272,7 +296,7 @@ async def do_export(
                         # the wheels are "sources" in the pex and get dumped in lib_dir
                         # so we move them to tmpdir where they will be removed at the end.
                         "mv",
-                        *[os.path.join(lib_dir, f) for f in wheels_snapshot.files],
+                        *(os.path.join(lib_dir, f) for f in wheels_snapshot.files),
                         tmpdir_under_digest_root,
                     ]
                 ),
@@ -281,7 +305,7 @@ async def do_export(
                         # now install the editable wheels
                         os.path.join(output_path, "bin", "pip"),
                         "install",
-                        *[os.path.join(tmpdir_under_digest_root, f) for f in wheels_snapshot.files],
+                        *(os.path.join(tmpdir_under_digest_root, f) for f in wheels_snapshot.files),
                     ]
                 ),
                 PostProcessingCommand(
@@ -326,6 +350,7 @@ class MaybeExportResult:
 async def export_virtualenv_for_resolve(
     request: _ExportVenvForResolveRequest,
     python_setup: PythonSetup,
+    export_subsys: ExportSubsystem,
     union_membership: UnionMembership,
 ) -> MaybeExportResult:
     editable_local_dists_digest: Digest | None = None
@@ -345,10 +370,13 @@ async def export_virtualenv_for_resolve(
             )
         )
 
-        editable_local_dists = await Get(
-            EditableLocalDists, EditableLocalDistsRequest(resolve=resolve)
-        )
-        editable_local_dists_digest = editable_local_dists.optional_digest
+        if resolve in export_subsys.py_editables_in_resolve:
+            editable_local_dists = await Get(
+                EditableLocalDists, EditableLocalDistsRequest(resolve=resolve)
+            )
+            editable_local_dists_digest = editable_local_dists.optional_digest
+        else:
+            editable_local_dists_digest = None
 
         pex_request = PexRequest(
             description=f"Build pex for resolve `{resolve}`",
