@@ -10,16 +10,11 @@ import shlex
 from collections import defaultdict
 from dataclasses import dataclass
 
-from pants.backend.python.dependency_inference import get_scripts_digest
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.subsystems.setuptools import PythonDistributionFieldSet
 from pants.backend.python.target_types import PythonProvidesField, PythonResolveField
 from pants.backend.python.util_rules import package_dists
-from pants.backend.python.util_rules.dists import (
-    BuildBackendError,
-    DistBuildRequest,
-    distutils_repr,
-)
+from pants.backend.python.util_rules.dists import BuildBackendError, DistBuildRequest
 from pants.backend.python.util_rules.dists import rules as dists_rules
 from pants.backend.python.util_rules.package_dists import (
     DependencyOwner,
@@ -49,6 +44,7 @@ from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.osutil import is_macos_big_sur
+from pants.util.resources import read_resource
 from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
@@ -72,7 +68,9 @@ def dump_backend_wrapper_json(
 ) -> bytes:
     """Build the settings json for our PEP 517 / PEP 660 wrapper script."""
 
-    def clean_config_settings(cs: FrozenDict[str, tuple[str, ...]] | None) -> dict[str, list[str]] | None:
+    def clean_config_settings(
+        cs: FrozenDict[str, tuple[str, ...]] | None
+    ) -> dict[str, list[str]] | None:
         # setuptools.build_meta expects list values and chokes on tuples.
         # We assume/hope that other backends accept lists as well.
         return None if cs is None else {k: list(v) for k, v in cs.items()}
@@ -91,7 +89,7 @@ def dump_backend_wrapper_json(
         "platform_compatibility_tags": "-".join([lang_tag, abi_tag, platform_tag]),
         "direct_url": direct_url,
     }
-    return json.dumps(settings)
+    return json.dumps(settings).encode()
 
 
 @rule
@@ -137,15 +135,12 @@ async def run_pep660_build(
     pth_file_name = "__pants__.pth"
     pth_file_path = os.path.join(request.working_directory, pth_file_name)
 
-
     # This is the setuptools dist directory, not Pants's, so we hardcode to dist/.
     dist_dir = "dist"
     dist_output_dir = os.path.join(dist_dir, request.output_path)
 
     backend_wrapper_json = "backend_wrapper.json"
-    backend_wrapper_json_path = os.path.join(request.working_directory, backend_wrapper_json)
     backend_wrapper_name = "backend_wrapper.py"
-    backend_wrapper_path = os.path.join(request.working_directory, backend_wrapper_name)
     backend_wrapper_content = read_resource(_scripts_package, "pep660_backend_wrapper.py")
     assert backend_wrapper_content is not None
 
@@ -167,9 +162,7 @@ async def run_pep660_build(
         # The backend_wrapper has its own digest for cache reuse.
         Get(
             Digest,
-            CreateDigest(
-                [FileContent(backend_wrapper_name, backend_wrapper_content)]
-            ),
+            CreateDigest([FileContent(backend_wrapper_name, backend_wrapper_content)]),
         ),
         # Note that this pex has no entrypoint. We use it to run our wrapper, which
         # in turn imports from and invokes the build backend.
@@ -182,7 +175,7 @@ async def run_pep660_build(
                 pex_path=request.extra_build_time_requirements,
                 interpreter_constraints=request.interpreter_constraints,
             ),
-        )
+        ),
     )
 
     merged_digest = await Get(

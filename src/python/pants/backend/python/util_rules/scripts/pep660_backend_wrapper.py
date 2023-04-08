@@ -2,12 +2,14 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import base64
+import errno
 import hashlib
 import importlib
+import json
 import os
 import shutil
+import sys
 import zipfile
-
 
 _WHEEL_TEMPLATE = """\
 Wheel-Version: 1.0
@@ -27,7 +29,7 @@ def import_build_backend(build_backend):
 def mkdir(directory):
     """Python 2.7 doesn't have the exist_ok arg on os.makedirs()."""
     try:
-        os.makedirs(d)
+        os.makedirs(directory)
     except OSError as e:
         if e.errno != errno.EEXIST:
             raise
@@ -36,10 +38,9 @@ def mkdir(directory):
 def prepare_dist_info(backend, build_dir, wheel_config_settings):
     """Use PEP 660 or PEP 517 backend methods to create .dist-info directory.
 
-    PEP 660 defines `prepare_metadata_for_build_editable`. If PEP 660 is not
-    supported, we fall back to PEP 517's `prepare_metadata_for_build_wheel`.
-    PEP 517, however, says that method is optional. So finally we fall back
-    to using `build_wheel` and then extract the dist-info directory and then
+    PEP 660 defines `prepare_metadata_for_build_editable`. If PEP 660 is not supported, we fall back
+    to PEP 517's `prepare_metadata_for_build_wheel`. PEP 517, however, says that method is optional.
+    So finally we fall back to using `build_wheel` and then extract the dist-info directory and then
     delete the extra wheel file (like one of PEP 517's examples).
     """
     prepare_metadata = getattr(
@@ -49,7 +50,7 @@ def prepare_dist_info(backend, build_dir, wheel_config_settings):
     )
     if prepare_metadata is not None:
         print("prepare_metadata: " + str(prepare_metadata))
-        metadata_path = _prepare_metadata(build_dir, wheel_config_settings)
+        metadata_path = prepare_metadata(build_dir, wheel_config_settings)
     else:
         # Optional PEP 517 method not defined. Use build_wheel instead.
         wheel_path = backend.build_wheel(build_dir, wheel_config_settings)
@@ -57,10 +58,10 @@ def prepare_dist_info(backend, build_dir, wheel_config_settings):
             dist_info_files = [n for n in whl.namelist() if ".dist-info/" in n]
             whl.extractall(build_dir, dist_info_files)
             metadata_path = os.path.dirname(dist_info_files[0])
-    return standardize_dist_info_path(metadata_path)
+    return standardize_dist_info_path(build_dir, metadata_path)
 
 
-def standardize_dist_info_path(metadata_path):
+def standardize_dist_info_path(build_dir, metadata_path):
     """Make sure dist-info dir is named pkg-version.dist-info.
 
     Returns the package name, version, and update metadata_path
@@ -76,12 +77,14 @@ def standardize_dist_info_path(metadata_path):
             lines = f.readlines()
         for line in lines:
             if line.startswith("Version: "):
-                version = line[len("Version: "):].strip()
+                version = line[len("Version: ") :].strip()
                 break
         # Standardize the name of the dist-info directory per Binary distribution format spec.
         old_metadata_path = metadata_path
         metadata_path = pkg + "-" + version + ".dist-info"
-        shutil.move(os.path.join(build_dir, old_metadata_path), os.path.join(build_dir, metadata_path))
+        shutil.move(
+            os.path.join(build_dir, old_metadata_path), os.path.join(build_dir, metadata_path)
+        )
     return pkg, version, metadata_path
 
 
@@ -92,7 +95,7 @@ def remove_record_files(build_dir, metadata_path):
             os.unlink(os.path.join(build_dir, metadata_path, file))
 
 
-def write_wheel_file(build_dir, metadata_path):
+def write_wheel_file(tags, build_dir, metadata_path):
     metadata_wheel_file = os.path.join(build_dir, metadata_path, "WHEEL")
     if not os.path.exists(metadata_wheel_file):
         with open(metadata_wheel_file, "w") as f:
@@ -102,22 +105,23 @@ def write_wheel_file(build_dir, metadata_path):
 def write_direct_url_file(direct_url, build_dir, metadata_path):
     """Create a direct_url.json file for later use during wheel install.
 
-    We abuse PEX to get the PEP 660 editable wheels into the virtualenv, and then use
-    pip to actually install the wheel. But PEX and pip do not know that this is an
-    editable install. We cannot add direct_url.json directly to the wheel because
-    that must be added by the wheel installer. So we will rename this file to
-    'direct_url.json' after pip has installed everything else.
+    We abuse PEX to get the PEP 660 editable wheels into the virtualenv, and then use pip to
+    actually install the wheel. But PEX and pip do not know that this is an editable install. We
+    cannot add direct_url.json directly to the wheel because that must be added by the wheel
+    installer. So we will rename this file to 'direct_url.json' after pip has installed everything
+    else.
     """
     direct_url_contents = {"url": direct_url, "dir_info": {"editable": True}}
     direct_url_file = os.path.join(build_dir, metadata_path, "direct_url__pants__.json")
-    with open(direct_url_file , "w") as f:
+    with open(direct_url_file, "w") as f:
         json.dump(direct_url_contents, f)
 
 
-def build_editable_wheel(pkg, build_dir, metadata_path, dist_dir, wheel_path):
+def build_editable_wheel(pkg, build_dir, metadata_path, dist_dir, wheel_path, pth_file_path):
     """Build the editable wheel, including .pth and RECORD files."""
 
     _record = []
+
     def record(file_path, file_arcname):
         """Calculate an entry for the RECORD file (required by the wheel spec)."""
         with open(file_path, "rb") as f:
@@ -143,7 +147,7 @@ def build_editable_wheel(pkg, build_dir, metadata_path, dist_dir, wheel_path):
                     whl.write(path, arcname)
 
         record_path = os.path.join(metadata_path, "RECORD")
-        _record.append(_record_path + ",,")
+        _record.append(record_path + ",,")
         _record.append("")  # "" to add newline at eof
         whl.writestr(record_path, os.linesep.join(_record))
 
@@ -157,11 +161,11 @@ def main(build_backend, dist_dir, pth_file_path, wheel_config_settings, tags, di
 
     pkg, version, metadata_path = prepare_dist_info(backend, build_dir, wheel_config_settings)
     remove_record_files(build_dir, metadata_path)
-    write_wheel_file(build_dir, metadata_path)
+    write_wheel_file(tags, build_dir, metadata_path)
     write_direct_url_file(direct_url, build_dir, metadata_path)
 
     wheel_path = "{}-{}-0.editable-{}.whl".format(pkg, version, tags)
-    build_editable_wheel(pkg, build_dir, metadata_path, dist_dir, wheel_path)
+    build_editable_wheel(pkg, build_dir, metadata_path, dist_dir, wheel_path, pth_file_path)
     print("editable_path: {editable_path}".format(editable_path=wheel_path))
 
 
