@@ -75,6 +75,7 @@ _BACKEND_WRAPPER_BOILERPLATE = """
 import base64
 import hashlib
 import os
+import shutil
 import zipfile
 import {build_backend_module}
 
@@ -113,6 +114,24 @@ else:
         whl.extractall(build_dir, dist_info_files)
         metadata_path = os.path.dirname(dist_info_files[0])
 
+pkg_version = metadata_path.replace(".dist-info", "")
+if "-" in pkg_version:
+    pkg, version = pkg_version.split("-")
+else:
+    # an old backend that doesn't conform to the latest specs
+    pkg = pkg_version
+    version = ""
+    with open(os.path.join(build_dir, metadata_path, "METADATA"), "r") as f:
+        lines = f.readlines()
+    for line in lines:
+        if line.startswith("Version: "):
+            version = line[len("Version: "):].strip()
+            break
+    # standardize the name of the dist-info directory
+    old_metadata_path = metadata_path
+    metadata_path = pkg + "-" + version + ".dist-info"
+    shutil.move(os.path.join(build_dir, old_metadata_path), os.path.join(build_dir, metadata_path))
+
 # Any RECORD* file will be incorrect since we are creating the wheel.
 for file in os.listdir(os.path.join(build_dir, metadata_path)):
     if file == "RECORD" or file.startswith("RECORD."):
@@ -144,18 +163,6 @@ if direct_url:
 }}}}
 '''.format(direct_url))
 
-pkg_version = metadata_path.replace(".dist-info", "")
-if "-" in pkg_version:
-    pkg, version = pkg_version.split("-")
-else:
-    pkg = pkg_version
-    version = ""
-    with open(os.path.join(build_dir, metadata_path, "METADATA"), "r") as f:
-        lines = f.readlines()
-    for line in lines:
-        if line.startswith("Version: "):
-            version = line[len("Version: "):].strip()
-            break
 pth_file_arcname = pkg + "__pants__.pth"
 
 _record = []
