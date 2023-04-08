@@ -19,7 +19,6 @@ from pants.backend.python.util_rules.local_dists_pep660 import (
     EditableLocalDists,
     EditableLocalDistsRequest,
 )
-from pants.backend.python.util_rules.local_dists_pep660 import rules as local_dists_pep660_rules
 from pants.backend.python.util_rules.pex import Pex, PexProcess, PexRequest, VenvPex, VenvPexProcess
 from pants.backend.python.util_rules.pex_cli import PexPEX
 from pants.backend.python.util_rules.pex_environment import PexEnvironment
@@ -281,19 +280,24 @@ async def do_export(
             PostProcessingCommand(["rm", "-rf", tmpdir_under_digest_root]),
         ]
 
+        # Insert editable wheel post processing commands if needed.
         if req.editable_local_dists_digest is not None:
-            # insert editable wheel post processing commands
+            # We need the snapshot to get the wheel file names which are something like:
+            #   - pkg_name-1.2.3-0.editable-py3-none-any.whl
             wheels_snapshot = await Get(Snapshot, Digest, req.editable_local_dists_digest)
-            py_minor_version = ".".join(py_version.split(".", 2)[:2])
-            lib_dir = os.path.join(output_path, "lib", f"python{py_minor_version}", "site-packages")
+            # We need the paths to the installed .dist-info directories to finish installation.
+            py_major_minor_version = ".".join(py_version.split(".", 2)[:2])
+            lib_dir = os.path.join(output_path, "lib", f"python{py_major_minor_version}", "site-packages")
             dist_info_dirs = [
+                # This builds: dist/.../resolve/3.8.9/lib/python3.8/site-packages/pkg_name-1.2.3.dist-info
                 os.path.join(lib_dir, "-".join(f.split("-")[:2]) + ".dist-info")
                 for f in wheels_snapshot.files
             ]
+            # We use slice assignment to insert multiple elements at index 1.
             post_processing_cmds[1:1] = [
                 PostProcessingCommand(
                     [
-                        # the wheels are "sources" in the pex and get dumped in lib_dir
+                        # The wheels are "sources" in the pex and get dumped in lib_dir
                         # so we move them to tmpdir where they will be removed at the end.
                         "mv",
                         *(os.path.join(lib_dir, f) for f in wheels_snapshot.files),
@@ -302,17 +306,17 @@ async def do_export(
                 ),
                 PostProcessingCommand(
                     [
-                        # now install the editable wheels
+                        # Now install the editable wheels.
                         os.path.join(output_path, "bin", "pip"),
                         "install",
-                        "--no-deps",  # deps already installed via requirements.pex
-                        "--no-build-isolation",  # avoid vcs dep downloads (as they are installed)
+                        "--no-deps",  # The deps were already installed via requirements.pex.
+                        "--no-build-isolation",  # Avoid VCS dep downloads (as they are installed).
                         *(os.path.join(tmpdir_under_digest_root, f) for f in wheels_snapshot.files),
                     ]
                 ),
                 PostProcessingCommand(
                     [
-                        # replace pip's direct_url.json (which points to the wheel)
+                        # Replace pip's direct_url.json (which points to the temp editable wheel)
                         # with ours (which points to build_dir sources and is marked "editable").
                         "sh",
                         "-c",
@@ -583,7 +587,6 @@ async def export_virtualenvs(
 def rules():
     return [
         *collect_rules(),
-        *local_dists_pep660_rules(),
         Export.subsystem_cls.register_plugin_options(ExportPluginOptions),
         UnionRule(ExportRequest, ExportVenvsRequest),
     ]

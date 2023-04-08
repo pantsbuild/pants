@@ -46,6 +46,7 @@ from pants.backend.python.target_types import (
 from pants.backend.python.util_rules import (
     ancestor_files,
     local_dists,
+    local_dists_pep660,
     pex,
     pex_from_targets,
     python_sources,
@@ -70,6 +71,7 @@ def rules():
         # Util rules
         *ancestor_files.rules(),
         *dependency_inference_rules.rules(),
+        *local_dists_pep660.rules(),
         *pex.rules(),
         *pex_from_targets.rules(),
         *python_sources.rules(),

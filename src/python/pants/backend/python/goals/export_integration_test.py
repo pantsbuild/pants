@@ -29,7 +29,7 @@ SOURCES = {
         python_source(name='foo', source='foo.py', resolve=parametrize('a', 'b'))
         python_distribution(
             name='dist',
-            provides=python_artifact(name='foo', version='1.2.3'),
+            provides=python_artifact(name='foo-dist', version='1.2.3'),
             dependencies=[':foo@resolve=a'],
         )
         """
@@ -143,27 +143,27 @@ def test_export(py_resolve_format: PythonResolveExportFormat) -> None:
         ), f"expected dist-info for ansicolors '{expected_ansicolors_dir}' does not exist"
 
         if py_resolve_format == PythonResolveExportFormat.mutable_virtualenv:
-            expected_foo_dir = os.path.join(lib_dir, "foo-1.2.3.dist-info")
+            expected_foo_dir = os.path.join(lib_dir, "foo_dist-1.2.3.dist-info")
             if resolve == "b":
                 assert not os.path.isdir(
                     expected_foo_dir
-                ), f"unexpected dist-info for foo '{expected_foo_dir}' exists"
+                ), f"unexpected dist-info for foo-dist '{expected_foo_dir}' exists"
             elif resolve == "a":
                 # make sure the editable wheel for the python_distribution is installed
                 assert os.path.isdir(
                     expected_foo_dir
-                ), f"expected dist-info for foo '{expected_foo_dir}' does not exist"
+                ), f"expected dist-info for foo-dist '{expected_foo_dir}' does not exist"
                 # direct_url__pants__.json should be moved to direct_url.json
                 expected_foo_direct_url_pants = os.path.join(
                     expected_foo_dir, "direct_url__pants__.json"
                 )
                 assert not os.path.isfile(
                     expected_foo_direct_url_pants
-                ), f"expected direct_url__pants__.json for foo '{expected_foo_direct_url_pants}' was not removed"
+                ), f"expected direct_url__pants__.json for foo-dist '{expected_foo_direct_url_pants}' was not removed"
                 expected_foo_direct_url = os.path.join(expected_foo_dir, "direct_url.json")
                 assert os.path.isfile(
                     expected_foo_direct_url
-                ), f"expected direct_url.json for foo '{expected_foo_direct_url}' does not exist"
+                ), f"expected direct_url.json for foo-dist '{expected_foo_direct_url}' does not exist"
 
     for tool_config in EXPORTED_TOOLS:
         export_dir = os.path.join(export_prefix, tool_config.name, platform.python_version())
