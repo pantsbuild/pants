@@ -42,7 +42,7 @@ use std::fmt::{self, Debug, Display};
 use std::fs::OpenOptions;
 use std::fs::Permissions as FSPermissions;
 use std::future::Future;
-use std::io::{self, Write};
+use std::io::Write;
 use std::os::unix::fs::{MetadataExt, OpenOptionsExt, PermissionsExt};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Weak};
@@ -140,12 +140,6 @@ impl Display for StoreError {
 impl From<String> for StoreError {
   fn from(err: String) -> Self {
     Self::Unclassified(err)
-  }
-}
-
-impl From<io::Error> for StoreError {
-  fn from(err: io::Error) -> Self {
-    Self::Unclassified(err.to_string())
   }
 }
 
@@ -385,7 +379,7 @@ impl Store {
     tls_config: grpc_util::tls::Config,
     headers: BTreeMap<String, String>,
     chunk_size_bytes: usize,
-    upload_timeout: Duration,
+    rpc_timeout: Duration,
     rpc_retries: usize,
     rpc_concurrency_limit: usize,
     capabilities_cell_opt: Option<Arc<OnceCell<ServerCapabilities>>>,
@@ -399,7 +393,7 @@ impl Store {
         tls_config,
         headers,
         chunk_size_bytes,
-        upload_timeout,
+        rpc_timeout,
         rpc_retries,
         rpc_concurrency_limit,
         capabilities_cell_opt,
@@ -1448,7 +1442,12 @@ impl Store {
     destination: PathBuf,
     target: String,
   ) -> Result<(), StoreError> {
-    symlink(target, destination).await?;
+    symlink(&target, &destination).await.map_err(|e| {
+      format!(
+        "Failed to create symlink to {target} at {}: {e}",
+        destination.display()
+      )
+    })?;
     Ok(())
   }
 
@@ -1464,9 +1463,19 @@ impl Store {
     // It also has the benefit of playing nicely with Docker for macOS file virtualization: see
     // #18162.
     #[cfg(target_os = "macos")]
-    copy(target, destination).await?;
+    copy(&target, &destination).await.map_err(|e| {
+      format!(
+        "Failed to copy from {target} to {}: {e}",
+        destination.display()
+      )
+    })?;
     #[cfg(not(target_os = "macos"))]
-    hard_link(target, destination).await?;
+    hard_link(&target, &destination).await.map_err(|e| {
+      format!(
+        "Failed to create hardlink to {target} at {}: {e}",
+        destination.display()
+      )
+    })?;
     Ok(())
   }
 
