@@ -9,23 +9,22 @@ import shlex
 from collections import defaultdict
 from dataclasses import dataclass
 
-# TODO: move this to a util_rules file
-from pants.backend.python.goals import setup_py
-from pants.backend.python.goals.setup_py import (
-    DependencyOwner,
-    ExportedTarget,
-    OwnedDependencies,
-    create_dist_build_request,
-)
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.subsystems.setuptools import PythonDistributionFieldSet
 from pants.backend.python.target_types import PythonProvidesField, PythonResolveField
+from pants.backend.python.util_rules import package_dists
 from pants.backend.python.util_rules.dists import (
     BuildBackendError,
     DistBuildRequest,
     distutils_repr,
 )
 from pants.backend.python.util_rules.dists import rules as dists_rules
+from pants.backend.python.util_rules.package_dists import (
+    DependencyOwner,
+    ExportedTarget,
+    OwnedDependencies,
+    create_dist_build_request,
+)
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.base.build_root import BuildRoot
 from pants.core.util_rules import system_binaries
@@ -534,6 +533,6 @@ def rules():
     return (
         *collect_rules(),
         *dists_rules(),
-        *setup_py.rules(),
+        *package_dists.rules(),
         *system_binaries.rules(),
     )
