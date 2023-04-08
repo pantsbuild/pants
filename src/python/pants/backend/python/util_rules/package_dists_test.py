@@ -9,41 +9,12 @@ from typing import Iterable
 import pytest
 
 from pants.backend.python import target_types_rules
-from pants.backend.python.goals.setup_py import (
-    AmbiguousOwnerError,
-    DependencyOwner,
-    DistBuildChroot,
-    DistBuildChrootRequest,
-    DistBuildSources,
-    ExportedTarget,
-    ExportedTargetRequirements,
-    FinalizedSetupKwargs,
-    FirstPartyDependencyVersionScheme,
-    GenerateSetupPyRequest,
-    InvalidEntryPoint,
-    InvalidSetupPyArgs,
-    NoDistTypeSelected,
-    NoOwnerError,
-    OwnedDependencies,
-    OwnedDependency,
-    SetupKwargs,
-    SetupKwargsRequest,
-    SetupPyError,
-    SetupPyGeneration,
-    declares_pkg_resources_namespace_package,
-    determine_explicitly_provided_setup_kwargs,
-    determine_finalized_setup_kwargs,
-    generate_chroot,
-    generate_setup_py,
-    get_exporting_owner,
-    get_owned_dependencies,
-    get_requirements,
-    get_sources,
-    merge_entry_points,
-    package_python_dist,
-    validate_commands,
-)
+from pants.backend.python.goals.package_dists import package_python_dist
 from pants.backend.python.macros.python_artifact import PythonArtifact
+from pants.backend.python.subsystems.setup_py_generation import (
+    FirstPartyDependencyVersionScheme,
+    SetupPyGeneration,
+)
 from pants.backend.python.subsystems.setuptools import PythonDistributionFieldSet
 from pants.backend.python.target_types import (
     PexBinary,
@@ -54,6 +25,37 @@ from pants.backend.python.target_types import (
 )
 from pants.backend.python.util_rules import dists, python_sources
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
+from pants.backend.python.util_rules.package_dists import (
+    AmbiguousOwnerError,
+    DependencyOwner,
+    DistBuildChroot,
+    DistBuildChrootRequest,
+    DistBuildSources,
+    ExportedTarget,
+    ExportedTargetRequirements,
+    FinalizedSetupKwargs,
+    GenerateSetupPyRequest,
+    InvalidEntryPoint,
+    InvalidSetupPyArgs,
+    NoDistTypeSelected,
+    NoOwnerError,
+    OwnedDependencies,
+    OwnedDependency,
+    SetupKwargs,
+    SetupKwargsRequest,
+    SetupPyError,
+    declares_pkg_resources_namespace_package,
+    determine_explicitly_provided_setup_kwargs,
+    determine_finalized_setup_kwargs,
+    generate_chroot,
+    generate_setup_py,
+    get_exporting_owner,
+    get_owned_dependencies,
+    get_requirements,
+    get_sources,
+    merge_entry_points,
+    validate_commands,
+)
 from pants.base.exceptions import IntrinsicError
 from pants.core.goals.package import BuiltPackage
 from pants.core.target_types import FileTarget, ResourcesGeneratorTarget, ResourceTarget

@@ -58,7 +58,7 @@ __dependents_rules__(
         DEFAULT_DEPENDENTS_RULES,
     ),
     (
-        "[/python/goals/setup_py.py]",
+        "[/python/util_rules/package_dists.py]",
         "//pants-plugins/internal_plugins/releases/register.py",
         DEFAULT_DEPENDENTS_RULES,
     ),
