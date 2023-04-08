@@ -305,6 +305,8 @@ async def do_export(
                         # now install the editable wheels
                         os.path.join(output_path, "bin", "pip"),
                         "install",
+                        "--no-deps",  # deps already installed via requirements.pex
+                        "--no-build-isolation",  # avoid vcs dep downloads (as they are installed)
                         *(os.path.join(tmpdir_under_digest_root, f) for f in wheels_snapshot.files),
                     ]
                 ),
