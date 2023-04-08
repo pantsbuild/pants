@@ -13,7 +13,7 @@ import pytest
 
 from pants.backend.python import target_types_rules
 from pants.backend.python.dependency_inference import rules as dependency_inference_rules
-from pants.backend.python.goals import package_pex_binary, pytest_runner, setup_py
+from pants.backend.python.goals import package_dists, package_pex_binary, pytest_runner
 from pants.backend.python.goals.coverage_py import create_or_update_coverage_config
 from pants.backend.python.goals.pytest_runner import (
     PytestPluginSetup,
@@ -71,7 +71,7 @@ def rule_runner() -> RuleRunner:
             get_filtered_environment,
             *target_types_rules.rules(),
             *local_dists.rules(),
-            *setup_py.rules(),
+            *package_dists.rules(),
             *package.rules(),
             QueryRule(Partitions, (PyTestRequest.PartitionRequest,)),
             QueryRule(TestResult, (PyTestRequest.Batch,)),

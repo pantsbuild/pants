@@ -9,5 +9,6 @@ python_tests(
         "local_dists_test.py": {"timeout": 120},
         "pex_from_targets_test.py": {"timeout": 200},
         "pex_test.py": {"timeout": 600},
+        "package_dists_test.py": {"timeout": 150},
     },
 )

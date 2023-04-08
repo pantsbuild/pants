@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import enum
 import itertools
 import logging
 import os
@@ -17,6 +16,7 @@ from typing import Any, DefaultDict, Dict, List, Mapping, Tuple, cast
 
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.subsystems.setup import PythonSetup
+from pants.backend.python.subsystems.setup_py_generation import SetupPyGeneration
 from pants.backend.python.subsystems.setuptools import PythonDistributionFieldSet
 from pants.backend.python.target_types import (
     BuildBackendEnvVarsField,
@@ -39,7 +39,6 @@ from pants.backend.python.util_rules.dists import (
     BuildSystem,
     BuildSystemRequest,
     DistBuildRequest,
-    DistBuildResult,
     distutils_repr,
 )
 from pants.backend.python.util_rules.dists import rules as dists_rules
@@ -54,7 +53,6 @@ from pants.backend.python.util_rules.python_sources import (
 from pants.backend.python.util_rules.python_sources import rules as python_sources_rules
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.base.specs import AncestorGlobSpec, RawSpecs
-from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact, PackageFieldSet
 from pants.core.target_types import FileSourceField, ResourceSourceField
 from pants.engine.addresses import Address, UnparsedAddressInputs
 from pants.engine.collection import Collection, DeduplicatedCollection
@@ -69,7 +67,6 @@ from pants.engine.fs import (
     FileContent,
     MergeDigests,
     PathGlobs,
-    Snapshot,
 )
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
@@ -83,9 +80,7 @@ from pants.engine.target import (
     TransitiveTargetsRequest,
     targets_with_sources_types,
 )
-from pants.engine.unions import UnionMembership, UnionRule, union
-from pants.option.option_types import BoolOption, EnumOption
-from pants.option.subsystem import Subsystem
+from pants.engine.unions import UnionMembership, union
 from pants.source.source_root import SourceRootsRequest, SourceRootsResult
 from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
@@ -317,56 +312,6 @@ class DistBuildChroot:
     working_directory: str  # Path to dir within digest.
 
 
-@enum.unique
-class FirstPartyDependencyVersionScheme(enum.Enum):
-    EXACT = "exact"  # i.e., ==
-    COMPATIBLE = "compatible"  # i.e., ~=
-    ANY = "any"  # i.e., no specifier
-
-
-class SetupPyGeneration(Subsystem):
-    options_scope = "setup-py-generation"
-    help = "Options to control how setup.py is generated from a `python_distribution` target."
-
-    # Generating setup is the more aggressive thing to do, so we'd prefer that the default
-    # be False. However that would break widespread existing usage, so we'll make that
-    # change in a future deprecation cycle.
-    generate_setup_default = BoolOption(
-        default=True,
-        help=softwrap(
-            """
-            The default value for the `generate_setup` field on `python_distribution` targets.
-            Can be overridden per-target by setting that field explicitly. Set this to False
-            if you mostly rely on handwritten setup files (setup.py, setup.cfg and similar).
-            Leave as True if you mostly rely on Pants generating setup files for you.
-            """
-        ),
-    )
-
-    first_party_dependency_version_scheme = EnumOption(
-        default=FirstPartyDependencyVersionScheme.EXACT,
-        help=softwrap(
-            """
-            What version to set in `install_requires` when a `python_distribution` depends on
-            other `python_distribution`s. If `exact`, will use `==`. If `compatible`, will
-            use `~=`. If `any`, will leave off the version. See
-            https://www.python.org/dev/peps/pep-0440/#version-specifiers.
-            """
-        ),
-    )
-
-    def first_party_dependency_version(self, version: str) -> str:
-        """Return the version string (e.g. '~=4.0') for a first-party dependency.
-
-        If the user specified to use "any" version, then this will return an empty string.
-        """
-        scheme = self.first_party_dependency_version_scheme
-        if scheme == FirstPartyDependencyVersionScheme.ANY:
-            return ""
-        specifier = "==" if scheme == FirstPartyDependencyVersionScheme.EXACT else "~="
-        return f"{specifier}{version}"
-
-
 def validate_commands(commands: tuple[str, ...]):
     # We rely on the dist dir being the default, so we know where to find the created dists.
     if "--dist-dir" in commands or "-d" in commands:
@@ -529,27 +474,6 @@ async def create_dist_build_request(
         extra_build_time_requirements=extra_build_time_requirements,
         extra_build_time_env=extra_build_time_env,
         output_path=output_path,
-    )
-
-
-@rule
-async def package_python_dist(
-    field_set: PythonDistributionFieldSet,
-    python_setup: PythonSetup,
-    union_membership: UnionMembership,
-) -> BuiltPackage:
-    dist_build_request = await create_dist_build_request(
-        field_set=field_set,
-        python_setup=python_setup,
-        union_membership=union_membership,
-        # raises an error if both dist_tgt.wheel and dist_tgt.sdist are False
-        validate_wheel_sdist=True,
-    )
-    setup_py_result = await Get(DistBuildResult, DistBuildRequest, dist_build_request)
-    dist_snapshot = await Get(Snapshot, Digest, setup_py_result.output)
-    return BuiltPackage(
-        setup_py_result.output,
-        tuple(BuiltPackageArtifact(path) for path in dist_snapshot.files),
     )
 
 
@@ -1210,5 +1134,4 @@ def rules():
         *python_sources_rules(),
         *dists_rules(),
         *collect_rules(),
-        UnionRule(PackageFieldSet, PythonDistributionFieldSet),
     ]

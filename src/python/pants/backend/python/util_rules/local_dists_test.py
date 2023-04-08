@@ -11,7 +11,7 @@ from textwrap import dedent
 import pytest
 
 from pants.backend.python import target_types_rules
-from pants.backend.python.goals.setup_py import rules as setup_py_rules
+from pants.backend.python.goals import package_dists
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.subsystems.setuptools import rules as setuptools_rules
 from pants.backend.python.target_types import PythonDistribution, PythonSourcesGeneratorTarget
@@ -31,7 +31,7 @@ def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             *local_dists.rules(),
-            *setup_py_rules(),
+            *package_dists.rules(),
             *setuptools_rules(),
             *target_types_rules.rules(),
             *pex_from_targets.rules(),
