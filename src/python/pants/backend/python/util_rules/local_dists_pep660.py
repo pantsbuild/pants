@@ -195,8 +195,7 @@ def interpolate_backend_wrapper(
     direct_url: str,
     request: DistBuildRequest,
 ) -> bytes:
-    """
-    This builds a PEP 517 / PEP 660 wrapper script that builds the editable wheel.
+    """This builds a PEP 517 / PEP 660 wrapper script that builds the editable wheel.
 
     This backend wrapper script, along with the commands that install the editable wheel,
     need to conform to the following specs so that Pants is a PEP 660 compliant frontend,

@@ -287,7 +287,9 @@ async def do_export(
             wheels_snapshot = await Get(Snapshot, Digest, req.editable_local_dists_digest)
             # We need the paths to the installed .dist-info directories to finish installation.
             py_major_minor_version = ".".join(py_version.split(".", 2)[:2])
-            lib_dir = os.path.join(output_path, "lib", f"python{py_major_minor_version}", "site-packages")
+            lib_dir = os.path.join(
+                output_path, "lib", f"python{py_major_minor_version}", "site-packages"
+            )
             dist_info_dirs = [
                 # This builds: dist/.../resolve/3.8.9/lib/python3.8/site-packages/pkg_name-1.2.3.dist-info
                 os.path.join(lib_dir, "-".join(f.split("-")[:2]) + ".dist-info")

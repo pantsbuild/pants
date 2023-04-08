@@ -17,7 +17,7 @@ from pants.backend.python.target_types import (
     PythonRequirementTarget,
     PythonSourcesGeneratorTarget,
 )
-from pants.backend.python.util_rules import pex_from_targets, local_dists_pep660
+from pants.backend.python.util_rules import local_dists_pep660, pex_from_targets
 from pants.base.specs import RawSpecs, RecursiveGlobSpec
 from pants.core.goals.export import ExportResults
 from pants.core.util_rules import distdir
