@@ -127,7 +127,7 @@ class ExportPluginOptions:
         removal_hint="Set the `[export].py_resolve_format` option to 'symlinked_immutable_virtualenv'",
     )
 
-    py_editables_in_resolves = StrListOption(
+    py_editable_in_resolve = StrListOption(
         # TODO: Is there a way to get [python].resolves in a memoized_property here?
         #       If so, then we can validate that all resolves here are defined there.
         help=softwrap(
@@ -380,7 +380,7 @@ async def export_virtualenv_for_resolve(
             )
         )
 
-        if resolve in export_subsys.options.py_editables_in_resolves:
+        if resolve in export_subsys.options.py_editable_in_resolve:
             editable_local_dists = await Get(
                 EditableLocalDists, EditableLocalDistsRequest(resolve=resolve)
             )
