@@ -320,17 +320,19 @@ async def do_export(
                     [
                         # Replace pip's direct_url.json (which points to the temp editable wheel)
                         # with ours (which points to build_dir sources and is marked "editable").
+                        # Also update INSTALLER file to indicate that pants installed it.
                         "sh",
                         "-c",
                         " ".join(
                             [
-                                f"mv -f {src} {dst};"
-                                for src, dst in zip(
+                                f"mv -f {src} {dst}; echo pants > {installer};"
+                                for src, dst, installer in zip(
                                     [
                                         os.path.join(d, "direct_url__pants__.json")
                                         for d in dist_info_dirs
                                     ],
                                     [os.path.join(d, "direct_url.json") for d in dist_info_dirs],
+                                    [os.path.join(d, "INSTALLER") for d in dist_info_dirs],
                                 )
                             ]
                         ),
