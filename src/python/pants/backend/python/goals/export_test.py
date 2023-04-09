@@ -208,7 +208,7 @@ def test_export_venv_new_codepath(
             "--python-invalid-lockfile-behavior=ignore",
             # Turn off python synthetic lockfile targets to make the test simpler.
             "--no-python-enable-lockfile-targets",
-            "--export-py-editables-in-resolves=['a', 'b']",
+            "--export-py-editable-in-resolve=['a', 'b']",
             format_flag,
         ],
         env_inherit={"PATH", "PYENV_ROOT"},

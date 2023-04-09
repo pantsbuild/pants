@@ -110,7 +110,7 @@ def test_export(py_resolve_format: PythonResolveExportFormat) -> None:
                 "generate-lockfiles",
                 "export",
                 *(f"--resolve={name}" for name in resolve_names),
-                "--export-py-editables-in-resolves=['a']",
+                "--export-py-editable-in-resolve=['a']",
             ],
             config=build_config(tmpdir, py_resolve_format),
         ).assert_success()
