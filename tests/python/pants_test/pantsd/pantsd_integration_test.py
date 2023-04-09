@@ -684,9 +684,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
 
         This is a regression test for the most glaring case of https://github.com/pantsbuild/pants/issues/7597.
         """
-        with self.pantsd_run_context(
-            success=False, extra_config={"python": {"interpreter_constraints": "['>=3.7,<3.10']"}}
-        ) as ctx, temporary_dir(".") as directory:
+        with self.pantsd_run_context(success=False) as ctx, temporary_dir(".") as directory:
             Path(directory, "BUILD").write_text(
                 dedent(
                     """\
