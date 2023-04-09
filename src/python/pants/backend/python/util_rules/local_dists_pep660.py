@@ -86,7 +86,7 @@ def dump_backend_wrapper_json(
         "dist_dir": dist_dir,
         "pth_file_path": pth_file_path,
         "wheel_config_settings": clean_config_settings(request.wheel_config_settings),
-        "platform_compatibility_tags": "-".join([lang_tag, abi_tag, platform_tag]),
+        "tags": "-".join([lang_tag, abi_tag, platform_tag]),
         "direct_url": direct_url,
     }
     return json.dumps(settings).encode()
@@ -140,7 +140,9 @@ async def run_pep660_build(
     dist_output_dir = os.path.join(dist_dir, request.output_path)
 
     backend_wrapper_json = "backend_wrapper.json"
+    backend_wrapper_json_path = os.path.join(request.working_directory, backend_wrapper_json)
     backend_wrapper_name = "backend_wrapper.py"
+    backend_wrapper_path = os.path.join(request.working_directory, backend_wrapper_name)
     backend_wrapper_content = read_resource(_scripts_package, "pep660_backend_wrapper.py")
     assert backend_wrapper_content is not None
 
@@ -151,7 +153,7 @@ async def run_pep660_build(
                 [
                     FileContent(pth_file_path, pth_file_contents.encode()),
                     FileContent(
-                        backend_wrapper_json,
+                        backend_wrapper_json_path,
                         dump_backend_wrapper_json(
                             dist_output_dir, pth_file_name, direct_url, request
                         ),
@@ -162,7 +164,7 @@ async def run_pep660_build(
         # The backend_wrapper has its own digest for cache reuse.
         Get(
             Digest,
-            CreateDigest([FileContent(backend_wrapper_name, backend_wrapper_content)]),
+            CreateDigest([FileContent(backend_wrapper_path, backend_wrapper_content)]),
         ),
         # Note that this pex has no entrypoint. We use it to run our wrapper, which
         # in turn imports from and invokes the build backend.
