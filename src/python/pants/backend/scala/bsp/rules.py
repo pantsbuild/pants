@@ -36,7 +36,7 @@ from pants.bsp.util_rules.targets import (
     BSPResourcesRequest,
     BSPResourcesResult,
 )
-from pants.core.util_rules.system_binaries import BashBinary, ReadlinkBinary, ReadlinkBinaryRequest
+from pants.core.util_rules.system_binaries import BashBinary, ReadlinkBinary
 from pants.engine.addresses import Addresses
 from pants.engine.fs import AddPrefix, CreateDigest, Digest, FileContent, MergeDigests, Workspace
 from pants.engine.internals.native_engine import Snapshot
@@ -181,6 +181,7 @@ async def bsp_resolve_scala_metadata(
     jvm: JvmSubsystem,
     scala: ScalaSubsystem,
     build_root: BuildRoot,
+    readlink: ReadlinkBinary,
 ) -> BSPBuildTargetsMetadataResult:
     resolves = {fs.resolve.normalized_value(jvm) for fs in request.field_sets}
     jdk_versions = {fs.jdk for fs in request.field_sets}
@@ -212,11 +213,7 @@ async def bsp_resolve_scala_metadata(
     # The maximum JDK version will be compatible with all the specified targets
     jdk_requests = [JdkRequest.from_field(version) for version in jdk_versions]
     jdk_request = max(jdk_requests, key=_jdk_request_sort_key(jvm))
-
-    jdk, readlink, = await MultiGet(
-        Get(JdkEnvironment, JdkRequest, jdk_request),
-        Get(ReadlinkBinary, ReadlinkBinaryRequest()),
-    )
+    jdk = await Get(JdkEnvironment, JdkRequest, jdk_request)
 
     if any(i.version == DefaultJdk.SYSTEM for i in jdk_requests):
         system_jdk = await Get(JdkEnvironment, JdkRequest, JdkRequest.SYSTEM)

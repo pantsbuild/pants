@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import functools
 import itertools
 import json
@@ -10,7 +11,7 @@ import logging
 import os.path
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Iterable, Iterator, NamedTuple, Sequence, Type, cast
+from typing import Any, Iterable, Iterator, NamedTuple, Sequence, Type, cast
 
 from pants.base.deprecated import warn_or_error
 from pants.base.specs import AncestorGlobSpec, RawSpecsWithoutFileOwners, RecursiveGlobSpec
@@ -26,6 +27,7 @@ from pants.engine.collection import Collection
 from pants.engine.environment import ChosenLocalEnvironmentName, EnvironmentName
 from pants.engine.fs import EMPTY_SNAPSHOT, GlobMatchErrorBehavior, PathGlobs, Paths, Snapshot
 from pants.engine.internals import native_engine
+from pants.engine.internals.mapper import AddressFamilies
 from pants.engine.internals.native_engine import AddressParseException
 from pants.engine.internals.parametrize import Parametrize, _TargetParametrization
 from pants.engine.internals.parametrize import (  # noqa: F401
@@ -88,11 +90,7 @@ from pants.engine.target import (
     _generate_file_level_targets,
 )
 from pants.engine.unions import UnionMembership, UnionRule
-from pants.option.global_options import (
-    GlobalOptions,
-    OwnersNotFoundBehavior,
-    UnmatchedBuildFileGlobs,
-)
+from pants.option.global_options import GlobalOptions, UnmatchedBuildFileGlobs
 from pants.util.docutil import bin_name, doc_url
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
@@ -171,179 +169,287 @@ def warn_deprecated_field_type(field_type: type[Field]) -> None:
     )
 
 
+@dataclass(frozen=True)
+class _AdaptorAndType:
+    adaptor: TargetAdaptor
+    target_type: type[Target]
+
+
+@dataclass(frozen=True)
+class _RequestAdaptorAndType:
+    address: Address
+    description_of_origin: str
+
+
+@rule
 async def _determine_target_adaptor_and_type(
-    address: Address, registered_target_types: RegisteredTargetTypes, *, description_of_origin: str
-) -> tuple[TargetAdaptor, type[Target]]:
+    req: _RequestAdaptorAndType, registered_target_types: RegisteredTargetTypes
+) -> _AdaptorAndType:
     target_adaptor = await Get(
         TargetAdaptor,
-        TargetAdaptorRequest(address, description_of_origin=description_of_origin),
+        TargetAdaptorRequest(req.address, description_of_origin=req.description_of_origin),
     )
     target_type = registered_target_types.aliases_to_types.get(target_adaptor.type_alias, None)
     if target_type is None:
         raise UnrecognizedTargetTypeException(
-            target_adaptor.type_alias,
-            registered_target_types,
-            address,
-            build_file_source=target_adaptor.source,
+            target_adaptor.type_alias, registered_target_types, req.address
         )
     if (
         target_type.deprecated_alias is not None
         and target_type.deprecated_alias == target_adaptor.type_alias
-        and not address.is_generated_target
+        and not req.address.is_generated_target
     ):
         warn_deprecated_target_type(target_type)
-    return target_adaptor, target_type
+    return _AdaptorAndType(target_adaptor, target_type)
+
+
+@dataclass(frozen=True)
+class _TargetGeneratorOverridesRequest:
+    target_generator: TargetGenerator
+
+
+@dataclass(frozen=True)
+class ResolvedTargetGeneratorRequests:
+    requests: tuple[GenerateTargetsRequest, ...] = tuple()
+
+
+@dataclass(frozen=True)
+class ResolveTargetGeneratorRequests:
+    address: Address
+    description_of_origin: str = dataclasses.field(hash=False, compare=False)
+
+
+@dataclass(frozen=True)
+class ResolveAllTargetGeneratorRequests:
+    description_of_origin: str = dataclasses.field(hash=False, compare=False)
+    of_type: type[TargetGenerator] | None = None
 
 
 @rule
-async def resolve_target_parametrizations(
-    request: _TargetParametrizationsRequest,
-    registered_target_types: RegisteredTargetTypes,
+async def resolve_all_generator_target_requests(
+    req: ResolveAllTargetGeneratorRequests,
+) -> ResolvedTargetGeneratorRequests:
+    address_families = await Get(
+        AddressFamilies,
+        RawSpecsWithoutFileOwners(
+            recursive_globs=(RecursiveGlobSpec(""),),
+            description_of_origin="the `ResolveAllTargetGeneratorRequests` rule",
+        ),
+    )
+    results = await MultiGet(
+        Get(
+            ResolvedTargetGeneratorRequests,
+            ResolveTargetGeneratorRequests(address, req.description_of_origin),
+        )
+        for family in address_families
+        for address, target_adaptor in family.addresses_to_target_adaptors.items()
+        if not req.of_type or target_adaptor.type_alias == req.of_type.alias
+    )
+    return ResolvedTargetGeneratorRequests(
+        tuple(itertools.chain.from_iterable(result.requests for result in results))
+    )
+
+
+async def _target_generator_overrides(
+    target_generator: TargetGenerator, unmatched_build_file_globs: UnmatchedBuildFileGlobs
+) -> dict[str, dict[str, Any]]:
+    address = target_generator.address
+    if target_generator.has_field(OverridesField):
+        overrides_field = target_generator[OverridesField]
+        overrides_flattened = overrides_field.flatten()
+    else:
+        overrides_flattened = {}
+    if isinstance(target_generator, TargetFilesGenerator):
+        override_globs = OverridesField.to_path_globs(
+            address, overrides_flattened, unmatched_build_file_globs
+        )
+        override_paths = await MultiGet(
+            Get(Paths, PathGlobs, path_globs) for path_globs in override_globs
+        )
+        return OverridesField.flatten_paths(
+            address, zip(override_paths, override_globs, overrides_flattened.values())
+        )
+    return overrides_flattened
+
+
+@rule
+async def resolve_generator_target_requests(
+    req: ResolveTargetGeneratorRequests,
     union_membership: UnionMembership,
     target_types_to_generate_requests: TargetTypesToGenerateTargetsRequests,
     unmatched_build_file_globs: UnmatchedBuildFileGlobs,
-) -> _TargetParametrizations:
-    address = request.address
-    target_adaptor, target_type = await _determine_target_adaptor_and_type(
-        address, registered_target_types, description_of_origin=request.description_of_origin
+) -> ResolvedTargetGeneratorRequests:
+    adaptor_and_type = await Get(
+        _AdaptorAndType, _RequestAdaptorAndType(req.address, req.description_of_origin)
     )
-    create_target = functools.partial(
+    target_adaptor = adaptor_and_type.adaptor
+    target_type = adaptor_and_type.target_type
+    if not issubclass(target_type, TargetGenerator):
+        return ResolvedTargetGeneratorRequests()
+
+    generate_request = target_types_to_generate_requests.request_for(target_type)
+    if not generate_request:
+        return ResolvedTargetGeneratorRequests()
+    generator_fields = dict(target_adaptor.kwargs)
+    generators = _parametrized_target_generators_with_templates(
+        req.address,
+        target_adaptor,
         target_type,
+        generator_fields,
+        union_membership,
+    )
+    base_generator = target_type(
+        generator_fields,
+        req.address,
         name_explicitly_set=target_adaptor.name_explicitly_set,
         union_membership=union_membership,
         build_file_source=target_adaptor.source,
     )
-    target = None
-    parametrizations: list[_TargetParametrization] = []
-    generate_request: type[GenerateTargetsRequest] | None = None
-    if issubclass(target_type, TargetGenerator):
-        generate_request = target_types_to_generate_requests.request_for(target_type)
-    if generate_request:
-        # Split out the `propagated_fields` before construction.
-        generator_fields = dict(target_adaptor.kwargs)
-        template_fields = {}
-        if issubclass(target_type, TargetGenerator):
-            copied_fields = (
-                *target_type.copied_fields,
-                *target_type._find_plugin_fields(union_membership),
-            )
-            for field_type in copied_fields:
-                field_value = generator_fields.get(field_type.alias, None)
-                if field_value is not None:
-                    template_fields[field_type.alias] = field_value
-            for field_type in target_type.moved_fields:
-                field_value = generator_fields.pop(field_type.alias, None)
-                if field_value is not None:
-                    template_fields[field_type.alias] = field_value
-
-        field_type_aliases = target_type._get_field_aliases_to_field_types(
-            target_type.class_field_types(union_membership)
-        ).keys()
-        generator_fields_parametrized = {
-            name
-            for name, field in generator_fields.items()
-            if isinstance(field, Parametrize) and name in field_type_aliases
-        }
-        if generator_fields_parametrized:
-            noun = pluralize(len(generator_fields_parametrized), "field", include_count=False)
-            generator_fields_parametrized_text = ", ".join(
-                repr(f) for f in generator_fields_parametrized
-            )
-            raise InvalidFieldException(
-                softwrap(
-                    f"""
-                    {target_adaptor.source}: Only fields which will be moved to generated targets
-                    may be parametrized, so target generator {address} (with type
-                    {target_type.alias}) cannot parametrize the {generator_fields_parametrized_text}
-                    {noun}.
-                    """
-                )
-            )
-
-        base_generator = create_target(
-            generator_fields,
-            address,
-        )
-        overrides = {}
-        if base_generator.has_field(OverridesField):
-            overrides_field = base_generator[OverridesField]
-            overrides_flattened = overrides_field.flatten()
-            if issubclass(target_type, TargetFilesGenerator):
-                override_globs = OverridesField.to_path_globs(
-                    address, overrides_flattened, unmatched_build_file_globs
-                )
-                override_paths = await MultiGet(
-                    Get(Paths, PathGlobs, path_globs) for path_globs in override_globs
-                )
-                overrides = OverridesField.flatten_paths(
-                    address,
-                    zip(override_paths, override_globs, overrides_flattened.values()),
-                )
-            else:
-                overrides = overrides_field.flatten()
-
-        generators = [
-            (
-                create_target(
-                    generator_fields,
-                    address,
-                ),
-                template,
-            )
-            for address, template in Parametrize.expand(address, template_fields)
-        ]
-        all_generated = await MultiGet(
-            Get(
-                GeneratedTargets,
-                GenerateTargetsRequest,
-                generate_request(
-                    generator,
-                    template_address=generator.address,
-                    template=template,
-                    overrides={
-                        name: dict(Parametrize.expand(generator.address, override))
-                        for name, override in overrides.items()
-                    },
-                ),
+    overrides = await _target_generator_overrides(base_generator, unmatched_build_file_globs)
+    return ResolvedTargetGeneratorRequests(
+        requests=tuple(
+            generate_request(
+                generator,
+                template_address=generator.address,
+                template=template,
+                overrides={
+                    name: dict(Parametrize.expand(generator.address, override))
+                    for name, override in overrides.items()
+                },
             )
             for generator, template in generators
         )
+    )
+
+
+@rule
+async def resolve_target_parametrizations(
+    request: _TargetParametrizationsRequest, union_membership: UnionMembership
+) -> _TargetParametrizations:
+    address = request.address
+    adaptor_and_type = await Get(
+        _AdaptorAndType, _RequestAdaptorAndType(request.address, request.description_of_origin)
+    )
+    target_adaptor = adaptor_and_type.adaptor
+    target_type = adaptor_and_type.target_type
+
+    parametrizations: list[_TargetParametrization] = []
+    requests: ResolvedTargetGeneratorRequests | None = None
+    if issubclass(target_type, TargetGenerator):
+        requests = await Get(
+            ResolvedTargetGeneratorRequests,
+            ResolveTargetGeneratorRequests(address, request.description_of_origin),
+        )
+    if requests and requests.requests:
+        all_generated = await MultiGet(
+            Get(GeneratedTargets, GenerateTargetsRequest, generate_request)
+            for generate_request in requests.requests
+        )
         parametrizations.extend(
-            _TargetParametrization(generator, generated_batch)
-            for generated_batch, (generator, _) in zip(all_generated, generators)
+            _TargetParametrization(generate_request.generator, generated_batch)
+            for generated_batch, generate_request in zip(all_generated, requests.requests)
         )
     else:
-        first, *rest = Parametrize.expand(address, target_adaptor.kwargs)
-        if rest:
-            # The target was parametrized, and so the original Target does not exist.
-            generated = FrozenDict(
-                (
-                    parameterized_address,
-                    create_target(
-                        parameterized_fields,
-                        parameterized_address,
-                    ),
-                )
-                for parameterized_address, parameterized_fields in (first, *rest)
-            )
-            parametrizations.append(_TargetParametrization(None, generated))
-        else:
-            # The target was not parametrized.
-            target = create_target(
-                target_adaptor.kwargs,
-                address,
-            )
-            parametrizations.append(_TargetParametrization(target, FrozenDict()))
-
-    # TODO: Move to Target constructor.
-    for field_type in target.field_types if target else ():
-        if (
-            field_type.deprecated_alias is not None
-            and field_type.deprecated_alias in target_adaptor.kwargs
-        ):
-            warn_deprecated_field_type(field_type)
+        parametrizations.append(
+            _target_parametrizations(address, target_adaptor, target_type, union_membership)
+        )
 
     return _TargetParametrizations(parametrizations)
+
+
+def _target_parametrizations(
+    address: Address,
+    target_adaptor: TargetAdaptor,
+    target_type: type[Target],
+    union_membership: UnionMembership,
+) -> _TargetParametrization:
+    first, *rest = Parametrize.expand(address, target_adaptor.kwargs)
+    if rest:
+        # The target was parametrized, and so the original Target does not exist.
+        generated = FrozenDict(
+            (
+                parameterized_address,
+                target_type(
+                    parameterized_fields,
+                    parameterized_address,
+                    name_explicitly_set=target_adaptor.name_explicitly_set,
+                    union_membership=union_membership,
+                    build_file_source=target_adaptor.source,
+                ),
+            )
+            for parameterized_address, parameterized_fields in (first, *rest)
+        )
+        return _TargetParametrization(None, generated)
+    else:
+        # The target was not parametrized.
+        target = target_type(
+            target_adaptor.kwargs,
+            address,
+            name_explicitly_set=target_adaptor.name_explicitly_set,
+            union_membership=union_membership,
+            build_file_source=target_adaptor.source,
+        )
+        for field_type in target.field_types:
+            if (
+                field_type.deprecated_alias is not None
+                and field_type.deprecated_alias in target_adaptor.kwargs
+            ):
+                warn_deprecated_field_type(field_type)
+        return _TargetParametrization(target, FrozenDict())
+
+
+def _parametrized_target_generators_with_templates(
+    address: Address,
+    target_adaptor: TargetAdaptor,
+    target_type: type[TargetGenerator],
+    generator_fields: dict[str, Any],
+    union_membership: UnionMembership,
+) -> list[tuple[TargetGenerator, dict[str, Any]]]:
+    # Split out the `propagated_fields` before construction.
+    template_fields = {}
+    copied_fields = (
+        *target_type.copied_fields,
+        *target_type._find_plugin_fields(union_membership),
+    )
+    for field_type in copied_fields:
+        field_value = generator_fields.get(field_type.alias, None)
+        if field_value is not None:
+            template_fields[field_type.alias] = field_value
+    for field_type in target_type.moved_fields:
+        field_value = generator_fields.pop(field_type.alias, None)
+        if field_value is not None:
+            template_fields[field_type.alias] = field_value
+    field_type_aliases = target_type._get_field_aliases_to_field_types(
+        target_type.class_field_types(union_membership)
+    ).keys()
+    generator_fields_parametrized = {
+        name
+        for name, field in generator_fields.items()
+        if isinstance(field, Parametrize) and name in field_type_aliases
+    }
+    if generator_fields_parametrized:
+        noun = pluralize(len(generator_fields_parametrized), "field", include_count=False)
+        generator_fields_parametrized_text = ", ".join(
+            repr(f) for f in generator_fields_parametrized
+        )
+        raise InvalidFieldException(
+            f"Only fields which will be moved to generated targets may be parametrized, "
+            f"so target generator {address} (with type {target_type.alias}) cannot "
+            f"parametrize the {generator_fields_parametrized_text} {noun}."
+        )
+    return [
+        (
+            target_type(
+                generator_fields,
+                address,
+                name_explicitly_set=target_adaptor.name is not None,
+                union_membership=union_membership,
+                build_file_source=target_adaptor.source,
+            ),
+            template,
+        )
+        for address, template in Parametrize.expand(address, template_fields)
+    ]
 
 
 @rule(_masked_types=[EnvironmentName])
@@ -395,14 +501,17 @@ class WrappedTargetForBootstrap:
 @rule
 async def resolve_target_for_bootstrapping(
     request: WrappedTargetRequest,
-    registered_target_types: RegisteredTargetTypes,
     union_membership: UnionMembership,
 ) -> WrappedTargetForBootstrap:
-    target_adaptor, target_type = await _determine_target_adaptor_and_type(
-        request.address,
-        registered_target_types,
-        description_of_origin=request.description_of_origin,
+    adaptor_and_type = await Get(
+        _AdaptorAndType,
+        _RequestAdaptorAndType(
+            request.address,
+            description_of_origin=request.description_of_origin,
+        ),
     )
+    target_adaptor = adaptor_and_type.adaptor
+    target_type = adaptor_and_type.target_type
     target = target_type(
         target_adaptor.kwargs,
         request.address,
@@ -459,8 +568,20 @@ async def resolve_targets(
     return Targets(expanded_targets)
 
 
+@rule(_masked_types=[EnvironmentName])
+def find_all_targets_deprecated(_: AllTargetsRequest, all_targets: AllTargets) -> AllTargets:
+    return all_targets
+
+
+@rule(_masked_types=[EnvironmentName])
+def find_all_unexpanded_targets_deprecated(
+    _: AllTargetsRequest, all_targets: AllUnexpandedTargets
+) -> AllUnexpandedTargets:
+    return all_targets
+
+
 @rule(desc="Find all targets in the project", level=LogLevel.DEBUG, _masked_types=[EnvironmentName])
-async def find_all_targets(_: AllTargetsRequest) -> AllTargets:
+async def find_all_targets() -> AllTargets:
     tgts = await Get(
         Targets,
         RawSpecsWithoutFileOwners(
@@ -470,8 +591,12 @@ async def find_all_targets(_: AllTargetsRequest) -> AllTargets:
     return AllTargets(tgts)
 
 
-@rule(desc="Find all targets in the project", level=LogLevel.DEBUG, _masked_types=[EnvironmentName])
-async def find_all_unexpanded_targets(_: AllTargetsRequest) -> AllUnexpandedTargets:
+@rule(
+    desc="Find all (unexpanded) targets in the project",
+    level=LogLevel.DEBUG,
+    _masked_types=[EnvironmentName],
+)
+async def find_all_unexpanded_targets() -> AllUnexpandedTargets:
     tgts = await Get(
         UnexpandedTargets,
         RawSpecsWithoutFileOwners(
@@ -479,16 +604,6 @@ async def find_all_unexpanded_targets(_: AllTargetsRequest) -> AllUnexpandedTarg
         ),
     )
     return AllUnexpandedTargets(tgts)
-
-
-@rule(_masked_types=[EnvironmentName])
-async def find_all_targets_singleton() -> AllTargets:
-    return await Get(AllTargets, AllTargetsRequest())
-
-
-@rule(_masked_types=[EnvironmentName])
-async def find_all_unexpanded_targets_singleton() -> AllUnexpandedTargets:
-    return await Get(AllUnexpandedTargets, AllTargetsRequest())
 
 
 # -----------------------------------------------------------------------------------------------
@@ -678,7 +793,6 @@ def coarsened_targets_request(addresses: Addresses) -> CoarsenedTargetsRequest:
 async def coarsened_targets(
     request: CoarsenedTargetsRequest, local_environment_name: ChosenLocalEnvironmentName
 ) -> CoarsenedTargets:
-
     dependency_mapping = await Get(
         _DependencyMapping,
         _DependencyMappingRequest(
@@ -746,7 +860,7 @@ async def coarsened_targets(
 
 def _log_or_raise_unmatched_owners(
     file_paths: Sequence[PurePath],
-    owners_not_found_behavior: OwnersNotFoundBehavior,
+    owners_not_found_behavior: GlobMatchErrorBehavior,
     ignore_option: str | None = None,
 ) -> None:
     option_msg = (
@@ -772,7 +886,7 @@ def _log_or_raise_unmatched_owners(
         f"{doc_url('create-initial-build-files')}.{option_msg}"
     )
 
-    if owners_not_found_behavior == OwnersNotFoundBehavior.warn:
+    if owners_not_found_behavior == GlobMatchErrorBehavior.warn:
         logger.warning(msg)
     else:
         raise ResolveError(msg)
@@ -787,7 +901,7 @@ class OwnersRequest:
     """
 
     sources: tuple[str, ...]
-    owners_not_found_behavior: OwnersNotFoundBehavior = OwnersNotFoundBehavior.ignore
+    owners_not_found_behavior: GlobMatchErrorBehavior = GlobMatchErrorBehavior.ignore
     filter_by_global_options: bool = False
     match_if_owning_build_file_included_in_sources: bool = False
 
@@ -876,7 +990,7 @@ async def find_owners(
             # primary ownership, but the target still should match the file. We can't use
             # `tgt.get()` because this is a mixin, and there technically may be >1 field.
             secondary_owner_fields = tuple(
-                field
+                field  # type: ignore[misc]
                 for field in candidate_tgt.field_values.values()
                 if isinstance(field, SecondaryOwnerMixin)
             )
@@ -895,7 +1009,7 @@ async def find_owners(
 
     if (
         unmatched_sources
-        and owners_request.owners_not_found_behavior != OwnersNotFoundBehavior.ignore
+        and owners_request.owners_not_found_behavior != GlobMatchErrorBehavior.ignore
     ):
         _log_or_raise_unmatched_owners(
             [PurePath(path) for path in unmatched_sources], owners_request.owners_not_found_behavior
@@ -913,7 +1027,7 @@ async def find_owners(
 def extract_unmatched_build_file_globs(
     global_options: GlobalOptions,
 ) -> UnmatchedBuildFileGlobs:
-    return global_options.unmatched_build_file_globs
+    return UnmatchedBuildFileGlobs(global_options.unmatched_build_file_globs)
 
 
 class AmbiguousCodegenImplementationsException(Exception):
@@ -1179,20 +1293,15 @@ async def resolve_dependencies(
     local_environment_name: ChosenLocalEnvironmentName,
 ) -> Addresses:
     environment_name = local_environment_name.val
-    wrapped_tgt = await Get(
-        WrappedTarget,
-        # It's only possible to find dependencies for a target that we already know exists.
-        WrappedTargetRequest(request.field.address, description_of_origin="<infallible>"),
+    wrapped_tgt, explicitly_provided = await MultiGet(
+        Get(
+            WrappedTarget,
+            # It's only possible to find dependencies for a target that we already know exists.
+            WrappedTargetRequest(request.field.address, description_of_origin="<infallible>"),
+        ),
+        Get(ExplicitlyProvidedDependencies, DependenciesRequest, request),
     )
     tgt = wrapped_tgt.target
-    try:
-        explicitly_provided = await Get(
-            ExplicitlyProvidedDependencies, DependenciesRequest, request
-        )
-    except Exception as e:
-        raise InvalidFieldException(
-            f"{tgt.build_file_source}: Failed to get dependencies for {tgt.address}: {e}"
-        )
 
     # Infer any dependencies (based on `SourcesField` field).
     inference_request_types = cast(
@@ -1430,21 +1539,9 @@ async def generate_file_targets(
     request: GenerateFileTargets,
     union_membership: UnionMembership,
 ) -> GeneratedTargets:
-    try:
-        sources_paths = await Get(
-            SourcesPaths, SourcesPathsRequest(request.generator[MultipleSourcesField])
-        )
-    except Exception as e:
-        tgt = request.generator
-        fld = tgt[MultipleSourcesField]
-        raise InvalidFieldException(
-            softwrap(
-                f"""
-                {tgt.build_file_source}: Invalid field value for {fld.alias!r} in target {tgt.address}:
-                {e}
-                """
-            )
-        ) from e
+    sources_paths = await Get(
+        SourcesPaths, SourcesPathsRequest(request.generator[MultipleSourcesField])
+    )
 
     add_dependencies_on_all_siblings = False
     if request.generator.settings_request_cls:

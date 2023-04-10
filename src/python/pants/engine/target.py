@@ -1035,6 +1035,13 @@ class AllTargetsRequest:
     Use with either `AllUnexpandedTargets` or `AllTargets`.
     """
 
+    def __post_init__(self) -> None:
+        warn_or_error(
+            "2.18.0.dev0",
+            "using `Get(AllTargets, AllTargetsRequest)",
+            "Instead, simply use `Get(AllTargets)` or put `AllTargets` in the rule signature",
+        )
+
 
 # -----------------------------------------------------------------------------------------------
 # Target generation
@@ -2000,7 +2007,7 @@ class SourcesField(AsyncFieldMixin, Field):
         """
         if self.expected_file_extensions is not None:
             bad_files = [
-                fp for fp in files if not PurePath(fp).suffix in self.expected_file_extensions
+                fp for fp in files if PurePath(fp).suffix not in self.expected_file_extensions
             ]
             if bad_files:
                 expected = (
@@ -2095,7 +2102,7 @@ class SourcesField(AsyncFieldMixin, Field):
         # Use fields default error behavior if defined, if we use default globs else the provided
         # error behavior.
         error_behavior = (
-            unmatched_build_file_globs.to_glob_match_error_behavior()
+            unmatched_build_file_globs.error_behavior
             if conjunction == GlobExpansionConjunction.all_match
             or self.default_glob_match_error_behavior is None
             else self.default_glob_match_error_behavior
@@ -2910,7 +2917,7 @@ class OverridesField(AsyncFieldMixin, Field):
         return tuple(
             PathGlobs(
                 [relativize_glob(glob)],
-                glob_match_error_behavior=unmatched_build_file_globs.to_glob_match_error_behavior(),
+                glob_match_error_behavior=unmatched_build_file_globs.error_behavior,
                 description_of_origin=f"the `overrides` field for {address}",
             )
             for glob in overrides_keys
@@ -2989,7 +2996,7 @@ def generate_file_based_overrides_field_help_message(
     return "\n".join(
         [
             softwrap(
-                """
+                f"""
                 Override the field values for generated `{generated_target_name}` targets.
 
                 Expects a dictionary of relative file paths and globs to a dictionary for the

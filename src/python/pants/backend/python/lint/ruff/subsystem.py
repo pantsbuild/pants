@@ -7,14 +7,13 @@ import os.path
 from dataclasses import dataclass
 from typing import Iterable
 
-from pants.backend.python.goals import lockfile
 from pants.backend.python.goals.export import ExportPythonTool, ExportPythonToolSentinel
-from pants.backend.python.goals.lockfile import (
-    GeneratePythonLockfile,
-    GeneratePythonToolLockfileSentinel,
-)
 from pants.backend.python.lint.ruff.skip_field import SkipRuffField
-from pants.backend.python.subsystems.python_tool_base import ExportToolOption, PythonToolBase
+from pants.backend.python.subsystems.python_tool_base import (
+    ExportToolOption,
+    LockfileRules,
+    PythonToolBase,
+)
 from pants.backend.python.target_types import (
     ConsoleScript,
     InterpreterConstraintsField,
@@ -22,7 +21,6 @@ from pants.backend.python.target_types import (
     PythonSourceField,
 )
 from pants.backend.python.util_rules import python_sources
-from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import FieldSet, Target
@@ -56,8 +54,9 @@ class Ruff(PythonToolBase):
     name = "Ruff"
     help = "The Ruff Python formatter (https://github.com/charliermarsh/ruff)."
 
-    default_version = "ruff==0.0.213"
+    default_version = "ruff==0.0.254"
     default_main = ConsoleScript("ruff")
+    default_requirements = ["ruff>=0.0.213,<0.1"]
 
     register_interpreter_constraints = True
     default_interpreter_constraints = ["CPython>=3.7,<4"]
@@ -66,6 +65,7 @@ class Ruff(PythonToolBase):
     default_lockfile_resource = ("pants.backend.python.lint.ruff", "ruff.lock")
     default_lockfile_path = "src/python/pants/backend/python/lint/ruff/ruff.lock"
     default_lockfile_url = git_url(default_lockfile_path)
+    lockfile_rules_type = LockfileRules.SIMPLE
 
     skip = SkipOption("fmt", "lint")
     args = ArgsListOption(example="--exclude=foo --ignore=E501")
@@ -73,12 +73,12 @@ class Ruff(PythonToolBase):
     config = FileOption(
         default=None,
         advanced=True,
-        help=lambda cls: softwrap(
+        help=softwrap(
             f"""
             Path to the `pyproject.toml` or `ruff.toml` file to use for configuration
             (https://github.com/charliermarsh/ruff#configuration).
 
-            Setting this option will disable `[{cls.options_scope}].config_discovery`. Use
+            Setting this option will disable `[{options_scope}].config_discovery`. Use
             this option if the config is located in a non-standard location.
             """
         ),
@@ -86,12 +86,12 @@ class Ruff(PythonToolBase):
     config_discovery = BoolOption(
         default=True,
         advanced=True,
-        help=lambda cls: softwrap(
+        help=softwrap(
             f"""
             If true, Pants will include any relevant config files during
             runs (`pyproject.toml`, and `ruff.toml`).
 
-            Use `[{cls.options_scope}].config` instead if your config is in a
+            Use `[{options_scope}].config` instead if your config is in a
             non-standard location.
             """
         ),
@@ -105,30 +105,8 @@ class Ruff(PythonToolBase):
             specified_option_name=f"[{self.options_scope}].config",
             discovery=self.config_discovery,
             check_existence=["ruff.toml", *(os.path.join(d, "ruff.toml") for d in ("", *dirs))],
-            check_content={"pyproject.toml": b"[tool.ruff]"},
+            check_content={"pyproject.toml": b"[tool.ruff"},
         )
-
-
-# --------------------------------------------------------------------------------------
-# Lockfile
-# --------------------------------------------------------------------------------------
-
-
-class RuffLockfileSentinel(GeneratePythonToolLockfileSentinel):
-    resolve_name = Ruff.options_scope
-
-
-@rule(
-    desc=softwrap(
-        """
-        Determine all Python interpreter versions used by ruff in your project
-        (for lockfile generation)
-        """
-    ),
-    level=LogLevel.DEBUG,
-)
-async def setup_ruff_lockfile(_: RuffLockfileSentinel, ruff: Ruff) -> GeneratePythonLockfile:
-    return GeneratePythonLockfile.from_tool(ruff)
 
 
 # --------------------------------------------------------------------------------------
@@ -161,8 +139,6 @@ async def ruff_export(_: RuffExportSentinel, ruff: Ruff) -> ExportPythonTool:
 def rules():
     return (
         *collect_rules(),
-        *lockfile.rules(),
         *python_sources.rules(),
-        UnionRule(GenerateToolLockfileSentinel, RuffLockfileSentinel),
         UnionRule(ExportPythonToolSentinel, RuffExportSentinel),
     )

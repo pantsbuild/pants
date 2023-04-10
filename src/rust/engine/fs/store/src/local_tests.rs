@@ -3,27 +3,33 @@
 use crate::local::ByteStore;
 use crate::{EntryType, LocalOptions, ShrinkBehavior};
 
+use std::collections::HashSet;
+use std::io::Write;
 use std::path::Path;
 use std::time::Duration;
 
-use bytes::{Buf, BufMut, Bytes, BytesMut};
+use bytes::{BufMut, Bytes, BytesMut};
 use hashing::{Digest, Fingerprint};
-use tempfile::TempDir;
+use tempfile::{NamedTempFile, TempDir};
 use testutil::data::{TestData, TestDirectory};
 use tokio::time::sleep;
 use walkdir::WalkDir;
 
-// Store bytes using both the one-pass and two-pass APIs, and ensure identical results.
 async fn assert_store_bytes(
   store: ByteStore,
   entry_type: EntryType,
   bytes: Bytes,
   expected_digest: Digest,
 ) {
+  let mut file = NamedTempFile::new().unwrap();
+  file.write_all(&bytes).unwrap();
+  file.flush().unwrap();
+
   let digest = store
-    .store(entry_type, false, true, move || Ok(bytes.clone().reader()))
+    .store(entry_type, false, true, file.path().to_owned())
     .await
     .unwrap();
+
   assert_eq!(expected_digest, digest);
 }
 
@@ -150,6 +156,7 @@ async fn garbage_collect_nothing_to_do() {
     .expect("Error storing");
   store
     .shrink(10, ShrinkBehavior::Fast)
+    .await
     .expect("Error shrinking");
   assert_eq!(
     load_bytes(&store, EntryType::File, digest).await,
@@ -177,6 +184,7 @@ async fn garbage_collect_nothing_to_do_with_lease() {
     .expect("Error leasing");
   store
     .shrink(10, ShrinkBehavior::Fast)
+    .await
     .expect("Error shrinking");
   assert_eq!(
     load_bytes(&store, EntryType::File, file_digest).await,
@@ -207,6 +215,7 @@ async fn garbage_collect_expired() {
     file_len,
     store
       .shrink(0, ShrinkBehavior::Fast)
+      .await
       .expect("Error shrinking"),
   );
   assert_eq!(
@@ -220,6 +229,7 @@ async fn garbage_collect_expired() {
     0,
     store
       .shrink(0, ShrinkBehavior::Fast)
+      .await
       .expect("Should have cleared expired lease")
   );
 }
@@ -250,6 +260,7 @@ async fn garbage_collect_remove_one_of_two_files_no_leases() {
     .expect("Error storing");
   store
     .shrink(10, ShrinkBehavior::Fast)
+    .await
     .expect("Error shrinking");
   let mut entries = Vec::new();
   entries.push(
@@ -295,6 +306,7 @@ async fn garbage_collect_remove_both_files_no_leases() {
     .expect("Error storing");
   store
     .shrink(1, ShrinkBehavior::Fast)
+    .await
     .expect("Error shrinking");
   assert_eq!(
     load_bytes(&store, EntryType::File, digest_1).await,
@@ -336,6 +348,7 @@ async fn garbage_collect_remove_one_of_two_directories_no_leases() {
     .expect("Error storing");
   store
     .shrink(84, ShrinkBehavior::Fast)
+    .await
     .expect("Error shrinking");
   let mut entries = Vec::new();
   entries.push(
@@ -385,6 +398,7 @@ async fn garbage_collect_remove_file_with_leased_directory() {
 
   store
     .shrink(80, ShrinkBehavior::Fast)
+    .await
     .expect("Error shrinking");
 
   assert_eq!(
@@ -428,6 +442,7 @@ async fn garbage_collect_remove_file_while_leased_file() {
 
   store
     .shrink(80, ShrinkBehavior::Fast)
+    .await
     .expect("Error shrinking");
 
   assert_eq!(
@@ -474,7 +489,7 @@ async fn garbage_collect_fail_because_too_many_leases() {
     .await
     .expect("Error storing");
 
-  assert_eq!(store.shrink(80, ShrinkBehavior::Fast), Ok(164));
+  assert_eq!(store.shrink(80, ShrinkBehavior::Fast).await, Ok(164));
 
   assert_eq!(
     load_bytes(&store, EntryType::File, forty_chars.digest()).await,
@@ -489,9 +504,9 @@ async fn garbage_collect_fail_because_too_many_leases() {
   // Whether the unleased file is present is undefined.
 }
 
-async fn write_one_meg(store: &ByteStore, byte: u8) {
-  let mut bytes = BytesMut::with_capacity(1024 * 1024);
-  for _ in 0..1024 * 1024 {
+async fn write_256kb(store: &ByteStore, byte: u8) {
+  let mut bytes = BytesMut::with_capacity(256 * 1024);
+  for _ in 0..256 * 1024 {
     bytes.put_u8(byte);
   }
   let fingerprint = Digest::of_bytes(&bytes).hash;
@@ -506,9 +521,14 @@ async fn garbage_collect_and_compact() {
   let dir = TempDir::new().unwrap();
   let store = new_store(dir.path());
 
-  write_one_meg(&store, b'0').await;
-
-  write_one_meg(&store, b'1').await;
+  write_256kb(&store, b'0').await;
+  write_256kb(&store, b'1').await;
+  write_256kb(&store, b'2').await;
+  write_256kb(&store, b'3').await;
+  write_256kb(&store, b'4').await;
+  write_256kb(&store, b'5').await;
+  write_256kb(&store, b'6').await;
+  write_256kb(&store, b'7').await;
 
   let size = get_directory_size(dir.path());
   assert!(
@@ -518,6 +538,7 @@ async fn garbage_collect_and_compact() {
 
   store
     .shrink(1024 * 1024, ShrinkBehavior::Compact)
+    .await
     .expect("Error shrinking");
 
   let size = get_directory_size(dir.path());
@@ -629,8 +650,45 @@ async fn empty_directory_is_known() {
 async fn all_digests() {
   let dir = TempDir::new().unwrap();
   let store = new_store(dir.path());
-  let digest = prime_store_with_file_bytes(&store, TestData::roland().bytes()).await;
-  assert_eq!(Ok(vec![digest]), store.all_digests(EntryType::File));
+  let digest1 = prime_store_with_file_bytes(&store, TestData::roland().bytes()).await;
+  assert_eq!(Ok(vec![digest1]), store.all_digests(EntryType::File).await);
+  let large_testdata = TestData::new("123456789".repeat(1000 * 512).as_str());
+  let digest2 = prime_store_with_file_bytes(&store, large_testdata.bytes()).await;
+  assert_eq!(
+    vec![digest1, digest2].into_iter().collect::<HashSet<_>>(),
+    store
+      .all_digests(EntryType::File)
+      .await
+      .unwrap()
+      .into_iter()
+      .collect::<HashSet<_>>(),
+  );
+}
+
+#[tokio::test]
+async fn get_missing_digests() {
+  let dir = TempDir::new().unwrap();
+  let store = new_store(dir.path());
+  let small_testdata = TestData::roland();
+  let large_testdata = TestData::new("123456789".repeat(1000 * 512).as_str());
+
+  prime_store_with_file_bytes(&store, small_testdata.bytes()).await;
+  prime_store_with_file_bytes(&store, large_testdata.bytes()).await;
+  let missing = store
+    .get_missing_digests(
+      EntryType::File,
+      HashSet::from([
+        small_testdata.digest(),
+        large_testdata.digest(),
+        hashing::Digest::of_bytes("1".as_bytes()),
+      ]),
+    )
+    .await
+    .unwrap();
+  assert_eq!(
+    missing,
+    HashSet::from([hashing::Digest::of_bytes("1".as_bytes())])
+  )
 }
 
 pub fn new_store<P: AsRef<Path>>(dir: P) -> ByteStore {

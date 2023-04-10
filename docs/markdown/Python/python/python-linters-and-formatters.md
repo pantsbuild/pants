@@ -4,7 +4,6 @@ slug: "python-linters-and-formatters"
 excerpt: "How to activate and use the Python linters and formatters bundled with Pants."
 hidden: false
 createdAt: "2020-03-03T00:57:15.994Z"
-updatedAt: "2022-04-03T02:01:57.201Z"
 ---
 > 👍 Benefit of Pants: consistent interface
 > 

@@ -26,8 +26,8 @@ use workunit_store::{
 use crate::remote::apply_headers;
 use process_execution::{
   check_cache_content, populate_fallible_execution_result, CacheContentBehavior, Context,
-  FallibleProcessResultWithPlatform, Platform, Process, ProcessCacheScope, ProcessError,
-  ProcessResultSource,
+  FallibleProcessResultWithPlatform, Process, ProcessCacheScope, ProcessError,
+  ProcessExecutionEnvironment, ProcessResultSource,
 };
 use process_execution::{make_execute_request, EntireExecuteRequest};
 use tonic::{Code, Request, Status};
@@ -80,7 +80,7 @@ impl CommandRunner {
     warnings_behavior: RemoteCacheWarningsBehavior,
     cache_content_behavior: CacheContentBehavior,
     concurrency_limit: usize,
-    read_timeout: Duration,
+    rpc_timeout: Duration,
     append_only_caches_base_path: Option<String>,
   ) -> Result<Self, String> {
     let tls_client_config = if action_cache_address.starts_with("https://") {
@@ -99,7 +99,7 @@ impl CommandRunner {
       tonic::transport::Channel::balance_list(vec![endpoint].into_iter()),
       concurrency_limit,
       http_headers,
-      Some((read_timeout, Metric::RemoteCacheRequestTimeouts)),
+      Some((rpc_timeout, Metric::RemoteCacheRequestTimeouts)),
     );
     let action_cache_client = Arc::new(ActionCacheClient::new(channel));
 
@@ -281,7 +281,7 @@ impl CommandRunner {
         action_digest,
         &request.description,
         self.instance_name.clone(),
-        request.platform,
+        request.execution_environment.clone(),
         &context,
         self.action_cache_client.clone(),
         self.store.clone(),
@@ -348,14 +348,13 @@ impl CommandRunner {
     cache_result: Option<FallibleProcessResultWithPlatform>,
     local_execution_future: BoxFuture<'_, Result<FallibleProcessResultWithPlatform, ProcessError>>,
   ) -> Result<(FallibleProcessResultWithPlatform, bool), ProcessError> {
-    if let Some(cached_response) = cache_result {
-      let lookup_elapsed = cache_lookup_start.elapsed();
-      workunit.increment_counter(Metric::RemoteCacheSpeculationRemoteCompletedFirst, 1);
-      if let Some(time_saved) = cached_response
+    if let Some(mut cached_response) = cache_result {
+      cached_response
         .metadata
-        .time_saved_from_cache(lookup_elapsed)
-      {
-        let time_saved = time_saved.as_millis() as u64;
+        .update_cache_hit_elapsed(cache_lookup_start.elapsed());
+      workunit.increment_counter(Metric::RemoteCacheSpeculationRemoteCompletedFirst, 1);
+      if let Some(time_saved) = cached_response.metadata.saved_by_cache {
+        let time_saved = std::time::Duration::from(time_saved).as_millis() as u64;
         workunit.increment_counter(Metric::RemoteCacheTotalTimeSavedMs, time_saved);
         workunit.record_observation(ObservationMetric::RemoteCacheTimeSavedMs, time_saved);
       }
@@ -576,7 +575,7 @@ async fn check_action_cache(
   action_digest: Digest,
   command_description: &str,
   instance_name: Option<String>,
-  platform: Platform,
+  environment: ProcessExecutionEnvironment,
   context: &Context,
   action_cache_client: Arc<ActionCacheClient<LayeredService>>,
   store: Store,
@@ -610,9 +609,9 @@ async fn check_action_cache(
           store.clone(),
           context.run_id,
           &action_result,
-          platform,
           false,
           ProcessResultSource::HitRemotely,
+          environment,
         )
         .await
         .map_err(|e| Status::unavailable(format!("Output roots could not be loaded: {e}")))?;

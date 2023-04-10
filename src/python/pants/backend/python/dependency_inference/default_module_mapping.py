@@ -114,8 +114,10 @@ DEFAULT_MODULE_MAPPING = {
     "mail-parser": ("mailparser",),
     "mysql-connector-python": ("mysql.connector",),
     "opencv-python": ("cv2",),
+    "opensearch-py": ("opensearchpy",),
     # opentelemetry
     "opentelemetry-api": ("opentelemetry",),
+    "opentelemetry-exporter-otlp": ("opentelemetry.exporter",),
     "opentelemetry-exporter-otlp-proto-grpc": ("opentelemetry.exporter.otlp.proto.grpc",),
     "opentelemetry-exporter-otlp-proto-http": ("opentelemetry.exporter.otlp.proto.http",),
     "opentelemetry-instrumentation-aiohttp-client": (
@@ -199,12 +201,14 @@ DEFAULT_MODULE_MAPPING = {
     "snowflake-connector-python": ("snowflake.connector",),
     "strawberry-graphql": ("strawberry",),
     "streamlit-aggrid": ("st_aggrid",),
-    "opensearch-py": ("opensearchpy",),
+    "tensorboard": ("torch.utils.tensorboard",),
+    "websocket-client": ("websocket",),
 }
 
 DEFAULT_TYPE_STUB_MODULE_MAPPING = {
     "djangorestframework-types": ("rest_framework",),
     "lark-stubs": ("lark",),
+    "types-beautifulsoup4": ("bs4",),
     "types-enum34": ("enum34",),
     "types-pillow": ("PIL",),
     "types-protobuf": ("google.protobuf",),

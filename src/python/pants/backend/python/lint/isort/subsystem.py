@@ -6,15 +6,13 @@ from __future__ import annotations
 import os.path
 from typing import Iterable
 
-from pants.backend.python.goals import lockfile
 from pants.backend.python.goals.export import ExportPythonTool, ExportPythonToolSentinel
-from pants.backend.python.goals.lockfile import (
-    GeneratePythonLockfile,
-    GeneratePythonToolLockfileSentinel,
+from pants.backend.python.subsystems.python_tool_base import (
+    ExportToolOption,
+    LockfileRules,
+    PythonToolBase,
 )
-from pants.backend.python.subsystems.python_tool_base import ExportToolOption, PythonToolBase
 from pants.backend.python.target_types import ConsoleScript
-from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
@@ -30,6 +28,7 @@ class Isort(PythonToolBase):
 
     default_version = "isort[pyproject,colors]>=5.9.3,<6.0"
     default_main = ConsoleScript("isort")
+    default_requirements = [default_version]
 
     register_interpreter_constraints = True
     default_interpreter_constraints = ["CPython>=3.7,<4"]
@@ -38,6 +37,7 @@ class Isort(PythonToolBase):
     default_lockfile_resource = ("pants.backend.python.lint.isort", "isort.lock")
     default_lockfile_path = "src/python/pants/backend/python/lint/isort/isort.lock"
     default_lockfile_url = git_url(default_lockfile_path)
+    lockfile_rules_type = LockfileRules.SIMPLE
 
     skip = SkipOption("fmt", "lint")
     args = ArgsListOption(example="--case-sensitive --trailing-comma")
@@ -104,15 +104,6 @@ class Isort(PythonToolBase):
         )
 
 
-class IsortLockfileSentinel(GeneratePythonToolLockfileSentinel):
-    resolve_name = Isort.options_scope
-
-
-@rule
-def setup_isort_lockfile(_: IsortLockfileSentinel, isort: Isort) -> GeneratePythonLockfile:
-    return GeneratePythonLockfile.from_tool(isort)
-
-
 class IsortExportSentinel(ExportPythonToolSentinel):
     pass
 
@@ -127,7 +118,5 @@ def isort_export(_: IsortExportSentinel, isort: Isort) -> ExportPythonTool:
 def rules():
     return (
         *collect_rules(),
-        *lockfile.rules(),
-        UnionRule(GenerateToolLockfileSentinel, IsortLockfileSentinel),
         UnionRule(ExportPythonToolSentinel, IsortExportSentinel),
     )

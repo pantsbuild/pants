@@ -8,7 +8,7 @@ from pants.backend.python.dependency_inference.parse_python_dependencies import 
     PythonDependencyVisitorRequest,
     get_scripts_digest,
 )
-from pants.backend.python.framework.django.detect_apps import DjangoApps, DjangoAppsRequest
+from pants.backend.python.framework.django.detect_apps import DjangoApps
 from pants.engine.fs import CreateDigest, FileContent
 from pants.engine.internals.native_engine import Digest, MergeDigests
 from pants.engine.internals.selectors import Get
@@ -28,8 +28,8 @@ _scripts_package = "pants.backend.python.framework.django.scripts"
 @rule
 async def django_parser_script(
     _: DjangoDependencyVisitorRequest,
+    django_apps: DjangoApps,
 ) -> PythonDependencyVisitor:
-    django_apps = await Get(DjangoApps, DjangoAppsRequest())
     django_apps_digest = await Get(
         Digest, CreateDigest([FileContent("apps.json", django_apps.to_json())])
     )

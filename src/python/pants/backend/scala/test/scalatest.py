@@ -91,7 +91,6 @@ async def setup_scalatest_for_target(
     test_subsystem: TestSubsystem,
     test_extra_env: TestExtraEnv,
 ) -> TestSetup:
-
     jdk, transitive_tgts = await MultiGet(
         Get(JdkEnvironment, JdkRequest, JdkRequest.from_field(request.field_set.jdk_version)),
         Get(TransitiveTargets, TransitiveTargetsRequest([request.field_set.address])),

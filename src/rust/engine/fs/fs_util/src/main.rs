@@ -423,10 +423,7 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
             // leave this hanging forever.
             //
             // Make fs_util have a very long deadline (because it's not configurable,
-            // like it is inside pants) until we switch to Tower (where we can more
-            // carefully control specific components of timeouts).
-            //
-            // See https://github.com/pantsbuild/pants/pull/6433 for more context.
+            // like it is inside pants).
             Duration::from_secs(30 * 60),
             top_match
               .value_of_t::<usize>("rpc-attempts")
@@ -523,8 +520,8 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
             .materialize_directory(
               destination,
               output_digest,
+              false,
               &BTreeSet::new(),
-              None,
               Permissions::Writable,
             )
             .await?,
@@ -547,8 +544,8 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
             .materialize_directory(
               destination,
               digest,
+              false,
               &BTreeSet::new(),
-              None,
               Permissions::Writable,
             )
             .await?,
@@ -686,6 +683,7 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
       ("list", _) => {
         for digest in store
           .all_local_digests(::store::EntryType::Directory)
+          .await
           .expect("Error opening store")
         {
           println!("{} {}", digest.hash, digest.size_bytes);
@@ -698,7 +696,9 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
       let target_size_bytes = args
         .value_of_t::<usize>("target-size-bytes")
         .expect("--target-size-bytes must be passed as a non-negative integer");
-      store.garbage_collect(target_size_bytes, store::ShrinkBehavior::Compact)?;
+      store
+        .garbage_collect(target_size_bytes, store::ShrinkBehavior::Compact)
+        .await?;
       Ok(())
     }
 

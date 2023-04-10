@@ -4,7 +4,6 @@ slug: "troubleshooting"
 excerpt: "Frequently asked questions (FAQs) and known issues you may encounter."
 hidden: false
 createdAt: "2020-04-10T19:42:28.637Z"
-updatedAt: "2022-05-25T14:34:36.454Z"
 ---
 > 👍 We love giving help!
 > 
@@ -189,6 +188,13 @@ BadZipFile error when processing Python wheels
 This can happen if your temporary directory (`/tmp/` by default) is not on the same filesystem as `~/.cache/pants/named_caches`, and is caused by the fact that `pip` is not concurrency-safe when moving files across filesystems.
 
 The solution is to move `~/.cache/pants`, or at least the `named_caches_dir`(see [above](#how-to-change-your-cache-directory)), to the same filesystem as the temporary directory, or vice versa.
+
+Issues packaging AWS CDK into a PEX
+-----------------------------------
+
+If you get errors like `ModuleNotFoundError: No module named 'aws_cdk.asset_awscli_v1`, set `execution_mode="venv"` and `venv_site_packages_copies=True` on your `pex_binary` target.
+
+This ensures that the `aws_cdk` subpackages are properly nested under the parent package, despite those distributions not being configured as [namespace packages](https://packaging.python.org/en/latest/guides/packaging-namespace-packages/).
 
 "Double requirement given" error when resolving Python requirements
 -------------------------------------------------------------------

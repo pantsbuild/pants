@@ -4,7 +4,6 @@ slug: "macros"
 excerpt: "Reducing boilerplate in BUILD files."
 hidden: false
 createdAt: "2020-05-08T04:15:04.126Z"
-updatedAt: "2022-05-12T15:59:18.084Z"
 ---
 When to use a macro
 -------------------

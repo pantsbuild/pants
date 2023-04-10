@@ -4,7 +4,6 @@ slug: "rules-api-subsystems"
 excerpt: "How to add options to your plugin."
 hidden: false
 createdAt: "2020-07-01T04:55:36.180Z"
-updatedAt: "2022-04-26T22:11:07.667Z"
 ---
 Defining options
 ----------------
@@ -18,11 +17,10 @@ To add new options:
       - This value will be prepended to all options in the subsystem, e.g. `--skip` will become `--shellcheck-skip`.
    2. Set the class property `help`, which is used by `pants help`.
 2. Add new options through `pants.options.option_types` class attributes.
-3. Register the `Subsystem` with `SubsystemRule` and `register.py`.
-   - You don't need `SubsystemRule` if the `Subsystem` is used in an `@rule` because `collect_rules()` will recognize it. It doesn't hurt to keep this around, though.
+3. Register the `Subsystem` with `Subsystem.rules()` and `register.py`.
+   - You don't need `Subsystem.rules()` if the `Subsystem` is used in an `@rule` because `collect_rules()` will recognize it. It doesn't hurt to keep this around, though.
 
 ```python pants-plugins/example/shellcheck.py
-from pants.engine.rules import SubsystemRule
 from pants.option.option_types import BoolOption
 from pants.option.subsystem import Subsystem
 

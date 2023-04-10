@@ -13,7 +13,6 @@ from pants.backend.python.lint.ruff.rules import RuffRequest
 from pants.backend.python.lint.ruff.rules import rules as ruff_rules
 from pants.backend.python.lint.ruff.subsystem import RuffFieldSet
 from pants.backend.python.lint.ruff.subsystem import rules as ruff_subsystem_rules
-from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import PythonSourcesGeneratorTarget
 from pants.core.goals.fix import FixResult
 from pants.core.util_rules import config_files
@@ -80,7 +79,7 @@ def get_snapshot(rule_runner: RuleRunner, source_files: dict[str, str]) -> Snaps
 @pytest.mark.platform_specific_behavior
 @pytest.mark.parametrize(
     "major_minor_interpreter",
-    all_major_minor_python_versions(PythonSetup.default_interpreter_constraints),
+    all_major_minor_python_versions(["CPython>=3.7,<4"]),
 )
 def test_passing(rule_runner: RuleRunner, major_minor_interpreter: str) -> None:
     rule_runner.write_files({"f.py": GOOD_FILE, "BUILD": "python_sources(name='t')"})
@@ -100,7 +99,7 @@ def test_failing(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({"f.py": BAD_FILE, "BUILD": "python_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
     result = run_ruff(rule_runner, [tgt])
-    assert result.stdout == "Found 1 error(s) (1 fixed, 0 remaining).\n"
+    assert result.stdout == "Found 1 error (1 fixed, 0 remaining).\n"
     assert result.stderr == ""
     assert result.did_change
     assert result.output == get_snapshot(rule_runner, {"f.py": GOOD_FILE})

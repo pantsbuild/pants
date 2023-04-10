@@ -4,7 +4,6 @@ slug: "goals"
 excerpt: "The commands Pants runs."
 hidden: false
 createdAt: "2020-02-21T17:44:52.605Z"
-updatedAt: "2022-04-11T21:31:11.557Z"
 ---
 Pants commands are known as _goals_, such as `test` and `lint`.
 

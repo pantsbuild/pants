@@ -4,7 +4,6 @@ slug: "protobuf-go"
 excerpt: "How to generate Go from Protocol Buffers."
 hidden: false
 createdAt: "2022-04-20T22:34:22.819Z"
-updatedAt: "2022-04-25T23:26:26.127Z"
 ---
 When your Go code imports Protobuf generated files, Pants will detect the imports and run the Protoc compiler to generate then compile those files.
 

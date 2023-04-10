@@ -63,7 +63,6 @@ async def _find_binary(
     fingerprint_args: tuple[str, ...] | None,
     fingerprint_dependencies: tuple[str, ...] | None,
 ) -> BinaryPath:
-
     search_paths = tuple(extra_search_paths) + SEARCH_PATHS
 
     binaries = await Get(
@@ -78,7 +77,7 @@ async def _find_binary(
 
     deps = await Get(
         ResolvedExecutionDependencies,
-        ResolveExecutionDependenciesRequest(address, (), None, fingerprint_dependencies),
+        ResolveExecutionDependenciesRequest(address, (), fingerprint_dependencies),
     )
     rds = deps.runnable_dependencies
     env: dict[str, str] = {}
@@ -130,7 +129,6 @@ async def _find_binary(
 
 @rule(level=LogLevel.DEBUG)
 async def create_system_binary_run_request(field_set: SystemBinaryFieldSet) -> RunRequest:
-
     assert field_set.name.value is not None
     extra_search_paths = field_set.extra_search_paths.value or ()
 

@@ -4,7 +4,6 @@ slug: "python-lint-goal"
 excerpt: "Lint source code."
 hidden: false
 createdAt: "2020-03-16T16:19:55.704Z"
-updatedAt: "2022-03-05T01:09:54.477Z"
 ---
 The `lint` goal runs both dedicated linters and any formatters in check-only mode:
 

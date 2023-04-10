@@ -130,3 +130,37 @@ def test_runnable_dependencies() -> None:
         ]
         result = run_pants(args)
         assert "[INFO] I am a duck." in result.stderr.strip()
+
+
+def test_external_env_vars() -> None:
+    sources = {
+        "src/BUILD": dedent(
+            """\
+
+            system_binary(
+                name="bash",
+                binary_name="bash",
+            )
+
+            adhoc_tool(
+                name="adhoc",
+                runnable=":bash",
+                args=["-c", "echo $ENVVAR"],
+                log_output=True,
+                stdout="stdout",
+                extra_env_vars=["ENVVAR"],
+            )
+            """
+        ),
+    }
+
+    with setup_tmpdir(sources) as tmpdir:
+        args = [
+            "--backend-packages=['pants.backend.experimental.adhoc',]",
+            f"--source-root-patterns=['{tmpdir}/src']",
+            "export-codegen",
+            f"{tmpdir}/src:adhoc",
+        ]
+        extra_env = {"ENVVAR": "clang"}
+        result = run_pants(args, extra_env=extra_env)
+        assert "[INFO] clang" in result.stderr.strip()

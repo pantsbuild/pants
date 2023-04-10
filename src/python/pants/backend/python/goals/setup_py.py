@@ -257,7 +257,7 @@ class SetupKwargs:
         object.__setattr__(
             self,
             "_pickled_bytes",
-            pickle.dumps({k: v for k, v in sorted(kwargs.items())}, protocol=4),
+            pickle.dumps(dict(sorted(kwargs.items())), protocol=4),
         )
 
     @memoized_property
@@ -277,7 +277,7 @@ class SetupKwargs:
 # authors. To resolve `SetupKwargs`, call `await Get(SetupKwargs, ExportedTarget)`, which handles
 # running any custom implementations vs. using the default implementation.
 @union(in_scope_types=[EnvironmentName])
-@dataclass(frozen=True)  # type: ignore[misc]
+@dataclass(frozen=True)
 class SetupKwargsRequest(ABC):
     """A request to allow setting the kwargs passed to the `setup()` function.
 

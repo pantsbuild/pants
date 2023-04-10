@@ -7,7 +7,7 @@ import functools
 import inspect
 import re
 from abc import ABCMeta
-from typing import TYPE_CHECKING, Any, Callable, ClassVar, Iterable, TypeVar, cast
+from typing import TYPE_CHECKING, Any, Callable, ClassVar, Iterable, Sequence, TypeVar, cast
 
 from pants import ox
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
@@ -18,7 +18,6 @@ from pants.option.option_types import OptionsInfo, collect_options_info
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.options import Options
 from pants.option.scope import Scope, ScopedOptions, ScopeInfo, normalize_scope
-from pants.util.memo import memoized_classmethod
 from pants.util.strutil import softwrap
 
 if TYPE_CHECKING:
@@ -76,6 +75,8 @@ class Subsystem(metaclass=_SubsystemMeta):
     deprecated_options_scope_removal_version: str | None = None
 
     _scope_name_re = re.compile(r"^(?:[a-z0-9_])+(?:-(?:[a-z0-9_])+)*$")
+
+    _rules: ClassVar[Sequence[Rule] | None] = None
 
     class EnvironmentAware(metaclass=ABCMeta):
         """A separate container for options that may be redefined by the runtime environment.
@@ -135,25 +136,29 @@ class Subsystem(metaclass=_SubsystemMeta):
             assert isinstance(v, OptionsInfo)
 
             return (
-                self.options.is_default(__name)
+                # vars beginning with `_` are exposed as option names with the leading `_` stripped
+                self.options.is_default(__name.lstrip("_"))
                 and resolve_environment_sensitive_option(v.flag_names[0], self) is None
             )
 
-    @memoized_classmethod
+    @classmethod
     def rules(cls: Any) -> Iterable[Rule]:
-        from pants.core.util_rules.environments import add_option_fields_for
-        from pants.engine.rules import Rule
+        # NB: This avoids using `memoized_classmethod` until its interaction with `mypy` can be improved.
+        if cls._rules is None:
+            from pants.core.util_rules.environments import add_option_fields_for
+            from pants.engine.rules import Rule
 
-        # nb. `rules` needs to be memoized so that repeated calls to add these rules
-        # return exactly the same rule objects. As such, returning this generator
-        # directly won't work, because the iterator needs to be replayable.
-        def inner() -> Iterable[Rule]:
-            yield cls._construct_subsystem_rule()
-            if cls.EnvironmentAware is not Subsystem.EnvironmentAware:
-                yield cls._construct_env_aware_rule()
-                yield from (cast(Rule, i) for i in add_option_fields_for(cls.EnvironmentAware))
+            # nb. `rules` needs to be memoized so that repeated calls to add these rules
+            # return exactly the same rule objects. As such, returning this generator
+            # directly won't work, because the iterator needs to be replayable.
+            def inner() -> Iterable[Rule]:
+                yield cls._construct_subsystem_rule()
+                if cls.EnvironmentAware is not Subsystem.EnvironmentAware:
+                    yield cls._construct_env_aware_rule()
+                    yield from (cast(Rule, i) for i in add_option_fields_for(cls.EnvironmentAware))
 
-        return list(inner())
+            cls._rules = tuple(inner())
+        return cast("Sequence[Rule]", cls._rules)
 
     @distinct_union_type_per_subclass
     class PluginOption:

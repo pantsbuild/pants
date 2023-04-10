@@ -56,7 +56,7 @@ def test_shell_command_as_test(rule_runner: RuleRunner) -> None:
                   name="msg-gen",
                   command="echo message > msg.txt",
                   tools=["echo"],
-                  outputs=["msg.txt"],
+                  output_files=["msg.txt"],
                 )
 
                 experimental_test_shell_command(

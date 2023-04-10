@@ -76,6 +76,13 @@ def test_single_get() -> None:
     assert_awaitables(rule, [(str, int)])
 
 
+def test_single_no_args_syntax() -> None:
+    async def rule():
+        await Get(STR)
+
+    assert_awaitables(rule, [(str, [])])
+
+
 def test_get_multi_param_syntax() -> None:
     async def rule():
         await Get(str, {42: int, "towel": str})
@@ -115,7 +122,7 @@ def test_attribute_lookup() -> None:
 
 
 def test_get_no_index_call_no_subject_call_allowed() -> None:
-    async def rule():
+    async def rule() -> None:
         get_type: type = Get  # noqa: F841
 
     assert_awaitables(rule, [])
@@ -180,11 +187,9 @@ def test_valid_get_unresolvable_subject_declared_type() -> None:
         collect_awaitables(rule)
 
 
-def test_invalid_get_no_subject_args() -> None:
+def test_invalid_get_no_args() -> None:
     async def rule():
-        Get(
-            STR,
-        )
+        Get()
 
     with pytest.raises(GetParseError):
         collect_awaitables(rule)

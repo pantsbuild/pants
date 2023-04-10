@@ -51,7 +51,7 @@ from pants.core.target_types import FilesGeneratorTarget, ResourcesGeneratorTarg
 from pants.core.target_types import rules as core_target_types_rules
 from pants.engine.addresses import Address
 from pants.engine.internals.parametrize import Parametrize
-from pants.engine.rules import SubsystemRule, rule
+from pants.engine.rules import rule
 from pants.engine.target import ExplicitlyProvidedDependencies, InferredDependencies
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner, engine_error
 from pants.util.ordered_set import FrozenOrderedSet
@@ -369,7 +369,7 @@ def test_infer_python_inits(behavior: InitFilesInference) -> None:
             *target_types_rules.rules(),
             *core_target_types_rules(),
             infer_python_init_dependencies,
-            SubsystemRule(PythonInferSubsystem),
+            *PythonInferSubsystem.rules(),
             QueryRule(InferredDependencies, (InferInitDependencies,)),
         ],
         target_types=[PythonSourcesGeneratorTarget],
@@ -437,7 +437,7 @@ def test_infer_python_conftests() -> None:
             *target_types_rules.rules(),
             *core_target_types_rules(),
             infer_python_conftest_dependencies,
-            SubsystemRule(PythonInferSubsystem),
+            *PythonInferSubsystem.rules(),
             QueryRule(InferredDependencies, (InferConftestDependencies,)),
         ],
         target_types=[PythonTestsGeneratorTarget, PythonTestUtilsGeneratorTarget],
@@ -932,7 +932,6 @@ class TestFindOtherOwners:
         assert not r.value
 
     def test_other_owners_found_in_single_resolve(self, _imports_rule_runner: RuleRunner):
-
         _imports_rule_runner.write_files(
             {
                 "other/BUILD": dedent(
@@ -960,7 +959,6 @@ class TestFindOtherOwners:
         ]
 
     def test_other_owners_found_in_multiple_resolves(self, _imports_rule_runner: RuleRunner):
-
         _imports_rule_runner.write_files(
             {
                 "other/BUILD": dedent(

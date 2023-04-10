@@ -444,7 +444,18 @@ impl<R: Rule> RuleGraph<R> {
       .collect::<Vec<String>>();
     queries_strs.sort();
     writeln!(f, "digraph {{")?;
-    writeln!(f, "  // queries: {}", queries_strs.join(", "))?;
+    writeln!(f, "  /*")?;
+    writeln!(f, "  queries:")?;
+    writeln!(
+      f,
+      "{}",
+      queries_strs
+        .iter()
+        .map(|q| format!("    {}", q))
+        .collect::<Vec<String>>()
+        .join(",\n")
+    )?;
+    writeln!(f, "  */")?;
     writeln!(f, "  // root entries")?;
     let mut root_rule_strs = self
       .rule_dependency_edges

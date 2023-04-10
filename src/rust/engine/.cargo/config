@@ -2,3 +2,8 @@
 # See https://docs.rs/tokio/1.21.1/tokio/task/struct.JoinSet.html#method.join_next_with_id.
 [build]
 rustflags = ["--cfg", "tokio_unstable"]
+
+# Opt-in to the Cargo "sparse" protocol for index downloads.
+# Note: Remove once this becomes the default in Rust v1.70.0
+[registries.crates-io]
+protocol = "sparse"

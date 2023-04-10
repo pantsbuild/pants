@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from pathlib import PurePath
 from typing import Generic, Optional, Sequence, TypeVar, Union, cast
 
+from pants.base.deprecated import warn_or_error
 from pants.core.goals import package
 from pants.core.goals.package import (
     BuiltPackage,
@@ -30,6 +31,7 @@ from pants.engine.fs import (
     FileDigest,
     FileEntry,
     MergeDigests,
+    PathGlobs,
     RemovePrefix,
     Snapshot,
 )
@@ -48,6 +50,7 @@ from pants.engine.target import (
     HydrateSourcesRequest,
     InvalidFieldTypeException,
     MultipleSourcesField,
+    OptionalSingleSourceField,
     OverridesField,
     SingleSourceField,
     SourcesField,
@@ -60,6 +63,7 @@ from pants.engine.target import (
     generate_multiple_sources_field_help_message,
 )
 from pants.engine.unions import UnionRule
+from pants.option.global_options import UnmatchedBuildFileGlobs
 from pants.util.docutil import bin_name
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
@@ -649,7 +653,12 @@ class GenericTarget(Target):
 
 @dataclass(frozen=True)
 class AllAssetTargetsRequest:
-    pass
+    def __post_init__(self) -> None:
+        warn_or_error(
+            "2.18.0.dev0",
+            "using `Get(AllAssetTargets, AllAssetTargetsRequest)",
+            "Instead, simply use `Get(AllAssetTargets)` or put `AllAssetTargets` in the rule signature",
+        )
 
 
 @dataclass(frozen=True)
@@ -659,10 +668,7 @@ class AllAssetTargets:
 
 
 @rule(desc="Find all assets in project")
-def find_all_assets(
-    all_targets: AllTargets,
-    _: AllAssetTargetsRequest,
-) -> AllAssetTargets:
+def find_all_assets(all_targets: AllTargets) -> AllAssetTargets:
     resources = []
     files = []
     for tgt in all_targets:
@@ -671,6 +677,13 @@ def find_all_assets(
         if tgt.has_field(FileSourceField):
             files.append(tgt)
     return AllAssetTargets(tuple(resources), tuple(files))
+
+
+@rule
+def find_all_assets_request(
+    _: AllAssetTargetsRequest, all_asset_targets: AllAssetTargets
+) -> AllAssetTargets:
+    return all_asset_targets
 
 
 @dataclass(frozen=True)
@@ -683,7 +696,6 @@ class AllAssetTargetsByPath:
 def map_assets_by_path(
     all_asset_targets: AllAssetTargets,
 ) -> AllAssetTargetsByPath:
-
     resources_by_path: defaultdict[PurePath, set[Target]] = defaultdict(set)
     for resource_tgt in all_asset_targets.resources:
         resources_by_path[PurePath(resource_tgt[ResourceSourceField].file_path)].add(resource_tgt)
@@ -858,9 +870,19 @@ async def package_archive_target(field_set: ArchiveFieldSet) -> BuiltPackage:
 # -----------------------------------------------------------------------------------------------
 
 
-class LockfileSourceField(SingleSourceField):
+class LockfileSourceField(OptionalSingleSourceField):
+    """Source field for synthesized `_lockfile` targets.
+
+    It is special in that it always ignores any missing files, regardless of the global
+    `--unmatched-build-file-globs` option.
+    """
+
     uses_source_roots = False
     required = True
+    value: str
+
+    def path_globs(self, unmatched_build_file_globs: UnmatchedBuildFileGlobs) -> PathGlobs:  # type: ignore[misc]
+        return super().path_globs(UnmatchedBuildFileGlobs.ignore())
 
 
 class LockfileDependenciesField(Dependencies):

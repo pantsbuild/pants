@@ -938,7 +938,7 @@ def assert_generated(
     if expected_dependencies is not None:
         # TODO: Adjust the `TransitiveTargets` API to expose the complete mapping.
         #   see https://github.com/pantsbuild/pants/issues/11270
-        specs = SpecsParser(rule_runner.build_root).parse_specs(
+        specs = SpecsParser(root_dir=rule_runner.build_root).parse_specs(
             ["::"], description_of_origin="tests"
         )
         addresses = rule_runner.request(Addresses, [specs])

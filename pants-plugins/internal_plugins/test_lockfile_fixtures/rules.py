@@ -58,16 +58,10 @@ class RenderedJVMLockfileFixtures(DeduplicatedCollection[RenderedJVMLockfileFixt
     pass
 
 
-@dataclass(frozen=True)
-class CollectFixtureConfigsRequest:
-    pass
-
-
 # TODO: This rule was mostly copied from the rule `setup_pytest_for_target` in
 # `src/python/pants/backend/python/goals/pytest_runner.py`. Some refactoring should be done.
 @rule
 async def collect_fixture_configs(
-    _request: CollectFixtureConfigsRequest,
     pytest: PyTest,
     python_setup: PythonSetup,
     test_extra_env: TestExtraEnv,
@@ -177,8 +171,9 @@ async def collect_fixture_configs(
 
 
 @rule
-async def gather_lockfile_fixtures() -> RenderedJVMLockfileFixtures:
-    configs = await Get(CollectedJVMLockfileFixtureConfigs, CollectFixtureConfigsRequest())
+async def gather_lockfile_fixtures(
+    configs: CollectedJVMLockfileFixtureConfigs,
+) -> RenderedJVMLockfileFixtures:
     rendered_fixtures = []
     for config in configs:
         artifact_reqs = ArtifactRequirements(

@@ -5,7 +5,8 @@ python_sources()
 python_tests(
     name="tests",
     overrides={
-        "test_test.py": {"timeout": 320},
         "package_binary_integration_test.py": {"timeout": 120},
+        "run_binary_integration_test.py": {"timeout": 120},
+        "test_test.py": {"timeout": 480},
     },
 )

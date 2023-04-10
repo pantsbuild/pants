@@ -11,6 +11,7 @@ from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import InterpreterConstraintsField
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex_environment import PythonExecutable
+from pants.base.deprecated import warn_or_error
 from pants.base.specs import FileGlobSpec, RawSpecs
 from pants.engine.fs import AddPrefix, Digest, MergeDigests
 from pants.engine.internals.selectors import Get, MultiGet
@@ -28,7 +29,12 @@ from pants.util.frozendict import FrozenDict
 
 @dataclass(frozen=True)
 class DjangoAppsRequest:
-    pass
+    def __post_init__(self) -> None:
+        warn_or_error(
+            "2.18.0.dev0",
+            "using `Get(DjangoApps, DjangoAppsRequest)",
+            "Instead, simply use `Get(DjangoApps)` or put `DjangoApps` in the rule signature",
+        )
 
 
 @dataclass(frozen=True)
@@ -44,10 +50,7 @@ class DjangoApps:
 
 
 @rule
-async def detect_django_apps(
-    _: DjangoAppsRequest,
-    python_setup: PythonSetup,
-) -> DjangoApps:
+async def detect_django_apps(python_setup: PythonSetup) -> DjangoApps:
     # A Django app has a "name" - the full import path to the app ("path.to.myapp"),
     # and a "label" - a short name, usually the last segment of the import path ("myapp").
     #
@@ -127,6 +130,11 @@ async def detect_django_apps(
             ),
         )
         django_apps = django_apps.add_from_json(process_result.stdout or b"{}")
+    return django_apps
+
+
+@rule
+def django_apps_from_request(_: DjangoAppsRequest, django_apps: DjangoApps) -> DjangoApps:
     return django_apps
 
 

@@ -3,7 +3,6 @@ title: "Prerequisites"
 slug: "prerequisites"
 hidden: false
 createdAt: "2021-10-17T18:21:38.905Z"
-updatedAt: "2022-04-11T21:13:21.965Z"
 ---
 To run Pants, you need:
 
@@ -43,9 +42,9 @@ System-specific notes
 
 > 📘 Apple Silicon (M1/M2) support
 >
-> If you have Python code, you may need to [set your interpreter constraints](doc:python-interpreter-compatibility) to Python 3.9+, as many tools, such as Black, will not install correctly when using earlier Python versions.
->
-> When running in Docker you will need to set `--no-watch-filesystem --no-pantsd`. (Although we don't recommend permanently setting this, as these options are crucial for performance when iterating.)
+> If running Pants inside a Docker container on an Apple Silicon machine you may need to set `--no-watch-filesystem --no-pantsd`. This is because notifications on native macOS files aren't mirrored over to the virtualized Linux system.
+> 
+> We don't recommend setting this permanently, as these options are crucial for performance when iterating. Instead, you may want to look at the new [Environments](doc:environments) feature, that lets Pants run natively on macOS but selectively invoke processes in a Docker container.
 
 ### Microsoft Windows
 

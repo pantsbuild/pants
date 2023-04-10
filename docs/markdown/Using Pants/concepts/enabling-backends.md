@@ -4,7 +4,6 @@ slug: "enabling-backends"
 excerpt: "How to enable specific functionality."
 hidden: false
 createdAt: "2020-02-21T17:44:27.363Z"
-updatedAt: "2022-04-20T22:31:51.974Z"
 ---
 Most Pants functionality is opt-in by adding the relevant _backend_ to the `[GLOBAL].backend_packages` option in `pants.toml`. For example:
 

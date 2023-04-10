@@ -83,11 +83,11 @@ class PythonSetup(Subsystem):
 
     @memoized_property
     def interpreter_constraints(self) -> tuple[str, ...]:
-        # TODO: In 2.17.0.dev0 we should set the default above to None and tweak the message here
+        # TODO: In 2.17.0.dev3 we should set the default above to None and tweak the message here
         #  appropriately.
         if self.options.is_default("interpreter_constraints"):
             warn_or_error(
-                "2.17.0.dev0",
+                "2.17.0.dev3",
                 "the factory default interpreter constraints value",
                 softwrap(
                     f"""\
@@ -237,7 +237,7 @@ class PythonSetup(Subsystem):
             constraints, such as `{'data-science': ['==3.8.*']}`.
 
             Warning: this does NOT impact the interpreter constraints used by targets within the
-            resolve, which is instead set by the option `[python.interpreter_constraints` and the
+            resolve, which is instead set by the option `[python].interpreter_constraints` and the
             `interpreter_constraints` field. It only impacts how the lockfile is generated.
 
             Pants will validate that the interpreter constraints of your code using a
@@ -246,10 +246,7 @@ class PythonSetup(Subsystem):
             using a resolve whose interpreter constraints are set to ['==3.7.*'], then
             Pants will error explaining the incompatibility.
 
-            The keys must be defined as resolves in `[python].resolves`. To change the interpreter
-            constraints for tool lockfiles, change `[tool].interpreter_constraints`, e.g.
-            `[black].interpreter_constraints`; if the tool does not have that option, it determines
-            its interpreter constraints from your user code.
+            The keys must be defined as resolves in `[python].resolves`.
             """
         ),
         advanced=True,
@@ -376,12 +373,12 @@ class PythonSetup(Subsystem):
             If you are using Pex lockfiles, we generally do not recommend this. You will already
             get similar performance benefits to this option, without the downsides.
 
-            Otherwise, this option can improve
-            performance and reduce cache size. But it has two consequences: 1) All cached test
-            results will be invalidated if any requirement in the lockfile changes, rather
-            than just those that depend on the changed requirement. 2) Requirements unneeded
-            by a test/run/repl will be present on the sys.path, which might in rare cases
-            cause their behavior to change.
+            Otherwise, this option can improve performance and reduce cache size.
+            But it has two consequences:
+            1) All cached test results will be invalidated if any requirement in the lockfile
+               changes, rather than just those that depend on the changed requirement.
+            2) Requirements unneeded by a test/run/repl will be present on the sys.path, which
+               might in rare cases cause their behavior to change.
 
             This option does not affect packaging deployable artifacts, such as
             PEX files, wheels and cloud functions, which will still use just the exact

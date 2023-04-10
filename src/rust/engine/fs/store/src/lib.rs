@@ -39,11 +39,11 @@ pub use crate::snapshot_ops::{SnapshotOps, SubsetParams};
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::fmt::{self, Debug, Display};
-use std::fs::hard_link;
 use std::fs::OpenOptions;
+use std::fs::Permissions as FSPermissions;
 use std::future::Future;
-use std::io::{self, Read, Seek, Write};
-use std::os::unix::fs::{symlink, OpenOptionsExt, PermissionsExt};
+use std::io::Write;
+use std::os::unix::fs::{MetadataExt, OpenOptionsExt, PermissionsExt};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Weak};
 use std::time::{Duration, Instant};
@@ -56,9 +56,10 @@ use fs::{
   FileEntry, Link, PathStat, Permissions, RelativePath, SymlinkBehavior, SymlinkEntry,
   EMPTY_DIRECTORY_DIGEST,
 };
-use futures::future::{self, BoxFuture, Either, FutureExt, TryFutureExt};
+use futures::future::{self, BoxFuture, Either, FutureExt};
 use grpc_util::prost::MessageExt;
 use hashing::{Digest, Fingerprint};
+use local::ByteStore;
 use parking_lot::Mutex;
 use prost::Message;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
@@ -66,18 +67,17 @@ use protos::require_digest;
 use remexec::{ServerCapabilities, Tree};
 use serde_derive::Serialize;
 use sharded_lmdb::DEFAULT_LEASE_TIME;
+#[cfg(target_os = "macos")]
+use tokio::fs::copy;
+#[cfg(not(target_os = "macos"))]
+use tokio::fs::hard_link;
+use tokio::fs::symlink;
 use tryfuture::try_future;
 use workunit_store::{in_workunit, Level, Metric};
 
 const KILOBYTES: usize = 1024;
 const MEGABYTES: usize = 1024 * KILOBYTES;
 const GIGABYTES: usize = 1024 * MEGABYTES;
-
-/// How big a file must be to become an immutable input symlink.
-// NB: These numbers were chosen after micro-benchmarking the code on one machine at the time of
-// writing. They were chosen using a rough equation from the microbenchmarks that are optimized
-// for somewhere between 2 and 3 uses of the corresponding entry to "break even".
-const IMMUTABLE_FILE_SIZE_LIMIT: usize = 512 * KILOBYTES;
 
 mod local;
 #[cfg(test)]
@@ -140,12 +140,6 @@ impl Display for StoreError {
 impl From<String> for StoreError {
   fn from(err: String) -> Self {
     Self::Unclassified(err)
-  }
-}
-
-impl From<io::Error> for StoreError {
-  fn from(err: io::Error) -> Self {
-    Self::Unclassified(err.to_string())
   }
 }
 
@@ -236,6 +230,19 @@ impl RemoteStore {
       .map(|&()| ())
   }
 
+  async fn remote_writer(
+    remote_store: &remote::ByteStore,
+    digest: Digest,
+    file: tokio::fs::File,
+  ) -> Result<tokio::fs::File, StoreError> {
+    remote_store.load_file(digest, file).await?.ok_or_else(|| {
+      StoreError::MissingDigest(
+        "Was not present in either the local or remote store".to_owned(),
+        digest,
+      )
+    })
+  }
+
   /// Download the digest to the local byte store from this remote store. The function `f_remote`
   /// can be used to validate the bytes (NB. if provided, the whole value will be buffered into
   /// memory to provide the `Bytes` argument, and thus `f_remote` should only be used for small digests).
@@ -247,59 +254,32 @@ impl RemoteStore {
     f_remote: Option<&(dyn Fn(Bytes) -> Result<(), String> + Send + Sync + 'static)>,
   ) -> Result<(), StoreError> {
     let remote_store = self.store.clone();
-    let create_missing = || {
-      StoreError::MissingDigest(
-        "Was not present in either the local or remote store".to_owned(),
-        digest,
-      )
-    };
     self
       .maybe_download(digest, async move {
-        let stored_digest = if digest.size_bytes <= IMMUTABLE_FILE_SIZE_LIMIT || f_remote.is_some()
-        {
-          // (if there's a function to call, always just buffer fully into memory)
-          let bytes = remote_store
-            .load_bytes(digest)
-            .await?
-            .ok_or_else(create_missing)?;
+        let store_into_fsdb =
+          f_remote.is_none() && ByteStore::should_use_fsdb(entry_type, digest.size_bytes);
+        if store_into_fsdb {
+          local_store
+            .get_file_fsdb()
+            .write_using(digest.hash, |file| {
+              Self::remote_writer(&remote_store, digest, file)
+            })
+            .await?;
+        } else {
+          let bytes = remote_store.load_bytes(digest).await?.ok_or_else(|| {
+            StoreError::MissingDigest(
+              "Was not present in either the local or remote store".to_owned(),
+              digest,
+            )
+          })?;
           if let Some(f_remote) = f_remote {
             f_remote(bytes.clone())?;
           }
-          let digest = Digest::of_bytes(&bytes);
           local_store
             .store_bytes(entry_type, digest.hash, bytes, true)
             .await?;
-          digest
-        } else {
-          assert!(f_remote.is_none());
-          // TODO(#18048): choose a file that can be plopped into the local store directly, when
-          // large files are stored there
-          let file = tokio::task::spawn_blocking(tempfile::tempfile)
-            .await
-            .map_err(|e| e.to_string())??;
-          let file = tokio::fs::File::from_std(file);
-
-          let file = remote_store
-            .load_file(digest, file)
-            .await?
-            .ok_or_else(create_missing)?;
-
-          let file = file.into_std().await;
-          local_store
-            .store(entry_type, true, true, move || {
-              let mut file = file.try_clone()?;
-              file.rewind()?;
-              Ok(file)
-            })
-            .await?
-        };
-        if digest == stored_digest {
-          Ok(())
-        } else {
-          Err(StoreError::Unclassified(format!(
-            "CAS gave wrong digest: expected {digest:?}, got {stored_digest:?}"
-          )))
         }
+        Ok(())
       })
       .await
   }
@@ -399,7 +379,7 @@ impl Store {
     tls_config: grpc_util::tls::Config,
     headers: BTreeMap<String, String>,
     chunk_size_bytes: usize,
-    upload_timeout: Duration,
+    rpc_timeout: Duration,
     rpc_retries: usize,
     rpc_concurrency_limit: usize,
     capabilities_cell_opt: Option<Arc<OnceCell<ServerCapabilities>>>,
@@ -413,7 +393,7 @@ impl Store {
         tls_config,
         headers,
         chunk_size_bytes,
-        upload_timeout,
+        rpc_timeout,
         rpc_retries,
         rpc_concurrency_limit,
         capabilities_cell_opt,
@@ -426,6 +406,11 @@ impl Store {
   // This default suffix is also hard-coded into the Python options code in global_options.py
   pub fn default_path() -> PathBuf {
     default_cache_path().join("lmdb_store")
+  }
+
+  /// Return the device ID that the local Store is hosted on.
+  pub fn local_filesystem_device(&self) -> u64 {
+    self.local.filesystem_device()
   }
 
   ///
@@ -468,30 +453,22 @@ impl Store {
     self
       .local
       .store_bytes_batch(EntryType::File, items, initial_lease)
-      .await
+      .await?;
+    Ok(())
   }
 
   ///
   /// Store a file locally by streaming its contents.
   ///
-  pub async fn store_file<F, R>(
+  pub async fn store_file(
     &self,
     initial_lease: bool,
     data_is_immutable: bool,
-    data_provider: F,
-  ) -> Result<Digest, String>
-  where
-    R: Read + Debug,
-    F: Fn() -> Result<R, io::Error> + Send + 'static,
-  {
+    src: PathBuf,
+  ) -> Result<Digest, String> {
     self
       .local
-      .store(
-        EntryType::File,
-        initial_lease,
-        data_is_immutable,
-        data_provider,
-      )
+      .store(EntryType::File, initial_lease, data_is_immutable, src)
       .await
   }
 
@@ -542,7 +519,8 @@ impl Store {
     digest: Digest,
     f: F,
   ) -> Result<T, StoreError> {
-    // No transformation or verification is needed for files.
+    // No transformation or verification (beyond verifying their digest, which the
+    // `remote::ByteStore` will do) is needed for files.
     self
       .load_bytes_with(EntryType::File, digest, move |v: &[u8]| Ok(f(v)), None)
       .await
@@ -1097,12 +1075,12 @@ impl Store {
     Ok(())
   }
 
-  pub fn garbage_collect(
+  pub async fn garbage_collect(
     &self,
     target_size_bytes: usize,
     shrink_behavior: ShrinkBehavior,
   ) -> Result<(), String> {
-    match self.local.shrink(target_size_bytes, shrink_behavior) {
+    match self.local.shrink(target_size_bytes, shrink_behavior).await {
       Ok(size) => {
         if size > target_size_bytes {
           log::warn!(
@@ -1234,8 +1212,8 @@ impl Store {
     &self,
     destination: PathBuf,
     digest: DirectoryDigest,
+    force_mutable: bool,
     mutable_paths: &BTreeSet<RelativePath>,
-    immutable_inputs: Option<&ImmutableInputs>,
     perms: Permissions,
   ) -> Result<(), StoreError> {
     // Load the DigestTrie for the digest, and convert it into a mapping between a fully qualified
@@ -1256,14 +1234,44 @@ impl Store {
       mutable_path_ancestors.extend(relpath.ancestors().map(|p| destination.join(p)));
     }
 
+    // Create the root, and determine what filesystem it and the store are on.
+    let materializing_to_same_filesystem = {
+      let store_filesystem_device = self.local_filesystem_device();
+      self
+        .local
+        .executor()
+        .spawn_blocking(
+          {
+            let destination = destination.clone();
+            move || {
+              std::fs::create_dir_all(&destination).map_err(|e| {
+                format!("Failed to create directory {}: {e}", destination.display())
+              })?;
+              let dest_device = destination
+                .metadata()
+                .map_err(|e| {
+                  format!(
+                    "Failed to get metadata for destination {}: {e}",
+                    destination.display()
+                  )
+                })?
+                .dev();
+              Ok(dest_device == store_filesystem_device)
+            }
+          },
+          |e| Err(format!("Directory creation task failed: {e}")),
+        )
+        .await?
+    };
+
     self
       .materialize_directory_children(
         destination.clone(),
         true,
-        false,
+        force_mutable,
+        materializing_to_same_filesystem,
         &parent_to_child,
         &mutable_path_ancestors,
-        immutable_inputs,
         perms,
       )
       .await
@@ -1274,35 +1282,21 @@ impl Store {
     destination: PathBuf,
     is_root: bool,
     force_mutable: bool,
+    can_hardlink: bool,
     parent_to_child: &'a HashMap<PathBuf, Vec<directory::Entry>>,
     mutable_paths: &'a BTreeSet<PathBuf>,
-    immutable_inputs: Option<&'a ImmutableInputs>,
     perms: Permissions,
   ) -> BoxFuture<'a, Result<(), StoreError>> {
     let store = self.clone();
     async move {
-      let destination2 = destination.clone();
-      store
-        .local
-        .executor()
-        .spawn_blocking(
-          move || {
-            if is_root {
-              fs::safe_create_dir_all(&destination2)
-            } else {
-              fs::safe_create_dir(&destination2)
-            }
-          },
-          |e| Err(format!("Directory creation task failed: {e}")),
-        )
-        .map_err(|e| {
-          format!(
-            "Failed to create directory {}: {}",
-            destination.display(),
-            e
-          )
-        })
-        .await?;
+      if !is_root {
+        // NB: Although we know that all parent directories already exist, we use `create_dir_all`
+        // because it succeeds even if _this_ directory already exists (which it might, if we're
+        // materializing atop an existing directory structure).
+        tokio::fs::create_dir_all(&destination)
+          .await
+          .map_err(|e| format!("Failed to create directory {}: {e}", destination.display()))?;
+      }
 
       if let Some(children) = parent_to_child.get(&destination) {
         let mut child_futures = Vec::new();
@@ -1310,8 +1304,7 @@ impl Store {
           let path = destination.join(child.name().as_ref());
           let store = store.clone();
           child_futures.push(async move {
-            let can_be_immutable =
-              immutable_inputs.is_some() && !mutable_paths.contains(&path) && !force_mutable;
+            let can_be_immutable = !force_mutable && can_hardlink && !mutable_paths.contains(&path);
 
             match child {
               directory::Entry::File(f) => {
@@ -1322,7 +1315,6 @@ impl Store {
                     perms,
                     f.is_executable(),
                     can_be_immutable,
-                    immutable_inputs,
                   )
                   .await
               }
@@ -1336,10 +1328,10 @@ impl Store {
                   .materialize_directory_children(
                     path.clone(),
                     false,
-                    mutable_paths.contains(&path),
+                    mutable_paths.contains(&path) || force_mutable,
+                    can_hardlink,
                     parent_to_child,
                     mutable_paths,
-                    immutable_inputs,
                     perms,
                   )
                   .await
@@ -1373,20 +1365,23 @@ impl Store {
     perms: Permissions,
     is_executable: bool,
     can_be_immutable: bool,
-    immutable_inputs: Option<&ImmutableInputs>,
   ) -> Result<(), StoreError> {
-    if can_be_immutable && digest.size_bytes > IMMUTABLE_FILE_SIZE_LIMIT {
-      let dest_path = immutable_inputs
-        .unwrap()
-        .path_for_file(digest, is_executable)
-        .await?;
-      self
-        .materialize_hardlink(destination, dest_path.to_str().unwrap().to_string())
-        .await
+    let hardlink_tgt = if can_be_immutable {
+      self.local.load_from_fs(digest).await?
     } else {
-      self
-        .materialize_file(destination, digest, perms, is_executable)
-        .await
+      None
+    };
+    match hardlink_tgt {
+      Some(path) => {
+        self
+          .materialize_hardlink(destination, path.to_str().unwrap().to_string())
+          .await
+      }
+      None => {
+        self
+          .materialize_file(destination, digest, perms, is_executable)
+          .await
+      }
     }
   }
 
@@ -1397,31 +1392,49 @@ impl Store {
     perms: Permissions,
     is_executable: bool,
   ) -> Result<(), StoreError> {
-    self
-      .load_file_bytes_with(digest, move |bytes| {
-        let mut f = OpenOptions::new()
-          .create(true)
-          .write(true)
-          .truncate(true)
-          .mode(match perms {
-            Permissions::ReadOnly if is_executable => 0o555,
-            Permissions::ReadOnly => 0o444,
-            Permissions::Writable if is_executable => 0o755,
-            Permissions::Writable => 0o644,
-          })
-          .open(&destination)
-          .map_err(|e| {
-            format!(
-              "Error opening file {} for writing: {:?}",
-              destination.display(),
-              e
-            )
-          })?;
-        f.write_all(bytes)
-          .map_err(|e| format!("Error writing file {}: {:?}", destination.display(), e))?;
+    let mode = match perms {
+      Permissions::ReadOnly if is_executable => 0o555,
+      Permissions::ReadOnly => 0o444,
+      Permissions::Writable if is_executable => 0o755,
+      Permissions::Writable => 0o644,
+    };
+    match self.local.load_from_fs(digest).await? {
+      Some(path) => {
+        tokio::fs::copy(&path, &destination).await.map_err(|e| {
+          format!(
+            "Error copying bytes from {} to {}: {e}",
+            path.display(),
+            destination.display()
+          )
+        })?;
+        tokio::fs::set_permissions(destination, FSPermissions::from_mode(mode))
+          .await
+          .map_err(|e| format!("Error setting permissions on {}: {e}", path.display()))?;
         Ok(())
-      })
-      .await?
+      }
+      None => {
+        self
+          .load_file_bytes_with(digest, move |bytes| {
+            let mut f = OpenOptions::new()
+              .create(true)
+              .write(true)
+              .truncate(true)
+              .mode(mode)
+              .open(&destination)
+              .map_err(|e| {
+                format!(
+                  "Error opening file {} for writing: {:?}",
+                  destination.display(),
+                  e
+                )
+              })?;
+            f.write_all(bytes)
+              .map_err(|e| format!("Error writing file {}: {:?}", destination.display(), e))?;
+            Ok(())
+          })
+          .await?
+      }
+    }
   }
 
   pub async fn materialize_symlink(
@@ -1429,7 +1442,12 @@ impl Store {
     destination: PathBuf,
     target: String,
   ) -> Result<(), StoreError> {
-    symlink(target, destination)?;
+    symlink(&target, &destination).await.map_err(|e| {
+      format!(
+        "Failed to create symlink to {target} at {}: {e}",
+        destination.display()
+      )
+    })?;
     Ok(())
   }
 
@@ -1438,7 +1456,26 @@ impl Store {
     destination: PathBuf,
     target: String,
   ) -> Result<(), StoreError> {
-    hard_link(target, destination)?;
+    // On macOS, copy uses a copy-on-write syscall (fclonefileat) which creates a disconnected
+    // clone. It is more defensive than a hardlink, but has the same requirement that the source
+    // and destination filesystem are the same.
+    //
+    // It also has the benefit of playing nicely with Docker for macOS file virtualization: see
+    // #18162.
+    #[cfg(target_os = "macos")]
+    copy(&target, &destination).await.map_err(|e| {
+      format!(
+        "Failed to copy from {target} to {}: {e}",
+        destination.display()
+      )
+    })?;
+    #[cfg(not(target_os = "macos"))]
+    hard_link(&target, &destination).await.map_err(|e| {
+      format!(
+        "Failed to create hardlink to {target} at {}: {e}",
+        destination.display()
+      )
+    })?;
     Ok(())
   }
 
@@ -1601,8 +1638,8 @@ impl Store {
     res.boxed()
   }
 
-  pub fn all_local_digests(&self, entry_type: EntryType) -> Result<Vec<Digest>, String> {
-    self.local.all_digests(entry_type)
+  pub async fn all_local_digests(&self, entry_type: EntryType) -> Result<Vec<Digest>, String> {
+    self.local.all_digests(entry_type).await
   }
 }
 

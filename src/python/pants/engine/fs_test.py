@@ -1185,6 +1185,35 @@ def test_write_digest_workspace(rule_runner: RuleRunner) -> None:
     assert path2.read_text() == "goodbye"
 
 
+def test_write_digest_workspace_clear_destination(rule_runner: RuleRunner) -> None:
+    workspace = Workspace(rule_runner.scheduler, _enforce_effects=False)
+    digest_a = rule_runner.request(
+        Digest,
+        [CreateDigest([FileContent("newdir/a.txt", b"hello")])],
+    )
+    digest_b = rule_runner.request(
+        Digest,
+        [CreateDigest([FileContent("newdir/b.txt", b"goodbye")])],
+    )
+    digest_c = rule_runner.request(
+        Digest,
+        [CreateDigest([FileContent("newdir/c.txt", b"hello again")])],
+    )
+    path1 = Path(rule_runner.build_root, "newdir/a.txt")
+    path2 = Path(rule_runner.build_root, "newdir/b.txt")
+    path3 = Path(rule_runner.build_root, "newdir/c.txt")
+
+    workspace.write_digest(digest_a, clear_destination=False)
+    workspace.write_digest(digest_b, clear_destination=False)
+    assert path1.exists()
+    assert path2.exists()
+
+    workspace.write_digest(digest_c, clear_destination=True)
+    assert not path1.exists()
+    assert not path2.exists()
+    assert path3.read_text() == "hello again"
+
+
 @dataclass(frozen=True)
 class DigestRequest:
     create_digest: CreateDigest

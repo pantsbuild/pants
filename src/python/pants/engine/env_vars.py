@@ -89,3 +89,7 @@ class EnvironmentVars(FrozenDict[str, str]):
     `CompleteEnvironmentVars`, as it represents a filtered/relevant subset of the environment, rather
     than the entire unfiltered environment.
     """
+
+
+class PathEnvironmentVariable(FrozenOrderedSet):
+    """The PATH environment variable entries, split on `os.pathsep`."""

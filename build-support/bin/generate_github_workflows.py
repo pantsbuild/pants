@@ -717,7 +717,7 @@ def build_wheels_job(platform: Platform, python_versions: list[str]) -> Jobs:
         # Unfortunately Equinix do not support the CentOS 7 image on the hardware we've been
         # generously given by the Runs on ARM program. Se we have to build in this image.
         container = {
-            "image": "registry.hub.docker.com/pantsbuild/wheel_build_aarch64:v3-8384c5cf",
+            "image": "ghcr.io/pantsbuild/wheel_build_aarch64:v3-8384c5cf",
         }
     else:
         container = None
@@ -1077,7 +1077,7 @@ def generate() -> dict[Path, str]:
         {
             "name": test_workflow_name,
             "concurrency": {
-                "group": "${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}",
+                "group": "${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}",
                 "cancel-in-progress": True,
             },
             "on": {"pull_request": {}, "push": {"branches-ignore": ["dependabot/**"]}},

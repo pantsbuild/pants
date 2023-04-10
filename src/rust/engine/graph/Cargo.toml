@@ -19,5 +19,5 @@ tokio = { version = "1.21", features = ["time", "parking_lot"] }
 
 [dev-dependencies]
 rand = "0.8"
-env_logger = "0.9.0"
+env_logger = "0.10.0"
 tokio = { version = "1.21", features = ["macros", "rt-multi-thread", "time"] }

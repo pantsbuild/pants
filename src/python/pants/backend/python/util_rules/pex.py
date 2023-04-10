@@ -54,17 +54,30 @@ from pants.core.util_rules.system_binaries import BashBinary
 from pants.engine.addresses import UnparsedAddressInputs
 from pants.engine.collection import Collection, DeduplicatedCollection
 from pants.engine.engine_aware import EngineAwareParameter
+from pants.engine.environment import EnvironmentName
 from pants.engine.fs import EMPTY_DIGEST, AddPrefix, CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.internals.native_engine import Snapshot
 from pants.engine.internals.selectors import MultiGet
 from pants.engine.process import Process, ProcessCacheScope, ProcessResult
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import HydratedSources, HydrateSourcesRequest, SourcesField, Targets
+from pants.engine.unions import UnionMembership, union
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
-from pants.util.strutil import pluralize, softwrap
+from pants.util.strutil import bullet_list, pluralize, softwrap
 
 logger = logging.getLogger(__name__)
+
+
+@union(in_scope_types=[EnvironmentName])
+@dataclass(frozen=True)
+class PythonProvider:
+    """Union which should have 0 or 1 implementations registered which provide Python.
+
+    Subclasses should provide a rule from their subclass type to `PythonExecutable`.
+    """
+
+    interpreter_constraints: InterpreterConstraints
 
 
 class PexPlatforms(DeduplicatedCollection[str]):
@@ -151,6 +164,7 @@ class PexRequest(EngineAwareParameter):
     additional_args: tuple[str, ...]
     pex_path: tuple[Pex, ...]
     description: str | None = dataclasses.field(compare=False)
+    cache_scope: ProcessCacheScope
 
     def __init__(
         self,
@@ -171,6 +185,7 @@ class PexRequest(EngineAwareParameter):
         additional_args: Iterable[str] = (),
         pex_path: Iterable[Pex] = (),
         description: str | None = None,
+        cache_scope: ProcessCacheScope = ProcessCacheScope.SUCCESSFUL,
     ) -> None:
         """A request to create a PEX from its inputs.
 
@@ -207,6 +222,7 @@ class PexRequest(EngineAwareParameter):
         :param pex_path: Pex files to add to the PEX_PATH.
         :param description: A human-readable description to render in the dynamic UI when building
             the Pex.
+        :param cache_scope: The cache scope for the underlying pex cli invocation process.
         """
         object.__setattr__(self, "output_filename", output_filename)
         object.__setattr__(self, "internal_only", internal_only)
@@ -228,6 +244,7 @@ class PexRequest(EngineAwareParameter):
         object.__setattr__(self, "additional_args", tuple(additional_args))
         object.__setattr__(self, "pex_path", tuple(pex_path))
         object.__setattr__(self, "description", description)
+        object.__setattr__(self, "cache_scope", cache_scope)
 
         self.__post_init__()
 
@@ -308,7 +325,27 @@ async def find_interpreter(
     interpreter_constraints: InterpreterConstraints,
     pex_subsystem: PexSubsystem,
     env_target: EnvironmentTarget,
+    union_membership: UnionMembership,
 ) -> PythonExecutable:
+    python_providers = union_membership.get(PythonProvider)
+    if len(python_providers) > 1:
+        raise ValueError(
+            softwrap(
+                f"""
+                Too many Python provider plugins were registered. We expected 0 or 1, but found
+                {len(python_providers)}. Providers were:
+
+                {bullet_list(repr(provider.__class__) for provider in python_providers)}
+                """
+            )
+        )
+    if python_providers:
+        python_provider = next(iter(python_providers))
+        python = await Get(
+            PythonExecutable, PythonProvider, python_provider(interpreter_constraints)
+        )
+        return python
+
     formatted_constraints = " OR ".join(str(constraint) for constraint in interpreter_constraints)
     result = await Get(
         ProcessResult,
@@ -451,8 +488,12 @@ async def _setup_pex_requirements(
                 request.interpreter_constraints,
                 loaded_lockfile.original_lockfile,
                 request.requirements.complete_req_strings,
-                python_setup,
-                resolve_config,
+                # We're using the entire lockfile, so there is no Pex subsetting operation we
+                # can delegate requirement validation to.  So we do our naive string-matching
+                # validation.
+                validate_consumed_req_strings=True,
+                python_setup=python_setup,
+                resolve_config=resolve_config,
             )
 
         return _BuildPexRequirementsSetup(
@@ -486,9 +527,15 @@ async def _setup_pex_requirements(
                 loaded_lockfile.metadata,
                 request.interpreter_constraints,
                 loaded_lockfile.original_lockfile,
-                request.requirements.req_strings,
-                python_setup,
-                resolve_config,
+                consumed_req_strings=request.requirements.req_strings,
+                # Don't validate user requirements when subsetting a resolve, as Pex's
+                # validation during the subsetting is far more precise than our naive string
+                # comparison. For example, if a lockfile was generated with `foo==1.2.3`
+                # and we want to resolve `foo>=1.0.0` or just `foo` out of it, Pex will do
+                # so successfully, while our naive validation would fail.
+                validate_consumed_req_strings=False,
+                python_setup=python_setup,
+                resolve_config=resolve_config,
             )
 
         return _BuildPexRequirementsSetup(
@@ -581,7 +628,6 @@ async def build_pex(
     result = await Get(
         ProcessResult,
         PexCliProcess(
-            python=pex_python_setup.python,
             subcommand=(),
             extra_args=argv,
             additional_input_digest=merged_digest,
@@ -589,6 +635,7 @@ async def build_pex(
             output_files=output_files,
             output_directories=output_directories,
             concurrency_available=requirements_setup.concurrency_available,
+            cache_scope=request.cache_scope,
         ),
     )
 
@@ -710,7 +757,7 @@ class VenvScriptWriter:
         env_vars = (
             f"{name}={shlex.quote(value)}"
             for name, value in self.complete_pex_env.environment_dict(
-                python_configured=True
+                python=self.pex.python
             ).items()
         )
 
@@ -718,7 +765,7 @@ class VenvScriptWriter:
         venv_dir = shlex.quote(str(self.venv_dir))
         execute_pex_args = " ".join(
             f"$(adjust_relative_paths {shlex.quote(arg)})"
-            for arg in self.complete_pex_env.create_argv(self.pex.name, python=self.pex.python)
+            for arg in self.complete_pex_env.create_argv(self.pex.name)
         )
 
         script = dedent(
@@ -807,6 +854,7 @@ class VenvScriptWriter:
 @dataclass(frozen=True)
 class VenvPex:
     digest: Digest
+    append_only_caches: FrozenDict[str, str] | None
     pex_filename: str
     pex: Script
     python: Script
@@ -923,9 +971,13 @@ async def create_venv_pex(
         ),
     )
     input_digest = await Get(Digest, MergeDigests((venv_script_writer.pex.digest, scripts_digest)))
+    append_only_caches = (
+        venv_pex_result.python.append_only_caches if venv_pex_result.python else None
+    )
 
     return VenvPex(
         digest=input_digest,
+        append_only_caches=append_only_caches,
         pex_filename=venv_pex_result.pex_filename,
         pex=pex.script,
         python=python.script,
@@ -988,15 +1040,18 @@ class PexProcess:
 async def setup_pex_process(request: PexProcess, pex_environment: PexEnvironment) -> Process:
     pex = request.pex
     complete_pex_env = pex_environment.in_sandbox(working_directory=request.working_directory)
-    argv = complete_pex_env.create_argv(pex.name, *request.argv, python=pex.python)
+    argv = complete_pex_env.create_argv(pex.name, *request.argv)
     env = {
-        **complete_pex_env.environment_dict(python_configured=pex.python is not None),
+        **complete_pex_env.environment_dict(python=pex.python),
         **request.extra_env,
     }
     input_digest = (
         await Get(Digest, MergeDigests((pex.digest, request.input_digest)))
         if request.input_digest
         else pex.digest
+    )
+    append_only_caches = (
+        request.pex.python.append_only_caches if request.pex.python else FrozenDict({})
     )
     return Process(
         argv,
@@ -1007,7 +1062,11 @@ async def setup_pex_process(request: PexProcess, pex_environment: PexEnvironment
         env=env,
         output_files=request.output_files,
         output_directories=request.output_directories,
-        append_only_caches=complete_pex_env.append_only_caches,
+        append_only_caches={
+            **complete_pex_env.append_only_caches,
+            **append_only_caches,
+        },
+        immutable_input_digests=pex_environment.bootstrap_python.immutable_input_digests,
         timeout_seconds=request.timeout_seconds,
         execution_slot_variable=request.execution_slot_variable,
         concurrency_available=request.concurrency_available,
@@ -1089,6 +1148,7 @@ async def setup_venv_pex_process(
             working_directory=request.working_directory
         ).append_only_caches,
         **request.append_only_caches,
+        **(FrozenDict({}) if venv_pex.append_only_caches is None else venv_pex.append_only_caches),
     )
     return Process(
         argv=argv,
@@ -1100,6 +1160,7 @@ async def setup_venv_pex_process(
         output_files=request.output_files,
         output_directories=request.output_directories,
         append_only_caches=append_only_caches,
+        immutable_input_digests=pex_environment.bootstrap_python.immutable_input_digests,
         timeout_seconds=request.timeout_seconds,
         execution_slot_variable=request.execution_slot_variable,
         concurrency_available=request.concurrency_available,

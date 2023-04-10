@@ -4,7 +4,6 @@ slug: "media"
 excerpt: "Learn more about Pants and related topics from these talks, posts and podcasts featuring Pants contributors and users."
 hidden: false
 createdAt: "2021-04-18T17:27:18.361Z"
-updatedAt: "2023-01-04T22:02:38.457Z"
 ---
 
 ## Case Studies

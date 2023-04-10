@@ -4,7 +4,6 @@ slug: "release-strategy"
 excerpt: "Our approach to semantic versioning + time-based releases."
 hidden: false
 createdAt: "2020-05-17T03:02:12.315Z"
-updatedAt: "2022-04-29T21:43:57.204Z"
 ---
 Pants release cycles flow through:
 

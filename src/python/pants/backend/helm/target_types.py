@@ -479,6 +479,12 @@ class HelmDeploymentPostRenderersField(SpecialCasedDependencies):
     )
 
 
+class HelmDeploymentEnableDNSField(BoolField):
+    alias = "enable_dns"
+    default = False
+    help = "Enables DNS lookups when using the `getHostByName` template function."
+
+
 class HelmDeploymentTarget(Target):
     alias = "helm_deployment"
     core_fields = (
@@ -493,6 +499,7 @@ class HelmDeploymentTarget(Target):
         HelmDeploymentNoHooksField,
         HelmDeploymentTimeoutField,
         HelmDeploymentPostRenderersField,
+        HelmDeploymentEnableDNSField,
     )
     help = "A Helm chart deployment."
 
@@ -514,6 +521,7 @@ class HelmDeploymentFieldSet(FieldSet):
     dependencies: HelmDeploymentDependenciesField
     values: HelmDeploymentValuesField
     post_renderers: HelmDeploymentPostRenderersField
+    enable_dns: HelmDeploymentEnableDNSField
 
     def format_values(
         self, interpolation_context: InterpolationContext, *, ignore_missing: bool = False

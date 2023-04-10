@@ -376,7 +376,7 @@ class Options:
         pairs = []
         parser = self.get_parser(scope)
         # Sort the arguments, so that the fingerprint is consistent.
-        for (_, kwargs) in sorted(parser.option_registrations_iter()):
+        for _, kwargs in sorted(parser.option_registrations_iter()):
             if not kwargs.get("fingerprint", True):
                 continue
             if daemon_only and not kwargs.get("daemon", False):

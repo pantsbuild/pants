@@ -9,7 +9,6 @@ import pytest
 
 from pants.backend.codegen.protobuf.target_types import ProtobufSourceTarget
 from pants.backend.python.goals import repl as python_repl
-from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
     PythonRequirementTarget,
     PythonSourcesGeneratorTarget,
@@ -87,7 +86,7 @@ def test_default_repl(rule_runner: RuleRunner) -> None:
 @pytest.mark.platform_specific_behavior
 @pytest.mark.parametrize(
     "major_minor_interpreter",
-    all_major_minor_python_versions(PythonSetup.default_interpreter_constraints),
+    all_major_minor_python_versions(["CPython>=3.7,<4"]),
 )
 def test_ipython(rule_runner: RuleRunner, major_minor_interpreter: str) -> None:
     assert (
@@ -114,7 +113,7 @@ def test_eagerly_validate_roots_have_common_resolve(rule_runner: RuleRunner) -> 
             )
         }
     )
-    with engine_error(NoCompatibleResolveException, contains="./pants peek"):
+    with engine_error(NoCompatibleResolveException, contains="pants peek"):
         run_repl(
             rule_runner,
             ["//:t1", "//:t2"],

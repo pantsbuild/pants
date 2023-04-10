@@ -4,7 +4,6 @@ slug: "python-interpreter-compatibility"
 excerpt: "How to configure which Python version(s) your project should use."
 hidden: false
 createdAt: "2020-04-30T20:06:44.249Z"
-updatedAt: "2022-04-23T21:58:23.364Z"
 ---
 Setting the default Python version
 ----------------------------------
@@ -26,6 +25,10 @@ The value can be any valid Requirement-style strings. You can use multiple strin
 | `['CPython==2.7.*', 'CPython>=3.5']` | CPython 2.7 or 3.5+                      |
 
 As a shortcut, you can leave off `CPython` and just put the version specifier. For example, `==3.8` will be expanded automatically to `CPython==3.8`.
+
+> 📘 Using Apple Silicon (M1/M2)?
+>
+> If you use Python code on Apple's M1/M2 hardware you may need to set your interpreter constraints to Python 3.9+, as many tools, such as Black, will not install correctly on earlier Python versions on this platform.
 
 Using multiple Python versions in the same project
 --------------------------------------------------

@@ -65,6 +65,7 @@ module = [
     "hdrh",
     "hdrh.histogram",
     "ijson.*",
+    "nodesemver",
     "pex.*",
     "psutil",
 ]

@@ -3,7 +3,6 @@ title: "Remote execution"
 slug: "remote-execution"
 hidden: false
 createdAt: "2020-11-13T23:44:25.806Z"
-updatedAt: "2021-03-19T21:47:56.096Z"
 ---
 > 🚧 Remote execution support is still experimental
 > 

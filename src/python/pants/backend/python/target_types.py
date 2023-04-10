@@ -192,6 +192,7 @@ class PythonFilesGeneratorSettingsRequest(TargetFilesGeneratorSettingsRequest):
 # `pex_binary` and `pex_binaries` target
 # -----------------------------------------------------------------------------------------------
 
+
 # See `target_types_rules.py` for a dependency injection rule.
 class PexBinaryDependenciesField(Dependencies):
     supports_transitive_excludes = True

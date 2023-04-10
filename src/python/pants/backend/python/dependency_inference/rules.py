@@ -42,8 +42,9 @@ from pants.backend.python.target_types import (
 from pants.backend.python.util_rules import ancestor_files, pex
 from pants.backend.python.util_rules.ancestor_files import AncestorFiles, AncestorFilesRequest
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
+from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.core import target_types
-from pants.core.target_types import AllAssetTargets, AllAssetTargetsByPath, AllAssetTargetsRequest
+from pants.core.target_types import AllAssetTargetsByPath
 from pants.core.util_rules import stripped_source_files
 from pants.engine.addresses import Address, Addresses
 from pants.engine.internals.graph import Owners, OwnersRequest
@@ -57,7 +58,6 @@ from pants.engine.target import (
     Targets,
 )
 from pants.engine.unions import UnionRule
-from pants.option.global_options import OwnersNotFoundBehavior
 from pants.source.source_root import SourceRoot, SourceRootRequest
 from pants.util.docutil import doc_url
 from pants.util.strutil import bullet_list, softwrap
@@ -430,8 +430,7 @@ async def resolve_parsed_dependencies(
         resolve_results = {}
 
     if parsed_assets:
-        all_asset_targets = await Get(AllAssetTargets, AllAssetTargetsRequest())
-        assets_by_path = await Get(AllAssetTargetsByPath, AllAssetTargets, all_asset_targets)
+        assets_by_path = await Get(AllAssetTargetsByPath)
         asset_deps = _get_inferred_asset_deps(
             request.field_set.address,
             request.field_set.source.file_path,
@@ -475,7 +474,7 @@ async def infer_python_dependencies_via_source(
 
     inferred_deps = import_deps | asset_deps
 
-    _ = await _handle_unowned_imports(
+    await _handle_unowned_imports(
         request.field_set.address,
         python_infer_subsystem.unowned_dependency_behavior,
         python_setup,
@@ -564,7 +563,7 @@ async def infer_python_conftest_dependencies(
     owners = await MultiGet(
         # NB: Because conftest.py files effectively always have content, we require an
         # owning target.
-        Get(Owners, OwnersRequest((f,), OwnersNotFoundBehavior.error))
+        Get(Owners, OwnersRequest((f,), GlobMatchErrorBehavior.error))
         for f in conftest_files.snapshot.files
     )
 

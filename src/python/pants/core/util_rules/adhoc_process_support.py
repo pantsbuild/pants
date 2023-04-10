@@ -10,7 +10,6 @@ from dataclasses import dataclass
 from textwrap import dedent  # noqa: PNT20
 from typing import Iterable, Mapping, TypeVar, Union
 
-from pants.base.deprecated import warn_or_error
 from pants.build_graph.address import Address
 from pants.core.goals.package import BuiltPackage, EnvironmentAwarePackageRequest, PackageFieldSet
 from pants.core.goals.run import RunFieldSet, RunInSandboxRequest
@@ -73,7 +72,6 @@ class AdhocProcessResult:
 class ResolveExecutionDependenciesRequest:
     address: Address
     execution_dependencies: tuple[str, ...] | None
-    dependencies: tuple[str, ...] | None  # can go away after 2.17.0.dev0 per deprecation
     runnable_dependencies: tuple[str, ...] | None
 
 
@@ -148,7 +146,6 @@ async def merge_extra_sandbox_contents(request: MergeExtraSandboxContents) -> Ex
 
 @rule
 async def add_extra_contents_to_prcess(request: AddExtraSandboxContentsToProcess) -> Process:
-
     proc = request.process
     extras = request.contents
     new_digest = await Get(
@@ -182,7 +179,6 @@ async def add_extra_contents_to_prcess(request: AddExtraSandboxContentsToProcess
 async def _resolve_runnable_dependencies(
     bash: BashBinary, deps: tuple[str, ...] | None, owning: Address, origin: str
 ) -> tuple[Digest, RunnableDependencies | None]:
-
     if not deps:
         return EMPTY_DIGEST, None
 
@@ -263,12 +259,8 @@ async def resolve_execution_environment(
     request: ResolveExecutionDependenciesRequest,
     bash: BashBinary,
 ) -> ResolvedExecutionDependencies:
-
     target_address = request.address
     raw_execution_dependencies = request.execution_dependencies
-    raw_regular_dependencies = request.dependencies
-
-    any_dependencies_defined = raw_regular_dependencies is not None
 
     # Always include the execution dependencies that were specified
     if raw_execution_dependencies is not None:
@@ -281,23 +273,8 @@ async def resolve_execution_environment(
                 description_of_origin=_descr,
             ),
         )
-    elif any_dependencies_defined:
-        # If we're specifying the `dependencies` as relevant to the execution environment, then
-        # include this command as a root for the transitive dependency search for execution
-        # dependencies.
-        execution_dependencies = Addresses((target_address,))
-        warn_or_error(
-            "2.17.0.dev0",
-            "Using `dependencies` to specify execution-time dependencies for `shell_command` ",
-            (
-                "To clear this warning, use the `output_dependencies` and `execution_dependencies`"
-                "fields. Set `execution_dependencies=()` if you have no execution-time "
-                "dependencies."
-            ),
-            print_warning=True,
-        )
     else:
-        execution_dependencies = Addresses((target_address,))
+        execution_dependencies = Addresses(())
 
     transitive = await Get(
         TransitiveTargets,
@@ -472,7 +449,6 @@ async def prepare_adhoc_process(
 
 
 def _output_at_build_root(process: Process, bash: BashBinary) -> Process:
-
     working_directory = process.working_directory or ""
 
     output_directories = process.output_directories
