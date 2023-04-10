@@ -36,7 +36,7 @@ class PyenvPythonProviderSubsystem(TemplatedExternalTool):
     options_scope = "pyenv-python-provider"
     name = "pyenv"
     help = softwrap(
-        f"""
+        """
         A subsystem for Pants-provided Python leveraging pyenv (https://github.com/pyenv/pyenv).
 
         Enabling this subsystem will switch Pants from trying to find an appropriate Python on your
