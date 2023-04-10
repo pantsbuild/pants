@@ -175,7 +175,10 @@ class LintRequest:
 
     @classproperty
     def tool_id(cls) -> str:
-        """The "id" of the tool, used in tool selection (E.g. --only=<id>)."""
+        """The "id" of the tool, used in tool selection (E.g.
+
+        --only=<id>).
+        """
         return
 
     @distinct_union_type_per_subclass(in_scope_types=[EnvironmentName])
@@ -339,9 +342,7 @@ async def _get_partitions_by_request_type(
     )
 
     filtered_core_request_types = [
-        request_type
-        for request_type in core_request_types
-        if request_type.tool_id in specified_ids
+        request_type for request_type in core_request_types if request_type.tool_id in specified_ids
     ]
     if not filtered_core_request_types:
         return {}
