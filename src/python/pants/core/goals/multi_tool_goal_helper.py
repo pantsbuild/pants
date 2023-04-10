@@ -79,12 +79,12 @@ def determine_specified_tool_ids(
     only_option: Iterable[str],
     all_requests: Iterable[type],
 ) -> set[str]:
-    all_valid_names = {request.tool_id for request in all_requests}  # type: ignore[attr-defined]
+    all_valid_ids = {request.tool_id for request in all_requests}  # type: ignore[attr-defined]
     if not only_option:
-        return all_valid_names
+        return all_valid_ids
 
     specified = set(only_option)
-    unrecognized_names = specified - all_valid_names
+    unrecognized_names = specified - all_valid_ids
     if unrecognized_names:
         plural = (
             ("s", repr(sorted(unrecognized_names)))
@@ -96,7 +96,7 @@ def determine_specified_tool_ids(
                 f"""
                 Unrecognized name{plural[0]} with the option `--{goal_name}-only`: {plural[1]}
 
-                All valid names: {sorted(all_valid_names)}
+                All valid names: {sorted(all_valid_ids)}
                 """
             )
         )

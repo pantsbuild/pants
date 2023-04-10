@@ -175,8 +175,8 @@ class LintRequest:
 
     @classproperty
     def tool_id(cls) -> str:
-        """The "slug" of the tool, used in tool selection (E.g. --only=<slug>)."""
-        return cls.tool_subsystem.options_scope
+        """The "id" of the tool, used in tool selection (E.g. --only=<id>)."""
+        return
 
     @distinct_union_type_per_subclass(in_scope_types=[EnvironmentName])
     class Batch(_BatchBase[PartitionElementT, PartitionMetadataT]):
@@ -332,7 +332,7 @@ async def _get_partitions_by_request_type(
     make_targets_partition_request_get: Callable[[_TargetPartitioner], Get[Partitions]],
     make_files_partition_request_get: Callable[[_FilePartitioner], Get[Partitions]],
 ) -> dict[type[_CoreRequestType], list[Partitions]]:
-    specified_slugs = determine_specified_tool_ids(
+    specified_ids = determine_specified_tool_ids(
         subsystem.name,
         subsystem.only,
         core_request_types,
@@ -341,7 +341,7 @@ async def _get_partitions_by_request_type(
     filtered_core_request_types = [
         request_type
         for request_type in core_request_types
-        if request_type.tool_id in specified_slugs
+        if request_type.tool_id in specified_ids
     ]
     if not filtered_core_request_types:
         return {}

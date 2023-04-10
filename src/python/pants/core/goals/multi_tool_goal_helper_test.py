@@ -20,7 +20,7 @@ from pants.util.strutil import softwrap
 def test_determine_specified_tool_ids() -> None:
     class StyleReq:
         @classproperty
-        def tool_name(cls) -> str:
+        def tool_id(cls) -> str:
             return "my-tool"
 
     with pytest.raises(ValueError) as exc:

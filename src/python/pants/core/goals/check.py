@@ -186,14 +186,14 @@ async def check(
     check_subsystem: CheckSubsystem,
 ) -> Check:
     request_types = cast("Iterable[type[CheckRequest]]", union_membership[CheckRequest])
-    specified_slugs = determine_specified_tool_ids("check", check_subsystem.only, request_types)
+    specified_ids = determine_specified_tool_ids("check", check_subsystem.only, request_types)
 
     requests = tuple(
         request_type(
             request_type.field_set_type.create(target)
             for target in targets
             if (
-                request_type.tool_id in specified_slugs
+                request_type.tool_id in specified_ids
                 and request_type.field_set_type.is_applicable(target)
             )
         )
