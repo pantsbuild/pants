@@ -12,10 +12,6 @@ from pants.testutil.rule_runner import RuleRunner
 class PythonRuleRunner(RuleRunner):
     """Set common python rule-specific options."""
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.set_options([])
-
     def create_options_bootstrapper(
         self, args: Iterable[str], env: Mapping[str, str] | None
     ) -> OptionsBootstrapper:
