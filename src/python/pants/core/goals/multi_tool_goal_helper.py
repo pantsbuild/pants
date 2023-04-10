@@ -74,12 +74,12 @@ class BatchSizeOption(IntOption):
         )
 
 
-def determine_specified_tool_slugs(
+def determine_specified_tool_ids(
     goal_name: str,
     only_option: Iterable[str],
     all_requests: Iterable[type],
 ) -> set[str]:
-    all_valid_names = {request.tool_slug for request in all_requests}  # type: ignore[attr-defined]
+    all_valid_names = {request.tool_id for request in all_requests}  # type: ignore[attr-defined]
     if not only_option:
         return all_valid_names
 

@@ -13,7 +13,7 @@ import colors
 from pants.core.goals.lint import REPORT_DIR as REPORT_DIR  # noqa: F401
 from pants.core.goals.multi_tool_goal_helper import (
     OnlyOption,
-    determine_specified_tool_slugs,
+    determine_specified_tool_ids,
     write_reports,
 )
 from pants.core.util_rules.distdir import DistDir
@@ -186,14 +186,14 @@ async def check(
     check_subsystem: CheckSubsystem,
 ) -> Check:
     request_types = cast("Iterable[type[CheckRequest]]", union_membership[CheckRequest])
-    specified_slugs = determine_specified_tool_slugs("check", check_subsystem.only, request_types)
+    specified_slugs = determine_specified_tool_ids("check", check_subsystem.only, request_types)
 
     requests = tuple(
         request_type(
             request_type.field_set_type.create(target)
             for target in targets
             if (
-                request_type.tool_slug in specified_slugs
+                request_type.tool_id in specified_slugs
                 and request_type.field_set_type.is_applicable(target)
             )
         )
