@@ -175,10 +175,7 @@ class LintRequest:
 
     @classproperty
     def tool_id(cls) -> str:
-        """The "id" of the tool, used in tool selection (E.g.
-
-        --only=<id>).
-        """
+        """The "id" of the tool, used in tool selection (Eg --only=<id>)."""
         return
 
     @distinct_union_type_per_subclass(in_scope_types=[EnvironmentName])
