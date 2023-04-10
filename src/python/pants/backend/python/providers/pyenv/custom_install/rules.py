@@ -40,7 +40,11 @@ async def make_synthetic_targets(request: SyntheticPyenvTargetsRequest) -> Synth
         [
             (
                 source,
-                (TargetAdaptor("_pyenv_install", name="pants-pyenv-install", __source__=source),),
+                (
+                    TargetAdaptor(
+                        "_pyenv_install", name="pants-pyenv-install", __source__=(source, 0)
+                    ),
+                ),
             )
         ],
     )

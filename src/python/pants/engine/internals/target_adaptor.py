@@ -31,7 +31,9 @@ class TargetAdaptor:
 
     __slots__ = ("type_alias", "name", "kwargs", "source")
 
-    def __init__(self, type_alias: str, name: str | None, __source__: str, **kwargs: Any) -> None:
+    def __init__(
+        self, type_alias: str, name: str | None, __source__: tuple[str, int], **kwargs: Any
+    ) -> None:
         self.type_alias = type_alias
         self.name = name
         self.kwargs = kwargs

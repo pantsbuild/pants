@@ -29,7 +29,7 @@ from pants.engine.unions import UnionMembership
 from pants.testutil.option_util import create_goal_subsystem
 from pants.util.frozendict import FrozenDict
 
-TargetAdaptor = functools.partial(_TargetAdaptor, __source__="BUILD:x")
+TargetAdaptor = functools.partial(_TargetAdaptor, __source__=("BUILD", 0))
 
 
 def parse_address_map(build_file: str, *, ignore_unrecognized_symbols: bool = False) -> AddressMap:

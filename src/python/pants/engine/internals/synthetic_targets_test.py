@@ -39,7 +39,7 @@ from pants.engine.target import (
 from pants.testutil.rule_runner import RuleRunner, engine_error
 from pants.util.strutil import softwrap
 
-TargetAdaptor = functools.partial(_TargetAdaptor, __source__="BUILD:x")
+TargetAdaptor = functools.partial(_TargetAdaptor, __source__=("BUILD", 0))
 
 
 @dataclass(frozen=True)

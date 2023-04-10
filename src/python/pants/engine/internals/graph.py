@@ -192,7 +192,7 @@ async def _determine_target_adaptor_and_type(
     target_type = registered_target_types.aliases_to_types.get(target_adaptor.type_alias, None)
     if target_type is None:
         raise UnrecognizedTargetTypeException(
-            target_adaptor.type_alias, registered_target_types, req.address
+            target_adaptor.type_alias, registered_target_types, req.address, target_adaptor.source
         )
     if (
         target_type.deprecated_alias is not None

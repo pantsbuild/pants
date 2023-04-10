@@ -379,7 +379,7 @@ class Target:
     field_values: FrozenDict[type[Field], Field]
     residence_dir: str
     name_explicitly_set: bool
-    build_file_source: str
+    build_file_source: tuple[str, int]
 
     @final
     def __init__(
@@ -394,7 +394,7 @@ class Target:
         name_explicitly_set: bool = True,
         residence_dir: str | None = None,
         ignore_unrecognized_fields: bool = False,
-        build_file_source: str | None = None,
+        build_file_source: tuple[str, int] | None = None,
     ) -> None:
         """Create a target.
 
@@ -430,9 +430,7 @@ class Target:
             self, "residence_dir", residence_dir if residence_dir is not None else address.spec_path
         )
         object.__setattr__(self, "address", address)
-        object.__setattr__(
-            self, "build_file_source", build_file_source or f"{self.residence_dir}??"
-        )
+        object.__setattr__(self, "build_file_source", build_file_source or (self.residence_dir, 0))
         object.__setattr__(self, "name_explicitly_set", name_explicitly_set)
         try:
             object.__setattr__(
@@ -513,6 +511,16 @@ class Target:
     def field_types(self) -> Tuple[Type[Field], ...]:
         return (*self.core_fields, *self.plugin_fields)
 
+    @final
+    @property
+    def build_file_name(self) -> str:
+        return self.build_file_source[0]
+
+    @final
+    @property
+    def build_file_line(self) -> int:
+        return self.build_file_source[1]
+
     @distinct_union_type_per_subclass
     class PluginField:
         pass
@@ -524,7 +532,7 @@ class Target:
             f"address={self.address}, "
             f"alias={self.alias!r}, "
             f"residence_dir={self.residence_dir!r}, "
-            f"source={self.build_file_source!r}, "
+            f"source={self.build_file_source}, "
             f"{fields})"
         )
 
@@ -1630,10 +1638,10 @@ class UnrecognizedTargetTypeException(Exception):
         target_type: str,
         registered_target_types: RegisteredTargetTypes,
         address: Address | None = None,
-        build_file_source: str | None = None,
+        build_file_source: tuple[str, int] | None = None,
     ) -> None:
         for_address = f" for address {address}" if address else ""
-        prefix = f"{build_file_source}: " if build_file_source else ""
+        prefix = f"{build_file_source[0]}:{build_file_source[1]}: " if build_file_source else ""
         super().__init__(
             softwrap(
                 f"""

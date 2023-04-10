@@ -843,4 +843,4 @@ def test_build_file_source(target_adaptor_rule_runner: RuleRunner) -> None:
         TargetAdaptor,
         [TargetAdaptorRequest(Address("src", target_name="foo"), description_of_origin="test")],
     )
-    assert "src/BUILD:2" == target_adaptor.source
+    assert ("src/BUILD", 2) == target_adaptor.source
