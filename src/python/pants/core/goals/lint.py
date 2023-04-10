@@ -15,7 +15,7 @@ from pants.core.goals.multi_tool_goal_helper import (
     BatchSizeOption,
     OnlyOption,
     SkippableSubsystem,
-    determine_specified_tool_names,
+    determine_specified_tool_slugs,
     write_reports,
 )
 from pants.core.util_rules.distdir import DistDir
@@ -170,6 +170,12 @@ class LintRequest:
 
     @classproperty
     def tool_name(cls) -> str:
+        """The user-facing "name" of the tool."""
+        return cls.tool_subsystem.options_scope
+
+    @classproperty
+    def tool_slug(cls) -> str:
+        """The "slug" of the tool, used in tool selection (E.g. --only=<slug>)."""
         return cls.tool_subsystem.options_scope
 
     @distinct_union_type_per_subclass(in_scope_types=[EnvironmentName])
@@ -326,7 +332,7 @@ async def _get_partitions_by_request_type(
     make_targets_partition_request_get: Callable[[_TargetPartitioner], Get[Partitions]],
     make_files_partition_request_get: Callable[[_FilePartitioner], Get[Partitions]],
 ) -> dict[type[_CoreRequestType], list[Partitions]]:
-    specified_names = determine_specified_tool_names(
+    specified_slugs = determine_specified_tool_slugs(
         subsystem.name,
         subsystem.only,
         core_request_types,
@@ -335,7 +341,7 @@ async def _get_partitions_by_request_type(
     filtered_core_request_types = [
         request_type
         for request_type in core_request_types
-        if request_type.tool_name in specified_names
+        if request_type.tool_slug in specified_slugs
     ]
     if not filtered_core_request_types:
         return {}
