@@ -98,7 +98,13 @@ class GraphSession:
     goal_map: Any
 
     # NB: Keep this in sync with the method `run_goal_rules`.
-    goal_param_types: ClassVar[tuple[type, ...]] = (Specs, Console, Workspace, EnvironmentName)
+    goal_param_types: ClassVar[tuple[type, ...]] = (
+        Specs,
+        Console,
+        Workspace,
+        EnvironmentName,
+        CurrentExecutingGoal,
+    )
 
     def goal_consumed_subsystem_scopes(self, goal_name: str) -> tuple[str, ...]:
         """Return the scopes of subsystems that could be consumed while running the given goal."""
@@ -143,7 +149,9 @@ class GraphSession:
             if not goal_product.subsystem_cls.activated(union_membership):
                 raise GoalNotActivatedException(goal)
             # NB: Keep this in sync with the property `goal_param_types`.
-            params = Params(specs, self.console, workspace, env_name)
+            params = Params(
+                specs, self.console, workspace, env_name, CurrentExecutingGoal(goal, goal_product)
+            )
             logger.debug(f"requesting {goal_product} to satisfy execution of `{goal}` goal")
             try:
                 exit_code = self.scheduler_session.run_goal_rule(
@@ -267,10 +275,6 @@ class EngineInitializer:
         @rule
         def build_root_singleton() -> BuildRoot:
             return cast(BuildRoot, BuildRoot.instance)
-
-        @rule
-        def current_executing_goal(session_values: SessionValues) -> CurrentExecutingGoal:
-            return session_values.get(CurrentExecutingGoal) or CurrentExecutingGoal()
 
         # Create a Scheduler containing graph and filesystem rules, with no installed goals.
         rules = FrozenOrderedSet(

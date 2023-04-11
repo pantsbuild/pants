@@ -137,20 +137,8 @@ class Goal:
 
 @dataclass(frozen=True)
 class CurrentExecutingGoal(EngineAwareReturnType):
-    goal: type[Goal] | None = None
-
-    @property
-    def name(self) -> str | None:
-        return None if self.goal is None else self.goal.name
-
-    @contextmanager
-    def _executing(self, goal: type[Goal]) -> Iterator[None]:
-        # Mutate current goal; we're only frozen to avoid inadvertent tampering with `self.goal`.
-        object.__setattr__(self, "goal", goal)
-        try:
-            yield
-        finally:
-            object.__setattr__(self, "goal", None)
+    name: str
+    goal: type[Goal]
 
     def cacheable(self) -> bool:
         return False

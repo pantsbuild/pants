@@ -32,7 +32,7 @@ from pants.engine.fs import (
     Snapshot,
     SymlinkEntry,
 )
-from pants.engine.goal import CurrentExecutingGoal, Goal
+from pants.engine.goal import Goal
 from pants.engine.internals import native_engine
 from pants.engine.internals.docker import DockerResolveImageRequest, DockerResolveImageResult
 from pants.engine.internals.native_engine import (
@@ -354,9 +354,6 @@ class SchedulerSession:
     def __init__(self, scheduler: Scheduler, session: PySession) -> None:
         self._scheduler = scheduler
         self._py_session = session
-        self._current_goal = (
-            session.session_values.get(CurrentExecutingGoal) or CurrentExecutingGoal()
-        )
 
     @property
     def scheduler(self) -> Scheduler:
@@ -534,19 +531,16 @@ class SchedulerSession:
         :param poll_delay: See self.execution_request.
         :returns: An exit_code for the given Goal.
         """
-        with self._current_goal._executing(product):
-            if self._scheduler.visualize_to_dir is not None:
-                rule_graph_name = f"rule_graph.{product.name}.dot"
-                params = self._scheduler._to_params_list(subject)
-                self._scheduler.visualize_rule_subgraph_to_file(
-                    os.path.join(self._scheduler.visualize_to_dir, rule_graph_name),
-                    [type(p) for p in params],
-                    product,
-                )
-            (return_value,) = self.product_request(
-                product, [subject], poll=poll, poll_delay=poll_delay
+        if self._scheduler.visualize_to_dir is not None:
+            rule_graph_name = f"rule_graph.{product.name}.dot"
+            params = self._scheduler._to_params_list(subject)
+            self._scheduler.visualize_rule_subgraph_to_file(
+                os.path.join(self._scheduler.visualize_to_dir, rule_graph_name),
+                [type(p) for p in params],
+                product,
             )
-            return cast(int, return_value.exit_code)
+        (return_value,) = self.product_request(product, [subject], poll=poll, poll_delay=poll_delay)
+        return cast(int, return_value.exit_code)
 
     def product_request(
         self,

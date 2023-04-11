@@ -374,7 +374,6 @@ class RuleRunner:
                 {
                     OptionsBootstrapper: self.options_bootstrapper,
                     CompleteEnvironmentVars: self.environment,
-                    CurrentExecutingGoal: CurrentExecutingGoal(),
                     **self.extra_session_values,
                 }
             ),
@@ -437,6 +436,7 @@ class RuleRunner:
                 console,
                 Workspace(self.scheduler),
                 *([self.inherent_environment] if self.inherent_environment else []),
+                CurrentExecutingGoal(goal.name, goal),
             ),
         )
 
