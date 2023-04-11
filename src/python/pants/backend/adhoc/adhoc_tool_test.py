@@ -28,12 +28,13 @@ from pants.engine.target import (
     TransitiveTargets,
     TransitiveTargetsRequest,
 )
-from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.testutil.python_rule_runner import PythonRuleRunner
+from pants.testutil.rule_runner import QueryRule
 
 
 @pytest.fixture
-def rule_runner() -> RuleRunner:
-    rule_runner = RuleRunner(
+def rule_runner() -> PythonRuleRunner:
+    rule_runner = PythonRuleRunner(
         rules=[
             *archive.rules(),
             *adhoc_tool_rules(),
@@ -59,7 +60,7 @@ def rule_runner() -> RuleRunner:
 
 
 def assert_adhoc_tool_result(
-    rule_runner: RuleRunner,
+    rule_runner: PythonRuleRunner,
     address: Address,
     expected_contents: dict[str, str],
 ) -> None:
@@ -72,7 +73,7 @@ def assert_adhoc_tool_result(
         assert fc.content == expected_contents[fc.path].encode()
 
 
-def test_adhoc_tool(rule_runner: RuleRunner) -> None:
+def test_adhoc_tool(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files(
         {
             "src/fruitcake.py": dedent(
@@ -107,7 +108,7 @@ def test_adhoc_tool(rule_runner: RuleRunner) -> None:
     )
 
 
-def test_adhoc_tool_with_workdir(rule_runner: RuleRunner) -> None:
+def test_adhoc_tool_with_workdir(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files(
         {
             "src/fruitcake.py": dedent(
@@ -142,7 +143,7 @@ def test_adhoc_tool_with_workdir(rule_runner: RuleRunner) -> None:
     )
 
 
-def test_adhoc_tool_capture_stdout_err(rule_runner: RuleRunner) -> None:
+def test_adhoc_tool_capture_stdout_err(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files(
         {
             "src/fruitcake.py": dedent(
@@ -193,7 +194,7 @@ def test_adhoc_tool_capture_stdout_err(rule_runner: RuleRunner) -> None:
     ),
 )
 def test_working_directory_special_values(
-    rule_runner: RuleRunner, workdir: str, file_location: str
+    rule_runner: PythonRuleRunner, workdir: str, file_location: str
 ) -> None:
     rule_runner.write_files(
         {
@@ -229,7 +230,7 @@ def test_working_directory_special_values(
     )
 
 
-def test_env_vars(rule_runner: RuleRunner) -> None:
+def test_env_vars(rule_runner: PythonRuleRunner) -> None:
     envvar_value = "clang"
     rule_runner.write_files(
         {
