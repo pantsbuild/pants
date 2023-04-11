@@ -1293,15 +1293,20 @@ async def resolve_dependencies(
     local_environment_name: ChosenLocalEnvironmentName,
 ) -> Addresses:
     environment_name = local_environment_name.val
-    wrapped_tgt, explicitly_provided = await MultiGet(
-        Get(
-            WrappedTarget,
-            # It's only possible to find dependencies for a target that we already know exists.
-            WrappedTargetRequest(request.field.address, description_of_origin="<infallible>"),
-        ),
-        Get(ExplicitlyProvidedDependencies, DependenciesRequest, request),
+    wrapped_tgt = await Get(
+        WrappedTarget,
+        # It's only possible to find dependencies for a target that we already know exists.
+        WrappedTargetRequest(request.field.address, description_of_origin="<infallible>"),
     )
     tgt = wrapped_tgt.target
+    try:
+        explicitly_provided = await Get(
+            ExplicitlyProvidedDependencies, DependenciesRequest, request
+        )
+    except Exception as e:
+        raise InvalidFieldException(
+            f"{tgt.origin}: Failed to get dependencies for {tgt.address}: {e}"
+        )
 
     # Infer any dependencies (based on `SourcesField` field).
     inference_request_types = cast(
@@ -1539,9 +1544,21 @@ async def generate_file_targets(
     request: GenerateFileTargets,
     union_membership: UnionMembership,
 ) -> GeneratedTargets:
-    sources_paths = await Get(
-        SourcesPaths, SourcesPathsRequest(request.generator[MultipleSourcesField])
-    )
+    try:
+        sources_paths = await Get(
+            SourcesPaths, SourcesPathsRequest(request.generator[MultipleSourcesField])
+        )
+    except Exception as e:
+        tgt = request.generator
+        fld = tgt[MultipleSourcesField]
+        raise InvalidFieldException(
+            softwrap(
+                f"""
+                {tgt.origin}: Invalid field value for {fld.alias!r} in target {tgt.address}:
+                {e}
+                """
+            )
+        ) from e
 
     add_dependencies_on_all_siblings = False
     if request.generator.settings_request_cls:

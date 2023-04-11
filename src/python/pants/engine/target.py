@@ -450,7 +450,7 @@ class Target:
 
             self.validate()
         except Exception as e:
-            raise InvalidTargetException(f"{self.build_file_source}: {e}") from e
+            raise InvalidTargetException(f"{self.origin}: {e}") from e
 
     @final
     def _calculate_field_values(
@@ -520,6 +520,14 @@ class Target:
     @property
     def build_file_line(self) -> int:
         return self.build_file_source[1]
+
+    @final
+    @property
+    def origin(self) -> str:
+        if not self.build_file_line:
+            return self.build_file_name
+        else:
+            return f"{self.build_file_name}:{self.build_file_line}"
 
     @distinct_union_type_per_subclass
     class PluginField:

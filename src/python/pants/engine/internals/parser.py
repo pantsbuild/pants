@@ -273,7 +273,7 @@ class Registrar:
 
         frame = inspect.currentframe()
         source_line = frame.f_back.f_lineno if frame and frame.f_back else "??"
-        kwargs["__source__"] = f"{self._parse_state.filepath()}:{source_line}"
+        kwargs["__source__"] = (self._parse_state.filepath(), source_line)
         raw_values = dict(self._parse_state.defaults.get(self._type_alias))
         raw_values.update(kwargs)
         target_adaptor = TargetAdaptor(self._type_alias, **raw_values)
