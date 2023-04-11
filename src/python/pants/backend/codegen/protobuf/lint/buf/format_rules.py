@@ -41,6 +41,10 @@ class BufFormatRequest(FmtTargetsRequest):
     def tool_name(cls) -> str:
         return "buf-format"
 
+    @classproperty
+    def tool_id(cls) -> str:
+        return "buf format"
+
 
 @rule
 async def partition_buf(
