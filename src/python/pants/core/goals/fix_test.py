@@ -69,7 +69,11 @@ class FortranFixRequest(FixTargetsRequest):
 
     @classproperty
     def tool_name(cls) -> str:
-        return "FortranConditionallyDidChange"
+        return "Fortran Conditionally Did Change"
+
+    @classproperty
+    def tool_id(cls) -> str:
+        return "fortranconditionallydidchange"
 
 
 class FortranFmtRequest(FmtTargetsRequest):
@@ -77,7 +81,11 @@ class FortranFmtRequest(FmtTargetsRequest):
 
     @classproperty
     def tool_name(cls) -> str:
-        return "FortranFormatter"
+        return "Fortran Formatter"
+
+    @classproperty
+    def tool_id(cls) -> str:
+        return "fortranformatter"
 
 
 @rule
@@ -138,7 +146,11 @@ class SmalltalkNoopRequest(FixTargetsRequest):
 
     @classproperty
     def tool_name(cls) -> str:
-        return "SmalltalkDidNotChange"
+        return "Smalltalk Did Not Change"
+
+    @classproperty
+    def tool_id(cls) -> str:
+        return "smalltalkdidnotchange"
 
 
 @rule
@@ -163,7 +175,11 @@ class SmalltalkSkipRequest(FixTargetsRequest):
 
     @classproperty
     def tool_name(cls) -> str:
-        return "SmalltalkSkipped"
+        return "Smalltalk Skipped"
+
+    @classproperty
+    def tool_id(cls) -> str:
+        return "smalltalkskipped"
 
 
 @rule
@@ -181,7 +197,11 @@ class BrickyBuildFileFixer(FixFilesRequest):
 
     @classproperty
     def tool_name(cls) -> str:
-        return "BrickyBobby"
+        return "Bricky Bobby"
+
+    @classproperty
+    def tool_id(cls) -> str:
+        return "brickybobby"
 
 
 @rule
@@ -288,10 +308,10 @@ def test_summary() -> None:
     assert stderr == dedent(
         """\
 
-        + BrickyBobby made changes.
-        + FortranConditionallyDidChange made changes.
-        ✓ FortranFormatter made no changes.
-        ✓ SmalltalkDidNotChange made no changes.
+        + Bricky Bobby made changes.
+        + Fortran Conditionally Did Change made changes.
+        ✓ Fortran Formatter made no changes.
+        ✓ Smalltalk Did Not Change made no changes.
         """
     )
 
@@ -342,8 +362,8 @@ def test_fixers_first() -> None:
     assert stderr == dedent(
         """\
 
-        + FortranConditionallyDidChange made changes.
-        ✓ FortranFormatter made no changes.
+        + Fortran Conditionally Did Change made changes.
+        ✓ Fortran Formatter made no changes.
         """
     )
 
@@ -364,9 +384,9 @@ def test_only() -> None:
     stderr = run_fix(
         rule_runner,
         target_specs=["::"],
-        only=[SmalltalkNoopRequest.tool_name],
+        only=[SmalltalkNoopRequest.tool_id],
     )
-    assert stderr.strip() == "✓ SmalltalkDidNotChange made no changes."
+    assert stderr.strip() == "✓ Smalltalk Did Not Change made no changes."
 
 
 def test_no_targets() -> None:
