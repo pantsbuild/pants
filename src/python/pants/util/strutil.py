@@ -353,10 +353,8 @@ class _JsonEncoder(json.JSONEncoder):
             return dict(o)
         if isinstance(o, abc.Sequence):
             return list(o)
-        try:
-            return super().default(o)
-        except TypeError:
-            return str(o)
+        return super().default(o)
+
 
 
 def stable_hash(value: Any, *, name: str = "sha256") -> hashlib._Hash:
