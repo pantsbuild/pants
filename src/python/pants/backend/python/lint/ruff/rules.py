@@ -4,12 +4,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 from pants.backend.python.lint.ruff.subsystem import Ruff, RuffFieldSet
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.core.goals.fix import FixResult, FixTargetsRequest
-from pants.core.goals.lint import LintRequest, LintResult, LintTargetsRequest
+from pants.core.goals.lint import LintResult, LintTargetsRequest
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.partitions import PartitionerType
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
@@ -63,16 +64,16 @@ async def run_ruff(
     )
 
     conf_args = [f"--config={ruff.config}"] if ruff.config else []
-    maybe_fix_args = ("--fix",) if request.is_fix else ()
+    initial_args = ("--fix",) if request.is_fix else ()
 
     result = await Get(
         FallibleProcessResult,
         VenvPexProcess(
             ruff_pex,
-            argv=(*maybe_fix_args, *conf_args, *ruff.args, *request.snapshot.files),
+            argv=(*initial_args, *conf_args, *ruff.args, *request.snapshot.files),
             input_digest=input_digest,
             output_files=request.snapshot.files,
-            description=f"Run ruff {' '.join(maybe_fix_args)} on {pluralize(len(request.snapshot.files), 'file')}.",
+            description=f"Run ruff {' '.join(initial_args)} on {pluralize(len(request.snapshot.files), 'file')}.",
             level=LogLevel.DEBUG,
         ),
     )
@@ -81,16 +82,20 @@ async def run_ruff(
 
 @rule(desc="Fix with ruff", level=LogLevel.DEBUG)
 async def ruff_fix(request: RuffFixRequest.Batch, ruff: Ruff) -> FixResult:
-    result = await Get(FallibleProcessResult, _RunRuffRequest(snapshot=request.snapshot, is_fix=True))
+    result = await Get(
+        FallibleProcessResult, _RunRuffRequest(snapshot=request.snapshot, is_fix=True)
+    )
     return await FixResult.create(request, result, strip_chroot_path=True)
 
 
 @rule(desc="Lint with ruff", level=LogLevel.DEBUG)
-async def ruff_lint(request: RuffLintRequest.Batch) -> LintResult:
+async def ruff_lint(request: RuffLintRequest.Batch[RuffFieldSet, Any]) -> LintResult:
     source_files = await Get(
         SourceFiles, SourceFilesRequest(field_set.source for field_set in request.elements)
     )
-    result = await Get(FallibleProcessResult, _RunRuffRequest(snapshot=source_files.snapshot, is_fix=False))
+    result = await Get(
+        FallibleProcessResult, _RunRuffRequest(snapshot=source_files.snapshot, is_fix=False)
+    )
     return LintResult.create(request, result, strip_chroot_path=True)
 
 
