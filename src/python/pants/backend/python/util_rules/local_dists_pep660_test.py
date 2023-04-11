@@ -32,13 +32,14 @@ from pants.testutil.python_interpreter_selection import (
     skip_unless_python27_present,
     skip_unless_python39_present,
 )
-from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.testutil.python_rule_runner import PythonRuleRunner
+from pants.testutil.rule_runner import QueryRule
 from pants.util.frozendict import FrozenDict
 
 
 @pytest.fixture
-def rule_runner() -> RuleRunner:
-    ret = RuleRunner(
+def rule_runner() -> PythonRuleRunner:
+    ret = PythonRuleRunner(
         rules=[
             *local_dists_pep660.rules(),
             *setuptools_rules(),
@@ -59,7 +60,7 @@ def rule_runner() -> RuleRunner:
     return ret
 
 
-def do_test_backend_wrapper(rule_runner: RuleRunner, constraints: str) -> None:
+def do_test_backend_wrapper(rule_runner: PythonRuleRunner, constraints: str) -> None:
     setup_py = "from setuptools import setup; setup(name='foobar', version='1.2.3')"
     input_digest = rule_runner.request(
         Digest, [CreateDigest([FileContent("setup.py", setup_py.encode())])]
@@ -91,16 +92,16 @@ def do_test_backend_wrapper(rule_runner: RuleRunner, constraints: str) -> None:
 
 
 @skip_unless_python27_present
-def test_works_with_python2(rule_runner: RuleRunner) -> None:
+def test_works_with_python2(rule_runner: PythonRuleRunner) -> None:
     do_test_backend_wrapper(rule_runner, constraints="CPython==2.7.*")
 
 
 @skip_unless_python39_present
-def test_works_with_python39(rule_runner: RuleRunner) -> None:
+def test_works_with_python39(rule_runner: PythonRuleRunner) -> None:
     do_test_backend_wrapper(rule_runner, constraints="CPython==3.9.*")
 
 
-def test_sort_all_python_distributions_by_resolve(rule_runner: RuleRunner) -> None:
+def test_sort_all_python_distributions_by_resolve(rule_runner: PythonRuleRunner) -> None:
     rule_runner.set_options(
         [
             "--python-enable-resolves=True",
@@ -153,7 +154,7 @@ def test_sort_all_python_distributions_by_resolve(rule_runner: RuleRunner) -> No
     assert dist == result.targets["a"][0]
 
 
-def test_build_editable_local_dists(rule_runner: RuleRunner) -> None:
+def test_build_editable_local_dists(rule_runner: PythonRuleRunner) -> None:
     foo = PurePath("foo")
     rule_runner.write_files(
         {

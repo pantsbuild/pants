@@ -26,12 +26,13 @@ from pants.testutil.python_interpreter_selection import (
     skip_unless_python38_present,
     skip_unless_python39_present,
 )
-from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.testutil.python_rule_runner import PythonRuleRunner
+from pants.testutil.rule_runner import QueryRule
 
 
 @pytest.fixture
-def rule_runner() -> RuleRunner:
-    return RuleRunner(
+def rule_runner() -> PythonRuleRunner:
+    return PythonRuleRunner(
         rules=[
             *black_rules(),
             *black_subsystem_rules(),
@@ -53,7 +54,7 @@ NEEDS_CONFIG_FILE = "animal = 'Koala'\n"  # Note the single quotes.
 
 
 def run_black(
-    rule_runner: RuleRunner,
+    rule_runner: PythonRuleRunner,
     targets: list[Target],
     *,
     expected_ics: str = Black.default_interpreter_constraints[0],
@@ -106,7 +107,7 @@ def run_black(
     return fmt_result
 
 
-def get_snapshot(rule_runner: RuleRunner, source_files: dict[str, str]) -> Snapshot:
+def get_snapshot(rule_runner: PythonRuleRunner, source_files: dict[str, str]) -> Snapshot:
     files = [FileContent(path, content.encode()) for path, content in source_files.items()]
     digest = rule_runner.request(Digest, [CreateDigest(files)])
     return rule_runner.request(Snapshot, [digest])
@@ -117,7 +118,7 @@ def get_snapshot(rule_runner: RuleRunner, source_files: dict[str, str]) -> Snaps
     "major_minor_interpreter",
     all_major_minor_python_versions(Black.default_interpreter_constraints),
 )
-def test_passing(rule_runner: RuleRunner, major_minor_interpreter: str) -> None:
+def test_passing(rule_runner: PythonRuleRunner, major_minor_interpreter: str) -> None:
     rule_runner.write_files({"f.py": GOOD_FILE, "BUILD": "python_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
     interpreter_constraint = (
@@ -134,7 +135,7 @@ def test_passing(rule_runner: RuleRunner, major_minor_interpreter: str) -> None:
     assert fmt_result.did_change is False
 
 
-def test_failing(rule_runner: RuleRunner) -> None:
+def test_failing(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files({"f.py": BAD_FILE, "BUILD": "python_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
     fmt_result = run_black(rule_runner, [tgt])
@@ -143,7 +144,7 @@ def test_failing(rule_runner: RuleRunner) -> None:
     assert fmt_result.did_change is True
 
 
-def test_multiple_targets(rule_runner: RuleRunner) -> None:
+def test_multiple_targets(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files(
         {"good.py": GOOD_FILE, "bad.py": BAD_FILE, "BUILD": "python_sources(name='t')"}
     )
@@ -163,7 +164,9 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
     "config_path,extra_args",
     (["pyproject.toml", []], ["custom_config.toml", ["--black-config=custom_config.toml"]]),
 )
-def test_config_file(rule_runner: RuleRunner, config_path: str, extra_args: list[str]) -> None:
+def test_config_file(
+    rule_runner: PythonRuleRunner, config_path: str, extra_args: list[str]
+) -> None:
     rule_runner.write_files(
         {
             "f.py": NEEDS_CONFIG_FILE,
@@ -178,7 +181,7 @@ def test_config_file(rule_runner: RuleRunner, config_path: str, extra_args: list
     assert fmt_result.did_change is False
 
 
-def test_passthrough_args(rule_runner: RuleRunner) -> None:
+def test_passthrough_args(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files({"f.py": NEEDS_CONFIG_FILE, "BUILD": "python_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
     fmt_result = run_black(
@@ -190,7 +193,7 @@ def test_passthrough_args(rule_runner: RuleRunner) -> None:
 
 
 @skip_unless_python38_present
-def test_works_with_python38(rule_runner: RuleRunner) -> None:
+def test_works_with_python38(rule_runner: PythonRuleRunner) -> None:
     """Black's typed-ast dependency does not understand Python 3.8, so we must instead run Black
     with Python 3.8 when relevant."""
     content = dedent(
@@ -217,7 +220,7 @@ def test_works_with_python38(rule_runner: RuleRunner) -> None:
 
 
 @skip_unless_python39_present
-def test_works_with_python39(rule_runner: RuleRunner) -> None:
+def test_works_with_python39(rule_runner: PythonRuleRunner) -> None:
     """Black's typed-ast dependency does not understand Python 3.9, so we must instead run Black
     with Python 3.9 when relevant."""
     content = dedent(
@@ -237,7 +240,7 @@ def test_works_with_python39(rule_runner: RuleRunner) -> None:
     assert fmt_result.did_change is False
 
 
-def test_stub_files(rule_runner: RuleRunner) -> None:
+def test_stub_files(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files(
         {
             "good.pyi": GOOD_FILE,
