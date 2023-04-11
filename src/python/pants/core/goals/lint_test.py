@@ -83,7 +83,11 @@ class MockLintTargetsRequest(MockLintRequest, LintTargetsRequest):
 class SuccessfulRequest(MockLintTargetsRequest):
     @classproperty
     def tool_name(cls) -> str:
-        return "SuccessfulLinter"
+        return "Successful Linter"
+
+    @classproperty
+    def tool_id(cls) -> str:
+        return "successfullinter"
 
     @staticmethod
     def exit_code(_: Iterable[Address]) -> int:
@@ -93,7 +97,11 @@ class SuccessfulRequest(MockLintTargetsRequest):
 class FailingRequest(MockLintTargetsRequest):
     @classproperty
     def tool_name(cls) -> str:
-        return "FailingLinter"
+        return "Failing Linter"
+
+    @classproperty
+    def tool_id(cls) -> str:
+        return "failinglinter"
 
     @staticmethod
     def exit_code(_: Iterable[Address]) -> int:
@@ -103,7 +111,11 @@ class FailingRequest(MockLintTargetsRequest):
 class ConditionallySucceedsRequest(MockLintTargetsRequest):
     @classproperty
     def tool_name(cls) -> str:
-        return "ConditionallySucceedsLinter"
+        return "Conditionally Succeeds Linter"
+
+    @classproperty
+    def tool_id(cls) -> str:
+        return "conditionallysucceedslinter"
 
     @staticmethod
     def exit_code(addresses: Iterable[Address]) -> int:
@@ -115,7 +127,11 @@ class ConditionallySucceedsRequest(MockLintTargetsRequest):
 class SkippedRequest(MockLintTargetsRequest):
     @classproperty
     def tool_name(cls) -> str:
-        return "SkippedLinter"
+        return "Skipped Linter"
+
+    @classproperty
+    def tool_id(cls) -> str:
+        return "skippedlinter"
 
     @staticmethod
     def exit_code(_) -> int:
@@ -135,7 +151,11 @@ class InvalidRequest(MockLintTargetsRequest):
 
     @classproperty
     def tool_name(cls) -> str:
-        return "InvalidLinter"
+        return "Invalid Linter"
+
+    @classproperty
+    def tool_id(cls) -> str:
+        return "invalidlinter"
 
     @staticmethod
     def exit_code(_: Iterable[Address]) -> int:
@@ -169,7 +189,11 @@ def mock_target_partitioner(
 class MockFilesRequest(MockLintRequest, LintFilesRequest):
     @classproperty
     def tool_name(cls) -> str:
-        return "FilesLinter"
+        return "Files Linter"
+
+    @classproperty
+    def tool_id(cls) -> str:
+        return "fileslinter"
 
     @classmethod
     def get_lint_result(cls, files: Iterable[str]) -> LintResult:
@@ -192,7 +216,11 @@ class MockFmtRequest(MockLintRequest, FmtTargetsRequest):
 class SuccessfulFormatter(MockFmtRequest):
     @classproperty
     def tool_name(cls) -> str:
-        return "SuccessfulFormatter"
+        return "Successful Formatter"
+
+    @classproperty
+    def tool_id(cls) -> str:
+        return "successfulformatter"
 
     @classmethod
     def get_lint_result(cls, field_sets: Iterable[MockLinterFieldSet]) -> LintResult:
@@ -202,7 +230,11 @@ class SuccessfulFormatter(MockFmtRequest):
 class FailingFormatter(MockFmtRequest):
     @classproperty
     def tool_name(cls) -> str:
-        return "FailingFormatter"
+        return "Failing Formatter"
+
+    @classproperty
+    def tool_id(cls) -> str:
+        return "failingformatter"
 
     @classmethod
     def get_lint_result(cls, field_sets: Iterable[MockLinterFieldSet]) -> LintResult:
@@ -212,7 +244,11 @@ class FailingFormatter(MockFmtRequest):
 class BuildFileFormatter(MockLintRequest, FmtFilesRequest):
     @classproperty
     def tool_name(cls) -> str:
-        return "BobTheBUILDer"
+        return "Bob The BUILDer"
+
+    @classproperty
+    def tool_id(cls) -> str:
+        return "bob"
 
     @classmethod
     def get_lint_result(cls, files: Iterable[str]) -> LintResult:
@@ -226,7 +262,11 @@ class MockFixRequest(MockLintRequest, FixTargetsRequest):
 class SuccessfulFixer(MockFixRequest):
     @classproperty
     def tool_name(cls) -> str:
-        return "SuccessfulFixer"
+        return "Successful Fixer"
+
+    @classproperty
+    def tool_id(cls) -> str:
+        return "successfulfixer"
 
     @classmethod
     def get_lint_result(cls, field_sets: Iterable[MockLinterFieldSet]) -> LintResult:
@@ -236,7 +276,11 @@ class SuccessfulFixer(MockFixRequest):
 class FailingFixer(MockFixRequest):
     @classproperty
     def tool_name(cls) -> str:
-        return "FailingFixer"
+        return "Failing Fixer"
+
+    @classproperty
+    def tool_id(cls) -> str:
+        return "failingfixer"
 
     @classmethod
     def get_lint_result(cls, field_sets: Iterable[MockLinterFieldSet]) -> LintResult:
@@ -246,7 +290,11 @@ class FailingFixer(MockFixRequest):
 class BuildFileFixer(MockLintRequest, FixFilesRequest):
     @classproperty
     def tool_name(cls) -> str:
-        return "BUILDAnnually"
+        return "BUILD Annually"
+
+    @classproperty
+    def tool_id(cls) -> str:
+        return "buildannually"
 
     @classmethod
     def get_lint_result(cls, files: Iterable[str]) -> LintResult:
@@ -389,16 +437,16 @@ def test_summary(rule_runner: RuleRunner) -> None:
     assert stderr == dedent(
         """\
 
-        ✓ BUILDAnnually succeeded.
-        ✓ BobTheBUILDer succeeded.
-        ✕ ConditionallySucceedsLinter failed.
-        ✕ FailingFixer failed.
-        ✕ FailingFormatter failed.
-        ✕ FailingLinter failed.
-        ✓ FilesLinter succeeded.
-        ✓ SuccessfulFixer succeeded.
-        ✓ SuccessfulFormatter succeeded.
-        ✓ SuccessfulLinter succeeded.
+        ✓ BUILD Annually succeeded.
+        ✓ Bob The BUILDer succeeded.
+        ✕ Conditionally Succeeds Linter failed.
+        ✕ Failing Fixer failed.
+        ✕ Failing Formatter failed.
+        ✕ Failing Linter failed.
+        ✓ Files Linter succeeded.
+        ✓ Successful Fixer succeeded.
+        ✓ Successful Formatter succeeded.
+        ✓ Successful Linter succeeded.
 
         (One or more formatters failed. Run `pants fmt` to fix.)
         (One or more fixers failed. Run `pants fix` to fix.)
@@ -410,23 +458,23 @@ def test_summary(rule_runner: RuleRunner) -> None:
         lint_request_types=request_types,
         targets=targets,
         only=[
-            FailingRequest.tool_name,
-            MockFilesRequest.tool_name,
-            FailingFormatter.tool_name,
-            FailingFixer.tool_name,
-            BuildFileFormatter.tool_name,
-            BuildFileFixer.tool_name,
+            FailingRequest.tool_id,
+            MockFilesRequest.tool_id,
+            FailingFormatter.tool_id,
+            FailingFixer.tool_id,
+            BuildFileFormatter.tool_id,
+            BuildFileFixer.tool_id,
         ],
     )
     assert stderr == dedent(
         """\
 
-        ✓ BUILDAnnually succeeded.
-        ✓ BobTheBUILDer succeeded.
-        ✕ FailingFixer failed.
-        ✕ FailingFormatter failed.
-        ✕ FailingLinter failed.
-        ✓ FilesLinter succeeded.
+        ✓ BUILD Annually succeeded.
+        ✓ Bob The BUILDer succeeded.
+        ✕ Failing Fixer failed.
+        ✕ Failing Formatter failed.
+        ✕ Failing Linter failed.
+        ✓ Files Linter succeeded.
 
         (One or more formatters failed. Run `pants fmt` to fix.)
         (One or more fixers failed. Run `pants fix` to fix.)
@@ -443,10 +491,10 @@ def test_summary(rule_runner: RuleRunner) -> None:
     assert stderr == dedent(
         """\
 
-        ✕ ConditionallySucceedsLinter failed.
-        ✕ FailingLinter failed.
-        ✓ FilesLinter succeeded.
-        ✓ SuccessfulLinter succeeded.
+        ✕ Conditionally SucceedsLinter failed.
+        ✕ Failing Linter failed.
+        ✓ Files Linter succeeded.
+        ✓ Successful Linter succeeded.
         """
     )
 
@@ -459,13 +507,13 @@ def test_summary(rule_runner: RuleRunner) -> None:
     assert stderr == dedent(
         """\
 
-        ✓ BobTheBUILDer succeeded.
-        ✕ ConditionallySucceedsLinter failed.
-        ✕ FailingFormatter failed.
-        ✕ FailingLinter failed.
-        ✓ FilesLinter succeeded.
-        ✓ SuccessfulFormatter succeeded.
-        ✓ SuccessfulLinter succeeded.
+        ✓ Bob The BUILDer succeeded.
+        ✕ Conditionally Succeeds Linter failed.
+        ✕ Failing Formatter failed.
+        ✕ Failing Linter failed.
+        ✓ Files Linter succeeded.
+        ✓ Successful Formatter succeeded.
+        ✓ Successful Linter succeeded.
 
         (One or more formatters failed. Run `pants fmt` to fix.)
         """
@@ -480,13 +528,13 @@ def test_summary(rule_runner: RuleRunner) -> None:
     assert stderr == dedent(
         """\
 
-        ✓ BUILDAnnually succeeded.
-        ✕ ConditionallySucceedsLinter failed.
-        ✕ FailingFixer failed.
-        ✕ FailingLinter failed.
-        ✓ FilesLinter succeeded.
-        ✓ SuccessfulFixer succeeded.
-        ✓ SuccessfulLinter succeeded.
+        ✓ BUILD Annually succeeded.
+        ✕ Conditionally Succeeds Linter failed.
+        ✕ Failing Fixer failed.
+        ✕ Failing Linter failed.
+        ✓ Files Linter succeeded.
+        ✓ Successful Fixer succeeded.
+        ✓ Successful Linter succeeded.
 
         (One or more fixers failed. Run `pants fix` to fix.)
         """
@@ -540,9 +588,9 @@ def test_batched(rule_runner: RuleRunner, batch_size: int) -> None:
     assert stderr == dedent(
         """\
 
-        ✓ ConditionallySucceedsLinter succeeded.
-        ✕ FailingLinter failed.
-        ✓ SuccessfulLinter succeeded.
+        ✓ Conditionally Succeeds Linter succeeded.
+        ✕ Failing Linter failed.
+        ✓ Successful Linter succeeded.
         """
     )
 

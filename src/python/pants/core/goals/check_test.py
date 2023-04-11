@@ -67,7 +67,8 @@ class MockCheckRequest(CheckRequest, metaclass=ABCMeta):
 
 
 class SuccessfulRequest(MockCheckRequest):
-    tool_name = "SuccessfulChecker"
+    tool_name = "Successful Checker"
+    tool_id = "successfulchecker"
 
     @staticmethod
     def exit_code(_: Iterable[Address]) -> int:
@@ -75,7 +76,8 @@ class SuccessfulRequest(MockCheckRequest):
 
 
 class FailingRequest(MockCheckRequest):
-    tool_name = "FailingChecker"
+    tool_name = "Failing Checker"
+    tool_id = "failingchecker"
 
     @staticmethod
     def exit_code(_: Iterable[Address]) -> int:
@@ -83,7 +85,8 @@ class FailingRequest(MockCheckRequest):
 
 
 class ConditionallySucceedsRequest(MockCheckRequest):
-    tool_name = "ConditionallySucceedsChecker"
+    tool_name = "Conditionally Succeeds Checker"
+    tool_id = "conditionallysucceedschecker"
 
     @staticmethod
     def exit_code(addresses: Iterable[Address]) -> int:
@@ -93,7 +96,8 @@ class ConditionallySucceedsRequest(MockCheckRequest):
 
 
 class SkippedRequest(MockCheckRequest):
-    tool_name = "SkippedChecker"
+    tool_name = "Skipped Checker"
+    tool_id = "skippedchecker"
 
     @staticmethod
     def exit_code(_) -> int:
@@ -114,7 +118,8 @@ class InvalidFieldSet(MockCheckFieldSet):
 
 class InvalidRequest(MockCheckRequest):
     field_set_type = InvalidFieldSet
-    tool_name = "InvalidChecker"
+    tool_name = "Invalid Checker"
+    tool_id = "invalidchecker"
 
     @staticmethod
     def exit_code(_: Iterable[Address]) -> int:
@@ -190,22 +195,22 @@ def test_summary() -> None:
     assert stderr == dedent(
         """\
 
-        ✕ ConditionallySucceedsChecker failed.
-        ✕ FailingChecker failed.
-        ✓ SuccessfulChecker succeeded.
+        ✕ Conditionally Succeeds Checker failed.
+        ✕ Failing Checker failed.
+        ✓ Successful Checker succeeded.
         """
     )
 
     exit_code, stderr = run_typecheck_rule(
         request_types=requests,
         targets=targets,
-        only=[FailingRequest.tool_name, SuccessfulRequest.tool_name],
+        only=[FailingRequest.tool_id, SuccessfulRequest.tool_id],
     )
     assert stderr == dedent(
         """\
 
-        ✕ FailingChecker failed.
-        ✓ SuccessfulChecker succeeded.
+        ✕ Failing Checker failed.
+        ✓ Successful Checker succeeded.
         """
     )
 
