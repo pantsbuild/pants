@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from textwrap import dedent
+from typing import Iterable
 
 import pytest
 
@@ -155,7 +156,7 @@ def test_setup_lockfile_interpreter_constraints(rule_runner: PythonRuleRunner) -
 
     def assert_lockfile_request(
         build_file: str,
-        expected_ics: list[str],
+        expected_ics: Iterable[str],
         *,
         extra_expected_requirements: list[str] | None = None,
         extra_args: list[str] | None = None,
