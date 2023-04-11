@@ -34,6 +34,7 @@ from pants.engine.unions import UnionMembership
 from pants.testutil.option_util import create_options_bootstrapper, create_subsystem
 from pants.testutil.rule_runner import MockGet, RuleRunner, mock_console, run_rule_with_mocks
 from pants.util.logging import LogLevel
+from pants.util.meta import classproperty
 
 
 class MockMultipleSourcesField(MultipleSourcesField):
@@ -68,7 +69,10 @@ class MockCheckRequest(CheckRequest, metaclass=ABCMeta):
 
 class SuccessfulRequest(MockCheckRequest):
     tool_name = "Successful Checker"
-    tool_id = "successfulchecker"
+
+    @classproperty
+    def tool_id(cls) -> str:
+        return "successfulchecker"
 
     @staticmethod
     def exit_code(_: Iterable[Address]) -> int:
@@ -77,7 +81,10 @@ class SuccessfulRequest(MockCheckRequest):
 
 class FailingRequest(MockCheckRequest):
     tool_name = "Failing Checker"
-    tool_id = "failingchecker"
+
+    @classproperty
+    def tool_id(cls) -> str:
+        return "failingchecker"
 
     @staticmethod
     def exit_code(_: Iterable[Address]) -> int:
@@ -86,7 +93,10 @@ class FailingRequest(MockCheckRequest):
 
 class ConditionallySucceedsRequest(MockCheckRequest):
     tool_name = "Conditionally Succeeds Checker"
-    tool_id = "conditionallysucceedschecker"
+
+    @classproperty
+    def tool_id(cls) -> str:
+        return "conditionallysucceedschecker"
 
     @staticmethod
     def exit_code(addresses: Iterable[Address]) -> int:
@@ -97,7 +107,10 @@ class ConditionallySucceedsRequest(MockCheckRequest):
 
 class SkippedRequest(MockCheckRequest):
     tool_name = "Skipped Checker"
-    tool_id = "skippedchecker"
+
+    @classproperty
+    def tool_id(cls) -> str:
+        return "skippedchecker"
 
     @staticmethod
     def exit_code(_) -> int:
@@ -119,7 +132,10 @@ class InvalidFieldSet(MockCheckFieldSet):
 class InvalidRequest(MockCheckRequest):
     field_set_type = InvalidFieldSet
     tool_name = "Invalid Checker"
-    tool_id = "invalidchecker"
+
+    @classproperty
+    def tool_id(cls) -> str:
+        return "invalidchecker"
 
     @staticmethod
     def exit_code(_: Iterable[Address]) -> int:
