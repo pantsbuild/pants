@@ -491,7 +491,7 @@ def test_summary(rule_runner: RuleRunner) -> None:
     assert stderr == dedent(
         """\
 
-        ✕ Conditionally SucceedsLinter failed.
+        ✕ Conditionally Succeeds Linter failed.
         ✕ Failing Linter failed.
         ✓ Files Linter succeeded.
         ✓ Successful Linter succeeded.
