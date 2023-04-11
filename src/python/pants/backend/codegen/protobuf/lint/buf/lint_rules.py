@@ -10,6 +10,7 @@ from pants.backend.codegen.protobuf.target_types import (
     ProtobufSourceField,
 )
 from pants.core.goals.lint import LintResult, LintTargetsRequest, Partitions
+from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.core.util_rules.source_files import SourceFilesRequest
 from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
@@ -79,8 +80,17 @@ async def run_buf(
 
     download_buf_get = Get(DownloadedExternalTool, ExternalToolRequest, buf.get_request(platform))
 
-    target_sources_stripped, all_sources_stripped, downloaded_buf = await MultiGet(
-        target_stripped_sources_request, all_stripped_sources_request, download_buf_get
+    config_files_get = Get(
+        ConfigFiles,
+        ConfigFilesRequest,
+        buf.config_request,
+    )
+
+    target_sources_stripped, all_sources_stripped, downloaded_buf, config_files = await MultiGet(
+        target_stripped_sources_request,
+        all_stripped_sources_request,
+        download_buf_get,
+        config_files_get,
     )
 
     input_digest = await Get(
@@ -90,9 +100,12 @@ async def run_buf(
                 target_sources_stripped.snapshot.digest,
                 all_sources_stripped.snapshot.digest,
                 downloaded_buf.digest,
+                config_files.snapshot.digest,
             )
         ),
     )
+
+    config_arg = ["--config", buf.config] if buf.config else []
 
     process_result = await Get(
         FallibleProcessResult,
@@ -100,6 +113,7 @@ async def run_buf(
             argv=[
                 downloaded_buf.exe,
                 "lint",
+                *config_arg,
                 *buf.lint_args,
                 "--path",
                 ",".join(target_sources_stripped.snapshot.files),

@@ -4,7 +4,6 @@ slug: "contributor-overview"
 excerpt: "The flow for making changes to Pants."
 hidden: false
 createdAt: "2020-05-16T22:54:21.867Z"
-updatedAt: "2022-06-04T12:23:09.473Z"
 ---
 We welcome contributions of all types: from fixing typos to bug fixes to new features. For further questions about any of the below, please refer to the [community overview](doc:the-pants-community).
 
@@ -71,14 +70,14 @@ To begin, [set up Pants on your local machine](doc:contributor-setup).
 To run a test, run:
 
 ```bash
-$ ./pants test src/python/pants/util/frozendict_test.py
+$ pants test src/python/pants/util/frozendict_test.py
 ```
 
 Periodically, you will want to run MyPy and the autoformatters and linters:
 
 ```bash
 # Format un-committed changes
-$ ./pants --changed-since=HEAD fmt
+$ pants --changed-since=HEAD fmt
 
 # Run the pre-commit checks, including `check` and `lint`
 $ build-support/githooks/pre-commit

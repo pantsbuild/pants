@@ -7,6 +7,8 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
 
+from typing_extensions import Protocol
+
 from pants.engine.addresses import Address
 from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.engine.rules import Get, collect_rules, rule
@@ -47,6 +49,9 @@ class DependencyRuleAction(Enum):
             raise NotImplementedError(f"{type(self).__name__}.execute() not implemented for {self}")
         return None
 
+    def __str__(self) -> str:
+        return self.name
+
 
 @dataclass(frozen=True)
 class DependencyRuleApplication:
@@ -67,10 +72,18 @@ class DependencyRuleApplication:
         if err is None:
             return None
         else:
-            return (
-                f"{self.rule_description} : {self.action.name}\n{self.origin_type} "
-                f"{self.origin_address} -> {self.dependency_type} {self.dependency_address}"
-            )
+            return str(self)
+
+    def __str__(self) -> str:
+        return (
+            f"{self.rule_description} : {self.action.name}\n{self.origin_type} "
+            f"{self.origin_address} -> {self.dependency_type} {self.dependency_address}"
+        )
+
+
+class DependencyRuleSet(Protocol):
+    def peek(self) -> tuple[str, ...]:
+        """Return a list of all rules in rule set."""
 
 
 class BuildFileDependencyRules(ABC):
@@ -100,6 +113,10 @@ class BuildFileDependencyRules(ABC):
         Return dependency rule application describing the resulting action to take: ALLOW, DENY or
         WARN. WARN is effectively the same as ALLOW, but with a logged warning.
         """
+
+    @abstractmethod
+    def get_ruleset(self, address: Address, target: TargetAdaptor) -> DependencyRuleSet | None:
+        ...
 
 
 class BuildFileDependencyRulesParserState(ABC):
@@ -143,7 +160,7 @@ async def get_build_file_dependency_rules_implementation(
             f"There must be at most one BUILD file dependency rules implementation, got: {impls}"
         )
     for request_type in request_types:
-        impl = await Get(
+        impl = await Get(  # noqa: PNT30: this for loop will never process more than a single iteration.
             BuildFileDependencyRulesImplementation,
             BuildFileDependencyRulesImplementationRequest,
             request_type(),

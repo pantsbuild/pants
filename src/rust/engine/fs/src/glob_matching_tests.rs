@@ -11,7 +11,7 @@ fn path_globs_create_distinguishes_between_includes_and_excludes() {
 
   let mut glob_inputs: Vec<String> = vec![];
   glob_inputs.extend_from_slice(&include_globs);
-  glob_inputs.extend(parsed_exclude_globs.iter().map(|glob| format!("!{}", glob)));
+  glob_inputs.extend(parsed_exclude_globs.iter().map(|glob| format!("!{glob}")));
 
   let pg = PathGlobs::new(
     glob_inputs,
@@ -26,9 +26,9 @@ fn path_globs_create_distinguishes_between_includes_and_excludes() {
     PathGlob::spread_filespecs(include_globs).expect("Include globs failed to expand")
   );
   assert_eq!(
-    pg.exclude.patterns,
+    pg.exclude.exclude_patterns(),
     GitignoreStyleExcludes::create(parsed_exclude_globs)
       .expect("Exclude globs failed to expand")
-      .patterns
+      .exclude_patterns()
   );
 }

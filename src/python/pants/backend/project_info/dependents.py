@@ -14,7 +14,6 @@ from pants.engine.target import AllUnexpandedTargets, Dependencies, Dependencies
 from pants.option.option_types import BoolOption
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
-from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet
 
 
@@ -44,8 +43,7 @@ async def map_addresses_to_dependents(all_targets: AllUnexpandedTargets) -> Addr
     )
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class DependentsRequest:
     addresses: FrozenOrderedSet[Address]
     transitive: bool
@@ -54,9 +52,9 @@ class DependentsRequest:
     def __init__(
         self, addresses: Iterable[Address], *, transitive: bool, include_roots: bool
     ) -> None:
-        self.addresses = FrozenOrderedSet(addresses)
-        self.transitive = transitive
-        self.include_roots = include_roots
+        object.__setattr__(self, "addresses", FrozenOrderedSet(addresses))
+        object.__setattr__(self, "transitive", transitive)
+        object.__setattr__(self, "include_roots", include_roots)
 
 
 class Dependents(DeduplicatedCollection[Address]):

@@ -4,7 +4,6 @@ slug: "advanced-target-selection"
 excerpt: "Alternative techniques to tell Pants which files/targets to run on."
 hidden: false
 createdAt: "2020-05-11T20:10:29.560Z"
-updatedAt: "2022-07-25T23:44:44.463Z"
 ---
 See [Goal arguments](doc:goals#goal-arguments) for the normal techniques for telling Pants what to
 run on. 
@@ -20,19 +19,19 @@ Because Pants understands Git, it can find which files have changed since a cert
 For example, to lint all uncommitted files, run:
 
 ```bash
-./pants --changed-since=HEAD lint
+pants --changed-since=HEAD lint
 ```
 
 To run against another branch, run:
 
 ```bash
-./pants --changed-since=origin/main lint
+pants --changed-since=origin/main lint
 ```
 
 By default, `--changed-since` will only run over files directly changed. Often, though, you will want to run over any [dependents](doc:project-introspection) of those changed files, meaning any targets that depend on the changed files. Use ` --changed-dependents=direct` or ` --changed-dependents=transitive` for this:
 
 ```bash
-❯ ./pants \
+❯ pants \
   --changed-since=origin/main \
   --changed-dependents=transitive \
   test
@@ -52,37 +51,37 @@ Some examples:
 
 ```bash
 # Only `python_source` targets.
-./pants --filter-target-type=python_source list ::
+pants --filter-target-type=python_source list ::
 
 # `python_source` or `python_test` targets.
-./pants --filter-target-type='python_source,python_test' list ::
+pants --filter-target-type='python_source,python_test' list ::
 
 # Any target except for `python_source` targets
-./pants --filter-target-type='-python_source' list ::
+pants --filter-target-type='-python_source' list ::
 ```
 
 You can combine multiple filter options in the same run, e.g.:
 
 ```bash
-./pants --filter-target-type='python_test' --filter-address-regex=^integration_tests test ::
+pants --filter-target-type='python_test' --filter-address-regex=^integration_tests test ::
 ```
 
 ### `--filter-target-type`
 
 Each value should be the name of a target type, e.g.
-`./pants --filter-target-type=python_test test ::`.
+`pants --filter-target-type=python_test test ::`.
 
-Run `./pants help targets` to see what targets are registered.
+Run `pants help targets` to see what targets are registered.
 
 ### `--filter-address-regex`
 
 Regex strings for the address, such as
-`./pants --filter-address-regex='^integration_tests$' test ::`.
+`pants --filter-address-regex='^integration_tests$' test ::`.
 
 ### `--filter-tag-regex`
 
 Regex strings to match against the `tags` field, such as 
-`./pants --filter-tag-regex='^skip_lint$' lint ::`.
+`pants --filter-tag-regex='^skip_lint$' lint ::`.
 
 If you don't need the power of regex, use the simpler `--tag` global option explained below.
 
@@ -103,19 +102,19 @@ python_tests(
 You can then filter by tags with the global `--tag` [option](doc:reference-global#section-tag), like this:
 
 ```bash
-./pants --tag=integration_test list ::
+pants --tag=integration_test list ::
 ```
 
 To exclude certain tags, prefix with a `-`:
 
 ```bash
-./pants --tag='-integration_test' list ::
+pants --tag='-integration_test' list ::
 ```
 
 You can even combine multiple includes and excludes:
 
 ```bash
-./pants --tag='+type_checked,skip_lint' --tag='-integration_test' list ::
+pants --tag='+type_checked,skip_lint' --tag='-integration_test' list ::
 ```
 
 Use `--filter-tag-regex` instead for more complex queries.
@@ -130,7 +129,7 @@ Each entry must be separated by a new line.
 For example:
 
 ```text Shell
-$ ./pants --spec-files=targets.txt list
+$ pants --spec-files=targets.txt list
 ```
 ```text targets.txt
 helloworld/lang/*.py
@@ -148,16 +147,16 @@ Piping to other Pants runs
 To pipe a Pants run, use your shell's `|` pipe operator and `xargs`:
 
 ```bash
-./pants dependents helloworld/util | xargs ./pants  list
+pants dependents helloworld/util | xargs pants  list
 ```
 
 You can, of course, pipe multiple times:
 
 ```bash
 # Run over the second-degree dependents of `utils.py`.
-❯ ./pants dependents helloworld/utils.py | \
-   xargs ./pants dependents | \
-   xargs ./pants lint
+❯ pants dependents helloworld/utils.py | \
+   xargs pants dependents | \
+   xargs pants lint
 ```
 
 > 📘 Alternative: use `--spec-files`
@@ -167,15 +166,15 @@ You can, of course, pipe multiple times:
 > For example:
 > 
 > ```bash
-> $ ./pants dependencies helloworld/util > util_dependencies.txt
-> $ ./pants --spec-files=util_dependencies.txt lint
+> $ pants dependencies helloworld/util > util_dependencies.txt
+> $ pants --spec-files=util_dependencies.txt lint
 > ```
 > 
 > If you don't want to save the output to an actual file—such as to not pollute version control—you can use a variable and a named pipe:
 > 
 > ```bash
-> $ TARGETS=$(./pants dependencies helloworld/util)
-> $ ./pants --spec-files=<(echo $TARGETS) lint
+> $ TARGETS=$(pants dependencies helloworld/util)
+> $ pants --spec-files=<(echo $TARGETS) lint
 > ```
 
 Sharding the input targets
@@ -186,5 +185,5 @@ The `test` goal natively supports sharding input targets into multiple shards. U
 For other goals, you can leverage shell piping to partition the input targets into multiple shards. For example, to split your `package` run into 5 shards, and select shard 0:
 
 ```bash
-./pants list :: | awk 'NR % 5 == 0' | xargs ./pants package
+pants list :: | awk 'NR % 5 == 0' | xargs pants package
 ```

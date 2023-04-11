@@ -28,11 +28,13 @@ from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.jvm.jdk_rules import InternalJdk, JvmProcess
+from pants.jvm.jdk_rules import rules as jdk_rules
 from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
+from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
+from pants.jvm.resolve.jvm_tool import rules as jvm_tool_rules
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
-from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet
 
 
@@ -45,8 +47,7 @@ class JarDuplicateAction(Enum):
     THROW = "throw"
 
 
-@dataclass(unsafe_hash=True)
-@frozen_after_init
+@dataclass(frozen=True)
 class JarToolRequest:
     jar_name: str
     digest: Digest
@@ -77,18 +78,18 @@ class JarToolRequest:
         compress: bool = False,
         update: bool = False,
     ) -> None:
-        self.jar_name = jar_name
-        self.digest = digest
-        self.main_class = main_class
-        self.manifest = manifest
-        self.classpath_entries = tuple(classpath_entries or ())
-        self.jars = tuple(jars or ())
-        self.file_mappings = FrozenDict(file_mappings or {})
-        self.default_action = default_action
-        self.policies = tuple(JarToolRequest.__parse_policies(policies or ()))
-        self.skip = tuple(skip or ())
-        self.compress = compress
-        self.update = update
+        object.__setattr__(self, "jar_name", jar_name)
+        object.__setattr__(self, "digest", digest)
+        object.__setattr__(self, "main_class", main_class)
+        object.__setattr__(self, "manifest", manifest)
+        object.__setattr__(self, "classpath_entries", tuple(classpath_entries or ()))
+        object.__setattr__(self, "jars", tuple(jars or ()))
+        object.__setattr__(self, "file_mappings", FrozenDict(file_mappings or {}))
+        object.__setattr__(self, "default_action", default_action)
+        object.__setattr__(self, "policies", tuple(JarToolRequest.__parse_policies(policies or ())))
+        object.__setattr__(self, "skip", tuple(skip or ()))
+        object.__setattr__(self, "compress", compress)
+        object.__setattr__(self, "update", update)
 
     @staticmethod
     def __parse_policies(
@@ -300,5 +301,8 @@ async def generate_jartool_lockfile_request(
 def rules():
     return [
         *collect_rules(),
+        *coursier_fetch_rules(),
+        *jdk_rules(),
+        *jvm_tool_rules(),
         UnionRule(GenerateToolLockfileSentinel, JarToolGenerateLockfileSentinel),
     ]

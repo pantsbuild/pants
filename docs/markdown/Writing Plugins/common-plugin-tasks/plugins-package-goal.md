@@ -4,7 +4,6 @@ slug: "plugins-package-goal"
 excerpt: "How to add a new implementation to the `package` goal."
 hidden: true
 createdAt: "2020-07-01T04:54:11.398Z"
-updatedAt: "2021-03-18T23:59:53.235Z"
 ---
 The `package` goal bundles all the relevant code and third-party dependencies into a single asset, such as a JAR, PEX, or zip file. 
 
@@ -177,7 +176,7 @@ def rules():
     return [*package_binary.rules()]
 ```
 
-Now, when you run `./pants package ::`, Pants should create packages for all your package target types in the `--pants-distdir` (defaults to `dist/`).
+Now, when you run `pants package ::`, Pants should create packages for all your package target types in the `--pants-distdir` (defaults to `dist/`).
 
 4. Add tests (optional)
 -----------------------

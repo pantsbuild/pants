@@ -147,7 +147,7 @@ async def parse_one_bsp_mapping(request: _ParseOneBSPMappingRequest) -> BSPBuild
 async def materialize_bsp_build_targets(bsp_goal: BSPGoal) -> BSPBuildTargets:
     definitions: dict[str, BSPTargetDefinition] = {}
     for config_file in bsp_goal.groups_config_files:
-        config_contents = await Get(
+        config_contents = await Get(  # noqa: PNT30: requires triage
             DigestContents,
             PathGlobs(
                 [config_file],

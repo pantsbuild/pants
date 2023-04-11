@@ -27,7 +27,6 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionMembership
 from pants.util.frozendict import FrozenDict
-from pants.util.meta import frozen_after_init
 
 SetDefaultsValueT = Mapping[str, Any]
 SetDefaultsKeyT = Union[str, Tuple[str, ...]]
@@ -38,8 +37,7 @@ class BuildFileDefaults(FrozenDict[str, FrozenDict[str, ImmutableValue]]):
     """Map target types to default field values."""
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class ParametrizeDefault(Parametrize):
     """A frozen version of `Parametrize` for defaults.
 
@@ -52,8 +50,8 @@ class ParametrizeDefault(Parametrize):
     kwargs: FrozenDict[str, ImmutableValue]  # type: ignore[assignment]
 
     def __init__(self, *args: str, **kwargs: ImmutableValue) -> None:
-        self.args = args
-        self.kwargs = FrozenDict(kwargs)
+        object.__setattr__(self, "args", args)
+        object.__setattr__(self, "kwargs", FrozenDict(kwargs))
 
     @classmethod
     def create(
@@ -63,9 +61,6 @@ class ParametrizeDefault(Parametrize):
             *map(freeze, parametrize.args),
             **{kw: freeze(arg) for kw, arg in parametrize.kwargs.items()},
         )
-
-    def __repr__(self) -> str:
-        return super().__repr__()
 
 
 @dataclass
@@ -127,6 +122,7 @@ class BuildFileDefaultsParserState:
         *args: SetDefaultsT,
         all: SetDefaultsValueT | None = None,
         extend: bool = False,
+        ignore_unknown_fields: bool = False,
         **kwargs,
     ) -> None:
         defaults: dict[str, dict[str, Any]] = (
@@ -141,7 +137,7 @@ class BuildFileDefaultsParserState:
             )
 
         for arg in args:
-            self._process_defaults(defaults, arg)
+            self._process_defaults(defaults, arg, ignore_unknown_fields=ignore_unknown_fields)
 
         # Update with new defaults, dropping targets without any default values.
         for tgt, default in defaults.items():

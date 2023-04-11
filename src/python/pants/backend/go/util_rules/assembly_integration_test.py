@@ -54,7 +54,11 @@ def rule_runner() -> RuleRunner:
             QueryRule(BuiltPackage, (GoBinaryFieldSet,)),
             QueryRule(FallibleBuiltGoPackage, (BuildGoPackageRequest,)),
         ],
-        target_types=[GoBinaryTarget, GoModTarget, GoPackageTarget],
+        target_types=[
+            GoBinaryTarget,
+            GoModTarget,
+            GoPackageTarget,
+        ],
     )
     rule_runner.set_options([], env_inherit={"PATH"})
     return rule_runner

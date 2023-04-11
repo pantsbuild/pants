@@ -5,11 +5,14 @@
 from __future__ import annotations
 
 import argparse
+import logging
 import os
 import shutil
 import subprocess
 
 from common import die
+
+logger = logging.getLogger(__name__)
 
 
 def main() -> None:
@@ -23,6 +26,21 @@ def main() -> None:
     )
     options = parser.parse_args()
     perform_deploy(scope=options.scope)
+
+
+def _run(args, env=None) -> None:
+    try:
+        subprocess.run(
+            args=args,
+            env=env,
+            capture_output=True,
+            check=True,
+        )
+    except subprocess.CalledProcessError as ex:
+        logger.error(f"Process `{' '.join(args)}` failed with exit code {ex.returncode}.")
+        logger.error(f"stdout: {ex.stdout}")
+        logger.error(f"stderr: {ex.stderr}")
+        raise
 
 
 def perform_deploy(*, aws_cli_symlink_path: str | None = None, scope: str | None = None) -> None:
@@ -44,9 +62,7 @@ def perform_deploy(*, aws_cli_symlink_path: str | None = None, scope: str | None
 
 def install_aws_cli(symlink_path: str | None = None) -> None:
     env = {"AWS_CLI_SYMLINK_PATH": symlink_path} if symlink_path else {}
-    subprocess.run(
-        ["./build-support/bin/install_aws_cli.sh"], env={**os.environ, **env}, check=True
-    )
+    _run(["./build-support/bin/install_aws_cli.sh"], env={**os.environ, **env})
 
 
 def validate_authentication() -> None:
@@ -64,13 +80,16 @@ def deploy(scope: str | None = None) -> None:
 
     local_path = "dist/deploy"
     s3_dest = "s3://binaries.pantsbuild.org"
+    s3_dest_region = "us-east-1"
     if scope:
         local_path = f"{local_path}/{scope}"
         s3_dest = f"{s3_dest}/{scope}"
 
-    subprocess.run(
+    _run(
         [
             "aws",
+            "--region",
+            s3_dest_region,
             "s3",
             "sync",
             # This instructs the sync command to ignore timestamps, which we must do to allow
@@ -83,8 +102,7 @@ def deploy(scope: str | None = None) -> None:
             "public-read",
             str(local_path),
             s3_dest,
-        ],
-        check=True,
+        ]
     )
 
     # Create/update the index file in S3.  After running on both the MacOS and Linux shards
@@ -92,7 +110,7 @@ def deploy(scope: str | None = None) -> None:
     wheels_dir = "dist/deploy/wheels/pantsbuild.pants"
     if os.path.isdir(wheels_dir):
         for sha in os.listdir(wheels_dir):
-            subprocess.run(["./build-support/bin/create_s3_index_file.sh", sha])
+            _run(["./build-support/bin/create_s3_index_file.sh", sha])
 
 
 if __name__ == "__main__":

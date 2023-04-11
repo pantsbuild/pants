@@ -127,7 +127,7 @@ impl PathGlob {
     for component in Path::new(pattern).components() {
       let part = match component {
         Component::Prefix(..) | Component::RootDir => {
-          return Err(format!("Absolute paths not supported: {:?}", pattern));
+          return Err(format!("Absolute paths not supported: {pattern:?}"));
         }
         Component::CurDir => continue,
         c => c.as_os_str(),
@@ -160,7 +160,7 @@ impl PathGlob {
       .into_iter()
       .map(|part| {
         Pattern::new(&part.to_string_lossy())
-          .map_err(|e| format!("Could not parse {:?} as a glob: {:?}", filespec, e))
+          .map_err(|e| format!("Could not parse {filespec:?} as a glob: {e:?}"))
       })
       .collect::<Result<Vec<_>, _>>()?;
 
@@ -233,8 +233,7 @@ impl PathGlob {
         let mut symbolic_path = symbolic_path_parent;
         symbolic_path.extend(parts.iter().map(Pattern::as_str));
         return Err(format!(
-          "Globs may not traverse outside of the buildroot: {:?}",
-          symbolic_path,
+          "Globs may not traverse outside of the buildroot: {symbolic_path:?}",
         ));
       }
       symbolic_path_parent.push(Path::new(&Component::ParentDir));
@@ -334,7 +333,7 @@ impl FilespecMatcher {
         PathGlob::normalize_pattern(glob).and_then(|components| {
           let normalized_pattern: PathBuf = components.into_iter().collect();
           Pattern::new(normalized_pattern.to_str().unwrap())
-            .map_err(|e| format!("Could not parse {:?} as a glob: {:?}", glob, e))
+            .map_err(|e| format!("Could not parse {glob:?} as a glob: {e:?}"))
         })
       })
       .collect::<Result<Vec<_>, String>>()?;
@@ -364,7 +363,7 @@ impl FilespecMatcher {
   }
 
   pub fn exclude_globs(&self) -> &[String] {
-    self.excludes.patterns.as_slice()
+    self.excludes.exclude_patterns()
   }
 }
 
@@ -569,14 +568,14 @@ trait GlobMatchingImplementation<E: Display + Send + Sync + 'static>: Vfs<E> {
         let prefix = format!("Unmatched glob{}", if single_glob { "" } else { "s" });
         let origin = match &strict_match_behavior {
           StrictGlobMatching::Warn(description) | StrictGlobMatching::Error(description) => {
-            format!(" from {}: ", description)
+            format!(" from {description}: ")
           }
           _ => ": ".to_string(),
         };
         let unmatched_globs = if single_glob {
           format!("{:?}", non_matching_inputs[0])
         } else {
-          format!("{:?}", non_matching_inputs)
+          format!("{non_matching_inputs:?}")
         };
         let exclude_patterns = exclude.exclude_patterns();
         let excludes_portion = if exclude_patterns.is_empty() {
@@ -586,7 +585,7 @@ trait GlobMatchingImplementation<E: Display + Send + Sync + 'static>: Vfs<E> {
           if single_exclude {
             format!(", exclude: {:?}", exclude_patterns[0])
           } else {
-            format!(", excludes: {:?}", exclude_patterns)
+            format!(", excludes: {exclude_patterns:?}")
           }
         };
         let msg = format!(

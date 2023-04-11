@@ -52,7 +52,11 @@ def rule_runner() -> RuleRunner:
             QueryRule(FallibleFirstPartyPkgDigest, [FirstPartyPkgDigestRequest]),
             QueryRule(FirstPartyPkgImportPath, [FirstPartyPkgImportPathRequest]),
         ],
-        target_types=[GoModTarget, GoPackageTarget, ResourcesGeneratorTarget],
+        target_types=[
+            GoModTarget,
+            GoPackageTarget,
+            ResourcesGeneratorTarget,
+        ],
     )
     rule_runner.set_options([], env_inherit={"PATH"})
     return rule_runner

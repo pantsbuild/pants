@@ -19,6 +19,7 @@ from pants.util.dirutil import (
     _mkdtemp_unregister_cleaner,
     absolute_symlink,
     fast_relpath,
+    group_by_dir,
     longest_dir_prefix,
     read_file,
     relative_symlink,
@@ -171,9 +172,9 @@ class TestDirutilTest:
         path: str
 
     def assert_tree(self, root: str, *expected: Dir | File | Symlink):
-        def collect_tree() -> Iterator[
-            TestDirutilTest.Dir | TestDirutilTest.File | TestDirutilTest.Symlink
-        ]:
+        def collect_tree() -> (
+            Iterator[TestDirutilTest.Dir | TestDirutilTest.File | TestDirutilTest.Symlink]
+        ):
             for path, dirnames, filenames in os.walk(root, followlinks=False):
                 relpath = os.path.relpath(path, root)
                 if relpath == os.curdir:
@@ -359,6 +360,25 @@ class TestDirutilTest:
             safe_rmtree(link)
             assert os.path.exists(real)
             assert not os.path.exists(link)
+
+    def test_group_by_dir(self) -> None:
+        paths = {
+            "foo/bar/baz1.ext",
+            "foo/bar/baz1_test.ext",
+            "foo/bar/qux/quux1.ext",
+            "foo/__init__.ext",
+            "foo/bar/__init__.ext",
+            "foo/bar/baz2.ext",
+            "foo/bar1.ext",
+            "foo1.ext",
+            "__init__.ext",
+        }
+        assert {
+            "": {"__init__.ext", "foo1.ext"},
+            "foo": {"__init__.ext", "bar1.ext"},
+            "foo/bar": {"__init__.ext", "baz1.ext", "baz1_test.ext", "baz2.ext"},
+            "foo/bar/qux": {"quux1.ext"},
+        } == group_by_dir(paths)
 
 
 class AbsoluteSymlinkTest(unittest.TestCase):

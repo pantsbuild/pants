@@ -34,9 +34,9 @@ enum Node<R: Rule> {
 impl<R: Rule> std::fmt::Display for Node<R> {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     match self {
-      Node::Query(q) => write!(f, "{}", q),
-      Node::Rule(r) => write!(f, "{}", r),
-      Node::Param(p) => write!(f, "Param({})", p),
+      Node::Query(q) => write!(f, "{q}"),
+      Node::Rule(r) => write!(f, "{r}"),
+      Node::Param(p) => write!(f, "Param({p})"),
       Node::Reentry(q, in_scope) => write!(f, "Reentry({}, {})", q.product, params_str(in_scope)),
     }
   }
@@ -627,8 +627,8 @@ impl<R: Rule> Builder<R> {
       #[allow(clippy::type_complexity)]
       let dependencies_by_key: Vec<Vec<(DependencyKey<R::TypeId>, NodeIndex<u32>)>> =
         Self::edges_by_dependency_key(&graph, node_id, false)
-          .into_iter()
-          .map(|(_, edge_refs)| {
+          .into_values()
+          .map(|edge_refs| {
             edge_refs
               .iter()
               .map(|edge_ref| (edge_ref.weight().0.clone(), edge_ref.target()))
@@ -773,7 +773,7 @@ impl<R: Rule> Builder<R> {
           let subgraph = graph.filter_map(
             |node_id, node| {
               if maybe_in_loop.contains(&node_id) {
-                Some(format!("{:?}: {}", node_id, node))
+                Some(format!("{node_id:?}: {node}"))
               } else {
                 None
               }
@@ -1177,10 +1177,10 @@ impl<R: Rule> Builder<R> {
             let reason = edge_ref
               .weight()
               .deleted_reason()
-              .map(|r| format!("{:?}", r))
-              .or_else(|| node.deleted_reason().map(|r| format!("{:?}", r)));
+              .map(|r| format!("{r:?}"))
+              .or_else(|| node.deleted_reason().map(|r| format!("{r:?}")));
             let reason_suffix = if let Some(reason) = reason {
-              format!("{}: ", reason)
+              format!("{reason}: ")
             } else {
               "".to_owned()
             };
@@ -1354,10 +1354,7 @@ impl<R: Rule> Builder<R> {
       edges_by_dependency_key
         .get_mut(dependency_key)
         .unwrap_or_else(|| {
-          panic!(
-            "{} did not declare a dependency {}, but had an edge for it.",
-            node, dependency_key
-          );
+          panic!("{node} did not declare a dependency {dependency_key}, but had an edge for it.");
         })
         .push(edge_ref);
     }

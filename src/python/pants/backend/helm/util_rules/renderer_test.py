@@ -6,6 +6,7 @@ from __future__ import annotations
 from textwrap import dedent
 
 import pytest
+import yaml
 
 from pants.backend.helm.target_types import (
     HelmChartTarget,
@@ -25,6 +26,7 @@ from pants.engine.fs import DigestContents, DigestSubset, PathGlobs
 from pants.engine.internals.native_engine import Digest
 from pants.engine.process import InteractiveProcess
 from pants.engine.rules import QueryRule
+from pants.engine.target import Target
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, RuleRunner
 
 
@@ -229,3 +231,60 @@ def test_ignore_missing_interpolated_keys_during_render(rule_runner: RuleRunner)
         ],
     )
     assert rendered.snapshot.files
+
+
+def test_flag_dns_lookups(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/mychart/BUILD": "helm_chart()",
+            "src/mychart/Chart.yaml": HELM_CHART_FILE,
+            "src/mychart/templates/configmap.yaml": dedent(
+                """\
+                apiVersion: v1
+                kind: ConfigMap
+                metadata:
+                name: foo-mychart-foo
+                labels:
+                    chart: "mychart-0.1.0"
+                data:
+                    host_addr: "{{ getHostByName "www.google.com" }}"
+                """
+            ),
+            "src/deployment/BUILD": dedent(
+                """\
+                helm_deployment(name='foo', dependencies=['//src/mychart'])
+                helm_deployment(name='bar', dependencies=['//src/mychart'], enable_dns=True)
+                """
+            ),
+        }
+    )
+
+    def render_deployment(tgt: Target):
+        field_set = HelmDeploymentFieldSet.create(tgt)
+
+        rendered = rule_runner.request(
+            RenderedHelmFiles,
+            [
+                HelmDeploymentRequest(
+                    field_set,
+                    cmd=HelmDeploymentCmd.RENDER,
+                    description="Test do not perform DNS lookups",
+                )
+            ],
+        )
+
+        template_output = _read_file_from_digest(
+            rule_runner,
+            digest=rendered.snapshot.digest,
+            filename="mychart/templates/configmap.yaml",
+        )
+        return yaml.safe_load(template_output)
+
+    foo_tgt = rule_runner.get_target(Address("src/deployment", target_name="foo"))
+    bar_tgt = rule_runner.get_target(Address("src/deployment", target_name="bar"))
+
+    foo_rendered = render_deployment(foo_tgt)
+    bar_rendered = render_deployment(bar_tgt)
+
+    assert foo_rendered["data"]["host_addr"] == ""
+    assert not bar_rendered["data"]["host_addr"] == ""

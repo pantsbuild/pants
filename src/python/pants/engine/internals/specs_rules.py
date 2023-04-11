@@ -27,7 +27,7 @@ from pants.engine.environment import ChosenLocalEnvironmentName, EnvironmentName
 from pants.engine.fs import PathGlobs, Paths, SpecsPaths
 from pants.engine.internals.build_files import AddressFamilyDir, BuildFileOptions
 from pants.engine.internals.graph import Owners, OwnersRequest
-from pants.engine.internals.mapper import AddressFamily, SpecsFilter
+from pants.engine.internals.mapper import AddressFamilies, AddressFamily, SpecsFilter
 from pants.engine.internals.parametrize import (
     _TargetParametrizations,
     _TargetParametrizationsRequest,
@@ -37,7 +37,7 @@ from pants.engine.internals.synthetic_targets import (
     SyntheticTargetsSpecPaths,
     SyntheticTargetsSpecPathsRequest,
 )
-from pants.engine.rules import collect_rules, rule, rule_helper
+from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
     FieldSet,
     FieldSetsPerTarget,
@@ -72,7 +72,6 @@ logger = logging.getLogger(__name__)
 # -----------------------------------------------------------------------------------------------
 
 
-@rule_helper
 async def _determine_literal_addresses_from_raw_specs(
     literal_specs: tuple[AddressLiteralSpec, ...],
     local_environment_name: ChosenLocalEnvironmentName,
@@ -128,29 +127,12 @@ async def _determine_literal_addresses_from_raw_specs(
 
 
 @rule(_masked_types=[EnvironmentName])
-async def addresses_from_raw_specs_without_file_owners(
+async def address_families_from_raw_specs_without_file_owners(
     specs: RawSpecsWithoutFileOwners,
     build_file_options: BuildFileOptions,
-    specs_filter: SpecsFilter,
-    local_environment_name: ChosenLocalEnvironmentName,
-    union_membership: UnionMembership,
-) -> Addresses:
-    matched_addresses: OrderedSet[Address] = OrderedSet()
-    filtering_disabled = specs.filter_by_global_options is False
-
-    literal_wrapped_targets = await _determine_literal_addresses_from_raw_specs(
-        specs.address_literals,
-        local_environment_name,
-        description_of_origin=specs.description_of_origin,
-    )
-    matched_addresses.update(
-        wrapped_tgt.target.address
-        for wrapped_tgt in literal_wrapped_targets
-        if filtering_disabled or specs_filter.matches(wrapped_tgt.target)
-    )
+) -> AddressFamilies:
     if not (specs.dir_literals or specs.dir_globs or specs.recursive_globs or specs.ancestor_globs):
-        return Addresses(matched_addresses)
-
+        return AddressFamilies()
     # Resolve all globs.
     build_file_globs, validation_globs = specs.to_build_file_path_globs_tuple(
         build_patterns=build_file_options.patterns,
@@ -166,12 +148,36 @@ async def addresses_from_raw_specs_without_file_owners(
         )
     )
     dirnames.update(os.path.dirname(f) for f in build_file_paths.files)
-    address_families = await MultiGet(Get(AddressFamily, AddressFamilyDir(d)) for d in dirnames)
-    base_addresses = Addresses(
-        itertools.chain.from_iterable(
-            address_family.addresses_to_target_adaptors for address_family in address_families
-        )
+    return AddressFamilies(
+        await MultiGet(Get(AddressFamily, AddressFamilyDir(d)) for d in dirnames)
     )
+
+
+@rule(_masked_types=[EnvironmentName])
+async def addresses_from_raw_specs_without_file_owners(
+    specs: RawSpecsWithoutFileOwners,
+    specs_filter: SpecsFilter,
+    local_environment_name: ChosenLocalEnvironmentName,
+) -> Addresses:
+    matched_addresses: OrderedSet[Address] = OrderedSet()
+    filtering_disabled = specs.filter_by_global_options is False
+
+    literal_wrapped_targets = await _determine_literal_addresses_from_raw_specs(
+        specs.address_literals,
+        local_environment_name,
+        description_of_origin=specs.description_of_origin,
+    )
+    matched_addresses.update(
+        wrapped_tgt.target.address
+        for wrapped_tgt in literal_wrapped_targets
+        if filtering_disabled or specs_filter.matches(wrapped_tgt.target)
+    )
+
+    address_families = await Get(AddressFamilies, RawSpecsWithoutFileOwners, specs)
+    if not address_families:
+        return Addresses(matched_addresses)
+
+    base_addresses = address_families.addresses()
 
     target_parametrizations_list = await MultiGet(
         Get(

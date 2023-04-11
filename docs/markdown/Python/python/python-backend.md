@@ -4,7 +4,6 @@ slug: "python-backend"
 excerpt: "How to enable Pants's bundled Python backend package."
 hidden: false
 createdAt: "2020-03-02T22:39:55.355Z"
-updatedAt: "2022-05-16T05:07:38.169Z"
 ---
 > 📘 Example Python repository
 >
@@ -44,10 +43,10 @@ python_sources(name="lib")
 python_tests(name="tests")
 ```
 
-You can generate these targets by running [`./pants tailor ::`](doc:initial-configuration#5-generate-build-files).
+You can generate these targets by running [`pants tailor ::`](doc:initial-configuration#5-generate-build-files).
 
 ```
-❯ ./pants tailor ::
+❯ pants tailor ::
 Created project/BUILD:
   - Add python_sources target project
   - Add python_tests target tests

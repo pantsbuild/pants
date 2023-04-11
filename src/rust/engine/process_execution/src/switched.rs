@@ -108,7 +108,7 @@ mod tests {
     if let ProcessError::Unclassified(msg) = &err {
       assert_eq!(msg, "left");
     } else {
-      panic!("unexpected value: {:?}", err)
+      panic!("unexpected value: {err:?}")
     }
 
     let req = Process::new(vec!["not-left".to_string()]);
@@ -119,7 +119,7 @@ mod tests {
     if let ProcessError::Unclassified(msg) = &err {
       assert_eq!(msg, "right");
     } else {
-      panic!("unexpected value: {:?}", err)
+      panic!("unexpected value: {err:?}")
     }
   }
 }

@@ -254,7 +254,7 @@ def add_markers(base: str, attributes: PyprojectAttr, fp) -> str:
     if not markers_lookup and not python_lookup:
         return base
 
-    result = f"{base};("
+    result = f"{base} ;("
 
     if markers_lookup:
         result += f"{markers_lookup})"
@@ -328,7 +328,6 @@ def parse_single_dependency(
     attributes: str | Mapping[str, str | Sequence] | Sequence[Mapping[str, str | Sequence]],
     pyproject_toml: PyProjectToml,
 ) -> Iterator[PipRequirement]:
-
     if isinstance(attributes, str):
         # E.g. `foo = "~1.1~'.
         yield PipRequirement.parse(

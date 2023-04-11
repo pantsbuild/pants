@@ -8,6 +8,7 @@ from hashlib import sha1
 from pants.base.build_environment import get_buildroot
 from pants.base.hash_utils import CoercingEncoder, json_hash
 from pants.option.custom_types import UnsetBool, dict_with_files_option, dir_option, file_option
+from pants.util.strutil import softwrap
 
 
 class CoercingOptionEncoder(CoercingEncoder):
@@ -40,7 +41,7 @@ class OptionsFingerprinter:
         fingerprinter = cls()
         hasher = sha1()
         pairs = options.get_fingerprintable_for_scope(scope, daemon_only)
-        for (option_type, option_value) in pairs:
+        for option_type, option_value in pairs:
             fingerprint = fingerprinter.fingerprint(option_type, option_value)
             if fingerprint is None:
                 # This isn't necessarily a good value to be using here, but it preserves behavior from
@@ -88,12 +89,17 @@ class OptionsFingerprinter:
             return os.path.join(root, filepath)
         else:
             if ".." in os.path.relpath(filepath, root).split(os.path.sep):
-                # The path wasn't in the buildroot. This is an error because it violates the pants being
+                # The path wasn't in the buildroot. This is an error because it violates pants being
                 # hermetic.
                 raise ValueError(
-                    "Received a file_option that was not inside the build root:\n"
-                    "  file_option: {filepath}\n"
-                    "  build_root:  {buildroot}\n".format(filepath=filepath, buildroot=root)
+                    softwrap(
+                        f"""
+                        Received a file_option that was not inside the build root:
+
+                            file_option: {filepath}
+                            build_root:  {root}
+                        """
+                    )
                 )
             return filepath
 

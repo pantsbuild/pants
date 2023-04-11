@@ -4,9 +4,8 @@ slug: "plugins-fmt-goal"
 excerpt: "How to add a new formatter to the `fmt` and `lint` goals."
 hidden: false
 createdAt: "2020-07-01T04:52:28.820Z"
-updatedAt: "2022-04-27T18:37:11.334Z"
 ---
-In Pants, every formatter is also a linter, meaning that if you can run a tool with `./pants fmt`, you can run the same tool in check-only mode with `./pants lint`. Start by skimming [Add a linter](doc:plugins-lint-goal) to familiarize yourself with how linters work.
+In Pants, every formatter is also a linter, meaning that if you can run a tool with `pants fmt`, you can run the same tool in check-only mode with `pants lint`. Start by skimming [Add a linter](doc:plugins-lint-goal) to familiarize yourself with how linters work.
 
 This guide assumes that you are running a formatter that already exists outside of Pants as a stand-alone binary, such as running Black or Prettier.
 
@@ -171,7 +170,7 @@ def rules():
     return [*shfmt.rules()]
 ```
 
-Now, when you run `./pants fmt ::` or `./pants lint ::`, your new formatter should run.
+Now, when you run `pants fmt ::` or `pants lint ::`, your new formatter should run.
 
 # 4. Add tests (optional)
 

@@ -22,10 +22,10 @@ from pants.engine.fs import (
     DigestEntries,
     DigestSubset,
     Directory,
-    DownloadFile,
     FileContent,
     FileDigest,
     FileEntry,
+    NativeDownloadFile,
     PathGlobs,
     PathGlobsAndRoot,
     Paths,
@@ -157,7 +157,7 @@ class Scheduler:
             path_globs=PathGlobs,
             create_digest=CreateDigest,
             digest_subset=DigestSubset,
-            download_file=DownloadFile,
+            native_download_file=NativeDownloadFile,
             platform=Platform,
             process=Process,
             process_result=FallibleProcessResult,
@@ -180,14 +180,14 @@ class Scheduler:
             root_ca_certs_path=execution_options.remote_ca_certs_path,
             store_headers=execution_options.remote_store_headers,
             store_chunk_bytes=execution_options.remote_store_chunk_bytes,
-            store_chunk_upload_timeout=execution_options.remote_store_chunk_upload_timeout_seconds,
             store_rpc_retries=execution_options.remote_store_rpc_retries,
             store_rpc_concurrency=execution_options.remote_store_rpc_concurrency,
+            store_rpc_timeout_millis=execution_options.remote_store_rpc_timeout_millis,
             store_batch_api_size_limit=execution_options.remote_store_batch_api_size_limit,
             cache_warnings_behavior=execution_options.remote_cache_warnings.value,
             cache_content_behavior=execution_options.cache_content_behavior.value,
             cache_rpc_concurrency=execution_options.remote_cache_rpc_concurrency,
-            cache_read_timeout_millis=execution_options.remote_cache_read_timeout_millis,
+            cache_rpc_timeout_millis=execution_options.remote_cache_rpc_timeout_millis,
             execution_headers=execution_options.remote_execution_headers,
             execution_overall_deadline_secs=execution_options.remote_execution_overall_deadline_secs,
             execution_rpc_concurrency=execution_options.remote_execution_rpc_concurrency,
@@ -214,6 +214,7 @@ class Scheduler:
             graceful_shutdown_timeout=execution_options.process_execution_graceful_shutdown_timeout,
         )
 
+        self._py_executor = executor
         self._py_scheduler = native_engine.scheduler_create(
             executor,
             tasks,
@@ -241,6 +242,10 @@ class Scheduler:
     @property
     def py_scheduler(self) -> PyScheduler:
         return self._py_scheduler
+
+    @property
+    def py_executor(self) -> PyExecutor:
+        return self._py_executor
 
     def _to_params_list(self, subject_or_params: Any | Params) -> Sequence[Any]:
         if isinstance(subject_or_params, Params):
@@ -603,14 +608,18 @@ class SchedulerSession:
     def ensure_directory_digest_persisted(self, digest: Digest) -> None:
         native_engine.ensure_directory_digest_persisted(self.py_scheduler, digest)
 
-    def write_digest(self, digest: Digest, *, path_prefix: str | None = None) -> None:
+    def write_digest(
+        self, digest: Digest, *, path_prefix: str | None = None, clear_destination: bool = False
+    ) -> None:
         """Write a digest to disk, relative to the build root."""
         if path_prefix and PurePath(path_prefix).is_absolute():
             raise ValueError(
                 f"The `path_prefix` {path_prefix} must be a relative path, as the engine writes "
                 "the digest relative to the build root."
             )
-        native_engine.write_digest(self.py_scheduler, self.py_session, digest, path_prefix or "")
+        native_engine.write_digest(
+            self.py_scheduler, self.py_session, digest, path_prefix or "", clear_destination
+        )
 
     def lease_files_in_graph(self) -> None:
         native_engine.lease_files_in_graph(self.py_scheduler, self.py_session)

@@ -4,7 +4,7 @@
 from dataclasses import dataclass
 from typing import Any
 
-from pants.backend.javascript.subsystems.nodejs import NpxProcess
+from pants.backend.javascript.subsystems.nodejs import NodeJSToolProcess
 from pants.backend.openapi.lint.spectral.skip_field import SkipSpectralField
 from pants.backend.openapi.lint.spectral.subsystem import SpectralSubsystem
 from pants.backend.openapi.target_types import (
@@ -89,7 +89,8 @@ async def run_spectral(
 
     process_result = await Get(
         FallibleProcessResult,
-        NpxProcess(
+        NodeJSToolProcess,
+        NodeJSToolProcess.npx(
             npm_package=spectral.version,
             args=(
                 "lint",

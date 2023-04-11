@@ -3,7 +3,7 @@
 
 import string
 from collections import namedtuple
-from dataclasses import dataclass
+from dataclasses import FrozenInstanceError, dataclass
 from enum import Enum
 from typing import Any, ClassVar, Dict, Iterable, List, Optional, Sequence, Set, Tuple, cast
 
@@ -52,7 +52,6 @@ from pants.engine.unions import UnionMembership
 from pants.option.global_options import UnmatchedBuildFileGlobs
 from pants.testutil.pytest_util import no_exception
 from pants.util.frozendict import FrozenDict
-from pants.util.meta import FrozenInstanceError
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
 # -----------------------------------------------------------------------------------------------
@@ -118,7 +117,7 @@ def test_field_and_target_eq() -> None:
 
     # Ensure the field is frozen.
     with pytest.raises(FrozenInstanceError):
-        field.y = "foo"  # type: ignore[attr-defined]
+        field.value = "foo"
 
     tgt = FortranTarget({"version": "dev0"}, addr)
     assert tgt.address == addr
@@ -137,7 +136,7 @@ def test_field_and_target_eq() -> None:
 
     # Ensure the target is frozen.
     with pytest.raises(FrozenInstanceError):
-        tgt.y = "foo"  # type: ignore[attr-defined]
+        tgt.address = addr  # type: ignore[misc]
 
     # Ensure that subclasses are not equal.
     class SubclassField(FortranVersion):
@@ -447,7 +446,7 @@ def test_async_field_mixin() -> None:
 
     # Ensure it's still frozen.
     with pytest.raises(FrozenInstanceError):
-        field.y = "foo"  # type: ignore[attr-defined]
+        field.value = 11
 
     # Ensure that subclasses are not equal.
     class Subclass(ExampleField):
@@ -736,15 +735,15 @@ def test_string_field_valid_choices() -> None:
 
 @pytest.mark.parametrize("field_cls", [IntField, FloatField])
 def test_int_float_fields_valid_numbers(field_cls: type) -> None:
-    class AllNums(field_cls):  # type: ignore[valid-type,misc]
+    class AllNums(field_cls):
         alias = "all_nums"
         valid_numbers = ValidNumbers.all
 
-    class PositiveAndZero(field_cls):  # type: ignore[valid-type,misc]
+    class PositiveAndZero(field_cls):
         alias = "positive_and_zero"
         valid_numbers = ValidNumbers.positive_and_zero
 
-    class PositiveOnly(field_cls):  # type: ignore[valid-type,misc]
+    class PositiveOnly(field_cls):
         alias = "positive_only"
         valid_numbers = ValidNumbers.positive_only
 
@@ -1048,7 +1047,7 @@ def test_multiple_sources_path_globs(
         default_glob_match_error_behavior = GlobMatchErrorBehavior.ignore
 
     sources = TestMultipleSourcesField(field_value, Address("test"))
-    actual = sources.path_globs(UnmatchedBuildFileGlobs.warn)
+    actual = sources.path_globs(UnmatchedBuildFileGlobs.warn())
     for attr, expect in zip(expected._fields, expected):
         if expect is not SKIP:
             assert getattr(actual, attr) == expect
@@ -1108,7 +1107,7 @@ def test_single_source_path_globs(
 
     sources = TestSingleSourceField(field_value, Address("test"))
 
-    actual = sources.path_globs(UnmatchedBuildFileGlobs.warn)
+    actual = sources.path_globs(UnmatchedBuildFileGlobs.warn())
     for attr, expect in zip(expected._fields, expected):
         if expect is not SKIP:
             assert getattr(actual, attr) == expect
@@ -1429,7 +1428,7 @@ def test_overrides_field_normalization() -> None:
         {"foo.ext": tgt1_override, ("foo.ext", "bar*.ext"): tgt2_override}, Address("dir")
     )
     globs = OverridesField.to_path_globs(
-        Address("dir"), path_field.flatten(), UnmatchedBuildFileGlobs.error
+        Address("dir"), path_field.flatten(), UnmatchedBuildFileGlobs.error()
     )
     assert [path_globs.globs for path_globs in globs] == [
         ("dir/foo.ext",),

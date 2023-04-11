@@ -36,7 +36,6 @@ from pants.engine.unions import UnionMembership, union
 from pants.jvm.resolve.key import CoursierResolveKey
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
-from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import strip_v2_chroot_path
 
@@ -217,8 +216,7 @@ def calculate_jvm_request_types(union_membership: UnionMembership) -> ClasspathE
     return ClasspathEntryRequestFactory(tuple(cpe_impls), sources_by_impl)
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class ClasspathEntry:
     """A JVM classpath entry represented as a series of JAR files, and their dependencies.
 
@@ -250,9 +248,9 @@ class ClasspathEntry:
         filenames: Iterable[str] = (),
         dependencies: Iterable[ClasspathEntry] = (),
     ):
-        self.digest = digest
-        self.filenames = tuple(filenames)
-        self.dependencies = FrozenOrderedSet(dependencies)
+        object.__setattr__(self, "digest", digest)
+        object.__setattr__(self, "filenames", tuple(filenames))
+        object.__setattr__(self, "dependencies", FrozenOrderedSet(dependencies))
 
     @classmethod
     def merge(cls, digest: Digest, entries: Iterable[ClasspathEntry]) -> ClasspathEntry:

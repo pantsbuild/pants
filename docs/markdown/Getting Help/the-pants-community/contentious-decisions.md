@@ -4,7 +4,6 @@ slug: "contentious-decisions"
 excerpt: "How we make decisions when consensus cannot be reached"
 hidden: false
 createdAt: "2021-03-17T04:19:25.352Z"
-updatedAt: "2021-08-31T18:59:09.932Z"
 ---
 Pants is a friendly community, and we prefer to reach decisions by consensus among Maintainers.
 

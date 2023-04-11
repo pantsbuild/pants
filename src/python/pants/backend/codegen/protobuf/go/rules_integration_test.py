@@ -29,6 +29,7 @@ from pants.backend.go.util_rules import (
     build_pkg_target,
     first_party_pkg,
     go_mod,
+    implicit_linker_deps,
     link,
     sdk,
     tests_analysis,
@@ -41,7 +42,7 @@ from pants.core.util_rules.external_tool import rules as external_tool_rules
 from pants.engine.fs import Digest, DigestContents
 from pants.engine.rules import QueryRule
 from pants.engine.target import GeneratedSources, HydratedSources, HydrateSourcesRequest
-from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, RuleRunner, logging
+from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, RuleRunner
 from pants.testutil.skip_utils import requires_go
 
 
@@ -66,6 +67,7 @@ def rule_runner() -> RuleRunner:
             *first_party_pkg.rules(),
             *go_mod.rules(),
             *link.rules(),
+            *implicit_linker_deps.rules(),
             *sdk.rules(),
             *target_type_rules.rules(),
             *tests_analysis.rules(),
@@ -115,7 +117,6 @@ def test_extracts_go_package() -> None:
     assert import_path == "example.com/dir1"
 
 
-@logging
 @requires_go
 def test_generates_go(rule_runner: RuleRunner) -> None:
     # This tests a few things:

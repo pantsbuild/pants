@@ -168,6 +168,73 @@ class GoTestSubsystem(Subsystem):
         ),
     )
 
+    block_profile = BoolOption(
+        default=False,
+        help=softwrap(
+            """
+            Capture a goroutine blocking profile from the execution of the test runner. The profile will be written
+            to the file `block.out` in the test extra output directory. The test binary will also be written to
+            the test extra output directory.
+
+            """
+        ),
+    )
+
+    cpu_profile = BoolOption(
+        default=False,
+        help=softwrap(
+            """
+            Capture a CPU profile from the execution of the test runner. The profile will be written to the
+            file `cpu.out` in the test extra output directory. The test binary will also be written to the
+            test extra output directory.
+            """
+        ),
+    )
+
+    mem_profile = BoolOption(
+        default=False,
+        help=softwrap(
+            """
+            Capture an allocation profile from the execution of the test runner after tests have passed.
+            The profile will be written to the file `mem.out` in the test extra output directory.
+            The test binary will also be written to the test extra output directory.
+            """
+        ),
+    )
+
+    mutex_profile = BoolOption(
+        default=False,
+        help=softwrap(
+            """
+            Capture a mutex contention profile from the execution of the test runner when all tests are
+            complete. The profile will be written to the file `mutex.out` in the test extra output directory.
+            The test binary will also be written to the test extra output directory.
+            """
+        ),
+    )
+
+    trace = BoolOption(
+        default=False,
+        help=softwrap(
+            """
+            Capture an execution trace from the execution of the test runner. The trace will be written to the
+            file `trace.out` in the test extra output directory.
+            """
+        ),
+    )
+
+    output_test_binary = BoolOption(
+        default=False,
+        help=softwrap(
+            """
+            Write the test binary to the test extra output directory.
+
+            This is similar to the `go test -c` option, but will still run the underlying test.
+            """
+        ),
+        advanced=True,
+    )
+
     def coverage_output_dir(self, distdir: DistDir, address: Address, import_path: str) -> PurePath:
         target_spec = address.spec_path.replace(os.sep, ".")
         import_path_escaped = import_path.replace("/", "_")

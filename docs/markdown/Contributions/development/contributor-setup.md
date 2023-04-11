@@ -4,7 +4,6 @@ slug: "contributor-setup"
 excerpt: "How to set up Pants for local development."
 hidden: false
 createdAt: "2020-05-16T22:54:22.684Z"
-updatedAt: "2022-04-26T23:55:48.923Z"
 ---
 Step 1: Fork and clone `pantsbuild/pants`
 -----------------------------------------
@@ -58,7 +57,7 @@ Step 3: Bootstrap the Rust engine
 
 Pants uses Rustup to install Rust. Run the command from <https://rustup.rs> to install Rustup; ensure that `rustup` is on your `$PATH`.
 
-Then, run `./pants` to set up the Python virtual environment and compile the engine.
+Then, run `pants` to set up the Python virtual environment and compile the engine.
 
 > 🚧 This will take several minutes
 > 
@@ -68,7 +67,7 @@ Then, run `./pants` to set up the Python virtual environment and compile the eng
 > 
 > We default to compiling with Rust's `release` mode, instead of its `debug` mode, because this makes Pants substantially faster.  However, this results in the compile taking 5-10x longer.
 > 
-> If you are okay with Pants running much slower when iterating, set the environment variable `MODE=debug` and rerun `./pants` to compile in debug mode.
+> If you are okay with Pants running much slower when iterating, set the environment variable `MODE=debug` and rerun `pants` to compile in debug mode.
 
 > 🚧 Rust compilation can use lots of storage
 > 

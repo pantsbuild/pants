@@ -22,6 +22,7 @@ from pants.backend.go.util_rules import (
     first_party_pkg,
     go_mod,
     goroot,
+    implicit_linker_deps,
     import_analysis,
     link,
     sdk,
@@ -59,6 +60,7 @@ def rule_runner() -> RuleRunner:
             *go_mod.rules(),
             *goroot.rules(),
             *link.rules(),
+            *implicit_linker_deps.rules(),
             *target_type_rules.rules(),
             *third_party_pkg.rules(),
             *sdk.rules(),
@@ -67,7 +69,11 @@ def rule_runner() -> RuleRunner:
             QueryRule(GoRoot, ()),
             QueryRule(BuildGoPackageRequest, [BuildGoPackageTargetRequest]),
         ],
-        target_types=[GoModTarget, GoPackageTarget, GoBinaryTarget],
+        target_types=[
+            GoModTarget,
+            GoPackageTarget,
+            GoBinaryTarget,
+        ],
     )
     rule_runner.set_options([], env_inherit={"PATH"})
     return rule_runner

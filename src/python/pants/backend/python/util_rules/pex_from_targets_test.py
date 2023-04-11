@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import importlib.resources
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -19,6 +20,7 @@ from pants.backend.python.subsystems import setuptools
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.subsystems.setuptools import Setuptools
 from pants.backend.python.target_types import (
+    EntryPoint,
     PexLayout,
     PythonRequirementTarget,
     PythonSourcesGeneratorTarget,
@@ -46,8 +48,9 @@ from pants.backend.python.util_rules.pex_requirements import (
     EntireLockfile,
     LoadedLockfile,
     LoadedLockfileRequest,
-    LockfileContent,
+    Lockfile,
     PexRequirements,
+    Resolve,
 )
 from pants.backend.python.util_rules.pex_test_utils import get_all_data
 from pants.build_graph.address import Address
@@ -164,8 +167,14 @@ def test_determine_requirements_for_pex_from_targets() -> None:
     req_strings = ["req1", "req2"]
     global_requirement_constraints = ["constraint1", "constraint2"]
 
+    resolve__pex = Resolve("pex")
     loaded_lockfile__pex = Mock(is_pex_native=True, as_constraints_strings=None)
+    chosen_resolve__pex = Mock(lockfile=Mock())
+    chosen_resolve__pex.name = "pex"  # name has special meaning in Mock(), so must set it here.
+    resolve__not_pex = Resolve("not_pex")
     loaded_lockfile__not_pex = Mock(is_pex_native=False, as_constraints_strings=req_strings)
+    chosen_resolve__not_pex = Mock(lockfile=Mock())
+    chosen_resolve__not_pex.name = "not_pex"  # ditto.
 
     repository_pex_request__lockfile = Mock()
     repository_pex_request__constraints = Mock()
@@ -174,16 +183,17 @@ def test_determine_requirements_for_pex_from_targets() -> None:
     repository_pex__constraints = Mock()
 
     def assert_setup(
-        mode: RequirementMode,
+        _mode: RequirementMode,
         *,
-        internal_only: bool,
-        platforms: bool,
+        _internal_only: bool,
+        _platforms: bool,
         include_requirements: bool = True,
         run_against_entire_lockfile: bool = False,
-        expected: PexRequirements | PexRequest,
+        expected_reqs: PexRequirements = PexRequirements(),
+        expected_pexes: Iterable[Pex] = (),
     ) -> None:
-        lockfile_used = mode in (RequirementMode.PEX_LOCKFILE, RequirementMode.NON_PEX_LOCKFILE)
-        requirement_constraints_used = mode in (
+        lockfile_used = _mode in (RequirementMode.PEX_LOCKFILE, RequirementMode.NON_PEX_LOCKFILE)
+        requirement_constraints_used = _mode in (
             RequirementMode.CONSTRAINTS_RESOLVE_ALL,
             RequirementMode.CONSTRAINTS_NO_RESOLVE_ALL,
         )
@@ -192,15 +202,15 @@ def test_determine_requirements_for_pex_from_targets() -> None:
             PythonSetup,
             enable_resolves=lockfile_used,
             run_against_entire_lockfile=run_against_entire_lockfile,
-            resolve_all_constraints=mode != RequirementMode.CONSTRAINTS_NO_RESOLVE_ALL,
+            resolve_all_constraints=_mode != RequirementMode.CONSTRAINTS_NO_RESOLVE_ALL,
             requirement_constraints="foo.constraints" if requirement_constraints_used else None,
         )
         pex_from_targets_request = PexFromTargetsRequest(
             Addresses(),
             output_filename="foo",
             include_requirements=include_requirements,
-            platforms=PexPlatforms(["foo"] if platforms else []),
-            internal_only=internal_only,
+            platforms=PexPlatforms(["foo"] if _platforms else []),
+            internal_only=_internal_only,
         )
         resolved_pex_requirements = PexRequirements(
             req_strings,
@@ -210,12 +220,12 @@ def test_determine_requirements_for_pex_from_targets() -> None:
         )
 
         # NB: We recreate that platforms should turn off first creating a repository.pex.
-        if lockfile_used and not platforms:
+        if lockfile_used and not _platforms:
             mock_repository_pex_request = OptionalPexRequest(
                 maybe_pex_request=repository_pex_request__lockfile
             )
             mock_repository_pex = OptionalPex(maybe_pex=repository_pex__lockfile)
-        elif mode == RequirementMode.CONSTRAINTS_RESOLVE_ALL and not platforms:
+        elif _mode == RequirementMode.CONSTRAINTS_RESOLVE_ALL and not _platforms:
             mock_repository_pex_request = OptionalPexRequest(
                 maybe_pex_request=repository_pex_request__constraints
             )
@@ -224,7 +234,7 @@ def test_determine_requirements_for_pex_from_targets() -> None:
             mock_repository_pex_request = OptionalPexRequest(maybe_pex_request=None)
             mock_repository_pex = OptionalPex(maybe_pex=None)
 
-        requirements_or_pex_request = run_rule_with_mocks(
+        reqs, pexes = run_rule_with_mocks(
             _determine_requirements_for_pex_from_targets,
             rule_args=[pex_from_targets_request, python_setup],
             mock_gets=[
@@ -236,14 +246,25 @@ def test_determine_requirements_for_pex_from_targets() -> None:
                 MockGet(
                     output_type=ChosenPythonResolve,
                     input_types=(ChosenPythonResolveRequest,),
-                    mock=lambda _: Mock(lockfile=Mock()),
+                    mock=lambda _: (
+                        chosen_resolve__pex
+                        if _mode == RequirementMode.PEX_LOCKFILE
+                        else chosen_resolve__not_pex
+                    ),
+                ),
+                MockGet(
+                    output_type=Lockfile,
+                    input_types=(Resolve,),
+                    mock=lambda _: (
+                        resolve__pex if _mode == RequirementMode.PEX_LOCKFILE else resolve__not_pex
+                    ),
                 ),
                 MockGet(
                     output_type=LoadedLockfile,
                     input_types=(LoadedLockfileRequest,),
                     mock=lambda _: (
                         loaded_lockfile__pex
-                        if mode == RequirementMode.PEX_LOCKFILE
+                        if _mode == RequirementMode.PEX_LOCKFILE
                         else loaded_lockfile__not_pex
                     ),
                 ),
@@ -259,49 +280,51 @@ def test_determine_requirements_for_pex_from_targets() -> None:
                 ),
             ],
         )
-        if expected:
-            assert requirements_or_pex_request == expected
+        assert expected_reqs == reqs
+        assert expected_pexes == pexes
 
     # If include_requirements is False, no matter what, early return.
     for mode in RequirementMode:
         assert_setup(
             mode,
             include_requirements=False,
-            internal_only=False,
-            platforms=False,
-            expected=PexRequirements(),
+            _internal_only=False,
+            _platforms=False,
+            # Nothing is expected
         )
 
-    # Pex lockfiles: usually, return PexRequirements with from_superset as the LoadedLockfile.
+    # Pex lockfiles: usually, return PexRequirements with from_superset as the resolve.
     #   Except for when run_against_entire_lockfile is set and it's an internal_only Pex, then
     #   return PexRequest.
     for internal_only in (True, False):
         assert_setup(
             RequirementMode.PEX_LOCKFILE,
-            internal_only=internal_only,
-            platforms=False,
-            expected=PexRequirements(req_strings, from_superset=loaded_lockfile__pex),
+            _internal_only=internal_only,
+            _platforms=False,
+            expected_reqs=PexRequirements(req_strings, from_superset=resolve__pex),
         )
+
     assert_setup(
         RequirementMode.PEX_LOCKFILE,
-        internal_only=False,
-        platforms=True,
-        expected=PexRequirements(req_strings, from_superset=loaded_lockfile__pex),
+        _internal_only=False,
+        _platforms=True,
+        expected_reqs=PexRequirements(req_strings, from_superset=resolve__pex),
     )
     for platforms in (True, False):
         assert_setup(
             RequirementMode.PEX_LOCKFILE,
-            internal_only=False,
+            _internal_only=False,
             run_against_entire_lockfile=True,
-            platforms=platforms,
-            expected=PexRequirements(req_strings, from_superset=loaded_lockfile__pex),
+            _platforms=platforms,
+            expected_reqs=PexRequirements(req_strings, from_superset=resolve__pex),
         )
     assert_setup(
         RequirementMode.PEX_LOCKFILE,
-        internal_only=True,
+        _internal_only=True,
         run_against_entire_lockfile=True,
-        platforms=False,
-        expected=repository_pex_request__lockfile,
+        _platforms=False,
+        expected_reqs=repository_pex_request__lockfile.requirements,
+        expected_pexes=[repository_pex__lockfile],
     )
 
     # Non-Pex lockfiles: except for when run_against_entire_lockfile is applicable, return
@@ -310,40 +333,45 @@ def test_determine_requirements_for_pex_from_targets() -> None:
     for internal_only in (False, True):
         assert_setup(
             RequirementMode.NON_PEX_LOCKFILE,
-            internal_only=internal_only,
-            platforms=False,
-            expected=PexRequirements(
+            _internal_only=internal_only,
+            _platforms=False,
+            expected_reqs=PexRequirements(
                 req_strings, constraints_strings=req_strings, from_superset=repository_pex__lockfile
             ),
         )
     assert_setup(
         RequirementMode.NON_PEX_LOCKFILE,
-        internal_only=False,
-        platforms=True,
-        expected=PexRequirements(req_strings, constraints_strings=req_strings, from_superset=None),
+        _internal_only=False,
+        _platforms=True,
+        expected_reqs=PexRequirements(
+            req_strings, constraints_strings=req_strings, from_superset=None
+        ),
     )
     assert_setup(
         RequirementMode.NON_PEX_LOCKFILE,
-        internal_only=False,
+        _internal_only=False,
         run_against_entire_lockfile=True,
-        platforms=False,
-        expected=PexRequirements(
+        _platforms=False,
+        expected_reqs=PexRequirements(
             req_strings, constraints_strings=req_strings, from_superset=repository_pex__lockfile
         ),
     )
     assert_setup(
         RequirementMode.NON_PEX_LOCKFILE,
-        internal_only=False,
+        _internal_only=False,
         run_against_entire_lockfile=True,
-        platforms=True,
-        expected=PexRequirements(req_strings, constraints_strings=req_strings, from_superset=None),
+        _platforms=True,
+        expected_reqs=PexRequirements(
+            req_strings, constraints_strings=req_strings, from_superset=None
+        ),
     )
     assert_setup(
         RequirementMode.NON_PEX_LOCKFILE,
-        internal_only=True,
+        _internal_only=True,
         run_against_entire_lockfile=True,
-        platforms=False,
-        expected=repository_pex_request__lockfile,
+        _platforms=False,
+        expected_reqs=repository_pex_request__lockfile.requirements,
+        expected_pexes=[repository_pex__lockfile],
     )
 
     # Constraints file with resolve_all_constraints: except for when run_against_entire_lockfile
@@ -352,9 +380,9 @@ def test_determine_requirements_for_pex_from_targets() -> None:
     for internal_only in (False, True):
         assert_setup(
             RequirementMode.CONSTRAINTS_RESOLVE_ALL,
-            internal_only=internal_only,
-            platforms=False,
-            expected=PexRequirements(
+            _internal_only=internal_only,
+            _platforms=False,
+            expected_reqs=PexRequirements(
                 req_strings,
                 constraints_strings=global_requirement_constraints,
                 from_superset=repository_pex__constraints,
@@ -362,18 +390,18 @@ def test_determine_requirements_for_pex_from_targets() -> None:
         )
     assert_setup(
         RequirementMode.CONSTRAINTS_RESOLVE_ALL,
-        internal_only=False,
-        platforms=True,
-        expected=PexRequirements(
+        _internal_only=False,
+        _platforms=True,
+        expected_reqs=PexRequirements(
             req_strings, constraints_strings=global_requirement_constraints, from_superset=None
         ),
     )
     assert_setup(
         RequirementMode.CONSTRAINTS_RESOLVE_ALL,
-        internal_only=False,
+        _internal_only=False,
         run_against_entire_lockfile=True,
-        platforms=False,
-        expected=PexRequirements(
+        _platforms=False,
+        expected_reqs=PexRequirements(
             req_strings,
             constraints_strings=global_requirement_constraints,
             from_superset=repository_pex__constraints,
@@ -381,19 +409,20 @@ def test_determine_requirements_for_pex_from_targets() -> None:
     )
     assert_setup(
         RequirementMode.CONSTRAINTS_RESOLVE_ALL,
-        internal_only=False,
+        _internal_only=False,
         run_against_entire_lockfile=True,
-        platforms=True,
-        expected=PexRequirements(
+        _platforms=True,
+        expected_reqs=PexRequirements(
             req_strings, constraints_strings=global_requirement_constraints, from_superset=None
         ),
     )
     assert_setup(
         RequirementMode.CONSTRAINTS_RESOLVE_ALL,
-        internal_only=True,
+        _internal_only=True,
         run_against_entire_lockfile=True,
-        platforms=False,
-        expected=repository_pex_request__constraints,
+        _platforms=False,
+        expected_reqs=repository_pex_request__constraints.requirements,
+        expected_pexes=[repository_pex__constraints],
     )
 
     # Constraints file without resolve_all_constraints: always PexRequirements with
@@ -401,18 +430,18 @@ def test_determine_requirements_for_pex_from_targets() -> None:
     for internal_only in (True, False):
         assert_setup(
             RequirementMode.CONSTRAINTS_NO_RESOLVE_ALL,
-            internal_only=internal_only,
-            platforms=platforms,
-            expected=PexRequirements(
+            _internal_only=internal_only,
+            _platforms=platforms,
+            expected_reqs=PexRequirements(
                 req_strings, constraints_strings=global_requirement_constraints
             ),
         )
     for platforms in (True, False):
         assert_setup(
             RequirementMode.CONSTRAINTS_NO_RESOLVE_ALL,
-            internal_only=False,
-            platforms=platforms,
-            expected=PexRequirements(
+            _internal_only=False,
+            _platforms=platforms,
+            expected_reqs=PexRequirements(
                 req_strings, constraints_strings=global_requirement_constraints
             ),
         )
@@ -421,15 +450,15 @@ def test_determine_requirements_for_pex_from_targets() -> None:
     for internal_only in (True, False):
         assert_setup(
             RequirementMode.NO_LOCKS,
-            internal_only=internal_only,
-            platforms=False,
-            expected=PexRequirements(req_strings),
+            _internal_only=internal_only,
+            _platforms=False,
+            expected_reqs=PexRequirements(req_strings),
         )
     assert_setup(
         RequirementMode.NO_LOCKS,
-        internal_only=False,
-        platforms=True,
-        expected=PexRequirements(req_strings),
+        _internal_only=False,
+        _platforms=True,
+        expected_reqs=PexRequirements(req_strings),
     )
 
 
@@ -596,16 +625,16 @@ def test_constraints_validation(tmp_path: Path, rule_runner: RuleRunner) -> None
         constraints_file: str | None,
         resolve_all_constraints: bool | None,
         *,
-        additional_args: Iterable[str] = (),
-        additional_lockfile_args: Iterable[str] = (),
+        _additional_args: Iterable[str] = (),
+        _additional_lockfile_args: Iterable[str] = (),
     ) -> PexRequest:
         args = ["--backend-packages=pants.backend.python"]
         request = PexFromTargetsRequest(
             [Address("", target_name="app")],
             output_filename="demo.pex",
             internal_only=True,
-            additional_args=additional_args,
-            additional_lockfile_args=additional_lockfile_args,
+            additional_args=_additional_args,
+            additional_lockfile_args=_additional_lockfile_args,
         )
         if resolve_all_constraints is not None:
             args.append(f"--python-resolve-all-constraints={resolve_all_constraints!r}")
@@ -615,7 +644,7 @@ def test_constraints_validation(tmp_path: Path, rule_runner: RuleRunner) -> None
         args.append(f"--python-repos-repos={find_links}")
         rule_runner.set_options(args, env_inherit={"PATH"})
         pex_request = rule_runner.request(PexRequest, [request])
-        assert OrderedSet(additional_args).issubset(OrderedSet(pex_request.additional_args))
+        assert OrderedSet(_additional_args).issubset(OrderedSet(pex_request.additional_args))
         return pex_request
 
     additional_args = ["--strip-pex-env"]
@@ -630,8 +659,8 @@ def test_constraints_validation(tmp_path: Path, rule_runner: RuleRunner) -> None
     pex_req2 = get_pex_request(
         constraints1_filename,
         resolve_all_constraints=True,
-        additional_args=additional_args,
-        additional_lockfile_args=additional_lockfile_args,
+        _additional_args=additional_args,
+        _additional_lockfile_args=additional_lockfile_args,
     )
     pex_req2_reqs = pex_req2.requirements
     assert isinstance(pex_req2_reqs, PexRequirements)
@@ -807,13 +836,10 @@ def test_lockfile_requirements_selection(
         mode_files.update({"3rdparty/python/default.lock": setuptools_poetry_lockfile})
     else:
         assert mode == ResolveMode.pex
-
-        requirements = rule_runner.request(Setuptools, []).pex_requirements()
-        assert isinstance(requirements, EntireLockfile)
-        assert isinstance(requirements.lockfile, LockfileContent)
-        mode_files.update(
-            {"3rdparty/python/default.lock": requirements.lockfile.file_content.content}
+        lock_content = importlib.resources.read_binary(
+            "pants.backend.python.subsystems", "setuptools.lock"
         )
+        mode_files.update({"3rdparty/python/default.lock": lock_content})
 
     rule_runner.write_files(mode_files)
 
@@ -825,6 +851,8 @@ def test_lockfile_requirements_selection(
         # NB: It doesn't matter what the lockfile generator is set to: only what is actually on disk.
         options = [
             "--python-enable-resolves",
+            "--python-default-resolve=myresolve",
+            "--python-resolves={'myresolve':'3rdparty/python/default.lock'}",
         ]
 
     if run_against_entire_lockfile:
@@ -834,10 +862,12 @@ def test_lockfile_requirements_selection(
         [Address("", target_name="lib")],
         output_filename="demo.pex",
         internal_only=internal_only,
+        main=EntryPoint("a"),
     )
     rule_runner.set_options(options, env_inherit={"PATH"})
     result = rule_runner.request(PexRequest, [request])
     assert result.layout == (PexLayout.PACKED if internal_only else PexLayout.ZIPAPP)
+    assert result.main == EntryPoint("a")
 
     if run_against_entire_lockfile and internal_only:
         # With `run_against_entire_lockfile`, all internal requests result in the full set
@@ -858,5 +888,5 @@ def test_lockfile_requirements_selection(
             assert not get_all_data(rule_runner, result.requirements.from_superset).is_zipapp
         else:
             assert mode == ResolveMode.pex
-            assert isinstance(result.requirements.from_superset, LoadedLockfile)
-            assert result.requirements.from_superset.is_pex_native
+            assert isinstance(result.requirements.from_superset, Resolve)
+            assert result.requirements.from_superset.name == "myresolve"

@@ -13,7 +13,7 @@ from pants.engine.fs import Digest, DigestContents, DigestEntries, FileDigest, F
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.native_engine import PyExecutor, PyStubCAS
 from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import Get, SubsystemRule, goal_rule, rule
+from pants.engine.rules import Get, goal_rule, rule
 from pants.option.global_options import CacheContentBehavior, RemoteCacheWarningsBehavior
 from pants.testutil.pants_integration_test import run_pants
 from pants.testutil.rule_runner import QueryRule, RuleRunner
@@ -49,7 +49,6 @@ def test_warns_on_remote_cache_errors() -> None:
                 "check",
                 "testprojects/src/jvm/org/pantsbuild/example/lib/ExampleLib.java",
             ],
-            use_pantsd=False,
         )
         pants_run.assert_success()
         return pants_run.stderr
@@ -78,7 +77,6 @@ def test_warns_on_remote_cache_errors() -> None:
             "--no-local-cache",
             "generate-lockfiles",
         ],
-        use_pantsd=False,
     )
     pants_run.assert_success()
 
@@ -213,7 +211,7 @@ def test_sync_backtracking() -> None:
     def run() -> dict[str, int]:
         # Use an isolated store to ensure that the only content is in the remote/stub cache.
         rule_runner = RuleRunner(
-            rules=[mock_run, *distdir.rules(), SubsystemRule(MockRunSubsystem)],
+            rules=[mock_run, *distdir.rules(), *MockRunSubsystem.rules()],
             isolated_local_store=True,
             bootstrap_args=[
                 "--cache-content-behavior=defer",
@@ -257,7 +255,7 @@ def test_eager_validation(cache_content_behavior: CacheContentBehavior) -> None:
     def run() -> dict[str, int]:
         # Use an isolated store to ensure that the only content is in the remote/stub cache.
         rule_runner = RuleRunner(
-            rules=[mock_run, *distdir.rules(), SubsystemRule(MockRunSubsystem)],
+            rules=[mock_run, *distdir.rules(), *MockRunSubsystem.rules()],
             isolated_local_store=True,
             bootstrap_args=[
                 f"--cache-content-behavior={cache_content_behavior.value}",

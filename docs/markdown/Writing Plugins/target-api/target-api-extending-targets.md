@@ -4,7 +4,6 @@ slug: "target-api-extending-targets"
 excerpt: "Adding new fields to target types."
 hidden: false
 createdAt: "2020-05-07T22:38:39.512Z"
-updatedAt: "2022-02-24T02:54:42.625Z"
 ---
 When to add new fields?
 -----------------------
@@ -37,4 +36,4 @@ def rules():
     return [ProtobufSourceTarget.register_plugin_field(ProtobufJdkVersionField)]
 ```
 
-To confirm this worked, run `./pants help protobuf_source`.
+To confirm this worked, run `pants help protobuf_source`.

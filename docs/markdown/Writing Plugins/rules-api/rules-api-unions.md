@@ -4,7 +4,6 @@ slug: "rules-api-unions"
 excerpt: "Polymorphism for the engine."
 hidden: false
 createdAt: "2020-05-08T04:15:07.104Z"
-updatedAt: "2022-04-26T22:37:59.286Z"
 ---
 Union rules solve the same problem that polymorphism solves in general: how to write generic code that operates on types not known about at the time of writing.
 

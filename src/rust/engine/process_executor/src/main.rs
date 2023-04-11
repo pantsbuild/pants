@@ -33,18 +33,18 @@ use std::process::exit;
 use std::sync::Arc;
 use std::time::Duration;
 
+use clap::StructOpt;
 use fs::{DirectoryDigest, Permissions, RelativePath};
 use hashing::{Digest, Fingerprint};
 use process_execution::{
   local::KeepSandboxes, CacheContentBehavior, Context, InputDigests, NamedCaches, Platform,
-  ProcessCacheScope, ProcessExecutionStrategy,
+  ProcessCacheScope, ProcessExecutionEnvironment, ProcessExecutionStrategy,
 };
 use prost::Message;
 use protos::gen::build::bazel::remote::execution::v2::{Action, Command};
 use protos::gen::buildbarn::cas::UncachedActionResult;
 use protos::require_digest;
 use store::{ImmutableInputs, Store};
-use structopt::StructOpt;
 use workunit_store::{in_workunit, Level, WorkunitStore};
 
 #[derive(Clone, Debug, Default)]
@@ -77,7 +77,7 @@ struct CommandSpec {
   /// Symlink a JDK from .jdk in the working directory.
   /// For local execution, symlinks to the value of this flag.
   /// For remote execution, just requests that some JDK is symlinked if this flag has any value.
-  /// https://github.com/pantsbuild/pants/issues/6416 will make this less weird in the future.
+  /// <https://github.com/pantsbuild/pants/issues/6416> will make this less weird in the future.
   #[structopt(long)]
   jdk: Option<PathBuf>,
 
@@ -112,7 +112,7 @@ struct ActionDigestSpec {
 }
 
 #[derive(StructOpt)]
-#[structopt(name = "process_executor", setting = structopt::clap::AppSettings::TrailingVarArg)]
+#[structopt(name = "process_executor", setting = clap::AppSettings::TrailingVarArg)]
 struct Opt {
   #[structopt(flatten)]
   command: CommandSpec,
@@ -297,7 +297,7 @@ async fn main() {
         );
       }
 
-      let remote_runner = process_execution::remote::CommandRunner::new(
+      let remote_runner = remote::remote::CommandRunner::new(
         &address,
         process_metadata.instance_name.clone(),
         process_metadata.cache_key_gen_version.clone(),
@@ -315,7 +315,7 @@ async fn main() {
 
       let command_runner_box: Box<dyn process_execution::CommandRunner> = {
         Box::new(
-          process_execution::remote_cache::CommandRunner::new(
+          remote::remote_cache::CommandRunner::new(
             Arc::new(remote_runner),
             process_metadata.instance_name.clone(),
             process_metadata.cache_key_gen_version.clone(),
@@ -326,7 +326,7 @@ async fn main() {
             headers,
             true,
             true,
-            process_execution::remote_cache::RemoteCacheWarningsBehavior::Backoff,
+            remote::remote_cache::RemoteCacheWarningsBehavior::Backoff,
             CacheContentBehavior::Defer,
             args.cache_rpc_concurrency,
             Duration::from_secs(2),
@@ -344,10 +344,10 @@ async fn main() {
       store.clone(),
       executor,
       workdir.clone(),
-      NamedCaches::new(
+      NamedCaches::new_local(
         args
           .named_cache_path
-          .unwrap_or_else(NamedCaches::default_path),
+          .unwrap_or_else(NamedCaches::default_local_path),
       ),
       ImmutableInputs::new(store.clone(), &workdir).unwrap(),
       KeepSandboxes::Never,
@@ -365,8 +365,8 @@ async fn main() {
       .materialize_directory(
         output,
         result.output_directory,
+        false,
         &BTreeSet::new(),
-        None,
         Permissions::Writable,
       )
       .await
@@ -392,16 +392,22 @@ async fn make_request(
   store: &Store,
   args: &Opt,
 ) -> Result<(process_execution::Process, ProcessMetadata), String> {
-  let (execution_strategy, platform) = if args.server.is_some() {
+  let execution_environment = if args.server.is_some() {
     let strategy = ProcessExecutionStrategy::RemoteExecution(collection_from_keyvalues(
       args.command.extra_platform_property.iter(),
     ));
-    (strategy, Platform::Linux_x86_64)
+    ProcessExecutionEnvironment {
+      name: None,
+      // TODO: Make configurable.
+      platform: Platform::Linux_x86_64,
+      strategy,
+    }
   } else {
-    (
-      ProcessExecutionStrategy::Local,
-      Platform::current().unwrap(),
-    )
+    ProcessExecutionEnvironment {
+      name: None,
+      platform: Platform::current().unwrap(),
+      strategy: ProcessExecutionStrategy::Local,
+    }
   };
 
   match (
@@ -412,15 +418,13 @@ async fn make_request(
     args.buildbarn_url.as_ref(),
   ) {
     (Some(input_digest), Some(input_digest_length), None, None, None) => {
-      make_request_from_flat_args(store, args, Digest::new(input_digest, input_digest_length), execution_strategy, platform).await
-
+      make_request_from_flat_args(store, args, Digest::new(input_digest, input_digest_length), execution_environment).await
     }
     (None, None, Some(action_fingerprint), Some(action_digest_length), None) => {
       extract_request_from_action_digest(
         store,
         Digest::new(action_fingerprint, action_digest_length),
-        execution_strategy,
-        platform,
+        execution_environment,
         args.remote_instance_name.clone(),
         args.command.cache_key_gen_version.clone(),
       ).await
@@ -429,8 +433,7 @@ async fn make_request(
       extract_request_from_buildbarn_url(
         store,
         buildbarn_url,
-        execution_strategy,
-        platform,
+        execution_environment,
         args.command.cache_key_gen_version.clone()
       ).await
     }
@@ -447,8 +450,7 @@ async fn make_request_from_flat_args(
   store: &Store,
   args: &Opt,
   input_files: Digest,
-  execution_strategy: ProcessExecutionStrategy,
-  platform: Platform,
+  execution_environment: ProcessExecutionEnvironment,
 ) -> Result<(process_execution::Process, ProcessMetadata), String> {
   let output_files = args
     .command
@@ -469,7 +471,7 @@ async fn make_request_from_flat_args(
     .clone()
     .map(|path| {
       RelativePath::new(path)
-        .map_err(|err| format!("working-directory must be a relative path: {:?}", err))
+        .map_err(|err| format!("working-directory must be a relative path: {err:?}"))
     })
     .transpose()?;
 
@@ -481,7 +483,7 @@ async fn make_request_from_flat_args(
     BTreeSet::default(),
   )
   .await
-  .map_err(|e| format!("Could not create input digest for process: {:?}", e))?;
+  .map_err(|e| format!("Could not create input digest for process: {e:?}"))?;
 
   let process = process_execution::Process {
     argv: args.command.argv.clone(),
@@ -495,11 +497,10 @@ async fn make_request_from_flat_args(
     level: Level::Info,
     append_only_caches: BTreeMap::new(),
     jdk_home: args.command.jdk.clone(),
-    platform,
     execution_slot_variable: None,
     concurrency_available: args.command.concurrency_available.unwrap_or(0),
     cache_scope: ProcessCacheScope::Always,
-    execution_strategy,
+    execution_environment,
     remote_cache_speculation_delay: Duration::from_millis(0),
   };
   let metadata = ProcessMetadata {
@@ -513,8 +514,7 @@ async fn make_request_from_flat_args(
 async fn extract_request_from_action_digest(
   store: &Store,
   action_digest: Digest,
-  execution_strategy: ProcessExecutionStrategy,
-  platform: Platform,
+  execution_environment: ProcessExecutionEnvironment,
   instance_name: Option<String>,
   cache_key_gen_version: Option<String>,
 ) -> Result<(process_execution::Process, ProcessMetadata), String> {
@@ -522,15 +522,10 @@ async fn extract_request_from_action_digest(
     .load_file_bytes_with(action_digest, |bytes| Action::decode(bytes))
     .await
     .map_err(|e| e.enrich("Could not load action proto from CAS").to_string())?
-    .map_err(|err| {
-      format!(
-        "Error deserializing action proto {:?}: {:?}",
-        action_digest, err
-      )
-    })?;
+    .map_err(|err| format!("Error deserializing action proto {action_digest:?}: {err:?}"))?;
 
-  let command_digest = require_digest(&action.command_digest)
-    .map_err(|err| format!("Bad Command digest: {:?}", err))?;
+  let command_digest =
+    require_digest(&action.command_digest).map_err(|err| format!("Bad Command digest: {err:?}"))?;
   let command = store
     .load_file_bytes_with(command_digest, |bytes| Command::decode(bytes))
     .await
@@ -538,24 +533,19 @@ async fn extract_request_from_action_digest(
       e.enrich("Could not load command proto from CAS")
         .to_string()
     })?
-    .map_err(|err| {
-      format!(
-        "Error deserializing command proto {:?}: {:?}",
-        command_digest, err
-      )
-    })?;
+    .map_err(|err| format!("Error deserializing command proto {command_digest:?}: {err:?}"))?;
   let working_directory = if command.working_directory.is_empty() {
     None
   } else {
     Some(
       RelativePath::new(command.working_directory)
-        .map_err(|err| format!("working-directory must be a relative path: {:?}", err))?,
+        .map_err(|err| format!("working-directory must be a relative path: {err:?}"))?,
     )
   };
 
   let input_digests = InputDigests::with_input_files(DirectoryDigest::from_persisted_digest(
     require_digest(&action.input_root_digest)
-      .map_err(|err| format!("Bad input root digest: {:?}", err))?,
+      .map_err(|err| format!("Bad input root digest: {err:?}"))?,
   ));
 
   // In case the local Store doesn't have the input root Directory,
@@ -573,7 +563,7 @@ async fn extract_request_from_action_digest(
       .filter(|env| {
         // Filter out environment variables which will be (re-)set by ExecutionRequest
         // construction.
-        env.name != process_execution::remote::CACHE_KEY_TARGET_PLATFORM_ENV_VAR_NAME
+        env.name != process_execution::CACHE_KEY_TARGET_PLATFORM_ENV_VAR_NAME
       })
       .map(|env| (env.name.clone(), env.value.clone()))
       .collect(),
@@ -598,9 +588,8 @@ async fn extract_request_from_action_digest(
     level: Level::Error,
     append_only_caches: BTreeMap::new(),
     jdk_home: None,
-    platform,
     cache_scope: ProcessCacheScope::Always,
-    execution_strategy,
+    execution_environment,
     remote_cache_speculation_delay: Duration::from_millis(0),
   };
 
@@ -615,8 +604,7 @@ async fn extract_request_from_action_digest(
 async fn extract_request_from_buildbarn_url(
   store: &Store,
   buildbarn_url: &str,
-  execution_strategy: ProcessExecutionStrategy,
-  platform: Platform,
+  execution_environment: ProcessExecutionEnvironment,
   cache_key_gen_version: Option<String>,
 ) -> Result<(process_execution::Process, ProcessMetadata), String> {
   let url_parts: Vec<&str> = buildbarn_url.trim_end_matches('/').split('/').collect();
@@ -632,16 +620,13 @@ async fn extract_request_from_buildbarn_url(
       let action_fingerprint = Fingerprint::from_hex_string(interesting_parts[2])?;
       let action_digest_length: usize = interesting_parts[3]
         .parse()
-        .map_err(|err| format!("Couldn't parse action digest length as a number: {:?}", err))?;
+        .map_err(|err| format!("Couldn't parse action digest length as a number: {err:?}"))?;
       Digest::new(action_fingerprint, action_digest_length)
     }
     "uncached_action_result" => {
       let action_result_fingerprint = Fingerprint::from_hex_string(interesting_parts[2])?;
       let action_result_digest_length: usize = interesting_parts[3].parse().map_err(|err| {
-        format!(
-          "Couldn't parse uncached action digest result length as a number: {:?}",
-          err
-        )
+        format!("Couldn't parse uncached action digest result length as a number: {err:?}")
       })?;
       let action_result_digest =
         Digest::new(action_result_fingerprint, action_result_digest_length);
@@ -652,14 +637,13 @@ async fn extract_request_from_buildbarn_url(
         })
         .await
         .map_err(|e| e.enrich("Could not load action result proto").to_string())?
-        .map_err(|err| format!("Error deserializing action result proto: {:?}", err))?;
+        .map_err(|err| format!("Error deserializing action result proto: {err:?}"))?;
 
       require_digest(&action_result.action_digest)?
     }
     _ => {
       return Err(format!(
-        "Wrong kind in buildbarn URL; wanted action or uncached_action_result, got {}",
-        kind
+        "Wrong kind in buildbarn URL; wanted action or uncached_action_result, got {kind}"
       ));
     }
   };
@@ -667,8 +651,7 @@ async fn extract_request_from_buildbarn_url(
   extract_request_from_action_digest(
     store,
     action_digest,
-    execution_strategy,
-    platform,
+    execution_environment,
     Some(instance.to_owned()),
     cache_key_gen_version,
   )

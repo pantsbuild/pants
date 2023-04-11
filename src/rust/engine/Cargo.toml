@@ -41,6 +41,9 @@ members = [
   "nailgun",
   "options",
   "process_execution",
+  "process_execution/docker",
+  "process_execution/pe_nailgun",
+  "process_execution/remote",
   "process_executor",
   "rule_graph",
   "sharded_lmdb",
@@ -81,6 +84,9 @@ default-members = [
   "nailgun",
   "options",
   "process_execution",
+  "process_execution/docker",
+  "process_execution/pe_nailgun",
+  "process_execution/remote",
   "process_executor",
   "rule_graph",
   "sharded_lmdb",
@@ -120,6 +126,7 @@ crossbeam-channel = "0.5"
 deepsize = { git = "https://github.com/stuhood/deepsize.git", rev = "5c8bee5443fcafe4aaa9274490d354412d0955c1", features=["internment", "smallvec"] }
 derivative = "2.2"
 async-oncecell = "0.2"
+docker = { path = "process_execution/docker" }
 fnv = "1.0.5"
 fs = { path = "fs" }
 futures = "0.3"
@@ -161,11 +168,13 @@ ui = { path = "ui" }
 url = "2.3"
 watch = { path = "watch" }
 workunit_store = { path = "workunit_store" }
+remote = { path = "process_execution/remote" }
+pe_nailgun = { path = "process_execution/pe_nailgun" }
 
 [dev-dependencies]
 testutil = { path = "./testutil" }
 fs = { path = "./fs" }
-env_logger = "0.9.0"
+env_logger = "0.10.0"
 
 [build-dependencies]
 pyo3-build-config = "0.17"

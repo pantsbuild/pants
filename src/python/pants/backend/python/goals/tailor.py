@@ -32,15 +32,16 @@ from pants.core.goals.tailor import (
     PutativeTarget,
     PutativeTargets,
     PutativeTargetsRequest,
-    group_by_dir,
 )
+from pants.core.target_types import ResourceTarget
 from pants.engine.fs import DigestContents, FileContent, PathGlobs, Paths
 from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.rules import collect_rules, rule, rule_helper
+from pants.engine.rules import collect_rules, rule
 from pants.engine.target import Target, UnexpandedTargets
 from pants.engine.unions import UnionRule
 from pants.source.filespec import FilespecMatcher
 from pants.source.source_root import SourceRootsRequest, SourceRootsResult
+from pants.util.dirutil import group_by_dir
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
@@ -90,7 +91,27 @@ def is_entry_point(content: bytes) -> bool:
     return _entry_point_re.search(content) is not None
 
 
-@rule_helper
+async def _find_resource_py_typed_targets(
+    py_typed_files_globs: PathGlobs, all_owned_sources: AllOwnedSources
+) -> list[PutativeTarget]:
+    """Find resource targets that may be created after discovering any `py.typed` files."""
+    all_py_typed_files = await Get(Paths, PathGlobs, py_typed_files_globs)
+    unowned_py_typed_files = set(all_py_typed_files.files) - set(all_owned_sources)
+
+    putative_targets = []
+    for dirname, filenames in group_by_dir(unowned_py_typed_files).items():
+        putative_targets.append(
+            PutativeTarget.for_target_type(
+                ResourceTarget,
+                kwargs={"source": "py.typed"},
+                path=dirname,
+                name="py_typed",
+                triggering_sources=sorted(filenames),
+            )
+        )
+    return putative_targets
+
+
 async def _find_source_targets(
     py_files_globs: PathGlobs, all_owned_sources: AllOwnedSources, python_setup: PythonSetup
 ) -> list[PutativeTarget]:
@@ -152,6 +173,13 @@ async def find_putative_targets(
             all_py_files_globs, all_owned_sources, python_setup
         )
         pts.extend(source_targets)
+
+    if python_setup.tailor_py_typed_targets:
+        all_py_typed_files_globs: PathGlobs = req.path_globs("py.typed")
+        resource_targets = await _find_resource_py_typed_targets(
+            all_py_typed_files_globs, all_owned_sources
+        )
+        pts.extend(resource_targets)
 
     if python_setup.tailor_requirements_targets:
         # Find requirements files.

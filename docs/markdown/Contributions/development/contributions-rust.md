@@ -4,7 +4,6 @@ slug: "contributions-rust"
 excerpt: "Hacking on the Pants engine in Rust."
 hidden: false
 createdAt: "2020-05-16T23:11:31.121Z"
-updatedAt: "2022-02-08T20:56:52.599Z"
 ---
 We welcome contributions to Rust! We use Rust to implement the Pants engine in a performant, safe, and ergonomic way.
 
@@ -49,7 +48,7 @@ Rather than using a global installation of Cargo, use the `./cargo` script.
 
 ### Compile
 
-To check that the Rust code is valid, use `./cargo check`. To check that it integrates correctly with Pants' Python code, use `MODE=debug ./pants ...` as usual (which will `compile` first, and is slower than `check`).
+To check that the Rust code is valid, use `./cargo check`. To check that it integrates correctly with Pants' Python code, use `MODE=debug pants ...` as usual (which will `compile` first, and is slower than `check`).
 
 > 🚧 Set `MODE=debug` when iterating on Rust
 > 

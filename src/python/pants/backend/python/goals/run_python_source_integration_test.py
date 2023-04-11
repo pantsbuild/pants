@@ -22,7 +22,7 @@ from pants.backend.codegen.protobuf.target_types import ProtobufSourcesGenerator
 from pants.backend.codegen.protobuf.target_types import rules as protobuf_target_types_rules
 from pants.backend.python import target_types_rules
 from pants.backend.python.dependency_inference import rules as dependency_inference_rules
-from pants.backend.python.goals import setup_py
+from pants.backend.python.goals import package_dists
 from pants.backend.python.goals.run_python_source import PythonSourceFieldSet
 from pants.backend.python.goals.run_python_source import rules as run_rules
 from pants.backend.python.macros.python_artifact import PythonArtifact
@@ -37,6 +37,7 @@ from pants.core.goals.run import RunDebugAdapterRequest, RunRequest
 from pants.engine.process import InteractiveProcess
 from pants.engine.rules import QueryRule
 from pants.engine.target import Target
+from pants.testutil.debug_adapter_util import debugadapter_port_for_testing
 from pants.testutil.pants_integration_test import run_pants
 from pants.testutil.rule_runner import RuleRunner, mock_console
 
@@ -50,7 +51,7 @@ def rule_runner() -> RuleRunner:
             *target_types_rules.rules(),
             *local_dists.rules(),
             *pex_from_targets.rules(),
-            *setup_py.rules(),
+            *package_dists.rules(),
             *protobuf_subsystem_rules(),
             *protobuf_target_types_rules(),
             *protobuf_python_rules(),
@@ -186,6 +187,7 @@ def test_run_sample_script(
         "--backend-packages=pants.backend.python",
         "--backend-packages=pants.backend.codegen.protobuf.python",
         "--source-root-patterns=['src_root1', 'src_root2']",
+        f"--debug-adapter-port={debugadapter_port_for_testing()}",
         *(
             (
                 "--python-default-run-goal-use-sandbox"

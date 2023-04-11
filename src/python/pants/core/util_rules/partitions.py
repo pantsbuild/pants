@@ -25,7 +25,7 @@ from pants.engine.target import (
     _get_field_set_fields,
 )
 from pants.util.memo import memoized
-from pants.util.meta import frozen_after_init, runtime_ignore_subscripts
+from pants.util.meta import runtime_ignore_subscripts
 
 _FieldSetT = TypeVar("_FieldSetT", bound=FieldSet)
 
@@ -151,9 +151,7 @@ class Partitions(Collection[Partition[PartitionElementT, PartitionMetadataT]]):
         return Partitions([Partition(tuple(elements), metadata or _EmptyMetadata())])
 
 
-# NB: Not frozen so it can be subclassed
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 @runtime_ignore_subscripts
 class _BatchBase(Generic[PartitionElementT, PartitionMetadataT], EngineAwareParameter):
     """Base class for a collection of elements that should all be processed together.

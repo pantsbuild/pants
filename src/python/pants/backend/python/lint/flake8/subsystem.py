@@ -66,8 +66,9 @@ class Flake8(PythonToolBase):
     name = "Flake8"
     help = "The Flake8 Python linter (https://flake8.pycqa.org/)."
 
-    default_version = "flake8>=5.0.4,<5.1"
+    default_version = "flake8>=5.0.4,<7"
     default_main = ConsoleScript("flake8")
+    default_requirements = [default_version]
 
     register_lockfile = True
     default_lockfile_resource = ("pants.backend.python.lint.flake8", "flake8.lock")
@@ -254,16 +255,15 @@ async def setup_flake8_lockfile(
     python_setup: PythonSetup,
 ) -> GeneratePythonLockfile:
     if not flake8.uses_custom_lockfile:
-        return GeneratePythonLockfile.from_tool(flake8)
+        return flake8.to_lockfile_request()
 
     constraints = await _find_all_unique_interpreter_constraints(
         python_setup,
         Flake8FieldSet,
         extra_constraints_per_tgt=first_party_plugins.interpreter_constraints_fields,
     )
-    return GeneratePythonLockfile.from_tool(
-        flake8,
-        constraints,
+    return flake8.to_lockfile_request(
+        interpreter_constraints=constraints,
         extra_requirements=first_party_plugins.requirement_strings,
     )
 

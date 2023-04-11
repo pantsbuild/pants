@@ -12,19 +12,13 @@ from typing import Any, MutableMapping, cast
 
 import toml
 
-from pants.backend.python.goals import lockfile
-from pants.backend.python.goals.lockfile import (
-    GeneratePythonLockfile,
-    GeneratePythonToolLockfileSentinel,
-)
-from pants.backend.python.subsystems.python_tool_base import PythonToolBase
+from pants.backend.python.subsystems.python_tool_base import LockfileRules, PythonToolBase
 from pants.backend.python.target_types import ConsoleScript
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.backend.python.util_rules.python_sources import (
     PythonSourceFiles,
     PythonSourceFilesRequest,
 )
-from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.goals.test import (
     ConsoleCoverageReport,
     CoverageData,
@@ -115,8 +109,9 @@ class CoverageSubsystem(PythonToolBase):
     options_scope = "coverage-py"
     help = "Configuration for Python test coverage measurement."
 
-    default_version = "coverage[toml]>=6.5,<6.6"
+    default_version = "coverage[toml]>=6.5,<8"
     default_main = ConsoleScript("coverage")
+    default_requirements = [default_version]
 
     register_interpreter_constraints = True
     default_interpreter_constraints = ["CPython>=3.7,<4"]
@@ -125,12 +120,13 @@ class CoverageSubsystem(PythonToolBase):
     default_lockfile_resource = ("pants.backend.python.subsystems", "coverage_py.lock")
     default_lockfile_path = "src/python/pants/backend/python/subsystems/coverage_py.lock"
     default_lockfile_url = git_url(default_lockfile_path)
+    lockfile_rules_type = LockfileRules.SIMPLE
 
     filter = StrListOption(
         help=softwrap(
             """
             A list of Python modules or filesystem paths to use in the coverage report, e.g.
-            `['helloworld_test', 'helloworld/util/dirutil'].
+            `['helloworld_test', 'helloworld/util/dirutil']`.
 
             Both modules and directory paths are recursive: any submodules or child paths,
             respectively, will be included.
@@ -227,17 +223,6 @@ class CoverageSubsystem(PythonToolBase):
                 "pyproject.toml": b"[tool.coverage",
             },
         )
-
-
-class CoveragePyLockfileSentinel(GeneratePythonToolLockfileSentinel):
-    resolve_name = CoverageSubsystem.options_scope
-
-
-@rule
-def setup_coverage_lockfile(
-    _: CoveragePyLockfileSentinel, coverage: CoverageSubsystem
-) -> GeneratePythonLockfile:
-    return GeneratePythonLockfile.from_tool(coverage)
 
 
 @dataclass(frozen=True)
@@ -620,7 +605,5 @@ def _get_coverage_report(
 def rules():
     return [
         *collect_rules(),
-        *lockfile.rules(),
         UnionRule(CoverageDataCollection, PytestCoverageDataCollection),
-        UnionRule(GenerateToolLockfileSentinel, CoveragePyLockfileSentinel),
     ]

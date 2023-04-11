@@ -3,30 +3,38 @@
 
 from __future__ import annotations
 
-import importlib.resources
-from typing import ClassVar, Iterable, Sequence
+import logging
+from typing import Any, ClassVar, Iterable, Sequence
 
+from pants.backend.python.goals.lockfile import GeneratePythonLockfile
 from pants.backend.python.target_types import ConsoleScript, EntryPoint, MainSpecification
+from pants.backend.python.util_rules import lockfile
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import PexRequest
 from pants.backend.python.util_rules.pex_requirements import (
     EntireLockfile,
     LoadedLockfile,
     LoadedLockfileRequest,
+    Lockfile,
     PexRequirements,
-    ToolCustomLockfile,
-    ToolDefaultLockfile,
+    Resolve,
 )
 from pants.core.goals.generate_lockfiles import DEFAULT_TOOL_LOCKFILE, NO_TOOL_LOCKFILE
 from pants.core.util_rules.lockfile_metadata import calculate_invalidation_digest
-from pants.engine.fs import Digest, FileContent
+from pants.engine.fs import Digest
 from pants.engine.internals.selectors import Get
-from pants.engine.rules import rule_helper
 from pants.option.errors import OptionsError
 from pants.option.option_types import BoolOption, StrListOption, StrOption
 from pants.option.subsystem import Subsystem
-from pants.util.docutil import bin_name
+from pants.util.docutil import bin_name, doc_url
+from pants.util.memo import memoized_property
+from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import softwrap
+
+logger = logging.getLogger(__name__)
+
+
+LockfileRules = lockfile.LockfileRules  # explicit re-export
 
 
 class PythonToolRequirementsBase(Subsystem):
@@ -37,20 +45,65 @@ class PythonToolRequirementsBase(Subsystem):
     # Subclasses do not need to override.
     default_extra_requirements: ClassVar[Sequence[str]] = []
 
+    # Subclasses may set to override the value computed from default_version and
+    # default_extra_requirements.
+    # TODO: Once we get rid of those options, subclasses must set this to loose
+    #  requirements that reflect any minimum capabilities Pants assumes about the tool.
+    default_requirements: Sequence[str] = []
+
     default_interpreter_constraints: ClassVar[Sequence[str]] = []
     register_interpreter_constraints: ClassVar[bool] = False
 
-    # If this tool does not mix with user requirements (e.g. Flake8 and Isort, but not Pylint and
-    # Pytest), you should set this to True.
+    # If this tool does not mix with user requirements you should set this to True.
     #
     # You also need to subclass `GeneratePythonToolLockfileSentinel` and create a rule that goes
-    # from it -> GeneratePythonLockfile by calling `GeneratePythonLockfile.from_python_tool()`.
+    # from it -> GeneratePythonLockfile by calling `to_lockfile_request`.
     # Register the UnionRule.
     register_lockfile: ClassVar[bool] = False
     default_lockfile_resource: ClassVar[tuple[str, str] | None] = None
     default_lockfile_url: ClassVar[str | None] = None
-    uses_requirements_from_source_plugins: ClassVar[bool] = False
+    lockfile_rules_type: LockfileRules = LockfileRules.CUSTOM
 
+    install_from_resolve = StrOption(
+        advanced=True,
+        default=None,
+        help=lambda cls: softwrap(
+            f"""\
+            If specified, install the tool using the lockfile for this named resolve.
+
+            This resolve must be defined in [python].resolves, as described in
+            {doc_url("python-third-party-dependencies#user-lockfiles")}, and its lockfile must
+            provide the requirements named in the `requirements` option.
+
+            If unspecified, and the `lockfile` option is unset, the tool will be installed
+            using the default lockfile shipped with Pants.
+
+            If unspecified, and the `lockfile` option is set, the tool will use the custom
+            `{cls.options_scope}` "tool lockfile" generated from the `version` and
+            `extra_requirements` options. But note that this mechanism is deprecated.
+            """
+        ),
+    )
+    # TODO: After we deprecate and remove the tool lockfile concept, we can remove the
+    #  version and extra_requirements options and directly list loosely-constrained
+    #  requirements for each tool in this option's default. The specific versions will then
+    #  come either from the default lockfile we provide, or from a user lockfile.
+    requirements = StrListOption(
+        advanced=True,
+        default=lambda cls: cls.default_requirements
+        or sorted([cls.default_version, *cls.default_extra_requirements]),
+        help=lambda cls: softwrap(
+            """\
+            If install_from_resolve is specified, it will install these requirements,
+            at the versions locked by the specified resolve's lockfile.
+
+            The default version ranges provided here are versions that Pants is expected to be
+            compatible with. If you need a version outside these ranges you can loosen this
+            restriction by setting this option to a wider range, but you may encounter errors
+            if Pants is not compatible with the version you choose.
+            """
+        ),
+    )
     version = StrOption(
         advanced=True,
         default=lambda cls: cls.default_version,
@@ -74,6 +127,23 @@ class PythonToolRequirementsBase(Subsystem):
         register_if=lambda cls: cls.register_lockfile,
         default=DEFAULT_TOOL_LOCKFILE,
         advanced=True,
+        removal_version="2.18.0.dev0",
+        removal_hint=lambda cls: softwrap(
+            f"""\
+            Custom tool versions are now installed from named resolves, as
+            described at {doc_url("python-lockfiles")}.
+
+            1. If you have an existing resolve that includes the requirements for this tool,
+                you can set `[{cls.options_scope}].install_from_resolve = "<resolve name>".
+                This may be the case if the tool also provides a runtime library, and you want
+                to specify the version in just one place.
+            2. If not, you can set up a new resolve as described at the link above.
+
+            Either way, the resolve you choose should provide the requirements currently set
+            by the `requirements` option for this tool, which you can see
+            by running `pants help-advanced {cls.options_scope}`.
+            """
+        ),
         help=lambda cls: softwrap(
             f"""
             Path to a lockfile used for installing the tool.
@@ -151,38 +221,45 @@ class PythonToolRequirementsBase(Subsystem):
         if not self.uses_lockfile:
             return PexRequirements(requirements)
 
+        if self.install_from_resolve:
+            return PexRequirements(
+                self.requirements, from_superset=Resolve(self.install_from_resolve)
+            )
+
         hex_digest = calculate_invalidation_digest(requirements)
 
-        lockfile: ToolDefaultLockfile | ToolCustomLockfile
         if self.lockfile == DEFAULT_TOOL_LOCKFILE:
             assert self.default_lockfile_resource is not None
-            lockfile = ToolDefaultLockfile(
-                file_content=FileContent(
-                    f"{self.options_scope}_default.lock",
-                    importlib.resources.read_binary(*self.default_lockfile_resource),
-                ),
-                lockfile_hex_digest=hex_digest,
-                resolve_name=self.options_scope,
-                uses_project_interpreter_constraints=(not self.register_interpreter_constraints),
-                uses_source_plugins=self.uses_requirements_from_source_plugins,
-            )
+            pkg, path = self.default_lockfile_resource
+            url = f"resource://{pkg}/{path}"
+            origin = f"The built-in default lockfile for {self.options_scope}"
         else:
-            lockfile = ToolCustomLockfile(
-                file_path=self.lockfile,
-                file_path_description_of_origin=f"the option `[{self.options_scope}].lockfile`",
-                lockfile_hex_digest=hex_digest,
-                resolve_name=self.options_scope,
-                uses_project_interpreter_constraints=(not self.register_interpreter_constraints),
-                uses_source_plugins=self.uses_requirements_from_source_plugins,
-            )
+            url = self.lockfile
+            origin = f"the option `[{self.options_scope}].lockfile`"
+
+        lockfile = Lockfile(
+            url=url,
+            url_description_of_origin=origin,
+            lockfile_hex_digest=hex_digest,
+            resolve_name=self.options_scope,
+        )
         return EntireLockfile(lockfile, complete_req_strings=tuple(requirements))
 
-    @property
+    @memoized_property
     def lockfile(self) -> str:
         f"""The path to a lockfile or special strings '{NO_TOOL_LOCKFILE}' and '{DEFAULT_TOOL_LOCKFILE}'.
 
         This assumes you have set the class property `register_lockfile = True`.
         """
+        if self._lockfile not in {NO_TOOL_LOCKFILE, DEFAULT_TOOL_LOCKFILE}:
+            # Augment the deprecation message for the option with useful information
+            # about the remedy. We will only display this note if the invocation actually
+            # tries to use the tool, whereas the deprecations will display on options parsing,
+            # so this is just a best-effort attempt to be helpful when we can.
+            logger.warning(
+                f"Note: the resolve you use for the {self.options_scope} tool must "
+                f"provide these requirements:" + "\n\n" + "\n".join(self.requirements) + "\n"
+            )
         return self._lockfile
 
     @property
@@ -209,6 +286,37 @@ class PythonToolRequirementsBase(Subsystem):
         """
         return InterpreterConstraints(self._interpreter_constraints)
 
+    def to_lockfile_request(
+        self,
+        interpreter_constraints: InterpreterConstraints | None = None,
+        extra_requirements: Iterable[str] = (),
+    ) -> GeneratePythonLockfile:
+        """Create a request for a dedicated lockfile for the tool.
+
+        If the tool determines its interpreter constraints by using the constraints of user code,
+        rather than the option `--interpreter-constraints`, you must pass the arg
+        `interpreter_constraints`.
+        """
+        if not self.uses_custom_lockfile:
+            return GeneratePythonLockfile(
+                requirements=FrozenOrderedSet(),
+                interpreter_constraints=InterpreterConstraints(),
+                resolve_name=self.options_scope,
+                lockfile_dest=self.lockfile,
+                diff=False,
+            )
+        return GeneratePythonLockfile(
+            requirements=FrozenOrderedSet((*self.all_requirements, *extra_requirements)),
+            interpreter_constraints=(
+                interpreter_constraints
+                if interpreter_constraints is not None
+                else self.interpreter_constraints
+            ),
+            resolve_name=self.options_scope,
+            lockfile_dest=self.lockfile,
+            diff=False,
+        )
+
     def to_pex_request(
         self,
         *,
@@ -225,6 +333,12 @@ class PythonToolRequirementsBase(Subsystem):
             main=main,
             sources=sources,
         )
+
+    @classmethod
+    def rules(cls: Any) -> Iterable[Any]:
+        yield from super().rules()
+
+        yield from lockfile.default_rules(cls)
 
 
 class PythonToolBase(PythonToolRequirementsBase):
@@ -299,7 +413,6 @@ class PythonToolBase(PythonToolRequirementsBase):
         )
 
     @staticmethod
-    @rule_helper
     async def _find_python_interpreter_constraints_from_lockfile(
         subsystem: PythonToolBase,
     ) -> InterpreterConstraints:

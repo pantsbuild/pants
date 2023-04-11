@@ -2,19 +2,63 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
+from typing import Any
 
-from packaging.version import Version
+from packaging.version import Version as _Version
 
 import pants._version
 
 # Generate a inferrable dependency on the `pants._version` package and its associated resources.
 from pants.util.resources import read_resource
 
+
+# Simple derived class to enable comparison with strings in BUILD files.
+class Version(_Version):
+    def __hash__(self):
+        # This is required to be directly implemented because we implement __eq__,
+        # see the docs for object.__hash__:
+        # https://docs.python.org/3/reference/datamodel.html#object.__hash__
+        return super().__hash__()
+
+    def __eq__(self, other: Any):
+        if isinstance(other, str):
+            other = Version(other)
+        return super().__eq__(other)
+
+    def __ne__(self, other: Any):
+        if isinstance(other, str):
+            other = Version(other)
+        return super().__ne__(other)
+
+    def __lt__(self, other: Any):
+        if isinstance(other, str):
+            other = Version(other)
+        return super().__lt__(other)
+
+    def __le__(self, other: Any):
+        if isinstance(other, str):
+            other = Version(other)
+        return super().__le__(other)
+
+    def __gt__(self, other: Any):
+        if isinstance(other, str):
+            other = Version(other)
+        return super().__gt__(other)
+
+    def __ge__(self, other: Any):
+        if isinstance(other, str):
+            other = Version(other)
+        return super().__ge__(other)
+
+
 # Set this env var to override the version pants reports. Useful for testing.
+# Do not change. (see below)
 _PANTS_VERSION_OVERRIDE = "_PANTS_VERSION_OVERRIDE"
 
 
 VERSION: str = (
+    # Do not remove/change this env var without coordinating with `pantsbuild/scie-pants` as it is
+    # being used when bootstrapping Pants with a released version.
     os.environ.get(_PANTS_VERSION_OVERRIDE)
     or
     # NB: We expect VERSION to always have an entry and want a runtime failure if this is false.

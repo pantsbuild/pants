@@ -3,12 +3,9 @@
 
 from __future__ import annotations
 
-import os
-
-from pants.option.option_types import BoolOption, StrListOption
+from pants.core.util_rules.search_paths import ExecutableSearchPathsOptionMixin
+from pants.option.option_types import BoolOption
 from pants.option.subsystem import Subsystem
-from pants.util.memo import memoized_property
-from pants.util.ordered_set import OrderedSet
 from pants.util.strutil import softwrap
 
 
@@ -31,32 +28,10 @@ class ShellSetup(Subsystem):
         advanced=True,
     )
 
-    class EnvironmentAware(Subsystem.EnvironmentAware):
-        env_vars_used_by_options = ("PATH",)
-
-        _executable_search_path = StrListOption(
-            default=["<PATH>"],
-            help=softwrap(
-                """
-                The PATH value that will be used to find shells and to run certain processes
-                like the shunit2 test runner.
-
-                The special string `"<PATH>"` will expand to the contents of the PATH env var.
-                """
-            ),
-            advanced=True,
-            metavar="<binary-paths>",
+    class EnvironmentAware(ExecutableSearchPathsOptionMixin, Subsystem.EnvironmentAware):
+        executable_search_paths_help = softwrap(
+            """
+            The PATH value that will be used to find shells
+            and to run certain processes like the shunit2 test runner.
+            """
         )
-
-        @memoized_property
-        def executable_search_path(self) -> tuple[str, ...]:
-            def iter_path_entries():
-                for entry in self._executable_search_path:
-                    if entry == "<PATH>":
-                        path = self._options_env.get("PATH")
-                        if path:
-                            yield from path.split(os.pathsep)
-                    else:
-                        yield entry
-
-            return tuple(OrderedSet(iter_path_entries()))

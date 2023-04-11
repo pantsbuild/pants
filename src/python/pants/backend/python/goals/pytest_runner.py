@@ -97,7 +97,7 @@ class PytestPluginSetup:
 
 
 @union(in_scope_types=[EnvironmentName])
-@dataclass(frozen=True)  # type: ignore[misc]
+@dataclass(frozen=True)
 class PytestPluginSetupRequest(ABC):
     """A request to set up the test environment before Pytest runs, e.g. to set up databases.
 
@@ -226,13 +226,7 @@ async def setup_pytest_for_target(
 
     requirements_pex_get = Get(Pex, RequirementsPexRequest(addresses))
     pytest_pex_get = Get(
-        Pex,
-        PexRequest(
-            output_filename="pytest.pex",
-            requirements=pytest.pex_requirements(),
-            interpreter_constraints=interpreter_constraints,
-            internal_only=True,
-        ),
+        Pex, PexRequest, pytest.to_pex_request(interpreter_constraints=interpreter_constraints)
     )
 
     # Ensure that the empty extra output dir exists.
@@ -446,7 +440,7 @@ async def partition_python_tests(
             interpreter_constraints=InterpreterConstraints.create_from_compatibility_fields(
                 [field_set.interpreter_constraints], python_setup
             ),
-            extra_env_vars=tuple(sorted(field_set.extra_env_vars.value or ())),
+            extra_env_vars=field_set.extra_env_vars.sorted(),
             xdist_concurrency=field_set.xdist_concurrency.value,
             resolve=field_set.resolve.normalized_value(python_setup),
             environment=field_set.environment.value,
@@ -471,7 +465,6 @@ async def run_python_tests(
     batch: PyTestRequest.Batch[PythonTestFieldSet, TestMetadata],
     test_subsystem: TestSubsystem,
 ) -> TestResult:
-
     setup = await Get(
         TestSetup, TestSetupRequest(batch.elements, batch.partition_metadata, is_debug=False)
     )

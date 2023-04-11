@@ -3,7 +3,6 @@ title: "Remote execution"
 slug: "remote-execution"
 hidden: false
 createdAt: "2020-11-13T23:44:25.806Z"
-updatedAt: "2021-03-19T21:47:56.096Z"
 ---
 > 🚧 Remote execution support is still experimental
 > 
@@ -97,6 +96,6 @@ remote_ca_certs_path = "/etc/ssl/certs/ca-certificates.crt"
 Reference
 =========
 
-For global options, run `./pants help-advanced global` or refer to [Global options](doc:reference-global). Most remote execution and caching options begin with the prefix `--remote`.
+For global options, run `pants help-advanced global` or refer to [Global options](doc:reference-global). Most remote execution and caching options begin with the prefix `--remote`.
 
-For environment-specific options, see `./pants help-advanced remote_environment` or the [`remote_environment` target](doc:reference-remote_environment).
+For environment-specific options, see `pants help-advanced remote_environment` or the [`remote_environment` target](doc:reference-remote_environment).

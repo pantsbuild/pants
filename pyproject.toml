@@ -54,6 +54,7 @@ show_traceback = true
 
 [[tool.mypy.overrides]]
 module = [
+    "botocore",
     "bs4",
     "chevron",
     "colors",
@@ -64,6 +65,7 @@ module = [
     "hdrh",
     "hdrh.histogram",
     "ijson.*",
+    "nodesemver",
     "pex.*",
     "psutil",
 ]

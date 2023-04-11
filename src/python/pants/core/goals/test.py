@@ -9,10 +9,10 @@ from abc import ABC, ABCMeta
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import PurePath
-from typing import Any, ClassVar, Iterable, Optional, TypeVar, cast
+from typing import Any, ClassVar, Iterable, Optional, Sequence, TypeVar, cast
 
 from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
-from pants.core.goals.package import BuiltPackage, PackageFieldSet
+from pants.core.goals.package import BuiltPackage, EnvironmentAwarePackageRequest, PackageFieldSet
 from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
 from pants.core.util_rules.distdir import DistDir
 from pants.core.util_rules.environments import (
@@ -42,7 +42,7 @@ from pants.engine.process import (
     InteractiveProcessResult,
     ProcessResultMetadata,
 )
-from pants.engine.rules import Effect, Get, MultiGet, collect_rules, goal_rule, rule, rule_helper
+from pants.engine.rules import Effect, Get, MultiGet, collect_rules, goal_rule, rule
 from pants.engine.target import (
     FieldSet,
     FieldSetsPerTarget,
@@ -65,7 +65,7 @@ from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized
 from pants.util.meta import classproperty
-from pants.util.strutil import softwrap
+from pants.util.strutil import help_text, softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -93,6 +93,8 @@ class TestResult(EngineAwareReturnType):
     xml_results: Snapshot | None = None
     # Any extra output (such as from plugins) that the test runner was configured to output.
     extra_output: Snapshot | None = None
+    # True if the core test rules should log that extra output was written.
+    log_extra_output: bool = False
 
     # Prevent this class from being detected by pytest as a test class.
     __test__ = False
@@ -137,6 +139,7 @@ class TestResult(EngineAwareReturnType):
         coverage_data: CoverageData | None = None,
         xml_results: Snapshot | None = None,
         extra_output: Snapshot | None = None,
+        log_extra_output: bool = False,
     ) -> TestResult:
         return TestResult(
             exit_code=process_result.exit_code,
@@ -150,6 +153,7 @@ class TestResult(EngineAwareReturnType):
             coverage_data=coverage_data,
             xml_results=xml_results,
             extra_output=extra_output,
+            log_extra_output=log_extra_output,
         )
 
     @staticmethod
@@ -161,6 +165,7 @@ class TestResult(EngineAwareReturnType):
         coverage_data: CoverageData | None = None,
         xml_results: Snapshot | None = None,
         extra_output: Snapshot | None = None,
+        log_extra_output: bool = False,
     ) -> TestResult:
         return TestResult(
             exit_code=process_result.exit_code,
@@ -174,6 +179,7 @@ class TestResult(EngineAwareReturnType):
             coverage_data=coverage_data,
             xml_results=xml_results,
             extra_output=extra_output,
+            log_extra_output=log_extra_output,
             partition_description=batch.partition_metadata.description,
         )
 
@@ -644,7 +650,7 @@ class TestTimeoutField(IntField, metaclass=ABCMeta):
     alias = "timeout"
     required = False
     valid_numbers = ValidNumbers.positive_only
-    help = softwrap(
+    help = help_text(
         """
         A timeout (in seconds) used by each test file belonging to this target.
 
@@ -670,7 +676,7 @@ class TestTimeoutField(IntField, metaclass=ABCMeta):
 
 class TestExtraEnvVarsField(StringSequenceField, metaclass=ABCMeta):
     alias = "extra_env_vars"
-    help = softwrap(
+    help = help_text(
         """
          Additional environment variables to include in test processes.
 
@@ -681,8 +687,10 @@ class TestExtraEnvVarsField(StringSequenceField, metaclass=ABCMeta):
         """
     )
 
+    def sorted(self) -> tuple[str, ...]:
+        return tuple(sorted(self.value or ()))
 
-@rule_helper
+
 async def _get_test_batches(
     core_request_types: Iterable[type[TestRequest]],
     targets_to_field_sets: TargetRootsToFieldSets,
@@ -725,31 +733,28 @@ async def _get_test_batches(
     ]
 
 
-@rule_helper
 async def _run_debug_tests(
     batches: Iterable[TestRequest.Batch],
+    environment_names: Sequence[EnvironmentName],
     test_subsystem: TestSubsystem,
     debug_adapter: DebugAdapterSubsystem,
-    local_environment_name: ChosenLocalEnvironmentName,
 ) -> Test:
-    # TODO: Because these are interactive, they are always pinned to the local environment.
-    # See https://github.com/pantsbuild/pants/issues/17182
     debug_requests = await MultiGet(
         (
             Get(
                 TestDebugRequest,
-                {batch: TestRequest.Batch, local_environment_name.val: EnvironmentName},
+                {batch: TestRequest.Batch, environment_name: EnvironmentName},
             )
             if not test_subsystem.debug_adapter
             else Get(
                 TestDebugAdapterRequest,
-                {batch: TestRequest.Batch, local_environment_name.val: EnvironmentName},
+                {batch: TestRequest.Batch, environment_name: EnvironmentName},
             )
         )
-        for batch in batches
+        for batch, environment_name in zip(batches, environment_names)
     )
     exit_code = 0
-    for debug_request in debug_requests:
+    for debug_request, environment_name in zip(debug_requests, environment_names):
         if test_subsystem.debug_adapter:
             logger.info(
                 softwrap(
@@ -764,7 +769,7 @@ async def _run_debug_tests(
             InteractiveProcessResult,
             {
                 debug_request.process: InteractiveProcess,
-                local_environment_name.val: EnvironmentName,
+                environment_name: EnvironmentName,
             },
         )
         if debug_result.exit_code != 0:
@@ -813,11 +818,6 @@ async def run_tests(
         test_subsystem,
     )
 
-    if test_subsystem.debug or test_subsystem.debug_adapter:
-        return await _run_debug_tests(
-            test_batches, test_subsystem, debug_adapter, local_environment_name
-        )
-
     environment_names = await MultiGet(
         Get(
             EnvironmentName,
@@ -826,6 +826,11 @@ async def run_tests(
         )
         for batch in test_batches
     )
+
+    if test_subsystem.debug or test_subsystem.debug_adapter:
+        return await _run_debug_tests(
+            test_batches, environment_names, test_subsystem, debug_adapter
+        )
 
     results = await MultiGet(
         Get(TestResult, {batch: TestRequest.Batch, environment_name: EnvironmentName})
@@ -849,10 +854,15 @@ async def run_tests(
         console.print_stderr(_format_test_summary(result, run_id, console))
 
         if result.extra_output and result.extra_output.files:
+            path_prefix = str(distdir.relpath / "test" / result.path_safe_description)
             workspace.write_digest(
                 result.extra_output.digest,
-                path_prefix=str(distdir.relpath / "test" / result.path_safe_description),
+                path_prefix=path_prefix,
             )
+            if result.log_extra_output:
+                logger.info(
+                    f"Wrote extra output from test `{result.addresses[0]}` to `{path_prefix}`."
+                )
 
     if test_subsystem.report:
         report_dir = test_subsystem.report_dir(distdir)
@@ -925,7 +935,7 @@ async def run_tests(
 
 _SOURCE_MAP = {
     ProcessResultMetadata.Source.MEMOIZED: "memoized",
-    ProcessResultMetadata.Source.RAN_REMOTELY: "ran remotely",
+    ProcessResultMetadata.Source.RAN: "ran",
     ProcessResultMetadata.Source.HIT_LOCALLY: "cached locally",
     ProcessResultMetadata.Source.HIT_REMOTELY: "cached remotely",
 }
@@ -943,8 +953,19 @@ def _format_test_summary(result: TestResult, run_id: RunId, console: Console) ->
         sigil = console.sigil_failed()
         status = "failed"
 
-    source = _SOURCE_MAP.get(result.result_metadata.source(run_id))
-    source_print = f" ({source})" if source else ""
+    environment = result.result_metadata.execution_environment.name
+    environment_type = result.result_metadata.execution_environment.environment_type
+    source = result.result_metadata.source(run_id)
+    source_str = _SOURCE_MAP[source]
+    if environment:
+        preposition = "in" if source == ProcessResultMetadata.Source.RAN else "for"
+        source_desc = (
+            f" ({source_str} {preposition} {environment_type} environment `{environment}`)"
+        )
+    elif source == ProcessResultMetadata.Source.RAN:
+        source_desc = ""
+    else:
+        source_desc = f" ({source_str})"
 
     elapsed_print = ""
     total_elapsed_ms = result.result_metadata.total_elapsed_ms
@@ -952,7 +973,7 @@ def _format_test_summary(result: TestResult, run_id: RunId, console: Console) ->
         elapsed_secs = total_elapsed_ms / 1000
         elapsed_print = f"in {elapsed_secs:.2f}s"
 
-    suffix = f" {elapsed_print}{source_print}"
+    suffix = f" {elapsed_print}{source_desc}"
     return f"{sigil} {result.description} {status}{suffix}."
 
 
@@ -999,7 +1020,7 @@ def _unsupported_debug_adapter_rules(cls: type[TestRequest]) -> Iterable:
 
 class RuntimePackageDependenciesField(SpecialCasedDependencies):
     alias = "runtime_package_dependencies"
-    help = softwrap(
+    help = help_text(
         f"""
         Addresses to targets that can be built with the `{bin_name()} package` goal and whose
         resulting artifacts should be included in the test run.
@@ -1035,7 +1056,8 @@ async def build_runtime_package_dependencies(
         FieldSetsPerTarget, FieldSetsPerTargetRequest(PackageFieldSet, tgts)
     )
     packages = await MultiGet(
-        Get(BuiltPackage, PackageFieldSet, field_set) for field_set in field_sets_per_tgt.field_sets
+        Get(BuiltPackage, EnvironmentAwarePackageRequest(field_set))
+        for field_set in field_sets_per_tgt.field_sets
     )
     return BuiltPackageDependencies(packages)
 

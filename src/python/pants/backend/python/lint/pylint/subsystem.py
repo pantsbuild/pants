@@ -72,14 +72,14 @@ class Pylint(PythonToolBase):
     name = "Pylint"
     help = "The Pylint linter for Python code (https://www.pylint.org/)."
 
-    default_version = "pylint>=2.13.0,<2.15"
+    default_version = "pylint>=2.13.0,<3"
     default_main = ConsoleScript("pylint")
+    default_requirements = [default_version]
 
     register_lockfile = True
     default_lockfile_resource = ("pants.backend.python.lint.pylint", "pylint.lock")
     default_lockfile_path = "src/python/pants/backend/python/lint/pylint/pylint.lock"
     default_lockfile_url = git_url(default_lockfile_path)
-    uses_requirements_from_source_plugins = True
 
     skip = SkipOption("lint")
     args = ArgsListOption(example="--ignore=foo.py,bar.py --disable=C0330,W0311")
@@ -245,16 +245,15 @@ async def setup_pylint_lockfile(
     python_setup: PythonSetup,
 ) -> GeneratePythonLockfile:
     if not pylint.uses_custom_lockfile:
-        return GeneratePythonLockfile.from_tool(pylint)
+        return pylint.to_lockfile_request()
 
     constraints = await _find_all_unique_interpreter_constraints(
         python_setup,
         PylintFieldSet,
         extra_constraints_per_tgt=first_party_plugins.interpreter_constraints_fields,
     )
-    return GeneratePythonLockfile.from_tool(
-        pylint,
-        constraints,
+    return pylint.to_lockfile_request(
+        interpreter_constraints=constraints,
         extra_requirements=first_party_plugins.requirement_strings,
     )
 

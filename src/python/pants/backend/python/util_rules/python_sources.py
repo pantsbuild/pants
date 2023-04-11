@@ -19,7 +19,6 @@ from pants.engine.target import HydratedSources, HydrateSourcesRequest, SourcesF
 from pants.engine.unions import UnionMembership
 from pants.source.source_root import SourceRoot, SourceRootRequest
 from pants.util.logging import LogLevel
-from pants.util.meta import frozen_after_init
 
 
 @dataclass(frozen=True)
@@ -53,7 +52,6 @@ class StrippedPythonSourceFiles:
     stripped_source_files: StrippedSourceFiles
 
 
-@frozen_after_init
 @dataclass(unsafe_hash=True)
 class PythonSourceFilesRequest:
     targets: tuple[Target, ...]
@@ -67,9 +65,9 @@ class PythonSourceFilesRequest:
         include_resources: bool = True,
         include_files: bool = False,
     ) -> None:
-        self.targets = tuple(targets)
-        self.include_resources = include_resources
-        self.include_files = include_files
+        object.__setattr__(self, "targets", tuple(targets))
+        object.__setattr__(self, "include_resources", include_resources)
+        object.__setattr__(self, "include_files", include_files)
 
     @property
     def valid_sources_types(self) -> tuple[type[SourcesField], ...]:

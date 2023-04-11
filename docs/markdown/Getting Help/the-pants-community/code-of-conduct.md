@@ -4,7 +4,6 @@ slug: "code-of-conduct"
 excerpt: "Our expectations for participants in the Pants community."
 hidden: false
 createdAt: "2020-05-16T22:54:21.817Z"
-updatedAt: "2021-03-17T04:23:56.115Z"
 ---
 We are committed to providing a welcoming and inspiring community for all and expect our code of conduct to be honored. Anyone who violates this code of conduct may be banned from contributing to the project or participating in community discussion.
 

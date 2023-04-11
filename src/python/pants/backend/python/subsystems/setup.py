@@ -11,6 +11,7 @@ from typing import Iterable, List, Optional, TypeVar, cast
 from packaging.utils import canonicalize_name
 
 from pants.core.goals.generate_lockfiles import UnrecognizedResolveNamesError
+from pants.option.errors import OptionsError
 from pants.option.option_types import (
     BoolOption,
     DictOption,
@@ -32,6 +33,9 @@ class PipVersion(enum.Enum):
     V20_3_4 = "20.3.4-patched"
     V22_2_2 = "22.2.2"
     V22_3 = "22.3"
+    V22_3_1 = "22.3.1"
+    V23_0 = "23.0"
+    V23_0_1 = "23.0.1"
 
 
 @enum.unique
@@ -56,11 +60,10 @@ class PythonSetup(Subsystem):
     options_scope = "python"
     help = "Options for Pants's Python backend."
 
-    default_interpreter_constraints = ["CPython>=3.7,<4"]
     default_interpreter_universe = ["2.7", "3.5", "3.6", "3.7", "3.8", "3.9", "3.10", "3.11"]
 
-    interpreter_constraints = StrListOption(
-        default=default_interpreter_constraints,
+    _interpreter_constraints = StrListOption(
+        default=None,
         help=softwrap(
             """
             The Python interpreters your codebase is compatible with.
@@ -76,6 +79,39 @@ class PythonSetup(Subsystem):
         advanced=True,
         metavar="<requirement>",
     )
+
+    @memoized_property
+    def interpreter_constraints(self) -> tuple[str, ...]:
+        if not self._interpreter_constraints:
+            # TODO: This is a hacky affordance for Pants's own tests, dozens of which were
+            #  written when Pants provided default ICs, and implicitly rely on that assumption.
+            #  We'll probably want to find and modify all those tests to set an explicit IC, but
+            #  that will take time.
+            if "PYTEST_CURRENT_TEST" in os.environ:
+                return (">=3.7,<4",)
+            raise OptionsError(
+                softwrap(
+                    f"""\
+                    You must explicitly specify the default Python interpreter versions your code
+                    is intended to run against.
+
+                    You specify these interpreter constraints using the `interpreter_constraints`
+                    option in the `[python]` section of pants.toml.
+
+                    We recommend constraining to a single interpreter minor version if you can,
+                    e.g., `interpreter_constraints = ['==3.11.*']`, or at least a small number of
+                    interpreter minor versions, e.g., `interpreter_constraints = ['>=3.10,<3.12']`.
+
+                    Individual targets can override these default interpreter constraints,
+                    if different parts of your codebase run against different python interpreter
+                    versions in a single repo.
+
+                    See {doc_url("python-interpreter-compatibility")} for details.
+                    """
+                ),
+            )
+        return self._interpreter_constraints
+
     interpreter_versions_universe = StrListOption(
         default=default_interpreter_universe,
         help=softwrap(
@@ -205,7 +241,7 @@ class PythonSetup(Subsystem):
             constraints, such as `{'data-science': ['==3.8.*']}`.
 
             Warning: this does NOT impact the interpreter constraints used by targets within the
-            resolve, which is instead set by the option `[python.interpreter_constraints` and the
+            resolve, which is instead set by the option `[python].interpreter_constraints` and the
             `interpreter_constraints` field. It only impacts how the lockfile is generated.
 
             Pants will validate that the interpreter constraints of your code using a
@@ -214,10 +250,7 @@ class PythonSetup(Subsystem):
             using a resolve whose interpreter constraints are set to ['==3.7.*'], then
             Pants will error explaining the incompatibility.
 
-            The keys must be defined as resolves in `[python].resolves`. To change the interpreter
-            constraints for tool lockfiles, change `[tool].interpreter_constraints`, e.g.
-            `[black].interpreter_constraints`; if the tool does not have that option, it determines
-            its interpreter constraints from your user code.
+            The keys must be defined as resolves in `[python].resolves`.
             """
         ),
         advanced=True,
@@ -344,12 +377,12 @@ class PythonSetup(Subsystem):
             If you are using Pex lockfiles, we generally do not recommend this. You will already
             get similar performance benefits to this option, without the downsides.
 
-            Otherwise, this option can improve
-            performance and reduce cache size. But it has two consequences: 1) All cached test
-            results will be invalidated if any requirement in the lockfile changes, rather
-            than just those that depend on the changed requirement. 2) Requirements unneeded
-            by a test/run/repl will be present on the sys.path, which might in rare cases
-            cause their behavior to change.
+            Otherwise, this option can improve performance and reduce cache size.
+            But it has two consequences:
+            1) All cached test results will be invalidated if any requirement in the lockfile
+               changes, rather than just those that depend on the changed requirement.
+            2) Requirements unneeded by a test/run/repl will be present on the sys.path, which
+               might in rare cases cause their behavior to change.
 
             This option does not affect packaging deployable artifacts, such as
             PEX files, wheels and cloud functions, which will still use just the exact
@@ -482,6 +515,15 @@ class PythonSetup(Subsystem):
         ),
         advanced=True,
     )
+    tailor_py_typed_targets = BoolOption(
+        default=True,
+        help=softwrap(
+            """
+            If true, add `resource` targets for marker files named `py.typed` with the `tailor` goal.
+            """
+        ),
+        advanced=True,
+    )
     macos_big_sur_compatibility = BoolOption(
         default=False,
         help=softwrap(
@@ -510,6 +552,10 @@ class PythonSetup(Subsystem):
             """
         ),
         advanced=True,
+    )
+    repl_history = BoolOption(
+        default=True,
+        help="Whether to use the standard Python command history file when running a repl.",
     )
 
     @property

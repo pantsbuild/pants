@@ -25,6 +25,12 @@ from pants.backend.python.dependency_inference.parse_python_dependencies import 
     ParsedPythonImports,
     ParsePythonDependenciesRequest,
 )
+from pants.backend.python.dependency_inference.subsystem import (
+    AmbiguityResolution,
+    InitFilesInference,
+    PythonInferSubsystem,
+    UnownedDependencyUsage,
+)
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
     InterpreterConstraintsField,
@@ -36,12 +42,13 @@ from pants.backend.python.target_types import (
 from pants.backend.python.util_rules import ancestor_files, pex
 from pants.backend.python.util_rules.ancestor_files import AncestorFiles, AncestorFilesRequest
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
+from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.core import target_types
-from pants.core.target_types import AllAssetTargets, AllAssetTargetsByPath, AllAssetTargetsRequest
+from pants.core.target_types import AllAssetTargetsByPath
 from pants.core.util_rules import stripped_source_files
 from pants.engine.addresses import Address, Addresses
 from pants.engine.internals.graph import Owners, OwnersRequest
-from pants.engine.rules import Get, MultiGet, rule, rule_helper
+from pants.engine.rules import Get, MultiGet, rule
 from pants.engine.target import (
     DependenciesRequest,
     ExplicitlyProvidedDependencies,
@@ -51,10 +58,8 @@ from pants.engine.target import (
     Targets,
 )
 from pants.engine.unions import UnionRule
-from pants.option.global_options import OwnersNotFoundBehavior
-from pants.option.option_types import BoolOption, EnumOption, IntOption
-from pants.option.subsystem import Subsystem
-from pants.util.docutil import bin_name, doc_url
+from pants.source.source_root import SourceRoot, SourceRootRequest
+from pants.util.docutil import doc_url
 from pants.util.strutil import bullet_list, softwrap
 
 logger = logging.getLogger(__name__)
@@ -62,138 +67,6 @@ logger = logging.getLogger(__name__)
 
 class UnownedDependencyError(Exception):
     """The inferred dependency does not have any owner."""
-
-
-class UnownedDependencyUsage(Enum):
-    """What action to take when an inferred dependency is unowned."""
-
-    RaiseError = "error"
-    LogWarning = "warning"
-    DoNothing = "ignore"
-
-
-class InitFilesInference(Enum):
-    """How to handle inference for __init__.py files."""
-
-    always = "always"
-    content_only = "content_only"
-    never = "never"
-
-
-class PythonInferSubsystem(Subsystem):
-    options_scope = "python-infer"
-    help = "Options controlling which dependencies will be inferred for Python targets."
-
-    imports = BoolOption(
-        default=True,
-        help=softwrap(
-            """
-            Infer a target's imported dependencies by parsing import statements from sources.
-
-            To ignore a false positive, you can either put `# pants: no-infer-dep` on the line of
-            the import or put `!{bad_address}` in the `dependencies` field of your target.
-            """
-        ),
-    )
-    string_imports = BoolOption(
-        default=False,
-        help=softwrap(
-            """
-            Infer a target's dependencies based on strings that look like dynamic
-            dependencies, such as Django settings files expressing dependencies as strings.
-
-            To ignore a false positive, you can either put `# pants: no-infer-dep` on the line of
-            the string or put `!{bad_address}` in the `dependencies` field of your target.
-            """
-        ),
-    )
-    string_imports_min_dots = IntOption(
-        default=2,
-        help=softwrap(
-            """
-            If --string-imports is True, treat valid-looking strings with at least this many
-            dots in them as potential dynamic dependencies. E.g., `'foo.bar.Baz'` will be
-            treated as a potential dependency if this option is set to 2 but not if set to 3.
-            """
-        ),
-    )
-    assets = BoolOption(
-        default=False,
-        help=softwrap(
-            """
-            Infer a target's asset dependencies based on strings that look like Posix
-            filepaths, such as those given to `open` or `pkgutil.get_data`.
-
-            To ignore a false positive, you can either put `# pants: no-infer-dep` on the line of
-            the string or put `!{bad_address}` in the `dependencies` field of your target.
-            """
-        ),
-    )
-    assets_min_slashes = IntOption(
-        default=1,
-        help=softwrap(
-            """
-            If --assets is True, treat valid-looking strings with at least this many forward
-            slash characters as potential assets. E.g. `'data/databases/prod.db'` will be
-            treated as a potential candidate if this option is set to 2 but not to 3.
-            """
-        ),
-    )
-    init_files = EnumOption(
-        help=softwrap(
-            f"""
-            Infer a target's dependencies on any `__init__.py` files in the packages
-            it is located in (recursively upward in the directory structure).
-
-            Even if this is set to `never` or `content_only`, Pants will still always include any
-            ancestor `__init__.py` files in the sandbox. Only, they will not be "proper"
-            dependencies, e.g. they will not show up in `{bin_name()} dependencies` and their own
-            dependencies will not be used.
-
-            By default, Pants only adds a "proper" dependency if there is content in the
-            `__init__.py` file. This makes sure that dependencies are added when likely necessary
-            to build, while also avoiding adding unnecessary dependencies. While accurate, those
-            unnecessary dependencies can complicate setting metadata like the
-            `interpreter_constraints` and `resolve` fields.
-            """
-        ),
-        default=InitFilesInference.content_only,
-    )
-    conftests = BoolOption(
-        default=True,
-        help=softwrap(
-            """
-            Infer a test target's dependencies on any conftest.py files in the current
-            directory and ancestor directories.
-            """
-        ),
-    )
-    entry_points = BoolOption(
-        default=True,
-        help=softwrap(
-            """
-            Infer dependencies on targets' entry points, e.g. `pex_binary`'s
-            `entry_point` field, `python_awslambda`'s `handler` field and
-            `python_distribution`'s `entry_points` field.
-            """
-        ),
-    )
-    unowned_dependency_behavior = EnumOption(
-        default=UnownedDependencyUsage.LogWarning,
-        help=softwrap(
-            """
-            How to handle imports that don't have an inferrable owner.
-
-            Usually when an import cannot be inferred, it represents an issue like Pants not being
-            properly configured, e.g. targets not set up. Often, missing dependencies will result
-            in confusing runtime errors like `ModuleNotFoundError`, so this option can be helpful
-            to error more eagerly.
-
-            To ignore any false positives, either add `# pants: no-infer-dep` to the line of the
-            import or put the import inside a `try: except ImportError:` block.
-            """
-        ),
-    )
 
 
 @dataclass(frozen=True)
@@ -333,6 +206,33 @@ def _collect_imports_info(
     )
 
 
+def _remove_ignored_imports(
+    unowned_imports: frozenset[str], ignored_paths: tuple[str, ...]
+) -> frozenset[str]:
+    """Remove unowned imports given a list of paths to ignore.
+
+    E.g. having
+    ```
+    import foo.bar
+    from foo.bar import baz
+    import foo.barley
+    ```
+
+    and passing `ignored-paths=["foo.bar"]`, only `foo.bar` and `foo.bar.baz` will be ignored.
+    """
+    if not ignored_paths:
+        return unowned_imports
+
+    unowned_imports_filtered = set()
+    for unowned_import in unowned_imports:
+        if not any(
+            unowned_import == ignored_path or unowned_import.startswith(f"{ignored_path}.")
+            for ignored_path in ignored_paths
+        ):
+            unowned_imports_filtered.add(unowned_import)
+    return frozenset(unowned_imports_filtered)
+
+
 @dataclass(frozen=True)
 class UnownedImportsPossibleOwnersRequest:
     """A request to find possible owners for several imports originating in a resolve."""
@@ -357,7 +257,6 @@ class UnownedImportPossibleOwners:
     value: list[tuple[Address, ResolveName]]
 
 
-@rule_helper
 async def _find_other_owners_for_unowned_imports(
     req: UnownedImportsPossibleOwnersRequest,
 ) -> UnownedImportsPossibleOwners:
@@ -383,7 +282,8 @@ async def find_other_owners_for_unowned_import(
     python_setup: PythonSetup,
 ) -> UnownedImportPossibleOwners:
     other_owner_from_other_resolves = await Get(
-        PythonModuleOwners, PythonModuleOwnersRequest(req.unowned_import, resolve=None)
+        PythonModuleOwners,
+        PythonModuleOwnersRequest(req.unowned_import, resolve=None, locality=None),
     )
 
     owners = other_owner_from_other_resolves
@@ -398,7 +298,6 @@ async def find_other_owners_for_unowned_import(
     return UnownedImportPossibleOwners(other_owners)
 
 
-@rule_helper
 async def _handle_unowned_imports(
     address: Address,
     unowned_dependency_behavior: UnownedDependencyUsage,
@@ -456,10 +355,8 @@ async def _handle_unowned_imports(
         raise UnownedDependencyError(msg)
 
 
-@rule_helper
 async def _exec_parse_deps(
     field_set: PythonImportDependenciesInferenceFieldSet,
-    python_infer_subsystem: PythonInferSubsystem,
     python_setup: PythonSetup,
 ) -> ParsedPythonDependencies:
     interpreter_constraints = InterpreterConstraints.create_from_compatibility_fields(
@@ -470,10 +367,6 @@ async def _exec_parse_deps(
         ParsePythonDependenciesRequest(
             field_set.source,
             interpreter_constraints,
-            string_imports=python_infer_subsystem.string_imports,
-            string_imports_min_dots=python_infer_subsystem.string_imports_min_dots,
-            assets=python_infer_subsystem.assets,
-            assets_min_slashes=python_infer_subsystem.assets_min_slashes,
         ),
     )
     return resp
@@ -509,11 +402,21 @@ async def resolve_parsed_dependencies(
         ExplicitlyProvidedDependencies, DependenciesRequest(request.field_set.dependencies)
     )
 
+    # Only set locality if needed, to avoid unnecessary rule graph memoization misses.
+    # When set, use the source root, which is useful in practice, but incurs fewer memoization
+    # misses than using the full spec_path.
+    locality = None
+    if python_infer_subsystem.ambiguity_resolution == AmbiguityResolution.by_source_root:
+        source_root = await Get(
+            SourceRoot, SourceRootRequest, SourceRootRequest.for_address(request.field_set.address)
+        )
+        locality = source_root.path
+
     if parsed_imports:
         owners_per_import = await MultiGet(
             Get(
                 PythonModuleOwners,
-                PythonModuleOwnersRequest(imported_module, resolve=request.resolve),
+                PythonModuleOwnersRequest(imported_module, request.resolve, locality),
             )
             for imported_module in parsed_imports
         )
@@ -527,8 +430,7 @@ async def resolve_parsed_dependencies(
         resolve_results = {}
 
     if parsed_assets:
-        all_asset_targets = await Get(AllAssetTargets, AllAssetTargetsRequest())
-        assets_by_path = await Get(AllAssetTargetsByPath, AllAssetTargets, all_asset_targets)
+        assets_by_path = await Get(AllAssetTargetsByPath)
         asset_deps = _get_inferred_asset_deps(
             request.field_set.address,
             request.field_set.source.file_path,
@@ -555,9 +457,7 @@ async def infer_python_dependencies_via_source(
     if not python_infer_subsystem.imports and not python_infer_subsystem.assets:
         return InferredDependencies([])
 
-    parsed_dependencies = await _exec_parse_deps(
-        request.field_set, python_infer_subsystem, python_setup
-    )
+    parsed_dependencies = await _exec_parse_deps(request.field_set, python_setup)
 
     resolve = request.field_set.resolve.normalized_value(python_setup)
 
@@ -566,12 +466,15 @@ async def infer_python_dependencies_via_source(
         ResolvedParsedPythonDependenciesRequest(request.field_set, parsed_dependencies, resolve),
     )
     import_deps, unowned_imports = _collect_imports_info(resolved_dependencies.resolve_results)
+    unowned_imports = _remove_ignored_imports(
+        unowned_imports, python_infer_subsystem.ignored_unowned_imports
+    )
 
     asset_deps, unowned_assets = _collect_imports_info(resolved_dependencies.assets)
 
     inferred_deps = import_deps | asset_deps
 
-    _ = await _handle_unowned_imports(
+    await _handle_unowned_imports(
         request.field_set.address,
         python_infer_subsystem.unowned_dependency_behavior,
         python_setup,
@@ -660,7 +563,7 @@ async def infer_python_conftest_dependencies(
     owners = await MultiGet(
         # NB: Because conftest.py files effectively always have content, we require an
         # owning target.
-        Get(Owners, OwnersRequest((f,), OwnersNotFoundBehavior.error))
+        Get(Owners, OwnersRequest((f,), GlobMatchErrorBehavior.error))
         for f in conftest_files.snapshot.files
     )
 

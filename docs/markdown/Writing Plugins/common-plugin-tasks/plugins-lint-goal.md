@@ -4,7 +4,6 @@ slug: "plugins-lint-goal"
 excerpt: "How to add a new linter to the `lint` goal."
 hidden: false
 createdAt: "2020-07-01T04:51:55.583Z"
-updatedAt: "2022-04-07T14:48:36.791Z"
 ---
 This guide assumes that you are running a linter that already exists outside of Pants as a stand-alone binary, such as running Shellcheck, Pylint, Checkstyle, or ESLint.
 
@@ -223,7 +222,7 @@ def rules():
     return [*shellcheck.rules()]
 ```
 
-Now, when you run `./pants lint ::`, your new linter should run.
+Now, when you run `pants lint ::`, your new linter should run.
 
 # 4. Add tests (optional)
 

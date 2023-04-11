@@ -30,6 +30,7 @@ from pants.backend.python.target_types import (
     PythonSourcesGeneratorTarget,
 )
 from pants.backend.python.target_types_rules import rules as python_target_types_rules
+from pants.core.goals import package
 from pants.core.goals.package import BuiltPackage
 from pants.core.target_types import (
     FilesGeneratorTarget,
@@ -54,6 +55,7 @@ def rule_runner() -> RuleRunner:
             *target_rules(),
             *python_target_types_rules(),
             *core_target_types_rules(),
+            *package.rules(),
             QueryRule(BuiltPackage, (PythonGoogleCloudFunctionFieldSet,)),
         ],
         target_types=[

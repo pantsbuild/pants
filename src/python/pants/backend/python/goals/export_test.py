@@ -11,11 +11,17 @@ from pants.backend.python import target_types_rules
 from pants.backend.python.goals import export
 from pants.backend.python.goals.export import ExportVenvsRequest, PythonResolveExportFormat
 from pants.backend.python.lint.flake8 import subsystem as flake8_subsystem
-from pants.backend.python.target_types import PythonRequirementTarget
-from pants.backend.python.util_rules import pex_from_targets
+from pants.backend.python.macros.python_artifact import PythonArtifact
+from pants.backend.python.target_types import (
+    PythonDistribution,
+    PythonRequirementTarget,
+    PythonSourcesGeneratorTarget,
+)
+from pants.backend.python.util_rules import local_dists_pep660, pex_from_targets
 from pants.base.specs import RawSpecs, RecursiveGlobSpec
 from pants.core.goals.export import ExportResults
 from pants.core.util_rules import distdir
+from pants.engine.internals.parametrize import Parametrize
 from pants.engine.rules import QueryRule
 from pants.engine.target import Targets
 from pants.testutil.rule_runner import RuleRunner
@@ -30,11 +36,13 @@ def rule_runner() -> RuleRunner:
             *pex_from_targets.rules(),
             *target_types_rules.rules(),
             *distdir.rules(),
+            *local_dists_pep660.rules(),
             *flake8_subsystem.rules(),
             QueryRule(Targets, [RawSpecs]),
             QueryRule(ExportResults, [ExportVenvsRequest]),
         ],
-        target_types=[PythonRequirementTarget],
+        target_types=[PythonRequirementTarget, PythonSourcesGeneratorTarget, PythonDistribution],
+        objects={"python_artifact": PythonArtifact, "parametrize": Parametrize},
     )
 
 
@@ -88,13 +96,15 @@ def test_export_venv_old_codepath(
 
     for result, resolve in zip(all_results, ["a", "b"] if enable_resolves else [""]):
         if py_resolve_format == PythonResolveExportFormat.symlinked_immutable_virtualenv:
-            assert len(result.post_processing_cmds) == 1
-            ppc0 = result.post_processing_cmds[0]
-            assert ppc0.argv[0:2] == ("ln", "-s")
+            assert len(result.post_processing_cmds) == 2
+            ppc0, ppc1 = result.post_processing_cmds
+            assert ppc0.argv == ("rmdir", "{digest_root}")
+            assert ppc0.extra_env == FrozenDict()
+            assert ppc1.argv[0:2] == ("ln", "-s")
             # The third arg is the full path to the venv under the pex_root, which we
             # don't easily know here, so we ignore it in this comparison.
-            assert ppc0.argv[3] == os.path.join("{digest_root}", current_interpreter)
-            assert ppc0.extra_env == FrozenDict()
+            assert ppc1.argv[3] == "{digest_root}"
+            assert ppc1.extra_env == FrozenDict()
         else:
             assert len(result.post_processing_cmds) == 2
 
@@ -116,7 +126,7 @@ def test_export_venv_old_codepath(
                 "venv",
                 "--pip",
                 "--collisions-ok",
-                f"{{digest_root}}/{current_interpreter}",
+                "{digest_root}",
             )
             assert ppc0.extra_env["PEX_MODULE"] == "pex.tools"
             assert ppc0.extra_env.get("PEX_ROOT") is not None
@@ -127,13 +137,29 @@ def test_export_venv_old_codepath(
 
     reldirs = [result.reldir for result in all_results]
     if enable_resolves:
-        assert reldirs == [
-            "python/virtualenvs/a",
-            "python/virtualenvs/b",
-            "python/virtualenvs/tools/flake8",
-        ]
+        if py_resolve_format == PythonResolveExportFormat.symlinked_immutable_virtualenv:
+            assert reldirs == [
+                f"python/virtualenvs/a/{current_interpreter}",
+                f"python/virtualenvs/b/{current_interpreter}",
+                f"python/virtualenvs/tools/flake8/{current_interpreter}",
+            ]
+        else:
+            assert reldirs == [
+                f"python/virtualenvs/a/{current_interpreter}",
+                f"python/virtualenvs/b/{current_interpreter}",
+                "python/virtualenvs/tools/flake8",
+            ]
     else:
-        assert reldirs == ["python/virtualenv", "python/virtualenvs/tools/flake8"]
+        if py_resolve_format == PythonResolveExportFormat.symlinked_immutable_virtualenv:
+            assert reldirs == [
+                f"python/virtualenv/{current_interpreter}",
+                f"python/virtualenvs/tools/flake8/{current_interpreter}",
+            ]
+        else:
+            assert reldirs == [
+                f"python/virtualenv/{current_interpreter}",
+                "python/virtualenvs/tools/flake8",
+            ]
 
 
 @pytest.mark.parametrize(
@@ -152,8 +178,15 @@ def test_export_venv_new_codepath(
     current_interpreter = f"{vinfo.major}.{vinfo.minor}.{vinfo.micro}"
     rule_runner.write_files(
         {
+            "src/foo/__init__.py": "from colors import *",
             "src/foo/BUILD": dedent(
                 """\
+                python_sources(name='foo', resolve=parametrize('a', 'b'))
+                python_distribution(
+                    name='dist',
+                    provides=python_artifact(name='foo', version='1.2.3'),
+                    dependencies=[':foo@resolve=a'],
+                )
                 python_requirement(name='req1', requirements=['ansicolors==1.1.8'], resolve='a')
                 python_requirement(name='req2', requirements=['ansicolors==1.1.8'], resolve='b')
                 """
@@ -166,12 +199,16 @@ def test_export_venv_new_codepath(
     rule_runner.set_options(
         [
             f"--python-interpreter-constraints=['=={current_interpreter}']",
+            "--python-enable-resolves=True",
             "--python-resolves={'a': 'lock.txt', 'b': 'lock.txt'}",
             "--export-resolve=a",
             "--export-resolve=b",
             "--export-resolve=flake8",
             # Turn off lockfile validation to make the test simpler.
             "--python-invalid-lockfile-behavior=ignore",
+            # Turn off python synthetic lockfile targets to make the test simpler.
+            "--no-python-enable-lockfile-targets",
+            "--export-py-editable-in-resolve=['a', 'b']",
             format_flag,
         ],
         env_inherit={"PATH", "PYENV_ROOT"},
@@ -180,15 +217,23 @@ def test_export_venv_new_codepath(
 
     for result, resolve in zip(all_results, ["a", "b", "flake8"]):
         if py_resolve_format == PythonResolveExportFormat.symlinked_immutable_virtualenv:
-            assert len(result.post_processing_cmds) == 1
-            ppc0 = result.post_processing_cmds[0]
-            assert ppc0.argv[0:2] == ("ln", "-s")
+            assert len(result.post_processing_cmds) == 2
+            ppc0, ppc1 = result.post_processing_cmds
+            assert ppc0.argv == ("rmdir", "{digest_root}")
+            assert ppc0.extra_env == FrozenDict()
+            assert ppc1.argv[0:2] == ("ln", "-s")
             # The third arg is the full path to the venv under the pex_root, which we
             # don't easily know here, so we ignore it in this comparison.
-            assert ppc0.argv[3] == os.path.join("{digest_root}", current_interpreter)
-            assert ppc0.extra_env == FrozenDict()
+            assert ppc1.argv[3] == "{digest_root}"
+            assert ppc1.extra_env == FrozenDict()
         else:
-            assert len(result.post_processing_cmds) == 2
+            if resolve == "a":
+                # editable wheels are installed for a user resolve that has dists
+                assert len(result.post_processing_cmds) == 5
+            else:
+                # tool resolves (flake8) and user resolves w/o dists (b)
+                # do not run the commands to do editable installs
+                assert len(result.post_processing_cmds) == 2
 
             ppc0 = result.post_processing_cmds[0]
             # The first arg is the full path to the python interpreter, which we
@@ -208,18 +253,18 @@ def test_export_venv_new_codepath(
                 "venv",
                 "--pip",
                 "--collisions-ok",
-                f"{{digest_root}}/{current_interpreter}",
+                "{digest_root}",
             )
             assert ppc0.extra_env["PEX_MODULE"] == "pex.tools"
             assert ppc0.extra_env.get("PEX_ROOT") is not None
 
-            ppc1 = result.post_processing_cmds[1]
+            ppc1 = result.post_processing_cmds[-1]
             assert ppc1.argv == ("rm", "-rf", tmpdir)
             assert ppc1.extra_env == FrozenDict()
 
     reldirs = [result.reldir for result in all_results]
     assert reldirs == [
-        "python/virtualenvs/a",
-        "python/virtualenvs/b",
-        "python/virtualenvs/flake8",
+        f"python/virtualenvs/a/{current_interpreter}",
+        f"python/virtualenvs/b/{current_interpreter}",
+        f"python/virtualenvs/flake8/{current_interpreter}",
     ]

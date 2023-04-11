@@ -77,6 +77,7 @@ class PyTest(PythonToolBase):
     #  E.g., as default_version = "pytest>=7,<8,!=7.1.0,!=7.1.1"
     default_version = "pytest==7.0.1"
     default_extra_requirements = ["pytest-cov>=2.12,!=2.12.1,<3.1", "pytest-xdist>=2.5,<3"]
+    default_requirements = [default_version, *default_extra_requirements]
 
     default_main = ConsoleScript("pytest")
 
@@ -218,10 +219,10 @@ async def setup_pytest_lockfile(
     _: PytestLockfileSentinel, pytest: PyTest, python_setup: PythonSetup
 ) -> GeneratePythonLockfile:
     if not pytest.uses_custom_lockfile:
-        return GeneratePythonLockfile.from_tool(pytest)
+        return pytest.to_lockfile_request()
 
     constraints = await _find_all_unique_interpreter_constraints(python_setup, PythonTestFieldSet)
-    return GeneratePythonLockfile.from_tool(pytest, constraints)
+    return pytest.to_lockfile_request(constraints)
 
 
 class PytestExportSentinel(ExportPythonToolSentinel):

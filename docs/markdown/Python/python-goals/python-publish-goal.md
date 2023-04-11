@@ -4,7 +4,6 @@ slug: "python-publish-goal"
 excerpt: "How to distribute packages to a PyPi repository"
 hidden: true
 createdAt: "2021-10-05T08:10:25.568Z"
-updatedAt: "2022-01-11T16:09:21.278Z"
 ---
 The `publish` goal is currently in the experimental Python backend. Activate with this config:
 
@@ -15,7 +14,7 @@ backend_packages.add = [
 ]
 ```
 
-This will register a new `repositories` field for the `python_distribution` target, so when you run `./pants publish` for those targets, they will package  them and then publish the distributions using Twine to the repositories specified in your BUILD files.
+This will register a new `repositories` field for the `python_distribution` target, so when you run `pants publish` for those targets, they will package  them and then publish the distributions using Twine to the repositories specified in your BUILD files.
 
 Python Repositories
 -------------------
@@ -52,7 +51,7 @@ The repositories are either references to a configured repository in the `.pypir
 > 
 > We strongly discourage the use of secrets verbatim in your configuration files.
 > 
-> Better is to inject the required secrets as environment variables only when needed when running `./pants publish`, or better still is to use `keyring` is possible as described in the [Twine documentation](https://twine.readthedocs.io/en/latest/#keyring-support)
+> Better is to inject the required secrets as environment variables only when needed when running `pants publish`, or better still is to use `keyring` is possible as described in the [Twine documentation](https://twine.readthedocs.io/en/latest/#keyring-support)
 
 Environment variables
 ---------------------
@@ -79,5 +78,5 @@ export TWINE_PASSWORD_PRIVATE_REPO="secretvalue"
 Given the example `BUILD` and `.pypirc` files from the previous section, `demo` could be published with the following command:
 
 ```shell
-$ { source ./secrets && ./pants publish src/python:demo }
+$ { source ./secrets && pants publish src/python:demo }
 ```

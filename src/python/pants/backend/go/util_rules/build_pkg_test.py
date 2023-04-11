@@ -80,10 +80,8 @@ def test_build_pkg(rule_runner: RuleRunner) -> None:
                     """\
                     package transitive
 
-                    import "fmt"
-
                     func Quote(s string) string {
-                        return fmt.Sprintf(">> %s <<", s)
+                        return ">>" + s + "<<"
                     }
                     """
                 )
@@ -131,10 +129,9 @@ def test_build_pkg(rule_runner: RuleRunner) -> None:
                     package foo
 
                     import "example.com/foo/dep"
-                    import "fmt"
 
                     func main() {
-                        fmt.Println(dep.Quote("Hello world!"))
+                        dep.Quote("Hello world!")
                     }
                     """
                 )
@@ -207,13 +204,12 @@ def test_build_invalid_pkg(rule_runner: RuleRunner) -> None:
     assert invalid_direct_result.exit_code == 1
     assert (
         invalid_direct_result.stdout
-        == "./dep/f.go:1:1: syntax error: package statement must be first\n"
+        == "dep/f.go:1:1: syntax error: package statement must be first\n"
     )
 
     invalid_dep_result = rule_runner.request(FallibleBuiltGoPackage, [main])
     assert invalid_dep_result.output is None
     assert invalid_dep_result.exit_code == 1
     assert (
-        invalid_dep_result.stdout
-        == "./dep/f.go:1:1: syntax error: package statement must be first\n"
+        invalid_dep_result.stdout == "dep/f.go:1:1: syntax error: package statement must be first\n"
     )

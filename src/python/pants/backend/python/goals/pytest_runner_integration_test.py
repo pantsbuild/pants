@@ -13,7 +13,7 @@ import pytest
 
 from pants.backend.python import target_types_rules
 from pants.backend.python.dependency_inference import rules as dependency_inference_rules
-from pants.backend.python.goals import package_pex_binary, pytest_runner, setup_py
+from pants.backend.python.goals import package_dists, package_pex_binary, pytest_runner
 from pants.backend.python.goals.coverage_py import create_or_update_coverage_config
 from pants.backend.python.goals.pytest_runner import (
     PytestPluginSetup,
@@ -23,7 +23,6 @@ from pants.backend.python.goals.pytest_runner import (
 )
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.subsystems.pytest import PythonTestFieldSet
-from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
     PexBinary,
     PythonDistribution,
@@ -33,6 +32,7 @@ from pants.backend.python.target_types import (
     PythonTestUtilsGeneratorTarget,
 )
 from pants.backend.python.util_rules import local_dists, pex_from_targets
+from pants.core.goals import package
 from pants.core.goals.test import (
     TestDebugAdapterRequest,
     TestDebugRequest,
@@ -48,6 +48,7 @@ from pants.engine.process import InteractiveProcessResult
 from pants.engine.rules import Get, rule
 from pants.engine.target import Target
 from pants.engine.unions import UnionRule
+from pants.testutil.debug_adapter_util import debugadapter_port_for_testing
 from pants.testutil.python_interpreter_selection import (
     all_major_minor_python_versions,
     skip_unless_python27_and_python3_present,
@@ -70,7 +71,8 @@ def rule_runner() -> RuleRunner:
             get_filtered_environment,
             *target_types_rules.rules(),
             *local_dists.rules(),
-            *setup_py.rules(),
+            *package_dists.rules(),
+            *package.rules(),
             QueryRule(Partitions, (PyTestRequest.PartitionRequest,)),
             QueryRule(TestResult, (PyTestRequest.Batch,)),
             QueryRule(TestDebugRequest, (PyTestRequest.Batch,)),
@@ -108,6 +110,7 @@ def _configure_pytest_runner(
     args = [
         "--backend-packages=pants.backend.python",
         f"--source-root-patterns={SOURCE_ROOT}",
+        f"--debug-adapter-port={debugadapter_port_for_testing()}",
         *(extra_args or ()),
     ]
     rule_runner.set_options(args, env=env, env_inherit={"PATH", "PYENV_ROOT", "HOME"})
@@ -183,7 +186,7 @@ def run_pytest_interactive(
 @pytest.mark.platform_specific_behavior
 @pytest.mark.parametrize(
     "major_minor_interpreter",
-    all_major_minor_python_versions(PythonSetup.default_interpreter_constraints),
+    all_major_minor_python_versions(["CPython>=3.7,<4"]),
 )
 def test_passing(rule_runner: RuleRunner, major_minor_interpreter: str) -> None:
     rule_runner.write_files(
@@ -289,7 +292,7 @@ def test_uses_correct_python_version(rule_runner: RuleRunner) -> None:
             f"{PACKAGE}/BUILD": dedent(
                 """\
                 python_tests(name='py2', interpreter_constraints=['==2.7.*'])
-                python_tests(name='py3', interpreter_constraints=['>=3.6.*'])
+                python_tests(name='py3', interpreter_constraints=['>=3.6.0'])
                 """
             ),
         }
@@ -921,7 +924,7 @@ def test_partition(
 @pytest.mark.platform_specific_behavior
 @pytest.mark.parametrize(
     "major_minor_interpreter",
-    all_major_minor_python_versions(PythonSetup.default_interpreter_constraints),
+    all_major_minor_python_versions(["CPython>=3.7,<4"]),
 )
 def test_batched_passing(rule_runner: RuleRunner, major_minor_interpreter: str) -> None:
     rule_runner.write_files(

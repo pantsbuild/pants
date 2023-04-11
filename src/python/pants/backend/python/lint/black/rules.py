@@ -14,7 +14,7 @@ from pants.core.goals.fmt import FmtRequest, FmtResult, FmtTargetsRequest, Parti
 from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.engine.fs import Digest, MergeDigests
 from pants.engine.process import ProcessResult
-from pants.engine.rules import Get, MultiGet, collect_rules, rule, rule_helper
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize, softwrap
 
@@ -24,7 +24,6 @@ class BlackRequest(FmtTargetsRequest):
     tool_subsystem = Black
 
 
-@rule_helper
 async def _run_black(
     request: FmtRequest.Batch,
     black: Black,

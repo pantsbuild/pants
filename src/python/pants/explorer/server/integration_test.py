@@ -46,7 +46,6 @@ def test_explorer_graphql_query(query: dict, expected_result: dict) -> None:
                 "--port=7908",
             ],
             workdir=workdir,
-            use_pantsd=False,
         )
         assert handle.process.stderr is not None
         os.set_blocking(handle.process.stderr.fileno(), False)

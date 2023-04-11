@@ -79,7 +79,7 @@ class PantsRunner:
             stderr_fileno=stderr_fileno,
         ):
             # N.B. We inline imports to speed up the python thin client run, and avoids importing
-            # engine types until after the runner has had a chance to set PANTS_BIN_NAME.
+            # engine types until after the runner has had a chance to set __PANTS_BIN_NAME.
 
             if self._should_run_with_pantsd(global_bootstrap_options):
                 from pants.bin.remote_pants_runner import RemotePantsRunner
@@ -97,6 +97,8 @@ class PantsRunner:
                 log_location=init_workdir(global_bootstrap_options), pantsd_instance=False
             )
             runner = LocalPantsRunner.create(
-                env=CompleteEnvironmentVars(self.env), options_bootstrapper=options_bootstrapper
+                env=CompleteEnvironmentVars(self.env),
+                working_dir=os.getcwd(),
+                options_bootstrapper=options_bootstrapper,
             )
             return runner.run(start_time)

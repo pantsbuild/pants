@@ -4,7 +4,6 @@ slug: "plugins-setup-py"
 excerpt: "How to add your own logic to `python_artifact()`."
 hidden: false
 createdAt: "2020-09-02T00:21:52.821Z"
-updatedAt: "2022-05-10T00:41:52.802Z"
 ---
 Pants can build [Python distributions](doc:python-distributions), such as wheels and sdists, from information you provide in a [`python_distribution`](doc:reference-python_distribution) target. 
 
@@ -32,7 +31,7 @@ Set the class method `is_applicable()` to determine whether your implementation 
 In this example, we will always use our custom implementation:
 
 ```python
-from pants.backend.python.goals.setup_py import SetupKwargsRequest
+from pants.backend.python.util_rules.package_dists import SetupKwargsRequest
 from pants.engine.target import Target
 
 class CustomSetupKwargsRequest(SetupKwargsRequest):
@@ -116,7 +115,7 @@ Your rule should return `SetupKwargs`, which takes two arguments: `kwargs: dict[
 For example, this will simply hardcode a kwarg:
 
 ```python
-from pants.backend.python.goals.setup_py import SetupKwargs
+from pants.backend.python.util_rules.package_dists import SetupKwargs
 from pants.engine.rules import rule
 
 @rule
@@ -135,12 +134,12 @@ def rules():
    return custom_python_artifact.rules()
 ```
 
-Then, run `./pants package path/to:python_distribution` and inspect the generated `setup.py`to confirm that your plugin worked correctly.
+Then, run `pants package path/to:python_distribution` and inspect the generated `setup.py`to confirm that your plugin worked correctly.
 
 Often, you will want to read from a file in your project to set kwargs like `version` or `long_description`. Use `await Get(DigestContents, PathGlobs)` to do this (see [File system](doc:rules-api-file-system)):
 
 ```python
-from pants.backend.python.goals.setup_py import SetupKwargs
+from pants.backend.python.util_rules.package_dists import SetupKwargs
 from pants.engine.fs import DigestContents, GlobMatchErrorBehavior, PathGlobs
 from pants.engine.rules import rule
 
@@ -180,7 +179,7 @@ python_distribution(
 ```python
 import os.path
 
-from pants.backend.python.goals.setup_py import SetupKwargs
+from pants.backend.python.util_rules.package_dists import SetupKwargs
 from pants.engine.fs import DigestContents, GlobMatchErrorBehavior, PathGlobs
 from pants.engine.rules import rule
 

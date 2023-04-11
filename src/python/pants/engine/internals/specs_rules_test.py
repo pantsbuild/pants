@@ -633,7 +633,7 @@ def test_resolve_addresses_from_raw_specs(rule_runner: RuleRunner) -> None:
         "address_spec:nonfile#gen",
     ]
     multiple_files_specs = ["multiple_files/f2.txt", "multiple_files:multiple_files"]
-    specs = SpecsParser(rule_runner.build_root).parse_specs(
+    specs = SpecsParser(root_dir=rule_runner.build_root).parse_specs(
         [*no_interaction_specs, *multiple_files_specs],
         description_of_origin="tests",
     )
@@ -960,7 +960,7 @@ def test_no_applicable_targets_exception() -> None:
         goal_description="the `foo` goal",
     )
     remedy = (
-        "Please specify relevant file and/or target arguments. Run `./pants "
+        "Please specify relevant file and/or target arguments. Run `pants "
         "--filter-target-type=tgt1 list ::` to find all applicable targets in your project."
     )
     assert (
@@ -989,9 +989,9 @@ def test_no_applicable_targets_exception() -> None:
         goal_description="the `foo` goal",
     )
     remedy = (
-        "Please specify relevant file and/or target arguments. Run `./pants "
+        "Please specify relevant file and/or target arguments. Run `pants "
         "--filter-target-type=tgt1,tgt2 list ::` to find all applicable targets in your project, "
-        "or run `./pants --filter-target-type=tgt1,tgt2 filedeps ::` to find all "
+        "or run `pants --filter-target-type=tgt1,tgt2 filedeps ::` to find all "
         "applicable files."
     )
     assert (

@@ -4,7 +4,6 @@ slug: "plugins-overview"
 excerpt: "An intro to the Pants engine's core concepts."
 hidden: false
 createdAt: "2020-05-07T22:38:39.922Z"
-updatedAt: "2022-05-16T19:56:56.104Z"
 ---
 Pants is designed for extensibility: you can extend Pants by writing custom _plugins_, using a standard Plugin API. In fact, all of Pants's built-in functionality uses the same API!
 
@@ -166,7 +165,7 @@ python-default = "3rdparty/python/default_lock.txt"
 pants-plugins = [">=3.7,<3.10"]
 ```
 
-Then, update your `pants_requirements` target generator with `resolve="pants-plugins"`, and run `./pants generate-lockfiles`. You will also need to update the relevant `python_source` / `python_sources` and `python_test` / `python_tests` targets to set `resolve="pants-plugins"` (along with possibly the `interpreter_constraints` field).
+Then, update your `pants_requirements` target generator with `resolve="pants-plugins"`, and run `pants generate-lockfiles`. You will also need to update the relevant `python_source` / `python_sources` and `python_test` / `python_tests` targets to set `resolve="pants-plugins"` (along with possibly the `interpreter_constraints` field).
 
 Publishing a plugin
 -------------------

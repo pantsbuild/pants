@@ -4,11 +4,10 @@ slug: "python-linters-and-formatters"
 excerpt: "How to activate and use the Python linters and formatters bundled with Pants."
 hidden: false
 createdAt: "2020-03-03T00:57:15.994Z"
-updatedAt: "2022-04-03T02:01:57.201Z"
 ---
 > 👍 Benefit of Pants: consistent interface
 > 
-> `./pants lint` and `./pants fmt` will consistently and correctly run all your linters and formatters. No need to remember how to invoke each tool, and no need to write custom scripts. 
+> `pants lint` and `pants fmt` will consistently and correctly run all your linters and formatters. No need to remember how to invoke each tool, and no need to write custom scripts. 
 > 
 > This consistent interface even works with multiple languages, like running Python linters at the same time as Go, Shell, Java, and Scala.
 
@@ -32,6 +31,7 @@ Linter/formatter support is implemented in separate [backends](doc:enabling-back
 | `pants.backend.python.lint.docformatter`           | [Docformatter](https://pypi.org/project/docformatter/): docstring formatter                                                |
 | `pants.backend.python.lint.flake8`                 | [Flake8](https://flake8.pycqa.org/en/latest/): style and bug linter                                                        |
 | `pants.backend.python.lint.isort`                  | [isort](https://readthedocs.org/projects/isort/): import statement formatter                                               |
+| `pants.backend.python.lint.pydocstyle`             | [Pydocstyle](https://pypi.org/project/pydocstyle/): docstring linter                                                       |
 | `pants.backend.python.lint.pylint`                 | [Pylint](https://pylint.pycqa.org/): style and bug linter                                                                  |
 | `pants.backend.python.lint.yapf`                   | [Yapf](https://github.com/google/yapf): code formatter                                                                     |
 | `pants.backend.experimental.python.lint.autoflake` | [Autoflake](https://github.com/myint/autoflake): remove unused imports                                                     |
@@ -49,10 +49,10 @@ backend_packages = [
 ]
 ```
 
-You should now be able to run `./pants lint`, and possibly `./pants fmt`:
+You should now be able to run `pants lint`, and possibly `pants fmt`:
 
 ```
-$ ./pants lint src/py/project.py
+$ pants lint src/py/project.py
 17:54:32.51 [INFO] Completed: lint - Flake8 succeeded.
 17:54:32.70 [INFO] Completed: lint - Black succeeded.
 All done! ✨ 🍰 ✨
@@ -99,7 +99,7 @@ extra_requirements.add = ["flake8-2020"]
 lockfile = "3rdparty/flake8_lockfile.txt"
 ```
 
-Run `./pants help-advanced black`, `./pants help-advanced flake8`, and so on for more information.
+Run `pants help-advanced black`, `pants help-advanced flake8`, and so on for more information.
 
 > 📘 Config files are normally auto-discovered
 > 
@@ -113,17 +113,17 @@ Running only certain formatters or linters
 To temporarily skip a tool, use the `--skip` option for that tool. For example, run:
 
 ```bash
-❯  ./pants --black-skip --flake8-skip lint ::
+❯  pants --black-skip --flake8-skip lint ::
 ```
 
 You can also use the `--lint-only` and `--fmt-only` options with the names of the tools:
 
 ```bash
-❯ ./pants lint --only=black ::
+❯ pants lint --only=black ::
 
 # To run several, you can use either approach:
-❯ ./pants fmt --only=black --only=isort ::
-❯ ./pants fmt --only='["black", "isort"]' ::
+❯ pants fmt --only=black --only=isort ::
+❯ pants fmt --only='["black", "isort"]' ::
 ```
 
 You can also skip for certain targets with the `skip_<tool>` fields, which can be useful for [incrementally adopting new tools](https://www.youtube.com/watch?v=BOhcdRsmv0s). For example:
@@ -146,7 +146,7 @@ python_tests(
 )
 ```
 
-When you run `./pants fmt` and `./pants lint`, Pants will ignore any files belonging to skipped targets.
+When you run `pants fmt` and `pants lint`, Pants will ignore any files belonging to skipped targets.
 
 Tip: only run over changed files
 --------------------------------
@@ -156,13 +156,13 @@ With formatters and linters, there is usually no need to rerun on files that hav
 Use the option `--changed-since` to get much better performance, like this:
 
 ```bash
-❯ ./pants --changed-since=HEAD fmt
+❯ pants --changed-since=HEAD fmt
 ```
 
 or
 
 ```bash
-❯ ./pants --changed-since=main lint
+❯ pants --changed-since=main lint
 ```
 
 Pants will find which files have changed and only run over those files. See [Advanced target selection](doc:advanced-target-selection) for more information.

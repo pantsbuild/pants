@@ -62,7 +62,7 @@ def _initialize_build_configuration(
 
 
 def create_bootstrap_scheduler(
-    options_bootstrapper: OptionsBootstrapper, executor: PyExecutor | None = None
+    options_bootstrapper: OptionsBootstrapper, executor: PyExecutor
 ) -> BootstrapScheduler:
     bc_builder = BuildConfiguration.Builder()
     # To load plugins, we only need access to the Python/PEX rules.
@@ -77,7 +77,7 @@ def create_bootstrap_scheduler(
             bc_builder.create(),
             DynamicRemoteOptions.disabled(),
             executor,
-            ignore_unrecognized_build_file_symbols=True,
+            is_bootstrap=True,
         ).scheduler
     )
 
@@ -98,7 +98,7 @@ class OptionsInitializer:
     def __init__(
         self,
         options_bootstrapper: OptionsBootstrapper,
-        executor: PyExecutor | None = None,
+        executor: PyExecutor,
     ) -> None:
         self._bootstrap_scheduler = create_bootstrap_scheduler(options_bootstrapper, executor)
         self._plugin_resolver = PluginResolver(self._bootstrap_scheduler)

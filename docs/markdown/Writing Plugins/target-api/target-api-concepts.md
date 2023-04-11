@@ -4,7 +4,6 @@ slug: "target-api-concepts"
 excerpt: "The core concepts of Targets and Fields."
 hidden: false
 createdAt: "2020-05-07T22:38:43.975Z"
-updatedAt: "2021-11-16T02:52:06.072Z"
 ---
 The Target API defines how you interact with targets in your plugin. For example, you would use the Target API to read the `source` / `sources` field of a target to know which files to run on.
 
@@ -132,7 +131,7 @@ This subclass mechanism is key to how the Target API behaves:
 Synthetic Targets API
 ---------------------
 
-Normally targets are declared in BUILD files to provide meta data about the project's sources and artifacts etc. Occassionally there may be instances of project meta data that is not served well by being declared explicitly in a BUILD file, for instance if the meta data itself is inferred from other sources of information. For these cases, there is a Target API for declaring synthetic targets, that is targets that are not declared in a BUILD file on disk but instead come from a Plugin's rule.
+Normally targets are declared in BUILD files to provide metadata about the project's sources and artifacts etc. Occassionally there may be instances of project metadata that is not served well by being declared explicitly in a BUILD file, for instance if the metadata itself is inferred from other sources of information. For these cases, there is a Target API for declaring synthetic targets, that is targets that are not declared in a BUILD file on disk but instead come from a Plugin's rule.
 
 ### Example
 
