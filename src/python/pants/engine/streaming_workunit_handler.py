@@ -116,7 +116,12 @@ class StreamingWorkunitContext:
         for target in expanded_targets:
             source = targets_dict.get(str(target.address.spec), None)
             if source is None:
-                source = targets_dict[str(target.address.maybe_convert_to_target_generator())]
+                source = targets_dict.get(str(target.address.maybe_convert_to_target_generator()))
+                if source is None:
+                    # This is a thing, that may need investigating to be fully understood.
+                    # merely patches over a crash here. See #18564.
+                    logger.debug(f"Unknown source address for target: `{target.address}`.")
+                    continue
             source.append(
                 TargetInfo(
                     filename=(
