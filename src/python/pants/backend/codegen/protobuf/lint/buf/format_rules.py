@@ -39,6 +39,10 @@ class BufFormatRequest(FmtTargetsRequest):
 
     @classproperty
     def tool_name(cls) -> str:
+        return "buf format"
+
+    @classproperty
+    def tool_id(cls) -> str:
         return "buf-format"
 
 
