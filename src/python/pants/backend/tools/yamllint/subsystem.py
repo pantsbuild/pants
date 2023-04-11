@@ -29,7 +29,6 @@ class Yamllint(PythonToolBase):
     default_requirements = ["yamllint>=1.28.0,<2"]
 
     register_interpreter_constraints = True
-    default_interpreter_constraints = ["CPython>=3.7,<4"]
 
     register_lockfile = True
     default_lockfile_resource = ("pants.backend.tools.yamllint", "yamllint.lock")

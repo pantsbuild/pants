@@ -20,14 +20,15 @@ from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.core.goals.generate_lockfiles import GenerateLockfileResult, UserGenerateLockfiles
 from pants.engine.fs import DigestContents
-from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner
+from pants.testutil.python_rule_runner import PythonRuleRunner
+from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import strip_prefix
 
 
 @pytest.fixture
-def rule_runner() -> RuleRunner:
-    rule_runner = RuleRunner(
+def rule_runner() -> PythonRuleRunner:
+    rule_runner = PythonRuleRunner(
         rules=[
             *lockfile_rules(),
             *pex.rules(),
@@ -40,7 +41,7 @@ def rule_runner() -> RuleRunner:
 
 def _generate(
     *,
-    rule_runner: RuleRunner,
+    rule_runner: PythonRuleRunner,
     ansicolors_version: str = "==1.1.8",
     requirement_constraints_str: str = '//   "requirement_constraints": [],\n',
     only_binary_and_no_binary_str: str = '//   "only_binary": [],\n//   "no_binary": []',
@@ -95,7 +96,7 @@ def _generate(
     ("no_binary", "only_binary"), ((False, False), (False, True), (True, False))
 )
 def test_pex_lockfile_generation(
-    rule_runner: RuleRunner, no_binary: bool, only_binary: bool
+    rule_runner: PythonRuleRunner, no_binary: bool, only_binary: bool
 ) -> None:
     args = ["--python-resolves={'test': 'foo.lock'}"]
     only_binary_lock_str = '//   "only_binary": [],\n'
@@ -164,7 +165,7 @@ def test_pex_lockfile_generation(
         assert artifacts == [wheel]
 
 
-def test_constraints_file(rule_runner: RuleRunner) -> None:
+def test_constraints_file(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files({"constraints.txt": "ansicolors==1.1.7"})
     rule_runner.set_options(
         [
@@ -194,7 +195,7 @@ def test_constraints_file(rule_runner: RuleRunner) -> None:
 
 
 def test_multiple_resolves() -> None:
-    rule_runner = RuleRunner(
+    rule_runner = PythonRuleRunner(
         rules=[
             setup_user_lockfile_requests,
             *PythonSetup.rules(),
@@ -235,7 +236,7 @@ def test_multiple_resolves() -> None:
     assert set(result) == {
         GeneratePythonLockfile(
             requirements=FrozenOrderedSet(["a"]),
-            interpreter_constraints=InterpreterConstraints(["CPython>=3.7,<4"]),
+            interpreter_constraints=InterpreterConstraints(["CPython>=3.7,<3.10"]),
             resolve_name="a",
             lockfile_dest="a.lock",
             diff=False,

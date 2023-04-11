@@ -58,21 +58,16 @@ from pants.core.goals.generate_lockfiles import NoCompatibleResolveException
 from pants.engine.addresses import Addresses
 from pants.engine.fs import Snapshot
 from pants.testutil.option_util import create_subsystem
-from pants.testutil.rule_runner import (
-    MockGet,
-    QueryRule,
-    RuleRunner,
-    engine_error,
-    run_rule_with_mocks,
-)
+from pants.testutil.python_rule_runner import PythonRuleRunner
+from pants.testutil.rule_runner import MockGet, QueryRule, engine_error, run_rule_with_mocks
 from pants.util.contextutil import pushd
 from pants.util.ordered_set import OrderedSet
 from pants.util.strutil import softwrap
 
 
 @pytest.fixture
-def rule_runner() -> RuleRunner:
-    return RuleRunner(
+def rule_runner() -> PythonRuleRunner:
+    return PythonRuleRunner(
         rules=[
             *pex_test_utils.rules(),
             *pex_from_targets.rules(),
@@ -94,7 +89,7 @@ def rule_runner() -> RuleRunner:
 
 @pytest.mark.skip(reason="TODO(#15824)")
 @pytest.mark.no_error_if_skipped
-def test_choose_compatible_resolve(rule_runner: RuleRunner) -> None:
+def test_choose_compatible_resolve(rule_runner: PythonRuleRunner) -> None:
     def create_target_files(
         directory: str, *, req_resolve: str, source_resolve: str, test_resolve: str
     ) -> dict[str, str]:
@@ -554,11 +549,11 @@ def create_dists(workdir: Path, project: Project, *projects: Project) -> PurePat
     return find_links
 
 
-def requirements(rule_runner: RuleRunner, pex: Pex) -> list[str]:
+def requirements(rule_runner: PythonRuleRunner, pex: Pex) -> list[str]:
     return cast(List[str], get_all_data(rule_runner, pex).info["requirements"])
 
 
-def test_constraints_validation(tmp_path: Path, rule_runner: RuleRunner) -> None:
+def test_constraints_validation(tmp_path: Path, rule_runner: PythonRuleRunner) -> None:
     sdists = tmp_path / "sdists"
     sdists.mkdir()
     find_links = create_dists(
@@ -689,7 +684,7 @@ def test_constraints_validation(tmp_path: Path, rule_runner: RuleRunner) -> None
 
 @pytest.mark.parametrize("include_requirements", [False, True])
 def test_exclude_requirements(
-    include_requirements: bool, tmp_path: Path, rule_runner: RuleRunner
+    include_requirements: bool, tmp_path: Path, rule_runner: PythonRuleRunner
 ) -> None:
     sdists = tmp_path / "sdists"
     sdists.mkdir()
@@ -729,7 +724,7 @@ def test_exclude_requirements(
 
 
 @pytest.mark.parametrize("include_sources", [False, True])
-def test_exclude_sources(include_sources: bool, rule_runner: RuleRunner) -> None:
+def test_exclude_sources(include_sources: bool, rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files(
         {
             "BUILD": dedent(
@@ -762,7 +757,7 @@ def test_exclude_sources(include_sources: bool, rule_runner: RuleRunner) -> None
 
 @pytest.mark.parametrize("enable_resolves", [False, True])
 def test_cross_platform_pex_disables_subsetting(
-    rule_runner: RuleRunner, enable_resolves: bool
+    rule_runner: PythonRuleRunner, enable_resolves: bool
 ) -> None:
     # See https://github.com/pantsbuild/pants/issues/12222.
     lockfile = "3rdparty/python/default.lock"
@@ -816,7 +811,7 @@ class ResolveMode(Enum):
     [(m, io, rael) for m in ResolveMode for io in [True, False] for rael in [True, False]],
 )
 def test_lockfile_requirements_selection(
-    rule_runner: RuleRunner,
+    rule_runner: PythonRuleRunner,
     mode: ResolveMode,
     internal_only: bool,
     run_against_entire_lockfile: bool,

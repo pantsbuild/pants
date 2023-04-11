@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from textwrap import dedent
+from typing import Iterable
 
 import pytest
 
@@ -24,14 +25,15 @@ from pants.core.target_types import GenericTarget
 from pants.core.util_rules import config_files
 from pants.engine.fs import EMPTY_DIGEST
 from pants.testutil.python_interpreter_selection import skip_unless_python39_present
-from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.testutil.python_rule_runner import PythonRuleRunner
+from pants.testutil.rule_runner import QueryRule
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import softwrap
 
 
 @pytest.fixture
-def rule_runner() -> RuleRunner:
-    return RuleRunner(
+def rule_runner() -> PythonRuleRunner:
+    return PythonRuleRunner(
         rules=[
             *subsystem.rules(),
             *skip_field.rules(),
@@ -47,7 +49,7 @@ def rule_runner() -> RuleRunner:
     )
 
 
-def test_warn_if_python_version_configured(rule_runner: RuleRunner, caplog) -> None:
+def test_warn_if_python_version_configured(rule_runner: PythonRuleRunner, caplog) -> None:
     config = {"mypy.ini": "[mypy]\npython_version = 3.6"}
     rule_runner.write_files(config)
     config_digest = rule_runner.make_snapshot(config).digest
@@ -103,7 +105,7 @@ def test_warn_if_python_version_configured(rule_runner: RuleRunner, caplog) -> N
     maybe_assert_configured(has_config=False, args=[])
 
 
-def test_first_party_plugins(rule_runner: RuleRunner) -> None:
+def test_first_party_plugins(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files(
         {
             "BUILD": dedent(
@@ -149,12 +151,12 @@ def test_first_party_plugins(rule_runner: RuleRunner) -> None:
 
 
 @skip_unless_python39_present
-def test_setup_lockfile_interpreter_constraints(rule_runner: RuleRunner) -> None:
+def test_setup_lockfile_interpreter_constraints(rule_runner: PythonRuleRunner) -> None:
     global_constraint = "==3.9.*"
 
     def assert_lockfile_request(
         build_file: str,
-        expected_ics: list[str],
+        expected_ics: Iterable[str],
         *,
         extra_expected_requirements: list[str] | None = None,
         extra_args: list[str] | None = None,
@@ -251,7 +253,9 @@ def test_setup_lockfile_interpreter_constraints(rule_runner: RuleRunner) -> None
     )
 
 
-def test_setup_extra_type_stubs_lockfile_interpreter_constraints(rule_runner: RuleRunner) -> None:
+def test_setup_extra_type_stubs_lockfile_interpreter_constraints(
+    rule_runner: PythonRuleRunner,
+) -> None:
     global_constraint = "==3.9.*"
 
     def assert_lockfile_request(build_file: str, expected_ics: list[str]) -> None:

@@ -35,12 +35,13 @@ from pants.core.target_types import (
 )
 from pants.core.target_types import rules as core_target_types_rules
 from pants.testutil.python_interpreter_selection import skip_unless_python36_present
-from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.testutil.python_rule_runner import PythonRuleRunner
+from pants.testutil.rule_runner import QueryRule
 
 
 @pytest.fixture
-def rule_runner() -> RuleRunner:
-    rule_runner = RuleRunner(
+def rule_runner() -> PythonRuleRunner:
+    rule_runner = PythonRuleRunner(
         rules=[
             *package_pex_binary.rules(),
             *pex_from_targets.rules(),
@@ -66,7 +67,7 @@ def rule_runner() -> RuleRunner:
     return rule_runner
 
 
-def test_warn_files_targets(rule_runner: RuleRunner, caplog) -> None:
+def test_warn_files_targets(rule_runner: PythonRuleRunner, caplog) -> None:
     rule_runner.write_files(
         {
             "assets/f.txt": "",
@@ -111,7 +112,9 @@ def test_warn_files_targets(rule_runner: RuleRunner, caplog) -> None:
     assert result.artifacts[0].relpath == "src.py.project/project.pex"
 
 
-def test_include_sources_avoids_files_targets_warning(rule_runner: RuleRunner, caplog) -> None:
+def test_include_sources_avoids_files_targets_warning(
+    rule_runner: PythonRuleRunner, caplog
+) -> None:
     rule_runner.write_files(
         {
             "assets/f.txt": "",
@@ -170,7 +173,7 @@ def test_include_sources_avoids_files_targets_warning(rule_runner: RuleRunner, c
     "layout",
     [pytest.param(layout, id=layout.value) for layout in PexLayout],
 )
-def test_layout(rule_runner: RuleRunner, layout: PexLayout) -> None:
+def test_layout(rule_runner: PythonRuleRunner, layout: PexLayout) -> None:
     rule_runner.write_files(
         {
             "src/py/project/app.py": dedent(
@@ -220,7 +223,7 @@ def test_layout(rule_runner: RuleRunner, layout: PexLayout) -> None:
 
 
 @pytest.fixture
-def pex_executable(rule_runner: RuleRunner) -> str:
+def pex_executable(rule_runner: PythonRuleRunner) -> str:
     rule_runner.write_files(
         {
             "pex_exe/BUILD": dedent(
@@ -241,7 +244,7 @@ def pex_executable(rule_runner: RuleRunner) -> str:
     return os.path.join(rule_runner.build_root, expected_pex_relpath)
 
 
-def test_resolve_local_platforms(pex_executable: str, rule_runner: RuleRunner) -> None:
+def test_resolve_local_platforms(pex_executable: str, rule_runner: PythonRuleRunner) -> None:
     complete_current_platform = subprocess.run(
         args=[pex_executable, "interpreter", "inspect", "-mt"],
         env=dict(PEX_MODULE="pex.cli", **os.environ),
@@ -280,7 +283,7 @@ def test_resolve_local_platforms(pex_executable: str, rule_runner: RuleRunner) -
 
 
 @skip_unless_python36_present
-def test_complete_platforms(rule_runner: RuleRunner) -> None:
+def test_complete_platforms(rule_runner: PythonRuleRunner) -> None:
     linux_complete_platform = pkgutil.get_data(__name__, "platform-linux-py36.json")
     assert linux_complete_platform is not None
 
@@ -329,7 +332,7 @@ def test_complete_platforms(rule_runner: RuleRunner) -> None:
     ) == sorted(pex_info["distributions"])
 
 
-def test_non_hermetic_venv_scripts(rule_runner: RuleRunner) -> None:
+def test_non_hermetic_venv_scripts(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files(
         {
             "src/py/project/app.py": dedent(
