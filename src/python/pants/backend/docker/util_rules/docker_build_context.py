@@ -44,7 +44,7 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionRule
 from pants.util.meta import classproperty
-from pants.util.strutil import get_stable_hash, softwrap
+from pants.util.strutil import softwrap, stable_hash
 from pants.util.value_interpolation import InterpolationContext, InterpolationValue
 
 logger = logging.getLogger(__name__)
@@ -130,7 +130,7 @@ class DockerBuildContext:
         # Data from Pants.
         interpolation_context["pants"] = {
             # Present hash for all inputs that can be used for image tagging.
-            "hash": get_stable_hash((build_args, build_env, snapshot.digest)).hexdigest(),
+            "hash": stable_hash((build_args, build_env, snapshot.digest)).hexdigest(),
         }
 
         # Base image tags values for all stages (as parsed from the Dockerfile instructions).

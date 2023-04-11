@@ -359,7 +359,7 @@ class _JsonEncoder(json.JSONEncoder):
             return str(o)
 
 
-def get_stable_hash(value: Any, *, name: str = "sha256") -> hashlib._Hash:
+def stable_hash(value: Any, *, name: str = "sha256") -> hashlib._Hash:
     """Attempts to return a stable hash of the value stable across processes."""
     return hashlib.new(
         name,

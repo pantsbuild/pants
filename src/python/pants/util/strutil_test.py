@@ -16,11 +16,11 @@ from pants.util.strutil import (
     ensure_text,
     first_paragraph,
     fmt_memory_size,
-    get_stable_hash,
     hard_wrap,
     path_safe,
     pluralize,
     softwrap,
+    stable_hash,
     strip_prefix,
     strip_v2_chroot_path,
 )
@@ -402,7 +402,7 @@ def test_docstring_decorator() -> None:
         assert show_why_this_is_needed.__doc__ == "calc 1 + 1 = 2"
 
 
-def test_hash() -> None:
+def test_stable_hash() -> None:
     @dataclass(frozen=True)
     class Data:
         mapping: FrozenDict[str, str]
@@ -413,6 +413,6 @@ def test_hash() -> None:
         )
     )
     assert (
-        get_stable_hash(data).hexdigest()
+        stable_hash(data).hexdigest()
         == "e4da3c55de6ce98ddcbd5b854ff01f5c8b47fdcb2e10ddd5176505e39a332730"
     )
