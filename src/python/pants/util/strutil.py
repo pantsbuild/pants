@@ -3,13 +3,13 @@
 
 from __future__ import annotations
 
-import abc
 import dataclasses
 import hashlib
 import json
 import re
 import shlex
 import textwrap
+from collections import abc
 from typing import Any, Callable, Iterable, TypeVar
 
 from typing_extensions import ParamSpec
