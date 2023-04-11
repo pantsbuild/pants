@@ -3,10 +3,14 @@
 
 from __future__ import annotations
 
+import abc
+import dataclasses
+import hashlib
+import json
 import re
 import shlex
 import textwrap
-from typing import Callable, Iterable, TypeVar
+from typing import Any, Callable, Iterable, TypeVar
 
 from typing_extensions import ParamSpec
 
@@ -335,3 +339,31 @@ def docstring(doc: str | Callable[[], str]) -> Callable[[Callable[P, R]], Callab
         return func
 
     return wrapper
+
+
+class _JsonEncoder(json.JSONEncoder):
+    """Allow us to serialize everything, with a fallback on `str()` in case of any esoteric
+    types."""
+
+    def default(self, o):
+        """Return a serializable object for o."""
+        if dataclasses.is_dataclass(o):
+            return dataclasses.asdict(o)
+        if isinstance(o, abc.Mapping):
+            return dict(o)
+        if isinstance(o, abc.Sequence):
+            return list(o)
+        try:
+            return super().default(o)
+        except TypeError:
+            return str(o)
+
+
+def get_stable_hash(value: Any, *, name: str = "sha256") -> hashlib._Hash:
+    """Attempts to return a stable hash of the value stable across processes."""
+    return hashlib.new(
+        name,
+        json.dumps(
+            value, indent=None, separators=(",", ":"), sort_keys=True, cls=_JsonEncoder
+        ).encode("utf-8"),
+    )
