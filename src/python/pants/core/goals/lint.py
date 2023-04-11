@@ -176,7 +176,7 @@ class LintRequest:
     @classproperty
     def tool_id(cls) -> str:
         """The "id" of the tool, used in tool selection (Eg --only=<id>)."""
-        return
+        return cls.tool_subsystem.options_scope
 
     @distinct_union_type_per_subclass(in_scope_types=[EnvironmentName])
     class Batch(_BatchBase[PartitionElementT, PartitionMetadataT]):

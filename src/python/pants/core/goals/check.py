@@ -30,6 +30,7 @@ from pants.engine.target import FieldSet, FilteredTargets
 from pants.engine.unions import UnionMembership, union
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_property
+from pants.util.meta import classproperty
 from pants.util.strutil import strip_v2_chroot_path
 
 logger = logging.getLogger(__name__)
@@ -147,6 +148,11 @@ class CheckRequest(Generic[_FS], EngineAwareParameter):
 
     field_set_type: ClassVar[type[_FS]]  # type: ignore[misc]
     tool_name: ClassVar[str]
+
+    @classproperty
+    def tool_id(cls) -> str:
+        """The "id" of the tool, used in tool selection (Eg --only=<id>)."""
+        return cls.tool_name
 
     field_sets: Collection[_FS]
 
