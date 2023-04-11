@@ -37,7 +37,6 @@ class ClangFormat(PythonToolBase):
     default_requirements = [default_version]
 
     register_interpreter_constraints = True
-    default_interpreter_constraints = ["CPython>=3.7,<4"]
 
     skip = SkipOption("fmt", "lint")
     args = ArgsListOption(example="--version")

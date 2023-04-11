@@ -30,7 +30,6 @@ class TwineSubsystem(PythonToolBase):
     default_requirements = ["twine>=3.7.1,<5", *default_extra_requirements]
 
     register_interpreter_constraints = True
-    default_interpreter_constraints = ["CPython>=3.7,<4"]
 
     register_lockfile = True
     default_lockfile_resource = ("pants.backend.python.subsystems", "twine.lock")

@@ -59,7 +59,6 @@ class Ruff(PythonToolBase):
     default_requirements = ["ruff>=0.0.213,<0.1"]
 
     register_interpreter_constraints = True
-    default_interpreter_constraints = ["CPython>=3.7,<4"]
 
     register_lockfile = True
     default_lockfile_resource = ("pants.backend.python.lint.ruff", "ruff.lock")
