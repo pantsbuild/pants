@@ -45,7 +45,7 @@ username: publisher-example
 repository: https://pypi.private.example.com
 ```
 
-Each repository is either a repository URL or a reference to a repository configured in the `.pypirc` file, when prefixed with `@`.
+Each repository is either a repository URL or, when prefixed with `@`, a reference to a repository configured in the `.pypirc` file.
 
 > ❗️ Keep Secrets Secret
 > 
