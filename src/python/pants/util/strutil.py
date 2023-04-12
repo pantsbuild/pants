@@ -14,6 +14,7 @@ from typing import Any, Callable, Iterable, TypeVar
 
 from typing_extensions import ParamSpec
 
+from pants.engine.internals.native_engine import Digest
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
 
@@ -355,6 +356,11 @@ class _JsonEncoder(json.JSONEncoder):
             return dict(o)
         if isinstance(o, (abc.Sequence, OrderedSet, FrozenOrderedSet)):
             return list(o)
+        if isinstance(o, (Digest,)):
+            return {
+                "fingerprint": o.fingerprint,
+                "serialized_bytes_length": o.serialized_bytes_length,
+            }
         return super().default(o)
 
 
