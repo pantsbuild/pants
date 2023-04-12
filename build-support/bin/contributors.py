@@ -19,7 +19,10 @@ def create_parser() -> argparse.ArgumentParser:
 def main() -> None:
     args = create_parser().parse_args()
     if args.since:
-        print("  " + "\n  ".join(sorted_contributors(range=f"{args.since}..HEAD")))
+        tag = args.since
+        if not tag_exists(tag):
+            tag = f"release_{tag}"
+        print("  " + "\n  ".join(sorted_contributors(range=f"{tag}..HEAD")))
     else:
         update_contributors_md()
 
@@ -44,6 +47,10 @@ def update_contributors_md() -> None:
         + "\n+ ".join(sorted_contributors(range="HEAD"))
         + "\n"
     )
+
+
+def tag_exists(tag):
+    return subprocess.run(["git", "rev-parse", tag + "^{tag}"], capture_output=True).returncode == 0
 
 
 if __name__ == "__main__":
