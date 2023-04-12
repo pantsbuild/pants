@@ -445,7 +445,6 @@ async def lint(
             (batch, partition.metadata)
             for partitions in partitions_list
             for partition in partitions
-            if partition.elements
             for batch in batch_by_size(partition.elements)
         ]
         for request_type, partitions_list in partitions_by_request_type.items()
