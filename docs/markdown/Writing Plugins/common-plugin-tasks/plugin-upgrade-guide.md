@@ -35,6 +35,11 @@ The lazy API is useful, for example, when you only want to `Get` that output typ
 We added syntax in 2.17 to now use `Get(OutputType)`, whereas before you had to do `Get(OutputType, OutputTypeRequest)` or (as of 2.15) `Get(OutputType, {})`. So, these `OutputTypeRequest` types are now redudent and deprecated in favor of simply using `Get(OutputType)`.
 
 
+### `EnvironmentBehavior.UNMIGRATED` is no longer available
+
+Following the deprecation cycle in 2.15, all `Goal`s need to set `EnvironmentBehavior.LOCAL_ONLY` or `EnvironmentBehavior.UNMIGRATED`.
+
+
 2.16
 ----
 
