@@ -37,7 +37,7 @@ We added syntax in 2.17 to now use `Get(OutputType)`, whereas before you had to 
 
 ### `EnvironmentBehavior.UNMIGRATED` is no longer available
 
-Following the deprecation cycle in 2.15, all `Goal`s need to set `EnvironmentBehavior.LOCAL_ONLY` or `EnvironmentBehavior.UNMIGRATED`.
+Following the deprecation cycle in 2.15, all `Goal`s need to set `EnvironmentBehavior.LOCAL_ONLY` or `EnvironmentBehavior.USES_ENVIRONMENTS`.
 
 
 2.16
