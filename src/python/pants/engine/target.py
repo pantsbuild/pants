@@ -197,9 +197,9 @@ class Field:
         )
 
     def __repr__(self) -> str:
-        params = [f"alias={repr(self.alias)}", f"value={repr(self.value)}"]
+        params = [f"alias={self.alias!r}", f"value={self.value!r}"]
         if hasattr(self, "default"):
-            params.append(f"default={repr(self.default)}")
+            params.append(f"default={self.default!r}")
         return f"{self.__class__}({', '.join(params)})"
 
     def __str__(self) -> str:
@@ -270,12 +270,12 @@ class AsyncFieldMixin(Field):
 
     def __repr__(self) -> str:
         params = [
-            f"alias={repr(self.alias)}",
+            f"alias={self.alias!r}",
             f"address={self.address}",
-            f"value={repr(self.value)}",
+            f"value={self.value!r}",
         ]
         if hasattr(self, "default"):
-            params.append(f"default={repr(self.default)}")
+            params.append(f"default={self.default!r}")
         return f"{self.__class__}({', '.join(params)})"
 
     def __hash__(self) -> int:
