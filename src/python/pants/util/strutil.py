@@ -359,7 +359,6 @@ class _JsonEncoder(json.JSONEncoder):
         if isinstance(o, (Digest,)):
             return {
                 "fingerprint": o.fingerprint,
-                "serialized_bytes_length": o.serialized_bytes_length,
             }
         return super().default(o)
 
