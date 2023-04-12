@@ -14,6 +14,8 @@ from typing import Any, Callable, Iterable, TypeVar
 
 from typing_extensions import ParamSpec
 
+from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
+
 
 def ensure_binary(text_or_binary: bytes | str) -> bytes:
     if isinstance(text_or_binary, bytes):
@@ -351,14 +353,18 @@ class _JsonEncoder(json.JSONEncoder):
             return dataclasses.asdict(o)
         if isinstance(o, abc.Mapping):
             return dict(o)
-        if isinstance(o, abc.Sequence):
+        if isinstance(o, (abc.Sequence, OrderedSet, FrozenOrderedSet)):
             return list(o)
         return super().default(o)
 
 
-
 def stable_hash(value: Any, *, name: str = "sha256") -> hashlib._Hash:
-    """Attempts to return a stable hash of the value stable across processes."""
+    """Attempts to return a stable hash of the value stable across processes.
+
+    "Stable" here means that if `value` is equivalent in multiple invocations (across multiple
+    processes), it should produce the same hash. To that end, what values are accepted are limited
+    in scope.
+    """
     return hashlib.new(
         name,
         json.dumps(
