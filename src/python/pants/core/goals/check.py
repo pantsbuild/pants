@@ -13,7 +13,7 @@ import colors
 from pants.core.goals.lint import REPORT_DIR as REPORT_DIR  # noqa: F401
 from pants.core.goals.multi_tool_goal_helper import (
     OnlyOption,
-    determine_specified_tool_names,
+    determine_specified_tool_ids,
     write_reports,
 )
 from pants.core.util_rules.distdir import DistDir
@@ -30,6 +30,7 @@ from pants.engine.target import FieldSet, FilteredTargets
 from pants.engine.unions import UnionMembership, union
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_property
+from pants.util.meta import classproperty
 from pants.util.strutil import strip_v2_chroot_path
 
 logger = logging.getLogger(__name__)
@@ -148,6 +149,11 @@ class CheckRequest(Generic[_FS], EngineAwareParameter):
     field_set_type: ClassVar[type[_FS]]  # type: ignore[misc]
     tool_name: ClassVar[str]
 
+    @classproperty
+    def tool_id(cls) -> str:
+        """The "id" of the tool, used in tool selection (Eg --only=<id>)."""
+        return cls.tool_name
+
     field_sets: Collection[_FS]
 
     def __init__(self, field_sets: Iterable[_FS]) -> None:
@@ -186,14 +192,14 @@ async def check(
     check_subsystem: CheckSubsystem,
 ) -> Check:
     request_types = cast("Iterable[type[CheckRequest]]", union_membership[CheckRequest])
-    specified_names = determine_specified_tool_names("check", check_subsystem.only, request_types)
+    specified_ids = determine_specified_tool_ids("check", check_subsystem.only, request_types)
 
     requests = tuple(
         request_type(
             request_type.field_set_type.create(target)
             for target in targets
             if (
-                request_type.tool_name in specified_names
+                request_type.tool_id in specified_ids
                 and request_type.field_set_type.is_applicable(target)
             )
         )

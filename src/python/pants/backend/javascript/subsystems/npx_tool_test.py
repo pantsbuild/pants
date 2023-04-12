@@ -30,7 +30,7 @@ def rule_runner() -> RuleRunner:
 
 
 def test_version_option_overrides_default(rule_runner: RuleRunner):
-    rule_runner.set_options(["--cowsay-version=cowsay@1.5.0"])
+    rule_runner.set_options(["--cowsay-version=cowsay@1.5.0"], env_inherit={"PATH"})
     tool = rule_runner.request(CowsayTool, [])
     assert tool.default_version == "cowsay@1.4.0"
     assert tool.version == "cowsay@1.5.0"

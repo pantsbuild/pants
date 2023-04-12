@@ -22,18 +22,13 @@ from pants.core.goals.repl import Repl
 from pants.core.goals.repl import rules as repl_rules
 from pants.engine.process import Process
 from pants.testutil.python_interpreter_selection import all_major_minor_python_versions
-from pants.testutil.rule_runner import (
-    GoalRuleResult,
-    QueryRule,
-    RuleRunner,
-    engine_error,
-    mock_console,
-)
+from pants.testutil.python_rule_runner import PythonRuleRunner
+from pants.testutil.rule_runner import GoalRuleResult, QueryRule, engine_error, mock_console
 
 
 @pytest.fixture
-def rule_runner() -> RuleRunner:
-    rule_runner = RuleRunner(
+def rule_runner() -> PythonRuleRunner:
+    rule_runner = PythonRuleRunner(
         rules=[
             *repl_rules(),
             *python_repl.rules(),
@@ -65,7 +60,7 @@ def rule_runner() -> RuleRunner:
 
 
 def run_repl(
-    rule_runner: RuleRunner, args: list[str], *, global_args: list[str] | None = None
+    rule_runner: PythonRuleRunner, args: list[str], *, global_args: list[str] | None = None
 ) -> GoalRuleResult:
     # TODO(#9108): Expand `mock_console` to allow for providing input for the repl to verify
     # that, e.g., the generated protobuf code is available. Right now this test prepares for
@@ -79,7 +74,7 @@ def run_repl(
         )
 
 
-def test_default_repl(rule_runner: RuleRunner) -> None:
+def test_default_repl(rule_runner: PythonRuleRunner) -> None:
     assert run_repl(rule_runner, ["src/python/lib.py"]).exit_code == 0
 
 
@@ -88,7 +83,7 @@ def test_default_repl(rule_runner: RuleRunner) -> None:
     "major_minor_interpreter",
     all_major_minor_python_versions(["CPython>=3.7,<4"]),
 )
-def test_ipython(rule_runner: RuleRunner, major_minor_interpreter: str) -> None:
+def test_ipython(rule_runner: PythonRuleRunner, major_minor_interpreter: str) -> None:
     assert (
         run_repl(
             rule_runner,
@@ -102,7 +97,7 @@ def test_ipython(rule_runner: RuleRunner, major_minor_interpreter: str) -> None:
     )
 
 
-def test_eagerly_validate_roots_have_common_resolve(rule_runner: RuleRunner) -> None:
+def test_eagerly_validate_roots_have_common_resolve(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files(
         {
             "BUILD": dedent(

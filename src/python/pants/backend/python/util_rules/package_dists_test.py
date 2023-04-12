@@ -9,41 +9,12 @@ from typing import Iterable
 import pytest
 
 from pants.backend.python import target_types_rules
-from pants.backend.python.goals.setup_py import (
-    AmbiguousOwnerError,
-    DependencyOwner,
-    DistBuildChroot,
-    DistBuildChrootRequest,
-    DistBuildSources,
-    ExportedTarget,
-    ExportedTargetRequirements,
-    FinalizedSetupKwargs,
-    FirstPartyDependencyVersionScheme,
-    GenerateSetupPyRequest,
-    InvalidEntryPoint,
-    InvalidSetupPyArgs,
-    NoDistTypeSelected,
-    NoOwnerError,
-    OwnedDependencies,
-    OwnedDependency,
-    SetupKwargs,
-    SetupKwargsRequest,
-    SetupPyError,
-    SetupPyGeneration,
-    declares_pkg_resources_namespace_package,
-    determine_explicitly_provided_setup_kwargs,
-    determine_finalized_setup_kwargs,
-    generate_chroot,
-    generate_setup_py,
-    get_exporting_owner,
-    get_owned_dependencies,
-    get_requirements,
-    get_sources,
-    merge_entry_points,
-    package_python_dist,
-    validate_commands,
-)
+from pants.backend.python.goals.package_dists import package_python_dist
 from pants.backend.python.macros.python_artifact import PythonArtifact
+from pants.backend.python.subsystems.setup_py_generation import (
+    FirstPartyDependencyVersionScheme,
+    SetupPyGeneration,
+)
 from pants.backend.python.subsystems.setuptools import PythonDistributionFieldSet
 from pants.backend.python.target_types import (
     PexBinary,
@@ -54,6 +25,37 @@ from pants.backend.python.target_types import (
 )
 from pants.backend.python.util_rules import dists, python_sources
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
+from pants.backend.python.util_rules.package_dists import (
+    AmbiguousOwnerError,
+    DependencyOwner,
+    DistBuildChroot,
+    DistBuildChrootRequest,
+    DistBuildSources,
+    ExportedTarget,
+    ExportedTargetRequirements,
+    FinalizedSetupKwargs,
+    GenerateSetupPyRequest,
+    InvalidEntryPoint,
+    InvalidSetupPyArgs,
+    NoDistTypeSelected,
+    NoOwnerError,
+    OwnedDependencies,
+    OwnedDependency,
+    SetupKwargs,
+    SetupKwargsRequest,
+    SetupPyError,
+    declares_pkg_resources_namespace_package,
+    determine_explicitly_provided_setup_kwargs,
+    determine_finalized_setup_kwargs,
+    generate_chroot,
+    generate_setup_py,
+    get_exporting_owner,
+    get_owned_dependencies,
+    get_requirements,
+    get_sources,
+    merge_entry_points,
+    validate_commands,
+)
 from pants.base.exceptions import IntrinsicError
 from pants.core.goals.package import BuiltPackage
 from pants.core.target_types import FileTarget, ResourcesGeneratorTarget, ResourceTarget
@@ -64,14 +66,15 @@ from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import rule
 from pants.engine.target import InvalidFieldException
 from pants.engine.unions import UnionRule
-from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error
+from pants.testutil.python_rule_runner import PythonRuleRunner
+from pants.testutil.rule_runner import QueryRule, engine_error
 from pants.util.strutil import softwrap
 
 _namespace_decl = "__import__('pkg_resources').declare_namespace(__name__)"
 
 
-def create_setup_py_rule_runner(*, rules: Iterable) -> RuleRunner:
-    rule_runner = RuleRunner(
+def create_setup_py_rule_runner(*, rules: Iterable) -> PythonRuleRunner:
+    rule_runner = PythonRuleRunner(
         rules=rules,
         target_types=[
             PexBinary,
@@ -102,7 +105,7 @@ def setup_kwargs_plugin(request: PluginSetupKwargsRequest) -> SetupKwargs:
 
 
 @pytest.fixture
-def chroot_rule_runner() -> RuleRunner:
+def chroot_rule_runner() -> PythonRuleRunner:
     return create_setup_py_rule_runner(
         rules=[
             *core_target_types_rules(),
@@ -127,7 +130,7 @@ def chroot_rule_runner() -> RuleRunner:
 
 
 def assert_chroot(
-    rule_runner: RuleRunner,
+    rule_runner: PythonRuleRunner,
     expected_files: list[str],
     expected_setup_kwargs,
     addr: Address,
@@ -153,7 +156,9 @@ def assert_chroot(
         assert expected_setup_kwargs == setup_kwargs.kwargs
 
 
-def assert_chroot_error(rule_runner: RuleRunner, addr: Address, exc_cls: type[Exception]) -> None:
+def assert_chroot_error(
+    rule_runner: PythonRuleRunner, addr: Address, exc_cls: type[Exception]
+) -> None:
     tgt = rule_runner.get_target(addr)
     with pytest.raises(ExecutionError) as excinfo:
         rule_runner.request(
@@ -345,7 +350,7 @@ def test_merge_entry_points() -> None:
         merge_entry_points(*list(conflicting_sources.items()))
 
 
-def test_generate_chroot(chroot_rule_runner: RuleRunner) -> None:
+def test_generate_chroot(chroot_rule_runner: PythonRuleRunner) -> None:
     chroot_rule_runner.write_files(
         {
             "src/python/foo/bar/baz/BUILD": textwrap.dedent(
@@ -437,7 +442,7 @@ def test_generate_chroot(chroot_rule_runner: RuleRunner) -> None:
     )
 
 
-def test_generate_chroot_entry_points(chroot_rule_runner: RuleRunner) -> None:
+def test_generate_chroot_entry_points(chroot_rule_runner: PythonRuleRunner) -> None:
     chroot_rule_runner.write_files(
         {
             "src/python/foo/qux/BUILD": textwrap.dedent(
@@ -524,7 +529,7 @@ def test_generate_chroot_entry_points(chroot_rule_runner: RuleRunner) -> None:
     )
 
 
-def test_generate_long_description_field_from_file(chroot_rule_runner: RuleRunner) -> None:
+def test_generate_long_description_field_from_file(chroot_rule_runner: PythonRuleRunner) -> None:
     chroot_rule_runner.write_files(
         {
             "src/python/foo/BUILD": textwrap.dedent(
@@ -564,7 +569,7 @@ def test_generate_long_description_field_from_file(chroot_rule_runner: RuleRunne
 
 
 def test_generate_long_description_field_from_file_already_having_it(
-    chroot_rule_runner: RuleRunner,
+    chroot_rule_runner: PythonRuleRunner,
 ) -> None:
     chroot_rule_runner.write_files(
         {
@@ -592,7 +597,7 @@ def test_generate_long_description_field_from_file_already_having_it(
 
 
 def test_generate_long_description_field_from_non_existing_file(
-    chroot_rule_runner: RuleRunner,
+    chroot_rule_runner: PythonRuleRunner,
 ) -> None:
     chroot_rule_runner.write_files(
         {
@@ -617,7 +622,7 @@ def test_generate_long_description_field_from_non_existing_file(
     )
 
 
-def test_invalid_binary(chroot_rule_runner: RuleRunner) -> None:
+def test_invalid_binary(chroot_rule_runner: PythonRuleRunner) -> None:
     chroot_rule_runner.write_files(
         {
             "src/python/invalid_binary/lib.py": "",
@@ -683,7 +688,7 @@ def test_invalid_binary(chroot_rule_runner: RuleRunner) -> None:
     )
 
 
-def test_binary_shorthand(chroot_rule_runner: RuleRunner) -> None:
+def test_binary_shorthand(chroot_rule_runner: PythonRuleRunner) -> None:
     chroot_rule_runner.write_files(
         {
             "src/python/project/app.py": "",
@@ -1132,7 +1137,7 @@ def test_owned_dependencies() -> None:
 
 
 @pytest.fixture
-def exporting_owner_rule_runner() -> RuleRunner:
+def exporting_owner_rule_runner() -> PythonRuleRunner:
     return create_setup_py_rule_runner(
         rules=[
             get_exporting_owner,
@@ -1142,7 +1147,7 @@ def exporting_owner_rule_runner() -> RuleRunner:
     )
 
 
-def assert_is_owner(rule_runner: RuleRunner, owner: str, owned: Address):
+def assert_is_owner(rule_runner: PythonRuleRunner, owner: str, owned: Address):
     tgt = rule_runner.get_target(owned)
     assert (
         owner
@@ -1165,15 +1170,15 @@ def assert_owner_error(rule_runner, owned: Address, exc_cls: type[Exception]):
     assert type(ex.wrapped_exceptions[0]) == exc_cls
 
 
-def assert_no_owner(rule_runner: RuleRunner, owned: Address):
+def assert_no_owner(rule_runner: PythonRuleRunner, owned: Address):
     assert_owner_error(rule_runner, owned, NoOwnerError)
 
 
-def assert_ambiguous_owner(rule_runner: RuleRunner, owned: Address):
+def assert_ambiguous_owner(rule_runner: PythonRuleRunner, owned: Address):
     assert_owner_error(rule_runner, owned, AmbiguousOwnerError)
 
 
-def test_get_owner_simple(exporting_owner_rule_runner: RuleRunner) -> None:
+def test_get_owner_simple(exporting_owner_rule_runner: PythonRuleRunner) -> None:
     exporting_owner_rule_runner.write_files(
         {
             "src/python/foo/bar/baz/BUILD": textwrap.dedent(
@@ -1256,7 +1261,7 @@ def test_get_owner_simple(exporting_owner_rule_runner: RuleRunner) -> None:
     )
 
 
-def test_get_owner_siblings(exporting_owner_rule_runner: RuleRunner) -> None:
+def test_get_owner_siblings(exporting_owner_rule_runner: PythonRuleRunner) -> None:
     exporting_owner_rule_runner.write_files(
         {
             "src/python/siblings/BUILD": textwrap.dedent(
@@ -1284,7 +1289,7 @@ def test_get_owner_siblings(exporting_owner_rule_runner: RuleRunner) -> None:
     )
 
 
-def test_get_owner_not_an_ancestor(exporting_owner_rule_runner: RuleRunner) -> None:
+def test_get_owner_not_an_ancestor(exporting_owner_rule_runner: PythonRuleRunner) -> None:
     exporting_owner_rule_runner.write_files(
         {
             "src/python/notanancestor/aaa/BUILD": textwrap.dedent(
@@ -1312,7 +1317,9 @@ def test_get_owner_not_an_ancestor(exporting_owner_rule_runner: RuleRunner) -> N
     )
 
 
-def test_get_owner_multiple_ancestor_generations(exporting_owner_rule_runner: RuleRunner) -> None:
+def test_get_owner_multiple_ancestor_generations(
+    exporting_owner_rule_runner: PythonRuleRunner,
+) -> None:
     exporting_owner_rule_runner.write_files(
         {
             "src/python/aaa/bbb/ccc/BUILD": textwrap.dedent(
@@ -1392,7 +1399,7 @@ def test_does_not_declare_pkg_resources_namespace_package(python_src: str) -> No
 
 
 def test_no_dist_type_selected() -> None:
-    rule_runner = RuleRunner(
+    rule_runner = PythonRuleRunner(
         rules=[
             determine_explicitly_provided_setup_kwargs,
             generate_chroot,
@@ -1448,7 +1455,7 @@ def test_no_dist_type_selected() -> None:
     )
 
 
-def test_too_many_interpreter_constraints(chroot_rule_runner: RuleRunner) -> None:
+def test_too_many_interpreter_constraints(chroot_rule_runner: PythonRuleRunner) -> None:
     chroot_rule_runner.write_files(
         {
             "src/python/foo/BUILD": textwrap.dedent(

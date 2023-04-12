@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from textwrap import dedent
+from typing import Iterable
 
 import pytest
 
@@ -143,9 +144,9 @@ def test_find_python_interpreter_constraints_from_lockfile() -> None:
 
     def assert_ics(
         lckfile: str,
-        expected: list[str],
+        expected: Iterable[str],
         *,
-        ics: RankedValue = RankedValue(Rank.HARDCODED, Black.default_interpreter_constraints),
+        ics: RankedValue = RankedValue(Rank.HARDCODED, list(Black.default_interpreter_constraints)),
         metadata: PythonLockfileMetadata | None = default_metadata,
     ) -> None:
         black = create_subsystem(

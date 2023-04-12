@@ -11,7 +11,7 @@ from textwrap import dedent
 import pytest
 
 from pants.backend.python import target_types_rules
-from pants.backend.python.goals.setup_py import rules as setup_py_rules
+from pants.backend.python.goals import package_dists
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.subsystems.setuptools import rules as setuptools_rules
 from pants.backend.python.target_types import PythonDistribution, PythonSourcesGeneratorTarget
@@ -23,15 +23,16 @@ from pants.backend.python.util_rules.python_sources import PythonSourceFiles
 from pants.build_graph.address import Address
 from pants.core.util_rules.source_files import SourceFiles
 from pants.engine.fs import CreateDigest, Digest, DigestContents, FileContent, Snapshot
-from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.testutil.python_rule_runner import PythonRuleRunner
+from pants.testutil.rule_runner import QueryRule
 
 
 @pytest.fixture
-def rule_runner() -> RuleRunner:
-    return RuleRunner(
+def rule_runner() -> PythonRuleRunner:
+    return PythonRuleRunner(
         rules=[
             *local_dists.rules(),
-            *setup_py_rules(),
+            *package_dists.rules(),
             *setuptools_rules(),
             *target_types_rules.rules(),
             *pex_from_targets.rules(),
@@ -43,7 +44,7 @@ def rule_runner() -> RuleRunner:
     )
 
 
-def test_build_local_dists(rule_runner: RuleRunner) -> None:
+def test_build_local_dists(rule_runner: PythonRuleRunner) -> None:
     foo = PurePath("foo")
     rule_runner.write_files(
         {
