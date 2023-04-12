@@ -34,15 +34,16 @@ class SyntheticPyenvTargetsRequest(SyntheticTargetsRequest):
 
 @rule
 async def make_synthetic_targets(request: SyntheticPyenvTargetsRequest) -> SyntheticAddressMaps:
-    source = "BUILD.pyenv"
     return SyntheticAddressMaps.for_targets_request(
         request,
         [
             (
-                source,
+                "BUILD.pyenv",
                 (
                     TargetAdaptor(
-                        "_pyenv_install", name="pants-pyenv-install", __source__=(source, 0)
+                        "_pyenv_install",
+                        name="pants-pyenv-install",
+                        description_of_origin="the `pyenv` provider",
                     ),
                 ),
             )

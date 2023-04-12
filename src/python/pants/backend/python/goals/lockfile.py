@@ -280,14 +280,13 @@ async def python_lockfile_synthetic_targets(
     def synthesize_BUILD_file(
         spec_path: str, lockfiles: Iterator[tuple[str, str, str]]
     ) -> tuple[str, tuple[TargetAdaptor, ...]]:
-        source = os.path.join(spec_path, "BUILD.python-lockfiles")
         return (
-            source,
+            os.path.join(spec_path, "BUILD.python-lockfiles"),
             tuple(
                 TargetAdaptor(
                     "_lockfiles",
                     name=synthetic_lockfile_target_name(name),
-                    __source__=(source, 0),
+                    description_of_origin=f"the [python].resolves option {name!r}",
                     sources=[lockfile],
                 )
                 for _, lockfile, name in lockfiles

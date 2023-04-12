@@ -308,7 +308,7 @@ def test_target_glob_parse_spec(target_spec: str | Mapping[str, Any], expected: 
 )
 def test_targetglob_match(expected: bool, target_spec: str) -> None:
     path = "src/file.ext"
-    adaptor = TargetAdaptor("file", None, tags=["tag-a", "tag-c"], __source__=("BUILD", 0))
+    adaptor = TargetAdaptor("file", None, tags=["tag-a", "tag-c"], description_of_origin="BUILD:1")
     address = Address(os.path.dirname(path), relative_file_path=os.path.basename(path))
     assert expected == TargetGlob.parse(target_spec, "src").match(address, adaptor, "src")
 

@@ -192,7 +192,10 @@ async def _determine_target_adaptor_and_type(
     target_type = registered_target_types.aliases_to_types.get(target_adaptor.type_alias, None)
     if target_type is None:
         raise UnrecognizedTargetTypeException(
-            target_adaptor.type_alias, registered_target_types, req.address, target_adaptor.source
+            target_adaptor.type_alias,
+            registered_target_types,
+            req.address,
+            target_adaptor.description_of_origin,
         )
     if (
         target_type.deprecated_alias is not None
@@ -303,7 +306,7 @@ async def resolve_generator_target_requests(
         req.address,
         name_explicitly_set=target_adaptor.name_explicitly_set,
         union_membership=union_membership,
-        build_file_source=target_adaptor.source,
+        description_of_origin=target_adaptor.description_of_origin,
     )
     overrides = await _target_generator_overrides(base_generator, unmatched_build_file_globs)
     return ResolvedTargetGeneratorRequests(
@@ -374,7 +377,7 @@ def _target_parametrizations(
                     parameterized_address,
                     name_explicitly_set=target_adaptor.name_explicitly_set,
                     union_membership=union_membership,
-                    build_file_source=target_adaptor.source,
+                    description_of_origin=target_adaptor.description_of_origin,
                 ),
             )
             for parameterized_address, parameterized_fields in (first, *rest)
@@ -387,7 +390,7 @@ def _target_parametrizations(
             address,
             name_explicitly_set=target_adaptor.name_explicitly_set,
             union_membership=union_membership,
-            build_file_source=target_adaptor.source,
+            description_of_origin=target_adaptor.description_of_origin,
         )
         for field_type in target.field_types:
             if (
@@ -444,7 +447,7 @@ def _parametrized_target_generators_with_templates(
                 address,
                 name_explicitly_set=target_adaptor.name is not None,
                 union_membership=union_membership,
-                build_file_source=target_adaptor.source,
+                description_of_origin=target_adaptor.description_of_origin,
             ),
             template,
         )
@@ -518,7 +521,7 @@ async def resolve_target_for_bootstrapping(
         name_explicitly_set=target_adaptor.name_explicitly_set,
         union_membership=union_membership,
         ignore_unrecognized_fields=True,
-        build_file_source=target_adaptor.source,
+        description_of_origin=target_adaptor.description_of_origin,
     )
     return WrappedTargetForBootstrap(target)
 
@@ -1305,7 +1308,7 @@ async def resolve_dependencies(
         )
     except Exception as e:
         raise InvalidFieldException(
-            f"{tgt.origin}: Failed to get dependencies for {tgt.address}: {e}"
+            f"{tgt.description_of_origin}: Failed to get dependencies for {tgt.address}: {e}"
         )
 
     # Infer any dependencies (based on `SourcesField` field).
@@ -1554,7 +1557,7 @@ async def generate_file_targets(
         raise InvalidFieldException(
             softwrap(
                 f"""
-                {tgt.origin}: Invalid field value for {fld.alias!r} in target {tgt.address}:
+                {tgt.description_of_origin}: Invalid field value for {fld.alias!r} in target {tgt.address}:
                 {e}
                 """
             )

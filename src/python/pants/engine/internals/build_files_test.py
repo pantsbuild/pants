@@ -828,7 +828,7 @@ def test_build_file_parse_error(target_adaptor_rule_runner: RuleRunner) -> None:
         )
 
 
-def test_build_file_source(target_adaptor_rule_runner: RuleRunner) -> None:
+def test_build_file_description_of_origin(target_adaptor_rule_runner: RuleRunner) -> None:
     target_adaptor_rule_runner.write_files(
         {
             "src/BUILD": dedent(
@@ -843,4 +843,4 @@ def test_build_file_source(target_adaptor_rule_runner: RuleRunner) -> None:
         TargetAdaptor,
         [TargetAdaptorRequest(Address("src", target_name="foo"), description_of_origin="test")],
     )
-    assert ("src/BUILD", 2) == target_adaptor.source
+    assert "src/BUILD:2" == target_adaptor.description_of_origin
