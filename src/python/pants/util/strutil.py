@@ -357,9 +357,7 @@ class _JsonEncoder(json.JSONEncoder):
         if isinstance(o, (abc.Sequence, OrderedSet, FrozenOrderedSet)):
             return list(o)
         if isinstance(o, (Digest,)):
-            return {
-                "fingerprint": o.fingerprint,
-            }
+            return {"fingerprint": o.fingerprint}
         return super().default(o)
 
 
