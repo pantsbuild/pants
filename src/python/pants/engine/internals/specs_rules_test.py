@@ -6,7 +6,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from textwrap import dedent
 from typing import Iterable, Type
-from pants.source.filespec import Filespec
 
 import pytest
 
@@ -53,6 +52,7 @@ from pants.engine.target import (
     TargetRootsToFieldSetsRequest,
 )
 from pants.engine.unions import UnionMembership, UnionRule, union
+from pants.source.filespec import Filespec
 from pants.testutil.rule_runner import RuleRunner, engine_error
 from pants.util.frozendict import FrozenDict
 from pants.util.strutil import softwrap
@@ -837,6 +837,7 @@ def test_resolve_specs_paths(rule_runner: RuleRunner) -> None:
 class FortranSources(MultipleSourcesField):
     pass
 
+
 def test_find_valid_field_sets(caplog) -> None:
     class FortranTarget(Target):
         alias = "fortran_target"
@@ -1044,26 +1045,28 @@ def test_no_applicable_targets_exception() -> None:
         exc
     )
 
+
 class FortranSecondaryOwnerField(StringField, SecondaryOwnerMixin):
     alias = "borrows"
 
     @property
     def filespec(self) -> Filespec:
+        assert self.value
         return {"includes": [self.value]}
+
 
 def test_secondary_owner_warning(caplog) -> None:
     class FortranTarget(Target):
         alias = "fortran_target"
-        core_fields = (FortranSources, )
+        core_fields = (FortranSources,)
 
     class SecondaryOwnerTarget(Target):
         alias = "secondary_owner_target"
-        core_fields = (FortranSecondaryOwnerField, )
+        core_fields = (FortranSecondaryOwnerField,)
 
     @union
     class SomeGoalFieldSet(FieldSet):
         pass
-
 
     @dataclass(frozen=True)
     class SecondaryOwnerFS(SomeGoalFieldSet):
@@ -1084,30 +1087,48 @@ def test_secondary_owner_warning(caplog) -> None:
             "BUILD": dedent(
                 """\
                 fortran_target(name="primary", sources=["a.ft"])
-                secondary_owner_target(name="secondary", borrows="a.ft")
+                secondary_owner_target(name="secondary1", borrows="a.ft")
+                secondary_owner_target(name="secondary2", borrows="a.ft")
                 """
-            )
+            ),
+            "a.ft": "",
         }
     )
-    primary_spec = AddressLiteralSpec("", "primary")
-    secondary_spec = AddressLiteralSpec("", "secondary")
-
 
     request = TargetRootsToFieldSetsRequest(
-            SomeGoalFieldSet,
-            goal_description="fake",
-            no_applicable_targets_behavior=NoApplicableTargetsBehavior.error,
-        )
-    result = rule_runner.request(
-        TargetRootsToFieldSets,
-        [
-            request,
-            Specs(
-                includes=RawSpecs.create([primary_spec, secondary_spec], description_of_origin="tests"),
-                ignores=RawSpecs(description_of_origin="tests"),
-            ),
-        ],
+        SomeGoalFieldSet,
+        goal_description="some goal",
+        no_applicable_targets_behavior=NoApplicableTargetsBehavior.warn,
     )
 
+    def run_rule(specs: Iterable[Spec]):
+        caplog.clear()
+        return rule_runner.request(
+            TargetRootsToFieldSets,
+            [
+                request,
+                Specs(
+                    includes=RawSpecs.create(specs, description_of_origin="tests"),
+                    ignores=RawSpecs(description_of_origin="tests"),
+                ),
+            ],
+        )
+
+    result = run_rule([AddressLiteralSpec("", "primary"), AddressLiteralSpec("", "secondary1")])
+    # No warning because the secondary target was referred to by address literally
+    assert len(caplog.records) == 0
+    assert result.mapping
+
+    result = run_rule([AddressLiteralSpec("", "primary")])
     assert len(caplog.records) == 1
-    assert "No applicable files or targets matched." in caplog.text
+    assert "Refer to the following targets" not in caplog.text
+    assert not result.mapping
+
+    run_rule([FileLiteralSpec("a.ft")])
+    assert len(caplog.records) == 1
+    assert "Refer to the following targets by their addresses:\n\n  * //:secondary1" in caplog.text
+
+    run_rule([FileLiteralSpec("a.ft"), AddressLiteralSpec("", "secondary1")])
+    assert len(caplog.records) == 1
+    assert "secondary1" not in caplog.text
+    assert "secondary2" in caplog.text

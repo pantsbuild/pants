@@ -11,6 +11,7 @@ from typing import ClassVar, Iterable, Iterator, cast
 from typing_extensions import Protocol
 
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
+from pants.build_graph.address import Address
 from pants.engine.fs import GlobExpansionConjunction, PathGlobs
 from pants.util.dirutil import fast_relpath_optional, recursive_dirname
 from pants.util.frozendict import FrozenDict
@@ -61,6 +62,14 @@ class AddressLiteralSpec(Spec):
             self.target_component is None
             and self.generated_component is None
             and not self.parameters
+        )
+
+    def to_address(self) -> Address:
+        return Address(
+            self.path_component,
+            target_name=self.target_component,
+            generated_name=self.generated_component,
+            parameters=self.parameters,
         )
 
 

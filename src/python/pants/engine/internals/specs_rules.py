@@ -529,10 +529,16 @@ async def find_valid_field_sets_for_target_roots(
         ):
             logger.warning(str(no_applicable_exception))
 
-
     secondary_owner_targets = set()
+    specified_literal_addresses = {
+        address_literal.to_address() for address_literal in specs.includes.address_literals
+    }
     for tgt, field_sets in targets_to_applicable_field_sets.items():
-        if any(isinstance(field, SecondaryOwnerMixin) for field in tgt.field_values.values()):
+        is_secondary = any(
+            isinstance(field, SecondaryOwnerMixin) for field in tgt.field_values.values()
+        )
+        is_explicitly_specified = tgt.address in specified_literal_addresses
+        if is_secondary and not is_explicitly_specified:
             secondary_owner_targets.add(tgt)
     if secondary_owner_targets:
         warn_or_error(
@@ -549,7 +555,7 @@ async def find_valid_field_sets_for_target_roots(
 
                 {bullet_list(sorted(tgt.address.spec for tgt in secondary_owner_targets))}
                 """
-            )
+            ),
         )
 
     if request.num_shards > 0:
