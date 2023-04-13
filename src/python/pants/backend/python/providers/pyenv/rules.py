@@ -23,10 +23,10 @@ from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessCacheScope, ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
-from pants.option.option_types import DictOption
+from pants.option.option_types import StrListOption
 from pants.util.frozendict import FrozenDict
 from pants.util.meta import classproperty
-from pants.util.strutil import softwrap
+from pants.util.strutil import softwrap, stable_hash
 
 PYENV_NAMED_CACHE = ".pyenv"
 PYENV_APPEND_ONLY_CACHES = FrozenDict({"pyenv": PYENV_NAMED_CACHE})
@@ -62,24 +62,27 @@ class PyenvPythonProviderSubsystem(TemplatedExternalTool):
     default_version = "2.3.13"
     default_url_template = "https://github.com/pyenv/pyenv/archive/refs/tags/v{version}.tar.gz"
 
-    installation_env_vars = DictOption[str](
-        help=softwrap(
-            """
-            Environment variables to set when invoking `pyenv install`.
+    class EnvironmentAware:
+        installation_extra_env_vars = StrListOption(
+            help=softwrap(
+                """
+                Additional environment variables to include when running `pyenv install`.
 
-            This is especially useful if you want to use an optimized Python (E.g. setting
-            `PYTHON_CONFIGURE_OPTS='--enable-optimizations --with-lto'` and
-            `PYTHON_CFLAGS='-march=native -mtune=native'`) or need custom compiler flags.
+                Entries are strings in the form `ENV_VAR=value` to use explicitly; or just
+                `ENV_VAR` to copy the value of a variable in Pants's own environment.
 
-            Note that changes to this option result in a different fingerprint for the installed
-            Python, and therefore will cause a full re-install if changed.
+                This is especially useful if you want to use an optimized Python (E.g. setting
+                `PYTHON_CONFIGURE_OPTS='--enable-optimizations --with-lto'` and
+                `PYTHON_CFLAGS='-march=native -mtune=native'`) or need custom compiler flags.
 
-            See https://github.com/pyenv/pyenv/blob/master/plugins/python-build/README.md#special-environment-variables
-            for supported env vars.
-            """,
-        ),
-        fromfile=True,
-    )
+                Note that changes to this option result in a different fingerprint for the installed
+                Python, and therefore will cause a full re-install if changed.
+
+                See https://github.com/pyenv/pyenv/blob/master/plugins/python-build/README.md#special-environment-variables
+                for supported env vars.
+                """
+            ),
+        )
 
     @classproperty
     def default_known_versions(cls):
@@ -114,15 +117,19 @@ class PyenvInstallInfoRequest:
 async def get_pyenv_install_info(
     _: PyenvInstallInfoRequest,
     pyenv_subsystem: PyenvPythonProviderSubsystem,
+    pyenv_env_aware: PyenvPythonProviderSubsystem.EnvironmentAware,
     platform: Platform,
     python_binary: PythonBinary,
 ) -> RunRequest:
     env_vars, pyenv = await MultiGet(
-        Get(EnvironmentVars, EnvironmentVarsRequest(["PATH"])),
+        Get(
+            EnvironmentVars,
+            EnvironmentVarsRequest(("PATH",) + pyenv_env_aware.installation_extra_env_vars),
+        ),
         Get(DownloadedExternalTool, ExternalToolRequest, pyenv_subsystem.get_request(platform)),
     )
-    frozen_env_vars = FrozenDict(pyenv_subsystem.installation_env_vars)
-    installation_fingerprint = hash(frozen_env_vars)
+    installation_env_vars = {key: name for key, name in env_vars.items() if key != "PATH"}
+    installation_fingerprint = stable_hash(installation_env_vars)
     install_script_digest = await Get(
         Digest,
         CreateDigest(
@@ -194,7 +201,7 @@ async def get_pyenv_install_info(
         extra_env={
             "PATH": env_vars.get("PATH", ""),
             "TMPDIR": "{chroot}/tmpdir",
-            **frozen_env_vars,
+            **installation_env_vars,
         },
         append_only_caches=PYENV_APPEND_ONLY_CACHES,
     )
