@@ -547,7 +547,7 @@ async def find_valid_field_sets_for_target_roots(
                 f"""
                 Refer to the following targets by their addresses:
 
-                {bullet_list(sorted(secondary_owner_targets))}
+                {bullet_list(sorted(tgt.address.spec for tgt in secondary_owner_targets))}
                 """
             )
         )

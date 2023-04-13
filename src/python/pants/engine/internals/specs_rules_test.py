@@ -6,6 +6,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from textwrap import dedent
 from typing import Iterable, Type
+from pants.source.filespec import Filespec
 
 import pytest
 
@@ -41,6 +42,7 @@ from pants.engine.target import (
     MultipleSourcesField,
     NoApplicableTargetsBehavior,
     OverridesField,
+    SecondaryOwnerMixin,
     SingleSourceField,
     StringField,
     Tags,
@@ -835,7 +837,6 @@ def test_resolve_specs_paths(rule_runner: RuleRunner) -> None:
 class FortranSources(MultipleSourcesField):
     pass
 
-
 def test_find_valid_field_sets(caplog) -> None:
     class FortranTarget(Target):
         alias = "fortran_target"
@@ -1042,3 +1043,71 @@ def test_no_applicable_targets_exception() -> None:
     assert "However, you only specified target and file arguments with these target types:" in str(
         exc
     )
+
+class FortranSecondaryOwnerField(StringField, SecondaryOwnerMixin):
+    alias = "borrows"
+
+    @property
+    def filespec(self) -> Filespec:
+        return {"includes": [self.value]}
+
+def test_secondary_owner_warning(caplog) -> None:
+    class FortranTarget(Target):
+        alias = "fortran_target"
+        core_fields = (FortranSources, )
+
+    class SecondaryOwnerTarget(Target):
+        alias = "secondary_owner_target"
+        core_fields = (FortranSecondaryOwnerField, )
+
+    @union
+    class SomeGoalFieldSet(FieldSet):
+        pass
+
+
+    @dataclass(frozen=True)
+    class SecondaryOwnerFS(SomeGoalFieldSet):
+        required_fields = (FortranSecondaryOwnerField,)
+
+        secondary_owner: FortranSecondaryOwnerField
+
+    rule_runner = RuleRunner(
+        rules=[
+            QueryRule(TargetRootsToFieldSets, [TargetRootsToFieldSetsRequest, Specs]),
+            UnionRule(SomeGoalFieldSet, SecondaryOwnerFS),
+        ],
+        target_types=[FortranTarget, SecondaryOwnerTarget],
+    )
+
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                fortran_target(name="primary", sources=["a.ft"])
+                secondary_owner_target(name="secondary", borrows="a.ft")
+                """
+            )
+        }
+    )
+    primary_spec = AddressLiteralSpec("", "primary")
+    secondary_spec = AddressLiteralSpec("", "secondary")
+
+
+    request = TargetRootsToFieldSetsRequest(
+            SomeGoalFieldSet,
+            goal_description="fake",
+            no_applicable_targets_behavior=NoApplicableTargetsBehavior.error,
+        )
+    result = rule_runner.request(
+        TargetRootsToFieldSets,
+        [
+            request,
+            Specs(
+                includes=RawSpecs.create([primary_spec, secondary_spec], description_of_origin="tests"),
+                ignores=RawSpecs(description_of_origin="tests"),
+            ),
+        ],
+    )
+
+    assert len(caplog.records) == 1
+    assert "No applicable files or targets matched." in caplog.text
