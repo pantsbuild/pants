@@ -414,5 +414,5 @@ def test_stable_hash() -> None:
     )
     assert (
         stable_hash(data).hexdigest()
-        == "e4da3c55de6ce98ddcbd5b854ff01f5c8b47fdcb2e10ddd5176505e39a332730"
+        == "1f2a0caa2588274fa99dc7397c1687dbbe6159be0de646a37ba7af241ecf1add"
     )
