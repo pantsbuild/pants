@@ -32,7 +32,7 @@ from pants.engine.environment import EnvironmentName
 from pants.engine.fs import PathGlobs, SpecsPaths, Workspace
 from pants.engine.internals.native_engine import EMPTY_SNAPSHOT, Snapshot
 from pants.engine.rules import QueryRule
-from pants.engine.target import FieldSet, FilteredTargets, MultipleSourcesField, Target
+from pants.engine.target import Field, FieldSet, FilteredTargets, MultipleSourcesField, Target
 from pants.engine.unions import UnionMembership
 from pants.option.option_types import SkipOption
 from pants.option.subsystem import Subsystem
@@ -48,15 +48,21 @@ class MockMultipleSourcesField(MultipleSourcesField):
     pass
 
 
+class MockRequiredField(Field):
+    alias = "required"
+    required = True
+
+
 class MockTarget(Target):
     alias = "mock_target"
-    core_fields = (MockMultipleSourcesField,)
+    core_fields = (MockMultipleSourcesField, MockRequiredField)
 
 
 @dataclass(frozen=True)
 class MockLinterFieldSet(FieldSet):
     required_fields = (MultipleSourcesField,)
     sources: MultipleSourcesField
+    required: MockRequiredField
 
 
 class MockLintRequest(LintRequest, metaclass=ABCMeta):
@@ -307,7 +313,9 @@ def rule_runner() -> RuleRunner:
 
 
 def make_target(address: Optional[Address] = None) -> Target:
-    return MockTarget({}, address or Address("", target_name="tests"))
+    return MockTarget(
+        {MockRequiredField.alias: "present"}, address or Address("", target_name="tests")
+    )
 
 
 def run_lint_rule(
@@ -559,8 +567,16 @@ def test_default_single_partition_partitioner() -> None:
     ]
     rule_runner = RuleRunner(rules=rules)
     field_sets = (
-        MockLinterFieldSet(Address("knife"), MultipleSourcesField(["knife"], Address("knife"))),
-        MockLinterFieldSet(Address("bowl"), MultipleSourcesField(["bowl"], Address("bowl"))),
+        MockLinterFieldSet(
+            Address("knife"),
+            MultipleSourcesField(["knife"], Address("knife")),
+            MockRequiredField("present", Address("")),
+        ),
+        MockLinterFieldSet(
+            Address("bowl"),
+            MultipleSourcesField(["bowl"], Address("bowl")),
+            MockRequiredField("present", Address("")),
+        ),
     )
     partitions = rule_runner.request(Partitions, [LintKitchenRequest.PartitionRequest(field_sets)])
     assert len(partitions) == 1
