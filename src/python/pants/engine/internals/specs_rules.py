@@ -11,6 +11,7 @@ from collections import defaultdict
 from typing import Iterable
 
 from pants.backend.project_info.filter_targets import FilterSubsystem
+from pants.base.deprecated import warn_or_error
 from pants.base.specs import (
     AddressLiteralSpec,
     AncestorGlobSpec,
@@ -45,6 +46,7 @@ from pants.engine.target import (
     FilteredTargets,
     NoApplicableTargetsBehavior,
     RegisteredTargetTypes,
+    SecondaryOwnerMixin,
     SourcesField,
     SourcesPaths,
     SourcesPathsRequest,
@@ -62,7 +64,7 @@ from pants.util.dirutil import recursive_dirname
 from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
-from pants.util.strutil import bullet_list
+from pants.util.strutil import bullet_list, softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -526,6 +528,35 @@ async def find_valid_field_sets_for_target_roots(
             and not empty_ok
         ):
             logger.warning(str(no_applicable_exception))
+
+    secondary_owner_targets = set()
+    specified_literal_addresses = {
+        address_literal.to_address() for address_literal in specs.includes.address_literals
+    }
+    for tgt, field_sets in targets_to_applicable_field_sets.items():
+        is_secondary = any(
+            isinstance(field, SecondaryOwnerMixin) for field in tgt.field_values.values()
+        )
+        is_explicitly_specified = tgt.address in specified_literal_addresses
+        if is_secondary and not is_explicitly_specified:
+            secondary_owner_targets.add(tgt)
+    if secondary_owner_targets:
+        warn_or_error(
+            removal_version="2.18.0.dev0",
+            entity=softwrap(
+                """
+                indirectly referring to a target by using a corresponding file argument, when the
+                target owning the file isn't applicable
+                """
+            ),
+            hint=softwrap(
+                f"""
+                Refer to the following targets by their addresses:
+
+                {bullet_list(sorted(tgt.address.spec for tgt in secondary_owner_targets))}
+                """
+            ),
+        )
 
     if request.num_shards > 0:
         sharded_targets_to_applicable_field_sets = {
