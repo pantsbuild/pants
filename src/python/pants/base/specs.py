@@ -37,7 +37,7 @@ class AddressLiteralSpec(Spec):
 
     * A traditional address, like `dir:lib`.
     * A generated target address like `dir:lib#generated` or `dir#generated`.
-    * A file address using disambiguation syntax like dir/f.ext:lib`.
+    * A file address using disambiguation syntax like `dir/f.ext:lib`.
     """
 
     path_component: str
