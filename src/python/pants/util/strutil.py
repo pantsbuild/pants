@@ -350,14 +350,18 @@ class _JsonEncoder(json.JSONEncoder):
 
     def default(self, o):
         """Return a serializable object for o."""
-        if dataclasses.is_dataclass(o):
-            return dataclasses.asdict(o)
         if isinstance(o, abc.Mapping):
             return dict(o)
         if isinstance(o, (abc.Sequence, OrderedSet, FrozenOrderedSet)):
             return list(o)
+
+        # NB: A quick way to embed the type in the hash so that two objects with the same data but
+        # different types produce different hashes.
+        classname = o.__class__.__name__
+        if dataclasses.is_dataclass(o):
+            return {"__class__.__name__": classname, **dataclasses.asdict(o)}
         if isinstance(o, (Digest,)):
-            return {"fingerprint": o.fingerprint}
+            return {"__class__.__name__": classname, "fingerprint": o.fingerprint}
         return super().default(o)
 
 
