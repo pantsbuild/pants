@@ -365,7 +365,7 @@ class _JsonEncoder(json.JSONEncoder):
         return super().default(o)
 
 
-def stable_hash(value: Any, *, name: str = "sha256") -> hashlib._Hash:
+def stable_hash(value: Any, *, name: str = "sha256") -> str:
     """Attempts to return a stable hash of the value stable across processes.
 
     "Stable" here means that if `value` is equivalent in multiple invocations (across multiple
@@ -377,4 +377,4 @@ def stable_hash(value: Any, *, name: str = "sha256") -> hashlib._Hash:
         json.dumps(
             value, indent=None, separators=(",", ":"), sort_keys=True, cls=_JsonEncoder
         ).encode("utf-8"),
-    )
+    ).hexdigest()
