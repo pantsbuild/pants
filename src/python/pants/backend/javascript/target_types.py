@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from pants.core.goals.test import TestExtraEnvVarsField, TestTimeoutField
+from pants.core.util_rules.partitions import TestsBatchCompatibilityTagField
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     Dependencies,
@@ -15,6 +16,7 @@ from pants.engine.target import (
     generate_file_based_overrides_field_help_message,
     generate_multiple_sources_field_help_message,
 )
+from pants.util.strutil import help_text
 
 JS_FILE_EXTENSIONS = (".js", ".cjs", ".mjs")
 
@@ -90,6 +92,12 @@ class JSTestExtraEnvVarsField(TestExtraEnvVarsField):
     pass
 
 
+class JSTestBatchCompatibilityTagField(TestsBatchCompatibilityTagField):
+    help = help_text(
+        TestsBatchCompatibilityTagField.format_help("javascript_test", "nodejs test runner")
+    )
+
+
 class JSTestTarget(Target):
     alias = "javascript_test"
     core_fields = (
@@ -98,6 +106,7 @@ class JSTestTarget(Target):
         JSTestSourceField,
         JSTestTimeoutField,
         JSTestExtraEnvVarsField,
+        JSTestBatchCompatibilityTagField,
     )
     help = "A single Javascript test file."
 
@@ -131,5 +140,10 @@ class JSTestsGeneratorTarget(TargetFilesGenerator):
     )
     generated_target_cls = JSTestTarget
     copied_fields = COMMON_TARGET_FIELDS
-    moved_fields = (JSTestDependenciesField, JSTestTimeoutField, JSTestExtraEnvVarsField)
+    moved_fields = (
+        JSTestDependenciesField,
+        JSTestTimeoutField,
+        JSTestExtraEnvVarsField,
+        JSTestBatchCompatibilityTagField,
+    )
     help = "Generate a `javascript_test` target for each file in the `sources` field."

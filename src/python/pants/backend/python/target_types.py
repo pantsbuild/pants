@@ -926,7 +926,6 @@ class PythonTestsXdistConcurrencyField(IntField):
 
 
 class PythonTestsBatchCompatibilityTagField(TestsBatchCompatibilityTagField):
-    alias = "batch_compatibility_tag"
     help = help_text(TestsBatchCompatibilityTagField.format_help("python_test", "pytest"))
 
 
