@@ -23,6 +23,7 @@ from pants.core.util_rules.external_tool import (
 )
 from pants.core.util_rules.external_tool import rules as external_tool_rules
 from pants.core.util_rules.search_paths import (
+    ExecutableSearchPathsOptionMixin,
     ValidatedSearchPaths,
     ValidateSearchPathsRequest,
     VersionManagerSearchPaths,
@@ -34,6 +35,8 @@ from pants.core.util_rules.system_binaries import (
     BinaryPathRequest,
     BinaryPaths,
     BinaryPathTest,
+    BinaryShims,
+    BinaryShimsRequest,
 )
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest, PathEnvironmentVariable
 from pants.engine.fs import EMPTY_DIGEST, Digest, DownloadFile
@@ -117,9 +120,7 @@ class NodeJS(Subsystem, TemplatedExternalToolOptionsMixin):
         download_file = DownloadFile(url, FileDigest(known_version.sha256, known_version.filesize))
         return await Get(DownloadedExternalTool, ExternalToolRequest(download_file, exe))
 
-    class EnvironmentAware(Subsystem.EnvironmentAware):
-        env_vars_used_by_options = ("PATH",)
-
+    class EnvironmentAware(ExecutableSearchPathsOptionMixin, Subsystem.EnvironmentAware):
         search_path = StrListOption(
             default=["<PATH>"],
             help=lambda cls: help_text(
@@ -152,6 +153,12 @@ class NodeJS(Subsystem, TemplatedExternalToolOptionsMixin):
             ),
             advanced=True,
             metavar="<binary-paths>",
+        )
+
+        executable_search_paths_help = softwrap(
+            """
+            The PATH value that will be used to find any tools required to run nodejs processes.
+            """
         )
 
 
@@ -235,12 +242,13 @@ class NodeJSBinaries:
 class NodeJSProcessEnvironment:
     binaries: NodeJSBinaries
     npm_config_cache: str
+    tool_binaries: BinaryShims
 
     base_bin_dir: ClassVar[str] = "__node"
 
     def to_env_dict(self) -> dict[str, str]:
         return {
-            "PATH": f"/bin:{self.binary_directory}",
+            "PATH": f"{self.tool_binaries.path_component}:{self.binary_directory}",
             "npm_config_cache": self.npm_config_cache,  # Normally stored at ~/.npm
         }
 
@@ -253,12 +261,32 @@ class NodeJSProcessEnvironment:
         return self.binaries.binary_dir
 
     def immutable_digest(self) -> dict[str, Digest]:
-        return {self.base_bin_dir: self.binaries.digest} if self.binaries.digest else {}
+        return (
+            {self.base_bin_dir: self.binaries.digest, **self.tool_binaries.immutable_input_digests}
+            if self.binaries.digest
+            else {**self.tool_binaries.immutable_input_digests}
+        )
 
 
 @rule(level=LogLevel.DEBUG)
-async def node_process_environment(binaries: NodeJSBinaries) -> NodeJSProcessEnvironment:
-    return NodeJSProcessEnvironment(binaries=binaries, npm_config_cache="._npm")
+async def node_process_environment(
+    binaries: NodeJSBinaries, nodejs: NodeJS.EnvironmentAware
+) -> NodeJSProcessEnvironment:
+    binary_shims = await Get(
+        BinaryShims,
+        BinaryShimsRequest.for_binaries(
+            "sh",
+            "bash",
+            "mkdir",  # Some default scripts are generated using mkdir, rm & touch.
+            "rm",
+            "touch",
+            rationale="execute a nodejs process",
+            search_path=nodejs.executable_search_path,
+        ),
+    )
+    return NodeJSProcessEnvironment(
+        binaries=binaries, npm_config_cache="._npm", tool_binaries=binary_shims
+    )
 
 
 @dataclass(frozen=True)

@@ -40,6 +40,7 @@ def rule_runner() -> RuleRunner:
         ],
         objects=dict(package_json.build_file_aliases().objects),
     )
+    rule_runner.set_options([], env_inherit={"PATH"})
     return rule_runner
 
 
@@ -157,7 +158,7 @@ def test_mocha_tests_are_successful(rule_runner: RuleRunner) -> None:
 
 
 def test_jest_test_with_coverage_reporting(rule_runner: RuleRunner) -> None:
-    rule_runner.set_options(args=["--test-use-coverage", "True"])
+    rule_runner.set_options(args=["--test-use-coverage", "True"], env_inherit={"PATH"})
     rule_runner.write_files(
         {
             "foo/BUILD": textwrap.dedent(

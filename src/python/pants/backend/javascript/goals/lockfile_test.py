@@ -32,7 +32,7 @@ from pants.testutil.rule_runner import RuleRunner
 
 @pytest.fixture
 def rule_runner() -> RuleRunner:
-    return RuleRunner(
+    rule_runner = RuleRunner(
         rules=[
             *lockfile.rules(),
             QueryRule(
@@ -53,6 +53,8 @@ def rule_runner() -> RuleRunner:
         ],
         target_types=[PackageJsonTarget],
     )
+    rule_runner.set_options([], env_inherit={"PATH"})
+    return rule_runner
 
 
 def given_package_with_name(name: str) -> str:

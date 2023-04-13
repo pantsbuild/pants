@@ -27,7 +27,7 @@ from pants.util.ordered_set import FrozenOrderedSet
 
 @pytest.fixture
 def rule_runner() -> RuleRunner:
-    return RuleRunner(
+    rule_runner = RuleRunner(
         rules=[
             *package_json.rules(),
             *dependency_inference_rules(),
@@ -38,6 +38,8 @@ def rule_runner() -> RuleRunner:
         ],
         target_types=[*package_json.target_types(), JSSourceTarget, JSSourcesGeneratorTarget],
     )
+    rule_runner.set_options([], env_inherit={"PATH"})
+    return rule_runner
 
 
 def given_package(name: str, version: str, **kwargs: str | dict[str, str]) -> str:

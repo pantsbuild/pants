@@ -19,7 +19,7 @@ from pants.testutil.rule_runner import RuleRunner
 
 @pytest.fixture
 def rule_runner() -> RuleRunner:
-    return RuleRunner(
+    rule_runner = RuleRunner(
         rules=[
             *run_rules(),
             QueryRule(RunRequest, (RunNodeBuildScriptFieldSet,)),
@@ -31,6 +31,8 @@ def rule_runner() -> RuleRunner:
         ],
         objects=dict(package_json.build_file_aliases().objects),
     )
+    rule_runner.set_options([], env_inherit={"PATH"})
+    return rule_runner
 
 
 def test_creates_run_requests_package_json_scripts(rule_runner: RuleRunner) -> None:

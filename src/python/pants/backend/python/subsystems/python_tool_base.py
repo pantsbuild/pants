@@ -51,7 +51,7 @@ class PythonToolRequirementsBase(Subsystem):
     #  requirements that reflect any minimum capabilities Pants assumes about the tool.
     default_requirements: Sequence[str] = []
 
-    default_interpreter_constraints: ClassVar[Sequence[str]] = []
+    default_interpreter_constraints: ClassVar[Sequence[str]] = ["CPython>=3.7,<4"]
     register_interpreter_constraints: ClassVar[bool] = False
 
     # If this tool does not mix with user requirements you should set this to True.
@@ -171,7 +171,11 @@ class PythonToolRequirementsBase(Subsystem):
     )
 
     def __init__(self, *args, **kwargs):
-        if self.default_interpreter_constraints and not self.register_interpreter_constraints:
+        if (
+            self.default_interpreter_constraints
+            != PythonToolRequirementsBase.default_interpreter_constraints
+            and not self.register_interpreter_constraints
+        ):
             raise ValueError(
                 softwrap(
                     f"""
