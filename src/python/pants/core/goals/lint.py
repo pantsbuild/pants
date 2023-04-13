@@ -430,12 +430,10 @@ async def lint(
     if not partitions_by_request_type:
         return Lint(exit_code=0)
 
-    def batch_by_size(
-        iterable: Iterable[_T], key: Callable[[_T], str] = lambda x: str(x)
-    ) -> Iterator[tuple[_T, ...]]:
+    def batch_by_size(iterable: Iterable[_T]) -> Iterator[tuple[_T, ...]]:
         batches = partition_sequentially(
             iterable,
-            key=key,
+            key=lambda x: str(x.address) if isinstance(x, FieldSet) else str(x),
             size_target=lint_subsystem.batch_size,
             size_max=4 * lint_subsystem.batch_size,
         )

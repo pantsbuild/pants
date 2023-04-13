@@ -723,7 +723,7 @@ async def _get_test_batches(
         for partition in partitions
         for batch in partition_sequentially(
             partition.elements,
-            key=lambda x: str(x),
+            key=lambda x: str(x.address) if isinstance(x, FieldSet) else str(x),
             size_target=test_subsystem.batch_size,
             size_max=2 * test_subsystem.batch_size,
         )
