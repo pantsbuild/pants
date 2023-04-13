@@ -412,7 +412,4 @@ def test_stable_hash() -> None:
             {alpha: alpha.lower() for alpha in [chr(a) for a in range(ord("A"), ord("Z") + 1)]}
         )
     )
-    assert (
-        stable_hash(data).hexdigest()
-        == "1f2a0caa2588274fa99dc7397c1687dbbe6159be0de646a37ba7af241ecf1add"
-    )
+    assert stable_hash(data) == "1f2a0caa2588274fa99dc7397c1687dbbe6159be0de646a37ba7af241ecf1add"

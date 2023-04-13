@@ -130,7 +130,7 @@ class DockerBuildContext:
         # Data from Pants.
         interpolation_context["pants"] = {
             # Present hash for all inputs that can be used for image tagging.
-            "hash": stable_hash((build_args, build_env, snapshot.digest)).hexdigest(),
+            "hash": stable_hash((build_args, build_env, snapshot.digest)),
         }
 
         # Base image tags values for all stages (as parsed from the Dockerfile instructions).
