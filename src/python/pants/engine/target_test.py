@@ -400,7 +400,7 @@ def test_override_preexisting_field_via_new_target() -> None:
 
 
 def test_required_field() -> None:
-    class RequiredField(StringField):
+    class RequiredField(Field):
         alias = "field"
         required = True
 
@@ -409,6 +409,8 @@ def test_required_field() -> None:
         core_fields = (RequiredField,)
 
     address = Address("", target_name="lib")
+    # No errors getting the repr
+    assert repr(RequiredField("present", address))
 
     # No errors when defined
     RequiredTarget({"field": "present"}, address)

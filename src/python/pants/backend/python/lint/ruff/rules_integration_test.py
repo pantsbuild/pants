@@ -9,14 +9,16 @@ import pytest
 
 from pants.backend.python import target_types_rules
 from pants.backend.python.lint.ruff import skip_field
-from pants.backend.python.lint.ruff.rules import RuffRequest
+from pants.backend.python.lint.ruff.rules import RuffFixRequest, RuffLintRequest
 from pants.backend.python.lint.ruff.rules import rules as ruff_rules
 from pants.backend.python.lint.ruff.subsystem import RuffFieldSet
 from pants.backend.python.lint.ruff.subsystem import rules as ruff_subsystem_rules
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import PythonSourcesGeneratorTarget
 from pants.core.goals.fix import FixResult
+from pants.core.goals.lint import LintResult
 from pants.core.util_rules import config_files
+from pants.core.util_rules.partitions import _EmptyMetadata
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, FileContent
@@ -38,7 +40,8 @@ def rule_runner() -> RuleRunner:
             *ruff_subsystem_rules(),
             *config_files.rules(),
             *target_types_rules.rules(),
-            QueryRule(FixResult, [RuffRequest.Batch]),
+            QueryRule(FixResult, [RuffFixRequest.Batch]),
+            QueryRule(LintResult, [RuffLintRequest.Batch]),
             QueryRule(SourceFiles, (SourceFilesRequest,)),
         ],
         target_types=[PythonSourcesGeneratorTarget],
@@ -50,7 +53,7 @@ def run_ruff(
     targets: list[Target],
     *,
     extra_args: list[str] | None = None,
-) -> FixResult:
+) -> tuple[FixResult, LintResult]:
     args = ["--backend-packages=pants.backend.python.lint.ruff", *(extra_args or ())]
     rule_runner.set_options(args, env_inherit={"PATH", "PYENV_ROOT", "HOME"})
 
@@ -58,17 +61,29 @@ def run_ruff(
     source_reqs = [SourceFilesRequest(field_set.source for field_set in field_sets)]
     input_sources = rule_runner.request(SourceFiles, source_reqs)
 
-    req_inputs = [
-        RuffRequest.Batch(
-            "",
-            input_sources.snapshot.files,
-            partition_metadata=None,
-            snapshot=input_sources.snapshot,
-        ),
-    ]
-    result = rule_runner.request(FixResult, req_inputs)
+    fix_result = rule_runner.request(
+        FixResult,
+        [
+            RuffFixRequest.Batch(
+                "",
+                input_sources.snapshot.files,
+                partition_metadata=None,
+                snapshot=input_sources.snapshot,
+            ),
+        ],
+    )
+    lint_result = rule_runner.request(
+        LintResult,
+        [
+            RuffLintRequest.Batch(
+                "",
+                tuple(field_sets),
+                partition_metadata=_EmptyMetadata(),
+            ),
+        ],
+    )
 
-    return result
+    return fix_result, lint_result
 
 
 def get_snapshot(rule_runner: RuleRunner, source_files: dict[str, str]) -> Snapshot:
@@ -85,25 +100,27 @@ def get_snapshot(rule_runner: RuleRunner, source_files: dict[str, str]) -> Snaps
 def test_passing(rule_runner: RuleRunner, major_minor_interpreter: str) -> None:
     rule_runner.write_files({"f.py": GOOD_FILE, "BUILD": "python_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
-    result = run_ruff(
+    fix_result, lint_result = run_ruff(
         rule_runner,
         [tgt],
         extra_args=[f"--python-interpreter-constraints=['=={major_minor_interpreter}.*']"],
     )
-    assert result.stderr == ""
-    assert result.stdout == ""
-    assert not result.did_change
-    assert result.output == get_snapshot(rule_runner, {"f.py": GOOD_FILE})
+    assert lint_result.exit_code == 0
+    assert fix_result.stderr == ""
+    assert fix_result.stdout == ""
+    assert not fix_result.did_change
+    assert fix_result.output == get_snapshot(rule_runner, {"f.py": GOOD_FILE})
 
 
 def test_failing(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({"f.py": BAD_FILE, "BUILD": "python_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
-    result = run_ruff(rule_runner, [tgt])
-    assert result.stdout == "Found 1 error (1 fixed, 0 remaining).\n"
-    assert result.stderr == ""
-    assert result.did_change
-    assert result.output == get_snapshot(rule_runner, {"f.py": GOOD_FILE})
+    fix_result, lint_result = run_ruff(rule_runner, [tgt])
+    assert lint_result.exit_code == 1
+    assert fix_result.stdout == "Found 1 error (1 fixed, 0 remaining).\n"
+    assert fix_result.stderr == ""
+    assert fix_result.did_change
+    assert fix_result.output == get_snapshot(rule_runner, {"f.py": GOOD_FILE})
 
 
 def test_multiple_targets(rule_runner: RuleRunner) -> None:
@@ -118,9 +135,12 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
         rule_runner.get_target(Address("", target_name="t", relative_file_path="good.py")),
         rule_runner.get_target(Address("", target_name="t", relative_file_path="bad.py")),
     ]
-    result = run_ruff(rule_runner, tgts)
-    assert result.output == get_snapshot(rule_runner, {"good.py": GOOD_FILE, "bad.py": GOOD_FILE})
-    assert result.did_change is True
+    fix_result, lint_result = run_ruff(rule_runner, tgts)
+    assert lint_result.exit_code == 1
+    assert fix_result.output == get_snapshot(
+        rule_runner, {"good.py": GOOD_FILE, "bad.py": GOOD_FILE}
+    )
+    assert fix_result.did_change is True
 
 
 @pytest.mark.parametrize(
@@ -152,5 +172,6 @@ def test_config_file(
     rel_file_path = file_path.relative_to(*file_path.parts[:1]) if spec_path else file_path
     addr = Address(spec_path, relative_file_path=str(rel_file_path))
     tgt = rule_runner.get_target(addr)
-    result = run_ruff(rule_runner, [tgt], extra_args=extra_args)
-    assert result.did_change is should_change
+    fix_result, lint_result = run_ruff(rule_runner, [tgt], extra_args=extra_args)
+    assert lint_result.exit_code == bool(should_change)
+    assert fix_result.did_change is should_change
