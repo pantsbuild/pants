@@ -2,10 +2,12 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import textwrap
+from dataclasses import dataclass
 from textwrap import dedent
 
 import pytest
 
+from pants.util.frozendict import FrozenDict
 from pants.util.strutil import (
     bullet_list,
     comma_separated_list,
@@ -18,6 +20,7 @@ from pants.util.strutil import (
     path_safe,
     pluralize,
     softwrap,
+    stable_hash,
     strip_prefix,
     strip_v2_chroot_path,
 )
@@ -397,3 +400,19 @@ def test_docstring_decorator() -> None:
 
     with pytest.raises(AssertionError):
         assert show_why_this_is_needed.__doc__ == "calc 1 + 1 = 2"
+
+
+def test_stable_hash() -> None:
+    @dataclass(frozen=True)
+    class Data:
+        mapping: FrozenDict[str, str]
+
+    data = Data(
+        FrozenDict(
+            {alpha: alpha.lower() for alpha in [chr(a) for a in range(ord("A"), ord("Z") + 1)]}
+        )
+    )
+    assert (
+        stable_hash(data).hexdigest()
+        == "1f2a0caa2588274fa99dc7397c1687dbbe6159be0de646a37ba7af241ecf1add"
+    )
