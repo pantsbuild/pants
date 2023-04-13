@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from abc import ABCMeta, abstractmethod
+from abc import abstractmethod
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
@@ -60,6 +60,7 @@ from pants.engine.internals.session import RunId
 from pants.engine.process import InteractiveProcess, InteractiveProcessResult, ProcessResultMetadata
 from pants.engine.target import (
     BoolField,
+    Field,
     MultipleSourcesField,
     Target,
     TargetRootsToFieldSets,
@@ -93,9 +94,14 @@ class MockSkipTestsField(BoolField):
     default = False
 
 
+class MockRequiredField(Field):
+    alias = "required"
+    required = True
+
+
 class MockTarget(Target):
     alias = "mock_target"
-    core_fields = (MockMultipleSourcesField, MockSkipTestsField)
+    core_fields = (MockMultipleSourcesField, MockSkipTestsField, MockRequiredField)
 
 
 @dataclass(frozen=True)
@@ -107,8 +113,11 @@ class MockCoverageDataCollection(CoverageDataCollection):
     element_type = MockCoverageData
 
 
-class MockTestFieldSet(TestFieldSet, metaclass=ABCMeta):
-    required_fields = (MultipleSourcesField,)
+@dataclass(frozen=True)
+class MockTestFieldSet(TestFieldSet):
+    required_fields = (MultipleSourcesField, MockRequiredField)
+    sources: MultipleSourcesField
+    required: MockRequiredField
 
     @classmethod
     def opt_out(cls, tgt: Target) -> bool:
@@ -196,7 +205,7 @@ def rule_runner() -> RuleRunner:
 def make_target(address: Address | None = None, *, skip: bool = False) -> Target:
     if address is None:
         address = Address("", target_name="tests")
-    return MockTarget({MockSkipTestsField.alias: skip}, address)
+    return MockTarget({MockSkipTestsField.alias: skip, MockRequiredField.alias: "present"}, address)
 
 
 def run_test_rule(
