@@ -548,6 +548,55 @@ async fn garbage_collect_and_compact() {
   );
 }
 
+async fn write_1mb(store: &ByteStore, byte: u8) -> Digest {
+  let mut bytes = BytesMut::with_capacity(1024 * 1024);
+  for _ in 0..1024 * 1024 {
+    bytes.put_u8(byte);
+  }
+  let digest = Digest::of_bytes(&bytes);
+  store
+    .store_bytes(EntryType::File, digest.hash, bytes.freeze(), false)
+    .await
+    .expect("Error storing");
+  digest
+}
+
+#[tokio::test]
+async fn remove_big_file_and_store_again() {
+  let dir = TempDir::new().unwrap();
+  let store = new_store(dir.path());
+
+  let digest1 = write_1mb(&store, b'0').await;
+  let digest2 = write_1mb(&store, b'1').await;
+
+  let size = get_directory_size(dir.path());
+  assert!(
+    size >= 2 * 1024 * 1024,
+    "Expect size to be at least 2MB but was {size}"
+  );
+
+  store.remove(EntryType::File, digest1)
+    .await
+    .expect("Error removing");
+  store.remove(EntryType::File, digest2)
+    .await
+    .expect("Error removing");
+
+  let size = get_directory_size(dir.path());
+  assert!(
+    size < 2 * 1024 * 1024,
+    "Expect size to be less than 2MB but was {size}"
+  );
+
+  write_1mb(&store, b'0').await;
+  write_1mb(&store, b'1').await;
+  let size = get_directory_size(dir.path());
+  assert!(
+    size >= 2 * 1024 * 1024,
+    "Expect size to be at least 2MB but was {size}"
+  );
+}
+
 #[tokio::test]
 async fn entry_type_for_file() {
   let testdata = TestData::roland();
