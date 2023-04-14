@@ -185,7 +185,7 @@ pub enum EntryState<N: Node> {
   // The `previous_result` value for a Running node is not a valid value. See NotStarted.
   Running {
     run_token: RunToken,
-    pending_value: AsyncValue<NodeResult<N>>,
+    pending_value: AsyncValue<NodeResult<N>, NodeResult<N>>,
     generation: Generation,
     previous_result: Option<EntryResult<N>>,
     is_cleaning: bool,
@@ -330,7 +330,7 @@ impl<N: Node> Entry<N> {
     let context = context_factory.clone_for(entry_id);
     let context2 = context.clone();
     let node = node.clone();
-    let (value, mut sender, receiver) = AsyncValue::<NodeResult<N>>::new();
+    let (value, mut sender, receiver) = AsyncValue::<NodeResult<N>, NodeResult<N>>::new();
     let is_cleaning = previous_dep_generations.is_some();
 
     let run_or_clean = async move {
@@ -378,8 +378,8 @@ impl<N: Node> Entry<N> {
 
     let _join = context2.graph().executor.clone().native_spawn(async move {
       let maybe_res = tokio::select! {
-        abort_item = sender.aborted() => {
-          if let Some(res) = abort_item {
+        interrupt_item = sender.interrupted() => {
+          if let Some(res) = interrupt_item {
             // We were aborted via terminate: complete with the given res.
             Some(res.0)
           } else {
@@ -588,7 +588,7 @@ impl<N: Node> Entry<N> {
     context: &Context<N>,
     result_run_token: RunToken,
     dep_generations: Vec<Generation>,
-    sender: AsyncValueSender<NodeResult<N>>,
+    sender: AsyncValueSender<NodeResult<N>, NodeResult<N>>,
     result: Option<Result<N::Item, N::Error>>,
     has_uncacheable_deps: bool,
     _graph: &mut super::InnerGraph<N>,
@@ -830,7 +830,7 @@ impl<N: Node> Entry<N> {
       ..
     } = state
     {
-      let _ = pending_value.try_abort((Err(err), generation.next()));
+      let _ = pending_value.try_interrupt((Err(err), generation.next()));
     };
   }
 

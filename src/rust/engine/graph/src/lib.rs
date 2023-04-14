@@ -703,7 +703,7 @@ impl<N: Node> Graph<N> {
     context: &Context<N>,
     entry_id: EntryId,
     run_token: RunToken,
-    sender: AsyncValueSender<NodeResult<N>>,
+    sender: AsyncValueSender<NodeResult<N>, NodeResult<N>>,
     result: Option<Result<N::Item, N::Error>>,
   ) {
     let (entry, has_uncacheable_deps, dep_generations) = {
