@@ -12,7 +12,7 @@ from pants.core.goals.lint import LintResult, LintTargetsRequest
 from pants.core.util_rules.partitions import Partition, Partitions
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests, PathGlobs, Snapshot
-from pants.engine.process import FallibleProcessResult
+from pants.engine.process import FallibleProcessResult, ProcessCacheScope
 from pants.engine.rules import Get, MultiGet, Rule, collect_rules, rule
 from pants.engine.target import DependenciesRequest, Targets
 from pants.engine.unions import UnionRule
@@ -167,6 +167,9 @@ async def lint(
             concurrency_available=len(input_files.files),
             description=f"Run Semgrep on {pluralize(len(input_files.files), 'file')}.",
             level=LogLevel.DEBUG,
+            cache_scope=ProcessCacheScope.PER_SESSION
+            if semgrep.force
+            else ProcessCacheScope.SUCCESSFUL,
         ),
     )
 

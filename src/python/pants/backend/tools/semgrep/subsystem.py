@@ -65,6 +65,12 @@ class Semgrep(PythonToolBase):
         help="Set to true suppress the warning about `.semgrepignore` files not at the build root not being used",
     )
 
+    force = BoolOption(
+        default=False,
+        help="If true, semgrep is always run, even if the input files haven't changed. This can be used to run cloud rulesets like `--semgrep-force --semgrep-args='--config p/python`.",
+        advanced=True,
+    )
+
 
 class SemgrepLockfileSentinel(GeneratePythonToolLockfileSentinel):
     resolve_name = Semgrep.options_scope
