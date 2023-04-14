@@ -29,7 +29,7 @@ mod context;
 mod entry;
 mod node;
 
-use crate::entry::{Entry, Generation, NodeResult, RunToken};
+use crate::entry::{Entry, Generation, NodeInterrupt, NodeResult, RunToken};
 
 use std::collections::VecDeque;
 use std::fs::File;
@@ -302,12 +302,12 @@ impl<N: Node> InnerGraph<N> {
     // Dirty transitive entries, but do not yet clear their output edges. We wait to clear
     // outbound edges until we decide whether we can clean an entry: if we can, all edges are
     // preserved; if we can't, they are cleared in `Graph::clear_deps`.
-    for id in &transitive_ids {
-      if let Some(mut entry) = self.pg.node_weight_mut(*id).cloned() {
+    for id in transitive_ids {
+      if let Some(entry) = self.entry_for_id_mut(id) {
         if log_dirtied {
           log::info!("Dirtying {}", entry.node());
         }
-        entry.dirty(self);
+        entry.dirty();
       }
     }
 
@@ -684,17 +684,8 @@ impl<N: Node> Graph<N> {
 
   ///
   /// When the Executor finishes executing a Node it calls back to store the result value. We use
-  /// the run_token and dirty bits to determine whether the Node changed while we were busy
-  /// executing it, so that we can discard the work.
-  ///
-  /// We use the dirty bit in addition to the RunToken in order to avoid cases where dependencies
-  /// change while we're running. In order for a dependency to "change" it must have been cleared
-  /// or been marked dirty. But if our dependencies have been cleared or marked dirty, then we will
-  /// have been as well. We can thus use the dirty bit as a signal that the generation values of
-  /// our dependencies are still accurate. The dirty bit is safe to rely on as it is only ever
-  /// mutated, and dependencies' dirty bits are only read, under the InnerGraph lock - this is only
-  /// reliably the case because Entry happens to require a &mut InnerGraph reference; it would be
-  /// great not to violate that in the future.
+  /// the run_token to determine whether the Node changed while we were busy executing it, so that
+  /// we can discard the work.
   ///
   /// See also: `Self::cancel`.
   ///
@@ -703,7 +694,7 @@ impl<N: Node> Graph<N> {
     context: &Context<N>,
     entry_id: EntryId,
     run_token: RunToken,
-    sender: AsyncValueSender<NodeResult<N>, NodeResult<N>>,
+    sender: AsyncValueSender<NodeResult<N>, NodeInterrupt<N>>,
     result: Option<Result<N::Item, N::Error>>,
   ) {
     let (entry, has_uncacheable_deps, dep_generations) = {
@@ -733,7 +724,6 @@ impl<N: Node> Graph<N> {
       )
     };
     if let Some(mut entry) = entry {
-      let mut inner = self.inner.lock();
       entry.complete(
         context,
         run_token,
@@ -741,7 +731,6 @@ impl<N: Node> Graph<N> {
         sender,
         result,
         has_uncacheable_deps,
-        &mut inner,
       );
     }
   }

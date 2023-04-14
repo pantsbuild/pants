@@ -1,8 +1,8 @@
 // Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 use std::mem;
-use std::sync::atomic;
-use std::sync::Arc;
+use std::pin::pin;
+use std::sync::{atomic, Arc};
 
 use crate::context::Context;
 use crate::node::{EntryId, Node, NodeError};
@@ -53,6 +53,12 @@ impl Generation {
   fn next(self) -> Generation {
     Generation(self.0 + 1)
   }
+}
+
+#[derive(Debug)]
+pub(crate) enum NodeInterrupt<N: Node> {
+  Dirtied,
+  Aborted(NodeResult<N>),
 }
 
 ///
@@ -162,7 +168,7 @@ impl<N: Node> AsRef<N::Item> for EntryResult<N> {
 pub type NodeResult<N> = (Result<<N as Node>::Item, <N as Node>::Error>, Generation);
 
 #[derive(Debug)]
-pub enum EntryState<N: Node> {
+pub(crate) enum EntryState<N: Node> {
   // A node that has either been explicitly cleared, or has not yet started Running. In this state
   // there is no need for a dirty bit because the RunToken is either in its initial state, or has
   // been explicitly incremented when the node was cleared.
@@ -185,7 +191,7 @@ pub enum EntryState<N: Node> {
   // The `previous_result` value for a Running node is not a valid value. See NotStarted.
   Running {
     run_token: RunToken,
-    pending_value: AsyncValue<NodeResult<N>, NodeResult<N>>,
+    pending_value: AsyncValue<NodeResult<N>, NodeInterrupt<N>>,
     generation: Generation,
     previous_result: Option<EntryResult<N>>,
     is_cleaning: bool,
@@ -220,7 +226,7 @@ impl<N: Node> EntryState<N> {
 /// An Entry and its adjacencies.
 ///
 #[derive(Clone, Debug)]
-pub struct Entry<N: Node> {
+pub(crate) struct Entry<N: Node> {
   // TODO: This is a clone of the Node, which is also kept in the `nodes` map. It would be
   // nice to avoid keeping two copies of each Node, but tracking references between the two
   // maps is painful.
@@ -330,7 +336,7 @@ impl<N: Node> Entry<N> {
     let context = context_factory.clone_for(entry_id);
     let context2 = context.clone();
     let node = node.clone();
-    let (value, mut sender, receiver) = AsyncValue::<NodeResult<N>, NodeResult<N>>::new();
+    let (value, mut sender, receiver) = AsyncValue::<NodeResult<N>, NodeInterrupt<N>>::new();
     let is_cleaning = previous_dep_generations.is_some();
 
     let run_or_clean = async move {
@@ -377,21 +383,33 @@ impl<N: Node> Entry<N> {
     };
 
     let _join = context2.graph().executor.clone().native_spawn(async move {
-      let maybe_res = tokio::select! {
-        interrupt_item = sender.interrupted() => {
-          if let Some(res) = interrupt_item {
-            // We were aborted via terminate: complete with the given res.
-            Some(res.0)
-          } else {
-            // We were aborted via drop: exit.
-            context2
-              .graph()
-              .cancel(entry_id, run_token);
-            return;
+      let mut run_or_clean = pin!(run_or_clean);
+      let maybe_res = loop {
+        tokio::select! {
+          interrupt_item = sender.interrupted() => {
+            match interrupt_item {
+              Some(NodeInterrupt::Aborted(res)) => {
+                  // We were aborted via terminate: complete with the given res.
+                  break Some(res.0)
+              }
+              Some(NodeInterrupt::Dirtied) => {
+                  // The dependencies requested by the Node so far have changed: return to cancel
+                  // the work so that it can be retried from the beginning.
+                  return;
+              }
+              None => {
+                  // We were aborted via drop: exit.
+                  context2
+                  .graph()
+                  .cancel(entry_id, run_token);
+                  return;
+              }
+            }
           }
-        }
-        maybe_res = run_or_clean => {
-          maybe_res
+          maybe_res = &mut run_or_clean => {
+            // Running (or cleaning) the Node completed.
+            break maybe_res
+          }
         }
       };
       // The node completed.
@@ -575,12 +593,6 @@ impl<N: Node> Entry<N> {
   /// result should be used. This special case exists to avoid 1) cloning the result to call this
   /// method, and 2) comparing the current/previous results unnecessarily.
   ///
-  /// Takes a &mut InnerGraph to ensure that completing nodes doesn't race with dirtying them.
-  /// The important relationship being guaranteed here is that if the Graph is calling
-  /// invalidate_from_roots, it may mark us, or our dependencies, as dirty. We don't want to
-  /// complete _while_ a batch of nodes are being marked as dirty, and this exclusive access ensures
-  /// that can't happen.
-  ///
   /// See also: `Self::cancel`.
   ///
   pub(crate) fn complete(
@@ -588,10 +600,9 @@ impl<N: Node> Entry<N> {
     context: &Context<N>,
     result_run_token: RunToken,
     dep_generations: Vec<Generation>,
-    sender: AsyncValueSender<NodeResult<N>, NodeResult<N>>,
+    sender: AsyncValueSender<NodeResult<N>, NodeInterrupt<N>>,
     result: Option<Result<N::Item, N::Error>>,
     has_uncacheable_deps: bool,
-    _graph: &mut super::InnerGraph<N>,
   ) {
     let mut state = self.state.lock();
 
@@ -761,9 +772,7 @@ impl<N: Node> Entry<N> {
   /// Dirties this Node, which will cause it to examine its dependencies the next time it is
   /// requested, and re-run if any of them have changed generations.
   ///
-  /// See comment on complete for information about _graph argument.
-  ///
-  pub(crate) fn dirty(&mut self, _graph: &mut super::InnerGraph<N>) {
+  pub(crate) fn dirty(&mut self) {
     let state = &mut *self.state.lock();
     test_trace_log!("Dirtying node {:?}", self.node);
     match state {
@@ -784,12 +793,15 @@ impl<N: Node> Entry<N> {
         pollers.clear();
         return;
       }
-      &mut EntryState::Running { .. } if !self.node.cacheable() => {
-        // An uncacheable node cannot be interrupted.
-        return;
-      }
-      &mut EntryState::Running { .. } => {
-        // Handled below: we need to move back to NotStarted.
+      &mut EntryState::Running {
+        ref mut pending_value,
+        ..
+      } => {
+        // Attempt to interrupt the Running node with a notification that it has been dirtied. If
+        // we fail to interrupt, fall through to move back to NotStarted.
+        if pending_value.try_interrupt(NodeInterrupt::Dirtied).is_ok() {
+          return;
+        }
       }
     };
 
@@ -801,8 +813,11 @@ impl<N: Node> Entry<N> {
         previous_result,
         ..
       } => {
-        // Dirtying a Running node immediately cancels it.
-        test_trace_log!("Node {:?} was dirtied while running.", self.node);
+        // We failed to interrupt the Running node, so cancel it.
+        test_trace_log!(
+          "Failed to interrupt {:?} while running: canceling instead.",
+          self.node
+        );
         std::mem::drop(pending_value);
         EntryState::NotStarted {
           run_token,
@@ -830,7 +845,7 @@ impl<N: Node> Entry<N> {
       ..
     } = state
     {
-      let _ = pending_value.try_interrupt((Err(err), generation.next()));
+      let _ = pending_value.try_interrupt(NodeInterrupt::Aborted((Err(err), generation.next())));
     };
   }
 
