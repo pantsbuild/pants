@@ -308,10 +308,10 @@ impl UnderlyingByteStore for ShardedFSDB {
   }
 
   async fn remove(&self, fingerprint: Fingerprint) -> Result<bool, String> {
+    let _ = self.dest_initializer.lock().remove(&fingerprint);
     let removed = tokio::fs::remove_file(self.get_path(fingerprint))
       .await
       .is_ok();
-    let _ = self.dest_initializer.lock().remove(&fingerprint);
     Ok(removed)
   }
 
