@@ -575,10 +575,12 @@ async fn remove_big_file_and_store_again() {
     "Expect size to be at least 2MB but was {size}"
   );
 
-  store.remove(EntryType::File, digest1)
+  store
+    .remove(EntryType::File, digest1)
     .await
     .expect("Error removing");
-  store.remove(EntryType::File, digest2)
+  store
+    .remove(EntryType::File, digest2)
     .await
     .expect("Error removing");
 
