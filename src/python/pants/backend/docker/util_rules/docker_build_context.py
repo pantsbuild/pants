@@ -21,7 +21,7 @@ from pants.backend.docker.util_rules.docker_build_env import (
     DockerBuildEnvironmentError,
     DockerBuildEnvironmentRequest,
 )
-from pants.backend.docker.utils import get_hash, suggest_renames
+from pants.backend.docker.utils import suggest_renames
 from pants.backend.docker.value_interpolation import DockerBuildArgsInterpolationValue
 from pants.backend.shell.target_types import ShellSourceField
 from pants.core.goals.package import BuiltPackage, EnvironmentAwarePackageRequest, PackageFieldSet
@@ -44,7 +44,7 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionRule
 from pants.util.meta import classproperty
-from pants.util.strutil import softwrap
+from pants.util.strutil import softwrap, stable_hash
 from pants.util.value_interpolation import InterpolationContext, InterpolationValue
 
 logger = logging.getLogger(__name__)
@@ -130,7 +130,7 @@ class DockerBuildContext:
         # Data from Pants.
         interpolation_context["pants"] = {
             # Present hash for all inputs that can be used for image tagging.
-            "hash": get_hash((build_args, build_env, snapshot.digest)).hexdigest(),
+            "hash": stable_hash((build_args, build_env, snapshot.digest)),
         }
 
         # Base image tags values for all stages (as parsed from the Dockerfile instructions).
