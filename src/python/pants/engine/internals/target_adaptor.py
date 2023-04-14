@@ -32,12 +32,12 @@ class TargetAdaptor:
     __slots__ = ("type_alias", "name", "kwargs", "description_of_origin")
 
     def __init__(
-        self, type_alias: str, name: str | None, description_of_origin: str, **kwargs: Any
+        self, type_alias: str, name: str | None, __description_of_origin__: str, **kwargs: Any
     ) -> None:
         self.type_alias = type_alias
         self.name = name
         self.kwargs = kwargs
-        self.description_of_origin = description_of_origin
+        self.description_of_origin = __description_of_origin__
 
     def __repr__(self) -> str:
         return f"TargetAdaptor(type_alias={self.type_alias}, name={self.name}, origin={self.description_of_origin})"

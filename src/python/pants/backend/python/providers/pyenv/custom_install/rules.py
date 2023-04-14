@@ -43,7 +43,7 @@ async def make_synthetic_targets(request: SyntheticPyenvTargetsRequest) -> Synth
                     TargetAdaptor(
                         "_pyenv_install",
                         name="pants-pyenv-install",
-                        description_of_origin="the `pyenv` provider",
+                        __description_of_origin__="the `pyenv` provider",
                     ),
                 ),
             )

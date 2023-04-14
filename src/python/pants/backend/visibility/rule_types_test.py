@@ -166,7 +166,7 @@ def test_visibility_rule(expected: bool, spec: str, path: str, relpath: str) -> 
         os.path.dirname(path), relative_file_path=os.path.basename(path), target_name="tgt-name"
     )
     assert expected == rule.match(
-        address, TargetAdaptor("target", None, description_of_origin="BUILD:1"), relpath
+        address, TargetAdaptor("target", None, __description_of_origin__="BUILD:1"), relpath
     )
 
 
@@ -375,10 +375,12 @@ def test_check_dependency_rules(
         dependency_type=target_type,
     ) == BuildFileVisibilityRules.check_dependency_rules(
         origin_address=origin_address,
-        origin_adaptor=TargetAdaptor(target_type, "source", description_of_origin="BUILD:1"),
+        origin_adaptor=TargetAdaptor(target_type, "source", __description_of_origin__="BUILD:1"),
         dependencies_rules=dependencies_rules,
         dependency_address=dependency_address,
-        dependency_adaptor=TargetAdaptor(target_type, "target", description_of_origin="BUILD:1"),
+        dependency_adaptor=TargetAdaptor(
+            target_type, "target", __description_of_origin__="BUILD:1"
+        ),
         dependents_rules=dependents_rules,
     )
 

@@ -416,7 +416,8 @@ class Target:
             like `dir:` know whether to match the target or not.
         :param ignore_unrecognized_fields: Don't error if fields are not recognized. This is only
             intended for when Pants is bootstrapping itself.
-        :param build_file_source: Path to BUILD file and line number where this target is declared.
+        :param description_of_origin: Where this target was declared, such as a path to BUILD file
+            and line number.
         """
         if self.removal_version and not address.is_generated_target:
             if not self.removal_hint:
@@ -1581,6 +1582,20 @@ class InvalidTargetException(Exception):
          f"The `{alias!r}` target {address} ..."
     """
 
+    def __init__(self, message: Any, *, description_of_origin: str | None = None) -> None:
+        self.description_of_origin = description_of_origin
+        super().__init__(message)
+
+    def __str__(self) -> str:
+        if not self.description_of_origin:
+            return super().__str__()
+        return f"{self.description_of_origin}: {super().__str__()}"
+
+    def __repr__(self) -> str:
+        if not self.description_of_origin:
+            return super().__repr__()
+        return f"{self.description_of_origin}: {super().__repr__()}"
+
 
 class InvalidGeneratedTargetException(InvalidTargetException):
     pass
@@ -1594,23 +1609,49 @@ class InvalidFieldException(Exception):
          f"The {alias!r} field in target {address} must ..., but ..."
     """
 
+    def __init__(self, message: Any, *, description_of_origin: str | None = None) -> None:
+        self.description_of_origin = description_of_origin
+        super().__init__(message)
+
+    def __str__(self) -> str:
+        if not self.description_of_origin:
+            return super().__str__()
+        return f"{self.description_of_origin}: {super().__str__()}"
+
+    def __repr__(self) -> str:
+        if not self.description_of_origin:
+            return super().__repr__()
+        return f"{self.description_of_origin}: {super().__repr__()}"
+
 
 class InvalidFieldTypeException(InvalidFieldException):
     """This is used to ensure that the field's value conforms with the expected type for the field,
     e.g. `a boolean` or `a string` or `an iterable of strings and integers`."""
 
     def __init__(
-        self, address: Address, field_alias: str, raw_value: Optional[Any], *, expected_type: str
+        self,
+        address: Address,
+        field_alias: str,
+        raw_value: Optional[Any],
+        *,
+        expected_type: str,
+        description_of_origin: str | None = None,
     ) -> None:
         super().__init__(
             f"The {repr(field_alias)} field in target {address} must be {expected_type}, but was "
-            f"`{repr(raw_value)}` with type `{type(raw_value).__name__}`."
+            f"`{repr(raw_value)}` with type `{type(raw_value).__name__}`.",
+            description_of_origin=description_of_origin,
         )
 
 
 class RequiredFieldMissingException(InvalidFieldException):
-    def __init__(self, address: Address, field_alias: str) -> None:
-        super().__init__(f"The {repr(field_alias)} field in target {address} must be defined.")
+    def __init__(
+        self, address: Address, field_alias: str, *, description_of_origin: str | None = None
+    ) -> None:
+        super().__init__(
+            f"The {repr(field_alias)} field in target {address} must be defined.",
+            description_of_origin=description_of_origin,
+        )
 
 
 class InvalidFieldChoiceException(InvalidFieldException):
@@ -1621,14 +1662,16 @@ class InvalidFieldChoiceException(InvalidFieldException):
         raw_value: Optional[Any],
         *,
         valid_choices: Iterable[Any],
+        description_of_origin: str | None = None,
     ) -> None:
         super().__init__(
             f"Values for the {repr(field_alias)} field in target {address} must be one of "
-            f"{sorted(valid_choices)}, but {repr(raw_value)} was provided."
+            f"{sorted(valid_choices)}, but {repr(raw_value)} was provided.",
+            description_of_origin=description_of_origin,
         )
 
 
-class UnrecognizedTargetTypeException(Exception):
+class UnrecognizedTargetTypeException(InvalidTargetException):
     def __init__(
         self,
         target_type: str,
@@ -1637,11 +1680,10 @@ class UnrecognizedTargetTypeException(Exception):
         description_of_origin: str | None = None,
     ) -> None:
         for_address = f" for address {address}" if address else ""
-        prefix = description_of_origin or ""
         super().__init__(
             softwrap(
                 f"""
-                {prefix}Target type {target_type!r} is not registered{for_address}.
+                Target type {target_type!r} is not registered{for_address}.
 
                 All valid target types: {sorted(registered_target_types.aliases)}
 
@@ -1649,7 +1691,8 @@ class UnrecognizedTargetTypeException(Exception):
                 {doc_url('target-api-concepts')} for getting it registered with Pants.)
 
                 """
-            )
+            ),
+            description_of_origin=description_of_origin,
         )
 
 

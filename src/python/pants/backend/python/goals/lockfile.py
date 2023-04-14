@@ -8,7 +8,6 @@ import os.path
 from collections import defaultdict
 from dataclasses import dataclass
 from operator import itemgetter
-from typing import Iterator
 
 from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.subsystems.setup import PythonSetup
@@ -277,26 +276,21 @@ async def python_lockfile_synthetic_targets(
         for name, lockfile in python_setup.resolves.items()
     ]
 
-    def synthesize_BUILD_file(
-        spec_path: str, lockfiles: Iterator[tuple[str, str, str]]
-    ) -> tuple[str, tuple[TargetAdaptor, ...]]:
-        return (
-            os.path.join(spec_path, "BUILD.python-lockfiles"),
-            tuple(
-                TargetAdaptor(
-                    "_lockfiles",
-                    name=synthetic_lockfile_target_name(name),
-                    description_of_origin=f"the [python].resolves option {name!r}",
-                    sources=[lockfile],
-                )
-                for _, lockfile, name in lockfiles
-            ),
-        )
-
     return SyntheticAddressMaps.for_targets_request(
         request,
         [
-            synthesize_BUILD_file(spec_path, lockfiles)
+            (
+                os.path.join(spec_path, "BUILD.python-lockfiles"),
+                tuple(
+                    TargetAdaptor(
+                        "_lockfiles",
+                        name=synthetic_lockfile_target_name(name),
+                        sources=[lockfile],
+                        __description_of_origin__=f"the [python].resolves option {name!r}",
+                    )
+                    for _, lockfile, name in lockfiles
+                ),
+            )
             for spec_path, lockfiles in itertools.groupby(sorted(resolves), key=itemgetter(0))
         ],
     )
