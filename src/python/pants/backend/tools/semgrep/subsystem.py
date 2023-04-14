@@ -16,7 +16,7 @@ from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.engine.rules import Rule, collect_rules, rule
 from pants.engine.target import Dependencies, FieldSet, SingleSourceField, Target
 from pants.engine.unions import UnionRule
-from pants.option.option_types import ArgsListOption, BoolOption, SkipOption, StrListOption
+from pants.option.option_types import ArgsListOption, BoolOption, SkipOption
 from pants.util.docutil import git_url
 
 

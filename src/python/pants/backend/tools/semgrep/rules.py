@@ -7,6 +7,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Iterable
 
+from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.core.goals.lint import LintResult, LintTargetsRequest
 from pants.core.util_rules.partitions import Partition, Partitions
@@ -177,4 +178,4 @@ async def lint(
 
 
 def rules() -> Iterable[Rule | UnionRule]:
-    return [*collect_rules(), *SemgrepRequest.rules()]
+    return [*collect_rules(), *SemgrepRequest.rules(), *pex.rules()]
