@@ -60,6 +60,7 @@ def rule_runner() -> RuleRunner:
 
 
 def test_npx_process(rule_runner: RuleRunner):
+    rule_runner.set_options(["--nodejs-package-managers={'npm': '8.5.5'}"], env_inherit={"PATH"})
     result = rule_runner.request(
         ProcessResult,
         [
@@ -91,6 +92,7 @@ def test_npx_process_with_different_version(rule_runner: RuleRunner):
 
 
 def test_npm_process(rule_runner: RuleRunner):
+    rule_runner.set_options(["--nodejs-package-managers={'npm': '8.5.5'}"], env_inherit={"PATH"})
     result = rule_runner.request(
         ProcessResult,
         [nodejs.NodeJSToolProcess.npm(args=("--version",), description="Testing NpmProcess")],
