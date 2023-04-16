@@ -124,7 +124,7 @@ async def generate_lockfile_from_package_jsons(
         NodeJsProjectEnvironmentProcess(
             env=NodeJsProjectEnvironment.from_root(request.project),
             args=request.project.generate_lockfile_args,
-            description=f"generate package-lock.json for '{request.resolve_name}'.",
+            description=f"generate {request.project.lockfile_name} for '{request.resolve_name}'.",
             output_files=(request.project.lockfile_name,),
         ),
     )
