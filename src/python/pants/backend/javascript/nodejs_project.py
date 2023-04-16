@@ -21,18 +21,25 @@ from pants.util.strutil import softwrap
 
 
 @dataclass(frozen=True)
-class NodeJSProject:
+class _TentativeProject:
     root_dir: str
     workspaces: FrozenOrderedSet[PackageJson]
     default_resolve_name: str
 
-    def is_parent(self, project: NodeJSProject) -> bool:
+    def is_parent(self, project: _TentativeProject) -> bool:
         return self.root_dir != project.root_dir and any(
             project.root_dir == workspace.root_dir for workspace in self.workspaces
         )
 
-    def including_workspaces_from(self, child: NodeJSProject) -> NodeJSProject:
+    def including_workspaces_from(self, child: _TentativeProject) -> _TentativeProject:
         return replace(self, workspaces=self.workspaces | child.workspaces)
+
+
+@dataclass(frozen=True)
+class NodeJSProject:
+    root_dir: str
+    workspaces: FrozenOrderedSet[PackageJson]
+    default_resolve_name: str
 
     def get_project_digest(self) -> MergeDigests:
         return MergeDigests(ws.digest for ws in self.workspaces)
@@ -40,6 +47,14 @@ class NodeJSProject:
     @property
     def single_workspace(self) -> bool:
         return len(self.workspaces) == 1 and next(iter(self.workspaces)).root_dir == self.root_dir
+
+    @classmethod
+    def from_tentative(cls, project: _TentativeProject) -> NodeJSProject:
+        return NodeJSProject(
+            root_dir=project.root_dir,
+            workspaces=project.workspaces,
+            default_resolve_name=project.default_resolve_name,
+        )
 
 
 class AllNodeJSProjects(Collection[NodeJSProject]):
@@ -77,19 +92,20 @@ async def find_node_js_projects(package_workspaces: AllPackageJson) -> AllNodeJS
     )
 
     node_js_projects = {
-        NodeJSProject(
+        _TentativeProject(
             paths.root,
             FrozenOrderedSet(pkg for pkg in package_workspaces if paths.matches_glob(pkg)),
             await _get_default_resolve_name(paths.root),
         )
         for paths in project_paths
     }
-    return AllNodeJSProjects(_merge_workspaces(node_js_projects))
+    merged_projects = _merge_workspaces(node_js_projects)
+    return AllNodeJSProjects(NodeJSProject.from_tentative(p) for p in merged_projects)
 
 
 def _project_to_parents(
-    projects: set[NodeJSProject],
-) -> dict[NodeJSProject, list[NodeJSProject]]:
+    projects: set[_TentativeProject],
+) -> dict[_TentativeProject, list[_TentativeProject]]:
     return {
         project: [
             candidate_parent for candidate_parent in projects if candidate_parent.is_parent(project)
@@ -98,7 +114,7 @@ def _project_to_parents(
     }
 
 
-def _merge_workspaces(node_js_projects: set[NodeJSProject]) -> Iterable[NodeJSProject]:
+def _merge_workspaces(node_js_projects: set[_TentativeProject]) -> Iterable[_TentativeProject]:
     project_to_parents = _project_to_parents(node_js_projects)
     while any(parents for parents in project_to_parents.values()):
         _ensure_one_parent(project_to_parents)
@@ -112,7 +128,7 @@ def _merge_workspaces(node_js_projects: set[NodeJSProject]) -> Iterable[NodeJSPr
     return node_js_projects
 
 
-def _ensure_one_parent(project_to_parents: dict[NodeJSProject, list[NodeJSProject]]) -> None:
+def _ensure_one_parent(project_to_parents: dict[_TentativeProject, list[_TentativeProject]]) -> None:
     for project, parents in project_to_parents.items():
         if len(parents) > 1:
             raise ValueError(
