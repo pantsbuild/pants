@@ -210,6 +210,8 @@ async def user_chosen_resolve_aliases(nodejs: NodeJS) -> UserChosenNodeJSResolve
 class NodeJSToolProcess:
     """A request for a tool installed with NodeJS."""
 
+    tool: str
+    tool_version: str | None
     args: tuple[str, ...]
     description: str
     level: LogLevel = LogLevel.INFO
@@ -220,6 +222,7 @@ class NodeJSToolProcess:
     append_only_caches: FrozenDict[str, str] = field(default_factory=FrozenDict)
     timeout_seconds: int | None = None
     extra_env: Mapping[str, str] = field(default_factory=FrozenDict)
+    project_digest: Digest | None = None
 
     @classmethod
     def npm(
@@ -234,9 +237,13 @@ class NodeJSToolProcess:
         append_only_caches: FrozenDict[str, str] | None = None,
         timeout_seconds: int | None = None,
         extra_env: Mapping[str, str] | None = None,
+        tool_version: str | None = None,
+        project_digest: Digest | None = None,
     ) -> NodeJSToolProcess:
         return cls(
-            args=("npm", *args),
+            tool="npm",
+            tool_version=tool_version,
+            args=tuple(args),
             description=description,
             level=level,
             input_digest=input_digest,
@@ -246,6 +253,7 @@ class NodeJSToolProcess:
             append_only_caches=append_only_caches or FrozenDict(),
             timeout_seconds=timeout_seconds,
             extra_env=extra_env or FrozenDict(),
+            project_digest=project_digest,
         )
 
     @classmethod
@@ -259,7 +267,9 @@ class NodeJSToolProcess:
         output_files: tuple[str, ...] = (),
     ) -> NodeJSToolProcess:
         return cls(
-            args=("npx", "--yes", npm_package, *args),
+            tool="npx",
+            tool_version=None,
+            args=("--yes", npm_package, *args),
             description=description,
             level=level,
             input_digest=input_digest,
@@ -288,13 +298,13 @@ class NodeJSProcessEnvironment:
         return {
             "PATH": f"{self.tool_binaries.path_component}:{self.corepack_shims}:{self.binary_directory}",
             "npm_config_cache": self.npm_config_cache,  # Normally stored at ~/.npm,
-            "COREPACK_HOME": self.corepack_home,
+            "COREPACK_HOME": os.path.join("{chroot}", self.corepack_home),
             **self.corepack_env_vars,
         }
 
     @property
     def append_only_caches(self) -> Mapping[str, str]:
-        return {"npm": self.npm_config_cache, "corepack": self.corepack_home}
+        return {"npm": self.npm_config_cache}
 
     @property
     def binary_directory(self) -> str:
@@ -349,6 +359,7 @@ async def node_process_environment(
             "mkdir",  # Some default scripts are generated using mkdir, rm & touch.
             "rm",
             "touch",
+            "which",
             rationale="execute a nodejs process",
             search_path=nodejs.executable_search_path,
         ),
@@ -523,44 +534,71 @@ async def determine_nodejs_binaries(
     return NodeJSBinaries(os.path.dirname(paths_per_version[satisfying_version][0].path))
 
 
-async def prepare_default_package_managers(
-    environment: NodeJSProcessEnvironment, nodejs: NodeJS
-) -> list[str]:
-    version_tuples = sorted(
-        f"{pkg_manager}@{version}" for pkg_manager, version in nodejs.package_managers.items()
+@dataclass(frozen=True)
+class CorepackToolRequest:
+    tool: str
+    input_digest: Digest
+    working_directory: str | None = None
+    version: str | None = None
+
+
+@dataclass(frozen=True)
+class CorepackToolDigest:
+    digest: Digest
+
+
+@rule(desc="Preparing Corepack managed tool.")
+async def prepare_corepack_tool(
+    request: CorepackToolRequest, environment: NodeJSProcessEnvironment, nodejs: NodeJS
+) -> CorepackToolDigest:
+    version = request.version or nodejs.package_managers.get(request.tool)
+    if not version and request.input_digest == EMPTY_DIGEST:
+        raise ValueError(f"Could not determine tool version for {request.tool}.")
+    tool_spec = f"{request.tool}@{version}" if version else request.tool
+    tool_description = tool_spec if version else f"default {tool_spec} version"
+    result = await Get(
+        ProcessResult,
+        Process(
+            argv=("corepack", "prepare", tool_spec, "--activate"),
+            description=f"Preparing configured {tool_description}.",
+            input_digest=request.input_digest,
+            immutable_input_digests=environment.immutable_digest(),
+            working_directory=request.working_directory,
+            level=LogLevel.DEBUG,
+            env=environment.to_env_dict(),
+            append_only_caches={**environment.append_only_caches},
+            output_directories=[environment.corepack_home],
+        ),
     )
-    if version_tuples:
-        await Get(
-            ProcessResult,
-            Process(
-                argv=("corepack", "prepare", *version_tuples, "--activate"),
-                description=f"Preparing default configured package managers {', '.join(version_tuples)}.",
-                immutable_input_digests=environment.immutable_digest(),
-                level=LogLevel.DEBUG,
-                env={**environment.to_env_dict()},
-                append_only_caches={**environment.append_only_caches},
-            ),
-        )
-    return version_tuples
+    return CorepackToolDigest(result.output_digest)
 
 
 @rule(level=LogLevel.DEBUG)
 async def setup_node_tool_process(
-    request: NodeJSToolProcess, environment: NodeJSProcessEnvironment, nodejs: NodeJS
+    request: NodeJSToolProcess, environment: NodeJSProcessEnvironment
 ) -> Process:
-    versions = await prepare_default_package_managers(environment, nodejs)
-    pkg_manager_env = {
-        "__PACKAGE_MANAGER_VERSIONS": ",".join(versions)
-    }  # Invalidates cached process in event of update
+    if request.tool in ("npm", "npx"):
+        corepack_tool = await Get(
+            CorepackToolDigest,
+            CorepackToolRequest(
+                "npm",
+                request.project_digest or EMPTY_DIGEST,
+                request.working_directory,
+                request.tool_version,
+            ),
+        )
+        input_digest = await Get(Digest, MergeDigests([request.input_digest, corepack_tool.digest]))
+    else:
+        input_digest = request.input_digest
     return Process(
-        argv=filter(None, request.args),
-        input_digest=request.input_digest,
+        argv=list(filter(None, (request.tool, *request.args))),
+        input_digest=input_digest,
         output_files=request.output_files,
         immutable_input_digests=environment.immutable_digest(),
         output_directories=request.output_directories,
         description=request.description,
         level=request.level,
-        env={**request.extra_env, **pkg_manager_env, **environment.to_env_dict()},
+        env={**request.extra_env, **environment.to_env_dict()},
         working_directory=request.working_directory,
         append_only_caches={**request.append_only_caches, **environment.append_only_caches},
         timeout_seconds=request.timeout_seconds,

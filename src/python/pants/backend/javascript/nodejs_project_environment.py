@@ -108,11 +108,11 @@ async def get_nodejs_environment(req: NodeJSProjectEnvironmentRequest) -> NodeJs
 
 @rule
 async def setup_nodejs_project_environment_process(req: NodeJsProjectEnvironmentProcess) -> Process:
-    digests = await MultiGet(
+    lockfile_digest, project_digest = await MultiGet(
         Get(Digest, PathGlobs, req.env.resolve.get_lockfile_glob()),
         Get(Digest, MergeDigests, req.env.project.get_project_digest()),
     )
-    merged = await Get(Digest, MergeDigests((req.input_digest, *digests)))
+    merged = await Get(Digest, MergeDigests((req.input_digest, lockfile_digest, project_digest)))
 
     if not req.env.project.single_workspace and req.env.target:
         target = req.env.ensure_target()
@@ -141,6 +141,7 @@ async def setup_nodejs_project_environment_process(req: NodeJsProjectEnvironment
             append_only_caches=per_package_caches,
             timeout_seconds=req.timeout_seconds,
             extra_env=req.extra_env,
+            project_digest=project_digest,
         ),
     )
 
