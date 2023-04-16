@@ -116,7 +116,11 @@ async def setup_nodejs_project_environment_process(req: NodeJsProjectEnvironment
 
     if not req.env.project.single_workspace and req.env.target:
         target = req.env.ensure_target()
-        args = ("--workspace", target[NodePackageNameField].value, *req.args)
+        args = (
+            req.env.project.workspace_specifier_arg,
+            target[NodePackageNameField].value,
+            *req.args,
+        )
     else:
         args = tuple(req.args)
     output_files = req.output_files
@@ -130,8 +134,8 @@ async def setup_nodejs_project_environment_process(req: NodeJsProjectEnvironment
     return await Get(
         Process,
         NodeJSToolProcess,
-        NodeJSToolProcess.npm(
-            args=args,
+        NodeJSToolProcess(
+            args=(req.env.project.package_manager, *args),
             description=req.description,
             level=req.level,
             input_digest=merged,

@@ -58,6 +58,10 @@ class NodeJSProject:
     def generate_lockfile_args(self) -> tuple[str, ...]:
         return ("install", "--package-lock-only")
 
+    @property
+    def workspace_specifier_arg(self) -> str:
+        return "--workspace"
+
     def get_project_digest(self) -> MergeDigests:
         return MergeDigests(ws.digest for ws in self.workspaces)
 
