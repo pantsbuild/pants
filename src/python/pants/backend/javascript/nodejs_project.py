@@ -62,6 +62,12 @@ class NodeJSProject:
     def workspace_specifier_arg(self) -> str:
         return "--workspace"
 
+    def extra_env(self) -> dict[str, str]:
+        return {}
+
+    def extra_caches(self) -> dict[str, str]:
+        return {}
+
     def get_project_digest(self) -> MergeDigests:
         return MergeDigests(ws.digest for ws in self.workspaces)
 

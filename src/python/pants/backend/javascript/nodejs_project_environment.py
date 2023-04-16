@@ -142,10 +142,10 @@ async def setup_nodejs_project_environment_process(req: NodeJsProjectEnvironment
             working_directory=req.env.root_dir,
             output_files=output_files,
             output_directories=output_directories,
-            append_only_caches=per_package_caches,
+            append_only_caches=FrozenDict(**per_package_caches, **req.env.project.extra_caches()),
             timeout_seconds=req.timeout_seconds,
-            extra_env=req.extra_env,
             project_digest=project_digest,
+            extra_env={**req.extra_env, **req.env.project.extra_env()},
         ),
     )
 
