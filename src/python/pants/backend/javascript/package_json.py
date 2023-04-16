@@ -509,6 +509,7 @@ class PackageJson:
     workspaces: tuple[str, ...] = ()
     module: Literal["commonjs", "module"] | None = None
     dependencies: FrozenDict[str, str] = field(default_factory=FrozenDict)
+    package_manager: str | None = None
 
     def __post_init__(self) -> None:
         if self.module not in (None, "commonjs", "module"):
@@ -609,6 +610,7 @@ async def parse_package_json(content: FileContent) -> PackageJson:
                 **parsed_package_json.get("peerDependencies", {}),
             }
         ),
+        package_manager=parsed_package_json.get("packageManager"),
     )
 
 
