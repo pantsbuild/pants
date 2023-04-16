@@ -109,7 +109,7 @@ async def install_node_packages_for_address(
         ProcessResult,
         NodeJsProjectEnvironmentProcess(
             project_env,
-            ("clean-install",),
+            project_env.project.immutable_install_args,
             description=f"Installing {target[NodePackageNameField].value}@{target[NodePackageVersionField].value}.",
             input_digest=install_input_digest,
             output_directories=tuple(project_env.node_modules_directories),

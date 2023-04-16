@@ -59,6 +59,10 @@ class NodeJSProject:
         return ("install", "--package-lock-only")
 
     @property
+    def immutable_install_args(self) -> tuple[str, ...]:
+        return ("clean-install",)
+
+    @property
     def workspace_specifier_arg(self) -> str:
         return "--workspace"
 
