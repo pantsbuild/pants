@@ -9,6 +9,8 @@ from typing import Iterable
 
 from pants.backend.javascript import package_json
 from pants.backend.javascript.package_json import AllPackageJson, PackageJson
+from pants.backend.javascript.subsystems import nodejs
+from pants.backend.javascript.subsystems.nodejs import NodeJS
 from pants.core.util_rules import stripped_source_files
 from pants.core.util_rules.stripped_source_files import StrippedFileName, StrippedFileNameRequest
 from pants.engine.collection import Collection
@@ -34,12 +36,19 @@ class _TentativeProject:
     def including_workspaces_from(self, child: _TentativeProject) -> _TentativeProject:
         return replace(self, workspaces=self.workspaces | child.workspaces)
 
+    def root_workspace(self) -> PackageJson | None:
+        for ws in self.workspaces:
+            if ws.root_dir == self.root_dir:
+                return ws
+        return None
+
 
 @dataclass(frozen=True)
 class NodeJSProject:
     root_dir: str
     workspaces: FrozenOrderedSet[PackageJson]
     default_resolve_name: str
+    package_manager: str
 
     def get_project_digest(self) -> MergeDigests:
         return MergeDigests(ws.digest for ws in self.workspaces)
@@ -49,11 +58,45 @@ class NodeJSProject:
         return len(self.workspaces) == 1 and next(iter(self.workspaces)).root_dir == self.root_dir
 
     @classmethod
-    def from_tentative(cls, project: _TentativeProject) -> NodeJSProject:
+    def from_tentative(cls, project: _TentativeProject, nodejs: NodeJS) -> NodeJSProject:
+        root_ws = project.root_workspace()
+        package_manager: str | None = None
+        if root_ws:
+            package_manager = root_ws.package_manager or nodejs.default_package_manager
+        if not package_manager:
+            raise ValueError(
+                softwrap(
+                    f"""
+                    Could not determine package manager for project {project.default_resolve_name}.
+
+                    Either configure a default [{NodeJS.name}].package_manager, or set the root
+                    `package.json#packageManager` property.
+                    """
+                )
+            )
+
+        for workspace in project.workspaces:
+            if workspace.package_manager:
+                if not package_manager == workspace.package_manager:
+                    ws_ref = f"{workspace.name}@{workspace.version}"
+                    raise ValueError(
+                        softwrap(
+                            f"""
+                            Workspace {ws_ref}'s package manager
+                            {workspace.package_manager} is not compatible with
+                            project {project.default_resolve_name}'s package manager {package_manager}.
+
+                            Move or duplicate the `package.json#packageManager` entry from the
+                            workspace {ws_ref} to the root package to resolve this error.
+                            """
+                        )
+                    )
+        package_manager_command, *_ = package_manager.split("@")
         return NodeJSProject(
             root_dir=project.root_dir,
             workspaces=project.workspaces,
             default_resolve_name=project.default_resolve_name,
+            package_manager=package_manager_command,
         )
 
 
@@ -86,7 +129,9 @@ async def _get_default_resolve_name(path: str) -> str:
 
 
 @rule
-async def find_node_js_projects(package_workspaces: AllPackageJson) -> AllNodeJSProjects:
+async def find_node_js_projects(
+    package_workspaces: AllPackageJson, nodejs: NodeJS
+) -> AllNodeJSProjects:
     project_paths = (
         ProjectPaths(pkg.root_dir, ["", *pkg.workspaces]) for pkg in package_workspaces
     )
@@ -100,7 +145,7 @@ async def find_node_js_projects(package_workspaces: AllPackageJson) -> AllNodeJS
         for paths in project_paths
     }
     merged_projects = _merge_workspaces(node_js_projects)
-    return AllNodeJSProjects(NodeJSProject.from_tentative(p) for p in merged_projects)
+    return AllNodeJSProjects(NodeJSProject.from_tentative(p, nodejs) for p in merged_projects)
 
 
 def _project_to_parents(
@@ -128,7 +173,9 @@ def _merge_workspaces(node_js_projects: set[_TentativeProject]) -> Iterable[_Ten
     return node_js_projects
 
 
-def _ensure_one_parent(project_to_parents: dict[_TentativeProject, list[_TentativeProject]]) -> None:
+def _ensure_one_parent(
+    project_to_parents: dict[_TentativeProject, list[_TentativeProject]]
+) -> None:
     for project, parents in project_to_parents.items():
         if len(parents) > 1:
             raise ValueError(
@@ -144,4 +191,9 @@ def _ensure_one_parent(project_to_parents: dict[_TentativeProject, list[_Tentati
 
 
 def rules() -> Iterable[Rule | UnionRule]:
-    return [*package_json.rules(), *stripped_source_files.rules(), *collect_rules()]
+    return [
+        *nodejs.rules(),
+        *package_json.rules(),
+        *stripped_source_files.rules(),
+        *collect_rules(),
+    ]

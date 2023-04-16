@@ -46,7 +46,7 @@ from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, Rule, collect_rules, rule
 from pants.engine.unions import UnionRule
-from pants.option.option_types import DictOption, ShellStrListOption, StrListOption
+from pants.option.option_types import DictOption, ShellStrListOption, StrListOption, StrOption
 from pants.option.subsystem import Subsystem
 from pants.util.docutil import bin_name
 from pants.util.frozendict import FrozenDict
@@ -120,6 +120,22 @@ class NodeJS(Subsystem, TemplatedExternalToolOptionsMixin):
         download_file = DownloadFile(url, FileDigest(known_version.sha256, known_version.filesize))
         return await Get(DownloadedExternalTool, ExternalToolRequest(download_file, exe))
 
+    package_manager = StrOption(
+        default="npm",
+        help=softwrap(
+            """
+            Default Node.js package manager to use.
+
+            You can either rely on this default together with the [nodejs].package_managers
+            option, or specify the `package.json#packageManager` tool and version
+            in the package.json of your project.
+
+            Specifying conflicting package manager versions within a multi-package
+            workspace is an error.
+            """
+        ),
+    )
+
     package_managers = DictOption[str](
         default={"npm": "8.5.5"},
         help=help_text(
@@ -135,6 +151,12 @@ class NodeJS(Subsystem, TemplatedExternalToolOptionsMixin):
             """
         ),
     )
+
+    @property
+    def default_package_manager(self) -> str | None:
+        if self.package_manager in self.package_managers:
+            return f"{self.package_manager}@{self.package_managers[self.package_manager]}"
+        return self.package_manager
 
     class EnvironmentAware(ExecutableSearchPathsOptionMixin, Subsystem.EnvironmentAware):
         search_path = StrListOption(
