@@ -144,7 +144,7 @@ venv_use_symlinks = true
 interpreter_constraints = [">=3.7,<3.10"]
 macos_big_sur_compatibility = true
 enable_resolves = true
-pip_version = "23.0.1"
+pip_version = "latest"
 
 [python.resolves]
 python-default = "3rdparty/python/user_reqs.lock"
