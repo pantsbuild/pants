@@ -59,6 +59,9 @@ from pants.util.dirutil import touch
 logger = logging.getLogger(__name__)
 
 
+default_python_interpreter_constraints = "CPython>=3.7,<4"
+
+
 ToolBaseT = TypeVar("ToolBaseT")
 
 
@@ -82,15 +85,12 @@ class Tool(Generic[ToolBaseT]):
 
 @dataclass
 class PythonTool(Tool[PythonToolRequirementsBase]):
-    ...
+    interpreter_constraints: str = default_python_interpreter_constraints
 
 
 @dataclass
 class JvmTool(Tool[JvmToolBase]):
     ...
-
-
-python_interpreter_constraints = "CPython>=3.7,<3.12"
 
 
 all_python_tools = tuple(
@@ -112,7 +112,7 @@ all_python_tools = tuple(
             PythonTool(HelmPostRendererSubsystem, "pants.backend.experimental.helm"),
             PythonTool(IPython, "pants.backend.python"),
             PythonTool(Isort, "pants.backend.python.lint.isort"),
-            PythonTool(Lambdex, "pants.backend.awslambda.python"),
+            PythonTool(Lambdex, "pants.backend.awslambda.python", "CPython>=3.7,<3.12"),
             PythonTool(MyPy, "pants.backend.python.typecheck.mypy"),
             PythonTool(Pydocstyle, "pants.backend.python.lint.pydocstyle"),
             PythonTool(PyTest, "pants.backend.python"),
@@ -175,10 +175,17 @@ def create_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--all-jvm", action="store_true", help="Regenerate all builtin JVM tool lockfiles."
     )
+    parser.add_argument(
+        "--dry-run", action="store_true", help="Show Pants commands that would be run."
+    )
+    parser.add_argument(
+        '-d', '--debug',
+        action="store_const", dest="loglevel", const=logging.DEBUG, default=logging.INFO,
+    )
     return parser
 
 
-def generate_python_tool_lockfiles(tools: Sequence[PythonTool]) -> None:
+def generate_python_tool_lockfiles(tools: Sequence[PythonTool], dry_run: bool) -> None:
     def req_file(_tool: PythonTool) -> str:
         return f"{_tool.name}-requirements.txt"
 
@@ -206,6 +213,7 @@ def generate_python_tool_lockfiles(tools: Sequence[PythonTool]) -> None:
                     )
                 )
         resolves = {tool.resolve: tool.lockfile_name for tool in tools}
+        resolves_to_ics = {tool.resolve: [tool.interpreter_constraints] for tool in tools}
         for file in resolves.values():
             touch(os.path.join(tmp_buildroot, file))  # Prevent "Unmatched glob" warning.
         python_args = [
@@ -213,23 +221,23 @@ def generate_python_tool_lockfiles(tools: Sequence[PythonTool]) -> None:
             # for the Python resolves mechanism to work.
             "--backend-packages=pants.backend.python",
             "--python-pip-version=23.0.1",
-            f"--python-interpreter-constraints=['{python_interpreter_constraints}']",
+            f"--python-interpreter-constraints=['{default_python_interpreter_constraints}']",
             # `generate_all_lockfiles.sh` will have overridden this option to solve the chicken
             # and egg problem from https://github.com/pantsbuild/pants/issues/12457. We must
             # restore it here so that the lockfile gets generated properly.
             "--python-enable-resolves",
             # Unset any existing resolve names in the Pants repo, and set to just our temporary ones.
             f"--python-resolves={resolves}",
+            f"--python-resolves-to-interpreter-constraints={resolves_to_ics}",
             # Blank these out in case the Pants repo sets them using resolve names that we've unset.
-            "--python-resolves-to-interpreter-constraints={}",
             "--python-resolves-to-constraints-file={}",
             "--python-resolves-to-no-binary={}",
             "--python-resolves-to-only-binary={}",
         ]
-        generate(tmp_buildroot, tools, python_args)
+        generate(tmp_buildroot, tools, python_args, dry_run)
 
 
-def generate_jvm_tool_lockfiles(tools: Sequence[JvmTool]) -> None:
+def generate_jvm_tool_lockfiles(tools: Sequence[JvmTool], dry_run: bool) -> None:
     # Generate the builtin lockfiles via temporary named resolves in a tmp repo.
     # This is to completely disassociate the generation of builtin lockfiles from
     # the consumption of lockfiles in the Pants repo.
@@ -243,10 +251,10 @@ def generate_jvm_tool_lockfiles(tools: Sequence[JvmTool]) -> None:
                     f"--{tool.name}-lockfile={tool.lockfile_name}",
                 ]
             )
-        generate(tmp_buildroot, tools, jvm_args)
+        generate(tmp_buildroot, tools, jvm_args, dry_run)
 
 
-def generate(buildroot: str, tools: Sequence[Tool], args: Sequence[str]) -> None:
+def generate(buildroot: str, tools: Sequence[Tool], args: Sequence[str], dry_run: bool) -> None:
     pants_repo_root = get_buildroot()
     touch(os.path.join(buildroot, "BUILDROOT"))
     backends = sorted({tool.backend for tool in tools})
@@ -261,6 +269,11 @@ def generate(buildroot: str, tools: Sequence[Tool], args: Sequence[str]) -> None
         "generate-lockfiles",
         *[f"--resolve={tool.resolve}" for tool in tools],
     ]
+
+    if dry_run:
+        logger.info("Would run: " + " ".join(args))
+        return
+
     logger.debug("Running: " + " ".join(args))
     subprocess.run(args, cwd=buildroot, check=True)
 
@@ -279,6 +292,11 @@ def generate(buildroot: str, tools: Sequence[Tool], args: Sequence[str]) -> None
 def main() -> None:
     parser = create_parser()
     args = parser.parse_args()
+    logging.basicConfig(
+        level=args.loglevel,
+        format='%(asctime)s.%(msecs)02d [%(levelname)s] %(message)s',
+        datefmt='%I:%M:%S'
+    )
 
     python_tools = []
     jvm_tools = []
@@ -300,9 +318,9 @@ def main() -> None:
             "or via the --all-python/--all-jvm flags."
         )
     if python_tools:
-        generate_python_tool_lockfiles(python_tools)
+        generate_python_tool_lockfiles(python_tools, args.dry_run)
     if jvm_tools:
-        generate_jvm_tool_lockfiles(jvm_tools)
+        generate_jvm_tool_lockfiles(jvm_tools, args.dry_run)
 
 
 if __name__ == "__main__":
