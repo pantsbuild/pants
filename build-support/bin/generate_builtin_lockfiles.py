@@ -179,8 +179,12 @@ def create_parser() -> argparse.ArgumentParser:
         "--dry-run", action="store_true", help="Show Pants commands that would be run."
     )
     parser.add_argument(
-        '-d', '--debug',
-        action="store_const", dest="loglevel", const=logging.DEBUG, default=logging.INFO,
+        "-d",
+        "--debug",
+        action="store_const",
+        dest="loglevel",
+        const=logging.DEBUG,
+        default=logging.INFO,
     )
     return parser
 
@@ -294,8 +298,8 @@ def main() -> None:
     args = parser.parse_args()
     logging.basicConfig(
         level=args.loglevel,
-        format='%(asctime)s.%(msecs)02d [%(levelname)s] %(message)s',
-        datefmt='%I:%M:%S'
+        format="%(asctime)s.%(msecs)02d [%(levelname)s] %(message)s",
+        datefmt="%I:%M:%S",
     )
 
     python_tools = []
