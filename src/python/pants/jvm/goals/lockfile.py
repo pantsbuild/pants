@@ -10,6 +10,7 @@ from typing import Mapping
 from pants.core.goals.generate_lockfiles import (
     GenerateLockfile,
     GenerateLockfileResult,
+    GenerateLockfilesSubsystem,
     KnownUserResolveNames,
     KnownUserResolveNamesRequest,
     RequestedUserResolveNames,
@@ -64,14 +65,18 @@ def wrap_jvm_lockfile_request(request: GenerateJvmLockfile) -> WrappedGenerateLo
 @rule(desc="Generate JVM lockfile", level=LogLevel.DEBUG)
 async def generate_jvm_lockfile(
     request: GenerateJvmLockfile,
+    generate_lockfiles_subsystem: GenerateLockfilesSubsystem,
 ) -> GenerateLockfileResult:
     resolved_lockfile = await Get(CoursierResolvedLockfile, ArtifactRequirements, request.artifacts)
+    regenerate_command = (
+        generate_lockfiles_subsystem.custom_command or f"{bin_name()} generate-lockfiles"
+    )
 
     resolved_lockfile_contents = resolved_lockfile.to_serialized()
     metadata = JVMLockfileMetadata.new(request.artifacts)
     resolved_lockfile_contents = metadata.add_header_to_lockfile(
         resolved_lockfile_contents,
-        regenerate_command=f"{bin_name()} generate-lockfiles",
+        regenerate_command=regenerate_command,
         delimeter="#",
     )
 
