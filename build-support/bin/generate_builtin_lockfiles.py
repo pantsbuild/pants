@@ -226,9 +226,6 @@ def generate_python_tool_lockfiles(tools: Sequence[PythonTool], dry_run: bool) -
             "--backend-packages=pants.backend.python",
             "--python-pip-version=23.0.1",
             f"--python-interpreter-constraints=['{default_python_interpreter_constraints}']",
-            # `generate_all_lockfiles.sh` will have overridden this option to solve the chicken
-            # and egg problem from https://github.com/pantsbuild/pants/issues/12457. We must
-            # restore it here so that the lockfile gets generated properly.
             "--python-enable-resolves",
             # Unset any existing resolve names in the Pants repo, and set to just our temporary ones.
             f"--python-resolves={resolves}",
