@@ -17,7 +17,6 @@ from pants.backend.codegen.avro.java.subsystem import AvroSubsystem
 from pants.backend.codegen.protobuf.java.subsystem import JavaProtobufGrpcSubsystem
 from pants.backend.codegen.protobuf.python.python_protobuf_subsystem import PythonProtobufMypyPlugin
 from pants.backend.codegen.protobuf.scala.subsystem import ScalaPBSubsystem
-from pants.backend.codegen.soap.java.jaxws import JaxWsTools
 from pants.backend.codegen.thrift.scrooge.subsystem import ScroogeSubsystem
 from pants.backend.docker.subsystems.dockerfile_parser import DockerfileParser
 from pants.backend.helm.subsystems.k8s_parser import HelmKubeParserSubsystem
@@ -25,7 +24,6 @@ from pants.backend.helm.subsystems.post_renderer import HelmPostRendererSubsyste
 from pants.backend.java.lint.google_java_format.subsystem import GoogleJavaFormatSubsystem
 from pants.backend.java.subsystems.junit import JUnit
 from pants.backend.kotlin.lint.ktlint.subsystem import KtlintSubsystem
-from pants.backend.openapi.subsystems.openapi_generator import OpenAPIGenerator
 from pants.backend.python.goals.coverage_py import CoverageSubsystem
 from pants.backend.python.lint.add_trailing_comma.subsystem import AddTrailingComma
 from pants.backend.python.lint.autoflake.subsystem import Autoflake
