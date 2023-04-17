@@ -17,6 +17,7 @@ from pants.backend.codegen.avro.java.subsystem import AvroSubsystem
 from pants.backend.codegen.protobuf.java.subsystem import JavaProtobufGrpcSubsystem
 from pants.backend.codegen.protobuf.python.python_protobuf_subsystem import PythonProtobufMypyPlugin
 from pants.backend.codegen.protobuf.scala.subsystem import ScalaPBSubsystem
+from pants.backend.codegen.soap.java.jaxws import JaxWsTools
 from pants.backend.codegen.thrift.scrooge.subsystem import ScroogeSubsystem
 from pants.backend.docker.subsystems.dockerfile_parser import DockerfileParser
 from pants.backend.helm.subsystems.k8s_parser import HelmKubeParserSubsystem
@@ -24,6 +25,7 @@ from pants.backend.helm.subsystems.post_renderer import HelmPostRendererSubsyste
 from pants.backend.java.lint.google_java_format.subsystem import GoogleJavaFormatSubsystem
 from pants.backend.java.subsystems.junit import JUnit
 from pants.backend.kotlin.lint.ktlint.subsystem import KtlintSubsystem
+from pants.backend.openapi.subsystems.openapi_generator import OpenAPIGenerator
 from pants.backend.python.goals.coverage_py import CoverageSubsystem
 from pants.backend.python.lint.add_trailing_comma.subsystem import AddTrailingComma
 from pants.backend.python.lint.autoflake.subsystem import Autoflake
@@ -53,6 +55,7 @@ from pants.backend.terraform.dependency_inference import TerraformHcl2Parser
 from pants.backend.tools.yamllint.subsystem import Yamllint
 from pants.base.build_environment import get_buildroot
 from pants.jvm.resolve.jvm_tool import JvmToolBase
+from pants.jvm.shading.jarjar import JarJar
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import touch
 
@@ -141,9 +144,10 @@ all_jvm_tools = tuple(
                 GoogleJavaFormatSubsystem, "pants.backend.experimental.java.lint.google_java_format"
             ),
             JvmTool(JUnit, "pants.backend.experimental.java"),
+            JvmTool(JarJar, "pants.backend.experimental.java"),
+            JvmTool(JavaProtobufGrpcSubsystem, "pants.backend.experimental.codegen.protobuf.java"),
             JvmTool(KtlintSubsystem, "pants.backend.experimental.kotlin.lint.ktlint"),
             JvmTool(ScalaPBSubsystem, "pants.backend.experimental.codegen.protobuf.scala"),
-            JvmTool(JavaProtobufGrpcSubsystem, "pants.backend.experimental.codegen.protobuf.java"),
             JvmTool(ScalafmtSubsystem, "pants.backend.experimental.scala.lint.scalafmt"),
             JvmTool(Scalatest, "pants.backend.experimental.scala"),
             JvmTool(ScroogeSubsystem, "pants.backend.experimental.codegen.thrift.scrooge.scala"),
