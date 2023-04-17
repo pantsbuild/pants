@@ -22,7 +22,6 @@ from pants.engine.target import (
     SourcesField,
     SourcesPaths,
     SourcesPathsRequest,
-    StringField,
     _get_field_set_fields,
 )
 from pants.util.memo import memoized
@@ -333,41 +332,3 @@ def _get_sources_field_name(field_set_type: type[FieldSet]) -> str:
             + " Pants can't provide a default partitioner."
         )
     return sources_field_name
-
-
-class TestsBatchCompatibilityTagField(StringField):
-    alias = "batch_compatibility_tag"
-
-    @classmethod
-    def format_help(cls, target_name: str, test_runner_name: str) -> str:
-        return f"""
-        An arbitrary value used to mark the test files belonging to this target as valid for
-        batched execution.
-
-        It's _sometimes_ safe to run multiple `{target_name}`s within a single test runner process,
-        and doing so can give significant wins by allowing reuse of expensive test setup /
-        teardown logic. To opt into this behavior, set this field to an arbitrary non-empty
-        string on all the `{target_name}` targets that are safe/compatible to run in the same
-        process.
-
-        If this field is left unset on a target, the target is assumed to be incompatible with
-        all others and will run in a dedicated `{test_runner_name}` process.
-
-        If this field is set on a target, and its value is different from the value on some
-        other test `{target_name}`, then the two targets are explicitly incompatible and are guaranteed
-        to not run in the same `{test_runner_name}` process.
-
-        If this field is set on a target, and its value is the same as the value on some other
-        `{target_name}`, then the two targets are explicitly compatible and _may_ run in the same
-        test runner process. Compatible tests may not end up in the same test runner batch if:
-
-            * There are "too many" compatible tests in a partition, as determined by the \
-                `[test].batch_size` config parameter, or
-            * Compatible tests have some incompatibility in Pants metadata (i.e. different \
-                `resolve`s or `extra_env_vars`).
-
-        When tests with the same `batch_compatibility_tag` have incompatibilities in some other
-        Pants metadata, they will be automatically split into separate batches. This way you can
-        set a high-level `batch_compatibility_tag` using `__defaults__` and then have tests
-        continue to work as you tweak BUILD metadata on specific targets.
-        """

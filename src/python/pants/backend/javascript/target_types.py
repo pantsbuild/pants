@@ -3,8 +3,11 @@
 
 from __future__ import annotations
 
-from pants.core.goals.test import TestExtraEnvVarsField, TestTimeoutField
-from pants.core.util_rules.partitions import TestsBatchCompatibilityTagField
+from pants.core.goals.test import (
+    TestExtraEnvVarsField,
+    TestsBatchCompatibilityTagField,
+    TestTimeoutField,
+)
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     Dependencies,

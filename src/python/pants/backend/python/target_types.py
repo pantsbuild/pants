@@ -33,10 +33,10 @@ from pants.core.goals.run import RestartableField
 from pants.core.goals.test import (
     RuntimePackageDependenciesField,
     TestExtraEnvVarsField,
+    TestsBatchCompatibilityTagField,
     TestSubsystem,
 )
 from pants.core.util_rules.environments import EnvironmentField
-from pants.core.util_rules.partitions import TestsBatchCompatibilityTagField
 from pants.engine.addresses import Address, Addresses
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
