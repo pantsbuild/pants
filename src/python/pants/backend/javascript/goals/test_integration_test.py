@@ -17,7 +17,7 @@ from pants.backend.javascript.goals.test import (
     JSTestRequest,
     TestMetadata,
 )
-from pants.backend.javascript.package_json import OwningNodePackage, PackageJsonTarget
+from pants.backend.javascript.package_json import PackageJsonTarget
 from pants.backend.javascript.target_types import (
     JSSourcesGeneratorTarget,
     JSTestsGeneratorTarget,
@@ -271,5 +271,5 @@ def given_request_for(*js_test: Target, package: Target) -> JSTestRequest.Batch:
     return JSTestRequest.Batch(
         "",
         tuple(JSTestFieldSet.create(tgt) for tgt in js_test),
-        TestMetadata(tuple(), OwningNodePackage(package)),
+        TestMetadata(tuple(), package),
     )

@@ -57,6 +57,7 @@ from pants.engine.rules import Rule, collect_rules, rule
 from pants.engine.target import (
     Dependencies,
     SourcesField,
+    Target,
     TransitiveTargets,
     TransitiveTargetsRequest,
 )
@@ -101,14 +102,14 @@ class JSTestRequest(TestRequest):
 @dataclass(frozen=True)
 class TestMetadata:
     extra_env_vars: tuple[str, ...]
-    owning_package: OwningNodePackage
+    owning_target: Target
     compatibility_tag: str | None = None
 
     __test__ = False
 
     @property
     def description(self) -> str:
-        return f'{self.owning_package.ensure_owner()[NodePackageNameField].value} {self.compatibility_tag or ""}'
+        return f'{self.owning_target[NodePackageNameField].value} {self.compatibility_tag or ""}'
 
 
 @rule(desc="Partition NodeJS tests", level=LogLevel.DEBUG)
@@ -124,7 +125,7 @@ async def partition_nodejs_tests(
     for field_set, owning_package in zip(request.field_sets, owning_packages):
         metadata = TestMetadata(
             extra_env_vars=field_set.extra_env_vars.sorted(),
-            owning_package=owning_package,
+            owning_target=owning_package.ensure_owner(),
             compatibility_tag=field_set.batch_compatibility_tag.value,
         )
 
@@ -149,7 +150,7 @@ async def run_javascript_tests(
     metadata = batch.partition_metadata
     installation_get = Get(
         InstalledNodePackage,
-        InstalledNodePackageRequest(metadata.owning_package.ensure_owner().address),
+        InstalledNodePackageRequest(metadata.owning_target.address),
     )
     transitive_tgts_get = Get(
         TransitiveTargets, TransitiveTargetsRequest(field_set.address for field_set in field_sets)

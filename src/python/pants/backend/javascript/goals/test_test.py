@@ -41,9 +41,9 @@ def test_batches_are_seperated_on_owning_packages() -> None:
 
     def mocked_owning_node_package(r: OwningNodePackageRequest) -> Any:
         if r.address == sentinel.address_1:
-            return sentinel.owning_package_1
+            return OwningNodePackage(sentinel.owning_package_1)
         else:
-            return sentinel.owning_package_2
+            return OwningNodePackage(sentinel.owning_package_2)
 
     parititions = run_rule_with_mocks(
         partition_nodejs_tests,
@@ -82,7 +82,7 @@ def test_batches_are_seperated_on_metadata(field_set_1: Mock, field_set_2: Mock)
     request = JSTestRequest.PartitionRequest(field_sets=(field_set_1, field_set_2))
 
     def mocked_owning_node_package(_: OwningNodePackageRequest) -> Any:
-        return sentinel.same_owning_package
+        return OwningNodePackage(sentinel.same_owning_package)
 
     parititions = run_rule_with_mocks(
         partition_nodejs_tests,
@@ -102,7 +102,7 @@ def test_batches_are_the_same_for_same_compat_and_package() -> None:
     request = JSTestRequest.PartitionRequest(field_sets=(field_set_1, field_set_2))
 
     def mocked_owning_node_package(_: OwningNodePackageRequest) -> Any:
-        return sentinel.same_owning_package
+        return OwningNodePackage(sentinel.same_owning_package)
 
     parititions = run_rule_with_mocks(
         partition_nodejs_tests,
