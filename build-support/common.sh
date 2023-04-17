@@ -69,6 +69,11 @@ function determine_python() {
     if [[ "$("${interpreter_path}" --version 2>&1 > /dev/null)" == "pyenv: python${version}"* ]]; then
       continue
     fi
+    # Sometimes the 'python3.Y' binary is a symlink to a suffixed version: 'python3.Ym'.
+    # We use 'realpath' to get the most precise version (the suffixed version or the real file),
+    # or pex can fail to find the interpreter in the venv and then fail to reexecute.
+    # See: https://github.com/pantsbuild/pex/issues/2119
+    interpreter_path="$(realpath "${interpreter_path}")"
     echo "${interpreter_path}" && return 0
   done
   echo "pants: failed to find suitable Python interpreter, looking for: ${candidate_versions[*]}" >&2
