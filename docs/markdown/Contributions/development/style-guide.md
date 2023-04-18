@@ -389,6 +389,37 @@ merge_constraints([constraint for constraint in all_constraints if constraint.st
 
 The return type, however, should usually be as precise as possible so that call sites have better type inference.
 
+### Use descriptive names for `TypeVar`s
+
+#### Bounded `TypeVar`s
+
+Bounded `TypeVar`s should be named after their `bound` type, followed by a single letter (starting with `T`, continuing on to `U`, `V`, etc if multiple `TypeVar`s with the same bound are required.):
+
+```python
+ListElementT = TypeVar("ListElementT", bound=ListElement)
+```
+
+#### Unbounded `TypeVar`s
+
+Unbounded `TypeVars` should have a descriptive name, for example in `selectors.py`, output types for `Get` and `MultiGet` are named `_Output`, `_Out1`, `_Out2`, etc.
+
+```python
+@overload
+async def MultiGet(  # noqa: F811
+    __get0: Get[_Out0], __get1: Get[_Out1], __get2: Get[_Out2]
+) -> tuple[_Out0, _Out1, _Out2]:
+    ...
+```
+
+For purposes where the purpose of a `TypeVar` is to bind a generic parameter of an argument or return type to the type of an argument or return type, `T`, or `_T` (or `U`, `V`, if multiple `TypeVar`s are required) is acceptable:
+
+```python
+@overload
+def union(cls: _T, *, in_scope_types: None = None) -> _T:
+    ...
+```
+
+
 Tests
 -----
 
