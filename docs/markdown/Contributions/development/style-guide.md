@@ -396,7 +396,7 @@ The return type, however, should usually be as precise as possible so that call 
 Bounded `TypeVar`s should be named after their `bound` type, followed by a single letter (starting with `T`, continuing on to `U`, `V`, etc if multiple `TypeVar`s with the same bound are required.):
 
 ```python
-ListElementT = TypeVar("ListElementT", bound=ListElement)
+_ListElementT = TypeVar("_ListElementT", bound=ListElement)
 ```
 
 #### Unbounded `TypeVar`s
@@ -418,6 +418,10 @@ For purposes where the purpose of a `TypeVar` is to bind a generic parameter of 
 def union(cls: _T, *, in_scope_types: None = None) -> _T:
     ...
 ```
+
+#### Bias towards private `TypeVars`
+
+Unless there's a particularly good reason to, it's encouraged for `TypeVar`s to begin with an underscore so that IDEs do not attempt to import `TypeVar`s from other modules.
 
 
 Tests
