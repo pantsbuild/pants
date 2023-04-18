@@ -53,6 +53,7 @@ from pants.backend.terraform.dependency_inference import TerraformHcl2Parser
 from pants.backend.tools.yamllint.subsystem import Yamllint
 from pants.base.build_environment import get_buildroot
 from pants.jvm.resolve.jvm_tool import JvmToolBase
+from pants.jvm.shading.jarjar import JarJar
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import touch
 
@@ -141,9 +142,10 @@ all_jvm_tools = tuple(
                 GoogleJavaFormatSubsystem, "pants.backend.experimental.java.lint.google_java_format"
             ),
             JvmTool(JUnit, "pants.backend.experimental.java"),
+            JvmTool(JarJar, "pants.backend.experimental.java"),
+            JvmTool(JavaProtobufGrpcSubsystem, "pants.backend.experimental.codegen.protobuf.java"),
             JvmTool(KtlintSubsystem, "pants.backend.experimental.kotlin.lint.ktlint"),
             JvmTool(ScalaPBSubsystem, "pants.backend.experimental.codegen.protobuf.scala"),
-            JvmTool(JavaProtobufGrpcSubsystem, "pants.backend.experimental.codegen.protobuf.java"),
             JvmTool(ScalafmtSubsystem, "pants.backend.experimental.scala.lint.scalafmt"),
             JvmTool(Scalatest, "pants.backend.experimental.scala"),
             JvmTool(ScroogeSubsystem, "pants.backend.experimental.codegen.thrift.scrooge.scala"),
@@ -226,9 +228,6 @@ def generate_python_tool_lockfiles(tools: Sequence[PythonTool], dry_run: bool) -
             "--backend-packages=pants.backend.python",
             "--python-pip-version=23.0.1",
             f"--python-interpreter-constraints=['{default_python_interpreter_constraints}']",
-            # `generate_all_lockfiles.sh` will have overridden this option to solve the chicken
-            # and egg problem from https://github.com/pantsbuild/pants/issues/12457. We must
-            # restore it here so that the lockfile gets generated properly.
             "--python-enable-resolves",
             # Unset any existing resolve names in the Pants repo, and set to just our temporary ones.
             f"--python-resolves={resolves}",
