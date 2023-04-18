@@ -92,7 +92,7 @@ class PexSubsystem(Subsystem):
 
 
 @dataclass(frozen=True)
-class PythonExecutable(BinaryPath, EngineAwareReturnType):
+class PythonExecutable(BinaryPath["PythonExecutable"], EngineAwareReturnType):
     """The BinaryPath of a Python executable for user code, along with some extras."""
 
     append_only_caches: FrozenDict[str, str] = FrozenDict({})

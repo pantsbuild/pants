@@ -11,7 +11,7 @@ import subprocess
 from dataclasses import dataclass
 from enum import Enum
 from textwrap import dedent  # noqa: PNT20
-from typing import Iterable, Mapping, Sequence
+from typing import Generic, Iterable, Mapping, Sequence, TypeVar
 
 from pants.base.deprecated import warn_or_error
 from pants.core.subsystems import python_bootstrap
@@ -40,8 +40,11 @@ logger = logging.getLogger(__name__)
 SEARCH_PATHS = ("/usr/bin", "/bin", "/usr/local/bin", "/opt/homebrew/bin")
 
 
+BinaryPathT = TypeVar("BinaryPathT", bound="BinaryPath")
+
+
 @dataclass(frozen=True)
-class BinaryPath:
+class BinaryPath(Generic[BinaryPathT]):
     path: str
     fingerprint: str
 
@@ -58,8 +61,8 @@ class BinaryPath:
 
     @classmethod
     def fingerprinted(
-        cls, path: str, representative_content: bytes | bytearray | memoryview
-    ) -> BinaryPath:
+        cls: type[BinaryPathT], path: str, representative_content: bytes | bytearray | memoryview
+    ) -> BinaryPathT:
         return cls(path, fingerprint=cls._fingerprint(representative_content))
 
 
