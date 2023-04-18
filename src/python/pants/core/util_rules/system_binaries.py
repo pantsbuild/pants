@@ -40,11 +40,11 @@ logger = logging.getLogger(__name__)
 SEARCH_PATHS = ("/usr/bin", "/bin", "/usr/local/bin", "/opt/homebrew/bin")
 
 
-Tbp = TypeVar("Tbp", bound="BinaryPath")
+BinaryPathT = TypeVar("BinaryPathT", bound="BinaryPath")
 
 
 @dataclass(frozen=True)
-class BinaryPath(Generic[Tbp]):
+class BinaryPath(Generic[BinaryPathT]):
     path: str
     fingerprint: str
 
@@ -61,8 +61,8 @@ class BinaryPath(Generic[Tbp]):
 
     @classmethod
     def fingerprinted(
-        cls: type[Tbp], path: str, representative_content: bytes | bytearray | memoryview
-    ) -> Tbp:
+        cls: type[BinaryPathT], path: str, representative_content: bytes | bytearray | memoryview
+    ) -> BinaryPathT:
         return cls(path, fingerprint=cls._fingerprint(representative_content))
 
 
