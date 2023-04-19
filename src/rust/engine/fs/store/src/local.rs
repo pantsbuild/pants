@@ -246,6 +246,10 @@ impl ShardedFSDB {
               .shutdown()
               .await
               .map_err(|e| format!("Failed to shutdown {tmp_path:?}: {e}"))?;
+            tokio_file
+              .sync_all()
+              .await
+              .map_err(|e| format!("Failed to sync {tmp_path:?}: {e}"))?;
 
             tokio::fs::set_permissions(&tmp_path, std::fs::Permissions::from_mode(0o555))
               .await
