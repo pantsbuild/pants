@@ -27,7 +27,10 @@ from .target_types import SemgrepRuleSource, SemgrepRuleSourcesGeneratorTarget
 
 DIR = "src"
 
-GOOD_FILE = "good_pattern"
+# https://semgrep.dev/docs/cli-reference/#exit-codes
+SEMGREP_ERROR_FAILURE_RETURN_CODE = 1
+
+GOOD_FILE = "nothing_bad"
 BAD_FILE = "bad_pattern"
 RULES = dedent(
     """\
@@ -39,6 +42,10 @@ RULES = dedent(
         bad pattern found!
       languages: [generic]
       severity: ERROR
+      paths:
+        # 'generic' means this finds itself
+        exclude:
+         - '*.yml'
     """
 )
 
@@ -65,7 +72,10 @@ def run_semgrep(
     *,
     extra_args: Sequence[str] = (),
 ) -> tuple[LintResult, ...]:
-    rule_runner.set_options(["--backend-packages=pants.backend.tools.semgrep", *extra_args])
+    rule_runner.set_options(
+        ["--backend-packages=pants.backend.tools.semgrep", *extra_args],
+        env_inherit={"PATH", "PYENV_ROOT", "HOME"},
+    )
     partitions = rule_runner.request(
         Partitions[SemgrepFieldSet, PartitionMetadata],
         [SemgrepRequest.PartitionRequest(tuple(SemgrepFieldSet.create(tgt) for tgt in targets))],
@@ -85,7 +95,7 @@ def assert_success(
     result = run_semgrep(rule_runner, [target], extra_args=extra_args)
 
     assert len(result) == 1
-    assert "FIXME FIXME" in result[0].stdout
+    assert "Ran 1 rule on 1 file: 0 findings" in result[0].stderr
     assert result[0].exit_code == 0
     assert result[0].report == EMPTY_DIGEST
 
@@ -113,3 +123,28 @@ def test_passing(rule_runner: RuleRunner, major_minor_interpreter: str) -> None:
         tgt,
         extra_args=[f"--python-interpreter-constraints=['=={major_minor_interpreter}.*']"],
     )
+
+
+def test_failing(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            f"{DIR}/file.txt": BAD_FILE,
+            f"{DIR}/.semgrep.yml": RULES,
+            f"{DIR}/BUILD": dedent(
+                """\
+                file(name="f", source="file.txt")
+                semgrep_rule_sources(name="s")
+                """
+            ),
+        }
+    )
+    tgt = rule_runner.get_target(Address(DIR, target_name="f"))
+
+    result = run_semgrep(
+        rule_runner,
+        [tgt],
+    )
+    assert len(result) == 1
+    assert "Ran 1 rule on 1 file: 1 finding" in result[0].stderr
+    assert result[0].exit_code == SEMGREP_ERROR_FAILURE_RETURN_CODE
+    assert result[0].report == EMPTY_DIGEST

@@ -153,9 +153,14 @@ async def lint(
                 "{pants_concurrency}",
                 "--error",
                 *semgrep.args,
-                # we don't pass the target files, because semgrep does its own file traversal, and
-                # letting it do so is the only way for .semgrepignore files to be obeyed
-                # https://github.com/returntocorp/semgrep/issues/4978
+                # we don't pass the target files directly because that overrides .semgrepignore
+                # (https://github.com/returntocorp/semgrep/issues/4978), so instead we just tell its
+                # traversal to include all the source files in this partition. Unfortunately this
+                # include is implicitly unrooted (i.e. as if it was **/path/to/file), and so may
+                # pick up other files if the names match. The highest risk of this is within the
+                # semgrep PEX.
+                *(f"--include={f}" for f in input_files.files),
+                f"--exclude={semgrep_pex.pex_filename}",
             ),
             extra_env={
                 "SEMGREP_FORCE_COLOR": "true",
