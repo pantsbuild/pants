@@ -151,8 +151,6 @@ python-default = "3rdparty/python/user_reqs.lock"
 flake8 = "3rdparty/python/flake8.lock"
 mypy = "3rdparty/python/mypy.lock"
 pytest = "3rdparty/python/pytest.lock"
-helm-post-renderer = "src/python/pants/backend/helm/subsystems/post_renderer.lock"
-helm-k8s-parser = "src/python/pants/backend/helm/subsystems/k8s_parser.lock"
 
 [python.resolves_to_interpreter_constraints]
 # Without setting this explicitly, the 'python-default' resolve uses the Pants default
