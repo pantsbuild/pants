@@ -152,6 +152,9 @@ rand = "0.8"
 regex = "1"
 reqwest = { version = "0.11", default_features = false, features = ["stream", "rustls-tls"] }
 rule_graph = { path = "rule_graph" }
+rustpython-parser = { features = [
+  "lalrpop",
+], git = "https://github.com/RustPython/RustPython.git", rev = "c7faae9b22ce31a3ba1f2cc1cd3ad759b54ce100" }
 smallvec = { version = "1", features=["union"] }
 stdio = { path = "stdio" }
 store = { path = "fs/store" }

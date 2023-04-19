@@ -48,6 +48,7 @@ use workunit_store::{
 
 use crate::externs::fs::{possible_store_missing_digest, PyFileDigest};
 use crate::externs::process::PyProcessExecutionEnvironment;
+use crate::externs::python_parsing::get_dependencies;
 use crate::{
   externs, nodes, Context, Core, ExecutionRequest, ExecutionStrategyOptions, ExecutionTermination,
   Failure, Function, Intrinsic, Intrinsics, Key, LocalStoreOptions, Params, RemotingOptions, Rule,
@@ -150,6 +151,7 @@ fn native_engine(py: Python, m: &PyModule) -> PyO3Result<()> {
 
   m.add_function(wrap_pyfunction!(strongly_connected_components, m)?)?;
   m.add_function(wrap_pyfunction!(hash_prefix_zero_bits, m)?)?;
+  m.add_function(wrap_pyfunction!(parse_python_deps, m)?)?;
 
   Ok(())
 }
@@ -649,6 +651,33 @@ fn hash_prefix_zero_bits(item: &str) -> u32 {
   let mut hasher = FnvHasher::default();
   hasher.write(item.as_bytes());
   hasher.finish().leading_zeros()
+}
+
+/// @TODO: ...
+/// HashMap<String, (u64, bool)>
+#[pyfunction]
+fn parse_python_deps<'py>(
+  py: Python<'py>,
+  py_scheduler: &PyScheduler,
+  py_file_digest: PyFileDigest,
+) -> PyO3Result<()> {
+  let core = &py_scheduler.0.core;
+  core.executor.enter(|| {
+    let store = core.store();
+    let bytes_future = async move {
+      store
+        .load_file_bytes_with(py_file_digest.0, |bytes| Vec::from(bytes))
+        .await
+    };
+    let bytes_value = py
+      .allow_threads(|| core.executor.block_on(bytes_future))
+      .map_err(possible_store_missing_digest)?;
+
+    let contents = std::str::from_utf8(&bytes_value).map_err(PyValueError::new_err)?;
+    let _ = get_dependencies(contents, "filename").map_err(PyValueError::new_err)?;
+
+    Ok(())
+  })
 }
 
 ///

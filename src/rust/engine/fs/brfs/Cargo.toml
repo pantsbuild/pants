@@ -7,7 +7,7 @@ publish = false
 
 [dependencies]
 protos = { path = "../../protos" }
-clap = "3"
+clap = "4"
 dirs-next = "2"
 env_logger = "0.10.0"
 errno = "0.2.8"

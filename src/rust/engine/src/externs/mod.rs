@@ -30,6 +30,7 @@ mod interface;
 mod interface_tests;
 pub mod nailgun;
 pub mod process;
+mod python_parsing;
 pub mod scheduler;
 mod stdio;
 pub mod testutil;
