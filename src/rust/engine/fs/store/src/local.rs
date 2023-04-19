@@ -145,6 +145,7 @@ impl UnderlyingByteStore for ShardedLmdb {
 
 // We shard so there isn't a plethora of entries in one single dir.
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub(crate) struct ShardedFSDB {
   root: PathBuf,
   executor: Executor,
@@ -210,59 +211,73 @@ impl ShardedFSDB {
     // NB: The error type must be convertible from a string
     E: std::convert::From<std::string::String>,
   {
-    let cell = self
-      .dest_initializer
-      .lock()
-      .entry(fingerprint)
-      .or_default()
-      .clone();
-    cell
-      .get_or_try_init(async {
-        let dest_path = self.get_path(fingerprint);
-        tokio::fs::create_dir_all(dest_path.parent().unwrap())
-          .await
-          .map_err(|e| format! {"Failed to create local store subdirectory {dest_path:?}: {e}"})?;
+    let dest_path = self.get_path(fingerprint);
+    if tokio::fs::metadata(dest_path.clone()).await.is_ok() {
+      return Ok(());
+    }
 
-        let dest_path2 = dest_path.clone();
-        // Make the tempfile in the same dir as the final file so that materializing the final file doesn't
-        // have to worry about parent dirs.
-        let named_temp_file = self
-          .executor
-          .spawn_blocking(
-            move || {
-              NamedTempFile::new_in(dest_path2.parent().unwrap())
-                .map_err(|e| format!("Failed to create temp file: {e}"))
-            },
-            |e| Err(format!("temp file creation task failed: {e}")),
-          )
-          .await?;
-        let (std_file, tmp_path) = named_temp_file
-          .keep()
-          .map_err(|e| format!("Failed to keep temp file: {e}"))?;
-
-        match writer_func(std_file.into()).await {
-          Ok(mut tokio_file) => {
-            tokio_file
-              .shutdown()
-              .await
-              .map_err(|e| format!("Failed to shutdown {tmp_path:?}: {e}"))?;
-
-            tokio::fs::set_permissions(&tmp_path, std::fs::Permissions::from_mode(0o555))
-              .await
-              .map_err(|e| format!("Failed to set permissions on {:?}: {e}", tmp_path))?;
-            tokio::fs::rename(tmp_path.clone(), dest_path.clone())
-              .await
-              .map_err(|e| format!("Error while renaming: {e}."))?;
-            Ok(())
-          }
-          Err(e) => {
-            let _ = tokio::fs::remove_file(tmp_path).await;
-            Err(e)
-          }
-        }
-      })
+    tokio::fs::create_dir_all(dest_path.parent().unwrap())
       .await
-      .cloned()
+      .map_err(|e| format! {"Failed to create local store subdirectory {dest_path:?}: {e}"})?;
+
+    let lockfile_path = dest_path.with_extension("lock");
+    let lockfile_path2 = lockfile_path.clone();
+    let _ = self
+      .executor
+      .spawn_blocking(
+        move || {
+          file_lock::FileLock::lock(lockfile_path2, true,
+            file_lock::FileOptions::new().create(true).write(true)
+          ).map_err(|e| format!("Failed to lock lockfile: {e}"))
+        },
+        |e| Err(format!("Error locking {lockfile_path:?}: {e}")),
+      )
+      .await?;
+
+    if tokio::fs::metadata(dest_path.clone()).await.is_ok() {
+      return Ok(());
+    }
+
+    let dest_path2 = dest_path.clone();
+    // Make the tempfile in the same dir as the final file so that materializing the final file doesn't
+    // have to worry about parent dirs.
+    let named_temp_file = self
+      .executor
+      .spawn_blocking(
+        move || {
+          NamedTempFile::new_in(dest_path2.parent().unwrap())
+            .map_err(|e| format!("Failed to create temp file: {e}"))
+        },
+        |e| Err(format!("temp file creation task failed: {e}")),
+      )
+      .await?;
+    let (std_file, tmp_path) = named_temp_file
+      .keep()
+      .map_err(|e| format!("Failed to keep temp file: {e}"))?;
+
+    match writer_func(std_file.into()).await {
+      Ok(mut tokio_file) => {
+        tokio_file
+          .shutdown()
+          .await
+          .map_err(|e| format!("Failed to shutdown {tmp_path:?}: {e}"))?;
+        tokio_file.sync_all().await
+          .map_err(|e| format!("Failed to sync_all {tmp_path:?}: {e}"))?;
+
+        tokio::fs::set_permissions(&tmp_path, std::fs::Permissions::from_mode(0o555))
+          .await
+          .map_err(|e| format!("Failed to set permissions on {:?}: {e}", tmp_path))?;
+        tokio::fs::rename(tmp_path.clone(), dest_path.clone())
+          .await
+          .map_err(|e| format!("Error while renaming: {e}."))?;
+
+        Ok(())
+      }
+      Err(e) => {
+        let _ = tokio::fs::remove_file(tmp_path).await;
+        Err(e)
+      }
+    }
   }
 }
 
