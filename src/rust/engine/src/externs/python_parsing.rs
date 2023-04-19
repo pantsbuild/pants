@@ -2,14 +2,17 @@ use rustpython_parser::ast;
 use rustpython_parser::parser::parse_program;
 use std::collections::HashMap;
 
-pub fn get_dependencies(contents: &str, filepath: &str) -> Result<(), String> {
+pub fn get_dependencies(
+  contents: &str,
+  filepath: &str,
+) -> Result<HashMap<String, (u64, bool)>, String> {
   let program =
     parse_program(contents, filepath).map_err(|e| format!("Failed to parse file <BLAH>: {e}"))?;
 
   let mut result = HashMap::new();
   visit_stmts(&program, filepath, &mut result);
 
-  Ok(())
+  Ok(result)
 }
 
 fn visit_stmts(stmts: &[ast::Stmt], filepath: &str, import_map: &mut HashMap<String, (u64, bool)>) {

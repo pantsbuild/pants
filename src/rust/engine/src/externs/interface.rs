@@ -656,11 +656,11 @@ fn hash_prefix_zero_bits(item: &str) -> u32 {
 /// @TODO: ...
 /// HashMap<String, (u64, bool)>
 #[pyfunction]
-fn parse_python_deps<'py>(
-  py: Python<'py>,
+fn parse_python_deps(
+  py: Python,
   py_scheduler: &PyScheduler,
   py_file_digest: PyFileDigest,
-) -> PyO3Result<()> {
+) -> PyO3Result<HashMap<String, (u64, bool)>> {
   let core = &py_scheduler.0.core;
   core.executor.enter(|| {
     let store = core.store();
@@ -674,9 +674,9 @@ fn parse_python_deps<'py>(
       .map_err(possible_store_missing_digest)?;
 
     let contents = std::str::from_utf8(&bytes_value).map_err(PyValueError::new_err)?;
-    let _ = get_dependencies(contents, "filename").map_err(PyValueError::new_err)?;
+    let result = get_dependencies(contents, "filename").map_err(PyValueError::new_err)?;
 
-    Ok(())
+    Ok(result)
   })
 }
 
