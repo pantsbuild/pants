@@ -63,11 +63,6 @@ jobs:
           src/python/pants/engine/internals/native_engine.so
 
           src/python/pants/engine/internals/native_engine.so.metadata'
-    - if: github.event_name != 'pull_request'
-      name: Setup toolchain auth
-      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
-
-        '
     - name: Bootstrap Pants
       run: ./pants version > ${{ runner.temp }}/_pants_version.stdout && [[ -s ${{ runner.temp }}/_pants_version.stdout ]]
     - name: Run smoke tests
@@ -163,11 +158,6 @@ jobs:
           src/python/pants/engine/internals/native_engine.so
 
           src/python/pants/engine/internals/native_engine.so.metadata'
-    - if: github.event_name != 'pull_request'
-      name: Setup toolchain auth
-      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
-
-        '
     - name: Bootstrap Pants
       run: ./pants version > ${{ runner.temp }}/_pants_version.stdout && [[ -s ${{ runner.temp }}/_pants_version.stdout ]]
     - name: Run smoke tests
@@ -275,11 +265,6 @@ jobs:
           src/python/pants/engine/internals/native_engine.so
 
           src/python/pants/engine/internals/native_engine.so.metadata'
-    - if: github.event_name != 'pull_request'
-      name: Setup toolchain auth
-      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
-
-        '
     - name: Bootstrap Pants
       run: ./pants version > ${{ runner.temp }}/_pants_version.stdout && [[ -s ${{ runner.temp }}/_pants_version.stdout ]]
     - name: Run smoke tests
@@ -356,11 +341,6 @@ jobs:
         echo "/opt/python/cp39-cp39/bin" >> $GITHUB_PATH
 
         '
-    - if: github.event_name != 'pull_request'
-      name: Setup toolchain auth
-      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
-
-        '
     - env:
         PANTS_CONFIG_FILES: +['pants.ci.toml','pants.ci.aarch64.toml']
       name: Build wheels
@@ -418,11 +398,6 @@ jobs:
         echo "/opt/python/cp38-cp38/bin" >> $GITHUB_PATH
 
         echo "/opt/python/cp39-cp39/bin" >> $GITHUB_PATH
-
-        '
-    - if: github.event_name != 'pull_request'
-      name: Setup toolchain auth
-      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
 
         '
     - name: Install Go
@@ -487,11 +462,6 @@ jobs:
         cache-bin: 'false'
         shared-key: engine
         workspaces: src/rust/engine
-    - if: github.event_name != 'pull_request'
-      name: Setup toolchain auth
-      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
-
-        '
     - name: Install Go
       uses: actions/setup-go@v3
       with:
@@ -555,11 +525,6 @@ jobs:
         cache-bin: 'false'
         shared-key: engine
         workspaces: src/rust/engine
-    - if: github.event_name != 'pull_request'
-      name: Setup toolchain auth
-      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
-
-        '
     - name: Install Go
       uses: actions/setup-go@v3
       with:
@@ -655,11 +620,6 @@ jobs:
       uses: actions/download-artifact@v3
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
-    - if: github.event_name != 'pull_request'
-      name: Setup toolchain auth
-      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
-
-        '
     - name: Lint
       run: './pants lint check ::
 
@@ -746,11 +706,6 @@ jobs:
       uses: actions/download-artifact@v3
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-ARM64
-    - if: github.event_name != 'pull_request'
-      name: Setup toolchain auth
-      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
-
-        '
     - name: Run Python tests
       run: './pants --tag=+platform_specific_behavior test :: -- -m platform_specific_behavior
 
@@ -817,11 +772,6 @@ jobs:
       uses: actions/download-artifact@v3
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
-    - if: github.event_name != 'pull_request'
-      name: Setup toolchain auth
-      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
-
-        '
     - name: Run Python test shard 0/3
       run: './pants test --shard=0/3 ::
 
@@ -888,11 +838,6 @@ jobs:
       uses: actions/download-artifact@v3
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
-    - if: github.event_name != 'pull_request'
-      name: Setup toolchain auth
-      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
-
-        '
     - name: Run Python test shard 1/3
       run: './pants test --shard=1/3 ::
 
@@ -959,11 +904,6 @@ jobs:
       uses: actions/download-artifact@v3
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
-    - if: github.event_name != 'pull_request'
-      name: Setup toolchain auth
-      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
-
-        '
     - name: Run Python test shard 2/3
       run: './pants test --shard=2/3 ::
 
@@ -1016,11 +956,6 @@ jobs:
       uses: actions/download-artifact@v3
       with:
         name: native_binaries.${{ matrix.python-version }}.macOS11-x86_64
-    - if: github.event_name != 'pull_request'
-      name: Setup toolchain auth
-      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
-
-        '
     - name: Run Python tests
       run: './pants --tag=+platform_specific_behavior test :: -- -m platform_specific_behavior
 

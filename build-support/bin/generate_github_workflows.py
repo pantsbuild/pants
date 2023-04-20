@@ -189,18 +189,6 @@ def checkout(*, fetch_depth: int = 10, containerized: bool = False) -> Sequence[
     return steps
 
 
-def setup_toolchain_auth() -> Step:
-    return {
-        "name": "Setup toolchain auth",
-        "if": "github.event_name != 'pull_request'",
-        "run": dedent(
-            f"""\
-            echo TOOLCHAIN_AUTH_TOKEN="{gha_expr('secrets.TOOLCHAIN_AUTH_TOKEN')}" >> $GITHUB_ENV
-            """
-        ),
-    }
-
-
 def global_env() -> Env:
     return {
         "PANTS_CONFIG_FILES": "+['pants.ci.toml']",
@@ -446,7 +434,6 @@ class Helper:
             *checkout(),
             *self.setup_primary_python(),
             *self.bootstrap_caches(),
-            setup_toolchain_auth(),
             {
                 "name": "Bootstrap Pants",
                 # Check for a regression of https://github.com/pantsbuild/pants/issues/17470.
@@ -648,7 +635,6 @@ def test_jobs(
             *helper.setup_primary_python(),
             *helper.expose_all_pythons(),
             helper.native_binaries_download(),
-            setup_toolchain_auth(),
             {
                 "name": human_readable_step_name,
                 "run": pants_args_str,
@@ -761,7 +747,6 @@ def build_wheels_job(platform: Platform, python_versions: list[str]) -> Jobs:
             "env": DISABLE_REMOTE_CACHE_ENV,
             "steps": initial_steps
             + [
-                setup_toolchain_auth(),
                 *([] if platform == Platform.LINUX_ARM64 else [install_go()]),
                 *helper.build_wheels(python_versions),
                 helper.upload_log_artifacts(name="wheels"),
@@ -811,7 +796,6 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                     *checkout(),
                     *linux_x86_64_helper.setup_primary_python(),
                     linux_x86_64_helper.native_binaries_download(),
-                    setup_toolchain_auth(),
                     {
                         "name": "Lint",
                         "run": "./pants lint check ::\n",
@@ -887,7 +871,6 @@ def cache_comparison_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
             "strategy": {"matrix": {"python-version": [PYTHON37_VERSION]}},
             "steps": [
                 *checkout(),
-                setup_toolchain_auth(),
                 *helper.setup_primary_python(),
                 *helper.expose_all_pythons(),
                 {
