@@ -1222,7 +1222,7 @@ async fn server_rejecting_execute_request_gives_error() {
   let error = run_command_remote(mock_server.address(), execute_request)
     .await
     .expect_err("Want Err");
-  aasert!(&error.to_string().contains("InvalidArgument"));
+  assert!(&error.to_string().contains("InvalidArgument"));
   assert!(&error.to_string().contains("Did not expect this request"));
 }
 
