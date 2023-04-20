@@ -39,14 +39,14 @@ from pants.core.util_rules.system_binaries import (
     BinaryShimsRequest,
 )
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest, PathEnvironmentVariable
-from pants.engine.fs import EMPTY_DIGEST, Digest, DownloadFile
-from pants.engine.internals.native_engine import FileDigest
+from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, Directory, DownloadFile
+from pants.engine.internals.native_engine import FileDigest, MergeDigests
 from pants.engine.internals.selectors import MultiGet
 from pants.engine.platform import Platform
-from pants.engine.process import Process
+from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, Rule, collect_rules, rule
 from pants.engine.unions import UnionRule
-from pants.option.option_types import DictOption, StrListOption
+from pants.option.option_types import DictOption, ShellStrListOption, StrListOption
 from pants.option.subsystem import Subsystem
 from pants.util.docutil import bin_name
 from pants.util.frozendict import FrozenDict
@@ -59,7 +59,7 @@ _logger = logging.getLogger(__name__)
 
 class NodeJS(Subsystem, TemplatedExternalToolOptionsMixin):
     options_scope = "nodejs"
-    help = "The Node.js Javascript runtime (including npm and npx)."
+    help = "The Node.js Javascript runtime (including Corepack)."
 
     default_version = "v16.15.0"
     default_known_versions = [
@@ -120,6 +120,22 @@ class NodeJS(Subsystem, TemplatedExternalToolOptionsMixin):
         download_file = DownloadFile(url, FileDigest(known_version.sha256, known_version.filesize))
         return await Get(DownloadedExternalTool, ExternalToolRequest(download_file, exe))
 
+    package_managers = DictOption[str](
+        default={"npm": "8.5.5"},
+        help=help_text(
+            """
+            A mapping of package manager versions to semver releases.
+
+            Many organizations only need a single version of a package manager, which is
+            a good default and often the simplest thing to do.
+
+            The version download is managed by Corepack. This mapping corresponds to
+            the https://github.com/nodejs/corepack#known-good-releases setting, using
+            the `--activate` flag.
+            """
+        ),
+    )
+
     class EnvironmentAware(ExecutableSearchPathsOptionMixin, Subsystem.EnvironmentAware):
         search_path = StrListOption(
             default=["<PATH>"],
@@ -161,6 +177,25 @@ class NodeJS(Subsystem, TemplatedExternalToolOptionsMixin):
             """
         )
 
+        _corepack_env_vars = ShellStrListOption(
+            help=softwrap(
+                """
+                Environment variables to set for `corepack` invocations.
+
+                Entries are either strings in the form `ENV_VAR=value` to set an explicit value;
+                or just `ENV_VAR` to copy the value from Pants's own environment.
+
+                Review https://github.com/nodejs/corepack#environment-variables
+                for available variables.
+                """
+            ),
+            advanced=True,
+        )
+
+        @property
+        def corepack_env_vars(self) -> tuple[str, ...]:
+            return tuple(sorted(set(self._corepack_env_vars)))
+
 
 class UserChosenNodeJSResolveAliases(FrozenDict[str, str]):
     pass
@@ -175,6 +210,8 @@ async def user_chosen_resolve_aliases(nodejs: NodeJS) -> UserChosenNodeJSResolve
 class NodeJSToolProcess:
     """A request for a tool installed with NodeJS."""
 
+    tool: str
+    tool_version: str | None
     args: tuple[str, ...]
     description: str
     level: LogLevel = LogLevel.INFO
@@ -185,6 +222,7 @@ class NodeJSToolProcess:
     append_only_caches: FrozenDict[str, str] = field(default_factory=FrozenDict)
     timeout_seconds: int | None = None
     extra_env: Mapping[str, str] = field(default_factory=FrozenDict)
+    project_digest: Digest | None = None
 
     @classmethod
     def npm(
@@ -199,9 +237,13 @@ class NodeJSToolProcess:
         append_only_caches: FrozenDict[str, str] | None = None,
         timeout_seconds: int | None = None,
         extra_env: Mapping[str, str] | None = None,
+        tool_version: str | None = None,
+        project_digest: Digest | None = None,
     ) -> NodeJSToolProcess:
         return cls(
-            args=("npm", *args),
+            tool="npm",
+            tool_version=tool_version,
+            args=tuple(args),
             description=description,
             level=level,
             input_digest=input_digest,
@@ -211,6 +253,7 @@ class NodeJSToolProcess:
             append_only_caches=append_only_caches or FrozenDict(),
             timeout_seconds=timeout_seconds,
             extra_env=extra_env or FrozenDict(),
+            project_digest=project_digest,
         )
 
     @classmethod
@@ -224,7 +267,9 @@ class NodeJSToolProcess:
         output_files: tuple[str, ...] = (),
     ) -> NodeJSToolProcess:
         return cls(
-            args=("npx", "--yes", npm_package, *args),
+            tool="npx",
+            tool_version=None,
+            args=("--yes", npm_package, *args),
             description=description,
             level=level,
             input_digest=input_digest,
@@ -243,13 +288,18 @@ class NodeJSProcessEnvironment:
     binaries: NodeJSBinaries
     npm_config_cache: str
     tool_binaries: BinaryShims
+    corepack_home: str
+    corepack_shims: str
+    corepack_env_vars: EnvironmentVars
 
     base_bin_dir: ClassVar[str] = "__node"
 
     def to_env_dict(self) -> dict[str, str]:
         return {
-            "PATH": f"{self.tool_binaries.path_component}:{self.binary_directory}",
-            "npm_config_cache": self.npm_config_cache,  # Normally stored at ~/.npm
+            "PATH": f"{self.tool_binaries.path_component}:{self.corepack_shims}:{self.binary_directory}",
+            "npm_config_cache": self.npm_config_cache,  # Normally stored at ~/.npm,
+            "COREPACK_HOME": os.path.join("{chroot}", self.corepack_home),
+            **self.corepack_env_vars,
         }
 
     @property
@@ -268,6 +318,35 @@ class NodeJSProcessEnvironment:
         )
 
 
+async def add_corepack_shims_to_digest(
+    binaries: NodeJSBinaries, tool_shims: BinaryShims, corepack_env_vars: EnvironmentVars
+) -> Digest:
+    directory_digest = await Get(Digest, CreateDigest([Directory("._corepack")]))
+    binary_digest = binaries.digest if binaries.digest else EMPTY_DIGEST
+    input_digest = await Get(Digest, MergeDigests((directory_digest, binary_digest)))
+
+    none_immutable_binary_path = binaries.binary_dir.replace(
+        f"/{NodeJSProcessEnvironment.base_bin_dir}", ""
+    )
+    enable_corepack_result = await Get(
+        ProcessResult,
+        Process(
+            argv=("corepack", "enable", "npm", "--install-directory", "._corepack"),
+            input_digest=input_digest,
+            immutable_input_digests={**tool_shims.immutable_input_digests},
+            output_directories=["._corepack"],
+            description="Enabling corepack shims",
+            level=LogLevel.DEBUG,
+            env={
+                "PATH": f"{tool_shims.path_component}:{none_immutable_binary_path}",
+                "COREPACK_HOME": "._corepack_home",
+                **corepack_env_vars,
+            },
+        ),
+    )
+    return await Get(Digest, MergeDigests((binary_digest, enable_corepack_result.output_digest)))
+
+
 @rule(level=LogLevel.DEBUG)
 async def node_process_environment(
     binaries: NodeJSBinaries, nodejs: NodeJS.EnvironmentAware
@@ -280,12 +359,26 @@ async def node_process_environment(
             "mkdir",  # Some default scripts are generated using mkdir, rm & touch.
             "rm",
             "touch",
+            "which",
             rationale="execute a nodejs process",
             search_path=nodejs.executable_search_path,
         ),
     )
+    corepack_env_vars = await Get(EnvironmentVars, EnvironmentVarsRequest(nodejs.corepack_env_vars))
+    binary_digest_with_shims = await add_corepack_shims_to_digest(
+        binaries, binary_shims, corepack_env_vars
+    )
+    binaries = NodeJSBinaries(binaries.binary_dir, binary_digest_with_shims)
+
     return NodeJSProcessEnvironment(
-        binaries=binaries, npm_config_cache="._npm", tool_binaries=binary_shims
+        binaries=binaries,
+        npm_config_cache="._npm",
+        tool_binaries=binary_shims,
+        corepack_home="._corepack_home",
+        corepack_shims=os.path.join(
+            "{chroot}", NodeJSProcessEnvironment.base_bin_dir, "._corepack"
+        ),
+        corepack_env_vars=corepack_env_vars,
     )
 
 
@@ -441,19 +534,71 @@ async def determine_nodejs_binaries(
     return NodeJSBinaries(os.path.dirname(paths_per_version[satisfying_version][0].path))
 
 
+@dataclass(frozen=True)
+class CorepackToolRequest:
+    tool: str
+    input_digest: Digest
+    working_directory: str | None = None
+    version: str | None = None
+
+
+@dataclass(frozen=True)
+class CorepackToolDigest:
+    digest: Digest
+
+
+@rule(desc="Preparing Corepack managed tool.")
+async def prepare_corepack_tool(
+    request: CorepackToolRequest, environment: NodeJSProcessEnvironment, nodejs: NodeJS
+) -> CorepackToolDigest:
+    version = request.version or nodejs.package_managers.get(request.tool)
+    if not version and request.input_digest == EMPTY_DIGEST:
+        raise ValueError(f"Could not determine tool version for {request.tool}.")
+    tool_spec = f"{request.tool}@{version}" if version else request.tool
+    tool_description = tool_spec if version else f"default {tool_spec} version"
+    result = await Get(
+        ProcessResult,
+        Process(
+            argv=("corepack", "prepare", tool_spec, "--activate"),
+            description=f"Preparing configured {tool_description}.",
+            input_digest=request.input_digest,
+            immutable_input_digests=environment.immutable_digest(),
+            working_directory=request.working_directory,
+            level=LogLevel.DEBUG,
+            env=environment.to_env_dict(),
+            append_only_caches={**environment.append_only_caches},
+            output_directories=[environment.corepack_home],
+        ),
+    )
+    return CorepackToolDigest(result.output_digest)
+
+
 @rule(level=LogLevel.DEBUG)
 async def setup_node_tool_process(
     request: NodeJSToolProcess, environment: NodeJSProcessEnvironment
 ) -> Process:
+    if request.tool in ("npm", "npx"):
+        corepack_tool = await Get(
+            CorepackToolDigest,
+            CorepackToolRequest(
+                "npm",
+                request.project_digest or EMPTY_DIGEST,
+                request.working_directory,
+                request.tool_version,
+            ),
+        )
+        input_digest = await Get(Digest, MergeDigests([request.input_digest, corepack_tool.digest]))
+    else:
+        input_digest = request.input_digest
     return Process(
-        argv=filter(None, request.args),
-        input_digest=request.input_digest,
+        argv=list(filter(None, (request.tool, *request.args))),
+        input_digest=input_digest,
         output_files=request.output_files,
         immutable_input_digests=environment.immutable_digest(),
         output_directories=request.output_directories,
         description=request.description,
         level=request.level,
-        env={**environment.to_env_dict(), **request.extra_env},
+        env={**request.extra_env, **environment.to_env_dict()},
         working_directory=request.working_directory,
         append_only_caches={**request.append_only_caches, **environment.append_only_caches},
         timeout_seconds=request.timeout_seconds,

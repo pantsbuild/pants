@@ -136,7 +136,7 @@ venv_use_symlinks = true
 
 [python]
 # N.B.: When adjusting this to support new Python versions, you must update the Pants
-# `python_distrobution` targets, currently:
+# `python_distribution` targets, currently:
 # + src/python/pants:pants-packaged
 # + src/python/pants/testutil:testutil_wheel
 # And update the PythonBuildStandalone version/URL:
@@ -144,15 +144,13 @@ venv_use_symlinks = true
 interpreter_constraints = [">=3.7,<3.10"]
 macos_big_sur_compatibility = true
 enable_resolves = true
-pip_version = "23.0.1"
+pip_version = "latest"
 
 [python.resolves]
 python-default = "3rdparty/python/user_reqs.lock"
 flake8 = "3rdparty/python/flake8.lock"
 mypy = "3rdparty/python/mypy.lock"
 pytest = "3rdparty/python/pytest.lock"
-helm-post-renderer = "src/python/pants/backend/helm/subsystems/post_renderer.lock"
-helm-k8s-parser = "src/python/pants/backend/helm/subsystems/k8s_parser.lock"
 
 [python.resolves_to_interpreter_constraints]
 # Without setting this explicitly, the 'python-default' resolve uses the Pants default
@@ -225,7 +223,6 @@ interpreter_constraints = [">=3.7,<3.10"]
 template_by_globs = "@build-support/preambles/config.yaml"
 
 [generate-lockfiles]
-custom_command = "build-support/bin/generate_all_lockfiles.sh"
 diff = true
 
 [jvm]

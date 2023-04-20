@@ -261,12 +261,11 @@ impl ShardedFSDB {
           .shutdown()
           .await
           .map_err(|e| format!("Failed to shutdown {tmp_path:?}: {e}"))?;
+        tokio::fs::set_permissions(&tmp_path, std::fs::Permissions::from_mode(0o555))
+        .await
+        .map_err(|e| format!("Failed to set permissions on {:?}: {e}", tmp_path))?;
         tokio_file.sync_all().await
           .map_err(|e| format!("Failed to sync_all {tmp_path:?}: {e}"))?;
-
-        tokio::fs::set_permissions(&tmp_path, std::fs::Permissions::from_mode(0o555))
-          .await
-          .map_err(|e| format!("Failed to set permissions on {:?}: {e}", tmp_path))?;
         tokio::fs::rename(tmp_path.clone(), dest_path.clone())
           .await
           .map_err(|e| format!("Error while renaming: {e}."))?;
@@ -323,6 +322,7 @@ impl UnderlyingByteStore for ShardedFSDB {
   }
 
   async fn remove(&self, fingerprint: Fingerprint) -> Result<bool, String> {
+    let _ = self.dest_initializer.lock().remove(&fingerprint);
     Ok(
       tokio::fs::remove_file(self.get_path(fingerprint))
         .await
