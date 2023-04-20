@@ -33,7 +33,6 @@ backend_packages.add = [
 ]
 plugins = [
   "hdrhistogram",  # For use with `--stats-log`.
-  "toolchain.pants.plugin==0.27.0",
 ]
 
 # The invalidation globs cover the PYTHONPATH by default, but we exclude some files that are on the
@@ -219,13 +218,6 @@ version_for_resolve = { "scala_parser_dev" = "2.13.8" }
 
 [scala-infer]
 force_add_siblings_as_dependencies = false
-
-[toolchain-setup]
-repo = "pants"
-org = "pantsbuild"
-
-[buildsense]
-enable = false
 
 [pants-releases.release_notes]
 master = "src/python/pants/notes/master.rst"
