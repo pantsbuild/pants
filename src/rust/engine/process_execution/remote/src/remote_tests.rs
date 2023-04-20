@@ -14,8 +14,6 @@ use prost::Message;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;
 use protos::gen::google::longrunning::Operation;
 use remexec::{execution_stage::Value as ExecutionStageValue, ExecutedActionMetadata};
-use spectral::prelude::*;
-use spectral::{assert_that, string::StrAssertions};
 use store::{SnapshotOps, Store, StoreError};
 use tempfile::TempDir;
 use testutil::data::{TestData, TestDirectory, TestTree};
@@ -1224,8 +1222,8 @@ async fn server_rejecting_execute_request_gives_error() {
   let error = run_command_remote(mock_server.address(), execute_request)
     .await
     .expect_err("Want Err");
-  assert_that(&error.to_string()).contains("InvalidArgument");
-  assert_that(&error.to_string()).contains("Did not expect this request");
+  aassert!(&error.to_string().contains("InvalidArgument"));
+  assert!(&error.to_string().contains("Did not expect this request"));
 }
 
 #[tokio::test]
@@ -1343,7 +1341,7 @@ async fn sends_headers() {
     .iter()
     .map(|received_message| received_message.headers.clone())
     .collect();
-  assert_that!(message_headers).has_length(1);
+  assert_eq!(message_headers.len(), 1);
   for headers in message_headers {
     {
       let want_key = "google.devtools.remoteexecution.v1test.requestmetadata-bin";
