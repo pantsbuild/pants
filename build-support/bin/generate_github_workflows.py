@@ -184,18 +184,6 @@ def checkout(*, containerized: bool = False) -> Sequence[Step]:
     return steps
 
 
-def setup_toolchain_auth() -> Step:
-    return {
-        "name": "Setup toolchain auth",
-        "if": "github.event_name != 'pull_request'",
-        "run": dedent(
-            f"""\
-            echo TOOLCHAIN_AUTH_TOKEN="{gha_expr('secrets.TOOLCHAIN_AUTH_TOKEN')}" >> $GITHUB_ENV
-            """
-        ),
-    }
-
-
 def global_env() -> Env:
     return {
         "PANTS_CONFIG_FILES": "+['pants.ci.toml']",
@@ -410,7 +398,6 @@ class Helper:
             *checkout(),
             *setup_primary_python(install_python=install_python),
             *self.bootstrap_caches(),
-            setup_toolchain_auth(),
             {
                 "name": "Bootstrap Pants",
                 # Check for a regression of https://github.com/pantsbuild/pants/issues/17470.
@@ -500,7 +487,6 @@ def linux_x86_64_test_jobs(python_versions: list[str]) -> Jobs:
                 *setup_primary_python(),
                 expose_all_pythons(),
                 helper.native_binaries_download(),
-                setup_toolchain_auth(),
                 {
                     "name": f"Run Python test shard {shard}",
                     "run": f"./pants test --shard={shard} ::\n",
@@ -587,7 +573,6 @@ def macos11_x86_64_test_jobs(python_versions: list[str]) -> Jobs:
                 *setup_primary_python(),
                 expose_all_pythons(),
                 helper.native_binaries_download(),
-                setup_toolchain_auth(),
                 {
                     "name": "Run Python tests",
                     "run": softwrap(
@@ -648,7 +633,6 @@ def build_wheels_job(platform: Platform, python_versions: list[str]) -> Jobs:
             "env": DISABLE_REMOTE_CACHE_ENV,
             "steps": initial_steps
             + [
-                setup_toolchain_auth(),
                 *helper.build_wheels(python_versions),
                 helper.upload_log_artifacts(name="wheels"),
                 deploy_to_s3(),
@@ -692,7 +676,6 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                     *checkout(),
                     *setup_primary_python(),
                     linux_x86_64_helper.native_binaries_download(),
-                    setup_toolchain_auth(),
                     {
                         "name": "Lint",
                         "run": "./pants lint check ::\n",
@@ -766,7 +749,6 @@ def cache_comparison_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
             "strategy": {"matrix": {"python-version": [PYTHON37_VERSION]}},
             "steps": [
                 *checkout(),
-                setup_toolchain_auth(),
                 *setup_primary_python(),
                 expose_all_pythons(),
                 {
