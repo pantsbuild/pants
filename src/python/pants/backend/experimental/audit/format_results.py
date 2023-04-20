@@ -34,7 +34,7 @@ def format_results(
     for dep, vulns in result.items():
         for vuln in vulns:
             vuln_data.append([
-                dep, vuln['id'], vuln['fixed_in'], vuln['link']
+                dep, vuln.vuln_id, vuln.fixed_in, vuln.link
             ])
     columns_string = ""
 

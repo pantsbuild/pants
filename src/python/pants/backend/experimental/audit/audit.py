@@ -24,6 +24,7 @@ _FS = TypeVar("_FS", bound=FieldSet)
 
 @dataclass(frozen=True)
 class AuditResult:
+    resolve_name: str
     lockfile: str
     report: str
 
@@ -110,7 +111,15 @@ async def audit(
     )
     for results in all_results:
         for result in results.results:
-            console.print_stdout(result.report)
+            if result.report:
+                sigil = console.sigil_failed()
+            else:
+                sigil = console.sigil_succeeded()
+            console.print_stdout(f"\n\n{sigil} Resolve: {result.resolve_name} (from {result.lockfile})")
+            if result.report:
+                console.print_stdout(result.report)
+            else:
+                console.print_stdout(f"No vulnerabilities reported.")
     # results_by_tool: dict[str, list[AuditResult]] = defaultdict(list)
     # for results in all_results:
     #     results_by_tool[results.auditor_name].extend(results.results)

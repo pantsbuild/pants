@@ -13,11 +13,15 @@ from pants.backend.python.util_rules.pex_requirements import (
     LoadedLockfileRequest,
     Lockfile,
 )
+from pants.option.option_types import DictOption
 from pants.backend.python.target_types import PythonResolveField
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import FieldSet
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
+from pants.option.subsystem import Subsystem
+from pants.util.strutil import softwrap
+
 
 logger = logging.getLogger(__name__)
 
@@ -31,9 +35,26 @@ class PypiAuditRequest(AuditRequest):
     field_set_type = PypiAuditFieldSet
     tool_name = "pypi-audit"
 
+class PypiAuditSubsystem(Subsystem):
+    name = "pypi-audit"
+    options_scope = "pypi-audit"
+    help = "Configuration for the pypi audit rule."
+
+    lockfile_vulnerability_excludes = DictOption(
+        help=softwrap(
+            f"""
+            A mapping of logical names of Python lockfiles to a list of excluded vulnerability IDs.
+            """
+        ),
+    )
+
 
 @rule(desc="Audit lockfiles with pypi vulnerabilities database.", level=LogLevel.DEBUG)
-async def pypi_audit(request: PypiAuditRequest, python_setup: PythonSetup) -> AuditResults:
+async def pypi_audit(
+    request: PypiAuditRequest,
+    pypi_audit_subsystem: PypiAuditSubsystem,
+    python_setup: PythonSetup,
+) -> AuditResults:
     if not PythonSetup.enable_resolves:
         # TODO: Fail, we need lockfiles.
         pass
@@ -48,14 +69,20 @@ async def pypi_audit(request: PypiAuditRequest, python_setup: PythonSetup) -> Au
         )
         loaded_lockfile = await Get(LoadedLockfile, LoadedLockfileRequest(lockfile))
         lockfile_audit_result = audit_constraints_strings(
-            loaded_lockfile.as_constraints_strings, session
+            constraints_strings=loaded_lockfile.as_constraints_strings,
+            session=session,
+            excludes_ids=frozenset(pypi_audit_subsystem.lockfile_vulnerability_excludes.get(resolve_name, [])),
         )
         audit_results_by_lockfile[lockfile_path] = format_results(lockfile_audit_result)
 
     return AuditResults(
         results=tuple(
-            AuditResult(lockfile=lockfile, report=audit_results_by_lockfile[lockfile])
-            for _, lockfile in lockfile_paths
+            AuditResult(
+                resolve_name=resolve_name,
+                lockfile=lockfile,
+                report=audit_results_by_lockfile[lockfile],
+            )
+            for resolve_name, lockfile in lockfile_paths
         ),
         auditor_name="pypi_auditor",
     )

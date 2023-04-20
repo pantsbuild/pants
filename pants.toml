@@ -241,3 +241,6 @@ args = ["-Yrangepos", "-Xlint:unused"]
 
 [scala-infer]
 force_add_siblings_as_dependencies = false
+
+[pypi-audit]
+lockfile_vulnerability_excludes = {"python-default" = ["GHSA-w596-4wvx-j9j6"]}
