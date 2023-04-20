@@ -3,20 +3,18 @@
 use super::{EntryType, ShrinkBehavior};
 
 use core::future::Future;
-use std::collections::{BinaryHeap, HashMap, HashSet};
+use std::collections::{BinaryHeap, HashSet};
 use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime};
 
-use async_oncecell::OnceCell;
 use async_trait::async_trait;
 use bytes::Bytes;
 use futures::future::{self, join_all, try_join, try_join_all};
 use hashing::{
   async_copy_and_hash, async_verified_copy, AgedFingerprint, Digest, Fingerprint, EMPTY_DIGEST,
 };
-use parking_lot::Mutex;
 use sharded_lmdb::ShardedLmdb;
 use std::os::unix::fs::PermissionsExt;
 use task_executor::Executor;
@@ -145,12 +143,10 @@ impl UnderlyingByteStore for ShardedLmdb {
 
 // We shard so there isn't a plethora of entries in one single dir.
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
 pub(crate) struct ShardedFSDB {
   root: PathBuf,
   executor: Executor,
   lease_time: Duration,
-  dest_initializer: Arc<Mutex<HashMap<Fingerprint, Arc<OnceCell<()>>>>>,
 }
 
 enum VerifiedCopyError {
@@ -226,9 +222,12 @@ impl ShardedFSDB {
       .executor
       .spawn_blocking(
         move || {
-          file_lock::FileLock::lock(lockfile_path2, true,
-            file_lock::FileOptions::new().create(true).write(true)
-          ).map_err(|e| format!("Failed to lock lockfile: {e}"))
+          file_lock::FileLock::lock(
+            lockfile_path2,
+            true,
+            file_lock::FileOptions::new().create(true).write(true),
+          )
+          .map_err(|e| format!("Failed to lock lockfile: {e}"))
         },
         |e| Err(format!("Error locking {lockfile_path:?}: {e}")),
       )
@@ -262,9 +261,11 @@ impl ShardedFSDB {
           .await
           .map_err(|e| format!("Failed to shutdown {tmp_path:?}: {e}"))?;
         tokio::fs::set_permissions(&tmp_path, std::fs::Permissions::from_mode(0o555))
-        .await
-        .map_err(|e| format!("Failed to set permissions on {:?}: {e}", tmp_path))?;
-        tokio_file.sync_all().await
+          .await
+          .map_err(|e| format!("Failed to set permissions on {:?}: {e}", tmp_path))?;
+        tokio_file
+          .sync_all()
+          .await
           .map_err(|e| format!("Failed to sync_all {tmp_path:?}: {e}"))?;
         tokio::fs::rename(tmp_path.clone(), dest_path.clone())
           .await
@@ -322,7 +323,6 @@ impl UnderlyingByteStore for ShardedFSDB {
   }
 
   async fn remove(&self, fingerprint: Fingerprint) -> Result<bool, String> {
-    let _ = self.dest_initializer.lock().remove(&fingerprint);
     Ok(
       tokio::fs::remove_file(self.get_path(fingerprint))
         .await
@@ -535,7 +535,6 @@ impl ByteStore {
           executor: executor.clone(),
           root: fsdb_files_root,
           lease_time: options.lease_time,
-          dest_initializer: Arc::new(Mutex::default()),
         },
         executor,
         filesystem_device,
