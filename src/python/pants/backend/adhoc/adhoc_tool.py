@@ -7,6 +7,7 @@ import logging
 from pants.backend.adhoc.target_types import (
     AdhocToolArgumentsField,
     AdhocToolExecutionDependenciesField,
+    AdhocToolExtraEnvVarsField,
     AdhocToolLogOutputField,
     AdhocToolOutputDependenciesField,
     AdhocToolOutputDirectoriesField,
@@ -162,7 +163,7 @@ async def run_in_sandbox_request(
         append_only_caches=FrozenDict.frozen(merged_extras.append_only_caches),
         output_files=output_files,
         output_directories=output_directories,
-        fetch_env_vars=(),
+        fetch_env_vars=target.get(AdhocToolExtraEnvVarsField).value or (),
         supplied_env_var_values=FrozenDict(extra_env),
         log_on_process_errors=None,
         log_output=target[AdhocToolLogOutputField].value,
