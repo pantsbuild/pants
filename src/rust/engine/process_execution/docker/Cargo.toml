@@ -9,8 +9,7 @@ publish = false
 async-stream = "0.3"
 async-trait = "0.1"
 async-lock = "2.5"
-bollard = { git = "https://github.com/fussybeaver/bollard.git", rev = "2d66d11b44aeff0373ece3d64a44b243e5152973" }
-bollard-stubs = { git = "https://github.com/fussybeaver/bollard.git", rev = "2d66d11b44aeff0373ece3d64a44b243e5152973" }
+bollard = "0.14.0"
 docker_credential = "1.2"
 fs = { path = "../../fs" }
 futures = "0.3"
