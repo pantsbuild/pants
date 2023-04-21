@@ -139,6 +139,8 @@ async def lint(
         ),
     )
 
+    cache_scope = ProcessCacheScope.PER_SESSION if semgrep.force else ProcessCacheScope.SUCCESSFUL
+
     # TODO: https://github.com/pantsbuild/pants/issues/18430 support running this with --autofix
     # under the fix goal... but not all rules have fixes, so we need to be running with
     # --error/checking exit codes, which FixResult doesn't currently support.
@@ -173,9 +175,7 @@ async def lint(
             concurrency_available=len(input_files.files),
             description=f"Run Semgrep on {pluralize(len(input_files.files), 'file')}.",
             level=LogLevel.DEBUG,
-            cache_scope=ProcessCacheScope.PER_SESSION
-            if semgrep.force
-            else ProcessCacheScope.SUCCESSFUL,
+            cache_scope=cache_scope,
         ),
     )
 

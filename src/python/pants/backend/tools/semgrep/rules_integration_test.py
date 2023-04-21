@@ -341,7 +341,11 @@ def test_skip(rule_runner: RuleRunner) -> None:
     assert not results
 
 
-@pytest.mark.xfail
+@pytest.mark.xfail(
+    reason=""" TODO: --semgrep-force does rerun the underlying process, but the LintResult's
+    contents are the same (same stdout etc.), these are deduped, and thus we cannot detect the
+    rerun"""
+)
 def test_force(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(GOOD_FILE_LAYOUT)
     tgt = rule_runner.get_target(Address(DIR, target_name="f"))
