@@ -289,8 +289,8 @@ class Parser:
                     error=MissingRequiredOptionError(
                         softwrap(
                             f"""
-                        The option {args_str} in {self._scope_str()} is required.
-                        """
+                            The option {args_str} in {self._scope_str()} is required.
+                            """
                         )
                     ),
                 )
