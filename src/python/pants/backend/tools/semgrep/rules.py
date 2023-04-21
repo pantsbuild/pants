@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import Iterable
@@ -15,7 +16,7 @@ from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests, PathGlobs, Snapshot
 from pants.engine.process import FallibleProcessResult, ProcessCacheScope
 from pants.engine.rules import Get, MultiGet, Rule, collect_rules, rule
-from pants.engine.target import DependenciesRequest, Targets
+from pants.engine.target import AllTargets, Target, Targets
 from pants.engine.unions import UnionRule
 from pants.option.global_options import GlobalOptions
 from pants.util.logging import LogLevel
@@ -68,6 +69,50 @@ class SemgrepIgnoreFiles:
     snapshot: Snapshot
 
 
+@dataclass
+class AllSemgrepConfigs:
+    targets: dict[str, list[Target]]
+
+
+@rule
+async def find_all_semgrep_configs(all_targets: AllTargets) -> AllSemgrepConfigs:
+    targets = defaultdict(list)
+    for tgt in all_targets:
+        if tgt.has_field(SemgrepRuleSourceField):
+            targets[tgt.address.spec_path].append(tgt)
+    return AllSemgrepConfigs(targets)
+
+
+@dataclass(frozen=True)
+class InferSemgrepDependenciesRequest:
+    field_set: SemgrepFieldSet
+
+
+@rule
+async def infer_semgrep_dependencies(
+    request: InferSemgrepDependenciesRequest, all_semgrep: AllSemgrepConfigs
+) -> Targets:
+    # TODO: introspect the semgrep rules and determine which (if any) apply to the files, e.g. a #
+    # Python file shouldn't depend on a .semgrep.yml that doesn't have any 'python' or 'generic' #
+    # rules, and similarly if there's path inclusions/exclusions.
+    # TODO: this would be better as actual dependency inference (e.g. allows inspection, manual
+    # addition/exclusion), but that can only infer 'full' dependencies and it is wrong (e.g. JVM
+    # things break) for real code files to depend on this sort of non-code linter config; requires
+    # dependency scopes or similar (https://github.com/pantsbuild/pants/issues/12794)
+    spec = request.field_set.address.spec_path
+    found: list[Target] = []
+
+    while True:
+        found.extend(all_semgrep.targets.get(spec, []))
+
+        if not spec:
+            break
+
+        spec = os.path.dirname(spec)
+
+    return Targets(found)
+
+
 @rule
 async def all_semgrep_ignore_files() -> SemgrepIgnoreFiles:
     snapshot = await Get(Snapshot, PathGlobs([f"**/{_IGNORE_FILE_NAME}"]))
@@ -86,8 +131,7 @@ async def partition(
     warn_about_ignore_files_if_required(ignore_files.snapshot, semgrep)
 
     dependencies = await MultiGet(
-        Get(Targets, DependenciesRequest(field_set.dependencies))
-        for field_set in request.field_sets
+        Get(Targets, InferSemgrepDependenciesRequest(field_set)) for field_set in request.field_sets
     )
 
     # partition by the sets of configs that apply to each input

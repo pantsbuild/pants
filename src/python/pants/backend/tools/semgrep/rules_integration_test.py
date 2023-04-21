@@ -18,7 +18,6 @@ from pants.engine.target import Target
 from pants.testutil.python_interpreter_selection import all_major_minor_python_versions
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
-from .dependency_inference import rules as dependency_inference_rules
 from .rules import PartitionMetadata, SemgrepRequest
 from .rules import rules as semgrep_rules
 from .subsystem import Semgrep, SemgrepFieldSet
@@ -90,7 +89,6 @@ def rule_runner() -> RuleRunner:
         rules=[
             *semgrep_rules(),
             *semgrep_subsystem_rules(),
-            *dependency_inference_rules(),
             *source_files.rules(),
             QueryRule(Partitions, (SemgrepRequest.PartitionRequest,)),
             QueryRule(LintResult, (SemgrepRequest.Batch,)),

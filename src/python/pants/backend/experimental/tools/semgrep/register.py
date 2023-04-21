@@ -12,7 +12,6 @@ from __future__ import annotations
 from typing import Iterable
 
 from pants.backend.python.goals import lockfile as python_lockfile
-from pants.backend.tools.semgrep import dependency_inference
 from pants.backend.tools.semgrep import rules as semgrep_rules
 from pants.backend.tools.semgrep import subsystem as subsystem
 from pants.backend.tools.semgrep import tailor
@@ -33,6 +32,5 @@ def rules() -> Iterable[Rule | UnionRule]:
         *semgrep_rules.rules(),
         *subsystem.rules(),
         *python_lockfile.rules(),
-        *dependency_inference.rules(),
         *tailor.rules(),
     )
