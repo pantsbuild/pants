@@ -570,6 +570,21 @@ async def build_pex(
     request: PexRequest, python_setup: PythonSetup, pex_subsystem: PexSubsystem
 ) -> BuildPexResult:
     """Returns a PEX with the given settings."""
+
+    if (
+        isinstance(request.requirements, PexRequirements)
+        and isinstance(request.requirements.from_superset, Resolve)
+        and not request.interpreter_constraints
+    ):
+        # Blank ICs in the request means that the caller wants us to use
+        # the ICs configured for the resolve.
+        interpreter_constraints = InterpreterConstraints(
+            python_setup.resolves_to_interpreter_constraints.get(
+                request.requirements.from_superset.name, python_setup.interpreter_constraints
+            )
+        )
+        request = dataclasses.replace(request, interpreter_constraints=interpreter_constraints)
+
     argv = [
         "--output-file",
         request.output_filename,
