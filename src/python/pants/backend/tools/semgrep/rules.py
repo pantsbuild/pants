@@ -39,7 +39,7 @@ class PartitionMetadata:
 
     @property
     def description(self) -> str:
-        return ", ".join(sorted(field.value for field in self.config_files))
+        return ", ".join(sorted(field.file_path for field in self.config_files))
 
 
 _IGNORE_FILE_NAME = ".semgrepignore"
@@ -151,8 +151,7 @@ async def lint(
             argv=(
                 "scan",
                 *(f"--config={f}" for f in config_files.snapshot.files),
-                "-j",
-                "{pants_concurrency}",
+                "--jobs={pants_concurrency}",
                 "--error",
                 *semgrep.args,
                 # we don't pass the target files directly because that overrides .semgrepignore
