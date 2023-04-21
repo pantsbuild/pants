@@ -50,7 +50,11 @@ class Semgrep(PythonToolBase):
 
     export = ExportToolOption()
 
-    args = ArgsListOption(example="--verbose")
+    args = ArgsListOption(
+        example="--verbose",
+        default=["--quiet"],
+        extra_help="This includes --quiet by default to reduce the volume of output.",
+    )
 
     skip = SkipOption("lint")
 

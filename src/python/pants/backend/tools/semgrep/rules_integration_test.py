@@ -105,7 +105,13 @@ def run_semgrep(
     targets: list[Target],
     *,
     extra_args: Sequence[str] = (),
+    use_default_semgrep_args: bool = False,
 ) -> tuple[LintResult, ...]:
+    if not use_default_semgrep_args:
+        # clear out the default --quiet so that we can check the 'Ran ... rules on ... files:
+        # ... findings' output
+        extra_args = ("--semgrep-args=[]", *extra_args)
+
     rule_runner.set_options(
         ["--backend-packages=pants.backend.tools.semgrep", *extra_args],
         env_inherit={"PATH", "PYENV_ROOT", "HOME"},
@@ -366,6 +372,19 @@ def test_force(rule_runner: RuleRunner) -> None:
     assert results1[0] is results2[0]
 
 
+def test_default_args(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(BAD_FILE_LAYOUT)
+    tgt = rule_runner.get_target(Address(DIR, target_name="f"))
+
+    results = run_semgrep(rule_runner, [tgt], use_default_semgrep_args=True)
+    assert len(results) == 1
+    result = results[0]
+    assert "find-bad-pattern" in result.stdout
+    assert result.stderr == ""
+    assert result.exit_code == SEMGREP_ERROR_FAILURE_RETURN_CODE
+    assert result.report == EMPTY_DIGEST
+
+
 def test_extra_args(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(BAD_FILE_LAYOUT)
     tgt = rule_runner.get_target(Address(DIR, target_name="f"))
@@ -392,7 +411,7 @@ def test_semgrep_pex_contents_is_ignored(rule_runner: RuleRunner) -> None:
                 file(name="f", source="__main__.py")
                 semgrep_rule_sources(name="s")
                 """
-            )
+            ),
         }
     )
 
