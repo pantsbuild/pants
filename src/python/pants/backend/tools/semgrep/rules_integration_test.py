@@ -377,3 +377,31 @@ def test_extra_args(rule_runner: RuleRunner) -> None:
     assert result.stderr == ""
     assert result.exit_code == SEMGREP_ERROR_FAILURE_RETURN_CODE
     assert result.report == EMPTY_DIGEST
+
+
+def test_semgrep_pex_contents_is_ignored(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            # Validate that this doesn't traverse into the PEX created for semgrep itself: a
+            # top-level __main__.py will translate into --include=__main__.py (aka **/__main__.py)
+            # which will, naively, find the __main__.py in the PEX.
+            "__main__.py": "",
+            ".semgrep.yml": RULES,
+            "BUILD": dedent(
+                """\
+                file(name="f", source="__main__.py")
+                semgrep_rule_sources(name="s")
+                """
+            )
+        }
+    )
+
+    tgt = rule_runner.get_target(Address("", target_name="f"))
+    results = run_semgrep(rule_runner, [tgt])
+
+    assert len(results) == 1
+    result = results[0]
+    assert result.stdout == ""
+    # Without the --exclude, this would run on 2 files.
+    assert "Ran 1 rule on 1 file: 0 findings" in result.stderr
+    assert result.exit_code == 0
