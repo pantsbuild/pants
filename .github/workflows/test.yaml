@@ -595,7 +595,7 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       if: github.event_name == 'pull_request'
       name: Ensure category label
-      uses: mheap/github-action-required-labels@v2.1.0
+      uses: mheap/github-action-required-labels@v4.0.0
       with:
         count: 1
         labels: category:new feature, category:user api change, category:plugin api change, category:performance, category:bugfix,
