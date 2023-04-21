@@ -573,24 +573,23 @@ async def build_pex(
 
     if not request.interpreter_constraints:
         # Blank ICs in the request means that the caller wants us to use the ICs configured
-        # for the resolve (or the global ICs, if using the builtin lockfile).
+        # for the resolve (falling back to the global ICs).
+        resolve_name = ""
         if isinstance(request.requirements, PexRequirements) and isinstance(
             request.requirements.from_superset, Resolve
         ):
+            resolve_name = request.requirements.from_superset.name
+        elif isinstance(request.requirements, EntireLockfile):
+            resolve_name = request.requirements.lockfile.resolve_name
+
+        if resolve_name:
             request = dataclasses.replace(
                 request,
                 interpreter_constraints=InterpreterConstraints(
                     python_setup.resolves_to_interpreter_constraints.get(
-                        request.requirements.from_superset.name,
+                        resolve_name,
                         python_setup.interpreter_constraints,
                     )
-                ),
-            )
-        elif isinstance(request.requirements, EntireLockfile):
-            request = dataclasses.replace(
-                request,
-                interpreter_constraints=InterpreterConstraints(
-                    python_setup.interpreter_constraints
                 ),
             )
 
