@@ -6,15 +6,15 @@ hidden: false
 createdAt: "2020-03-03T00:57:15.994Z"
 ---
 > 👍 Benefit of Pants: consistent interface
-> 
-> `pants lint` and `pants fmt` will consistently and correctly run all your linters and formatters. No need to remember how to invoke each tool, and no need to write custom scripts. 
-> 
+>
+> `pants lint` and `pants fmt` will consistently and correctly run all your linters and formatters. No need to remember how to invoke each tool, and no need to write custom scripts.
+>
 > This consistent interface even works with multiple languages, like running Python linters at the same time as Go, Shell, Java, and Scala.
 
 > 👍 Benefit of Pants: concurrency
-> 
+>
 > Pants does several things to speed up running formatters and linters:
-> 
+>
 > - Automatically configures tools that support concurrency (e.g. a `--jobs` option) based on your number of cores and what else is already running.
 > - Runs everything in parallel with the `lint` goal (although not the `fmt` goal, which pipes the results of one formatter to the next for correctness).
 > - Runs in batches of 256 files by default, which gives parallelism even for tools that don't have a `--jobs` option. This also increases cache reuse.
@@ -66,22 +66,21 @@ All done! ✨ 🍰 ✨
 ```
 
 > 📘 How to activate MyPy
-> 
+>
 > MyPy is run with the [check goal](doc:python-check-goal), rather than `lint`.
 
-Configuring the tools, e.g. adding plugins
+Configuring the tools, for example, adding plugins
 ------------------------------------------
 
 You can configure each formatter and linter using these options:
 
 | Option                    | What it does                                                                                                                                                                           |
 | :------------------------ | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `version`                 | E.g. `flake8==3.8.0`.                                                                                                                                                                  |
-| `extra_requirements`      | Any additional dependencies to install, such as any plugins.                                                                                                                           |
 | `interpreter_constraints` | What interpreter to run the tool with. (`bandit`, `flake8`, and `pylint` instead determine this based on your [code's interpreter constraints](doc:python-interpreter-compatibility).) |
 | `args`                    | Any command-line arguments you want to pass to the tool.                                                                                                                               |
 | `config`                  | Path to a config file. Useful if the file is in a non-standard location such that it cannot be auto-discovered.                                                                        |
-| `lockfile`                | Path to a custom lockfile if the default does not work, or `"<none>"` to opt out. See [Third-party dependencies](doc:python-third-party-dependencies#tool-lockfiles).                  |
+| `requirements`                        | List of requirements to be included with this formatter or linter. See [Lockfiles for tools](doc:python-lockfiles#lockfiles-for-tools).                  |
+| `install_from_resolve`                | Name of a custom resolve to use for tool versions and plugins. See [Lockfiles for tools](doc:python-lockfiles#lockfiles-for-tools).                  |
 
 For example:
 
@@ -89,22 +88,47 @@ For example:
 [docformatter]
 args = ["--wrap-summaries=100", "--wrap-descriptions=100"]
 
+[python.resolves]
+flake8 = "3rdparty/python/flake8.lock"
+
 [flake8]
 # Load a config file in a non-standard location.
 config = "build-support/flake8"
 # Change the version and add a custom plugin. Because we do this, we
-# use a custom lockfile.
-version = "flake8==3.8.0"
-extra_requirements.add = ["flake8-2020"]
-lockfile = "3rdparty/flake8_lockfile.txt"
+# use a custom resolve.
+install_from_resolve = "flake8"
+requirements.add = [
+    "flake8-bugbear",
+]
+```
+
+Then set up the resolve's inputs:
+
+```python 3rdparty/python/BUILD
+python_requirements(
+    source="flake8-requirements.txt",
+    resolve="flake8",
+)
+```
+```Text 3rdparty/python/flake8-requirements.txt
+flake8==6.0.0
+flake8-bugbear>=23.3.23
+```
+
+And generate its custom lockfile:
+
+```shell Bash
+$ pants generate-lockfiles --resolve=flake8
+16:00:39.26 [INFO] Completed: Generate lockfile for flake8
+16:00:39.29 [INFO] Wrote lockfile for the resolve `flake8` to 3rdparty/python/flake8.lock
 ```
 
 Run `pants help-advanced black`, `pants help-advanced flake8`, and so on for more information.
 
 > 📘 Config files are normally auto-discovered
-> 
+>
 > For tools that autodiscover config files—such as Black, isort, Flake8, and Pylint—Pants will include any relevant config files in the process's sandbox when running the tool.
-> 
+>
 > If your config file is in a non-standard location, you must instead set the `--config` option, e.g. `[isort].config`. This will ensure that the config file is included in the process's sandbox and Pants will instruct the tool to load the config.
 
 Running only certain formatters or linters
@@ -172,14 +196,14 @@ Tips for specific tools
 
 ### Order of `backend_packages` matters for `fmt`
 
-Pants will run formatters in the order in which they appear in the `backend_packages` option. 
+Pants will run formatters in the order in which they appear in the `backend_packages` option.
 
 For example, you likely want to put Autoflake (which removes unused imports) before Black and Isort, which will format your import statements.
 
 ```toml pants.toml
 [GLOBAL]
 backend_packages = [
-    # Note that we want Autoflake to run before Black and isort, 
+    # Note that we want Autoflake to run before Black and isort,
     # so it must appear first.
     "pants.backend.python.experimental.autoflake",
     "pants.backend.python.black",
@@ -189,7 +213,7 @@ backend_packages = [
 
 ### Bandit, Flake8, and Pylint: report files
 
-Flake8, Bandit, and Pylint can generate report files saved to disk. 
+Flake8, Bandit, and Pylint can generate report files saved to disk.
 
 For Pants to properly preserve the reports, instruct the tools to write to the `reports/` folder
 by updating their config files, or `--flake8-args`, `--bandit-args`, and `--pylint-args`. For
@@ -214,7 +238,7 @@ See [`[pylint].source_plugins`](https://www.pantsbuild.org/docs/reference-pylint
 
 ### Bandit: less verbose logging
 
-Bandit output can be extremely verbose, including on successful runs. You may want to use its `--quiet` option, which will turn off output for successful runs but keep it for failures. 
+Bandit output can be extremely verbose, including on successful runs. You may want to use its `--quiet` option, which will turn off output for successful runs but keep it for failures.
 
 For example, you can set this in your `pants.toml`:
 
