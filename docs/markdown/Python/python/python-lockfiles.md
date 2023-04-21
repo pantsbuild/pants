@@ -181,7 +181,7 @@ Pants's Python support typically involves invoking underlying tools, such as `py
 
 It is strongly recommended that these tools be installed from a hermetic lockfile, for the same security and stability reasons stated above. In fact, Pants ships with built-in lockfiles for every Python tool it uses, and uses them automatically.
 
-The only time you need to think about this is if you want to customize the tool requirements that Pants uses. This might be the case if you want to modify the version of a tool or add extra requirements (e.g., tool plugins).
+The only time you need to think about this is if you want to customize the tool requirements that Pants uses. This might be the case if you want to modify the version of a tool or add extra requirements (for example, tool plugins).
 
 If you want a tool to be installed from some resolve, instead of from the built-in lockfile, you set `install_from_resolve` on the tool's config section, and enumerate any non-default requirements you need from that resolve:
 
