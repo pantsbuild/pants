@@ -27,7 +27,7 @@ from pants.testutil.rule_runner import RuleRunner
 
 @pytest.fixture
 def rule_runner() -> RuleRunner:
-    return RuleRunner(
+    rule_runner = RuleRunner(
         rules=[
             *package_rules(),
             QueryRule(BuiltPackage, (NodePackageTarFieldSet,)),
@@ -42,6 +42,8 @@ def rule_runner() -> RuleRunner:
         ],
         objects=dict(package_json.build_file_aliases().objects),
     )
+    rule_runner.set_options([], env_inherit={"PATH"})
+    return rule_runner
 
 
 def test_creates_tar_for_package_json(rule_runner: RuleRunner) -> None:
@@ -145,6 +147,7 @@ def test_packages_files_as_resource_in_workspace(rule_runner: RuleRunner) -> Non
             "src/js/package.json": json.dumps(
                 {"name": "spam", "version": "0.0.1", "workspaces": ["a"]}
             ),
+            "src/js/BUILD": "package_json()",
             "src/js/a/BUILD": dedent(
                 """\
                 package_json(

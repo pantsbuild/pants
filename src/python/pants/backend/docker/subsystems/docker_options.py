@@ -3,12 +3,11 @@
 
 from __future__ import annotations
 
-import os
 import sys
 from typing import Any
 
 from pants.backend.docker.registries import DockerRegistries
-from pants.engine.env_vars import EnvironmentVars
+from pants.core.util_rules.search_paths import ExecutableSearchPathsOptionMixin
 from pants.option.option_types import (
     BoolOption,
     DictOption,
@@ -20,7 +19,6 @@ from pants.option.option_types import (
 from pants.option.subsystem import Subsystem
 from pants.util.docutil import bin_name
 from pants.util.memo import memoized_method
-from pants.util.ordered_set import OrderedSet
 from pants.util.strutil import bullet_list, softwrap
 
 doc_links = {
@@ -34,7 +32,7 @@ class DockerOptions(Subsystem):
     options_scope = "docker"
     help = "Options for interacting with Docker."
 
-    class EnvironmentAware:
+    class EnvironmentAware(ExecutableSearchPathsOptionMixin, Subsystem.EnvironmentAware):
         _env_vars = ShellStrListOption(
             help=softwrap(
                 """
@@ -46,35 +44,15 @@ class DockerOptions(Subsystem):
             ),
             advanced=True,
         )
-        _executable_search_paths = StrListOption(
-            default=["<PATH>"],
-            help=softwrap(
-                """
-            The PATH value that will be used to find the Docker client and any tools required.
-
-            The special string `"<PATH>"` will expand to the contents of the PATH env var.
+        executable_search_paths_help = softwrap(
             """
-            ),
-            advanced=True,
-            metavar="<binary-paths>",
+            The PATH value that will be used to find the Docker client and any tools required.
+            """
         )
 
         @property
         def env_vars(self) -> tuple[str, ...]:
             return tuple(sorted(set(self._env_vars)))
-
-        @memoized_method
-        def executable_search_path(self, env: EnvironmentVars) -> tuple[str, ...]:
-            def iter_path_entries():
-                for entry in self._executable_search_paths:
-                    if entry == "<PATH>":
-                        path = env.get("PATH")
-                        if path:
-                            yield from path.split(os.pathsep)
-                    else:
-                        yield entry
-
-            return tuple(OrderedSet(iter_path_entries()))
 
     _registries = DictOption[Any](
         help=softwrap(

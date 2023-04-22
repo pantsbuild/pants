@@ -56,8 +56,20 @@ _HelpT = _MaybeDynamicT[str]
 _RegisterIfFuncT = Callable[[_SubsystemType], Any]
 
 
-def _eval_maybe_dynamic(val: _MaybeDynamicT[_DefaultT], subsystem_cls: _SubsystemType) -> _DefaultT:
-    return val(subsystem_cls) if inspect.isfunction(val) else val  # type: ignore[no-any-return]
+# Missing arg sentinel.
+class Missing:
+    pass
+
+
+_MISSING = Missing()
+
+
+def _eval_maybe_dynamic(
+    val: _MaybeDynamicT[_DefaultT] | Missing, subsystem_cls: _SubsystemType
+) -> _DefaultT | None:
+    if isinstance(val, Missing):
+        return None
+    return val(subsystem_cls) if inspect.isfunction(val) else cast(_DefaultT, val)
 
 
 class _OptionBase(Generic[_OptT, _DefaultT]):
@@ -71,7 +83,7 @@ class _OptionBase(Generic[_OptT, _DefaultT]):
     """
 
     _flag_names: tuple[str, ...] | None
-    _default: _MaybeDynamicT[_DefaultT]
+    _default: _MaybeDynamicT[_DefaultT] | Missing
     _help: _HelpT
     _register_if: _RegisterIfFuncT
     _extra_kwargs: dict[str, Any]
@@ -82,8 +94,8 @@ class _OptionBase(Generic[_OptT, _DefaultT]):
         cls,
         flag_name: str | None = None,
         *,
-        default: _MaybeDynamicT[_DefaultT],
         help: _HelpT,
+        default: _MaybeDynamicT[_DefaultT] | Missing = _MISSING,
         # Additional bells/whistles
         register_if: _RegisterIfFuncT | None = None,
         advanced: bool | None = None,
@@ -94,6 +106,7 @@ class _OptionBase(Generic[_OptT, _DefaultT]):
         removal_version: str | None = None,
         removal_hint: _HelpT | None = None,
         deprecation_start_version: str | None = None,
+        required: bool | None = None,
         # Internal bells/whistles
         daemon: bool | None = None,
         fingerprint: bool | None = None,
@@ -107,8 +120,8 @@ class _OptionBase(Generic[_OptT, _DefaultT]):
             instance of the scalar type or `None`, but __must__ be provided.
             For Non-scalar types (like ListOption subclasses or DictOption) the default can't be
             `None`, but does have an "empty" default value.
-        :param help: The help message to use when users run `./pants help` or
-            `./pants help-advanced`
+        :param help: The help message to use when users run `pants help` or
+            `pants help-advanced`
         :param register_if: A callable (usually a lambda) which, if provided, can be used to
             specify if the option should be registered. This is useful for "Base" subsystem
             classes, who might/might not want to register options based on information provided
@@ -122,7 +135,7 @@ class _OptionBase(Generic[_OptT, _DefaultT]):
             to "#cores")
         :param fromfile: If True, allows the user to specify a string value (starting with "@")
             which represents a file to read the option's value from.
-        :param metavar: Sets what users see in `./pants help` as possible values for the flag.
+        :param metavar: Sets what users see in `pants help` as possible values for the flag.
             The default is based on the option type (E.g. "<str>" or "<int>").
         :param mutually_exclusive_group: If specified disallows all other options using the same
             value to also be specified by the user.
@@ -132,7 +145,11 @@ class _OptionBase(Generic[_OptT, _DefaultT]):
             user when running `help`.
         :param deprecation_start_version: If the option is deprecated, sets the version at which the
             deprecation will begin. Must be less than the `removal_version`.
+        :param required: Asserts that a value is provided by the user.
         """
+        if default is _MISSING and not required:
+            raise ValueError("`default` must be provided unless `required=True`.")
+
         self = super().__new__(cls)
         self._flag_names = (flag_name,) if flag_name else None
         self._default = default
@@ -151,6 +168,7 @@ class _OptionBase(Generic[_OptT, _DefaultT]):
                 "removal_hint": removal_hint,
                 "removal_version": removal_version,
                 "deprecation_start_version": deprecation_start_version,
+                "required": required,
             }.items()
             if v is not None
         }

@@ -114,7 +114,7 @@ def temporary_dir(
     :API: public
 
     You may specify the following keyword args:
-    :param root_dir: The parent directory to create the temporary directory.
+    :param root_dir: The parent directory in which to create the temporary directory.
     :param cleanup: Whether or not to clean up the temporary directory.
     :param suffix: If not None the directory name will end with this suffix.
     :param permissions: If provided, sets the directory permissions to this mode.

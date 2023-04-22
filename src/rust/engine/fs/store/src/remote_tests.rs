@@ -8,7 +8,7 @@ use grpc_util::tls;
 use hashing::Digest;
 use mock::StubCAS;
 use testutil::data::{TestData, TestDirectory};
-use tokio::io::AsyncReadExt;
+use tokio::io::{AsyncReadExt, AsyncSeekExt};
 use workunit_store::WorkunitStore;
 
 use crate::remote::ByteStore;
@@ -50,6 +50,7 @@ async fn loads_huge_file_via_temp_file() {
     .await
     .unwrap()
     .unwrap();
+  file.rewind().await.unwrap();
 
   let mut buf = String::new();
   file.read_to_string(&mut buf).await.unwrap();

@@ -10,11 +10,7 @@ from typing import Iterable, List, Mapping, Optional, Tuple
 from pants.backend.python.subsystems.python_native_code import PythonNativeCodeSubsystem
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.util_rules import pex_environment
-from pants.backend.python.util_rules.pex_environment import (
-    PexEnvironment,
-    PexSubsystem,
-    PythonExecutable,
-)
+from pants.backend.python.util_rules.pex_environment import PexEnvironment, PexSubsystem
 from pants.core.util_rules import adhoc_binaries, external_tool
 from pants.core.util_rules.adhoc_binaries import PythonBuildStandaloneBinary
 from pants.core.util_rules.external_tool import (
@@ -39,9 +35,9 @@ class PexCli(TemplatedExternalTool):
     name = "pex"
     help = "The PEX (Python EXecutable) tool (https://github.com/pantsbuild/pex)."
 
-    default_version = "v2.1.130"
+    default_version = "v2.1.133"
     default_url_template = "https://github.com/pantsbuild/pex/releases/download/{version}/pex"
-    version_constraints = ">=2.1.124,<3.0"
+    version_constraints = ">=2.1.132,<3.0"
 
     @classproperty
     def default_known_versions(cls):
@@ -50,8 +46,8 @@ class PexCli(TemplatedExternalTool):
                 (
                     cls.default_version,
                     plat,
-                    "0ffb9fe8146945031d596f4559bd1803d5d9f70fe318adb385ed8c4a44cb7dec",
-                    "4082176",
+                    "2b1e4eaeeebedb939af33cfdade5d260003488f55864e18a13355804586b42b6",
+                    "4084722",
                 )
             )
             for plat in ["macos_arm64", "macos_x86_64", "linux_x86_64", "linux_arm64"]
@@ -67,7 +63,6 @@ class PexCliProcess:
     extra_env: Optional[FrozenDict[str, str]]
     output_files: Optional[Tuple[str, ...]]
     output_directories: Optional[Tuple[str, ...]]
-    python: Optional[PythonExecutable]
     level: LogLevel
     concurrency_available: int
     cache_scope: ProcessCacheScope
@@ -82,7 +77,6 @@ class PexCliProcess:
         extra_env: Optional[Mapping[str, str]] = None,
         output_files: Optional[Iterable[str]] = None,
         output_directories: Optional[Iterable[str]] = None,
-        python: Optional[PythonExecutable] = None,
         level: LogLevel = LogLevel.INFO,
         concurrency_available: int = 0,
         cache_scope: ProcessCacheScope = ProcessCacheScope.SUCCESSFUL,
@@ -96,7 +90,6 @@ class PexCliProcess:
         object.__setattr__(
             self, "output_directories", tuple(output_directories) if output_directories else None
         )
-        object.__setattr__(self, "python", python)
         object.__setattr__(self, "level", level)
         object.__setattr__(self, "concurrency_available", concurrency_available)
         object.__setattr__(self, "cache_scope", cache_scope)
@@ -190,7 +183,7 @@ async def setup_pex_cli_process(
     complete_pex_env = pex_env.in_sandbox(working_directory=None)
     normalized_argv = complete_pex_env.create_argv(pex_pex.exe, *args)
     env = {
-        **complete_pex_env.environment_dict(python=request.python),
+        **complete_pex_env.environment_dict(python=bootstrap_python),
         **python_native_code.subprocess_env_vars,
         **(request.extra_env or {}),
         # If a subcommand is used, we need to use the `pex3` console script.

@@ -28,7 +28,6 @@ class PyUpgrade(PythonToolBase):
     default_requirements = [default_version]
 
     register_interpreter_constraints = True
-    default_interpreter_constraints = ["CPython>=3.7,<4"]
 
     register_lockfile = True
     default_lockfile_resource = ("pants.backend.python.lint.pyupgrade", "pyupgrade.lock")

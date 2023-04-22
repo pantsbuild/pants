@@ -20,12 +20,15 @@ def test_goal_validation(use_pantsd: bool) -> None:
     assert "Unknown goal: blah" in result.stdout
 
 
-def test_unimplemented_goals_noop() -> None:
-    # Running on a `file` target should usually fail, but it should no-op if no `run`
-    # implementations are activated.
-    with setup_tmpdir({"bad.txt": "", "BUILD": "file(source='f.txt')"}) as tmpdir:
-        run_pants(["run", tmpdir]).assert_success()
-        run_pants(["--backend-packages=['pants.backend.python']", "run", tmpdir]).assert_failure()
+def test_unimplemented_goals_error() -> None:
+    # Running on a Python target should fail if the backend is not activated.
+    with setup_tmpdir(
+        {"foo.py": "print('hello')", "BUILD": "python_source(source='foo.py')"}
+    ) as tmpdir:
+        result = run_pants(["run", tmpdir])
+        result.assert_failure()
+        assert "No relevant backends activate the `run` goal" in result.stderr
+        run_pants(["--backend-packages=['pants.backend.python']", "run", tmpdir]).assert_success()
 
 
 @pytest.mark.skip(reason="Flaky test. https://github.com/pantsbuild/pants/issues/10478")

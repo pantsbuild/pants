@@ -422,6 +422,9 @@ def test_property_types() -> None:
         skip_opt = SkipOption("fmt")
         args_opt = ArgsListOption(example="--whatever")
 
+        # Required opts
+        req_opt = StrOption(required=True, help="")
+
     my_subsystem = MySubsystem()
     if TYPE_CHECKING:
         assert_type["str"](my_subsystem.str_opt)
@@ -474,3 +477,5 @@ def test_property_types() -> None:
 
         assert_type["bool"](my_subsystem.skip_opt)
         assert_type["tuple[str, ...]"](my_subsystem.args_opt)
+
+        assert_type["str"](my_subsystem.req_opt)

@@ -83,7 +83,7 @@ def run_run_request(
         rule_runner.run_interactive_process(run_process)
         print(mocked_console[1].get_stdout().strip())
         print(mocked_console[1].get_stderr().strip())
-        assert "pyenv/versions/3.9.16/bin/python" in mocked_console[1].get_stdout().strip()
+        assert "versions/3.9.16/bin/python" in mocked_console[1].get_stdout().strip()
 
     run_request = rule_runner.request(RunRequest, [PythonSourceFieldSet.create(target)])
     run_process = InteractiveProcess(

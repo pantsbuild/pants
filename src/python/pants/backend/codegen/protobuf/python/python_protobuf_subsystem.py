@@ -74,7 +74,6 @@ class PythonProtobufMypyPlugin(PythonToolRequirementsBase):
     default_requirements = ["mypy-protobuf>=3.4.0,<4"]
 
     register_interpreter_constraints = True
-    default_interpreter_constraints = ["CPython>=3.7,<4"]
 
     register_lockfile = True
     default_lockfile_resource = ("pants.backend.codegen.protobuf.python", "mypy_protobuf.lock")

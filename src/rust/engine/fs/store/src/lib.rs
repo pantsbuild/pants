@@ -42,7 +42,7 @@ use std::fmt::{self, Debug, Display};
 use std::fs::OpenOptions;
 use std::fs::Permissions as FSPermissions;
 use std::future::Future;
-use std::io::{self, Write};
+use std::io::Write;
 use std::os::unix::fs::{MetadataExt, OpenOptionsExt, PermissionsExt};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Weak};
@@ -56,7 +56,7 @@ use fs::{
   FileEntry, Link, PathStat, Permissions, RelativePath, SymlinkBehavior, SymlinkEntry,
   EMPTY_DIRECTORY_DIGEST,
 };
-use futures::future::{self, BoxFuture, Either, FutureExt, TryFutureExt};
+use futures::future::{self, BoxFuture, Either, FutureExt};
 use grpc_util::prost::MessageExt;
 use hashing::{Digest, Fingerprint};
 use local::ByteStore;
@@ -140,12 +140,6 @@ impl Display for StoreError {
 impl From<String> for StoreError {
   fn from(err: String) -> Self {
     Self::Unclassified(err)
-  }
-}
-
-impl From<io::Error> for StoreError {
-  fn from(err: io::Error) -> Self {
-    Self::Unclassified(err.to_string())
   }
 }
 
@@ -236,6 +230,19 @@ impl RemoteStore {
       .map(|&()| ())
   }
 
+  async fn remote_writer(
+    remote_store: &remote::ByteStore,
+    digest: Digest,
+    file: tokio::fs::File,
+  ) -> Result<tokio::fs::File, StoreError> {
+    remote_store.load_file(digest, file).await?.ok_or_else(|| {
+      StoreError::MissingDigest(
+        "Was not present in either the local or remote store".to_owned(),
+        digest,
+      )
+    })
+  }
+
   /// Download the digest to the local byte store from this remote store. The function `f_remote`
   /// can be used to validate the bytes (NB. if provided, the whole value will be buffered into
   /// memory to provide the `Bytes` argument, and thus `f_remote` should only be used for small digests).
@@ -247,31 +254,24 @@ impl RemoteStore {
     f_remote: Option<&(dyn Fn(Bytes) -> Result<(), String> + Send + Sync + 'static)>,
   ) -> Result<(), StoreError> {
     let remote_store = self.store.clone();
-    let create_missing = || {
-      StoreError::MissingDigest(
-        "Was not present in either the local or remote store".to_owned(),
-        digest,
-      )
-    };
     self
       .maybe_download(digest, async move {
         let store_into_fsdb =
           f_remote.is_none() && ByteStore::should_use_fsdb(entry_type, digest.size_bytes);
         if store_into_fsdb {
-          let tempfile = local_store
+          local_store
             .get_file_fsdb()
-            .get_tempfile(digest.hash)
+            .write_using(digest.hash, |file| {
+              Self::remote_writer(&remote_store, digest, file)
+            })
             .await?;
-          remote_store
-            .load_file(digest, tempfile.open().await?)
-            .await?
-            .ok_or_else(create_missing)?;
-          tempfile.persist().await?;
         } else {
-          let bytes = remote_store
-            .load_bytes(digest)
-            .await?
-            .ok_or_else(create_missing)?;
+          let bytes = remote_store.load_bytes(digest).await?.ok_or_else(|| {
+            StoreError::MissingDigest(
+              "Was not present in either the local or remote store".to_owned(),
+              digest,
+            )
+          })?;
           if let Some(f_remote) = f_remote {
             f_remote(bytes.clone())?;
           }
@@ -379,7 +379,7 @@ impl Store {
     tls_config: grpc_util::tls::Config,
     headers: BTreeMap<String, String>,
     chunk_size_bytes: usize,
-    upload_timeout: Duration,
+    rpc_timeout: Duration,
     rpc_retries: usize,
     rpc_concurrency_limit: usize,
     capabilities_cell_opt: Option<Arc<OnceCell<ServerCapabilities>>>,
@@ -393,7 +393,7 @@ impl Store {
         tls_config,
         headers,
         chunk_size_bytes,
-        upload_timeout,
+        rpc_timeout,
         rpc_retries,
         rpc_concurrency_limit,
         capabilities_cell_opt,
@@ -1244,7 +1244,9 @@ impl Store {
           {
             let destination = destination.clone();
             move || {
-              fs::safe_create_dir_all(&destination)?;
+              std::fs::create_dir_all(&destination).map_err(|e| {
+                format!("Failed to create directory {}: {e}", destination.display())
+              })?;
               let dest_device = destination
                 .metadata()
                 .map_err(|e| {
@@ -1259,8 +1261,7 @@ impl Store {
           },
           |e| Err(format!("Directory creation task failed: {e}")),
         )
-        .await
-        .map_err(|e| format!("Failed to create directory {}: {e}", destination.display()))?
+        .await?
     };
 
     self
@@ -1289,16 +1290,12 @@ impl Store {
     let store = self.clone();
     async move {
       if !is_root {
-        let destination2 = destination.clone();
-        store
-          .local
-          .executor()
-          .spawn_blocking(
-            move || fs::safe_create_dir(&destination2),
-            |e| Err(format!("Directory creation task failed: {e}")),
-          )
-          .map_err(|e| format!("Failed to create directory {}: {e}", destination.display(),))
-          .await?;
+        // NB: Although we know that all parent directories already exist, we use `create_dir_all`
+        // because it succeeds even if _this_ directory already exists (which it might, if we're
+        // materializing atop an existing directory structure).
+        tokio::fs::create_dir_all(&destination)
+          .await
+          .map_err(|e| format!("Failed to create directory {}: {e}", destination.display()))?;
       }
 
       if let Some(children) = parent_to_child.get(&destination) {
@@ -1445,7 +1442,12 @@ impl Store {
     destination: PathBuf,
     target: String,
   ) -> Result<(), StoreError> {
-    symlink(target, destination).await?;
+    symlink(&target, &destination).await.map_err(|e| {
+      format!(
+        "Failed to create symlink to {target} at {}: {e}",
+        destination.display()
+      )
+    })?;
     Ok(())
   }
 
@@ -1461,9 +1463,19 @@ impl Store {
     // It also has the benefit of playing nicely with Docker for macOS file virtualization: see
     // #18162.
     #[cfg(target_os = "macos")]
-    copy(target, destination).await?;
+    copy(&target, &destination).await.map_err(|e| {
+      format!(
+        "Failed to copy from {target} to {}: {e}",
+        destination.display()
+      )
+    })?;
     #[cfg(not(target_os = "macos"))]
-    hard_link(target, destination).await?;
+    hard_link(&target, &destination).await.map_err(|e| {
+      format!(
+        "Failed to create hardlink to {target} at {}: {e}",
+        destination.display()
+      )
+    })?;
     Ok(())
   }
 

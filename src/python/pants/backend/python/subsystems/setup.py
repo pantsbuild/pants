@@ -10,8 +10,8 @@ from typing import Iterable, List, Optional, TypeVar, cast
 
 from packaging.utils import canonicalize_name
 
-from pants.base.deprecated import warn_or_error
 from pants.core.goals.generate_lockfiles import UnrecognizedResolveNamesError
+from pants.option.errors import OptionsError
 from pants.option.option_types import (
     BoolOption,
     DictOption,
@@ -36,6 +36,8 @@ class PipVersion(enum.Enum):
     V22_3_1 = "22.3.1"
     V23_0 = "23.0"
     V23_0_1 = "23.0.1"
+    V23_1 = "23.1"
+    LATEST = "latest"
 
 
 @enum.unique
@@ -60,11 +62,10 @@ class PythonSetup(Subsystem):
     options_scope = "python"
     help = "Options for Pants's Python backend."
 
-    default_interpreter_constraints = ["CPython>=3.7,<4"]
     default_interpreter_universe = ["2.7", "3.5", "3.6", "3.7", "3.8", "3.9", "3.10", "3.11"]
 
     _interpreter_constraints = StrListOption(
-        default=default_interpreter_constraints,
+        default=None,
         help=softwrap(
             """
             The Python interpreters your codebase is compatible with.
@@ -83,26 +84,31 @@ class PythonSetup(Subsystem):
 
     @memoized_property
     def interpreter_constraints(self) -> tuple[str, ...]:
-        # TODO: In 2.17.0.dev1 we should set the default above to None and tweak the message here
-        #  appropriately.
-        if self.options.is_default("interpreter_constraints"):
-            warn_or_error(
-                "2.17.0.dev1",
-                "the factory default interpreter constraints value",
+        if not self._interpreter_constraints:
+            # TODO: This is a hacky affordance for Pants's own tests, dozens of which were
+            #  written when Pants provided default ICs, and implicitly rely on that assumption.
+            #  We'll probably want to find and modify all those tests to set an explicit IC, but
+            #  that will take time.
+            if "PYTEST_CURRENT_TEST" in os.environ:
+                return (">=3.7,<4",)
+            raise OptionsError(
                 softwrap(
                     f"""\
-                    You're relying on the default interpreter constraints that ship with Pants
-                    ({self._interpreter_constraints}). This default is deprecated, in favor of
-                    explicitly specifying the interpreter versions your code is actually intended to
-                    run against.
+                    You must explicitly specify the default Python interpreter versions your code
+                    is intended to run against.
 
-                    You specify interpreter constraints using the `interpreter_constraints` option in
-                    the `[python]` section of pants.toml. We recommend constraining to a single interpreter
-                    minor version if you can, e.g., `interpreter_constraints = ['==3.11.*']`, or at
-                    least a small number of interpreter minor versions, e.g., `interpreter_constraints
-                    = ['>=3.10,<3.12']`. See {doc_url("python-interpreter-compatibility")} for details.
+                    You specify these interpreter constraints using the `interpreter_constraints`
+                    option in the `[python]` section of pants.toml.
 
-                    Set explicit interpreter constraints now to get rid of this warning.
+                    We recommend constraining to a single interpreter minor version if you can,
+                    e.g., `interpreter_constraints = ['==3.11.*']`, or at least a small number of
+                    interpreter minor versions, e.g., `interpreter_constraints = ['>=3.10,<3.12']`.
+
+                    Individual targets can override these default interpreter constraints,
+                    if different parts of your codebase run against different python interpreter
+                    versions in a single repo.
+
+                    See {doc_url("python-interpreter-compatibility")} for details.
                     """
                 ),
             )
@@ -222,7 +228,14 @@ class PythonSetup(Subsystem):
     )
     pip_version = EnumOption(
         default=PipVersion.V20_3_4,
-        help="Use this version of Pip for resolving requirements and generating lockfiles.",
+        help=softwrap(
+            """
+            Use this version of Pip for resolving requirements and generating lockfiles.
+
+            N.B.: The `latest` value selects the latest of the listed choices which is not
+            necessarily the latest Pip version released on PyPI.
+            """
+        ),
         advanced=True,
     )
     _resolves_to_interpreter_constraints = DictOption["list[str]"](

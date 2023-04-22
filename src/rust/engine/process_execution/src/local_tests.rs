@@ -7,7 +7,6 @@ use std::time::Duration;
 
 use maplit::hashset;
 use shell_quote::bash;
-use spectral::{assert_that, string::StrAssertions};
 use tempfile::TempDir;
 
 use fs::EMPTY_DIRECTORY_DIGEST;
@@ -568,9 +567,9 @@ async fn timeout() {
   assert_eq!(result.original.exit_code, -15);
   let stdout = String::from_utf8(result.stdout_bytes.to_vec()).unwrap();
   let stderr = String::from_utf8(result.stderr_bytes.to_vec()).unwrap();
-  assert_that(&stdout).contains("Calculating...");
-  assert_that(&stderr).contains("Exceeded timeout");
-  assert_that(&stderr).contains("sleepy-cat");
+  assert!(&stdout.contains("Calculating..."));
+  assert!(&stderr.contains("Exceeded timeout"));
+  assert!(&stderr.contains("sleepy-cat"));
 }
 
 #[tokio::test]

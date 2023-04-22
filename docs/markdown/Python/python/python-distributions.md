@@ -212,4 +212,4 @@ The generated `setup.py` will have its `install_requires` set to include the 3rd
 
 > 📘 How to publish your distributions to a package index
 > 
-> See [publish](doc:python-publish-goal) for example support publishing distributions using Twine.
+> See [publish](doc:python-publish-goal) for how to use Pants to publish distributions using Twine.

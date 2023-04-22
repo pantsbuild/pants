@@ -10,7 +10,8 @@ import pytest
 
 from pants.backend.adhoc.adhoc_tool import GenerateFilesFromAdhocToolRequest
 from pants.backend.adhoc.adhoc_tool import rules as adhoc_tool_rules
-from pants.backend.adhoc.target_types import AdhocToolTarget
+from pants.backend.adhoc.run_system_binary import rules as run_system_binary_rules
+from pants.backend.adhoc.target_types import AdhocToolTarget, SystemBinaryTarget
 from pants.backend.python.goals.run_python_source import rules as run_python_source_rules
 from pants.backend.python.target_types import PythonSourceTarget
 from pants.core.target_types import ArchiveTarget, FilesGeneratorTarget
@@ -27,24 +28,27 @@ from pants.engine.target import (
     TransitiveTargets,
     TransitiveTargetsRequest,
 )
-from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.testutil.python_rule_runner import PythonRuleRunner
+from pants.testutil.rule_runner import QueryRule
 
 
 @pytest.fixture
-def rule_runner() -> RuleRunner:
-    rule_runner = RuleRunner(
+def rule_runner() -> PythonRuleRunner:
+    rule_runner = PythonRuleRunner(
         rules=[
             *archive.rules(),
             *adhoc_tool_rules(),
             *source_files.rules(),
             *core_target_type_rules(),
             *run_python_source_rules(),
+            *run_system_binary_rules(),
             QueryRule(GeneratedSources, [GenerateFilesFromAdhocToolRequest]),
             QueryRule(Process, [AdhocProcessRequest]),
             QueryRule(SourceFiles, [SourceFilesRequest]),
             QueryRule(TransitiveTargets, [TransitiveTargetsRequest]),
         ],
         target_types=[
+            SystemBinaryTarget,
             AdhocToolTarget,
             ArchiveTarget,
             FilesGeneratorTarget,
@@ -56,7 +60,7 @@ def rule_runner() -> RuleRunner:
 
 
 def assert_adhoc_tool_result(
-    rule_runner: RuleRunner,
+    rule_runner: PythonRuleRunner,
     address: Address,
     expected_contents: dict[str, str],
 ) -> None:
@@ -69,7 +73,7 @@ def assert_adhoc_tool_result(
         assert fc.content == expected_contents[fc.path].encode()
 
 
-def test_adhoc_tool(rule_runner: RuleRunner) -> None:
+def test_adhoc_tool(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files(
         {
             "src/fruitcake.py": dedent(
@@ -104,7 +108,7 @@ def test_adhoc_tool(rule_runner: RuleRunner) -> None:
     )
 
 
-def test_adhoc_tool_with_workdir(rule_runner: RuleRunner) -> None:
+def test_adhoc_tool_with_workdir(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files(
         {
             "src/fruitcake.py": dedent(
@@ -139,7 +143,7 @@ def test_adhoc_tool_with_workdir(rule_runner: RuleRunner) -> None:
     )
 
 
-def test_adhoc_tool_capture_stdout_err(rule_runner: RuleRunner) -> None:
+def test_adhoc_tool_capture_stdout_err(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files(
         {
             "src/fruitcake.py": dedent(
@@ -190,7 +194,7 @@ def test_adhoc_tool_capture_stdout_err(rule_runner: RuleRunner) -> None:
     ),
 )
 def test_working_directory_special_values(
-    rule_runner: RuleRunner, workdir: str, file_location: str
+    rule_runner: PythonRuleRunner, workdir: str, file_location: str
 ) -> None:
     rule_runner.write_files(
         {
@@ -223,4 +227,35 @@ def test_working_directory_special_values(
         rule_runner,
         Address("src", target_name="run_fruitcake"),
         expected_contents={os.path.join(file_location, "fruitcake.txt"): "fruitcake\n"},
+    )
+
+
+def test_env_vars(rule_runner: PythonRuleRunner) -> None:
+    envvar_value = "clang"
+    rule_runner.write_files(
+        {
+            "src/BUILD": dedent(
+                f"""\
+                system_binary(
+                    name="bash",
+                    binary_name="bash",
+                )
+
+                adhoc_tool(
+                  name="envvars",
+                  runnable=":bash",
+                  args=['-c', 'echo $ENVVAR > out.log'],
+                  output_files=["out.log"],
+                  extra_env_vars=["ENVVAR={envvar_value}"],
+                  root_output_directory=".",
+                )
+                """
+            ),
+        }
+    )
+
+    assert_adhoc_tool_result(
+        rule_runner,
+        Address("src", target_name="envvars"),
+        expected_contents={"out.log": f"{envvar_value}\n"},
     )

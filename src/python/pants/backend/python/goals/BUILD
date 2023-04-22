@@ -30,12 +30,11 @@ python_tests(
         },
         "run_pex_binary_integration_test.py": {"timeout": 600},
         "run_python_source_integration_test.py": {"timeout": 180},
-        "setup_py_integration_test.py": {
+        "package_dists_integration_test.py": {
             "dependencies": ["testprojects/src/python:native_directory"],
             "tags": ["platform_specific_behavior"],
             "timeout": 180,
         },
-        "setup_py_test.py": {"timeout": 150},
     },
 )
 

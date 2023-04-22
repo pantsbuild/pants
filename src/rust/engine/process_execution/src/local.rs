@@ -1,7 +1,6 @@
 // Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
-use std::ffi::OsStr;
 use std::fmt::{self, Debug};
 use std::io::Write;
 use std::ops::Neg;
@@ -30,14 +29,14 @@ use store::{
 };
 use task_executor::Executor;
 use tempfile::TempDir;
-use tokio::process::{Child, Command};
+use tokio::process::Command;
 use tokio::sync::RwLock;
 use tokio::time::{timeout, Duration};
 use tokio_util::codec::{BytesCodec, FramedRead};
 use workunit_store::{in_workunit, Level, Metric, RunningWorkunit};
 
 use crate::{
-  Context, FallibleProcessResultWithPlatform, NamedCaches, Process, ProcessError,
+  Context, FallibleProcessResultWithPlatform, ManagedChild, NamedCaches, Process, ProcessError,
   ProcessResultMetadata, ProcessResultSource,
 };
 
@@ -147,66 +146,6 @@ impl Debug for CommandRunner {
   }
 }
 
-pub struct HermeticCommand {
-  inner: Command,
-}
-
-///
-/// A command that accepts no input stream and does not consult the `PATH`.
-///
-impl HermeticCommand {
-  fn new<S: AsRef<OsStr>>(program: S) -> HermeticCommand {
-    let mut inner = Command::new(program);
-    inner
-      // TODO: This will not universally prevent child processes continuing to run in the
-      // background, because killing a pantsd client with Ctrl+C kills the server with a signal,
-      // which won't currently result in an orderly dropping of everything in the graph. See #10004.
-      .kill_on_drop(true)
-      .env_clear()
-      // It would be really nice not to have to manually set PATH but this is sadly the only way
-      // to stop automatic PATH searching.
-      .env("PATH", "");
-    HermeticCommand { inner }
-  }
-
-  fn args<I, S>(&mut self, args: I) -> &mut HermeticCommand
-  where
-    I: IntoIterator<Item = S>,
-    S: AsRef<OsStr>,
-  {
-    self.inner.args(args);
-    self
-  }
-
-  fn envs<I, K, V>(&mut self, vars: I) -> &mut HermeticCommand
-  where
-    I: IntoIterator<Item = (K, V)>,
-    K: AsRef<OsStr>,
-    V: AsRef<OsStr>,
-  {
-    self.inner.envs(vars);
-    self
-  }
-
-  fn current_dir<P: AsRef<Path>>(&mut self, dir: P) -> &mut HermeticCommand {
-    self.inner.current_dir(dir);
-    self
-  }
-
-  fn spawn<O: Into<Stdio>, E: Into<Stdio>>(
-    &mut self,
-    stdout: O,
-    stderr: E,
-  ) -> std::io::Result<Child> {
-    self
-      .inner
-      .stdin(Stdio::null())
-      .stdout(stdout)
-      .stderr(stderr)
-      .spawn()
-  }
-}
-
 // TODO: A Stream that ends with `Exit` is error prone: we should consider creating a Child struct
 // similar to nails::server::Child (which is itself shaped like `std::process::Child`).
 // See https://github.com/stuhood/nails/issues/1 for more info.
@@ -283,6 +222,10 @@ impl super::CommandRunner for CommandRunner {
         .await?;
 
         workunit.increment_counter(Metric::LocalExecutionRequests, 1);
+        // NB: The constraint on `CapturedWorkdir` is that any child processes spawned here have
+        // exited (or been killed in their `Drop` handlers), so this function can rely on the usual
+        // Drop order of local variables to assume that the sandbox is cleaned up after the process
+        // is.
         let res = self
           .run_and_capture_workdir(
             req.clone(),
@@ -348,8 +291,18 @@ impl CapturedWorkdir for CommandRunner {
     } else {
       workdir_path.to_owned()
     };
-    let mut command = HermeticCommand::new(&req.argv[0]);
-    command.args(&req.argv[1..]).current_dir(cwd).envs(&req.env);
+    let mut command = Command::new(&req.argv[0]);
+    command
+      .env_clear()
+      // It would be really nice not to have to manually set PATH but this is sadly the only way
+      // to stop automatic PATH searching.
+      .env("PATH", "")
+      .args(&req.argv[1..])
+      .current_dir(cwd)
+      .envs(&req.env)
+      .stdin(Stdio::null())
+      .stdout(Stdio::piped())
+      .stderr(Stdio::piped());
 
     // See the documentation of the `CapturedWorkdir::run_in_workdir` method, but `exclusive_spawn`
     // indicates the binary we're spawning was written out by the current thread, and, as such,
@@ -368,7 +321,7 @@ impl CapturedWorkdir for CommandRunner {
     //
     // See: https://github.com/golang/go/issues/22315 for an excellent description of this generic
     // unix problem.
-    let mut fork_exec = move || command.spawn(Stdio::piped(), Stdio::piped());
+    let mut fork_exec = move || ManagedChild::spawn(&mut command, None);
     let mut child = {
       if exclusive_spawn {
         let _write_locked = self.spawn_lock.write().await;
@@ -572,6 +525,11 @@ pub trait CapturedWorkdir {
 
   ///
   /// Spawn the given process in a working directory prepared with its expected input digest.
+  ///
+  /// NB: The implementer of this method must guarantee that the spawned process has completely
+  /// exited when the returned BoxStream is Dropped. Otherwise it might be possible for the process
+  /// to observe the working directory that it is running in being torn down. In most cases, this
+  /// requires Drop handlers to synchronously wait for their child processes to exit.
   ///
   /// If the process to be executed has an `argv[0]` that points into its input digest then
   /// `exclusive_spawn` will be `true` and the spawn implementation should account for the

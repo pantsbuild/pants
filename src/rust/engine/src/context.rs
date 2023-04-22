@@ -20,7 +20,7 @@ use crate::types::Types;
 
 use async_oncecell::OnceCell;
 use cache::PersistentCache;
-use fs::{safe_create_dir_all_ioerror, GitignoreStyleExcludes, PosixFS};
+use fs::{GitignoreStyleExcludes, PosixFS};
 use futures::FutureExt;
 use graph::{self, EntryId, Graph, InvalidationResult, NodeContext};
 use hashing::Digest;
@@ -93,14 +93,14 @@ pub struct RemotingOptions {
   pub root_ca_certs_path: Option<PathBuf>,
   pub store_headers: BTreeMap<String, String>,
   pub store_chunk_bytes: usize,
-  pub store_chunk_upload_timeout: Duration,
   pub store_rpc_retries: usize,
   pub store_rpc_concurrency: usize,
+  pub store_rpc_timeout: Duration,
   pub store_batch_api_size_limit: usize,
   pub cache_warnings_behavior: RemoteCacheWarningsBehavior,
   pub cache_content_behavior: CacheContentBehavior,
   pub cache_rpc_concurrency: usize,
-  pub cache_read_timeout: Duration,
+  pub cache_rpc_timeout: Duration,
   pub execution_headers: BTreeMap<String, String>,
   pub execution_overall_deadline: Duration,
   pub execution_rpc_concurrency: usize,
@@ -169,7 +169,7 @@ impl Core {
         grpc_util::tls::Config::new_without_mtls(root_ca_certs.clone()),
         remoting_opts.store_headers.clone(),
         remoting_opts.store_chunk_bytes,
-        remoting_opts.store_chunk_upload_timeout,
+        remoting_opts.store_rpc_timeout,
         remoting_opts.store_rpc_retries,
         remoting_opts.store_rpc_concurrency,
         capabilities_cell_opt,
@@ -337,7 +337,7 @@ impl Core {
         remoting_opts.cache_warnings_behavior,
         remoting_opts.cache_content_behavior,
         remoting_opts.cache_rpc_concurrency,
-        remoting_opts.cache_read_timeout,
+        remoting_opts.cache_rpc_timeout,
         remoting_opts.append_only_caches_base_path.clone(),
       )?);
     }
@@ -495,7 +495,7 @@ impl Core {
       None
     };
 
-    safe_create_dir_all_ioerror(&local_store_options.store_dir).map_err(|e| {
+    std::fs::create_dir_all(&local_store_options.store_dir).map_err(|e| {
       format!(
         "Error making directory {:?}: {:?}",
         local_store_options.store_dir, e
@@ -572,18 +572,14 @@ impl Core {
       .map_err(|err| format!("Error building HTTP client: {err}"))?;
     let rule_graph = RuleGraph::new(tasks.rules().clone(), tasks.queries().clone())?;
 
-    let gitignore_file = if use_gitignore {
-      let gitignore_path = build_root.join(".gitignore");
-      if Path::is_file(&gitignore_path) {
-        Some(gitignore_path)
-      } else {
-        None
-      }
+    let gitignore_files = if use_gitignore {
+      GitignoreStyleExcludes::gitignore_file_paths(&build_root)
     } else {
-      None
+      vec![]
     };
+
     let ignorer =
-      GitignoreStyleExcludes::create_with_gitignore_file(ignore_patterns, gitignore_file)
+      GitignoreStyleExcludes::create_with_gitignore_files(ignore_patterns, gitignore_files)
         .map_err(|e| format!("Could not parse build ignore patterns: {e:?}"))?;
 
     let watcher = if watch_filesystem {

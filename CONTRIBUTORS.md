@@ -6,6 +6,7 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Adam Retter
 + Alan Paulin
 + Alan Velasco
++ Alex Bancroft
 + Alex Schmitt
 + Alexander Johnson
 + Alexey Tereshenkov
@@ -250,6 +251,7 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Shantanu Kumar
 + Shuo Li
 + Simeon Franklin
++ Simon Biggs
 + Srikanth Kotagiri
 + Stefan Sauer
 + Stephan Erb

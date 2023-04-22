@@ -13,7 +13,6 @@ from pants.backend.python.lint.flake8.rules import Flake8Request
 from pants.backend.python.lint.flake8.rules import rules as flake8_rules
 from pants.backend.python.lint.flake8.subsystem import Flake8FieldSet
 from pants.backend.python.lint.flake8.subsystem import rules as flake8_subsystem_rules
-from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import PythonSourcesGeneratorTarget
 from pants.backend.python.util_rules import python_sources
 from pants.core.goals.lint import LintResult, Partitions
@@ -25,12 +24,13 @@ from pants.testutil.python_interpreter_selection import (
     all_major_minor_python_versions,
     skip_unless_python27_and_python3_present,
 )
-from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.testutil.python_rule_runner import PythonRuleRunner
+from pants.testutil.rule_runner import QueryRule
 
 
 @pytest.fixture
-def rule_runner() -> RuleRunner:
-    return RuleRunner(
+def rule_runner() -> PythonRuleRunner:
+    return PythonRuleRunner(
         rules=[
             *flake8_rules(),
             *flake8_subsystem_rules(),
@@ -49,7 +49,7 @@ BAD_FILE = "import typing\n"  # Unused import.
 
 
 def run_flake8(
-    rule_runner: RuleRunner, targets: list[Target], *, extra_args: list[str] | None = None
+    rule_runner: PythonRuleRunner, targets: list[Target], *, extra_args: list[str] | None = None
 ) -> tuple[LintResult, ...]:
     rule_runner.set_options(
         ["--backend-packages=pants.backend.python.lint.flake8", *(extra_args or ())],
@@ -70,7 +70,7 @@ def run_flake8(
 
 
 def assert_success(
-    rule_runner: RuleRunner, target: Target, *, extra_args: list[str] | None = None
+    rule_runner: PythonRuleRunner, target: Target, *, extra_args: list[str] | None = None
 ) -> None:
     result = run_flake8(rule_runner, [target], extra_args=extra_args)
     assert len(result) == 1
@@ -82,9 +82,9 @@ def assert_success(
 @pytest.mark.platform_specific_behavior
 @pytest.mark.parametrize(
     "major_minor_interpreter",
-    all_major_minor_python_versions(PythonSetup.default_interpreter_constraints),
+    all_major_minor_python_versions(["CPython>=3.7,<4"]),
 )
-def test_passing(rule_runner: RuleRunner, major_minor_interpreter: str) -> None:
+def test_passing(rule_runner: PythonRuleRunner, major_minor_interpreter: str) -> None:
     rule_runner.write_files({"f.py": GOOD_FILE, "BUILD": "python_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
     assert_success(
@@ -94,7 +94,7 @@ def test_passing(rule_runner: RuleRunner, major_minor_interpreter: str) -> None:
     )
 
 
-def test_failing(rule_runner: RuleRunner) -> None:
+def test_failing(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files({"f.py": BAD_FILE, "BUILD": "python_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
     result = run_flake8(rule_runner, [tgt])
@@ -104,7 +104,7 @@ def test_failing(rule_runner: RuleRunner) -> None:
     assert result[0].report == EMPTY_DIGEST
 
 
-def test_multiple_targets(rule_runner: RuleRunner) -> None:
+def test_multiple_targets(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files(
         {"good.py": GOOD_FILE, "bad.py": BAD_FILE, "BUILD": "python_sources(name='t')"}
     )
@@ -120,7 +120,7 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
 
 
 @skip_unless_python27_and_python3_present
-def test_uses_correct_python_version(rule_runner: RuleRunner) -> None:
+def test_uses_correct_python_version(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files(
         {
             "f.py": "version: str = 'Py3 > Py2'\n",
@@ -172,7 +172,9 @@ def test_uses_correct_python_version(rule_runner: RuleRunner) -> None:
     "config_path,extra_args",
     ([".flake8", []], ["custom_config.ini", ["--flake8-config=custom_config.ini"]]),
 )
-def test_config_file(rule_runner: RuleRunner, config_path: str, extra_args: list[str]) -> None:
+def test_config_file(
+    rule_runner: PythonRuleRunner, config_path: str, extra_args: list[str]
+) -> None:
     rule_runner.write_files(
         {
             "f.py": BAD_FILE,
@@ -184,20 +186,20 @@ def test_config_file(rule_runner: RuleRunner, config_path: str, extra_args: list
     assert_success(rule_runner, tgt, extra_args=extra_args)
 
 
-def test_passthrough_args(rule_runner: RuleRunner) -> None:
+def test_passthrough_args(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files({"f.py": BAD_FILE, "BUILD": "python_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
     assert_success(rule_runner, tgt, extra_args=["--flake8-args='--ignore=F401'"])
 
 
-def test_skip(rule_runner: RuleRunner) -> None:
+def test_skip(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files({"f.py": BAD_FILE, "BUILD": "python_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
     result = run_flake8(rule_runner, [tgt], extra_args=["--flake8-skip"])
     assert not result
 
 
-def test_3rdparty_plugin(rule_runner: RuleRunner) -> None:
+def test_3rdparty_plugin(rule_runner: PythonRuleRunner) -> None:
     # Test extra_files option
     rule_runner.write_files(
         {
@@ -221,7 +223,7 @@ def test_3rdparty_plugin(rule_runner: RuleRunner) -> None:
     assert result[0].exit_code == 0, result[0].stderr
 
 
-def test_report_file(rule_runner: RuleRunner) -> None:
+def test_report_file(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files({"f.py": BAD_FILE, "BUILD": "python_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
     result = run_flake8(
@@ -235,7 +237,7 @@ def test_report_file(rule_runner: RuleRunner) -> None:
     assert "f.py:1:1: F401" in report_files[0].content.decode()
 
 
-def test_type_stubs(rule_runner: RuleRunner) -> None:
+def test_type_stubs(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files(
         {"f.pyi": BAD_FILE, "f.py": GOOD_FILE, "BUILD": "python_sources(name='t')"}
     )

@@ -439,10 +439,20 @@ def test_execution_dependencies(caplog, rule_runner: RuleRunner) -> None:
                     workdir="/",
                 )
 
-                # Fails because runtime dependencies are not fetched transitively
-                # even if the root is requested through `output_dependencies`
+                # Fails because `output_dependencies` are not available at runtime
                 shell_command(
                     name="expect_fail_3",
+                    tools=["cat"],
+                    command="cat msg.txt",
+                    output_dependencies=[":a1"],
+                    workdir="/",
+                )
+
+
+                # Fails because execution dependencies are not fetched transitively
+                # even if the root is requested through `output_dependencies`
+                shell_command(
+                    name="expect_fail_4",
                     tools=["cat"],
                     command="cat msg.txt",
                     output_dependencies=[":a2"],
@@ -465,6 +475,7 @@ def test_execution_dependencies(caplog, rule_runner: RuleRunner) -> None:
                     name="expect_success_2",
                     tools=["cat"],
                     command="cat msg.txt msg2.txt > output.txt",
+                    execution_dependencies=[":a1", ":a2",],
                     output_dependencies=[":a1", ":a2",],
                     output_files=["output.txt"],
                     workdir="/",
@@ -474,18 +485,11 @@ def test_execution_dependencies(caplog, rule_runner: RuleRunner) -> None:
         }
     )
 
-    with engine_error(ProcessExecutionFailure):
-        assert_shell_command_result(
-            rule_runner, Address("src", target_name="expect_fail_1"), expected_contents={}
-        )
-    with engine_error(ProcessExecutionFailure):
-        assert_shell_command_result(
-            rule_runner, Address("src", target_name="expect_fail_2"), expected_contents={}
-        )
-    with engine_error(ProcessExecutionFailure):
-        assert_shell_command_result(
-            rule_runner, Address("src", target_name="expect_fail_3"), expected_contents={}
-        )
+    for i in range(1, 5):
+        with engine_error(ProcessExecutionFailure):
+            assert_shell_command_result(
+                rule_runner, Address("src", target_name=f"expect_fail_{i}"), expected_contents={}
+            )
     assert_shell_command_result(
         rule_runner,
         Address("src", target_name="expect_success_1"),
@@ -494,50 +498,6 @@ def test_execution_dependencies(caplog, rule_runner: RuleRunner) -> None:
     assert_shell_command_result(
         rule_runner,
         Address("src", target_name="expect_success_2"),
-        expected_contents={"output.txt": "message\nmessage\n"},
-    )
-
-
-def test_old_style_dependencies(caplog, rule_runner: RuleRunner) -> None:
-    caplog.set_level(logging.INFO)
-    caplog.clear()
-
-    rule_runner.write_files(
-        {
-            "src/BUILD": dedent(
-                """\
-                shell_command(
-                  name="a1",
-                  command="echo message > msg.txt",
-                  outputs=["msg.txt"],
-                  workdir="/",\
-                )
-
-                shell_command(
-                    name="a2",
-                    tools=["cat"],
-                    command="cat msg.txt > msg2.txt",
-                    dependencies=[":a1",],
-                    outputs=["msg2.txt",],
-                    workdir="/",
-                )
-
-                shell_command(
-                    name="expect_success",
-                    tools=["cat"],
-                    command="cat msg.txt msg2.txt > output.txt",
-                    dependencies=[":a1", ":a2",],
-                    outputs=["output.txt"],
-                    workdir="/",
-                )
-                """
-            ),
-        }
-    )
-
-    assert_shell_command_result(
-        rule_runner,
-        Address("src", target_name="expect_success"),
         expected_contents={"output.txt": "message\nmessage\n"},
     )
 
@@ -803,3 +763,29 @@ def test_missing_tool_called(
         )
 
     assert "requires the names of any external commands" in caplog.text
+
+
+def test_env_vars(rule_runner: RuleRunner) -> None:
+    envvar_value = "clang"
+    rule_runner.write_files(
+        {
+            "src/BUILD": dedent(
+                f"""\
+                shell_command(
+                  name="envvars",
+                  tools=[],
+                  command='echo $ENVVAR > out.log',
+                  output_files=["out.log"],
+                  extra_env_vars=["ENVVAR={envvar_value}"],
+                  root_output_directory=".",
+                )
+                """
+            ),
+        }
+    )
+
+    assert_shell_command_result(
+        rule_runner,
+        Address("src", target_name="envvars"),
+        expected_contents={"out.log": f"{envvar_value}\n"},
+    )

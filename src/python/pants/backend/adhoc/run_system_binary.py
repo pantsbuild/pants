@@ -77,7 +77,7 @@ async def _find_binary(
 
     deps = await Get(
         ResolvedExecutionDependencies,
-        ResolveExecutionDependenciesRequest(address, (), None, fingerprint_dependencies),
+        ResolveExecutionDependenciesRequest(address, (), fingerprint_dependencies),
     )
     rds = deps.runnable_dependencies
     env: dict[str, str] = {}

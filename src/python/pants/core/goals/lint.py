@@ -16,7 +16,7 @@ from pants.core.goals.multi_tool_goal_helper import (
     BatchSizeOption,
     OnlyOption,
     SkippableSubsystem,
-    determine_specified_tool_names,
+    determine_specified_tool_ids,
     write_reports,
 )
 from pants.core.util_rules.distdir import DistDir
@@ -174,6 +174,12 @@ class LintRequest:
 
     @classproperty
     def tool_name(cls) -> str:
+        """The user-facing "name" of the tool."""
+        return cls.tool_subsystem.options_scope
+
+    @classproperty
+    def tool_id(cls) -> str:
+        """The "id" of the tool, used in tool selection (Eg --only=<id>)."""
         return cls.tool_subsystem.options_scope
 
     @distinct_union_type_per_subclass(in_scope_types=[EnvironmentName])
@@ -330,16 +336,14 @@ async def _get_partitions_by_request_type(
     make_targets_partition_request_get: Callable[[_TargetPartitioner], Get[Partitions]],
     make_files_partition_request_get: Callable[[_FilePartitioner], Get[Partitions]],
 ) -> dict[type[_CoreRequestType], list[Partitions]]:
-    specified_names = determine_specified_tool_names(
+    specified_ids = determine_specified_tool_ids(
         subsystem.name,
         subsystem.only,
         core_request_types,
     )
 
     filtered_core_request_types = [
-        request_type
-        for request_type in core_request_types
-        if request_type.tool_name in specified_names
+        request_type for request_type in core_request_types if request_type.tool_id in specified_ids
     ]
     if not filtered_core_request_types:
         return {}
@@ -430,12 +434,10 @@ async def lint(
     if not partitions_by_request_type:
         return Lint(exit_code=0)
 
-    def batch_by_size(
-        iterable: Iterable[_T], key: Callable[[_T], str] = lambda x: str(x)
-    ) -> Iterator[tuple[_T, ...]]:
+    def batch_by_size(iterable: Iterable[_T]) -> Iterator[tuple[_T, ...]]:
         batches = partition_sequentially(
             iterable,
-            key=key,
+            key=lambda x: str(x.address) if isinstance(x, FieldSet) else str(x),
             size_target=lint_subsystem.batch_size,
             size_max=4 * lint_subsystem.batch_size,
         )

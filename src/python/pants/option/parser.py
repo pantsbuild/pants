@@ -9,7 +9,7 @@ import json
 import re
 import typing
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import Enum
 from pathlib import Path
 from typing import Any, DefaultDict, Iterable, Mapping
@@ -40,6 +40,7 @@ from pants.option.errors import (
     InvalidKwargNonGlobalScope,
     InvalidMemberType,
     MemberTypeNotAllowed,
+    MissingRequiredOptionError,
     MutuallyExclusiveOptionError,
     NoOptionNames,
     OptionAlreadyRegistered,
@@ -281,6 +282,18 @@ class Parser:
                             """
                         )
                     )
+            elif kwargs.get("required"):
+                args_str = ", ".join(args)
+                val = replace(
+                    val,
+                    error=MissingRequiredOptionError(
+                        softwrap(
+                            f"""
+                            The option {args_str} in {self._scope_str()} is required.
+                            """
+                        )
+                    ),
+                )
 
             setattr(namespace, dest, val)
 
@@ -357,25 +370,26 @@ class Parser:
             )
 
     _allowed_registration_kwargs = {
-        "type",
-        "member_type",
+        "advanced",
         "choices",
-        "dest",
+        "daemon",
         "default",
         "default_help_repr",
-        "implicit_value",
-        "metavar",
-        "help",
-        "advanced",
-        "fingerprint",
-        "removal_version",
-        "removal_hint",
         "deprecation_start_version",
-        "fromfile",
-        "mutually_exclusive_group",
-        "daemon",
-        "passthrough",
+        "dest",
         "environment_aware",
+        "fingerprint",
+        "fromfile",
+        "help",
+        "implicit_value",
+        "member_type",
+        "metavar",
+        "mutually_exclusive_group",
+        "passthrough",
+        "removal_hint",
+        "removal_version",
+        "required",
+        "type",
     }
 
     _allowed_member_types = {

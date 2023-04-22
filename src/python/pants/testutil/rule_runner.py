@@ -256,6 +256,7 @@ class RuleRunner:
         rules: Iterable | None = None,
         target_types: Iterable[type[Target]] | None = None,
         objects: dict[str, Any] | None = None,
+        aliases: Iterable[BuildFileAliases] | None = None,
         context_aware_object_factories: dict[str, Any] | None = None,
         isolated_local_store: bool = False,
         preserve_tmpdirs: bool = False,
@@ -306,12 +307,16 @@ class RuleRunner:
                 objects=objects, context_aware_object_factories=context_aware_object_factories
             )
         )
+        aliases = aliases or ()
+        for build_file_aliases in aliases:
+            build_config_builder.register_aliases(build_file_aliases)
+
         build_config_builder.register_rules("_dummy_for_test_", all_rules)
         build_config_builder.register_target_types("_dummy_for_test_", target_types or ())
         self.build_config = build_config_builder.create()
 
         self.environment = CompleteEnvironmentVars({})
-        self.options_bootstrapper = create_options_bootstrapper(args=bootstrap_args)
+        self.options_bootstrapper = self.create_options_bootstrapper(args=bootstrap_args, env=None)
         self.extra_session_values = extra_session_values or {}
         self.inherent_environment = inherent_environment
         self.max_workunit_verbosity = max_workunit_verbosity
@@ -437,6 +442,11 @@ class RuleRunner:
         console.flush()
         return GoalRuleResult(exit_code, stdout.getvalue(), stderr.getvalue())
 
+    def create_options_bootstrapper(
+        self, args: Iterable[str], env: Mapping[str, str] | None
+    ) -> OptionsBootstrapper:
+        return create_options_bootstrapper(args=args, env=env)
+
     def set_options(
         self,
         args: Iterable[str],
@@ -460,7 +470,7 @@ class RuleRunner:
             **{k: os.environ[k] for k in (env_inherit or set()) if k in os.environ},
             **(env or {}),
         }
-        self.options_bootstrapper = create_options_bootstrapper(args=args, env=env)
+        self.options_bootstrapper = self.create_options_bootstrapper(args=args, env=env)
         self.environment = CompleteEnvironmentVars(env)
         self._set_new_session(self.scheduler.scheduler)
 

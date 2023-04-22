@@ -113,6 +113,10 @@ class MutuallyExclusiveOptionError(ParseError):
     """Indicates that two options in the same mutually exclusive group were specified."""
 
 
+class MissingRequiredOptionError(ParseError):
+    """Indicates that a required option has not been configured with a value."""
+
+
 class UnknownFlagsError(ParseError):
     """Indicates that unknown command-line flags were encountered in some scope."""
 
