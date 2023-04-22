@@ -46,14 +46,17 @@ config = "build-support/mypy.ini"
 
 ### Change the MyPy version
 
-Use the `version` option in the `[mypy]` scope:
+Use the `install_from_resolve` option in the `[mypy]` scope:
 
 ```toml pants.toml
+[python.resolves]
+mypy = "3rdparty/python/mypy.lock"
+
 [mypy]
-version = "mypy==0.910"
+install_from_resolve = "mypy"
 ```
 
-If you change this option, Pants's default lockfile for MyPy will not work. Either set the `lockfile` option to a custom path or `"<none>"` to opt out. See [Third-party dependencies](doc:python-third-party-dependencies#tool-lockfiles).
+See [Lockfiles for tools](doc:python-lockfiles#lockfiles-for-tools).
 
 ### Incrementally adopt MyPy with `skip_mypy=True`
 
@@ -120,7 +123,7 @@ python_sources(name="lib")
 
 ### Third-party type stubs
 
-You can install third-party type stubs (e.g. `types-requests`) like [normal Python requirements](doc:python-third-party-dependencies). Pants will infer a dependency on both the type stub and the actual dependency, e.g. both `types-requests` and `requests`, which you can confirm by running `pants dependencies path/to/f.py`.
+You can install third-party type stubs (for example, `types-requests`) like [normal Python requirements](doc:python-third-party-dependencies). Pants will infer a dependency on both the type stub and the actual dependency, for example, both `types-requests` and `requests`, which you can confirm by running `pants dependencies path/to/f.py`.
 
 You can also install the type stub via the option `[mypy].extra_type_stubs`, which ensures
 the stubs are only used when running MyPy and are not included when, for example,
@@ -130,25 +133,35 @@ the stubs are only used when running MyPy and are not included when, for example
 ```toml pants.toml
 [mypy]
 extra_type_stubs = ["types-requests==2.25.12"]
-# Set this to a path, then run `pants generate-lockfiles --resolve=mypy-extra-type-stubs`. 
+# Set this to a path, then run `pants generate-lockfiles --resolve=mypy-extra-type-stubs`.
 extra_type_stubs_lockfile = "3rdparty/python/mypy_extra_type_stubs.lock
 ```
 
 ### Add a third-party plugin
 
-Add the plugin to the `extra_requirements` option in the `[mypy]` scope, then update your `mypy.ini` to load the plugin:
+Add the plugin to the `requirements` option in the `[mypy]` scope, and create a `requirements.txt` file for the version. Then specify the resolve that the requirements should be installed from:
 
 ```toml pants.toml
+[python.resolves]
+mypy = "3rdparty/python/mypy-lock.txt"
+
 [mypy]
-extra_requirements.add = ["pydantic==1.6.1"]
+requirements.add = ["pydantic"]
+install_from_resolve = "mypy"
 ```
+```Text mypy-requirements.txt
+pydantic==1.6.1
+```
+
+Then update your `mypy.ini` to load the plugin:
+
 ```text mypy.ini
 [mypy]
 plugins =
     pydantic.mypy
 ```
 
-If you change this option, Pants's default lockfile for MyPy will not work. Either set the `lockfile` option to a custom path or `"<none>"` to opt out. See [Third-party dependencies](doc:python-third-party-dependencies#tool-lockfiles).
+For more information, see [Lockfiles for tools](doc:python-lockfiles#lockfiles-for-tools).
 
 For some plugins, like `django-stubs`, you may need to always load certain source files, such as a `settings.py` file. You can make sure that this source file is always used by hijacking the `source_plugins` option, which allows you to specify targets whose `sources` should always be used when running MyPy. See the below section for more information about source plugins.
 
