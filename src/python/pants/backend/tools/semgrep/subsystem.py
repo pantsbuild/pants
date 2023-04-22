@@ -1,4 +1,4 @@
-# Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from __future__ import annotations
@@ -22,6 +22,7 @@ from pants.engine.target import Dependencies, FieldSet, SingleSourceField, Targe
 from pants.engine.unions import UnionRule
 from pants.option.option_types import ArgsListOption, BoolOption, SkipOption
 from pants.util.docutil import git_url
+from pants.util.strutil import softwrap
 
 
 @dataclass(frozen=True)
@@ -76,7 +77,15 @@ class Semgrep(PythonToolBase):
 
     force = BoolOption(
         default=False,
-        help="If true, semgrep is always run, even if the input files haven't changed. This can be used to run cloud rulesets like `--semgrep-force --semgrep-args='--config p/python`.",
+        help=softwrap(
+            """\
+            If true, semgrep is always run, even if the input files haven't changed. This can be
+            used to run cloud rulesets like `pants lint --semgrep-force
+            --semgrep-args='--config=p/python' ::`. Without `--semgrep-force`, using the cloud
+            rulesets may give inconsistent results on different machines, due to caching, because
+            the rulesets may change.
+            """
+        ),
         advanced=True,
     )
 
