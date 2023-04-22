@@ -1,14 +1,16 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+from __future__ import annotations
 
 from abc import abstractmethod
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from typing import TYPE_CHECKING, Callable, ClassVar, Iterator, Type, cast
 
 from typing_extensions import final
 
+from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.unions import UnionMembership
 from pants.option.option_types import StrOption
 from pants.option.scope import ScopeInfo
@@ -176,3 +178,25 @@ class LineOriented(Outputting):
         sep = self.sep.encode().decode("unicode_escape")
         with self.output_sink(console) as output_sink:
             yield lambda msg: print(msg, file=output_sink, end=sep)
+
+
+@dataclass(frozen=True)
+class CurrentExecutingGoals(EngineAwareReturnType):
+    executing: dict[str, type[Goal]] = field(default_factory=dict)
+
+    def __hash__(self) -> int:
+        return hash(tuple(self.executing.keys()))
+
+    def is_running(self, goal: str) -> bool:
+        return goal in self.executing
+
+    @contextmanager
+    def _execute(self, goal: type[Goal]) -> Iterator[None]:
+        self.executing[goal.name] = goal
+        try:
+            yield
+        finally:
+            self.executing.pop(goal.name, None)
+
+    def cacheable(self) -> bool:
+        return False
