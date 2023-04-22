@@ -27,7 +27,6 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionMembership
 from pants.util.frozendict import FrozenDict
-from pants.util.meta import frozen_after_init
 
 SetDefaultsValueT = Mapping[str, Any]
 SetDefaultsKeyT = Union[str, Tuple[str, ...]]
@@ -38,22 +37,12 @@ class BuildFileDefaults(FrozenDict[str, FrozenDict[str, ImmutableValue]]):
     """Map target types to default field values."""
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
 class ParametrizeDefault(Parametrize):
-    """A frozen version of `Parametrize` for defaults.
+    """Parametrize for default field values.
 
-    This is needed since all defaults must be hashable, which the `Parametrize` class is not nor can
-    it be as it may get unhashable data as input and is unaware of the field type it is being
-    applied to.
+    This is to have eager validation on the field values rather than erroring first when applied on
+    an actual target.
     """
-
-    args: tuple[str, ...]
-    kwargs: FrozenDict[str, ImmutableValue]  # type: ignore[assignment]
-
-    def __init__(self, *args: str, **kwargs: ImmutableValue) -> None:
-        self.args = args
-        self.kwargs = FrozenDict(kwargs)
 
     @classmethod
     def create(
