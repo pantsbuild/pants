@@ -66,11 +66,8 @@ async def resolve_plugins(
 
     python: PythonExecutable | None = None
     if not request.interpreter_constraints:
-        python = cast(
-            PythonExecutable,
-            PythonExecutable.fingerprinted(
-                sys.executable, ".".join(map(str, sys.version_info[:3])).encode("utf8")
-            ),
+        python = PythonExecutable.fingerprinted(
+            sys.executable, ".".join(map(str, sys.version_info[:3])).encode("utf8")
         )
 
     plugins_pex = await Get(

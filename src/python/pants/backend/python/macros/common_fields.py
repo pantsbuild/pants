@@ -79,7 +79,7 @@ class RequirementsOverrideField(OverridesField):
 
             ```
             overrides={
-                "django": {"dependencies": ["#setuptools"]]},
+                "django": {"dependencies": ["#setuptools"]},
                 "ansicolors": {"description": "pretty colors"]},
                 ("ansicolors, "django"): {"tags": ["overridden"]},
             }

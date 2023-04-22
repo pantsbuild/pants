@@ -96,4 +96,7 @@ class RankedValue:
 
     rank: Rank
     value: Value
-    details: str | None = None  # Optional details about the derivation of the value.
+    # Optional details about the derivation of the value.
+    details: str | None = None
+    # Any deferred error that should be triggered if this value is accessed.
+    error: Exception | None = None

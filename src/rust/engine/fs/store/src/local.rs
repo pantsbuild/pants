@@ -246,10 +246,17 @@ impl ShardedFSDB {
               .shutdown()
               .await
               .map_err(|e| format!("Failed to shutdown {tmp_path:?}: {e}"))?;
-
             tokio::fs::set_permissions(&tmp_path, std::fs::Permissions::from_mode(0o555))
               .await
               .map_err(|e| format!("Failed to set permissions on {:?}: {e}", tmp_path))?;
+            // NB: Syncing metadata to disk ensures the `hard_link` we do later has the opportunity
+            // to succeed. Otherwise, if later when we try to `hard_link` the metadata isn't
+            // persisted to disk, we'll get `No such file or directory`.
+            // See https://github.com/pantsbuild/pants/pull/18768
+            tokio_file
+              .sync_all()
+              .await
+              .map_err(|e| format!("Failed to sync {tmp_path:?}: {e}"))?;
             tokio::fs::rename(tmp_path.clone(), dest_path.clone())
               .await
               .map_err(|e| format!("Error while renaming: {e}."))?;
@@ -308,6 +315,7 @@ impl UnderlyingByteStore for ShardedFSDB {
   }
 
   async fn remove(&self, fingerprint: Fingerprint) -> Result<bool, String> {
+    let _ = self.dest_initializer.lock().remove(&fingerprint);
     Ok(
       tokio::fs::remove_file(self.get_path(fingerprint))
         .await

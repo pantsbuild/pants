@@ -329,11 +329,27 @@ class PythonToolRequirementsBase(Subsystem):
         main: MainSpecification | None = None,
         sources: Digest | None = None,
     ) -> PexRequest:
+        requirements = self.pex_requirements(extra_requirements=extra_requirements)
+        if not interpreter_constraints:
+            if self.options.is_default("interpreter_constraints") and (
+                isinstance(requirements, EntireLockfile)
+                or (
+                    isinstance(requirements, PexRequirements)
+                    and isinstance(requirements.from_superset, Resolve)
+                )
+            ):
+                # If installing the tool from a resolve, and custom ICs weren't explicitly set,
+                # leave these blank. This will cause the ones for the resolve to be used,
+                # which is clearly what the user intends, rather than forcing the
+                # user to override interpreter_constraints to match those of the resolve.
+                interpreter_constraints = InterpreterConstraints()
+            else:
+                interpreter_constraints = self.interpreter_constraints
         return PexRequest(
             output_filename=f"{self.options_scope.replace('-', '_')}.pex",
             internal_only=True,
             requirements=self.pex_requirements(extra_requirements=extra_requirements),
-            interpreter_constraints=interpreter_constraints or self.interpreter_constraints,
+            interpreter_constraints=interpreter_constraints,
             main=main,
             sources=sources,
         )
