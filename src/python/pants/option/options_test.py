@@ -509,6 +509,7 @@ def test_required_option(caplog) -> None:
         opts.register(GLOBAL_SCOPE, "--opt", type=bool, required=True)
 
     opts = create_options([GLOBAL_SCOPE], register, config={}).for_global_scope()
+    assert opts.get("opt") is False
     with pytest.raises(
         MissingRequiredOptionError, match="The option --opt in global scope is required."
     ):

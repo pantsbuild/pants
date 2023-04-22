@@ -108,11 +108,11 @@ class OptionValueContainer:
         """
         return self.get_rank(key) in (Rank.NONE, Rank.HARDCODED)
 
-    def get(self, key: Key, default: Value | None = None):
+    def get(self, key: Key, default: Value | None = None, throw_errors: bool = False):
         # Support dict-like dynamic access.  See also __getitem__ below.
         if key not in self._value_map:
             return default
-        return self._get_underlying_value(key)
+        return self._get_underlying_value(key, throw_errors)
 
     def as_dict(self) -> dict[Key, Value]:
         return {key: self.get(key) for key in self._value_map}
@@ -120,13 +120,13 @@ class OptionValueContainer:
     def to_builder(self) -> OptionValueContainerBuilder:
         return OptionValueContainerBuilder(copy.copy(self._value_map))
 
-    def _get_underlying_value(self, key: Key):
+    def _get_underlying_value(self, key: Key, throw_errors: bool):
         # Note that the key may exist with a value of None, so we can't just
         # test self._value_map.get() for None.
         if key not in self._value_map:
             raise AttributeError(key)
         ranked_val = self._value_map[key]
-        if ranked_val.error is not None:
+        if throw_errors and ranked_val.error is not None:
             raise ranked_val.error
         return ranked_val.value
 
@@ -141,7 +141,7 @@ class OptionValueContainer:
         if key == "_value_map":
             # In case we get called in copy, which don't invoke the ctor.
             raise AttributeError(key)
-        return self._get_underlying_value(key)
+        return self._get_underlying_value(key, throw_errors=True)
 
     def __iter__(self) -> Iterator[Key]:
         """Returns an iterator over all option names, in lexicographical order."""
