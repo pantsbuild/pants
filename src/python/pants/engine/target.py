@@ -457,7 +457,9 @@ class Target:
 
             self.validate()
         except Exception as e:
-            raise InvalidTargetException(str(e), description_of_origin=self.description_of_origin) from e
+            raise InvalidTargetException(
+                str(e), description_of_origin=self.description_of_origin
+            ) from e
 
     @final
     def _calculate_field_values(
