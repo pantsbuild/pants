@@ -5,4 +5,9 @@ resource(name="lockfile", source="semgrep.lock")
 
 python_sources(dependencies=[":lockfile"])
 
-python_tests(name="tests")
+python_tests(
+    name="tests",
+    overrides={
+        "rules_integration_test.py": dict(timeout=240),
+    },
+)

@@ -9,7 +9,11 @@ from typing import Iterable
 from pants.backend.python.goals import lockfile
 from pants.backend.python.goals.export import ExportPythonTool, ExportPythonToolSentinel
 from pants.backend.python.goals.lockfile import GeneratePythonLockfile
-from pants.backend.python.subsystems.python_tool_base import ExportToolOption, LockfileRules, PythonToolBase
+from pants.backend.python.subsystems.python_tool_base import (
+    ExportToolOption,
+    LockfileRules,
+    PythonToolBase,
+)
 from pants.backend.python.target_types import ConsoleScript
 from pants.backend.python.util_rules.pex_requirements import GeneratePythonToolLockfileSentinel
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
