@@ -272,7 +272,7 @@ class DockerEnvironmentTarget(Target):
         
         Before running Pants using this environment, if you are using Docker Desktop, make sure the option
         **Enable default Docker socket** is enabled, you can find it in **Docker Desktop Settings > Advanced**
-        panel. That option makes sures of creating a socket at `/var/run/docker.sock` which Pants can use to
+        panel. That option tells Docker to create a socket at `/var/run/docker.sock` which Pants can use to
         communicate with Docker.
         """
         # TODO(#17096) Add a link to the environments docs once they land.
