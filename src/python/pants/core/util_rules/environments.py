@@ -269,7 +269,7 @@ class DockerEnvironmentTarget(Target):
         To use this environment, map this target's address with a memorable name in
         `[environments-preview].names`. You can then consume this environment by specifying the name in
         the `environment` field defined on other targets.
-        
+
         Before running Pants using this environment, if you are using Docker Desktop, make sure the option
         **Enable default Docker socket** is enabled, you can find it in **Docker Desktop Settings > Advanced**
         panel. That option tells Docker to create a socket at `/var/run/docker.sock` which Pants can use to
