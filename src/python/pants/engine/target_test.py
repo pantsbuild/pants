@@ -1414,15 +1414,16 @@ def test_overrides_field_normalization() -> None:
     addr = Address("", target_name="example")
 
     assert OverridesField(None, addr).value is None
-    assert OverridesField({}, addr).value == {}
+    assert OverridesField({}, addr).value == FrozenDict({})
 
-    # Note that `list_field` is not hashable. We have to override `__hash__` for this to work.
     tgt1_override = {"str_field": "value", "list_field": [0, 1, 3]}
     tgt2_override = {"int_field": 0, "dict_field": {"a": 0}}
 
     # Convert a `str` key to `tuple[str, ...]`.
     field = OverridesField({"tgt1": tgt1_override, ("tgt1", "tgt2"): tgt2_override}, addr)
-    assert field.value == {("tgt1",): tgt1_override, ("tgt1", "tgt2"): tgt2_override}
+    assert field.value == FrozenDict.deep_freeze(
+        {("tgt1",): tgt1_override, ("tgt1", "tgt2"): tgt2_override}
+    )
     with no_exception():
         hash(field)
 
@@ -1454,8 +1455,8 @@ def test_overrides_field_normalization() -> None:
         "dir/bar2.ext": tgt2_override,
     }
     assert path_field.flatten() == {
-        "foo.ext": {**tgt2_override, **tgt1_override},
-        "bar*.ext": tgt2_override,
+        "foo.ext": dict(FrozenDict.deep_freeze({**tgt2_override, **tgt1_override})),
+        "bar*.ext": dict(FrozenDict.deep_freeze(tgt2_override)),
     }
     with pytest.raises(InvalidFieldException):
         # Same field is overridden for the same file multiple times, which is an error.

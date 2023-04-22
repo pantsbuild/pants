@@ -18,6 +18,7 @@ from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     Dependencies,
     InvalidFieldException,
+    OverridesField,
     RegisteredTargetTypes,
     TargetGenerator,
 )
@@ -41,7 +42,10 @@ class TestGenTarget(GenericTarget):
 class TestGenTargetGenerator(TargetGenerator):
     alias = "test_gen_targets"
     generated_target_cls = TestGenTarget
-    core_fields = COMMON_TARGET_FIELDS
+    core_fields = (
+        OverridesField,
+        *COMMON_TARGET_FIELDS,
+    )
     copied_fields = COMMON_TARGET_FIELDS
     moved_fields = (GenericTargetDependenciesField,)
 
@@ -239,6 +243,25 @@ Scenario = namedtuple(
                 },
             ),
             id="parametrize default field value",
+        ),
+        pytest.param(
+            Scenario(
+                args=(
+                    {
+                        ("test_gen_targets",): dict(
+                            overrides={"*_generated.py": {"skip_yapf": True}},
+                        ),
+                    },
+                ),
+                expected_defaults={
+                    "test_gen_targets": dict(
+                        overrides=FrozenDict.deep_freeze(
+                            {("*_generated.py",): {"skip_yapf": True}}
+                        ),
+                    ),
+                },
+            ),
+            id="overrides value not frozen (issue #18784)",
         ),
     ],
 )
