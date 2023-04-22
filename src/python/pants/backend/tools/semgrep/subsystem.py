@@ -9,7 +9,7 @@ from typing import Iterable
 from pants.backend.python.goals import lockfile
 from pants.backend.python.goals.export import ExportPythonTool, ExportPythonToolSentinel
 from pants.backend.python.goals.lockfile import GeneratePythonLockfile
-from pants.backend.python.subsystems.python_tool_base import ExportToolOption, PythonToolBase
+from pants.backend.python.subsystems.python_tool_base import ExportToolOption, LockfileRules, PythonToolBase
 from pants.backend.python.target_types import ConsoleScript
 from pants.backend.python.util_rules.pex_requirements import GeneratePythonToolLockfileSentinel
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
@@ -37,16 +37,17 @@ class Semgrep(PythonToolBase):
     options_scope = "semgrep"
     help = "Lightweight static analysis for many languages. Find bug variants with patterns that look like source code. (https://semgrep.dev/)"
 
-    default_version = "semgrep==1.14.0"
+    default_version = "semgrep>=1.19.0,<2"
     default_main = ConsoleScript("semgrep")
+    default_requirements = [default_version]
 
     register_interpreter_constraints = True
-    default_interpreter_constraints = ["CPython>=3.7,<4"]
 
     register_lockfile = True
     default_lockfile_resource = ("pants.backend.tools.semgrep", "semgrep.lock")
     default_lockfile_path = "src/python/pants/backend/tools/semgrep/semgrep.lock"
     default_lockfile_url = git_url(default_lockfile_path)
+    lockfile_rules_type = LockfileRules.SIMPLE
 
     export = ExportToolOption()
 
