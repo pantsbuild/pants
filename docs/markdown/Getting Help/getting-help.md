@@ -20,16 +20,6 @@ Blog
 
 Read [blog.pantsbuild.org](https://blog.pantsbuild.org/) to find elaboration on new features, tutorials, reveals of upcoming features, insights into what we're thinking about and working on, and behind-the-scenes interviews with Pants users and maintainers.
 
-Newsletter
-----------
-
-The [Pants Build Open Source Community Newsletter](https://newsletter.pantsbuild.org/) is published 1-2 times per month. It offers a quick roundup of what's new in Pants and the extended community.
-
-[block:html]
-{
-  "html": "<div id=\"revue-embed\">\n  <form action=\"http://newsletter.pantsbuild.org/add_subscriber\" method=\"post\" id=\"revue-form\" name=\"revue-form\"  target=\"_blank\">\n  <div class=\"revue-form-group\">\n    <label for=\"member_email\">Email address</label>\n    <input class=\"revue-form-field\" placeholder=\"Your email address...\" type=\"email\" name=\"member[email]\" id=\"member_email\">\n  </div>\n  <div class=\"revue-form-group\">\n    <label for=\"member_first_name\">First name <span class=\"optional\">(Optional)</span></label>\n    <input class=\"revue-form-field\" placeholder=\"First name... (Optional)\" type=\"text\" name=\"member[first_name]\" id=\"member_first_name\">\n  </div>\n  <div class=\"revue-form-group\">\n    <label for=\"member_last_name\">Last name <span class=\"optional\">(Optional)</span></label>\n    <input class=\"revue-form-field\" placeholder=\"Last name... (Optional)\" type=\"text\" name=\"member[last_name]\" id=\"member_last_name\">\n  </div>\n  <div class=\"revue-form-actions\">\n    <input type=\"submit\" value=\"Subscribe\" name=\"member[subscribe]\" id=\"member_submit\">\n  </div>\n  <div class=\"revue-form-footer\">By subscribing, you agree with Revue’s <a target=\"_blank\" href=\"https://www.getrevue.co/terms\">Terms of Service</a> and <a target=\"_blank\" href=\"https://www.getrevue.co/privacy\">Privacy Policy</a>.</div>\n  </form>\n</div>"
-}
-[/block]
 
 Mailing list
 ------------
