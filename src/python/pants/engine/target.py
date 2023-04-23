@@ -383,6 +383,7 @@ class Target:
     field_values: FrozenDict[type[Field], Field]
     residence_dir: str
     name_explicitly_set: bool
+    description_of_origin: str
 
     @final
     def __init__(
@@ -397,6 +398,7 @@ class Target:
         name_explicitly_set: bool = True,
         residence_dir: str | None = None,
         ignore_unrecognized_fields: bool = False,
+        description_of_origin: str | None = None,
     ) -> None:
         """Create a target.
 
@@ -414,6 +416,8 @@ class Target:
             like `dir:` know whether to match the target or not.
         :param ignore_unrecognized_fields: Don't error if fields are not recognized. This is only
             intended for when Pants is bootstrapping itself.
+        :param description_of_origin: Where this target was declared, such as a path to BUILD file
+            and line number.
         """
         if self.removal_version and not address.is_generated_target:
             if not self.removal_hint:
@@ -427,23 +431,35 @@ class Target:
                 hint=f"Using the `{self.alias}` target type for {address}. {self.removal_hint}",
             )
 
-        object.__setattr__(self, "address", address)
-        object.__setattr__(
-            self, "plugin_fields", self._find_plugin_fields(union_membership or UnionMembership({}))
-        )
         object.__setattr__(
             self, "residence_dir", residence_dir if residence_dir is not None else address.spec_path
         )
-        object.__setattr__(self, "name_explicitly_set", name_explicitly_set)
+        object.__setattr__(self, "address", address)
         object.__setattr__(
-            self,
-            "field_values",
-            self._calculate_field_values(
-                unhydrated_values, address, ignore_unrecognized_fields=ignore_unrecognized_fields
-            ),
+            self, "description_of_origin", description_of_origin or self.residence_dir
         )
+        object.__setattr__(self, "name_explicitly_set", name_explicitly_set)
+        try:
+            object.__setattr__(
+                self,
+                "plugin_fields",
+                self._find_plugin_fields(union_membership or UnionMembership({})),
+            )
+            object.__setattr__(
+                self,
+                "field_values",
+                self._calculate_field_values(
+                    unhydrated_values,
+                    address,
+                    ignore_unrecognized_fields=ignore_unrecognized_fields,
+                ),
+            )
 
-        self.validate()
+            self.validate()
+        except Exception as e:
+            raise InvalidTargetException(
+                str(e), description_of_origin=self.description_of_origin
+            ) from e
 
     @final
     def _calculate_field_values(
@@ -513,8 +529,9 @@ class Target:
         return (
             f"{self.__class__}("
             f"address={self.address}, "
-            f"alias={repr(self.alias)}, "
-            f"residence_dir={repr(self.residence_dir)}, "
+            f"alias={self.alias!r}, "
+            f"residence_dir={self.residence_dir!r}, "
+            f"origin={self.description_of_origin}, "
             f"{fields})"
         )
 
@@ -1564,8 +1581,22 @@ class InvalidTargetException(Exception):
 
     Suggested template:
 
-         f"The `{repr(alias)}` target {address} ..."
+         f"The `{alias!r}` target {address} ..."
     """
+
+    def __init__(self, message: Any, *, description_of_origin: str | None = None) -> None:
+        self.description_of_origin = description_of_origin
+        super().__init__(message)
+
+    def __str__(self) -> str:
+        if not self.description_of_origin:
+            return super().__str__()
+        return f"{self.description_of_origin}: {super().__str__()}"
+
+    def __repr__(self) -> str:
+        if not self.description_of_origin:
+            return super().__repr__()
+        return f"{self.description_of_origin}: {super().__repr__()}"
 
 
 class InvalidGeneratedTargetException(InvalidTargetException):
@@ -1577,8 +1608,22 @@ class InvalidFieldException(Exception):
 
     Suggested template:
 
-         f"The {repr(alias)} field in target {address} must ..., but ..."
+         f"The {alias!r} field in target {address} must ..., but ..."
     """
+
+    def __init__(self, message: Any, *, description_of_origin: str | None = None) -> None:
+        self.description_of_origin = description_of_origin
+        super().__init__(message)
+
+    def __str__(self) -> str:
+        if not self.description_of_origin:
+            return super().__str__()
+        return f"{self.description_of_origin}: {super().__str__()}"
+
+    def __repr__(self) -> str:
+        if not self.description_of_origin:
+            return super().__repr__()
+        return f"{self.description_of_origin}: {super().__repr__()}"
 
 
 class InvalidFieldTypeException(InvalidFieldException):
@@ -1586,17 +1631,29 @@ class InvalidFieldTypeException(InvalidFieldException):
     e.g. `a boolean` or `a string` or `an iterable of strings and integers`."""
 
     def __init__(
-        self, address: Address, field_alias: str, raw_value: Optional[Any], *, expected_type: str
+        self,
+        address: Address,
+        field_alias: str,
+        raw_value: Optional[Any],
+        *,
+        expected_type: str,
+        description_of_origin: str | None = None,
     ) -> None:
         super().__init__(
             f"The {repr(field_alias)} field in target {address} must be {expected_type}, but was "
-            f"`{repr(raw_value)}` with type `{type(raw_value).__name__}`."
+            f"`{repr(raw_value)}` with type `{type(raw_value).__name__}`.",
+            description_of_origin=description_of_origin,
         )
 
 
 class RequiredFieldMissingException(InvalidFieldException):
-    def __init__(self, address: Address, field_alias: str) -> None:
-        super().__init__(f"The {repr(field_alias)} field in target {address} must be defined.")
+    def __init__(
+        self, address: Address, field_alias: str, *, description_of_origin: str | None = None
+    ) -> None:
+        super().__init__(
+            f"The {repr(field_alias)} field in target {address} must be defined.",
+            description_of_origin=description_of_origin,
+        )
 
 
 class InvalidFieldChoiceException(InvalidFieldException):
@@ -1607,27 +1664,37 @@ class InvalidFieldChoiceException(InvalidFieldException):
         raw_value: Optional[Any],
         *,
         valid_choices: Iterable[Any],
+        description_of_origin: str | None = None,
     ) -> None:
         super().__init__(
             f"Values for the {repr(field_alias)} field in target {address} must be one of "
-            f"{sorted(valid_choices)}, but {repr(raw_value)} was provided."
+            f"{sorted(valid_choices)}, but {repr(raw_value)} was provided.",
+            description_of_origin=description_of_origin,
         )
 
 
-class UnrecognizedTargetTypeException(Exception):
+class UnrecognizedTargetTypeException(InvalidTargetException):
     def __init__(
         self,
         target_type: str,
         registered_target_types: RegisteredTargetTypes,
         address: Address | None = None,
+        description_of_origin: str | None = None,
     ) -> None:
         for_address = f" for address {address}" if address else ""
         super().__init__(
-            f"Target type {repr(target_type)} is not registered{for_address}.\n\nAll valid target "
-            f"types: {sorted(registered_target_types.aliases)}\n\n(If {repr(target_type)} is a "
-            "custom target type, refer to "
-            "https://groups.google.com/forum/#!topic/pants-devel/WsRFODRLVZI for instructions on "
-            "writing a light-weight Target API binding.)"
+            softwrap(
+                f"""
+                Target type {target_type!r} is not registered{for_address}.
+
+                All valid target types: {sorted(registered_target_types.aliases)}
+
+                (If {target_type!r} is a custom target type, refer to
+                {doc_url('target-api-concepts')} for getting it registered with Pants.)
+
+                """
+            ),
+            description_of_origin=description_of_origin,
         )
 
 

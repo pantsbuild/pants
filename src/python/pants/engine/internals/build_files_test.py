@@ -802,3 +802,45 @@ def test_invalid_build_file_env_vars(caplog, target_adaptor_rule_runner: RuleRun
             ),
         ],
     )
+
+
+def test_build_file_parse_error(target_adaptor_rule_runner: RuleRunner) -> None:
+    target_adaptor_rule_runner.write_files(
+        {
+            "src/bad/BUILD": dedent(
+                """\
+                mock_tgt(
+                  name="foo"
+                  tags=[]
+                )
+                """
+            ),
+        },
+    )
+    with pytest.raises(ExecutionError, match='File "src/bad/BUILD", line 3'):
+        target_adaptor_rule_runner.request(
+            TargetAdaptor,
+            [
+                TargetAdaptorRequest(
+                    Address("src/bad", target_name="foo"), description_of_origin="test"
+                )
+            ],
+        )
+
+
+def test_build_file_description_of_origin(target_adaptor_rule_runner: RuleRunner) -> None:
+    target_adaptor_rule_runner.write_files(
+        {
+            "src/BUILD": dedent(
+                """\
+                # Define a target..
+                mock_tgt(name="foo")
+                """
+            ),
+        },
+    )
+    target_adaptor = target_adaptor_rule_runner.request(
+        TargetAdaptor,
+        [TargetAdaptorRequest(Address("src", target_name="foo"), description_of_origin="test")],
+    )
+    assert "src/BUILD:2" == target_adaptor.description_of_origin
