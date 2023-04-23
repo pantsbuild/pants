@@ -429,7 +429,12 @@ async def _determine_requirements_for_pex_from_targets(
         chosen_resolve = await Get(
             ChosenPythonResolve, ChosenPythonResolveRequest(request.addresses)
         )
-        return dataclasses.replace(requirements, from_superset=Resolve(chosen_resolve.name)), ()
+        return (
+            dataclasses.replace(
+                requirements, from_superset=Resolve(chosen_resolve.name, use_entire_lockfile=False)
+            ),
+            (),
+        )
 
     # Else, request the repository PEX and possibly subset it.
     repository_pex_request = await Get(
