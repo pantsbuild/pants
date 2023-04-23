@@ -776,7 +776,7 @@ def test_setup_pex_requirements() -> None:
 
     # Subset of Pex lockfile.
     assert_setup(
-        PexRequirements(["req1"], from_superset=Resolve("resolve")),
+        PexRequirements(["req1"], from_superset=Resolve("resolve", False)),
         _BuildPexRequirementsSetup(
             [lockfile_digest], ["req1", "--lock", lockfile_path, *pex_args], 1
         ),
