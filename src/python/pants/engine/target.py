@@ -2765,38 +2765,37 @@ class OverridesField(AsyncFieldMixin, Field):
         cls,
         raw_value: Optional[Dict[Union[str, Tuple[str, ...]], Dict[str, Any]]],
         address: Address,
-    ) -> Optional[Dict[Tuple[str, ...], Dict[str, Any]]]:
+    ) -> Optional[FrozenDict[Tuple[str, ...], FrozenDict[str, ImmutableValue]]]:
         value_or_default = super().compute_value(raw_value, address)
         if value_or_default is None:
             return None
-        invalid_type_exception = InvalidFieldTypeException(
-            address,
-            cls.alias,
-            raw_value,
-            expected_type="dict[str | tuple[str, ...], dict[str, Any]]",
-        )
-        if not isinstance(value_or_default, collections.abc.Mapping):
-            raise invalid_type_exception
 
-        result: dict[tuple[str, ...], dict[str, Any]] = {}
+        def invalid_type_exception() -> InvalidFieldException:
+            return InvalidFieldTypeException(
+                address,
+                cls.alias,
+                raw_value,
+                expected_type="dict[str | tuple[str, ...], dict[str, Any]]",
+            )
+
+        if not isinstance(value_or_default, collections.abc.Mapping):
+            raise invalid_type_exception()
+
+        result: dict[tuple[str, ...], FrozenDict[str, ImmutableValue]] = {}
         for outer_key, nested_value in value_or_default.items():
             if isinstance(outer_key, str):
                 outer_key = (outer_key,)
             if not isinstance(outer_key, collections.abc.Sequence) or not all(
                 isinstance(elem, str) for elem in outer_key
             ):
-                raise invalid_type_exception
+                raise invalid_type_exception()
             if not isinstance(nested_value, collections.abc.Mapping):
-                raise invalid_type_exception
+                raise invalid_type_exception()
             if not all(isinstance(inner_key, str) for inner_key in nested_value):
-                raise invalid_type_exception
-            result[tuple(outer_key)] = dict(nested_value)
+                raise invalid_type_exception()
+            result[tuple(outer_key)] = FrozenDict.deep_freeze(cast(Mapping[str, Any], nested_value))
 
-        return result
-
-    def __hash__(self) -> int:
-        # The value might have unhashable elements like `list`, so we stringify it.
-        return hash((self.__class__, repr(self.value)))
+        return FrozenDict(result)
 
     @classmethod
     def to_path_globs(
