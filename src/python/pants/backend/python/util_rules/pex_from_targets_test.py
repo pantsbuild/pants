@@ -162,11 +162,11 @@ def test_determine_requirements_for_pex_from_targets() -> None:
     req_strings = ["req1", "req2"]
     global_requirement_constraints = ["constraint1", "constraint2"]
 
-    resolve__pex = Resolve("pex")
+    resolve__pex = Resolve("pex", False)
     loaded_lockfile__pex = Mock(is_pex_native=True, as_constraints_strings=None)
     chosen_resolve__pex = Mock(lockfile=Mock())
     chosen_resolve__pex.name = "pex"  # name has special meaning in Mock(), so must set it here.
-    resolve__not_pex = Resolve("not_pex")
+    resolve__not_pex = Resolve("not_pex", False)
     loaded_lockfile__not_pex = Mock(is_pex_native=False, as_constraints_strings=req_strings)
     chosen_resolve__not_pex = Mock(lockfile=Mock())
     chosen_resolve__not_pex.name = "not_pex"  # ditto.
