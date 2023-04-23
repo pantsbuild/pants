@@ -321,13 +321,8 @@ def test_get_all_help_info():
                         "env_var": "PANTS_OPT1",
                         "value_history": {
                             "ranked_values": (
-                                {"rank": Rank.NONE, "value": None, "details": None, "error": None},
-                                {
-                                    "rank": Rank.HARDCODED,
-                                    "value": 42,
-                                    "details": None,
-                                    "error": None,
-                                },
+                                {"rank": Rank.NONE, "value": None, "details": None},
+                                {"rank": Rank.HARDCODED, "value": 42, "details": None},
                             ),
                         },
                         "typ": int,
@@ -351,13 +346,8 @@ def test_get_all_help_info():
                         "env_var": "PANTS_LEVEL",
                         "value_history": {
                             "ranked_values": (
-                                {"rank": Rank.NONE, "value": None, "details": None, "error": None},
-                                {
-                                    "rank": Rank.HARDCODED,
-                                    "value": LogLevel.INFO,
-                                    "details": None,
-                                    "error": None,
-                                },
+                                {"rank": Rank.NONE, "value": None, "details": None},
+                                {"rank": Rank.HARDCODED, "value": LogLevel.INFO, "details": None},
                             ),
                         },
                         "typ": LogLevel,
@@ -392,13 +382,12 @@ def test_get_all_help_info():
                         "unscoped_cmd_line_args": ("--backend-packages",),
                         "value_history": {
                             "ranked_values": (
-                                {"details": "", "rank": Rank.NONE, "value": [], "error": None},
-                                {"details": "", "rank": Rank.HARDCODED, "value": [], "error": None},
+                                {"details": "", "rank": Rank.NONE, "value": []},
+                                {"details": "", "rank": Rank.HARDCODED, "value": []},
                                 {
                                     "details": "from command-line flag",
                                     "rank": Rank.FLAG,
                                     "value": ["internal_plugins.releases"],
-                                    "error": None,
                                 },
                             ),
                         },
@@ -423,12 +412,11 @@ def test_get_all_help_info():
                         "unscoped_cmd_line_args": ("--pythonpath",),
                         "value_history": {
                             "ranked_values": (
-                                {"details": "", "rank": Rank.NONE, "value": [], "error": None},
+                                {"details": "", "rank": Rank.NONE, "value": []},
                                 {
                                     "details": "",
                                     "rank": Rank.HARDCODED,
                                     "value": [f"{get_buildroot()}/pants-plugins"],
-                                    "error": None,
                                 },
                             ),
                         },
@@ -454,13 +442,8 @@ def test_get_all_help_info():
                         "env_var": "PANTS_FOO_OPT2",
                         "value_history": {
                             "ranked_values": (
-                                {"rank": Rank.NONE, "value": None, "details": None, "error": None},
-                                {
-                                    "rank": Rank.HARDCODED,
-                                    "value": True,
-                                    "details": None,
-                                    "error": None,
-                                },
+                                {"rank": Rank.NONE, "value": None, "details": None},
+                                {"rank": Rank.HARDCODED, "value": True, "details": None},
                             ),
                         },
                         "typ": bool,
