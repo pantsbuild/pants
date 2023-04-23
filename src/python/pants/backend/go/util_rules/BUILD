@@ -6,6 +6,9 @@ python_tests(
     name="tests",
     timeout=120,
     overrides={
-        "embed_integration_test.py": {"timeout": 240},
+        (
+            "cgo_test.py",
+            "embed_integration_test.py",
+        ): {"timeout": 240},
     },
 )
