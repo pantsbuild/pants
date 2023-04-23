@@ -74,13 +74,13 @@ Configuring the tools, for example, adding plugins
 
 You can configure each formatter and linter using these options:
 
-| Option                    | What it does                                                                                                                                                                           |
-| :------------------------ | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `interpreter_constraints` | What interpreter to run the tool with. (`bandit`, `flake8`, and `pylint` instead determine this based on your [code's interpreter constraints](doc:python-interpreter-compatibility).) |
-| `args`                    | Any command-line arguments you want to pass to the tool.                                                                                                                               |
-| `config`                  | Path to a config file. Useful if the file is in a non-standard location such that it cannot be auto-discovered.                                                                        |
-| `requirements`                        | List of requirements to be included with this formatter or linter. See [Lockfiles for tools](doc:python-lockfiles#lockfiles-for-tools).                  |
-| `install_from_resolve`                | Name of a custom resolve to use for tool versions and plugins. See [Lockfiles for tools](doc:python-lockfiles#lockfiles-for-tools).                  |
+| Option                               | What it does                                                                                                                                                                   |
+|:-------------------------------------|:-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `interpreter_constraints`            | What interpreter to run the tool with. (`bandit`, `flake8`, and `pylint` determine this based on your [code's interpreter constraints](doc:python-interpreter-compatibility).) |
+| `args`                               | Any command-line arguments you want to pass to the tool.                                                                                                                       |
+| `config`                             | Path to a config file. Useful if the file is in a non-standard location such that it cannot be auto-discovered.                                                                |
+| `install_from_resolve`               | Name of a custom resolve to use for tool versions and plugins. See [Lockfiles for tools](doc:python-lockfiles#lockfiles-for-tools).                                            |
+| `requirements`                       | Optional subset of requirements to install from the custom resolve for this formatter or linter. See [Lockfiles for tools](doc:python-lockfiles#lockfiles-for-tools).          |
 
 For example:
 
@@ -89,17 +89,13 @@ For example:
 args = ["--wrap-summaries=100", "--wrap-descriptions=100"]
 
 [python.resolves]
+# A custom resolve that updates the version and adds a custom plugin.
 flake8 = "3rdparty/python/flake8.lock"
 
 [flake8]
 # Load a config file in a non-standard location.
 config = "build-support/flake8"
-# Change the version and add a custom plugin. Because we do this, we
-# use a custom resolve.
 install_from_resolve = "flake8"
-requirements.add = [
-    "flake8-bugbear",
-]
 ```
 
 Then set up the resolve's inputs:
