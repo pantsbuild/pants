@@ -302,6 +302,10 @@ class Scheduler:
         self, execution_request: PyExecutionRequest, subject_or_params: Any | Params, product: type
     ) -> None:
         params = self._to_params_list(subject_or_params)
+        print(self.py_scheduler.__class__)
+        print(execution_request.__class__)
+        print(params.__class__)
+        print(product.__class__)
         native_engine.execution_add_root_select(
             self.py_scheduler, execution_request, params, product
         )

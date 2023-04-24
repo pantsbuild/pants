@@ -17,7 +17,6 @@ from pants.engine.internals.selectors import Get
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import FieldSet, Target
-from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 
@@ -36,7 +35,6 @@ class RustfmtFieldSet(FieldSet):
 class RustfmtRequest(FmtRequest):
     field_set_type = RustfmtFieldSet
     name = RustfmtSubsystem.options_scope
-
 
 @rule(level=LogLevel.DEBUG)
 async def setup_rustfmt(request: RustfmtRequest) -> Process:
@@ -68,5 +66,5 @@ def rules():
     return [
         *collect_rules(),
         *skip_field.rules(),
-        UnionRule(FmtRequest, RustfmtRequest),
+        *RustfmtRequest.rules(),
     ]

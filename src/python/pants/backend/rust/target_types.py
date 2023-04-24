@@ -1,7 +1,8 @@
 # Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants.engine.target import COMMON_TARGET_FIELDS, Dependencies, MultipleSourcesField, Target, SingleSourceField
+from pants.engine.target import COMMON_TARGET_FIELDS, Dependencies, MultipleSourcesField, Target, \
+    SingleSourceField
 
 
 class CargoTomlSourceField(SingleSourceField):
