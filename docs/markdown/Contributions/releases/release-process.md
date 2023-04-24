@@ -194,12 +194,10 @@ Note that this step can currently only be performed by a subset of maintainers d
 
 Go to the [documentation dashboard](https://dash.readme.com/). In the top left dropdown, where it says the current version, click "Manage versions". Click "Add new version" and use a "v" with the minor release number, e.g. "v2.9". Fork from the prior release. Mark this new version as public by clicking on "Is public?"
 
-Also, update the [Changelog](doc:changelog) page with the new release series at the top of the table. It's okay if there are no "highlights" yet.
-
 ### Sync the `docs/` content
 
 See the `docs/NOTES.md` for instructions setting up the the necessary Node tooling your first time.
-You'll need to 1st login as outlined there via some variant of `npx rdme login --project pants ...`.
+You'll need to 1st login as outlined there via some variant of `npx rdme login --2fa --project pants ...`.
 On the relevant release branch, run `npx rdme docs docs/markdown --version v<pants major>.<pants minor>`; e.g: `npx rdme docs docs/markdown --version v2.8`.
 
 ### Regenerate the references
