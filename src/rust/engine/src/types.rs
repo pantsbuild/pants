@@ -34,4 +34,5 @@ pub struct Types {
   pub engine_aware_parameter: TypeId,
   pub docker_resolve_image_request: TypeId,
   pub docker_resolve_image_result: TypeId,
+  pub parsed_python_deps_result: TypeId,
 }

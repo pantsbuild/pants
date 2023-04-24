@@ -12,6 +12,7 @@ from types import CoroutineType
 from typing import Any, Dict, Iterable, NoReturn, Sequence, cast
 
 from typing_extensions import TypedDict
+from pants.backend.python.dependency_inference.idk import ParsedPythonDependencies
 
 from pants.engine.collection import Collection
 from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType, SideEffecting
@@ -170,6 +171,7 @@ class Scheduler:
             engine_aware_parameter=EngineAwareParameter,
             docker_resolve_image_request=DockerResolveImageRequest,
             docker_resolve_image_result=DockerResolveImageResult,
+            parsed_python_deps_result=ParsedPythonDependencies,
         )
         remoting_options = PyRemotingOptions(
             execution_enable=execution_options.remote_execution,

@@ -38,6 +38,7 @@ mod interning;
 mod intrinsics;
 mod nodes;
 mod python;
+mod python_parsing;
 mod scheduler;
 mod session;
 mod tasks;

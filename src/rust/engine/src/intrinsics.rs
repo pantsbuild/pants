@@ -16,6 +16,7 @@ use crate::nodes::{
   RunId, SessionValues, Snapshot,
 };
 use crate::python::{throw, Key, Value};
+use crate::python_parsing::get_dependencies;
 use crate::tasks::Intrinsic;
 use crate::types::Types;
 use crate::Failure;
@@ -23,12 +24,12 @@ use crate::Failure;
 use futures::future::{BoxFuture, FutureExt, TryFutureExt};
 use futures::try_join;
 use indexmap::IndexMap;
-use pyo3::types::PyString;
+use pyo3::types::{PyString, PyTuple};
 use pyo3::{IntoPy, PyAny, PyRef, Python, ToPyObject};
 use tokio::process;
 
 use docker::docker::{ImagePullPolicy, ImagePullScope, DOCKER, IMAGE_PULL_CACHE};
-use fs::{DigestTrie, DirectoryDigest, RelativePath, TypedPath};
+use fs::{DigestTrie, DirectoryDigest, Entry, RelativePath, SymlinkBehavior, TypedPath};
 use hashing::{Digest, EMPTY_DIGEST};
 use process_execution::local::{
   apply_chroot, create_sandbox, prepare_workdir, setup_run_sh_script, KeepSandboxes,
@@ -135,6 +136,13 @@ impl Intrinsics {
         inputs: vec![DependencyKey::new(types.docker_resolve_image_request)],
       },
       Box::new(docker_resolve_image),
+    );
+    intrinsics.insert(
+      Intrinsic {
+        product: types.parsed_python_deps_result,
+        inputs: vec![DependencyKey::new(types.directory_digest)],
+      },
+      Box::new(parse_python_deps),
     );
     Intrinsics { intrinsics }
   }
@@ -738,6 +746,61 @@ fn docker_resolve_image(
         &[Value::from(PyString::new(py, &image_id).to_object(py))],
       )
     };
+    Ok(result)
+  }
+  .boxed()
+}
+
+fn parse_python_deps(context: Context, args: Vec<Value>) -> BoxFuture<'static, NodeResult<Value>> {
+  async move {
+    let core = &context.core;
+    let directory_digest = Python::with_gil(|py| {
+      let py_digest = (*args[0]).as_ref(py);
+      lift_directory_digest(py_digest)
+    })?;
+
+    let mut path = None;
+    let mut digest = None;
+    directory_digest
+      .tree
+      .unwrap()
+      .walk(SymlinkBehavior::Oblivious, &mut |node_path, entry| {
+        if let Entry::File(file) = entry {
+          path = Some(node_path.to_owned());
+          digest = Some(file.digest());
+        }
+      });
+
+    let store = core.store();
+    let bytes = store
+      .load_file_bytes_with(digest.unwrap(), |bytes| Vec::from(bytes))
+      .await?;
+
+    let contents = std::str::from_utf8(&bytes)
+      .map_err(|err| format!("Failed to convert digest bytes to utf-8: {err}"))?;
+    let result = get_dependencies(contents, path.unwrap())?;
+
+    let result = {
+      let gil = Python::acquire_gil();
+      let py = gil.python();
+      let create_func = externs::getattr(
+        core.types.parsed_python_deps_result.as_py_type(py),
+        "create",
+      )
+      .unwrap();
+      externs::call_function(
+        create_func,
+        &[
+          result.to_object(py).into(),
+          PyTuple::empty(py).to_object(py).into(),
+        ],
+      )
+      .map(|obj| Value::new(obj.into_py(py)))
+      .unwrap_or_else(|e| {
+        panic!("Creator `` failed: {:?}", e);
+      })
+    };
+
     Ok(result)
   }
   .boxed()

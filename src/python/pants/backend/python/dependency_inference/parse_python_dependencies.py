@@ -2,17 +2,18 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import json
+import logging
 import os
 from dataclasses import dataclass
 from typing import Iterable
 
 from pants.backend.python.dependency_inference.subsystem import PythonInferSubsystem
+from pants.backend.python.dependency_inference.idk import ParsedPythonAssetPaths, ParsedPythonDependencies, ParsedPythonImportInfo, ParsedPythonImports
 from pants.backend.python.target_types import PythonSourceField
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex_environment import PythonExecutable
 from pants.core.util_rules.source_files import SourceFilesRequest
 from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
-from pants.engine.collection import DeduplicatedCollection
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.process import Process, ProcessResult
@@ -23,31 +24,8 @@ from pants.util.logging import LogLevel
 from pants.util.resources import read_resource
 from pants.util.strutil import softwrap
 
+logger = logging.getLogger(__name__)
 
-@dataclass(frozen=True)
-class ParsedPythonImportInfo:
-    lineno: int
-    # An import is considered "weak" if we're unsure if a dependency will exist between the parsed
-    # file and the parsed import.
-    # Examples of "weak" imports include string imports (if enabled) or those inside a try block
-    # which has a handler catching ImportError.
-    weak: bool
-
-
-class ParsedPythonImports(FrozenDict[str, ParsedPythonImportInfo]):
-    """All the discovered imports from a Python source file mapped to the relevant info."""
-
-
-class ParsedPythonAssetPaths(DeduplicatedCollection[str]):
-    """All the discovered possible assets from a Python source file."""
-
-    # N.B. Don't set `sort_input`, as the input is already sorted
-
-
-@dataclass(frozen=True)
-class ParsedPythonDependencies:
-    imports: ParsedPythonImports
-    assets: ParsedPythonAssetPaths
 
 
 @dataclass(frozen=True)
@@ -175,6 +153,9 @@ async def parse_python_dependencies(
         Get(PythonExecutable, InterpreterConstraints, request.interpreter_constraints),
         Get(StrippedSourceFiles, SourceFilesRequest([request.source])),
     )
+
+    native_result = await Get(ParsedPythonDependencies, Digest, stripped_sources.snapshot.digest)
+    logger.warn(native_result)
 
     # We operate on PythonSourceField, which should be one file.
     assert len(stripped_sources.snapshot.files) == 1
