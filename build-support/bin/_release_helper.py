@@ -786,20 +786,16 @@ def build_fs_util() -> None:
 def build_pex(fetch: bool) -> None:
     stable = os.environ.get("PANTS_PEX_RELEASE", "") == "STABLE"
     if fetch:
-        # TODO: Support macOS on ARM64.
+        # TODO: Support macos and linux arm64.
         extra_pex_args = [
             "--python-shebang",
             "/usr/bin/env python",
-            *(
-                f"--platform={plat}-{abi}"
-                for plat in ("linux_x86_64", "macosx_11.0_x86_64")
-                for abi in ("cp-37-m", "cp-38-cp38", "cp-39-cp39")
-            ),
+            *(f"--platform={plat}-cp-39-cp39" for plat in ("linux_x86_64", "macosx_11.0_x86_64")),
         ]
         pex_name = f"pants.{CONSTANTS.pants_unstable_version}.pex"
         banner(f"Building {pex_name} by fetching wheels.")
     else:
-        # TODO: Support macOS on ARM64. Will require qualifying the pex name with the arch.
+        # TODO: Support macos and linux arm64. Will require qualifying the pex name with the arch.
         major, minor = sys.version_info[:2]
         extra_pex_args = [
             f"--interpreter-constraint=CPython=={major}.{minor}.*",
@@ -1177,13 +1173,12 @@ def check_pants_wheels_present(check_dir: str | Path) -> None:
         if not local_files:
             missing_packages.append(package.name)
             continue
-        if is_cross_platform(local_files) and len(local_files) != 10:
+        if is_cross_platform(local_files) and len(local_files) != 4:
             formatted_local_files = "\n    ".join(sorted(f.name for f in local_files))
             missing_packages.append(
                 softwrap(
                     f"""
-                    {package.name}. Expected 10 wheels ({{cp37m, cp38, cp39}} x
-                    {{macosx10.15-x86_64, macosx11-x86_64, linux-x86_64}} + cp39-macosx-arm64),
+                    {package.name}. Expected 4 wheels (linux/mac X x86_64/arm64),
                     but found {len(local_files)}:\n    {formatted_local_files}
                     """
                 )

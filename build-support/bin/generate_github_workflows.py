@@ -75,7 +75,7 @@ NATIVE_FILES = [
 PYTHON37_VERSION = "3.7"
 PYTHON38_VERSION = "3.8"
 PYTHON39_VERSION = "3.9"
-ALL_PYTHON_VERSIONS = [PYTHON37_VERSION, PYTHON38_VERSION, PYTHON39_VERSION]
+ALL_PYTHON_VERSIONS = [PYTHON39_VERSION]
 
 DONT_SKIP_RUST = "needs.classify_changes.outputs.rust == 'true'"
 DONT_SKIP_WHEELS = "github.event_name == 'push' || needs.classify_changes.outputs.release == 'true'"
