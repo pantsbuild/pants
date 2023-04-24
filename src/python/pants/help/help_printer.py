@@ -427,6 +427,11 @@ class HelpPrinter(MaybeColor):
         print_cmd("help tools", "List all external tools.")
         print_cmd("help backends", "List all available backends.")
         print_cmd("help-advanced backends", "List all backends, including experimental/preview.")
+        print_cmd("help symbols", "List available BUILD file symbols.")
+        print_cmd(
+            "help-advanced symbols",
+            "List all available BUILD file symbols, including target types.",
+        )
         print_cmd("help api-types", "List all plugin API types.")
         print_cmd("help global", "Help for global options.")
         print_cmd("help-advanced global", "Help for global advanced options.")
