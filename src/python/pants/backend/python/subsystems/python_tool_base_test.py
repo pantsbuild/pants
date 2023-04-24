@@ -11,9 +11,7 @@ from pants.util.ordered_set import FrozenOrderedSet
 
 class _DummyTool(PythonToolBase):
     options_scope = "dummy"
-    register_lockfile = True
     default_lockfile_resource = ("dummy", "dummy")
-    default_lockfile_url = "dummy"
 
 
 def test_install_from_resolve_default() -> None:

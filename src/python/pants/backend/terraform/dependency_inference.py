@@ -28,7 +28,6 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionRule
 from pants.util.dirutil import group_by_dir
-from pants.util.docutil import git_url
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import OrderedSet
 from pants.util.resources import read_resource
@@ -43,10 +42,7 @@ class TerraformHcl2Parser(PythonToolRequirementsBase):
 
     register_interpreter_constraints = True
 
-    register_lockfile = True
     default_lockfile_resource = ("pants.backend.terraform", "hcl2.lock")
-    default_lockfile_path = "src/python/pants/backend/terraform/hcl2.lock"
-    default_lockfile_url = git_url(default_lockfile_path)
     lockfile_rules_type = LockfileRules.SIMPLE
 
 

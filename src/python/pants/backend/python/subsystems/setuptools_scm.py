@@ -4,7 +4,6 @@
 from pants.backend.python.subsystems.python_tool_base import LockfileRules, PythonToolBase
 from pants.backend.python.target_types import EntryPoint
 from pants.engine.rules import collect_rules
-from pants.util.docutil import git_url
 
 
 class SetuptoolsSCM(PythonToolBase):
@@ -19,10 +18,7 @@ class SetuptoolsSCM(PythonToolBase):
 
     register_interpreter_constraints = True
 
-    register_lockfile = True
     default_lockfile_resource = ("pants.backend.python.subsystems", "setuptools_scm.lock")
-    default_lockfile_path = "src/python/pants/backend/python/subsystems/setuptools_scm.lock"
-    default_lockfile_url = git_url(default_lockfile_path)
     lockfile_rules_type = LockfileRules.SIMPLE
 
 
