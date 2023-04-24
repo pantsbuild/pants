@@ -99,5 +99,9 @@ pex_binary(
     strip_pex_env=False,
 )
 
+resources(
+    name="native_client",
+    sources=["native_client"],
+)
 
 python_tests(name="tests")

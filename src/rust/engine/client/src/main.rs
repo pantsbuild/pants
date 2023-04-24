@@ -25,13 +25,16 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
-use std::convert::AsRef;
+use std::convert::{AsRef, Infallible};
 use std::env;
+use std::ffi::{CString, OsString};
+use std::os::unix::ffi::OsStringExt;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::time::SystemTime;
 
 use log::debug;
+use nix::unistd::execv;
 use strum::VariantNames;
 use strum_macros::{AsRefStr, EnumString, EnumVariantNames};
 
@@ -135,6 +138,23 @@ fn find_pantsd(
   Ok(pantsd_settings)
 }
 
+fn execv_fallback_client(pants_venv: OsString) -> Result<Infallible, i32> {
+  let exe = PathBuf::from(pants_venv.clone()).join("bin").join("pants");
+  let c_exe = CString::new(exe.into_os_string().into_vec())
+    .expect("Failed to convert executable to a C string.");
+
+  let mut c_args = vec![c_exe.clone()];
+  c_args.extend(
+    std::env::args_os()
+      .map(|arg| CString::new(arg.into_vec()).expect("Failed to convert argument to a C string.")),
+  );
+
+  execv(&c_exe, &c_args).map_err(|errno| {
+    eprintln!("Failed to spawn pants in {pants_venv:?}: {}", errno.desc());
+    1
+  })
+}
+
 // The value is taken from this C precedent:
 // ```
 // $ grep 75 /usr/include/sysexits.h
@@ -142,16 +162,33 @@ fn find_pantsd(
 // ```
 const EX_TEMPFAIL: i32 = 75;
 
+// An environment variable which if set, points to the root of a virtualenv to fall back to
+// spawning `pantsd` with if it is not already running.
+//
+// This environment variable constitutes a public API used by `scie-pants`, which is part of the
+// reason why it points to a venv rather than a concrete executable: in future, the native client
+// may become the only client for `pantsd` (by directly handling forking the `pantsd` process and
+// then connecting to it).
+const PANTS_VENV: &str = "_PANTS_VENV";
+
 #[tokio::main]
 async fn main() {
   let start = SystemTime::now();
-  match execute(start).await {
-    Err(err) => {
+  let pants_venv = env::var_os(PANTS_VENV);
+  match (execute(start).await, pants_venv) {
+    (Err(_), Some(pants_venv)) => {
+      // We failed to connect to `pantsd`, but a venv was provided. Fall back to `execv`'ing the
+      // legacy Python client, which will handle spawning `pantsd`.
+      if let Err(exit_code) = execv_fallback_client(pants_venv) {
+        std::process::exit(exit_code);
+      }
+    }
+    (Err(err), None) => {
       eprintln!("{err}");
       // We use this exit code to indicate an error running pants via the nailgun protocol to
       // differentiate from a successful nailgun protocol session.
       std::process::exit(EX_TEMPFAIL);
     }
-    Ok(exit_code) => std::process::exit(exit_code),
+    (Ok(exit_code), _) => std::process::exit(exit_code),
   }
 }
