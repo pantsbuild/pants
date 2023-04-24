@@ -1233,6 +1233,7 @@ impl<R: Rule> Builder<R> {
       .collect::<Vec<_>>();
 
     leaf_errors.sort();
+    leaf_errors.dedup();
 
     let subgraph = graph.filter_map(
       |node_id, node| {

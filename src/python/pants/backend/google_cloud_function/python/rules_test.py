@@ -42,12 +42,13 @@ from pants.core.target_types import rules as core_target_types_rules
 from pants.engine.addresses import Address
 from pants.engine.fs import DigestContents
 from pants.testutil.python_interpreter_selection import all_major_minor_python_versions
-from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.testutil.python_rule_runner import PythonRuleRunner
+from pants.testutil.rule_runner import QueryRule
 
 
 @pytest.fixture
-def rule_runner() -> RuleRunner:
-    rule_runner = RuleRunner(
+def rule_runner() -> PythonRuleRunner:
+    rule_runner = PythonRuleRunner(
         rules=[
             *package_pex_binary.rules(),
             *python_google_cloud_function_rules(),
@@ -74,7 +75,7 @@ def rule_runner() -> RuleRunner:
 
 
 def create_python_google_cloud_function(
-    rule_runner: RuleRunner,
+    rule_runner: PythonRuleRunner,
     addr: Address,
     *,
     expected_extra_log_lines: tuple[str, ...],
@@ -100,7 +101,7 @@ def create_python_google_cloud_function(
 
 
 @pytest.fixture
-def complete_platform(rule_runner: RuleRunner) -> bytes:
+def complete_platform(rule_runner: PythonRuleRunner) -> bytes:
     rule_runner.write_files(
         {
             "pex_exe/BUILD": dedent(
@@ -130,7 +131,7 @@ def complete_platform(rule_runner: RuleRunner) -> bytes:
     all_major_minor_python_versions(Lambdex.default_interpreter_constraints),
 )
 def test_create_hello_world_lambda(
-    rule_runner: RuleRunner, major_minor_interpreter: str, complete_platform: str, caplog
+    rule_runner: PythonRuleRunner, major_minor_interpreter: str, complete_platform: str, caplog
 ) -> None:
     rule_runner.write_files(
         {
@@ -177,7 +178,7 @@ def test_create_hello_world_lambda(
         assert "Google Cloud Functions built on macOS may fail to build." in caplog.text
 
 
-def test_warn_files_targets(rule_runner: RuleRunner, caplog) -> None:
+def test_warn_files_targets(rule_runner: PythonRuleRunner, caplog) -> None:
     rule_runner.write_files(
         {
             "assets/f.txt": "",

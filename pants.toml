@@ -40,7 +40,7 @@ backend_packages.add = [
 ]
 plugins = [
   "hdrhistogram",  # For use with `--stats-log`.
-  "toolchain.pants.plugin==0.26.0",
+  "toolchain.pants.plugin==0.27.0",
 ]
 
 # The invalidation globs cover the PYTHONPATH by default, but we exclude some files that are on the
@@ -136,7 +136,7 @@ venv_use_symlinks = true
 
 [python]
 # N.B.: When adjusting this to support new Python versions, you must update the Pants
-# `python_distrobution` targets, currently:
+# `python_distribution` targets, currently:
 # + src/python/pants:pants-packaged
 # + src/python/pants/testutil:testutil_wheel
 # And update the PythonBuildStandalone version/URL:
@@ -144,15 +144,13 @@ venv_use_symlinks = true
 interpreter_constraints = [">=3.7,<3.10"]
 macos_big_sur_compatibility = true
 enable_resolves = true
-pip_version = "23.0.1"
+pip_version = "latest"
 
 [python.resolves]
 python-default = "3rdparty/python/user_reqs.lock"
 flake8 = "3rdparty/python/flake8.lock"
 mypy = "3rdparty/python/mypy.lock"
 pytest = "3rdparty/python/pytest.lock"
-helm-post-renderer = "src/python/pants/backend/helm/subsystems/post_renderer.lock"
-helm-k8s-parser = "src/python/pants/backend/helm/subsystems/k8s_parser.lock"
 
 [python.resolves_to_interpreter_constraints]
 # Without setting this explicitly, the 'python-default' resolve uses the Pants default
@@ -168,11 +166,6 @@ args = ["--wrap-summaries=100", "--wrap-descriptions=100"]
 
 [flake8]
 config = "build-support/flake8/.flake8"
-requirements.add = [
-  "flake8-2020",
-  "flake8-no-implicit-concat",
-  "flake8-comprehensions",
-]
 
 source_plugins = ["build-support/flake8"]
 install_from_resolve = "flake8"
@@ -186,13 +179,6 @@ args = ["-i 2", "-ci", "-sr"]
 
 [pytest]
 args = ["--no-header"]
-requirements.add = [
-  "ipdb",
-  "pytest-asyncio",
-  "pytest-html",
-  "pytest-icdiff",
-  "pygments",
-]
 execution_slot_var = "TEST_EXECUTION_SLOT"
 install_from_resolve = "pytest"
 
@@ -211,10 +197,6 @@ timeout_default = 60
 
 [mypy]
 interpreter_constraints = [">=3.7,<3.10"]
-requirements.add = [
-  "mypy-typing-asserts",
-  "strawberry-graphql",
-]
 install_from_resolve = "mypy"
 
 
@@ -225,7 +207,6 @@ interpreter_constraints = [">=3.7,<3.10"]
 template_by_globs = "@build-support/preambles/config.yaml"
 
 [generate-lockfiles]
-custom_command = "build-support/bin/generate_all_lockfiles.sh"
 diff = true
 
 [jvm]

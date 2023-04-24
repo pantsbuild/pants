@@ -9,7 +9,6 @@ from typing import TYPE_CHECKING, Callable, ClassVar, Iterator, Type, cast
 
 from typing_extensions import final
 
-from pants.base.deprecated import deprecated_conditional
 from pants.engine.unions import UnionMembership
 from pants.option.option_types import StrOption
 from pants.option.scope import ScopeInfo
@@ -83,18 +82,11 @@ class Goal:
     """
 
     class EnvironmentBehavior(Enum):
-        """Indicates that a goal's behavior with respect to environments has not been considered.
+        """Indicates that the goal will always operate on the local environment target.
 
-        If set, will trigger a deprecation warning. If the desired behavior is to stay pinned to
-        defaults, changing to `LOCAL_ONLY` will silence the warning for this goal.
+        This is largely the same behavior as Pants has had pre-2.15.
         """
 
-        UNMIGRATED = 1
-
-        """ Indicates that the goal will always operate on the local environment target.
-
-        This is largely the same behavior as Pants has had pre-2.15. Set to this value to silence
-        the deprecation warning that arises from using `UNMIGRATED`."""
         LOCAL_ONLY = 2
 
         f""" Indicates that the goal chooses the environments to use to execute rules within the goal.
@@ -114,17 +106,10 @@ class Goal:
 
     See {doc_url('plugin-upgrade-guide')}.
     """
-    environment_behavior: ClassVar[EnvironmentBehavior] = EnvironmentBehavior.UNMIGRATED
+    environment_behavior: ClassVar[EnvironmentBehavior]
 
     @classmethod
     def _selects_environments(cls) -> bool:
-        deprecated_conditional(
-            lambda: cls.environment_behavior == Goal.EnvironmentBehavior.UNMIGRATED,
-            "2.17.0.dev4",
-            f"Setting `Goal.environment_behavior=EnvironmentBehavior.UNMIGRATED` for `Goal` "
-            f"`{cls.name}`",
-            hint=f"See {doc_url('plugin-upgrade-guide')}\n",
-        )
         return cls.environment_behavior == Goal.EnvironmentBehavior.USES_ENVIRONMENTS
 
     @final

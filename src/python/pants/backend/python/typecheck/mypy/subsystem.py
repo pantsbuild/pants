@@ -99,7 +99,6 @@ class MyPy(PythonToolBase):
 
     # See `mypy/rules.py`. We only use these default constraints in some situations.
     register_interpreter_constraints = True
-    default_interpreter_constraints = ["CPython>=3.7,<4"]
 
     register_lockfile = True
     default_lockfile_resource = ("pants.backend.python.typecheck.mypy", "mypy.lock")

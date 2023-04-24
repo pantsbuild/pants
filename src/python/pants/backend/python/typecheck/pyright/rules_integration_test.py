@@ -28,12 +28,12 @@ from pants.engine.fs import EMPTY_DIGEST
 from pants.engine.rules import QueryRule
 from pants.engine.target import Target
 from pants.testutil.python_interpreter_selection import skip_unless_all_pythons_present
-from pants.testutil.rule_runner import RuleRunner
+from pants.testutil.python_rule_runner import PythonRuleRunner
 
 
 @pytest.fixture
-def rule_runner() -> RuleRunner:
-    return RuleRunner(
+def rule_runner() -> PythonRuleRunner:
+    return PythonRuleRunner(
         rules=[
             *nodejs_rules(),
             *pyright_rules(),
@@ -86,7 +86,7 @@ UNDEFINED_VARIABLE_TOML_CONFIG = dedent(
 
 
 def run_pyright(
-    rule_runner: RuleRunner, targets: list[Target], *, extra_args: list[str] | None = None
+    rule_runner: PythonRuleRunner, targets: list[Target], *, extra_args: list[str] | None = None
 ) -> tuple[CheckResult, ...]:
     rule_runner.set_options(extra_args or (), env_inherit={"PATH", "PYENV_ROOT", "HOME"})
     result = rule_runner.request(
@@ -95,7 +95,7 @@ def run_pyright(
     return result.results
 
 
-def test_passing(rule_runner: RuleRunner) -> None:
+def test_passing(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files({f"{PACKAGE}/f.py": GOOD_FILE, f"{PACKAGE}/BUILD": "python_sources()"})
     tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))
     result = run_pyright(rule_runner, [tgt])
@@ -105,7 +105,7 @@ def test_passing(rule_runner: RuleRunner) -> None:
     assert result[0].report == EMPTY_DIGEST
 
 
-def test_failing(rule_runner: RuleRunner) -> None:
+def test_failing(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files({f"{PACKAGE}/f.py": BAD_FILE, f"{PACKAGE}/BUILD": "python_sources()"})
     tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))
     result = run_pyright(rule_runner, [tgt])
@@ -116,7 +116,7 @@ def test_failing(rule_runner: RuleRunner) -> None:
     assert result[0].report == EMPTY_DIGEST
 
 
-def test_multiple_targets(rule_runner: RuleRunner) -> None:
+def test_multiple_targets(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files(
         {
             f"{PACKAGE}/good.py": GOOD_FILE,
@@ -146,7 +146,7 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
     ),
 )
 def test_config_file(
-    rule_runner: RuleRunner, config_filename: str, config_file: str, exit_code: int
+    rule_runner: PythonRuleRunner, config_filename: str, config_file: str, exit_code: int
 ) -> None:
     rule_runner.write_files(
         {
@@ -161,7 +161,7 @@ def test_config_file(
     assert result[0].exit_code == exit_code
 
 
-def test_additional_source_roots(rule_runner: RuleRunner) -> None:
+def test_additional_source_roots(rule_runner: PythonRuleRunner) -> None:
     LIB_1_PACKAGE = f"{PACKAGE}/lib1"
     LIB_2_PACKAGE = f"{PACKAGE}/lib2"
     rule_runner.write_files(
@@ -199,14 +199,14 @@ def test_additional_source_roots(rule_runner: RuleRunner) -> None:
     assert result[0].exit_code == 0
 
 
-def test_skip(rule_runner: RuleRunner) -> None:
+def test_skip(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files({f"{PACKAGE}/f.py": BAD_FILE, f"{PACKAGE}/BUILD": "python_sources()"})
     tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))
     result = run_pyright(rule_runner, [tgt], extra_args=["--pyright-skip"])
     assert not result
 
 
-def test_thirdparty_dependency(rule_runner: RuleRunner) -> None:
+def test_thirdparty_dependency(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files(
         {
             "BUILD": (
@@ -230,7 +230,7 @@ def test_thirdparty_dependency(rule_runner: RuleRunner) -> None:
 
 
 @skip_unless_all_pythons_present("3.8", "3.9")
-def test_partition_targets(rule_runner: RuleRunner) -> None:
+def test_partition_targets(rule_runner: PythonRuleRunner) -> None:
     def create_folder(folder: str, resolve: str, interpreter: str) -> dict[str, str]:
         return {
             f"{folder}/dep.py": "",

@@ -51,7 +51,7 @@ class PythonToolRequirementsBase(Subsystem):
     #  requirements that reflect any minimum capabilities Pants assumes about the tool.
     default_requirements: Sequence[str] = []
 
-    default_interpreter_constraints: ClassVar[Sequence[str]] = []
+    default_interpreter_constraints: ClassVar[Sequence[str]] = ["CPython>=3.7,<4"]
     register_interpreter_constraints: ClassVar[bool] = False
 
     # If this tool does not mix with user requirements you should set this to True.
@@ -72,8 +72,12 @@ class PythonToolRequirementsBase(Subsystem):
             If specified, install the tool using the lockfile for this named resolve.
 
             This resolve must be defined in [python].resolves, as described in
-            {doc_url("python-third-party-dependencies#user-lockfiles")}, and its lockfile must
-            provide the requirements named in the `requirements` option.
+            {doc_url("python-third-party-dependencies#user-lockfiles")}.
+
+            The resolve's entire lockfile will be installed, unless specific requirements are
+            listed via the `requirements` option, in which case only those requirements
+            will be installed. This is useful if you don't want to invalidate the tool's
+            outputs when the resolve incurs changes to unrelated requirements.
 
             If unspecified, and the `lockfile` option is unset, the tool will be installed
             using the default lockfile shipped with Pants.
@@ -84,23 +88,15 @@ class PythonToolRequirementsBase(Subsystem):
             """
         ),
     )
-    # TODO: After we deprecate and remove the tool lockfile concept, we can remove the
-    #  version and extra_requirements options and directly list loosely-constrained
-    #  requirements for each tool in this option's default. The specific versions will then
-    #  come either from the default lockfile we provide, or from a user lockfile.
+
     requirements = StrListOption(
         advanced=True,
-        default=lambda cls: cls.default_requirements
-        or sorted([cls.default_version, *cls.default_extra_requirements]),
         help=lambda cls: softwrap(
             """\
-            If install_from_resolve is specified, it will install these requirements,
-            at the versions locked by the specified resolve's lockfile.
+            If install_from_resolve is specified, install these requirements,
+            at the versions provided by the specified resolve's lockfile.
 
-            The default version ranges provided here are versions that Pants is expected to be
-            compatible with. If you need a version outside these ranges you can loosen this
-            restriction by setting this option to a wider range, but you may encounter errors
-            if Pants is not compatible with the version you choose.
+            If unspecified, install the entire lockfile.
             """
         ),
     )
@@ -171,7 +167,11 @@ class PythonToolRequirementsBase(Subsystem):
     )
 
     def __init__(self, *args, **kwargs):
-        if self.default_interpreter_constraints and not self.register_interpreter_constraints:
+        if (
+            self.default_interpreter_constraints
+            != PythonToolRequirementsBase.default_interpreter_constraints
+            and not self.register_interpreter_constraints
+        ):
             raise ValueError(
                 softwrap(
                     f"""
@@ -215,16 +215,18 @@ class PythonToolRequirementsBase(Subsystem):
         If the tool supports lockfiles, the returned type will install from the lockfile rather than
         `all_requirements`.
         """
+        if self.install_from_resolve:
+            use_entire_lockfile = not self.requirements
+            return PexRequirements(
+                (*self.requirements, *extra_requirements),
+                from_superset=Resolve(self.install_from_resolve, use_entire_lockfile),
+            )
 
         requirements = (*self.all_requirements, *extra_requirements)
 
+        # TODO: Redundant? I think no tools do not use a lockfile.
         if not self.uses_lockfile:
             return PexRequirements(requirements)
-
-        if self.install_from_resolve:
-            return PexRequirements(
-                self.requirements, from_superset=Resolve(self.install_from_resolve)
-            )
 
         hex_digest = calculate_invalidation_digest(requirements)
 
@@ -264,7 +266,7 @@ class PythonToolRequirementsBase(Subsystem):
 
     @property
     def uses_lockfile(self) -> bool:
-        """Return true if the tool is installed from a lockfile.
+        """Return true if the tool is installed from an old-style tool lockfile.
 
         Note that this lockfile may be the default lockfile Pants distributes.
         """
@@ -325,11 +327,27 @@ class PythonToolRequirementsBase(Subsystem):
         main: MainSpecification | None = None,
         sources: Digest | None = None,
     ) -> PexRequest:
+        requirements = self.pex_requirements(extra_requirements=extra_requirements)
+        if not interpreter_constraints:
+            if self.options.is_default("interpreter_constraints") and (
+                isinstance(requirements, EntireLockfile)
+                or (
+                    isinstance(requirements, PexRequirements)
+                    and isinstance(requirements.from_superset, Resolve)
+                )
+            ):
+                # If installing the tool from a resolve, and custom ICs weren't explicitly set,
+                # leave these blank. This will cause the ones for the resolve to be used,
+                # which is clearly what the user intends, rather than forcing the
+                # user to override interpreter_constraints to match those of the resolve.
+                interpreter_constraints = InterpreterConstraints()
+            else:
+                interpreter_constraints = self.interpreter_constraints
         return PexRequest(
             output_filename=f"{self.options_scope.replace('-', '_')}.pex",
             internal_only=True,
             requirements=self.pex_requirements(extra_requirements=extra_requirements),
-            interpreter_constraints=interpreter_constraints or self.interpreter_constraints,
+            interpreter_constraints=interpreter_constraints,
             main=main,
             sources=sources,
         )
