@@ -41,7 +41,6 @@ source "${HERE}/build-support/pants_venv"
 source "${HERE}/build-support/bin/rust/bootstrap_code.sh"
 
 function exec_pants_bare() {
-  PANTS_NATIVE_EXE="${HERE}/.pants"
   PANTS_PY_EXE="${HERE}/src/python/pants/bin/pants_loader.py"
   PANTS_SRCPATH="${HERE}/src/python"
 
@@ -51,7 +50,7 @@ function exec_pants_bare() {
 
   if [ -n "${USE_NATIVE_PANTS}" ]; then
     set +e
-    "${PANTS_NATIVE_EXE}" "$@"
+    "${NATIVE_CLIENT_BINARY}" "$@"
     result=$?
     # N.B.: The native pants client currently relies on pantsd being up. If it's not, it will fail
     # with exit code 75 (EX_TEMPFAIL in /usr/include/sysexits.h) and we should fall through to the
