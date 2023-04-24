@@ -166,11 +166,6 @@ args = ["--wrap-summaries=100", "--wrap-descriptions=100"]
 
 [flake8]
 config = "build-support/flake8/.flake8"
-requirements.add = [
-  "flake8-2020",
-  "flake8-no-implicit-concat",
-  "flake8-comprehensions",
-]
 
 source_plugins = ["build-support/flake8"]
 install_from_resolve = "flake8"
@@ -184,13 +179,6 @@ args = ["-i 2", "-ci", "-sr"]
 
 [pytest]
 args = ["--no-header"]
-requirements.add = [
-  "ipdb",
-  "pytest-asyncio",
-  "pytest-html",
-  "pytest-icdiff",
-  "pygments",
-]
 execution_slot_var = "TEST_EXECUTION_SLOT"
 install_from_resolve = "pytest"
 
@@ -209,10 +197,6 @@ timeout_default = 60
 
 [mypy]
 interpreter_constraints = [">=3.7,<3.10"]
-requirements.add = [
-  "mypy-typing-asserts",
-  "strawberry-graphql",
-]
 install_from_resolve = "mypy"
 
 

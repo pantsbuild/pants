@@ -471,10 +471,19 @@ async def _setup_pex_requirements(
     pex_lock_resolver_args = list(resolve_config.pex_args())
     pip_resolver_args = [*resolve_config.pex_args(), "--resolver-version", "pip-2020-resolver"]
 
-    if isinstance(request.requirements, EntireLockfile):
-        loaded_lockfile = await Get(
-            LoadedLockfile, LoadedLockfileRequest(request.requirements.lockfile)
-        )
+    # TODO: This is clunky, but can be simplified once we get rid of old-style tool
+    #  lockfiles, because we can unify EntireLockfile and Resolve.
+    if isinstance(request.requirements, EntireLockfile) or (
+        isinstance(request.requirements.from_superset, Resolve)
+        and request.requirements.from_superset.use_entire_lockfile
+    ):
+        if isinstance(request.requirements, EntireLockfile):
+            complete_req_strings = request.requirements.complete_req_strings
+            lockfile = request.requirements.lockfile
+        else:
+            complete_req_strings = None
+            lockfile = await Get(Lockfile, Resolve, request.requirements.from_superset)
+        loaded_lockfile = await Get(LoadedLockfile, LoadedLockfileRequest(lockfile))
         argv = (
             ["--lock", loaded_lockfile.lockfile_path, *pex_lock_resolver_args]
             if loaded_lockfile.is_pex_native
@@ -482,12 +491,12 @@ async def _setup_pex_requirements(
             # We use pip to resolve a requirements.txt pseudo-lockfile, possibly with hashes.
             ["--requirement", loaded_lockfile.lockfile_path, "--no-transitive", *pip_resolver_args]
         )
-        if loaded_lockfile.metadata and request.requirements.complete_req_strings:
+        if loaded_lockfile.metadata and complete_req_strings:
             validate_metadata(
                 loaded_lockfile.metadata,
                 request.interpreter_constraints,
                 loaded_lockfile.original_lockfile,
-                request.requirements.complete_req_strings,
+                complete_req_strings,
                 # We're using the entire lockfile, so there is no Pex subsetting operation we
                 # can delegate requirement validation to.  So we do our naive string-matching
                 # validation.
