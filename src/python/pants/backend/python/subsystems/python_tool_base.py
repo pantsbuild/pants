@@ -20,7 +20,7 @@ from pants.backend.python.util_rules.pex_requirements import (
     PexRequirements,
     Resolve,
 )
-from pants.core.goals.generate_lockfiles import DEFAULT_TOOL_LOCKFILE
+from pants.core.goals.generate_lockfiles import DEFAULT_TOOL_LOCKFILE, NO_TOOL_LOCKFILE
 from pants.core.util_rules.lockfile_metadata import calculate_invalidation_digest
 from pants.engine.fs import Digest
 from pants.engine.internals.selectors import Get
@@ -222,6 +222,10 @@ class PythonToolRequirementsBase(Subsystem):
             )
 
         requirements = (*self.all_requirements, *extra_requirements)
+
+        if not self.uses_lockfile:
+            return PexRequirements(requirements)
+
         hex_digest = calculate_invalidation_digest(requirements)
 
         if self.lockfile == DEFAULT_TOOL_LOCKFILE:
@@ -243,8 +247,11 @@ class PythonToolRequirementsBase(Subsystem):
 
     @memoized_property
     def lockfile(self) -> str:
-        f"""The path to a lockfile or the special string '{DEFAULT_TOOL_LOCKFILE}'."""
-        if self._lockfile != DEFAULT_TOOL_LOCKFILE:
+        f"""The path to a lockfile.
+
+        Or one of the special strings '{NO_TOOL_LOCKFILE}' or '{DEFAULT_TOOL_LOCKFILE}'.
+        """
+        if self._lockfile not in {NO_TOOL_LOCKFILE, DEFAULT_TOOL_LOCKFILE}:
             # Augment the deprecation message for the option with useful information
             # about the remedy. We will only display this note if the invocation actually
             # tries to use the tool, whereas the deprecations will display on options parsing,
@@ -256,10 +263,20 @@ class PythonToolRequirementsBase(Subsystem):
         return self._lockfile
 
     @property
+    def uses_lockfile(self) -> bool:
+        """Return true if the tool is installed from an old-style tool lockfile.
+
+        Note that this lockfile may be the default lockfile Pants distributes.
+        """
+        return self.lockfile != NO_TOOL_LOCKFILE
+
+    @property
     def uses_custom_lockfile(self) -> bool:
-        """Return true if the tool is installed from an old-style custom lockfile the user sets
-        up."""
-        return self.lockfile != DEFAULT_TOOL_LOCKFILE
+        """Return true if the tool is installed from an old-style custom lockfile."""
+        return self.lockfile not in (
+            NO_TOOL_LOCKFILE,
+            DEFAULT_TOOL_LOCKFILE,
+        )
 
     @property
     def interpreter_constraints(self) -> InterpreterConstraints:
@@ -420,8 +437,12 @@ class PythonToolBase(PythonToolRequirementsBase):
 
         This allows us to work around https://github.com/pantsbuild/pants/issues/14912.
         """
-        # If the tool's interpreter constraints are explicitly set then we should use those.
-        if not subsystem.options.is_default("interpreter_constraints"):
+        # If the tool's interpreter constraints are explicitly set, or it is not using a lockfile at
+        # all, then we should use the tool's interpreter constraints option.
+        if (
+            not subsystem.options.is_default("interpreter_constraints")
+            or not subsystem.uses_lockfile
+        ):
             return subsystem.interpreter_constraints
 
         # If using Pants's default lockfile, we can simply use the tool's default interpreter
