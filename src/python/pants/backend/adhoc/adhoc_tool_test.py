@@ -163,9 +163,8 @@ def test_adhoc_tool_capture_stdout_err(rule_runner: PythonRuleRunner) -> None:
                 adhoc_tool(
                   name="run_fruitcake",
                   runnable=":fruitcake",
-                  stdout="stdout",
-                  stderr="stderr",
-                  root_output_directory=".",
+                  stdout="dir/stdout",
+                  stderr="dir/stderr",
                 )
                 """
             ),
@@ -176,8 +175,8 @@ def test_adhoc_tool_capture_stdout_err(rule_runner: PythonRuleRunner) -> None:
         rule_runner,
         Address("src", target_name="run_fruitcake"),
         expected_contents={
-            "stderr": "inconceivable\n",
-            "stdout": "fruitcake\n",
+            "src/dir/stderr": "inconceivable\n",
+            "src/dir/stdout": "fruitcake\n",
         },
     )
 
