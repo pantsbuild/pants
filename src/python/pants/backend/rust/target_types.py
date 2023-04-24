@@ -26,7 +26,7 @@ class RustPackageTarget(Target):
 
 
 class RustCrateSourcesField(MultipleSourcesField):
-    default = ()
+    default = ("Cargo.toml", "src/**/*.rs", "tests/**/*.rs")
     uses_source_roots = False
 
 

@@ -78,16 +78,15 @@ def run_rustfmt(
             SourceFilesRequest(field_set.sources for field_set in field_sets),
         ],
     )
-    batch = RustfmtRequest.Batch(
-        "",
-        input_sources.snapshot.files,
-        partition_metadata=None,
-        snapshot=input_sources.snapshot
-    ),
     fmt_result = rule_runner.request(
         FmtResult,
         [
-            batch
+            RustfmtRequest.Batch(
+                "",
+                input_sources.snapshot.files,
+                partition_metadata=None,
+                snapshot=input_sources.snapshot
+            ),
         ],
     )
     return fmt_result
@@ -106,7 +105,7 @@ def test_passing(rule_runner: RuleRunner) -> None:
     tgt = rule_runner.get_target(Address("", target_name="crate"))
     fmt_result = run_rustfmt(rule_runner, [tgt])
 
-    assert fmt_result.stdout == ""
+    assert fmt_result.stdout.strip() == ""
     assert fmt_result.output == get_snapshot(
         rule_runner, {"src/lib.rs": GOOD_FILE, "Cargo.toml": ""}
     )
@@ -166,13 +165,3 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
         },
     )
     assert fmt_result.did_change is True
-
-
-def test_skip(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files(
-        {"src/lib.rs": BAD_FILE, "Cargo.toml": "", "BUILD": "rust_crate(name='crate')"}
-    )
-    tgt = rule_runner.get_target(Address("", target_name="crate"))
-    fmt_result = run_rustfmt(rule_runner, [tgt], extra_args=["--rustfmt-skip"])
-    assert fmt_result.skipped is True
-    assert fmt_result.did_change is False

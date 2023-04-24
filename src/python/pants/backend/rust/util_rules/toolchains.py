@@ -111,7 +111,6 @@ async def rust_toolchain_process(request: RustToolchainProcess) -> Process:
         input_digest=request.input_digest,
         output_files=request.output_files,
         output_directories=request.output_directories,
-        platform=request.platform,
         cache_scope=request.cache_scope or ProcessCacheScope.SUCCESSFUL,
     )
 

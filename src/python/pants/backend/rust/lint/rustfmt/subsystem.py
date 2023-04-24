@@ -7,7 +7,7 @@ from pants.option.subsystem import Subsystem
 
 class RustfmtSubsystem(Subsystem):
     options_scope = "rustfmt"
+
     name = "rustfmt"
     help = "Rustfmt-specific options."
-
     skip = SkipOption("fmt", "lint")
