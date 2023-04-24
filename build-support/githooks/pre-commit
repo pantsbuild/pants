@@ -2,6 +2,10 @@
 
 set -e
 
+# If you use the `pants` scie, you may "export PANTS=pants" in order to use the same bootstrapped
+# pants setup for this pre-commit hook as you get from the command line for any other pants command.
+: "${PANTS:=./pants}"
+
 # NB: pre-commit runs in the context of GIT_WORK_TREE, ie: pwd == REPO_ROOT
 source build-support/common.sh
 
@@ -21,19 +25,19 @@ if git diff "${MERGE_BASE}" --name-only | grep '\.rs$' > /dev/null; then
 fi
 
 echo "* Typechecking"
-./pants --changed-since="${MERGE_BASE}" --changed-dependents=transitive check
+$PANTS --changed-since="${MERGE_BASE}" --changed-dependents=transitive check
 
 echo "* Checking linters, formatters, and headers"
-./pants --changed-since="${MERGE_BASE}" lint ||
-  die "If there were formatting errors, run \`./pants --changed-since=$(git rev-parse --symbolic "${MERGE_BASE}") fmt\`"
+$PANTS --changed-since="${MERGE_BASE}" lint ||
+  die "If there were formatting errors, run \`$PANTS --changed-since=$(git rev-parse --symbolic "${MERGE_BASE}") fmt\`"
 
 if git diff "${MERGE_BASE}" --name-only | grep build-support/bin/generate_github_workflows.py > /dev/null; then
   echo "* Checking GitHub workflows generation"
-  ./pants run build-support/bin/generate_github_workflows.py -- --check
+  $PANTS run build-support/bin/generate_github_workflows.py -- --check
 fi
 
 echo "* Checking __init__.py files"
-./pants run build-support/bin/check_inits.py
+$PANTS run build-support/bin/check_inits.py
 
 echo "* Checking for banned imports"
-./pants run build-support/bin/check_banned_imports.py
+$PANTS run build-support/bin/check_banned_imports.py
