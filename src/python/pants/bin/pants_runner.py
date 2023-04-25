@@ -85,7 +85,7 @@ class PantsRunner:
             # engine types until after the runner has had a chance to set __PANTS_BIN_NAME.
             if "SCIE" not in os.environ and "NO_SCIE_WARNING" not in os.environ:
                 warn_or_error(
-                    "2.17.0.dev5",
+                    "2.18.0.dev0",
                     f"Running Pants in an external Python interpreter via a `{bin_name()}` script",
                     softwrap(
                         f"""
