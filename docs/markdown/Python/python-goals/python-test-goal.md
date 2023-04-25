@@ -33,7 +33,7 @@ Examples
 Pytest version and plugins
 --------------------------
 
-To change the Pytest version, set the `install_from_resolve` option in the `[pytest]` scope. You may also add [plugins](https://docs.pytest.org/en/latest/plugins.html) by setting or adding to the `requirements` option and including the plugins in the resolve:
+To change the Pytest version, set the `install_from_resolve` option in the `[pytest]` scope. You may also add [plugins](https://docs.pytest.org/en/latest/plugins.html) including the plugins in the resolve:
 
 ```toml pants.toml
 [python.resolves]
@@ -41,10 +41,9 @@ pytest = "3rdparty/python/pytest-lock.txt"
 
 [pytest]
 install_from_resolve = "pytest"
-requirements.add ["pytest-django", "pytest-rerunfailures"]
 ```
 
-Then, add a `requirements.txt` file specifying the version of `pytest`:
+Then, add a `requirements.txt` file specifying the version of `pytest` and other plugins:
 
 ```Text pytest-requirements.txt
 pytest>=5.4

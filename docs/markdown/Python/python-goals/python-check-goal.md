@@ -146,7 +146,6 @@ Add the plugin to the `requirements` option in the `[mypy]` scope, and create a 
 mypy = "3rdparty/python/mypy-lock.txt"
 
 [mypy]
-requirements.add = ["pydantic"]
 install_from_resolve = "mypy"
 ```
 ```Text mypy-requirements.txt
