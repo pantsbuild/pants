@@ -203,7 +203,7 @@ def test_working_directory_special_values(
             "src/BUILD": dedent(
                 f"""\
                 system_binary(name="bash", binary_name="bash")
-                system_binary(name="sed", binary_name="sed")
+                system_binary(name="sed", binary_name="sed", fingerprint_args=["q"])
 
                 adhoc_tool(
                   name="workdir",
