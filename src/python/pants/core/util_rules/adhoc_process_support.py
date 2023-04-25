@@ -404,7 +404,7 @@ async def run_adhoc_process(
         extra_digest = await Get(
             Digest,
             CreateDigest(
-                FileContent(os.path.join(working_directory, name), content)
+                FileContent(_parse_relative_file(name, working_directory), content)
                 for name, content in extra_contents.items()
             ),
         )
@@ -506,6 +506,16 @@ def _parse_relative_directory(workdir_in: str, relative_to: Union[Address, str])
         return workdir_in[1:]
     else:
         return workdir_in
+
+
+def _parse_relative_file(file_in: str, relative_to: str) -> str:
+    """Convert the `capture_std..._file` fields into something that can be understood by
+    `Process`."""
+
+    if file_in.startswith("/"):
+        return file_in[1:]
+
+    return os.path.join(relative_to, file_in)
 
 
 def rules():

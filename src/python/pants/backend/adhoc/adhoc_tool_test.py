@@ -143,19 +143,42 @@ def test_adhoc_tool_with_workdir(rule_runner: PythonRuleRunner) -> None:
     )
 
 
-def test_adhoc_tool_capture_stdout_err(rule_runner: PythonRuleRunner) -> None:
+@pytest.mark.parametrize(
+    ("write_dir", "workdir", "root_output_directory", "expected_dir"),
+    [
+        # various relative paths:
+        ("", None, None, "src/"),
+        ("dir/", None, None, "src/dir/"),
+        ("../", None, None, ""),
+        # absolute path
+        ("/", None, None, ""),
+        # interaction with workdir and root_output_directory:
+        ("", "/", None, ""),
+        ("dir/", None, ".", "dir/"),
+        ("3/", "1/2", "1", "2/3/"),
+    ],
+)
+def test_adhoc_tool_capture_stdout_err(
+    rule_runner: PythonRuleRunner,
+    write_dir: str,
+    workdir: None | str,
+    root_output_directory: None | str,
+    expected_dir: str,
+) -> None:
     rule_runner.write_files(
         {
             "src/BUILD": dedent(
-                """\
+                f"""\
                 system_binary(name="bash", binary_name="bash")
 
                 adhoc_tool(
                   name="run_fruitcake",
                   runnable=":bash",
                   args=["-c", "echo fruitcake; echo inconceivable >&2"],
-                  stdout="dir/stdout",
-                  stderr="dir/stderr",
+                  stdout="{write_dir}stdout",
+                  stderr="{write_dir}stderr",
+                  workdir={workdir!r},
+                  root_output_directory={root_output_directory!r},
                 )
                 """
             ),
@@ -166,8 +189,8 @@ def test_adhoc_tool_capture_stdout_err(rule_runner: PythonRuleRunner) -> None:
         rule_runner,
         Address("src", target_name="run_fruitcake"),
         expected_contents={
-            "src/dir/stderr": "inconceivable\n",
-            "src/dir/stdout": "fruitcake\n",
+            f"{expected_dir}stderr": "inconceivable\n",
+            f"{expected_dir}stdout": "fruitcake\n",
         },
     )
 
