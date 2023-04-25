@@ -348,11 +348,11 @@ impl<N: Node> InnerGraph<N> {
     Ok(())
   }
 
-  fn live_reachable<'g>(
-    &'g self,
+  fn live_reachable(
+    &self,
     roots: &[N],
     context: &N::Context,
-  ) -> impl Iterator<Item = (&N, N::Item)> + 'g {
+  ) -> impl Iterator<Item = (&N, N::Item)> {
     // TODO: This is a surprisingly expensive method, because it will clone all reachable values by
     // calling `peek` on them.
     let root_ids = roots
@@ -368,7 +368,7 @@ impl<N: Node> InnerGraph<N> {
     )
   }
 
-  fn live<'g>(&'g self, context: &N::Context) -> impl Iterator<Item = (&N, N::Item)> + 'g {
+  fn live(&self, context: &N::Context) -> impl Iterator<Item = (&N, N::Item)> {
     self.live_internal(self.pg.node_indices().collect(), context.clone())
   }
 

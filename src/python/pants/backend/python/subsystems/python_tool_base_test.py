@@ -11,9 +11,7 @@ from pants.util.ordered_set import FrozenOrderedSet
 
 class _DummyTool(PythonToolBase):
     options_scope = "dummy"
-    register_lockfile = True
     default_lockfile_resource = ("dummy", "dummy")
-    default_lockfile_url = "dummy"
 
 
 def test_install_from_resolve_default() -> None:
@@ -27,5 +25,5 @@ def test_install_from_resolve_default() -> None:
     )
     pex_reqs = tool.pex_requirements()
     assert isinstance(pex_reqs, PexRequirements)
-    assert pex_reqs.from_superset == Resolve("dummy_resolve")
+    assert pex_reqs.from_superset == Resolve("dummy_resolve", False)
     assert pex_reqs.req_strings == FrozenOrderedSet(["bar", "baz", "foo"])

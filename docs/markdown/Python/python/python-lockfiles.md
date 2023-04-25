@@ -183,7 +183,7 @@ It is strongly recommended that these tools be installed from a hermetic lockfil
 
 The only time you need to think about this is if you want to customize the tool requirements that Pants uses. This might be the case if you want to modify the version of a tool or add extra requirements (for example, tool plugins).
 
-If you want a tool to be installed from some resolve, instead of from the built-in lockfile, you set `install_from_resolve` on the tool's config section, and enumerate any non-default requirements you need from that resolve:
+If you want a tool to be installed from some resolve, instead of from the built-in lockfile, you set `install_from_resolve` on the tool's config section:
 
 ```toml pants.toml
 [python.resolves]
@@ -191,15 +191,6 @@ pytest = "3rdparty/python/pytest.lock"
 
 [pytest]
 install_from_resolve = "pytest"
-
-requirements.add = [
-  # No need to provide version constraints, as you control those in pytest-requirements.txt.
-  "pytest-myplugin",
-]
-# Note that the default tool requirements are constrained to versions that Pants expects
-# to be compatible with (you can see this value with `pants help-advanced <name of tool>`).
-# If you want to use a version outside this range, you can override `requirements` entirely,
-# instead of adding to it. In that case we can't guarantee compatibility.
 ```
 
 Then set up the resolve's inputs:
@@ -215,6 +206,7 @@ python_requirements(
 pytest==7.1.1
 pytest-cov>=2.12,!=2.12.1,<3.1
 pytest-xdist>=2.5,<3
+ipdb
 # Our extra requirement.
 pytest-myplugin>=1.2.0,<2
 ```
@@ -227,7 +219,7 @@ $ pants generate-lockfiles --resolve=pytest
 19:00:39.29 [INFO] Wrote lockfile for the resolve `pytest` to 3rdparty/python/pytest.lock
 ```
 
-Note that some tools, such as Flake8 and Bandit, must run on a Python interpreter that is compatible with the code they operate on. In this case you must ensure that the interpreter constraints for the tool's resolve are the same as those for the code in question.
+Note that some tools, such as Flake8 and Bandit, must run on a Python interpreter that is compatible with the code they operate on. In this case you must ensure that the [interpreter constraints](#interpreter-constraints) for the tool's resolve are the same as those for the code in question.
 
 ### Sharing lockfiles between tools and code
 
@@ -237,10 +229,25 @@ Rather than repeat the same requirement in two different resolves, you can point
 
 ```toml pants.toml
 [pytest]
-resolve=python-default
+install_from_resolve = python-default
 ```
 
 Of course, you have to make sure that this resolve does in fact provide appropriate versions of the tool.
+
+By default, Pants will use the entire lockfile when installing the tool. This may cause Pants to invalidate the tool, and therefore its outputs, due to unrelated changes in the lockfile. You can instead enumerate a subset of requirements to be installed from a larger lockfile using the `requirements` option:
+
+```toml pants.toml
+[pytest]
+install_from_resolve = python-default
+
+requirements = [
+  "pytest",
+  "pytest-cov",
+  "pytest-xdist",
+  "pytest-myplugin",
+  "ipdb",
+]
+```
 
 You can have a single resolve for all your tools, or even a single resolve for all your tools and code! This may be useful if you want to [export](doc:reference-export) a virtualenv that includes all your dependencies and all the tools you use.
 

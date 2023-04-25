@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from typing import ClassVar
 
@@ -22,7 +23,8 @@ from pants.jvm.resolve.common import (
 from pants.jvm.target_types import JvmArtifactFieldSet
 from pants.option.option_types import StrListOption, StrOption
 from pants.option.subsystem import Subsystem
-from pants.util.docutil import bin_name
+from pants.util.docutil import bin_name, git_url
+from pants.util.meta import classproperty
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import softwrap
 
@@ -39,8 +41,6 @@ class JvmToolBase(Subsystem):
 
     # Default resource for the tool's lockfile. (Subclasses must set.)
     default_lockfile_resource: ClassVar[tuple[str, str]]
-
-    default_lockfile_url: ClassVar[str | None] = None
 
     version = StrOption(
         advanced=True,
@@ -92,6 +92,17 @@ class JvmToolBase(Subsystem):
         ),
         advanced=True,
     )
+
+    @classproperty
+    def default_lockfile_url(cls) -> str:
+        return git_url(
+            os.path.join(
+                "src",
+                "python",
+                cls.default_lockfile_resource[0].replace(".", os.path.sep),
+                cls.default_lockfile_resource[1],
+            )
+        )
 
     @property
     def artifact_inputs(self) -> tuple[str, ...]:

@@ -275,6 +275,7 @@ async def python_lockfile_synthetic_targets(
         (os.path.dirname(lockfile), os.path.basename(lockfile), name)
         for name, lockfile in python_setup.resolves.items()
     ]
+
     return SyntheticAddressMaps.for_targets_request(
         request,
         [
@@ -282,7 +283,10 @@ async def python_lockfile_synthetic_targets(
                 os.path.join(spec_path, "BUILD.python-lockfiles"),
                 tuple(
                     TargetAdaptor(
-                        "_lockfiles", name=synthetic_lockfile_target_name(name), sources=[lockfile]
+                        "_lockfiles",
+                        name=synthetic_lockfile_target_name(name),
+                        sources=[lockfile],
+                        __description_of_origin__=f"the [python].resolves option {name!r}",
                     )
                     for _, lockfile, name in lockfiles
                 ),

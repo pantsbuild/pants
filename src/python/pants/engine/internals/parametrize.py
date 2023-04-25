@@ -12,7 +12,13 @@ from pants.build_graph.address import BANNED_CHARS_IN_PARAMETERS
 from pants.engine.addresses import Address
 from pants.engine.collection import Collection
 from pants.engine.engine_aware import EngineAwareParameter
-from pants.engine.target import Field, FieldDefaults, Target, TargetTypesToGenerateTargetsRequests
+from pants.engine.target import (
+    Field,
+    FieldDefaults,
+    ImmutableValue,
+    Target,
+    TargetTypesToGenerateTargetsRequests,
+)
 from pants.util.frozendict import FrozenDict
 from pants.util.strutil import bullet_list, softwrap
 
@@ -33,11 +39,11 @@ class Parametrize:
     """
 
     args: tuple[str, ...]
-    kwargs: dict[str, Any]
+    kwargs: FrozenDict[str, ImmutableValue]
 
     def __init__(self, *args: str, **kwargs: Any) -> None:
         object.__setattr__(self, "args", args)
-        object.__setattr__(self, "kwargs", kwargs)
+        object.__setattr__(self, "kwargs", FrozenDict.deep_freeze(kwargs))
 
     def to_parameters(self) -> dict[str, Any]:
         """Validates and returns a mapping from aliases to parameter values.

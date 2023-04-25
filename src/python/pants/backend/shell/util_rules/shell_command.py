@@ -76,9 +76,7 @@ async def _prepare_process_request_from_target(
     description = f"the `{shell_command.alias}` at `{shell_command.address}`"
 
     working_directory = shell_command[ShellCommandWorkdirField].value
-
-    if not working_directory:
-        working_directory = "."
+    assert working_directory is not None, "working_directory should always be a string"
 
     command = shell_command[ShellCommandCommandField].value
     if not command:
@@ -241,9 +239,8 @@ async def _interactive_shell_command(
     )
     dependencies_digest = execution_environment.digest
 
-    _working_directory = working_directory or "."
     relpath = os.path.relpath(
-        _working_directory, start="/" if os.path.isabs(_working_directory) else "."
+        working_directory, start="/" if os.path.isabs(working_directory) else "."
     )
     boot_script = f"cd {shlex.quote(relpath)}; " if relpath != "." else ""
 

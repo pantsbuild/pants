@@ -34,7 +34,6 @@ from pants.option.errors import (
     InvalidKwarg,
     InvalidMemberType,
     MemberTypeNotAllowed,
-    MissingRequiredOptionError,
     MutuallyExclusiveOptionError,
     NoOptionNames,
     OptionAlreadyRegistered,
@@ -502,17 +501,6 @@ def test_scope_deprecation_default_config_section(caplog) -> None:
     caplog.clear()
     assert opts.for_scope(Subsystem1.options_scope).foo == "xx"
     assert not caplog.records
-
-
-def test_required_option(caplog) -> None:
-    def register(opts: Options) -> None:
-        opts.register(GLOBAL_SCOPE, "--opt", type=bool, required=True)
-
-    opts = create_options([GLOBAL_SCOPE], register, config={}).for_global_scope()
-    with pytest.raises(
-        MissingRequiredOptionError, match="The option --opt in global scope is required."
-    ):
-        opts.opt
 
 
 # ----------------------------------------------------------------------------------------

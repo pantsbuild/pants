@@ -42,10 +42,7 @@ class FakeTool(PythonToolBase):
     register_interpreter_constraints = True
     default_interpreter_constraints = ["CPython>=3.7,<4"]
 
-    register_lockfile = True
-    default_lockfile_path = "cowsay.lock"
-    default_lockfile_resource = ("", "")
-    default_lockfile_url = " "
+    default_lockfile_resource = ("", "cowsay.lock")
     lockfile_rules_type = LockfileRules.SIMPLE
 
 
