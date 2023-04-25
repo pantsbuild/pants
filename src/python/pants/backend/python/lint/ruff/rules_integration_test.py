@@ -20,8 +20,6 @@ from pants.core.util_rules import config_files
 from pants.core.util_rules.partitions import _EmptyMetadata
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
-from pants.engine.fs import CreateDigest, FileContent
-from pants.engine.internals.native_engine import Digest, Snapshot
 from pants.engine.target import Target
 from pants.testutil.python_interpreter_selection import all_major_minor_python_versions
 from pants.testutil.rule_runner import QueryRule, RuleRunner
@@ -85,12 +83,6 @@ def run_ruff(
     return fix_result, lint_result
 
 
-def get_snapshot(rule_runner: RuleRunner, source_files: dict[str, str]) -> Snapshot:
-    files = [FileContent(path, content.encode()) for path, content in source_files.items()]
-    digest = rule_runner.request(Digest, [CreateDigest(files)])
-    return rule_runner.request(Snapshot, [digest])
-
-
 @pytest.mark.platform_specific_behavior
 @pytest.mark.parametrize(
     "major_minor_interpreter",
@@ -108,7 +100,7 @@ def test_passing(rule_runner: RuleRunner, major_minor_interpreter: str) -> None:
     assert fix_result.stderr == ""
     assert fix_result.stdout == ""
     assert not fix_result.did_change
-    assert fix_result.output == get_snapshot(rule_runner, {"f.py": GOOD_FILE})
+    assert fix_result.output == rule_runner.make_snapshot({"f.py": GOOD_FILE})
 
 
 def test_failing(rule_runner: RuleRunner) -> None:
@@ -119,7 +111,7 @@ def test_failing(rule_runner: RuleRunner) -> None:
     assert fix_result.stdout == "Found 1 error (1 fixed, 0 remaining).\n"
     assert fix_result.stderr == ""
     assert fix_result.did_change
-    assert fix_result.output == get_snapshot(rule_runner, {"f.py": GOOD_FILE})
+    assert fix_result.output == rule_runner.make_snapshot({"f.py": GOOD_FILE})
 
 
 def test_multiple_targets(rule_runner: RuleRunner) -> None:
@@ -136,8 +128,8 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
     ]
     fix_result, lint_result = run_ruff(rule_runner, tgts)
     assert lint_result.exit_code == 1
-    assert fix_result.output == get_snapshot(
-        rule_runner, {"good.py": GOOD_FILE, "bad.py": GOOD_FILE}
+    assert fix_result.output == rule_runner.make_snapshot(
+        {"good.py": GOOD_FILE, "bad.py": GOOD_FILE}
     )
     assert fix_result.did_change is True
 
