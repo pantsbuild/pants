@@ -146,23 +146,14 @@ def test_adhoc_tool_with_workdir(rule_runner: PythonRuleRunner) -> None:
 def test_adhoc_tool_capture_stdout_err(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files(
         {
-            "src/fruitcake.py": dedent(
-                """\
-                import sys
-                print("fruitcake")
-                print("inconceivable", file=sys.stderr)
-                """
-            ),
             "src/BUILD": dedent(
                 """\
-                python_source(
-                    source="fruitcake.py",
-                    name="fruitcake",
-                )
+                system_binary(name="bash", binary_name="bash")
 
                 adhoc_tool(
                   name="run_fruitcake",
-                  runnable=":fruitcake",
+                  runnable=":bash",
+                  args=["-c", "echo fruitcake; echo inconceivable >&2"],
                   stdout="dir/stdout",
                   stderr="dir/stderr",
                 )
