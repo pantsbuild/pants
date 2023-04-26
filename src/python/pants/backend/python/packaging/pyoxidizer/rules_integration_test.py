@@ -70,6 +70,7 @@ def test_end_to_end() -> None:
     with setup_tmpdir(sources) as tmpdir:
         package_args = [
             "--backend-packages=['pants.backend.python', 'pants.backend.experimental.python.packaging.pyoxidizer']",
+            "--python-interpreter-constraints=['>=3.8,<4']",
             f"--source-root-patterns=['/{tmpdir}']",
             "package",
             f"{tmpdir}/hellotest:bin",
@@ -86,6 +87,7 @@ def test_end_to_end() -> None:
         # Check that the binary runs.
         run_args = [
             "--backend-packages=['pants.backend.python', 'pants.backend.experimental.python.packaging.pyoxidizer']",
+            "--python-interpreter-constraints=['>=3.8,<4']",
             f"--source-root-patterns=['/{tmpdir}']",
             "run",
             f"{tmpdir}/hellotest:bin",

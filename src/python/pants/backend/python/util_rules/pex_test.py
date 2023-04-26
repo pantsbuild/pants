@@ -503,7 +503,7 @@ def test_local_requirements_and_path_mappings(
             [
                 GeneratePythonLockfile(
                     requirements=FrozenOrderedSet([wheel_req_str]),
-                    interpreter_constraints=InterpreterConstraints(),
+                    interpreter_constraints=InterpreterConstraints([">=3.7,<4"]),
                     resolve_name="test",
                     lockfile_dest="test.lock",
                     diff=False,
