@@ -65,12 +65,14 @@ class OptionsBootstrapper:
 
     @classmethod
     def create(
-        cls, env: Mapping[str, str], args: Sequence[str], *, allow_pantsrc: bool
+        cls, env: Mapping[str, str], args: Sequence[str], *, configs: Sequence[str] = (), allow_pantsrc: bool
     ) -> OptionsBootstrapper:
         """Parses the minimum amount of configuration necessary to create an OptionsBootstrapper.
 
         :param env: An environment dictionary.
         :param args: An args array.
+        :param configs: Optional statically-known config files, which will be used _in addition_ to
+          any files discovered via the `--pants-config-files` option.
         :param allow_pantsrc: True to allow pantsrc files to be used. Unless tests are expecting to
           consume pantsrc files, they should pass False in order to avoid reading files from
           absolute paths. Production usecases should pass True to allow options values to make the
@@ -84,7 +86,7 @@ class OptionsBootstrapper:
         # TODO: Restore Aliases.
         alias = CliAlias()
 
-        return cls(env_tuples, args, alias, PyOptionParser(dict(env), args))
+        return cls(env_tuples, args, alias, PyOptionParser(dict(env), args, configs))
 
     @memoized_property
     def env(self) -> dict[str, str]:

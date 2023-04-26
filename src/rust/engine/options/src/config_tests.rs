@@ -11,7 +11,7 @@ use tempfile::TempDir;
 
 fn config<I: IntoIterator<Item = &'static str>>(file_contents: I) -> Config {
   let dir = TempDir::new().unwrap();
-  let files = file_contents
+  let configs = file_contents
     .into_iter()
     .enumerate()
     .map(|(idx, file_content)| {
@@ -20,10 +20,11 @@ fn config<I: IntoIterator<Item = &'static str>>(file_contents: I) -> Config {
         .unwrap()
         .write_all(file_content.as_bytes())
         .unwrap();
-      path
+      Config::parse(path)
     })
-    .collect::<Vec<_>>();
-  Config::merged(&files).unwrap()
+    .collect::<Result<Vec<_>, _>>()
+    .unwrap();
+  Config::merged(configs)
 }
 
 #[test]

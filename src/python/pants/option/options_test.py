@@ -88,11 +88,10 @@ def create_options(
         return file.name
 
     with ExitStack() as stack:
-        config_filenames = [dump_config(stack, config) for config in configs]
-        config_file_options = [f"--pants-config-files={filename}" for filename in config_filenames]
+        configs = [dump_config(stack, config) for config in configs]
 
-        args = ["./pants", *config_file_options, *(args or ())]
-        option_parser = PyOptionParser(env or {}, args)
+        args = ["./pants", *(args or ())]
+        option_parser = PyOptionParser(env or {}, args, configs)
         options = Options.create(
             known_scope_infos=[
                 *((ScopeInfo(scope) if isinstance(scope, str) else scope) for scope in scopes),
@@ -621,7 +620,7 @@ class OptionsTest(unittest.TestCase):
             "--shell-str-listy",
             type=list,
             member_type=shell_str,
-            default="--default1 --default2=test",
+            default=["--default1 --default2=test"],
         )
 
         # Implicit value.

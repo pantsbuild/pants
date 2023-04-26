@@ -14,18 +14,18 @@ use super::parse::parse_string_list;
 use super::{ListEdit, ListEditAction, OptionsSource, StringDict};
 
 #[derive(Clone)]
-pub(crate) struct Config {
+pub struct Config {
   config: Value,
 }
 
 impl Config {
-  pub(crate) fn default() -> Config {
+  pub fn default() -> Config {
     Config {
       config: Value::Table(Table::new()),
     }
   }
 
-  pub(crate) fn parse<P: AsRef<Path>>(file: P) -> Result<Config, String> {
+  pub fn parse<P: AsRef<Path>>(file: P) -> Result<Config, String> {
     let config_contents = fs::read_to_string(&file).map_err(|e| {
       format!(
         "Failed to read config file {}: {}",
@@ -66,13 +66,10 @@ impl Config {
     Ok(Config { config })
   }
 
-  pub(crate) fn merged<P: AsRef<Path>>(files: &[P]) -> Result<Config, String> {
-    files
-      .iter()
-      .map(Config::parse)
-      .try_fold(Config::default(), |config, parse_result| {
-        parse_result.map(|parsed| config.merge(parsed))
-      })
+  pub fn merged<I: IntoIterator<Item = Config>>(config: I) -> Config {
+    config
+      .into_iter()
+      .fold(Config::default(), |acc, config| acc.merge(config))
   }
 
   fn option_name(id: &OptionId) -> String {

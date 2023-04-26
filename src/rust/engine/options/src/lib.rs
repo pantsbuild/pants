@@ -57,7 +57,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 pub use self::args::Args;
-use self::config::Config;
+pub use self::config::Config;
 pub use self::env::Env;
 pub use build_root::BuildRoot;
 pub use id::{OptionId, Scope};
@@ -206,10 +206,17 @@ pub struct OptionParser {
 }
 
 impl OptionParser {
-  pub fn new(env: Env, args: Args) -> Result<Self, String> {
+  /// Creates an OptionParser with the given statically known Env, Args, Config.
+  ///
+  /// The static options sources will be read to discover additional Config files, which will be
+  /// merged atop the static Config.
+  pub fn new(env: Env, args: Args, config: Config) -> Result<Self, String> {
+    let base_config = Arc::new(config);
+
     let mut sources: BTreeMap<Source, Arc<dyn OptionsSource>> = BTreeMap::new();
     sources.insert(Source::Env, Arc::new(env));
     sources.insert(Source::Flag, Arc::new(args));
+    sources.insert(Source::Config, base_config.clone());
     let mut parser = OptionParser {
       sources: sources.clone(),
     };
@@ -229,7 +236,11 @@ impl OptionParser {
         ],
       )?
       .value;
-    let mut config = Config::merged(&repo_config_files)?;
+    let repo_configs = repo_config_files
+      .into_iter()
+      .map(Config::parse)
+      .collect::<Result<Vec<_>, _>>()?;
+    let mut config = Config::merged(std::iter::once((*base_config).clone()).chain(repo_configs));
     sources.insert(Source::Config, Arc::new(config.clone()));
     parser = OptionParser {
       sources: sources.clone(),
@@ -255,7 +266,7 @@ impl OptionParser {
   }
 
   pub fn from_globals() -> Result<Self, String> {
-    Self::new(Env::capture(), Args::argv())
+    Self::new(Env::capture(), Args::argv(), Config::default())
   }
 
   pub fn parse_bool(&self, id: &OptionId, default: bool) -> Result<OptionValue<bool>, String> {

@@ -7,7 +7,7 @@ use pyo3::exceptions;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyFunction, PyList, PyTuple};
 
-use options::{Args, Env, OptionId, OptionParser, Scope, Source};
+use options::{Args, Config, Env, OptionId, OptionParser, Scope, Source};
 
 use crate::Key;
 
@@ -83,14 +83,22 @@ struct PyOptionParser(OptionParser);
 #[pymethods]
 impl PyOptionParser {
   #[new]
-  fn __new__(env: &PyDict, args: Vec<String>) -> PyResult<Self> {
+  fn __new__(env: &PyDict, args: Vec<String>, configs: Vec<&str>) -> PyResult<Self> {
     let env = env
       .items()
       .into_iter()
       .map(|kv_pair| kv_pair.extract::<(String, String)>())
       .collect::<Result<HashMap<_, _>, _>>()?;
 
-    let option_parser = OptionParser::new(Env::new(env), Args::new(args))
+    let config = Config::merged(
+      configs
+        .into_iter()
+        .map(Config::parse)
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(exceptions::PyValueError::new_err)?,
+    );
+
+    let option_parser = OptionParser::new(Env::new(env), Args::new(args), config)
       .map_err(exceptions::PyValueError::new_err)?;
     Ok(Self(option_parser))
   }
