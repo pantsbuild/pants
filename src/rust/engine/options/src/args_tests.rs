@@ -95,7 +95,7 @@ fn test_float() {
   assert!(args.get_float(&option_id!("dne")).unwrap().is_none());
 
   assert_eq!(
-    "Problem parsing --bad value swallow as a float value: invalid float literal".to_owned(),
+    "Problem parsing --bad value 'swallow' as a float value: invalid float literal".to_owned(),
     args.get_float(&option_id!("bad")).unwrap_err()
   );
 }

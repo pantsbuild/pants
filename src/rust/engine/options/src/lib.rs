@@ -125,7 +125,7 @@ pub(crate) trait OptionsSource: Send + Sync {
     if let Some(value) = self.get_string(id)? {
       value.parse().map(Some).map_err(|e| {
         format!(
-          "Problem parsing {} value {} as an int value: {}",
+          "Problem parsing {} value '{}' as an int value: {}",
           self.display(id),
           value,
           e
@@ -147,7 +147,7 @@ pub(crate) trait OptionsSource: Send + Sync {
     if let Some(value) = self.get_string(id)? {
       value.parse().map(Some).map_err(|e| {
         format!(
-          "Problem parsing {} value {} as a float value: {}",
+          "Problem parsing {} value '{}' as a float value: {}",
           self.display(id),
           value,
           e
