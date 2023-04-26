@@ -83,12 +83,6 @@ def run_openapi_format(
     return results
 
 
-def get_snapshot(rule_runner: RuleRunner, source_files: dict[str, str]) -> Snapshot:
-    files = [FileContent(path, content.encode()) for path, content in source_files.items()]
-    digest = rule_runner.request(Digest, [CreateDigest(files)])
-    return rule_runner.request(Snapshot, [digest])
-
-
 def test_passing(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({"openapi.yaml": GOOD_FILE, "BUILD": "openapi_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="openapi.yaml"))
@@ -98,7 +92,7 @@ def test_passing(rule_runner: RuleRunner) -> None:
     )
     assert len(fmt_result) == 1
     assert "OpenAPI formatted successfully" in fmt_result[0].stderr
-    assert fmt_result[0].output == get_snapshot(rule_runner, {"openapi.yaml": GOOD_FILE})
+    assert fmt_result[0].output == rule_runner.make_snapshot({"openapi.yaml": GOOD_FILE})
     assert fmt_result[0].did_change is False
 
 
@@ -108,7 +102,7 @@ def test_failing(rule_runner: RuleRunner) -> None:
     fmt_result = run_openapi_format(rule_runner, [tgt])
     assert len(fmt_result) == 1
     assert "OpenAPI formatted successfully" in fmt_result[0].stderr
-    assert fmt_result[0].output == get_snapshot(rule_runner, {"openapi.yaml": GOOD_FILE})
+    assert fmt_result[0].output == rule_runner.make_snapshot({"openapi.yaml": GOOD_FILE})
     assert fmt_result[0].did_change is True
 
 
@@ -128,8 +122,8 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
     assert len(fmt_result) == 2
     assert "OpenAPI formatted successfully" in fmt_result[0].stderr
     assert "OpenAPI formatted successfully" in fmt_result[1].stderr
-    assert fmt_result[0].output == get_snapshot(rule_runner, {"bad.yaml": GOOD_FILE})
-    assert fmt_result[1].output == get_snapshot(rule_runner, {"good.yaml": GOOD_FILE})
+    assert fmt_result[0].output == rule_runner.make_snapshot({"bad.yaml": GOOD_FILE})
+    assert fmt_result[1].output == rule_runner.make_snapshot({"good.yaml": GOOD_FILE})
     assert fmt_result[0].did_change is True
     assert fmt_result[1].did_change is False
 
@@ -142,7 +136,7 @@ def test_passthrough_args(rule_runner: RuleRunner) -> None:
     )
     assert len(fmt_result) == 1
     assert "OpenAPI formatted successfully" in fmt_result[0].stderr
-    assert fmt_result[0].output == get_snapshot(rule_runner, {"openapi.yaml": BAD_FILE})
+    assert fmt_result[0].output == rule_runner.make_snapshot({"openapi.yaml": BAD_FILE})
     assert fmt_result[0].did_change is False
 
 
