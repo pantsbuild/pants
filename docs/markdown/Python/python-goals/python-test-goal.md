@@ -33,20 +33,25 @@ Examples
 Pytest version and plugins
 --------------------------
 
-To change the Pytest version, set the `version` option in the `[pytest]` scope.
-
-To install any [plugins](https://docs.pytest.org/en/latest/plugins.html), add the pip requirement string to `extra_requirements` in the `[pytest]` scope, like this:
+To change the Pytest version, set the `install_from_resolve` option in the `[pytest]` scope. You may also add [plugins](https://docs.pytest.org/en/latest/plugins.html) including the plugins in the resolve:
 
 ```toml pants.toml
+[python.resolves]
+pytest = "3rdparty/python/pytest-lock.txt"
+
 [pytest]
-version = "pytest>=5.4"
-extra_requirements.add = [
-  "pytest-django>=3.9.0,<4",
-  "pytest-rerunfailures==9.0",
-]
+install_from_resolve = "pytest"
 ```
 
-If you change either `version` or `extra_requirements`, Pants's default lockfile for Pytest will not work. Either set the `lockfile` option to a custom path or `"<none>"` to opt out. See [Third-party dependencies](doc:python-third-party-dependencies#tool-lockfiles).
+Then, add a `requirements.txt` file specifying the version of `pytest` and other plugins:
+
+```Text pytest-requirements.txt
+pytest>=5.4
+pytest-django>=3.9.0,<4
+pytest-rerunfailures==9.0
+```
+
+Finally, generate the relevant lockfile with `pants generate-lockfiles --resolve=pytest`. For more information, see [Lockfiles for tools](doc:python-lockfiles#lockfiles-for-tools).
 
 Alternatively, if you only want to install the plugin for certain tests, you can add the plugin to the `dependencies` field of your `python_test` / `python_tests` target. See [Third-party dependencies](doc:python-third-party-dependencies) for how to install Python dependencies. For example:
 
@@ -524,7 +529,7 @@ Coverage will report data on any files encountered during the tests. You can fil
 > By default, coverage.py will only report on files encountered during the tests' run. This means
 > that your coverage score may be misleading; even with a score of 100%, you may have files
 > without any tests.
-> 
+>
 > Instead, you can set `global_report = true`:
 >
 > ```toml pants.toml
