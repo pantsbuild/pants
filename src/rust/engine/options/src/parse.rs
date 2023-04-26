@@ -107,7 +107,9 @@ peg::parser! {
             }
 
         rule implicit_add() -> Vec<ListEdit<String>>
-            = !(whitespace() / add() / remove() / tuple_start() / list_start()) item:string() {
+            // If the value is not prefixed with any of the syntax that we recognize as indicating
+            // our list edit syntax, then it is implicitly an Add.
+            = !(whitespace() / (action() list_start()) / (action() tuple_start()) / tuple_start() / list_start()) item:string() {
                 vec![ListEdit { action: ListEditAction::Add, items: vec![item.to_owned()] }]
             }
 

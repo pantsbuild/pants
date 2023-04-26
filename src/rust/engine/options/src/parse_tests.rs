@@ -102,6 +102,10 @@ fn test_parse_string_list_implicit_add() {
     vec![list_edit(ListEditAction::Add, vec!["foo bar"])],
     parse_string_list("foo bar").unwrap()
   );
+  assert_eq!(
+    vec![list_edit(ListEditAction::Add, ["--bar"])],
+    parse_string_list("--bar").unwrap()
+  );
 }
 
 #[test]
