@@ -34,8 +34,8 @@ class EnforceVisibilityRules(LintTargetsRequest):
     partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 
-@rule(desc="Enforce visibility rules", level=LogLevel.DEBUG)
-async def enforce_visibility_rules(
+@rule(desc="Check for visibility rule violations", level=LogLevel.DEBUG)
+async def check_visibility_rule_violations(
     request: EnforceVisibilityRules.Batch, platform: Platform, run_id: RunId
 ) -> LintResult:
     all_dependencies = await MultiGet(
@@ -55,11 +55,11 @@ async def enforce_visibility_rules(
     )
 
     violations = []
-    try:
-        for deps_rule_action in all_dependencies_rule_action:
+    for deps_rule_action in all_dependencies_rule_action:
+        try:
             deps_rule_action.execute_actions()
-    except DependencyRuleActionDeniedError as e:
-        violations.append(str(e))
+        except DependencyRuleActionDeniedError as e:
+            violations.append(str(e))
 
     return LintResult(
         exit_code=0 if not violations else 1,
