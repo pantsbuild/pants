@@ -218,7 +218,7 @@ impl ShardedFSDB {
 
     let lockfile_path = dest_path.with_extension("lock");
     let lockfile_path2 = lockfile_path.clone();
-    let _ = self
+    let _guard = self
       .executor
       .spawn_blocking(
         move || {
