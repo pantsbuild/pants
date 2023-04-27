@@ -1008,6 +1008,7 @@ dependencies = [
  "remote",
  "reqwest",
  "rule_graph",
+ "rustpython-ast",
  "rustpython-parser",
  "serde_json",
  "smallvec",
@@ -2205,7 +2206,6 @@ dependencies = [
  "autocfg",
  "num-integer",
  "num-traits",
- "serde",
 ]
 
 [[package]]
@@ -2225,7 +2225,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "02e0d21255c828d6f128a1e41534206671e8c3ea0c62f32291e808dc82cff17d"
 dependencies = [
  "num-traits",
- "serde",
 ]
 
 [[package]]
@@ -2501,30 +2500,30 @@ dependencies = [
 
 [[package]]
 name = "phf"
-version = "0.10.1"
+version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fabbf1ead8a5bcbc20f5f8b939ee3f5b0f6f281b6ad3468b84656b658b455259"
+checksum = "928c6535de93548188ef63bb7c4036bd415cd8f36ad25af44b9789b2ee72a48c"
 dependencies = [
- "phf_shared",
+ "phf_shared 0.11.1",
 ]
 
 [[package]]
 name = "phf_codegen"
-version = "0.10.0"
+version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4fb1c3a8bc4dd4e5cfce29b44ffc14bedd2ee294559a294e2a4d4c9e9a6a13cd"
+checksum = "a56ac890c5e3ca598bbdeaa99964edb5b0258a583a9eb6ef4e89fc85d9224770"
 dependencies = [
  "phf_generator",
- "phf_shared",
+ "phf_shared 0.11.1",
 ]
 
 [[package]]
 name = "phf_generator"
-version = "0.10.0"
+version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5d5285893bb5eb82e6aaf5d59ee909a06a16737a8970984dd7746ba9283498d6"
+checksum = "b1181c94580fa345f50f19d738aaa39c0ed30a600d95cb2d3e23f94266f14fbf"
 dependencies = [
- "phf_shared",
+ "phf_shared 0.11.1",
  "rand 0.8.5",
 ]
 
@@ -2533,6 +2532,15 @@ name = "phf_shared"
 version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b6796ad771acdc0123d2a88dc428b5e38ef24456743ddb1744ed628f9815c096"
+dependencies = [
+ "siphasher",
+]
+
+[[package]]
+name = "phf_shared"
+version = "0.11.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e1fb5f6f826b772a8d4c0394209441e7d37cbbb967ae9c7e0e8134365c9ee676"
 dependencies = [
  "siphasher",
 ]
@@ -3306,7 +3314,7 @@ dependencies = [
 [[package]]
 name = "rustpython-ast"
 version = "0.2.0"
-source = "git+https://github.com/RustPython/RustPython.git?rev=c7faae9b22ce31a3ba1f2cc1cd3ad759b54ce100#c7faae9b22ce31a3ba1f2cc1cd3ad759b54ce100"
+source = "git+https://github.com/thejcannon/RustPython.git?rev=250ac78d04ae48904ba9ee2faf1d2f4219c4e949#250ac78d04ae48904ba9ee2faf1d2f4219c4e949"
 dependencies = [
  "num-bigint 0.4.3",
  "rustpython-compiler-core",
@@ -3315,24 +3323,20 @@ dependencies = [
 [[package]]
 name = "rustpython-compiler-core"
 version = "0.2.0"
-source = "git+https://github.com/RustPython/RustPython.git?rev=c7faae9b22ce31a3ba1f2cc1cd3ad759b54ce100#c7faae9b22ce31a3ba1f2cc1cd3ad759b54ce100"
+source = "git+https://github.com/thejcannon/RustPython.git?rev=250ac78d04ae48904ba9ee2faf1d2f4219c4e949#250ac78d04ae48904ba9ee2faf1d2f4219c4e949"
 dependencies = [
- "bincode",
  "bitflags",
  "bstr 0.2.17",
  "itertools",
  "lz4_flex",
  "num-bigint 0.4.3",
  "num-complex 0.4.3",
- "serde",
- "static_assertions",
- "thiserror",
 ]
 
 [[package]]
 name = "rustpython-parser"
 version = "0.2.0"
-source = "git+https://github.com/RustPython/RustPython.git?rev=c7faae9b22ce31a3ba1f2cc1cd3ad759b54ce100#c7faae9b22ce31a3ba1f2cc1cd3ad759b54ce100"
+source = "git+https://github.com/thejcannon/RustPython.git?rev=250ac78d04ae48904ba9ee2faf1d2f4219c4e949#250ac78d04ae48904ba9ee2faf1d2f4219c4e949"
 dependencies = [
  "ahash",
  "anyhow",
@@ -3347,7 +3351,6 @@ dependencies = [
  "rustc-hash",
  "rustpython-ast",
  "rustpython-compiler-core",
- "thiserror",
  "tiny-keccak",
  "unic-emoji-char",
  "unic-ucd-ident",
@@ -3694,7 +3697,7 @@ dependencies = [
  "new_debug_unreachable",
  "once_cell",
  "parking_lot 0.12.1",
- "phf_shared",
+ "phf_shared 0.10.0",
  "precomputed-hash",
 ]
 
@@ -4345,9 +4348,11 @@ checksum = "8ccb82d61f80a663efe1f787a51b16b5a51e3314d6ac365b08639f52387b33f3"
 
 [[package]]
 name = "unicode_names2"
-version = "0.5.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "029df4cc8238cefc911704ff8fa210853a0f3bce2694d8f51181dd41ee0f3301"
+version = "0.6.0"
+source = "git+https://github.com/youknowone/unicode_names2.git?rev=4ce16aa85cbcdd9cc830410f1a72ef9a235f2fde#4ce16aa85cbcdd9cc830410f1a72ef9a235f2fde"
+dependencies = [
+ "phf",
+]
 
 [[package]]
 name = "unindent"

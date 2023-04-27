@@ -154,7 +154,10 @@ reqwest = { version = "0.11", default_features = false, features = ["stream", "r
 rule_graph = { path = "rule_graph" }
 rustpython-parser = { features = [
   "lalrpop",
-], git = "https://github.com/RustPython/RustPython.git", rev = "c7faae9b22ce31a3ba1f2cc1cd3ad759b54ce100" }
+], git = "https://github.com/thejcannon/RustPython.git", rev = "250ac78d04ae48904ba9ee2faf1d2f4219c4e949" }
+rustpython-ast = { features = [
+  "visitor",
+], git = "https://github.com/thejcannon/RustPython.git", rev = "250ac78d04ae48904ba9ee2faf1d2f4219c4e949" }
 smallvec = { version = "1", features=["union"] }
 stdio = { path = "stdio" }
 store = { path = "fs/store" }
