@@ -323,6 +323,7 @@ impl UnderlyingByteStore for ShardedFSDB {
   }
 
   async fn remove(&self, fingerprint: Fingerprint) -> Result<bool, String> {
+    // NB: We don't remove the lockfile. No technical reason, we just don't.
     Ok(
       tokio::fs::remove_file(self.get_path(fingerprint))
         .await
@@ -433,6 +434,12 @@ impl UnderlyingByteStore for ShardedFSDB {
                 })?;
                 let path = large_file.path();
                 let hash = path.file_name().unwrap().to_str().unwrap();
+
+                if hash.contains('.') {
+                  // NB: each entry has the actual file and a .lock file, so skip the lockfiles.
+                  continue;
+                }
+
                 let (length, mtime) = large_file
                   .metadata()
                   .and_then(|metadata| {
