@@ -82,8 +82,25 @@ class NfpmPlatformField(StringField):
     valid_choices = GoOS
 
 
-# TODO: maybe add a package name field as well
-NFPM_COMMON_FIELDS = (NfpmArchField, NfpmPlatformField)
+class NfpmVersionField(StringField):
+    alias = "version"
+    required = True
+    help = help_text(
+        """
+        The package version (preferably following semver).
+
+        Some package managers, like deb, require the version start
+        with a digit. Hence, you should not prefix the version with 'v'.
+        """
+    )
+
+NFPM_COMMON_FIELDS = (
+    # TODO: maybe add a package name field as well
+    NfpmArchField,
+    NfpmPlatformField,
+    NfpmVersionField,
+    # Other Version fields are package-specific, not COMMON
+)
 
 
 class NfpmApkPackage(Target):
