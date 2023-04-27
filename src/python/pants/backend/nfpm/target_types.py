@@ -5,6 +5,10 @@ from __future__ import annotations
 
 from enum import Enum
 
+from pants.backend.nfpm.apk_fields import NfpmApkMaintainerField
+from pants.backend.nfpm.archlinux_fields import NfpmArchlinuxPackagerField
+from pants.backend.nfpm.deb_fields import NfpmDebMaintainerField
+from pants.backend.nfpm.rpm_fields import NfpmRpmPackagerField
 from pants.backend.nfpm.version_fields import (
     NfpmVersionEpochField,
     NfpmVersionField,
@@ -64,7 +68,7 @@ class GoOS(Enum):
 
 class NfpmArchField(StringField):
     alias = "arch"
-    required = True
+    default = GoArch.amd64.value  # based on nFPM default
     help = help_text(
         """
         The package architecture.
@@ -81,7 +85,7 @@ class NfpmArchField(StringField):
 class NfpmPlatformField(StringField):
     alias = "platform"
     valid_choices = GoOS
-    default = GoOS.linux.value
+    default = GoOS.linux.value  # based on nFPM default
     help = help_text(
         """
         The package platform.
@@ -147,6 +151,7 @@ class NfpmApkPackage(Target):
         # other package metadata fields
         NfpmHomepageField,
         NfpmLicenseField,
+        NfpmApkMaintainerField,
     )
     help = help_text(
         f""""
@@ -175,6 +180,7 @@ class NfpmArchlinuxPackage(Target):
         # other package metadata fields
         NfpmHomepageField,
         NfpmLicenseField,
+        NfpmArchlinuxPackagerField,
     )
     help = help_text(
         f""""
@@ -205,6 +211,7 @@ class NfpmDebPackage(Target):
         # other package metadata fields
         NfpmHomepageField,
         NfpmLicenseField,  # not used by nFPM yet.
+        NfpmDebMaintainerField,
     )
     help = help_text(
         f""""
@@ -235,6 +242,7 @@ class NfpmRpmPackage(Target):
         # other package metadata fields
         NfpmHomepageField,
         NfpmLicenseField,
+        NfpmRpmPackagerField,
     )
     help = help_text(
         f""""
