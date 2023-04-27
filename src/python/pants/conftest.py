@@ -33,7 +33,6 @@ def dedicated_target_fields():
                     )
                 if (
                     issubclass(field_cls, Dependencies)
-                    and field_cls is not Dependencies
                     and field_cls.__module__ is Dependencies.__module__
                 ):
                     raise ValueError(
