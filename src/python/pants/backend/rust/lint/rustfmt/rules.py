@@ -11,10 +11,8 @@ from pants.backend.rust.lint.rustfmt.subsystem import RustfmtSubsystem
 from pants.backend.rust.target_types import RustCrateSourcesField
 from pants.backend.rust.util_rules.toolchains import RustToolchainProcess
 from pants.core.goals.fmt import FmtRequest, FmtResult
-from pants.engine.fs import Digest
-from pants.engine.internals.native_engine import Snapshot, MergeDigests
 from pants.engine.internals.selectors import Get
-from pants.engine.process import Process, ProcessResult
+from pants.engine.process import ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import FieldSet, Target
 from pants.util.logging import LogLevel

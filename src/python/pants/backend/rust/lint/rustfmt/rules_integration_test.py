@@ -165,3 +165,13 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
         },
     )
     assert fmt_result.did_change is True
+
+
+@pytest.mark.skip(reason="TODO")
+def test_skip(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {"src/lib.rs": BAD_FILE, "Cargo.toml": "", "BUILD": "rust_crate(name='crate')"}
+    )
+    tgt = rule_runner.get_target(Address("", target_name="crate"))
+    fmt_result = run_rustfmt(rule_runner, [tgt], extra_args=["--rustfmt-skip"])
+    assert fmt_result.did_change is False
