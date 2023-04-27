@@ -4,9 +4,6 @@
 from __future__ import annotations
 
 import inspect
-import io
-import json
-import zipfile
 from textwrap import dedent
 
 import pytest
@@ -15,6 +12,7 @@ from pants.backend.go import target_type_rules
 from pants.backend.go.goals.test import GoTestFieldSet, GoTestRequest
 from pants.backend.go.goals.test import rules as _test_rules
 from pants.backend.go.target_types import GoModTarget, GoPackageTarget
+from pants.backend.go.testutil import gen_module_gomodproxy
 from pants.backend.go.util_rules import (
     assembly,
     build_pkg,
@@ -53,7 +51,11 @@ def rule_runner() -> RuleRunner:
             get_filtered_environment,
             QueryRule(TestResult, [GoTestRequest.Batch]),
         ],
-        target_types=[GoModTarget, GoPackageTarget, ResourceTarget],
+        target_types=[
+            GoModTarget,
+            GoPackageTarget,
+            ResourceTarget,
+        ],
     )
     rule_runner.set_options(["--go-test-args=-v -bench=."], env_inherit={"PATH"})
     return rule_runner
@@ -262,31 +264,28 @@ def test_third_party_package_embed(rule_runner: RuleRunner) -> None:
     # Build the zip file and other content needed to simulate a third-party module.
     import_path = "pantsbuild.org/go-embed-sample-for-test"
     version = "v0.0.1"
-    go_mod_content = dedent(
-        f"""\
-        module {import_path}
-        go 1.16
-        """
-    )
     embed_content = "This message comes from an embedded file."
-    mod_zip_bytes = io.BytesIO()
-    with zipfile.ZipFile(mod_zip_bytes, "w") as mod_zip:
-        prefix = f"{import_path}@{version}"
-        mod_zip.writestr(f"{prefix}/go.mod", go_mod_content)
-        mod_zip.writestr(
-            f"{prefix}/pkg/message.go",
-            dedent(
-                """\
-            package pkg
-            import _ "embed"
-            //go:embed message.txt
-            var Message string
-            """
+    fake_gomod = gen_module_gomodproxy(
+        version,
+        import_path,
+        (
+            (
+                "pkg/message.go",
+                dedent(
+                    """\
+        package pkg
+        import _ "embed"
+        //go:embed message.txt
+        var Message string
+        """
+                ),
             ),
-        )
-        mod_zip.writestr(f"{prefix}/pkg/message.txt", embed_content)
+            ("pkg/message.txt", embed_content),
+        ),
+    )
 
-    rule_runner.write_files(
+    # mypy gets sad if update is reversed or ** is used here
+    fake_gomod.update(
         {
             "BUILD": dedent(
                 """
@@ -321,19 +320,10 @@ def test_third_party_package_embed(rule_runner: RuleRunner) -> None:
                 }}
                 """
             ),
-            # Setup the third-party dependency as a custom Go module proxy site.
-            # See https://go.dev/ref/mod#goproxy-protocol for details.
-            f"go-mod-proxy/{import_path}/@v/list": f"{version}\n",
-            f"go-mod-proxy/{import_path}/@v/{version}.info": json.dumps(
-                {
-                    "Version": version,
-                    "Time": "2022-01-01T01:00:00Z",
-                }
-            ),
-            f"go-mod-proxy/{import_path}/@v/{version}.mod": go_mod_content,
-            f"go-mod-proxy/{import_path}/@v/{version}.zip": mod_zip_bytes.getvalue(),
         }
     )
+
+    rule_runner.write_files(fake_gomod)
 
     rule_runner.set_options(
         [

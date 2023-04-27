@@ -79,6 +79,13 @@ class Category(Enum):
     Documentation = "documentation"
     Internal = "internal"
 
+    def heading(self):
+        if self == Category.Internal:
+            return "Internal (put these in a PR comment for review, not the release notes)"
+        return " ".join(
+            re.sub(r"([A-Z][a-z]+)", r" \1", re.sub(r"([A-Z]+)", r" \1", self.name)).split()
+        )
+
 
 @dataclass(frozen=True)
 class Entry:
@@ -153,7 +160,12 @@ def instructions(new_version: str, entries: list[Entry]) -> str:
         entries_by_category[entry.category].append(entry.text)
 
     def format_entries(category: Category | None) -> str:
-        return "\n{lines}".format(lines="\n\n".join(entries_by_category.get(category, [])))
+        entries = entries_by_category.get(category, [])
+        heading = category.heading() if category else "Uncategorized"
+        lines = "\n\n".join(entries)
+        if not entries:
+            return ""
+        return f"\n### {heading}\n\n{lines}\n"
 
     return dedent(
         f"""\
@@ -168,28 +180,7 @@ def instructions(new_version: str, entries: list[Entry]) -> str:
         ---------------------------------------------------------------------
 
         ## {new_version} ({date})
-
-        ### New Features
-        {{new_features}}
-
-        ### User API Changes
-        {{user_api_changes}}
-
-        ### Plugin API Changes
-        {{plugin_api_changes}}
-
-        ### Bug fixes
-        {{bugfixes}}
-
-        ### Performance
-        {{performance}}
-
-        ### Documentation
-        {{documentation}}
-
-        ### Internal (put these in a PR comment for review, not the release notes)
-        {{internal}}
-
+        {{new_features}}{{user_api_changes}}{{plugin_api_changes}}{{bugfixes}}{{performance}}{{documentation}}{{internal}}
         --------------------------------------------------------------------
         {{uncategorized}}
         """

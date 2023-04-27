@@ -5,6 +5,7 @@
 
 These are always activated and cannot be disabled.
 """
+from pants.backend.codegen import export_codegen_goal
 from pants.bsp.rules import rules as bsp_rules
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.core.goals import (
@@ -32,12 +33,14 @@ from pants.core.target_types import (
     LockfileTarget,
     RelocatedFiles,
     ResourcesGeneratorTarget,
+    ResourceSourceField,
     ResourceTarget,
     http_source,
     per_platform,
 )
 from pants.core.target_types import rules as target_type_rules
 from pants.core.util_rules import (
+    adhoc_binaries,
     archive,
     config_files,
     external_tool,
@@ -51,10 +54,14 @@ from pants.core.util_rules.environments import (
     LocalEnvironmentTarget,
     RemoteEnvironmentTarget,
 )
+from pants.core.util_rules.wrap_source import wrap_source_rule_and_target
 from pants.engine.internals.parametrize import Parametrize
 from pants.goal import anonymous_telemetry, stats_aggregator
 from pants.source import source_root
 from pants.vcs import git
+from pants.version import PANTS_SEMVER
+
+wrap_as_resources = wrap_source_rule_and_target(ResourceSourceField, "resources")
 
 
 def rules():
@@ -63,6 +70,7 @@ def rules():
         *check.rules(),
         *deploy.rules(),
         *export.rules(),
+        *export_codegen_goal.rules(),
         *fmt.rules(),
         *fix.rules(),
         *generate_lockfiles.rules(),
@@ -76,6 +84,7 @@ def rules():
         *test.rules(),
         *bsp_rules(),
         # util_rules
+        *adhoc_binaries.rules(),
         *anonymous_telemetry.rules(),
         *archive.rules(),
         *config_files.rules(),
@@ -88,6 +97,7 @@ def rules():
         *subprocess_environment.rules(),
         *system_binaries.rules(),
         *target_type_rules(),
+        *wrap_as_resources.rules,
     ]
 
 
@@ -105,12 +115,14 @@ def target_types():
         RemoteEnvironmentTarget,
         ResourcesGeneratorTarget,
         ResourceTarget,
+        *wrap_as_resources.target_types,
     ]
 
 
 def build_file_aliases():
     return BuildFileAliases(
         objects={
+            "PANTS_VERSION": PANTS_SEMVER,
             "http_source": http_source,
             "per_platform": per_platform,
             "parametrize": Parametrize,

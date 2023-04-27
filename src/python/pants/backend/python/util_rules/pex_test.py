@@ -47,8 +47,8 @@ from pants.backend.python.util_rules.pex_requirements import (
     LoadedLockfile,
     LoadedLockfileRequest,
     Lockfile,
-    LockfileContent,
     PexRequirements,
+    Resolve,
     ResolvePexConfig,
     ResolvePexConfigRequest,
 )
@@ -396,7 +396,7 @@ def test_lockfiles(rule_runner: RuleRunner) -> None:
     def create_lock(path: str) -> None:
         lock = Lockfile(
             path,
-            file_path_description_of_origin="foo",
+            url_description_of_origin="foo",
             resolve_name="a",
         )
         create_pex_and_get_pex_info(
@@ -503,9 +503,10 @@ def test_local_requirements_and_path_mappings(
             [
                 GeneratePythonLockfile(
                     requirements=FrozenOrderedSet([wheel_req_str]),
-                    interpreter_constraints=InterpreterConstraints(),
+                    interpreter_constraints=InterpreterConstraints([">=3.7,<4"]),
                     resolve_name="test",
                     lockfile_dest="test.lock",
+                    diff=False,
                 )
             ],
         )
@@ -515,8 +516,10 @@ def test_local_requirements_and_path_mappings(
         assert b"${WHEEL_DIR}/ansicolors-1.1.8-py2.py3-none-any.whl" in lock_file_content.content
         assert b"files.pythonhosted.org" not in lock_file_content.content
 
+        rule_runner.write_files({"test.lock": lock_file_content.content})
         lockfile_obj = EntireLockfile(
-            LockfileContent(lock_file_content, resolve_name="test"), (wheel_req_str,)
+            Lockfile(url="test.lock", url_description_of_origin="test", resolve_name="test"),
+            (wheel_req_str,),
         )
 
         # Wipe cache to ensure `--path-mappings` works.
@@ -606,8 +609,8 @@ def test_venv_pex_resolve_info(rule_runner: RuleRunner, pex_type: type[Pex | Ven
 
 
 def test_determine_pex_python_and_platforms() -> None:
-    hardcoded_python = PythonExecutable("hardcoded/python")
-    discovered_python = PythonExecutable("discovered/python")
+    hardcoded_python = PythonExecutable("/hardcoded/python")
+    discovered_python = PythonExecutable("/discovered/python")
     ics = InterpreterConstraints(["==3.7"])
 
     def assert_setup(
@@ -679,9 +682,7 @@ def test_setup_pex_requirements() -> None:
 
     lockfile_path = "foo.lock"
     lockfile_digest = rule_runner.make_snapshot_of_empty_files([lockfile_path]).digest
-    lockfile_obj = Lockfile(
-        lockfile_path, file_path_description_of_origin="foo", resolve_name="resolve"
-    )
+    lockfile_obj = Lockfile(lockfile_path, url_description_of_origin="foo", resolve_name="resolve")
 
     def create_loaded_lockfile(is_pex_lock: bool) -> LoadedLockfile:
         return LoadedLockfile(
@@ -709,6 +710,11 @@ def test_setup_pex_requirements() -> None:
             _setup_pex_requirements,
             rule_args=[request, create_subsystem(PythonSetup)],
             mock_gets=[
+                MockGet(
+                    output_type=Lockfile,
+                    input_types=(Resolve,),
+                    mock=lambda _: lockfile_obj,
+                ),
                 MockGet(
                     output_type=LoadedLockfile,
                     input_types=(LoadedLockfileRequest,),
@@ -770,7 +776,7 @@ def test_setup_pex_requirements() -> None:
 
     # Subset of Pex lockfile.
     assert_setup(
-        PexRequirements(["req1"], from_superset=create_loaded_lockfile(is_pex_lock=True)),
+        PexRequirements(["req1"], from_superset=Resolve("resolve", False)),
         _BuildPexRequirementsSetup(
             [lockfile_digest], ["req1", "--lock", lockfile_path, *pex_args], 1
         ),
@@ -801,7 +807,7 @@ def test_build_pex_description() -> None:
             requirements=requirements,
             description=description,
         )
-        assert _build_pex_description(request) == expected
+        assert _build_pex_description(request, {}) == expected
 
     repo_pex = Pex(EMPTY_DIGEST, "repo.pex", None)
 
@@ -832,8 +838,9 @@ def test_build_pex_description() -> None:
 
     assert_description(
         EntireLockfile(
-            LockfileContent(
-                file_content=FileContent("lock.txt", b""),
+            Lockfile(
+                url="lock.txt",
+                url_description_of_origin="test",
                 resolve_name="a",
             )
         ),
@@ -843,8 +850,8 @@ def test_build_pex_description() -> None:
     assert_description(
         EntireLockfile(
             Lockfile(
-                file_path="lock.txt",
-                file_path_description_of_origin="foo",
+                url="lock.txt",
+                url_description_of_origin="foo",
                 resolve_name="a",
             )
         ),
@@ -871,21 +878,12 @@ def test_lockfile_validation(rule_runner: RuleRunner) -> None:
     ).add_header_to_lockfile(b"", regenerate_command="regen", delimeter="#")
     rule_runner.write_files({"lock.txt": lock_content.decode()})
 
-    lockfile = Lockfile(
+    _lockfile = Lockfile(
         "lock.txt",
-        file_path_description_of_origin="a test",
+        url_description_of_origin="a test",
         resolve_name="a",
     )
     with engine_error(InvalidLockfileError):
         create_pex_and_get_all_data(
-            rule_runner, requirements=EntireLockfile(lockfile, ("ansicolors",))
-        )
-
-    lockfile_content = LockfileContent(
-        FileContent("lock.txt", lock_content),
-        resolve_name="a",
-    )
-    with engine_error(InvalidLockfileError):
-        create_pex_and_get_all_data(
-            rule_runner, requirements=EntireLockfile(lockfile_content, ("ansicolors",))
+            rule_runner, requirements=EntireLockfile(_lockfile, ("ansicolors",))
         )

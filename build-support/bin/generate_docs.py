@@ -134,7 +134,7 @@ class DocUrlRewriter:
 class TitleFinder(HTMLParser):
     """Grabs the page title out of a docsite page."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         self._in_title: bool = False
         self._title: str | None = None
@@ -242,6 +242,7 @@ def run_pants_help_all() -> dict[str, Any]:
         "pants.backend.codegen.thrift.apache.python",
         "pants.backend.docker",
         "pants.backend.docker.lint.hadolint",
+        "pants.backend.experimental.adhoc",
         "pants.backend.experimental.codegen.protobuf.go",
         "pants.backend.experimental.codegen.protobuf.java",
         "pants.backend.experimental.codegen.protobuf.scala",
@@ -254,6 +255,7 @@ def run_pants_help_all() -> dict[str, Any]:
         "pants.backend.experimental.openapi",
         "pants.backend.experimental.openapi.lint.spectral",
         "pants.backend.experimental.python",
+        "pants.backend.experimental.python.framework.stevedore",
         "pants.backend.experimental.python.lint.add_trailing_comma",
         "pants.backend.experimental.python.lint.autoflake",
         "pants.backend.experimental.python.lint.pyupgrade",
@@ -261,6 +263,7 @@ def run_pants_help_all() -> dict[str, Any]:
         "pants.backend.experimental.scala",
         "pants.backend.experimental.scala.lint.scalafmt",
         "pants.backend.experimental.terraform",
+        "pants.backend.experimental.tools.yamllint",
         "pants.backend.google_cloud_function.python",
         "pants.backend.plugin_development",
         "pants.backend.python",
@@ -269,6 +272,7 @@ def run_pants_help_all() -> dict[str, Any]:
         "pants.backend.python.lint.docformatter",
         "pants.backend.python.lint.flake8",
         "pants.backend.python.lint.isort",
+        "pants.backend.python.lint.pydocstyle",
         "pants.backend.python.lint.pylint",
         "pants.backend.python.lint.yapf",
         "pants.backend.python.mixed_interpreter_constraints",
@@ -276,6 +280,7 @@ def run_pants_help_all() -> dict[str, Any]:
         "pants.backend.shell",
         "pants.backend.shell.lint.shellcheck",
         "pants.backend.shell.lint.shfmt",
+        "pants.backend.tools.preamble",
     ]
     argv = [
         "./pants",
@@ -283,7 +288,6 @@ def run_pants_help_all() -> dict[str, Any]:
         "--plugins=[]",
         f"--backend-packages={repr(backends)}",
         "--no-verify-config",
-        "--remote-auth-plugin= ",
         "help-all",
     ]
     run = subprocess.run(argv, stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding="utf-8")
@@ -556,6 +560,7 @@ class ReferenceGenerator:
 
         The individual reference pages are nested under these parent pages.
         """
+
         # Docs appear on the site in creation order.  If we only create new docs
         # that don't already exist then they will appear at the end, instead of in
         # alphabetical order. So we first delete all previous docs, then recreate them.

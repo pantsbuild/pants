@@ -780,12 +780,8 @@ impl DigestTrie {
     let mut prefix_iter = prefix.iter();
     let mut tree = self;
     while let Some(parent) = prefix_iter.next_back() {
-      let directory = Directory {
-        name: first_path_component_to_name(parent.as_ref())?,
-        digest: tree.compute_root_digest(),
-        tree,
-      };
-
+      let directory =
+        Directory::from_digest_tree(first_path_component_to_name(parent.as_ref())?, tree);
       tree = DigestTrie(vec![Entry::Directory(directory)].into());
     }
 
@@ -1202,7 +1198,7 @@ fn first_path_component_to_name(path: &Path) -> Result<Name, String> {
   let name = first_path_component
     .as_os_str()
     .to_str()
-    .ok_or_else(|| format!("{:?} is not representable in UTF8", first_path_component))?;
+    .ok_or_else(|| format!("{first_path_component:?} is not representable in UTF8"))?;
   Ok(Name(Intern::from(name)))
 }
 

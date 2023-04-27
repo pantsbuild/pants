@@ -36,7 +36,7 @@ from pants.backend.go.util_rules.go_mod import (
     OwningGoMod,
     OwningGoModRequest,
 )
-from pants.backend.go.util_rules.import_analysis import GoStdLibImports, GoStdLibImportsRequest
+from pants.backend.go.util_rules.import_analysis import GoStdLibPackages, GoStdLibPackagesRequest
 from pants.backend.go.util_rules.third_party_pkg import (
     AllThirdPartyPackages,
     AllThirdPartyPackagesRequest,
@@ -91,7 +91,7 @@ async def go_map_import_paths_by_module(
     candidate_go_source_targets = [
         tgt
         for tgt in all_targets
-        if tgt.has_field(GoImportPathField) or tgt.has_field(GoPackageSourcesField)
+        if (tgt.has_field(GoImportPathField) or tgt.has_field(GoPackageSourcesField))
     ]
 
     owning_go_mod_targets = await MultiGet(
@@ -225,13 +225,13 @@ async def infer_go_dependencies(
     )
 
     addr = request.field_set.address
-    maybe_pkg_analysis, std_lib_imports = await MultiGet(
+    maybe_pkg_analysis, stdlib_packages = await MultiGet(
         Get(
             FallibleFirstPartyPkgAnalysis, FirstPartyPkgAnalysisRequest(addr, build_opts=build_opts)
         ),
         Get(
-            GoStdLibImports,
-            GoStdLibImportsRequest(with_race_detector=build_opts.with_race_detector),
+            GoStdLibPackages,
+            GoStdLibPackagesRequest(with_race_detector=build_opts.with_race_detector),
         ),
     )
 
@@ -249,8 +249,6 @@ async def infer_go_dependencies(
         *pkg_analysis.test_imports,
         *pkg_analysis.xtest_imports,
     ):
-        if import_path in std_lib_imports:
-            continue
         # Avoid a dependency cycle caused by external test imports of this package (i.e., "xtest").
         if import_path == pkg_analysis.import_path:
             continue
@@ -305,27 +303,25 @@ async def infer_go_third_party_package_dependencies(
         Get(GoBuildOptions, GoBuildOptionsFromTargetRequest(go_mod_address)),
     )
 
-    pkg_info, std_lib_imports = await MultiGet(
+    pkg_info, stdlib_packages = await MultiGet(
         Get(
             ThirdPartyPkgAnalysis,
             ThirdPartyPkgAnalysisRequest(
                 request.field_set.import_path.value,
+                go_mod_address,
                 go_mod_info.digest,
                 go_mod_info.mod_path,
                 build_opts=build_opts,
             ),
         ),
         Get(
-            GoStdLibImports,
-            GoStdLibImportsRequest(with_race_detector=build_opts.with_race_detector),
+            GoStdLibPackages,
+            GoStdLibPackagesRequest(with_race_detector=build_opts.with_race_detector),
         ),
     )
 
     inferred_dependencies: list[Address] = []
     for import_path in pkg_info.imports:
-        if import_path in std_lib_imports:
-            continue
-
         candidate_packages = package_mapping.mapping.get(import_path, ())
         if candidate_packages:
             if candidate_packages.infer_all:
@@ -373,6 +369,7 @@ async def generate_targets_from_go_mod(
     all_packages = await Get(
         AllThirdPartyPackages,
         AllThirdPartyPackagesRequest(
+            generator_addr,
             go_mod_info.digest,
             go_mod_info.mod_path,
             # TODO: There is a rule graph cycle in this rule if this rule tries to use GoBuildOptionsFromTargetRequest.

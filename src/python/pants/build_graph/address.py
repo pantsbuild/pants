@@ -17,7 +17,6 @@ from pants.engine.internals.native_engine import (  # noqa: F401
 )
 from pants.util.dirutil import fast_relpath, longest_dir_prefix
 from pants.util.frozendict import FrozenDict
-from pants.util.meta import frozen_after_init
 from pants.util.strutil import bullet_list, softwrap, strip_prefix
 
 # `:`, `#`, `@` are used as delimiters already. Others are reserved for possible future needs.
@@ -46,8 +45,7 @@ class UnsupportedWildcardError(InvalidAddressError):
     """Indicate that an address wildcard was used."""
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class AddressInput:
     """A string that has been parsed and normalized using the Address syntax.
 
@@ -70,12 +68,15 @@ class AddressInput:
         parameters: Mapping[str, str] = FrozenDict(),
         description_of_origin: str,
     ) -> None:
-        self.path_component = path_component
-        self.target_component = target_component
-        self.generated_component = generated_component
-        self.parameters = FrozenDict(parameters)
-        self.description_of_origin = description_of_origin
+        object.__setattr__(self, "path_component", path_component)
+        object.__setattr__(self, "target_component", target_component)
+        object.__setattr__(self, "generated_component", generated_component)
+        object.__setattr__(self, "parameters", FrozenDict(parameters))
+        object.__setattr__(self, "description_of_origin", description_of_origin)
 
+        self.__post_init__()
+
+    def __post_init__(self):
         if not self.target_component:
             if self.target_component is not None:
                 raise InvalidTargetNameError(

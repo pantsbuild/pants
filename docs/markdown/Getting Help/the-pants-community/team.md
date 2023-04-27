@@ -4,7 +4,6 @@ slug: "team"
 excerpt: ""
 hidden: false
 createdAt: "2022-08-15T22:36:48.659Z"
-updatedAt: "2022-09-08T00:28:12.217Z"
 ---
 Pants open source project has had many team members in over a decade. The current team is comprised of elected Contributors and Maintainers, who are nominated based on [criteria](doc:the-pants-community#how-is-the-community-structured) including demonstrated commitment to the project and a track record of contributions to the project and community.
 
@@ -25,11 +24,13 @@ Pants open source project has had many team members in over a decade. The curren
 | **Benjy Weinberger**       | "The options system — unifying our flags, config and env vars into a coherent, extensible framework." |
 | **Carina C. Zona**         | "Developing the #welcome channel on Pants community chat"                                             |
 | **Christopher Neugebauer** | Adding multi-architecture Mac support for Apple Silicon (M1s)                                         |
-| **Dan Moran**            | "Enabling batched `pytest` execution in `./pants test`"                                          |
+| **Dan Moran**            | "Enabling batched `pytest` execution in `pants test`"                                          |
 | **Daniel Wagner-Hall**     | Laid the foundation for remote execution                                                              |
 | **Danny McClanahan**       | Implemented bounded runtime polymorphism with union rules and improved plugin UX with async/await     |
 | **Eric Arellano**          | "Migrating Pants to Python 3 for my internship project"                                               |
 | **Henry Fuller**           | "Working on replacing watchman with a kernel based file watcher in the V2 engine"                     |
+| **Huon Wilson**            | "Improving the experiencing of using `mypy` with Pants"          |
+| **Jacob Floyd**            | Gave the idea for `skip_flake8` et al, which grew into a flagship feature: incremental adoption          |
 | **John Sirois**            |                                                                                                       |
 | **Josh Reed**              | "Remains continually willing to bikeshed about design decisions on the Pants Slack"                   |
 | **Joshua Cannon**          | "I'm proud and thankful my voice can and is being used to shape Pants inside and out"                 |
@@ -46,8 +47,9 @@ Pants open source project has had many team members in over a decade. The curren
 | **NAME**                | **PROUDEST CONTRIBUTION**                                                                                |
 |-------------------------|----------------------------------------------------------------------------------------------------------|
 | **Chris Williams**      |                                                                                                          |
+| **Daniel Goldman**      | "Pants metaprogramming"                                                                                                         |
+| **Darcy Shen**      | "Exploring the best Pants practice for Data and ML Engineering in Python and Scala"                                                                                                         |
 | **Doron Somech**        | "Improving Scala dependency inference to support our codebase"                                           |
-| **Jacob Floyd**         | Gave the idea for `skip_flake8` et al, which grew into a flagship feature: incremental adoption          |
 | **Jonas Stendahl**      | "Adding formatting and linting support for Protobuf"                                                     |
 | **Marcelo Trylesinski** | "Improving onboarding experience"                                                                        |
 | **Nick Grisafi**        | "Participating in podcasts with maintainers (Eric and Josh) on developer experience and Pants!"          |
@@ -56,6 +58,7 @@ Pants open source project has had many team members in over a decade. The curren
 | **Shantanu Kumar**      |                                                                                                          |
 | **Tansy Arron-Walker**  | "Writing my first task in the new engine was really exciting!"                                           |
 | **Thales Menato**       | "Making sure Pants can run even under heavily secured work environments!"                                |
+| **Tobias Nilsson**       | "Implementing Javascript dependency inference and nodejs workspaces the Pants way"                                |
 
 ***
 

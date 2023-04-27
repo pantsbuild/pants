@@ -77,7 +77,7 @@ impl SpanId {
 
 impl std::fmt::Display for SpanId {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    write!(f, "{:016.x}", self.0)
+    write!(f, "{:016x}", self.0)
   }
 }
 
@@ -262,6 +262,14 @@ pub struct Workunit {
 }
 
 impl Workunit {
+  // If the workunit has completed, its TimeSpan.
+  pub fn time_span(&self) -> Option<TimeSpan> {
+    match self.state {
+      WorkunitState::Started { .. } => None,
+      WorkunitState::Completed { time_span } => Some(time_span),
+    }
+  }
+
   fn log_workunit_state(&self, canceled: bool) {
     let metadata = match self.metadata.as_ref() {
       Some(metadata) if log::log_enabled!(self.level) => metadata,
@@ -290,16 +298,13 @@ impl Workunit {
     let effective_identifier = if identifier.len() > max_len {
       let truncated_identifier: String = identifier.chars().take(max_len).collect();
       let trunc = identifier.len() - max_len;
-      format!(
-        "{}... ({} characters truncated)",
-        truncated_identifier, trunc
-      )
+      format!("{truncated_identifier}... ({trunc} characters truncated)")
     } else {
       identifier.to_string()
     };
 
     let message = if let Some(ref s) = metadata.message {
-      format!(" - {}", s)
+      format!(" - {s}")
     } else {
       "".to_string()
     };

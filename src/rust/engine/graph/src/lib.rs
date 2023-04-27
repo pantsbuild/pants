@@ -348,11 +348,11 @@ impl<N: Node> InnerGraph<N> {
     Ok(())
   }
 
-  fn live_reachable<'g>(
-    &'g self,
+  fn live_reachable(
+    &self,
     roots: &[N],
     context: &N::Context,
-  ) -> impl Iterator<Item = (&N, N::Item)> + 'g {
+  ) -> impl Iterator<Item = (&N, N::Item)> {
     // TODO: This is a surprisingly expensive method, because it will clone all reachable values by
     // calling `peek` on them.
     let root_ids = roots
@@ -368,7 +368,7 @@ impl<N: Node> InnerGraph<N> {
     )
   }
 
-  fn live<'g>(&'g self, context: &N::Context) -> impl Iterator<Item = (&N, N::Item)> + 'g {
+  fn live(&self, context: &N::Context) -> impl Iterator<Item = (&N, N::Item)> {
     self.live_internal(self.pg.node_indices().collect(), context.clone())
   }
 
@@ -402,7 +402,7 @@ impl<N: Node> Graph<N> {
       nodes: HashMap::default(),
       pg: DiGraph::new(),
     }));
-    let _join = executor.spawn(Self::cycle_check_task(Arc::downgrade(&inner)));
+    let _join = executor.native_spawn(Self::cycle_check_task(Arc::downgrade(&inner)));
 
     Graph {
       inner,
@@ -440,7 +440,7 @@ impl<N: Node> Graph<N> {
     src_id: Option<EntryId>,
     context: &N::Context,
     dst_node: N,
-  ) -> Result<(N::Item, Generation), N::Error> {
+  ) -> (Result<N::Item, N::Error>, Generation) {
     // Compute information about the dst under the Graph lock, and then release it.
     let (dst_retry, mut entry, entry_id) = {
       // Get or create the destination, and then insert the dep and return its state.
@@ -478,8 +478,7 @@ impl<N: Node> Graph<N> {
       let context = context.clone();
       loop {
         match entry.get_node_result(&context, entry_id).await {
-          Ok(r) => break Ok(r),
-          Err(err) if err == N::Error::invalidated() => {
+          (Err(err), _) if err == N::Error::invalidated() => {
             let node = {
               let inner = self.inner.lock();
               inner.unsafe_entry_for_id(entry_id).node().clone()
@@ -491,7 +490,7 @@ impl<N: Node> Graph<N> {
             sleep(self.invalidation_delay).await;
             continue;
           }
-          Err(other_err) => break Err(other_err),
+          res => break res,
         }
       }
     } else {
@@ -515,8 +514,8 @@ impl<N: Node> Graph<N> {
     context: &N::Context,
     dst_node: N,
   ) -> Result<N::Item, N::Error> {
-    let (res, _generation) = self.get_inner(src_id, context, dst_node).await?;
-    Ok(res)
+    let (res, _generation) = self.get_inner(src_id, context, dst_node).await;
+    res
   }
 
   ///
@@ -536,7 +535,7 @@ impl<N: Node> Graph<N> {
     token: Option<LastObserved>,
     delay: Option<Duration>,
     context: &N::Context,
-  ) -> Result<(N::Item, LastObserved), N::Error> {
+  ) -> (Result<N::Item, N::Error>, LastObserved) {
     // If the node is currently clean at the given token, Entry::poll will delay until it has
     // changed in some way.
     if let Some(LastObserved(generation)) = token {
@@ -552,8 +551,8 @@ impl<N: Node> Graph<N> {
     };
 
     // Re-request the Node.
-    let (res, generation) = self.get_inner(None, context, node).await?;
-    Ok((res, LastObserved(generation)))
+    let (res, generation) = self.get_inner(None, context, node).await;
+    (res, LastObserved(generation))
   }
 
   ///
@@ -595,10 +594,7 @@ impl<N: Node> Graph<N> {
             .unwrap_or_else(|| panic!("Dependency not present in Graph."))
             .clone();
           async move {
-            let (_, generation) = dep_entry
-              .get_node_result(context, dep_id)
-              .await
-              .map_err(|_| ())?;
+            let (_, generation) = dep_entry.get_node_result(context, dep_id).await;
             if generation == previous_dep_generation {
               // Matched.
               Ok(())

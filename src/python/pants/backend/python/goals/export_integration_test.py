@@ -5,13 +5,16 @@ from __future__ import annotations
 
 import os
 import platform
+import shutil
 from dataclasses import dataclass
 from textwrap import dedent
 from typing import List, Mapping, MutableMapping
 
 import pytest
 
+from pants.backend.python.goals.export import PythonResolveExportFormat
 from pants.testutil.pants_integration_test import run_pants, setup_tmpdir
+from pants.util.contextutil import temporary_dir
 
 SOURCES = {
     "3rdparty/BUILD": dedent(
@@ -21,7 +24,16 @@ SOURCES = {
         """
     ),
     "src/python/foo.py": "from colors import *",
-    "src/python/BUILD": "python_source(name='foo', source='foo.py', resolve=parametrize('a', 'b'))",
+    "src/python/BUILD": dedent(
+        """\
+        python_source(name='foo', source='foo.py', resolve=parametrize('a', 'b'))
+        python_distribution(
+            name='dist',
+            provides=python_artifact(name='foo-dist', version='1.2.3'),
+            dependencies=[':foo@resolve=a'],
+        )
+        """
+    ),
 }
 
 
@@ -40,21 +52,14 @@ class _ToolConfig:
 
 EXPORTED_TOOLS: List[_ToolConfig] = [
     _ToolConfig(name="add-trailing-comma", version="2.2.3", experimental=True),
-    _ToolConfig(name="autoflake", version="1.3.1", experimental=True),
     _ToolConfig(name="bandit", version="1.6.2", takes_ics=False),
     _ToolConfig(name="black", version="22.3.0"),
-    _ToolConfig(name="docformatter", version="1.3.1"),
-    _ToolConfig(name="flake8", version="4.0.1", takes_ics=False),
-    _ToolConfig(name="isort", version="5.10.1"),
-    _ToolConfig(name="pylint", version="2.13.1", takes_ics=False),
-    _ToolConfig(name="pyupgrade", version="2.31.1", experimental=True),
-    _ToolConfig(name="yapf", version="0.32.0"),
     _ToolConfig(name="mypy", version="0.940", backend_prefix="typecheck"),
     _ToolConfig(name="pytest", version="7.1.0", backend_prefix=None, takes_ics=False),
 ]
 
 
-def build_config(tmpdir: str, symlink_python_virtualenv: bool) -> Mapping:
+def build_config(tmpdir: str, py_resolve_format: PythonResolveExportFormat) -> Mapping:
     cfg: MutableMapping = {
         "GLOBAL": {
             "backend_packages": ["pants.backend.python"],
@@ -67,7 +72,7 @@ def build_config(tmpdir: str, symlink_python_virtualenv: bool) -> Mapping:
                 "b": f"{tmpdir}/3rdparty/b.lock",
             },
         },
-        "export": {"symlink_python_virtualenv": symlink_python_virtualenv},
+        "export": {"py_resolve_format": py_resolve_format.value},
     }
     for tool_config in EXPORTED_TOOLS:
         cfg[tool_config.name] = {
@@ -90,21 +95,46 @@ def build_config(tmpdir: str, symlink_python_virtualenv: bool) -> Mapping:
     return cfg
 
 
-@pytest.mark.parametrize("symlink_python_virtualenv", [False, True])
-def test_export(symlink_python_virtualenv: bool) -> None:
+@pytest.mark.parametrize(
+    "py_resolve_format",
+    [
+        PythonResolveExportFormat.mutable_virtualenv,
+        PythonResolveExportFormat.symlinked_immutable_virtualenv,
+    ],
+)
+def test_export(py_resolve_format: PythonResolveExportFormat) -> None:
     with setup_tmpdir(SOURCES) as tmpdir:
+        resolve_names = ["a", "b", *(tool.name for tool in EXPORTED_TOOLS)]
         run_pants(
-            ["generate-lockfiles", "export", f"{tmpdir}/::"],
-            config=build_config(tmpdir, symlink_python_virtualenv),
+            [
+                "generate-lockfiles",
+                "export",
+                *(f"--resolve={name}" for name in resolve_names),
+                "--export-py-editable-in-resolve=['a']",
+            ],
+            config=build_config(tmpdir, py_resolve_format),
         ).assert_success()
 
     export_prefix = os.path.join("dist", "export", "python", "virtualenvs")
+    assert os.path.isdir(
+        export_prefix
+    ), f"expected export prefix dir '{export_prefix}' does not exist"
     py_minor_version = f"{platform.python_version_tuple()[0]}.{platform.python_version_tuple()[1]}"
     for resolve, ansicolors_version in [("a", "1.1.8"), ("b", "1.0.2")]:
-        export_dir = os.path.join(export_prefix, resolve, platform.python_version())
+        export_resolve_dir = os.path.join(export_prefix, resolve)
+        assert os.path.isdir(
+            export_resolve_dir
+        ), f"expected export resolve dir '{export_resolve_dir}' does not exist"
+
+        export_dir = os.path.join(export_resolve_dir, platform.python_version())
         assert os.path.isdir(export_dir), f"expected export dir '{export_dir}' does not exist"
+        if py_resolve_format == PythonResolveExportFormat.symlinked_immutable_virtualenv:
+            assert os.path.islink(
+                export_dir
+            ), f"expected export dir '{export_dir}' is not a symlink"
 
         lib_dir = os.path.join(export_dir, "lib", f"python{py_minor_version}", "site-packages")
+        assert os.path.isdir(lib_dir), f"expected export lib dir '{lib_dir}' does not exist"
         expected_ansicolors_dir = os.path.join(
             lib_dir, f"ansicolors-{ansicolors_version}.dist-info"
         )
@@ -112,10 +142,31 @@ def test_export(symlink_python_virtualenv: bool) -> None:
             expected_ansicolors_dir
         ), f"expected dist-info for ansicolors '{expected_ansicolors_dir}' does not exist"
 
+        if py_resolve_format == PythonResolveExportFormat.mutable_virtualenv:
+            expected_foo_dir = os.path.join(lib_dir, "foo_dist-1.2.3.dist-info")
+            if resolve == "b":
+                assert not os.path.isdir(
+                    expected_foo_dir
+                ), f"unexpected dist-info for foo-dist '{expected_foo_dir}' exists"
+            elif resolve == "a":
+                # make sure the editable wheel for the python_distribution is installed
+                assert os.path.isdir(
+                    expected_foo_dir
+                ), f"expected dist-info for foo-dist '{expected_foo_dir}' does not exist"
+                # direct_url__pants__.json should be moved to direct_url.json
+                expected_foo_direct_url_pants = os.path.join(
+                    expected_foo_dir, "direct_url__pants__.json"
+                )
+                assert not os.path.isfile(
+                    expected_foo_direct_url_pants
+                ), f"expected direct_url__pants__.json for foo-dist '{expected_foo_direct_url_pants}' was not removed"
+                expected_foo_direct_url = os.path.join(expected_foo_dir, "direct_url.json")
+                assert os.path.isfile(
+                    expected_foo_direct_url
+                ), f"expected direct_url.json for foo-dist '{expected_foo_direct_url}' does not exist"
+
     for tool_config in EXPORTED_TOOLS:
-        export_dir = os.path.join(export_prefix, "tools", tool_config.name)
-        if symlink_python_virtualenv:
-            export_dir = os.path.join(export_dir, platform.python_version())
+        export_dir = os.path.join(export_prefix, tool_config.name, platform.python_version())
         assert os.path.isdir(export_dir), f"expected export dir '{export_dir}' does not exist"
 
         # NOTE: Not every tool implements --version so this is the best we can do.
@@ -127,3 +178,42 @@ def test_export(symlink_python_virtualenv: bool) -> None:
         assert os.path.isdir(
             expected_tool_dir
         ), f"expected dist-info for {tool_config.name} '{expected_tool_dir}' does not exist"
+
+
+def test_symlinked_venv_resilience() -> None:
+    with temporary_dir() as named_caches:
+        pex_root = os.path.join(os.path.realpath(named_caches), "pex_root")
+        with setup_tmpdir(SOURCES) as tmpdir:
+            run_pants(
+                [
+                    f"--named-caches-dir={named_caches}",
+                    "generate-lockfiles",
+                    "export",
+                    "--resolve=a",
+                ],
+                config=build_config(
+                    tmpdir, PythonResolveExportFormat.symlinked_immutable_virtualenv
+                ),
+            ).assert_success()
+
+            def check():
+                export_dir = os.path.join(
+                    "dist", "export", "python", "virtualenvs", "a", platform.python_version()
+                )
+                assert os.path.islink(export_dir)
+                export_dir_tgt = os.readlink(export_dir)
+                assert os.path.isdir(export_dir_tgt)
+                assert os.path.commonpath([pex_root, export_dir_tgt]) == pex_root
+
+            check()
+
+            shutil.rmtree(pex_root)
+
+            run_pants(
+                [f"--named-caches-dir={named_caches}", "export", "--resolve=a"],
+                config=build_config(
+                    tmpdir, PythonResolveExportFormat.symlinked_immutable_virtualenv
+                ),
+            ).assert_success()
+
+            check()

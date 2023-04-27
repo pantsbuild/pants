@@ -24,7 +24,7 @@ from typing import (
 
 from typing_extensions import ParamSpec, Protocol
 
-from pants.base.deprecated import warn_or_error
+from pants.base.deprecated import deprecated
 from pants.engine.engine_aware import SideEffecting
 from pants.engine.goal import Goal
 from pants.engine.internals.rule_visitor import collect_awaitables
@@ -35,29 +35,10 @@ from pants.engine.internals.selectors import MultiGet as MultiGet  # noqa: F401
 from pants.engine.unions import UnionRule
 from pants.option.subsystem import Subsystem
 from pants.util.logging import LogLevel
-from pants.util.memo import memoized
-from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 from pants.util.strutil import softwrap
 
 PANTS_RULES_MODULE_KEY = "__pants_rules__"
-
-
-# NB: This violates Python naming conventions of using snake_case for functions. This is because
-# SubsystemRule behaves very similarly to UnionRule and RootRule, and we want to use the same
-# naming scheme.
-#
-# We could refactor this to be a class with __call__() defined, but we would lose the `@memoized`
-# decorator.
-@memoized
-def SubsystemRule(subsystem: Type[Subsystem]) -> Rule:
-    """Returns a TaskRule that constructs an instance of the subsystem."""
-    warn_or_error(
-        removal_version="2.17.0.dev0",
-        entity=f"using `SubsystemRule({subsystem.__name__})`",
-        hint=f"Use `*{subsystem.__name__}.rules()` instead.",
-    )
-    return next(iter(subsystem.rules()))  # type: ignore[call-arg]  # mypy dislikes memoziedclassmethod
 
 
 class RuleType(Enum):
@@ -364,7 +345,7 @@ def _rule_helper_decorator(func: Callable[P, R], _public: bool = False) -> Calla
         raise ValueError("@rule_helpers must be async.")
 
     setattr(func, "rule_helper", func)
-    return func
+    return func  # type: ignore[return-value]
 
 
 @overload
@@ -377,10 +358,21 @@ def rule_helper(func: None = None, **kwargs: Any) -> Callable[[Callable[P, R]], 
     ...
 
 
+@deprecated(
+    removal_version="2.20.0.dev0",
+    hint=softwrap(
+        """
+        The `@rule_helper` decorator is no longer needed. `@rule` methods may call any other
+        methods, and if they are `async` may also use `Get` and `MultiGet`.
+        """
+    ),
+)
 def rule_helper(
     func: Callable[P, R] | None = None, **kwargs: Any
 ) -> Callable[P, R] | Callable[[Callable[P, R]], Callable[P, R]]:
     """Decorator which marks a function as a "rule helper".
+
+    This docstring is now deprecated. Any async method may now use `await Get/MultiGet`.
 
     Functions marked as rule helpers are allowed to be called by rules and other rule helpers
     and can `await Get/MultiGet`. The rule parser adds these functions' awaitables to the rule's
@@ -499,8 +491,7 @@ class TaskRule:
         )
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class QueryRule:
     """A QueryRule declares that a given set of Params will be used to request an output type.
 
@@ -508,16 +499,12 @@ class QueryRule:
     that the relevant portions of the RuleGraph are generated.
     """
 
-    _output_type: Type
+    output_type: Type
     input_types: Tuple[Type, ...]
 
     def __init__(self, output_type: Type, input_types: Iterable[Type]) -> None:
-        self._output_type = output_type
-        self.input_types = tuple(input_types)
-
-    @property
-    def output_type(self):
-        return self._output_type
+        object.__setattr__(self, "output_type", output_type)
+        object.__setattr__(self, "input_types", tuple(input_types))
 
 
 @dataclass(frozen=True)

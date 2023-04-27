@@ -30,8 +30,12 @@ use std::collections::{BTreeMap, HashMap};
 use std::iter::FromIterator;
 use std::str::FromStr;
 use std::sync::Arc;
+use std::task::{Context, Poll};
+use std::time::Duration;
 
 use either::Either;
+use futures::future::BoxFuture;
+use futures::{FutureExt, TryFutureExt};
 use http::header::{HeaderName, USER_AGENT};
 use http::{HeaderMap, HeaderValue};
 use itertools::Itertools;
@@ -39,8 +43,10 @@ use lazy_static::lazy_static;
 use tokio_rustls::rustls::ClientConfig;
 use tonic::transport::{Channel, ClientTlsConfig, Endpoint};
 use tower::limit::ConcurrencyLimit;
+use tower::timeout::{Timeout, TimeoutLayer};
 use tower::ServiceBuilder;
-use workunit_store::ObservationMetric;
+use tower_service::Service;
+use workunit_store::{get_workunit_store_handle, Metric, ObservationMetric};
 
 use crate::headers::{SetRequestHeaders, SetRequestHeadersLayer};
 use crate::metrics::{NetworkMetrics, NetworkMetricsLayer};
@@ -55,17 +61,24 @@ pub mod tls;
 // NB: Rather than boxing our tower/tonic services, we define a type alias that fully defines the
 // Service layers that we use universally. If this type becomes unwieldy, or our various Services
 // diverge in which layers they use, we should instead use a Box<dyn Service<..>>.
-pub type LayeredService = SetRequestHeaders<ConcurrencyLimit<NetworkMetrics<Channel>>>;
+pub type LayeredService =
+  SetRequestHeaders<ConcurrencyLimit<NetworkMetrics<CountErrorsService<Timeout<Channel>>>>>;
 
 pub fn layered_service(
   channel: Channel,
   concurrency_limit: usize,
   http_headers: HeaderMap,
+  timeout: Option<(Duration, Metric)>,
 ) -> LayeredService {
+  let (timeout, metric) = timeout
+    .map(|(t, m)| (t, Some(m)))
+    .unwrap_or_else(|| (Duration::from_secs(60 * 60), None));
   ServiceBuilder::new()
     .layer(SetRequestHeadersLayer::new(http_headers))
     .concurrency_limit(concurrency_limit)
     .layer(NetworkMetricsLayer::new(&METRIC_FOR_REAPI_PATH))
+    .layer_fn(|service| CountErrorsService { service, metric })
+    .layer(TimeoutLayer::new(timeout))
     .service(channel)
 }
 
@@ -87,13 +100,13 @@ pub fn create_endpoint(
   headers: &mut BTreeMap<String, String>,
 ) -> Result<Endpoint, String> {
   let uri =
-    tonic::transport::Uri::try_from(addr).map_err(|err| format!("invalid address: {}", err))?;
+    tonic::transport::Uri::try_from(addr).map_err(|err| format!("invalid address: {err}"))?;
   let endpoint = Channel::builder(uri);
 
   let endpoint = if let Some(tls_config) = tls_config_opt {
     endpoint
       .tls_config(ClientTlsConfig::new().rustls_client_config(tls_config.clone()))
-      .map_err(|e| format!("TLS setup error: {}", e))?
+      .map_err(|e| format!("TLS setup error: {e}"))?
   } else {
     endpoint
   };
@@ -103,7 +116,7 @@ pub fn create_endpoint(
       let (_, user_agent) = e.remove_entry();
       endpoint
         .user_agent(user_agent)
-        .map_err(|e| format!("Unable to convert user-agent header: {}", e))?
+        .map_err(|e| format!("Unable to convert user-agent header: {e}"))?
     }
     Entry::Vacant(_) => endpoint,
   };
@@ -116,10 +129,10 @@ pub fn headers_to_http_header_map(headers: &BTreeMap<String, String>) -> Result<
     .iter()
     .map(|(key, value)| {
       let header_name =
-        HeaderName::from_str(key).map_err(|err| format!("Invalid header name {}: {}", key, err))?;
+        HeaderName::from_str(key).map_err(|err| format!("Invalid header name {key}: {err}"))?;
 
       let header_value = HeaderValue::from_str(value)
-        .map_err(|err| format!("Invalid header value {}: {}", value, err))?;
+        .map_err(|err| format!("Invalid header value {value}: {err}"))?;
 
       Ok((header_name, header_value))
     })
@@ -135,8 +148,48 @@ pub fn headers_to_http_header_map(headers: &BTreeMap<String, String>) -> Result<
   Ok(HeaderMap::from_iter(http_headers))
 }
 
-pub fn status_to_str(status: tonic::Status) -> String {
+pub fn status_ref_to_str(status: &tonic::Status) -> String {
   format!("{:?}: {:?}", status.code(), status.message())
+}
+
+pub fn status_to_str(status: tonic::Status) -> String {
+  status_ref_to_str(&status)
+}
+
+#[derive(Clone)]
+pub struct CountErrorsService<S> {
+  service: S,
+  metric: Option<Metric>,
+}
+
+impl<S, Request> Service<Request> for CountErrorsService<S>
+where
+  S: Service<Request> + Send + Sync + 'static,
+  S::Response: Send + 'static,
+  S::Error: Send + 'static,
+  S::Future: Send + 'static,
+{
+  type Response = S::Response;
+  type Error = S::Error;
+  type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
+
+  fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+    self.service.poll_ready(cx)
+  }
+
+  fn call(&mut self, req: Request) -> Self::Future {
+    let metric = self.metric;
+    let result = self.service.call(req);
+    result
+      .inspect_err(move |_| {
+        if let Some(metric) = metric {
+          if let Some(mut workunit_store_handle) = get_workunit_store_handle() {
+            workunit_store_handle.store.increment_counter(metric, 1)
+          }
+        }
+      })
+      .boxed()
+  }
 }
 
 #[cfg(test)]
@@ -169,16 +222,14 @@ mod tests {
           Some(user_agent_value) => {
             let user_agent = user_agent_value.to_str().map_err(|err| {
               Status::invalid_argument(format!(
-                "Unable to convert user-agent header to string: {}",
-                err
+                "Unable to convert user-agent header to string: {err}"
               ))
             })?;
             if user_agent.contains(EXPECTED_USER_AGENT) {
               Ok(Response::new(gen::Output {}))
             } else {
               Err(Status::invalid_argument(format!(
-                "user-agent header did not contain expected value: actual={}",
-                user_agent
+                "user-agent header did not contain expected value: actual={user_agent}"
               )))
             }
           }

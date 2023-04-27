@@ -1,3 +1,5 @@
+// Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
+// Licensed under the Apache License, Version 2.0 (see LICENSE).
 impl<'a> From<&'a hashing::Digest> for crate::gen::build::bazel::remote::execution::v2::Digest {
   fn from(d: &'a hashing::Digest) -> Self {
     Self {

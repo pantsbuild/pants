@@ -52,7 +52,11 @@ def rule_runner() -> RuleRunner:
             QueryRule(FallibleFirstPartyPkgDigest, [FirstPartyPkgDigestRequest]),
             QueryRule(FirstPartyPkgImportPath, [FirstPartyPkgImportPathRequest]),
         ],
-        target_types=[GoModTarget, GoPackageTarget, ResourcesGeneratorTarget],
+        target_types=[
+            GoModTarget,
+            GoPackageTarget,
+            ResourcesGeneratorTarget,
+        ],
     )
     rule_runner.set_options([], env_inherit={"PATH"})
     return rule_runner
@@ -325,8 +329,8 @@ def test_embeds_supported(rule_runner: RuleRunner) -> None:
                 go 1.17
                 """
             ),
-            **resources,  # type: ignore[arg-type]
-            **go_sources,  # type: ignore[arg-type]
+            **resources,
+            **go_sources,
         }
     )
     maybe_analysis = rule_runner.request(

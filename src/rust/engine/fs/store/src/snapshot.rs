@@ -168,7 +168,7 @@ impl Snapshot {
       let path_stats = posix_fs
         .expand_globs(path_globs, SymlinkBehavior::Oblivious, None)
         .await
-        .map_err(|err| format!("Error expanding globs: {}", err))?;
+        .map_err(|err| format!("Error expanding globs: {err}"))?;
       Snapshot::from_path_stats(
         OneOffStoreFileByDigest::new(store, posix_fs, true),
         path_stats,
@@ -276,9 +276,7 @@ impl StoreFileByDigest<String> for OneOffStoreFileByDigest {
     let immutable = self.immutable;
     let res = async move {
       let path = posix_fs.file_path(&file);
-      store
-        .store_file(true, immutable, move || std::fs::File::open(&path))
-        .await
+      store.store_file(true, immutable, path).await
     };
     res.boxed()
   }

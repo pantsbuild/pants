@@ -20,22 +20,24 @@ use crate::types::Types;
 
 use async_oncecell::OnceCell;
 use cache::PersistentCache;
-use fs::{safe_create_dir_all_ioerror, GitignoreStyleExcludes, PosixFS};
+use fs::{GitignoreStyleExcludes, PosixFS};
 use futures::FutureExt;
 use graph::{self, EntryId, Graph, InvalidationResult, NodeContext};
 use hashing::Digest;
 use log::info;
 use parking_lot::Mutex;
-use process_execution::docker::{DOCKER, IMAGE_PULL_CACHE};
+// use docker::docker::{self, DOCKER, IMAGE_PULL_CACHE};
+use docker::docker;
 use process_execution::switched::SwitchedCommandRunner;
 use process_execution::{
-  self, bounded, docker, local, nailgun, remote, remote_cache, CacheContentBehavior, CommandRunner,
-  ImmutableInputs, NamedCaches, ProcessExecutionStrategy, RemoteCacheWarningsBehavior,
+  self, bounded, local, CacheContentBehavior, CommandRunner, NamedCaches, ProcessExecutionStrategy,
 };
 use protos::gen::build::bazel::remote::execution::v2::ServerCapabilities;
 use regex::Regex;
+use remote::remote_cache::RemoteCacheWarningsBehavior;
+use remote::{self, remote_cache};
 use rule_graph::RuleGraph;
-use store::{self, Store};
+use store::{self, ImmutableInputs, Store};
 use task_executor::Executor;
 use watch::{Invalidatable, InvalidationWatcher};
 use workunit_store::{Metric, RunId, RunningWorkunit};
@@ -91,14 +93,14 @@ pub struct RemotingOptions {
   pub root_ca_certs_path: Option<PathBuf>,
   pub store_headers: BTreeMap<String, String>,
   pub store_chunk_bytes: usize,
-  pub store_chunk_upload_timeout: Duration,
   pub store_rpc_retries: usize,
   pub store_rpc_concurrency: usize,
+  pub store_rpc_timeout: Duration,
   pub store_batch_api_size_limit: usize,
   pub cache_warnings_behavior: RemoteCacheWarningsBehavior,
   pub cache_content_behavior: CacheContentBehavior,
   pub cache_rpc_concurrency: usize,
-  pub cache_read_timeout: Duration,
+  pub cache_rpc_timeout: Duration,
   pub execution_headers: BTreeMap<String, String>,
   pub execution_overall_deadline: Duration,
   pub execution_rpc_concurrency: usize,
@@ -144,6 +146,7 @@ impl Core {
   fn make_store(
     executor: &Executor,
     local_store_options: &LocalStoreOptions,
+    local_execution_root_dir: &Path,
     enable_remote: bool,
     remoting_opts: &RemotingOptions,
     remote_store_address: &Option<String>,
@@ -153,6 +156,7 @@ impl Core {
     let local_only = Store::local_only_with_options(
       executor.clone(),
       local_store_options.store_dir.clone(),
+      local_execution_root_dir,
       local_store_options.into(),
     )?;
     if enable_remote {
@@ -165,7 +169,7 @@ impl Core {
         grpc_util::tls::Config::new_without_mtls(root_ca_certs.clone()),
         remoting_opts.store_headers.clone(),
         remoting_opts.store_chunk_bytes,
-        remoting_opts.store_chunk_upload_timeout,
+        remoting_opts.store_rpc_timeout,
         remoting_opts.store_rpc_retries,
         remoting_opts.store_rpc_concurrency,
         capabilities_cell_opt,
@@ -217,7 +221,7 @@ impl Core {
         exec_strategy_opts.local_parallelism * 2
       };
 
-      let nailgun_runner = nailgun::CommandRunner::new(
+      let nailgun_runner = pe_nailgun::CommandRunner::new(
         local_execution_root_dir.to_path_buf(),
         local_runner_store.clone(),
         executor.clone(),
@@ -240,15 +244,17 @@ impl Core {
     let docker_runner = Box::new(docker::CommandRunner::new(
       local_runner_store.clone(),
       executor.clone(),
-      &DOCKER,
-      &IMAGE_PULL_CACHE,
+      &docker::DOCKER,
+      &docker::IMAGE_PULL_CACHE,
       local_execution_root_dir.to_path_buf(),
-      named_caches.clone(),
       immutable_inputs.clone(),
       exec_strategy_opts.local_keep_sandboxes,
     )?);
     let runner = Box::new(SwitchedCommandRunner::new(docker_runner, runner, |req| {
-      matches!(req.execution_strategy, ProcessExecutionStrategy::Docker(_))
+      matches!(
+        req.execution_environment.strategy,
+        ProcessExecutionStrategy::Docker(_)
+      )
     }));
 
     let mut runner: Box<dyn CommandRunner> = Box::new(bounded::CommandRunner::new(
@@ -261,7 +267,7 @@ impl Core {
       // We always create the remote execution runner if it is globally enabled, but it may not
       // actually be used thanks to the `SwitchedCommandRunner` below. Only one of local execution
       // or remote execution will be used for any particular process.
-      let remote_execution_runner = Box::new(remote::CommandRunner::new(
+      let remote_execution_runner = Box::new(remote::remote::CommandRunner::new(
         // We unwrap because global_options.py will have already validated this is defined.
         remoting_opts.execution_address.as_ref().unwrap(),
         instance_name,
@@ -286,7 +292,7 @@ impl Core {
         runner,
         |req| {
           matches!(
-            req.execution_strategy,
+            req.execution_environment.strategy,
             ProcessExecutionStrategy::RemoteExecution(_)
           )
         },
@@ -331,7 +337,7 @@ impl Core {
         remoting_opts.cache_warnings_behavior,
         remoting_opts.cache_content_behavior,
         remoting_opts.cache_rpc_concurrency,
-        remoting_opts.cache_read_timeout,
+        remoting_opts.cache_rpc_timeout,
         remoting_opts.append_only_caches_base_path.clone(),
       )?);
     }
@@ -468,7 +474,7 @@ impl Core {
     let root_ca_certs = if let Some(ref path) = remoting_opts.root_ca_certs_path {
       Some(
         std::fs::read(path)
-          .map_err(|err| format!("Error reading root CA certs file {:?}: {}", path, err))?,
+          .map_err(|err| format!("Error reading root CA certs file {path:?}: {err}"))?,
       )
     } else {
       None
@@ -489,7 +495,7 @@ impl Core {
       None
     };
 
-    safe_create_dir_all_ioerror(&local_store_options.store_dir).map_err(|e| {
+    std::fs::create_dir_all(&local_store_options.store_dir).map_err(|e| {
       format!(
         "Error making directory {:?}: {:?}",
         local_store_options.store_dir, e
@@ -498,13 +504,14 @@ impl Core {
     let full_store = Self::make_store(
       &executor,
       &local_store_options,
+      &local_execution_root_dir,
       need_remote_store,
       &remoting_opts,
       &remoting_opts.store_address,
       &root_ca_certs,
       capabilities_cell_opt.clone(),
     )
-    .map_err(|e| format!("Could not initialize Store: {:?}", e))?;
+    .map_err(|e| format!("Could not initialize Store: {e:?}"))?;
 
     let local_cache = PersistentCache::new(
       &local_store_options.store_dir,
@@ -532,7 +539,7 @@ impl Core {
     };
 
     let immutable_inputs = ImmutableInputs::new(store.clone(), &local_execution_root_dir)?;
-    let named_caches = NamedCaches::new(named_caches_dir);
+    let named_caches = NamedCaches::new_local(named_caches_dir);
     let command_runners = Self::make_command_runners(
       &full_store,
       &store,
@@ -562,26 +569,22 @@ impl Core {
       });
     let http_client = http_client_builder
       .build()
-      .map_err(|err| format!("Error building HTTP client: {}", err))?;
+      .map_err(|err| format!("Error building HTTP client: {err}"))?;
     let rule_graph = RuleGraph::new(tasks.rules().clone(), tasks.queries().clone())?;
 
-    let gitignore_file = if use_gitignore {
-      let gitignore_path = build_root.join(".gitignore");
-      if Path::is_file(&gitignore_path) {
-        Some(gitignore_path)
-      } else {
-        None
-      }
+    let gitignore_files = if use_gitignore {
+      GitignoreStyleExcludes::gitignore_file_paths(&build_root)
     } else {
-      None
+      vec![]
     };
+
     let ignorer =
-      GitignoreStyleExcludes::create_with_gitignore_file(ignore_patterns, gitignore_file)
-        .map_err(|e| format!("Could not parse build ignore patterns: {:?}", e))?;
+      GitignoreStyleExcludes::create_with_gitignore_files(ignore_patterns, gitignore_files)
+        .map_err(|e| format!("Could not parse build ignore patterns: {e:?}"))?;
 
     let watcher = if watch_filesystem {
       let w = InvalidationWatcher::new(executor.clone(), build_root.clone(), ignorer.clone())?;
-      w.start(&graph);
+      w.start(&graph)?;
       Some(w)
     } else {
       None
@@ -601,7 +604,7 @@ impl Core {
       http_client,
       local_cache,
       vfs: PosixFS::new(&build_root, ignorer, executor)
-        .map_err(|e| format!("Could not initialize Vfs: {:?}", e))?,
+        .map_err(|e| format!("Could not initialize Vfs: {e:?}"))?,
       build_root,
       watcher,
       local_parallelism: exec_strategy_opts.local_parallelism,
@@ -636,8 +639,8 @@ impl Core {
       .iter()
       .map(|runner| runner.shutdown().boxed());
     let shutdown_results = futures::future::join_all(shutdown_futures).await;
-    for shutfdown_result in shutdown_results {
-      if let Err(err) = shutfdown_result {
+    for shutdown_result in shutdown_results {
+      if let Err(err) = shutdown_result {
         log::warn!("Command runner failed to shutdown cleanly: {err}");
       }
     }
@@ -879,6 +882,6 @@ impl NodeContext for Context {
   where
     F: Future<Output = ()> + Send + 'static,
   {
-    let _join = self.core.executor.spawn(future);
+    let _join = self.core.executor.native_spawn(future);
   }
 }

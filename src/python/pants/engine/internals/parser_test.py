@@ -6,6 +6,8 @@ from __future__ import annotations
 import pytest
 
 from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.core.target_types import GenericTarget
+from pants.engine.env_vars import EnvironmentVars
 from pants.engine.internals.defaults import BuildFileDefaults, BuildFileDefaultsParserState
 from pants.engine.internals.parser import (
     BuildFilePreludeSymbols,
@@ -30,7 +32,8 @@ def defaults_parser_state() -> BuildFileDefaultsParserState:
 def test_imports_banned(defaults_parser_state: BuildFileDefaultsParserState) -> None:
     parser = Parser(
         build_root="",
-        target_type_aliases=[],
+        registered_target_types=RegisteredTargetTypes({}),
+        union_membership=UnionMembership({}),
         object_aliases=BuildFileAliases(),
         ignore_unrecognized_symbols=False,
     )
@@ -38,7 +41,9 @@ def test_imports_banned(defaults_parser_state: BuildFileDefaultsParserState) -> 
         parser.parse(
             "dir/BUILD",
             "\nx = 'hello'\n\nimport os\n",
-            BuildFilePreludeSymbols(FrozenDict()),
+            BuildFilePreludeSymbols(FrozenDict(), ()),
+            EnvironmentVars({}),
+            False,
             defaults_parser_state,
             dependents_rules=None,
             dependencies_rules=None,
@@ -55,17 +60,22 @@ def test_unrecognized_symbol(defaults_parser_state: BuildFileDefaultsParserState
     def perform_test(extra_targets: list[str], dym: str) -> None:
         parser = Parser(
             build_root="",
-            target_type_aliases=["tgt", *extra_targets],
+            registered_target_types=RegisteredTargetTypes(
+                {alias: GenericTarget for alias in ("tgt", *extra_targets)}
+            ),
+            union_membership=UnionMembership({}),
             object_aliases=build_file_aliases,
             ignore_unrecognized_symbols=False,
         )
-        prelude_symbols = BuildFilePreludeSymbols(FrozenDict({"prelude": 0}))
+        prelude_symbols = BuildFilePreludeSymbols.create({"prelude": 0}, ())
         fmt_extra_sym = str(extra_targets)[1:-1] + (", ") if len(extra_targets) != 0 else ""
         with pytest.raises(ParseError) as exc:
             parser.parse(
                 "dir/BUILD",
                 "fake",
                 prelude_symbols,
+                EnvironmentVars({}),
+                False,
                 defaults_parser_state,
                 dependents_rules=None,
                 dependencies_rules=None,
@@ -76,14 +86,17 @@ def test_unrecognized_symbol(defaults_parser_state: BuildFileDefaultsParserState
             f" refer to {doc_url('enabling-backends')} for all available"
             " backends to activate.\n\n"
             "All registered symbols: ['__defaults__', '__dependencies_rules__', "
-            f"'__dependents_rules__', 'build_file_dir', 'caof', {fmt_extra_sym}"
+            f"'__dependents_rules__', 'build_file_dir', 'caof', 'env', {fmt_extra_sym}"
             "'obj', 'prelude', 'tgt']"
         )
 
         with no_exception():
             parser = Parser(
                 build_root="",
-                target_type_aliases=["tgt", *extra_targets],
+                registered_target_types=RegisteredTargetTypes(
+                    {alias: GenericTarget for alias in ("tgt", *extra_targets)}
+                ),
+                union_membership=UnionMembership({}),
                 object_aliases=build_file_aliases,
                 ignore_unrecognized_symbols=True,
             )
@@ -91,6 +104,8 @@ def test_unrecognized_symbol(defaults_parser_state: BuildFileDefaultsParserState
                 "dir/BUILD",
                 "fake",
                 prelude_symbols,
+                EnvironmentVars({}),
+                False,
                 defaults_parser_state,
                 dependents_rules=None,
                 dependencies_rules=None,

@@ -9,6 +9,7 @@ from pants.backend.scala.target_types import (
     ScalacPluginTarget,
     ScalaJunitTestsGeneratorTarget,
     ScalaJunitTestTarget,
+    ScalaSourceField,
     ScalaSourcesGeneratorTarget,
     ScalaSourceTarget,
     ScalatestTestsGeneratorTarget,
@@ -16,25 +17,14 @@ from pants.backend.scala.target_types import (
 )
 from pants.backend.scala.target_types import rules as target_types_rules
 from pants.backend.scala.test import scalatest
-from pants.jvm import classpath, jdk_rules, resources, run_deploy_jar
-from pants.jvm import util_rules as jvm_util_rules
-from pants.jvm.goals import lockfile
-from pants.jvm.jar_tool import jar_tool
-from pants.jvm.package import deploy_jar
-from pants.jvm.package.war import rules as war_rules
-from pants.jvm.resolve import coursier_fetch, coursier_setup, jvm_tool
-from pants.jvm.shading.rules import rules as shading_rules
-from pants.jvm.strip_jar import strip_jar
-from pants.jvm.target_types import DeployJarTarget, JvmArtifactTarget, JvmWarTarget
-from pants.jvm.target_types import build_file_aliases as jvm_build_file_aliases
-from pants.jvm.test import junit
+from pants.core.util_rules.wrap_source import wrap_source_rule_and_target
+from pants.jvm import jvm_common
+
+wrap_scala = wrap_source_rule_and_target(ScalaSourceField, "scala_sources")
 
 
 def target_types():
     return [
-        DeployJarTarget,
-        JvmArtifactTarget,
-        JvmWarTarget,
         ScalaJunitTestTarget,
         ScalaJunitTestsGeneratorTarget,
         ScalaSourceTarget,
@@ -42,6 +32,8 @@ def target_types():
         ScalacPluginTarget,
         ScalatestTestTarget,
         ScalatestTestsGeneratorTarget,
+        *jvm_common.target_types(),
+        *wrap_scala.target_types,
     ]
 
 
@@ -52,27 +44,14 @@ def rules():
         *check.rules(),
         *tailor.rules(),
         *repl.rules(),
-        *classpath.rules(),
-        *junit.rules(),
-        *strip_jar.rules(),
-        *shading_rules(),
-        *deploy_jar.rules(),
-        *jar_tool.rules(),
-        *lockfile.rules(),
-        *coursier_fetch.rules(),
-        *coursier_setup.rules(),
-        *jvm_util_rules.rules(),
-        *jdk_rules.rules(),
         *dep_inf_rules.rules(),
         *target_types_rules(),
-        *jvm_tool.rules(),
-        *resources.rules(),
-        *run_deploy_jar.rules(),
         *scala_lockfile_rules(),
         *bsp_rules(),
-        *war_rules(),
+        *jvm_common.rules(),
+        *wrap_scala.rules,
     ]
 
 
 def build_file_aliases():
-    return jvm_build_file_aliases()
+    return jvm_common.build_file_aliases()

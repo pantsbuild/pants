@@ -1,3 +1,5 @@
+// Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
+// Licensed under the Apache License, Version 2.0 (see LICENSE).
 use std::sync::Arc;
 
 use rustls::{ClientConfig, RootCertStore, ServerCertVerified, ServerCertVerifier, TLSError};
@@ -52,8 +54,7 @@ impl TryFrom<Config> for ClientConfig {
             format!(
               "Could not discover root CA cert files to use TLS with remote caching and remote \
             execution. Consider setting `--remote-ca-certs-path` instead to explicitly point to \
-            the correct PEM file.\n\n{}",
-              e
+            the correct PEM file.\n\n{e}"
             )
           })?;
       }
@@ -65,7 +66,7 @@ impl TryFrom<Config> for ClientConfig {
           cert_chain_from_pem_bytes(cert_chain)?,
           der_key_from_pem_bytes(key)?,
         )
-        .map_err(|err| format!("Error creating MTLS config: {:?}", err))?;
+        .map_err(|err| format!("Error creating MTLS config: {err:?}"))?;
     }
 
     if let CertificateCheck::DangerouslyDisabled = config.certificate_check {
@@ -118,12 +119,12 @@ fn cert_chain_from_pem_bytes(cert_chain: Vec<u8>) -> Result<Vec<rustls::Certific
         .map(|cert| Ok(rustls::Certificate(cert)))
         .collect::<Result<Vec<_>, _>>()
     })
-    .map_err(|err| format!("Failed to parse certificates from PEM file {:?}", err))
+    .map_err(|err| format!("Failed to parse certificates from PEM file {err:?}"))
 }
 
 fn der_key_from_pem_bytes(pem_bytes: Vec<u8>) -> Result<rustls::PrivateKey, String> {
   let key = rustls_pemfile::read_one(&mut pem_bytes.as_slice())
-    .map_err(|err| format!("Failed to read PEM file: {:?}", err))?
+    .map_err(|err| format!("Failed to read PEM file: {err:?}"))?
     .ok_or_else(|| "No private key found in PEM file".to_owned())?;
   use rustls_pemfile::Item;
   let key = match key {

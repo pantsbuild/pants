@@ -32,13 +32,10 @@ fn test_display() {
 #[test]
 fn test_scope() {
   let env = env([("PANTS_PYTHON_EXAMPLE", "true")]);
-  assert_eq!(
-    true,
-    env
-      .get_bool(&option_id!(["python"], "example"))
-      .unwrap()
-      .unwrap()
-  );
+  assert!(env
+    .get_bool(&option_id!(["python"], "example"))
+    .unwrap()
+    .unwrap());
 }
 
 #[test]
@@ -97,7 +94,7 @@ fn test_float() {
   let assert_float =
     |expected: f64, id: OptionId| assert_eq!(expected, env.get_float(&id).unwrap().unwrap());
 
-  assert_float(4 as f64, option_id!("foo"));
+  assert_float(4_f64, option_id!("foo"));
   assert_float(3.14, option_id!("bar", "baz"));
   assert_float(1.137, option_id!("pants", "eggs"));
 

@@ -70,7 +70,7 @@ _known_packages = [
 
 _expected_owners = {"benjyw", "John.Sirois", "stuhood"}
 
-_expected_maintainers = {"EricArellano", "illicitonion", "wisechengyi"}
+_expected_maintainers = {"EricArellano", "illicitonion", "wisechengyi", "kaos"}
 
 
 # Disable the Pants repository-internal internal_plugins.test_lockfile_fixtures plugin because
@@ -790,8 +790,6 @@ def build_pex(fetch: bool) -> None:
         extra_pex_args = [
             "--python-shebang",
             "/usr/bin/env python",
-            "--interpreter-constraint",
-            "CPython>=3.7,<3.10",
             *(
                 f"--platform={plat}-{abi}"
                 for plat in ("linux_x86_64", "macosx_11.0_x86_64")
@@ -863,15 +861,12 @@ def build_pex(fetch: bool) -> None:
         dest = stable_dest
     green(f"Built {dest}")
 
-    with temporary_dir() as tmpdir:
-        validated_pex_path = Path(tmpdir, "pants.pex")
-        shutil.copyfile(dest, validated_pex_path)
-        validated_pex_path.chmod(0o777)
-        Path(tmpdir, "BUILD_ROOT").touch()
-        # We also need to filter out Pants options like `PANTS_CONFIG_FILES` and disable certain internal backends.
-        env = {k: v for k, v in env.items() if not k.startswith("PANTS_")}
-        env.update(DISABLED_BACKENDS_CONFIG)
-        subprocess.run([validated_pex_path, "--version"], env=env, check=True, cwd=dest.parent)
+    # We filter out Pants options like `PANTS_CONFIG_FILES` and disable certain internal backends.
+    env = {k: v for k, v in env.items() if not k.startswith("PANTS_")}
+    env.update(DISABLED_BACKENDS_CONFIG)
+    # NB: Set `--concurrent` so that if this script is running under `pantsd`, the validation
+    # won't kill it.
+    subprocess.run([dest, "--concurrent", "--version"], env=env, check=True)
     green(f"Validated {dest}")
 
 
@@ -970,12 +965,12 @@ def check_roles() -> None:
 
 
 def reversion_prebuilt_wheels() -> None:
-    # First, rewrite to manylinux. See https://www.python.org/dev/peps/pep-0599/. We build on
-    # Centos7, so use manylinux2014.
-    source_platform = "linux_x86_64"
-    dest_platform = "manylinux2014_x86_64"
+    # First, rewrite to manylinux. See https://www.python.org/dev/peps/pep-0599/. We use
+    # manylinux2014 images.
+    source_platform = "linux_"
+    dest_platform = "manylinux2014_"
     unstable_wheel_dir = CONSTANTS.deploy_pants_wheel_dir / CONSTANTS.pants_unstable_version
-    for whl in unstable_wheel_dir.glob(f"*{source_platform}.whl"):
+    for whl in unstable_wheel_dir.glob(f"*{source_platform}*.whl"):
         whl.rename(str(whl).replace(source_platform, dest_platform))
 
     # Now, reversion to use the STABLE_VERSION.

@@ -19,7 +19,6 @@ from pants.backend.python.subsystems import pytest
 from pants.backend.python.subsystems.debugpy import DebugPy
 from pants.backend.python.subsystems.pytest import PyTest, PythonTestFieldSet
 from pants.backend.python.subsystems.setup import PythonSetup
-from pants.backend.python.target_types import MainSpecification
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.local_dists import LocalDistsPex, LocalDistsPexRequest
 from pants.backend.python.util_rules.pex import Pex, PexRequest, VenvPex, VenvPexProcess
@@ -35,7 +34,6 @@ from pants.core.goals.test import (
     TestDebugAdapterRequest,
     TestDebugRequest,
     TestExtraEnv,
-    TestFieldSet,
     TestRequest,
     TestResult,
     TestSubsystem,
@@ -76,6 +74,7 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.option.global_options import GlobalOptions
+from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger()
@@ -98,7 +97,7 @@ class PytestPluginSetup:
 
 
 @union(in_scope_types=[EnvironmentName])
-@dataclass(frozen=True)  # type: ignore[misc]
+@dataclass(frozen=True)
 class PytestPluginSetupRequest(ABC):
     """A request to set up the test environment before Pytest runs, e.g. to set up databases.
 
@@ -184,7 +183,7 @@ class TestSetupRequest:
     field_sets: Tuple[PythonTestFieldSet, ...]
     metadata: TestMetadata
     is_debug: bool
-    main: Optional[MainSpecification] = None  # Defaults to pytest.main
+    extra_env: FrozenDict[str, str] = FrozenDict()
     prepend_argv: Tuple[str, ...] = ()
     additional_pexes: Tuple[Pex, ...] = ()
 
@@ -227,13 +226,7 @@ async def setup_pytest_for_target(
 
     requirements_pex_get = Get(Pex, RequirementsPexRequest(addresses))
     pytest_pex_get = Get(
-        Pex,
-        PexRequest(
-            output_filename="pytest.pex",
-            requirements=pytest.pex_requirements(),
-            interpreter_constraints=interpreter_constraints,
-            internal_only=True,
-        ),
+        Pex, PexRequest, pytest.to_pex_request(interpreter_constraints=interpreter_constraints)
     )
 
     # Ensure that the empty extra output dir exists.
@@ -284,7 +277,7 @@ async def setup_pytest_for_target(
         PexRequest(
             output_filename="pytest_runner.pex",
             interpreter_constraints=interpreter_constraints,
-            main=request.main or pytest.main,
+            main=pytest.main,
             internal_only=True,
             pex_path=[pytest_pex, requirements_pex, local_dists.pex, *request.additional_pexes],
         ),
@@ -365,6 +358,7 @@ async def setup_pytest_for_target(
 
     extra_env = {
         "PEX_EXTRA_SYS_PATH": ":".join(prepared_sources.source_roots),
+        **request.extra_env,
         **test_extra_env.env,
         # NOTE: field_set_extra_env intentionally after `test_extra_env` to allow overriding within
         # `python_tests`.
@@ -401,10 +395,10 @@ async def setup_pytest_for_target(
         VenvPexProcess(
             pytest_runner_pex,
             argv=(
-                *(("-c", pytest.config) if pytest.config else ()),
-                *(("-n", "{pants_concurrency}") if xdist_concurrency else ()),
                 *request.prepend_argv,
                 *pytest.args,
+                *(("-c", pytest.config) if pytest.config else ()),
+                *(("-n", "{pants_concurrency}") if xdist_concurrency else ()),
                 # N.B.: Now that we're using command-line options instead of the PYTEST_ADDOPTS
                 # environment variable, it's critical that `pytest_args` comes after `pytest.args`.
                 *pytest_args,
@@ -429,6 +423,8 @@ class PyTestRequest(TestRequest):
     tool_subsystem = PyTest
     field_set_type = PythonTestFieldSet
     partitioner_type = PartitionerType.CUSTOM
+    supports_debug = True
+    supports_debug_adapter = True
 
 
 @rule(desc="Partition Pytest", level=LogLevel.DEBUG)
@@ -444,7 +440,7 @@ async def partition_python_tests(
             interpreter_constraints=InterpreterConstraints.create_from_compatibility_fields(
                 [field_set.interpreter_constraints], python_setup
             ),
-            extra_env_vars=tuple(sorted(field_set.extra_env_vars.value or ())),
+            extra_env_vars=field_set.extra_env_vars.sorted(),
             xdist_concurrency=field_set.xdist_concurrency.value,
             resolve=field_set.resolve.normalized_value(python_setup),
             environment=field_set.environment.value,
@@ -469,7 +465,6 @@ async def run_python_tests(
     batch: PyTestRequest.Batch[PythonTestFieldSet, TestMetadata],
     test_subsystem: TestSubsystem,
 ) -> TestResult:
-
     setup = await Get(
         TestSetup, TestSetupRequest(batch.elements, batch.partition_metadata, is_debug=False)
     )
@@ -538,9 +533,17 @@ async def debugpy_python_test(
     batch: PyTestRequest.Batch[PythonTestFieldSet, TestMetadata],
     debugpy: DebugPy,
     debug_adapter: DebugAdapterSubsystem,
-    pytest: PyTest,
+    python_setup: PythonSetup,
 ) -> TestDebugAdapterRequest:
-    debugpy_pex = await Get(Pex, PexRequest, debugpy.to_pex_request())
+    debugpy_pex = await Get(
+        Pex,
+        PexRequest,
+        debugpy.to_pex_request(
+            interpreter_constraints=InterpreterConstraints.create_from_compatibility_fields(
+                [field_set.interpreter_constraints for field_set in batch.elements], python_setup
+            )
+        ),
+    )
 
     setup = await Get(
         TestSetup,
@@ -548,8 +551,8 @@ async def debugpy_python_test(
             batch.elements,
             batch.partition_metadata,
             is_debug=True,
-            main=debugpy.main,
-            prepend_argv=debugpy.get_args(debug_adapter, pytest.main),
+            prepend_argv=debugpy.get_args(debug_adapter),
+            extra_env=FrozenDict(PEX_MODULE="debugpy"),
             additional_pexes=(debugpy_pex,),
         ),
     )
@@ -586,7 +589,6 @@ def rules():
     return [
         *collect_rules(),
         *pytest.rules(),
-        UnionRule(TestFieldSet, PythonTestFieldSet),
         UnionRule(PytestPluginSetupRequest, RuntimePackagesPluginRequest),
         *PyTestRequest.rules(),
     ]

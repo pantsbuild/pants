@@ -13,7 +13,7 @@ from pants.engine.addresses import Addresses
 from pants.engine.fs import AddPrefix, Digest, MergeDigests
 from pants.engine.internals.native_engine import EMPTY_DIGEST
 from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.rules import collect_rules, rule, rule_helper
+from pants.engine.rules import collect_rules, rule
 from pants.engine.target import CoarsenedTargets
 from pants.jvm import classpath
 from pants.jvm.classpath import LooseClassfiles
@@ -69,13 +69,12 @@ async def notify_for_classpath_entry(
     return entry
 
 
-@rule_helper
 async def _jvm_bsp_compile(
     request: BSPCompileRequest, classpath_entry_request: ClasspathEntryRequestFactory
 ) -> BSPCompileResult:
     """Generically handles a BSPCompileRequest (subclass).
 
-    This is a `@rule_helper` rather than a `@rule`, because BSP backends like `java` and `scala`
+    This is a rule helper rather than a `@rule`, because BSP backends like `java` and `scala`
     independently declare their `BSPCompileRequest` union members. We can't register a single shared
     `BSPCompileRequest` @union member for all JVM because their FieldSets are also declared via
     @unions, and we can't forward the implementation of a @union to another the way we might with

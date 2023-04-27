@@ -9,6 +9,7 @@ from typing import Mapping
 
 from pants.backend.docker.subsystems.docker_options import DockerOptions
 from pants.backend.docker.util_rules.docker_build_args import DockerBuildArgs
+from pants.base.deprecated import warn_or_error
 from pants.core.util_rules.system_binaries import (
     BinaryPath,
     BinaryPathRequest,
@@ -17,7 +18,6 @@ from pants.core.util_rules.system_binaries import (
     BinaryShims,
     BinaryShimsRequest,
 )
-from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.fs import Digest
 from pants.engine.process import Process, ProcessCacheScope
 from pants.engine.rules import Get, collect_rules, rule
@@ -25,8 +25,7 @@ from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 
 
-# The base class is decorated with `frozen_after_init`.
-@dataclass
+@dataclass(frozen=True)
 class DockerBinary(BinaryPath):
     """The `docker` binary."""
 
@@ -40,8 +39,8 @@ class DockerBinary(BinaryPath):
         extra_env: Mapping[str, str] | None = None,
         extra_input_digests: Mapping[str, Digest] | None = None,
     ) -> None:
-        self.extra_env = {} if extra_env is None else extra_env
-        self.extra_input_digests = extra_input_digests
+        object.__setattr__(self, "extra_env", {} if extra_env is None else extra_env)
+        object.__setattr__(self, "extra_input_digests", extra_input_digests)
         super().__init__(path, fingerprint)
 
     def _get_process_environment(self, env: Mapping[str, str]) -> Mapping[str, str]:
@@ -121,17 +120,23 @@ class DockerBinary(BinaryPath):
 
 @dataclass(frozen=True)
 class DockerBinaryRequest:
-    pass
+    def __post_init__(self) -> None:
+        warn_or_error(
+            "2.18.0.dev0",
+            "using `Get(DockerBinary, DockerBinaryRequest)",
+            "Instead, simply use `Get(DockerBinary)` or put `DockerBinary` in the rule signature",
+        )
+
+
+async def find_docker(_: DockerBinaryRequest, docker: DockerBinary) -> DockerBinary:
+    return docker
 
 
 @rule(desc="Finding the `docker` binary and related tooling", level=LogLevel.DEBUG)
-async def find_docker(
-    docker_request: DockerBinaryRequest,
-    docker_options: DockerOptions,
-    docker_options_env_aware: DockerOptions.EnvironmentAware,
+async def get_docker(
+    docker_options: DockerOptions, docker_options_env_aware: DockerOptions.EnvironmentAware
 ) -> DockerBinary:
-    env = await Get(EnvironmentVars, EnvironmentVarsRequest(["PATH"]))
-    search_path = docker_options_env_aware.executable_search_path(env)
+    search_path = docker_options_env_aware.executable_search_path
     request = BinaryPathRequest(
         binary_name="docker",
         search_path=search_path,
@@ -149,13 +154,11 @@ async def find_docker(
         BinaryShimsRequest.for_binaries(
             *docker_options.tools,
             rationale="use docker",
-            output_directory="bin",
             search_path=search_path,
         ),
     )
-    tools_path = ".shims"
-    extra_env = {"PATH": os.path.join("{chroot}", tools_path, tools.bin_directory)}
-    extra_input_digests = {tools_path: tools.digest}
+    extra_env = {"PATH": tools.path_component}
+    extra_input_digests = tools.immutable_input_digests
 
     return DockerBinary(
         first_path.path,
@@ -163,11 +166,6 @@ async def find_docker(
         extra_env=extra_env,
         extra_input_digests=extra_input_digests,
     )
-
-
-@rule
-async def get_docker() -> DockerBinary:
-    return await Get(DockerBinary, DockerBinaryRequest())
 
 
 def rules():

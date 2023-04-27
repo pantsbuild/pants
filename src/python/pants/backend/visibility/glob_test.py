@@ -143,6 +143,16 @@ from pants.engine.internals.target_adaptor import TargetAdaptor
                 uplvl=0,
             ),
         ),
+        (
+            "base",
+            "**/path",
+            PathGlob(
+                raw="**/path",
+                anchor_mode=PathGlobAnchorMode.FLOATING,
+                glob=re.compile(r"/?\bpath$"),
+                uplvl=0,
+            ),
+        ),
     ],
 )
 def test_pathglob_parse(base: str, pattern_text: str | tuple[str, str], expected: PathGlob) -> None:
@@ -250,49 +260,71 @@ def test_pathglob_match(glob: PathGlob, tests: tuple[tuple[str, str, bool], ...]
 @pytest.mark.parametrize(
     "target_spec, expected",
     [
-        ({}, "*"),
-        ("", "*"),
-        (dict(type="resources"), "resources"),
-        (dict(type="file", path="glob/*/this.ext"), "file[glob/*/this.ext]"),
-        (dict(path="glob/*/this.ext"), "[glob/*/this.ext]"),
+        ({"path": ""}, "!*"),
+        ("[]", "!*"),
+        (dict(type="resources"), "<resources>"),
+        (dict(type="file", path="glob/*/this.ext"), "<file>[glob/*/this.ext]"),
+        (dict(path="glob/*/this.ext"), "glob/*/this.ext"),
         (dict(tags=["tagged"]), "(tagged)"),
         (dict(tags=["tag-a", "tag-b , b", "c"]), "(tag-a, 'tag-b , b', c)"),
-        (dict(type="file*", tags=["foo", "bar"], path="baz.txt"), "file*(foo, bar)[baz.txt]"),
-        ("resources", "resources"),
-        ("file[glob/*/this.ext]", "file[glob/*/this.ext]"),
-        ("[glob/*/this.ext]", "[glob/*/this.ext]"),
+        (dict(type="file*", tags=["foo", "bar"], path="baz.txt"), "<file*>[baz.txt](foo, bar)"),
+        ("<resources>", "<resources>"),
+        ("<file>[glob/*/this.ext]", "<file>[glob/*/this.ext]"),
+        ("glob/*/this.ext", "glob/*/this.ext"),
         ("(tag-a)", "(tag-a)"),
         ("(tag-a  ,  tag-b)", "(tag-a, tag-b)"),
-        ("file*(foo, bar)[baz.txt]", "file*(foo, bar)[baz.txt]"),
+        ("<file*>(foo, bar)[baz.txt]", "<file*>[baz.txt](foo, bar)"),
+        (":name", ":name"),
+        (dict(name="name"), ":name"),
+        (dict(path="src/*", name="name"), "src/*:name"),
+        (dict(type="target", path="src", name="name"), "<target>[src:name]"),
     ],
 )
 def test_target_glob_parse_spec(target_spec: str | Mapping[str, Any], expected: str) -> None:
     assert expected == str(TargetGlob.parse(target_spec, "base"))
 
 
-def tagged(type_alias: str, name: str | None = None, *tags: str, **kwargs) -> TargetAdaptor:
-    kwargs["tags"] = tags
-    return TargetAdaptor(type_alias, name, **kwargs)
-
-
 @pytest.mark.parametrize(
     "expected, target_spec",
     [
         (True, "*"),
-        (True, "file"),
+        (True, "<file>"),
         (True, "(tag-c)"),
         (True, "(tag-*)"),
         (False, "(tag-b)"),
         (True, "[file.ext]"),
         (False, "[files.ext]"),
-        (True, "[//src/*]"),
-        (True, "file(tag-a, tag-c)[src/file.ext]"),
-        (False, "file(tag-a, tag-b)[src/file.ext]"),
-        (False, "resource"),
+        (True, "//src/*"),
+        (True, "<file>(tag-a, tag-c)[src/file.ext]"),
+        (False, "<file>(tag-a, tag-b)[src/file.ext]"),
+        (False, "<resource>"),
+        (False, ":name"),
+        (True, ":src"),
+        (True, ":*"),
+        (False, "other.txt:src"),
+        (True, "file.ext:src"),
+        (True, "src/file.ext:src"),
     ],
 )
 def test_targetglob_match(expected: bool, target_spec: str) -> None:
     path = "src/file.ext"
-    adaptor = TargetAdaptor("file", None, tags=["tag-a", "tag-c"])
+    adaptor = TargetAdaptor(
+        "file", None, tags=["tag-a", "tag-c"], __description_of_origin__="BUILD:1"
+    )
     address = Address(os.path.dirname(path), relative_file_path=os.path.basename(path))
     assert expected == TargetGlob.parse(target_spec, "src").match(address, adaptor, "src")
+
+
+@pytest.mark.parametrize(
+    "address, path",
+    [
+        (Address("src", relative_file_path="file"), "src/file"),
+        (Address("src", target_name="name"), "src"),
+        (Address("src", target_name="gen", generated_name="name"), "src/gen#name"),
+        (Address("", relative_file_path="file"), "file"),
+        (Address("", target_name="name"), ""),
+        (Address("", target_name="gen", generated_name="name"), "gen#name"),
+    ],
+)
+def test_address_path(address: Address, path: str) -> None:
+    assert TargetGlob.address_path(address) == path

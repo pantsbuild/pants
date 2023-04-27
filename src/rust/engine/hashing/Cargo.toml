@@ -9,11 +9,13 @@ publish = false
 byteorder = "1.4"
 # TODO: Waiting on https://github.com/Aeledfyr/deepsize/pull/{30,31,32}.
 deepsize = { git = "https://github.com/stuhood/deepsize.git", rev = "5c8bee5443fcafe4aaa9274490d354412d0955c1" }
-digest = "0.9"
+digest = "0.10"
 generic-array = "0.14"
 hex = "0.4.3"
 serde = { version = "1.0", features = ["derive"] }
 sha2 = "0.10"
+tokio = { version = "1.21", features = ["io-util"] }
 
 [dev-dependencies]
 serde_test = "1.0"
+tempfile = "3"

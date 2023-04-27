@@ -39,7 +39,6 @@ def fake_asdf_root(
     tool_name: str,
 ):
     with temporary_dir() as home_dir, temporary_dir() as asdf_dir:
-
         fake_dirs: list[Path] = []
         fake_version_dirs: list[str] = []
 
@@ -167,14 +166,15 @@ def test_get_asdf_paths(
         expected_asdf_home_paths,
         expected_asdf_local_paths,
     ):
-
         extra_kwargs: dict = {}
         if env_tgt_type is DockerEnvironmentTarget:
             extra_kwargs = {
                 DockerImageField.alias: "my_img",
             }
+        env_name = "name"
         env_tgt = EnvironmentTarget(
-            env_tgt_type(extra_kwargs, Address("flem")) if env_tgt_type is not None else None
+            env_name,
+            env_tgt_type(extra_kwargs, Address("flem")) if env_tgt_type is not None else None,
         )
 
         # Check the "all installed" fallback

@@ -3,7 +3,6 @@
 
 from pants.jvm.resolve.jvm_tool import JvmToolBase
 from pants.option.option_types import ArgsListOption, SkipOption
-from pants.util.docutil import git_url
 
 
 class JUnit(JvmToolBase):
@@ -18,8 +17,6 @@ class JUnit(JvmToolBase):
         "org.junit.vintage:junit-vintage-engine:{version}",
     )
     default_lockfile_resource = ("pants.jvm.test", "junit.default.lockfile.txt")
-    default_lockfile_path = "src/python/pants/jvm/test/junit.default.lockfile.txt"
-    default_lockfile_url = git_url(default_lockfile_path)
 
     args = ArgsListOption(example="--disable-ansi-colors", passthrough=True)
 

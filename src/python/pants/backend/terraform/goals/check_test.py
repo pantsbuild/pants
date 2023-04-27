@@ -68,7 +68,7 @@ def make_target(
         "BUILD": f"terraform_module(name='{target_name}')\n",
     }
     files.update({source_file.path: source_file.content.decode() for source_file in source_files})
-    rule_runner.write_files(files)  # type: ignore[arg-type]
+    rule_runner.write_files(files)
     return rule_runner.get_target(Address("", target_name=target_name))
 
 

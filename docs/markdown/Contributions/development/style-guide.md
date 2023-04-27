@@ -4,7 +4,6 @@ slug: "style-guide"
 excerpt: "Some conventions we encourage."
 hidden: false
 createdAt: "2020-05-17T04:29:11.796Z"
-updatedAt: "2022-04-26T23:57:26.701Z"
 ---
 Reminder: running the autoformatters and linters
 ------------------------------------------------
@@ -12,7 +11,7 @@ Reminder: running the autoformatters and linters
 Most of Pants' style is enforced via Black, isort, Docformatter, Flake8, and MyPy. You may find it helpful to run these commands before pushing a PR:
 
 ```bash
-$ ./pants --changed-since=HEAD fmt
+$ pants --changed-since=HEAD fmt
 $ build-support/githooks/pre-commit
 ```
 
@@ -22,7 +21,7 @@ $ build-support/githooks/pre-commit
 > 
 > ```python
 > StrOption(
->     default="./pants",
+>     default="pants",
 >     help="The name of the script or binary used to invoke pants. "
 >     "Useful when printing help messages.",
 > )
@@ -32,7 +31,7 @@ $ build-support/githooks/pre-commit
 > 
 > ```python
 > StrOption(
->     default="./pants",
+>     default="pants",
 >     help=(
 >         "The name of the script or binary used to invoke pants. "
 >         "Useful when printing help messages."
@@ -87,7 +86,7 @@ Good:
 ```
 def __hash__(self):
     # By overriding __hash__ here, rather than using the default implementation, 
-    # we get a 10% speedup to `./pants list ::` (1000 targets) thanks to more
+    # we get a 10% speedup to `pants list ::` (1000 targets) thanks to more
     # cache hits. This is safe to do because ...
     ...
 
@@ -275,21 +274,18 @@ class Example:
             )
 ```
 
-If you need a custom constructor, such as to transform the parameters, use `@frozen_after_init` and `unsafe_hash=True` instead of `frozen=True`.
+If you need a custom constructor, such as to transform the parameters, the Python docs say to use `object.__setattr__` to set the attributes.
 
 ```python
 from dataclasses import dataclass
 from typing import Iterable, Tuple
 
-from pants.util.meta import frozen_after_init
-
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class Example:
     values: Tuple[str, ...]
 
     def __init__(self, values: Iterable[str]) -> None:
-        self.values = tuple(values)
+        object.__setattr__(self, "values", tuple(values))
 ```
 
 Type hints

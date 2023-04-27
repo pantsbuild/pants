@@ -39,7 +39,6 @@ class ClangFormatRequest(FmtTargetsRequest):
 
 @rule(level=LogLevel.DEBUG)
 async def clangformat_fmt(request: ClangFormatRequest.Batch, clangformat: ClangFormat) -> FmtResult:
-
     # Look for any/all of the clang-format configuration files (recurse sub-dirs)
     config_files_get = Get(
         ConfigFiles,

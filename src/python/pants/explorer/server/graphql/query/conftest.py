@@ -11,6 +11,7 @@ from pants.backend.docker.target_types import DockerImageTarget
 from pants.backend.project_info import peek
 from pants.engine.environment import EnvironmentName
 from pants.engine.explorer import RequestState
+from pants.engine.internals.parser import BuildFileSymbolsInfo
 from pants.engine.target import RegisteredTargetTypes
 from pants.engine.unions import UnionMembership
 from pants.explorer.server.graphql.rules import rules
@@ -48,6 +49,7 @@ def all_help_info(rule_runner: RuleRunner) -> AllHelpInfo:
         union_membership=rule_runner.union_membership,
         consumed_scopes_mapper=fake_consumed_scopes_mapper,
         registered_target_types=RegisteredTargetTypes.create(rule_runner.build_config.target_types),
+        build_symbols=BuildFileSymbolsInfo.from_info(),
         build_configuration=rule_runner.build_config,
     )
 

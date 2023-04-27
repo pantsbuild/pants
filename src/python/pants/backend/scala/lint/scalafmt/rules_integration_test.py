@@ -16,7 +16,6 @@ from pants.backend.scala.lint.scalafmt.rules import (
     ScalafmtConfigFiles,
     ScalafmtFieldSet,
     ScalafmtRequest,
-    find_nearest_ancestor_file,
 )
 from pants.backend.scala.lint.scalafmt.rules import rules as scalafmt_rules
 from pants.backend.scala.target_types import ScalaSourcesGeneratorTarget, ScalaSourceTarget
@@ -24,7 +23,7 @@ from pants.build_graph.address import Address
 from pants.core.goals.fmt import FmtResult, Partitions
 from pants.core.util_rules import config_files, source_files
 from pants.core.util_rules.external_tool import rules as external_tool_rules
-from pants.engine.fs import CreateDigest, Digest, FileContent, PathGlobs, Snapshot
+from pants.engine.fs import PathGlobs, Snapshot
 from pants.engine.rules import QueryRule
 from pants.engine.target import Target
 from pants.jvm import classpath
@@ -34,6 +33,7 @@ from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
 from pants.jvm.strip_jar import strip_jar
 from pants.jvm.util_rules import rules as util_rules
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, RuleRunner
+from pants.util.dirutil import find_nearest_ancestor_file
 
 
 @pytest.fixture
@@ -157,12 +157,6 @@ def run_scalafmt(
     return fmt_results if expected_partitions else fmt_results[0]
 
 
-def get_snapshot(rule_runner: RuleRunner, source_files: dict[str, str]) -> Snapshot:
-    files = [FileContent(path, content.encode()) for path, content in source_files.items()]
-    digest = rule_runner.request(Digest, [CreateDigest(files)])
-    return rule_runner.request(Snapshot, [digest])
-
-
 def test_passing(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -173,7 +167,7 @@ def test_passing(rule_runner: RuleRunner) -> None:
     )
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="Foo.scala"))
     fmt_result = run_scalafmt(rule_runner, [tgt])
-    assert fmt_result.output == get_snapshot(rule_runner, {"Foo.scala": GOOD_FILE})
+    assert fmt_result.output == rule_runner.make_snapshot({"Foo.scala": GOOD_FILE})
     assert fmt_result.did_change is False
 
 
@@ -187,7 +181,7 @@ def test_failing(rule_runner: RuleRunner) -> None:
     )
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="Bar.scala"))
     fmt_result = run_scalafmt(rule_runner, [tgt])
-    assert fmt_result.output == get_snapshot(rule_runner, {"Bar.scala": FIXED_BAD_FILE})
+    assert fmt_result.output == rule_runner.make_snapshot({"Bar.scala": FIXED_BAD_FILE})
     assert fmt_result.did_change is True
 
 
@@ -205,8 +199,8 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
         rule_runner.get_target(Address("", target_name="t", relative_file_path="Bar.scala")),
     ]
     fmt_result = run_scalafmt(rule_runner, tgts)
-    assert fmt_result.output == get_snapshot(
-        rule_runner, {"Foo.scala": GOOD_FILE, "Bar.scala": FIXED_BAD_FILE}
+    assert fmt_result.output == rule_runner.make_snapshot(
+        {"Foo.scala": GOOD_FILE, "Bar.scala": FIXED_BAD_FILE}
     )
     assert fmt_result.did_change is True
 
@@ -242,10 +236,10 @@ def test_multiple_config_files(rule_runner: RuleRunner) -> None:
         },
     )
     assert not fmt_results[0].did_change
-    assert fmt_results[0].output == get_snapshot(rule_runner, {"foo/Foo.scala": GOOD_FILE})
+    assert fmt_results[0].output == rule_runner.make_snapshot({"foo/Foo.scala": GOOD_FILE})
     assert fmt_results[1].did_change
-    assert fmt_results[1].output == get_snapshot(
-        rule_runner, {"foo/bar/Bar.scala": FIXED_BAD_FILE_INDENT_4}
+    assert fmt_results[1].output == rule_runner.make_snapshot(
+        {"foo/bar/Bar.scala": FIXED_BAD_FILE_INDENT_4}
     )
 
 

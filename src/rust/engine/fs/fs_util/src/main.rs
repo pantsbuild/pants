@@ -46,7 +46,7 @@ use hashing::{Digest, Fingerprint};
 use parking_lot::Mutex;
 use protos::require_digest;
 use serde_derive::Serialize;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use store::{
   Snapshot, SnapshotOps, Store, StoreError, StoreFileByDigest, SubsetParams, UploadSummary,
 };
@@ -338,12 +338,8 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
     .unwrap_or_else(Store::default_path);
   let runtime = task_executor::Executor::new();
   let (store, store_has_remote) = {
-    let local_only = Store::local_only(runtime.clone(), &store_dir).map_err(|e| {
-      format!(
-        "Failed to open/create store for directory {:?}: {}",
-        store_dir, e
-      )
-    })?;
+    let local_only = Store::local_only(runtime.clone(), &store_dir)
+      .map_err(|e| format!("Failed to open/create store for directory {store_dir:?}: {e}"))?;
     let (store_result, store_has_remote) = match top_match.value_of("server-address") {
       Some(cas_address) => {
         let chunk_size = top_match
@@ -353,7 +349,7 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
         let root_ca_certs = if let Some(path) = top_match.value_of("root-ca-cert-file") {
           Some(
             std::fs::read(path)
-              .map_err(|err| format!("Error reading root CA certs file {}: {}", path, err))?,
+              .map_err(|err| format!("Error reading root CA certs file {path}: {err}"))?,
           )
         } else {
           None
@@ -365,15 +361,11 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
         ) {
           (Some(cert_chain_path), Some(key_path)) => {
             let key = std::fs::read(key_path).map_err(|err| {
-              format!(
-                "Failed to read mtls-client-key-path from {:?}: {:?}",
-                key_path, err
-              )
+              format!("Failed to read mtls-client-key-path from {key_path:?}: {err:?}")
             })?;
             let cert_chain = std::fs::read(cert_chain_path).map_err(|err| {
               format!(
-                "Failed to read mtls-client-certificate-chain-path from {:?}: {:?}",
-                cert_chain_path, err
+                "Failed to read mtls-client-certificate-chain-path from {cert_chain_path:?}: {err:?}"
               )
             })?;
             Some(MtlsConfig { key, cert_chain })
@@ -403,17 +395,14 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
             if let Some((key, value)) = h.split_once('=') {
               headers.insert(key.to_owned(), value.to_owned());
             } else {
-              panic!("Expected --header flag to contain = but was {}", h);
+              panic!("Expected --header flag to contain = but was {h}");
             }
           }
         }
 
         if let Some(oauth_path) = top_match.value_of("oauth-bearer-token-file") {
           let token = std::fs::read_to_string(oauth_path).map_err(|err| {
-            format!(
-              "Error reading oauth bearer token from {:?}: {}",
-              oauth_path, err
-            )
+            format!("Error reading oauth bearer token from {oauth_path:?}: {err}")
           })?;
           headers.insert(
             "authorization".to_owned(),
@@ -434,10 +423,7 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
             // leave this hanging forever.
             //
             // Make fs_util have a very long deadline (because it's not configurable,
-            // like it is inside pants) until we switch to Tower (where we can more
-            // carefully control specific components of timeouts).
-            //
-            // See https://github.com/pantsbuild/pants/pull/6433 for more context.
+            // like it is inside pants).
             Duration::from_secs(30 * 60),
             top_match
               .value_of_t::<usize>("rpc-attempts")
@@ -482,14 +468,14 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
             runtime.clone(),
             path
               .canonicalize()
-              .map_err(|e| format!("Error canonicalizing path {:?}: {:?}", path, e))?
+              .map_err(|e| format!("Error canonicalizing path {path:?}: {e:?}"))?
               .parent()
-              .ok_or_else(|| format!("File being saved must have parent but {:?} did not", path))?,
+              .ok_or_else(|| format!("File being saved must have parent but {path:?} did not"))?,
           );
           let file = posix_fs
             .stat_sync(PathBuf::from(path.file_name().unwrap()))
             .unwrap()
-            .ok_or_else(|| format!("Tried to save file {:?} but it did not exist", path))?;
+            .ok_or_else(|| format!("Tried to save file {path:?} but it did not exist"))?;
           match file {
             fs::Stat::File(f) => {
               let digest =
@@ -505,13 +491,9 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
 
               Ok(())
             }
-            o => Err(
-              format!(
-                "Tried to save file {:?} but it was not a file, was a {:?}",
-                path, o
-              )
-              .into(),
-            ),
+            o => {
+              Err(format!("Tried to save file {path:?} but it was not a file, was a {o:?}").into())
+            }
           }
         }
         (_, _) => unimplemented!(),
@@ -535,7 +517,13 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
           output_digest_opt.ok_or_else(|| ExitError("not found".into(), ExitCode::NotFound))?;
         Ok(
           store
-            .materialize_directory(destination, output_digest, Permissions::Writable)
+            .materialize_directory(
+              destination,
+              output_digest,
+              false,
+              &BTreeSet::new(),
+              Permissions::Writable,
+            )
             .await?,
         )
       }
@@ -553,7 +541,13 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
         let digest = DirectoryDigest::from_persisted_digest(Digest::new(fingerprint, size_bytes));
         Ok(
           store
-            .materialize_directory(destination, digest, Permissions::Writable)
+            .materialize_directory(
+              destination,
+              digest,
+              false,
+              &BTreeSet::new(),
+              Permissions::Writable,
+            )
             .await?,
         )
       }
@@ -578,7 +572,7 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
         let paths = posix_fs
           .expand_globs(path_globs, SymlinkBehavior::Oblivious, None)
           .await
-          .map_err(|e| format!("Error expanding globs: {:?}", e))?;
+          .map_err(|e| format!("Error expanding globs: {e:?}"))?;
 
         let snapshot = Snapshot::from_path_stats(
           store::OneOffStoreFileByDigest::new(store_copy, posix_fs, false),
@@ -610,7 +604,7 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
               digest,
               SubsetParams {
                 globs: PreparedPathGlobs::create(
-                  vec![format!("{}/**", prefix_to_strip)],
+                  vec![format!("{prefix_to_strip}/**")],
                   StrictGlobMatching::Ignore,
                   GlobExpansionConjunction::AnyMatch,
                 )?,
@@ -644,7 +638,7 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
           "recursive-file-list" => expand_files(store, digest.as_digest())
             .await?
             .into_iter()
-            .map(|(name, _digest)| format!("{}\n", name))
+            .map(|(name, _digest)| format!("{name}\n"))
             .collect::<Vec<String>>()
             .join("")
             .into_bytes(),
@@ -656,7 +650,7 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
             .join("")
             .into_bytes(),
           format => {
-            return Err(format!("Unexpected value of --output-format arg: {}", format).into())
+            return Err(format!("Unexpected value of --output-format arg: {format}").into())
           }
         };
 
@@ -689,6 +683,7 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
       ("list", _) => {
         for digest in store
           .all_local_digests(::store::EntryType::Directory)
+          .await
           .expect("Error opening store")
         {
           println!("{} {}", digest.hash, digest.size_bytes);
@@ -701,7 +696,9 @@ async fn execute(top_match: &clap::ArgMatches) -> Result<(), ExitError> {
       let target_size_bytes = args
         .value_of_t::<usize>("target-size-bytes")
         .expect("--target-size-bytes must be passed as a non-negative integer");
-      store.garbage_collect(target_size_bytes, store::ShrinkBehavior::Compact)?;
+      store
+        .garbage_collect(target_size_bytes, store::ShrinkBehavior::Compact)
+        .await?;
       Ok(())
     }
 

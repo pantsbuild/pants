@@ -3,16 +3,21 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+import json
+import logging
+from dataclasses import dataclass, replace
 from typing import Iterable
 
-from pants.backend.javascript.subsystems.nodejs import NpxProcess
+import toml
+
+from pants.backend.javascript.subsystems.nodejs import NodeJSToolProcess
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
     InterpreterConstraintsField,
     PythonResolveField,
     PythonSourceField,
 )
+from pants.backend.python.typecheck.pyright.skip_field import SkipPyrightField
 from pants.backend.python.typecheck.pyright.subsystem import Pyright
 from pants.backend.python.util_rules import pex_from_targets
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
@@ -27,18 +32,22 @@ from pants.backend.python.util_rules.python_sources import (
     PythonSourceFilesRequest,
 )
 from pants.core.goals.check import CheckRequest, CheckResult, CheckResults
+from pants.core.util_rules import config_files
+from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.collection import Collection
-from pants.engine.fs import CreateDigest, FileContent
+from pants.engine.fs import CreateDigest, DigestContents, FileContent
 from pants.engine.internals.native_engine import Digest, MergeDigests
 from pants.engine.internals.selectors import MultiGet
 from pants.engine.process import FallibleProcessResult, Process
 from pants.engine.rules import Get, Rule, collect_rules, rule
-from pants.engine.target import CoarsenedTargets, CoarsenedTargetsRequest, FieldSet
+from pants.engine.target import CoarsenedTargets, CoarsenedTargetsRequest, FieldSet, Target
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 from pants.util.strutil import pluralize
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -48,6 +57,10 @@ class PyrightFieldSet(FieldSet):
     sources: PythonSourceField
     resolve: PythonResolveField
     interpreter_constraints: InterpreterConstraintsField
+
+    @classmethod
+    def opt_out(cls, tgt: Target) -> bool:
+        return tgt.get(SkipPyrightField).value
 
 
 class PyrightRequest(CheckRequest):
@@ -71,6 +84,61 @@ class PyrightPartitions(Collection[PyrightPartition]):
     pass
 
 
+async def _patch_config_file(
+    config_files: ConfigFiles, venv_dir: str, source_roots: Iterable[str]
+) -> Digest:
+    """Patch the Pyright config file to use the incoming venv directory (from
+    requirements_venv_pex). If there is no config file, create a dummy pyrightconfig.json with the
+    `venv` key populated.
+
+    The incoming venv directory works alongside the `--venv-path` CLI argument.
+
+    Additionally, add source roots to the `extraPaths` key in the config file.
+    """
+
+    source_roots_list = list(source_roots)
+    if not config_files.snapshot.files:
+        # venv workaround as per: https://github.com/microsoft/pyright/issues/4051
+        generated_config = {"venv": venv_dir, "extraPaths": source_roots_list}
+        return await Get(
+            Digest,
+            CreateDigest(
+                [
+                    FileContent(
+                        "pyrightconfig.json",
+                        json.dumps(generated_config).encode(),
+                    )
+                ]
+            ),
+        )
+
+    config_contents = await Get(DigestContents, Digest, config_files.snapshot.digest)
+    new_files: list[FileContent] = []
+    for file in config_contents:
+        # This only supports a single json config file in the root of the project
+        # https://github.com/pantsbuild/pants/issues/17816 tracks supporting multiple config files and workspaces
+        if file.path == "pyrightconfig.json":
+            json_config = json.loads(file.content)
+            json_config["venv"] = venv_dir
+            json_extra_paths: list[str] = json_config.get("extraPaths", [])
+            json_config["extraPaths"] = list(OrderedSet(json_extra_paths + source_roots_list))
+            new_content = json.dumps(json_config).encode()
+            new_files.append(replace(file, content=new_content))
+
+        # This only supports a single pyproject.toml file in the root of the project
+        # https://github.com/pantsbuild/pants/issues/17816 tracks supporting multiple config files and workspaces
+        elif file.path == "pyproject.toml":
+            toml_config = toml.loads(file.content.decode())
+            pyright_config = toml_config["tool"]["pyright"]
+            pyright_config["venv"] = venv_dir
+            toml_extra_paths: list[str] = pyright_config.get("extraPaths", [])
+            pyright_config["extraPaths"] = list(OrderedSet(toml_extra_paths + source_roots_list))
+            new_content = toml.dumps(toml_config).encode()
+            new_files.append(replace(file, content=new_content))
+
+    return await Get(Digest, CreateDigest(new_files))
+
+
 @rule(
     desc="Pyright typecheck each partition based on its interpreter_constraints",
     level=LogLevel.DEBUG,
@@ -80,24 +148,38 @@ async def pyright_typecheck_partition(
     pyright: Pyright,
     pex_environment: PexEnvironment,
 ) -> CheckResult:
-
-    root_sources = await Get(
+    root_sources_get = Get(
         SourceFiles,
         SourceFilesRequest(fs.sources for fs in partition.field_sets),
     )
 
-    # Grab the inferred and supporting files for the root source files to be typechecked
-    coarsened_sources = await Get(
+    # Grab the closure of the root source files to be typechecked
+    transitive_sources_get = Get(
         PythonSourceFiles, PythonSourceFilesRequest(partition.root_targets.closure())
     )
 
     # See `requirements_venv_pex` for how this will get wrapped in a `VenvPex`.
-    requirements_pex = await Get(
+    requirements_pex_get = Get(
         Pex,
         RequirementsPexRequest(
             (fs.address for fs in partition.field_sets),
             hardcoded_interpreter_constraints=partition.interpreter_constraints,
         ),
+    )
+
+    # Look for any/all of the Pyright configuration files (the config is modified below
+    # for the `venv` workaround)
+    config_files_get = Get(
+        ConfigFiles,
+        ConfigFilesRequest,
+        pyright.config_request(),
+    )
+
+    root_sources, transitive_sources, requirements_pex, config_files = await MultiGet(
+        root_sources_get,
+        transitive_sources_get,
+        requirements_pex_get,
+        config_files_get,
     )
 
     requirements_venv_pex = await Get(
@@ -110,26 +192,19 @@ async def pyright_typecheck_partition(
         ),
     )
 
-    # venv workaround as per: https://github.com/microsoft/pyright/issues/4051
-    dummy_config_digest = await Get(
-        Digest,
-        CreateDigest(
-            [
-                FileContent(
-                    "pyrightconfig.json",
-                    f'{{ "venv": "{requirements_venv_pex.venv_rel_dir}" }}'.encode(),
-                )
-            ]
-        ),
+    # Patch the config file to use the venv directory from the requirements pex,
+    # and add source roots to the `extraPaths` key in the config file.
+    patched_config_digest = await _patch_config_file(
+        config_files, requirements_venv_pex.venv_rel_dir, transitive_sources.source_roots
     )
 
     input_digest = await Get(
         Digest,
         MergeDigests(
             [
-                coarsened_sources.source_files.snapshot.digest,
+                transitive_sources.source_files.snapshot.digest,
                 requirements_venv_pex.digest,
-                dummy_config_digest,
+                patched_config_digest,
             ]
         ),
     )
@@ -137,7 +212,8 @@ async def pyright_typecheck_partition(
     complete_pex_env = pex_environment.in_workspace()
     process = await Get(
         Process,
-        NpxProcess(
+        NodeJSToolProcess,
+        NodeJSToolProcess.npx(
             npm_package=pyright.version,
             args=(
                 f"--venv-path={complete_pex_env.pex_root}",  # Used with `venv` in config
@@ -165,7 +241,6 @@ async def pyright_determine_partitions(
     pyright: Pyright,
     python_setup: PythonSetup,
 ) -> PyrightPartitions:
-
     resolve_and_interpreter_constraints_to_field_sets = (
         _partition_by_interpreter_constraints_and_resolve(request.field_sets, python_setup)
     )
@@ -214,6 +289,7 @@ async def pyright_typecheck(
 def rules() -> Iterable[Rule | UnionRule]:
     return (
         *collect_rules(),
+        *config_files.rules(),
         *pex_from_targets.rules(),
         UnionRule(CheckRequest, PyrightRequest),
     )

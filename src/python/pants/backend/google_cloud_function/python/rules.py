@@ -7,6 +7,7 @@ import logging
 from dataclasses import dataclass
 
 from pants.backend.google_cloud_function.python.target_types import (
+    PythonGoogleCloudFunctionCompletePlatforms,
     PythonGoogleCloudFunctionHandlerField,
     PythonGoogleCloudFunctionRuntime,
     PythonGoogleCloudFunctionType,
@@ -14,7 +15,6 @@ from pants.backend.google_cloud_function.python.target_types import (
     ResolvePythonGoogleHandlerRequest,
 )
 from pants.backend.python.subsystems.lambdex import Lambdex
-from pants.backend.python.target_types import PexCompletePlatformsField
 from pants.backend.python.util_rules import pex_from_targets
 from pants.backend.python.util_rules.pex import (
     CompletePlatforms,
@@ -32,6 +32,8 @@ from pants.core.goals.package import (
     PackageFieldSet,
 )
 from pants.core.target_types import FileSourceField
+from pants.core.util_rules.environments import EnvironmentField
+from pants.engine.addresses import UnparsedAddressInputs
 from pants.engine.platform import Platform
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
@@ -53,9 +55,19 @@ class PythonGoogleCloudFunctionFieldSet(PackageFieldSet):
 
     handler: PythonGoogleCloudFunctionHandlerField
     runtime: PythonGoogleCloudFunctionRuntime
-    complete_platforms: PexCompletePlatformsField
+    complete_platforms: PythonGoogleCloudFunctionCompletePlatforms
     type: PythonGoogleCloudFunctionType
     output_path: OutputPathField
+    environment: EnvironmentField
+
+
+@rule
+async def digest_complete_platforms(
+    complete_platforms: PythonGoogleCloudFunctionCompletePlatforms,
+) -> CompletePlatforms:
+    return await Get(
+        CompletePlatforms, UnparsedAddressInputs, complete_platforms.to_unparsed_address_inputs()
+    )
 
 
 @rule(desc="Create Python Google Cloud Function", level=LogLevel.DEBUG)
@@ -102,7 +114,7 @@ async def package_python_google_cloud_function(
     )
 
     complete_platforms = await Get(
-        CompletePlatforms, PexCompletePlatformsField, field_set.complete_platforms
+        CompletePlatforms, PythonGoogleCloudFunctionCompletePlatforms, field_set.complete_platforms
     )
 
     pex_request = PexFromTargetsRequest(
@@ -114,14 +126,7 @@ async def package_python_google_cloud_function(
         additional_args=additional_pex_args,
         additional_lockfile_args=additional_pex_args,
     )
-
-    lambdex_request = PexRequest(
-        output_filename="lambdex.pex",
-        internal_only=True,
-        requirements=lambdex.pex_requirements(),
-        interpreter_constraints=lambdex.interpreter_constraints,
-        main=lambdex.main,
-    )
+    lambdex_request = lambdex.to_pex_request()
 
     lambdex_pex, pex_result, handler, transitive_targets = await MultiGet(
         Get(VenvPex, PexRequest, lambdex_request),

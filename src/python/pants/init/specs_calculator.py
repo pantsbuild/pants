@@ -7,7 +7,7 @@ from typing import cast
 from pants.base.specs import AddressLiteralSpec, FileLiteralSpec, RawSpecs, Specs
 from pants.base.specs_parser import SpecsParser
 from pants.core.util_rules.environments import determine_bootstrap_environment
-from pants.core.util_rules.system_binaries import GitBinary, GitBinaryRequest
+from pants.core.util_rules.system_binaries import GitBinary
 from pants.engine.addresses import AddressInput
 from pants.engine.environment import EnvironmentName
 from pants.engine.internals.scheduler import SchedulerSession
@@ -29,11 +29,12 @@ def calculate_specs(
     options_bootstrapper: OptionsBootstrapper,
     options: Options,
     session: SchedulerSession,
+    working_dir: str,
 ) -> Specs:
     """Determine the specs for a given Pants run."""
     global_options = options.for_global_scope()
-    unmatched_cli_globs = global_options.unmatched_cli_globs.to_glob_match_error_behavior()
-    specs = SpecsParser().parse_specs(
+    unmatched_cli_globs = global_options.unmatched_cli_globs
+    specs = SpecsParser(working_dir=working_dir).parse_specs(
         options.specs,
         description_of_origin="CLI arguments",
         unmatched_glob_behavior=unmatched_cli_globs,
@@ -57,9 +58,7 @@ def calculate_specs(
 
     bootstrap_environment = determine_bootstrap_environment(session)
 
-    (git_binary,) = session.product_request(
-        GitBinary, [Params(GitBinaryRequest(), bootstrap_environment)]
-    )
+    (git_binary,) = session.product_request(GitBinary, [Params(bootstrap_environment)])
     (maybe_git_worktree,) = session.product_request(
         MaybeGitWorktree, [Params(GitWorktreeRequest(), git_binary, bootstrap_environment)]
     )
@@ -108,6 +107,6 @@ def calculate_specs(
 def rules():
     return [
         QueryRule(ChangedAddresses, [ChangedRequest, EnvironmentName]),
-        QueryRule(GitBinary, [GitBinaryRequest, EnvironmentName]),
+        QueryRule(GitBinary, [EnvironmentName]),
         QueryRule(MaybeGitWorktree, [GitWorktreeRequest, GitBinary, EnvironmentName]),
     ]

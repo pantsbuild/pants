@@ -38,7 +38,7 @@ from pants.engine.rules import collect_rules, rule
 from pants.engine.target import Target
 from pants.engine.unions import UnionRule
 from pants.option.option_types import ArgsListOption, BoolOption, FileOption, SkipOption, StrOption
-from pants.util.docutil import bin_name, doc_url, git_url
+from pants.util.docutil import bin_name, doc_url
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_method
 from pants.util.strutil import softwrap
@@ -77,13 +77,11 @@ class PyTest(PythonToolBase):
     #  E.g., as default_version = "pytest>=7,<8,!=7.1.0,!=7.1.1"
     default_version = "pytest==7.0.1"
     default_extra_requirements = ["pytest-cov>=2.12,!=2.12.1,<3.1", "pytest-xdist>=2.5,<3"]
+    default_requirements = [default_version, *default_extra_requirements]
 
     default_main = ConsoleScript("pytest")
 
-    register_lockfile = True
     default_lockfile_resource = ("pants.backend.python.subsystems", "pytest.lock")
-    default_lockfile_path = "src/python/pants/backend/python/subsystems/pytest.lock"
-    default_lockfile_url = git_url(default_lockfile_path)
 
     args = ArgsListOption(example="-k test_foo --quiet", passthrough=True)
     junit_family = StrOption(
@@ -218,10 +216,10 @@ async def setup_pytest_lockfile(
     _: PytestLockfileSentinel, pytest: PyTest, python_setup: PythonSetup
 ) -> GeneratePythonLockfile:
     if not pytest.uses_custom_lockfile:
-        return GeneratePythonLockfile.from_tool(pytest)
+        return pytest.to_lockfile_request()
 
     constraints = await _find_all_unique_interpreter_constraints(python_setup, PythonTestFieldSet)
-    return GeneratePythonLockfile.from_tool(pytest, constraints)
+    return pytest.to_lockfile_request(constraints)
 
 
 class PytestExportSentinel(ExportPythonToolSentinel):

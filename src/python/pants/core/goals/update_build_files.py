@@ -19,6 +19,7 @@ from pants.backend.build_files.fix.deprecations import renamed_fields_rules, ren
 from pants.backend.build_files.fix.deprecations.base import FixedBUILDFile
 from pants.backend.build_files.fmt.black.register import BlackRequest
 from pants.backend.build_files.fmt.yapf.register import YapfRequest
+from pants.backend.python.goals import lockfile
 from pants.backend.python.lint.black.rules import _run_black
 from pants.backend.python.lint.black.subsystem import Black
 from pants.backend.python.lint.yapf.rules import _run_yapf
@@ -48,7 +49,7 @@ from pants.option.option_types import BoolOption, EnumOption
 from pants.util.docutil import bin_name, doc_url
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized
-from pants.util.strutil import softwrap
+from pants.util.strutil import help_text, softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -107,7 +108,7 @@ class DeprecationFixerRequest(RewrittenBuildFileRequest):
 
 class UpdateBuildFilesSubsystem(GoalSubsystem):
     name = "update-build-files"
-    help = softwrap(
+    help = help_text(
         f"""
         Format and fix safe deprecations in BUILD files.
 
@@ -237,7 +238,7 @@ async def update_build_files(
     }
     build_file_to_change_descriptions: DefaultDict[str, list[str]] = defaultdict(list)
     for rewrite_request_cls in rewrite_request_classes:
-        all_rewritten_files = await MultiGet(
+        all_rewritten_files = await MultiGet(  # noqa: PNT30: this is inherently sequential
             Get(
                 RewrittenBuildFile,
                 RewrittenBuildFileRequest,
@@ -427,6 +428,7 @@ def rules():
         *collect_rules(renamed_fields_rules),
         *collect_rules(renamed_targets_rules),
         *pex.rules(),
+        *lockfile.rules(),
         UnionRule(RewrittenBuildFileRequest, RenameDeprecatedTargetsRequest),
         UnionRule(RewrittenBuildFileRequest, RenameDeprecatedFieldsRequest),
         # NB: We want this to come at the end so that running Black or Yapf happens

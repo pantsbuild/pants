@@ -4,14 +4,13 @@ slug: "plugins-test-goal"
 excerpt: "How to add a new test runner to the `test` goal."
 hidden: false
 createdAt: "2020-07-23T23:20:54.816Z"
-updatedAt: "2021-12-07T23:14:31.220Z"
 ---
 
 
 1. Set up a test target type
 ----------------------------
 
-Usually, you will want to add a "test" target type for your language, such as `shell_test` or `python_test`. A test target contrasts with a "source" target, such as `shell_source`. A test target is useful so that `./pants test ::` doesn't try to run tests on non-test files.
+Usually, you will want to add a "test" target type for your language, such as `shell_test` or `python_test`. A test target contrasts with a "source" target, such as `shell_source`. A test target is useful so that `pants test ::` doesn't try to run tests on non-test files.
 
 When creating a test target, you should usually subclass `SingleSourceField`. You may also want to create `TimeoutField` (which should subclass `IntField`) and a `SkipField` (which should subclass `BoolField`).
 
@@ -74,18 +73,6 @@ class ExampleTestFieldSet(TestFieldSet):
     @classmethod
     def opt_out(cls, tgt: Target) -> bool:
         return tgt.get(SkipExampleTestsField).value
-```
-
-Register your new subclass as a valid `TestFieldSet` using a `UnionRule`:
-
-```python
-from pants.engine.unions import UnionRule
-
-def rules():
-    return [
-        # Add to any other existing rules here:
-        UnionRule(TestFieldSet, ExampleTestFieldSet),
-    ]
 ```
 
 3. Set up a `Subsystem` for your test runner
@@ -231,10 +218,17 @@ If you didn't override the `partitioner_type` in your `TestRequest` subclass, `e
 7. Define `@rule`s for debug testing
 ------------------------------------
 
-`./pants test` exposes `--debug` and `--debug-adapter` options for interactive execution of tests. To hook into these execution modes, define two additional rules:
+`pants test` exposes `--debug` and `--debug-adapter` options for interactive execution of tests. To hook into these execution modes, opt-in in your `TestRequest` subclass and define one/both additional rules:
 
 ```python
 from pants.core.goals.test import TestDebugAdapterRequest, TestDebugRequest
+from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
+
+@dataclass(frozen=True)
+class ExampleTestRequest(TestRequest):
+    ...  # Fields from earlier
+    supports_debug = True  # Supports --debug
+    supports_debug_adapter = True  # Supports --debug-adapter
 
 @rule
 async def setup_example_debug_test(
@@ -245,8 +239,7 @@ async def setup_example_debug_test(
 @rule
 async def setup_example_debug_adapter_test(
     batch: ExampleTestRequest.Batch[ExampleTestFieldSet, ExampleTestMetadata],
+    debug_adapter: DebugAdapterSubsystem,
 ) -> TestDebugAdapterRequest:
     ...
 ```
-
-You _must_ define these rules to avoid rule-graph errors. If your test runner is not compatible with the Debug Adapter, or if it doesn't benefit from running in `--debug` mode, you can simply `raise` a `NotImplementedError` saying so in one/both of these rules.

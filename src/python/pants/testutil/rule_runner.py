@@ -3,9 +3,11 @@
 
 from __future__ import annotations
 
+import atexit
 import dataclasses
 import functools
 import os
+import re
 import sys
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -26,20 +28,22 @@ from typing import (
     Type,
     TypeVar,
     cast,
+    overload,
 )
 
 from pants.base.build_root import BuildRoot
 from pants.base.specs_parser import SpecsParser
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.core.util_rules import adhoc_binaries
 from pants.engine.addresses import Address
 from pants.engine.console import Console
 from pants.engine.env_vars import CompleteEnvironmentVars
 from pants.engine.environment import EnvironmentName
-from pants.engine.fs import Digest, PathGlobs, PathGlobsAndRoot, Snapshot, Workspace
-from pants.engine.goal import Goal
+from pants.engine.fs import CreateDigest, Digest, FileContent, Snapshot, Workspace
+from pants.engine.goal import CurrentExecutingGoals, Goal
 from pants.engine.internals import native_engine
-from pants.engine.internals.native_engine import ProcessConfigFromEnvironment, PyExecutor
+from pants.engine.internals.native_engine import ProcessExecutionEnvironment, PyExecutor
 from pants.engine.internals.scheduler import ExecutionError, Scheduler, SchedulerSession
 from pants.engine.internals.selectors import Effect, Get, Params
 from pants.engine.internals.session import SessionValues
@@ -60,16 +64,11 @@ from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.source import source_root
 from pants.testutil.option_util import create_options_bootstrapper
 from pants.util.collections import assert_single_element
-from pants.util.contextutil import temporary_dir, temporary_file
-from pants.util.dirutil import (
-    recursive_dirname,
-    safe_file_dump,
-    safe_mkdir,
-    safe_mkdtemp,
-    safe_open,
-)
+from pants.util.contextutil import pushd, temporary_dir, temporary_file
+from pants.util.dirutil import recursive_dirname, safe_mkdir, safe_mkdtemp, safe_open
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import OrderedSet
+from pants.util.strutil import softwrap
 
 
 def logging(original_function=None, *, level: LogLevel = LogLevel.INFO):
@@ -112,7 +111,10 @@ def logging(original_function=None, *, level: LogLevel = LogLevel.INFO):
 
 @contextmanager
 def engine_error(
-    expected_underlying_exception: type[Exception] = Exception, *, contains: str | None = None
+    expected_underlying_exception: type[Exception] = Exception,
+    *,
+    contains: str | None = None,
+    normalize_tracebacks: bool = False,
 ) -> Iterator[None]:
     """A context manager to catch `ExecutionError`s in tests and check that the underlying exception
     is expected.
@@ -123,6 +125,10 @@ def engine_error(
             rule_runner.request(OutputType, [input])
 
     Will raise AssertionError if no ExecutionError occurred.
+
+    Set `normalize_tracebacks=True` to replace file locations and addresses in the error message
+    with fixed values for testability, and check `contains` against the `ExecutionError` message
+    instead of the underlying error only.
     """
     try:
         yield
@@ -130,29 +136,63 @@ def engine_error(
         if not len(exec_error.wrapped_exceptions) == 1:
             formatted_errors = "\n\n".join(repr(e) for e in exec_error.wrapped_exceptions)
             raise ValueError(
-                "Multiple underlying exceptions, but this helper function expected only one. "
-                "Use `with pytest.raises(ExecutionError) as exc` directly and inspect "
-                "`exc.value.wrapped_exceptions`.\n\n"
-                f"Errors: {formatted_errors}"
+                softwrap(
+                    f"""
+                    Multiple underlying exceptions, but this helper function expected only one.
+                    Use `with pytest.raises(ExecutionError) as exc` directly and inspect
+                    `exc.value.wrapped_exceptions`.
+
+                    Errors: {formatted_errors}
+                    """
+                )
             )
         underlying = exec_error.wrapped_exceptions[0]
         if not isinstance(underlying, expected_underlying_exception):
             raise AssertionError(
-                "ExecutionError occurred as expected, but the underlying exception had type "
-                f"{type(underlying)} rather than the expected type "
-                f"{expected_underlying_exception}:\n\n{underlying}"
+                softwrap(
+                    f"""
+                    ExecutionError occurred as expected, but the underlying exception had type
+                    {type(underlying)} rather than the expected type
+                    {expected_underlying_exception}:
+
+                    {underlying}
+                    """
+                )
             )
-        if contains is not None and contains not in str(underlying):
-            raise AssertionError(
-                "Expected value not found in exception.\n"
-                f"expected: {contains}\n\n"
-                f"exception: {underlying}"
-            )
+        if contains is not None:
+            if normalize_tracebacks:
+                errmsg = remove_locations_from_traceback(str(exec_error))
+            else:
+                errmsg = str(underlying)
+            if contains not in errmsg:
+                raise AssertionError(
+                    softwrap(
+                        f"""
+                        Expected value not found in exception.
+
+                        => Expected: {contains}
+
+                        => Actual: {errmsg}
+                        """
+                    )
+                )
     else:
         raise AssertionError(
-            "DID NOT RAISE ExecutionError with underlying exception type "
-            f"{expected_underlying_exception}."
+            softwrap(
+                f"""
+                DID NOT RAISE ExecutionError with underlying exception type
+                {expected_underlying_exception}.
+                """
+            )
         )
+
+
+def remove_locations_from_traceback(trace: str) -> str:
+    location_pattern = re.compile(r'"/.*", line \d+')
+    address_pattern = re.compile(r"0x[0-9a-f]+")
+    new_trace = location_pattern.sub("LOCATION-INFO", trace)
+    new_trace = address_pattern.sub("0xEEEEEEEEE", new_trace)
+    return new_trace
 
 
 # -----------------------------------------------------------------------------------------------
@@ -164,10 +204,16 @@ _I = TypeVar("_I")
 _O = TypeVar("_O")
 
 
-# Use the ~minimum possible parallelism since integration tests using RuleRunner will already be run
-# by Pants using an appropriate Parallelism. We must set max_threads > core_threads; so 2 is the
-# minimum, but, via trial and error, 3 minimizes test times on average.
-_EXECUTOR = PyExecutor(core_threads=1, max_threads=3)
+# A global executor for Schedulers created in unit tests, which is shutdown using `atexit`. This
+# allows for reusing threads, and avoids waiting for straggling tasks during teardown of each test.
+EXECUTOR = PyExecutor(
+    # Use the ~minimum possible parallelism since integration tests using RuleRunner will already
+    # be run by Pants using an appropriate Parallelism. We must set max_threads > core_threads; so
+    # 2 is the minimum, but, via trial and error, 3 minimizes test times on average.
+    core_threads=1,
+    max_threads=3,
+)
+atexit.register(lambda: EXECUTOR.shutdown(5))
 
 
 # Environment variable names required for locating Python interpreters, for use with RuleRunner's
@@ -204,6 +250,7 @@ class RuleRunner:
         rules: Iterable | None = None,
         target_types: Iterable[type[Target]] | None = None,
         objects: dict[str, Any] | None = None,
+        aliases: Iterable[BuildFileAliases] | None = None,
         context_aware_object_factories: dict[str, Any] | None = None,
         isolated_local_store: bool = False,
         preserve_tmpdirs: bool = False,
@@ -212,8 +259,8 @@ class RuleRunner:
         extra_session_values: dict[Any, Any] | None = None,
         max_workunit_verbosity: LogLevel = LogLevel.DEBUG,
         inherent_environment: EnvironmentName | None = EnvironmentName(None),
+        is_bootstrap: bool = False,
     ) -> None:
-
         bootstrap_args = [*bootstrap_args]
 
         root_dir: Path | None = None
@@ -243,6 +290,7 @@ class RuleRunner:
         all_rules = (
             *self.rules,
             *source_root.rules(),
+            *adhoc_binaries.rules(),
             QueryRule(WrappedTarget, [WrappedTargetRequest]),
             QueryRule(AllTargets, []),
             QueryRule(UnionMembership, []),
@@ -253,12 +301,16 @@ class RuleRunner:
                 objects=objects, context_aware_object_factories=context_aware_object_factories
             )
         )
+        aliases = aliases or ()
+        for build_file_aliases in aliases:
+            build_config_builder.register_aliases(build_file_aliases)
+
         build_config_builder.register_rules("_dummy_for_test_", all_rules)
         build_config_builder.register_target_types("_dummy_for_test_", target_types or ())
         self.build_config = build_config_builder.create()
 
         self.environment = CompleteEnvironmentVars({})
-        self.options_bootstrapper = create_options_bootstrapper(args=bootstrap_args)
+        self.options_bootstrapper = self.create_options_bootstrapper(args=bootstrap_args, env=None)
         self.extra_session_values = extra_session_values or {}
         self.inherent_environment = inherent_environment
         self.max_workunit_verbosity = max_workunit_verbosity
@@ -295,12 +347,14 @@ class RuleRunner:
                 named_caches_dir=named_caches_dir,
                 build_root=self.build_root,
                 build_configuration=self.build_config,
-                executor=_EXECUTOR,
+                # Each Scheduler that is created borrows the global executor, which is shut down `atexit`.
+                executor=EXECUTOR.to_borrowed(),
                 execution_options=ExecutionOptions.from_options(
                     global_options, dynamic_remote_options
                 ),
                 ca_certs_path=ca_certs_path,
                 engine_visualize_to=None,
+                is_bootstrap=is_bootstrap,
             ).scheduler
         )
 
@@ -314,6 +368,7 @@ class RuleRunner:
                 {
                     OptionsBootstrapper: self.options_bootstrapper,
                     CompleteEnvironmentVars: self.environment,
+                    CurrentExecutingGoals: CurrentExecutingGoals(),
                     **self.extra_session_values,
                 }
             ),
@@ -362,7 +417,7 @@ class RuleRunner:
             [GlobalOptions.get_scope_info(), goal.subsystem_cls.get_scope_info()],
             self.union_membership,
         ).specs
-        specs = SpecsParser(self.build_root).parse_specs(
+        specs = SpecsParser(root_dir=self.build_root).parse_specs(
             raw_specs, description_of_origin="RuleRunner.run_goal_rule()"
         )
 
@@ -381,6 +436,11 @@ class RuleRunner:
 
         console.flush()
         return GoalRuleResult(exit_code, stdout.getvalue(), stderr.getvalue())
+
+    def create_options_bootstrapper(
+        self, args: Iterable[str], env: Mapping[str, str] | None
+    ) -> OptionsBootstrapper:
+        return create_options_bootstrapper(args=args, env=env)
 
     def set_options(
         self,
@@ -405,7 +465,7 @@ class RuleRunner:
             **{k: os.environ[k] for k in (env_inherit or set()) if k in os.environ},
             **(env or {}),
         }
-        self.options_bootstrapper = create_options_bootstrapper(args=args, env=env)
+        self.options_bootstrapper = self.create_options_bootstrapper(args=args, env=env)
         self.environment = CompleteEnvironmentVars(env)
         self._set_new_session(self.scheduler.scheduler)
 
@@ -462,7 +522,17 @@ class RuleRunner:
         self._invalidate_for(str(relpath))
         return path
 
-    def write_files(self, files: Mapping[str | PurePath, str | bytes]) -> tuple[str, ...]:
+    @overload
+    def write_files(self, files: Mapping[str, str | bytes]) -> tuple[str, ...]:
+        ...
+
+    @overload
+    def write_files(self, files: Mapping[PurePath, str | bytes]) -> tuple[str, ...]:
+        ...
+
+    def write_files(
+        self, files: Mapping[PurePath, str | bytes] | Mapping[str, str | bytes]
+    ) -> tuple[str, ...]:
         """Write the files to the build root.
 
         :API: public
@@ -477,18 +547,25 @@ class RuleRunner:
             )
         return tuple(paths)
 
+    def read_file(self, file: str | PurePath, mode: str = "r") -> str | bytes:
+        """Read a file that was written to the build root, useful for testing."""
+        path = os.path.join(self.build_root, file)
+        with safe_open(path, mode=mode) as fp:
+            if "b" in mode:
+                return bytes(fp.read())
+            return str(fp.read())
+
     def make_snapshot(self, files: Mapping[str, str | bytes]) -> Snapshot:
         """Makes a snapshot from a map of file name to file content.
 
         :API: public
         """
-        with temporary_dir() as temp_dir:
-            for file_name, content in files.items():
-                mode = "wb" if isinstance(content, bytes) else "w"
-                safe_file_dump(os.path.join(temp_dir, file_name), content, mode=mode)
-            return self.scheduler.capture_snapshots(
-                (PathGlobsAndRoot(PathGlobs(("**",)), temp_dir),)
-            )[0]
+        file_contents = [
+            FileContent(path, content.encode() if isinstance(content, str) else content)
+            for path, content in files.items()
+        ]
+        digest = self.request(Digest, [CreateDigest(file_contents)])
+        return self.request(Snapshot, [digest])
 
     def make_snapshot_of_empty_files(self, files: Iterable[str]) -> Snapshot:
         """Makes a snapshot with empty content for each file.
@@ -512,26 +589,34 @@ class RuleRunner:
             [WrappedTargetRequest(address, description_of_origin="RuleRunner.get_target()")],
         ).target
 
-    def write_digest(self, digest: Digest, *, path_prefix: str | None = None) -> None:
+    def write_digest(
+        self, digest: Digest, *, path_prefix: str | None = None, clear_destination: bool = False
+    ) -> None:
         """Write a digest to disk, relative to the test's build root.
 
         Access the written files by using `os.path.join(rule_runner.build_root, <relpath>)`.
         """
         native_engine.write_digest(
-            self.scheduler.py_scheduler, self.scheduler.py_session, digest, path_prefix or ""
+            self.scheduler.py_scheduler,
+            self.scheduler.py_session,
+            digest,
+            path_prefix or "",
+            clear_destination,
         )
 
     def run_interactive_process(self, request: InteractiveProcess) -> InteractiveProcessResult:
-        return native_engine.session_run_interactive_process(
-            self.scheduler.py_session,
-            request,
-            ProcessConfigFromEnvironment(
-                platform=Platform.create_for_localhost().value,
-                docker_image=None,
-                remote_execution=False,
-                remote_execution_extra_platform_properties=[],
-            ),
-        )
+        with pushd(self.build_root):
+            return native_engine.session_run_interactive_process(
+                self.scheduler.py_session,
+                request,
+                ProcessExecutionEnvironment(
+                    environment_name=None,
+                    platform=Platform.create_for_localhost().value,
+                    docker_image=None,
+                    remote_execution=False,
+                    remote_execution_extra_platform_properties=[],
+                ),
+            )
 
     def do_not_use_mock(self, output_type: Type, input_types: Iterable[type]) -> MockGet:
         """Returns a `MockGet` whose behavior is to run the actual rule using this `RuleRunner`"""
@@ -608,9 +693,6 @@ def run_rule_with_mocks(
     """
 
     task_rule = getattr(rule, "rule", None)
-    rule_helper = getattr(rule, "rule_helper", None)
-    if task_rule is None and rule_helper is None:
-        raise TypeError(f"Expected to receive a decorated `@rule` or `@rule_helper`; got: {rule}")
 
     # Perform additional validation on `@rule` that the correct args are provided. We don't have
     # an easy way to do this for `@rule_helper` yet.
@@ -629,7 +711,7 @@ def run_rule_with_mocks(
 
     res = rule(*(rule_args or ()))
     if not isinstance(res, (CoroutineType, GeneratorType)):
-        return res  # type: ignore[return-value]
+        return res  # type: ignore[misc,return-value]
 
     def get(res: Get | Effect):
         provider = next(
@@ -666,10 +748,9 @@ def run_rule_with_mocks(
             elif type(res) in (tuple, list):
                 rule_input = [get(g) for g in res]  # type: ignore[attr-defined]
             else:
-                return res  # type: ignore[return-value]
+                return res  # type: ignore[misc,return-value]
         except StopIteration as e:
-            if e.args:
-                return e.value  # type: ignore[no-any-return]
+            return e.value  # type: ignore[no-any-return]
 
 
 @contextmanager

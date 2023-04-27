@@ -32,7 +32,6 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class DeployHelmDeploymentFieldSet(HelmDeploymentFieldSet, DeployFieldSet):
-
     timeout: HelmDeploymentTimeoutField
 
 
@@ -71,7 +70,7 @@ async def run_helm_deploy(
                 *passthrough_args,
             ],
             post_renderer=post_renderer,
-            description=f"Deploying {field_set.address}",
+            description=f"Running Helm deployment: {field_set.address}",
         ),
     )
 

@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from typing import DefaultDict
 
 from pants.backend.shell.lint.shellcheck.subsystem import Shellcheck
-from pants.backend.shell.shell_setup import ShellSetup
+from pants.backend.shell.subsystems.shell_setup import ShellSetup
 from pants.backend.shell.target_types import ShellDependenciesField, ShellSourceField
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.engine.addresses import Address

@@ -43,7 +43,7 @@ from pants.core.util_rules.system_binaries import CpBinary, MkdirBinary, MvBinar
 from pants.engine.collection import Collection
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests, RemovePrefix
 from pants.engine.process import FallibleProcessResult, Process
-from pants.engine.rules import Get, MultiGet, collect_rules, rule, rule_helper
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import CoarsenedTargets, CoarsenedTargetsRequest
 from pants.engine.unions import UnionRule
 from pants.option.global_options import GlobalOptions
@@ -73,7 +73,6 @@ class MyPyRequest(CheckRequest):
     tool_name = MyPy.options_scope
 
 
-@rule_helper
 async def _generate_argv(
     mypy: MyPy,
     *,
@@ -138,7 +137,6 @@ async def mypy_typecheck_partition(
     mv: MvBinary,
     global_options: GlobalOptions,
 ) -> CheckResult:
-
     # MyPy requires 3.5+ to run, but uses the typed-ast library to work with 2.7, 3.4, 3.5, 3.6,
     # and 3.7. However, typed-ast does not understand 3.8+, so instead we must run MyPy with
     # Python 3.8+ when relevant. We only do this if <3.8 can't be used, as we don't want a
@@ -181,7 +179,12 @@ async def mypy_typecheck_partition(
         ),
     )
 
-    (roots_sources, mypy_pex, extra_type_stubs_pex, requirements_pex,) = await MultiGet(
+    (
+        roots_sources,
+        mypy_pex,
+        extra_type_stubs_pex,
+        requirements_pex,
+    ) = await MultiGet(
         roots_sources_get,
         mypy_pex_get,
         extra_type_stubs_pex_get,
@@ -222,7 +225,8 @@ async def mypy_typecheck_partition(
     py_version = config_file.python_version_to_autoset(
         partition.interpreter_constraints, python_setup.interpreter_versions_universe
     )
-    named_cache_dir = f".cache/mypy_cache/{sha256(build_root.path.encode()).hexdigest()}"
+    named_cache_dir = ".cache/mypy_cache"
+    mypy_cache_dir = f"{named_cache_dir}/{sha256(build_root.path.encode()).hexdigest()}"
     run_cache_dir = ".tmp_cache/mypy_cache"
     argv = await _generate_argv(
         mypy,
@@ -271,14 +275,14 @@ async def mypy_typecheck_partition(
                             # Lastly, we expect that since this is run through Pants which attempts
                             # to partition MyPy runs by python version (which the DB is independent
                             # for different versions) and uses a one-process-at-a-time daemon by default,
-                            # multuple MyPy processes operating on a single db cache should be rare.
+                            # multiple MyPy processes operating on a single db cache should be rare.
 
                             {mkdir.path} -p {run_cache_dir}/{py_version} > /dev/null 2>&1 || true
-                            {cp.path} {named_cache_dir}/{py_version}/cache.db {run_cache_dir}/{py_version}/cache.db > /dev/null 2>&1 || true
+                            {cp.path} {mypy_cache_dir}/{py_version}/cache.db {run_cache_dir}/{py_version}/cache.db > /dev/null 2>&1 || true
                             {' '.join((shell_quote(arg) for arg in argv))}
                             EXIT_CODE=$?
-                            {mkdir.path} -p {named_cache_dir}/{py_version} > /dev/null 2>&1 || true
-                            {mv.path} {run_cache_dir}/{py_version}/cache.db {named_cache_dir}/{py_version}/cache.db > /dev/null 2>&1 || true
+                            {mkdir.path} -p {mypy_cache_dir}/{py_version} > /dev/null 2>&1 || true
+                            {mv.path} {run_cache_dir}/{py_version}/cache.db {mypy_cache_dir}/{py_version}/cache.db > /dev/null 2>&1 || true
                             exit $EXIT_CODE
                         """
                     ).encode(),

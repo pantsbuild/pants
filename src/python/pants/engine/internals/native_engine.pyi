@@ -20,7 +20,8 @@ from pants.engine.process import InteractiveProcess, InteractiveProcessResult
 # (core)
 # ------------------------------------------------------------------------------
 
-class PyFailure: ...
+class PyFailure:
+    def get_error(self) -> Exception | None: ...
 
 # ------------------------------------------------------------------------------
 # Address (parsing)
@@ -39,6 +40,8 @@ def address_spec_parse(
 
 class PyExecutor:
     def __init__(self, core_threads: int, max_threads: int) -> None: ...
+    def to_borrowed(self) -> PyExecutor: ...
+    def shutdown(self, duration_secs: float) -> None: ...
 
 # ------------------------------------------------------------------------------
 # FS
@@ -169,7 +172,7 @@ def default_cache_path() -> str: ...
 # Process
 # ------------------------------------------------------------------------------
 
-class ProcessConfigFromEnvironment:
+class ProcessExecutionEnvironment:
     """Settings from the current Environment for how a `Process` should be run.
 
     Note that most values from the Environment are instead set via changing the arguments `argv` and
@@ -179,14 +182,19 @@ class ProcessConfigFromEnvironment:
     def __init__(
         self,
         *,
+        environment_name: str | None,
         platform: str,
         docker_image: str | None,
         remote_execution: bool,
         remote_execution_extra_platform_properties: Sequence[tuple[str, str]],
     ) -> None: ...
-    def __eq__(self, other: ProcessConfigFromEnvironment | Any) -> bool: ...
+    def __eq__(self, other: ProcessExecutionEnvironment | Any) -> bool: ...
     def __hash__(self) -> int: ...
     def __repr__(self) -> str: ...
+    @property
+    def name(self) -> str | None: ...
+    @property
+    def environment_type(self) -> str: ...
     @property
     def remote_execution(self) -> bool: ...
     @property
@@ -243,6 +251,7 @@ class RawFdRunner(Protocol):
         command: str,
         args: tuple[str, ...],
         env: dict[str, str],
+        working_dir: str,
         cancellation_latch: PySessionCancellationLatch,
         stdin_fileno: int,
         stdout_fileno: int,
@@ -262,7 +271,11 @@ def single_file_digests_to_bytes(
     scheduler: PyScheduler, digests: list[FileDigest]
 ) -> list[bytes]: ...
 def write_digest(
-    scheduler: PyScheduler, session: PySession, digest: Digest, path_prefix: str
+    scheduler: PyScheduler,
+    session: PySession,
+    digest: Digest,
+    path_prefix: str,
+    clear_destination: bool,
 ) -> None: ...
 def write_log(msg: str, level: int, target: str) -> None: ...
 def flush_log() -> None: ...
@@ -343,7 +356,7 @@ def session_poll_workunits(
     scheduler: PyScheduler, session: PySession, max_log_verbosity_level: int
 ) -> tuple[tuple[Workunit, ...], tuple[Workunit, ...]]: ...
 def session_run_interactive_process(
-    session: PySession, process: InteractiveProcess, process_config: ProcessConfigFromEnvironment
+    session: PySession, process: InteractiveProcess, process_config: ProcessExecutionEnvironment
 ) -> InteractiveProcessResult: ...
 def session_get_metrics(session: PySession) -> dict[str, int]: ...
 def session_get_observation_histograms(
@@ -392,6 +405,8 @@ class PyGeneratorResponseGet(Generic[_Output]):
     input_types: Sequence[type]
     inputs: Sequence[Any]
 
+    @overload
+    def __init__(self, output_type: type[_Output]) -> None: ...
     @overload
     def __init__(
         self,
@@ -478,3 +493,14 @@ class PyThreadLocals:
 
 class PollTimeout(Exception):
     pass
+
+# Prefer to import these exception types from `pants.base.exceptions`
+
+class EngineError(Exception):
+    """Base exception used for errors originating from the native engine."""
+
+class IntrinsicError(EngineError):
+    """Exceptions raised for failures within intrinsic methods implemented in Rust."""
+
+class IncorrectProductError(EngineError):
+    """Exceptions raised when a rule's return value doesn't match its declared type."""

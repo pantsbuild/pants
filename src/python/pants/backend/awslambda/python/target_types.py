@@ -10,10 +10,15 @@ from pants.backend.python.dependency_inference.module_mapper import (
     PythonModuleOwners,
     PythonModuleOwnersRequest,
 )
-from pants.backend.python.dependency_inference.rules import PythonInferSubsystem, import_rules
+from pants.backend.python.dependency_inference.rules import import_rules
+from pants.backend.python.dependency_inference.subsystem import (
+    AmbiguityResolution,
+    PythonInferSubsystem,
+)
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import PexCompletePlatformsField, PythonResolveField
 from pants.core.goals.package import OutputPathField
+from pants.core.util_rules.environments import EnvironmentField
 from pants.engine.addresses import Address
 from pants.engine.fs import GlobMatchErrorBehavior, PathGlobs, Paths
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
@@ -37,14 +42,14 @@ from pants.engine.unions import UnionRule
 from pants.source.filespec import Filespec
 from pants.source.source_root import SourceRoot, SourceRootRequest
 from pants.util.docutil import doc_url
-from pants.util.strutil import softwrap
+from pants.util.strutil import help_text, softwrap
 
 
 class PythonAwsLambdaHandlerField(StringField, AsyncFieldMixin, SecondaryOwnerMixin):
     alias = "handler"
     required = True
     value: str
-    help = softwrap(
+    help = help_text(
         """
         Entry point to the AWS Lambda handler.
 
@@ -177,10 +182,23 @@ async def infer_lambda_handler_dependency(
         ),
     )
     module, _, _func = handler.val.partition(":")
+
+    # Only set locality if needed, to avoid unnecessary rule graph memoization misses.
+    # When set, use the source root, which is useful in practice, but incurs fewer memoization
+    # misses than using the full spec_path.
+    locality = None
+    if python_infer_subsystem.ambiguity_resolution == AmbiguityResolution.by_source_root:
+        source_root = await Get(
+            SourceRoot, SourceRootRequest, SourceRootRequest.for_address(request.field_set.address)
+        )
+        locality = source_root.path
+
     owners = await Get(
         PythonModuleOwners,
         PythonModuleOwnersRequest(
-            module, resolve=request.field_set.resolve.normalized_value(python_setup)
+            module,
+            resolve=request.field_set.resolve.normalized_value(python_setup),
+            locality=locality,
         ),
     )
     address = request.field_set.address
@@ -211,7 +229,7 @@ async def infer_lambda_handler_dependency(
 class PythonAwsLambdaIncludeRequirements(BoolField):
     alias = "include_requirements"
     default = True
-    help = softwrap(
+    help = help_text(
         """
         Whether to resolve requirements and include them in the Pex. This is most useful with Lambda
         Layers to make code uploads smaller when deps are in layers.
@@ -225,10 +243,15 @@ class PythonAwsLambdaRuntime(StringField):
 
     alias = "runtime"
     default = None
-    help = softwrap(
+    help = help_text(
         """
         The identifier of the AWS Lambda runtime to target (pythonX.Y).
         See https://docs.aws.amazon.com/lambda/latest/dg/lambda-python.html.
+
+        In general you'll want to define either a `runtime` or one `complete_platforms` but not
+        both. Specifying a `runtime` is simpler, but less accurate. If you have issues either
+        packaging the AWS Lambda PEX or running it as a deployed AWS Lambda function, you should try
+        using `complete_platforms` instead.
         """
     )
 
@@ -256,6 +279,18 @@ class PythonAwsLambdaRuntime(StringField):
         return int(mo.group("major")), int(mo.group("minor"))
 
 
+class PythonAwsLambdaCompletePlatforms(PexCompletePlatformsField):
+    help = help_text(
+        f"""
+        {PexCompletePlatformsField.help}
+
+        N.B.: If specifying `complete_platforms` to work around packaging failures encountered when
+        using the `runtime` field, ensure you delete the `runtime` field from your
+        `python_awslambda` target.
+        """
+    )
+
+
 class PythonAWSLambda(Target):
     alias = "python_awslambda"
     core_fields = (
@@ -265,10 +300,11 @@ class PythonAWSLambda(Target):
         PythonAwsLambdaHandlerField,
         PythonAwsLambdaIncludeRequirements,
         PythonAwsLambdaRuntime,
-        PexCompletePlatformsField,
+        PythonAwsLambdaCompletePlatforms,
         PythonResolveField,
+        EnvironmentField,
     )
-    help = softwrap(
+    help = help_text(
         f"""
         A self-contained Python function suitable for uploading to AWS Lambda.
 

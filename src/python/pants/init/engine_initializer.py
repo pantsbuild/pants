@@ -16,11 +16,11 @@ from pants.bsp.protocol import BSPHandlerMapping
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.core.util_rules import environments, system_binaries
 from pants.core.util_rules.environments import determine_bootstrap_environment
-from pants.engine import desktop, fs, process
+from pants.engine import desktop, download_file, fs, process
 from pants.engine.console import Console
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import PathGlobs, Snapshot, Workspace
-from pants.engine.goal import Goal
+from pants.engine.goal import CurrentExecutingGoals, Goal
 from pants.engine.internals import (
     build_files,
     dep_rules,
@@ -40,6 +40,7 @@ from pants.engine.streaming_workunit_handler import rules as streaming_workunit_
 from pants.engine.target import RegisteredTargetTypes
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.init import specs_calculator
+from pants.init.bootstrap_scheduler import BootstrapStatus
 from pants.option.global_options import (
     DEFAULT_EXECUTION_OPTIONS,
     DynamicRemoteOptions,
@@ -49,8 +50,10 @@ from pants.option.global_options import (
 )
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.subsystem import Subsystem
+from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
+from pants.util.strutil import softwrap
 from pants.vcs.changed import rules as changed_rules
 from pants.vcs.git import rules as git_rules
 
@@ -137,11 +140,8 @@ class GraphSession:
 
         for goal in goals:
             goal_product = self.goal_map[goal]
-            # NB: We no-op for goals that have no implementation because no relevant backends are
-            # registered. We might want to reconsider the behavior to instead warn or error when
-            # trying to run something like `./pants run` without any backends registered.
             if not goal_product.subsystem_cls.activated(union_membership):
-                continue
+                raise GoalNotActivatedException(goal)
             # NB: Keep this in sync with the property `goal_param_types`.
             params = Params(specs, self.console, workspace, env_name)
             logger.debug(f"requesting {goal_product} to satisfy execution of `{goal}` goal")
@@ -188,8 +188,8 @@ class EngineInitializer:
         bootstrap_options: OptionValueContainer,
         build_configuration: BuildConfiguration,
         dynamic_remote_options: DynamicRemoteOptions,
-        executor: PyExecutor | None = None,
-        ignore_unrecognized_build_file_symbols: bool = False,
+        executor: PyExecutor,
+        is_bootstrap: bool = False,
     ) -> GraphScheduler:
         build_root = get_buildroot()
         executor = executor or GlobalOptions.create_py_executor(bootstrap_options)
@@ -209,7 +209,7 @@ class EngineInitializer:
             include_trace_on_error=bootstrap_options.print_stacktrace,
             engine_visualize_to=bootstrap_options.engine_visualize_to,
             watch_filesystem=bootstrap_options.watch_filesystem,
-            ignore_unrecognized_build_file_symbols=ignore_unrecognized_build_file_symbols,
+            is_bootstrap=is_bootstrap,
         )
 
     @staticmethod
@@ -228,7 +228,7 @@ class EngineInitializer:
         include_trace_on_error: bool = True,
         engine_visualize_to: str | None = None,
         watch_filesystem: bool = True,
-        ignore_unrecognized_build_file_symbols: bool = False,
+        is_bootstrap: bool = False,
     ) -> GraphScheduler:
         build_root_path = build_root or get_buildroot()
 
@@ -242,10 +242,15 @@ class EngineInitializer:
         def parser_singleton() -> Parser:
             return Parser(
                 build_root=build_root_path,
-                target_type_aliases=registered_target_types.aliases,
+                registered_target_types=registered_target_types,
+                union_membership=union_membership,
                 object_aliases=build_configuration.registered_aliases,
-                ignore_unrecognized_symbols=ignore_unrecognized_build_file_symbols,
+                ignore_unrecognized_symbols=is_bootstrap,
             )
+
+        @rule
+        def bootstrap_status() -> BootstrapStatus:
+            return BootstrapStatus(is_bootstrap)
 
         @rule
         def build_configuration_singleton() -> BuildConfiguration:
@@ -263,6 +268,10 @@ class EngineInitializer:
         def build_root_singleton() -> BuildRoot:
             return cast(BuildRoot, BuildRoot.instance)
 
+        @rule
+        def current_executing_goals(session_values: SessionValues) -> CurrentExecutingGoals:
+            return session_values.get(CurrentExecutingGoals) or CurrentExecutingGoals()
+
         # Create a Scheduler containing graph and filesystem rules, with no installed goals.
         rules = FrozenOrderedSet(
             (
@@ -271,6 +280,7 @@ class EngineInitializer:
                 *fs.rules(),
                 *dep_rules.rules(),
                 *desktop.rules(),
+                *download_file.rules(),
                 *git_rules(),
                 *graph.rules(),
                 *specs_rules.rules(),
@@ -350,3 +360,19 @@ class EngineInitializer:
         )
 
         return GraphScheduler(scheduler, goal_map)
+
+
+class GoalNotActivatedException(Exception):
+    def __init__(self, goal_name: str) -> None:
+        super().__init__(
+            softwrap(
+                f"""
+                No relevant backends activate the `{goal_name}` goal, so the goal would do
+                nothing.
+
+                This usually means that you have not yet set the option
+                `[GLOBAL].backend_packages` in `pants.toml`, which is how Pants knows
+                which languages and tools to support. Run `{bin_name()} help backends`.
+                """
+            )
+        )

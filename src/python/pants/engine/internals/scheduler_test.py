@@ -9,11 +9,12 @@ from typing import Any
 
 import pytest
 
+from pants.base.exceptions import IncorrectProductError
 from pants.engine.internals.engine_testutil import remove_locations_from_traceback
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import Get, rule
 from pants.engine.unions import UnionRule, union
-from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error
 
 # -----------------------------------------------------------------------------------------------
 # Test params
@@ -242,10 +243,141 @@ def test_outlined_get() -> None:
     with pytest.raises(ExecutionError) as exc:
         rule_runner.request(int, [])
     assert (
-        "Get(int, str, hello) was not detected in your @rule body at rule compile time. "
-        "Was the `Get` constructor called in a separate function, or perhaps "
-        "dynamically? If so, it must be inlined into the @rule body."
+        "Get(int, str, hello) was not detected in your @rule body at rule compile time."
     ) in str(exc.value.args[0])
+
+
+@rule
+async def uses_rule_helper_before_definition() -> int:
+    return await get_after_rule()
+
+
+async def get_after_rule() -> int:
+    return await Get(int, str, "hello")
+
+
+def test_rule_helper_after_rule_definition_fails() -> None:
+    rule_runner = RuleRunner(
+        rules=[
+            uses_rule_helper_before_definition,
+            QueryRule(int, []),
+        ],
+    )
+
+    with pytest.raises(ExecutionError) as exc:
+        rule_runner.request(int, [])
+    assert (
+        "Get(int, str, hello) was not detected in your @rule body at rule compile time."
+    ) in str(exc.value.args[0])
+
+
+@dataclass(frozen=True)
+class SomeInput:
+    s: str
+
+
+@dataclass(frozen=True)
+class SomeOutput:
+    s: str
+
+
+@rule
+def raise_an_exception(some_input: SomeInput) -> SomeOutput:
+    raise Exception(some_input.s)
+
+
+@dataclass(frozen=True)
+class OuterInput:
+    s: str
+
+
+@rule
+async def catch_an_exception(outer_input: OuterInput) -> SomeOutput:
+    try:
+        return await Get(SomeOutput, SomeInput(outer_input.s))
+    except Exception as e:
+        return SomeOutput(str(e))
+
+
+@rule(desc="error chain")
+async def catch_and_reraise(outer_input: OuterInput) -> SomeOutput:
+    """This rule is used in a dedicated test only, so does not conflict with
+    `catch_an_exception`."""
+    try:
+        return await Get(SomeOutput, SomeInput(outer_input.s))
+    except Exception as e:
+        raise Exception("nested exception!") from e
+
+
+class InputWithNothing:
+    pass
+
+
+GLOBAL_FLAG: bool = True
+
+
+@rule
+def raise_an_exception_upon_global_state(input_with_nothing: InputWithNothing) -> SomeOutput:
+    if GLOBAL_FLAG:
+        raise Exception("global flag is set!")
+    return SomeOutput("asdf")
+
+
+@rule
+def return_a_wrong_product_type(input_with_nothing: InputWithNothing) -> A:
+    return B()  # type: ignore[return-value]
+
+
+@rule
+async def catch_a_wrong_product_type(input_with_nothing: InputWithNothing) -> B:
+    try:
+        _ = await Get(A, InputWithNothing, input_with_nothing)
+    except IncorrectProductError as e:
+        raise Exception(f"caught product type error: {e}")
+    return B()
+
+
+@pytest.fixture
+def rule_error_runner() -> RuleRunner:
+    return RuleRunner(
+        rules=(
+            consumes_a_and_b,
+            QueryRule(str, (A, B)),
+            transitive_b_c,
+            QueryRule(str, (A, C)),
+            transitive_coroutine_rule,
+            QueryRule(D, (C,)),
+            boolean_and_int,
+            QueryRule(A, (int, bool)),
+            raise_an_exception,
+            QueryRule(SomeOutput, (SomeInput,)),
+            catch_an_exception,
+            QueryRule(SomeOutput, (OuterInput,)),
+            raise_an_exception_upon_global_state,
+            QueryRule(SomeOutput, (InputWithNothing,)),
+            return_a_wrong_product_type,
+            QueryRule(A, (InputWithNothing,)),
+            catch_a_wrong_product_type,
+            QueryRule(B, (InputWithNothing,)),
+        )
+    )
+
+
+def test_catch_inner_exception(rule_error_runner: RuleRunner) -> None:
+    assert rule_error_runner.request(SomeOutput, [OuterInput("asdf")]) == SomeOutput("asdf")
+
+
+def test_exceptions_uncached(rule_error_runner: RuleRunner) -> None:
+    global GLOBAL_FLAG
+    with engine_error(Exception, contains="global flag is set!"):
+        rule_error_runner.request(SomeOutput, [InputWithNothing()])
+    GLOBAL_FLAG = False
+    assert rule_error_runner.request(SomeOutput, [InputWithNothing()]) == SomeOutput("asdf")
+
+
+def test_incorrect_product_type(rule_error_runner: RuleRunner) -> None:
+    with engine_error(Exception, contains="caught product type error"):
+        rule_error_runner.request(B, [InputWithNothing()])
 
 
 # -----------------------------------------------------------------------------------------------
@@ -264,11 +396,7 @@ def nested_raise() -> A:
 
 
 def test_trace_includes_rule_exception_traceback() -> None:
-    rule_runner = RuleRunner(rules=[nested_raise, QueryRule(A, [])])
-    with pytest.raises(ExecutionError) as exc:
-        rule_runner.request(A, [])
-    normalized_traceback = remove_locations_from_traceback(str(exc.value))
-    assert normalized_traceback == dedent(
+    normalized_traceback = dedent(
         f"""\
          1 Exception encountered:
 
@@ -287,6 +415,59 @@ def test_trace_includes_rule_exception_traceback() -> None:
 
          """
     )
+
+    rule_runner = RuleRunner(rules=[nested_raise, QueryRule(A, [])])
+    with engine_error(Exception, contains=normalized_traceback, normalize_tracebacks=True):
+        rule_runner.request(A, [])
+
+
+def test_trace_includes_nested_exception_traceback() -> None:
+    normalized_traceback = dedent(
+        f"""\
+        1 Exception encountered:
+
+        Engine traceback:
+          in select
+            ..
+          in {__name__}.{catch_and_reraise.__name__}
+            error chain
+          in {__name__}.{raise_an_exception.__name__}
+            ..
+
+        Traceback (most recent call last):
+          File LOCATION-INFO, in raise_an_exception
+            raise Exception(some_input.s)
+        Exception: asdf
+
+        During handling of the above exception, another exception occurred:
+
+        Traceback (most recent call last):
+          File LOCATION-INFO, in catch_and_reraise
+            return await Get(SomeOutput, SomeInput(outer_input.s))
+          File LOCATION-INFO, in __await__
+            result = yield self
+        Exception: asdf
+
+        The above exception was the direct cause of the following exception:
+
+        Traceback (most recent call last):
+          File LOCATION-INFO, in native_engine_generator_send
+            res = rule.send(arg) if err is None else rule.throw(throw or err)
+          File LOCATION-INFO, in catch_and_reraise
+            raise Exception("nested exception!") from e
+        Exception: nested exception!
+        """
+    )
+
+    rule_runner = RuleRunner(
+        rules=[
+            raise_an_exception,
+            catch_and_reraise,
+            QueryRule(SomeOutput, (OuterInput,)),
+        ]
+    )
+    with engine_error(Exception, contains=normalized_traceback, normalize_tracebacks=True):
+        rule_runner.request(SomeOutput, [OuterInput("asdf")])
 
 
 # -----------------------------------------------------------------------------------------------

@@ -41,6 +41,11 @@ class Org:
 # to keep this list in that order too.
 _orgs = (
     Org("Aiven", "https://aiven.io/", "https://files.readme.io/20085f3-aiven-small.png"),
+    Org(
+        "Astranis",
+        "https://www.astranis.com/",
+        "https://files.readme.io/e4989d4-astranis-small.png",
+    ),
     Org("Brand24", "https://brand24.com/", "https://files.readme.io/e3203d1-brand24-small.png"),
     Org(
         "Chartbeat", "https://chartbeat.com/", "https://files.readme.io/861ace7-chartbeat-small.png"
@@ -51,9 +56,19 @@ _orgs = (
         "https://files.readme.io/a213f0f-coinbase-small.png",
     ),
     Org(
+        "Doctrine",
+        "https://www.doctrine.fr/",
+        "https://files.readme.io/8497e9c-doctrine-small.png",
+    ),
+    Org(
         "ESL Gaming",
         "https://about.eslgaming.com/",
         "https://files.readme.io/b63d33d-esl-small.png",
+    ),
+    Org(
+        "ExoFlare",
+        "https://www.exoflare.com/open-source/?utm_source=pants&utm_campaign=open_source",
+        "https://files.readme.io/31bb960-exoflare-small.png",
     ),
     Org(
         "Foursquare",
@@ -73,6 +88,7 @@ _orgs = (
     ),
     Org("IBM", "https://www.ibm.com/", None),
     Org("iManage", "https://imanage.com/", "https://files.readme.io/0f7b5f6-imanage-small.png"),
+    Org("Kaiko", "https://www.kaiko.ai/", "https://files.readme.io/069b55d-kaiko.png"),
     Org("Lablup", "https://lablup.com/", "https://files.readme.io/a94d375-lablup-small.png"),
     Org("Myst AI", "https://www.myst.ai/", "https://files.readme.io/802d8fa-myst_ai_small.png"),
     Org("Ocrolus", "https://www.ocrolus.com/", "https://files.readme.io/ff166fa-ocrolus-small.png"),
@@ -82,6 +98,7 @@ _orgs = (
         "https://files.readme.io/e87f6c5-Orca_Security-small.png",
     ),
     Org("Pave", "https://www.pave.dev/", "https://files.readme.io/924aa3e-pave-small.png"),
+    Org("Payhere", "https://payhere.in/", "https://files.readme.io/d263cfd-payhere-small.jpg"),
     Org(
         "People Data Labs",
         "https://www.peopledatalabs.com/",

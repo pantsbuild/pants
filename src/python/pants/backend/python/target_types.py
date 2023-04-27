@@ -42,6 +42,7 @@ from pants.engine.target import (
     AsyncFieldMixin,
     BoolField,
     Dependencies,
+    DictStringToStringField,
     DictStringToStringSequenceField,
     Field,
     IntField,
@@ -72,7 +73,7 @@ from pants.option.subsystem import Subsystem
 from pants.source.filespec import Filespec
 from pants.util.docutil import bin_name, doc_url, git_url
 from pants.util.frozendict import FrozenDict
-from pants.util.strutil import softwrap
+from pants.util.strutil import help_text, softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -100,7 +101,7 @@ class PythonGeneratingSourcesBase(MultipleSourcesField):
 
 class InterpreterConstraintsField(StringSequenceField):
     alias = "interpreter_constraints"
-    help = softwrap(
+    help = help_text(
         f"""
         The Python interpreters this code is compatible with.
 
@@ -129,7 +130,7 @@ class InterpreterConstraintsField(StringSequenceField):
 class PythonResolveField(StringField, AsyncFieldMixin):
     alias = "resolve"
     required = False
-    help = softwrap(
+    help = help_text(
         """
         The resolve from `[python].resolves` to use.
 
@@ -155,7 +156,7 @@ class PythonResolveField(StringField, AsyncFieldMixin):
 
 class PythonRunGoalUseSandboxField(TriBoolField):
     alias = "run_goal_use_sandbox"
-    help = softwrap(
+    help = help_text(
         """
         Whether to use a sandbox when `run`ning this target. Defaults to `[python].run_goal_use_sandbox`.
 
@@ -190,6 +191,7 @@ class PythonFilesGeneratorSettingsRequest(TargetFilesGeneratorSettingsRequest):
 # -----------------------------------------------------------------------------------------------
 # `pex_binary` and `pex_binaries` target
 # -----------------------------------------------------------------------------------------------
+
 
 # See `target_types_rules.py` for a dependency injection rule.
 class PexBinaryDependenciesField(Dependencies):
@@ -292,10 +294,10 @@ class ConsoleScript(MainSpecification):
         return self.name
 
 
-class PexEntryPointField(AsyncFieldMixin, SecondaryOwnerMixin, Field):
+class EntryPointField(AsyncFieldMixin, SecondaryOwnerMixin, Field):
     alias = "entry_point"
     default = None
-    help = softwrap(
+    help = help_text(
         """
         Set the entry point, i.e. what gets run when executing `./my_app.pex`, to a module.
 
@@ -333,6 +335,11 @@ class PexEntryPointField(AsyncFieldMixin, SecondaryOwnerMixin, Field):
         return {"includes": [full_glob]}
 
 
+class PexEntryPointField(EntryPointField):
+    # Specialist subclass for use with `PexBinary` targets.
+    pass
+
+
 # See `target_types_rules.py` for the `ResolvePexEntryPointRequest -> ResolvedPexEntryPoint` rule.
 @dataclass(frozen=True)
 class ResolvedPexEntryPoint:
@@ -344,13 +351,13 @@ class ResolvedPexEntryPoint:
 class ResolvePexEntryPointRequest:
     """Determine the `entry_point` for a `pex_binary` after applying all syntactic sugar."""
 
-    entry_point_field: PexEntryPointField
+    entry_point_field: EntryPointField
 
 
 class PexScriptField(Field):
     alias = "script"
     default = None
-    help = softwrap(
+    help = help_text(
         """
         Set the entry point, i.e. what gets run when executing `./my_app.pex`, to a script or
         console_script as defined by any of the distributions in the PEX.
@@ -371,9 +378,29 @@ class PexScriptField(Field):
         return ConsoleScript(value)
 
 
+class PexArgsField(StringSequenceField):
+    alias = "args"
+    help = help_text(
+        """
+        Freeze these command-line args into the PEX. Allows you to run generic entry points
+        on specific arguments without creating a shim file.
+        """
+    )
+
+
+class PexEnvField(DictStringToStringField):
+    alias = "env"
+    help = help_text(
+        """
+        Freeze these environment variables into the PEX. Allows you to run generic entry points
+        on a specific environment without creating a shim file.
+        """
+    )
+
+
 class PexPlatformsField(StringSequenceField):
     alias = "platforms"
-    help = softwrap(
+    help = help_text(
         """
         The abbreviated platforms the built PEX should be compatible with.
 
@@ -406,7 +433,7 @@ class PexPlatformsField(StringSequenceField):
 
 class PexCompletePlatformsField(SpecialCasedDependencies):
     alias = "complete_platforms"
-    help = softwrap(
+    help = help_text(
         """
         The platforms the built PEX should be compatible with.
 
@@ -425,7 +452,7 @@ class PexCompletePlatformsField(SpecialCasedDependencies):
 class PexInheritPathField(StringField):
     alias = "inherit_path"
     valid_choices = ("false", "fallback", "prefer")
-    help = softwrap(
+    help = help_text(
         """
         Whether to inherit the `sys.path` (aka PYTHONPATH) of the environment that the binary runs in.
 
@@ -447,7 +474,7 @@ class PexInheritPathField(StringField):
 class PexStripEnvField(BoolField):
     alias = "strip_pex_env"
     default = True
-    help = softwrap(
+    help = help_text(
         """
         Whether or not to strip the PEX runtime environment of `PEX*` environment variables.
 
@@ -468,7 +495,7 @@ class PexIgnoreErrorsField(BoolField):
 
 class PexShebangField(StringField):
     alias = "shebang"
-    help = softwrap(
+    help = help_text(
         """
         Set the generated PEX to use this shebang, rather than the default of PEX choosing a
         shebang based on the interpreter constraints.
@@ -481,7 +508,7 @@ class PexShebangField(StringField):
 
 class PexEmitWarningsField(TriBoolField):
     alias = "emit_warnings"
-    help = softwrap(
+    help = help_text(
         """
         Whether or not to emit PEX warnings at runtime.
 
@@ -497,7 +524,7 @@ class PexEmitWarningsField(TriBoolField):
 
 class PexResolveLocalPlatformsField(TriBoolField):
     alias = "resolve_local_platforms"
-    help = softwrap(
+    help = help_text(
         f"""
         For each of the `{PexPlatformsField.alias}` specified, attempt to find a local
         interpreter that matches.
@@ -525,7 +552,7 @@ class PexExecutionModeField(StringField):
     valid_choices = PexExecutionMode
     expected_type = str
     default = PexExecutionMode.ZIPAPP.value
-    help = softwrap(
+    help = help_text(
         f"""
         The mode the generated PEX file will run in.
 
@@ -553,7 +580,7 @@ class PexLayoutField(StringField):
     valid_choices = PexLayout
     expected_type = str
     default = PexLayout.ZIPAPP.value
-    help = softwrap(
+    help = help_text(
         f"""
         The layout used for the PEX binary.
 
@@ -581,7 +608,7 @@ class PexLayoutField(StringField):
 class PexIncludeRequirementsField(BoolField):
     alias = "include_requirements"
     default = True
-    help = softwrap(
+    help = help_text(
         """
         Whether to include the third party requirements the binary depends on in the
         packaged PEX file.
@@ -592,7 +619,7 @@ class PexIncludeRequirementsField(BoolField):
 class PexIncludeSourcesField(BoolField):
     alias = "include_sources"
     default = True
-    help = softwrap(
+    help = help_text(
         """
         Whether to include your first party sources the binary uses in the packaged PEX file.
         """
@@ -602,7 +629,7 @@ class PexIncludeSourcesField(BoolField):
 class PexIncludeToolsField(BoolField):
     alias = "include_tools"
     default = False
-    help = softwrap(
+    help = help_text(
         """
         Whether to include Pex tools in the PEX bootstrap code.
 
@@ -615,11 +642,26 @@ class PexIncludeToolsField(BoolField):
 class PexVenvSitePackagesCopies(BoolField):
     alias = "venv_site_packages_copies"
     default = False
-    help = softwrap(
+    help = help_text(
         """
         If execution_mode is venv, populate the venv site packages using hard links or copies of resolved PEX dependencies instead of symlinks.
 
         This can be used to work around problems with tools or libraries that are confused by symlinked source files.
+        """
+    )
+
+
+class PexVenvHermeticScripts(BoolField):
+    alias = "venv_hermetic_scripts"
+    default = True
+    help = help_text(
+        """
+        If execution_mode is "venv", emit a hermetic venv `pex` script and hermetic console scripts.
+
+        The venv `pex` script and the venv console scripts are constructed to be hermetic by
+        default; Python is executed with `-sE` to restrict the `sys.path` to the PEX venv contents
+        only. Setting this field to `False` elides the Python `-sE` restrictions and can be used to
+        interoperate with frameworks that use `PYTHONPATH` manipulation to run code.
         """
     )
 
@@ -643,6 +685,7 @@ _PEX_BINARY_COMMON_FIELDS = (
     PexIncludeSourcesField,
     PexIncludeToolsField,
     PexVenvSitePackagesCopies,
+    PexVenvHermeticScripts,
     RestartableField,
 )
 
@@ -654,9 +697,11 @@ class PexBinary(Target):
         *_PEX_BINARY_COMMON_FIELDS,
         PexEntryPointField,
         PexScriptField,
+        PexArgsField,
+        PexEnvField,
         OutputPathField,
     )
-    help = softwrap(
+    help = help_text(
         f"""
         A Python target that can be converted into an executable PEX file.
 
@@ -681,7 +726,7 @@ class PexBinary(Target):
 class PexEntryPointsField(StringSequenceField, AsyncFieldMixin):
     alias = "entry_points"
     default = None
-    help = softwrap(
+    help = help_text(
         """
         The entry points for each binary, i.e. what gets run when when executing `./my_app.pex.`
 
@@ -696,7 +741,7 @@ class PexEntryPointsField(StringSequenceField, AsyncFieldMixin):
 
 
 class PexBinariesOverrideField(OverridesField):
-    help = softwrap(
+    help = help_text(
         f"""
         Override the field values for generated `{PexBinary.alias}` targets.
 
@@ -728,7 +773,7 @@ class PexBinariesOverrideField(OverridesField):
 
 class PexBinariesGeneratorTarget(TargetGenerator):
     alias = "pex_binaries"
-    help = softwrap(
+    help = help_text(
         """
         Generate a `pex_binary` target for each entry_point in the `entry_points` field.
 
@@ -820,7 +865,7 @@ class PythonTestsDependenciesField(PythonDependenciesField):
 # TODO This field class should extend from a core `TestTimeoutField` once the deprecated options in `pytest` get removed.
 class PythonTestsTimeoutField(IntField):
     alias = "timeout"
-    help = softwrap(
+    help = help_text(
         """
         A timeout (in seconds) used by each test file belonging to this target.
 
@@ -862,7 +907,7 @@ class PythonTestsExtraEnvVarsField(TestExtraEnvVarsField):
 
 class PythonTestsXdistConcurrencyField(IntField):
     alias = "xdist_concurrency"
-    help = softwrap(
+    help = help_text(
         """
         Maximum number of CPUs to allocate to run each test file belonging to this target.
 
@@ -881,7 +926,7 @@ class PythonTestsXdistConcurrencyField(IntField):
 
 class PythonTestsBatchCompatibilityTagField(StringField):
     alias = "batch_compatibility_tag"
-    help = softwrap(
+    help = help_text(
         """
         An arbitrary value used to mark the test files belonging to this target as valid for
         batched execution.
@@ -945,7 +990,7 @@ class PythonTestTarget(Target):
         PythonTestsDependenciesField,
         PythonTestSourceField,
     )
-    help = softwrap(
+    help = help_text(
         f"""
         A single Python test file, written in either Pytest style or unittest style.
 
@@ -1081,7 +1126,7 @@ class PythonTestUtilsGeneratorTarget(TargetFilesGenerator):
         InterpreterConstraintsField,
     )
     settings_request_cls = PythonFilesGeneratorSettingsRequest
-    help = softwrap(
+    help = help_text(
         """
         Generate a `python_source` target for each file in the `sources` field.
 
@@ -1113,7 +1158,7 @@ class PythonSourcesGeneratorTarget(TargetFilesGenerator):
         RestartableField,
     )
     settings_request_cls = PythonFilesGeneratorSettingsRequest
-    help = softwrap(
+    help = help_text(
         """
         Generate a `python_source` target for each file in the `sources` field.
 
@@ -1173,7 +1218,7 @@ class PythonRequirementDependenciesField(Dependencies):
 class PythonRequirementsField(_PipRequirementSequenceField):
     alias = "requirements"
     required = True
-    help = softwrap(
+    help = help_text(
         """
         A pip-style requirement string, e.g. `["Django==3.2.8"]`.
 
@@ -1194,7 +1239,7 @@ _default_module_mapping_url = git_url(
 
 class PythonRequirementModulesField(StringSequenceField):
     alias = "modules"
-    help = softwrap(
+    help = help_text(
         f"""
         The modules this requirement provides (used for dependency inference).
 
@@ -1213,7 +1258,7 @@ class PythonRequirementModulesField(StringSequenceField):
 
 class PythonRequirementTypeStubModulesField(StringSequenceField):
     alias = "type_stub_modules"
-    help = softwrap(
+    help = help_text(
         f"""
         The modules this requirement provides if the requirement is a type stub (used for
         dependency inference).
@@ -1241,7 +1286,7 @@ def normalize_module_mapping(
 class PythonRequirementResolveField(PythonResolveField):
     alias = "resolve"
     required = False
-    help = softwrap(
+    help = help_text(
         """
         The resolve from `[python].resolves` that this requirement is included in.
 
@@ -1257,6 +1302,11 @@ class PythonRequirementResolveField(PythonResolveField):
     )
 
 
+class PythonRequirementEntryPointField(EntryPointField):
+    # Specialist subclass for matching `PythonRequirementTarget` when running.
+    pass
+
+
 class PythonRequirementTarget(Target):
     alias = "python_requirement"
     core_fields = (
@@ -1266,8 +1316,9 @@ class PythonRequirementTarget(Target):
         PythonRequirementModulesField,
         PythonRequirementTypeStubModulesField,
         PythonRequirementResolveField,
+        PythonRequirementEntryPointField,
     )
-    help = softwrap(
+    help = help_text(
         f"""
         A Python requirement installable by pip.
 
@@ -1328,7 +1379,7 @@ class PythonProvidesField(ScalarField, AsyncFieldMixin):
     expected_type_help = "python_artifact(name='my-dist', **kwargs)"
     value: PythonArtifact
     required = True
-    help = softwrap(
+    help = help_text(
         f"""
         The setup.py kwargs for the external artifact built from this target.
 
@@ -1348,7 +1399,7 @@ class PythonProvidesField(ScalarField, AsyncFieldMixin):
 class PythonDistributionEntryPointsField(NestedDictStringToStringField, AsyncFieldMixin):
     alias = "entry_points"
     required = False
-    help = softwrap(
+    help = help_text(
         f"""
         Any entry points, such as `console_scripts` and `gui_scripts`.
 
@@ -1377,6 +1428,19 @@ class PythonDistributionEntryPointsField(NestedDictStringToStringField, AsyncFie
             {bin_name()} dependencies <python_distribution target address>
         """
     )
+
+
+class PythonDistributionOutputPathField(StringField, AsyncFieldMixin):
+    help = help_text(
+        """
+        The path to the directory to write the distribution file to, relative the dist directory.
+
+        If undefined, this defaults to the empty path, i.e. the output goes at the top
+        level of the dist dir.
+        """
+    )
+    alias = "output_path"
+    default = ""
 
 
 @dataclass(frozen=True)
@@ -1492,7 +1556,7 @@ class SDistConfigSettingsField(ConfigSettingsField):
 class BuildBackendEnvVarsField(StringSequenceField):
     alias = "env_vars"
     required = False
-    help = softwrap(
+    help = help_text(
         """
         Environment variables to set when running the PEP-517 build backend.
 
@@ -1509,7 +1573,7 @@ class GenerateSetupField(TriBoolField):
     # --generate-setup-default option in the setup-py-generation scope.
     default = None
 
-    help = softwrap(
+    help = help_text(
         """
         Whether to generate setup information for this distribution, based on analyzing
         sources and dependencies. Set to False to use existing setup information, such as
@@ -1522,7 +1586,7 @@ class LongDescriptionPathField(StringField):
     alias = "long_description_path"
     required = False
 
-    help = softwrap(
+    help = help_text(
         """
         Path to a file that will be used to fill the long_description field in setup.py.
 
@@ -1551,8 +1615,9 @@ class PythonDistribution(Target):
         SDistConfigSettingsField,
         BuildBackendEnvVarsField,
         LongDescriptionPathField,
+        PythonDistributionOutputPathField,
     )
-    help = softwrap(
+    help = help_text(
         f"""
         A publishable Python setuptools distribution (e.g. an sdist or wheel).
 
@@ -1583,7 +1648,7 @@ class VCSVersionDummySourceField(OptionalSingleSourceField):
 class VersionTagRegexField(StringField):
     default = r"^(?:[\w-]+-)?(?P<version>[vV]?\d+(?:\.\d+){0,2}[^\+]*)(?:\+.*)?$"
     alias = "tag_regex"
-    help = softwrap(
+    help = help_text(
         """
         A Python regex string to extract the version string from a VCS tag.
 
@@ -1600,7 +1665,7 @@ class VersionTagRegexField(StringField):
 class VersionGenerateToField(StringField):
     required = True
     alias = "generate_to"
-    help = softwrap(
+    help = help_text(
         """
         Generate the version data to this relative path, using the template field.
 
@@ -1613,7 +1678,7 @@ class VersionGenerateToField(StringField):
 class VersionTemplateField(StringField):
     required = True
     alias = "template"
-    help = softwrap(
+    help = help_text(
         """
         Generate the version data using this format string, which takes a version format kwarg.
 
@@ -1631,7 +1696,7 @@ class VCSVersion(Target):
         VersionGenerateToField,
         VersionTemplateField,
     )
-    help = softwrap(
+    help = help_text(
         f"""
         Generates a version string from VCS state.
 

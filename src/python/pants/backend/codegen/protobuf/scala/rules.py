@@ -5,7 +5,6 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
-from pants.backend.codegen import export_codegen_goal
 from pants.backend.codegen.protobuf.protoc import Protoc
 from pants.backend.codegen.protobuf.scala import dependency_inference
 from pants.backend.codegen.protobuf.scala.subsystem import PluginArtifactSpec, ScalaPBSubsystem
@@ -330,7 +329,6 @@ def rules():
     return [
         *collect_rules(),
         *lockfile.rules(),
-        *export_codegen_goal.rules(),
         *dependency_inference.rules(),
         UnionRule(GenerateSourcesRequest, GenerateScalaFromProtobufRequest),
         UnionRule(GenerateToolLockfileSentinel, ScalapbcToolLockfileSentinel),

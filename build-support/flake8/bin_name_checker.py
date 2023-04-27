@@ -23,11 +23,11 @@ def check_for_hardcoded_pants_bin_name(
     violations: list[tuple[int, int]] = []
 
     class Visitor(ast.NodeVisitor):
-        def __init__(self):
+        def __init__(self) -> None:
             self._docstrings: list[str | None] = []
 
         def visit_docstringable(self, node: ast.AST):
-            self._docstrings.append(ast.get_docstring(node, clean=False))
+            self._docstrings.append(ast.get_docstring(node, clean=False))  # type: ignore[arg-type]
             self.generic_visit(node)
             self._docstrings.pop()
 

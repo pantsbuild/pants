@@ -5,13 +5,12 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import ClassVar
 
-import ijson
+import ijson.backends.python as ijson
 
-from pants.backend.go.util_rules.build_opts import GoBuildOptions
+from pants.backend.go.util_rules import go_mod
+from pants.backend.go.util_rules.cgo import CGoCompilerFlags
 from pants.backend.go.util_rules.sdk import GoSdkProcess
-from pants.engine.fs import CreateDigest, Digest, FileContent
 from pants.engine.internals.selectors import Get
 from pants.engine.process import ProcessResult
 from pants.engine.rules import collect_rules, rule
@@ -21,84 +20,97 @@ from pants.util.logging import LogLevel
 logger = logging.getLogger(__name__)
 
 
-class GoStdLibImports(FrozenDict[str, str]):
-    """A mapping of standard library import paths to the `.a` static file paths for that import
-    path.
+@dataclass(frozen=True)
+class GoStdLibPackage:
+    name: str
+    import_path: str
+    pkg_source_path: str
+    imports: tuple[str, ...]
+    import_map: FrozenDict[str, str]
 
-    For example, "net/smtp": "/absolute_path_to_goroot/pkg/darwin_arm64/net/smtp.a".
-    """
+    # Analysis for when Pants is able to compile the SDK directly.
+    go_files: tuple[str, ...]
+    cgo_files: tuple[str, ...]
+    c_files: tuple[str, ...]
+    cxx_files: tuple[str, ...]
+    m_files: tuple[str, ...]
+    h_files: tuple[str, ...]
+    f_files: tuple[str, ...]
+    s_files: tuple[str, ...]
+    syso_files: tuple[str, ...]
+    cgo_flags: CGoCompilerFlags
+
+    # Embed configuration.
+    #
+    # Note: `EmbedConfig` is not resolved here to avoid issues with trying to build the the embed analyzer.
+    # The `EmbedConfig` will be resolved in `build_pkg_target.py` rules.
+    embed_patterns: tuple[str, ...]
+    embed_files: tuple[str, ...]
+
+
+class GoStdLibPackages(FrozenDict[str, GoStdLibPackage]):
+    """A mapping of standard library import paths to an analysis of the package at that import
+    path."""
 
 
 @dataclass(frozen=True)
-class GoStdLibImportsRequest:
+class GoStdLibPackagesRequest:
     with_race_detector: bool
+    cgo_enabled: bool = True
 
 
-@rule(desc="Determine Go std lib's imports", level=LogLevel.DEBUG)
-async def determine_go_std_lib_imports(request: GoStdLibImportsRequest) -> GoStdLibImports:
+@rule(desc="Analyze Go standard library packages.", level=LogLevel.DEBUG)
+async def analyze_go_stdlib_packages(request: GoStdLibPackagesRequest) -> GoStdLibPackages:
     maybe_race_arg = ["-race"] if request.with_race_detector else []
     list_result = await Get(
         ProcessResult,
         GoSdkProcess(
             # "-find" skips determining dependencies and imports for each package.
-            command=("list", "-find", *maybe_race_arg, "-json", "std"),
+            command=("list", *maybe_race_arg, "-json", "std"),
+            env={"CGO_ENABLED": "1" if request.cgo_enabled else "0"},
             description="Ask Go for its available import paths",
         ),
     )
-    result = {}
-    for package_descriptor in ijson.items(list_result.stdout, "", multiple_values=True):
-        import_path = package_descriptor.get("ImportPath")
-        target = package_descriptor.get("Target")
-        if not import_path or not target:
+    stdlib_packages = {}
+    for pkg_json in ijson.items(list_result.stdout, "", multiple_values=True):
+        import_path = pkg_json.get("ImportPath")
+        pkg_source_path = pkg_json.get("Dir")
+
+        if not import_path or not pkg_source_path:
             continue
-        result[import_path] = target
-    return GoStdLibImports(result)
 
-
-@dataclass(frozen=True)
-class ImportConfig:
-    """An `importcfg` file associating import paths to their `__pkg__.a` files."""
-
-    digest: Digest
-
-    CONFIG_PATH: ClassVar[str] = "./importcfg"
-
-
-@dataclass(frozen=True)
-class ImportConfigRequest:
-    """Create an `importcfg` file associating import paths to their `__pkg__.a` files."""
-
-    import_paths_to_pkg_a_files: FrozenDict[str, str]
-    build_opts: GoBuildOptions
-    include_stdlib: bool = True
-
-    @classmethod
-    def stdlib_only(cls, build_opts: GoBuildOptions) -> ImportConfigRequest:
-        return cls(FrozenDict(), build_opts=build_opts, include_stdlib=True)
-
-
-@rule
-async def generate_import_config(request: ImportConfigRequest) -> ImportConfig:
-    lines = [
-        "# import config",
-        *(
-            f"packagefile {import_path}={pkg_a_path}"
-            for import_path, pkg_a_path in request.import_paths_to_pkg_a_files.items()
-        ),
-    ]
-    if request.include_stdlib:
-        std_lib_imports = await Get(
-            GoStdLibImports,
-            GoStdLibImportsRequest(with_race_detector=request.build_opts.with_race_detector),
+        stdlib_packages[import_path] = GoStdLibPackage(
+            name=pkg_json.get("Name"),
+            import_path=import_path,
+            pkg_source_path=pkg_source_path,
+            imports=tuple(pkg_json.get("Imports", ())),
+            import_map=FrozenDict(pkg_json.get("ImportMap", {})),
+            go_files=tuple(pkg_json.get("GoFiles", ())),
+            cgo_files=tuple(pkg_json.get("CgoFiles", ())),
+            c_files=tuple(pkg_json.get("CFiles", ())),
+            cxx_files=tuple(pkg_json.get("CXXFiles", ())),
+            m_files=tuple(pkg_json.get("MFiles", ())),
+            h_files=tuple(pkg_json.get("HFiles", ())),
+            f_files=tuple(pkg_json.get("FFiles", ())),
+            s_files=tuple(pkg_json.get("SFiles", ())),
+            syso_files=tuple(pkg_json.get("SysoFiles", ())),
+            cgo_flags=CGoCompilerFlags(
+                cflags=tuple(pkg_json.get("CgoCFLAGS", [])),
+                cppflags=tuple(pkg_json.get("CgoCPPFLAGS", [])),
+                cxxflags=tuple(pkg_json.get("CgoCXXFLAGS", [])),
+                fflags=tuple(pkg_json.get("CgoFFLAGS", [])),
+                ldflags=tuple(pkg_json.get("CgoLDFLAGS", [])),
+                pkg_config=tuple(pkg_json.get("CgoPkgConfig", [])),
+            ),
+            embed_patterns=tuple(pkg_json.get("EmbedPatterns", [])),
+            embed_files=tuple(pkg_json.get("EmbedFiles", [])),
         )
-        lines.extend(
-            f"packagefile {import_path}={static_file_path}"
-            for import_path, static_file_path in std_lib_imports.items()
-        )
-    content = "\n".join(lines).encode("utf-8")
-    result = await Get(Digest, CreateDigest([FileContent(ImportConfig.CONFIG_PATH, content)]))
-    return ImportConfig(result)
+
+    return GoStdLibPackages(stdlib_packages)
 
 
 def rules():
-    return collect_rules()
+    return (
+        *collect_rules(),
+        *go_mod.rules(),
+    )

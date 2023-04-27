@@ -9,10 +9,10 @@ from abc import ABC, ABCMeta
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import PurePath
-from typing import Any, ClassVar, Iterable, Optional, TypeVar, cast
+from typing import Any, ClassVar, Iterable, Optional, Sequence, TypeVar, cast
 
 from pants.core.goals.multi_tool_goal_helper import SkippableSubsystem
-from pants.core.goals.package import BuiltPackage, PackageFieldSet
+from pants.core.goals.package import BuiltPackage, EnvironmentAwarePackageRequest, PackageFieldSet
 from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
 from pants.core.util_rules.distdir import DistDir
 from pants.core.util_rules.environments import (
@@ -42,7 +42,7 @@ from pants.engine.process import (
     InteractiveProcessResult,
     ProcessResultMetadata,
 )
-from pants.engine.rules import Effect, Get, MultiGet, collect_rules, goal_rule, rule, rule_helper
+from pants.engine.rules import Effect, Get, MultiGet, collect_rules, goal_rule, rule
 from pants.engine.target import (
     FieldSet,
     FieldSetsPerTarget,
@@ -63,14 +63,17 @@ from pants.option.option_types import BoolOption, EnumOption, IntOption, StrList
 from pants.util.collections import partition_sequentially
 from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
+from pants.util.memo import memoized
 from pants.util.meta import classproperty
-from pants.util.strutil import softwrap
+from pants.util.strutil import help_text, softwrap
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
 class TestResult(EngineAwareReturnType):
+    # A None exit_code indicates a backend that performs its own test discovery/selection
+    # (rather than delegating that to the underlying test tool), and discovered no tests.
     exit_code: int | None
     stdout: str
     stdout_digest: FileDigest
@@ -78,6 +81,9 @@ class TestResult(EngineAwareReturnType):
     stderr_digest: FileDigest
     addresses: tuple[Address, ...]
     output_setting: ShowOutput
+    # A None result_metadata indicates a backend that performs its own test discovery/selection
+    # and either discovered no tests, or encounted an error, such as a compilation error, in
+    # the attempt.
     result_metadata: ProcessResultMetadata | None
     partition_description: str | None = None
 
@@ -87,12 +93,15 @@ class TestResult(EngineAwareReturnType):
     xml_results: Snapshot | None = None
     # Any extra output (such as from plugins) that the test runner was configured to output.
     extra_output: Snapshot | None = None
+    # True if the core test rules should log that extra output was written.
+    log_extra_output: bool = False
 
     # Prevent this class from being detected by pytest as a test class.
     __test__ = False
 
     @staticmethod
-    def skip(address: Address, output_setting: ShowOutput) -> TestResult:
+    def no_tests_found(address: Address, output_setting: ShowOutput) -> TestResult:
+        """Used when we do test discovery ourselves, and we didn't find any."""
         return TestResult(
             exit_code=None,
             stdout="",
@@ -105,9 +114,10 @@ class TestResult(EngineAwareReturnType):
         )
 
     @staticmethod
-    def skip_batch(
+    def no_tests_found_in_batch(
         batch: TestRequest.Batch[_TestFieldSetT, Any], output_setting: ShowOutput
     ) -> TestResult:
+        """Used when we do test discovery ourselves, and we didn't find any."""
         return TestResult(
             exit_code=None,
             stdout="",
@@ -129,6 +139,7 @@ class TestResult(EngineAwareReturnType):
         coverage_data: CoverageData | None = None,
         xml_results: Snapshot | None = None,
         extra_output: Snapshot | None = None,
+        log_extra_output: bool = False,
     ) -> TestResult:
         return TestResult(
             exit_code=process_result.exit_code,
@@ -142,6 +153,7 @@ class TestResult(EngineAwareReturnType):
             coverage_data=coverage_data,
             xml_results=xml_results,
             extra_output=extra_output,
+            log_extra_output=log_extra_output,
         )
 
     @staticmethod
@@ -153,6 +165,7 @@ class TestResult(EngineAwareReturnType):
         coverage_data: CoverageData | None = None,
         xml_results: Snapshot | None = None,
         extra_output: Snapshot | None = None,
+        log_extra_output: bool = False,
     ) -> TestResult:
         return TestResult(
             exit_code=process_result.exit_code,
@@ -166,12 +179,9 @@ class TestResult(EngineAwareReturnType):
             coverage_data=coverage_data,
             xml_results=xml_results,
             extra_output=extra_output,
+            log_extra_output=log_extra_output,
             partition_description=batch.partition_metadata.description,
         )
-
-    @property
-    def skipped(self) -> bool:
-        return self.exit_code is None or self.result_metadata is None
 
     @property
     def description(self) -> str:
@@ -188,15 +198,14 @@ class TestResult(EngineAwareReturnType):
         return f"{self.addresses[0].path_safe_spec}+{len(self.addresses)-1}"
 
     def __lt__(self, other: Any) -> bool:
-        """We sort first by status (skipped vs failed vs succeeded), then alphanumerically within
-        each group."""
+        """We sort first by exit code, then alphanumerically within each group."""
         if not isinstance(other, TestResult):
             return NotImplemented
         if self.exit_code == other.exit_code:
             return self.description < other.description
-        if self.skipped or self.exit_code is None:
+        if self.exit_code is None:
             return True
-        if other.skipped or other.exit_code is None:
+        if other.exit_code is None:
             return False
         return abs(self.exit_code) < abs(other.exit_code)
 
@@ -210,13 +219,13 @@ class TestResult(EngineAwareReturnType):
         return output
 
     def level(self) -> LogLevel:
-        if self.skipped:
+        if self.exit_code is None:
             return LogLevel.DEBUG
         return LogLevel.INFO if self.exit_code == 0 else LogLevel.ERROR
 
     def message(self) -> str:
-        if self.skipped:
-            return "skipped."
+        if self.exit_code is None:
+            return "no tests found."
         status = "succeeded" if self.exit_code == 0 else f"failed (exit code {self.exit_code})"
         message = f"{status}."
         if self.partition_description:
@@ -265,7 +274,7 @@ class TestDebugAdapterRequest(TestDebugRequest):
     """
 
 
-@union(in_scope_types=[EnvironmentName])
+@union
 @dataclass(frozen=True)
 class TestFieldSet(FieldSet, metaclass=ABCMeta):
     """The fields necessary to run tests on a target."""
@@ -301,6 +310,9 @@ class TestRequest:
     tool_subsystem: ClassVar[type[SkippableSubsystem]]
     field_set_type: ClassVar[type[TestFieldSet]]
     partitioner_type: ClassVar[PartitionerType] = PartitionerType.DEFAULT_ONE_PARTITION_PER_INPUT
+
+    supports_debug: ClassVar[bool] = False
+    supports_debug_adapter: ClassVar[bool] = False
 
     __test__ = False
 
@@ -356,9 +368,16 @@ class TestRequest:
     def rules(cls) -> Iterable:
         yield from cls.partitioner_type.default_rules(cls, by_file=False)
 
+        yield UnionRule(TestFieldSet, cls.field_set_type)
         yield UnionRule(TestRequest, cls)
         yield UnionRule(TestRequest.PartitionRequest, cls.PartitionRequest)
         yield UnionRule(TestRequest.Batch, cls.Batch)
+
+        if not cls.supports_debug:
+            yield from _unsupported_debug_rules(cls)
+
+        if not cls.supports_debug_adapter:
+            yield from _unsupported_debug_adapter_rules(cls)
 
 
 class CoverageData(ABC):
@@ -468,7 +487,7 @@ class TestSubsystem(GoalSubsystem):
 
     @classmethod
     def activated(cls, union_membership: UnionMembership) -> bool:
-        return TestFieldSet in union_membership
+        return TestRequest in union_membership
 
     class EnvironmentAware:
         extra_env_vars = StrListOption(
@@ -631,7 +650,7 @@ class TestTimeoutField(IntField, metaclass=ABCMeta):
     alias = "timeout"
     required = False
     valid_numbers = ValidNumbers.positive_only
-    help = softwrap(
+    help = help_text(
         """
         A timeout (in seconds) used by each test file belonging to this target.
 
@@ -657,7 +676,7 @@ class TestTimeoutField(IntField, metaclass=ABCMeta):
 
 class TestExtraEnvVarsField(StringSequenceField, metaclass=ABCMeta):
     alias = "extra_env_vars"
-    help = softwrap(
+    help = help_text(
         """
          Additional environment variables to include in test processes.
 
@@ -668,8 +687,10 @@ class TestExtraEnvVarsField(StringSequenceField, metaclass=ABCMeta):
         """
     )
 
+    def sorted(self) -> tuple[str, ...]:
+        return tuple(sorted(self.value or ()))
 
-@rule_helper
+
 async def _get_test_batches(
     core_request_types: Iterable[type[TestRequest]],
     targets_to_field_sets: TargetRootsToFieldSets,
@@ -705,38 +726,35 @@ async def _get_test_batches(
         for partition in partitions
         for batch in partition_sequentially(
             partition.elements,
-            key=lambda x: str(x),
+            key=lambda x: str(x.address) if isinstance(x, FieldSet) else str(x),
             size_target=test_subsystem.batch_size,
             size_max=2 * test_subsystem.batch_size,
         )
     ]
 
 
-@rule_helper
 async def _run_debug_tests(
     batches: Iterable[TestRequest.Batch],
+    environment_names: Sequence[EnvironmentName],
     test_subsystem: TestSubsystem,
     debug_adapter: DebugAdapterSubsystem,
-    local_environment_name: ChosenLocalEnvironmentName,
 ) -> Test:
-    # TODO: Because these are interactive, they are always pinned to the local environment.
-    # See https://github.com/pantsbuild/pants/issues/17182
     debug_requests = await MultiGet(
         (
             Get(
                 TestDebugRequest,
-                {batch: TestRequest.Batch, local_environment_name.val: EnvironmentName},
+                {batch: TestRequest.Batch, environment_name: EnvironmentName},
             )
             if not test_subsystem.debug_adapter
             else Get(
                 TestDebugAdapterRequest,
-                {batch: TestRequest.Batch, local_environment_name.val: EnvironmentName},
+                {batch: TestRequest.Batch, environment_name: EnvironmentName},
             )
         )
-        for batch in batches
+        for batch, environment_name in zip(batches, environment_names)
     )
     exit_code = 0
-    for debug_request in debug_requests:
+    for debug_request, environment_name in zip(debug_requests, environment_names):
         if test_subsystem.debug_adapter:
             logger.info(
                 softwrap(
@@ -751,7 +769,7 @@ async def _run_debug_tests(
             InteractiveProcessResult,
             {
                 debug_request.process: InteractiveProcess,
-                local_environment_name.val: EnvironmentName,
+                environment_name: EnvironmentName,
             },
         )
         if debug_result.exit_code != 0:
@@ -800,11 +818,6 @@ async def run_tests(
         test_subsystem,
     )
 
-    if test_subsystem.debug or test_subsystem.debug_adapter:
-        return await _run_debug_tests(
-            test_batches, test_subsystem, debug_adapter, local_environment_name
-        )
-
     environment_names = await MultiGet(
         Get(
             EnvironmentName,
@@ -813,6 +826,11 @@ async def run_tests(
         )
         for batch in test_batches
     )
+
+    if test_subsystem.debug or test_subsystem.debug_adapter:
+        return await _run_debug_tests(
+            test_batches, environment_names, test_subsystem, debug_adapter
+        )
 
     results = await MultiGet(
         Get(TestResult, {batch: TestRequest.Batch, environment_name: EnvironmentName})
@@ -824,18 +842,27 @@ async def run_tests(
     if results:
         console.print_stderr("")
     for result in sorted(results):
-        if result.skipped:
+        if result.exit_code is None:
+            # We end up here, e.g., if we implemented test discovery and found no tests.
             continue
         if result.exit_code != 0:
-            exit_code = cast(int, result.exit_code)
+            exit_code = result.exit_code
+        if result.result_metadata is None:
+            # We end up here, e.g., if compilation failed during self-implemented test discovery.
+            continue
 
         console.print_stderr(_format_test_summary(result, run_id, console))
 
         if result.extra_output and result.extra_output.files:
+            path_prefix = str(distdir.relpath / "test" / result.path_safe_description)
             workspace.write_digest(
                 result.extra_output.digest,
-                path_prefix=str(distdir.relpath / "test" / result.path_safe_description),
+                path_prefix=path_prefix,
             )
+            if result.log_extra_output:
+                logger.info(
+                    f"Wrote extra output from test `{result.addresses[0]}` to `{path_prefix}`."
+                )
 
     if test_subsystem.report:
         report_dir = test_subsystem.report_dir(distdir)
@@ -908,7 +935,7 @@ async def run_tests(
 
 _SOURCE_MAP = {
     ProcessResultMetadata.Source.MEMOIZED: "memoized",
-    ProcessResultMetadata.Source.RAN_REMOTELY: "ran remotely",
+    ProcessResultMetadata.Source.RAN: "ran",
     ProcessResultMetadata.Source.HIT_LOCALLY: "cached locally",
     ProcessResultMetadata.Source.HIT_REMOTELY: "cached remotely",
 }
@@ -926,8 +953,19 @@ def _format_test_summary(result: TestResult, run_id: RunId, console: Console) ->
         sigil = console.sigil_failed()
         status = "failed"
 
-    source = _SOURCE_MAP.get(result.result_metadata.source(run_id))
-    source_print = f" ({source})" if source else ""
+    environment = result.result_metadata.execution_environment.name
+    environment_type = result.result_metadata.execution_environment.environment_type
+    source = result.result_metadata.source(run_id)
+    source_str = _SOURCE_MAP[source]
+    if environment:
+        preposition = "in" if source == ProcessResultMetadata.Source.RAN else "for"
+        source_desc = (
+            f" ({source_str} {preposition} {environment_type} environment `{environment}`)"
+        )
+    elif source == ProcessResultMetadata.Source.RAN:
+        source_desc = ""
+    else:
+        source_desc = f" ({source_str})"
 
     elapsed_print = ""
     total_elapsed_ms = result.result_metadata.total_elapsed_ms
@@ -935,7 +973,7 @@ def _format_test_summary(result: TestResult, run_id: RunId, console: Console) ->
         elapsed_secs = total_elapsed_ms / 1000
         elapsed_print = f"in {elapsed_secs:.2f}s"
 
-    suffix = f" {elapsed_print}{source_print}"
+    suffix = f" {elapsed_print}{source_desc}"
     return f"{sigil} {result.description} {status}{suffix}."
 
 
@@ -951,6 +989,30 @@ async def get_filtered_environment(test_env_aware: TestSubsystem.EnvironmentAwar
     )
 
 
+@memoized
+def _unsupported_debug_rules(cls: type[TestRequest]) -> Iterable:
+    """Returns a rule that implements TestDebugRequest by raising an error."""
+
+    @rule(_param_type_overrides={"request": cls.Batch})
+    async def get_test_debug_request(request: TestRequest.Batch) -> TestDebugRequest:
+        raise NotImplementedError("Testing this target with --debug is not yet supported.")
+
+    return collect_rules(locals())
+
+
+@memoized
+def _unsupported_debug_adapter_rules(cls: type[TestRequest]) -> Iterable:
+    """Returns a rule that implements TestDebugAdapterRequest by raising an error."""
+
+    @rule(_param_type_overrides={"request": cls.Batch})
+    async def get_test_debug_adapter_request(request: TestRequest.Batch) -> TestDebugAdapterRequest:
+        raise NotImplementedError(
+            "Testing this target type with a debug adapter is not yet supported."
+        )
+
+    return collect_rules(locals())
+
+
 # -------------------------------------------------------------------------------------------
 # `runtime_package_dependencies` field
 # -------------------------------------------------------------------------------------------
@@ -958,7 +1020,7 @@ async def get_filtered_environment(test_env_aware: TestSubsystem.EnvironmentAwar
 
 class RuntimePackageDependenciesField(SpecialCasedDependencies):
     alias = "runtime_package_dependencies"
-    help = softwrap(
+    help = help_text(
         f"""
         Addresses to targets that can be built with the `{bin_name()} package` goal and whose
         resulting artifacts should be included in the test run.
@@ -994,7 +1056,8 @@ async def build_runtime_package_dependencies(
         FieldSetsPerTarget, FieldSetsPerTargetRequest(PackageFieldSet, tgts)
     )
     packages = await MultiGet(
-        Get(BuiltPackage, PackageFieldSet, field_set) for field_set in field_sets_per_tgt.field_sets
+        Get(BuiltPackage, EnvironmentAwarePackageRequest(field_set))
+        for field_set in field_sets_per_tgt.field_sets
     )
     return BuiltPackageDependencies(packages)
 

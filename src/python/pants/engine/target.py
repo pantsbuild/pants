@@ -19,6 +19,7 @@ from enum import Enum
 from pathlib import PurePath
 from typing import (
     Any,
+    Callable,
     ClassVar,
     Dict,
     Generic,
@@ -62,9 +63,8 @@ from pants.util.dirutil import fast_relpath
 from pants.util.docutil import bin_name, doc_url
 from pants.util.frozendict import FrozenDict
 from pants.util.memo import memoized_method, memoized_property
-from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet
-from pants.util.strutil import bullet_list, pluralize, softwrap
+from pants.util.strutil import bullet_list, help_text, pluralize, softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -89,7 +89,7 @@ class _NoValue:
 NO_VALUE = _NoValue()
 
 
-@frozen_after_init
+@dataclass(frozen=True)
 class Field:
     """A Field.
 
@@ -143,7 +143,7 @@ class Field:
 
     # Subclasses must define these.
     alias: ClassVar[str]
-    help: ClassVar[str]
+    help: ClassVar[str | Callable[[], str]]
 
     # Subclasses must define at least one of these two.
     default: ClassVar[ImmutableValue]
@@ -156,12 +156,15 @@ class Field:
     deprecated_alias: ClassVar[str | None] = None
     deprecated_alias_removal_version: ClassVar[str | None] = None
 
+    value: Optional[ImmutableValue]
+
     @final
     def __init__(self, raw_value: Optional[Any], address: Address) -> None:
         if raw_value is NO_VALUE and not self.none_is_valid_value:
             raw_value = None
         self._check_deprecated(raw_value, address)
-        self.value: Optional[ImmutableValue] = self.compute_value(raw_value, address)
+
+        object.__setattr__(self, "value", self.compute_value(raw_value, address))
 
     @classmethod
     def compute_value(cls, raw_value: Optional[Any], address: Address) -> ImmutableValue:
@@ -194,10 +197,10 @@ class Field:
         )
 
     def __repr__(self) -> str:
-        return (
-            f"{self.__class__}(alias={repr(self.alias)}, value={repr(self.value)}, "
-            f"default={repr(self.default)})"
-        )
+        params = [f"alias={self.alias!r}", f"value={self.value!r}"]
+        if hasattr(self, "default"):
+            params.append(f"default={self.default!r}")
+        return f"{self.__class__}({', '.join(params)})"
 
     def __str__(self) -> str:
         return f"{self.alias}={self.value}"
@@ -205,14 +208,10 @@ class Field:
     def __hash__(self) -> int:
         return hash((self.__class__, self.value))
 
-    def __eq__(self, other: Union[Any, Field]) -> bool:
-        if not isinstance(other, Field):
-            return NotImplemented
-        return (self.__class__, self.value) == (other.__class__, other.value)
-
 
 # NB: By subclassing `Field`, MyPy understands our type hints, and it means it doesn't matter which
 # order you use for inheriting the field template vs. the mixin.
+@dataclass(frozen=True)
 class AsyncFieldMixin(Field):
     """A mixin to store the field's original `Address` for use during hydration by the engine.
 
@@ -259,34 +258,28 @@ class AsyncFieldMixin(Field):
         sources2 = await Get(HydratedSources, HydrateSourcesRequest(custom_tgt.get(CustomSources)))
     """
 
+    address: Address
+
     @final  # type: ignore[misc]
     def __init__(self, raw_value: Optional[Any], address: Address) -> None:
+        # N.B.: We store the address here and not in the Field base class, because the memory usage
+        # of storing this value in every field was shown to be excessive / lead to performance
+        # issues.
+        object.__setattr__(self, "address", address)
         super().__init__(raw_value, address)
-        # We must temporarily unfreeze the field, but then we refreeze to continue avoiding
-        # subclasses from adding arbitrary fields.
-        with self._unfrozen():  # type: ignore[attr-defined]
-            # N.B.: We store the address here and not in the Field base class, because the memory usage
-            # of storing this value in every field was shown to be excessive / lead to performance
-            # issues.
-            self.address = address
 
     def __repr__(self) -> str:
-        return (
-            f"{self.__class__}(alias={repr(self.alias)}, address={self.address}, "
-            f"value={repr(self.value)}, default={repr(self.default)})"
-        )
+        params = [
+            f"alias={self.alias!r}",
+            f"address={self.address}",
+            f"value={self.value!r}",
+        ]
+        if hasattr(self, "default"):
+            params.append(f"default={self.default!r}")
+        return f"{self.__class__}({', '.join(params)})"
 
     def __hash__(self) -> int:
         return hash((self.__class__, self.value, self.address))
-
-    def __eq__(self, other: Union[Any, AsyncFieldMixin]) -> bool:
-        if not isinstance(other, AsyncFieldMixin):
-            return NotImplemented
-        return (self.__class__, self.value, self.address) == (
-            other.__class__,
-            other.value,
-            other.address,
-        )
 
 
 @union
@@ -330,7 +323,9 @@ class FieldDefaults:
 
     See https://github.com/pantsbuild/pants/issues/12934 about potentially allowing unions
     (including Field registrations) to have `@rule_helper` methods, which would allow the
-    computation of an AsyncField to directly require a subsystem.
+    computation of an AsyncField to directly require a subsystem. Since
+    https://github.com/pantsbuild/pants/pull/17947 rules may use any methods as rule helpers without
+    special decoration so this should now be possible to implement.
     """
 
     _factories: FrozenDict[type[Field], FieldDefaultFactory]
@@ -362,7 +357,7 @@ class FieldDefaults:
 _F = TypeVar("_F", bound=Field)
 
 
-@frozen_after_init
+@dataclass(frozen=True)
 class Target:
     """A Target represents an addressable set of metadata.
 
@@ -374,7 +369,7 @@ class Target:
     # Subclasses must define these
     alias: ClassVar[str]
     core_fields: ClassVar[Tuple[Type[Field], ...]]
-    help: ClassVar[str]
+    help: ClassVar[str | Callable[[], str]]
 
     removal_version: ClassVar[str | None] = None
     removal_hint: ClassVar[str | None] = None
@@ -388,6 +383,7 @@ class Target:
     field_values: FrozenDict[type[Field], Field]
     residence_dir: str
     name_explicitly_set: bool
+    description_of_origin: str
 
     @final
     def __init__(
@@ -402,6 +398,7 @@ class Target:
         name_explicitly_set: bool = True,
         residence_dir: str | None = None,
         ignore_unrecognized_fields: bool = False,
+        description_of_origin: str | None = None,
     ) -> None:
         """Create a target.
 
@@ -419,6 +416,8 @@ class Target:
             like `dir:` know whether to match the target or not.
         :param ignore_unrecognized_fields: Don't error if fields are not recognized. This is only
             intended for when Pants is bootstrapping itself.
+        :param description_of_origin: Where this target was declared, such as a path to BUILD file
+            and line number.
         """
         if self.removal_version and not address.is_generated_target:
             if not self.removal_hint:
@@ -432,14 +431,35 @@ class Target:
                 hint=f"Using the `{self.alias}` target type for {address}. {self.removal_hint}",
             )
 
-        self.address = address
-        self.plugin_fields = self._find_plugin_fields(union_membership or UnionMembership({}))
-        self.residence_dir = residence_dir if residence_dir is not None else address.spec_path
-        self.name_explicitly_set = name_explicitly_set
-        self.field_values = self._calculate_field_values(
-            unhydrated_values, address, ignore_unrecognized_fields=ignore_unrecognized_fields
+        object.__setattr__(
+            self, "residence_dir", residence_dir if residence_dir is not None else address.spec_path
         )
-        self.validate()
+        object.__setattr__(self, "address", address)
+        object.__setattr__(
+            self, "description_of_origin", description_of_origin or self.residence_dir
+        )
+        object.__setattr__(self, "name_explicitly_set", name_explicitly_set)
+        try:
+            object.__setattr__(
+                self,
+                "plugin_fields",
+                self._find_plugin_fields(union_membership or UnionMembership({})),
+            )
+            object.__setattr__(
+                self,
+                "field_values",
+                self._calculate_field_values(
+                    unhydrated_values,
+                    address,
+                    ignore_unrecognized_fields=ignore_unrecognized_fields,
+                ),
+            )
+
+            self.validate()
+        except Exception as e:
+            raise InvalidTargetException(
+                str(e), description_of_origin=self.description_of_origin
+            ) from e
 
     @final
     def _calculate_field_values(
@@ -509,8 +529,9 @@ class Target:
         return (
             f"{self.__class__}("
             f"address={self.address}, "
-            f"alias={repr(self.alias)}, "
-            f"residence_dir={repr(self.residence_dir)}, "
+            f"alias={self.alias!r}, "
+            f"residence_dir={self.residence_dir!r}, "
+            f"origin={self.description_of_origin}, "
             f"{fields})"
         )
 
@@ -920,8 +941,7 @@ class CoarsenedTargets(Collection[CoarsenedTarget]):
     __hash__ = Tuple.__hash__
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class CoarsenedTargetsRequest:
     """A request to get CoarsenedTargets for input roots."""
 
@@ -936,9 +956,9 @@ class CoarsenedTargetsRequest:
         expanded_targets: bool = False,
         include_special_cased_deps: bool = False,
     ) -> None:
-        self.roots = tuple(roots)
-        self.expanded_targets = expanded_targets
-        self.include_special_cased_deps = include_special_cased_deps
+        object.__setattr__(self, "roots", tuple(roots))
+        object.__setattr__(self, "expanded_targets", expanded_targets)
+        object.__setattr__(self, "include_special_cased_deps", include_special_cased_deps)
 
 
 @dataclass(frozen=True)
@@ -958,8 +978,7 @@ class TransitiveTargets:
         return FrozenOrderedSet([*self.roots, *self.dependencies])
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class TransitiveTargetsRequest:
     """A request to get the transitive dependencies of the input roots.
 
@@ -973,17 +992,16 @@ class TransitiveTargetsRequest:
     def __init__(
         self, roots: Iterable[Address], *, include_special_cased_deps: bool = False
     ) -> None:
-        self.roots = tuple(roots)
-        self.include_special_cased_deps = include_special_cased_deps
+        object.__setattr__(self, "roots", tuple(roots))
+        object.__setattr__(self, "include_special_cased_deps", include_special_cased_deps)
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class RegisteredTargetTypes:
     aliases_to_types: FrozenDict[str, Type[Target]]
 
     def __init__(self, aliases_to_types: Mapping[str, Type[Target]]) -> None:
-        self.aliases_to_types = FrozenDict(aliases_to_types)
+        object.__setattr__(self, "aliases_to_types", FrozenDict(aliases_to_types))
 
     @classmethod
     def create(cls, target_types: Iterable[Type[Target]]) -> RegisteredTargetTypes:
@@ -1023,6 +1041,13 @@ class AllTargetsRequest:
 
     Use with either `AllUnexpandedTargets` or `AllTargets`.
     """
+
+    def __post_init__(self) -> None:
+        warn_or_error(
+            "2.18.0.dev0",
+            "using `Get(AllTargets, AllTargetsRequest)",
+            "Instead, simply use `Get(AllTargets)` or put `AllTargets` in the rule signature",
+        )
 
 
 # -----------------------------------------------------------------------------------------------
@@ -1439,13 +1464,16 @@ class FieldSet(EngineAwareParameter, metaclass=ABCMeta):
         return f"{self.__class__.__name__}(address={self.address})"
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class TargetRootsToFieldSets(Generic[_FS]):
     mapping: FrozenDict[Target, Tuple[_FS, ...]]
 
     def __init__(self, mapping: Mapping[Target, Iterable[_FS]]) -> None:
-        self.mapping = FrozenDict({tgt: tuple(field_sets) for tgt, field_sets in mapping.items()})
+        object.__setattr__(
+            self,
+            "mapping",
+            FrozenDict({tgt: tuple(field_sets) for tgt, field_sets in mapping.items()}),
+        )
 
     @memoized_property
     def field_sets(self) -> Tuple[_FS, ...]:
@@ -1493,8 +1521,7 @@ def get_shard(key: str, num_shards: int) -> int:
     return zlib.crc32(key.encode()) % num_shards
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class TargetRootsToFieldSetsRequest(Generic[_FS]):
     field_set_superclass: Type[_FS]
     goal_description: str
@@ -1511,39 +1538,37 @@ class TargetRootsToFieldSetsRequest(Generic[_FS]):
         shard: int = 0,
         num_shards: int = -1,
     ) -> None:
-        self.field_set_superclass = field_set_superclass
-        self.goal_description = goal_description
-        self.no_applicable_targets_behavior = no_applicable_targets_behavior
-        self.shard = shard
-        self.num_shards = num_shards
+        object.__setattr__(self, "field_set_superclass", field_set_superclass)
+        object.__setattr__(self, "goal_description", goal_description)
+        object.__setattr__(self, "no_applicable_targets_behavior", no_applicable_targets_behavior)
+        object.__setattr__(self, "shard", shard)
+        object.__setattr__(self, "num_shards", num_shards)
 
     def is_in_shard(self, key: str) -> bool:
         return get_shard(key, self.num_shards) == self.shard
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class FieldSetsPerTarget(Generic[_FS]):
     # One tuple of FieldSet instances per input target.
     collection: Tuple[Tuple[_FS, ...], ...]
 
     def __init__(self, collection: Iterable[Iterable[_FS]]):
-        self.collection = tuple(tuple(iterable) for iterable in collection)
+        object.__setattr__(self, "collection", tuple(tuple(iterable) for iterable in collection))
 
     @memoized_property
     def field_sets(self) -> Tuple[_FS, ...]:
         return tuple(itertools.chain.from_iterable(self.collection))
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class FieldSetsPerTargetRequest(Generic[_FS]):
     field_set_superclass: Type[_FS]
     targets: Tuple[Target, ...]
 
     def __init__(self, field_set_superclass: Type[_FS], targets: Iterable[Target]):
-        self.field_set_superclass = field_set_superclass
-        self.targets = tuple(targets)
+        object.__setattr__(self, "field_set_superclass", field_set_superclass)
+        object.__setattr__(self, "targets", tuple(targets))
 
 
 # -----------------------------------------------------------------------------------------------
@@ -1556,8 +1581,22 @@ class InvalidTargetException(Exception):
 
     Suggested template:
 
-         f"The `{repr(alias)}` target {address} ..."
+         f"The `{alias!r}` target {address} ..."
     """
+
+    def __init__(self, message: Any, *, description_of_origin: str | None = None) -> None:
+        self.description_of_origin = description_of_origin
+        super().__init__(message)
+
+    def __str__(self) -> str:
+        if not self.description_of_origin:
+            return super().__str__()
+        return f"{self.description_of_origin}: {super().__str__()}"
+
+    def __repr__(self) -> str:
+        if not self.description_of_origin:
+            return super().__repr__()
+        return f"{self.description_of_origin}: {super().__repr__()}"
 
 
 class InvalidGeneratedTargetException(InvalidTargetException):
@@ -1569,8 +1608,22 @@ class InvalidFieldException(Exception):
 
     Suggested template:
 
-         f"The {repr(alias)} field in target {address} must ..., but ..."
+         f"The {alias!r} field in target {address} must ..., but ..."
     """
+
+    def __init__(self, message: Any, *, description_of_origin: str | None = None) -> None:
+        self.description_of_origin = description_of_origin
+        super().__init__(message)
+
+    def __str__(self) -> str:
+        if not self.description_of_origin:
+            return super().__str__()
+        return f"{self.description_of_origin}: {super().__str__()}"
+
+    def __repr__(self) -> str:
+        if not self.description_of_origin:
+            return super().__repr__()
+        return f"{self.description_of_origin}: {super().__repr__()}"
 
 
 class InvalidFieldTypeException(InvalidFieldException):
@@ -1578,17 +1631,29 @@ class InvalidFieldTypeException(InvalidFieldException):
     e.g. `a boolean` or `a string` or `an iterable of strings and integers`."""
 
     def __init__(
-        self, address: Address, field_alias: str, raw_value: Optional[Any], *, expected_type: str
+        self,
+        address: Address,
+        field_alias: str,
+        raw_value: Optional[Any],
+        *,
+        expected_type: str,
+        description_of_origin: str | None = None,
     ) -> None:
         super().__init__(
             f"The {repr(field_alias)} field in target {address} must be {expected_type}, but was "
-            f"`{repr(raw_value)}` with type `{type(raw_value).__name__}`."
+            f"`{repr(raw_value)}` with type `{type(raw_value).__name__}`.",
+            description_of_origin=description_of_origin,
         )
 
 
 class RequiredFieldMissingException(InvalidFieldException):
-    def __init__(self, address: Address, field_alias: str) -> None:
-        super().__init__(f"The {repr(field_alias)} field in target {address} must be defined.")
+    def __init__(
+        self, address: Address, field_alias: str, *, description_of_origin: str | None = None
+    ) -> None:
+        super().__init__(
+            f"The {repr(field_alias)} field in target {address} must be defined.",
+            description_of_origin=description_of_origin,
+        )
 
 
 class InvalidFieldChoiceException(InvalidFieldException):
@@ -1599,27 +1664,37 @@ class InvalidFieldChoiceException(InvalidFieldException):
         raw_value: Optional[Any],
         *,
         valid_choices: Iterable[Any],
+        description_of_origin: str | None = None,
     ) -> None:
         super().__init__(
             f"Values for the {repr(field_alias)} field in target {address} must be one of "
-            f"{sorted(valid_choices)}, but {repr(raw_value)} was provided."
+            f"{sorted(valid_choices)}, but {repr(raw_value)} was provided.",
+            description_of_origin=description_of_origin,
         )
 
 
-class UnrecognizedTargetTypeException(Exception):
+class UnrecognizedTargetTypeException(InvalidTargetException):
     def __init__(
         self,
         target_type: str,
         registered_target_types: RegisteredTargetTypes,
         address: Address | None = None,
+        description_of_origin: str | None = None,
     ) -> None:
         for_address = f" for address {address}" if address else ""
         super().__init__(
-            f"Target type {repr(target_type)} is not registered{for_address}.\n\nAll valid target "
-            f"types: {sorted(registered_target_types.aliases)}\n\n(If {repr(target_type)} is a "
-            "custom target type, refer to "
-            "https://groups.google.com/forum/#!topic/pants-devel/WsRFODRLVZI for instructions on "
-            "writing a light-weight Target API binding.)"
+            softwrap(
+                f"""
+                Target type {target_type!r} is not registered{for_address}.
+
+                All valid target types: {sorted(registered_target_types.aliases)}
+
+                (If {target_type!r} is a custom target type, refer to
+                {doc_url('target-api-concepts')} for getting it registered with Pants.)
+
+                """
+            ),
+            description_of_origin=description_of_origin,
         )
 
 
@@ -1781,7 +1856,7 @@ class SequenceField(Generic[T], Field):
 
             @classmethod
             def compute_value(
-                cls, raw_value: Optional[Iterable[MyPluginObject]], *, address: Address
+                cls, raw_value: Optional[Iterable[MyPluginObject]], address: Address
             ) -> Optional[Tuple[MyPluginObject, ...]]:
                 return super().compute_value(raw_value, address=address)
     """
@@ -1981,7 +2056,7 @@ class SourcesField(AsyncFieldMixin, Field):
         """
         if self.expected_file_extensions is not None:
             bad_files = [
-                fp for fp in files if not PurePath(fp).suffix in self.expected_file_extensions
+                fp for fp in files if PurePath(fp).suffix not in self.expected_file_extensions
             ]
             if bad_files:
                 expected = (
@@ -2076,7 +2151,7 @@ class SourcesField(AsyncFieldMixin, Field):
         # Use fields default error behavior if defined, if we use default globs else the provided
         # error behavior.
         error_behavior = (
-            unmatched_build_file_globs.to_glob_match_error_behavior()
+            unmatched_build_file_globs.error_behavior
             if conjunction == GlobExpansionConjunction.all_match
             or self.default_glob_match_error_behavior is None
             else self.default_glob_match_error_behavior
@@ -2179,7 +2254,7 @@ class OptionalSingleSourceField(SourcesField, StringField):
     """
 
     alias = "source"
-    help = softwrap(
+    help = help_text(
         """
         A single file that belongs to this target.
 
@@ -2272,8 +2347,7 @@ class SingleSourceField(OptionalSingleSourceField):
         return result
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class HydrateSourcesRequest(EngineAwareParameter):
     field: SourcesField
     for_sources_types: tuple[type[SourcesField], ...]
@@ -2295,9 +2369,10 @@ class HydrateSourcesRequest(EngineAwareParameter):
         If `enable_codegen` is set to `True`, any codegen sources will try to be converted to one
         of the `for_sources_types`.
         """
-        self.field = field
-        self.for_sources_types = tuple(for_sources_types)
-        self.enable_codegen = enable_codegen
+        object.__setattr__(self, "field", field)
+        object.__setattr__(self, "for_sources_types", tuple(for_sources_types))
+        object.__setattr__(self, "enable_codegen", enable_codegen)
+
         self.__post_init__()
 
     def __post_init__(self) -> None:
@@ -2474,7 +2549,7 @@ class Dependencies(StringSequenceField, AsyncFieldMixin):
     """
 
     alias = "dependencies"
-    help = softwrap(
+    help = help_text(
         f"""
         Addresses to other targets that this target depends on, e.g.
         ['helloworld/subdir:lib', 'helloworld/main.py:lib', '3rdparty:reqs#django'].
@@ -2676,8 +2751,7 @@ class InferDependenciesRequest(Generic[FS], EngineAwareParameter):
     field_set: FS
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class InferredDependencies:
     include: FrozenOrderedSet[Address]
     exclude: FrozenOrderedSet[Address]
@@ -2689,8 +2763,8 @@ class InferredDependencies:
         exclude: Iterable[Address] = (),
     ) -> None:
         """The result of inferring dependencies."""
-        self.include = FrozenOrderedSet(sorted(include))
-        self.exclude = FrozenOrderedSet(sorted(exclude))
+        object.__setattr__(self, "include", FrozenOrderedSet(sorted(include)))
+        object.__setattr__(self, "exclude", FrozenOrderedSet(sorted(exclude)))
 
 
 @union(in_scope_types=[EnvironmentName])
@@ -2795,7 +2869,7 @@ class SpecialCasedDependencies(StringSequenceField, AsyncFieldMixin):
 
 class Tags(StringSequenceField):
     alias = "tags"
-    help = softwrap(
+    help = help_text(
         f"""
         Arbitrary strings to describe a target.
 
@@ -2807,7 +2881,7 @@ class Tags(StringSequenceField):
 
 class DescriptionField(StringField):
     alias = "description"
-    help = softwrap(
+    help = help_text(
         f"""
         A human-readable description of the target.
 
@@ -2837,38 +2911,37 @@ class OverridesField(AsyncFieldMixin, Field):
         cls,
         raw_value: Optional[Dict[Union[str, Tuple[str, ...]], Dict[str, Any]]],
         address: Address,
-    ) -> Optional[Dict[Tuple[str, ...], Dict[str, Any]]]:
+    ) -> Optional[FrozenDict[Tuple[str, ...], FrozenDict[str, ImmutableValue]]]:
         value_or_default = super().compute_value(raw_value, address)
         if value_or_default is None:
             return None
-        invalid_type_exception = InvalidFieldTypeException(
-            address,
-            cls.alias,
-            raw_value,
-            expected_type="dict[str | tuple[str, ...], dict[str, Any]]",
-        )
-        if not isinstance(value_or_default, collections.abc.Mapping):
-            raise invalid_type_exception
 
-        result: dict[tuple[str, ...], dict[str, Any]] = {}
+        def invalid_type_exception() -> InvalidFieldException:
+            return InvalidFieldTypeException(
+                address,
+                cls.alias,
+                raw_value,
+                expected_type="dict[str | tuple[str, ...], dict[str, Any]]",
+            )
+
+        if not isinstance(value_or_default, collections.abc.Mapping):
+            raise invalid_type_exception()
+
+        result: dict[tuple[str, ...], FrozenDict[str, ImmutableValue]] = {}
         for outer_key, nested_value in value_or_default.items():
             if isinstance(outer_key, str):
                 outer_key = (outer_key,)
             if not isinstance(outer_key, collections.abc.Sequence) or not all(
                 isinstance(elem, str) for elem in outer_key
             ):
-                raise invalid_type_exception
+                raise invalid_type_exception()
             if not isinstance(nested_value, collections.abc.Mapping):
-                raise invalid_type_exception
+                raise invalid_type_exception()
             if not all(isinstance(inner_key, str) for inner_key in nested_value):
-                raise invalid_type_exception
-            result[tuple(outer_key)] = dict(nested_value)
+                raise invalid_type_exception()
+            result[tuple(outer_key)] = FrozenDict.deep_freeze(cast(Mapping[str, Any], nested_value))
 
-        return result
-
-    def __hash__(self) -> int:
-        # The value might have unhashable elements like `list`, so we stringify it.
-        return hash((self.__class__, repr(self.value)))
+        return FrozenDict(result)
 
     @classmethod
     def to_path_globs(
@@ -2892,7 +2965,7 @@ class OverridesField(AsyncFieldMixin, Field):
         return tuple(
             PathGlobs(
                 [relativize_glob(glob)],
-                glob_match_error_behavior=unmatched_build_file_globs.to_glob_match_error_behavior(),
+                glob_match_error_behavior=unmatched_build_file_globs.error_behavior,
                 description_of_origin=f"the `overrides` field for {address}",
             )
             for glob in overrides_keys
@@ -2971,7 +3044,7 @@ def generate_file_based_overrides_field_help_message(
     return "\n".join(
         [
             softwrap(
-                """
+                f"""
                 Override the field values for generated `{generated_target_name}` targets.
 
                 Expects a dictionary of relative file paths and globs to a dictionary for the

@@ -1,10 +1,12 @@
+// Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
+// Licensed under the Apache License, Version 2.0 (see LICENSE).
 use std::io::Read;
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 
 pub fn list_dir(path: &Path) -> Vec<String> {
   let mut v: Vec<_> = std::fs::read_dir(path)
-    .unwrap_or_else(|err| panic!("Listing dir {:?}: {:?}", path, err))
+    .unwrap_or_else(|err| panic!("Listing dir {path:?}: {err:?}"))
     .map(|entry| {
       entry
         .expect("Error reading entry")

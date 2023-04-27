@@ -1,8 +1,10 @@
 # Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+
 from dataclasses import dataclass
 from typing import Any
 
+from pants.backend.javascript.subsystems.nodejs import NodeJSToolProcess
 from pants.backend.openapi.lint.spectral.skip_field import SkipSpectralField
 from pants.backend.openapi.lint.spectral.subsystem import SpectralSubsystem
 from pants.backend.openapi.target_types import (
@@ -11,12 +13,10 @@ from pants.backend.openapi.target_types import (
     OpenApiSourceField,
 )
 from pants.core.goals.lint import LintResult, LintTargetsRequest
-from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.core.util_rules.partitions import PartitionerType
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests
-from pants.engine.platform import Platform
-from pants.engine.process import FallibleProcessResult, Process
+from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import FieldSet, Target, TransitiveTargets, TransitiveTargetsRequest
 from pants.util.logging import LogLevel
@@ -45,7 +45,6 @@ class SpectralRequest(LintTargetsRequest):
 async def run_spectral(
     request: SpectralRequest.Batch[SpectralFieldSet, Any],
     spectral: SpectralSubsystem,
-    platform: Platform,
 ) -> LintResult:
     transitive_targets = await Get(
         TransitiveTargets,
@@ -72,12 +71,9 @@ async def run_spectral(
     ruleset_digest_get = Get(
         Digest, CreateDigest([FileContent(".spectral.yaml", b'extends: "spectral:oas"\n')])
     )
-    download_spectral_get = Get(
-        DownloadedExternalTool, ExternalToolRequest, spectral.get_request(platform)
-    )
 
-    target_sources, all_sources, downloaded_spectral, ruleset_digest = await MultiGet(
-        target_sources_request, all_sources_request, download_spectral_get, ruleset_digest_get
+    target_sources, all_sources, ruleset_digest = await MultiGet(
+        target_sources_request, all_sources_request, ruleset_digest_get
     )
 
     input_digest = await Get(
@@ -86,7 +82,6 @@ async def run_spectral(
             (
                 target_sources.snapshot.digest,
                 all_sources.snapshot.digest,
-                downloaded_spectral.digest,
                 ruleset_digest,
             )
         ),
@@ -94,16 +89,17 @@ async def run_spectral(
 
     process_result = await Get(
         FallibleProcessResult,
-        Process(
-            argv=[
-                downloaded_spectral.exe,
+        NodeJSToolProcess,
+        NodeJSToolProcess.npx(
+            npm_package=spectral.version,
+            args=(
                 "lint",
                 "--display-only-failures",
                 "--ruleset",
                 ".spectral.yaml",
                 *spectral.args,
                 *target_sources.snapshot.files,
-            ],
+            ),
             input_digest=input_digest,
             description=f"Run Spectral on {pluralize(len(request.elements), 'file')}.",
             level=LogLevel.DEBUG,

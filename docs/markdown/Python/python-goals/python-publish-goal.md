@@ -2,11 +2,10 @@
 title: "publish"
 slug: "python-publish-goal"
 excerpt: "How to distribute packages to a PyPi repository"
-hidden: true
+hidden: false
 createdAt: "2021-10-05T08:10:25.568Z"
-updatedAt: "2022-01-11T16:09:21.278Z"
 ---
-The `publish` goal is currently in the experimental Python backend. Activate with this config:
+The `publish` goal is currently in the experimental Python backend. Activate it with this config:
 
 ```toml pants.toml
 [GLOBAL]
@@ -15,12 +14,12 @@ backend_packages.add = [
 ]
 ```
 
-This will register a new `repositories` field for the `python_distribution` target, so when you run `./pants publish` for those targets, they will package  them and then publish the distributions using Twine to the repositories specified in your BUILD files.
+This will register a new `repositories` field on the `python_distribution` target type, so that when you run `pants publish` on such targets they will be packaged into wheels and/or sdists, and then published to the repositories specified in your BUILD files.
 
 Python Repositories
 -------------------
 
-When publishing a `python_distribution`, you need to tell Pants which repositories to publish to. That is done with a new `repositories` field on the `python_distribution`.
+When publishing a `python_distribution`, you need to tell Pants which repositories to publish to. That is done with a new `repositories` field on `python_distribution` targets.
 
 ```python src/python/BUILD
 python_distribution(
@@ -46,22 +45,18 @@ username: publisher-example
 repository: https://pypi.private.example.com
 ```
 
-The repositories are either references to a configured repository in the `.pypirc` file when prefixed with `@`, or the repository URL otherwise.
+Each repository is either a repository URL or, when prefixed with `@`, a reference to a repository configured in the `.pypirc` file.
 
 > ❗️ Keep Secrets Secret
 > 
 > We strongly discourage the use of secrets verbatim in your configuration files.
 > 
-> Better is to inject the required secrets as environment variables only when needed when running `./pants publish`, or better still is to use `keyring` is possible as described in the [Twine documentation](https://twine.readthedocs.io/en/latest/#keyring-support)
+> It is better to provide the required secrets using environment variables when running `pants publish`. Or, better yet, to use `keyring` as described in the [Twine documentation](https://twine.readthedocs.io/en/latest/#keyring-support)
 
 Environment variables
 ---------------------
 
-Twine may be configured using [environment variables](https://twine.readthedocs.io/en/latest/#environment-variables), and this is supported also when publishing with Pants. However, as there may be multiple repositories involved with a single `publish` goal, the repository name should be used (upper cased, and with hyphens replaced with underscores) as suffix on the variable names.
-
-It is only repositories configured with the URL directly in the build file that don't have any special suffix, so does not scale to multiple different repositories if using environment variables is a requirement.
-
-Only the following environment variable names are considered when running Twine:
+Pants will pass certain configuration [environment variables](https://twine.readthedocs.io/en/latest/#environment-variables), through to Twine. If multiple repositories are involved in a single `publish` goal, you can distinguish them by adding an undersore and the repository name (upper-cased, and with hyphens replaced with underscores) as a suffix on the environment variable names:
 
 - `TWINE_USERNAME` 
 - `TWINE_USERNAME_<repository>`
@@ -79,5 +74,5 @@ export TWINE_PASSWORD_PRIVATE_REPO="secretvalue"
 Given the example `BUILD` and `.pypirc` files from the previous section, `demo` could be published with the following command:
 
 ```shell
-$ { source ./secrets && ./pants publish src/python:demo }
+$ { source ./secrets && pants publish src/python:demo }
 ```

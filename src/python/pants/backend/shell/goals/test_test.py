@@ -16,6 +16,7 @@ from pants.backend.shell.target_types import (
     ShellSourcesGeneratorTarget,
 )
 from pants.build_graph.address import Address
+from pants.core.goals import package
 from pants.core.goals.test import TestResult, get_filtered_environment
 from pants.core.util_rules import archive, source_files
 from pants.engine.rules import QueryRule
@@ -30,6 +31,7 @@ def rule_runner() -> RuleRunner:
             *test.rules(),
             *source_files.rules(),
             *archive.rules(),
+            *package.rules(),
             get_filtered_environment,
             QueryRule(TestResult, (ShellTestRequest.Batch,)),
         ],
@@ -50,23 +52,23 @@ def test_shell_command_as_test(rule_runner: RuleRunner) -> None:
                 """\
                 shell_sources(name="src")
 
-                experimental_shell_command(
+                shell_command(
                   name="msg-gen",
                   command="echo message > msg.txt",
                   tools=["echo"],
-                  outputs=["msg.txt"],
+                  output_files=["msg.txt"],
                 )
 
                 experimental_test_shell_command(
                   name="pass",
-                  dependencies=[":msg-gen", ":src"],
+                  execution_dependencies=[":msg-gen", ":src"],
                   tools=["echo"],
                   command="./test.sh msg.txt message",
                 )
 
                 experimental_test_shell_command(
                   name="fail",
-                  dependencies=[":msg-gen", ":src"],
+                  execution_dependencies=[":msg-gen", ":src"],
                   tools=["echo"],
                   command="./test.sh msg.txt xyzzy",
                 )

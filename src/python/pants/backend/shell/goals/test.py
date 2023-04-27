@@ -13,21 +13,12 @@ from pants.backend.shell.target_types import (
     SkipShellCommandTestsField,
 )
 from pants.backend.shell.util_rules import shell_command
-from pants.backend.shell.util_rules.shell_command import ShellCommandProcessRequest
-from pants.core.goals.test import (
-    TestDebugAdapterRequest,
-    TestDebugRequest,
-    TestExtraEnv,
-    TestFieldSet,
-    TestRequest,
-    TestResult,
-    TestSubsystem,
-)
+from pants.backend.shell.util_rules.shell_command import ShellCommandProcessFromTargetRequest
+from pants.core.goals.test import TestExtraEnv, TestFieldSet, TestRequest, TestResult, TestSubsystem
 from pants.engine.internals.selectors import Get
 from pants.engine.process import FallibleProcessResult, Process, ProcessCacheScope
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import Target, WrappedTarget, WrappedTargetRequest
-from pants.engine.unions import UnionRule
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 
@@ -60,7 +51,10 @@ async def test_shell_command(
         WrappedTargetRequest(field_set.address, description_of_origin="<infallible>"),
     )
 
-    shell_process = await Get(Process, ShellCommandProcessRequest(wrapped_tgt.target))
+    shell_process = await Get(
+        Process,
+        ShellCommandProcessFromTargetRequest(wrapped_tgt.target),
+    )
 
     shell_process = dataclasses.replace(
         shell_process,
@@ -83,22 +77,9 @@ async def test_shell_command(
     )
 
 
-@rule
-async def generate_shell_tests_debug_request(_: ShellTestRequest.Batch) -> TestDebugRequest:
-    raise NotImplementedError("This is a stub.")
-
-
-@rule
-async def generate_shell_tests_debug_adapter_request(
-    _: ShellTestRequest.Batch,
-) -> TestDebugAdapterRequest:
-    raise NotImplementedError("This is a stub.")
-
-
 def rules():
     return (
         *collect_rules(),
         *shell_command.rules(),
         *ShellTestRequest.rules(),
-        UnionRule(TestFieldSet, TestShellCommandFieldSet),
     )

@@ -10,6 +10,7 @@ import pytest
 from pants.backend.go import target_type_rules
 from pants.backend.go.lint.gofmt.rules import GofmtFieldSet, GofmtRequest
 from pants.backend.go.lint.gofmt.rules import rules as gofmt_rules
+from pants.backend.go.lint.gofmt.subsystem import SUPPORTED_GOFMT_ARGS_AS_HELP
 from pants.backend.go.target_types import GoModTarget, GoPackageTarget
 from pants.backend.go.util_rules import (
     assembly,
@@ -24,8 +25,7 @@ from pants.core.goals.fmt import FmtResult
 from pants.core.util_rules import source_files
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
-from pants.engine.fs import CreateDigest, Digest, FileContent
-from pants.engine.internals.native_engine import Snapshot
+from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.target import Target
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
@@ -94,6 +94,33 @@ FIXED_BAD_FILE = dedent(
     """
 )
 
+BAD_FILE_TO_SIMPLIFY = dedent(
+    """\
+    package grok
+
+    import (
+    \t"fmt"
+    )
+
+    func Grok(s string) {
+    \tfmt.Println(s[1:len(s)])
+    }
+    """
+)
+
+FIXED_BAD_FILE_TO_SIMPLIFY = dedent(
+    """\
+    package grok
+
+    import (
+    \t"fmt"
+    )
+
+    func Grok(s string) {
+    \tfmt.Println(s[1:])
+    }
+    """
+)
 
 GO_MOD = dedent(
     """\
@@ -131,12 +158,6 @@ def run_gofmt(
     return fmt_result
 
 
-def get_snapshot(rule_runner: RuleRunner, source_files: dict[str, str]) -> Snapshot:
-    files = [FileContent(path, content.encode()) for path, content in source_files.items()]
-    digest = rule_runner.request(Digest, [CreateDigest(files)])
-    return rule_runner.request(Snapshot, [digest])
-
-
 def test_passing(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {"f.go": GOOD_FILE, "go.mod": GO_MOD, "BUILD": "go_mod(name='mod')\ngo_package(name='pkg')"}
@@ -144,8 +165,28 @@ def test_passing(rule_runner: RuleRunner) -> None:
     tgt = rule_runner.get_target(Address("", target_name="pkg"))
     fmt_result = run_gofmt(rule_runner, [tgt])
     assert fmt_result.stdout == ""
-    assert fmt_result.output == get_snapshot(rule_runner, {"f.go": GOOD_FILE})
+    assert fmt_result.output == rule_runner.make_snapshot({"f.go": GOOD_FILE})
     assert fmt_result.did_change is False
+
+
+def test_failing_gofmt_flags(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "f.go": BAD_FILE_TO_SIMPLIFY,
+            "go.mod": GO_MOD,
+            "BUILD": "go_mod(name='mod')\ngo_package(name='pkg')",
+        }
+    )
+    tgt = rule_runner.get_target(Address("", target_name="pkg"))
+    with pytest.raises(ExecutionError, match=SUPPORTED_GOFMT_ARGS_AS_HELP):
+        run_gofmt(rule_runner, [tgt], extra_args=["--gofmt-args=-unsupported"])
+
+    fmt_result = run_gofmt(
+        rule_runner, [tgt], extra_args=["--gofmt-args=-s"]
+    )  # -s flag will simplify the code
+    assert fmt_result.stderr == ""
+    assert fmt_result.output == rule_runner.make_snapshot({"f.go": FIXED_BAD_FILE_TO_SIMPLIFY})
+    assert fmt_result.did_change is True
 
 
 def test_failing(rule_runner: RuleRunner) -> None:
@@ -155,7 +196,7 @@ def test_failing(rule_runner: RuleRunner) -> None:
     tgt = rule_runner.get_target(Address("", target_name="pkg"))
     fmt_result = run_gofmt(rule_runner, [tgt])
     assert fmt_result.stderr == ""
-    assert fmt_result.output == get_snapshot(rule_runner, {"f.go": FIXED_BAD_FILE})
+    assert fmt_result.output == rule_runner.make_snapshot({"f.go": FIXED_BAD_FILE})
     assert fmt_result.did_change is True
 
 
@@ -170,8 +211,8 @@ def test_mixed_sources(rule_runner: RuleRunner) -> None:
     )
     tgt = rule_runner.get_target(Address("", target_name="pkg"))
     fmt_result = run_gofmt(rule_runner, [tgt])
-    assert fmt_result.output == get_snapshot(
-        rule_runner, {"good.go": GOOD_FILE, "bad.go": FIXED_BAD_FILE}
+    assert fmt_result.output == rule_runner.make_snapshot(
+        {"good.go": GOOD_FILE, "bad.go": FIXED_BAD_FILE}
     )
     assert fmt_result.did_change is True
 
@@ -189,7 +230,7 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
     )
     tgts = [rule_runner.get_target(Address("good")), rule_runner.get_target(Address("bad"))]
     fmt_result = run_gofmt(rule_runner, tgts)
-    assert fmt_result.output == get_snapshot(
-        rule_runner, {"good/f.go": GOOD_FILE, "bad/f.go": FIXED_BAD_FILE}
+    assert fmt_result.output == rule_runner.make_snapshot(
+        {"good/f.go": GOOD_FILE, "bad/f.go": FIXED_BAD_FILE}
     )
     assert fmt_result.did_change is True

@@ -4,7 +4,6 @@ slug: "plugins-repl-goal"
 excerpt: "How to add a new implementation to the `repl` goal."
 hidden: false
 createdAt: "2020-08-22T05:58:07.646Z"
-updatedAt: "2022-02-14T23:43:47.610Z"
 ---
 The `repl` goal opens up an interactive Read-Eval-Print Loop that runs in the foreground.
 
@@ -57,7 +56,7 @@ The `ReplRequest ` will get converted into an `InteractiveProcess` that will run
 
 The process will run in a temporary directory in the build root, which means that the script/program can access files that would normally need to be declared by adding a `file` / `files` or `resource` / `resources` target to the `dependencies` field.
 
-The process will not be hermetic, meaning that it will inherit the environment variables used by the `./pants` process. Any values you set in `extra_env` will add or update the specified environment variables.
+The process will not be hermetic, meaning that it will inherit the environment variables used by the `pants` process. Any values you set in `extra_env` will add or update the specified environment variables.
 
 ```python
 from dataclasses import dataclass
@@ -107,4 +106,4 @@ def rules():
     return [*repl.rules()]
 ```
 
-Now, when you run `./pants repl --shell=bash ::`, your new REPL should be used.
+Now, when you run `pants repl --shell=bash ::`, your new REPL should be used.

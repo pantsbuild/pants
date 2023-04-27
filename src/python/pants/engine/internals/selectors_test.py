@@ -21,22 +21,27 @@ class BClass:
 
 
 def test_create_get() -> None:
-    get = Get(AClass, int, 42)
-    assert get.output_type is AClass
-    assert get.input_types == [int]
-    assert get.inputs == [42]
+    get1 = Get(AClass)
+    assert get1.output_type is AClass
+    assert get1.input_types == []
+    assert get1.inputs == []
+
+    get2 = Get(AClass, int, 42)
+    assert get2.output_type is AClass
+    assert get2.input_types == [int]
+    assert get2.inputs == [42]
 
     # Also test the equivalence of the 1-arg and 2-arg versions.
-    get2 = Get(AClass, int(42))
-    assert get.output_type == get2.output_type
-    assert get.input_types == get2.input_types
-    assert get.inputs == get2.inputs
+    get3 = Get(AClass, int(42))
+    assert get2.output_type == get3.output_type
+    assert get2.input_types == get3.input_types
+    assert get2.inputs == get3.inputs
 
     # And finally the multiple parameter syntax.
-    get3 = Get(AClass, {42: int, "hello": str})
-    assert get3.output_type is AClass
-    assert get3.input_types == [int, str]
-    assert get3.inputs == [42, "hello"]
+    get4 = Get(AClass, {42: int, "hello": str})
+    assert get4.output_type is AClass
+    assert get4.input_types == [int, str]
+    assert get4.inputs == [42, "hello"]
 
 
 def assert_invalid_get(create_get: Callable[[], Get], *, expected: str) -> None:

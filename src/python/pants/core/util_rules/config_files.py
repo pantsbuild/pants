@@ -13,7 +13,6 @@ from pants.engine.rules import Get, collect_rules, rule
 from pants.util.collections import ensure_str_list
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
-from pants.util.meta import frozen_after_init
 
 logger = logging.getLogger(__name__)
 
@@ -25,8 +24,7 @@ class ConfigFiles:
     snapshot: Snapshot
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class ConfigFilesRequest:
     """Resolve the specified config files if given, else look for candidate config files if
     discovery is enabled.
@@ -50,11 +48,13 @@ class ConfigFilesRequest:
         check_existence: Iterable[str] = (),
         check_content: Mapping[str, bytes] = FrozenDict(),
     ) -> None:
-        self.specified = tuple(ensure_str_list(specified or (), allow_single_str=True))
-        self.specified_option_name = specified_option_name
-        self.discovery = discovery
-        self.check_existence = tuple(sorted(check_existence))
-        self.check_content = FrozenDict(check_content)
+        object.__setattr__(
+            self, "specified", tuple(ensure_str_list(specified or (), allow_single_str=True))
+        )
+        object.__setattr__(self, "specified_option_name", specified_option_name)
+        object.__setattr__(self, "discovery", discovery)
+        object.__setattr__(self, "check_existence", tuple(sorted(check_existence)))
+        object.__setattr__(self, "check_content", FrozenDict(check_content))
 
 
 @rule(desc="Find config files", level=LogLevel.DEBUG)

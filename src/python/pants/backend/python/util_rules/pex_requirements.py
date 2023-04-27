@@ -3,9 +3,11 @@
 
 from __future__ import annotations
 
+import importlib.resources
 import logging
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Iterable, Iterator
+from urllib.parse import urlparse
 
 from pants.backend.python.pip_requirement import PipRequirement
 from pants.backend.python.subsystems.repos import PythonRepos
@@ -18,7 +20,11 @@ from pants.backend.python.util_rules.lockfile_metadata import (
     PythonLockfileMetadataV2,
 )
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
-from pants.core.util_rules.lockfile_metadata import InvalidLockfileError, LockfileMetadataValidation
+from pants.core.util_rules.lockfile_metadata import (
+    InvalidLockfileError,
+    LockfileMetadataValidation,
+    NoLockfileMetadataBlock,
+)
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import (
     CreateDigest,
@@ -31,9 +37,8 @@ from pants.engine.fs import (
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.unions import UnionMembership
 from pants.util.docutil import bin_name, doc_url
-from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet
-from pants.util.strutil import softwrap
+from pants.util.strutil import comma_separated_list, pluralize, softwrap
 
 if TYPE_CHECKING:
     from pants.backend.python.util_rules.pex import Pex
@@ -43,34 +48,37 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
+class Resolve:
+    # A named resolve for a "user lockfile".
+    # Soon to be the only kind of lockfile, as this class will help
+    # get rid of the "tool lockfile" concept.
+    # TODO: Once we get rid of old-style tool lockfiles we can possibly
+    #  unify this with EntireLockfile.
+    # TODO: We might want to add the requirements subset to this data structure,
+    #  to further detangle this from PexRequirements.
+    name: str
+
+    use_entire_lockfile: bool
+
+
+@dataclass(frozen=True)
 class Lockfile:
-    file_path: str
-    file_path_description_of_origin: str
+    url: str
+    url_description_of_origin: str
     resolve_name: str
     lockfile_hex_digest: str | None = None
 
 
-@dataclass(frozen=True)
-class LockfileContent:
-    file_content: FileContent
-    resolve_name: str
-    lockfile_hex_digest: str | None = None
-
-
-@dataclass(frozen=True)
-class _ToolLockfileMixin:
-    uses_source_plugins: bool
-    uses_project_interpreter_constraints: bool
-
-
-@dataclass(frozen=True)
-class ToolDefaultLockfile(LockfileContent, _ToolLockfileMixin):
-    pass
-
-
-@dataclass(frozen=True)
-class ToolCustomLockfile(Lockfile, _ToolLockfileMixin):
-    pass
+@rule
+async def get_lockfile_for_resolve(resolve: Resolve, python_setup: PythonSetup) -> Lockfile:
+    lockfile_path = python_setup.resolves.get(resolve.name)
+    if not lockfile_path:
+        raise ValueError(f"No such resolve: {resolve.name}")
+    return Lockfile(
+        url=lockfile_path,
+        url_description_of_origin=f"the resolve `{resolve.name}`",
+        resolve_name=resolve.name,
+    )
 
 
 @dataclass(frozen=True)
@@ -97,17 +105,17 @@ class LoadedLockfile:
     as_constraints_strings: FrozenOrderedSet[str] | None
     # The original file or file content (which may not have identical content to the output
     # `lockfile_digest`).
-    original_lockfile: Lockfile | LockfileContent
+    original_lockfile: Lockfile
 
 
 @dataclass(frozen=True)
 class LoadedLockfileRequest:
     """A request to load and validate the content of the given lockfile."""
 
-    lockfile: Lockfile | LockfileContent
+    lockfile: Lockfile
 
 
-def _strip_comments_from_pex_json_lockfile(lockfile_bytes: bytes) -> bytes:
+def strip_comments_from_pex_json_lockfile(lockfile_bytes: bytes) -> bytes:
     """Pex does not like the header Pants adds to lockfiles, as it violates JSON.
 
     Note that we only strip lines starting with `//`, which is all that Pants will ever add. If
@@ -140,39 +148,84 @@ def _pex_lockfile_requirement_count(lockfile_bytes: bytes) -> int:
     return max((num_lines - num_lines_for_options) // lines_per_req, 2)
 
 
+def get_metadata(
+    python_setup: PythonSetup,
+    lock_bytes: bytes,
+    lockfile_path: str | None,
+    resolve_name: str,
+    delimiter: str,
+) -> PythonLockfileMetadata | None:
+    metadata: PythonLockfileMetadata | None = None
+    if python_setup.invalid_lockfile_behavior != InvalidLockfileBehavior.ignore:
+        try:
+            metadata = PythonLockfileMetadata.from_lockfile(
+                lockfile=lock_bytes,
+                lockfile_path=lockfile_path,
+                resolve_name=resolve_name,
+                delimeter=delimiter,
+            )
+        except NoLockfileMetadataBlock:
+            # We don't validate if the file isn't a pants-generated lockfile (as determined
+            # by the lack of a metadata block). But we propagate any other type of
+            # InvalidLockfileError incurred while parsing the metadata block.
+            logger.debug(
+                f"Lockfile for resolve {resolve_name} "
+                f"{('at ' + lockfile_path) if lockfile_path else ''}"
+                f" has no metadata block, so was not generated by Pants. "
+                f"Lockfile will not be validated."
+            )
+    return metadata
+
+
 @rule
 async def load_lockfile(
     request: LoadedLockfileRequest,
     python_setup: PythonSetup,
 ) -> LoadedLockfile:
     lockfile = request.lockfile
-    if isinstance(lockfile, Lockfile):
+    # TODO: Fold "resource://" URL support into the DownloadFile primitive, instead of
+    #  manually handling it here. That would also give us support for https:// URLs for tool
+    #  lockfiles (e.g., we could choose to download the default_lockfile_url instead of
+    #  embedding the lockfiles as resources). This would require capturing the SHA256 of
+    #  every current tool lockfile, and we need to think through the consequences of
+    #  downloading lockfiles, so we punt for now.
+    parts = urlparse(lockfile.url)
+    # urlparse retains the leading / in URLs with a netloc.
+    lockfile_path = parts.path[1:] if parts.path.startswith("/") else parts.path
+    if parts.scheme in {"", "file"}:
         synthetic_lock = False
-        lockfile_path = lockfile.file_path
         lockfile_digest = await Get(
             Digest,
             PathGlobs(
                 [lockfile_path],
                 glob_match_error_behavior=GlobMatchErrorBehavior.error,
-                description_of_origin=lockfile.file_path_description_of_origin,
+                description_of_origin=lockfile.url_description_of_origin,
             ),
         )
         _digest_contents = await Get(DigestContents, Digest, lockfile_digest)
         lock_bytes = _digest_contents[0].content
-    else:
+    elif parts.scheme == "resource":
         synthetic_lock = True
-        _fc = lockfile.file_content
+        _fc = FileContent(
+            lockfile_path,
+            # The "netloc" in our made-up "resource://" scheme is the package.
+            importlib.resources.read_binary(parts.netloc, lockfile_path),
+        )
         lockfile_path, lock_bytes = (_fc.path, _fc.content)
         lockfile_digest = await Get(Digest, CreateDigest([_fc]))
+    else:
+        raise ValueError(
+            f"Unsupported scheme {parts.scheme} for lockfile URL: {lockfile.url} "
+            f"(origin: {lockfile.url_description_of_origin})"
+        )
 
     is_pex_native = is_probably_pex_json_lockfile(lock_bytes)
     if is_pex_native:
         header_delimiter = "//"
+        stripped_lock_bytes = strip_comments_from_pex_json_lockfile(lock_bytes)
         lockfile_digest = await Get(
             Digest,
-            CreateDigest(
-                [FileContent(lockfile_path, _strip_comments_from_pex_json_lockfile(lock_bytes))]
-            ),
+            CreateDigest([FileContent(lockfile_path, stripped_lock_bytes)]),
         )
         requirement_estimate = _pex_lockfile_requirement_count(lock_bytes)
         constraints_strings = None
@@ -186,14 +239,13 @@ async def load_lockfile(
             str(req) for req in parse_requirements_file(lock_string, rel_path=lockfile_path)
         )
 
-    metadata: PythonLockfileMetadata | None = None
-    if should_validate_metadata(lockfile, python_setup):
-        metadata = PythonLockfileMetadata.from_lockfile(
-            lock_bytes,
-            **(dict() if synthetic_lock else dict(lockfile_path=lockfile_path)),
-            resolve_name=lockfile.resolve_name,
-            delimeter=header_delimiter,
-        )
+    metadata = get_metadata(
+        python_setup,
+        lock_bytes,
+        None if synthetic_lock else lockfile_path,
+        lockfile.resolve_name,
+        header_delimiter,
+    )
 
     return LoadedLockfile(
         lockfile_digest,
@@ -217,14 +269,13 @@ class EntireLockfile:
        content anyway.
     """
 
-    lockfile: Lockfile | LockfileContent
+    lockfile: Lockfile
     # If available, the current complete set of requirement strings that influence this lockfile.
     # Used for metadata validation.
     complete_req_strings: tuple[str, ...] | None = None
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class PexRequirements:
     """A request to resolve a series of requirements (optionally from a "superset" resolve)."""
 
@@ -233,32 +284,25 @@ class PexRequirements:
     # If these requirements should be resolved as a subset of either a repository PEX, or a
     # PEX-native lockfile, the superset to use. # NB: Use of a lockfile here asserts that the
     # lockfile is PEX-native, because legacy lockfiles do not support subset resolves.
-    from_superset: Pex | LoadedLockfile | None
+    from_superset: Pex | Resolve | None
 
     def __init__(
         self,
         req_strings: Iterable[str] = (),
         *,
         constraints_strings: Iterable[str] = (),
-        from_superset: Pex | LoadedLockfile | None = None,
+        from_superset: Pex | Resolve | None = None,
     ) -> None:
         """
         :param req_strings: The requirement strings to resolve.
         :param constraints_strings: Constraints strings to apply during the resolve.
         :param from_superset: An optional superset PEX or lockfile to resolve the req strings from.
         """
-        self.req_strings = FrozenOrderedSet(sorted(req_strings))
-        self.constraints_strings = FrozenOrderedSet(sorted(constraints_strings))
-        if isinstance(from_superset, LoadedLockfile) and not from_superset.is_pex_native:
-            raise ValueError(
-                softwrap(
-                    f"""
-                    The lockfile {from_superset.original_lockfile} was not in PEX's
-                    native format, and so cannot be directly used as a superset.
-                    """
-                )
-            )
-        self.from_superset = from_superset
+        object.__setattr__(self, "req_strings", FrozenOrderedSet(sorted(req_strings)))
+        object.__setattr__(
+            self, "constraints_strings", FrozenOrderedSet(sorted(constraints_strings))
+        )
+        object.__setattr__(self, "from_superset", from_superset)
 
     @classmethod
     def create_from_requirement_fields(
@@ -266,7 +310,7 @@ class PexRequirements:
         fields: Iterable[PythonRequirementsField],
         constraints_strings: Iterable[str],
     ) -> PexRequirements:
-        field_requirements = {str(python_req) for field in fields for python_req in field.value}
+        field_requirements = {str(python_req) for fld in fields for python_req in fld.value}
         return PexRequirements(field_requirements, constraints_strings=constraints_strings)
 
     @classmethod
@@ -302,8 +346,8 @@ class ResolvePexConfig:
     find_links: tuple[str, ...]
     manylinux: str | None
     constraints_file: ResolvePexConstraintsFile | None
-    only_binary: FrozenOrderedSet[PipRequirement]
-    no_binary: FrozenOrderedSet[PipRequirement]
+    only_binary: FrozenOrderedSet[str]
+    no_binary: FrozenOrderedSet[str]
     path_mappings: tuple[str, ...]
 
     def pex_args(self) -> Iterator[str]:
@@ -431,34 +475,24 @@ async def determine_resolve_pex_config(
     )
 
 
-def should_validate_metadata(
-    lockfile: Lockfile | LockfileContent,
-    python_setup: PythonSetup,
-):
-    if python_setup.invalid_lockfile_behavior == InvalidLockfileBehavior.ignore:
-        return False
-    is_tool = isinstance(lockfile, (ToolCustomLockfile, ToolDefaultLockfile))
-    return is_tool or python_setup.resolves_generate_lockfiles
-
-
 def validate_metadata(
     metadata: PythonLockfileMetadata,
     interpreter_constraints: InterpreterConstraints,
-    lockfile: Lockfile | LockfileContent,
+    lockfile: Lockfile,
     consumed_req_strings: Iterable[str],
+    validate_consumed_req_strings: bool,
     python_setup: PythonSetup,
     resolve_config: ResolvePexConfig,
 ) -> None:
     """Given interpreter constraints and requirements to be consumed, validate lockfile metadata."""
 
     # TODO(#12314): Improve the exception if invalid strings
-    user_requirements = {PipRequirement.parse(i) for i in consumed_req_strings}
+    user_requirements = [PipRequirement.parse(i) for i in consumed_req_strings]
     validation = metadata.is_valid_for(
-        is_tool=isinstance(lockfile, (ToolCustomLockfile, ToolDefaultLockfile)),
         expected_invalidation_digest=lockfile.lockfile_hex_digest,
         user_interpreter_constraints=interpreter_constraints,
         interpreter_universe=python_setup.interpreter_versions_universe,
-        user_requirements=user_requirements,
+        user_requirements=user_requirements if validate_consumed_req_strings else {},
         manylinux=resolve_config.manylinux,
         requirement_constraints=(
             resolve_config.constraints_file.constraints
@@ -475,22 +509,19 @@ def validate_metadata(
         metadata=metadata,
         validation=validation,
         lockfile=lockfile,
+        is_old_style_tool_lockfile=lockfile.resolve_name not in python_setup.resolves,
+        is_default_user_lockfile=lockfile.resolve_name == python_setup.default_resolve,
         user_interpreter_constraints=interpreter_constraints,
         user_requirements=user_requirements,
         maybe_constraints_file_path=(
             resolve_config.constraints_file.path if resolve_config.constraints_file else None
         ),
     )
-    is_tool = isinstance(lockfile, (ToolCustomLockfile, ToolDefaultLockfile))
-    msg_iter = (
-        _invalid_tool_lockfile_error(**error_msg_kwargs)  # type: ignore[arg-type]
-        if is_tool
-        else _invalid_user_lockfile_error(**error_msg_kwargs)  # type: ignore[arg-type]
-    )
+    msg_iter = _invalid_lockfile_error(**error_msg_kwargs)  # type: ignore[arg-type]
     msg = "".join(msg_iter).strip()
     if python_setup.invalid_lockfile_behavior == InvalidLockfileBehavior.error:
         raise InvalidLockfileError(msg)
-    logger.warning("%s", msg)
+    logger.warning(msg)
 
 
 def _common_failure_reasons(
@@ -530,27 +561,33 @@ def _common_failure_reasons(
         )
 
 
-def _invalid_tool_lockfile_error(
+def _invalid_lockfile_error(
     metadata: PythonLockfileMetadata,
     validation: LockfileMetadataValidation,
-    lockfile: ToolCustomLockfile | ToolDefaultLockfile,
+    lockfile: Lockfile,
     *,
-    user_requirements: set[PipRequirement],
+    is_old_style_tool_lockfile: bool,
+    is_default_user_lockfile: bool,
+    user_requirements: list[PipRequirement],
     user_interpreter_constraints: InterpreterConstraints,
     maybe_constraints_file_path: str | None,
 ) -> Iterator[str]:
-    tool_name = lockfile.resolve_name
+    resolve = lockfile.resolve_name
+    consumed_msg_parts = [f"`{str(r)}`" for r in user_requirements[0:2]]
+    if len(user_requirements) > 2:
+        consumed_msg_parts.append(
+            (
+                f"{len(user_requirements) - 2} other "
+                f"{pluralize(len(user_requirements) - 2, 'requirement', include_count=False)}"
+            )
+        )
 
-    yield "You are using "
-    yield "the `<default>` lockfile provided by Pants " if isinstance(
-        lockfile, ToolDefaultLockfile
-    ) else f"the lockfile at {lockfile.file_path} "
-    yield softwrap(
-        f"""
-        to install the tool `{tool_name}`, but it is not compatible with your
-        configuration:
-        """
-    ) + "\n\n"
+    yield f"\n\nYou are consuming {comma_separated_list(consumed_msg_parts)} from "
+    if lockfile.url.startswith("resource://"):
+        yield f"the built-in `{resolve}` lockfile provided by Pants "
+    else:
+        yield f"the `{resolve}` lockfile at {lockfile.url} "
+    yield "with incompatible inputs.\n\n"
 
     if any(
         i
@@ -561,140 +598,85 @@ def _invalid_tool_lockfile_error(
         for i in validation.failure_reasons
     ):
         yield softwrap(
-            f"""
-            - You have set different requirements than those used to generate the lockfile.
-            You can fix this by updating `[{tool_name}].version`
             """
-        )
-        if lockfile.uses_source_plugins:
-            yield f", `[{tool_name}].source_plugins`,"
-        yield f" and/or `[{tool_name}].extra_requirements`, or by using a new custom lockfile.\n"
-        if isinstance(metadata, PythonLockfileMetadataV2):
-            not_in_user_reqs = metadata.requirements - user_requirements
-            not_in_lock = user_requirements - metadata.requirements
-            if not_in_lock:
-                yield softwrap(
-                    f"""
-                    In the input requirements, but not in the lockfile:
-                    {sorted(str(r) for r in not_in_lock)}
-                    """
-                ) + "\n"
-            if not_in_user_reqs:
-                yield softwrap(
-                    f"""
-                    In the lockfile, but not in the input requirements:
-                    {sorted(str(r) for r in not_in_user_reqs)}
-                    """
-                ) + "\n"
-            yield "\n"
-
-    if InvalidPythonLockfileReason.INTERPRETER_CONSTRAINTS_MISMATCH in validation.failure_reasons:
-        yield softwrap(
-            f"""
-            - You have set interpreter constraints (`{user_interpreter_constraints}`) that
-            are not compatible with those used to generate the lockfile
-            (`{metadata.valid_for_interpreter_constraints}`).
-            """
-        )
-        yield softwrap(
-            f"""
-            You can fix this by not setting `[{tool_name}].interpreter_constraints`,
-            or by using a new custom lockfile.
-            """
-        ) if not lockfile.uses_project_interpreter_constraints else softwrap(
-            f"""
-            `{tool_name}` determines its interpreter constraints based on your code's own
-            constraints. To fix this error, you can either change your code's constraints
-            (see {doc_url('python-interpreter-compatibility')}) or generate a new
-            custom lockfile.
-            """
-        )
-        yield "\n\n"
-
-    yield from _common_failure_reasons(validation.failure_reasons, maybe_constraints_file_path)
-
-    yield softwrap(
-        f"""
-        To regenerate your lockfile based on your current configuration, run
-        `{bin_name()} generate-lockfiles --resolve={tool_name}`.
-        """
-    ) if isinstance(lockfile, ToolCustomLockfile) else softwrap(
-        f"""
-        To generate a custom lockfile based on your current configuration, set
-        `[{tool_name}].lockfile` to where you want to create the lockfile, then run
-        `{bin_name()} generate-lockfiles --resolve={tool_name}`.
-        """
-    )
-
-
-def _invalid_user_lockfile_error(
-    metadata: PythonLockfileMetadataV2,
-    validation: LockfileMetadataValidation,
-    lockfile: Lockfile | LockfileContent,
-    *,
-    user_requirements: set[PipRequirement],
-    user_interpreter_constraints: InterpreterConstraints,
-    maybe_constraints_file_path: str | None,
-) -> Iterator[str]:
-    yield "You are using the lockfile "
-    yield f"at {lockfile.file_path} " if isinstance(
-        lockfile, Lockfile
-    ) else f"synthetically created at {lockfile.file_content.path} "
-    yield softwrap(
-        f"""
-        to install the resolve `{lockfile.resolve_name}` (from `[python].resolves`). However,
-        it is not compatible with the current targets because:
-        """
-    ) + "\n\n"
-
-    if InvalidPythonLockfileReason.REQUIREMENTS_MISMATCH in validation.failure_reasons:
-        # Note that for user lockfiles, we only care that user requirements are a subset of the
-        # lock. So, unlike tools, we do not report on requirements in the lock but not in
-        # user_requirements.
-        #
-        # Also note that by the time we have gotten to this error message, we should have already
-        # validated that the transitive closure is using the same resolve, via
-        # pex_from_targets.py. This implies that we don't need to worry about users depending on
-        # python_requirement targets that aren't in that code's resolve.
-        not_in_lock = sorted(str(r) for r in user_requirements - metadata.requirements)
-        yield softwrap(
-            f"""
-            - The targets depend on requirements that are not in the lockfile: {not_in_lock}
-
-            This most often happens when adding a new requirement to your project, or bumping
-            requirement versions. You can fix this by regenerating the lockfile with
-            `generate-lockfiles`.
+            - The lockfile does not provide all the necessary requirements. You must
+            modify the input requirements and/or regenerate the lockfile (see below).
             """
         ) + "\n\n"
+        if is_old_style_tool_lockfile:
+            yield softwrap(
+                f"""
+                - The necessary requirements are specified by `[{resolve}].version`,
+                `[{resolve}].extra_requirements`, and/or `[{resolve}].source_plugins`.
+
+                - The custom lockfile destination is specified by `[{resolve}].lockfile`.
+                """
+            )
+        elif is_default_user_lockfile:
+            yield softwrap(
+                f"""
+                - The necessary requirements are specified by requirements targets marked with
+                `resolve="{resolve}"`, or those with no explicit resolve (since `{resolve}` is the
+                default for this repo).
+
+                - The lockfile destination is specified by the `{resolve}` key in `[python].resolves`.
+                """
+            )
+        else:
+            yield softwrap(
+                f"""
+                - The necessary requirements are specified by requirements targets marked with
+                `resolve="{resolve}"`.
+
+                - The lockfile destination is specified by the `{resolve}` key in
+                `[python].resolves`.
+                """
+            )
+
+        if isinstance(metadata, PythonLockfileMetadataV2):
+            # Note that by the time we have gotten to this error message, we should have already
+            # validated that the transitive closure is using the same resolve, via
+            # pex_from_targets.py. This implies that we don't need to worry about users depending
+            # on python_requirement targets that aren't in that code's resolve.
+            not_in_lock = sorted(str(r) for r in set(user_requirements) - metadata.requirements)
+            yield f"\n\n- The requirements not provided by the `{resolve}` resolve are:\n  "
+            yield str(not_in_lock)
 
     if InvalidPythonLockfileReason.INTERPRETER_CONSTRAINTS_MISMATCH in validation.failure_reasons:
+        yield "\n\n"
         yield softwrap(
             f"""
-            - The targets use interpreter constraints (`{user_interpreter_constraints}`) that
+            - The inputs use interpreter constraints (`{user_interpreter_constraints}`) that
             are not a subset of those used to generate the lockfile
             (`{metadata.valid_for_interpreter_constraints}`).
-
-            The lockfile's interpreter constraints are set by the option
-            `[python].resolves_to_interpreter_constraints`, which determines how the lockfile is
-            generated. Note that that option only changes how the lockfile is generated; you must
-            still set interpreter constraints for targets via `[python].interpreter_constraints` and
-            the `interpreter_constraints` field ({doc_url('python-interpreter-compatibility')}).
-            All targets must have interpreter constraints that are a subset of their resolve's
-            constraints.
-
-            To fix this, you can either adjust the interpreter constraints of the targets
-            which use the resolve '{lockfile.resolve_name}', or adjust
-            `[python].resolves_to_interpreter_constraints`
-            then run `generate-lockfiles`.
             """
-        ) + "\n\n"
+        )
+        if is_old_style_tool_lockfile:
+            yield softwrap(
+                """\n\n
+                - The input interpreter constraints may be specified by
+                `[{resolve}].interpreter_constraints` (if applicable).
+                """
+            )
+        else:
+            yield softwrap(
+                """\n\n
+                - The input interpreter constraints are specified by your code, using
+                the `[python].interpreter_constraints` option and the `interpreter_constraints`
+                target field.
 
+                - To create a lockfile with new interpreter constraints, update the option
+                `[python].resolves_to_interpreter_constraints`, and then generate the lockfile
+                (see below).
+                """
+            )
+        yield f"\n\nSee {doc_url('python-interpreter-compatibility')} for details."
+
+    yield "\n\n"
     yield from _common_failure_reasons(validation.failure_reasons, maybe_constraints_file_path)
-
     yield "To regenerate your lockfile, "
-    yield f"run `{bin_name()} generate-lockfiles --resolve={lockfile.resolve_name}`." if isinstance(
-        lockfile, Lockfile
-    ) else f"update your plugin generating this object: {lockfile}"
+    yield f"run `{bin_name()} generate-lockfiles --resolve={resolve}`."
+    yield f"\n\nSee {doc_url('python-third-party-dependencies')} for details.\n\n"
 
 
 def rules():

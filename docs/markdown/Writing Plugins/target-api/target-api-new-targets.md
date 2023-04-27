@@ -4,7 +4,6 @@ slug: "target-api-new-targets"
 excerpt: "How to add a custom target type."
 hidden: false
 createdAt: "2020-05-07T22:38:40.570Z"
-updatedAt: "2021-11-16T03:24:52.165Z"
 ---
 When to create a new target type?
 ---------------------------------
@@ -23,7 +22,7 @@ To define a new target:
 1. Subclass `pants.engine.target.Target`.
 2. Define the class property `alias`. This is the symbol that people use in BUILD files.
 3. Define the class property `core_fields`.
-4. Define the class property `help`. This is used by `./pants help`.
+4. Define the class property `help`. This is used by `pants help`.
 
 For `core_fields`, we recommend including `COMMON_TARGET_FIELDS`  to add the useful `tags` and `description` fields. You will also often want to add `Dependencies`, and either `SingleSourceField` or `MultipleSourcesField`.
 
@@ -48,7 +47,7 @@ class CustomTarget(Target):
     help = (
       "A custom target to demo the Target API.\n\n"
       "This docstring will be used in the output of "
-      "`./pants help $target_type`."
+      "`pants help $target_type`."
     )
 ```
 
@@ -101,4 +100,4 @@ def target_types():
     return [CustomTarget]
 ```
 
-You can confirm this works by running `./pants help custom_target`.
+You can confirm this works by running `pants help custom_target`.

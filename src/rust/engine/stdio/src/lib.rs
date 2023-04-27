@@ -181,8 +181,7 @@ impl Destination {
       }) => stderr_use_color,
       _ => {
         return Err(format!(
-          "Cannot start Exclusive access on Destination {:?}",
-          destination
+          "Cannot start Exclusive access on Destination {destination:?}"
         ))
       }
     };
@@ -279,10 +278,8 @@ impl Destination {
     };
 
     // Release the lock, clear the Console, log the error and retry.
-    let error_str = format!(
-      "Failed to write stdout to {:?}, falling back to Logging: {:?}",
-      destination, error_res
-    );
+    let error_str =
+      format!("Failed to write stdout to {destination:?}, falling back to Logging: {error_res:?}");
     std::mem::drop(destination);
     self.console_clear();
     log::warn!("{}", error_str);
@@ -348,10 +345,8 @@ impl Destination {
     };
 
     // Release the lock, clear the Console, log the error and retry.
-    let error_str = format!(
-      "Failed to write stderr to {:?}, falling back to Logging: {:?}",
-      destination, error_res
-    );
+    let error_str =
+      format!("Failed to write stderr to {destination:?}, falling back to Logging: {error_res:?}");
     std::mem::drop(destination);
     self.console_clear();
     log::warn!("{}", error_str);

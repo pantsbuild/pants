@@ -17,7 +17,6 @@ from pants.engine.rules import collect_rules, rule
 from pants.engine.target import FieldSet
 from pants.engine.unions import UnionRule
 from pants.option.option_types import BoolOption
-from pants.util.docutil import git_url
 from pants.util.logging import LogLevel
 from pants.util.strutil import softwrap
 
@@ -28,11 +27,9 @@ class IPython(PythonToolBase):
 
     default_version = "ipython>=7.34,<8"  # ipython 8 does not support Python 3.7.
     default_main = ConsoleScript("ipython")
+    default_requirements = ["ipython>=7.34,<9"]
 
-    register_lockfile = True
     default_lockfile_resource = ("pants.backend.python.subsystems", "ipython.lock")
-    default_lockfile_path = "src/python/pants/backend/python/subsystems/ipython.lock"
-    default_lockfile_url = git_url(default_lockfile_path)
 
     ignore_cwd = BoolOption(
         advanced=True,
@@ -73,12 +70,12 @@ async def setup_ipython_lockfile(
     _: IPythonLockfileSentinel, ipython: IPython, python_setup: PythonSetup
 ) -> GeneratePythonLockfile:
     if not ipython.uses_custom_lockfile:
-        return GeneratePythonLockfile.from_tool(ipython)
+        return ipython.to_lockfile_request()
 
     interpreter_constraints = await _find_all_unique_interpreter_constraints(
         python_setup, _IpythonFieldSetForLockfiles
     )
-    return GeneratePythonLockfile.from_tool(ipython, interpreter_constraints)
+    return ipython.to_lockfile_request(interpreter_constraints)
 
 
 def rules():

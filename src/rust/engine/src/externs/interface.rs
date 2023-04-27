@@ -8,7 +8,7 @@
 use std::any::Any;
 use std::cell::RefCell;
 use std::collections::hash_map::HashMap;
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::convert::TryInto;
 use std::fs::File;
 use std::hash::Hasher;
@@ -29,7 +29,7 @@ use log::{self, debug, error, warn, Log};
 use logging::logger::PANTS_LOGGER;
 use logging::{Logger, PythonLogLevel};
 use petgraph::graph::{DiGraph, Graph};
-use process_execution::{CacheContentBehavior, RemoteCacheWarningsBehavior};
+use process_execution::CacheContentBehavior;
 use pyo3::exceptions::{PyException, PyIOError, PyKeyboardInterrupt, PyValueError};
 use pyo3::prelude::{
   pyclass, pyfunction, pymethods, pymodule, wrap_pyfunction, PyModule, PyObject,
@@ -38,6 +38,7 @@ use pyo3::prelude::{
 use pyo3::types::{PyBytes, PyDict, PyList, PyTuple, PyType};
 use pyo3::{create_exception, IntoPy, PyAny, PyRef};
 use regex::Regex;
+use remote::remote_cache::RemoteCacheWarningsBehavior;
 use rule_graph::{self, DependencyKey, RuleGraph};
 use task_executor::Executor;
 use workunit_store::{
@@ -46,7 +47,7 @@ use workunit_store::{
 };
 
 use crate::externs::fs::{possible_store_missing_digest, PyFileDigest};
-use crate::externs::process::PyProcessConfigFromEnvironment;
+use crate::externs::process::PyProcessExecutionEnvironment;
 use crate::{
   externs, nodes, Context, Core, ExecutionRequest, ExecutionStrategyOptions, ExecutionTermination,
   Failure, Function, Intrinsic, Intrinsics, Key, LocalStoreOptions, Params, RemotingOptions, Rule,
@@ -183,7 +184,7 @@ impl PyTypes {
     path_globs: &PyType,
     create_digest: &PyType,
     digest_subset: &PyType,
-    download_file: &PyType,
+    native_download_file: &PyType,
     platform: &PyType,
     process: &PyType,
     process_result: &PyType,
@@ -215,12 +216,12 @@ impl PyTypes {
       remove_prefix: TypeId::new(py.get_type::<externs::fs::PyRemovePrefix>()),
       create_digest: TypeId::new(create_digest),
       digest_subset: TypeId::new(digest_subset),
-      download_file: TypeId::new(download_file),
+      native_download_file: TypeId::new(native_download_file),
       platform: TypeId::new(platform),
       process: TypeId::new(process),
       process_result: TypeId::new(process_result),
       process_config_from_environment: TypeId::new(
-        py.get_type::<externs::process::PyProcessConfigFromEnvironment>(),
+        py.get_type::<externs::process::PyProcessExecutionEnvironment>(),
       ),
       process_result_metadata: TypeId::new(process_result_metadata),
       coroutine: TypeId::new(coroutine),
@@ -298,14 +299,14 @@ impl PyRemotingOptions {
     root_ca_certs_path: Option<PathBuf>,
     store_headers: BTreeMap<String, String>,
     store_chunk_bytes: usize,
-    store_chunk_upload_timeout: u64,
     store_rpc_retries: usize,
     store_rpc_concurrency: usize,
+    store_rpc_timeout_millis: u64,
     store_batch_api_size_limit: usize,
     cache_warnings_behavior: String,
     cache_content_behavior: String,
     cache_rpc_concurrency: usize,
-    cache_read_timeout_millis: u64,
+    cache_rpc_timeout_millis: u64,
     execution_headers: BTreeMap<String, String>,
     execution_overall_deadline_secs: u64,
     execution_rpc_concurrency: usize,
@@ -320,15 +321,15 @@ impl PyRemotingOptions {
       root_ca_certs_path,
       store_headers,
       store_chunk_bytes,
-      store_chunk_upload_timeout: Duration::from_secs(store_chunk_upload_timeout),
       store_rpc_retries,
       store_rpc_concurrency,
+      store_rpc_timeout: Duration::from_millis(store_rpc_timeout_millis),
       store_batch_api_size_limit,
       cache_warnings_behavior: RemoteCacheWarningsBehavior::from_str(&cache_warnings_behavior)
         .unwrap(),
       cache_content_behavior: CacheContentBehavior::from_str(&cache_content_behavior).unwrap(),
       cache_rpc_concurrency,
-      cache_read_timeout: Duration::from_millis(cache_read_timeout_millis),
+      cache_rpc_timeout: Duration::from_millis(cache_rpc_timeout_millis),
       execution_headers,
       execution_overall_deadline: Duration::from_secs(execution_overall_deadline_secs),
       execution_rpc_concurrency,
@@ -353,8 +354,7 @@ impl PyLocalStoreOptions {
   ) -> PyO3Result<Self> {
     if shard_count.count_ones() != 1 {
       return Err(PyValueError::new_err(format!(
-        "The local store shard count must be a power of two: got {}",
-        shard_count
+        "The local store shard count must be a power of two: got {shard_count}"
       )));
     }
     Ok(Self(LocalStoreOptions {
@@ -493,7 +493,7 @@ fn py_result_from_root(py: Python, result: Result<Value, Failure>) -> PyResult {
     Err(f) => {
       let (val, python_traceback, engine_traceback) = match f {
         f @ (Failure::Invalidated | Failure::MissingDigest { .. }) => {
-          let msg = format!("{}", f);
+          let msg = format!("{f}");
           let python_traceback = Failure::native_traceback(&msg);
           (
             externs::create_exception(py, msg),
@@ -559,6 +559,7 @@ fn nailgun_server_create(
         exe.cmd.command,
         PyTuple::new(py, exe.cmd.args),
         exe.cmd.env.into_iter().collect::<HashMap<String, String>>(),
+        exe.cmd.working_dir,
         PySessionCancellationLatch(exe.cancelled),
         exe.stdin_fd as i64,
         exe.stdout_fd as i64,
@@ -956,7 +957,7 @@ fn session_poll_workunits(
       let py_session = py_session.extract::<PyRef<PySession>>(py)?;
       let py_level: PythonLogLevel = max_log_verbosity_level
         .try_into()
-        .map_err(|e| PyException::new_err(format!("{}", e)))?;
+        .map_err(|e| PyException::new_err(format!("{e}")))?;
       (py_scheduler.0.core.clone(), py_session.0.clone(), py_level)
     };
     core.executor.enter(|| {
@@ -992,7 +993,7 @@ fn session_run_interactive_process(
   py: Python,
   py_session: &PySession,
   interactive_process: PyObject,
-  process_config_from_environment: PyProcessConfigFromEnvironment,
+  process_config_from_environment: PyProcessExecutionEnvironment,
 ) -> PyO3Result<PyObject> {
   let core = py_session.0.core();
   let context = Context::new(core.clone(), py_session.0.clone());
@@ -1129,7 +1130,7 @@ fn tasks_task_begin(
 ) -> PyO3Result<()> {
   let py_level: PythonLogLevel = level
     .try_into()
-    .map_err(|e| PyException::new_err(format!("{}", e)))?;
+    .map_err(|e| PyException::new_err(format!("{e}")))?;
   let func = Function(Key::from_value(func.into())?);
   let output_type = TypeId::new(output_type);
   let arg_types = arg_types.into_iter().map(TypeId::new).collect();
@@ -1255,7 +1256,7 @@ fn session_new_run_id(py_session: &PySession) {
 }
 
 #[pyfunction]
-fn session_get_metrics<'py>(py: Python<'py>, py_session: &PySession) -> HashMap<&'static str, u64> {
+fn session_get_metrics(py: Python<'_>, py_session: &PySession) -> HashMap<&'static str, u64> {
   py.allow_threads(|| py_session.0.workunit_store().get_metrics())
 }
 
@@ -1417,8 +1418,8 @@ pub(crate) fn generate_panic_string(payload: &(dyn Any + Send)) -> String {
     .cloned()
     .or_else(|| payload.downcast_ref::<&str>().map(|&s| s.to_string()))
   {
-    Some(ref s) => format!("panic at '{}'", s),
-    None => format!("Non-string panic payload at {:p}", payload),
+    Some(ref s) => format!("panic at '{s}'"),
+    None => format!("Non-string panic payload at {payload:p}"),
   }
 }
 
@@ -1453,9 +1454,11 @@ fn garbage_collect_store(
   let core = &py_scheduler.0.core;
   core.executor.enter(|| {
     py.allow_threads(|| {
-      core
-        .store()
-        .garbage_collect(target_size_bytes, store::ShrinkBehavior::Fast)
+      core.executor.block_on(
+        core
+          .store()
+          .garbage_collect(target_size_bytes, store::ShrinkBehavior::Fast),
+      )
     })
     .map_err(PyException::new_err)
   })
@@ -1495,11 +1498,11 @@ fn capture_snapshots(
     let path_globs_and_roots = values
       .into_iter()
       .map(|value| {
-        let root: PathBuf = externs::getattr(value, "root").unwrap();
+        let root: PathBuf = externs::getattr(value, "root")?;
         let path_globs =
-          nodes::Snapshot::lift_prepared_path_globs(externs::getattr(value, "path_globs").unwrap());
+          nodes::Snapshot::lift_prepared_path_globs(externs::getattr(value, "path_globs")?);
         let digest_hint = {
-          let maybe_digest: &PyAny = externs::getattr(value, "digest_hint").unwrap();
+          let maybe_digest: &PyAny = externs::getattr(value, "digest_hint")?;
           if maybe_digest.is_none() {
             None
           } else {
@@ -1625,6 +1628,7 @@ fn write_digest(
   py_session: &PySession,
   digest: &PyAny,
   path_prefix: String,
+  clear_destination: bool,
 ) -> PyO3Result<()> {
   let core = &py_scheduler.0.core;
   core.executor.enter(|| {
@@ -1638,12 +1642,20 @@ fn write_digest(
     destination.push(core.build_root.clone());
     destination.push(path_prefix);
 
+    if clear_destination {
+      std::fs::remove_dir_all(&destination).map_err(|e| {
+        PyException::new_err(format!("Failed to clear {}: {e}", destination.display()))
+      })?;
+    }
+
     block_in_place_and_wait(py, || async move {
       core
         .store()
         .materialize_directory(
           destination.clone(),
           lifted_digest,
+          true, // Force everything we write to be mutable
+          &BTreeSet::new(),
           fs::Permissions::Writable,
         )
         .await
@@ -1672,8 +1684,7 @@ fn stdio_initialize(
       Regex::new(re).map_err(|e| {
         PyException::new_err(
           format!(
-            "Failed to parse warning filter. Please check the global option `--ignore-warnings`.\n\n{}",
-            e,
+            "Failed to parse warning filter. Please check the global option `--ignore-warnings`.\n\n{e}",
           )
         )
       })
@@ -1689,7 +1700,7 @@ fn stdio_initialize(
     regex_filters,
     log_file_path,
   )
-  .map_err(|s| PyException::new_err(format!("Could not initialize logging: {}", s)))?;
+  .map_err(|s| PyException::new_err(format!("Could not initialize logging: {s}")))?;
 
   Ok((
     externs::stdio::PyStdioRead,

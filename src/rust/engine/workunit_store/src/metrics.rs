@@ -40,6 +40,7 @@ pub enum Metric {
   /// The total time saved (in milliseconds) thanks to remote cache hits instead of running the
   /// processes directly.
   RemoteCacheTotalTimeSavedMs,
+  RemoteCacheRequestTimeouts,
   RemoteExecutionErrors,
   RemoteExecutionRequests,
   RemoteExecutionRPCErrors,
@@ -49,6 +50,7 @@ pub enum Metric {
   RemoteExecutionSuccess,
   RemoteExecutionTimeouts,
   RemoteStoreMissingDigest,
+  RemoteStoreRequestTimeouts,
   /// Number of times that we backtracked due to missing digests.
   BacktrackAttempts,
   DockerExecutionRequests,

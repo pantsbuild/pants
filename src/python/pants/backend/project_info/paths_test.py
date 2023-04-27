@@ -4,12 +4,16 @@
 from __future__ import annotations
 
 import json
+from textwrap import dedent
 from typing import ClassVar, List
 
 import pytest
 
 from pants.backend.project_info.paths import PathsGoal
 from pants.backend.project_info.paths import rules as paths_rules
+from pants.backend.python.macros import python_requirements
+from pants.backend.python.macros.python_requirements import PythonRequirementsTargetGenerator
+from pants.backend.python.target_types import PexBinary
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.target import Dependencies, OptionalSingleSourceField, Target
 from pants.testutil.rule_runner import RuleRunner
@@ -33,7 +37,13 @@ class MockTarget(Target):
 
 @pytest.fixture
 def rule_runner() -> RuleRunner:
-    runner = RuleRunner(rules=paths_rules(), target_types=[MockTarget])
+    runner = RuleRunner(
+        rules=(
+            *paths_rules(),
+            *python_requirements.rules(),
+        ),
+        target_types=[MockTarget, PexBinary, PythonRequirementsTargetGenerator],
+    )
     runner.write_files(
         {
             "base/base.txt": "",
@@ -43,6 +53,26 @@ def rule_runner() -> RuleRunner:
             "intermediate2/BUILD": "tgt(dependencies=['base'])",
             "leaf/BUILD": "tgt(dependencies=['intermediate', 'intermediate2'])",
             "island/BUILD": "tgt()",
+            "3rdparty/BUILD": dedent(
+                """\
+                python_requirements(
+                  overrides={
+                    "lib": {
+                      "dependencies": ("#lib-pluginA", "#lib-pluginB"),
+                    },
+                  },
+                )
+                """
+            ),
+            "3rdparty/requirements.txt": dedent(
+                """\
+                lib
+                lib-pluginA
+                lib-pluginB
+                """
+            ),
+            "src/prj/a/BUILD": "pex_binary(dependencies=['3rdparty#lib', '!!3rdparty#lib-pluginA'])",
+            "src/prj/b/BUILD": "pex_binary(dependencies=['3rdparty#lib'])",
         }
     )
     return runner
@@ -121,4 +151,13 @@ def test_multiple_paths(rule_runner: RuleRunner) -> None:
             ["leaf:leaf", "intermediate:intermediate", "base:base"],
             ["leaf:leaf", "intermediate2:intermediate2", "base:base"],
         ],
+    )
+
+
+def test_excluded_paths(rule_runner: RuleRunner) -> None:
+    assert_paths(
+        rule_runner,
+        path_from="src/prj/a",
+        path_to="src/prj/b",
+        expected=[],
     )

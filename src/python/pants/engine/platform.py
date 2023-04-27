@@ -8,6 +8,13 @@ from enum import Enum
 from pants.util.osutil import get_normalized_arch_name, get_normalized_os_name
 
 
+class PlatformError(Exception):
+    """Raise when an attempt is made to execute a process on a platform where it cannot succeed.
+
+    E.g., because it requires a tool that is not supported on the platform.
+    """
+
+
 class Platform(Enum):
     linux_arm64 = "linux_arm64"
     linux_x86_64 = "linux_x86_64"
