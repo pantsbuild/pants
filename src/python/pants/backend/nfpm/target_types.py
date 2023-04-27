@@ -1,0 +1,81 @@
+# Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+from __future__ import annotations
+
+from pants.core.goals.package import OutputPathField
+from pants.engine.target import COMMON_TARGET_FIELDS, Target
+from pants.util.docutil import doc_url
+from pants.util.strutil import help_text
+
+
+class NfpmApkPackage(Target):
+    alias = "nfpm_apk_package"
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        OutputPathField,
+    )
+    help = help_text(
+        f""""
+        An APK system package built by nFPM.
+
+        This will not install the package, only create an .apk file
+        that you can then distribute and install, e.g. via pkg.
+
+        See {doc_url('nfpm-apk-package')}.
+        """
+    )
+
+
+class NfpmArchlinuxPackage(Target):
+    alias = "nfpm_archlinux_package"
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        OutputPathField,
+    )
+    help = help_text(
+        f""""
+        An Archlinux system package built by nFPM.
+
+        This will not install the package, only create an .tar.zst file
+        that you can then distribute and install, e.g. via pkg.
+
+        See {doc_url('nfpm-archlinux-package')}.
+        """
+    )
+
+
+class NfpmDebPackage(Target):
+    alias = "nfpm_deb_package"
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        OutputPathField,
+    )
+    help = help_text(
+        f""""
+        A Debian system package built by nFPM.
+
+        This will not install the package, only create a .deb file
+        that you can then distribute and install, e.g. via pkg.
+
+        See {doc_url('nfpm-deb-package')}.
+        """
+    )
+
+
+class NfpmRpmPackage(Target):
+    alias = "nfpm_rpm_package"
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        OutputPathField,
+    )
+    help = help_text(
+        f""""
+        An RPM system package built by nFPM.
+
+        This will not install the package, only create an .rpm file
+        that you can then distribute and install, e.g. via pkg.
+
+        See {doc_url('nfpm-rpm-package')}.
+        """
+    )
