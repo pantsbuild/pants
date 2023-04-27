@@ -11,13 +11,10 @@ from pants.backend.rust.lint.rustfmt.subsystem import RustfmtSubsystem
 from pants.backend.rust.target_types import RustCrateSourcesField
 from pants.backend.rust.util_rules.toolchains import RustToolchainProcess
 from pants.core.goals.fmt import FmtRequest, FmtResult
-from pants.engine.fs import Digest
-from pants.engine.internals.native_engine import Snapshot
 from pants.engine.internals.selectors import Get
-from pants.engine.process import Process, ProcessResult
+from pants.engine.process import ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import FieldSet, Target
-from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 
@@ -38,11 +35,11 @@ class RustfmtRequest(FmtRequest):
     name = RustfmtSubsystem.options_scope
 
 
-@rule(level=LogLevel.DEBUG)
-async def setup_rustfmt(request: RustfmtRequest) -> Process:
+@rule(desc="Format with rustfmt")
+async def rustfmt_fmt(request: RustfmtRequest.Batch, rustfmt: RustfmtSubsystem) -> FmtResult:
     files = [f for f in request.snapshot.files if f.endswith(".rs")]  # filter out Cargo.toml
-    process = await Get(
-        Process,
+    result = await Get(
+        ProcessResult,
         RustToolchainProcess(
             binary="rustfmt",
             args=files,
@@ -52,21 +49,12 @@ async def setup_rustfmt(request: RustfmtRequest) -> Process:
             level=LogLevel.DEBUG,
         ),
     )
-    return process
-
-
-@rule(desc="Format with rustfmt")
-async def rustfmt_fmt(request: RustfmtRequest, rustfmt: RustfmtSubsystem) -> FmtResult:
-    if rustfmt.skip:
-        return FmtResult.skip(formatter_name=request.name)
-    result = await Get(ProcessResult, RustfmtRequest, request)
-    output_snapshot = await Get(Snapshot, Digest, result.output_digest)
-    return FmtResult.create(request, result, output_snapshot)
+    return await FmtResult.create(request, result)
 
 
 def rules():
     return [
         *collect_rules(),
         *skip_field.rules(),
-        UnionRule(FmtRequest, RustfmtRequest),
+        *RustfmtRequest.rules(),
     ]

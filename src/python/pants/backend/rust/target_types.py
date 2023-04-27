@@ -1,7 +1,8 @@
 # Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants.engine.target import COMMON_TARGET_FIELDS, Dependencies, MultipleSourcesField, Target, SingleSourceField
+from pants.engine.target import COMMON_TARGET_FIELDS, MultipleSourcesField, Target, \
+    SingleSourceField
 
 
 class CargoTomlSourceField(SingleSourceField):
@@ -25,7 +26,7 @@ class RustPackageTarget(Target):
 
 
 class RustCrateSourcesField(MultipleSourcesField):
-    default = ()
+    default = ("Cargo.toml", "src/**/*.rs", "tests/**/*.rs")
     uses_source_roots = False
 
 
@@ -34,6 +35,5 @@ class RustCrateTarget(Target):
     core_fields = (
         *COMMON_TARGET_FIELDS,
         RustCrateSourcesField,
-        Dependencies,
     )
     help = "A Rust crate. This must not be made manually, but only via target generation."
