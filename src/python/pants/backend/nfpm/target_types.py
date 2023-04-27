@@ -81,10 +81,10 @@ class NfpmArchField(StringField):
 class NfpmPlatformField(StringField):
     alias = "platform"
     valid_choices = GoOS
-    default = GoOS.linux
+    default = GoOS.linux.value
     help = help_text(
         """
-        The package architecture.
+        The package platform.
 
         This should be a valid GOOS value that nFPM can translate
         into the package-specific equivalent.
@@ -94,8 +94,8 @@ class NfpmPlatformField(StringField):
 
 class NfpmHomepageField(StringField):
     alias = "homepage"
-    help = lambda: help_text(
-        f"""
+    help = help_text(
+        lambda: f"""
         The URL of this package's homepage like "https://example.com".
 
         This field is named "{NfpmHomepageField.alias}" instead of "url" because
@@ -107,7 +107,7 @@ class NfpmHomepageField(StringField):
 
 class NfpmLicenseField(StringField):
     alias = "license"
-    help = lambda: help_text(
+    help = help_text(
         """
         The license of this package.
 

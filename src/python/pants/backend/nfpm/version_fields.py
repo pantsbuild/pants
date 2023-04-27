@@ -3,17 +3,19 @@
 
 from __future__ import annotations
 
+from typing import ClassVar
+
 from pants.engine.target import IntField, StringField
 from pants.util.strutil import help_text
 
 
 class NfpmVersionField(StringField):
-    alias = "version"
+    alias: ClassVar[str] = "version"
     required = True
-    help = lambda: help_text(
+    help = help_text(
         # Based in part on the docs from:
         # https://nfpm.goreleaser.com/configuration/#reference
-        f"""
+        lambda: f"""
         The package version (preferably following semver).
 
         If '{NfpmVersionSchemaField.alias}' is not 'semver', then this
@@ -27,13 +29,13 @@ class NfpmVersionField(StringField):
 
 
 class NfpmVersionSchemaField(StringField):
-    alias = "version_schema"
+    alias: ClassVar[str] = "version_schema"
     default = "semver"
     valid_choices = ("none", "semver")
-    help = lambda: help_text(
+    help = help_text(
         # Based in part on the docs from:
         # https://nfpm.goreleaser.com/configuration/#reference
-        f"""
+        lambda: f"""
         Which schema the '{NfpmVersionField.alias}' field follows.
 
         nFPM only supports two schemas for now: semver, none
@@ -72,9 +74,9 @@ class NfpmVersionSchemaField(StringField):
 class NfpmVersionPrereleaseField(StringField):
     # nFPM calls this "prerelease", but we prefix with "version_" to
     # highlight this field's relationship with the other version_ fields.
-    alias = "version_prerelease"
-    help = lambda: help_text(
-        f"""
+    alias: ClassVar[str] = "version_prerelease"
+    help = help_text(
+        lambda: f"""
         This is a pre-release indicator like "alpha" or "beta" and often includes
         a numeric component like "rc1" and "rc2".
 
@@ -89,9 +91,9 @@ class NfpmVersionPrereleaseField(StringField):
 
 
 class NfpmVersionMetadataField(StringField):
-    alias = "version_metadata"
-    help = lambda: help_text(
-        f"""
+    alias: ClassVar[str] = "version_metadata"
+    help = help_text(
+        lambda: f"""
         This is package-manager specific metadata for the version.
 
         This is typically prefixed with a "+" in the version. If the version
@@ -110,10 +112,10 @@ class NfpmVersionMetadataField(StringField):
 class NfpmVersionReleaseField(IntField):
     # nFPM calls this "release", but we prefix with "version_" to
     # highlight this field's relationship with the other version_ fields.
-    alias = "version_release"
+    alias: ClassVar[str] = "version_release"
     default = 1
-    help = lambda: help_text(
-        f"""
+    help = help_text(
+        lambda: f"""
         The release or revision number for a given package version.
 
         Increment the release each time you release the same version of the
@@ -131,9 +133,9 @@ class NfpmVersionReleaseField(IntField):
 class NfpmVersionEpochField(IntField):
     # nFPM calls this "epoch", but we prefix with "version_" to
     # highlight this field's relationship with the other version_ fields.
-    alias = "version_epoch"
-    help = lambda: help_text(
-        f"""
+    alias: ClassVar[str] = "version_epoch"
+    help = help_text(
+        lambda: f"""
         A package with a higher version epoch will always be considered newer.
         This is primarily useful when the version numbering scheme has changed.
 
