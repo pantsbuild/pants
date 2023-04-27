@@ -13,7 +13,7 @@ jobs:
       with:
         fetch-depth: 10
     - name: Cargo audit (for security vulnerabilities)
-      run: './cargo install --version 0.16.0 cargo-audit
+      run: './cargo install --version 0.17.5 cargo-audit
 
         ./cargo audit
 
@@ -22,3 +22,4 @@ name: Cargo Audit
 'on':
   schedule:
   - cron: 11 8 * * *
+  workflow_dispatch: null

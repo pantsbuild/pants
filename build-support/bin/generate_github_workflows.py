@@ -143,7 +143,7 @@ def ensure_category_label() -> Sequence[Step]:
         {
             "if": "github.event_name == 'pull_request'",
             "name": "Ensure category label",
-            "uses": "mheap/github-action-required-labels@v2.1.0",
+            "uses": "mheap/github-action-required-labels@v4.0.0",
             "env": {"GITHUB_TOKEN": gha_expr("secrets.GITHUB_TOKEN")},
             "with": {
                 "mode": "exactly",
@@ -1102,8 +1102,12 @@ def generate() -> dict[Path, str]:
     audit_yaml = yaml.dump(
         {
             "name": "Cargo Audit",
-            # 08:11 UTC / 12:11AM PST, 1:11AM PDT: arbitrary time after hours.
-            "on": {"schedule": [{"cron": "11 8 * * *"}]},
+            "on": {
+                # 08:11 UTC / 12:11AM PST, 1:11AM PDT: arbitrary time after hours.
+                "schedule": [{"cron": "11 8 * * *"}],
+                # Allow manually triggering this workflow
+                "workflow_dispatch": None,
+            },
             "jobs": {
                 "audit": {
                     "runs-on": "ubuntu-latest",
@@ -1112,7 +1116,7 @@ def generate() -> dict[Path, str]:
                         *checkout(),
                         {
                             "name": "Cargo audit (for security vulnerabilities)",
-                            "run": "./cargo install --version 0.16.0 cargo-audit\n./cargo audit\n",
+                            "run": "./cargo install --version 0.17.5 cargo-audit\n./cargo audit\n",
                         },
                     ],
                 }

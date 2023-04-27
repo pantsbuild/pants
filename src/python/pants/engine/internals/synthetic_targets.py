@@ -54,7 +54,7 @@ Example demonstrating how to register synthetic targets:
                 (
                   "BUILD.synthetic-example",
                   (
-                    TargetAdaptor("<type-alias>", "<name>", **kwargs),
+                    TargetAdaptor("<type-alias>", "<name>", description_of_origin="...", **kwargs),
                     ...
                   ),
                 ),

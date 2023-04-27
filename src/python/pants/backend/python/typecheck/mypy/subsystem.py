@@ -62,7 +62,7 @@ from pants.option.option_types import (
     StrOption,
     TargetListOption,
 )
-from pants.util.docutil import bin_name, doc_url, git_url
+from pants.util.docutil import bin_name, doc_url
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import softwrap
@@ -100,10 +100,7 @@ class MyPy(PythonToolBase):
     # See `mypy/rules.py`. We only use these default constraints in some situations.
     register_interpreter_constraints = True
 
-    register_lockfile = True
     default_lockfile_resource = ("pants.backend.python.typecheck.mypy", "mypy.lock")
-    default_lockfile_path = "src/python/pants/backend/python/typecheck/mypy/mypy.lock"
-    default_lockfile_url = git_url(default_lockfile_path)
 
     skip = SkipOption("check")
     args = ArgsListOption(example="--python-version 3.7 --disallow-any-expr")

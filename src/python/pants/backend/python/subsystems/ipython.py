@@ -17,7 +17,6 @@ from pants.engine.rules import collect_rules, rule
 from pants.engine.target import FieldSet
 from pants.engine.unions import UnionRule
 from pants.option.option_types import BoolOption
-from pants.util.docutil import git_url
 from pants.util.logging import LogLevel
 from pants.util.strutil import softwrap
 
@@ -30,10 +29,7 @@ class IPython(PythonToolBase):
     default_main = ConsoleScript("ipython")
     default_requirements = ["ipython>=7.34,<9"]
 
-    register_lockfile = True
     default_lockfile_resource = ("pants.backend.python.subsystems", "ipython.lock")
-    default_lockfile_path = "src/python/pants/backend/python/subsystems/ipython.lock"
-    default_lockfile_url = git_url(default_lockfile_path)
 
     ignore_cwd = BoolOption(
         advanced=True,

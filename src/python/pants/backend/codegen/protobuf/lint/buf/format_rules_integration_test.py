@@ -13,8 +13,6 @@ from pants.core.goals.fmt import FmtResult
 from pants.core.util_rules import config_files, external_tool, source_files
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
-from pants.engine.fs import CreateDigest, FileContent
-from pants.engine.internals.native_engine import Digest, Snapshot
 from pants.engine.target import Target
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
@@ -74,18 +72,12 @@ def run_buf(
     return fmt_result
 
 
-def get_snapshot(rule_runner: RuleRunner, source_files: dict[str, str]) -> Snapshot:
-    files = [FileContent(path, content.encode()) for path, content in source_files.items()]
-    digest = rule_runner.request(Digest, [CreateDigest(files)])
-    return rule_runner.request(Snapshot, [digest])
-
-
 def test_passing(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({"f.proto": GOOD_FILE, "BUILD": "protobuf_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.proto"))
     fmt_result = run_buf(rule_runner, [tgt])
     assert fmt_result.stdout == ""
-    assert fmt_result.output == get_snapshot(rule_runner, {"f.proto": GOOD_FILE})
+    assert fmt_result.output == rule_runner.make_snapshot({"f.proto": GOOD_FILE})
     assert fmt_result.did_change is False
 
 
@@ -93,7 +85,7 @@ def test_failing(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({"f.proto": BAD_FILE, "BUILD": "protobuf_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.proto"))
     fmt_result = run_buf(rule_runner, [tgt])
-    assert fmt_result.output == get_snapshot(rule_runner, {"f.proto": GOOD_FILE})
+    assert fmt_result.output == rule_runner.make_snapshot({"f.proto": GOOD_FILE})
     assert fmt_result.did_change is True
 
 
@@ -106,8 +98,8 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
         rule_runner.get_target(Address("", target_name="t", relative_file_path="bad.proto")),
     ]
     fmt_result = run_buf(rule_runner, tgts)
-    assert fmt_result.output == get_snapshot(
-        rule_runner, {"good.proto": GOOD_FILE, "bad.proto": GOOD_FILE}
+    assert fmt_result.output == rule_runner.make_snapshot(
+        {"good.proto": GOOD_FILE, "bad.proto": GOOD_FILE}
     )
     assert fmt_result.did_change is True
 
@@ -117,5 +109,5 @@ def test_passthrough_args(rule_runner: RuleRunner) -> None:
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.proto"))
     fmt_result = run_buf(rule_runner, [tgt], extra_args=["--buf-format-args=--debug"])
     assert fmt_result.stdout == ""
-    assert fmt_result.output == get_snapshot(rule_runner, {"f.proto": GOOD_FILE})
+    assert fmt_result.output == rule_runner.make_snapshot({"f.proto": GOOD_FILE})
     assert fmt_result.did_change is False

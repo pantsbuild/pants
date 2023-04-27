@@ -20,7 +20,7 @@ from pants.engine.target import FieldSet, InferDependenciesRequest, InferredDepe
 from pants.engine.unions import UnionRule
 from pants.option.option_types import BoolOption
 from pants.option.subsystem import Subsystem
-from pants.util.docutil import doc_url, git_url
+from pants.util.docutil import doc_url
 from pants.util.strutil import help_text, softwrap
 
 
@@ -75,10 +75,7 @@ class PythonProtobufMypyPlugin(PythonToolRequirementsBase):
 
     register_interpreter_constraints = True
 
-    register_lockfile = True
     default_lockfile_resource = ("pants.backend.codegen.protobuf.python", "mypy_protobuf.lock")
-    default_lockfile_path = "src/python/pants/backend/codegen/protobuf/python/mypy_protobuf.lock"
-    default_lockfile_url = git_url(default_lockfile_path)
     lockfile_rules_type = LockfileRules.SIMPLE
 
 
