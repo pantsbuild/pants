@@ -18,4 +18,4 @@ tokio = { version = "1.21", features = ["io-util"] }
 
 [dev-dependencies]
 serde_test = "1.0"
-tempfile = "3"
+tempfile = "3.5.0"
