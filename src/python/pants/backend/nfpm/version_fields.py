@@ -61,6 +61,10 @@ class NfpmVersionSchemaField(StringField):
         replaced by components parsed from '{NfpmVersionField.alias}'.
 
         N.B.: Some of these fields are not available for all package types.
+
+        This field is named "{NfpmVersionField.alias}" because that is the term
+        used by nFPM. Though deb and rpm packaging also use "version", this is
+        known as "pkgver" in apk and archlinux packaging.
         """
     )
 

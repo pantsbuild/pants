@@ -80,7 +80,6 @@ class NfpmArchField(StringField):
 
 class NfpmPlatformField(StringField):
     alias = "platform"
-    required = True
     valid_choices = GoOS
     default = GoOS.linux
     help = help_text(
@@ -89,6 +88,47 @@ class NfpmPlatformField(StringField):
 
         This should be a valid GOOS value that nFPM can translate
         into the package-specific equivalent.
+        """
+    )
+
+
+class NfpmHomepageField(StringField):
+    alias = "homepage"
+    help = lambda: help_text(
+        f"""
+        The URL of this package's homepage like "https://example.com".
+
+        This field is named "{NfpmHomepageField.alias}" instead of "url" because
+        that is the term used by nFPM, which adopted the term from deb packaging.
+        The term "url" is used by apk, archlinux, and rpm packaging.
+        """
+    )
+
+
+class NfpmLicenseField(StringField):
+    alias = "license"
+    help = lambda: help_text(
+        """
+        The license of this package.
+
+        Where possible, please try to use the SPDX license identifiers (for
+        example "Apache-2.0", "BSD-3-Clause", "GPL-3.0-or-later", or "MIT"):
+        https://spdx.org/licenses/
+
+        For more complex cases, where the package includes software with multiple
+        licenses, consider using an SPDX license expression:
+        https://spdx.github.io/spdx-spec/v2.3/SPDX-license-expressions/
+
+        See also these rpm-specific descriptions of how to set this field (this
+        is helpful info even if you are not using rpm):
+        https://docs.fedoraproject.org/en-US/legal/license-field/
+
+        nFPM does not yet generate the debian/copyright file, so this field is
+        technically unused for now. Even for deb, we recommend using this field
+        to document the software license for this package. See also these pages
+        about specifying a license for deb packaging:
+        https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/#license-specification
+        https://wiki.debian.org/Proposals/CopyrightFormat#Differences_between_DEP5_and_SPDX
         """
     )
 
@@ -105,6 +145,8 @@ class NfpmApkPackage(Target):
         NfpmVersionPrereleaseField,
         NfpmVersionReleaseField,
         # other package metadata fields
+        NfpmHomepageField,
+        NfpmLicenseField,
     )
     help = help_text(
         f""""
@@ -131,6 +173,8 @@ class NfpmArchlinuxPackage(Target):
         NfpmVersionReleaseField,
         NfpmVersionEpochField,
         # other package metadata fields
+        NfpmHomepageField,
+        NfpmLicenseField,
     )
     help = help_text(
         f""""
@@ -159,6 +203,8 @@ class NfpmDebPackage(Target):
         NfpmVersionReleaseField,
         NfpmVersionEpochField,
         # other package metadata fields
+        NfpmHomepageField,
+        NfpmLicenseField,  # not used by nFPM yet.
     )
     help = help_text(
         f""""
@@ -187,6 +233,8 @@ class NfpmRpmPackage(Target):
         NfpmVersionReleaseField,
         NfpmVersionEpochField,
         # other package metadata fields
+        NfpmHomepageField,
+        NfpmLicenseField,
     )
     help = help_text(
         f""""
