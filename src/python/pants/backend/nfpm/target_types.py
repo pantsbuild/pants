@@ -5,10 +5,20 @@ from __future__ import annotations
 
 from enum import Enum
 
+from pants.backend.nfpm.version_fields import (
+    NfpmVersionEpochField,
+    NfpmVersionField,
+    NfpmVersionMetadataField,
+    NfpmVersionPrereleaseField,
+    NfpmVersionReleaseField,
+    NfpmVersionSchemaField,
+)
 from pants.core.goals.package import OutputPathField
 from pants.engine.target import COMMON_TARGET_FIELDS, StringField, Target
 from pants.util.docutil import doc_url
 from pants.util.strutil import help_text
+
+# TODO: maybe add a package name field as well
 
 
 class GoArch(Enum):
@@ -71,6 +81,8 @@ class NfpmArchField(StringField):
 class NfpmPlatformField(StringField):
     alias = "platform"
     required = True
+    valid_choices = GoOS
+    default = GoOS.linux
     help = help_text(
         """
         The package architecture.
@@ -79,28 +91,6 @@ class NfpmPlatformField(StringField):
         into the package-specific equivalent.
         """
     )
-    valid_choices = GoOS
-
-
-class NfpmVersionField(StringField):
-    alias = "version"
-    required = True
-    help = help_text(
-        """
-        The package version (preferably following semver).
-
-        Some package managers, like deb, require the version start
-        with a digit. Hence, you should not prefix the version with 'v'.
-        """
-    )
-
-NFPM_COMMON_FIELDS = (
-    # TODO: maybe add a package name field as well
-    NfpmArchField,
-    NfpmPlatformField,
-    NfpmVersionField,
-    # Other Version fields are package-specific, not COMMON
-)
 
 
 class NfpmApkPackage(Target):
@@ -108,7 +98,13 @@ class NfpmApkPackage(Target):
     core_fields = (
         *COMMON_TARGET_FIELDS,  # tags, description
         OutputPathField,
-        *NFPM_COMMON_FIELDS,
+        NfpmArchField,
+        # version fields (apk does NOT get: version_metadata or epoch)
+        NfpmVersionField,
+        NfpmVersionSchemaField,
+        NfpmVersionPrereleaseField,
+        NfpmVersionReleaseField,
+        # other package metadata fields
     )
     help = help_text(
         f""""
@@ -127,7 +123,14 @@ class NfpmArchlinuxPackage(Target):
     core_fields = (
         *COMMON_TARGET_FIELDS,
         OutputPathField,
-        *NFPM_COMMON_FIELDS,
+        NfpmArchField,
+        # version fields (archlinux does NOT get: version_metadata)
+        NfpmVersionField,
+        NfpmVersionSchemaField,
+        NfpmVersionPrereleaseField,
+        NfpmVersionReleaseField,
+        NfpmVersionEpochField,
+        # other package metadata fields
     )
     help = help_text(
         f""""
@@ -146,7 +149,16 @@ class NfpmDebPackage(Target):
     core_fields = (
         *COMMON_TARGET_FIELDS,
         OutputPathField,
-        *NFPM_COMMON_FIELDS,
+        NfpmArchField,
+        NfpmPlatformField,
+        # version fields
+        NfpmVersionField,
+        NfpmVersionSchemaField,
+        NfpmVersionPrereleaseField,
+        NfpmVersionMetadataField,
+        NfpmVersionReleaseField,
+        NfpmVersionEpochField,
+        # other package metadata fields
     )
     help = help_text(
         f""""
@@ -165,7 +177,16 @@ class NfpmRpmPackage(Target):
     core_fields = (
         *COMMON_TARGET_FIELDS,
         OutputPathField,
-        *NFPM_COMMON_FIELDS,
+        NfpmArchField,
+        NfpmPlatformField,
+        # version fields
+        NfpmVersionField,
+        NfpmVersionSchemaField,
+        NfpmVersionPrereleaseField,
+        NfpmVersionMetadataField,
+        NfpmVersionReleaseField,
+        NfpmVersionEpochField,
+        # other package metadata fields
     )
     help = help_text(
         f""""
