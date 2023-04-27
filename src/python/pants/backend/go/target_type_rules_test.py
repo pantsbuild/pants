@@ -167,11 +167,11 @@ def test_go_package_dependency_inference(rule_runner: RuleRunner) -> None:
 
 
 def test_go_package_sources_field_validation() -> None:
-    with pytest.raises(InvalidFieldException):
+    with pytest.raises(InvalidTargetException):
         GoPackageTarget({GoPackageSourcesField.alias: ()}, Address("pkg"))
-    with pytest.raises(InvalidFieldException):
+    with pytest.raises(InvalidTargetException):
         GoPackageTarget({GoPackageSourcesField.alias: ("**.go",)}, Address("pkg"))
-    with pytest.raises(InvalidFieldException):
+    with pytest.raises(InvalidTargetException):
         GoPackageTarget({GoPackageSourcesField.alias: ("subdir/f.go",)}, Address("pkg"))
 
 

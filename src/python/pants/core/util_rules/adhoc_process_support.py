@@ -60,6 +60,8 @@ class AdhocProcessRequest:
     supplied_env_var_values: FrozenDict[str, str] | None
     log_on_process_errors: FrozenDict[int, str] | None
     log_output: bool
+    capture_stdout_file: str | None
+    capture_stderr_file: str | None
 
 
 @dataclass(frozen=True)
@@ -390,7 +392,25 @@ async def run_adhoc_process(
         request.root_output_directory, working_directory
     )
 
-    adjusted = await Get(Digest, RemovePrefix(result.output_digest, root_output_directory))
+    extras = (
+        (request.capture_stdout_file, result.stdout),
+        (request.capture_stderr_file, result.stderr),
+    )
+    extra_contents = {i: j for i, j in extras if i}
+
+    output_digest = result.output_digest
+
+    if extra_contents:
+        extra_digest = await Get(
+            Digest,
+            CreateDigest(
+                FileContent(_parse_relative_file(name, working_directory), content)
+                for name, content in extra_contents.items()
+            ),
+        )
+        output_digest = await Get(Digest, MergeDigests((output_digest, extra_digest)))
+
+    adjusted = await Get(Digest, RemovePrefix(output_digest, root_output_directory))
 
     return AdhocProcessResult(result, adjusted)
 
@@ -486,6 +506,16 @@ def _parse_relative_directory(workdir_in: str, relative_to: Union[Address, str])
         return workdir_in[1:]
     else:
         return workdir_in
+
+
+def _parse_relative_file(file_in: str, relative_to: str) -> str:
+    """Convert the `capture_std..._file` fields into something that can be understood by
+    `Process`."""
+
+    if file_in.startswith("/"):
+        return file_in[1:]
+
+    return os.path.join(relative_to, file_in)
 
 
 def rules():

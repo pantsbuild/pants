@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from typing import Any, ClassVar, Iterable, Sequence
 
 from pants.backend.python.goals.lockfile import GeneratePythonLockfile
@@ -26,8 +27,9 @@ from pants.engine.internals.selectors import Get
 from pants.option.errors import OptionsError
 from pants.option.option_types import BoolOption, StrListOption, StrOption
 from pants.option.subsystem import Subsystem
-from pants.util.docutil import bin_name, doc_url
+from pants.util.docutil import bin_name, doc_url, git_url
 from pants.util.memo import memoized_property
+from pants.util.meta import classproperty
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import softwrap
 
@@ -54,14 +56,7 @@ class PythonToolRequirementsBase(Subsystem):
     default_interpreter_constraints: ClassVar[Sequence[str]] = ["CPython>=3.7,<4"]
     register_interpreter_constraints: ClassVar[bool] = False
 
-    # If this tool does not mix with user requirements you should set this to True.
-    #
-    # You also need to subclass `GeneratePythonToolLockfileSentinel` and create a rule that goes
-    # from it -> GeneratePythonLockfile by calling `to_lockfile_request`.
-    # Register the UnionRule.
-    register_lockfile: ClassVar[bool] = False
     default_lockfile_resource: ClassVar[tuple[str, str] | None] = None
-    default_lockfile_url: ClassVar[str | None] = None
     lockfile_rules_type: LockfileRules = LockfileRules.CUSTOM
 
     install_from_resolve = StrOption(
@@ -72,8 +67,12 @@ class PythonToolRequirementsBase(Subsystem):
             If specified, install the tool using the lockfile for this named resolve.
 
             This resolve must be defined in [python].resolves, as described in
-            {doc_url("python-third-party-dependencies#user-lockfiles")}, and its lockfile must
-            provide the requirements named in the `requirements` option.
+            {doc_url("python-third-party-dependencies#user-lockfiles")}.
+
+            The resolve's entire lockfile will be installed, unless specific requirements are
+            listed via the `requirements` option, in which case only those requirements
+            will be installed. This is useful if you don't want to invalidate the tool's
+            outputs when the resolve incurs changes to unrelated requirements.
 
             If unspecified, and the `lockfile` option is unset, the tool will be installed
             using the default lockfile shipped with Pants.
@@ -84,23 +83,15 @@ class PythonToolRequirementsBase(Subsystem):
             """
         ),
     )
-    # TODO: After we deprecate and remove the tool lockfile concept, we can remove the
-    #  version and extra_requirements options and directly list loosely-constrained
-    #  requirements for each tool in this option's default. The specific versions will then
-    #  come either from the default lockfile we provide, or from a user lockfile.
+
     requirements = StrListOption(
         advanced=True,
-        default=lambda cls: cls.default_requirements
-        or sorted([cls.default_version, *cls.default_extra_requirements]),
         help=lambda cls: softwrap(
             """\
-            If install_from_resolve is specified, it will install these requirements,
-            at the versions locked by the specified resolve's lockfile.
+            If install_from_resolve is specified, install these requirements,
+            at the versions provided by the specified resolve's lockfile.
 
-            The default version ranges provided here are versions that Pants is expected to be
-            compatible with. If you need a version outside these ranges you can loosen this
-            restriction by setting this option to a wider range, but you may encounter errors
-            if Pants is not compatible with the version you choose.
+            If unspecified, install the entire lockfile.
             """
         ),
     )
@@ -124,7 +115,6 @@ class PythonToolRequirementsBase(Subsystem):
     )
 
     _lockfile = StrOption(
-        register_if=lambda cls: cls.register_lockfile,
         default=DEFAULT_TOOL_LOCKFILE,
         advanced=True,
         removal_version="2.18.0.dev0",
@@ -155,10 +145,6 @@ class PythonToolRequirementsBase(Subsystem):
             compatible (controlled by `[python].invalid_lockfile_behavior`). See
             {cls.default_lockfile_url} for the default lockfile contents.
 
-            Set to the string `{NO_TOOL_LOCKFILE}` to opt out of using a lockfile. We
-            do not recommend this, though, as lockfiles are essential for reproducible builds and
-            supply-chain security.
-
             To use a custom lockfile, set this option to a file path relative to the
             build root, then run `{bin_name()} generate-lockfiles --resolve={cls.options_scope}`.
 
@@ -187,19 +173,28 @@ class PythonToolRequirementsBase(Subsystem):
                 )
             )
 
-        if self.register_lockfile and (
-            not self.default_lockfile_resource or not self.default_lockfile_url
-        ):
+        if not self.default_lockfile_resource:
             raise ValueError(
                 softwrap(
                     f"""
-                    The class property `default_lockfile_resource` and `default_lockfile_url`
-                    must be set if `register_lockfile` is set. See `{self.options_scope}`.
+                    The class property `default_lockfile_resource` must be set. See `{self.options_scope}`.
                     """
                 )
             )
 
         super().__init__(*args, **kwargs)
+
+    @classproperty
+    def default_lockfile_url(cls) -> str:
+        assert cls.default_lockfile_resource is not None
+        return git_url(
+            os.path.join(
+                "src",
+                "python",
+                cls.default_lockfile_resource[0].replace(".", os.path.sep),
+                cls.default_lockfile_resource[1],
+            )
+        )
 
     @property
     def all_requirements(self) -> tuple[str, ...]:
@@ -219,16 +214,17 @@ class PythonToolRequirementsBase(Subsystem):
         If the tool supports lockfiles, the returned type will install from the lockfile rather than
         `all_requirements`.
         """
+        if self.install_from_resolve:
+            use_entire_lockfile = not self.requirements
+            return PexRequirements(
+                (*self.requirements, *extra_requirements),
+                from_superset=Resolve(self.install_from_resolve, use_entire_lockfile),
+            )
 
         requirements = (*self.all_requirements, *extra_requirements)
 
         if not self.uses_lockfile:
             return PexRequirements(requirements)
-
-        if self.install_from_resolve:
-            return PexRequirements(
-                self.requirements, from_superset=Resolve(self.install_from_resolve)
-            )
 
         hex_digest = calculate_invalidation_digest(requirements)
 
@@ -251,9 +247,9 @@ class PythonToolRequirementsBase(Subsystem):
 
     @memoized_property
     def lockfile(self) -> str:
-        f"""The path to a lockfile or special strings '{NO_TOOL_LOCKFILE}' and '{DEFAULT_TOOL_LOCKFILE}'.
+        f"""The path to a lockfile.
 
-        This assumes you have set the class property `register_lockfile = True`.
+        Or one of the special strings '{NO_TOOL_LOCKFILE}' or '{DEFAULT_TOOL_LOCKFILE}'.
         """
         if self._lockfile not in {NO_TOOL_LOCKFILE, DEFAULT_TOOL_LOCKFILE}:
             # Augment the deprecation message for the option with useful information
@@ -268,16 +264,16 @@ class PythonToolRequirementsBase(Subsystem):
 
     @property
     def uses_lockfile(self) -> bool:
-        """Return true if the tool is installed from a lockfile.
+        """Return true if the tool is installed from an old-style tool lockfile.
 
         Note that this lockfile may be the default lockfile Pants distributes.
         """
-        return self.register_lockfile and self.lockfile != NO_TOOL_LOCKFILE
+        return self.lockfile != NO_TOOL_LOCKFILE
 
     @property
     def uses_custom_lockfile(self) -> bool:
-        """Return true if the tool is installed from a custom lockfile the user sets up."""
-        return self.register_lockfile and self.lockfile not in (
+        """Return true if the tool is installed from an old-style custom lockfile."""
+        return self.lockfile not in (
             NO_TOOL_LOCKFILE,
             DEFAULT_TOOL_LOCKFILE,
         )

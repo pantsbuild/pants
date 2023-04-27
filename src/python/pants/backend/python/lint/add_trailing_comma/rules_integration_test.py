@@ -20,8 +20,6 @@ from pants.core.goals.fmt import FmtResult
 from pants.core.util_rules import config_files, source_files
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
-from pants.engine.fs import CreateDigest, Digest, FileContent
-from pants.engine.internals.native_engine import Snapshot
 from pants.engine.target import Target
 from pants.testutil.python_interpreter_selection import all_major_minor_python_versions
 from pants.testutil.rule_runner import QueryRule, RuleRunner
@@ -78,12 +76,6 @@ def run_add_trailing_comma(
     return fmt_result
 
 
-def get_snapshot(rule_runner: RuleRunner, source_files: dict[str, str]) -> Snapshot:
-    files = [FileContent(path, content.encode()) for path, content in source_files.items()]
-    digest = rule_runner.request(Digest, [CreateDigest(files)])
-    return rule_runner.request(Snapshot, [digest])
-
-
 @pytest.mark.platform_specific_behavior
 @pytest.mark.parametrize(
     "major_minor_interpreter",
@@ -100,7 +92,7 @@ def test_passing_source(rule_runner: RuleRunner, major_minor_interpreter: str) -
         ],
     )
     assert fmt_result.stdout == ""
-    assert fmt_result.output == get_snapshot(rule_runner, {"f.py": GOOD_FILE})
+    assert fmt_result.output == rule_runner.make_snapshot({"f.py": GOOD_FILE})
     assert fmt_result.did_change is False
 
 
@@ -108,7 +100,7 @@ def test_failing_source(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({"f.py": BAD_FILE, "BUILD": "python_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
     fmt_result = run_add_trailing_comma(rule_runner, [tgt])
-    assert fmt_result.output == get_snapshot(rule_runner, {"f.py": GOOD_FILE})
+    assert fmt_result.output == rule_runner.make_snapshot({"f.py": GOOD_FILE})
     assert fmt_result.did_change is True
 
 
@@ -121,8 +113,8 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
         rule_runner.get_target(Address("", target_name="t", relative_file_path="bad.py")),
     ]
     fmt_result = run_add_trailing_comma(rule_runner, tgts)
-    assert fmt_result.output == get_snapshot(
-        rule_runner, {"good.py": GOOD_FILE, "bad.py": GOOD_FILE}
+    assert fmt_result.output == rule_runner.make_snapshot(
+        {"good.py": GOOD_FILE, "bad.py": GOOD_FILE}
     )
     assert fmt_result.did_change is True
 
@@ -144,8 +136,8 @@ def test_stub_files(rule_runner: RuleRunner) -> None:
     ]
     fmt_result = run_add_trailing_comma(rule_runner, good_tgts)
     assert fmt_result.stdout == ""
-    assert fmt_result.output == get_snapshot(
-        rule_runner, {"good.py": GOOD_FILE, "good.pyi": GOOD_FILE}
+    assert fmt_result.output == rule_runner.make_snapshot(
+        {"good.py": GOOD_FILE, "good.pyi": GOOD_FILE}
     )
     assert not fmt_result.did_change
 
@@ -154,7 +146,7 @@ def test_stub_files(rule_runner: RuleRunner) -> None:
         rule_runner.get_target(Address("", target_name="t", relative_file_path="bad.py")),
     ]
     fmt_result = run_add_trailing_comma(rule_runner, bad_tgts)
-    assert fmt_result.output == get_snapshot(
-        rule_runner, {"bad.py": GOOD_FILE, "bad.pyi": GOOD_FILE}
+    assert fmt_result.output == rule_runner.make_snapshot(
+        {"bad.py": GOOD_FILE, "bad.pyi": GOOD_FILE}
     )
     assert fmt_result.did_change

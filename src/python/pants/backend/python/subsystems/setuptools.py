@@ -16,7 +16,6 @@ from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.goals.package import PackageFieldSet
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
-from pants.util.docutil import git_url
 from pants.util.logging import LogLevel
 from pants.util.strutil import softwrap
 
@@ -36,10 +35,7 @@ class Setuptools(PythonToolRequirementsBase):
     default_extra_requirements = ["wheel>=0.35.1,<0.38"]
     default_requirements = [default_version, *default_extra_requirements]
 
-    register_lockfile = True
     default_lockfile_resource = ("pants.backend.python.subsystems", "setuptools.lock")
-    default_lockfile_path = "src/python/pants/backend/python/subsystems/setuptools.lock"
-    default_lockfile_url = git_url(default_lockfile_path)
 
 
 class SetuptoolsLockfileSentinel(GeneratePythonToolLockfileSentinel):
