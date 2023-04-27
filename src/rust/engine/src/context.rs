@@ -19,7 +19,7 @@ use crate::tasks::{Rule, Tasks};
 use crate::types::Types;
 
 use async_oncecell::OnceCell;
-use cache::PersistentCache;
+use persistent_cache::PersistentCache;
 use fs::{GitignoreStyleExcludes, PosixFS};
 use futures::FutureExt;
 use graph::{self, EntryId, Graph, InvalidationResult, NodeContext};

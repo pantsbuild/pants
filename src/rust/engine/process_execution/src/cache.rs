@@ -6,7 +6,7 @@ use std::time::Instant;
 
 use async_trait::async_trait;
 use bytes::Bytes;
-use cache::PersistentCache;
+use persistent_cache::PersistentCache;
 use log::{debug, warn};
 use prost::Message;
 use protos::gen::build::bazel::remote::execution::v2 as remexec;

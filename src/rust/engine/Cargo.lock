@@ -300,18 +300,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ec8a7b6a70fde80372154c65702f00a0f56f3e1c36abbc6c440484be248856db"
 
 [[package]]
-name = "cache"
-version = "0.0.1"
-dependencies = [
- "bytes",
- "grpc_util",
- "hashing",
- "protos",
- "sharded_lmdb",
- "task_executor",
-]
-
-[[package]]
 name = "camino"
 version = "1.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -860,7 +848,6 @@ dependencies = [
  "async-trait",
  "async_latch",
  "bytes",
- "cache",
  "concrete_time",
  "crossbeam-channel",
  "deepsize",
@@ -887,6 +874,7 @@ dependencies = [
  "num_enum",
  "parking_lot 0.12.1",
  "pe_nailgun",
+ "persistent_cache",
  "petgraph",
  "process_execution",
  "protos",
@@ -2238,6 +2226,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "478c572c3d73181ff3c2539045f6eb99e5491218eae919370993b890cdbdd98e"
 
 [[package]]
+name = "persistent_cache"
+version = "0.0.1"
+dependencies = [
+ "bytes",
+ "grpc_util",
+ "hashing",
+ "protos",
+ "sharded_lmdb",
+ "task_executor",
+]
+
+[[package]]
 name = "petgraph"
 version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2392,7 +2392,6 @@ dependencies = [
  "async-trait",
  "bincode",
  "bytes",
- "cache",
  "concrete_time",
  "deepsize",
  "derivative",
@@ -2411,6 +2410,7 @@ dependencies = [
  "nix",
  "once_cell",
  "parking_lot 0.12.1",
+ "persistent_cache",
  "prost",
  "prost-types",
  "protos",

@@ -1,5 +1,5 @@
 [package]
-name = "cache"
+name = "persistent_cache"
 version = "0.0.1"
 edition = "2021"
 authors = [ "Pants Build <pantsbuild@gmail.com>" ]

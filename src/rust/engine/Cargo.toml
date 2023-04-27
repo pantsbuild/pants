@@ -32,7 +32,7 @@ members = [
   "address",
   "async_latch",
   "async_value",
-  "cache",
+  "persistent_cache",
   "client",
   "concrete_time",
   "fs",
@@ -76,7 +76,7 @@ default-members = [
   "address",
   "async_latch",
   "async_value",
-  "cache",
+  "persistent_cache",
   "client",
   "concrete_time",
   "fs",
@@ -124,7 +124,7 @@ async_latch = { path = "async_latch" }
 async-trait = "0.1"
 protos = { path = "protos" }
 bytes = "1.2"
-cache = { path = "cache" }
+persistent_cache = { path = "persistent_cache" }
 concrete_time = { path = "concrete_time" }
 crossbeam-channel = "0.5"
 # TODO: Waiting on https://github.com/Aeledfyr/deepsize/pull/{30,31,32}.

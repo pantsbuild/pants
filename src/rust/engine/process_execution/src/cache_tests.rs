@@ -4,7 +4,7 @@ use std::convert::TryInto;
 use std::io::Write;
 use std::path::PathBuf;
 
-use cache::PersistentCache;
+use persistent_cache::PersistentCache;
 use sharded_lmdb::DEFAULT_LEASE_TIME;
 use store::{ImmutableInputs, Store};
 use tempfile::TempDir;
