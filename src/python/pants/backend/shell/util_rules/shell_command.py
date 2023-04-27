@@ -157,6 +157,8 @@ async def _prepare_process_request_from_target(
         immutable_input_digests=FrozenDict.frozen(merged_extras.immutable_input_digests),
         log_on_process_errors=_LOG_ON_PROCESS_ERRORS,
         log_output=shell_command[ShellCommandLogOutputField].value,
+        capture_stdout_file=None,
+        capture_stderr_file=None,
     )
 
 
