@@ -403,8 +403,7 @@ class RuleRunner:
             if self.inherent_environment
             else Params(*inputs)
         )
-        request = self.scheduler.product_request(output_type, [params])
-        result = assert_single_element(request)
+        result = assert_single_element(self.scheduler.product_request(output_type, [params]))
         return cast(_O, result)
 
     def run_goal_rule(
