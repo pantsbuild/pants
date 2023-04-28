@@ -4,8 +4,16 @@
 from __future__ import annotations
 
 from enum import Enum
+from typing import Dict, Iterable, Optional, Tuple
 
-from pants.engine.target import StringField
+from pants.engine.addresses import Address
+from pants.engine.target import (
+    DictStringToStringField,
+    DictStringToStringSequenceField,
+    InvalidFieldException,
+    StringField,
+)
+from pants.util.frozendict import FrozenDict
 from pants.util.strutil import help_text
 
 # These fields are used by the `nfpm_deb_package` target
@@ -74,3 +82,76 @@ class NfpmDebPriorityField(StringField):
         https://www.debian.org/doc/debian-policy/ch-archive.html#priorities
         """
     )
+
+
+class NfpmDebFieldsField(DictStringToStringField):
+    alias = "fields"
+    help = help_text(
+        # based in part on the docs at:
+        # https://nfpm.goreleaser.com/configuration/#reference
+        lambda: f"""
+        Additional fields for the control file. Empty fields are ignored.
+
+        Debian control files supports more fields than the options that are
+        exposed by nFPM and the pants nfpm backend. Debian even allows for
+        user-defined fields. So, this '{NfpmDebFieldsField.alias}' field
+        provides a way to add any additional fields to the debian control file.
+
+        See: https://www.debian.org/doc/debian-policy/ch-controlfields.html#user-defined-fields
+        """
+    )
+
+
+class NfpmDebTriggersField(DictStringToStringSequenceField):
+    alias = "triggers"
+    help = help_text(
+        """
+        Custom deb triggers.
+
+        nFPM uses this to create a deb triggers file, so that the package
+        can declare its "interest" in named triggers or declare that the
+        indicated triggers should "activate" when this package's state changes.
+
+        The Debian documentation describes the format for the triggers file.
+        nFPM simplifies that by accepting a dictionary from trigger directives
+        to lists of trigger names.
+
+        For example (note the underscore in "interest_noawait"):
+
+        `triggers={"interest_noawait": ["some-trigger", "other-trigger"]}`
+
+        Gets translated by nFPM into:
+
+        ```
+        interest-noawait some-trigger
+        interest-noawait other-trigger
+        ```
+
+        See:
+        https://wiki.debian.org/DpkgTriggers
+        https://www.mankier.com/5/deb-triggers
+        """
+    )
+    valid_keys = {
+        # nFPM uses "_" even though the actual triggers file uses "-".
+        "interest",
+        "interest_await",
+        "interest_noawait",
+        "activate",
+        "activate_await",
+        "activate_noawait",
+    }
+
+    @classmethod
+    def compute_value(
+        cls, raw_value: Optional[Dict[str, Iterable[str]]], address: Address
+    ) -> Optional[FrozenDict[str, Tuple[str, ...]]]:
+        value_or_default = super().compute_value(raw_value, address)
+        # only certain keys are allowed in this dictionary.
+        if value_or_default and not cls.valid_keys.issuperset(value_or_default.keys()):
+            invalid_keys = value_or_default.keys() - cls.valid_keys
+            raise InvalidFieldException(
+                f"Each key for the {repr(cls.alias)} field in target {address} must be one of"
+                f"{repr(cls.valid_keys)}, but {repr(invalid_keys)} was provided.",
+            )
+        return value_or_default
