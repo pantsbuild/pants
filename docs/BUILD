@@ -27,6 +27,7 @@ adhoc_tool(
     execution_dependencies=[":inputs", ":conf", ":generated-pages"],
     output_directories=["_build/html"],
     root_output_directory="./_build/html",
+    log_output=True,
 )
 
 archive(name="docs", files=[":build-html"], format="zip")
