@@ -3,7 +3,8 @@
 use std::cmp;
 use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
-use std::sync::{atomic, mpsc, Arc};
+use std::sync::atomic::{self, AtomicUsize};
+use std::sync::{mpsc, Arc};
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -589,22 +590,22 @@ async fn eager_cleaning_failure() {
   // has already requested end up with new values before it completes.
   let _logger = env_logger::try_init();
   let invalidation_delay = Duration::from_millis(100);
+  let sleep_middle = Duration::from_millis(2000);
   let graph = Arc::new(Graph::new_with_invalidation_delay(
     Executor::new(),
     invalidation_delay,
   ));
 
-  let sleep_middle = Duration::from_millis(2000);
   let context = {
     let mut delays = HashMap::new();
     delays.insert(TNode::new(1), sleep_middle);
-    TContext::new(graph.clone()).with_delays_post(delays)
+    graph.context(TContext::new().with_delays_post(delays))
   };
 
   // Invalidate the bottom Node with a new salt (after the middle node has already requested it).
   assert!(sleep_middle > invalidation_delay * 3);
   let graph2 = graph.clone();
-  let context2 = context.clone();
+  let context2 = Context::<TNode>::clone(&context);
   let _join = thread::spawn(move || {
     thread::sleep(invalidation_delay);
     context2.set_salt(1);
@@ -612,11 +613,13 @@ async fn eager_cleaning_failure() {
   });
   assert_eq!(
     graph.create(TNode::new(2), &context).await,
-    Ok(vec![T(0, 1), T(1, 1), T(2, 1)])
+    Ok(vec![T(0, 1), T(1, 1), T(2, 0)])
   );
 
-  // The middle and top node should have seen aborts, since their dependencies could not be cleaned.
-  assert_eq!(vec![TNode::new(1), TNode::new(2)], context.aborts());
+  // The middle node should have seen an abort, since it already observed its dependency, and that
+  // dependency could not be cleaned. But the top Node will not abort, because it will not yet have
+  // received a value for its dependency, and so will be successfully cleaned.
+  assert_eq!(vec![TNode::new(1)], context.aborts());
 }
 
 #[tokio::test]
@@ -973,11 +976,11 @@ impl TContext {
   }
 
   fn salt(&self) -> usize {
-    self.salt.load(Ordering::SeqCst)
+    self.salt.load(atomic::Ordering::SeqCst)
   }
 
   fn set_salt(&self, salt: usize) {
-    self.salt.store(salt, Ordering::SeqCst)
+    self.salt.store(salt, atomic::Ordering::SeqCst)
   }
 
   fn abort_guard(&self, node: TNode) -> AbortGuard {
@@ -1068,5 +1071,9 @@ enum TError {
 impl NodeError for TError {
   fn invalidated() -> Self {
     TError::Invalidated
+  }
+
+  fn generic(_message: String) -> Self {
+    TError::Error
   }
 }

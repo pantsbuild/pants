@@ -675,7 +675,6 @@ impl Paths {
         SymlinkBehavior::Oblivious,
         unmatched_globs_additional_context(),
       )
-      .map_err(|e| throw(format!("{e}")))
       .await
   }
 
@@ -948,7 +947,6 @@ impl Snapshot {
         SymlinkBehavior::Oblivious,
         unmatched_globs_additional_context(),
       )
-      .map_err(|e| throw(format!("{e}")))
       .await?;
 
     store::Snapshot::from_path_stats(context.clone(), path_stats)
@@ -1630,6 +1628,10 @@ impl Display for NodeKey {
 impl NodeError for Failure {
   fn invalidated() -> Failure {
     Failure::Invalidated
+  }
+
+  fn generic(message: String) -> Failure {
+    throw(message)
   }
 }
 
