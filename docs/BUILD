@@ -8,15 +8,23 @@ files(
     name="inputs",
     sources=[
         # "_static/**/*", "_templates/**/*",
-        "markdown/**/*.md"
+        "markdown/**/*.md",
+        "markdown/**/*.rst"
     ],
+)
+
+adhoc_tool(
+    name="generated-pages",
+    runnable="build-support/bin/generate_docs.py:py_scripts",
+    args=["--no-prompt", "--skip-check-urls", "--output=markdown/generated"],
+    output_directories=["markdown/generated"],
 )
 
 adhoc_tool(
     name="build-html",
     runnable=":sphinx",
     args=["-M", "html", "markdown", "_build"],
-    execution_dependencies=[":inputs", ":conf"],
+    execution_dependencies=[":inputs", ":conf", ":generated-pages"],
     output_directories=["_build/html"],
     root_output_directory="./_build/html",
 )
