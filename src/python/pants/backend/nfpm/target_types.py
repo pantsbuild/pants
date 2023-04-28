@@ -6,7 +6,10 @@ from __future__ import annotations
 from enum import Enum
 
 from pants.backend.nfpm.apk_fields import NfpmApkMaintainerField
-from pants.backend.nfpm.archlinux_fields import NfpmArchlinuxPackagerField
+from pants.backend.nfpm.archlinux_fields import (
+    NfpmArchlinuxPackagerField,
+    NfpmArchlinuxPkgbaseField,
+)
 from pants.backend.nfpm.deb_fields import NfpmDebMaintainerField
 from pants.backend.nfpm.rpm_fields import NfpmRpmPackagerField
 from pants.backend.nfpm.version_fields import (
@@ -181,6 +184,7 @@ class NfpmArchlinuxPackage(Target):
         NfpmHomepageField,
         NfpmLicenseField,
         NfpmArchlinuxPackagerField,
+        NfpmArchlinuxPkgbaseField,
     )
     help = help_text(
         f""""
