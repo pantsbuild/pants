@@ -387,8 +387,8 @@ async def run_adhoc_process(
         if result.stderr:
             logger.warning(result.stderr.decode())
 
-    working_directory = _parse_relative_directory(request.working_directory, request.address)
-    root_output_directory = _parse_relative_directory(
+    working_directory = parse_relative_directory(request.working_directory, request.address)
+    root_output_directory = parse_relative_directory(
         request.root_output_directory, working_directory
     )
 
@@ -424,7 +424,7 @@ async def prepare_adhoc_process(
 
     description = request.description
     address = request.address
-    working_directory = _parse_relative_directory(request.working_directory or "", address)
+    working_directory = parse_relative_directory(request.working_directory or "", address)
     argv = request.argv
     timeout: int | None = request.timeout
     output_files = request.output_files
@@ -490,7 +490,7 @@ def _output_at_build_root(process: Process, bash: BashBinary) -> Process:
     )
 
 
-def _parse_relative_directory(workdir_in: str, relative_to: Union[Address, str]) -> str:
+def parse_relative_directory(workdir_in: str, relative_to: Union[Address, str]) -> str:
     """Convert the `workdir` field into something that can be understood by `Process`."""
 
     if isinstance(relative_to, Address):
