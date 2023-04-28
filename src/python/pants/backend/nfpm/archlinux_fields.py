@@ -34,3 +34,24 @@ class NfpmArchlinuxPackagerField(StringField):
         """
     )
     # TODO: Add validation for the "Name <email@domain>" format
+
+
+class NfpmArchlinuxPkgbaseField(StringField):
+    alias = "pkgbase"
+    help = help_text(
+        # based in part on the docs at:
+        # https://nfpm.goreleaser.com/configuration/#reference
+        lambda: f"""
+        The base name of an Archlinux package.
+
+        For split packages, '{NfpmArchlinuxPkgbaseField.alias}' specifies the
+        name of the group of packages. For all other packages, this is the same
+        as package name (known as 'pkgname' by Archlinux packaging tools).
+        If unset, nFPM will use the package name as the default value for the
+        '{NfpmArchlinuxPkgbaseField.alias}' field.
+
+        See:
+        https://man.archlinux.org/man/BUILDINFO.5
+        https://wiki.archlinux.org/title/PKGBUILD#pkgbase
+        """
+    )
