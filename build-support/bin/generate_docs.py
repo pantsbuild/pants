@@ -56,19 +56,19 @@ def main() -> None:
 
     version = determine_pants_version(args.no_prompt)
     help_info = run_pants_help_all()
-    doc_urls = find_doc_urls(value_strs_iter(help_info))
-    logger.info("Found the following docsite URLs:")
-    for url in sorted(doc_urls):
-        logger.info(f"  {url}")
+    # doc_urls = find_doc_urls(value_strs_iter(help_info))
+    # logger.info("Found the following docsite URLs:")
+    # for url in sorted(doc_urls):
+    #     logger.info(f"  {url}")
 
-    if not args.skip_check_urls:
-        logger.info("Fetching titles...")
-        slug_to_title = get_titles(doc_urls)
-        logger.info("Found the following titles:")
-        for slug, title in sorted(slug_to_title.items()):
-            logger.info(f"  {slug}: {title}")
+    # if not args.skip_check_urls:
+    #     logger.info("Fetching titles...")
+    #     slug_to_title = get_titles(doc_urls)
+    #     logger.info("Found the following titles:")
+    #     for slug, title in sorted(slug_to_title.items()):
+    #         logger.info(f"  {slug}: {title}")
 
-        help_info = rewrite_value_strs(help_info, slug_to_title)
+    #     help_info = rewrite_value_strs(help_info, slug_to_title)
 
     generator = ReferenceGenerator(args, version, help_info)
     if args.sync:
@@ -230,85 +230,88 @@ def create_parser() -> argparse.ArgumentParser:
 
 
 def run_pants_help_all() -> dict[str, Any]:
-    # List all (stable enough) backends here.
-    backends = [
-        "pants.backend.build_files.fix.deprecations",
-        "pants.backend.build_files.fmt.black",
-        "pants.backend.build_files.fmt.buildifier",
-        "pants.backend.build_files.fmt.yapf",
-        "pants.backend.awslambda.python",
-        "pants.backend.codegen.protobuf.lint.buf",
-        "pants.backend.codegen.protobuf.python",
-        "pants.backend.codegen.thrift.apache.python",
-        "pants.backend.docker",
-        "pants.backend.docker.lint.hadolint",
-        "pants.backend.experimental.adhoc",
-        "pants.backend.experimental.codegen.protobuf.go",
-        "pants.backend.experimental.codegen.protobuf.java",
-        "pants.backend.experimental.codegen.protobuf.scala",
-        "pants.backend.experimental.go",
-        "pants.backend.experimental.helm",
-        "pants.backend.experimental.java",
-        "pants.backend.experimental.java.lint.google_java_format",
-        "pants.backend.experimental.kotlin",
-        "pants.backend.experimental.kotlin.lint.ktlint",
-        "pants.backend.experimental.openapi",
-        "pants.backend.experimental.openapi.lint.spectral",
-        "pants.backend.experimental.python",
-        "pants.backend.experimental.python.framework.stevedore",
-        "pants.backend.experimental.python.lint.add_trailing_comma",
-        "pants.backend.experimental.python.lint.autoflake",
-        "pants.backend.experimental.python.lint.pyupgrade",
-        "pants.backend.experimental.python.packaging.pyoxidizer",
-        "pants.backend.experimental.scala",
-        "pants.backend.experimental.scala.lint.scalafmt",
-        "pants.backend.experimental.terraform",
-        "pants.backend.experimental.tools.yamllint",
-        "pants.backend.google_cloud_function.python",
-        "pants.backend.plugin_development",
-        "pants.backend.python",
-        "pants.backend.python.lint.bandit",
-        "pants.backend.python.lint.black",
-        "pants.backend.python.lint.docformatter",
-        "pants.backend.python.lint.flake8",
-        "pants.backend.python.lint.isort",
-        "pants.backend.python.lint.pydocstyle",
-        "pants.backend.python.lint.pylint",
-        "pants.backend.python.lint.yapf",
-        "pants.backend.python.mixed_interpreter_constraints",
-        "pants.backend.python.typecheck.mypy",
-        "pants.backend.shell",
-        "pants.backend.shell.lint.shellcheck",
-        "pants.backend.shell.lint.shfmt",
-        "pants.backend.tools.preamble",
-    ]
-    argv = [
-        "./pants",
-        "--concurrent",
-        "--plugins=[]",
-        f"--backend-packages={repr(backends)}",
-        "--no-verify-config",
-        "help-all",
-    ]
-    run = subprocess.run(argv, stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding="utf-8")
-    try:
-        run.check_returncode()
-    except subprocess.CalledProcessError:
-        logger.error(
-            softwrap(
-                f"""
-                Running {argv} failed with exit code {run.returncode}.
+    with open((Path(__file__) / "../help-all.json").resolve()) as f:
+        return cast("dict[str, Any]", json.load(f))
 
-                stdout:
-                {textwrap.indent(run.stdout, " " * 4)}
+    # # List all (stable enough) backends here.
+    # backends = [
+    #     "pants.backend.build_files.fix.deprecations",
+    #     "pants.backend.build_files.fmt.black",
+    #     "pants.backend.build_files.fmt.buildifier",
+    #     "pants.backend.build_files.fmt.yapf",
+    #     "pants.backend.awslambda.python",
+    #     "pants.backend.codegen.protobuf.lint.buf",
+    #     "pants.backend.codegen.protobuf.python",
+    #     "pants.backend.codegen.thrift.apache.python",
+    #     "pants.backend.docker",
+    #     "pants.backend.docker.lint.hadolint",
+    #     "pants.backend.experimental.adhoc",
+    #     "pants.backend.experimental.codegen.protobuf.go",
+    #     "pants.backend.experimental.codegen.protobuf.java",
+    #     "pants.backend.experimental.codegen.protobuf.scala",
+    #     "pants.backend.experimental.go",
+    #     "pants.backend.experimental.helm",
+    #     "pants.backend.experimental.java",
+    #     "pants.backend.experimental.java.lint.google_java_format",
+    #     "pants.backend.experimental.kotlin",
+    #     "pants.backend.experimental.kotlin.lint.ktlint",
+    #     "pants.backend.experimental.openapi",
+    #     "pants.backend.experimental.openapi.lint.spectral",
+    #     "pants.backend.experimental.python",
+    #     "pants.backend.experimental.python.framework.stevedore",
+    #     "pants.backend.experimental.python.lint.add_trailing_comma",
+    #     "pants.backend.experimental.python.lint.autoflake",
+    #     "pants.backend.experimental.python.lint.pyupgrade",
+    #     "pants.backend.experimental.python.packaging.pyoxidizer",
+    #     "pants.backend.experimental.scala",
+    #     "pants.backend.experimental.scala.lint.scalafmt",
+    #     "pants.backend.experimental.terraform",
+    #     "pants.backend.experimental.tools.yamllint",
+    #     "pants.backend.google_cloud_function.python",
+    #     "pants.backend.plugin_development",
+    #     "pants.backend.python",
+    #     "pants.backend.python.lint.bandit",
+    #     "pants.backend.python.lint.black",
+    #     "pants.backend.python.lint.docformatter",
+    #     "pants.backend.python.lint.flake8",
+    #     "pants.backend.python.lint.isort",
+    #     "pants.backend.python.lint.pydocstyle",
+    #     "pants.backend.python.lint.pylint",
+    #     "pants.backend.python.lint.yapf",
+    #     "pants.backend.python.mixed_interpreter_constraints",
+    #     "pants.backend.python.typecheck.mypy",
+    #     "pants.backend.shell",
+    #     "pants.backend.shell.lint.shellcheck",
+    #     "pants.backend.shell.lint.shfmt",
+    #     "pants.backend.tools.preamble",
+    # ]
+    # argv = [
+    #     "./pants",
+    #     "--concurrent",
+    #     "--plugins=[]",
+    #     f"--backend-packages={repr(backends)}",
+    #     "--no-verify-config",
+    #     "help-all",
+    # ]
+    # run = subprocess.run(argv, stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding="utf-8")
+    # try:
+    #     run.check_returncode()
+    # except subprocess.CalledProcessError:
+    #     logger.error(
+    #         softwrap(
+    #             f"""
+    #             Running {argv} failed with exit code {run.returncode}.
 
-                stderr:
-                {textwrap.indent(run.stderr, " " * 4)}
-                """
-            )
-        )
-        raise
-    return cast("dict[str, Any]", json.loads(run.stdout))
+    #             stdout:
+    #             {textwrap.indent(run.stdout, " " * 4)}
+
+    #             stderr:
+    #             {textwrap.indent(run.stderr, " " * 4)}
+    #             """
+    #         )
+    #     )
+    #     raise
+    # return cast("dict[str, Any]", json.loads(run.stdout))
 
 
 def value_strs_iter(help_info: dict[str, Any]) -> Iterable[str]:
@@ -410,7 +413,7 @@ class ReferenceGenerator:
             # Some option defaults are paths under the buildroot, and we don't want the paths
             # of the environment in which we happened to run the doc generator to leak into the
             # published docs. So we replace with a placeholder string.
-            default_str = default_str.replace(get_buildroot(), "<buildroot>")
+            # default_str = default_str.replace(get_buildroot(), "<buildroot>")
             # Similarly, some option defaults are paths under the user's cache dir, so we replace
             # with a placeholder for the same reason.  Using $XDG_CACHE_HOME as the placeholder is
             # a useful hint to how the cache dir may be set, even though in practice the user may
