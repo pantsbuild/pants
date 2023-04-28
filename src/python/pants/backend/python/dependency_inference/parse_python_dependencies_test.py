@@ -299,15 +299,19 @@ def test_imports_from_strings(rule_runner: RuleRunner, min_dots: int) -> None:
             'a.b2.c.D',
             'a.b.c_狗',
 
-            # Definitely invalid strings
+            # Invalid module names, but we don't check that hard
             '..a.b.c.d',
-            'a.B.d',
             'a.2b.d',
             'a..b..c',
             'a.b.c.d.2Bar',
-            'a.b_c.D.bar',
-            'a.b_c.D.Bar',
             'a.2b.c.D',
+
+            # Definitely invalid strings
+            'I/have/a/slash',
+            'I\\\\have\\\\backslashes',
+            'I have whitespace',
+            '\\ttabby',
+            '\\nnewliney',
         ]
 
         for module in modules:
@@ -327,13 +331,19 @@ def test_imports_from_strings(rule_runner: RuleRunner, min_dots: int) -> None:
         "a.b_c.d._bar": ImpInfo(lineno=11, weak=True),
         "a.b2.c.D": ImpInfo(lineno=12, weak=True),
         "a.b.c_狗": ImpInfo(lineno=13, weak=True),
+        '..a.b.c.d': ImpInfo(lineno=16, weak=True),
+        'a.2b.d': ImpInfo(lineno=17, weak=True),
+        'a..b..c': ImpInfo(lineno=18, weak=True),
+        'a.b.c.d.2Bar': ImpInfo(lineno=19, weak=True),
+        'a.2b.c.D': ImpInfo(lineno=20, weak=True),
+
     }
     expected = {sym: info for sym, info in potentially_valid.items() if sym.count(".") >= min_dots}
 
     assert_deps_parsed(
-        rule_runner, content, expected_imports=expected, string_imports_min_dots=min_dots
+        rule_runner, content, expected_imports=expected, string_imports_min_dots=min_dots, assets=False,
     )
-    assert_deps_parsed(rule_runner, content, string_imports=False, expected_imports={})
+    assert_deps_parsed(rule_runner, content, string_imports=False, expected_imports={}, assets=False)
 
 
 def test_real_import_beats_string_import(rule_runner: RuleRunner) -> None:
@@ -518,6 +528,9 @@ def test_assets(rule_runner: RuleRunner, min_slashes: int) -> None:
             'data/subdir1/subdir2/a.json',
             'data/subdir1/subdir2/subdir3/a.json',
             '狗/狗.狗',
+            'data/a.b/c.d',
+            'data/extensionless',
+            'a/........',
 
             # Looks weird, but Unix and pathlib treat repeated "/" as one slash.
             # Our parsing, however considers this as multiple slashes.
@@ -526,13 +539,12 @@ def test_assets(rule_runner: RuleRunner, min_slashes: int) -> None:
 
             # Probably invalid assets.
             'noslashes',
-            'data/database',  # Unfortunately, extenionless files don't get matched.
 
             # Definitely invalid assets.
-            'a/........',
+            'I have whitespace',
+            '\\ttabby\\ttabby',
             '\\n/foo.json',
-            'data/a.b/c.d',
-            'windows\\style.txt',
+            'windows\\\\style.txt',
         ]
         """
     )
@@ -546,6 +558,9 @@ def test_assets(rule_runner: RuleRunner, min_slashes: int) -> None:
         "data/subdir1/subdir2/a.json",
         "data/subdir1/subdir2/subdir3/a.json",
         "狗/狗.狗",
+        'data/a.b/c.d',
+        'data/extensionless',
+        'a/........',
         "//foo.bar",
         "//foo/////bar.txt",
     }

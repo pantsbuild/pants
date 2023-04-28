@@ -24,7 +24,7 @@ use crate::Failure;
 use futures::future::{BoxFuture, FutureExt, TryFutureExt};
 use futures::try_join;
 use indexmap::IndexMap;
-use pyo3::types::{PyString, PyTuple};
+use pyo3::types::{PyString};
 use pyo3::{IntoPy, PyAny, PyRef, Python, ToPyObject};
 use tokio::process;
 
@@ -785,14 +785,14 @@ fn parse_python_deps(context: Context, args: Vec<Value>) -> BoxFuture<'static, N
       let py = gil.python();
       let create_func = externs::getattr(
         core.types.parsed_python_deps_result.as_py_type(py),
-        "create",
+        "create_from_native",
       )
       .unwrap();
       externs::call_function(
         create_func,
         &[
-          result.to_object(py).into(),
-          PyTuple::empty(py).to_object(py).into(),
+          result.0.to_object(py).into(),
+          result.1.to_object(py).into(),
         ],
       )
       .map(|obj| Value::new(obj.into_py(py)))

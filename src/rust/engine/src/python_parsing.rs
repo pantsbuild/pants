@@ -1,12 +1,8 @@
-// TODO:
-// - Support string imports
-// - Support string assets
-
 #![allow(dead_code)]
 #![allow(unused_variables)]
 
 use rustpython_ast::visitor::{
-  CallNode, ImportFromNode, ImportNode, TryNode, TryStarNode, Visitor,
+  CallNode, ConstantNode, ImportFromNode, ImportNode, TryNode, TryStarNode, Visitor,
 };
 use rustpython_ast::{Alias, Constant, Excepthandler, ExcepthandlerKind, ExprKind, Stmt};
 use rustpython_parser::parse_program;
@@ -16,28 +12,38 @@ use std::path::PathBuf;
 pub fn get_dependencies(
   contents: &str,
   filepath: PathBuf,
-) -> Result<HashMap<String, (u64, bool)>, String> {
-  let program = parse_program(contents, filepath.to_str().unwrap())
-    .map_err(|e| format!("Failed to parse file {filepath:?}: {e}"))?;
+) -> Result<(HashMap<String, (u64, bool)>, HashMap<String, u64>), String> {
+  let program = parse_program(contents, filepath.to_str().unwrap()).unwrap_or(Vec::new());
 
-  let mut visitor = DependencyExtractorVisitor::new(filepath.clone());
+  let mut visitor = DependencyExtractorVisitor::new(filepath);
   for stmt in program.iter() {
     visitor.visit_stmt(stmt.clone());
   }
 
   // Remove entries whose row includes "# pants: no-infer-dep"
-  let contents_string = contents.to_string();
-  let lines: Vec<_> = contents_string.lines().collect();
-  visitor
-    .import_map
-    .retain(|_, &mut (line, _)| lines[line as usize].contains("# pants: no-infer-dep"));
+  if !visitor.import_map.is_empty() {
+    let contents_string = contents.to_string();
+    let lines: Vec<_> = contents_string.lines().collect();
+    visitor.import_map.retain(|_, &mut (mut lineno, _)| {
+      let mut line;
+      loop {
+        line = lines[(lineno - 1) as usize];
+        if !line.ends_with('\\') {
+          break;
+        }
+        lineno += 1;
+      }
+      !line.contains("# pants: no-infer-dep")
+    });
+  }
 
-  Ok(visitor.import_map)
+  Ok((visitor.import_map, visitor.string_candidates))
 }
 
 pub struct DependencyExtractorVisitor {
   pub filepath: PathBuf,
   pub import_map: HashMap<String, (u64, bool)>,
+  pub string_candidates: HashMap<String, u64>,
   weaken_imports: bool,
 }
 
@@ -46,7 +52,14 @@ impl DependencyExtractorVisitor {
     DependencyExtractorVisitor {
       filepath,
       import_map: HashMap::new(),
+      string_candidates: HashMap::new(),
       weaken_imports: false,
+    }
+  }
+
+  fn maybe_add_string(&mut self, string: String, row: u64) {
+    if !string.contains(|c: char| c.is_ascii_whitespace() || c == '\\') {
+      self.string_candidates.insert(string, row);
     }
   }
 
@@ -55,7 +68,10 @@ impl DependencyExtractorVisitor {
     let level = level.unwrap_or(0);
     if level > 0 {
       let extensionless = self.filepath.with_extension("");
-      let mut path_parts: Vec<String> = extensionless
+      let mut path_parts: Vec<String> = self
+        .filepath
+        .parent()
+        .unwrap()
         .iter()
         .map(|p| p.to_str().unwrap().to_string())
         .collect();
@@ -69,13 +85,10 @@ impl DependencyExtractorVisitor {
 
     let modname = mod_parts.join(".");
 
-    self.import_map.insert(
-      modname,
-      (
-        alias.location.row().try_into().unwrap(),
-        self.weaken_imports,
-      ),
-    );
+    self.import_map.entry(modname).or_insert((
+      alias.location.row().try_into().unwrap(),
+      self.weaken_imports,
+    ));
   }
 
   fn visit_try(&mut self, handlers: &Vec<Excepthandler>, body: Vec<Stmt>) {
@@ -115,6 +128,13 @@ impl DependencyExtractorVisitor {
 }
 
 impl Visitor for DependencyExtractorVisitor {
+  fn visit_Constant(&mut self, node: ConstantNode) {
+    if let Constant::Str(string) = &node.node.value {
+      self.maybe_add_string(string.clone(), node.location.row().try_into().unwrap());
+    }
+    self.generic_visit_Constant(node);
+  }
+
   fn visit_Import(&mut self, node: ImportNode) {
     for name in &node.node.names {
       self.add_dependency(&None, name, &None);
@@ -141,10 +161,10 @@ impl Visitor for DependencyExtractorVisitor {
           ..
         } = &arg.node
         {
-          self.import_map.insert(
-            string.clone(),
-            (arg.location.row().try_into().unwrap(), false),
-          );
+          self
+            .import_map
+            .entry(string.clone())
+            .or_insert((arg.location.row().try_into().unwrap(), false));
         }
       }
     }

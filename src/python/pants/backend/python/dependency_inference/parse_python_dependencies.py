@@ -1,19 +1,22 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+from __future__ import annotations
 
 import json
 import logging
 import os
 from dataclasses import dataclass
 from typing import Iterable
+from pants.backend.python.subsystems.setup import PythonSetup
+from pants.engine.internals.idk import NativeParsedPythonDependencies
 
 from pants.backend.python.dependency_inference.subsystem import PythonInferSubsystem
-from pants.backend.python.dependency_inference.idk import ParsedPythonAssetPaths, ParsedPythonDependencies, ParsedPythonImportInfo, ParsedPythonImports
 from pants.backend.python.target_types import PythonSourceField
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex_environment import PythonExecutable
 from pants.core.util_rules.source_files import SourceFilesRequest
 from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
+from pants.engine.collection import DeduplicatedCollection
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.process import Process, ProcessResult
@@ -24,8 +27,38 @@ from pants.util.logging import LogLevel
 from pants.util.resources import read_resource
 from pants.util.strutil import softwrap
 
+
+from dataclasses import dataclass
+
+from pants.engine.collection import DeduplicatedCollection
+from pants.util.frozendict import FrozenDict
+
 logger = logging.getLogger(__name__)
 
+@dataclass(frozen=True,order=True)
+class ParsedPythonImportInfo:
+    lineno: int
+    # An import is considered "weak" if we're unsure if a dependency will exist between the parsed
+    # file and the parsed import.
+    # Examples of "weak" imports include string imports (if enabled) or those inside a try block
+    # which has a handler catching ImportError.
+    weak: bool
+
+
+class ParsedPythonImports(FrozenDict[str, ParsedPythonImportInfo]):
+    """All the discovered imports from a Python source file mapped to the relevant info."""
+
+
+class ParsedPythonAssetPaths(DeduplicatedCollection[str]):
+    """All the discovered possible assets from a Python source file."""
+
+    # N.B. Don't set `sort_input`, as the input is already sorted
+
+
+@dataclass(frozen=True)
+class ParsedPythonDependencies:
+    imports: ParsedPythonImports
+    assets: ParsedPythonAssetPaths
 
 
 @dataclass(frozen=True)
@@ -148,21 +181,37 @@ async def general_parser_script(
 async def parse_python_dependencies(
     request: ParsePythonDependenciesRequest,
     parser_script: ParserScript,
+    python_setup: PythonSetup,
+    python_infer_subsystem: PythonInferSubsystem,
 ) -> ParsedPythonDependencies:
-    python_interpreter, stripped_sources = await MultiGet(
-        Get(PythonExecutable, InterpreterConstraints, request.interpreter_constraints),
-        Get(StrippedSourceFiles, SourceFilesRequest([request.source])),
-    )
-
-    native_result = await Get(ParsedPythonDependencies, Digest, stripped_sources.snapshot.digest)
-    logger.warn(native_result)
-
+    stripped_sources = await Get(StrippedSourceFiles, SourceFilesRequest([request.source]))
     # We operate on PythonSourceField, which should be one file.
     assert len(stripped_sources.snapshot.files) == 1
+
+    possible_major_minors =request.interpreter_constraints.partition_into_major_minor_versions(python_setup.interpreter_versions_universe)
+    if False:
+        native_result = await Get(NativeParsedPythonDependencies, Digest, stripped_sources.snapshot.digest)
+        imports = dict(native_result.imports)
+        assets = set()
+
+        if python_infer_subsystem.string_imports or python_infer_subsystem.assets:
+            for string, line in native_result.string_candidates.items():
+                slash_count = string.count("/")
+                if python_infer_subsystem.string_imports and not slash_count and string.count(".") >= python_infer_subsystem.string_imports_min_dots:
+                    imports.setdefault(string, (line, True))
+                if python_infer_subsystem.assets and slash_count >= python_infer_subsystem.assets_min_slashes:
+                    assets.add(string)
+
+
+        return ParsedPythonDependencies(ParsedPythonImports((key, ParsedPythonImportInfo(*value)) for key, value in imports.items()), ParsedPythonAssetPaths(sorted(assets)))
+
     file = stripped_sources.snapshot.files[0]
 
-    input_digest = await Get(
-        Digest, MergeDigests([parser_script.digest, stripped_sources.snapshot.digest])
+    python_interpreter, input_digest = await MultiGet(
+        Get(PythonExecutable, InterpreterConstraints, request.interpreter_constraints),
+        Get(
+            Digest, MergeDigests([parser_script.digest, stripped_sources.snapshot.digest])
+        ),
     )
     process_result = await Get(
         ProcessResult,
