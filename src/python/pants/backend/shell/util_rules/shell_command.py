@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import logging
-import os
 import shlex
 from dataclasses import dataclass
 
@@ -37,6 +36,7 @@ from pants.core.util_rules.adhoc_process_support import (
     MergeExtraSandboxContents,
     ResolvedExecutionDependencies,
     ResolveExecutionDependenciesRequest,
+    parse_relative_directory,
 )
 from pants.core.util_rules.adhoc_process_support import rules as adhoc_process_support_rules
 from pants.core.util_rules.environments import EnvironmentNameRequest
@@ -262,17 +262,14 @@ async def _interactive_shell_command(
     )
     dependencies_digest = execution_environment.digest
 
-    relpath = os.path.relpath(
-        working_directory, start="/" if os.path.isabs(working_directory) else "."
-    )
-    boot_script = f"cd {shlex.quote(relpath)}; " if relpath != "." else ""
+    relpath = parse_relative_directory(working_directory, shell_command.address)
+    boot_script = f"cd {shlex.quote(relpath)}; " if relpath != "" else ""
 
     return Process(
         argv=(bash.path, "-c", boot_script + command, shell_name),
         description=f"Running {description}",
         env=command_env,
         input_digest=dependencies_digest,
-        working_directory=working_directory,
     )
 
 

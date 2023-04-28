@@ -342,14 +342,8 @@ class ShellCommandWorkdirField(AdhocToolWorkdirField):
     pass
 
 
-class RunShellCommandWorkdirField(StringField):
-    alias = "workdir"
-    default = "."
-    help = help_text(
-        "Sets the current working directory of the command that is `run`. Values that begin with "
-        "`.` are relative to the directory you are running Pants from. Values that begin with `/` "
-        "are from your project root."
-    )
+class RunShellCommandWorkdirField(AdhocToolWorkdirField):
+    pass
 
 
 class ShellCommandOutputRootDirField(AdhocToolOutputRootDirField):
