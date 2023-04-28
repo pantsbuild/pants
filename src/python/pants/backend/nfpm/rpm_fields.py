@@ -33,6 +33,55 @@ class NfpmRpmPackagerField(StringField):
         (in RFC822 format). For example: "Foo Bar <maintainer@example.com>"
 
         See: https://ftp.osuosl.org/pub/rpm/max-rpm/s1-rpm-inside-tags.html#S3-RPM-INSIDE-PACKAGER-TAG
+
+        N.B.: Packages distributed by Fedora do not use this field.
+        https://docs.fedoraproject.org/en-US/packaging-guidelines/#_tags_and_sections
         """
     )
     # TODO: Add validation for the "Name <email@domain>" format
+
+
+class NfpmRpmVendorField(StringField):
+    alias = "vendor"
+    help = help_text(
+        """
+        The entity responsible for packaging (typically an organization).
+
+        See: https://ftp.osuosl.org/pub/rpm/max-rpm/s1-rpm-inside-tags.html#S3-RPM-INSIDE-VENDOR-TAG
+
+        N.B.: Packages distributed by Fedora do not use this field.
+        https://docs.fedoraproject.org/en-US/packaging-guidelines/#_tags_and_sections
+        """
+    )
+
+
+class NfpmRpmGroupField(StringField):
+    alias = "group"
+    help = help_text(
+        lambda: f"""
+        For older rpm-based distros, this groups packages by their functionality.
+
+        '{NfpmRpmGroupField}' is a path-like string to allow for hierarchical
+        grouping of applications like "Applications/Editors".
+
+        See: https://ftp.osuosl.org/pub/rpm/max-rpm/s1-rpm-inside-tags.html#S3-RPM-INSIDE-GROUP-TAG
+
+        N.B.: This field is only useful when packaging for old distros (EL 5 or earlier).
+        All newer rpm-based distros have deprecated--and do not use--this field.
+        https://docs.fedoraproject.org/en-US/packaging-guidelines/#_tags_and_sections
+        """
+    )
+
+
+class NfpmRpmSummaryField(StringField):
+    alias = "summary"
+    help = help_text(
+        lambda: f"""
+        A one-line description of the packaged software.
+
+        If unset, nFPM will use the first line of 'description' for
+        the '{NfpmRpmSummaryField.alias}'.
+
+        See: https://ftp.osuosl.org/pub/rpm/max-rpm/s1-rpm-inside-tags.html#S3-RPM-INSIDE-SUMMARY-TAG
+        """
+    )
