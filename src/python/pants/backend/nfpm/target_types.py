@@ -10,7 +10,11 @@ from pants.backend.nfpm.archlinux_fields import (
     NfpmArchlinuxPackagerField,
     NfpmArchlinuxPkgbaseField,
 )
-from pants.backend.nfpm.deb_fields import NfpmDebMaintainerField
+from pants.backend.nfpm.deb_fields import (
+    NfpmDebMaintainerField,
+    NfpmDebPriorityField,
+    NfpmDebSectionField,
+)
 from pants.backend.nfpm.rpm_fields import (
     NfpmRpmGroupField,
     NfpmRpmPackagerField,
@@ -221,6 +225,8 @@ class NfpmDebPackage(Target):
         NfpmHomepageField,
         NfpmLicenseField,  # not used by nFPM yet.
         NfpmDebMaintainerField,
+        NfpmDebSectionField,
+        NfpmDebPriorityField,
     )
     help = help_text(
         f""""
