@@ -11,7 +11,12 @@ from pants.backend.nfpm.archlinux_fields import (
     NfpmArchlinuxPkgbaseField,
 )
 from pants.backend.nfpm.deb_fields import NfpmDebMaintainerField
-from pants.backend.nfpm.rpm_fields import NfpmRpmPackagerField
+from pants.backend.nfpm.rpm_fields import (
+    NfpmRpmGroupField,
+    NfpmRpmPackagerField,
+    NfpmRpmSummaryField,
+    NfpmRpmVendorField,
+)
 from pants.backend.nfpm.version_fields import (
     NfpmVersionEpochField,
     NfpmVersionField,
@@ -247,6 +252,9 @@ class NfpmRpmPackage(Target):
         NfpmHomepageField,
         NfpmLicenseField,
         NfpmRpmPackagerField,
+        NfpmRpmVendorField,
+        NfpmRpmGroupField,
+        NfpmRpmSummaryField,
     )
     help = help_text(
         f""""
