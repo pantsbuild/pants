@@ -17,5 +17,8 @@ adhoc_tool(
     runnable=":sphinx",
     args=["-M", "html", "markdown", "_build"],
     execution_dependencies=[":inputs", ":conf"],
-    output_directories=["_build"],
+    output_directories=["_build/html"],
+    root_output_directory="./_build/html",
 )
+
+archive(name="docs", files=[":build-html"], format="zip")
