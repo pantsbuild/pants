@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from abc import ABCMeta
 from dataclasses import dataclass
+from typing import Any, cast
 
 from pants.backend.nfpm.target_types import (
     APK_FIELDS,
@@ -12,9 +13,11 @@ from pants.backend.nfpm.target_types import (
     DEB_FIELDS,
     RPM_FIELDS,
     NfpmPackageNameField,
+    _NfpmField,
 )
 from pants.core.goals.package import OutputPathField, PackageFieldSet
 from pants.engine.rules import collect_rules
+from pants.engine.target import Target
 from pants.engine.unions import UnionRule
 
 
@@ -22,6 +25,26 @@ from pants.engine.unions import UnionRule
 class NfpmPackageFieldSet(PackageFieldSet, metaclass=ABCMeta):
     output_path: OutputPathField
     package_name: NfpmPackageNameField
+
+    def nfpm_config(self, tgt: Target) -> dict[str, Any]:
+        config = {}
+        for field in self.required_fields:
+            value = tgt[field].value
+            if not field.required and value is None:
+                # omit undefined optional values from nfpm.yaml
+                continue
+
+            # handle nested fields (eg: deb.triggers)
+            keys = cast(_NfpmField, field).nfpm_alias.split(".")
+
+            cfg = config
+            for key in keys[:-1]:
+                # TODO: if key == "[]" then it is an array (.contents)
+                cfg.setdefault(key, {})
+                cfg = cfg[key]
+            cfg[keys[-1]] = tgt[field].value
+
+        return config
 
 
 @dataclass(frozen=True)
