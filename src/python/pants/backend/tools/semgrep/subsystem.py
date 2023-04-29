@@ -21,7 +21,6 @@ from pants.engine.rules import Rule, collect_rules, rule
 from pants.engine.target import Dependencies, FieldSet, SingleSourceField, Target
 from pants.engine.unions import UnionRule
 from pants.option.option_types import ArgsListOption, BoolOption, SkipOption
-from pants.util.docutil import git_url
 from pants.util.strutil import softwrap
 
 
@@ -51,7 +50,6 @@ class SemgrepSubsystem(PythonToolBase):
     register_lockfile = True
     default_lockfile_resource = ("pants.backend.tools.semgrep", "semgrep.lock")
     default_lockfile_path = "src/python/pants/backend/tools/semgrep/semgrep.lock"
-    default_lockfile_url = git_url(default_lockfile_path)
     lockfile_rules_type = LockfileRules.SIMPLE
 
     export = ExportToolOption()
