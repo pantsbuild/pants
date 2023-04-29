@@ -3,7 +3,6 @@
 
 from pants.jvm.resolve.jvm_tool import JvmToolBase
 from pants.option.option_types import SkipOption
-from pants.util.docutil import git_url
 
 
 class ScalafmtSubsystem(JvmToolBase):
@@ -17,9 +16,5 @@ class ScalafmtSubsystem(JvmToolBase):
         "pants.backend.scala.lint.scalafmt",
         "scalafmt.default.lockfile.txt",
     )
-    default_lockfile_path = (
-        "src/python/pants/backend/scala/lint/scalafmt/scalafmt.default.lockfile.txt"
-    )
-    default_lockfile_url = git_url(default_lockfile_path)
 
     skip = SkipOption("fmt", "lint")

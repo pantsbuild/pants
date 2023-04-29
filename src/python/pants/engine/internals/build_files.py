@@ -236,20 +236,6 @@ class BUILDFileEnvVarExtractor(ast.NodeVisitor):
             self.visit(kwarg)
 
 
-async def _extract_env_vars(
-    file_content: FileContent, extra_env: Sequence[str], env: CompleteEnvironmentVars
-) -> EnvironmentVars:
-    """For BUILD file env vars, we only ever consult the local systems env."""
-    env_vars = (*BUILDFileEnvVarExtractor.get_env_vars(file_content), *extra_env)
-    return await Get(
-        EnvironmentVars,
-        {
-            EnvironmentVarsRequest(env_vars): EnvironmentVarsRequest,
-            env: CompleteEnvironmentVars,
-        },
-    )
-
-
 @rule(desc="Search for addresses in BUILD files")
 async def parse_address_family(
     parser: Parser,
@@ -318,12 +304,25 @@ async def parse_address_family(
         dependents_rules_parser_state = None
         dependencies_rules_parser_state = None
 
-    all_env_vars = [
-        await _extract_env_vars(
+    def _extract_env_vars(
+        file_content: FileContent, extra_env: Sequence[str], env: CompleteEnvironmentVars
+    ) -> Get[EnvironmentVars]:
+        """For BUILD file env vars, we only ever consult the local systems env."""
+        env_vars = (*BUILDFileEnvVarExtractor.get_env_vars(file_content), *extra_env)
+        return Get(
+            EnvironmentVars,
+            {
+                EnvironmentVarsRequest(env_vars): EnvironmentVarsRequest,
+                env: CompleteEnvironmentVars,
+            },
+        )
+
+    all_env_vars = await MultiGet(
+        _extract_env_vars(
             fc, prelude_symbols.referenced_env_vars, session_values[CompleteEnvironmentVars]
         )
         for fc in digest_contents
-    ]
+    )
 
     address_maps = [
         AddressMap.parse(

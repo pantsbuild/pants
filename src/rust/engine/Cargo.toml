@@ -9,10 +9,15 @@ publish = false
 # tokio_unstable is necessary for access to the `id`-related functions of tokio::task::JoinSet.
 # See https://docs.rs/tokio/1.21.1/tokio/task/struct.JoinSet.html#method.join_next_with_id.
 
+[profile.dev]
+# Increase the optimization level of the dev profile slightly, as otherwise `rule_graph`
+# solving takes prohibitively long.
+opt-level = 1
+
 [profile.release]
-# Enable debug symbols in the `release` profile: doesn't add a noticeable overhead in size/speed,
-# but enables profiling of optimized builds.
-debug = true
+# Enable only "line tables", which give line information in backtraces, but do not record information
+# about local variables.
+debug = 1
 # Optimise for the speed of our binary, rather than the speed of compilation.
 codegen-units = 1
 
@@ -157,9 +162,9 @@ stdio = { path = "stdio" }
 store = { path = "fs/store" }
 serde_json = "1.0"
 task_executor = { path = "task_executor" }
-tempfile = "3"
+tempfile = "3.5.0"
 testutil_mock = { package = "mock", path = "testutil/mock" }
-time = "0.3"
+time = "0.3.20"
 tokio = { version = "1.21", features = ["macros", "rt", "rt-multi-thread"] }
 tokio-retry = "0.3"
 tokio-util = { version = "0.7", features = ["io"] }

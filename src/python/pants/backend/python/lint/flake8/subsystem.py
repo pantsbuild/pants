@@ -43,7 +43,7 @@ from pants.option.option_types import (
     SkipOption,
     TargetListOption,
 )
-from pants.util.docutil import doc_url, git_url
+from pants.util.docutil import doc_url
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 from pants.util.strutil import softwrap
@@ -70,10 +70,7 @@ class Flake8(PythonToolBase):
     default_main = ConsoleScript("flake8")
     default_requirements = [default_version]
 
-    register_lockfile = True
     default_lockfile_resource = ("pants.backend.python.lint.flake8", "flake8.lock")
-    default_lockfile_path = "src/python/pants/backend/python/lint/flake8/flake8.lock"
-    default_lockfile_url = git_url(default_lockfile_path)
 
     skip = SkipOption("lint")
     args = ArgsListOption(example="--ignore E123,W456 --enable-extensions H111")

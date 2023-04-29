@@ -27,7 +27,6 @@ from pants.engine.target import (
     WrappedTarget,
     WrappedTargetRequest,
 )
-from pants.util.docutil import git_url
 from pants.util.logging import LogLevel
 from pants.util.resources import read_resource
 
@@ -44,10 +43,7 @@ class DockerfileParser(PythonToolRequirementsBase):
 
     register_interpreter_constraints = True
 
-    register_lockfile = True
     default_lockfile_resource = (_DOCKERFILE_PACKAGE, "dockerfile.lock")
-    default_lockfile_path = f"src/python/{_DOCKERFILE_PACKAGE.replace('.', '/')}/dockerfile.lock"
-    default_lockfile_url = git_url(default_lockfile_path)
     lockfile_rules_type = LockfileRules.SIMPLE
 
 

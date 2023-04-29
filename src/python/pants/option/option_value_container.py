@@ -126,8 +126,6 @@ class OptionValueContainer:
         if key not in self._value_map:
             raise AttributeError(key)
         ranked_val = self._value_map[key]
-        if ranked_val.error is not None:
-            raise ranked_val.error
         return ranked_val.value
 
     # Support natural dynamic access, e.g., opts[foo] is more idiomatic than getattr(opts, 'foo').

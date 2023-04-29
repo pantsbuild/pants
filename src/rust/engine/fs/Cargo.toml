@@ -30,6 +30,6 @@ tokio = { version = "1.21", features = ["fs"] }
 workunit_store = { path = "../workunit_store" }
 
 [dev-dependencies]
-tempfile = "3"
+tempfile = "3.5.0"
 testutil = { path = "../testutil" }
 tokio = { version = "1.21", features = ["rt", "macros"] }

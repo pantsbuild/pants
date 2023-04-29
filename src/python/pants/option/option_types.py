@@ -56,20 +56,8 @@ _HelpT = _MaybeDynamicT[str]
 _RegisterIfFuncT = Callable[[_SubsystemType], Any]
 
 
-# Missing arg sentinel.
-class Missing:
-    pass
-
-
-_MISSING = Missing()
-
-
-def _eval_maybe_dynamic(
-    val: _MaybeDynamicT[_DefaultT] | Missing, subsystem_cls: _SubsystemType
-) -> _DefaultT | None:
-    if isinstance(val, Missing):
-        return None
-    return val(subsystem_cls) if inspect.isfunction(val) else cast(_DefaultT, val)
+def _eval_maybe_dynamic(val: _MaybeDynamicT[_DefaultT], subsystem_cls: _SubsystemType) -> _DefaultT:
+    return val(subsystem_cls) if inspect.isfunction(val) else val  # type: ignore[no-any-return]
 
 
 class _OptionBase(Generic[_OptT, _DefaultT]):
@@ -83,7 +71,7 @@ class _OptionBase(Generic[_OptT, _DefaultT]):
     """
 
     _flag_names: tuple[str, ...] | None
-    _default: _MaybeDynamicT[_DefaultT] | Missing
+    _default: _MaybeDynamicT[_DefaultT]
     _help: _HelpT
     _register_if: _RegisterIfFuncT
     _extra_kwargs: dict[str, Any]
@@ -94,8 +82,8 @@ class _OptionBase(Generic[_OptT, _DefaultT]):
         cls,
         flag_name: str | None = None,
         *,
+        default: _MaybeDynamicT[_DefaultT],
         help: _HelpT,
-        default: _MaybeDynamicT[_DefaultT] | Missing = _MISSING,
         # Additional bells/whistles
         register_if: _RegisterIfFuncT | None = None,
         advanced: bool | None = None,
@@ -106,7 +94,6 @@ class _OptionBase(Generic[_OptT, _DefaultT]):
         removal_version: str | None = None,
         removal_hint: _HelpT | None = None,
         deprecation_start_version: str | None = None,
-        required: bool | None = None,
         # Internal bells/whistles
         daemon: bool | None = None,
         fingerprint: bool | None = None,
@@ -145,11 +132,7 @@ class _OptionBase(Generic[_OptT, _DefaultT]):
             user when running `help`.
         :param deprecation_start_version: If the option is deprecated, sets the version at which the
             deprecation will begin. Must be less than the `removal_version`.
-        :param required: Asserts that a value is provided by the user.
         """
-        if default is _MISSING and not required:
-            raise ValueError("`default` must be provided unless `required=True`.")
-
         self = super().__new__(cls)
         self._flag_names = (flag_name,) if flag_name else None
         self._default = default
@@ -168,7 +151,6 @@ class _OptionBase(Generic[_OptT, _DefaultT]):
                 "removal_hint": removal_hint,
                 "removal_version": removal_version,
                 "deprecation_start_version": deprecation_start_version,
-                "required": required,
             }.items()
             if v is not None
         }

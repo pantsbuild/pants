@@ -2,7 +2,7 @@
 title: "Validating dependencies"
 slug: "validating-dependencies"
 excerpt: "Validating your code's dependencies."
-hidden: true
+hidden: false
 createdAt: "2022-12-12T09:10:16.427Z"
 ---
 

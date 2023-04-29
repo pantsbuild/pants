@@ -52,7 +52,13 @@ class Resolve:
     # A named resolve for a "user lockfile".
     # Soon to be the only kind of lockfile, as this class will help
     # get rid of the "tool lockfile" concept.
+    # TODO: Once we get rid of old-style tool lockfiles we can possibly
+    #  unify this with EntireLockfile.
+    # TODO: We might want to add the requirements subset to this data structure,
+    #  to further detangle this from PexRequirements.
     name: str
+
+    use_entire_lockfile: bool
 
 
 @dataclass(frozen=True)
