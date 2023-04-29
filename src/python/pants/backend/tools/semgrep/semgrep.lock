@@ -9,7 +9,7 @@
 //     "CPython<4,>=3.7"
 //   ],
 //   "generated_with_requirements": [
-//     "semgrep<2,>=1.19.0"
+//     "semgrep<2,>=1.20.0"
 //   ],
 //   "manylinux": "manylinux2014",
 //   "requirement_constraints": [],
@@ -604,13 +604,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "03ba783c3a2c69d751b109fc0c94a62c51f581b3d6acf8ed1331b6d5729321ff",
-              "url": "https://files.pythonhosted.org/packages/50/a2/75da1ccf2cc043aeb866e18c9a196f0b42abfe5d421c657019c68ebec1e9/importlib_metadata-6.5.0-py3-none-any.whl"
+              "hash": "43dd286a2cd8995d5eaef7fee2066340423b818ed3fd70adf0bad5f1fac53fed",
+              "url": "https://files.pythonhosted.org/packages/30/bb/bf2944b8b88c65b797acc2c6a2cb0fb817f7364debf0675792e034013858/importlib_metadata-6.6.0-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "7a8bdf1bc3a726297f5cfbc999e6e7ff6b4fa41b26bba4afc580448624460045",
-              "url": "https://files.pythonhosted.org/packages/9d/ce/dc7221b3044c7382d5abad27d2599e63b0e0ccabc49491244203ee1ded96/importlib_metadata-6.5.0.tar.gz"
+              "hash": "92501cdf9cc66ebd3e612f1b4f0c0765dfa42f0fa38ffb319b6bd84dd675d705",
+              "url": "https://files.pythonhosted.org/packages/0b/1f/9de392c2b939384e08812ef93adf37684ec170b5b6e7ea302d9f163c2ea0/importlib_metadata-6.6.0.tar.gz"
             }
           ],
           "project_name": "importlib-metadata",
@@ -639,7 +639,7 @@
             "zipp>=0.5"
           ],
           "requires_python": ">=3.7",
-          "version": "6.5.0"
+          "version": "6.6.0"
         },
         {
           "artifacts": [
@@ -970,13 +970,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "64299f4909223da747622c030b781c0d7811e359c37124b4bd368fb8c6518baa",
-              "url": "https://files.pythonhosted.org/packages/d2/f4/274d1dbe96b41cf4e0efb70cbced278ffd61b5c7bb70338b62af94ccb25b/requests-2.28.2-py3-none-any.whl"
+              "hash": "e8f3c9be120d3333921d213eef078af392fba3933ab7ed2d1cba3b56f2568c3b",
+              "url": "https://files.pythonhosted.org/packages/cf/e1/2aa539876d9ed0ddc95882451deb57cfd7aa8dbf0b8dbce68e045549ba56/requests-2.29.0-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "98b1b2782e3c6c4904938b84c0eb932721069dfdb9134313beff7c83c2df24bf",
-              "url": "https://files.pythonhosted.org/packages/9d/ee/391076f5937f0a8cdf5e53b701ffc91753e87b07d66bae4a09aa671897bf/requests-2.28.2.tar.gz"
+              "hash": "f2e34a75f4749019bb0e3effb66683630e4ffeaf75819fb51bebef1bf5aef059",
+              "url": "https://files.pythonhosted.org/packages/4c/d2/70fc708727b62d55bc24e43cc85f073039023212d482553d853c44e57bdb/requests-2.29.0.tar.gz"
             }
           ],
           "project_name": "requests",
@@ -988,20 +988,20 @@
             "idna<4,>=2.5",
             "urllib3<1.27,>=1.21.1"
           ],
-          "requires_python": "<4,>=3.7",
-          "version": "2.28.2"
+          "requires_python": ">=3.7",
+          "version": "2.29.0"
         },
         {
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "22b74cae0278fd5086ff44144d3813be1cedc9115bdfabbfefd86400cb88b20a",
-              "url": "https://files.pythonhosted.org/packages/9d/1a/28117ae737aec7c004ed5067034a8949adab43730420b50312821f466c3f/rich-13.3.4-py3-none-any.whl"
+              "hash": "69cdf53799e63f38b95b9bf9c875f8c90e78dd62b2f00c13a911c7a3b9fa4704",
+              "url": "https://files.pythonhosted.org/packages/39/03/6de23bdd88f5ee7f8b03f94f6e88108f5d7ffe6d207e95cdb06d9aa4cd57/rich-13.3.5-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "b5d573e13605423ec80bdd0cd5f8541f7844a0e71a13f74cf454ccb2f490708b",
-              "url": "https://files.pythonhosted.org/packages/31/3b/2360352760b436f822258396e66ffb6d42585518a9cde2f93f142e64c5eb/rich-13.3.4.tar.gz"
+              "hash": "2d11b9b8dd03868f09b4fffadc84a6a8cda574e40dc90821bd845720ebb8e89c",
+              "url": "https://files.pythonhosted.org/packages/3d/0b/8dd34d20929c4b5e474db2e64426175469c2b7fea5ba71c6d4b3397a9729/rich-13.3.5.tar.gz"
             }
           ],
           "project_name": "rich",
@@ -1012,7 +1012,7 @@
             "typing-extensions<5.0,>=4.0.0; python_version < \"3.9\""
           ],
           "requires_python": ">=3.7.0",
-          "version": "13.3.4"
+          "version": "13.3.5"
         },
         {
           "artifacts": [
@@ -1148,23 +1148,23 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "89cfde0b8bb5a3b0624d9710ec7ac73e74598bf227c3c61fd1fa489dd29e33eb",
-              "url": "https://files.pythonhosted.org/packages/a5/59/4ffda356d7a85b84746c44e81fdcff8bffb155e5dda9933508c7f53d7b99/semgrep-1.19.0-cp37.cp38.cp39.py37.py38.py39-none-macosx_11_0_arm64.whl"
+              "hash": "517ed80d50a408d18851ffd74323f43c78650c232b6a8c1defce92ec42d9f575",
+              "url": "https://files.pythonhosted.org/packages/4a/b0/4a46f38b4661576e3c12df7f80e3a7bea846bf1efe942da7bbf4fc27d6a7/semgrep-1.20.0-cp37.cp38.cp39.py37.py38.py39-none-macosx_11_0_arm64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "723429f9548bd4c959b12c25b6f88fc48858c129d0a13f0fc7904be866f344de",
-              "url": "https://files.pythonhosted.org/packages/a5/0f/87759b6f16c2195f367b3a5543190d823449a66263edd2e713c2688765b1/semgrep-1.19.0-cp37.cp38.cp39.py37.py38.py39-none-any.whl"
+              "hash": "db43b3fdbe427f9fe0caf8bafaf681fd3478a128e2b887a8036067cb02d3f272",
+              "url": "https://files.pythonhosted.org/packages/10/ac/d7972c3cf4bd5d9c0cf5d22d34f640967dccf005e6b5e60d78db997afb96/semgrep-1.20.0.tar.gz"
             },
             {
               "algorithm": "sha256",
-              "hash": "e59784801146a8d799bc553da68e5e5acbf338a3cae1e8486a9b7aaa925cb266",
-              "url": "https://files.pythonhosted.org/packages/c4/32/3642576d14b367cd68c5842112a4ac2763b2de72568d3a78e38e94ae5391/semgrep-1.19.0-cp37.cp38.cp39.py37.py38.py39-none-macosx_10_14_x86_64.whl"
+              "hash": "2b543d367acedaf5d3efa07d63b8f2444880255ce35d1106778db68ec559da5d",
+              "url": "https://files.pythonhosted.org/packages/a6/67/8b96236d72f9a4afd633e25ff9d37a5e54b1d8ceb2ab4c45e93b3d2e0d9e/semgrep-1.20.0-cp37.cp38.cp39.py37.py38.py39-none-macosx_10_14_x86_64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "5d5e32ffb1bd963e0ede87f0b801305b8367ad660a73f8e0dd8e14f0c8d3e956",
-              "url": "https://files.pythonhosted.org/packages/ee/68/573843402f3025f153dd70e6af37e352d061fa22bef7f4903198a31057dd/semgrep-1.19.0.tar.gz"
+              "hash": "613fc656ee23771d0e7ad9f093366e6446787e5ef4b84c93e106576eb1ef4cd7",
+              "url": "https://files.pythonhosted.org/packages/eb/49/58c6f38a458e42c86ae807f0bd5fab00a745e4125f0eef4851164f44ed69/semgrep-1.20.0-cp37.cp38.cp39.py37.py38.py39-none-any.whl"
             }
           ],
           "project_name": "semgrep",
@@ -1190,7 +1190,7 @@
             "wcmatch~=8.3"
           ],
           "requires_python": ">=3.7",
-          "version": "1.19.0"
+          "version": "1.20.0"
         },
         {
           "artifacts": [
@@ -1587,11 +1587,11 @@
     }
   ],
   "path_mappings": {},
-  "pex_version": "2.1.133",
+  "pex_version": "2.1.134",
   "pip_version": "23.0.1",
   "prefer_older_binary": false,
   "requirements": [
-    "semgrep<2,>=1.19.0"
+    "semgrep<2,>=1.20.0"
   ],
   "requires_python": [
     "<4,>=3.7"

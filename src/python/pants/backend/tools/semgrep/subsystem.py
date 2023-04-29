@@ -41,7 +41,7 @@ class SemgrepSubsystem(PythonToolBase):
     options_scope = "semgrep"
     help = "Lightweight static analysis for many languages. Find bug variants with patterns that look like source code. (https://semgrep.dev/)"
 
-    default_version = "semgrep>=1.19.0,<2"
+    default_version = "semgrep>=1.20.0,<2"
     default_main = ConsoleScript("semgrep")
     default_requirements = [default_version]
 
