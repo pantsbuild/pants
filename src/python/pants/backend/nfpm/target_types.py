@@ -37,6 +37,7 @@ from pants.engine.target import COMMON_TARGET_FIELDS, StringField, Target
 from pants.util.docutil import doc_url
 from pants.util.strutil import help_text
 
+
 # This allows us to define the nFPM config option name on the field
 class _NfpmField(Protocol):
     # nfpm_alias is a "." concatenated series of dict keys (keys of nfpm.yaml).
