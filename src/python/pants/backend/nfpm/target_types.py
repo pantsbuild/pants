@@ -8,23 +8,23 @@ from typing import ClassVar
 
 from typing_extensions import Protocol
 
-from pants.backend.nfpm.apk_fields import NfpmApkMaintainerField
-from pants.backend.nfpm.archlinux_fields import (
+from pants.backend.nfpm.fields.apk import NfpmApkMaintainerField
+from pants.backend.nfpm.fields.archlinux import (
     NfpmArchlinuxPackagerField,
     NfpmArchlinuxPkgbaseField,
 )
-from pants.backend.nfpm.deb_fields import (
+from pants.backend.nfpm.fields.deb import (
     NfpmDebMaintainerField,
     NfpmDebPriorityField,
     NfpmDebSectionField,
 )
-from pants.backend.nfpm.rpm_fields import (
+from pants.backend.nfpm.fields.rpm import (
     NfpmRpmGroupField,
     NfpmRpmPackagerField,
     NfpmRpmSummaryField,
     NfpmRpmVendorField,
 )
-from pants.backend.nfpm.version_fields import (
+from pants.backend.nfpm.fields.version import (
     NfpmVersionEpochField,
     NfpmVersionField,
     NfpmVersionMetadataField,
