@@ -8,19 +8,41 @@ from typing import ClassVar
 
 from typing_extensions import Protocol
 
-from pants.backend.nfpm.fields.apk import NfpmApkMaintainerField
+from pants.backend.nfpm.fields.apk import (
+    NfpmApkDependsField,
+    NfpmApkMaintainerField,
+    NfpmApkProvidesField,
+    NfpmApkReplacesField,
+)
 from pants.backend.nfpm.fields.archlinux import (
+    NfpmArchlinuxConflictsField,
+    NfpmArchlinuxDependsField,
     NfpmArchlinuxPackagerField,
     NfpmArchlinuxPkgbaseField,
+    NfpmArchlinuxProvidesField,
+    NfpmArchlinuxReplacesField,
 )
 from pants.backend.nfpm.fields.deb import (
+    NfpmDebBreaksField,
+    NfpmDebConflictsField,
+    NfpmDebDependsField,
     NfpmDebMaintainerField,
     NfpmDebPriorityField,
+    NfpmDebProvidesField,
+    NfpmDebRecommendsField,
+    NfpmDebReplacesField,
     NfpmDebSectionField,
+    NfpmDebSuggestsField,
 )
 from pants.backend.nfpm.fields.rpm import (
+    NfpmRpmConflictsField,
+    NfpmRpmDependsField,
     NfpmRpmGroupField,
     NfpmRpmPackagerField,
+    NfpmRpmProvidesField,
+    NfpmRpmRecommendsField,
+    NfpmRpmReplacesField,
+    NfpmRpmSuggestsField,
     NfpmRpmSummaryField,
     NfpmRpmVendorField,
 )
@@ -183,6 +205,10 @@ APK_FIELDS = (
     NfpmHomepageField,
     NfpmLicenseField,
     NfpmApkMaintainerField,
+    # package relationships
+    NfpmApkReplacesField,
+    NfpmApkProvidesField,
+    NfpmApkDependsField,
 )
 
 
@@ -219,6 +245,11 @@ ARCHLINUX_FIELDS = (
     NfpmLicenseField,
     NfpmArchlinuxPackagerField,
     NfpmArchlinuxPkgbaseField,
+    # package relationships
+    NfpmArchlinuxReplacesField,
+    NfpmArchlinuxProvidesField,
+    NfpmArchlinuxDependsField,
+    NfpmArchlinuxConflictsField,
 )
 
 
@@ -258,6 +289,14 @@ DEB_FIELDS = (
     NfpmDebMaintainerField,
     NfpmDebSectionField,
     NfpmDebPriorityField,
+    # package relationships
+    NfpmDebReplacesField,
+    NfpmDebProvidesField,
+    NfpmDebDependsField,
+    NfpmDebRecommendsField,
+    NfpmDebSuggestsField,
+    NfpmDebConflictsField,
+    NfpmDebBreaksField,
 )
 
 
@@ -298,6 +337,13 @@ RPM_FIELDS = (
     NfpmRpmVendorField,
     NfpmRpmGroupField,
     NfpmRpmSummaryField,
+    # package relationships
+    NfpmRpmReplacesField,
+    NfpmRpmProvidesField,
+    NfpmRpmDependsField,
+    NfpmRpmRecommendsField,
+    NfpmRpmSuggestsField,
+    NfpmRpmConflictsField,
 )
 
 

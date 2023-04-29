@@ -6,6 +6,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import Dict, Iterable, Optional, Tuple
 
+from pants.backend.nfpm.fields._relationships import NfpmPackageRelationshipsField
 from pants.engine.addresses import Address
 from pants.engine.target import (
     DictStringToStringField,
@@ -160,3 +161,66 @@ class NfpmDebTriggersField(DictStringToStringSequenceField):
                 f"{repr(cls.valid_keys)}, but {repr(invalid_keys)} was provided.",
             )
         return value_or_default
+
+
+class NfpmDebReplacesField(NfpmPackageRelationshipsField):
+    nfpm_alias = "replaces"
+    alias = nfpm_alias
+    help = help_text(
+        lambda: f"""
+        """
+    )
+
+
+class NfpmDebProvidesField(NfpmPackageRelationshipsField):
+    nfpm_alias = "provides"
+    alias = nfpm_alias
+    help = help_text(
+        lambda: f"""
+        """
+    )
+
+
+class NfpmDebDependsField(NfpmPackageRelationshipsField):
+    nfpm_alias = "depends"
+    alias = nfpm_alias  # TODO: this might be confused with "dependencies"
+    help = help_text(
+        lambda: f"""
+        """
+    )
+
+
+class NfpmDebRecommendsField(NfpmPackageRelationshipsField):
+    nfpm_alias = "recommends"
+    alias = nfpm_alias
+    help = help_text(
+        lambda: f"""
+        """
+    )
+
+
+class NfpmDebSuggestsField(NfpmPackageRelationshipsField):
+    nfpm_alias = "suggests"
+    alias = nfpm_alias
+    help = help_text(
+        lambda: f"""
+        """
+    )
+
+
+class NfpmDebConflictsField(NfpmPackageRelationshipsField):
+    nfpm_alias = "conflicts"
+    alias = nfpm_alias
+    help = help_text(
+        lambda: f"""
+        """
+    )
+
+
+class NfpmDebBreaksField(NfpmPackageRelationshipsField):
+    nfpm_alias = "deb.breaks"
+    alias = "breaks"
+    help = help_text(
+        lambda: f"""
+        """
+    )
