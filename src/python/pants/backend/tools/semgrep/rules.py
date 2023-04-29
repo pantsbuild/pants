@@ -22,15 +22,15 @@ from pants.option.global_options import GlobalOptions
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize, softwrap
 
-from .subsystem import Semgrep, SemgrepFieldSet
+from .subsystem import SemgrepFieldSet, SemgrepSubsystem
 from .target_types import SemgrepRuleSourceField
 
 logger = logging.getLogger(__name__)
 
 
-class SemgrepRequest(LintTargetsRequest):
+class SemgrepLintRequest(LintTargetsRequest):
     field_set_type = SemgrepFieldSet
-    tool_subsystem = Semgrep
+    tool_subsystem = SemgrepSubsystem
 
 
 @dataclass(frozen=True)
@@ -46,7 +46,7 @@ class PartitionMetadata:
 _IGNORE_FILE_NAME = ".semgrepignore"
 
 
-def warn_about_ignore_files_if_required(ignore_files: Snapshot, semgrep: Semgrep) -> None:
+def warn_about_ignore_files_if_required(ignore_files: Snapshot, semgrep: SemgrepSubsystem) -> None:
     non_root_files = sorted(name for name in ignore_files.files if name != _IGNORE_FILE_NAME)
     if non_root_files and not semgrep.acknowledge_nested_semgrepignore_files_are_not_used:
         # https://github.com/returntocorp/semgrep/issues/5669
@@ -121,8 +121,8 @@ async def all_semgrep_ignore_files() -> SemgrepIgnoreFiles:
 
 @rule
 async def partition(
-    request: SemgrepRequest.PartitionRequest[SemgrepFieldSet],
-    semgrep: Semgrep,
+    request: SemgrepLintRequest.PartitionRequest[SemgrepFieldSet],
+    semgrep: SemgrepSubsystem,
     ignore_files: SemgrepIgnoreFiles,
 ) -> Partitions:
     if semgrep.skip:
@@ -160,8 +160,8 @@ _DEFAULT_SETTINGS = FileContent(
 
 @rule(desc="Lint with Semgrep", level=LogLevel.DEBUG)
 async def lint(
-    request: SemgrepRequest.Batch[SemgrepFieldSet, PartitionMetadata],
-    semgrep: Semgrep,
+    request: SemgrepLintRequest.Batch[SemgrepFieldSet, PartitionMetadata],
+    semgrep: SemgrepSubsystem,
     global_options: GlobalOptions,
 ) -> LintResult:
     config_files, semgrep_pex, input_files, settings = await MultiGet(
@@ -226,4 +226,4 @@ async def lint(
 
 
 def rules() -> Iterable[Rule | UnionRule]:
-    return [*collect_rules(), *SemgrepRequest.rules(), *pex.rules()]
+    return [*collect_rules(), *SemgrepLintRequest.rules(), *pex.rules()]

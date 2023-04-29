@@ -18,11 +18,11 @@ from pants.engine.target import Target
 from pants.testutil.python_interpreter_selection import all_major_minor_python_versions
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
-from .rules import PartitionMetadata, SemgrepRequest
+from .rules import PartitionMetadata, SemgrepLintRequest
 from .rules import rules as semgrep_rules
-from .subsystem import Semgrep, SemgrepFieldSet
+from .subsystem import SemgrepFieldSet, SemgrepSubsystem
 from .subsystem import rules as semgrep_subsystem_rules
-from .target_types import SemgrepRuleSource, SemgrepRuleSourcesGeneratorTarget
+from .target_types import SemgrepRuleSourcesGeneratorTarget, SemgrepRuleSourceTarget
 
 DIR = "src"
 
@@ -90,11 +90,11 @@ def rule_runner() -> RuleRunner:
             *semgrep_rules(),
             *semgrep_subsystem_rules(),
             *source_files.rules(),
-            QueryRule(Partitions, (SemgrepRequest.PartitionRequest,)),
-            QueryRule(LintResult, (SemgrepRequest.Batch,)),
+            QueryRule(Partitions, (SemgrepLintRequest.PartitionRequest,)),
+            QueryRule(LintResult, (SemgrepLintRequest.Batch,)),
             QueryRule(SourceFiles, (SourceFilesRequest,)),
         ],
-        target_types=[SemgrepRuleSource, SemgrepRuleSourcesGeneratorTarget, FileTarget],
+        target_types=[SemgrepRuleSourceTarget, SemgrepRuleSourcesGeneratorTarget, FileTarget],
     )
 
 
@@ -116,12 +116,16 @@ def run_semgrep(
     )
     partitions = rule_runner.request(
         Partitions[SemgrepFieldSet, PartitionMetadata],
-        [SemgrepRequest.PartitionRequest(tuple(SemgrepFieldSet.create(tgt) for tgt in targets))],
+        [
+            SemgrepLintRequest.PartitionRequest(
+                tuple(SemgrepFieldSet.create(tgt) for tgt in targets)
+            )
+        ],
     )
 
     return tuple(
         rule_runner.request(
-            LintResult, [SemgrepRequest.Batch("", partition.elements, partition.metadata)]
+            LintResult, [SemgrepLintRequest.Batch("", partition.elements, partition.metadata)]
         )
         for partition in partitions
     )
@@ -142,7 +146,7 @@ def assert_success(
 
 @pytest.mark.parametrize(
     "major_minor_interpreter",
-    all_major_minor_python_versions(Semgrep.default_interpreter_constraints),
+    all_major_minor_python_versions(SemgrepSubsystem.default_interpreter_constraints),
 )
 def test_passing(rule_runner: RuleRunner, major_minor_interpreter: str) -> None:
     rule_runner.write_files(GOOD_FILE_LAYOUT)
@@ -313,7 +317,7 @@ def test_partition_by_config(rule_runner: RuleRunner) -> None:
 
     partitions = rule_runner.request(
         Partitions[SemgrepFieldSet, PartitionMetadata],
-        [SemgrepRequest.PartitionRequest(field_sets)],
+        [SemgrepLintRequest.PartitionRequest(field_sets)],
     )
 
     sorted_partitions = sorted(

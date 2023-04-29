@@ -8,7 +8,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Iterable
 
-from pants.backend.tools.semgrep.subsystem import Semgrep
+from pants.backend.tools.semgrep.subsystem import SemgrepSubsystem
 from pants.backend.tools.semgrep.target_types import SemgrepRuleSourcesGeneratorTarget
 from pants.core.goals.tailor import (
     AllOwnedSources,
@@ -47,7 +47,7 @@ def _group_by_semgrep_dir(paths: Iterable[str]) -> dict[str, set[str]]:
 async def find_putative_targets(
     req: PutativeSemgrepTargetsRequest,
     all_owned_sources: AllOwnedSources,
-    semgrep: Semgrep,
+    semgrep: SemgrepSubsystem,
 ) -> PutativeTargets:
     pts = []
 

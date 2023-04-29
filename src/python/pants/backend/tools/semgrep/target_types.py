@@ -32,7 +32,7 @@ class SemgrepRuleGeneratingSourcesField(MultipleSourcesField):
     )
 
 
-class SemgrepRuleSource(Target):
+class SemgrepRuleSourceTarget(Target):
     alias = "semgrep_rule_source"
     core_fields = (*COMMON_TARGET_FIELDS, SemgrepRuleSourceField)
 
@@ -45,7 +45,7 @@ class SemgrepRuleSourcesGeneratorTarget(TargetFilesGenerator):
         *COMMON_TARGET_FIELDS,
         SemgrepRuleGeneratingSourcesField,
     )
-    generated_target_cls = SemgrepRuleSource
+    generated_target_cls = SemgrepRuleSourceTarget
     copied_fields = COMMON_TARGET_FIELDS
     moved_fields = ()
     help = "Generate a `semgrep_rule_source` target for each file in the `sources` field."

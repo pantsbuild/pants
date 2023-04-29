@@ -16,15 +16,15 @@ from pants.backend.tools.semgrep import rules as semgrep_rules
 from pants.backend.tools.semgrep import subsystem as subsystem
 from pants.backend.tools.semgrep import tailor
 from pants.backend.tools.semgrep.target_types import (
-    SemgrepRuleSource,
     SemgrepRuleSourcesGeneratorTarget,
+    SemgrepRuleSourceTarget,
 )
 from pants.engine.rules import Rule
 from pants.engine.unions import UnionRule
 
 
 def target_types():
-    return [SemgrepRuleSource, SemgrepRuleSourcesGeneratorTarget]
+    return [SemgrepRuleSourceTarget, SemgrepRuleSourcesGeneratorTarget]
 
 
 def rules() -> Iterable[Rule | UnionRule]:

@@ -37,7 +37,7 @@ class SemgrepFieldSet(FieldSet):
         return False
 
 
-class Semgrep(PythonToolBase):
+class SemgrepSubsystem(PythonToolBase):
     name = "Semgrep"
     options_scope = "semgrep"
     help = "Lightweight static analysis for many languages. Find bug variants with patterns that look like source code. (https://semgrep.dev/)"
@@ -91,11 +91,13 @@ class Semgrep(PythonToolBase):
 
 
 class SemgrepLockfileSentinel(GeneratePythonToolLockfileSentinel):
-    resolve_name = Semgrep.options_scope
+    resolve_name = SemgrepSubsystem.options_scope
 
 
 @rule
-def setup_semgrep_lockfile(_: SemgrepLockfileSentinel, semgrep: Semgrep) -> GeneratePythonLockfile:
+def setup_semgrep_lockfile(
+    _: SemgrepLockfileSentinel, semgrep: SemgrepSubsystem
+) -> GeneratePythonLockfile:
     return semgrep.to_lockfile_request()
 
 
@@ -104,7 +106,7 @@ class SemgrepExportSentinel(ExportPythonToolSentinel):
 
 
 @rule
-def semgrep_export(_: SemgrepExportSentinel, semgrep: Semgrep) -> ExportPythonTool:
+def semgrep_export(_: SemgrepExportSentinel, semgrep: SemgrepSubsystem) -> ExportPythonTool:
     if not semgrep.export:
         return ExportPythonTool(resolve_name=semgrep.options_scope, pex_request=None)
     return ExportPythonTool(
