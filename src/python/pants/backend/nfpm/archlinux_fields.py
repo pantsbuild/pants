@@ -12,6 +12,7 @@ from pants.util.strutil import help_text
 
 
 class NfpmArchlinuxPackagerField(StringField):
+    nfpm_alias = "archlinux.packager"
     alias = "packager"
     help = help_text(
         # based in part on the docs at:
@@ -37,6 +38,7 @@ class NfpmArchlinuxPackagerField(StringField):
 
 
 class NfpmArchlinuxPkgbaseField(StringField):
+    nfpm_alias = "archlinux.pkgbase"
     alias = "pkgbase"
     help = help_text(
         # based in part on the docs at:

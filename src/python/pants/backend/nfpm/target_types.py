@@ -4,6 +4,9 @@
 from __future__ import annotations
 
 from enum import Enum
+from typing import ClassVar
+
+from typing_extensions import Protocol
 
 from pants.backend.nfpm.apk_fields import NfpmApkMaintainerField
 from pants.backend.nfpm.archlinux_fields import (
@@ -33,6 +36,12 @@ from pants.core.goals.package import OutputPathField
 from pants.engine.target import COMMON_TARGET_FIELDS, StringField, Target
 from pants.util.docutil import doc_url
 from pants.util.strutil import help_text
+
+# This allows us to define the nFPM config option name on the field
+class _NfpmField(Protocol):
+    # nfpm_alias is a "." concatenated series of dict keys (keys of nfpm.yaml).
+    nfpm_alias: ClassVar[str]
+
 
 # TODO: maybe add a package name field as well
 
@@ -79,7 +88,8 @@ class GoOS(Enum):
 
 
 class NfpmArchField(StringField):
-    alias = "arch"
+    nfpm_alias = "arch"
+    alias = nfpm_alias
     default = GoArch.amd64.value  # based on nFPM default
     help = help_text(
         """
@@ -95,7 +105,8 @@ class NfpmArchField(StringField):
 
 
 class NfpmPlatformField(StringField):
-    alias = "platform"
+    nfpm_alias = "platform"
+    alias = nfpm_alias
     valid_choices = GoOS
     default = GoOS.linux.value  # based on nFPM default
     help = help_text(
@@ -109,7 +120,8 @@ class NfpmPlatformField(StringField):
 
 
 class NfpmHomepageField(StringField):
-    alias = "homepage"
+    nfpm_alias = "homepage"
+    alias = nfpm_alias
     help = help_text(
         lambda: f"""
         The URL of this package's homepage like "https://example.com".
@@ -122,7 +134,8 @@ class NfpmHomepageField(StringField):
 
 
 class NfpmLicenseField(StringField):
-    alias = "license"
+    nfpm_alias = "license"
+    alias = nfpm_alias
     help = help_text(
         """
         The license of this package.

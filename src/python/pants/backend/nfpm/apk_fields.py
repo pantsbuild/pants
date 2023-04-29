@@ -12,7 +12,8 @@ from pants.util.strutil import help_text
 
 
 class NfpmApkMaintainerField(StringField):
-    alias = "maintainer"
+    nfpm_alias = "maintainer"
+    alias = nfpm_alias
     help = help_text(
         # based in part on the docs at:
         # https://nfpm.goreleaser.com/configuration/#reference

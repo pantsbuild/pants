@@ -10,7 +10,8 @@ from pants.util.strutil import help_text
 
 
 class NfpmVersionField(StringField):
-    alias: ClassVar[str] = "version"
+    nfpm_alias = "version"
+    alias: ClassVar[str] = nfpm_alias
     required = True
     help = help_text(
         # Based in part on the docs from:
@@ -29,7 +30,8 @@ class NfpmVersionField(StringField):
 
 
 class NfpmVersionSchemaField(StringField):
-    alias: ClassVar[str] = "version_schema"
+    nfpm_alias = "version_schema"
+    alias: ClassVar[str] = nfpm_alias
     default = "semver"
     valid_choices = ("none", "semver")
     help = help_text(
@@ -72,6 +74,7 @@ class NfpmVersionSchemaField(StringField):
 
 
 class NfpmVersionPrereleaseField(StringField):
+    nfpm_alias = "prerelease"
     # nFPM calls this "prerelease", but we prefix with "version_" to
     # highlight this field's relationship with the other version_ fields.
     alias: ClassVar[str] = "version_prerelease"
@@ -91,7 +94,8 @@ class NfpmVersionPrereleaseField(StringField):
 
 
 class NfpmVersionMetadataField(StringField):
-    alias: ClassVar[str] = "version_metadata"
+    nfpm_alias = "version_metadata"
+    alias: ClassVar[str] = nfpm_alias
     help = help_text(
         lambda: f"""
         This is package-manager specific metadata for the version.
@@ -110,6 +114,7 @@ class NfpmVersionMetadataField(StringField):
 
 
 class NfpmVersionReleaseField(IntField):
+    nfpm_alias = "release"
     # nFPM calls this "release", but we prefix with "version_" to
     # highlight this field's relationship with the other version_ fields.
     alias: ClassVar[str] = "version_release"
@@ -131,6 +136,7 @@ class NfpmVersionReleaseField(IntField):
 
 
 class NfpmVersionEpochField(IntField):
+    nfpm_alias = "epoch"
     # nFPM calls this "epoch", but we prefix with "version_" to
     # highlight this field's relationship with the other version_ fields.
     alias: ClassVar[str] = "version_epoch"
