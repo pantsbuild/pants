@@ -162,21 +162,26 @@ class NfpmLicenseField(StringField):
     )
 
 
+APK_FIELDS = (
+    NfpmArchField,
+    # version fields (apk does NOT get: version_metadata or epoch)
+    NfpmVersionField,
+    NfpmVersionSchemaField,
+    NfpmVersionPrereleaseField,
+    NfpmVersionReleaseField,
+    # other package metadata fields
+    NfpmHomepageField,
+    NfpmLicenseField,
+    NfpmApkMaintainerField,
+)
+
+
 class NfpmApkPackage(Target):
     alias = "nfpm_apk_package"
     core_fields = (
         *COMMON_TARGET_FIELDS,  # tags, description
         OutputPathField,
-        NfpmArchField,
-        # version fields (apk does NOT get: version_metadata or epoch)
-        NfpmVersionField,
-        NfpmVersionSchemaField,
-        NfpmVersionPrereleaseField,
-        NfpmVersionReleaseField,
-        # other package metadata fields
-        NfpmHomepageField,
-        NfpmLicenseField,
-        NfpmApkMaintainerField,
+        *APK_FIELDS,
     )
     help = help_text(
         f""""
@@ -190,23 +195,28 @@ class NfpmApkPackage(Target):
     )
 
 
+ARCHLINUX_FIELDS = (
+    NfpmArchField,
+    # version fields (archlinux does NOT get: version_metadata)
+    NfpmVersionField,
+    NfpmVersionSchemaField,
+    NfpmVersionPrereleaseField,
+    NfpmVersionReleaseField,
+    NfpmVersionEpochField,
+    # other package metadata fields
+    NfpmHomepageField,
+    NfpmLicenseField,
+    NfpmArchlinuxPackagerField,
+    NfpmArchlinuxPkgbaseField,
+)
+
+
 class NfpmArchlinuxPackage(Target):
     alias = "nfpm_archlinux_package"
     core_fields = (
         *COMMON_TARGET_FIELDS,
         OutputPathField,
-        NfpmArchField,
-        # version fields (archlinux does NOT get: version_metadata)
-        NfpmVersionField,
-        NfpmVersionSchemaField,
-        NfpmVersionPrereleaseField,
-        NfpmVersionReleaseField,
-        NfpmVersionEpochField,
-        # other package metadata fields
-        NfpmHomepageField,
-        NfpmLicenseField,
-        NfpmArchlinuxPackagerField,
-        NfpmArchlinuxPkgbaseField,
+        *ARCHLINUX_FIELDS,
     )
     help = help_text(
         f""""
@@ -220,26 +230,31 @@ class NfpmArchlinuxPackage(Target):
     )
 
 
+DEB_FIELDS = (
+    NfpmArchField,
+    NfpmPlatformField,
+    # version fields
+    NfpmVersionField,
+    NfpmVersionSchemaField,
+    NfpmVersionPrereleaseField,
+    NfpmVersionMetadataField,
+    NfpmVersionReleaseField,
+    NfpmVersionEpochField,
+    # other package metadata fields
+    NfpmHomepageField,
+    NfpmLicenseField,  # not used by nFPM yet.
+    NfpmDebMaintainerField,
+    NfpmDebSectionField,
+    NfpmDebPriorityField,
+)
+
+
 class NfpmDebPackage(Target):
     alias = "nfpm_deb_package"
     core_fields = (
         *COMMON_TARGET_FIELDS,
         OutputPathField,
-        NfpmArchField,
-        NfpmPlatformField,
-        # version fields
-        NfpmVersionField,
-        NfpmVersionSchemaField,
-        NfpmVersionPrereleaseField,
-        NfpmVersionMetadataField,
-        NfpmVersionReleaseField,
-        NfpmVersionEpochField,
-        # other package metadata fields
-        NfpmHomepageField,
-        NfpmLicenseField,  # not used by nFPM yet.
-        NfpmDebMaintainerField,
-        NfpmDebSectionField,
-        NfpmDebPriorityField,
+        *DEB_FIELDS,
     )
     help = help_text(
         f""""
@@ -253,27 +268,32 @@ class NfpmDebPackage(Target):
     )
 
 
+RPM_FIELDS = (
+    NfpmArchField,
+    NfpmPlatformField,
+    # version fields
+    NfpmVersionField,
+    NfpmVersionSchemaField,
+    NfpmVersionPrereleaseField,
+    NfpmVersionMetadataField,
+    NfpmVersionReleaseField,
+    NfpmVersionEpochField,
+    # other package metadata fields
+    NfpmHomepageField,
+    NfpmLicenseField,
+    NfpmRpmPackagerField,
+    NfpmRpmVendorField,
+    NfpmRpmGroupField,
+    NfpmRpmSummaryField,
+)
+
+
 class NfpmRpmPackage(Target):
     alias = "nfpm_rpm_package"
     core_fields = (
         *COMMON_TARGET_FIELDS,
         OutputPathField,
-        NfpmArchField,
-        NfpmPlatformField,
-        # version fields
-        NfpmVersionField,
-        NfpmVersionSchemaField,
-        NfpmVersionPrereleaseField,
-        NfpmVersionMetadataField,
-        NfpmVersionReleaseField,
-        NfpmVersionEpochField,
-        # other package metadata fields
-        NfpmHomepageField,
-        NfpmLicenseField,
-        NfpmRpmPackagerField,
-        NfpmRpmVendorField,
-        NfpmRpmGroupField,
-        NfpmRpmSummaryField,
+        *RPM_FIELDS,
     )
     help = help_text(
         f""""
