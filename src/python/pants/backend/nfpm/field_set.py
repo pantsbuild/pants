@@ -17,7 +17,7 @@ from pants.backend.nfpm.target_types import (
 )
 from pants.core.goals.package import OutputPathField, PackageFieldSet
 from pants.engine.rules import collect_rules
-from pants.engine.target import Target
+from pants.engine.target import DescriptionField, Target
 from pants.engine.unions import UnionRule
 
 
@@ -25,6 +25,7 @@ from pants.engine.unions import UnionRule
 class NfpmPackageFieldSet(PackageFieldSet, metaclass=ABCMeta):
     output_path: OutputPathField
     package_name: NfpmPackageNameField
+    description: DescriptionField
 
     def nfpm_config(self, tgt: Target) -> dict[str, Any]:
         config: dict[str, Any] = {}
@@ -43,6 +44,10 @@ class NfpmPackageFieldSet(PackageFieldSet, metaclass=ABCMeta):
                 cfg.setdefault(key, {})
                 cfg = cfg[key]
             cfg[keys[-1]] = value
+
+        description = self.description.value
+        if description:
+            config["description"] = description
 
         return config
 
