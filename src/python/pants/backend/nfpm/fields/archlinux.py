@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from pants.backend.nfpm.fields._relationships import NfpmPackageRelationshipsField
 from pants.engine.target import StringField
 from pants.util.strutil import help_text
 
@@ -55,5 +56,41 @@ class NfpmArchlinuxPkgbaseField(StringField):
         See:
         https://man.archlinux.org/man/BUILDINFO.5
         https://wiki.archlinux.org/title/PKGBUILD#pkgbase
+        """
+    )
+
+
+class NfpmArchlinuxReplacesField(NfpmPackageRelationshipsField):
+    nfpm_alias = "replaces"
+    alias = nfpm_alias
+    help = help_text(
+        lambda: f"""
+        """
+    )
+
+
+class NfpmArchlinuxProvidesField(NfpmPackageRelationshipsField):
+    nfpm_alias = "provides"
+    alias = nfpm_alias
+    help = help_text(
+        lambda: f"""
+        """
+    )
+
+
+class NfpmArchlinuxDependsField(NfpmPackageRelationshipsField):
+    nfpm_alias = "depends"
+    alias = nfpm_alias  # TODO: this might be confused with "dependencies"
+    help = help_text(
+        lambda: f"""
+        """
+    )
+
+
+class NfpmArchlinuxConflictsField(NfpmPackageRelationshipsField):
+    nfpm_alias = "conflicts"
+    alias = nfpm_alias
+    help = help_text(
+        lambda: f"""
         """
     )

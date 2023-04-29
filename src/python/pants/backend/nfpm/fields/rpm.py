@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from pants.backend.nfpm.fields._relationships import NfpmPackageRelationshipsField
 from pants.engine.target import StringField
 from pants.util.strutil import help_text
 
@@ -87,5 +88,59 @@ class NfpmRpmSummaryField(StringField):
         the '{NfpmRpmSummaryField.alias}'.
 
         See: https://ftp.osuosl.org/pub/rpm/max-rpm/s1-rpm-inside-tags.html#S3-RPM-INSIDE-SUMMARY-TAG
+        """
+    )
+
+
+class NfpmRpmReplacesField(NfpmPackageRelationshipsField):
+    nfpm_alias = "replaces"
+    alias = nfpm_alias
+    help = help_text(
+        lambda: f"""
+        """
+    )
+
+
+class NfpmRpmProvidesField(NfpmPackageRelationshipsField):
+    nfpm_alias = "provides"
+    alias = nfpm_alias
+    help = help_text(
+        lambda: f"""
+        """
+    )
+
+
+class NfpmRpmDependsField(NfpmPackageRelationshipsField):
+    nfpm_alias = "depends"
+    alias = nfpm_alias  # TODO: this might be confused with "dependencies"
+    help = help_text(
+        lambda: f"""
+        """
+    )
+
+
+class NfpmRpmRecommendsField(NfpmPackageRelationshipsField):
+    nfpm_alias = "recommends"
+    alias = nfpm_alias
+    help = help_text(
+        lambda: f"""
+        """
+    )
+
+
+class NfpmRpmSuggestsField(NfpmPackageRelationshipsField):
+    nfpm_alias = "suggests"
+    alias = nfpm_alias
+    help = help_text(
+        lambda: f"""
+        """
+    )
+
+
+class NfpmRpmConflictsField(NfpmPackageRelationshipsField):
+    nfpm_alias = "conflicts"
+    alias = nfpm_alias
+    help = help_text(
+        lambda: f"""
         """
     )

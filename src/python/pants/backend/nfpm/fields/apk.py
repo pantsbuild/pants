@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from pants.backend.nfpm.fields._relationships import NfpmPackageRelationshipsField
 from pants.engine.target import StringField
 from pants.util.strutil import help_text
 
@@ -30,3 +31,30 @@ class NfpmApkMaintainerField(StringField):
         """
     )
     # TODO: Add validation for the "Name <email@domain>" format
+
+
+class NfpmApkReplacesField(NfpmPackageRelationshipsField):
+    nfpm_alias = "replaces"
+    alias = nfpm_alias
+    help = help_text(
+        lambda: f"""
+        """
+    )
+
+
+class NfpmApkProvidesField(NfpmPackageRelationshipsField):
+    nfpm_alias = "provides"
+    alias = nfpm_alias
+    help = help_text(
+        lambda: f"""
+        """
+    )
+
+
+class NfpmApkDependsField(NfpmPackageRelationshipsField):
+    nfpm_alias = "depends"
+    alias = nfpm_alias  # TODO: this might be confused with "dependencies"
+    help = help_text(
+        lambda: f"""
+        """
+    )
