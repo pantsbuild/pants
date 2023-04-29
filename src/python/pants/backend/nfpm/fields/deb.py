@@ -168,6 +168,18 @@ class NfpmDebReplacesField(NfpmPackageRelationshipsField):
     alias = nfpm_alias
     help = help_text(
         lambda: f"""
+        A list or packages that this package replaces or partially replaces.
+
+        To declare that this package partially replaces another package, by
+        taking ownership of files in that package, include that other package in
+        both '{NfpmDebReplacesField.alias}' and '{NfpmDebBreaksField.alias}'.
+
+        If this package completely replaces the other package, you can force its
+        removal by including the other package in both '{NfpmDebReplacesField.alias}'
+        and '{NfpmDebConflictsField}' (and '{NfpmDebProvidesField.alias}' if it
+        is a virtual package).
+
+        See: https://www.debian.org/doc/debian-policy/ch-relationships.html#overwriting-files-and-replacing-packages-replaces
         """
     )
 
@@ -177,6 +189,22 @@ class NfpmDebProvidesField(NfpmPackageRelationshipsField):
     alias = nfpm_alias
     help = help_text(
         lambda: f"""
+        A list of virtual packages that this package provides.
+
+        Each entry can be either a package name, or a package name with a version.
+        The version, however, must be declared with `=` (not `<<`, `<=`, etc)
+
+        For example, these declare virtual packages foo and bar.
+
+        - "foo"
+        - "bar (=1.0.0)"
+
+        If several packages declare the same '{NfpmDebProvidesField.alias}',
+        then they might need to declare that they conflict with each other
+        using '{NfpmDebConflictsField.alias}' if, for example, they also install
+        a binary with the same path.
+
+        See: https://www.debian.org/doc/debian-policy/ch-relationships.html#virtual-packages-provides
         """
     )
 
@@ -186,6 +214,24 @@ class NfpmDebDependsField(NfpmPackageRelationshipsField):
     alias = nfpm_alias  # TODO: this might be confused with "dependencies"
     help = help_text(
         lambda: f"""
+        List of package dependencies (for package installers).
+
+        The '{NfpmDebDependsField.alias}' field has install-time dependencies
+        that can use version selectors (with one of `<<`, `<=`, `=`, `>=`, `>>`
+        in parentheses) or use `|` to specify package alternatives that equally
+        satisfy a dependency.
+
+        - "git"
+        - "libc6 (>= 2.2.1)"
+        - "default-mta | mail-transport-agent"
+
+        Make sure to include package dependencies of this package as well as any
+        packages required by the `postinstall`, `postupgrade`, or `preremove` scripts.
+
+        WARNING: This is NOT the same as the 'dependencies' field!
+        It does not accept pants-style dependencies like target addresses.
+
+        See: https://www.debian.org/doc/debian-policy/ch-relationships.html
         """
     )
 
@@ -195,6 +241,16 @@ class NfpmDebRecommendsField(NfpmPackageRelationshipsField):
     alias = nfpm_alias
     help = help_text(
         lambda: f"""
+        List of optional package dependencies (for package installers).
+
+        The '{NfpmDebRecommendsField.alias}' field has packages that can be
+        excluded in "unusual installations" but should generally be installed
+        with this package.
+
+        WARNING: This is NOT the same as the 'dependencies' field!
+        It does not accept pants-style dependencies like target addresses.
+
+        See: https://www.debian.org/doc/debian-policy/ch-relationships.html
         """
     )
 
@@ -203,7 +259,13 @@ class NfpmDebSuggestsField(NfpmPackageRelationshipsField):
     nfpm_alias = "suggests"
     alias = nfpm_alias
     help = help_text(
-        lambda: f"""
+        """
+        A list of package suggestions (for package installers).
+
+        These packages are completely optional, but could be useful for users
+        of this package to install as well.
+
+        See: https://www.debian.org/doc/debian-policy/ch-relationships.html
         """
     )
 
@@ -213,6 +275,22 @@ class NfpmDebConflictsField(NfpmPackageRelationshipsField):
     alias = nfpm_alias
     help = help_text(
         lambda: f"""
+        A list of packages that this package conflicts with.
+
+        Generally, you should use '{NfpmDebBreaksField.alias}' instead of
+        '{NfpmDebConflictsField.alias}', because '{NfpmDebConflictsField.alias}'
+        imposes much more strict requirements on the order of package installs
+        and removals. Use this if the conflicting packages must be completely
+        uninstalled before this package can be installed.
+
+        For example, this is how to declare that this package conflicts with the
+        foo (version 2.5 or less) and bar packages, so they must be uninstalled
+        before this package can be installed.
+
+        - "foo (<2.6)"
+        - "bar"
+
+        See: https://www.debian.org/doc/debian-policy/ch-relationships.html#conflicting-binary-packages-conflicts
         """
     )
 
@@ -222,5 +300,23 @@ class NfpmDebBreaksField(NfpmPackageRelationshipsField):
     alias = "breaks"
     help = help_text(
         lambda: f"""
+        A list of packages which would break if this package would be installed.
+
+        The installation of this package is blocked (by package installers)
+        if any packages in this list are already installed. This is a looser
+        package relationship than the '{NfpmDebConflictsField.alias}' field,
+        because it allows the package installer more flexibility on ordering
+        package installs and removals (For example, if this package breaks "bar",
+        then "bar" can be removed after this package when it gets removed in the
+        same package install transaction).
+        
+        For example, this is how to declare that this breaks package foo, but
+        only if foo version 2.5 or less is installed and it breaks package bar
+        no matter what version is installed.
+
+        - "foo (<2.6)"
+        - "bar"
+
+        See: https://www.debian.org/doc/debian-policy/ch-relationships.html#packages-which-break-other-packages-breaks
         """
     )
