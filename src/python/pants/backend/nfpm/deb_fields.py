@@ -22,7 +22,8 @@ from pants.util.strutil import help_text
 
 
 class NfpmDebMaintainerField(StringField):
-    alias = "maintainer"
+    nfpm_alias = "maintainer"
+    alias = nfpm_alias
     required = True  # Not setting this is deprecated in nFPM, so we require it.
     help = help_text(
         lambda: f"""
@@ -41,7 +42,8 @@ class NfpmDebMaintainerField(StringField):
 
 
 class NfpmDebSectionField(StringField):
-    alias = "section"
+    nfpm_alias = "section"
+    alias = nfpm_alias
     help = help_text(
         """
         Which section, or application area, this package is part of.
@@ -67,7 +69,8 @@ class DebPriority(Enum):
 
 
 class NfpmDebPriorityField(StringField):
-    alias = "priority"
+    nfpm_alias = "priority"
+    alias = nfpm_alias
     valid_choices = DebPriority
     default = DebPriority.optional.value
     help = help_text(
@@ -85,6 +88,7 @@ class NfpmDebPriorityField(StringField):
 
 
 class NfpmDebFieldsField(DictStringToStringField):
+    nfpm_alias = "deb.fields"
     alias = "fields"
     help = help_text(
         # based in part on the docs at:
@@ -103,6 +107,7 @@ class NfpmDebFieldsField(DictStringToStringField):
 
 
 class NfpmDebTriggersField(DictStringToStringSequenceField):
+    nfpm_alias = "deb.triggers"
     alias = "triggers"
     help = help_text(
         """

@@ -18,6 +18,7 @@ from pants.util.strutil import help_text
 
 
 class NfpmRpmPackagerField(StringField):
+    nfpm_alias = "rpm.packager"
     alias = "packager"
     # nFPM uses value of 'maintainer' as default.
     help = help_text(
@@ -42,7 +43,8 @@ class NfpmRpmPackagerField(StringField):
 
 
 class NfpmRpmVendorField(StringField):
-    alias = "vendor"
+    nfpm_alias = "vendor"
+    alias = nfpm_alias
     help = help_text(
         """
         The entity responsible for packaging (typically an organization).
@@ -56,6 +58,7 @@ class NfpmRpmVendorField(StringField):
 
 
 class NfpmRpmGroupField(StringField):
+    nfpm_alias = "rpm.group"
     alias = "group"
     help = help_text(
         lambda: f"""
@@ -74,6 +77,7 @@ class NfpmRpmGroupField(StringField):
 
 
 class NfpmRpmSummaryField(StringField):
+    nfpm_alias = "rpm.summary"
     alias = "summary"
     help = help_text(
         lambda: f"""
