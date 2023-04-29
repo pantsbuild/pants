@@ -13,6 +13,7 @@ from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProc
 from pants.core.goals.lint import LintResult, LintTargetsRequest
 from pants.core.util_rules.partitions import Partition, Partitions
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
+from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests, PathGlobs, Snapshot
 from pants.engine.process import FallibleProcessResult, ProcessCacheScope
 from pants.engine.rules import Get, MultiGet, Rule, collect_rules, rule
@@ -73,6 +74,24 @@ class SemgrepIgnoreFiles:
 class AllSemgrepConfigs:
     targets: dict[str, list[Target]]
 
+    def ancestor_targets(self, address: Address) -> Iterable[Target]:
+        # TODO: introspect the semgrep rules and determine which (if any) apply to the files, e.g. a #
+        # Python file shouldn't depend on a .semgrep.yml that doesn't have any 'python' or 'generic' #
+        # rules, and similarly if there's path inclusions/exclusions.
+        # TODO: this would be better as actual dependency inference (e.g. allows inspection, manual
+        # addition/exclusion), but that can only infer 'full' dependencies and it is wrong (e.g. JVM
+        # things break) for real code files to depend on this sort of non-code linter config; requires
+        # dependency scopes or similar (https://github.com/pantsbuild/pants/issues/12794)
+        spec = address.spec_path
+
+        while True:
+            yield from self.targets.get(spec, [])
+
+            if not spec:
+                break
+
+            spec = os.path.dirname(spec)
+
 
 @rule
 async def find_all_semgrep_configs(all_targets: AllTargets) -> AllSemgrepConfigs:
@@ -92,25 +111,7 @@ class InferSemgrepDependenciesRequest:
 async def infer_semgrep_dependencies(
     request: InferSemgrepDependenciesRequest, all_semgrep: AllSemgrepConfigs
 ) -> Targets:
-    # TODO: introspect the semgrep rules and determine which (if any) apply to the files, e.g. a #
-    # Python file shouldn't depend on a .semgrep.yml that doesn't have any 'python' or 'generic' #
-    # rules, and similarly if there's path inclusions/exclusions.
-    # TODO: this would be better as actual dependency inference (e.g. allows inspection, manual
-    # addition/exclusion), but that can only infer 'full' dependencies and it is wrong (e.g. JVM
-    # things break) for real code files to depend on this sort of non-code linter config; requires
-    # dependency scopes or similar (https://github.com/pantsbuild/pants/issues/12794)
-    spec = request.field_set.address.spec_path
-    found: list[Target] = []
-
-    while True:
-        found.extend(all_semgrep.targets.get(spec, []))
-
-        if not spec:
-            break
-
-        spec = os.path.dirname(spec)
-
-    return Targets(found)
+    return Targets(tuple(all_semgrep.ancestor_targets(request.field_set.address)))
 
 
 @rule
