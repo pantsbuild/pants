@@ -39,7 +39,7 @@ class RustfmtRequest(FmtRequest):
 async def rustfmt_fmt(request: RustfmtRequest.Batch, rustfmt: RustfmtSubsystem) -> FmtResult:
     args = (
         *rustfmt.args,
-        # Filter out non-.go files, e.g. cargo.toml, from the file list.
+        # Filter out non-.rs files, e.g. cargo.toml, from the file list.
         *(f for f in request.snapshot.files if f.endswith(".rs")),)
     result = await Get(
         ProcessResult,
