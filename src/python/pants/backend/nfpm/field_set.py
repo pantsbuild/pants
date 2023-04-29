@@ -42,7 +42,7 @@ class NfpmPackageFieldSet(PackageFieldSet, metaclass=ABCMeta):
                 # TODO: if key == "[]" then it is an array (.contents)
                 cfg.setdefault(key, {})
                 cfg = cfg[key]
-            cfg[keys[-1]] = tgt[field].value
+            cfg[keys[-1]] = value
 
         return config
 
