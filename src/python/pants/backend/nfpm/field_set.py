@@ -27,7 +27,7 @@ class NfpmPackageFieldSet(PackageFieldSet, metaclass=ABCMeta):
     package_name: NfpmPackageNameField
 
     def nfpm_config(self, tgt: Target) -> dict[str, Any]:
-        config = {}
+        config: dict[str, Any] = {}
         for field in self.required_fields:
             value = tgt[field].value
             if not field.required and value is None:
