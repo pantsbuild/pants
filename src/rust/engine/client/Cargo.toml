@@ -25,4 +25,4 @@ tokio = { version = "1.21", features = ["rt-multi-thread", "macros", "net", "io-
 uname = "0.1"
 
 [dev-dependencies]
-tempfile = "3"
+tempfile = "3.5.0"
