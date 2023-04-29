@@ -43,7 +43,15 @@ class _NfpmField(Protocol):
     nfpm_alias: ClassVar[str]
 
 
-# TODO: maybe add a package name field as well
+class NfpmPackageNameField(StringField):
+    nfpm_alias: str = "name"
+    alias = "package_name"
+    required = True
+    help = help_text(
+        """
+        The package name.
+        """
+    )
 
 
 class GoArch(Enum):
@@ -163,6 +171,7 @@ class NfpmLicenseField(StringField):
 
 
 APK_FIELDS = (
+    NfpmPackageNameField,
     NfpmArchField,
     # version fields (apk does NOT get: version_metadata or epoch)
     NfpmVersionField,
@@ -196,6 +205,7 @@ class NfpmApkPackage(Target):
 
 
 ARCHLINUX_FIELDS = (
+    NfpmPackageNameField,
     NfpmArchField,
     # version fields (archlinux does NOT get: version_metadata)
     NfpmVersionField,
@@ -231,6 +241,7 @@ class NfpmArchlinuxPackage(Target):
 
 
 DEB_FIELDS = (
+    NfpmPackageNameField,
     NfpmArchField,
     NfpmPlatformField,
     # version fields
@@ -269,6 +280,7 @@ class NfpmDebPackage(Target):
 
 
 RPM_FIELDS = (
+    NfpmPackageNameField,
     NfpmArchField,
     NfpmPlatformField,
     # version fields
