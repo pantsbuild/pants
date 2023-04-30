@@ -25,8 +25,8 @@ from pants.engine.target import GeneratedSources
 from pants.testutil.rule_runner import RuleRunner
 
 
-@pytest.fixture
-def rule_runner() -> RuleRunner:
+@pytest.fixture(params=["pnpm", "npm"])
+def rule_runner(request) -> RuleRunner:
     rule_runner = RuleRunner(
         rules=[
             *package_rules(),
@@ -42,7 +42,7 @@ def rule_runner() -> RuleRunner:
         ],
         objects=dict(package_json.build_file_aliases().objects),
     )
-    rule_runner.set_options([], env_inherit={"PATH"})
+    rule_runner.set_options([f"--nodejs-package-manager={request.param}"], env_inherit={"PATH"})
     return rule_runner
 
 
