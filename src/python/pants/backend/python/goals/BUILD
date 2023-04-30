@@ -11,7 +11,7 @@ python_tests(
         "coverage_py_test.py": {"timeout": 20},
         "coverage_py_integration_test.py": {
             "tags": ["platform_specific_behavior"],
-            "timeout": 480,
+            "timeout": 540,
         },
         "export_integration_test.py": {"timeout": 300},
         "export_test.py": {"timeout": 90},
