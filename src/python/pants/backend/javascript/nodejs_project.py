@@ -79,7 +79,7 @@ class NodeJSProject:
     @property
     def workspace_specifier_arg(self) -> str:
         if self.package_manager == "pnpm":
-            return "--prefix"
+            return "--filter"
         return "--workspace"
 
     def extra_env(self) -> dict[str, str]:
