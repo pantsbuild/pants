@@ -21,7 +21,7 @@ use pyo3::prelude::{Py, PyAny, PyErr, Python};
 use pyo3::IntoPy;
 use url::Url;
 
-use crate::context::{Context, Core};
+use crate::context::{Context, Core, SessionCore};
 use crate::downloads;
 use crate::externs;
 use crate::python::{display_sorted_in_parens, throw, Failure, Key, Params, TypeId, Value};
@@ -38,7 +38,7 @@ use process_execution::{
 
 use crate::externs::engine_aware::{EngineAwareParameter, EngineAwareReturnType};
 use crate::externs::fs::PyFileDigest;
-use graph::{Node, NodeError};
+use graph::{CompoundNode, Node, NodeError};
 use hashing::Digest;
 use rule_graph::{DependencyKey, Query};
 use store::{self, Store, StoreError, StoreFileByDigest};
@@ -107,24 +107,10 @@ impl StoreFileByDigest<Failure> for Context {
 }
 
 ///
-/// Defines the mapping between a NodeKey and its NodeOutput, to allow for type-safe lookups of
-/// (wrapped) `graph` Nodes via `Context::get`.
-///
-/// The Item type of a WrappedNode is bounded to values that can be stored and retrieved
-/// from the NodeOutput enum. Due to the semantics of memoization, retrieving the typed result
-/// stored inside the NodeOutput requires an implementation of TryFrom<NodeOutput>. But the
-/// combination of bounds at usage sites should mean that a failure to unwrap the result is
-/// exceedingly rare.
-///
-pub trait WrappedNode: Into<NodeKey> {
-  type Item: TryFrom<NodeOutput>;
-}
-
-///
 /// A Node that selects a product for some Params.
 ///
 /// NB: This is a Node so that it can be used as a root in the graph, but it does not implement
-/// WrappedNode, because it should never be requested as a Node using context.get. Select is a thin
+/// CompoundNode, because it should never be requested as a Node using context.get. Select is a thin
 /// proxy to other Node types (which it requests using context.get), and memoizing it would be
 /// redundant.
 ///
@@ -551,7 +537,7 @@ impl From<ExecuteProcess> for NodeKey {
   }
 }
 
-impl WrappedNode for ExecuteProcess {
+impl CompoundNode<NodeKey> for ExecuteProcess {
   type Item = ProcessResult;
 }
 
@@ -586,7 +572,7 @@ impl ReadLink {
 #[derive(Clone, Debug, DeepSizeOf, Eq, PartialEq)]
 pub struct LinkDest(PathBuf);
 
-impl WrappedNode for ReadLink {
+impl CompoundNode<NodeKey> for ReadLink {
   type Item = LinkDest;
 }
 
@@ -614,7 +600,7 @@ impl DigestFile {
   }
 }
 
-impl WrappedNode for DigestFile {
+impl CompoundNode<NodeKey> for DigestFile {
   type Item = hashing::Digest;
 }
 
@@ -643,7 +629,7 @@ impl Scandir {
   }
 }
 
-impl WrappedNode for Scandir {
+impl CompoundNode<NodeKey> for Scandir {
   type Item = Arc<DirectoryListing>;
 }
 
@@ -726,7 +712,7 @@ impl Paths {
   }
 }
 
-impl WrappedNode for Paths {
+impl CompoundNode<NodeKey> for Paths {
   type Item = Arc<Vec<PathStat>>;
 }
 
@@ -745,7 +731,7 @@ impl SessionValues {
   }
 }
 
-impl WrappedNode for SessionValues {
+impl CompoundNode<NodeKey> for SessionValues {
   type Item = Value;
 }
 
@@ -770,7 +756,7 @@ impl RunId {
   }
 }
 
-impl WrappedNode for RunId {
+impl CompoundNode<NodeKey> for RunId {
   type Item = Value;
 }
 
@@ -971,7 +957,7 @@ impl Snapshot {
   }
 }
 
-impl WrappedNode for Snapshot {
+impl CompoundNode<NodeKey> for Snapshot {
   type Item = store::Snapshot;
 }
 
@@ -1055,13 +1041,13 @@ impl DownloadedFile {
     let url =
       Url::parse(&url_str).map_err(|err| throw(format!("Error parsing URL {url_str}: {err}")))?;
     self
-      .load_or_download(context.core, url, auth_headers, expected_digest)
+      .load_or_download(context.core.clone(), url, auth_headers, expected_digest)
       .await
       .map_err(throw)
   }
 }
 
-impl WrappedNode for DownloadedFile {
+impl CompoundNode<NodeKey> for DownloadedFile {
   type Item = store::Snapshot;
 }
 
@@ -1295,7 +1281,7 @@ impl fmt::Debug for Task {
   }
 }
 
-impl WrappedNode for Task {
+impl CompoundNode<NodeKey> for Task {
   type Item = Value;
 }
 
@@ -1464,7 +1450,7 @@ impl NodeKey {
 
 #[async_trait]
 impl Node for NodeKey {
-  type Context = Context;
+  type Context = SessionCore;
 
   type Item = NodeOutput;
   type Error = Failure;
@@ -1518,7 +1504,7 @@ impl Node for NodeKey {
         };
 
         // If the Node failed with MissingDigest, attempt to invalidate the source of the Digest.
-        result = context2.maybe_backtrack(result, workunit);
+        result = context2.maybe_backtrack(&context2, result, workunit);
 
         // If both the Node and the watch failed, prefer the Node's error message (we have little
         // control over the error messages of the watch API).

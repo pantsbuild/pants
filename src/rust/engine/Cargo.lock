@@ -1270,6 +1270,7 @@ dependencies = [
  "rand",
  "task_executor",
  "tokio",
+ "workunit_store",
 ]
 
 [[package]]
