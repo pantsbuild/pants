@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import TYPE_CHECKING, Iterable, Mapping, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Iterable, Mapping, Optional, Sequence, Tuple, Union
 
 # Note: several of these types are re-exported as the public API of `engine/fs.py`.
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior as GlobMatchErrorBehavior
@@ -286,7 +286,7 @@ class Workspace(SideEffecting):
         digest: Digest,
         *,
         path_prefix: Optional[str] = None,
-        clear_destination: bool = False,
+        clear_paths: Sequence[str] = (),
         side_effecting: bool = True,
     ) -> None:
         """Write a digest to disk, relative to the build root.
@@ -300,7 +300,7 @@ class Workspace(SideEffecting):
         if side_effecting:
             self.side_effected()
         self._scheduler.write_digest(
-            digest, path_prefix=path_prefix, clear_destination=clear_destination
+            digest, path_prefix=path_prefix, clear_paths=clear_paths
         )
 
 

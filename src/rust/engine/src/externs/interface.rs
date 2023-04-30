@@ -1628,7 +1628,7 @@ fn write_digest(
   py_session: &PySession,
   digest: &PyAny,
   path_prefix: String,
-  clear_destination: bool,
+  clear_paths: Vec<String>,
 ) -> PyO3Result<()> {
   let core = &py_scheduler.0.core;
   core.executor.enter(|| {
@@ -1642,10 +1642,17 @@ fn write_digest(
     destination.push(core.build_root.clone());
     destination.push(path_prefix);
 
-    if clear_destination {
-      std::fs::remove_dir_all(&destination).map_err(|e| {
-        PyException::new_err(format!("Failed to clear {}: {e}", destination.display()))
-      })?;
+    for subpath in &clear_paths {
+      match std::fs::remove_dir_all(&destination.join(subpath)) {
+        Ok(()) => {}
+        Err(e) if e.kind() == io::Error::NotFound => {}
+        Err(e) => {
+          return Err(PyException::new_err(format!(
+            "Failed to clear {}: {e}",
+            destination.display()
+          )));
+        }
+      }
     }
 
     block_in_place_and_wait(py, || async move {

@@ -1185,7 +1185,7 @@ def test_write_digest_workspace(rule_runner: RuleRunner) -> None:
     assert path2.read_text() == "goodbye"
 
 
-def test_write_digest_workspace_clear_destination(rule_runner: RuleRunner) -> None:
+def test_write_digest_workspace_clear_paths(rule_runner: RuleRunner) -> None:
     workspace = Workspace(rule_runner.scheduler, _enforce_effects=False)
     digest_a = rule_runner.request(
         Digest,
@@ -1203,12 +1203,12 @@ def test_write_digest_workspace_clear_destination(rule_runner: RuleRunner) -> No
     path2 = Path(rule_runner.build_root, "newdir/b.txt")
     path3 = Path(rule_runner.build_root, "newdir/c.txt")
 
-    workspace.write_digest(digest_a, clear_destination=False)
-    workspace.write_digest(digest_b, clear_destination=False)
+    workspace.write_digest(digest_a, clear_paths=())
+    workspace.write_digest(digest_b, clear_paths=())
     assert path1.exists()
     assert path2.exists()
 
-    workspace.write_digest(digest_c, clear_destination=True)
+    workspace.write_digest(digest_c, clear_paths=("newdir",))
     assert not path1.exists()
     assert not path2.exists()
     assert path3.read_text() == "hello again"
