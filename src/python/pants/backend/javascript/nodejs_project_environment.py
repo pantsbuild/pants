@@ -135,7 +135,9 @@ async def setup_nodejs_project_environment_process(req: NodeJsProjectEnvironment
         Process,
         NodeJSToolProcess,
         NodeJSToolProcess(
-            args=(req.env.project.package_manager, *args),
+            tool=req.env.project.package_manager,
+            tool_version=req.env.project.package_manager_version,
+            args=args,
             description=req.description,
             level=req.level,
             input_digest=merged,
@@ -145,7 +147,7 @@ async def setup_nodejs_project_environment_process(req: NodeJsProjectEnvironment
             append_only_caches=FrozenDict(**per_package_caches, **req.env.project.extra_caches()),
             timeout_seconds=req.timeout_seconds,
             project_digest=project_digest,
-            extra_env={**req.extra_env, **req.env.project.extra_env()},
+            extra_env=FrozenDict(**req.extra_env, **req.env.project.extra_env()),
         ),
     )
 

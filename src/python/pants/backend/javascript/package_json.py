@@ -9,6 +9,7 @@ from abc import ABC
 from dataclasses import dataclass, field
 from typing import Any, ClassVar, Iterable, Mapping, Optional, Tuple
 
+import yaml
 from typing_extensions import Literal
 
 from pants.backend.project_info import dependencies
@@ -23,7 +24,13 @@ from pants.core.target_types import (
 from pants.core.util_rules import stripped_source_files
 from pants.engine import fs
 from pants.engine.collection import Collection, DeduplicatedCollection
-from pants.engine.fs import DigestContents, FileContent, GlobExpansionConjunction, PathGlobs
+from pants.engine.fs import (
+    CreateDigest,
+    DigestContents,
+    FileContent,
+    GlobExpansionConjunction,
+    PathGlobs,
+)
 from pants.engine.internals import graph
 from pants.engine.internals.graph import (
     ResolveAllTargetGeneratorRequests,
@@ -651,6 +658,44 @@ async def all_package_json() -> AllPackageJson:
                 globs, GlobMatchErrorBehavior.error, description_of_origin=description_of_origin
             ),
         )
+    )
+
+
+@dataclass(frozen=True)
+class PnpmWorkspaceGlobs:
+    packages: tuple[str, ...]
+    digest: Digest
+
+
+class PnpmWorkspaces(FrozenDict[PackageJson, PnpmWorkspaceGlobs]):
+    def for_root(self, root_dir: str) -> PnpmWorkspaceGlobs | None:
+        for pkg, workspaces in self.items():
+            if pkg.root_dir == root_dir:
+                return workspaces
+        return None
+
+
+@rule
+async def pnpm_workspace_files(pkgs: AllPackageJson) -> PnpmWorkspaces:
+    snapshot = await Get(
+        Snapshot, PathGlobs(os.path.join(pkg.root_dir, "pnpm-workspace.yaml") for pkg in pkgs)
+    )
+    digest_contents = await Get(DigestContents, Digest, snapshot.digest)
+
+    async def parse_package_globs(content: FileContent) -> PnpmWorkspaceGlobs:
+        parsed = yaml.safe_load(content.content) or {"packages": ("**",)}
+        return PnpmWorkspaceGlobs(
+            tuple(parsed.get("packages", ("**",)) or ("**",)),
+            await Get(Digest, CreateDigest([content])),
+        )
+
+    globs_per_root = {
+        os.path.dirname(digest_content.path): await parse_package_globs(digest_content)
+        for digest_content in digest_contents
+    }
+
+    return PnpmWorkspaces(
+        {pkg: globs_per_root[pkg.root_dir] for pkg in pkgs if pkg.root_dir in globs_per_root}
     )
 
 

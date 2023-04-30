@@ -353,7 +353,7 @@ async def add_corepack_shims_to_digest(
     enable_corepack_result = await Get(
         ProcessResult,
         Process(
-            argv=("corepack", "enable", "npm", "--install-directory", "._corepack"),
+            argv=("corepack", "enable", "npm", "pnpm", "--install-directory", "._corepack"),
             input_digest=input_digest,
             immutable_input_digests={**tool_shims.immutable_input_digests},
             output_directories=["._corepack"],
@@ -373,15 +373,15 @@ async def add_corepack_shims_to_digest(
 async def node_process_environment(
     binaries: NodeJSBinaries, nodejs: NodeJS.EnvironmentAware
 ) -> NodeJSProcessEnvironment:
+    default_required_tools = ["sh", "bash"]
+    tools_used_by_setup_scripts = ["mkdir", "rm", "touch", "which"]
+    pnpm_shim_tools = ["sed", "dirname"]
     binary_shims = await Get(
         BinaryShims,
         BinaryShimsRequest.for_binaries(
-            "sh",
-            "bash",
-            "mkdir",  # Some default scripts are generated using mkdir, rm & touch.
-            "rm",
-            "touch",
-            "which",
+            *default_required_tools,
+            *tools_used_by_setup_scripts,
+            *pnpm_shim_tools,
             rationale="execute a nodejs process",
             search_path=nodejs.executable_search_path,
         ),
@@ -581,7 +581,9 @@ async def prepare_corepack_tool(
     result = await Get(
         ProcessResult,
         Process(
-            argv=("corepack", "prepare", tool_spec, "--activate"),
+            argv=filter(
+                None, ("corepack", "prepare", tool_spec if version else None, "--activate")
+            ),
             description=f"Preparing configured {tool_description}.",
             input_digest=request.input_digest,
             immutable_input_digests=environment.immutable_digest(),
@@ -599,11 +601,12 @@ async def prepare_corepack_tool(
 async def setup_node_tool_process(
     request: NodeJSToolProcess, environment: NodeJSProcessEnvironment
 ) -> Process:
-    if request.tool in ("npm", "npx"):
+    if request.tool in ("npm", "npx", "pnpm"):
+        tool_name = request.tool.replace("npx", "npm")
         corepack_tool = await Get(
             CorepackToolDigest,
             CorepackToolRequest(
-                "npm",
+                tool_name,
                 request.project_digest or EMPTY_DIGEST,
                 request.working_directory,
                 request.tool_version,

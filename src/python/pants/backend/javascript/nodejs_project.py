@@ -2,13 +2,19 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
+import itertools
 import os.path
 from dataclasses import dataclass, replace
 from pathlib import PurePath
 from typing import Iterable
 
 from pants.backend.javascript import package_json
-from pants.backend.javascript.package_json import AllPackageJson, PackageJson
+from pants.backend.javascript.package_json import (
+    AllPackageJson,
+    PackageJson,
+    PnpmWorkspaceGlobs,
+    PnpmWorkspaces,
+)
 from pants.backend.javascript.subsystems import nodejs
 from pants.backend.javascript.subsystems.nodejs import NodeJS
 from pants.core.util_rules import stripped_source_files
@@ -49,38 +55,59 @@ class NodeJSProject:
     workspaces: FrozenOrderedSet[PackageJson]
     default_resolve_name: str
     package_manager: str
+    package_manager_version: str | None = None
+    pnpm_workspace: PnpmWorkspaceGlobs | None = None
 
     @property
     def lockfile_name(self) -> str:
+        if self.package_manager == "pnpm":
+            return "pnpm-lock.yaml"
         return "package-lock.json"
 
     @property
     def generate_lockfile_args(self) -> tuple[str, ...]:
+        if self.package_manager == "pnpm":
+            return ("install", "--lockfile-only")
         return ("install", "--package-lock-only")
 
     @property
     def immutable_install_args(self) -> tuple[str, ...]:
+        if self.package_manager == "pnpm":
+            return ("install", "--frozen-lockfile")
         return ("clean-install",)
 
     @property
     def workspace_specifier_arg(self) -> str:
+        if self.package_manager == "pnpm":
+            return "--prefix"
         return "--workspace"
 
     def extra_env(self) -> dict[str, str]:
+        if self.package_manager == "pnpm":
+            return {"PNPM_HOME": "{chroot}/._pnpm_home"}
         return {}
 
     def extra_caches(self) -> dict[str, str]:
+        if self.package_manager == "pnpm":
+            return {"pnpm_home": "{chroot}/._pnpm_home"}
         return {}
 
     def get_project_digest(self) -> MergeDigests:
-        return MergeDigests(ws.digest for ws in self.workspaces)
+        return MergeDigests(
+            itertools.chain(
+                (ws.digest for ws in self.workspaces),
+                [self.pnpm_workspace.digest] if self.pnpm_workspace else [],
+            )
+        )
 
     @property
     def single_workspace(self) -> bool:
         return len(self.workspaces) == 1 and next(iter(self.workspaces)).root_dir == self.root_dir
 
     @classmethod
-    def from_tentative(cls, project: _TentativeProject, nodejs: NodeJS) -> NodeJSProject:
+    def from_tentative(
+        cls, project: _TentativeProject, nodejs: NodeJS, pnpm_workspaces: PnpmWorkspaces
+    ) -> NodeJSProject:
         root_ws = project.root_workspace()
         package_manager: str | None = None
         if root_ws:
@@ -113,12 +140,16 @@ class NodeJSProject:
                             """
                         )
                     )
-        package_manager_command, *_ = package_manager.split("@")
+        package_manager_command, *maybe_version = package_manager.split("@")
+        package_manager_version = maybe_version[0] if maybe_version else None
+
         return NodeJSProject(
             root_dir=project.root_dir,
             workspaces=project.workspaces,
             default_resolve_name=project.default_resolve_name,
             package_manager=package_manager_command,
+            package_manager_version=package_manager_version,
+            pnpm_workspace=pnpm_workspaces.for_root(project.root_dir),
         )
 
 
@@ -152,10 +183,13 @@ async def _get_default_resolve_name(path: str) -> str:
 
 @rule
 async def find_node_js_projects(
-    package_workspaces: AllPackageJson, nodejs: NodeJS
+    package_workspaces: AllPackageJson, pnpm_workspaces: PnpmWorkspaces, nodejs: NodeJS
 ) -> AllNodeJSProjects:
     project_paths = (
-        ProjectPaths(pkg.root_dir, ["", *pkg.workspaces]) for pkg in package_workspaces
+        ProjectPaths(pkg.root_dir, ["", *pkg.workspaces])
+        if pkg not in pnpm_workspaces
+        else ProjectPaths(pkg.root_dir, ["", *pnpm_workspaces[pkg].packages])
+        for pkg in package_workspaces
     )
 
     node_js_projects = {
@@ -167,7 +201,9 @@ async def find_node_js_projects(
         for paths in project_paths
     }
     merged_projects = _merge_workspaces(node_js_projects)
-    return AllNodeJSProjects(NodeJSProject.from_tentative(p, nodejs) for p in merged_projects)
+    return AllNodeJSProjects(
+        NodeJSProject.from_tentative(p, nodejs, pnpm_workspaces) for p in merged_projects
+    )
 
 
 def _project_to_parents(
