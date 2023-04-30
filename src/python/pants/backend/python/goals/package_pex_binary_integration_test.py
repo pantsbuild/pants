@@ -181,7 +181,7 @@ def test_layout(rule_runner: PythonRuleRunner, layout: PexLayout) -> None:
                 import os
                 import sys
                 print(f"FOO={os.environ.get('FOO')}")
-                print(f"BAR={os.environ.get('BAR')}")
+                print(f"--inject-arg={os.environ.get('--inject-arg')}")
                 print(f"ARGV={sys.argv[1:]}")
                 """
             ),
@@ -190,8 +190,8 @@ def test_layout(rule_runner: PythonRuleRunner, layout: PexLayout) -> None:
                 python_sources(name="lib")
                 pex_binary(
                     entry_point="app.py",
-                    args=['123', 'abc'],
-                    env={{'FOO': 'xxx', 'BAR': 'yyy'}},
+                    args=['123', 'abc', '--inject-env'],
+                    env={{'FOO': 'xxx', '--inject-arg': 'yyy'}},
                     layout="{layout.value}",
                 )
                 """
@@ -215,8 +215,8 @@ def test_layout(rule_runner: PythonRuleRunner, layout: PexLayout) -> None:
     stdout = dedent(
         """\
         FOO=xxx
-        BAR=yyy
-        ARGV=['123', 'abc']
+        --inject-arg=yyy
+        ARGV=['123', 'abc', '--inject-env']
         """
     ).encode()
     assert stdout == subprocess.run([executable], check=True, stdout=subprocess.PIPE).stdout

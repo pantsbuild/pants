@@ -615,10 +615,8 @@ async def build_pex(
     if request.main is not None:
         argv.extend(request.main.iter_pex_args())
 
-    for injected_arg in request.inject_args:
-        argv.extend(["--inject-args", str(injected_arg)])
-    for k, v in sorted(request.inject_env.items()):
-        argv.extend(["--inject-env", f"{k}={v}"])
+    argv.extend(f"--inject-args={injected_arg}" for injected_arg in request.inject_args)
+    argv.extend(f"--inject-env={k}={v}" for k, v in sorted(request.inject_env.items()))
 
     # TODO(John Sirois): Right now any request requirements will shadow corresponding pex path
     #  requirements, which could lead to problems. Support shading python binaries.
