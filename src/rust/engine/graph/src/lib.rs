@@ -25,13 +25,11 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
-// make the entry module public for testing purposes. We use it to construct mock
-// graph entries in the notify watch tests.
-pub mod entry;
+mod context;
+mod entry;
 mod node;
 
-pub use crate::entry::{Entry, EntryState};
-use crate::entry::{Generation, NodeResult, RunToken};
+use crate::entry::{Entry, Generation, NodeResult, RunToken};
 
 use std::collections::VecDeque;
 use std::fs::File;
@@ -52,8 +50,10 @@ use petgraph::visit::{EdgeRef, VisitMap, Visitable};
 use petgraph::Direction;
 use task_executor::Executor;
 use tokio::time::sleep;
+use workunit_store::RunId;
 
-pub use crate::node::{EntryId, Node, NodeContext, NodeError, Stats};
+pub use crate::context::Context;
+pub use crate::node::{CompoundNode, EntryId, Node, NodeError};
 
 type PGraph<N> = DiGraph<Entry<N>, (), u32>;
 
@@ -68,6 +68,7 @@ type Nodes<N> = HashMap<N, EntryId>;
 struct InnerGraph<N: Node> {
   nodes: Nodes<N>,
   pg: PGraph<N>,
+  run_id_generator: u32,
 }
 
 impl<N: Node> InnerGraph<N> {
@@ -313,7 +314,7 @@ impl<N: Node> InnerGraph<N> {
     invalidation_result
   }
 
-  fn visualize(&self, roots: &[N], path: &Path, context: &N::Context) -> io::Result<()> {
+  fn visualize(&self, roots: &[N], path: &Path, context: &Context<N>) -> io::Result<()> {
     let file = File::create(path)?;
     let mut f = BufWriter::new(file);
 
@@ -351,7 +352,7 @@ impl<N: Node> InnerGraph<N> {
   fn live_reachable(
     &self,
     roots: &[N],
-    context: &N::Context,
+    context: &Context<N>,
   ) -> impl Iterator<Item = (&N, N::Item)> {
     // TODO: This is a surprisingly expensive method, because it will clone all reachable values by
     // calling `peek` on them.
@@ -368,14 +369,14 @@ impl<N: Node> InnerGraph<N> {
     )
   }
 
-  fn live(&self, context: &N::Context) -> impl Iterator<Item = (&N, N::Item)> {
+  fn live(&self, context: &Context<N>) -> impl Iterator<Item = (&N, N::Item)> {
     self.live_internal(self.pg.node_indices().collect(), context.clone())
   }
 
   fn live_internal(
     &self,
     entryids: Vec<EntryId>,
-    context: N::Context,
+    context: Context<N>,
   ) -> impl Iterator<Item = (&N, N::Item)> + '_ {
     entryids
       .into_iter()
@@ -387,9 +388,11 @@ impl<N: Node> InnerGraph<N> {
 ///
 /// A DAG (enforced on mutation) of Entries.
 ///
+#[derive(Clone)]
 pub struct Graph<N: Node> {
   inner: Arc<Mutex<InnerGraph<N>>>,
   invalidation_delay: Duration,
+  executor: Executor,
 }
 
 impl<N: Node> Graph<N> {
@@ -401,13 +404,33 @@ impl<N: Node> Graph<N> {
     let inner = Arc::new(Mutex::new(InnerGraph {
       nodes: HashMap::default(),
       pg: DiGraph::new(),
+      run_id_generator: 0,
     }));
     let _join = executor.native_spawn(Self::cycle_check_task(Arc::downgrade(&inner)));
 
     Graph {
       inner,
       invalidation_delay,
+      executor,
     }
+  }
+
+  /// Create a Context wrapping an opaque Node::Context type, which will use a newly generated RunId.
+  pub fn context(&self, context: N::Context) -> Context<N> {
+    self.context_with_run_id(context, self.generate_run_id())
+  }
+
+  /// Create a Context wrapping an opaque Node::Context type.
+  pub fn context_with_run_id(&self, context: N::Context, run_id: RunId) -> Context<N> {
+    Context::new(self.clone(), context, run_id)
+  }
+
+  /// Generate a unique RunId for this Graph which can be reused in `context_with_run_id`.
+  pub fn generate_run_id(&self) -> RunId {
+    let mut inner = self.inner.lock();
+    let run_id = inner.run_id_generator;
+    inner.run_id_generator += 1;
+    RunId(run_id)
   }
 
   ///
@@ -438,7 +461,7 @@ impl<N: Node> Graph<N> {
   async fn get_inner(
     &self,
     src_id: Option<EntryId>,
-    context: &N::Context,
+    context: &Context<N>,
     dst_node: N,
   ) -> (Result<N::Item, N::Error>, Generation) {
     // Compute information about the dst under the Graph lock, and then release it.
@@ -511,7 +534,7 @@ impl<N: Node> Graph<N> {
   pub async fn get(
     &self,
     src_id: Option<EntryId>,
-    context: &N::Context,
+    context: &Context<N>,
     dst_node: N,
   ) -> Result<N::Item, N::Error> {
     let (res, _generation) = self.get_inner(src_id, context, dst_node).await;
@@ -521,7 +544,7 @@ impl<N: Node> Graph<N> {
   ///
   /// Return the value of the given Node. Shorthand for `self.get(None, context, node)`.
   ///
-  pub async fn create(&self, node: N, context: &N::Context) -> Result<N::Item, N::Error> {
+  pub async fn create(&self, node: N, context: &Context<N>) -> Result<N::Item, N::Error> {
     self.get(None, context, node).await
   }
 
@@ -534,7 +557,7 @@ impl<N: Node> Graph<N> {
     node: N,
     token: Option<LastObserved>,
     delay: Option<Duration>,
-    context: &N::Context,
+    context: &Context<N>,
   ) -> (Result<N::Item, N::Error>, LastObserved) {
     // If the node is currently clean at the given token, Entry::poll will delay until it has
     // changed in some way.
@@ -564,7 +587,7 @@ impl<N: Node> Graph<N> {
     &self,
     entry_id: EntryId,
     previous_dep_generations: Vec<Generation>,
-    context: &N::Context,
+    context: &Context<N>,
   ) -> bool {
     let generation_matches = {
       let inner = self.inner.lock();
@@ -677,7 +700,7 @@ impl<N: Node> Graph<N> {
   ///
   fn complete(
     &self,
-    context: &N::Context,
+    context: &Context<N>,
     entry_id: EntryId,
     run_token: RunToken,
     sender: AsyncValueSender<NodeResult<N>>,
@@ -740,7 +763,7 @@ impl<N: Node> Graph<N> {
     inner.invalidate_from_roots(log_dirtied, predicate)
   }
 
-  pub fn visualize(&self, roots: &[N], path: &Path, context: &N::Context) -> io::Result<()> {
+  pub fn visualize(&self, roots: &[N], path: &Path, context: &Context<N>) -> io::Result<()> {
     let inner = self.inner.lock();
     inner.visualize(roots, path, context)
   }
@@ -748,7 +771,7 @@ impl<N: Node> Graph<N> {
   pub fn visit_live_reachable(
     &self,
     roots: &[N],
-    context: &N::Context,
+    context: &Context<N>,
     mut f: impl FnMut(&N, N::Item),
   ) {
     let inner = self.inner.lock();
@@ -757,7 +780,7 @@ impl<N: Node> Graph<N> {
     }
   }
 
-  pub fn visit_live(&self, context: &N::Context, mut f: impl FnMut(&N, N::Item)) {
+  pub fn visit_live(&self, context: &Context<N>, mut f: impl FnMut(&N, N::Item)) {
     let inner = self.inner.lock();
     for (n, v) in inner.live(context) {
       f(n, v);

@@ -1,21 +1,24 @@
 // Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 use std::mem;
+use std::sync::atomic;
 use std::sync::Arc;
 
-use crate::node::{EntryId, Node, NodeContext, NodeError};
+use crate::context::Context;
+use crate::node::{EntryId, Node, NodeError};
 use crate::test_trace_log;
 
 use async_value::{AsyncValue, AsyncValueReceiver, AsyncValueSender};
 use futures::channel::oneshot;
 use futures::future::{self, BoxFuture, FutureExt};
 use parking_lot::Mutex;
+use workunit_store::RunId;
 
 ///
-/// A token that uniquely identifies one run of a Node in the Graph. Each run of a Node (via
-/// `N::Context::spawn`) has a different RunToken associated with it. When a run completes, if
-/// the current RunToken of its Node no longer matches the RunToken of the spawned work (because
-/// the Node was `cleared`), the work is discarded. See `Entry::complete` for more information.
+/// A token that uniquely identifies one run of a Node in the Graph. Each run of a Node has a
+/// different RunToken associated with it. When a run completes, if the current RunToken of its
+/// Node no longer matches the RunToken of the spawned work (because the Node was `cleared`), the
+/// work is discarded. See `Entry::complete` for more information.
 ///
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct RunToken(u32);
@@ -64,34 +67,34 @@ pub enum EntryResult<N: Node> {
   Dirty(N::Item),
   /// Similar to Clean, but the value may only be consumed in the same Run that produced it, and
   /// _must_ (unlike UncacheableDependencies) be recomputed in a new Run.
-  Uncacheable(N::Item, <<N as Node>::Context as NodeContext>::RunId),
+  Uncacheable(N::Item, RunId),
   /// A value that was computed from an Uncacheable node, and is thus Run-specific. If the Run id
   /// of a consumer matches, the value can be considered to be Clean: otherwise, is considered to
   /// be Dirty.
-  UncacheableDependencies(N::Item, <<N as Node>::Context as NodeContext>::RunId),
+  UncacheableDependencies(N::Item, RunId),
 }
 
 impl<N: Node> EntryResult<N> {
   fn new(
     item: N::Item,
-    context: &N::Context,
+    context: &Context<N>,
     cacheable: bool,
     has_uncacheable_deps: bool,
   ) -> EntryResult<N> {
     if !cacheable {
-      EntryResult::Uncacheable(item, context.run_id().clone())
+      EntryResult::Uncacheable(item, context.run_id())
     } else if has_uncacheable_deps {
-      EntryResult::UncacheableDependencies(item, context.run_id().clone())
+      EntryResult::UncacheableDependencies(item, context.run_id())
     } else {
       EntryResult::Clean(item)
     }
   }
 
-  fn is_clean(&self, context: &N::Context) -> bool {
+  fn is_clean(&self, context: &Context<N>) -> bool {
     match self {
       EntryResult::Clean(..) => true,
-      EntryResult::Uncacheable(_, run_id) => context.run_id() == run_id,
-      EntryResult::UncacheableDependencies(.., run_id) => context.run_id() == run_id,
+      EntryResult::Uncacheable(_, run_id) => context.run_id() == *run_id,
+      EntryResult::UncacheableDependencies(.., run_id) => context.run_id() == *run_id,
       EntryResult::Dirty(..) => false,
     }
   }
@@ -105,15 +108,15 @@ impl<N: Node> EntryResult<N> {
 
   /// Returns true if this result should block for polling (because there is no work to do
   /// currently to clean it).
-  fn poll_should_wait(&self, context: &N::Context) -> bool {
+  fn poll_should_wait(&self, context: &Context<N>) -> bool {
     match self {
-      EntryResult::Uncacheable(_, run_id) => context.run_id() == run_id,
+      EntryResult::Uncacheable(_, run_id) => context.run_id() == *run_id,
       EntryResult::Dirty(..) => false,
       EntryResult::Clean(..) | EntryResult::UncacheableDependencies(_, _) => true,
     }
   }
 
-  fn peek(&self, context: &N::Context) -> Option<N::Item> {
+  fn peek(&self, context: &Context<N>) -> Option<N::Item> {
     if self.is_clean(context) {
       Some(self.as_ref().clone())
     } else {
@@ -134,7 +137,7 @@ impl<N: Node> EntryResult<N> {
   }
 
   /// Assert that the value is in "a dirty state", and move it to a clean state.
-  fn clean(&mut self, context: &N::Context, cacheable: bool, has_uncacheable_deps: bool) {
+  fn clean(&mut self, context: &Context<N>, cacheable: bool, has_uncacheable_deps: bool) {
     let value = match self {
       EntryResult::Dirty(value) => value.clone(),
       EntryResult::UncacheableDependencies(value, _) => value.clone(),
@@ -258,7 +261,7 @@ impl<N: Node> Entry<N> {
   /// be changed in any way. If the node is not clean, or the generation mismatches, returns
   /// immediately.
   ///
-  pub async fn poll(&self, context: &N::Context, last_seen_generation: Generation) {
+  pub async fn poll(&self, context: &Context<N>, last_seen_generation: Generation) {
     let recv = {
       let mut state = self.state.lock();
       let pollers = match *state {
@@ -301,7 +304,7 @@ impl<N: Node> Entry<N> {
   ///
   /// If the Future for this Node has already completed, returns a clone of its result.
   ///
-  pub fn peek(&self, context: &N::Context) -> Option<N::Item> {
+  pub fn peek(&self, context: &Context<N>) -> Option<N::Item> {
     let state = self.state.lock();
     match *state {
       EntryState::Completed { ref result, .. } => result.peek(context),
@@ -314,7 +317,7 @@ impl<N: Node> Entry<N> {
   /// the Graph lock and call back into the graph lock to set the final value.
   ///
   pub(crate) fn spawn_node_execution(
-    context_factory: &N::Context,
+    context_factory: &Context<N>,
     node: &N,
     entry_id: EntryId,
     run_token: RunToken,
@@ -343,11 +346,17 @@ impl<N: Node> Entry<N> {
           // If dependency generations mismatched or failed to fetch, clear the node's dependencies
           // and indicate that it should re-run.
           context.graph().cleaning_failed(entry_id, run_token);
-          context.stats().cleaning_failed += 1;
+          context
+            .stats()
+            .cleaning_failed
+            .fetch_add(1, atomic::Ordering::SeqCst);
           false
         } else {
           // Dependencies have not changed: Node is clean.
-          context.stats().cleaning_succeeded += 1;
+          context
+            .stats()
+            .cleaning_succeeded
+            .fetch_add(1, atomic::Ordering::SeqCst);
           true
         }
       } else {
@@ -362,12 +371,12 @@ impl<N: Node> Entry<N> {
       } else {
         // The Node needs to (re-)run!
         let res = node.run(context.clone()).await;
-        context.stats().ran += 1;
+        context.stats().ran.fetch_add(1, atomic::Ordering::SeqCst);
         Some(res)
       }
     };
 
-    context_factory.spawn(async move {
+    let _join = context2.graph().executor.clone().native_spawn(async move {
       let maybe_res = tokio::select! {
         abort_item = sender.aborted() => {
           if let Some(res) = abort_item {
@@ -414,7 +423,7 @@ impl<N: Node> Entry<N> {
   ///
   pub(crate) fn get_node_result(
     &mut self,
-    context: &N::Context,
+    context: &Context<N>,
     entry_id: EntryId,
   ) -> BoxFuture<NodeResult<N>> {
     let mut state = self.state.lock();
@@ -576,7 +585,7 @@ impl<N: Node> Entry<N> {
   ///
   pub(crate) fn complete(
     &mut self,
-    context: &N::Context,
+    context: &Context<N>,
     result_run_token: RunToken,
     dep_generations: Vec<Generation>,
     sender: AsyncValueSender<NodeResult<N>>,
@@ -856,26 +865,6 @@ impl<N: Node> Entry<N> {
     }
   }
 
-  pub fn is_clean(&self, context: &N::Context) -> bool {
-    match *self.state.lock() {
-      EntryState::NotStarted {
-        ref previous_result,
-        ..
-      }
-      | EntryState::Running {
-        ref previous_result,
-        ..
-      } => {
-        if let Some(result) = previous_result {
-          result.is_clean(context)
-        } else {
-          true
-        }
-      }
-      EntryState::Completed { ref result, .. } => result.is_clean(context),
-    }
-  }
-
   pub(crate) fn has_uncacheable_deps(&self) -> bool {
     match *self.state.lock() {
       EntryState::Completed { ref result, .. } => result.has_uncacheable_deps(),
@@ -883,7 +872,7 @@ impl<N: Node> Entry<N> {
     }
   }
 
-  pub(crate) fn format(&self, context: &N::Context) -> String {
+  pub(crate) fn format(&self, context: &Context<N>) -> String {
     let state = match self.peek(context) {
       Some(ref nr) => {
         let item = format!("{nr:?}");

@@ -34,6 +34,6 @@ maplit = "1.0.1"
 mock = { path = "../../testutil/mock" }
 parking_lot = "0.12"
 sharded_lmdb = { path = "../../sharded_lmdb" }
-tempfile = "3"
+tempfile = "3.5.0"
 testutil = { path = "../../testutil" }
 tokio = { version = "1.21", features = ["macros"] }

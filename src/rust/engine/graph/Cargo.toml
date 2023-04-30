@@ -16,6 +16,7 @@ parking_lot = "0.12"
 petgraph = "0.6"
 task_executor = { path = "../task_executor" }
 tokio = { version = "1.21", features = ["time", "parking_lot"] }
+workunit_store = { path = "../workunit_store" }
 
 [dev-dependencies]
 rand = "0.8"
