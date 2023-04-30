@@ -302,7 +302,7 @@ def _get_report(
 ) -> FilesystemCoverageReport:
     # It is up to the user to configure the output coverage reports.
     file_path = PurePath(file)
-    output_dir = nodejs_test.render_coverage_output_dir(dist_dir, addresses[0])
+    output_dir = nodejs_test.render_coverage_output_dir(dist_dir, addresses)
     return FilesystemCoverageReport(
         coverage_insufficient=False,
         result_snapshot=snapshot,
