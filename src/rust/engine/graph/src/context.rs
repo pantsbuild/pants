@@ -51,11 +51,12 @@ impl<N: Node + Send> Context<N> {
       .graph
       .get(self.entry_id, self, node.into())
       .await?;
-    Ok(
-      node_result
-        .try_into()
-        .unwrap_or_else(|_| panic!("A Node implementation was ambiguous.")),
-    )
+    Ok(node_result.try_into().unwrap_or_else(|_| {
+      panic!(
+        "The CompoundNode implementation for {} was ambiguous.",
+        std::any::type_name::<CN>()
+      )
+    }))
   }
 
   pub fn run_id(&self) -> RunId {
