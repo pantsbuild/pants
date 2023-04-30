@@ -135,7 +135,7 @@ def test_packages_files_as_resource(rule_runner: RuleRunner) -> None:
 
 
 @pytest.fixture
-def workspace_lockfile(package_manager: str) -> dict[str, str]:
+def workspace_files(package_manager: str) -> dict[str, str]:
     if package_manager == "npm":
         return {
             "src/js/package-lock.json": json.dumps(
@@ -155,6 +155,11 @@ def workspace_lockfile(package_manager: str) -> dict[str, str]:
         }
     if package_manager == "pnpm":
         return {
+            "src/js/pnpm-workspace.yaml": textwrap.dedent(
+                """\
+                packages:
+                """
+            ),
             "src/js/pnpm-lock.yaml": json.dumps(
                 {
                     "importers": {
@@ -163,22 +168,17 @@ def workspace_lockfile(package_manager: str) -> dict[str, str]:
                     },
                     "lockfileVersion": 5.3,
                 }
-            )
+            ),
         }
     raise AssertionError(f"No lockfile implemented for {package_manager}.")
 
 
 def test_packages_files_as_resource_in_workspace(
-    rule_runner: RuleRunner, workspace_lockfile: dict[str, str]
+    rule_runner: RuleRunner, workspace_files: dict[str, str]
 ) -> None:
     rule_runner.write_files(
         {
-            "src/js/pnpm-workspace.yaml": textwrap.dedent(
-                """\
-                packages:
-                """
-            ),
-            **workspace_lockfile,
+            **workspace_files,
             "src/js/package.json": json.dumps(
                 {"name": "spam", "version": "0.0.1", "workspaces": ["a"]}
             ),
