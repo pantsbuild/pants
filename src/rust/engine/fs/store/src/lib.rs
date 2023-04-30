@@ -71,7 +71,6 @@ use sharded_lmdb::DEFAULT_LEASE_TIME;
 use tokio::fs::copy;
 #[cfg(not(target_os = "macos"))]
 use tokio::fs::hard_link;
-use tokio::fs::remove_dir_all;
 use tokio::fs::symlink;
 use tryfuture::try_future;
 use workunit_store::{in_workunit, Level, Metric};
@@ -1289,13 +1288,6 @@ impl Store {
     perms: Permissions,
   ) -> BoxFuture<'a, Result<(), StoreError>> {
     let store = self.clone();
-
-    async fn remove_for_replacement(path: &Path) -> Result<(), String> {
-      remove_dir_all(&path)
-        .await
-        .map_err(|e| format!("Failed to remove {} before replacing: {e}", path.display()))
-    }
-
     async move {
       if !is_root {
         // NB: Although we know that all parent directories already exist, we use `create_dir_all`
@@ -1316,8 +1308,6 @@ impl Store {
 
             match child {
               directory::Entry::File(f) => {
-                remove_for_replacement(&path).await?;
-
                 store
                   .materialize_file_maybe_hardlink(
                     path,
@@ -1329,16 +1319,11 @@ impl Store {
                   .await
               }
               directory::Entry::Symlink(s) => {
-                remove_for_replacement(&path).await?;
                 store
                   .materialize_symlink(path, s.target().to_str().unwrap().to_string())
                   .await
               }
               directory::Entry::Directory(_) => {
-                // TODO(#17758): naively calling remove_for_replacement here might delete things it
-                // shouldn't, e.g. a `pants package path/to:target` call may materialize
-                // dist/path.to/target, and this code will traverse through dist/ and dist/path.to/,
-                // neither of which should be deleted.
                 store
                   .materialize_directory_children(
                     path.clone(),
