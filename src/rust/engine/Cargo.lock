@@ -229,7 +229,7 @@ dependencies = [
  "serde_urlencoded",
  "thiserror",
  "tokio",
- "tokio-util 0.7.4",
+ "tokio-util 0.7.8",
  "url",
  "winapi",
 ]
@@ -815,7 +815,7 @@ dependencies = [
  "testutil",
  "tokio",
  "tokio-rustls 0.23.4",
- "tokio-util 0.7.4",
+ "tokio-util 0.7.8",
  "workunit_store",
 ]
 
@@ -907,7 +907,7 @@ dependencies = [
  "time 0.3.20",
  "tokio",
  "tokio-retry",
- "tokio-util 0.7.4",
+ "tokio-util 0.7.8",
  "tryfuture",
  "ui",
  "url",
@@ -1322,7 +1322,7 @@ dependencies = [
  "indexmap",
  "slab",
  "tokio",
- "tokio-util 0.7.4",
+ "tokio-util 0.7.8",
  "tracing",
 ]
 
@@ -2192,7 +2192,7 @@ dependencies = [
  "testutil",
  "tokio",
  "tokio-rustls 0.23.4",
- "tokio-util 0.7.4",
+ "tokio-util 0.7.8",
  "workunit_store",
 ]
 
@@ -2420,7 +2420,7 @@ dependencies = [
  "testutil",
  "tokio",
  "tokio-rustls 0.23.4",
- "tokio-util 0.7.4",
+ "tokio-util 0.7.8",
  "tryfuture",
  "uname",
  "uuid",
@@ -2770,7 +2770,7 @@ dependencies = [
  "testutil",
  "tokio",
  "tokio-rustls 0.23.4",
- "tokio-util 0.7.4",
+ "tokio-util 0.7.8",
  "tonic",
  "workunit_store",
 ]
@@ -2805,7 +2805,7 @@ dependencies = [
  "serde_urlencoded",
  "tokio",
  "tokio-rustls 0.23.4",
- "tokio-util 0.7.4",
+ "tokio-util 0.7.8",
  "tower-service",
  "url",
  "wasm-bindgen",
@@ -3599,9 +3599,9 @@ dependencies = [
 
 [[package]]
 name = "tokio-util"
-version = "0.7.4"
+version = "0.7.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0bb2e075f03b3d66d8d8785356224ba688d2906a371015e225beeb65ca92c740"
+checksum = "806fe8c2c87eccc8b3267cbae29ed3ab2d0bd37fca70ab622e46aaa9375ddb7d"
 dependencies = [
  "bytes",
  "futures-core",
