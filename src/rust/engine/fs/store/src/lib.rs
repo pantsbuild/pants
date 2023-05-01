@@ -1437,7 +1437,7 @@ impl Store {
     //
     // NB. #17758, #18849: this is a work-around for inaccurate management of the contents of dist/.
     for first in [true, false] {
-      match symlink(&target, &destination).await {
+      match symlink(&target, &destination) {
         Ok(()) => break,
         Err(e) if first && e.kind() == std::io::ErrorKind::AlreadyExists => {
           tokio::fs::remove_dir_all(&destination).await.map_err(|e| {
