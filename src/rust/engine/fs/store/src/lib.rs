@@ -1431,7 +1431,28 @@ impl Store {
     destination: PathBuf,
     target: String,
   ) -> Result<(), StoreError> {
-    symlink(target, destination)?;
+    // Overwriting a symlink, even with another symlink, fails if it exists. This can occur when
+    // materializing to a fixed directory like dist/. To avoid pessimising the more common case (no
+    // overwrite, e.g. materializing to a temp dir), only remove after noticing a failure.
+    //
+    // NB. #17758, #18849: this is a work-around for inaccurate management of the contents of dist/.
+    for first in [true, false] {
+      match symlink(&target, &destination).await {
+        Ok(()) => break,
+        Err(e) if first && e.kind() == std::io::ErrorKind::AlreadyExists => {
+          tokio::fs::remove_dir_all(&destination).await.map_err(|e| {
+            format!(
+              "Failed to remove existing item at {} when creating symlink to {target} there: {e}",
+              destination.display()
+            )
+          })?
+        }
+        Err(e) => Err(format!(
+          "Failed to create symlink to {target} at {}: {e}",
+          destination.display()
+        ))?,
+      }
+    }
     Ok(())
   }
 
