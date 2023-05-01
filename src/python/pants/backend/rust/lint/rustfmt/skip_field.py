@@ -1,6 +1,6 @@
 # Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-from pants.backend.rust.target_types import RustCrateTarget
+from pants.backend.rust.target_types import RustPackageTarget
 from pants.engine.target import BoolField
 
 
@@ -11,4 +11,4 @@ class SkipRustfmtField(BoolField):
 
 
 def rules():
-    return [RustCrateTarget.register_plugin_field(SkipRustfmtField)]
+    return [RustPackageTarget.register_plugin_field(SkipRustfmtField)]
