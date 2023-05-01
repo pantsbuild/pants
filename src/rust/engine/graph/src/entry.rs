@@ -229,16 +229,11 @@ impl<N: Node> EntryState<N> {
 ///
 /// An Entry and its adjacencies.
 ///
-/// TODO: Move the state into an InnerEntry type.
-///
 #[derive(Clone, Debug)]
 pub(crate) struct Entry<N: Node> {
-  // TODO: This is a clone of the Node, which is also kept in the `nodes` map. It would be
-  // nice to avoid keeping two copies of each Node, but tracking references between the two
-  // maps is painful.
-  node: N,
+  node: Arc<N>,
 
-  pub state: Arc<Mutex<EntryState<N>>>,
+  state: Arc<Mutex<EntryState<N>>>,
 }
 
 impl<N: Node> Entry<N> {
@@ -249,7 +244,7 @@ impl<N: Node> Entry<N> {
   ///
   pub(crate) fn new(node: N) -> Entry<N> {
     Entry {
-      node,
+      node: Arc::new(node),
       state: Arc::new(Mutex::new(EntryState::initial())),
     }
   }
@@ -341,7 +336,7 @@ impl<N: Node> Entry<N> {
     let run_token = run_token.next();
     let context = context_factory.clone_for(entry_id);
     let context2 = context.clone();
-    let node = entry.node.clone();
+    let entry2 = entry.clone();
     let (value, mut sender, receiver) = AsyncValue::<NodeResult<N>, NodeInterrupt<N>>::new();
     let is_cleaning = previous_dep_generations.is_some();
 
@@ -390,9 +385,9 @@ impl<N: Node> Entry<N> {
         }
         Err(()) => {
           // The Node needs to (re-)run!
-          let res = node.run(context.clone()).await;
+          let res = entry.node().clone().run(context.clone()).await;
           context.stats().ran.fetch_add(1, atomic::Ordering::SeqCst);
-          (Some(res), context.complete())
+          (Some(res), context.complete(entry.node()))
         }
       }
     };
@@ -405,11 +400,11 @@ impl<N: Node> Entry<N> {
             match interrupt_item {
               Some(NodeInterrupt::Aborted(res)) => {
                   // We were aborted via terminate: complete with the given res.
-                  break (Some(res.0), context2.complete())
+                  break (Some(res.0), context2.complete(entry2.node()))
               }
               Some(NodeInterrupt::Dirtied) => {
                   // Attempt to clean the Node, and cancel it if we fail.
-                  let dep_generations_so_far = context2.dep_generations_so_far();
+                  let dep_generations_so_far = context2.dep_generations_so_far(entry2.node());
                   if context2
                     .graph()
                     .attempt_cleaning(entry_id, run_token, &dep_generations_so_far, &context2)
@@ -424,7 +419,7 @@ impl<N: Node> Entry<N> {
               }
               None => {
                   // We were aborted via drop: exit.
-                  entry.cancel(run_token);
+                  entry2.cancel(run_token);
                   return;
               }
             }
@@ -436,7 +431,7 @@ impl<N: Node> Entry<N> {
         }
       };
       // The node completed or was cleaned.
-      entry.complete(
+      entry2.complete(
         &context2,
         run_token,
         sender,

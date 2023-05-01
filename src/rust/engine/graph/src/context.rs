@@ -118,10 +118,10 @@ impl<N: Node + Send> Context<N> {
   /// Gets the dependency generations which have been computed for this Node so far. May not be
   /// called after `complete` has been called for a node.
   ///
-  pub(crate) fn dep_generations_so_far(&self) -> Vec<(EntryId, Generation)> {
+  pub(crate) fn dep_generations_so_far(&self, node: &N) -> Vec<(EntryId, Generation)> {
     (*self.dep_state.lock())
       .clone()
-      .expect("Node has already completed.")
+      .unwrap_or_else(|| panic!("Node {node} has already completed."))
       .generations
   }
 
@@ -129,12 +129,12 @@ impl<N: Node + Send> Context<N> {
   /// Completes the Context for this EntryId, returning the dependency generations that were
   /// recorded while it was running. May only be called once.
   ///
-  pub(crate) fn complete(&self) -> DepState {
+  pub(crate) fn complete(&self, node: &N) -> DepState {
     self
       .dep_state
       .lock()
       .take()
-      .expect("Node was completed multiple times.")
+      .unwrap_or_else(|| panic!("Node {node} was completed multiple times."))
   }
 
   ///
