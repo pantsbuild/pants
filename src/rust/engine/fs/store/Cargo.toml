@@ -29,7 +29,7 @@ madvise = "0.1"
 memmap = "0.7"
 parking_lot = "0.12"
 prost = "0.9"
-prost-types = "0.9"
+prost-types = "0.11"
 serde = "1.0"
 serde_derive = "1.0"
 sharded_lmdb = { path = "../../sharded_lmdb" }

@@ -30,7 +30,7 @@ workunit_store = { path = "../../workunit_store" }
 async-oncecell = "0.2"
 once_cell = "1.15"
 prost = "0.9"
-prost-types = "0.9"
+prost-types = "0.11"
 rand = "0.8"
 tonic = { version = "0.6", features = ["transport", "codegen", "tls", "tls-roots", "prost"] }
 process_execution = { path = ".." }
