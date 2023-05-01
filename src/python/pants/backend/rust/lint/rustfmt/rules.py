@@ -40,7 +40,8 @@ async def rustfmt_fmt(request: RustfmtRequest.Batch, rustfmt: RustfmtSubsystem) 
     args = (
         *rustfmt.args,
         # Filter out non-.rs files, e.g. cargo.toml, from the file list.
-        *(f for f in request.snapshot.files if f.endswith(".rs")),)
+        *(f for f in request.snapshot.files if f.endswith(".rs")),
+    )
     result = await Get(
         ProcessResult,
         RustToolchainProcess(

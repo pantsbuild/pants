@@ -1,7 +1,7 @@
 # Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants.option.option_types import SkipOption, ArgsListOption
+from pants.option.option_types import ArgsListOption, SkipOption
 from pants.option.subsystem import Subsystem
 from pants.util.ordered_set import FrozenOrderedSet
 

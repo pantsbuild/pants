@@ -15,8 +15,6 @@ from pants.core.goals.fmt import FmtResult
 from pants.core.util_rules import source_files, system_binaries
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
-from pants.engine.fs import CreateDigest, Digest, FileContent
-from pants.engine.internals.native_engine import Snapshot
 from pants.engine.target import Target
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
@@ -85,17 +83,11 @@ def run_rustfmt(
                 "",
                 input_sources.snapshot.files,
                 partition_metadata=None,
-                snapshot=input_sources.snapshot
+                snapshot=input_sources.snapshot,
             ),
         ],
     )
     return fmt_result
-
-
-def get_snapshot(rule_runner: RuleRunner, source_files: dict[str, str]) -> Snapshot:
-    files = [FileContent(path, content.encode()) for path, content in source_files.items()]
-    digest = rule_runner.request(Digest, [CreateDigest(files)])
-    return rule_runner.request(Snapshot, [digest])
 
 
 def test_passing(rule_runner: RuleRunner) -> None:
@@ -106,8 +98,8 @@ def test_passing(rule_runner: RuleRunner) -> None:
     fmt_result = run_rustfmt(rule_runner, [tgt])
 
     assert fmt_result.stdout.strip() == ""
-    assert fmt_result.output == get_snapshot(
-        rule_runner, {"src/lib.rs": GOOD_FILE, "Cargo.toml": ""}
+    assert fmt_result.output == rule_runner.make_snapshot(
+        {"src/lib.rs": GOOD_FILE, "Cargo.toml": ""}
     )
     assert fmt_result.did_change is False
 
@@ -119,8 +111,8 @@ def test_failing(rule_runner: RuleRunner) -> None:
     tgt = rule_runner.get_target(Address("", target_name="crate"))
     fmt_result = run_rustfmt(rule_runner, [tgt])
     assert fmt_result.stderr == ""
-    assert fmt_result.output == get_snapshot(
-        rule_runner, {"src/lib.rs": FIXED_BAD_FILE, "Cargo.toml": ""}
+    assert fmt_result.output == rule_runner.make_snapshot(
+        {"src/lib.rs": FIXED_BAD_FILE, "Cargo.toml": ""}
     )
     assert fmt_result.did_change is True
 
@@ -136,8 +128,8 @@ def test_mixed_sources(rule_runner: RuleRunner) -> None:
     )
     tgt = rule_runner.get_target(Address("", target_name="crate"))
     fmt_result = run_rustfmt(rule_runner, [tgt])
-    assert fmt_result.output == get_snapshot(
-        rule_runner, {"src/good.rs": GOOD_FILE, "src/bad.rs": FIXED_BAD_FILE, "Cargo.toml": ""}
+    assert fmt_result.output == rule_runner.make_snapshot(
+        {"src/good.rs": GOOD_FILE, "src/bad.rs": FIXED_BAD_FILE, "Cargo.toml": ""}
     )
     assert fmt_result.did_change is True
 
@@ -155,8 +147,7 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
     )
     tgts = [rule_runner.get_target(Address("good")), rule_runner.get_target(Address("bad"))]
     fmt_result = run_rustfmt(rule_runner, tgts)
-    assert fmt_result.output == get_snapshot(
-        rule_runner,
+    assert fmt_result.output == rule_runner.make_snapshot(
         {
             "good/src/f.rs": GOOD_FILE,
             "bad/src/f.rs": FIXED_BAD_FILE,
@@ -170,8 +161,12 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
 @pytest.mark.skip(reason="TODO")
 def test_skip(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
-        {"src/lib.rs": BAD_FILE, "Cargo.toml": "", "BUILD": "rust_crate(name='crate')"}
+        {
+            "src/lib.rs": BAD_FILE,
+            "Cargo.toml": "",
+            "BUILD": "rust_crate(name='crate', skip_rustfmt=True)",
+        }
     )
     tgt = rule_runner.get_target(Address("", target_name="crate"))
-    fmt_result = run_rustfmt(rule_runner, [tgt], extra_args=["--rustfmt-skip"])
+    fmt_result = run_rustfmt(rule_runner, [tgt])
     assert fmt_result.did_change is False
