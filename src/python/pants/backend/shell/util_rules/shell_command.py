@@ -198,8 +198,8 @@ async def shell_command_in_sandbox(
         EnvironmentName, EnvironmentNameRequest, EnvironmentNameRequest.from_target(shell_command)
     )
 
-    adhoc_result = await Get(
-        AdhocProcessResult,
+    return await Get(
+        GeneratedSources
         {
             environment_name: EnvironmentName,
             ShellCommandProcessFromTargetRequest(
@@ -207,9 +207,6 @@ async def shell_command_in_sandbox(
             ): ShellCommandProcessFromTargetRequest,
         },
     )
-
-    output = await Get(Snapshot, Digest, adhoc_result.adjusted_digest)
-    return GeneratedSources(output)
 
 
 async def _interactive_shell_command(

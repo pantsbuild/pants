@@ -68,6 +68,7 @@ class AdhocProcessRequest:
 class AdhocProcessResult:
     process_result: ProcessResult
     adjusted_digest: Digest
+    managed_globs: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -412,7 +413,7 @@ async def run_adhoc_process(
 
     adjusted = await Get(Digest, RemovePrefix(output_digest, root_output_directory))
 
-    return AdhocProcessResult(result, adjusted)
+    return AdhocProcessResult(result, adjusted, managed_globs=tuple(sorted(request.output_files + request.output_directories)))
 
 
 @rule

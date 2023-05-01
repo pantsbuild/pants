@@ -295,7 +295,7 @@ async def _hydrate_asset_source(
     target = request.protocol_target
     source_field = target[AssetSourceField]
     if isinstance(source_field.value, str):
-        return GeneratedSources(request.protocol_sources)
+        return GeneratedSources(request.protocol_sources, managed_globs=request.protocol_sources.files)
 
     source = source_field.value
     if isinstance(source, per_platform):
@@ -317,7 +317,7 @@ async def _hydrate_asset_source(
         ),
     )
 
-    return GeneratedSources(snapshot)
+    return GeneratedSources(snapshot, managed_globs=source_field.file_path)
 
 
 # -----------------------------------------------------------------------------------------------
@@ -534,7 +534,11 @@ async def relocate_files(request: RelocateFilesViaCodegenRequest) -> GeneratedSo
         snapshot = await Get(Snapshot, RemovePrefix(snapshot.digest, src_val))
     if dest_val:
         snapshot = await Get(Snapshot, AddPrefix(snapshot.digest, dest_val))
-    return GeneratedSources(snapshot)
+    return GeneratedSources(snapshot, managed_globs=tuple(
+        glob # TODO: remove src/dest as appropriate
+        for sources in original_files_sources
+        for glob in sources.managed_globs
+    ))
 
 
 # -----------------------------------------------------------------------------------------------

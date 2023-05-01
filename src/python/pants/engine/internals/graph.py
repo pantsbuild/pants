@@ -1120,7 +1120,7 @@ async def hydrate_sources(
         None,
     )
     if sources_type is None:
-        return HydratedSources(EMPTY_SNAPSHOT, sources_field.filespec, sources_type=None)
+        return HydratedSources(EMPTY_SNAPSHOT, sources_field.filespec, sources_type=None, managed_globs=())
 
     # Now, hydrate the `globs`. Even if we are going to use codegen, we will need the original
     # protocol sources to be hydrated.
@@ -1130,7 +1130,7 @@ async def hydrate_sources(
 
     # Finally, return if codegen is not in use; otherwise, run the relevant code generator.
     if not request.enable_codegen or generate_request_type is None:
-        return HydratedSources(snapshot, sources_field.filespec, sources_type=sources_type)
+        return HydratedSources(snapshot, sources_field.filespec, sources_type=sources_type, managed_globs=path_globs)
     wrapped_protocol_target = await Get(
         WrappedTarget,
         WrappedTargetRequest(
@@ -1145,7 +1145,7 @@ async def hydrate_sources(
         generate_request_type(snapshot, wrapped_protocol_target.target),
     )
     return HydratedSources(
-        generated_sources.snapshot, sources_field.filespec, sources_type=sources_type
+        generated_sources.snapshot, sources_field.filespec, sources_type=sources_type, managed_globs=generated_sources.managed_globs,
     )
 
 

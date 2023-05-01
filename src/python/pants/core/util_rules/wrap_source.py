@@ -95,7 +95,7 @@ async def _wrap_source(wrapper: GenerateSourcesRequest) -> GeneratedSources:
     )
 
     snapshot = await Get(Snapshot, Digest, filter_digest)
-    return GeneratedSources(snapshot)
+    return GeneratedSources(snapshot, managed_globs=())
 
 
 def wrap_source_rule_and_target(

@@ -169,17 +169,19 @@ async def run_in_sandbox_request(
         capture_stdout_file=target[AdhocToolStdoutFilenameField].value,
     )
 
-    adhoc_result = await Get(
-        AdhocProcessResult,
+    return await Get(
+        GeneratedSources,
         {
             environment_name: EnvironmentName,
             process_request: AdhocProcessRequest,
         },
     )
 
-    output = await Get(Snapshot, Digest, adhoc_result.adjusted_digest)
-    return GeneratedSources(output)
 
+@rule
+async def generated_sources_from_adhoc_process_result(adhoc_result: AdhocProcessResult) -> GeneratedSources:
+    output = await Get(Snapshot, Digest, adhoc_result.adjusted_digest)
+    return GeneratedSources(output, managed_globs=adhoc_result.managed_globs)
 
 def rules():
     return [

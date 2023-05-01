@@ -2405,6 +2405,7 @@ class HydratedSources:
     snapshot: Snapshot
     filespec: Filespec
     sources_type: type[SourcesField] | None
+    managed_globs: tuple[str, ...]
 
 
 @union(in_scope_types=[EnvironmentName])
@@ -2451,6 +2452,7 @@ class GenerateSourcesRequest:
 @dataclass(frozen=True)
 class GeneratedSources:
     snapshot: Snapshot
+    managed_globs: tuple[str, ...]
 
 
 class SourcesPaths(Paths):

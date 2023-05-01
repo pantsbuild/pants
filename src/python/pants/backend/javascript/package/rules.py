@@ -84,8 +84,8 @@ async def run_node_build_script(
     installation = await Get(
         InstalledNodePackageWithSource, InstalledNodePackageRequest(req.protocol_target.address)
     )
-    output_files = req.protocol_target[NodeBuildScriptOutputFilesField]
-    output_dirs = req.protocol_target[NodeBuildScriptOutputDirectoriesField]
+    raw_output_files = req.protocol_target[NodeBuildScriptOutputFilesField]
+    raw_output_dirs = req.protocol_target[NodeBuildScriptOutputDirectoriesField]
     script_name = req.protocol_target[NodeBuildScriptEntryPointField].value
     extra_caches = req.protocol_target[NodeBuildScriptExtraCaches].value
     if not (output_dirs.value or output_files.value):
@@ -104,6 +104,14 @@ async def run_node_build_script(
         parts = (installation.project_env.package_dir(), script_name, cache_path)
         return "_".join(_NOT_ALPHANUMERIC.sub("_", part) for part in parts if part)
 
+    output_files = tuple(
+                installation.join_relative_workspace_directory(file)
+                for file in raw_output_files.value or ()
+            )
+    output_directories = tuple(
+                installation.join_relative_workspace_directory(directory)
+                for directory in raw_output_dirs.value or ()
+            )
     args = ("run", script_name)
     result = await Get(
         ProcessResult,
@@ -112,14 +120,8 @@ async def run_node_build_script(
             args=filter(None, args),
             description=f"Running node build script '{script_name}'.",
             input_digest=installation.digest,
-            output_files=tuple(
-                installation.join_relative_workspace_directory(file)
-                for file in output_files.value or ()
-            ),
-            output_directories=tuple(
-                installation.join_relative_workspace_directory(directory)
-                for directory in output_dirs.value or ()
-            ),
+            output_files=output_files,
+            output_directories=output_directories,
             level=LogLevel.INFO,
             per_package_caches=FrozenDict(
                 {cache_name(extra_cache): extra_cache for extra_cache in extra_caches or ()}
@@ -128,7 +130,8 @@ async def run_node_build_script(
     )
 
     return GeneratedSources(
-        await Get(Snapshot, AddPrefix(result.output_digest, installation.project_dir))
+        await Get(Snapshot, AddPrefix(result.output_digest, installation.project_dir)),
+        managed_globs=sorted(output_files + output_directories)
     )
 
 
