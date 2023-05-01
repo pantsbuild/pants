@@ -19,7 +19,7 @@ pub type EntryId = graph::NodeIndex<u32>;
 /// Note that it is assumed that Nodes are very cheap to clone.
 ///
 #[async_trait]
-pub trait Node: Clone + Debug + Display + Eq + Hash + Send + 'static {
+pub trait Node: Clone + Debug + Display + Eq + Hash + Send + Sync + 'static {
   /// An implementation-specific context required to run this Node.
   type Context: Send + Sync;
 
@@ -65,6 +65,11 @@ pub trait Node: Clone + Debug + Display + Eq + Hash + Send + 'static {
 }
 
 pub trait NodeError: Clone + Debug + Eq + Send + Sync {
+  ///
+  /// Creates a generic Error of type NodeError.
+  ///
+  fn generic(message: String) -> Self;
+
   ///
   /// Creates an instance that represents that a Node was invalidated out of the
   /// Graph (generally while running).

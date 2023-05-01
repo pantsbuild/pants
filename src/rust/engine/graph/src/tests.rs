@@ -3,7 +3,8 @@
 use std::cmp;
 use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
-use std::sync::{atomic, mpsc, Arc};
+use std::sync::atomic::{self, AtomicUsize};
+use std::sync::{mpsc, Arc};
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -395,7 +396,7 @@ async fn non_restartable_node_only_runs_once() {
     graph.context(
       TContext::new()
         .with_non_restartable(non_restartable)
-        .with_delays(delays),
+        .with_delays_pre(delays),
     )
   };
 
@@ -525,7 +526,7 @@ async fn retries() {
     let sleep_root = Duration::from_millis(100);
     let mut delays = HashMap::new();
     delays.insert(TNode::new(0), sleep_root);
-    graph.context(TContext::new().with_delays(delays))
+    graph.context(TContext::new().with_delays_pre(delays))
   };
 
   // Spawn a thread that will invalidate in a loop for one second (much less than our timeout).
@@ -549,55 +550,76 @@ async fn retries() {
 }
 
 #[tokio::test]
-async fn canceled_on_invalidation() {
+async fn eager_cleaning_success() {
+  // Test that invalidation does not cause a Running node to restart if the dependencies that it
+  // has already requested can successfully be cleaned.
   let _logger = env_logger::try_init();
-  let invalidation_delay = Duration::from_millis(10);
+  let invalidation_delay = Duration::from_millis(100);
   let graph = Arc::new(Graph::<TNode>::new_with_invalidation_delay(
     Executor::new(),
     invalidation_delay,
   ));
 
   let sleep_middle = Duration::from_millis(2000);
-  let start_time = Instant::now();
   let context = {
     let mut delays = HashMap::new();
     delays.insert(TNode::new(1), sleep_middle);
-    graph.context(TContext::new().with_delays(delays))
+    graph.context(TContext::new().with_delays_pre(delays))
   };
 
-  // We invalidate three times: the mid should only actually run to completion once, because we
-  // should cancel it the other times. We wait longer than the invalidation_delay for each
-  // invalidation to ensure that work actually starts before being invalidated.
-  let iterations = 3;
-  let sleep_per_invalidation = invalidation_delay * 10;
-  assert!(sleep_middle > sleep_per_invalidation * 3);
+  // Invalidate the bottom Node (after the middle node has already requested it).
+  assert!(sleep_middle > invalidation_delay * 3);
   let graph2 = graph.clone();
   let _join = thread::spawn(move || {
-    for _ in 0..iterations {
-      thread::sleep(sleep_per_invalidation);
-      graph2.invalidate_from_roots(true, |n| n.id == 1);
-    }
+    thread::sleep(invalidation_delay);
+    graph2.invalidate_from_roots(true, |n| n.id == 0);
   });
   assert_eq!(
     graph.create(TNode::new(2), &context).await,
     Ok(vec![T(0, 0), T(1, 0), T(2, 0)])
   );
 
-  // We should have waited much less than the time it would have taken to complete three times.
-  assert!(Instant::now() < start_time + (sleep_middle * iterations));
+  // No nodes should have seen aborts, since the dirtied nodes had already completed, and the
+  // running node should not have been interrupted.
+  assert!(context.aborts().is_empty(), "{:?}", context.aborts());
+}
 
-  // And the top nodes should have seen three aborts.
+#[tokio::test]
+async fn eager_cleaning_failure() {
+  // Test that invalidation causes a Running node to restart if the dependencies that it
+  // has already requested end up with new values before it completes.
+  let _logger = env_logger::try_init();
+  let invalidation_delay = Duration::from_millis(100);
+  let sleep_middle = Duration::from_millis(2000);
+  let graph = Arc::new(Graph::new_with_invalidation_delay(
+    Executor::new(),
+    invalidation_delay,
+  ));
+
+  let context = {
+    let mut delays = HashMap::new();
+    delays.insert(TNode::new(1), sleep_middle);
+    graph.context(TContext::new().with_delays_post(delays))
+  };
+
+  // Invalidate the bottom Node with a new salt (after the middle node has already requested it).
+  assert!(sleep_middle > invalidation_delay * 3);
+  let graph2 = graph.clone();
+  let context2 = Context::<TNode>::clone(&context);
+  let _join = thread::spawn(move || {
+    thread::sleep(invalidation_delay);
+    context2.set_salt(1);
+    graph2.invalidate_from_roots(true, |n| n.id == 0);
+  });
   assert_eq!(
-    vec![
-      TNode::new(1),
-      TNode::new(2),
-      TNode::new(1),
-      TNode::new(2),
-      TNode::new(1),
-      TNode::new(2)
-    ],
-    context.aborts(),
+    graph.create(TNode::new(2), &context).await,
+    Ok(vec![T(0, 1), T(1, 1), T(2, 0)])
   );
+
+  // The middle node should have seen an abort, since it already observed its dependency, and that
+  // dependency could not be cleaned. But the top Node will not abort, because it will not yet have
+  // received a value for its dependency, and so will be successfully cleaned.
+  assert_eq!(vec![TNode::new(1)], context.aborts());
 }
 
 #[tokio::test]
@@ -610,7 +632,7 @@ async fn canceled_on_loss_of_interest() {
   let context = {
     let mut delays = HashMap::new();
     delays.insert(TNode::new(1), sleep_middle);
-    graph.context(TContext::new().with_delays(delays))
+    graph.context(TContext::new().with_delays_pre(delays))
   };
 
   // Start a run, but cancel it well before the delayed middle node can complete.
@@ -654,7 +676,7 @@ async fn clean_speculatively() {
     delays.insert(TNode::new(2), delay);
     graph.context(
       TContext::new()
-        .with_delays(delays)
+        .with_delays_pre(delays)
         .with_dependencies(dependencies.clone()),
     )
   };
@@ -791,7 +813,7 @@ impl Node for TNode {
       return Err(TError::Error);
     }
     let token = T(self.id, context.salt());
-    context.maybe_delay(&self).await;
+    context.maybe_delay_pre(&self).await;
     let res = match context.dependencies_of(&self) {
       deps if !deps.is_empty() => {
         // Request all dependencies, but include only the first in our output value.
@@ -808,6 +830,7 @@ impl Node for TNode {
       }
       _ => Ok(vec![token]),
     };
+    context.maybe_delay_post(&self).await;
     abort_guard.did_not_abort();
     res
   }
@@ -885,12 +908,13 @@ struct TContext {
   // A value that is included in every value computed by this context. Stands in for "the state of the
   // outside world". A test that wants to "change the outside world" and observe its effect on the
   // graph should change the salt to do so.
-  salt: usize,
+  salt: Arc<AtomicUsize>,
   // A mapping from source to destinations that drives what values each TNode depends on.
   // If there is no entry in this map for a node, then TNode::run will default to requesting
   // the next smallest node.
   edges: Arc<HashMap<TNode, Vec<TNode>>>,
-  delays: Arc<HashMap<TNode, Duration>>,
+  delays_pre: Arc<HashMap<TNode, Duration>>,
+  delays_post: Arc<HashMap<TNode, Duration>>,
   // Nodes which should error when they run.
   errors: Arc<HashSet<TNode>>,
   non_restartable: Arc<HashSet<TNode>>,
@@ -902,9 +926,10 @@ struct TContext {
 impl TContext {
   fn new() -> TContext {
     TContext {
-      salt: 0,
+      salt: Arc::new(AtomicUsize::new(0)),
       edges: Arc::default(),
-      delays: Arc::default(),
+      delays_pre: Arc::default(),
+      delays_post: Arc::default(),
       errors: Arc::default(),
       non_restartable: Arc::default(),
       uncacheable: Arc::default(),
@@ -918,8 +943,15 @@ impl TContext {
     self
   }
 
-  fn with_delays(mut self, delays: HashMap<TNode, Duration>) -> TContext {
-    self.delays = Arc::new(delays);
+  /// Delays incurred before a node has requested its dependencies.
+  fn with_delays_pre(mut self, delays: HashMap<TNode, Duration>) -> TContext {
+    self.delays_pre = Arc::new(delays);
+    self
+  }
+
+  /// Delays incurred after a node has requested its dependencies.
+  fn with_delays_post(mut self, delays: HashMap<TNode, Duration>) -> TContext {
+    self.delays_post = Arc::new(delays);
     self
   }
 
@@ -939,12 +971,16 @@ impl TContext {
   }
 
   fn with_salt(mut self, salt: usize) -> TContext {
-    self.salt = salt;
+    self.salt = Arc::new(AtomicUsize::new(salt));
     self
   }
 
   fn salt(&self) -> usize {
-    self.salt
+    self.salt.load(atomic::Ordering::SeqCst)
+  }
+
+  fn set_salt(&self, salt: usize) {
+    self.salt.store(salt, atomic::Ordering::SeqCst)
   }
 
   fn abort_guard(&self, node: TNode) -> AbortGuard {
@@ -964,8 +1000,14 @@ impl TContext {
     runs.push(node);
   }
 
-  async fn maybe_delay(&self, node: &TNode) {
-    if let Some(delay) = self.delays.get(node) {
+  async fn maybe_delay_pre(&self, node: &TNode) {
+    if let Some(delay) = self.delays_pre.get(node) {
+      sleep(*delay).await;
+    }
+  }
+
+  async fn maybe_delay_post(&self, node: &TNode) {
+    if let Some(delay) = self.delays_post.get(node) {
       sleep(*delay).await;
     }
   }
@@ -1029,5 +1071,9 @@ enum TError {
 impl NodeError for TError {
   fn invalidated() -> Self {
     TError::Invalidated
+  }
+
+  fn generic(_message: String) -> Self {
+    TError::Error
   }
 }
