@@ -189,7 +189,7 @@ async def parse_python_dependencies(
     assert len(stripped_sources.snapshot.files) == 1
 
     possible_major_minors =request.interpreter_constraints.partition_into_major_minor_versions(python_setup.interpreter_versions_universe)
-    if False:
+    if possible_major_minors != ("2.7",):
         native_result = await Get(NativeParsedPythonDependencies, Digest, stripped_sources.snapshot.digest)
         imports = dict(native_result.imports)
         assets = set()
