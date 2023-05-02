@@ -92,9 +92,9 @@ def run_rustfmt(
 
 def test_passing(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
-        {"src/lib.rs": GOOD_FILE, "Cargo.toml": "", "BUILD": "rust_crate(name='crate')"}
+        {"src/lib.rs": GOOD_FILE, "Cargo.toml": "", "BUILD": "rust_package(name='package')"}
     )
-    tgt = rule_runner.get_target(Address("", target_name="crate"))
+    tgt = rule_runner.get_target(Address("", target_name="package"))
     fmt_result = run_rustfmt(rule_runner, [tgt])
 
     assert fmt_result.stdout.strip() == ""
@@ -106,9 +106,9 @@ def test_passing(rule_runner: RuleRunner) -> None:
 
 def test_failing(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
-        {"src/lib.rs": BAD_FILE, "Cargo.toml": "", "BUILD": "rust_crate(name='crate')"}
+        {"src/lib.rs": BAD_FILE, "Cargo.toml": "", "BUILD": "rust_package(name='package')"}
     )
-    tgt = rule_runner.get_target(Address("", target_name="crate"))
+    tgt = rule_runner.get_target(Address("", target_name="package"))
     fmt_result = run_rustfmt(rule_runner, [tgt])
     assert fmt_result.stderr == ""
     assert fmt_result.output == rule_runner.make_snapshot(
@@ -123,10 +123,10 @@ def test_mixed_sources(rule_runner: RuleRunner) -> None:
             "src/good.rs": GOOD_FILE,
             "src/bad.rs": BAD_FILE,
             "Cargo.toml": "",
-            "BUILD": "rust_crate(name='crate')",
+            "BUILD": "rust_package(name='package')",
         }
     )
-    tgt = rule_runner.get_target(Address("", target_name="crate"))
+    tgt = rule_runner.get_target(Address("", target_name="package"))
     fmt_result = run_rustfmt(rule_runner, [tgt])
     assert fmt_result.output == rule_runner.make_snapshot(
         {"src/good.rs": GOOD_FILE, "src/bad.rs": FIXED_BAD_FILE, "Cargo.toml": ""}
@@ -139,10 +139,10 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
         {
             "good/src/f.rs": GOOD_FILE,
             "good/Cargo.toml": "",
-            "good/BUILD": "rust_crate()",
+            "good/BUILD": "rust_package()",
             "bad/src/f.rs": BAD_FILE,
             "bad/Cargo.toml": "",
-            "bad/BUILD": "rust_crate()",
+            "bad/BUILD": "rust_package()",
         }
     )
     tgts = [rule_runner.get_target(Address("good")), rule_runner.get_target(Address("bad"))]
@@ -164,9 +164,9 @@ def test_skip(rule_runner: RuleRunner) -> None:
         {
             "src/lib.rs": BAD_FILE,
             "Cargo.toml": "",
-            "BUILD": "rust_crate(name='crate', skip_rustfmt=True)",
+            "BUILD": "rust_package(name='package', skip_rustfmt=True)",
         }
     )
-    tgt = rule_runner.get_target(Address("", target_name="crate"))
+    tgt = rule_runner.get_target(Address("", target_name="package"))
     fmt_result = run_rustfmt(rule_runner, [tgt])
     assert fmt_result.did_change is False
