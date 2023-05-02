@@ -159,7 +159,9 @@ def test_jest_tests_are_successful(
     assert result.exit_code == 0
 
 
-def test_batched_jest_tests_are_successful(rule_runner: RuleRunner, jest_lockfile: dict[str, str]) -> None:
+def test_batched_jest_tests_are_successful(
+    rule_runner: RuleRunner, jest_lockfile: dict[str, str]
+) -> None:
     rule_runner.write_files(
         {
             "foo/BUILD": "package_json()",
