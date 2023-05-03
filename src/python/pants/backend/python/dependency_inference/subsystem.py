@@ -190,3 +190,13 @@ class PythonInferSubsystem(Subsystem):
         """
         ),
     )
+
+    use_rust_parser = BoolOption(
+        default=False,
+        help = softwrap(
+        """
+        @TODO...
+
+        """
+        )
+    )

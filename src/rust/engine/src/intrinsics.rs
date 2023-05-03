@@ -24,7 +24,7 @@ use crate::Failure;
 use futures::future::{BoxFuture, FutureExt, TryFutureExt};
 use futures::try_join;
 use indexmap::IndexMap;
-use pyo3::types::{PyString};
+use pyo3::types::PyString;
 use pyo3::{IntoPy, PyAny, PyRef, Python, ToPyObject};
 use tokio::process;
 
@@ -790,10 +790,7 @@ fn parse_python_deps(context: Context, args: Vec<Value>) -> BoxFuture<'static, N
       .unwrap();
       externs::call_function(
         create_func,
-        &[
-          result.0.to_object(py).into(),
-          result.1.to_object(py).into(),
-        ],
+        &[result.0.to_object(py).into(), result.1.to_object(py).into()],
       )
       .map(|obj| Value::new(obj.into_py(py)))
       .unwrap_or_else(|e| {

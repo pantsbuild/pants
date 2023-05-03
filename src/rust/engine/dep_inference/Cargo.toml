@@ -1,0 +1,13 @@
+[package]
+version = "0.0.1"
+edition = "2021"
+name = "dep_inference"
+authors = [ "Pants Build <pantsbuild@gmail.com>" ]
+publish = false
+
+[build-dependencies]
+tree-sitter-python = "0.20.2"
+
+[dependencies]
+tree-sitter = "0.20.10"
+tree-sitter-python = "0.20.2"

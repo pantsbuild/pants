@@ -109,11 +109,11 @@ def test_normal_imports(rule_runner: RuleRunner) -> None:
             ignored1 as alias1,  # pants: no-infer-dep
             ignored2 as \\
                 alias2,  # pants: no-infer-dep
-            ignored3 as  # pants: no-infer-dep
-                alias3,
-            ignored4 as alias4, ignored4,  # pants: no-infer-dep
-            not_ignored2, \\
-            not_ignored3
+            ignored3 as
+                alias3,  # pants: no-infer-dep
+            not_ignored2 as alias4, ignored3,  # pants: no-infer-dep
+            not_ignored3, \\
+            not_ignored4
         )
         from multiline_import2 import (ignored1,  # pants: no-infer-dep
             not_ignored)
@@ -126,7 +126,6 @@ def test_normal_imports(rule_runner: RuleRunner) -> None:
         rule_runner,
         content,
         expected_imports={
-            "__future__.print_function": ImpInfo(lineno=1, weak=False),
             "os": ImpInfo(lineno=3, weak=False),
             "os.path": ImpInfo(lineno=5, weak=False),
             "typing.TYPE_CHECKING": ImpInfo(lineno=6, weak=False),
@@ -135,8 +134,9 @@ def test_normal_imports(rule_runner: RuleRunner) -> None:
             "project.demo.Demo": ImpInfo(lineno=11, weak=False),
             "project.demo.OriginalName": ImpInfo(lineno=12, weak=False),
             "multiline_import1.not_ignored1": ImpInfo(lineno=16, weak=False),
-            "multiline_import1.not_ignored2": ImpInfo(lineno=23, weak=False),
-            "multiline_import1.not_ignored3": ImpInfo(lineno=24, weak=False),
+            "multiline_import1.not_ignored2": ImpInfo(lineno=22, weak=False),
+            "multiline_import1.not_ignored3": ImpInfo(lineno=23, weak=False),
+            "multiline_import1.not_ignored4": ImpInfo(lineno=24, weak=False),
             "multiline_import2.not_ignored": ImpInfo(lineno=27, weak=False),
             "project.circular_dep.CircularDep": ImpInfo(lineno=30, weak=False),
         },
@@ -149,16 +149,16 @@ def test_dunder_import_call(rule_runner: RuleRunner) -> None:
         __import__("pkg_resources")
         __import__("dunder_import_ignored")  # pants: no-infer-dep
         __import__(  # pants: no-infer-dep
-            "not_ignored_but_looks_like_it_could_be"
+            "ignored"
         )
         __import__(
-            "ignored"  # pants: no-infer-dep
+            "also_ignored"  # pants: no-infer-dep
         )
         __import__(
-            "also_not_ignored_but_looks_like_it_could_be"
+            "also_also_ignored"
         )  # pants: no-infer-dep
         __import__(
-            "ignored_too" \\
+            "not_ignored" \\
             # pants: no-infer-dep
         )
         __import__(
@@ -171,8 +171,7 @@ def test_dunder_import_call(rule_runner: RuleRunner) -> None:
         content,
         expected_imports={
             "pkg_resources": ImpInfo(lineno=1, weak=False),
-            "not_ignored_but_looks_like_it_could_be": ImpInfo(lineno=4, weak=False),
-            "also_not_ignored_but_looks_like_it_could_be": ImpInfo(lineno=10, weak=False),
+            "not_ignored": ImpInfo(lineno=13, weak=False),
         },
     )
 
@@ -511,6 +510,7 @@ def test_works_with_python39(rule_runner: RuleRunner) -> None:
             "treat.as.a.regular.import.not.a.string.import": ImpInfo(lineno=11, weak=False),
             "dep.from.str": ImpInfo(lineno=13, weak=True),
         },
+        expected_assets=["/dev/null"]
     )
 
 

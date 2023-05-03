@@ -124,6 +124,7 @@ concrete_time = { path = "concrete_time" }
 crossbeam-channel = "0.5"
 # TODO: Waiting on https://github.com/Aeledfyr/deepsize/pull/{30,31,32}.
 deepsize = { git = "https://github.com/stuhood/deepsize.git", rev = "5c8bee5443fcafe4aaa9274490d354412d0955c1", features=["internment", "smallvec"] }
+dep_inference = { path = "dep_inference" }
 derivative = "2.2"
 async-oncecell = "0.2"
 docker = { path = "process_execution/docker" }
@@ -152,12 +153,6 @@ rand = "0.8"
 regex = "1"
 reqwest = { version = "0.11", default_features = false, features = ["stream", "rustls-tls"] }
 rule_graph = { path = "rule_graph" }
-rustpython-parser = { features = [
-  "lalrpop",
-], git = "https://github.com/thejcannon/RustPython.git", rev = "250ac78d04ae48904ba9ee2faf1d2f4219c4e949" }
-rustpython-ast = { features = [
-  "visitor",
-], git = "https://github.com/thejcannon/RustPython.git", rev = "250ac78d04ae48904ba9ee2faf1d2f4219c4e949" }
 smallvec = { version = "1", features=["union"] }
 stdio = { path = "stdio" }
 store = { path = "fs/store" }
