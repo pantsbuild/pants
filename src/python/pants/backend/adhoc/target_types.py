@@ -124,7 +124,7 @@ class AdhocToolRunnableDependenciesField(SpecialCasedDependencies):
         dependencies will be made available on the `PATH` with the name of the target.
 
         See also `{AdhocToolOutputDependenciesField.alias}` and
-        `{AdhocToolExecutionDependenciesField.alias}.
+        `{AdhocToolExecutionDependenciesField.alias}`.
         """
     )
 
