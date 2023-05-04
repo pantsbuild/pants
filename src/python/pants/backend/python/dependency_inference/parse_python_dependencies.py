@@ -12,6 +12,7 @@ from pants.backend.python.dependency_inference.subsystem import PythonInferSubsy
 from pants.backend.python.target_types import PythonSourceField
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex_environment import PythonExecutable
+from pants.base.deprecated import warn_or_error
 from pants.core.util_rules.source_files import SourceFilesRequest
 from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
 from pants.engine.collection import DeduplicatedCollection
@@ -180,6 +181,15 @@ async def parse_python_dependencies(
     stripped_sources = await Get(StrippedSourceFiles, SourceFilesRequest([request.source]))
     # We operate on PythonSourceField, which should be one file.
     assert len(stripped_sources.snapshot.files) == 1
+
+    if python_infer_subsystem.options.is_default("use_rust_parser"):
+        # NB: In 2.18, we'll switch the default to `True` and stop warning
+        # NB: In 2.19, we remove the option altogether and remove the old code.
+        warn_or_error(
+            removal_version="2.18.0.dev0",
+            entity="Not explicitly providing [python-infer].use_rust_parser",
+            hint="Read the help for [python-infer].use_rust_parser, then set the value in pants.toml."
+        )
 
     if python_infer_subsystem.use_rust_parser:
         native_result = await Get(
