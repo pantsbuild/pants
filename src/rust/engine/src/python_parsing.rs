@@ -2,14 +2,21 @@
 #![allow(unused_variables)]
 
 use dep_inference::python::ImportCollector;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::path::PathBuf;
 
+#[derive(Serialize, Deserialize)]
+pub struct ParsedPythonDependencies {
+  pub imports: HashMap<String, (u64, bool)>,
+  pub string_candidates: HashMap<String, u64>,
+}
+
 pub fn get_dependencies(
   contents: &str,
   filepath: PathBuf,
-) -> Result<(HashMap<String, (u64, bool)>, HashMap<String, u64>), String> {
+) -> Result<ParsedPythonDependencies, String> {
   let mut collector = ImportCollector::new(contents);
   collector.collect();
 
@@ -44,5 +51,8 @@ pub fn get_dependencies(
     import_map.insert(new_key, old_value);
   }
 
-  Ok((import_map, collector.string_candidates))
+  Ok(ParsedPythonDependencies {
+    imports: import_map,
+    string_candidates: collector.string_candidates,
+  })
 }

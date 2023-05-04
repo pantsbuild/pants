@@ -156,6 +156,7 @@ rule_graph = { path = "rule_graph" }
 smallvec = { version = "1", features=["union"] }
 stdio = { path = "stdio" }
 store = { path = "fs/store" }
+serde = "1.0.136"
 serde_json = "1.0"
 task_executor = { path = "task_executor" }
 tempfile = "3"

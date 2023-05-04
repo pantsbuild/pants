@@ -961,6 +961,7 @@ dependencies = [
  "remote",
  "reqwest",
  "rule_graph",
+ "serde",
  "serde_json",
  "smallvec",
  "stdio",

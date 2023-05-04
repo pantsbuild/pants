@@ -7,7 +7,6 @@ import logging
 import os
 from dataclasses import dataclass
 from typing import Iterable
-from pants.backend.python.subsystems.setup import PythonSetup
 from pants.engine.internals.idk import NativeParsedPythonDependencies
 
 from pants.backend.python.dependency_inference.subsystem import PythonInferSubsystem
@@ -181,15 +180,13 @@ async def general_parser_script(
 async def parse_python_dependencies(
     request: ParsePythonDependenciesRequest,
     parser_script: ParserScript,
-    python_setup: PythonSetup,
     python_infer_subsystem: PythonInferSubsystem,
 ) -> ParsedPythonDependencies:
     stripped_sources = await Get(StrippedSourceFiles, SourceFilesRequest([request.source]))
     # We operate on PythonSourceField, which should be one file.
     assert len(stripped_sources.snapshot.files) == 1
 
-    possible_major_minors =request.interpreter_constraints.partition_into_major_minor_versions(python_setup.interpreter_versions_universe)
-    if possible_major_minors != ("2.7",) and python_infer_subsystem.use_rust_parser:
+    if python_infer_subsystem.use_rust_parser:
         native_result = await Get(NativeParsedPythonDependencies, Digest, stripped_sources.snapshot.digest)
         imports = dict(native_result.imports)
         assets = set()

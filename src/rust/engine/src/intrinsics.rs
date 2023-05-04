@@ -17,10 +17,13 @@ use crate::nodes::{
 };
 use crate::python::{throw, Key, Value};
 use crate::python_parsing::get_dependencies;
+use crate::python_parsing::ParsedPythonDependencies;
 use crate::tasks::Intrinsic;
 use crate::types::Types;
 use crate::Failure;
+use protos::gen::pants::cache::{CacheKey, CacheKeyType};
 
+use bytes::Bytes;
 use futures::future::{BoxFuture, FutureExt, TryFutureExt};
 use futures::try_join;
 use indexmap::IndexMap;
@@ -771,14 +774,37 @@ fn parse_python_deps(context: Context, args: Vec<Value>) -> BoxFuture<'static, N
         }
       });
 
-    let store = core.store();
-    let bytes = store
-      .load_file_bytes_with(digest.unwrap(), |bytes| Vec::from(bytes))
-      .await?;
+    let cache_key = CacheKey {
+      key_type: CacheKeyType::DepInferenceRequest.into(),
+      digest: Some(digest.unwrap().into()),
+    };
+    let cached_result = core.local_cache.load(&cache_key).await?;
 
-    let contents = std::str::from_utf8(&bytes)
-      .map_err(|err| format!("Failed to convert digest bytes to utf-8: {err}"))?;
-    let result = get_dependencies(contents, path.unwrap())?;
+    let mut result: Option<ParsedPythonDependencies> = None;
+    if let Some(bytes) = cached_result {
+      result = serde_json::from_slice(&bytes).ok();
+    }
+    if result.is_none() {
+      let store = core.store();
+      let bytes = store
+        .load_file_bytes_with(digest.unwrap(), |bytes| Vec::from(bytes))
+        .await?;
+
+      let contents = std::str::from_utf8(&bytes)
+        .map_err(|err| format!("Failed to convert digest bytes to utf-8: {err}"))?;
+      result = Some(get_dependencies(contents, path.unwrap())?);
+      core
+        .local_cache
+        .store(
+          &cache_key,
+          Bytes::from(
+            serde_json::to_string(&result)
+              .map_err(|e| format!("Failed to serialize dep inference cache result: {e}"))?,
+          ),
+        )
+        .await?;
+    };
+    let result = result.unwrap();
 
     let result = {
       let gil = Python::acquire_gil();
@@ -790,7 +816,10 @@ fn parse_python_deps(context: Context, args: Vec<Value>) -> BoxFuture<'static, N
       .unwrap();
       externs::call_function(
         create_func,
-        &[result.0.to_object(py).into(), result.1.to_object(py).into()],
+        &[
+          result.imports.to_object(py).into(),
+          result.string_candidates.to_object(py).into(),
+        ],
       )
       .map(|obj| Value::new(obj.into_py(py)))
       .unwrap_or_else(|e| {
