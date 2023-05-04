@@ -111,6 +111,11 @@ _orgs = (
         "https://files.readme.io/c8be3a1-rippling-small.png",
     ),
     Org(
+        "Salesforce",
+        "https://salesforce.com/",
+        "https://files.readme.io/d902211-small-salesforce-logo-small.png",
+    ),
+    Org(
         "Snowfall",
         "https://snowfalltravel.com/",
         "https://files.readme.io/245f03e-snowfall-small.png",
