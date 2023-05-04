@@ -12,7 +12,6 @@ from types import CoroutineType
 from typing import Any, Dict, Iterable, NoReturn, Sequence, cast
 
 from typing_extensions import TypedDict
-from pants.engine.internals.native_dep_inference import NativeParsedPythonDependencies
 
 from pants.engine.collection import Collection
 from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType, SideEffecting
@@ -36,6 +35,7 @@ from pants.engine.fs import (
 from pants.engine.goal import Goal
 from pants.engine.internals import native_engine
 from pants.engine.internals.docker import DockerResolveImageRequest, DockerResolveImageResult
+from pants.engine.internals.native_dep_inference import NativeParsedPythonDependencies
 from pants.engine.internals.native_engine import (
     PyExecutionRequest,
     PyExecutionStrategyOptions,

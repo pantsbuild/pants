@@ -17,7 +17,7 @@ class NativeParsedPythonDependencies:
     def create_from_native(
         imports: dict[str, tuple[int, bool]],
         string_candidates: dict[str, int],
-    )-> 'NativeParsedPythonDependencies':
+    ) -> "NativeParsedPythonDependencies":
         return NativeParsedPythonDependencies(
             FrozenDict(imports),
             FrozenDict(string_candidates),

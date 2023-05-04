@@ -7,7 +7,6 @@ import logging
 import os
 from dataclasses import dataclass
 from typing import Iterable
-from pants.engine.internals.native_dep_inference import NativeParsedPythonDependencies
 
 from pants.backend.python.dependency_inference.subsystem import PythonInferSubsystem
 from pants.backend.python.target_types import PythonSourceField
@@ -18,6 +17,7 @@ from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
 from pants.engine.collection import DeduplicatedCollection
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests
+from pants.engine.internals.native_dep_inference import NativeParsedPythonDependencies
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.unions import UnionMembership, UnionRule, union
@@ -26,15 +26,10 @@ from pants.util.logging import LogLevel
 from pants.util.resources import read_resource
 from pants.util.strutil import softwrap
 
-
-from dataclasses import dataclass
-
-from pants.engine.collection import DeduplicatedCollection
-from pants.util.frozendict import FrozenDict
-
 logger = logging.getLogger(__name__)
 
-@dataclass(frozen=True,order=True)
+
+@dataclass(frozen=True, order=True)
 class ParsedPythonImportInfo:
     lineno: int
     # An import is considered "weak" if we're unsure if a dependency will exist between the parsed
@@ -187,28 +182,39 @@ async def parse_python_dependencies(
     assert len(stripped_sources.snapshot.files) == 1
 
     if python_infer_subsystem.use_rust_parser:
-        native_result = await Get(NativeParsedPythonDependencies, Digest, stripped_sources.snapshot.digest)
+        native_result = await Get(
+            NativeParsedPythonDependencies, Digest, stripped_sources.snapshot.digest
+        )
         imports = dict(native_result.imports)
         assets = set()
 
         if python_infer_subsystem.string_imports or python_infer_subsystem.assets:
             for string, line in native_result.string_candidates.items():
                 slash_count = string.count("/")
-                if python_infer_subsystem.string_imports and not slash_count and string.count(".") >= python_infer_subsystem.string_imports_min_dots:
+                if (
+                    python_infer_subsystem.string_imports
+                    and not slash_count
+                    and string.count(".") >= python_infer_subsystem.string_imports_min_dots
+                ):
                     imports.setdefault(string, (line, True))
-                if python_infer_subsystem.assets and slash_count >= python_infer_subsystem.assets_min_slashes:
+                if (
+                    python_infer_subsystem.assets
+                    and slash_count >= python_infer_subsystem.assets_min_slashes
+                ):
                     assets.add(string)
 
-
-        return ParsedPythonDependencies(ParsedPythonImports((key, ParsedPythonImportInfo(*value)) for key, value in imports.items()), ParsedPythonAssetPaths(sorted(assets)))
+        return ParsedPythonDependencies(
+            ParsedPythonImports(
+                (key, ParsedPythonImportInfo(*value)) for key, value in imports.items()
+            ),
+            ParsedPythonAssetPaths(sorted(assets)),
+        )
 
     file = stripped_sources.snapshot.files[0]
 
     python_interpreter, input_digest = await MultiGet(
         Get(PythonExecutable, InterpreterConstraints, request.interpreter_constraints),
-        Get(
-            Digest, MergeDigests([parser_script.digest, stripped_sources.snapshot.digest])
-        ),
+        Get(Digest, MergeDigests([parser_script.digest, stripped_sources.snapshot.digest])),
     )
     process_result = await Get(
         ProcessResult,
