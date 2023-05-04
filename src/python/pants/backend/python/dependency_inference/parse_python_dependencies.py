@@ -172,7 +172,7 @@ async def general_parser_script(
     )
 
 
-@rule
+@rule(level=LogLevel.DEBUG)
 async def parse_python_dependencies(
     request: ParsePythonDependenciesRequest,
     parser_script: ParserScript,
