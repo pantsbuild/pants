@@ -1,7 +1,8 @@
 // Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
-use crate::python::ImportCollector;
+use crate::python::{get_dependencies, ImportCollector};
 use std::collections::{HashMap, HashSet};
+use std::path::PathBuf;
 
 fn assert_collected(
   code: &str,
@@ -454,4 +455,37 @@ fn python2() {
 #[test]
 fn still_parses_from_syntax_error() {
   assert_imports("import a; x=", &["a"]);
+}
+
+fn assert_relative_imports(filename: &str, code: &str, resolved_imports: &[&str]) {
+  let result = get_dependencies(code, PathBuf::from(filename)).unwrap();
+  assert_eq!(
+    HashSet::from_iter(resolved_imports.iter().map(|s| s.to_string())),
+    result.imports.keys().cloned().collect::<HashSet<_>>()
+  );
+}
+
+#[test]
+fn relative_imports_resolution() {
+  let filename = "foo/bar/baz.py";
+  assert_relative_imports(filename, "from . import b", &["foo.bar.b"]);
+  assert_relative_imports(filename, "from .a import b", &["foo.bar.a.b"]);
+  assert_relative_imports(filename, "from ..a import b", &["foo.a.b"]);
+  assert_relative_imports(filename, "from ..a import b.c", &["foo.a.b.c"]);
+
+  let filename = "bingo/bango/bongo/himom.py";
+  assert_relative_imports(filename, "from . import b", &["bingo.bango.bongo.b"]);
+  assert_relative_imports(filename, "from .a import b", &["bingo.bango.bongo.a.b"]);
+  assert_relative_imports(filename, "from ..a import b", &["bingo.bango.a.b"]);
+  assert_relative_imports(filename, "from ..a import b.c", &["bingo.bango.a.b.c"]);
+  assert_relative_imports(filename, "from ...a import b.c", &["bingo.a.b.c"]);
+
+  // Left unchanged, since we blew through the top, let Pants error using this string as a message
+  assert_relative_imports(filename, "from ....a import b.c", &["....a.b.c"]);
+  assert_relative_imports(filename, "from ....a import b, c", &["....a.b", "....a.c"]);
+  assert_relative_imports(
+    filename,
+    "from ....a import b as d, c",
+    &["....a.b", "....a.c"],
+  );
 }

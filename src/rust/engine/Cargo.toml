@@ -79,6 +79,7 @@ default-members = [
   "cache",
   "client",
   "concrete_time",
+  "dep_inference",
   "fs",
   "fs/fs_util",
   "fs/store",

@@ -6,7 +6,7 @@ use std::path::PathBuf;
 pub mod constants;
 pub mod visitor;
 
-use serde::{Deserialize, Serialize};
+use serde_derive::{Deserialize, Serialize};
 use tree_sitter::Parser;
 
 use self::visitor::Visitor;
