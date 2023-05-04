@@ -16,10 +16,10 @@ use crate::nodes::{
   RunId, SessionValues, Snapshot,
 };
 use crate::python::{throw, Key, Value};
-use dep_inference::python::{get_dependencies, ParsedPythonDependencies};
 use crate::tasks::Intrinsic;
 use crate::types::Types;
 use crate::Failure;
+use dep_inference::python::{get_dependencies, ParsedPythonDependencies};
 use protos::gen::pants::cache::{CacheKey, CacheKeyType};
 
 use bytes::Bytes;
@@ -754,79 +754,83 @@ fn docker_resolve_image(
 }
 
 fn parse_python_deps(context: Context, args: Vec<Value>) -> BoxFuture<'static, NodeResult<Value>> {
-  async move {
-    let core = &context.core;
-    let directory_digest = Python::with_gil(|py| {
-      let py_digest = (*args[0]).as_ref(py);
-      lift_directory_digest(py_digest)
-    })?;
+  in_workunit!(
+    "parse_python_dependencies",
+    Level::Debug,
+    |_workunit| async move {
+      let core = &context.core;
+      let directory_digest = Python::with_gil(|py| {
+        let py_digest = (*args[0]).as_ref(py);
+        lift_directory_digest(py_digest)
+      })?;
 
-    let mut path = None;
-    let mut digest = None;
-    directory_digest
-      .tree
-      .unwrap()
-      .walk(SymlinkBehavior::Oblivious, &mut |node_path, entry| {
-        if let Entry::File(file) = entry {
-          path = Some(node_path.to_owned());
-          digest = Some(file.digest());
-        }
-      });
+      let mut path = None;
+      let mut digest = None;
+      directory_digest
+        .tree
+        .unwrap()
+        .walk(SymlinkBehavior::Oblivious, &mut |node_path, entry| {
+          if let Entry::File(file) = entry {
+            path = Some(node_path.to_owned());
+            digest = Some(file.digest());
+          }
+        });
 
-    let cache_key = CacheKey {
-      key_type: CacheKeyType::DepInferenceRequest.into(),
-      digest: Some(digest.unwrap().into()),
-    };
-    let cached_result = core.local_cache.load(&cache_key).await?;
+      let cache_key = CacheKey {
+        key_type: CacheKeyType::DepInferenceRequest.into(),
+        digest: Some(digest.unwrap().into()),
+      };
+      let cached_result = core.local_cache.load(&cache_key).await?;
 
-    let mut result: Option<ParsedPythonDependencies> = None;
-    if let Some(bytes) = cached_result {
-      result = serde_json::from_slice(&bytes).ok();
-    }
-    if result.is_none() {
-      let store = core.store();
-      let bytes = store
-        .load_file_bytes_with(digest.unwrap(), |bytes| Vec::from(bytes))
-        .await?;
+      let mut result: Option<ParsedPythonDependencies> = None;
+      if let Some(bytes) = cached_result {
+        result = serde_json::from_slice(&bytes).ok();
+      }
+      if result.is_none() {
+        let store = core.store();
+        let bytes = store
+          .load_file_bytes_with(digest.unwrap(), |bytes| Vec::from(bytes))
+          .await?;
 
-      let contents = std::str::from_utf8(&bytes)
-        .map_err(|err| format!("Failed to convert digest bytes to utf-8: {err}"))?;
-      result = Some(get_dependencies(contents, path.unwrap())?);
-      core
-        .local_cache
-        .store(
-          &cache_key,
-          Bytes::from(
-            serde_json::to_string(&result)
-              .map_err(|e| format!("Failed to serialize dep inference cache result: {e}"))?,
-          ),
+        let contents = std::str::from_utf8(&bytes)
+          .map_err(|err| format!("Failed to convert digest bytes to utf-8: {err}"))?;
+        result = Some(get_dependencies(contents, path.unwrap())?);
+        core
+          .local_cache
+          .store(
+            &cache_key,
+            Bytes::from(
+              serde_json::to_string(&result)
+                .map_err(|e| format!("Failed to serialize dep inference cache result: {e}"))?,
+            ),
+          )
+          .await?;
+      };
+      let result = result.unwrap();
+
+      let result = {
+        let gil = Python::acquire_gil();
+        let py = gil.python();
+        let create_func = externs::getattr(
+          core.types.parsed_python_deps_result.as_py_type(py),
+          "create_from_native",
         )
-        .await?;
-    };
-    let result = result.unwrap();
+        .unwrap();
+        externs::call_function(
+          create_func,
+          &[
+            result.imports.to_object(py).into(),
+            result.string_candidates.to_object(py).into(),
+          ],
+        )
+        .map(|obj| Value::new(obj.into_py(py)))
+        .unwrap_or_else(|e| {
+          panic!("Creator `` failed: {:?}", e);
+        })
+      };
 
-    let result = {
-      let gil = Python::acquire_gil();
-      let py = gil.python();
-      let create_func = externs::getattr(
-        core.types.parsed_python_deps_result.as_py_type(py),
-        "create_from_native",
-      )
-      .unwrap();
-      externs::call_function(
-        create_func,
-        &[
-          result.imports.to_object(py).into(),
-          result.string_candidates.to_object(py).into(),
-        ],
-      )
-      .map(|obj| Value::new(obj.into_py(py)))
-      .unwrap_or_else(|e| {
-        panic!("Creator `` failed: {:?}", e);
-      })
-    };
-
-    Ok(result)
-  }
+      Ok(result)
+    }
+  )
   .boxed()
 }

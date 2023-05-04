@@ -1,10 +1,12 @@
 // Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+use std::path::PathBuf;
 
 pub mod constants;
 pub mod visitor;
 
+use serde::{Deserialize, Serialize};
 use tree_sitter::Parser;
 
 use self::visitor::Visitor;

@@ -781,6 +781,7 @@ dependencies = [
 name = "dep_inference"
 version = "0.0.1"
 dependencies = [
+ "serde",
  "tree-sitter",
  "tree-sitter-python",
 ]
@@ -961,7 +962,6 @@ dependencies = [
  "remote",
  "reqwest",
  "rule_graph",
- "serde",
  "serde_json",
  "smallvec",
  "stdio",
