@@ -18,9 +18,7 @@ We welcome contributions of all types: from fixing typos to bug fixes to new fea
 Documentation Fixes
 -------------------
 
-Pants uses [readme.com](https://readme.com/) for the documentation at [pantsbuild.org](https://pantsbuild.org). On any of docs pages, click "Suggest Edits" at the top right corner to be dropped into the editor interface. You will be asked to log in or sign up to readme.com, which only asks for your email address and a name.
-
-When ready, click "Submit Suggested Edits" at the top right corner in order to send them to us for review.
+To suggest edits to Pants documentation, fork the [Pants repository](https://github.com/pantsbuild/pants), make changes to files in the `docs/` directory, and submit a PR against the `main` branch. Address feedback from maintainers and, once approved, your changes will be incorporated into the official documentation.
 
 Pants's tech stack
 ------------------

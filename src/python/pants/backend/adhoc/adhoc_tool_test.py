@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import os
 from textwrap import dedent
 
 import pytest
@@ -143,29 +142,42 @@ def test_adhoc_tool_with_workdir(rule_runner: PythonRuleRunner) -> None:
     )
 
 
-def test_adhoc_tool_capture_stdout_err(rule_runner: PythonRuleRunner) -> None:
+@pytest.mark.parametrize(
+    ("write_dir", "workdir", "root_output_directory", "expected_dir"),
+    [
+        # various relative paths:
+        ("", None, None, "src/"),
+        ("dir/", None, None, "src/dir/"),
+        ("../", None, None, ""),
+        # absolute path
+        ("/", None, None, ""),
+        # interaction with workdir and root_output_directory:
+        ("", "/", None, ""),
+        ("dir/", None, ".", "dir/"),
+        ("3/", "1/2", "1", "2/3/"),
+    ],
+)
+def test_adhoc_tool_capture_stdout_err(
+    rule_runner: PythonRuleRunner,
+    write_dir: str,
+    workdir: None | str,
+    root_output_directory: None | str,
+    expected_dir: str,
+) -> None:
     rule_runner.write_files(
         {
-            "src/fruitcake.py": dedent(
-                """\
-                import sys
-                print("fruitcake")
-                print("inconceivable", file=sys.stderr)
-                """
-            ),
             "src/BUILD": dedent(
-                """\
-                python_source(
-                    source="fruitcake.py",
-                    name="fruitcake",
-                )
+                f"""\
+                system_binary(name="bash", binary_name="bash")
 
                 adhoc_tool(
                   name="run_fruitcake",
-                  runnable=":fruitcake",
-                  stdout="stdout",
-                  stderr="stderr",
-                  root_output_directory=".",
+                  runnable=":bash",
+                  args=["-c", "echo fruitcake; echo inconceivable >&2"],
+                  stdout="{write_dir}stdout",
+                  stderr="{write_dir}stderr",
+                  workdir={workdir!r},
+                  root_output_directory={root_output_directory!r},
                 )
                 """
             ),
@@ -176,47 +188,44 @@ def test_adhoc_tool_capture_stdout_err(rule_runner: PythonRuleRunner) -> None:
         rule_runner,
         Address("src", target_name="run_fruitcake"),
         expected_contents={
-            "stderr": "inconceivable\n",
-            "stdout": "fruitcake\n",
+            f"{expected_dir}stderr": "inconceivable\n",
+            f"{expected_dir}stdout": "fruitcake\n",
         },
     )
 
 
 @pytest.mark.parametrize(
-    ("workdir", "file_location"),
+    ("workdir", "expected_dir"),
     (
-        ("src", "src"),
-        (".", "src"),
-        ("./", "src"),
+        ("src", "/src"),
+        (".", "/src"),
+        ("./", "/src"),
+        ("./dst", "/src/dst"),
         ("/", ""),
         ("", ""),
-        ("/src", "src"),
+        ("/src", "/src"),
+        ("/dst", "/dst"),
+        (None, "/src"),
     ),
 )
 def test_working_directory_special_values(
-    rule_runner: PythonRuleRunner, workdir: str, file_location: str
+    rule_runner: PythonRuleRunner, workdir: str, expected_dir: str
 ) -> None:
     rule_runner.write_files(
         {
-            "src/fruitcake.py": dedent(
-                """\
-                f = open("fruitcake.txt", "w")
-                f.write("fruitcake\\n")
-                f.close()
-                """
-            ),
             "src/BUILD": dedent(
                 f"""\
-                python_source(
-                    source="fruitcake.py",
-                    name="fruitcake",
-                )
+                system_binary(name="bash", binary_name="bash")
+                system_binary(name="sed", binary_name="sed", fingerprint_args=["q"])
 
                 adhoc_tool(
-                  name="run_fruitcake",
-                  runnable=":fruitcake",
-                  output_files=["fruitcake.txt"],
-                  workdir="{workdir}",
+                  name="workdir",
+                  runnable=":bash",
+                  args=['-c', 'echo $PWD | sed s@^{{chroot}}@@ > out.log'],
+                  runnable_dependencies=[":sed"],
+                  workdir={workdir!r},
+                  output_files=["out.log"],
+                  root_output_directory=".",
                 )
                 """
             ),
@@ -225,8 +234,8 @@ def test_working_directory_special_values(
 
     assert_adhoc_tool_result(
         rule_runner,
-        Address("src", target_name="run_fruitcake"),
-        expected_contents={os.path.join(file_location, "fruitcake.txt"): "fruitcake\n"},
+        Address("src", target_name="workdir"),
+        expected_contents={"out.log": f"{expected_dir}\n"},
     )
 
 

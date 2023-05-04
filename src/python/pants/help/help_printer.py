@@ -227,7 +227,7 @@ class HelpPrinter(MaybeColor):
         elif thing == "api-types":
             self._print_all_api_types()
         elif thing == "backends":
-            self._print_all_backends()
+            self._print_all_backends(show_advanced)
         elif thing == "symbols":
             self._print_all_symbols(show_advanced)
 
@@ -351,7 +351,7 @@ class HelpPrinter(MaybeColor):
             f"Use `{self.maybe_green(api_help_cmd)}` to get help for a specific API type or rule.\n"
         )
 
-    def _print_all_backends(self) -> None:
+    def _print_all_backends(self, include_experimental: bool) -> None:
         self._print_title("Backends")
         print(
             softwrap(
@@ -368,6 +368,8 @@ class HelpPrinter(MaybeColor):
         provider_col_width = 3 + max(map(len, (info.provider for info in backends.values())))
         enabled_col_width = 4
         for info in backends.values():
+            if not (include_experimental or info.enabled) and ".experimental." in info.name:
+                continue
             enabled = "[*] " if info.enabled else "[ ] "
             name_col_width = max(
                 len(info.name) + 1, self._width - enabled_col_width - provider_col_width
@@ -427,6 +429,11 @@ class HelpPrinter(MaybeColor):
         print_cmd("help tools", "List all external tools.")
         print_cmd("help backends", "List all available backends.")
         print_cmd("help-advanced backends", "List all backends, including experimental/preview.")
+        print_cmd("help symbols", "List available BUILD file symbols.")
+        print_cmd(
+            "help-advanced symbols",
+            "List all available BUILD file symbols, including target types.",
+        )
         print_cmd("help api-types", "List all plugin API types.")
         print_cmd("help global", "Help for global options.")
         print_cmd("help-advanced global", "Help for global advanced options.")

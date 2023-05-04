@@ -41,6 +41,9 @@ class Platform(Enum):
 
 GITHUB_HOSTED = {Platform.LINUX_X86_64, Platform.MACOS11_X86_64}
 SELF_HOSTED = {Platform.LINUX_ARM64, Platform.MACOS10_15_X86_64, Platform.MACOS11_ARM64}
+CARGO_AUDIT_IGNORED_ADVISORY_IDS = (
+    "RUSTSEC-2020-0128",  # returns a false positive on the cache crate, which is a local crate not a 3rd party crate
+)
 
 
 def gha_expr(expr: str) -> str:
@@ -143,7 +146,7 @@ def ensure_category_label() -> Sequence[Step]:
         {
             "if": "github.event_name == 'pull_request'",
             "name": "Ensure category label",
-            "uses": "mheap/github-action-required-labels@v2.1.0",
+            "uses": "mheap/github-action-required-labels@v4.0.0",
             "env": {"GITHUB_TOKEN": gha_expr("secrets.GITHUB_TOKEN")},
             "with": {
                 "mode": "exactly",
@@ -715,7 +718,7 @@ def build_wheels_job(platform: Platform, python_versions: list[str]) -> Jobs:
         container = {"image": "quay.io/pypa/manylinux2014_x86_64:latest"}
     elif platform == Platform.LINUX_ARM64:
         # Unfortunately Equinix do not support the CentOS 7 image on the hardware we've been
-        # generously given by the Runs on ARM program. Se we have to build in this image.
+        # generously given by the Works on ARM program. So we have to build in this image.
         container = {
             "image": "ghcr.io/pantsbuild/wheel_build_aarch64:v3-8384c5cf",
         }
@@ -1098,12 +1101,18 @@ def generate() -> dict[Path, str]:
         },
         Dumper=NoAliasDumper,
     )
-
+    ignore_advisories = " ".join(
+        f"--ignore {adv_id}" for adv_id in CARGO_AUDIT_IGNORED_ADVISORY_IDS
+    )
     audit_yaml = yaml.dump(
         {
             "name": "Cargo Audit",
-            # 08:11 UTC / 12:11AM PST, 1:11AM PDT: arbitrary time after hours.
-            "on": {"schedule": [{"cron": "11 8 * * *"}]},
+            "on": {
+                # 08:11 UTC / 12:11AM PST, 1:11AM PDT: arbitrary time after hours.
+                "schedule": [{"cron": "11 8 * * *"}],
+                # Allow manually triggering this workflow
+                "workflow_dispatch": None,
+            },
             "jobs": {
                 "audit": {
                     "runs-on": "ubuntu-latest",
@@ -1112,7 +1121,7 @@ def generate() -> dict[Path, str]:
                         *checkout(),
                         {
                             "name": "Cargo audit (for security vulnerabilities)",
-                            "run": "./cargo install --version 0.16.0 cargo-audit\n./cargo audit\n",
+                            "run": f"./cargo install --version 0.17.5 cargo-audit\n./cargo audit {ignore_advisories}\n",
                         },
                     ],
                 }

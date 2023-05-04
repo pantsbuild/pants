@@ -32,7 +32,7 @@ from pants.engine.fs import (
     Snapshot,
     SymlinkEntry,
 )
-from pants.engine.goal import Goal
+from pants.engine.goal import CurrentExecutingGoals, Goal
 from pants.engine.internals import native_engine
 from pants.engine.internals.docker import DockerResolveImageRequest, DockerResolveImageResult
 from pants.engine.internals.native_dep_inference import NativeParsedPythonDependencies
@@ -356,6 +356,7 @@ class SchedulerSession:
     def __init__(self, scheduler: Scheduler, session: PySession) -> None:
         self._scheduler = scheduler
         self._py_session = session
+        self._goals = session.session_values.get(CurrentExecutingGoals) or CurrentExecutingGoals()
 
     @property
     def scheduler(self) -> Scheduler:
@@ -541,7 +542,10 @@ class SchedulerSession:
                 [type(p) for p in params],
                 product,
             )
-        (return_value,) = self.product_request(product, [subject], poll=poll, poll_delay=poll_delay)
+        with self._goals._execute(product):
+            (return_value,) = self.product_request(
+                product, [subject], poll=poll, poll_delay=poll_delay
+            )
         return cast(int, return_value.exit_code)
 
     def product_request(

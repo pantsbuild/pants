@@ -36,6 +36,10 @@ class PipVersion(enum.Enum):
     V22_3_1 = "22.3.1"
     V23_0 = "23.0"
     V23_0_1 = "23.0.1"
+    V23_1 = "23.1"
+    V23_1_1 = "23.1.1"
+    V23_1_2 = "23.1.2"
+    LATEST = "latest"
 
 
 @enum.unique
@@ -226,7 +230,14 @@ class PythonSetup(Subsystem):
     )
     pip_version = EnumOption(
         default=PipVersion.V20_3_4,
-        help="Use this version of Pip for resolving requirements and generating lockfiles.",
+        help=softwrap(
+            """
+            Use this version of Pip for resolving requirements and generating lockfiles.
+
+            N.B.: The `latest` value selects the latest of the listed choices which is not
+            necessarily the latest Pip version released on PyPI.
+            """
+        ),
         advanced=True,
     )
     _resolves_to_interpreter_constraints = DictOption["list[str]"](

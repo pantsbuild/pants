@@ -13,6 +13,8 @@ from enum import Enum
 from textwrap import dedent  # noqa: PNT20
 from typing import Iterable, Mapping, Sequence
 
+from typing_extensions import Self
+
 from pants.base.deprecated import warn_or_error
 from pants.core.subsystems import python_bootstrap
 from pants.core.subsystems.python_bootstrap import PythonBootstrap
@@ -59,7 +61,7 @@ class BinaryPath:
     @classmethod
     def fingerprinted(
         cls, path: str, representative_content: bytes | bytearray | memoryview
-    ) -> BinaryPath:
+    ) -> Self:
         return cls(path, fingerprint=cls._fingerprint(representative_content))
 
 

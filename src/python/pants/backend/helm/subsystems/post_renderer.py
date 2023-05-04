@@ -31,7 +31,6 @@ from pants.engine.internals.native_engine import MergeDigests
 from pants.engine.process import Process
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import FieldSetsPerTarget, FieldSetsPerTargetRequest, Targets
-from pants.util.docutil import git_url
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.strutil import bullet_list, pluralize, softwrap
@@ -55,12 +54,7 @@ class HelmPostRendererSubsystem(PythonToolRequirementsBase):
     register_interpreter_constraints = True
     default_interpreter_constraints = ["CPython>=3.7,<3.10"]
 
-    register_lockfile = True
     default_lockfile_resource = (_HELM_POSTRENDERER_PACKAGE, "post_renderer.lock")
-    default_lockfile_path = (
-        f"src/python/{_HELM_POSTRENDERER_PACKAGE.replace('.', '/')}/post_renderer.lock"
-    )
-    default_lockfile_url = git_url(default_lockfile_path)
     lockfile_rules_type = LockfileRules.SIMPLE
 
 

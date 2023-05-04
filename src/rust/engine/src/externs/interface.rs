@@ -49,9 +49,9 @@ use workunit_store::{
 use crate::externs::fs::{possible_store_missing_digest, PyFileDigest};
 use crate::externs::process::PyProcessExecutionEnvironment;
 use crate::{
-  externs, nodes, Context, Core, ExecutionRequest, ExecutionStrategyOptions, ExecutionTermination,
-  Failure, Function, Intrinsic, Intrinsics, Key, LocalStoreOptions, Params, RemotingOptions, Rule,
-  Scheduler, Session, Tasks, TypeId, Types, Value,
+  externs, nodes, Core, ExecutionRequest, ExecutionStrategyOptions, ExecutionTermination, Failure,
+  Function, Intrinsic, Intrinsics, Key, LocalStoreOptions, Params, RemotingOptions, Rule,
+  Scheduler, Session, SessionCore, Tasks, TypeId, Types, Value,
 };
 
 #[pymodule]
@@ -998,7 +998,11 @@ fn session_run_interactive_process(
   process_config_from_environment: PyProcessExecutionEnvironment,
 ) -> PyO3Result<PyObject> {
   let core = py_session.0.core();
-  let context = Context::new(core.clone(), py_session.0.clone());
+  let context = py_session
+    .0
+    .core()
+    .graph
+    .context(SessionCore::new(py_session.0.clone()));
   let interactive_process: Value = interactive_process.into();
   let process_config = Value::new(process_config_from_environment.into_py(py));
   py.allow_threads(|| {

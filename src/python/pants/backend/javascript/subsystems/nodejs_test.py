@@ -60,6 +60,7 @@ def rule_runner() -> RuleRunner:
 
 
 def test_npx_process(rule_runner: RuleRunner):
+    rule_runner.set_options(["--nodejs-package-managers={'npm': '8.5.5'}"], env_inherit={"PATH"})
     result = rule_runner.request(
         ProcessResult,
         [
@@ -74,18 +75,56 @@ def test_npx_process(rule_runner: RuleRunner):
     assert result.stdout.strip() == b"8.5.5"
 
 
-def test_npm_process(rule_runner: RuleRunner):
+def test_npx_process_with_different_version(rule_runner: RuleRunner):
+    rule_runner.set_options(["--nodejs-package-managers={'npm': '7.20.0'}"], env_inherit={"PATH"})
     result = rule_runner.request(
         ProcessResult,
         [
-            nodejs.NodeJSToolProcess.npm(
+            nodejs.NodeJSToolProcess.npx(
+                npm_package="",
                 args=("--version",),
-                description="Testing NpmProcess",
+                description="Testing NpxProcess",
             )
         ],
     )
 
+    assert result.stdout.strip() == b"7.20.0"
+
+
+def test_npm_process(rule_runner: RuleRunner):
+    rule_runner.set_options(["--nodejs-package-managers={'npm': '8.5.5'}"], env_inherit={"PATH"})
+    result = rule_runner.request(
+        ProcessResult,
+        [nodejs.NodeJSToolProcess.npm(args=("--version",), description="Testing NpmProcess")],
+    )
+
     assert result.stdout.strip() == b"8.5.5"
+
+
+def test_npm_process_with_different_version(rule_runner: RuleRunner):
+    rule_runner.set_options(["--nodejs-package-managers={'npm': '7.20.0'}"], env_inherit={"PATH"})
+    result = rule_runner.request(
+        ProcessResult,
+        [nodejs.NodeJSToolProcess.npm(args=("--version",), description="Testing NpmProcess")],
+    )
+
+    assert result.stdout.strip() == b"7.20.0"
+
+
+def test_pnpm_process(rule_runner: RuleRunner):
+    result = rule_runner.request(
+        ProcessResult,
+        [
+            nodejs.NodeJSToolProcess(
+                tool="pnpm",
+                tool_version="7.5.0",
+                args=("--version",),
+                description="Testing pnpm process",
+            )
+        ],
+    )
+
+    assert result.stdout.strip() == b"7.5.0"
 
 
 def given_known_version(version: str) -> str:

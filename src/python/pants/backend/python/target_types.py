@@ -33,6 +33,7 @@ from pants.core.goals.run import RestartableField
 from pants.core.goals.test import (
     RuntimePackageDependenciesField,
     TestExtraEnvVarsField,
+    TestsBatchCompatibilityTagField,
     TestSubsystem,
 )
 from pants.core.util_rules.environments import EnvironmentField
@@ -924,41 +925,8 @@ class PythonTestsXdistConcurrencyField(IntField):
     )
 
 
-class PythonTestsBatchCompatibilityTagField(StringField):
-    alias = "batch_compatibility_tag"
-    help = help_text(
-        """
-        An arbitrary value used to mark the test files belonging to this target as valid for
-        batched execution.
-
-        It's _sometimes_ safe to run multiple `python_test`s within a single `pytest` process,
-        and doing so can give significant wins by allowing reuse of expensive test setup /
-        teardown logic. To opt into this behavior, set this field to an arbitrary non-empty
-        string on all the `python_test` targets that are safe/compatible to run in the same
-        process.
-
-        If this field is left unset on a target, the target is assumed to be incompatible with
-        all others and will run in a dedicated `pytest` process.
-
-        If this field is set on a target, and its value is different from the value on some
-        other `python_test`, then the two targets are explicitly incompatible and are guaranteed
-        to not run in the same `pytest` process.
-
-        If this field is set on a target, and its value is the same as the value on some other
-        `python_test`, then the two targets are explicitly compatible and _may_ run in the same
-        `pytest` process. Compatible tests may not end up in the same `pytest` batch if:
-
-            * There are "too many" compatible tests in a partition, as determined by the \
-                `[test].batch_size` config parameter, or
-            * Compatible tests have some incompatibility in Pants metadata (i.e. different \
-                `resolve`s or `extra_env_vars`).
-
-        When tests with the same `batch_compatibility_tag` have incompatibilities in some other
-        Pants metadata, they will be automatically split into separate batches. This way you can
-        set a high-level `batch_compatibility_tag` using `__defaults__` and then have tests
-        continue to work as you tweak BUILD metadata on specific targets.
-        """
-    )
+class PythonTestsBatchCompatibilityTagField(TestsBatchCompatibilityTagField):
+    help = help_text(TestsBatchCompatibilityTagField.format_help("python_test", "pytest"))
 
 
 class SkipPythonTestsField(BoolField):

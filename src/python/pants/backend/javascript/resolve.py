@@ -36,7 +36,7 @@ class ChosenNodeResolve:
 
     @property
     def file_path(self) -> str:
-        return os.path.join(self.project.root_dir, "package-lock.json")
+        return os.path.join(self.project.root_dir, self.project.lockfile_name)
 
     def get_lockfile_glob(self) -> PathGlobs:
         return PathGlobs([self.file_path])

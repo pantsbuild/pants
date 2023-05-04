@@ -17,7 +17,7 @@ from pants.backend.javascript.package.rules import rules as package_rules
 from pants.backend.javascript.target_types import JSSourcesGeneratorTarget, JSSourceTarget
 from pants.build_graph.address import Address
 from pants.core.goals.package import BuiltPackage
-from pants.core.target_types import ResourceTarget
+from pants.core.target_types import FileTarget, ResourceTarget
 from pants.engine.internals.native_engine import EMPTY_DIGEST, Digest, Snapshot
 from pants.engine.rules import QueryRule
 from pants.engine.target import GeneratedSources
@@ -38,6 +38,7 @@ def rule_runner() -> RuleRunner:
             JSSourceTarget,
             JSSourcesGeneratorTarget,
             ResourceTarget,
+            FileTarget,
         ],
         objects=dict(package_json.build_file_aliases().objects),
     )
@@ -45,7 +46,17 @@ def rule_runner() -> RuleRunner:
     return rule_runner
 
 
-def test_packages_sources_as_resource_using_build_tool(rule_runner: RuleRunner) -> None:
+@pytest.mark.parametrize(
+    "lockfile, package_manager",
+    [
+        pytest.param(Path(__file__).parent / "package-lock.json", "npm"),
+        pytest.param(Path(__file__).parent / "pnpm-lock.yaml", "pnpm"),
+    ],
+)
+def test_packages_sources_as_resource_using_build_tool(
+    rule_runner: RuleRunner, package_manager: str, lockfile: Path
+) -> None:
+    rule_runner.set_options([f"--nodejs-package-manager={package_manager}"], env_inherit={"PATH"})
     rule_runner.write_files(
         {
             "src/js/BUILD": dedent(
@@ -57,8 +68,10 @@ def test_packages_sources_as_resource_using_build_tool(rule_runner: RuleRunner) 
                             output_directories=["dist"],
                             extra_caches=[".parcel-cache"],
                         )
-                    ]
+                    ],
+                    dependencies=[":npmrc"],
                 )
+                file(name="npmrc", source=".npmrc")
                 """
             ),
             "src/js/package.json": json.dumps(
@@ -72,7 +85,8 @@ def test_packages_sources_as_resource_using_build_tool(rule_runner: RuleRunner) 
                     "devDependencies": {"parcel": "2.6.2"},
                 }
             ),
-            "src/js/package-lock.json": (Path(__file__).parent / "package-lock.json").read_text(),
+            "src/js/.npmrc": "strict-peer-dependencies=false",
+            f"src/js/{lockfile.name}": lockfile.read_text(),
             "src/js/lib/BUILD": dedent(
                 """\
                 javascript_sources(dependencies=[":style"])
