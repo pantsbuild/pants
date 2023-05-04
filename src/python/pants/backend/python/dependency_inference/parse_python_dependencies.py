@@ -183,7 +183,7 @@ async def parse_python_dependencies(
     assert len(stripped_sources.snapshot.files) == 1
 
     if python_infer_subsystem.options.is_default("use_rust_parser"):
-        # NB: In 2.18, we'll switch the default to `True` and stop warning
+        # NB: In 2.18, we'll switch the default to `True` and then warn if the value is set (to anything)
         # NB: In 2.19, we remove the option altogether and remove the old code.
         warn_or_error(
             removal_version="2.18.0.dev0",
