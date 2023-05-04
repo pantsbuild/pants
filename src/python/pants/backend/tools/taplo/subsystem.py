@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import os.path
-from typing import Iterable, Sequence
+from typing import Sequence
 
 from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.core.util_rules.external_tool import TemplatedExternalTool
 from pants.engine.platform import Platform
-from pants.option.option_types import ArgsListOption, BoolOption, SkipOption
+from pants.option.option_types import ArgsListOption, BoolOption, SkipOption, StrListOption
+from pants.source.filespec import FilespecMatcher
 from pants.util.strutil import softwrap
 
 
@@ -41,7 +42,33 @@ class Taplo(TemplatedExternalTool):
         advanced=True,
         help=softwrap(
             """
-            If true, Pants will include all relevant `taplo.toml` files during runs.
+            If true, Pants will include all relevant `taplo.toml` or `.taplo.toml`
+            files during a run.
+            """
+        ),
+    )
+
+    include = StrListOption(
+        help=softwrap(
+            """
+            A list of glob patterns of files to include in formatting relative to the
+            build root.
+
+            Example:
+
+                ["**/*.toml", "**/pyproject.toml"]
+            """
+        ),
+    )
+    exclude = StrListOption(
+        help=softwrap(
+            """
+            A list of glob patterns of files to exclude from formatting relative to the
+            build root.
+
+            Example:
+
+                ["src/*.toml", "pants/pyproject.toml"]
             """
         ),
     )
@@ -49,7 +76,7 @@ class Taplo(TemplatedExternalTool):
     def generate_exe(self, plat: Platform) -> str:
         return f"./{self.generate_url(plat).rsplit('/', 1)[-1].removesuffix('.gz')}"
 
-    def config_request(self, dirs: Iterable[str]) -> ConfigFilesRequest:
+    def config_request(self, dirs: Sequence[str]) -> ConfigFilesRequest:
         candidates = [os.path.join(d, ".taplo.toml") for d in ("", *dirs)]
         candidates.extend(os.path.join(d, "taplo.toml") for d in ("", *dirs))
         return ConfigFilesRequest(
@@ -57,6 +84,9 @@ class Taplo(TemplatedExternalTool):
             check_existence=candidates,
         )
 
-    def pyproject_checker(self, filepaths: Sequence[str]) -> list[str]:
-        paths = set(filepaths)
-        return [f for f in paths if "pyproject.toml" in f]
+    def filter_inputs(self, filepaths: Sequence[str]) -> dict[str, str]:
+        """Returns a mapping of path to path."""
+        matched_filepaths = FilespecMatcher(includes=self.includes, excludes=self.excludes).matches(
+            filepaths
+        )
+        return {m: m for m in matched_filepaths}
