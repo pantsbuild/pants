@@ -127,7 +127,6 @@ impl ImportCollector<'_> {
       None => name_ref.to_string(),
     };
 
-    // @TODO: This isn't right, we should overwrite if the entry is weak but we're strong
     self
       .import_map
       .entry(full_name)
@@ -221,9 +220,8 @@ impl Visitor for ImportCollector<'_> {
   }
 
   fn visit_string(&mut self, node: tree_sitter::Node) -> visitor::ChildBehavior {
-    // @TODO: no-infer-dep
     let range = node.range();
-    let text: &str = &self.string_at(range);
+    let text: &str = self.string_at(range);
     if !text.contains(|c: char| c.is_ascii_whitespace() || c == '\\') {
       self
         .string_candidates

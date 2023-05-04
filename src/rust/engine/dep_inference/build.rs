@@ -34,8 +34,8 @@ fn gen_visitor_file() {
     .write_all(
       r#"#[derive(Debug, PartialEq)]
 pub enum ChildBehavior {
-    Visit,
-    Ignore,
+  Visit,
+  Ignore,
 }
 "#
       .as_bytes(),
@@ -53,7 +53,7 @@ pub enum ChildBehavior {
       let kind = python_lang.node_kind_for_id(id).unwrap();
       if kinds_seen.insert(kind.to_string()) {
         file.write_all(
-                    format!("  fn visit_{kind}(&mut self, node: tree_sitter::Node) -> ChildBehavior {{ ChildBehavior::Visit }}\n")
+                    format!("  fn visit_{kind}(&mut self, node: tree_sitter::Node) -> ChildBehavior {{\n    ChildBehavior::Visit\n  }}\n")
                         .as_bytes(),
                 )
                 .unwrap();
@@ -65,19 +65,19 @@ pub enum ChildBehavior {
     .write_all("\n  fn visit(&mut self, node: tree_sitter::Node) -> ChildBehavior {\n".as_bytes())
     .unwrap();
   file
-    .write_all("      match node.kind_id() {\n".as_bytes())
+    .write_all("    match node.kind_id() {\n".as_bytes())
     .unwrap();
   for id in 0..python_lang.node_kind_count() {
     let id = id as u16;
     if python_lang.node_kind_is_named(id) {
       let kind = python_lang.node_kind_for_id(id).unwrap();
       file
-        .write_all(format!("        {id} => self.visit_{kind}(node),\n").as_bytes())
+        .write_all(format!("      {id} => self.visit_{kind}(node),\n").as_bytes())
         .unwrap();
     }
   }
   file
-    .write_all("        _ => ChildBehavior::Visit,\n".as_bytes())
+    .write_all("      _ => ChildBehavior::Visit,\n".as_bytes())
     .unwrap();
   file.write_all("    }\n".as_bytes()).unwrap();
   file.write_all("  }\n".as_bytes()).unwrap();
