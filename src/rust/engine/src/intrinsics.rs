@@ -16,8 +16,7 @@ use crate::nodes::{
   RunId, SessionValues, Snapshot,
 };
 use crate::python::{throw, Key, Value};
-use crate::python_parsing::get_dependencies;
-use crate::python_parsing::ParsedPythonDependencies;
+use dep_inference::python::{get_dependencies, ParsedPythonDependencies};
 use crate::tasks::Intrinsic;
 use crate::types::Types;
 use crate::Failure;
