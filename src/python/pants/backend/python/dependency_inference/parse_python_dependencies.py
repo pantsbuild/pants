@@ -7,7 +7,7 @@ import logging
 import os
 from dataclasses import dataclass
 from typing import Iterable
-from pants.engine.internals.idk import NativeParsedPythonDependencies
+from pants.engine.internals.native_dep_inference import NativeParsedPythonDependencies
 
 from pants.backend.python.dependency_inference.subsystem import PythonInferSubsystem
 from pants.backend.python.target_types import PythonSourceField

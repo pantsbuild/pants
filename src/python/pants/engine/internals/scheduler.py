@@ -12,7 +12,7 @@ from types import CoroutineType
 from typing import Any, Dict, Iterable, NoReturn, Sequence, cast
 
 from typing_extensions import TypedDict
-from pants.engine.internals.idk import NativeParsedPythonDependencies
+from pants.engine.internals.native_dep_inference import NativeParsedPythonDependencies
 
 from pants.engine.collection import Collection
 from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType, SideEffecting
