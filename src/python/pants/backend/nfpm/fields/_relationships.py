@@ -7,5 +7,6 @@ from abc import ABCMeta
 
 from pants.engine.target import StringSequenceField
 
+
 class NfpmPackageRelationshipsField(StringSequenceField, metaclass=ABCMeta):
     pass
