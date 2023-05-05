@@ -221,7 +221,7 @@ class NfpmApkPackage(Target):
     )
     help = help_text(
         f""""
-        An APK system package built by nFPM.
+        An APK system package (Alpine Package Keeper) built by nFPM.
 
         This will not install the package, only create an .apk file
         that you can then distribute and install, e.g. via pkg.

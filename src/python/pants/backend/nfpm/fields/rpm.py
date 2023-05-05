@@ -97,7 +97,7 @@ class NfpmRpmReplacesField(NfpmPackageRelationshipsField):
     alias = nfpm_alias
     help = help_text(
         lambda: f"""
-        A list or packages that this package obsoletes (replaces).
+        A list of packages that this package obsoletes (replaces).
 
         When a pacakge name changes or splits, rpm uses "obsoletes" (ie the
         '{NfpmRpmReplacesField.alias}' field) on the new package to list the old

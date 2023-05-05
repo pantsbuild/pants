@@ -38,7 +38,7 @@ class NfpmApkReplacesField(NfpmPackageRelationshipsField):
     alias = nfpm_alias
     help = help_text(
         lambda: f"""
-        A list or packages whose files this package can take ownership of.
+        A list of packages whose files this package can take ownership of.
         
         WARNING: This field does NOT have the same semantics as "replaces" in
         other packaging systems. This field deals with allowing packages that
@@ -144,6 +144,9 @@ class NfpmApkDependsField(NfpmPackageRelationshipsField):
         - "so:libcurl.so.4"
         - "so:libpcre2-8.so.0"
         - "so:libz.so.1"
+
+        WARNING: This is NOT the same as the 'dependencies' field!
+        It does not accept pants-style dependencies like target addresses.
 
         See: https://wiki.alpinelinux.org/wiki/Apk_spec#PKGINFO_Format
 
