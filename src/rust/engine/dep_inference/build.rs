@@ -80,8 +80,8 @@ pub trait Visitor {
   file
     .write_all(
       b"\
-fn visit(&mut self, node: tree_sitter::Node) -> ChildBehavior {
-  match node.kind_id() {
+  fn visit(&mut self, node: tree_sitter::Node) -> ChildBehavior {
+    match node.kind_id() {
 ",
     )
     .unwrap();
