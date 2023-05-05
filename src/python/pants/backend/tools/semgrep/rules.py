@@ -2,10 +2,11 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
+import itertools
 import logging
-import os
 from collections import defaultdict
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Iterable
 
 from pants.backend.python.util_rules import pex
@@ -75,22 +76,18 @@ class AllSemgrepConfigs:
     targets: dict[str, list[Target]]
 
     def ancestor_targets(self, address: Address) -> Iterable[Target]:
-        # TODO: introspect the semgrep rules and determine which (if any) apply to the files, e.g. a #
-        # Python file shouldn't depend on a .semgrep.yml that doesn't have any 'python' or 'generic' #
+        # TODO: introspect the semgrep rules and determine which (if any) apply to the files, e.g. a
+        # Python file shouldn't depend on a .semgrep.yml that doesn't have any 'python' or 'generic'
         # rules, and similarly if there's path inclusions/exclusions.
         # TODO: this would be better as actual dependency inference (e.g. allows inspection, manual
         # addition/exclusion), but that can only infer 'full' dependencies and it is wrong (e.g. JVM
         # things break) for real code files to depend on this sort of non-code linter config; requires
         # dependency scopes or similar (https://github.com/pantsbuild/pants/issues/12794)
-        spec = address.spec_path
+        spec = Path(address.spec_path)
 
-        while True:
-            yield from self.targets.get(spec, [])
-
-            if not spec:
-                break
-
-            spec = os.path.dirname(spec)
+        for ancestor in itertools.chain([spec], spec.parents):
+            spec_path = str(ancestor)
+            yield from self.targets.get("" if spec_path == "." else spec_path, [])
 
 
 @rule
