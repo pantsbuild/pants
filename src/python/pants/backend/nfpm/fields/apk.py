@@ -39,7 +39,7 @@ class NfpmApkReplacesField(NfpmPackageRelationshipsField):
     help = help_text(
         lambda: f"""
         A list of packages whose files this package can take ownership of.
-        
+
         WARNING: This field does NOT have the same semantics as "replaces" in
         other packaging systems. This field deals with allowing packages that
         want to provide the same file to be installed at the same time.
@@ -121,7 +121,7 @@ class NfpmApkDependsField(NfpmPackageRelationshipsField):
         field. Even though this field is named "{NfpmApkDependsField.alias}",
         nFPM uses it to build the PKGINFO "depend" var, so you SHOULD include any
         shared-object dependencies in this list.
-        
+
         The '{NfpmApkDependsField.alias}' field takes a variety of different formats.
         You can depend on packages, absolute paths, shared objects, pkg-configs,
         and possibly other things. Sadly, that format is not very well documented,

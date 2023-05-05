@@ -309,7 +309,7 @@ class NfpmDebBreaksField(NfpmPackageRelationshipsField):
         package installs and removals (For example, if this package breaks "bar",
         then "bar" can be removed after this package when it gets removed in the
         same package install transaction).
-        
+
         For example, this is how to declare that this breaks package foo, but
         only if foo version 2.5 or less is installed and it breaks package bar
         no matter what version is installed.
