@@ -158,7 +158,9 @@ impl ImportCollector<'_> {
     is_string: bool,
   ) {
     let dotted_name = match name.kind_id() {
-      constants::KindID::ALIASED_IMPORT => name.named_child(0).unwrap(),
+      constants::KindID::ALIASED_IMPORT => name
+        .named_child(0)
+        .expect("Expected named child of aliased_import while parsing Python file."),
       constants::KindID::ERROR => {
         return;
       }

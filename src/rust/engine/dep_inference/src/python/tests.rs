@@ -89,6 +89,7 @@ from a.b import (
     "class X: def method(): if True: while True: class Y: def f(): import a",
     &["a"],
   );
+  assert_imports("try:\nexcept:import a", &["a"]);
 
   // NB: Doesn't collect __future__ imports
   assert_imports("from __future__ import annotations", &[]);
@@ -496,8 +497,8 @@ fn relative_imports_resolution() {
 }
 
 #[test]
-fn syntax_errors() {
-  // These tests aren't specifically testing what we parse, so much as "we don't crash and burn".
+fn syntax_errors_and_other_fun() {
+  // These tests aren't specifically testing what we parse, so much as we don't "crash and burn".
 
   assert_imports("imprt a", &[]);
   assert_imports("form a import b", &["b"]);
@@ -506,5 +507,11 @@ fn syntax_errors() {
   assert_imports("import a.", &[]);
   assert_imports("from a import", &[]);
   assert_imports("from a imp x", &[]);
+  assert_imports("from from import a as .as", &[]);
   assert_imports("from a import ......g", &["a.g"]);
+  assert_imports("try:...\nexcept:import a", &["a"]);
+  assert_imports("try:...\nexcept 1:import a", &["a"]);
+  assert_imports("try:...\nexcept x=1:import a", &["a"]);
+  assert_imports("try:...\nexcept (x=1):import a", &["a"]);
+  assert_imports("foo()", &[]);
 }
