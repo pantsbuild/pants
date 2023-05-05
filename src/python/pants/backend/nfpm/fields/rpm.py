@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Optional
+from typing import ClassVar, Optional
 
 from pants.backend.nfpm.fields._relationships import NfpmPackageRelationshipsField
 from pants.engine.addresses import Address
@@ -24,7 +24,7 @@ from pants.util.strutil import help_text
 
 class NfpmRpmPackagerField(StringField):
     nfpm_alias = "rpm.packager"
-    alias = "packager"
+    alias: ClassVar[str] = "packager"
     # nFPM uses value of 'maintainer' as default.
     help = help_text(
         # based in part on the docs at:
@@ -49,7 +49,7 @@ class NfpmRpmPackagerField(StringField):
 
 class NfpmRpmVendorField(StringField):
     nfpm_alias = "vendor"
-    alias = nfpm_alias
+    alias: ClassVar[str] = nfpm_alias
     help = help_text(
         """
         The entity responsible for packaging (typically an organization).
@@ -64,12 +64,12 @@ class NfpmRpmVendorField(StringField):
 
 class NfpmRpmGroupField(StringField):
     nfpm_alias = "rpm.group"
-    alias = "group"
+    alias: ClassVar[str] = "group"
     help = help_text(
         lambda: f"""
         For older rpm-based distros, this groups packages by their functionality.
 
-        '{NfpmRpmGroupField}' is a path-like string to allow for hierarchical
+        '{NfpmRpmGroupField.alias}' is a path-like string to allow for hierarchical
         grouping of applications like "Applications/Editors".
 
         See: https://ftp.osuosl.org/pub/rpm/max-rpm/s1-rpm-inside-tags.html#S3-RPM-INSIDE-GROUP-TAG
@@ -83,7 +83,7 @@ class NfpmRpmGroupField(StringField):
 
 class NfpmRpmSummaryField(StringField):
     nfpm_alias = "rpm.summary"
-    alias = "summary"
+    alias: ClassVar[str] = "summary"
     help = help_text(
         lambda: f"""
         A one-line description of the packaged software.
@@ -98,7 +98,7 @@ class NfpmRpmSummaryField(StringField):
 
 class NfpmRpmReplacesField(NfpmPackageRelationshipsField):
     nfpm_alias = "replaces"
-    alias = nfpm_alias
+    alias: ClassVar[str] = nfpm_alias
     help = help_text(
         lambda: f"""
         A list of packages that this package obsoletes (replaces).
@@ -118,7 +118,7 @@ class NfpmRpmReplacesField(NfpmPackageRelationshipsField):
 
 class NfpmRpmProvidesField(NfpmPackageRelationshipsField):
     nfpm_alias = "provides"
-    alias = nfpm_alias
+    alias: ClassVar[str] = nfpm_alias
     help = help_text(
         lambda: f"""
         A list of virtual packages or file paths that this package provides.
@@ -145,7 +145,7 @@ class NfpmRpmProvidesField(NfpmPackageRelationshipsField):
 
 class NfpmRpmDependsField(NfpmPackageRelationshipsField):
     nfpm_alias = "depends"
-    alias = nfpm_alias  # TODO: this might be confused with "dependencies"
+    alias: ClassVar[str] = nfpm_alias  # TODO: this might be confused with "dependencies"
     help = help_text(
         lambda: f"""
         List of package requirements (for package installers).
@@ -175,14 +175,14 @@ class NfpmRpmDependsField(NfpmPackageRelationshipsField):
 
 class NfpmRpmRecommendsField(NfpmPackageRelationshipsField):
     nfpm_alias = "recommends"
-    alias = nfpm_alias
+    alias: ClassVar[str] = nfpm_alias
     help = help_text(
         lambda: f"""
         List of weak package requirements (for package installers).
 
         This is like the '{NfpmRpmDependsField.alias}' field, but the package resolver
         can ignore the requirement if it cannot resolve the packages with it included.
-        If an entry in '{NfpmRpmRecommendsField}' is ignored, no error or warning gets
+        If an entry in '{NfpmRpmRecommendsField.alias}' is ignored, no error or warning gets
         reported.
 
         The '{NfpmRpmRecommendsField.alias}' field has the same syntax as the
@@ -196,7 +196,7 @@ class NfpmRpmRecommendsField(NfpmPackageRelationshipsField):
 
 class NfpmRpmSuggestsField(NfpmPackageRelationshipsField):
     nfpm_alias = "suggests"
-    alias = nfpm_alias
+    alias: ClassVar[str] = nfpm_alias
     help = help_text(
         lambda: f"""
         List of very weak package requirements (for package installers).
@@ -215,7 +215,7 @@ class NfpmRpmSuggestsField(NfpmPackageRelationshipsField):
 
 class NfpmRpmConflictsField(NfpmPackageRelationshipsField):
     nfpm_alias = "conflicts"
-    alias = nfpm_alias
+    alias: ClassVar[str] = nfpm_alias
     help = help_text(
         lambda: f"""
         A list of packages that this package conflicts with.
@@ -244,7 +244,7 @@ class NfpmRpmCompressionAlgorithm(Enum):
 
 class NfpmRpmCompressionField(StringField):
     nfpm_alias = "rpm.compression"
-    alias = "compression"
+    alias: ClassVar[str] = "compression"
     valid_choices = NfpmRpmCompressionAlgorithm
     default = f"{NfpmRpmCompressionAlgorithm.gzip.value}:-1"  # same default as nFPM
     help = help_text(

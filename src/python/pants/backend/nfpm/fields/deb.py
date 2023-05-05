@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Dict, Iterable, Optional, Tuple
+from typing import ClassVar, Dict, Iterable, Optional, Tuple
 
 from pants.backend.nfpm.fields._relationships import NfpmPackageRelationshipsField
 from pants.engine.addresses import Address
@@ -24,7 +24,7 @@ from pants.util.strutil import help_text
 
 class NfpmDebMaintainerField(StringField):
     nfpm_alias = "maintainer"
-    alias = nfpm_alias
+    alias: ClassVar[str] = nfpm_alias
     required = True  # Not setting this is deprecated in nFPM, so we require it.
     help = help_text(
         lambda: f"""
@@ -44,7 +44,7 @@ class NfpmDebMaintainerField(StringField):
 
 class NfpmDebSectionField(StringField):
     nfpm_alias = "section"
-    alias = nfpm_alias
+    alias: ClassVar[str] = nfpm_alias
     help = help_text(
         """
         Which section, or application area, this package is part of.
@@ -71,7 +71,7 @@ class DebPriority(Enum):
 
 class NfpmDebPriorityField(StringField):
     nfpm_alias = "priority"
-    alias = nfpm_alias
+    alias: ClassVar[str] = nfpm_alias
     valid_choices = DebPriority
     default = DebPriority.optional.value
     help = help_text(
@@ -90,7 +90,7 @@ class NfpmDebPriorityField(StringField):
 
 class NfpmDebFieldsField(DictStringToStringField):
     nfpm_alias = "deb.fields"
-    alias = "fields"
+    alias: ClassVar[str] = "fields"
     help = help_text(
         # based in part on the docs at:
         # https://nfpm.goreleaser.com/configuration/#reference
@@ -109,7 +109,7 @@ class NfpmDebFieldsField(DictStringToStringField):
 
 class NfpmDebTriggersField(DictStringToStringSequenceField):
     nfpm_alias = "deb.triggers"
-    alias = "triggers"
+    alias: ClassVar[str] = "triggers"
     help = help_text(
         """
         Custom deb triggers.
@@ -165,7 +165,7 @@ class NfpmDebTriggersField(DictStringToStringSequenceField):
 
 class NfpmDebReplacesField(NfpmPackageRelationshipsField):
     nfpm_alias = "replaces"
-    alias = nfpm_alias
+    alias: ClassVar[str] = nfpm_alias
     help = help_text(
         lambda: f"""
         A list of packages that this package replaces or partially replaces.
@@ -176,7 +176,7 @@ class NfpmDebReplacesField(NfpmPackageRelationshipsField):
 
         If this package completely replaces the other package, you can force its
         removal by including the other package in both '{NfpmDebReplacesField.alias}'
-        and '{NfpmDebConflictsField}' (and '{NfpmDebProvidesField.alias}' if it
+        and '{NfpmDebConflictsField.alias}' (and '{NfpmDebProvidesField.alias}' if it
         is a virtual package).
 
         See: https://www.debian.org/doc/debian-policy/ch-relationships.html#overwriting-files-and-replacing-packages-replaces
@@ -186,7 +186,7 @@ class NfpmDebReplacesField(NfpmPackageRelationshipsField):
 
 class NfpmDebProvidesField(NfpmPackageRelationshipsField):
     nfpm_alias = "provides"
-    alias = nfpm_alias
+    alias: ClassVar[str] = nfpm_alias
     help = help_text(
         lambda: f"""
         A list of virtual packages that this package provides.
@@ -211,7 +211,7 @@ class NfpmDebProvidesField(NfpmPackageRelationshipsField):
 
 class NfpmDebDependsField(NfpmPackageRelationshipsField):
     nfpm_alias = "depends"
-    alias = nfpm_alias  # TODO: this might be confused with "dependencies"
+    alias: ClassVar[str] = nfpm_alias  # TODO: this might be confused with "dependencies"
     help = help_text(
         lambda: f"""
         List of package dependencies (for package installers).
@@ -238,7 +238,7 @@ class NfpmDebDependsField(NfpmPackageRelationshipsField):
 
 class NfpmDebRecommendsField(NfpmPackageRelationshipsField):
     nfpm_alias = "recommends"
-    alias = nfpm_alias
+    alias: ClassVar[str] = nfpm_alias
     help = help_text(
         lambda: f"""
         List of optional package dependencies (for package installers).
@@ -257,7 +257,7 @@ class NfpmDebRecommendsField(NfpmPackageRelationshipsField):
 
 class NfpmDebSuggestsField(NfpmPackageRelationshipsField):
     nfpm_alias = "suggests"
-    alias = nfpm_alias
+    alias: ClassVar[str] = nfpm_alias
     help = help_text(
         """
         A list of package suggestions (for package installers).
@@ -272,7 +272,7 @@ class NfpmDebSuggestsField(NfpmPackageRelationshipsField):
 
 class NfpmDebConflictsField(NfpmPackageRelationshipsField):
     nfpm_alias = "conflicts"
-    alias = nfpm_alias
+    alias: ClassVar[str] = nfpm_alias
     help = help_text(
         lambda: f"""
         A list of packages that this package conflicts with.
@@ -297,7 +297,7 @@ class NfpmDebConflictsField(NfpmPackageRelationshipsField):
 
 class NfpmDebBreaksField(NfpmPackageRelationshipsField):
     nfpm_alias = "deb.breaks"
-    alias = "breaks"
+    alias: ClassVar[str] = "breaks"
     help = help_text(
         lambda: f"""
         A list of packages which would break if this package would be installed.
@@ -332,7 +332,7 @@ class NfpmDebCompressionAlgorithm(Enum):
 
 class NfpmDebCompressionField(StringField):
     nfpm_alias = "deb.compression"
-    alias = "compression"
+    alias: ClassVar[str] = "compression"
     valid_choices = NfpmDebCompressionAlgorithm
     default = NfpmDebCompressionAlgorithm.gzip.value  # same default as nFPM
     help = help_text(

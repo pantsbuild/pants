@@ -3,10 +3,8 @@
 
 from __future__ import annotations
 
-from abc import ABCMeta
-
 from pants.engine.target import StringSequenceField
 
 
-class NfpmPackageRelationshipsField(StringSequenceField, metaclass=ABCMeta):
+class NfpmPackageRelationshipsField(StringSequenceField):
     pass

@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+from typing import ClassVar
+
 from pants.backend.nfpm.fields._relationships import NfpmPackageRelationshipsField
 from pants.engine.target import StringField
 from pants.util.strutil import help_text
@@ -14,7 +16,7 @@ from pants.util.strutil import help_text
 
 class NfpmApkMaintainerField(StringField):
     nfpm_alias = "maintainer"
-    alias = nfpm_alias
+    alias: ClassVar[str] = nfpm_alias
     help = help_text(
         # based in part on the docs at:
         # https://nfpm.goreleaser.com/configuration/#reference
@@ -35,7 +37,7 @@ class NfpmApkMaintainerField(StringField):
 
 class NfpmApkReplacesField(NfpmPackageRelationshipsField):
     nfpm_alias = "replaces"
-    alias = nfpm_alias
+    alias: ClassVar[str] = nfpm_alias
     help = help_text(
         lambda: f"""
         A list of packages whose files this package can take ownership of.
@@ -64,7 +66,7 @@ class NfpmApkReplacesField(NfpmPackageRelationshipsField):
 
 class NfpmApkProvidesField(NfpmPackageRelationshipsField):
     nfpm_alias = "provides"
-    alias = nfpm_alias
+    alias: ClassVar[str] = nfpm_alias
     help = help_text(
         lambda: f"""
         A list of (virtual) packages or other things that this package provides.
@@ -102,7 +104,7 @@ class NfpmApkProvidesField(NfpmPackageRelationshipsField):
 
 class NfpmApkDependsField(NfpmPackageRelationshipsField):
     nfpm_alias = "depends"
-    alias = nfpm_alias  # TODO: this might be confused with "dependencies"
+    alias: ClassVar[str] = nfpm_alias  # TODO: this might be confused with "dependencies"
     help = help_text(
         lambda: f"""
         List of package dependencies or conflicts (for package installers).
