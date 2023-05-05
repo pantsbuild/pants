@@ -26,10 +26,10 @@ protos = { path = "../protos" }
 rlimit = "0.8"
 serde = "1.0.136"
 task_executor = { path = "../task_executor" }
-tokio = { version = "1.21", features = ["fs"] }
+tokio = { version = "1.28", features = ["fs"] }
 workunit_store = { path = "../workunit_store" }
 
 [dev-dependencies]
 tempfile = "3.5.0"
 testutil = { path = "../testutil" }
-tokio = { version = "1.21", features = ["rt", "macros"] }
+tokio = { version = "1.28", features = ["rt", "macros"] }

@@ -14,7 +14,7 @@ log = "0.4"
 nails = "0.13"
 store = { path = "../../fs/store" }
 task_executor = { path = "../../task_executor" }
-tokio = { version = "1.21", features = ["net", "process", "rt-multi-thread", "sync", "time"] }
+tokio = { version = "1.28", features = ["net", "process", "rt-multi-thread", "sync", "time"] }
 tokio-rustls = "0.23"
 tokio-util = { version = "0.7", features = ["codec"] }
 workunit_store = { path = "../../workunit_store" }
@@ -34,5 +34,5 @@ parking_lot = "0.12"
 sharded_lmdb = { path = "../../sharded_lmdb" }
 tempfile = "3.5.0"
 testutil = { path = "../../testutil" }
-tokio = { version = "1.21", features = ["macros"] }
+tokio = { version = "1.28", features = ["macros"] }
 process_execution = { path = ".." }

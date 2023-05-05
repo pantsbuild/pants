@@ -30,4 +30,4 @@ python_tests(
 
 python_tests(name="exiter_integration_test", sources=["exiter_integration_test.py"], timeout=180)
 
-python_tests(name="specs_integration_test", sources=["specs_integration_test.py"], timeout=180)
+python_tests(name="specs_integration_test", sources=["specs_integration_test.py"], timeout=240)

@@ -60,7 +60,7 @@ mod metrics;
 /// ordering.
 ///
 /// NB: This type is defined here to make it easily accessible to both the `process_execution`
-/// and `engine` crates: it's not actually used by the WorkunitStore.
+/// and `graph` crates: it's not actually used by the WorkunitStore.
 ///
 #[derive(Clone, Copy, Debug, DeepSizeOf, PartialEq, Eq, Hash)]
 pub struct RunId(pub u32);

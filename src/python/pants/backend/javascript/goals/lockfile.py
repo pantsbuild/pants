@@ -54,7 +54,7 @@ async def determine_package_json_user_resolves(
 ) -> KnownUserResolveNames:
     names = FrozenOrderedSet(
         user_chosen_resolves.get(
-            os.path.join(project.root_dir, "package-lock.json"), project.default_resolve_name
+            os.path.join(project.root_dir, project.lockfile_name), project.default_resolve_name
         )
         for project in all_projects
     )
@@ -98,14 +98,16 @@ async def setup_user_lockfile_requests(
 ) -> UserGenerateLockfiles:
     def get_name(project: NodeJSProject) -> str:
         return user_chosen_resolves.get(
-            os.path.join(project.root_dir, "package-lock.json"), project.default_resolve_name
+            os.path.join(project.root_dir, project.lockfile_name), project.default_resolve_name
         )
 
     projects_by_name = {get_name(project): project for project in all_projects}
     return UserGenerateLockfiles(
         GeneratePackageLockJsonFile(
             resolve_name=name,
-            lockfile_dest=os.path.join(projects_by_name[name].root_dir, "package-lock.json"),
+            lockfile_dest=os.path.join(
+                projects_by_name[name].root_dir, projects_by_name[name].lockfile_name
+            ),
             diff=False,
             project=projects_by_name[name],
         )
@@ -121,9 +123,9 @@ async def generate_lockfile_from_package_jsons(
         ProcessResult,
         NodeJsProjectEnvironmentProcess(
             env=NodeJsProjectEnvironment.from_root(request.project),
-            args=("install", "--package-lock-only"),
-            description=f"generate package-lock.json for '{request.resolve_name}'.",
-            output_files=("package-lock.json",),
+            args=request.project.generate_lockfile_args,
+            description=f"generate {request.project.lockfile_name} for '{request.resolve_name}'.",
+            output_files=(request.project.lockfile_name,),
         ),
     )
     output_digest = await Get(Digest, AddPrefix(result.output_digest, request.project.root_dir))
