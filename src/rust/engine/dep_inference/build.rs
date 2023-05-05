@@ -79,8 +79,7 @@ pub trait Visitor {
 
   file
     .write_all(
-      b"\
-  fn visit(&mut self, node: tree_sitter::Node) -> ChildBehavior {
+      b"  fn visit(&mut self, node: tree_sitter::Node) -> ChildBehavior {
     match node.kind_id() {
 ",
     )
@@ -96,8 +95,7 @@ pub trait Visitor {
   }
   file
     .write_all(
-      b"\
-      _ => ChildBehavior::Visit,
+      b"      _ => ChildBehavior::Visit,
     }
   }
 }
