@@ -85,6 +85,11 @@ from a.b import (
   assert_imports("from ....a import b, c", &["....a.b", "....a.c"]);
   assert_imports("from ....a import b as d, c", &["....a.b", "....a.c"]);
 
+  assert_imports(
+    "class X: def method(): if True: while True: class Y: def f(): import a",
+    &["a"],
+  );
+
   // NB: Doesn't collect __future__ imports
   assert_imports("from __future__ import annotations", &[]);
 }
@@ -488,4 +493,18 @@ fn relative_imports_resolution() {
     "from ....a import b as d, c",
     &["....a.b", "....a.c"],
   );
+}
+
+#[test]
+fn syntax_errors() {
+  // These tests aren't specifically testing what we parse, so much as "we don't crash and burn".
+
+  assert_imports("imprt a", &[]);
+  assert_imports("form a import b", &["b"]);
+  assert_imports("import .b", &[]);
+  assert_imports("import a....b", &["a....b"]);
+  assert_imports("import a.", &[]);
+  assert_imports("from a import", &[]);
+  assert_imports("from a imp x", &[]);
+  assert_imports("from a import ......g", &["a.g"]);
 }

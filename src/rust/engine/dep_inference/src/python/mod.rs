@@ -1,11 +1,11 @@
 // Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
-use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 
 pub mod constants;
 pub mod visitor;
 
+use fnv::{FnvHashMap as HashMap, FnvHashSet as HashSet};
 use serde_derive::{Deserialize, Serialize};
 use tree_sitter::Parser;
 
@@ -33,21 +33,29 @@ pub fn get_dependencies(
     .filter(|key| key.starts_with('.'))
     .cloned()
     .collect();
-  let parent_path = filepath.parent().unwrap();
-  let path_parts: Vec<&str> = parent_path.iter().map(|p| p.to_str().unwrap()).collect();
+  let parent_path = filepath
+    .parent()
+    .expect("Expected a filepath that was non-root");
+  let path_parts: Vec<&str> = parent_path
+    .iter()
+    .map(|p| {
+      p.to_str()
+        .expect("Expected UTF-8-compatible filepath parts")
+    })
+    .collect();
   for key in keys_to_replace {
-    let nonrelative = key.trim_start_matches('.').to_string();
+    let nonrelative = key.trim_start_matches('.');
     let level = key.len() - nonrelative.len();
-    let mut new_key = if level > path_parts.len() {
-      // Just put back the prefix, this went above the parent
-      key[0..level].to_string()
-    } else {
-      path_parts[0..((path_parts.len() - level) + 1)].join(".") + "."
-    };
-    new_key.push_str(nonrelative.as_str());
+    if level > path_parts.len() {
+      // Don't mess with the key, let Pants error with the original string
+      continue;
+    }
+
+    let mut new_key_parts = path_parts[0..((path_parts.len() - level) + 1)].to_vec();
+    new_key_parts.push(nonrelative);
 
     let old_value = import_map.remove(&key).unwrap();
-    import_map.insert(new_key, old_value);
+    import_map.insert(new_key_parts.join("."), old_value);
   }
 
   Ok(ParsedPythonDependencies {
@@ -66,8 +74,8 @@ struct ImportCollector<'a> {
 impl ImportCollector<'_> {
   pub fn new(code: &'_ str) -> ImportCollector<'_> {
     ImportCollector {
-      import_map: HashMap::new(),
-      string_candidates: HashMap::new(),
+      import_map: HashMap::default(),
+      string_candidates: HashMap::default(),
       code,
       weaken_imports: false,
     }
@@ -149,10 +157,12 @@ impl ImportCollector<'_> {
     module_name: Option<tree_sitter::Node>,
     is_string: bool,
   ) {
-    let dotted_name = if name.kind_id() == constants::KindID::ALIASED_IMPORT {
-      name.named_child(0).unwrap()
-    } else {
-      name
+    let dotted_name = match name.kind_id() {
+      constants::KindID::ALIASED_IMPORT => name.named_child(0).unwrap(),
+      constants::KindID::ERROR => {
+        return;
+      }
+      _ => name,
     };
     let name_range = dotted_name.range();
 

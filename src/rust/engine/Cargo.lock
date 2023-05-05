@@ -728,6 +728,7 @@ dependencies = [
 name = "dep_inference"
 version = "0.0.1"
 dependencies = [
+ "fnv",
  "serde",
  "serde_derive",
  "tree-sitter",
