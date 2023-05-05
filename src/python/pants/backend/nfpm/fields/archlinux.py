@@ -64,7 +64,7 @@ class NfpmArchlinuxReplacesField(NfpmPackageRelationshipsField):
     nfpm_alias = "replaces"
     alias = nfpm_alias
     help = help_text(
-        lambda: f"""
+        """
         A list of packages that this package replaces or obsoletes.
 
         This allows for combining packages or splitting them up. When pacman
