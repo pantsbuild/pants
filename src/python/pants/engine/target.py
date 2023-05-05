@@ -18,6 +18,7 @@ from dataclasses import dataclass
 from enum import Enum
 from pathlib import PurePath
 from typing import (
+    AbstractSet,
     Any,
     Callable,
     ClassVar,
@@ -25,6 +26,7 @@ from typing import (
     Generic,
     Iterable,
     Iterator,
+    KeysView,
     Mapping,
     Optional,
     Sequence,
@@ -379,7 +381,6 @@ class Target:
 
     # These get calculated in the constructor
     address: Address
-    plugin_fields: tuple[type[Field], ...]
     field_values: FrozenDict[type[Field], Field]
     residence_dir: str
     name_explicitly_set: bool
@@ -442,15 +443,11 @@ class Target:
         try:
             object.__setattr__(
                 self,
-                "plugin_fields",
-                self._find_plugin_fields(union_membership or UnionMembership({})),
-            )
-            object.__setattr__(
-                self,
                 "field_values",
                 self._calculate_field_values(
                     unhydrated_values,
                     address,
+                    union_membership,
                     ignore_unrecognized_fields=ignore_unrecognized_fields,
                 ),
             )
@@ -466,11 +463,14 @@ class Target:
         self,
         unhydrated_values: dict[str, Any],
         address: Address,
+        # See `__init__`.
+        union_membership: UnionMembership | None,
         *,
         ignore_unrecognized_fields: bool,
     ) -> FrozenDict[type[Field], Field]:
+        all_field_types = self.class_field_types(union_membership)
         field_values = {}
-        aliases_to_field_types = self._get_field_aliases_to_field_types(self.field_types)
+        aliases_to_field_types = self._get_field_aliases_to_field_types(all_field_types)
 
         for alias, value in unhydrated_values.items():
             if alias not in aliases_to_field_types:
@@ -494,7 +494,9 @@ class Target:
             field_values[field_type] = field_type(value, address)
 
         # For undefined fields, mark the raw value as missing.
-        for field_type in set(self.field_types) - set(field_values.keys()):
+        for field_type in all_field_types:
+            if field_type in field_values:
+                continue
             field_values[field_type] = field_type(NO_VALUE, address)
         return FrozenDict(
             sorted(
@@ -506,7 +508,7 @@ class Target:
     @final
     @classmethod
     def _get_field_aliases_to_field_types(
-        cls, field_types: tuple[type[Field], ...]
+        cls, field_types: Iterable[type[Field]]
     ) -> dict[str, type[Field]]:
         aliases_to_field_types = {}
         for field_type in field_types:
@@ -517,8 +519,8 @@ class Target:
 
     @final
     @property
-    def field_types(self) -> Tuple[Type[Field], ...]:
-        return (*self.core_fields, *self.plugin_fields)
+    def field_types(self) -> KeysView[Type[Field]]:
+        return self.field_values.keys()
 
     @distinct_union_type_per_subclass
     class PluginField:
@@ -555,6 +557,7 @@ class Target:
 
     @final
     @classmethod
+    @memoized_method
     def _find_plugin_fields(cls, union_membership: UnionMembership) -> tuple[type[Field], ...]:
         result: set[type[Field]] = set()
         classes = [cls]
@@ -594,7 +597,7 @@ class Target:
         if result is not None:
             return cast(_F, result)
         field_subclass = self._find_registered_field_subclass(
-            field, registered_fields=self.field_types
+            field, registered_fields=self.field_values.keys()
         )
         if field_subclass is not None:
             return cast(_F, self.field_values[field_subclass])
@@ -648,7 +651,7 @@ class Target:
     @final
     @classmethod
     def _has_fields(
-        cls, fields: Iterable[Type[Field]], *, registered_fields: Iterable[Type[Field]]
+        cls, fields: Iterable[Type[Field]], *, registered_fields: AbstractSet[Type[Field]]
     ) -> bool:
         unrecognized_fields = [field for field in fields if field not in registered_fields]
         if not unrecognized_fields:
@@ -679,17 +682,23 @@ class Target:
         custom subclass `CustomTags`, both `tgt.has_fields([Tags])` and
         `python_tgt.has_fields([CustomTags])` will return True.
         """
-        return self._has_fields(fields, registered_fields=self.field_types)
+        return self._has_fields(fields, registered_fields=self.field_values.keys())
 
     @final
     @classmethod
-    def class_field_types(cls, union_membership: UnionMembership) -> Tuple[Type[Field], ...]:
+    @memoized_method
+    def class_field_types(
+        cls, union_membership: UnionMembership | None
+    ) -> FrozenOrderedSet[Type[Field]]:
         """Return all registered Fields belonging to this target type.
 
         You can also use the instance property `tgt.field_types` to avoid having to pass the
         parameter UnionMembership.
         """
-        return (*cls.core_fields, *cls._find_plugin_fields(union_membership))
+        if union_membership is None:
+            return FrozenOrderedSet(cls.core_fields)
+        else:
+            return FrozenOrderedSet((*cls.core_fields, *cls._find_plugin_fields(union_membership)))
 
     @final
     @classmethod
