@@ -264,8 +264,8 @@ class AdhocToolTarget(Target):
                 {AdhocToolRunnableField.alias}=":python_source",
                 {AdhocToolArgumentsField.alias}=[""],
                 {AdhocToolExecutionDependenciesField.alias}=[":scripts"],
-                {AdhocToolOutputDirectoriesField.alias}=["logs/my-script.log"],
-                {AdhocToolOutputFilesField.alias}=["results/"],
+                {AdhocToolOutputDirectoriesField.alias}=["results/"],
+                {AdhocToolOutputFilesField.alias}=["logs/my-script.log"],
             )
 
             shell_sources(name="scripts")
