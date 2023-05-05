@@ -65,6 +65,16 @@ class NfpmArchlinuxReplacesField(NfpmPackageRelationshipsField):
     alias = nfpm_alias
     help = help_text(
         lambda: f"""
+        A list of packages that this package replaces or obsoletes.
+
+        This allows for combining packages or splitting them up. When pacman
+        does a `sysupgrade` operation, it will immediately replace the listed
+        packages with this package. This option is ignored during pacman
+        `sync` or `upgrade` operations.
+
+        See:
+        https://wiki.archlinux.org/title/PKGBUILD#replaces
+        https://man.archlinux.org/man/core/pacman/PKGBUILD.5.en
         """
     )
 
@@ -74,6 +84,42 @@ class NfpmArchlinuxProvidesField(NfpmPackageRelationshipsField):
     alias = nfpm_alias
     help = help_text(
         lambda: f"""
+        A list of (virtual) packages or shared libraries that this package provides.
+
+        Each entry can be either a package name or a shared library (which ends
+        with ".so"). You can specify a version on both package names and shared
+        libraries. If specified, the version must use `=` (not `<`, `<=`, etc).
+
+        Make sure to include any shared libraries (.so files) that this package
+        installs if they provide an external API for other packages to use.
+
+        Do not include the 'package_name' (known by 'pkgname' in Archlinux) in
+        the list of '{NfpmArchlinuxProvidesField.alias}' as that is implicit.
+
+        For example, package "baz" could declare that it also provides virtual
+        packages "foo" and "bar" as well as the "libbaz.so" v2 shared object.
+        Because the "baz" package implicitly provides its own name, this list
+        should not include "baz".
+
+        - "foo"
+        - "bar=1.0.0"
+        - "libbaz.so=2"
+
+        If several packages declare the same '{NfpmArchlinuxProvidesField.alias}',
+        then they might need to declare that they conflict with each other
+        using '{NfpmArchlinuxConflictsField.alias}' if, for example, they also
+        install a binary with the same path. Packages that have the same package
+        (or virtual package) in both '{NfpmArchlinuxProvidesField.alias}' and
+        '{NfpmArchlinuxConflictsField.alias}' are considered alternative packages
+        that cannot be installed at the same time. If those package only include
+        an entry in '{NfpmArchlinuxProvidesField.alias}' and not in
+        '{NfpmArchlinuxConflictsField.alias}', then they CAN be installed at the
+        same time.
+
+        See:
+        https://wiki.archlinux.org/title/PKGBUILD#provides
+        https://man.archlinux.org/man/core/pacman/PKGBUILD.5.en
+        https://wiki.archlinux.org/title/Arch_package_guidelines#Package_relations
         """
     )
 
@@ -83,6 +129,22 @@ class NfpmArchlinuxDependsField(NfpmPackageRelationshipsField):
     alias = nfpm_alias  # TODO: this might be confused with "dependencies"
     help = help_text(
         lambda: f"""
+        List of package dependencies (for package installers).
+
+        The '{NfpmArchlinuxDependsField.alias}' field has install-time dependencies
+        that can use version selectors (with one of `<`, `<=`, `=`, `>=`, `>`).
+
+        - "git"
+        - "tcpdump<5"
+        - "foobar>=1.8.0"
+
+        WARNING: This is NOT the same as the 'dependencies' field!
+        It does not accept pants-style dependencies like target addresses.
+
+        See:
+        https://wiki.archlinux.org/title/PKGBUILD#depends
+        https://man.archlinux.org/man/core/pacman/PKGBUILD.5.en
+        https://wiki.archlinux.org/title/Arch_package_guidelines#Package_dependencies
         """
     )
 
@@ -92,5 +154,15 @@ class NfpmArchlinuxConflictsField(NfpmPackageRelationshipsField):
     alias = nfpm_alias
     help = help_text(
         lambda: f"""
+        A list of (virtual) packages that this package conflicts with.
+
+        Packages that conflict with each other cannot be installed at the same time.
+
+        The '{NfpmArchlinuxConflictsField.alias}' field has the same syntax as the
+        '{NfpmArchlinuxDependsField.alias}' field.
+
+        See:
+        https://wiki.archlinux.org/title/PKGBUILD#conflicts
+        https://man.archlinux.org/man/core/pacman/PKGBUILD.5.en
         """
     )
