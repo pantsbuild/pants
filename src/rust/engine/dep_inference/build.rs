@@ -1,9 +1,9 @@
 // Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 use std::env;
-use std::{collections::HashSet, io::Write, path::PathBuf};
+use std::{collections::HashSet, io::Write, path::Path};
 
-fn gen_constants_file(out_dir: &PathBuf) {
+fn gen_constants_file(out_dir: &Path) {
   let mut file = std::fs::File::create(out_dir.join("constants.rs")).unwrap();
 
   file
@@ -42,7 +42,7 @@ impl KindID {
   file.write_all(b"}\n").unwrap();
 }
 
-fn gen_visitor_file(out_dir: &PathBuf) {
+fn gen_visitor_file(out_dir: &Path) {
   let mut file = std::fs::File::create(out_dir.join("visitor.rs")).unwrap();
   let python_lang = tree_sitter_python::language();
 
@@ -106,9 +106,9 @@ pub trait Visitor {
 }
 
 fn main() {
+  let out_dir = env::var_os("OUT_DIR").unwrap();
+  let out_dir = Path::new(&out_dir);
+  gen_constants_file(out_dir);
+  gen_visitor_file(out_dir);
   println!("cargo:rerun-if-env-changed=build.rs");
-
-  let out_dir = PathBuf::from(env::var_os("OUT_DIR").unwrap());
-  gen_constants_file(&out_dir);
-  gen_visitor_file(&out_dir);
 }

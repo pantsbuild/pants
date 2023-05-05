@@ -2,14 +2,12 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 use std::path::PathBuf;
 
-pub mod constants;
-pub mod visitor;
+include!(concat!(env!("OUT_DIR"), "/constants.rs"));
+include!(concat!(env!("OUT_DIR"), "/visitor.rs"));
 
 use fnv::{FnvHashMap as HashMap, FnvHashSet as HashSet};
 use serde_derive::{Deserialize, Serialize};
 use tree_sitter::Parser;
-
-use self::visitor::Visitor;
 
 #[derive(Serialize, Deserialize)]
 pub struct ParsedPythonDependencies {
@@ -98,7 +96,7 @@ impl ImportCollector<'_> {
       let node = cursor.node();
       let children_behavior = self.visit(node);
 
-      if children_behavior == visitor::ChildBehavior::Visit && cursor.goto_first_child() {
+      if children_behavior == ChildBehavior::Visit && cursor.goto_first_child() {
         continue;
       }
       // NB: Could post_visit(node) here
@@ -139,7 +137,7 @@ impl ImportCollector<'_> {
   fn is_pragma_ignored(&self, node: tree_sitter::Node) -> bool {
     if let Some(sibling) = node.next_named_sibling() {
       let next_node_range = sibling.range();
-      if sibling.kind_id() == constants::KindID::COMMENT
+      if sibling.kind_id() == KindID::COMMENT
         && node.range().end_point.row == next_node_range.start_point.row
         && self
           .code_at(next_node_range)
@@ -158,10 +156,10 @@ impl ImportCollector<'_> {
     is_string: bool,
   ) {
     let dotted_name = match name.kind_id() {
-      constants::KindID::ALIASED_IMPORT => name
+      KindID::ALIASED_IMPORT => name
         .named_child(0)
         .expect("Expected named child of aliased_import while parsing Python file."),
-      constants::KindID::ERROR => {
+      KindID::ERROR => {
         return;
       }
       _ => name,
@@ -198,20 +196,20 @@ impl ImportCollector<'_> {
 
 // NB: https://tree-sitter.github.io/tree-sitter/playground is very helpful
 impl Visitor for ImportCollector<'_> {
-  fn visit_import_statement(&mut self, node: tree_sitter::Node) -> visitor::ChildBehavior {
+  fn visit_import_statement(&mut self, node: tree_sitter::Node) -> ChildBehavior {
     if !self.is_pragma_ignored(node) {
       self.insert_import(node.named_child(0).unwrap(), None, false);
     }
-    visitor::ChildBehavior::Ignore
+    ChildBehavior::Ignore
   }
 
-  fn visit_import_from_statement(&mut self, node: tree_sitter::Node) -> visitor::ChildBehavior {
+  fn visit_import_from_statement(&mut self, node: tree_sitter::Node) -> ChildBehavior {
     if !self.is_pragma_ignored(node) {
       for child in node.children_by_field_name("name", &mut node.walk()) {
         self.insert_import(child, Some(node.named_child(0).unwrap()), false);
       }
     }
-    visitor::ChildBehavior::Ignore
+    ChildBehavior::Ignore
   }
 
   // @TODO: If we wanted to be most correct, this should use a stack. But realistically, that's
@@ -224,25 +222,22 @@ impl Visitor for ImportCollector<'_> {
   //   import weak2
   // except ImportError:
   //   ...
-  fn visit_try_statement(&mut self, node: tree_sitter::Node) -> visitor::ChildBehavior {
+  fn visit_try_statement(&mut self, node: tree_sitter::Node) -> ChildBehavior {
     let mut should_weaken = false;
     let mut cursor = node.walk();
     let children: Vec<_> = node.named_children(&mut cursor).collect();
     for child in children.iter() {
-      if child.kind_id() == constants::KindID::EXCEPT_CLAUSE {
+      if child.kind_id() == KindID::EXCEPT_CLAUSE {
         // N.B. Python allows any arbitrary expression as an except handler.
         // We only parse identifiers, or (Set/Tuple/List)-of-identifier expressions.
         let except_expr = child.named_child(0).unwrap();
         should_weaken = match except_expr.kind_id() {
-          constants::KindID::IDENTIFIER => self.code_at(except_expr.range()) == "ImportError",
-          constants::KindID::SET | constants::KindID::LIST | constants::KindID::TUPLE => {
-            except_expr
-              .named_children(&mut except_expr.walk())
-              .any(|expr| {
-                expr.kind_id() == constants::KindID::IDENTIFIER
-                  && self.code_at(expr.range()) == "ImportError"
-              })
-          }
+          KindID::IDENTIFIER => self.code_at(except_expr.range()) == "ImportError",
+          KindID::SET | KindID::LIST | KindID::TUPLE => except_expr
+            .named_children(&mut except_expr.walk())
+            .any(|expr| {
+              expr.kind_id() == KindID::IDENTIFIER && self.code_at(expr.range()) == "ImportError"
+            }),
           _ => false,
         };
         if should_weaken {
@@ -259,28 +254,28 @@ impl Visitor for ImportCollector<'_> {
     for child in children_iter {
       self.walk(&mut child.walk());
     }
-    visitor::ChildBehavior::Ignore
+    ChildBehavior::Ignore
   }
 
-  fn visit_call(&mut self, node: tree_sitter::Node) -> visitor::ChildBehavior {
+  fn visit_call(&mut self, node: tree_sitter::Node) -> ChildBehavior {
     let funcname = node.named_child(0).unwrap();
     if self.code_at(funcname.range()) != "__import__" {
-      return visitor::ChildBehavior::Visit;
+      return ChildBehavior::Visit;
     }
 
     let args = node.named_child(1).unwrap();
     if let Some(arg) = args.named_child(0) {
-      if arg.kind_id() == constants::KindID::STRING {
+      if arg.kind_id() == KindID::STRING {
         // NB: Call nodes are children of expression nodes. The comment is a sibling of the expression.
         if !self.is_pragma_ignored(node.parent().unwrap()) {
           self.insert_import(arg, None, true);
         }
       }
     }
-    visitor::ChildBehavior::Ignore
+    ChildBehavior::Ignore
   }
 
-  fn visit_string(&mut self, node: tree_sitter::Node) -> visitor::ChildBehavior {
+  fn visit_string(&mut self, node: tree_sitter::Node) -> ChildBehavior {
     let range = node.range();
     let text: &str = self.string_at(range);
     if !text.contains(|c: char| c.is_ascii_whitespace() || c == '\\') {
@@ -288,7 +283,7 @@ impl Visitor for ImportCollector<'_> {
         .string_candidates
         .insert(text.to_string(), (range.start_point.row + 1) as u64);
     }
-    visitor::ChildBehavior::Ignore
+    ChildBehavior::Ignore
   }
 }
 
