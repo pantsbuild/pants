@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
 import yaml
 
-from pants.backend.nfpm.field_set import NfpmPackageFieldSet
+from pants.backend.nfpm.field_sets import NfpmPackageFieldSet
 from pants.engine.addresses import Addresses
 from pants.engine.fs import CreateDigest, FileContent
 from pants.engine.internals.native_engine import Digest
