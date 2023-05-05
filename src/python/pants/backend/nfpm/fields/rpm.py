@@ -3,8 +3,12 @@
 
 from __future__ import annotations
 
+from enum import Enum
+from typing import Optional
+
 from pants.backend.nfpm.fields._relationships import NfpmPackageRelationshipsField
-from pants.engine.target import StringField
+from pants.engine.addresses import Address
+from pants.engine.target import InvalidFieldException, StringField
 from pants.util.strutil import help_text
 
 # These fields are used by the `nfpm_rpm_package` target
@@ -228,3 +232,82 @@ class NfpmRpmConflictsField(NfpmPackageRelationshipsField):
         https://ftp.osuosl.org/pub/rpm/max-rpm/s1-rpm-depend-manual-dependencies.html#S2-RPM-DEPEND-CONFLICTS-TAG
         """
     )
+
+
+class NfpmRpmCompressionAlgorithm(Enum):
+    # This is what nFPM implements.
+    gzip = "gzip"
+    lzma = "lzma"
+    xz = "xz"
+    zstd = "zstd"
+
+
+class NfpmRpmCompressionField(StringField):
+    nfpm_alias = "rpm.compression"
+    alias = "compression"
+    valid_choices = NfpmRpmCompressionAlgorithm
+    default = f"{NfpmRpmCompressionAlgorithm.gzip.value}:-1"  # same default as nFPM
+    help = help_text(
+        lambda: f"""
+        The compression algorithm to use on the rpm package.
+
+        This takes a compression algorithm and optionally a compression level.
+        To specify a level, use 'algorithm:level'. Specifying a compression level
+        is only valid for '{NfpmRpmCompressionAlgorithm.gzip.value}' or
+        '{NfpmRpmCompressionAlgorithm.zstd.value}'.
+
+        Here are several gzip examples with and without the optional compression level
+        (-1 means use the default level which is 5; 9 is the max).
+
+        '{NfpmRpmCompressionAlgorithm.gzip.value}:9'
+        '{NfpmRpmCompressionAlgorithm.gzip.value}:0'
+        '{NfpmRpmCompressionAlgorithm.gzip.value}:-1'
+        '{NfpmRpmCompressionAlgorithm.gzip.value}:5'
+        '{NfpmRpmCompressionAlgorithm.gzip.value}'
+
+        Here are several zstd examples. Note that nFPM uses a library that  only
+        defines four named compression levels, and then maps the zstd integer
+        levels to those. You may specify the zstd level as an integer, or using
+        these names: https://github.com/klauspost/compress/tree/master/zstd#status
+
+        '{NfpmRpmCompressionAlgorithm.zstd.value}:fastest'
+        '{NfpmRpmCompressionAlgorithm.zstd.value}:default'
+        '{NfpmRpmCompressionAlgorithm.zstd.value}:better'
+        '{NfpmRpmCompressionAlgorithm.zstd.value}:best'
+        '{NfpmRpmCompressionAlgorithm.zstd.value}:3'
+        '{NfpmRpmCompressionAlgorithm.zstd.value}:9'
+        '{NfpmRpmCompressionAlgorithm.zstd.value}'
+        """
+    )
+
+    @classmethod
+    def compute_value(cls, raw_value: Optional[str], address: Address) -> Optional[str]:
+        # We only need to do custom computation if raw_value has the optional level.
+        if not (isinstance(raw_value, cls.expected_type) and ":" in raw_value):
+            # If defined, only algorithm was provided, not level.
+            # If not defined, this will apply the default.
+            return super().compute_value(raw_value, address)
+
+        # ":" is in raw_value so both an algorithm and level were provided.
+        raw_algorithm, level, *unknown = raw_value.split(":")
+
+        # This will check algorithm against the algorithm Enum.
+        computed_algorithm = super().compute_value(raw_algorithm, address)
+        if computed_algorithm not in ("gzip", "zstd"):
+            raise InvalidFieldException(
+                f"Values for the {repr(cls.alias)} field in target {address} "
+                "may only specify a compression level for gzip or zstd compression, "
+                f"but {repr(computed_algorithm)} was provided as {repr(raw_value)}."
+            )
+
+        if unknown:
+            raise InvalidFieldException(
+                f"Values for the {repr(cls.alias)} field in target {address} "
+                f"must not have more than one ':', but got {len(unknown) + 1}."
+                "Only use ':' to specify an optional compression level after "
+                "the compression algorithm (ie '<algorithm>[:<level>]')."
+            )
+
+        # Pass level as-is w/o sanitization or type checking because
+        # there are too many possible levels to check it sanely here.
+        return f"{computed_algorithm}:{level}"

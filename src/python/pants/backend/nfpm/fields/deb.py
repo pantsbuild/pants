@@ -320,3 +320,23 @@ class NfpmDebBreaksField(NfpmPackageRelationshipsField):
         See: https://www.debian.org/doc/debian-policy/ch-relationships.html#packages-which-break-other-packages-breaks
         """
     )
+
+
+class NfpmDebCompressionAlgorithm(Enum):
+    # This is what nFPM implements.
+    gzip = "gzip"
+    none = "none"
+    xz = "xz"
+    zstd = "zstd"
+
+
+class NfpmDebCompressionField(StringField):
+    nfpm_alias = "deb.compression"
+    alias = "compression"
+    valid_choices = NfpmDebCompressionAlgorithm
+    default = NfpmDebCompressionAlgorithm.gzip.value  # same default as nFPM
+    help = help_text(
+        """
+        The compression algorithm to use on the deb package.
+        """
+    )
