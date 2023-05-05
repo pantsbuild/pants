@@ -19,7 +19,7 @@ use crate::python::{throw, Key, Value};
 use crate::tasks::Intrinsic;
 use crate::types::Types;
 use crate::Failure;
-use dep_inference::python::{get_dependencies, ParsedPythonDependencies};
+use dep_inference::python::get_dependencies;
 use protos::gen::pants::cache::{CacheKey, CacheKeyType};
 
 use bytes::Bytes;
@@ -764,15 +764,23 @@ fn parse_python_deps(context: Context, args: Vec<Value>) -> BoxFuture<'static, N
 
     let mut path = None;
     let mut digest = None;
-    store.load_digest_trie(directory_digest).await?.walk(
-      SymlinkBehavior::Oblivious,
-      &mut |node_path, entry| {
+    store
+      .load_digest_trie(directory_digest.clone())
+      .await?
+      .walk(SymlinkBehavior::Oblivious, &mut |node_path, entry| {
         if let Entry::File(file) = entry {
           path = Some(node_path.to_owned());
           digest = Some(file.digest());
         }
-      },
-    );
+      });
+    if digest.is_none() || path.is_none() {
+      Err(format!(
+        "Couldn't find a file in digest for Python inference: {directory_digest:?}"
+      ))?
+    }
+    let path = path.unwrap();
+    let digest = digest.unwrap();
+
     in_workunit!(
       "parse_python_dependencies",
       Level::Info,
@@ -780,22 +788,22 @@ fn parse_python_deps(context: Context, args: Vec<Value>) -> BoxFuture<'static, N
       |_workunit| async move {
         let cache_key = CacheKey {
           key_type: CacheKeyType::DepInferenceRequest.into(),
-          digest: Some(digest.unwrap().into()),
+          digest: Some(digest.into()),
         };
         let cached_result = core.local_cache.load(&cache_key).await?;
 
-        let mut result: Option<ParsedPythonDependencies> = None;
-        if let Some(bytes) = cached_result {
-          result = serde_json::from_slice(&bytes).ok();
-        }
-        if result.is_none() {
+        let result = if let Some(result) =
+          cached_result.and_then(|bytes| serde_json::from_slice(&bytes).ok())
+        {
+          result
+        } else {
           let bytes = store
-            .load_file_bytes_with(digest.unwrap(), |bytes| Vec::from(bytes))
+            .load_file_bytes_with(digest, |bytes| Vec::from(bytes))
             .await?;
 
           let contents = std::str::from_utf8(&bytes)
             .map_err(|err| format!("Failed to convert digest bytes to utf-8: {err}"))?;
-          result = Some(get_dependencies(contents, path.unwrap())?);
+          let result = Some(get_dependencies(contents, path)?);
           core
             .local_cache
             .store(
@@ -806,6 +814,7 @@ fn parse_python_deps(context: Context, args: Vec<Value>) -> BoxFuture<'static, N
               ),
             )
             .await?;
+          result
         };
         let result = result.unwrap();
 

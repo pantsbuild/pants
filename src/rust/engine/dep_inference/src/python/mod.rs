@@ -33,12 +33,8 @@ pub fn get_dependencies(
     .filter(|key| key.starts_with('.'))
     .cloned()
     .collect();
-  let path_parts: Vec<String> = filepath
-    .parent()
-    .unwrap()
-    .iter()
-    .map(|p| p.to_str().unwrap().to_string())
-    .collect();
+  let parent_path = filepath.parent().unwrap();
+  let path_parts: Vec<&str> = parent_path.iter().map(|p| p.to_str().unwrap()).collect();
   for key in keys_to_replace {
     let nonrelative = key.trim_start_matches('.').to_string();
     let level = key.len() - nonrelative.len();
