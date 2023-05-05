@@ -168,7 +168,7 @@ class NfpmDebReplacesField(NfpmPackageRelationshipsField):
     alias = nfpm_alias
     help = help_text(
         lambda: f"""
-        A list or packages that this package replaces or partially replaces.
+        A list of packages that this package replaces or partially replaces.
 
         To declare that this package partially replaces another package, by
         taking ownership of files in that package, include that other package in
