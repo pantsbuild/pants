@@ -17,11 +17,16 @@ class RustWorkspaceTarget(Target):
     )
 
 
+class RustPackageSourcesField(MultipleSourcesField):
+    default = ("Cargo.toml", "src/**/*.rs", "tests/**/*.rs")
+    uses_source_roots = False
+
+
 class RustPackageTarget(Target):
     alias = "rust_package"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        CargoTomlSourceField,
+        RustPackageSourcesField,
     )
 
 

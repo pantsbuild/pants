@@ -9,7 +9,7 @@ import pytest
 
 from pants.backend.rust.lint.rustfmt.rules import RustfmtFieldSet, RustfmtRequest
 from pants.backend.rust.lint.rustfmt.rules import rules as rustfmt_rules
-from pants.backend.rust.target_types import RustCrateTarget
+from pants.backend.rust.target_types import RustPackageTarget
 from pants.backend.rust.util_rules import toolchains
 from pants.core.goals.fmt import FmtResult
 from pants.core.util_rules import source_files, system_binaries
@@ -22,7 +22,7 @@ from pants.testutil.rule_runner import QueryRule, RuleRunner
 @pytest.fixture()
 def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
-        target_types=[RustCrateTarget],
+        target_types=[RustPackageTarget],
         rules=[
             *rustfmt_rules(),
             *toolchains.rules(),
