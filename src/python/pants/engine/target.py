@@ -62,7 +62,7 @@ from pants.util.collections import ensure_list, ensure_str_list
 from pants.util.dirutil import fast_relpath
 from pants.util.docutil import bin_name, doc_url
 from pants.util.frozendict import FrozenDict
-from pants.util.memo import memoized_method, memoized_property
+from pants.util.memo import memoized_classproperty, memoized_method, memoized_property
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import bullet_list, help_text, pluralize, softwrap
 
@@ -1350,23 +1350,14 @@ def _generate_file_level_targets(
 # -----------------------------------------------------------------------------------------------
 # FieldSet
 # -----------------------------------------------------------------------------------------------
-def _get_field_set_fields(field_set: Type[FieldSet]) -> Dict[str, Type[Field]]:
-    return {
-        name: field_type
-        for name, field_type in get_type_hints(field_set).items()
-        if isinstance(field_type, type) and issubclass(field_type, Field)
-    }
-
-
 def _get_field_set_fields_from_target(
     field_set: Type[FieldSet], target: Target
 ) -> Dict[str, Field]:
-    all_expected_fields = _get_field_set_fields(field_set)
     return {
         dataclass_field_name: (
             target[field_cls] if field_cls in field_set.required_fields else target.get(field_cls)
         )
-        for dataclass_field_name, field_cls in all_expected_fields.items()
+        for dataclass_field_name, field_cls in field_set.fields.items()
     }
 
 
@@ -1451,6 +1442,17 @@ class FieldSet(EngineAwareParameter, metaclass=ABCMeta):
     @classmethod
     def create(cls: Type[_FS], tgt: Target) -> _FS:
         return cls(address=tgt.address, **_get_field_set_fields_from_target(cls, tgt))
+
+    @final
+    @memoized_classproperty
+    def fields(cls) -> FrozenDict[str, Type[Field]]:
+        return FrozenDict(
+            (
+                (name, field_type)
+                for name, field_type in get_type_hints(cls).items()
+                if isinstance(field_type, type) and issubclass(field_type, Field)
+            )
+        )
 
     def debug_hint(self) -> str:
         return self.address.spec
