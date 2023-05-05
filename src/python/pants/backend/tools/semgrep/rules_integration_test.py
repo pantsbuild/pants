@@ -253,35 +253,6 @@ def test_semgrepignore(rule_runner: RuleRunner) -> None:
     assert result.report == EMPTY_DIGEST
 
 
-def test_semgrepignore_nested_ignored(rule_runner: RuleRunner, caplog) -> None:
-    rule_runner.write_files({**BAD_FILE_LAYOUT, f"{DIR}/.semgrepignore": "file.txt"})
-
-    tgt = rule_runner.get_target(Address(DIR, target_name="f"))
-    results = run_semgrep(rule_runner, [tgt])
-
-    # a nested semgrep ignore file is completely unused...
-    assert len(results) == 1
-    result = results[0]
-    assert "find-bad-pattern" in result.stdout
-    assert "Ran 1 rule on 1 file: 1 finding" in result.stderr
-    assert result.exit_code == SEMGREP_ERROR_FAILURE_RETURN_CODE
-    assert result.report == EMPTY_DIGEST
-
-    # ...but there's a pants warning about it...
-    assert "Semgrep does not obey .semgrepignore outside the working directory" in caplog.text
-    assert f"{DIR}/.semgrepignore" in caplog.text
-
-    caplog.clear()
-
-    # ... that can be silenced
-    results = run_semgrep(
-        rule_runner,
-        [tgt],
-        extra_args=["--semgrep-acknowledge-nested-semgrepignore-files-are-not-used"],
-    )
-    assert not caplog.records
-
-
 def test_partition_by_config(rule_runner: RuleRunner) -> None:
     file_dirs = []
 

@@ -63,11 +63,6 @@ class SemgrepSubsystem(PythonToolBase):
         advanced=True,
     )
 
-    acknowledge_nested_semgrepignore_files_are_not_used = BoolOption(
-        default=False,
-        help="Set to true suppress the warning about `.semgrepignore` files not at the build root not being used",
-    )
-
     force = BoolOption(
         default=False,
         help=softwrap(

@@ -22,7 +22,7 @@ from pants.engine.target import AllTargets, Target, Targets
 from pants.engine.unions import UnionRule
 from pants.option.global_options import GlobalOptions
 from pants.util.logging import LogLevel
-from pants.util.strutil import pluralize, softwrap
+from pants.util.strutil import pluralize
 
 from .subsystem import SemgrepFieldSet, SemgrepSubsystem
 from .target_types import SemgrepRuleSourceField
@@ -46,24 +46,6 @@ class PartitionMetadata:
 
 
 _IGNORE_FILE_NAME = ".semgrepignore"
-
-
-def warn_about_ignore_files_if_required(ignore_files: Snapshot, semgrep: SemgrepSubsystem) -> None:
-    non_root_files = sorted(name for name in ignore_files.files if name != _IGNORE_FILE_NAME)
-    if non_root_files and not semgrep.acknowledge_nested_semgrepignore_files_are_not_used:
-        # https://github.com/returntocorp/semgrep/issues/5669
-        logger.warning(
-            softwrap(
-                f"""
-                Semgrep does not obey {_IGNORE_FILE_NAME} outside the working directory, which is
-                the build root when run by pants. These files may not have the desired effect:
-                {', '.join(non_root_files)}
-
-                Set `acknowledge_nested_semgrepignore_files_are_not_used = true` in the `[semgrep]`
-                section of pants.toml to silence this warning.
-                """
-            )
-        )
 
 
 @dataclass
@@ -125,8 +107,6 @@ async def partition(
 ) -> Partitions:
     if semgrep.skip:
         return Partitions()
-
-    warn_about_ignore_files_if_required(ignore_files.snapshot, semgrep)
 
     dependencies = await MultiGet(
         Get(Targets, InferSemgrepDependenciesRequest(field_set)) for field_set in request.field_sets
