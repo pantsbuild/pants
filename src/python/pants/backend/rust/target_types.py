@@ -17,23 +17,14 @@ class RustWorkspaceTarget(Target):
     )
 
 
-class RustPackageTarget(Target):
-    alias = "rust_package"
-    core_fields = (
-        *COMMON_TARGET_FIELDS,
-        CargoTomlSourceField,
-    )
-
-
-class RustCrateSourcesField(MultipleSourcesField):
+class RustPackageSourcesField(MultipleSourcesField):
     default = ("Cargo.toml", "src/**/*.rs", "tests/**/*.rs")
     uses_source_roots = False
 
 
-class RustCrateTarget(Target):
-    alias = "rust_crate"
+class RustPackageTarget(Target):
+    alias = "rust_package"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        RustCrateSourcesField,
+        RustPackageSourcesField,
     )
-    help = "A Rust crate. This must not be made manually, but only via target generation."

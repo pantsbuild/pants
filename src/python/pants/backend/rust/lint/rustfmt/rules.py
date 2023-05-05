@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from pants.backend.rust.lint.rustfmt import skip_field
 from pants.backend.rust.lint.rustfmt.skip_field import SkipRustfmtField
 from pants.backend.rust.lint.rustfmt.subsystem import RustfmtSubsystem
-from pants.backend.rust.target_types import RustCrateSourcesField
+from pants.backend.rust.target_types import RustPackageSourcesField
 from pants.backend.rust.util_rules.toolchains import RustToolchainProcess
 from pants.core.goals.fmt import FmtRequest, FmtResult
 from pants.engine.internals.selectors import Get
@@ -21,9 +21,9 @@ from pants.util.strutil import pluralize
 
 @dataclass(frozen=True)
 class RustfmtFieldSet(FieldSet):
-    required_fields = (RustCrateSourcesField,)
+    required_fields = (RustPackageSourcesField,)
 
-    sources: RustCrateSourcesField
+    sources: RustPackageSourcesField
 
     @classmethod
     def opt_out(cls, tgt: Target) -> bool:

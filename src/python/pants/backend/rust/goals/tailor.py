@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from pants.backend.rust.target_types import RustCrateTarget
+from pants.backend.rust.target_types import RustPackageTarget
 from pants.core.goals.tailor import (
     AllOwnedSources,
     PutativeTarget,
@@ -38,7 +38,7 @@ async def find_putative_rust_targets(
     for dirname, filenames in group_by_dir(unowned_cargo_toml_files).items():
         putative_targets.append(
             PutativeTarget.for_target_type(
-                RustCrateTarget,
+                RustPackageTarget,
                 path=dirname,
                 name=None,
                 triggering_sources=sorted(filenames),
