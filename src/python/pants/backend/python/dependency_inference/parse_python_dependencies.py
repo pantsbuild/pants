@@ -188,7 +188,7 @@ async def parse_python_dependencies(
         warn_or_error(
             removal_version="2.18.0.dev0",
             entity="Not explicitly providing [python-infer].use_rust_parser",
-            hint="Read the help for [python-infer].use_rust_parser, then set the value in pants.toml."
+            hint="Read the help for [python-infer].use_rust_parser, then set the value in pants.toml.",
         )
 
     if python_infer_subsystem.use_rust_parser:

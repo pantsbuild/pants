@@ -13,12 +13,6 @@ class NativeParsedPythonDependencies:
     imports: FrozenDict[str, tuple[int, bool]]
     string_candidates: FrozenDict[str, int]
 
-    @staticmethod
-    def create_from_native(
-        imports: dict[str, tuple[int, bool]],
-        string_candidates: dict[str, int],
-    ) -> "NativeParsedPythonDependencies":
-        return NativeParsedPythonDependencies(
-            FrozenDict(imports),
-            FrozenDict(string_candidates),
-        )
+    def __init__(self, imports: dict[str, tuple[int, bool]], string_candidates: dict[str, int]):
+        object.__setattr__(self, "imports", FrozenDict(imports))
+        object.__setattr__(self, "string_candidates", FrozenDict(string_candidates))

@@ -50,7 +50,6 @@ pub fn get_dependencies(
     };
     new_key.push_str(nonrelative.as_str());
 
-    println!("Replacing {key:?} with {new_key:?} and level was {level:?}");
     let old_value = import_map.remove(&key).unwrap();
     import_map.insert(new_key, old_value);
   }

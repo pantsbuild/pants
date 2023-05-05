@@ -5,7 +5,13 @@ use std::{collections::HashSet, io::Write, path::PathBuf};
 fn gen_constants_file() {
   let mut file = std::fs::File::create(PathBuf::from("src/python/constants.rs")).unwrap();
 
-  file.write_all(b"// Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).\n// Licensed under the Apache License, Version 2.0 (see LICENSE).\n").unwrap();
+  file
+    .write_all(b"// Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).\n")
+    .unwrap();
+  file
+    .write_all(b"// Licensed under the Apache License, Version 2.0 (see LICENSE).\n")
+    .unwrap();
+  file.write_all(b"\n// Generated \n").unwrap();
 
   file
     .write_all(b"#[non_exhaustive]\npub struct KindID;\n\n")
@@ -19,7 +25,7 @@ fn gen_constants_file() {
     let id = id as u16;
     if python_lang.node_kind_is_named(id) {
       let kind = python_lang.node_kind_for_id(id).unwrap().to_uppercase();
-      if kinds_seen.insert(kind.to_string()) {
+      if kinds_seen.insert(kind.clone()) {
         file
           .write_all(format!("  pub const {kind}: u16 = {id};\n").as_bytes())
           .unwrap();
@@ -56,7 +62,7 @@ pub enum ChildBehavior {
     let id = id as u16;
     if python_lang.node_kind_is_named(id) {
       let kind = python_lang.node_kind_for_id(id).unwrap();
-      if kinds_seen.insert(kind.to_string()) {
+      if kinds_seen.insert(kind) {
         file.write_all(
           format!("  fn visit_{kind}(&mut self, node: tree_sitter::Node) -> ChildBehavior {{\n    ChildBehavior::Visit\n  }}\n").as_bytes(),
         )
