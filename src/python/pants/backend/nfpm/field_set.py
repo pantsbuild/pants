@@ -5,20 +5,22 @@ from __future__ import annotations
 
 from abc import ABCMeta
 from dataclasses import dataclass
-from typing import Any, cast
+from typing import Any, ClassVar, cast
 
-from pants.backend.nfpm.target_types import (
-    APK_FIELDS,
-    ARCHLINUX_FIELDS,
-    DEB_FIELDS,
-    RPM_FIELDS,
-    NfpmPackageNameField,
-    _NfpmField,
-)
+from typing_extensions import Protocol
+
+from pants.backend.nfpm.fields.all import NfpmPackageNameField
+from pants.backend.nfpm.target_types import APK_FIELDS, ARCHLINUX_FIELDS, DEB_FIELDS, RPM_FIELDS
 from pants.core.goals.package import OutputPathField, PackageFieldSet
 from pants.engine.rules import collect_rules
 from pants.engine.target import DescriptionField, Target
 from pants.engine.unions import UnionRule
+
+
+# This allows us to define the nFPM config option name on the field
+class _NfpmField(Protocol):
+    # nfpm_alias is a "." concatenated series of dict keys (keys of nfpm.yaml).
+    nfpm_alias: ClassVar[str]
 
 
 @dataclass(frozen=True)
