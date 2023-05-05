@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+from typing import ClassVar
+
 from pants.backend.nfpm.fields._relationships import NfpmPackageRelationshipsField
 from pants.engine.target import StringField
 from pants.util.strutil import help_text
@@ -14,7 +16,7 @@ from pants.util.strutil import help_text
 
 class NfpmArchlinuxPackagerField(StringField):
     nfpm_alias = "archlinux.packager"
-    alias = "packager"
+    alias: ClassVar[str] = "packager"
     help = help_text(
         # based in part on the docs at:
         # https://nfpm.goreleaser.com/configuration/#reference
@@ -40,7 +42,7 @@ class NfpmArchlinuxPackagerField(StringField):
 
 class NfpmArchlinuxPkgbaseField(StringField):
     nfpm_alias = "archlinux.pkgbase"
-    alias = "pkgbase"
+    alias: ClassVar[str] = "pkgbase"
     help = help_text(
         # based in part on the docs at:
         # https://nfpm.goreleaser.com/configuration/#reference
@@ -62,7 +64,7 @@ class NfpmArchlinuxPkgbaseField(StringField):
 
 class NfpmArchlinuxReplacesField(NfpmPackageRelationshipsField):
     nfpm_alias = "replaces"
-    alias = nfpm_alias
+    alias: ClassVar[str] = nfpm_alias
     help = help_text(
         """
         A list of packages that this package replaces or obsoletes.
@@ -81,7 +83,7 @@ class NfpmArchlinuxReplacesField(NfpmPackageRelationshipsField):
 
 class NfpmArchlinuxProvidesField(NfpmPackageRelationshipsField):
     nfpm_alias = "provides"
-    alias = nfpm_alias
+    alias: ClassVar[str] = nfpm_alias
     help = help_text(
         lambda: f"""
         A list of (virtual) packages or shared libraries that this package provides.
@@ -126,7 +128,7 @@ class NfpmArchlinuxProvidesField(NfpmPackageRelationshipsField):
 
 class NfpmArchlinuxDependsField(NfpmPackageRelationshipsField):
     nfpm_alias = "depends"
-    alias = nfpm_alias  # TODO: this might be confused with "dependencies"
+    alias: ClassVar[str] = nfpm_alias  # TODO: this might be confused with "dependencies"
     help = help_text(
         lambda: f"""
         List of package dependencies (for package installers).
@@ -151,7 +153,7 @@ class NfpmArchlinuxDependsField(NfpmPackageRelationshipsField):
 
 class NfpmArchlinuxConflictsField(NfpmPackageRelationshipsField):
     nfpm_alias = "conflicts"
-    alias = nfpm_alias
+    alias: ClassVar[str] = nfpm_alias
     help = help_text(
         lambda: f"""
         A list of (virtual) packages that this package conflicts with.
