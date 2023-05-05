@@ -10,7 +10,8 @@ from pants.backend.rust.lint.rustfmt.skip_field import SkipRustfmtField
 from pants.backend.rust.lint.rustfmt.subsystem import RustfmtSubsystem
 from pants.backend.rust.target_types import RustPackageSourcesField
 from pants.backend.rust.util_rules.toolchains import RustToolchainProcess
-from pants.core.goals.fmt import FmtRequest, FmtResult
+from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
+from pants.core.util_rules.partitions import PartitionerType
 from pants.engine.internals.selectors import Get
 from pants.engine.process import ProcessResult
 from pants.engine.rules import collect_rules, rule
@@ -30,9 +31,10 @@ class RustfmtFieldSet(FieldSet):
         return tgt.get(SkipRustfmtField).value
 
 
-class RustfmtRequest(FmtRequest):
+class RustfmtRequest(FmtTargetsRequest):
     field_set_type = RustfmtFieldSet
-    name = RustfmtSubsystem.options_scope
+    tool_subsystem = RustfmtSubsystem
+    partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 
 @rule(desc="Format with rustfmt")
