@@ -24,6 +24,7 @@ from pants.backend.nfpm.fields.archlinux import (
 )
 from pants.backend.nfpm.fields.deb import (
     NfpmDebBreaksField,
+    NfpmDebCompressionField,
     NfpmDebConflictsField,
     NfpmDebDependsField,
     NfpmDebMaintainerField,
@@ -35,6 +36,7 @@ from pants.backend.nfpm.fields.deb import (
     NfpmDebSuggestsField,
 )
 from pants.backend.nfpm.fields.rpm import (
+    NfpmRpmCompressionField,
     NfpmRpmConflictsField,
     NfpmRpmDependsField,
     NfpmRpmGroupField,
@@ -297,6 +299,8 @@ DEB_FIELDS = (
     NfpmDebSuggestsField,
     NfpmDebConflictsField,
     NfpmDebBreaksField,
+    # how to build the package
+    NfpmDebCompressionField,
 )
 
 
@@ -344,6 +348,8 @@ RPM_FIELDS = (
     NfpmRpmRecommendsField,
     NfpmRpmSuggestsField,
     NfpmRpmConflictsField,
+    # how to build the package
+    NfpmRpmCompressionField,
 )
 
 
