@@ -316,6 +316,25 @@ class NodePackageTarget(Target):
     )
 
 
+class NPMDistributionTarget(Target):
+    alias = "npm_distribution"
+
+    help = help_text(
+        """
+        A publishable npm registry distribution, typically a gzipped tarball
+        of the sources and any resources, but omitting the lockfile.
+
+        Generated using the projects package manager `pack` implementation.
+        """
+    )
+
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        PackageJsonSourceField,
+        OutputPathField,
+    )
+
+
 class PackageJsonTarget(TargetGenerator):
     alias = "package_json"
     core_fields = (
@@ -590,7 +609,11 @@ async def find_owning_package(request: OwningNodePackageRequest) -> OwningNodePa
         ),
     )
     package_json_tgts = sorted(
-        (tgt for tgt in candidate_targets if tgt.has_field(PackageJsonSourceField)),
+        (
+            tgt
+            for tgt in candidate_targets
+            if tgt.has_field(PackageJsonSourceField) and tgt.has_field(NodePackageNameField)
+        ),
         key=lambda tgt: tgt.address.spec_path,
         reverse=True,
     )

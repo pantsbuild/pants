@@ -44,10 +44,9 @@ from pants.util.strutil import softwrap
 
 @dataclass(frozen=True)
 class NodePackageTarFieldSet(PackageFieldSet):
-    required_fields = (PackageJsonSourceField, NodePackageNameField, NodePackageVersionField)
+    required_fields = (PackageJsonSourceField, OutputPathField)
     source: PackageJsonSourceField
-    name: NodePackageNameField
-    version: NodePackageVersionField
+    output_path: OutputPathField
 
 
 @dataclass(frozen=True)
@@ -83,20 +82,29 @@ async def pack_node_package_into_tgz_for_publication(
     installation = await Get(
         InstalledNodePackageWithSource, InstalledNodePackageRequest(field_set.address)
     )
-    archive_file = f"{field_set.name.value}-{field_set.version.value}.tgz"
+    node_package = installation.project_env.ensure_target()
+    name = node_package.get(NodePackageNameField).value
+    version = node_package.get(NodePackageVersionField).value
+    archive_file = f"{name}-{version}.tgz"
     result = await Get(
         ProcessResult,
         NodeJsProjectEnvironmentProcess(
             installation.project_env,
             args=("pack",),
-            description=f"Packaging .tgz archive for {field_set.name.value}@{field_set.version.value}",
+            description=f"Packaging .tgz archive for {name}@{version}",
             input_digest=installation.digest,
             output_files=(installation.join_relative_workspace_directory(archive_file),),
             level=LogLevel.INFO,
         ),
     )
+    if field_set.output_path.value:
+        digest = await Get(Digest, AddPrefix(result.output_digest, field_set.output_path.value))
+    else:
+        digest = result.output_digest
 
-    return BuiltPackage(result.output_digest, (BuiltPackageArtifact(archive_file),))
+    return BuiltPackage(
+        digest, (BuiltPackageArtifact(archive_file, tuple(result.stderr.decode().splitlines())),)
+    )
 
 
 _NOT_ALPHANUMERIC = re.compile("[^0-9a-zA-Z]+")
