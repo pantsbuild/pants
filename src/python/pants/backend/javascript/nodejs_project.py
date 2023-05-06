@@ -89,7 +89,7 @@ class NodeJSProject:
 
     def extra_caches(self) -> dict[str, str]:
         if self.package_manager == "pnpm":
-            return {"pnpm_home": "{chroot}/._pnpm_home"}
+            return {"pnpm_home": "._pnpm_home"}
         return {}
 
     def get_project_digest(self) -> MergeDigests:
