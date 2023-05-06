@@ -176,6 +176,7 @@ async def general_parser_script(
 async def parse_python_dependencies(
     request: ParsePythonDependenciesRequest,
     parser_script: ParserScript,
+    union_membership: UnionMembership,
     python_infer_subsystem: PythonInferSubsystem,
 ) -> ParsedPythonDependencies:
     stripped_sources = await Get(StrippedSourceFiles, SourceFilesRequest([request.source]))
@@ -191,7 +192,8 @@ async def parse_python_dependencies(
             hint="Read the help for [python-infer].use_rust_parser, then set the value in pants.toml.",
         )
 
-    if python_infer_subsystem.use_rust_parser:
+    has_custom_dep_inferences = bool(union_membership[PythonDependencyVisitorRequest])
+    if python_infer_subsystem.use_rust_parser and not has_custom_dep_inferences:
         native_result = await Get(
             NativeParsedPythonDependencies, Digest, stripped_sources.snapshot.digest
         )
