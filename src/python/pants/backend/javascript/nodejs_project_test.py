@@ -71,6 +71,19 @@ def test_parses_projects(rule_runner: RuleRunner) -> None:
     assert {project.root_dir for project in projects} == {"src/js/foo", "src/js/bar"}
 
 
+def test_root_package_json_is_supported(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "BUILD": "package_json()",
+            "package.json": given_package("ham", "0.0.1"),
+            "src/js/bar/BUILD": "package_json()",
+            "src/js/bar/package.json": given_package("spam", "0.0.2"),
+        }
+    )
+    projects = rule_runner.request(AllNodeJSProjects, [])
+    assert {project.root_dir for project in projects} == {"", "src/js/bar"}
+
+
 def test_parses_project_with_workspaces(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
