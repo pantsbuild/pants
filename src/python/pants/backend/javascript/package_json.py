@@ -340,6 +340,7 @@ class PackageJsonTarget(TargetGenerator):
 class NodeBuildScriptEntryPointField(StringField):
     alias = "entry_point"
     required = True
+    value: str
 
 
 class NodeBuildScriptSourcesField(SourcesField):
