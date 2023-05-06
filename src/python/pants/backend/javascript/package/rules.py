@@ -24,9 +24,14 @@ from pants.backend.javascript.package_json import (
     PackageJsonSourceField,
 )
 from pants.build_graph.address import Address
-from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact, PackageFieldSet
+from pants.core.goals.package import (
+    BuiltPackage,
+    BuiltPackageArtifact,
+    OutputPathField,
+    PackageFieldSet,
+)
 from pants.core.target_types import ResourceSourceField
-from pants.engine.internals.native_engine import AddPrefix, Snapshot
+from pants.engine.internals.native_engine import AddPrefix, Digest, Snapshot
 from pants.engine.internals.selectors import Get
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Rule, collect_rules, rule
@@ -43,6 +48,24 @@ class NodePackageTarFieldSet(PackageFieldSet):
     source: PackageJsonSourceField
     name: NodePackageNameField
     version: NodePackageVersionField
+
+
+@dataclass(frozen=True)
+class NodeBuildScriptPackageFieldSet(PackageFieldSet):
+    required_fields = (
+        NodeBuildScriptSourcesField,
+        OutputPathField,
+        NodeBuildScriptEntryPointField,
+        NodeBuildScriptOutputFilesField,
+        NodeBuildScriptOutputDirectoriesField,
+        NodeBuildScriptExtraCaches,
+    )
+    source: NodeBuildScriptSourcesField
+    output_path: OutputPathField
+    script_name: NodeBuildScriptEntryPointField
+    output_directories: NodeBuildScriptOutputDirectoriesField
+    output_files: NodeBuildScriptOutputFilesField
+    extra_caches: NodeBuildScriptExtraCaches
 
 
 @dataclass(frozen=True)
@@ -120,6 +143,20 @@ class NodeBuildScriptRequest:
             extra_caches=req.protocol_target[NodeBuildScriptExtraCaches].value or (),
         )
 
+    @classmethod
+    def from_package_request(cls, req: NodeBuildScriptPackageFieldSet) -> NodeBuildScriptRequest:
+        return cls(
+            address=req.address,
+            output_files=req.output_files.value or (),
+            output_directories=req.output_directories.value or (),
+            script_name=req.script_name.value,
+            extra_caches=req.extra_caches.value or (),
+        )
+
+    def get_paths(self) -> Iterable[str]:
+        yield from self.output_directories
+        yield from self.output_files
+
 
 @rule
 async def run_node_build_script(req: NodeBuildScriptRequest) -> NodeBuildScriptResult:
@@ -170,10 +207,25 @@ async def generate_resources_from_node_build_script(
     )
 
 
+@rule
+async def generate_package_artifact_from_node_build_script(
+    req: NodeBuildScriptPackageFieldSet,
+) -> BuiltPackage:
+    request = NodeBuildScriptRequest.from_package_request(req)
+    result = await Get(NodeBuildScriptResult, NodeBuildScriptRequest, request)
+    if req.output_path.value:
+        digest = await Get(Digest, AddPrefix(result.process.output_digest, req.output_path.value))
+    else:
+        digest = result.process.output_digest
+    artifacts = tuple(BuiltPackageArtifact(path) for path in request.get_paths())
+    return BuiltPackage(digest, artifacts)
+
+
 def rules() -> Iterable[Rule | UnionRule]:
     return [
         *collect_rules(),
         *install_node_package.rules(),
         UnionRule(PackageFieldSet, NodePackageTarFieldSet),
+        UnionRule(PackageFieldSet, NodeBuildScriptPackageFieldSet),
         UnionRule(GenerateSourcesRequest, GenerateResourcesFromNodeBuildScriptRequest),
     ]
