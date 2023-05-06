@@ -13,4 +13,4 @@ python_tests(
 )
 
 # The package.json file is inlined in ./rules_integration_tests.py
-resources(name="lockfiles", sources=["package-lock.json", "pnpm-lock.yaml"])
+resources(name="lockfiles", sources=["package-lock.json", "pnpm-lock.yaml", "yarn.lock"])

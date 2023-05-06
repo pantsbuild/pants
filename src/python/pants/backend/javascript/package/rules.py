@@ -83,7 +83,9 @@ async def pack_node_package_into_tgz_for_publication(
     installation = await Get(
         InstalledNodePackageWithSource, InstalledNodePackageRequest(field_set.address)
     )
-    archive_file = f"{field_set.name.value}-{field_set.version.value}.tgz"
+    archive_file = installation.project_env.project.pack_archive_format.format(
+        field_set.name.value, field_set.version.value
+    )
     result = await Get(
         ProcessResult,
         NodeJsProjectEnvironmentProcess(
