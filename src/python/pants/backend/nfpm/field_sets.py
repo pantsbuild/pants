@@ -5,9 +5,7 @@ from __future__ import annotations
 
 from abc import ABCMeta
 from dataclasses import dataclass
-from typing import Any, ClassVar, cast
-
-from typing_extensions import Protocol
+from typing import Any
 
 from pants.backend.nfpm.fields.all import NfpmPackageNameField
 from pants.backend.nfpm.target_types import APK_FIELDS, ARCHLINUX_FIELDS, DEB_FIELDS, RPM_FIELDS
@@ -15,12 +13,6 @@ from pants.core.goals.package import OutputPathField, PackageFieldSet
 from pants.engine.rules import collect_rules
 from pants.engine.target import DescriptionField, Target
 from pants.engine.unions import UnionRule
-
-
-# This allows us to define the nFPM config option name on the field
-class _NfpmField(Protocol):
-    # nfpm_alias is a "." concatenated series of dict keys (keys of nfpm.yaml).
-    nfpm_alias: ClassVar[str]
 
 
 @dataclass(frozen=True)
@@ -32,13 +24,23 @@ class NfpmPackageFieldSet(PackageFieldSet, metaclass=ABCMeta):
     def nfpm_config(self, tgt: Target) -> dict[str, Any]:
         config: dict[str, Any] = {}
         for field in self.required_fields:
+            # NB: This assumes that nfpm fields have a str 'nfpm_alias' attribute.
+            if not hasattr(field, "nfpm_alias"):
+                # Ignore field that is not defined in the nfpm backend.
+                continue
+            # nfpm_alias is a "." concatenated series of nfpm.yaml dict keys.
+            nfpm_alias: str = getattr(field, "nfpm_alias")
+
             value = tgt[field].value
+            # NB: This assumes that nfpm fields have 'none_is_valid_value=False'.
             if not field.required and value is None:
-                # omit undefined optional values from nfpm.yaml
+                # Omit any undefined optional values unless default applied.
+                # A default ensures value will not be None. So, the pants interface
+                # will be stable even if nFPM changes any defaults.
                 continue
 
-            # handle nested fields (eg: deb.triggers)
-            keys = cast(_NfpmField, field).nfpm_alias.split(".")
+            # handle nested fields (eg: deb.triggers, rpm.compression, maintainer)
+            keys = nfpm_alias.split(".")
 
             cfg = config
             for key in keys[:-1]:
