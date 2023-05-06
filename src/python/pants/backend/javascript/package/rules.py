@@ -21,6 +21,7 @@ from pants.backend.javascript.package_json import (
     NodeBuildScriptSourcesField,
     NodePackageNameField,
     NodePackageVersionField,
+    NPMDistributionTarget,
     PackageJsonSourceField,
 )
 from pants.build_graph.address import Address
@@ -85,6 +86,10 @@ async def pack_node_package_into_tgz_for_publication(
     node_package = installation.project_env.ensure_target()
     name = node_package.get(NodePackageNameField).value
     version = node_package.get(NodePackageVersionField).value
+    if version is None:
+        raise ValueError(
+            f"{field_set.source.file_path}#version must be set in order to package a {NPMDistributionTarget.alias}."
+        )
     archive_file = f"{name}-{version}.tgz"
     result = await Get(
         ProcessResult,
