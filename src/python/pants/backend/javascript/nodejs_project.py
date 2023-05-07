@@ -175,10 +175,8 @@ class ProjectPaths:
         path = PurePath(pkg_json.root_dir)
 
         def safe_match(glob: str) -> bool:
-            if pkg_json.root_dir == "":
-                return pkg_json.root_dir == glob
-            elif not glob:
-                return False
+            if glob == "":
+                return pkg_json.root_dir == ""
             return path.match(glob)
 
         return any(safe_match(glob) for glob in self.full_globs())
