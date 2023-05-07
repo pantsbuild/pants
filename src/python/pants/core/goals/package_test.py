@@ -149,3 +149,39 @@ def test_package_multiple_targets(rule_runner: RuleRunner, dist_base: Path) -> N
     assert result.exit_code == 0
     assert (dist_base / "x").read_text() == "single"
     assert (dist_base / "y").read_text() == "single"
+
+
+@pytest.mark.parametrize("existing", ["file", "directory"])
+@pytest.mark.parametrize("type", ["single_file", "directory"])
+def test_package_replace_existing(
+    existing: str, type: str, rule_runner: RuleRunner, dist_base: Path
+) -> None:
+    """All combinations of having existing contents (either file or directory) in dist/ and
+    replacing it with file or directory package contents: the final result should be exactly the
+    same as clearing dist/ and running package from scratch:
+
+    - works
+    - no extraneous files remaining within an artifact
+    """
+    existing_contents = (
+        {"dist/base/x": "existing"}
+        if existing == "file"
+        else {"dist/base/x/a": "existing: a", "dist/base/x/c": "existing: c"}
+    )
+    rule_runner.write_files({**existing_contents, "src/BUILD": f"mock(name='x', type='{type}')"})
+    result = rule_runner.run_goal_rule(
+        Package,
+        args=("src:x",),
+        env_inherit={"HOME", "PATH", "PYENV_ROOT"},
+    )
+
+    assert result.exit_code == 0
+
+    if type == "single_file":
+        assert (dist_base / "x").read_text() == "single"
+    else:
+        a = dist_base / "x/a"
+        b = dist_base / "x/b"
+        assert set((dist_base / "x").iterdir()) == {a, b}
+        assert a.read_text() == "directory: a"
+        assert b.read_text() == "directory: b"
