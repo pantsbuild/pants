@@ -3,6 +3,7 @@
 
 from pants.engine.target import COMMON_TARGET_FIELDS, MultipleSourcesField, Target, \
     SingleSourceField
+from pants.util.strutil import help_text
 
 
 class CargoTomlSourceField(SingleSourceField):
@@ -27,4 +28,11 @@ class RustPackageTarget(Target):
     core_fields = (
         *COMMON_TARGET_FIELDS,
         RustPackageSourcesField,
+    )
+    help = help_text(
+        """
+        A Rust package as defined in https://doc.rust-lang.org/book/ch07-01-packages-and-crates.html.
+
+        Expects that there is a `Cargo.toml` target in its root directory
+        """
     )
