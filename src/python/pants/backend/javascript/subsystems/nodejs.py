@@ -46,7 +46,7 @@ from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, Rule, collect_rules, rule
 from pants.engine.unions import UnionRule
-from pants.option.option_types import DictOption, ShellStrListOption, StrListOption
+from pants.option.option_types import DictOption, ShellStrListOption, StrListOption, StrOption
 from pants.option.subsystem import Subsystem
 from pants.util.docutil import bin_name
 from pants.util.frozendict import FrozenDict
@@ -120,6 +120,22 @@ class NodeJS(Subsystem, TemplatedExternalToolOptionsMixin):
         download_file = DownloadFile(url, FileDigest(known_version.sha256, known_version.filesize))
         return await Get(DownloadedExternalTool, ExternalToolRequest(download_file, exe))
 
+    package_manager = StrOption(
+        default="npm",
+        help=softwrap(
+            """
+            Default Node.js package manager to use.
+
+            You can either rely on this default together with the [nodejs].package_managers
+            option, or specify the `package.json#packageManager` tool and version
+            in the package.json of your project.
+
+            Specifying conflicting package manager versions within a multi-package
+            workspace is an error.
+            """
+        ),
+    )
+
     package_managers = DictOption[str](
         default={"npm": "8.5.5"},
         help=help_text(
@@ -135,6 +151,12 @@ class NodeJS(Subsystem, TemplatedExternalToolOptionsMixin):
             """
         ),
     )
+
+    @property
+    def default_package_manager(self) -> str | None:
+        if self.package_manager in self.package_managers:
+            return f"{self.package_manager}@{self.package_managers[self.package_manager]}"
+        return self.package_manager
 
     class EnvironmentAware(ExecutableSearchPathsOptionMixin, Subsystem.EnvironmentAware):
         search_path = StrListOption(
@@ -331,7 +353,7 @@ async def add_corepack_shims_to_digest(
     enable_corepack_result = await Get(
         ProcessResult,
         Process(
-            argv=("corepack", "enable", "npm", "--install-directory", "._corepack"),
+            argv=("corepack", "enable", "npm", "pnpm", "--install-directory", "._corepack"),
             input_digest=input_digest,
             immutable_input_digests={**tool_shims.immutable_input_digests},
             output_directories=["._corepack"],
@@ -351,15 +373,15 @@ async def add_corepack_shims_to_digest(
 async def node_process_environment(
     binaries: NodeJSBinaries, nodejs: NodeJS.EnvironmentAware
 ) -> NodeJSProcessEnvironment:
+    default_required_tools = ["sh", "bash"]
+    tools_used_by_setup_scripts = ["mkdir", "rm", "touch", "which"]
+    pnpm_shim_tools = ["sed", "dirname"]
     binary_shims = await Get(
         BinaryShims,
         BinaryShimsRequest.for_binaries(
-            "sh",
-            "bash",
-            "mkdir",  # Some default scripts are generated using mkdir, rm & touch.
-            "rm",
-            "touch",
-            "which",
+            *default_required_tools,
+            *tools_used_by_setup_scripts,
+            *pnpm_shim_tools,
             rationale="execute a nodejs process",
             search_path=nodejs.executable_search_path,
         ),
@@ -559,7 +581,9 @@ async def prepare_corepack_tool(
     result = await Get(
         ProcessResult,
         Process(
-            argv=("corepack", "prepare", tool_spec, "--activate"),
+            argv=filter(
+                None, ("corepack", "prepare", tool_spec if version else None, "--activate")
+            ),
             description=f"Preparing configured {tool_description}.",
             input_digest=request.input_digest,
             immutable_input_digests=environment.immutable_digest(),
@@ -577,11 +601,12 @@ async def prepare_corepack_tool(
 async def setup_node_tool_process(
     request: NodeJSToolProcess, environment: NodeJSProcessEnvironment
 ) -> Process:
-    if request.tool in ("npm", "npx"):
+    if request.tool in ("npm", "npx", "pnpm"):
+        tool_name = request.tool.replace("npx", "npm")
         corepack_tool = await Get(
             CorepackToolDigest,
             CorepackToolRequest(
-                "npm",
+                tool_name,
                 request.project_digest or EMPTY_DIGEST,
                 request.working_directory,
                 request.tool_version,

@@ -185,7 +185,7 @@ python_sources(
     dependencies=[
         # We don't have an import statement for this dep, so inference
         # won't add it automatically. We add it explicitly instead.
-        "3rdparty/python#psyscopg2-binary",
+        "3rdparty/python#psycopg2-binary",
     ],
 )
 ```

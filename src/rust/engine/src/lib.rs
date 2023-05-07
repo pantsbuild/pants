@@ -44,7 +44,7 @@ mod tasks;
 mod types;
 
 pub use crate::context::{
-  Context, Core, ExecutionStrategyOptions, LocalStoreOptions, RemotingOptions,
+  Context, Core, ExecutionStrategyOptions, LocalStoreOptions, RemotingOptions, SessionCore,
 };
 pub use crate::intrinsics::Intrinsics;
 pub use crate::python::{Failure, Function, Key, Params, TypeId, Value};

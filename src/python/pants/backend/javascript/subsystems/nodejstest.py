@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import os
 from pathlib import PurePath
 from typing import cast
 
@@ -85,13 +84,20 @@ class NodeJSTest(Subsystem):
             - `{distdir}` is replaced with the Pants `distdir`.
 
             - `{target_spec}` is replaced with the address of the applicable `javascript_test` target with `/`
-            characters replaced with dots (`.`).
+            characters replaced with dots (`.`). Additional batch information is included in `target_spec`, when
+            batching is used.
             """
         ),
     )
 
-    def render_coverage_output_dir(self, distdir: DistDir, address: Address) -> PurePath:
-        target_spec = address.spec_path.replace(os.sep, ".")
+    def render_coverage_output_dir(
+        self, distdir: DistDir, addresses: tuple[Address, ...]
+    ) -> PurePath:
+        results_file_prefix = addresses[0].path_safe_spec
+        if len(addresses) == 1:
+            target_spec = results_file_prefix
+        else:
+            target_spec = f"batch-of-{results_file_prefix}+{len(addresses)-1}-files"
         return PurePath(
             self.coverage_output_dir.format(distdir=distdir.relpath, target_spec=target_spec)
         )

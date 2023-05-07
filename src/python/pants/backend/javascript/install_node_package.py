@@ -24,7 +24,7 @@ from pants.backend.javascript.target_types import JSSourceField
 from pants.build_graph.address import Address
 from pants.core.target_types import FileSourceField, ResourceSourceField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.internals.native_engine import Digest, MergeDigests
+from pants.engine.internals.native_engine import AddPrefix, Digest, MergeDigests
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Rule, collect_rules, rule
@@ -109,17 +109,16 @@ async def install_node_packages_for_address(
         ProcessResult,
         NodeJsProjectEnvironmentProcess(
             project_env,
-            ("clean-install",),
+            project_env.project.immutable_install_args,
             description=f"Installing {target[NodePackageNameField].value}@{target[NodePackageVersionField].value}.",
             input_digest=install_input_digest,
             output_directories=tuple(project_env.node_modules_directories),
         ),
     )
+    node_modules = await Get(Digest, AddPrefix(install_result.output_digest, project_env.root_dir))
     return InstalledNodePackage(
         project_env,
-        digest=await Get(
-            Digest, MergeDigests([install_input_digest, install_result.output_digest])
-        ),
+        digest=await Get(Digest, MergeDigests([install_input_digest, node_modules])),
     )
 
 

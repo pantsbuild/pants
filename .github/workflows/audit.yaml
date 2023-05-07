@@ -15,7 +15,7 @@ jobs:
     - name: Cargo audit (for security vulnerabilities)
       run: './cargo install --version 0.17.5 cargo-audit
 
-        ./cargo audit
+        ./cargo audit --ignore RUSTSEC-2020-0128
 
         '
 name: Cargo Audit

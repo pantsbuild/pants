@@ -37,6 +37,8 @@ class PipVersion(enum.Enum):
     V23_0 = "23.0"
     V23_0_1 = "23.0.1"
     V23_1 = "23.1"
+    V23_1_1 = "23.1.1"
+    V23_1_2 = "23.1.2"
     LATEST = "latest"
 
 
