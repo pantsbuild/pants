@@ -126,7 +126,7 @@ The partitioner rule gives you all the matching files (or `FieldSet`s depending 
 
 The runner rule will mostly remain unchanged, aside from the request type (`<RequestType>.Batch`), which now has a `.files` property.
 
-If you don't require any `Get`s or metadata for your tool in your partitioner rule, Pants has a way to provide a "default" implementation. In your `FmtRequest` subclass, set the `partitioner_type` class variable to `PartitionerType.DEFAULT_SINGLE_PARTITION` and only provide a runner rule.
+If you don't require any `Get`s or metadata for your tool in your partitioner rule, Pants has a way to provide a "default" implementation. In your `AbstractFmtRequest` subclass, set the `partitioner_type` class variable to `PartitionerType.DEFAULT_SINGLE_PARTITION` and only provide a runner rule.
 
 -----
 
@@ -319,9 +319,9 @@ See <https://github.com/pantsbuild/pants/blob/main/src/python/pants/notes/2.14.x
 
 `Get` now takes only a single type parameter for the output type: `Get[_Output]`. The input type parameter was unused.
 
-### `FmtRequest` -> `FmtTargetsRequest`
+### `AbstractFmtRequest` -> `FmtTargetsRequest`
 
-In order to support non-target formatting (like `BUILD` files) we'll be introducing additional `fmt` request types. Therefore `FmtRequest` has been renamed to `FmtTargetsRequest` to reflect the behavior.
+In order to support non-target formatting (like `BUILD` files) we'll be introducing additional `fmt` request types. Therefore `AbstractFmtRequest` has been renamed to `FmtTargetsRequest` to reflect the behavior.
 
 This change also matches `lint`, which uses `LintTargetsRequest`.
 
@@ -458,7 +458,7 @@ See <https://github.com/pantsbuild/pants/blob/main/src/python/pants/notes/2.12.x
 
 ### Unified formatters
 
-Formatters no longer need to be installed in both the `FmtRequest` and `LintTargetsRequest` `@unions`: instead, installing in the `FmtRequest` union is sufficient to act as both a linter and formatter.
+Formatters no longer need to be installed in both the `AbstractFmtRequest` and `LintTargetsRequest` `@unions`: instead, installing in the `FmtRequest` union is sufficient to act as both a linter and formatter.
 
 See [Add a formatter](doc:plugins-fmt-goal) for more information.
 
@@ -532,7 +532,7 @@ Pants 2.10 added a new `LintFilesRequest`, which allows you to run linters on co
 
 To improve clarity, we renamed `LintRequest` to `LintTargetsRequest`.
 
-### `FmtRequest`, `CheckRequest`, and `LintTargetsRequest` must set `name`
+### `AbstractFmtRequest`, `CheckRequest`, and `LintTargetsRequest` must set `name`
 
 You must set the class property `name` on these three types.
 
@@ -562,7 +562,7 @@ When setting up a new language to be formatted, you used to have to copy and pas
 To fix your code:
 
 1. If you defined any new languages to be formatted, delete the copy-and-pasted `LanguageFmtTargets` code.
-2. For every formatter, change the `UnionRule` to be `UnionRule(FmtRequest, BlackRequest)`, rather than `UnionRule(PythonFmtRequest, BlackRequest)`, for example.
+2. For every formatter, change the `UnionRule` to be `UnionRule(AbstractFmtRequest, BlackRequest)`, rather than `UnionRule(PythonFmtRequest, BlackRequest)`, for example.
 
 ### `ReplImplementation` now passes root targets, not transitive closure
 
