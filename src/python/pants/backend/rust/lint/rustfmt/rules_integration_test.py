@@ -171,7 +171,7 @@ def test_skip_using_args(rule_runner: RuleRunner) -> None:
     fmt_result = run_rustfmt(rule_runner, [tgt], extra_args=["--rustfmt-skip"])
     assert fmt_result.did_change is False
 
-    
+
 @pytest.mark.skip(reason="This issue would have to be fixed in a future PR")
 def test_skip_target(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(

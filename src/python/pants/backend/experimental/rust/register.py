@@ -7,7 +7,7 @@ from pants.backend.rust.util_rules import toolchains
 
 
 def target_types():
-    return RustPackageTarget,
+    return (RustPackageTarget,)
 
 
 def rules():

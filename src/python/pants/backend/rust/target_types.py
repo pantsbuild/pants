@@ -1,8 +1,12 @@
 # Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants.engine.target import COMMON_TARGET_FIELDS, MultipleSourcesField, Target, \
-    SingleSourceField
+from pants.engine.target import (
+    COMMON_TARGET_FIELDS,
+    MultipleSourcesField,
+    SingleSourceField,
+    Target,
+)
 from pants.util.strutil import help_text
 
 
