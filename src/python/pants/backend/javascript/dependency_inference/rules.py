@@ -64,7 +64,10 @@ class InferJSDependenciesRequest(InferDependenciesRequest):
 @rule
 async def infer_node_package_dependencies(
     request: InferNodePackageDependenciesRequest,
+    nodejs_infer: NodeJSInfer,
 ) -> InferredDependencies:
+    if not nodejs_infer.package_json_entry_points:
+        return InferredDependencies(())
     entry_points = await Get(
         PackageJsonEntryPoints, PackageJsonSourceField, request.field_set.source
     )
