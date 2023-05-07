@@ -101,3 +101,42 @@ def test_parses_modules_from_not_valid_js_files(rule_runner: RuleRunner) -> None
     tgt = rule_runner.get_target(Address("src", target_name="src", relative_file_path="a.js"))
     imports = rule_runner.request(JSImportStrings, (ParseJsImportStrings(tgt[JSSourceField]),))
     assert set(imports) == {"fs", "@a-special-module/for-me"}
+
+
+def test_does_not_parse_modules_when_ignored(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/BUILD": "javascript_sources()\n",
+            "src/a.js": dedent(
+                """\
+                import { promises as fs } from 'fs'; // pants: no-infer-dep
+                import * as mod from "@a-special-module/for-me";
+
+                a b // invalid js
+                """
+            ),
+        }
+    )
+    tgt = rule_runner.get_target(Address("src", target_name="src", relative_file_path="a.js"))
+    imports = rule_runner.request(JSImportStrings, (ParseJsImportStrings(tgt[JSSourceField]),))
+    assert set(imports) == {"@a-special-module/for-me"}
+
+
+def test_does_not_parse_require_imports_when_ignored(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/BUILD": "javascript_sources()\n",
+            "src/a.js": dedent(
+                """\
+                const mod = require("@a-special-module/for-me");
+                const fs = require('fs').promises;
+                const { someVar } = require('./local'); // pants: no-infer-dep
+
+                require("no-assignment"); // for side-effects
+                """
+            ),
+        }
+    )
+    tgt = rule_runner.get_target(Address("src", target_name="src", relative_file_path="a.js"))
+    imports = rule_runner.request(JSImportStrings, (ParseJsImportStrings(tgt[JSSourceField]),))
+    assert set(imports) == {"fs", "@a-special-module/for-me", "no-assignment"}
