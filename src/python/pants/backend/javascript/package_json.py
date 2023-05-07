@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import itertools
 import json
+import logging
 import os.path
+import re
 from abc import ABC
 from dataclasses import dataclass, field
 from typing import Any, ClassVar, Iterable, Mapping, Optional, Tuple
@@ -62,6 +64,8 @@ from pants.engine.unions import UnionMembership, UnionRule
 from pants.option.global_options import UnmatchedBuildFileGlobs
 from pants.util.frozendict import FrozenDict
 from pants.util.strutil import help_text, softwrap
+
+_logger = logging.getLogger(__name__)
 
 
 class NodePackageDependenciesField(Dependencies):
@@ -449,6 +453,41 @@ class PackageJsonImports:
 
     imports: FrozenDict[str, tuple[str, ...]]
     root_dir: str
+
+    def replacements(self, import_string: str) -> tuple[str, ...]:
+        def replace_matching_pattern(pattern: str, subpath: str, string: str) -> str | None:
+            pattern = r"^" + re.escape(pattern).replace(r"\*", "(.*)")
+            match = re.match(pattern, string)
+            if match:
+                replacement = subpath
+                for group in match.groups():
+                    replacement = replacement.replace("*", group, 1)
+                if "*" in replacement:
+                    _logger.warning(
+                        softwrap(
+                            f"""
+                            package.json#imports pattern '{pattern}' matched '{string}',
+                            but the resulting subpath '{subpath}' string replacements '*'
+                            did not match.
+
+                            Inference will not behave correctly for import '{string}'.
+                            """
+                        )
+                    )
+                    return None
+                return "".join((replacement, string[match.endpos :]))
+            return None
+
+        return tuple(
+            filter(
+                None,
+                (
+                    replace_matching_pattern(pattern, subpath, import_string)
+                    for pattern, subpaths in self.imports.items()
+                    for subpath in subpaths
+                ),
+            )
+        )
 
     @classmethod
     def from_package_json(cls, pkg_json: PackageJson) -> PackageJsonImports:
