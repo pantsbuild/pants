@@ -15,6 +15,8 @@ from pants.backend.javascript.package_json import (
     NodeTestScript,
     NodeThirdPartyPackageTarget,
     PackageJson,
+    PackageJsonImports,
+    PackageJsonSourceField,
     PackageJsonTarget,
 )
 from pants.build_graph.address import Address
@@ -36,6 +38,7 @@ def rule_runner() -> RuleRunner:
             *package_json.rules(),
             QueryRule(AllPackageJson, ()),
             QueryRule(Owners, (OwnersRequest,)),
+            QueryRule(PackageJsonImports, (PackageJsonSourceField,)),
         ],
         target_types=[
             PackageJsonTarget,
@@ -269,3 +272,44 @@ def test_specifying_missing_custom_coverage_entry_point_script_is_an_error(
     )
     with pytest.raises(ExecutionError):
         rule_runner.get_target(Address("src/js", generated_name="ham"))
+
+
+def test_parses_subpath_imports(
+    rule_runner: RuleRunner,
+) -> None:
+    rule_runner.write_files(
+        {
+            "src/js/BUILD": dedent(
+                """\
+                package_json()
+                """
+            ),
+            "src/js/package.json": json.dumps(
+                {
+                    "name": "ham",
+                    "version": "0.0.1",
+                    "imports": {
+                        "#a": "./yep.js",
+                        "#b": "some-package",
+                        "#c": {"node": "polyfill", "default": "./polyfill.js"},
+                        "#d/module/js/*.js": "./module/*.js",
+                    },
+                }
+            ),
+        }
+    )
+
+    tgt = rule_runner.get_target(Address("src/js", generated_name="ham"))
+    imports = rule_runner.request(PackageJsonImports, (tgt[PackageJsonSourceField],))
+
+    assert imports.imports == FrozenDict(
+        {
+            "#a": ("./yep.js",),
+            "#b": ("some-package",),
+            "#c": (
+                "./polyfill.js",
+                "polyfill",
+            ),
+            "#d/module/js/*.js": ("./module/*.js",),
+        }
+    )

@@ -444,6 +444,38 @@ class NodeBuildScriptTarget(Target):
 
 
 @dataclass(frozen=True)
+class PackageJsonImports:
+    """https://nodejs.org/api/packages.html#subpath-imports."""
+
+    imports: FrozenDict[str, tuple[str, ...]]
+    root_dir: str
+
+    @classmethod
+    def from_package_json(cls, pkg_json: PackageJson) -> PackageJsonImports:
+        return cls(
+            imports=cls._import_from_package_json(pkg_json),
+            root_dir=pkg_json.root_dir,
+        )
+
+    @staticmethod
+    def _import_from_package_json(pkg_json: PackageJson) -> FrozenDict[str, tuple[str, ...]]:
+        imports: Mapping[str, Any] | None = pkg_json.content.get("imports")
+
+        def get_subpaths(value: str | Mapping[str, Any]) -> Iterable[str]:
+            if isinstance(value, str):
+                yield value
+            elif isinstance(value, Mapping):
+                for v in value.values():
+                    yield from get_subpaths(v)
+
+        if not imports:
+            return FrozenDict()
+        return FrozenDict(
+            {key: tuple(sorted(get_subpaths(subpath))) for key, subpath in imports.items()}
+        )
+
+
+@dataclass(frozen=True)
 class PackageJsonEntryPoints:
     """See https://nodejs.org/api/packages.html#package-entry-points and
     https://docs.npmjs.com/cli/v9/configuring-npm/package-json#browser."""
@@ -725,6 +757,15 @@ async def script_entrypoints_for_source(
     source_field: PackageJsonSourceField,
 ) -> PackageJsonEntryPoints:
     return PackageJsonEntryPoints.from_package_json(
+        await Get(PackageJson, PackageJsonSourceField, source_field)
+    )
+
+
+@rule
+async def subpath_imports_for_source(
+    source_field: PackageJsonSourceField,
+) -> PackageJsonImports:
+    return PackageJsonImports.from_package_json(
         await Get(PackageJson, PackageJsonSourceField, source_field)
     )
 
