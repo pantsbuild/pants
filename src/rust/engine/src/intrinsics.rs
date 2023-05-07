@@ -326,7 +326,7 @@ fn merge_digests_request_to_digest(
   context: Context,
   args: Vec<Value>,
 ) -> BoxFuture<'static, NodeResult<Value>> {
-  let core = context.core;
+  let core = &context.core;
   let store = core.store();
   async move {
     let digests = Python::with_gil(|py| {
@@ -558,7 +558,7 @@ fn interactive_process(
         (run_in_workspace, restartable, keep_sandboxes)
       });
 
-      let session = context.session;
+      let session = context.session.clone();
 
       let mut tempdir = create_sandbox(
         context.core.executor.clone(),

@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 
 import pytest
+import yaml
 
 from pants.backend.javascript.goals import lockfile
 from pants.backend.javascript.goals.lockfile import (
@@ -24,6 +25,7 @@ from pants.core.goals.generate_lockfiles import (
     KnownUserResolveNames,
     UserGenerateLockfiles,
 )
+from pants.core.target_types import FileTarget
 from pants.engine.fs import DigestContents, PathGlobs
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import QueryRule
@@ -51,7 +53,7 @@ def rule_runner() -> RuleRunner:
                 ),
             ),
         ],
-        target_types=[PackageJsonTarget],
+        target_types=[PackageJsonTarget, FileTarget],
     )
     rule_runner.set_options([], env_inherit={"PATH"})
     return rule_runner
@@ -61,8 +63,17 @@ def given_package_with_name(name: str) -> str:
     return json.dumps({"name": name, "version": "0.0.1"})
 
 
-def given_package_with_workspaces(name: str, version: str, *workspaces: str) -> str:
-    return json.dumps({"name": name, "version": version, "workspaces": list(workspaces)})
+def given_package_with_workspaces(
+    name: str, version: str, dependencies: dict[str, str] | None = None, *workspaces: str
+) -> str:
+    return json.dumps(
+        {
+            "name": name,
+            "version": version,
+            "dependencies": dependencies or {},
+            "workspaces": list(workspaces),
+        }
+    )
 
 
 def test_resolves_are_dotted_package_paths(rule_runner: RuleRunner) -> None:
@@ -178,11 +189,11 @@ def test_generates_lockfile_for_package_json_project(rule_runner: RuleRunner) ->
     }
 
 
-def test_generates_lockfile_for_package_json_workspace(rule_runner: RuleRunner) -> None:
+def test_generates_lockfile_for_npm_package_json_workspace(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "src/js/BUILD": "package_json()",
-            "src/js/package.json": given_package_with_workspaces("ham", "1.0.0", "a"),
+            "src/js/package.json": given_package_with_workspaces("ham", "1.0.0", None, "a"),
             "src/js/a/BUILD": "package_json()",
             "src/js/a/package.json": given_package_with_workspaces("spam", "0.1.0"),
         }
@@ -214,4 +225,42 @@ def test_generates_lockfile_for_package_json_workspace(rule_runner: RuleRunner) 
             "a": {"name": "spam", "version": "0.1.0"},
             "node_modules/spam": {"link": True, "resolved": "a"},
         },
+    }
+
+
+def test_generates_lockfile_for_pnpm_package_json_workspace(rule_runner: RuleRunner) -> None:
+    rule_runner.set_options(["--nodejs-package-manager=pnpm"], env_inherit={"PATH"})
+    rule_runner.write_files(
+        {
+            "src/js/BUILD": "package_json()",
+            "src/js/pnpm-workspace.yaml": "",
+            "src/js/package.json": given_package_with_workspaces(
+                "ham", "1.0.0", {"spam": "workspace:*"}
+            ),
+            "src/js/a/BUILD": "package_json()",
+            "src/js/a/package.json": given_package_with_workspaces("spam", "0.1.0"),
+        }
+    )
+    [project] = rule_runner.request(AllNodeJSProjects, [])
+
+    lockfile = rule_runner.request(
+        GenerateLockfileResult,
+        (
+            GeneratePackageLockJsonFile(
+                resolve_name="js",
+                lockfile_dest="src/js/pnpm-lock.yaml",
+                project=project,
+                diff=False,
+            ),
+        ),
+    )
+
+    digest_contents = rule_runner.request(DigestContents, [lockfile.digest])
+
+    assert yaml.safe_load(digest_contents[0].content) == {
+        "importers": {
+            ".": {"dependencies": {"spam": "link:a"}, "specifiers": {"spam": "workspace:*"}},
+            "a": {"specifiers": {}},
+        },
+        "lockfileVersion": 5.3,
     }

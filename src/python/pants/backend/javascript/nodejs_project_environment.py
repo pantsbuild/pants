@@ -116,7 +116,11 @@ async def setup_nodejs_project_environment_process(req: NodeJsProjectEnvironment
 
     if not req.env.project.single_workspace and req.env.target:
         target = req.env.ensure_target()
-        args = ("--workspace", target[NodePackageNameField].value, *req.args)
+        args = (
+            req.env.project.workspace_specifier_arg,
+            target[NodePackageNameField].value,
+            *req.args,
+        )
     else:
         args = tuple(req.args)
     output_files = req.output_files
@@ -130,7 +134,9 @@ async def setup_nodejs_project_environment_process(req: NodeJsProjectEnvironment
     return await Get(
         Process,
         NodeJSToolProcess,
-        NodeJSToolProcess.npm(
+        NodeJSToolProcess(
+            tool=req.env.project.package_manager,
+            tool_version=req.env.project.package_manager_version,
             args=args,
             description=req.description,
             level=req.level,
@@ -138,10 +144,10 @@ async def setup_nodejs_project_environment_process(req: NodeJsProjectEnvironment
             working_directory=req.env.root_dir,
             output_files=output_files,
             output_directories=output_directories,
-            append_only_caches=per_package_caches,
+            append_only_caches=FrozenDict(**per_package_caches, **req.env.project.extra_caches()),
             timeout_seconds=req.timeout_seconds,
-            extra_env=req.extra_env,
             project_digest=project_digest,
+            extra_env=FrozenDict(**req.extra_env, **req.env.project.extra_env()),
         ),
     )
 
