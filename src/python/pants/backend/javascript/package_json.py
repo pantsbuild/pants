@@ -451,13 +451,14 @@ class NodeBuildScriptTarget(Target):
 class PackageJsonImports:
     """https://nodejs.org/api/packages.html#subpath-imports."""
 
-    imports: FrozenDict[str, tuple[str, ...]]
+    imports: FrozenDict[re.Pattern[str], tuple[str, ...]]
     root_dir: str
 
     def replacements(self, import_string: str) -> tuple[str, ...]:
-        def replace_matching_pattern(pattern: str, subpath: str, string: str) -> str | None:
-            pattern = r"^" + re.escape(pattern).replace(r"\*", "(.*)")
-            match = re.match(pattern, string)
+        def replace_matching_pattern(
+            pattern: re.Pattern[str], subpath: str, string: str
+        ) -> str | None:
+            match = pattern.match(string)
             if match:
                 replacement = subpath
                 for group in match.groups():
@@ -466,7 +467,7 @@ class PackageJsonImports:
                     _logger.warning(
                         softwrap(
                             f"""
-                            package.json#imports pattern '{pattern}' matched '{string}',
+                            package.json#imports pattern '{pattern.pattern}' matched '{string}',
                             but the resulting subpath '{subpath}' string replacements '*'
                             did not match.
 
@@ -497,7 +498,13 @@ class PackageJsonImports:
         )
 
     @staticmethod
-    def _import_from_package_json(pkg_json: PackageJson) -> FrozenDict[str, tuple[str, ...]]:
+    def _to_import_pattern(string: str) -> re.Pattern[str]:
+        return re.compile(r"^" + re.escape(string).replace(r"\*", "(.*)"))
+
+    @staticmethod
+    def _import_from_package_json(
+        pkg_json: PackageJson,
+    ) -> FrozenDict[re.Pattern[str], tuple[str, ...]]:
         imports: Mapping[str, Any] | None = pkg_json.content.get("imports")
 
         def get_subpaths(value: str | Mapping[str, Any]) -> Iterable[str]:
@@ -510,7 +517,10 @@ class PackageJsonImports:
         if not imports:
             return FrozenDict()
         return FrozenDict(
-            {key: tuple(sorted(get_subpaths(subpath))) for key, subpath in imports.items()}
+            {
+                PackageJsonImports._to_import_pattern(key): tuple(sorted(get_subpaths(subpath)))
+                for key, subpath in imports.items()
+            }
         )
 
 
