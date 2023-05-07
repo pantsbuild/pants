@@ -1,0 +1,25 @@
+# Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+from __future__ import annotations
+
+from pants.option.option_types import BoolOption
+from pants.option.subsystem import Subsystem
+from pants.util.strutil import softwrap
+
+
+class NodeJSInfer(Subsystem):
+    options_scope = "nodejs-infer"
+    help = "Options controlling which dependencies will be inferred for javascript targets."
+
+    imports = BoolOption(
+        default=True,
+        help=softwrap(
+            """
+            Infer a target's imported dependencies by parsing import statements from sources.
+
+            To ignore a false positive, you can either put `// pants: no-infer-dep` on the line of
+            the import or put `!{bad_address}` in the `dependencies` field of your target.
+            """
+        ),
+    )
