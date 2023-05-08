@@ -24,6 +24,7 @@ from pants.backend.javascript.package_json import (
     PackageJsonEntryPoints,
     PackageJsonSourceField,
 )
+from pants.backend.javascript.subsystems.nodejs_infer import NodeJSInfer
 from pants.backend.javascript.target_types import JSDependenciesField, JSSourceField
 from pants.build_graph.address import Address
 from pants.engine.addresses import Addresses
@@ -63,7 +64,10 @@ class InferJSDependenciesRequest(InferDependenciesRequest):
 @rule
 async def infer_node_package_dependencies(
     request: InferNodePackageDependenciesRequest,
+    nodejs_infer: NodeJSInfer,
 ) -> InferredDependencies:
+    if not nodejs_infer.package_json_entry_points:
+        return InferredDependencies(())
     entry_points = await Get(
         PackageJsonEntryPoints, PackageJsonSourceField, request.field_set.source
     )
@@ -97,8 +101,12 @@ async def map_candidate_node_packages(
 @rule
 async def infer_js_source_dependencies(
     request: InferJSDependenciesRequest,
+    nodejs_infer: NodeJSInfer,
 ) -> InferredDependencies:
     source: JSSourceField = request.field_set.source
+    if not nodejs_infer.imports:
+        return InferredDependencies(())
+
     import_strings = await Get(JSImportStrings, ParseJsImportStrings(source))
     path_strings = FrozenOrderedSet(
         os.path.normpath(os.path.join(os.path.dirname(source.file_path), import_string))
