@@ -5,9 +5,6 @@ from __future__ import annotations
 
 from textwrap import dedent
 from typing import Iterable, Type
-from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.engine.rules import QueryRule
-from pants.util.ordered_set import FrozenOrderedSet
 
 import pytest
 
@@ -16,11 +13,14 @@ from pants.backend.python.goals import lockfile
 from pants.backend.python.goals.lockfile import GeneratePythonLockfile
 from pants.backend.python.subsystems.python_tool_base import LockfileRules, PythonToolBase
 from pants.backend.python.target_types import ConsoleScript
+from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.core.goals import generate_lockfiles
 from pants.core.goals.generate_lockfiles import GenerateLockfilesGoal, GenerateToolLockfileSentinel
+from pants.engine.rules import QueryRule
 from pants.engine.target import Dependencies, SingleSourceField, Target
 from pants.engine.unions import UnionRule
 from pants.testutil.rule_runner import RuleRunner
+from pants.util.ordered_set import FrozenOrderedSet
 
 
 def _get_generated_lockfile_sentinel(
@@ -68,7 +68,9 @@ class MockTarget(Target):
 
 @pytest.fixture
 def rule_runner() -> RuleRunner:
-    lockfile_sentinel = _get_generated_lockfile_sentinel(FakeToolWithSimpleLocking.rules(), FakeToolWithSimpleLocking)
+    lockfile_sentinel = _get_generated_lockfile_sentinel(
+        FakeToolWithSimpleLocking.rules(), FakeToolWithSimpleLocking
+    )
     rule_runner = RuleRunner(
         rules=[
             *lockfile.rules(),
@@ -109,10 +111,13 @@ def test_simple_python_lockfile(rule_runner):
         in lockfile_content
     )
 
+
 def test_setup_lockfile(rule_runner) -> None:
     global_constraint = "CPython<4,>=3.8"
 
-    lockfile_sentinel = _get_generated_lockfile_sentinel(FakeToolWithSimpleLocking.rules(), FakeToolWithSimpleLocking)
+    lockfile_sentinel = _get_generated_lockfile_sentinel(
+        FakeToolWithSimpleLocking.rules(), FakeToolWithSimpleLocking
+    )
 
     def assert_lockfile_request(
         build_file: str,
@@ -137,10 +142,12 @@ def test_setup_lockfile(rule_runner) -> None:
             ]
         )
 
-    assert_lockfile_request("python_sources()", FakeToolWithSimpleLocking.default_interpreter_constraints)
+    assert_lockfile_request(
+        "python_sources()", FakeToolWithSimpleLocking.default_interpreter_constraints
+    )
     assert_lockfile_request("target()", FakeToolWithSimpleLocking.default_interpreter_constraints)
     # Since the SIMPLE locking mechanism doesn't look at ICs, this will still use tool ICs.
     assert_lockfile_request(
-        "python_sources(interpreter_constraints=['CPython<4,>=3.7'])", FakeToolWithSimpleLocking.default_interpreter_constraints
+        "python_sources(interpreter_constraints=['CPython<4,>=3.7'])",
+        FakeToolWithSimpleLocking.default_interpreter_constraints,
     )
-
