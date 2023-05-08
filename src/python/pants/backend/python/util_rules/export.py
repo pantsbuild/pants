@@ -43,8 +43,7 @@ class FirstPartyPluginsType(Protocol):
     interpreter_constraints_fields: FrozenOrderedSet[InterpreterConstraintsField]
 
 
-@memoized
-def default_export_rules(python_tool: Type[ExportableSubsystem]) -> Iterable:
+def _generate_export_rules(python_tool: Type[ExportableSubsystem]) -> Iterable:
     if getattr(python_tool, "export_rules_type", None) not in ExportRules:
         raise NotImplementedError(f"Subsystem type `{python_tool}` is missing `export_rules_type`!")
 
@@ -156,3 +155,7 @@ def default_export_rules(python_tool: Type[ExportableSubsystem]) -> Iterable:
             )
 
         yield export_python_tool_with_firstparty_plugins
+
+@memoized
+def default_export_rules(python_tool: Type[ExportableSubsystem]) -> Iterable:
+    return list(_generate_export_rules(python_tool))
