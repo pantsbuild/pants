@@ -83,9 +83,9 @@ def default_export_rules(python_tool: Type[ExportableSubsystem]) -> Iterable:
         raise Exception(
             softwrap(
                 f"""
-            `{python_tool}` set `export_rules_type` to `WITH_ICS` but doesn't declare a
-            `field_set_type` class attribute. Please define `field_set_type`.
-            """
+                `{python_tool}` set `export_rules_type` to to a value that requires the
+                `field_set_type` class attribute. Please define `field_set_type`.
+                """
             )
         ) from e
 
@@ -120,9 +120,9 @@ def default_export_rules(python_tool: Type[ExportableSubsystem]) -> Iterable:
             raise Exception(
                 softwrap(
                     f"""
-                `{python_tool}` set `export_rules_type` to `WITH_FIRSTPARTY_PLUGINS` but doesn't declare a
-                `firstparty_plugins_type` class attribute. Please define `firstparty_plugins_type`.
-            """
+                    `{python_tool}` set `export_rules_type` to `WITH_FIRSTPARTY_PLUGINS` but doesn't declare a
+                    `firstparty_plugins_type` class attribute. Please define `firstparty_plugins_type`.
+                    """
                 )
             ) from e
 

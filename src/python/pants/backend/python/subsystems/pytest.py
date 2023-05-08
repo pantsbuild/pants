@@ -83,6 +83,7 @@ class PyTest(PythonToolBase):
 
     default_lockfile_resource = ("pants.backend.python.subsystems", "pytest.lock")
     field_set_type = PythonTestFieldSet
+    export_rules_type = ExportRules.WITH_ICS
 
     args = ArgsListOption(example="-k test_foo --quiet", passthrough=True)
     junit_family = StrOption(
@@ -148,7 +149,6 @@ class PyTest(PythonToolBase):
     )
 
     export = ExportToolOption()
-    export_rules_type = ExportRules.WITH_ICS
 
     skip = SkipOption("test")
 

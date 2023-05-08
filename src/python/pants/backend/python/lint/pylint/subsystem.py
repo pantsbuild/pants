@@ -8,7 +8,6 @@ from dataclasses import dataclass
 from typing import Iterable
 
 from pants.backend.python.goals import lockfile
-from pants.backend.python.util_rules.export import ExportRules
 from pants.backend.python.goals.lockfile import (
     GeneratePythonLockfile,
     GeneratePythonToolLockfileSentinel,
@@ -23,6 +22,7 @@ from pants.backend.python.target_types import (
     PythonResolveField,
     PythonSourceField,
 )
+from pants.backend.python.util_rules.export import ExportRules
 from pants.backend.python.util_rules.partition import _find_all_unique_interpreter_constraints
 from pants.backend.python.util_rules.pex_requirements import PexRequirements
 from pants.backend.python.util_rules.python_sources import (
@@ -90,7 +90,7 @@ class Pylint(PythonToolBase):
 
     default_lockfile_resource = ("pants.backend.python.lint.pylint", "pylint.lock")
     export_rules_type = ExportRules.WITH_FIRSTPARTY_PLUGINS
-    field_set_type: PylintFieldSet
+    field_set_type = PylintFieldSet
     firstparty_plugins_type = PylintFirstPartyPlugins
 
     skip = SkipOption("lint")
