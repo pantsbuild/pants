@@ -1625,6 +1625,19 @@ fn single_file_digests_to_bytes<'py>(
   })
 }
 
+fn ensure_path_doesnt_exist(path: &Path) -> io::Result<()> {
+  match std::fs::remove_file(path) {
+    Ok(()) => Ok(()),
+    Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(()),
+    // Always fall through to remove_dir_all unless the path definitely doesn't exist, because
+    // std::io::ErrorKind::IsADirectory is unstable https://github.com/rust-lang/rust/issues/86442
+    //
+    // NB. we don't need to check this returning NotFound because remove_file will identify that
+    // above (except if there's a concurrent removal, which is out of scope)
+    Err(_) => std::fs::remove_dir_all(path),
+  }
+}
+
 #[pyfunction]
 fn write_digest(
   py: Python,
@@ -1632,7 +1645,7 @@ fn write_digest(
   py_session: &PySession,
   digest: &PyAny,
   path_prefix: String,
-  clear_destination: bool,
+  clear_paths: Vec<String>,
 ) -> PyO3Result<()> {
   let core = &py_scheduler.0.core;
   core.executor.enter(|| {
@@ -1646,9 +1659,13 @@ fn write_digest(
     destination.push(core.build_root.clone());
     destination.push(path_prefix);
 
-    if clear_destination {
-      std::fs::remove_dir_all(&destination).map_err(|e| {
-        PyException::new_err(format!("Failed to clear {}: {e}", destination.display()))
+    for subpath in &clear_paths {
+      let resolved = destination.join(subpath);
+      ensure_path_doesnt_exist(&resolved).map_err(|e| {
+        PyIOError::new_err(format!(
+          "Failed to clear {} when writing digest: {e}",
+          resolved.display()
+        ))
       })?;
     }
 
