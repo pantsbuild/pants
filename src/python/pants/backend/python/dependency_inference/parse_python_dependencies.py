@@ -192,7 +192,7 @@ async def parse_python_dependencies(
             hint="Read the help for [python-infer].use_rust_parser, then set the value in pants.toml.",
         )
 
-    has_custom_dep_inferences = bool(union_membership[PythonDependencyVisitorRequest])
+    has_custom_dep_inferences = len(union_membership[PythonDependencyVisitorRequest]) > 1
     if python_infer_subsystem.use_rust_parser and not has_custom_dep_inferences:
         native_result = await Get(
             NativeParsedPythonDependencies, Digest, stripped_sources.snapshot.digest

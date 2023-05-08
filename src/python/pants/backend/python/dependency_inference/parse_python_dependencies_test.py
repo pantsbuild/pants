@@ -64,6 +64,7 @@ def assert_deps_parsed(
             f"--python-infer-string-imports-min-dots={string_imports_min_dots}",
             f"--python-infer-assets={assets}",
             f"--python-infer-assets-min-slashes={assets_min_slashes}",
+            "--python-infer-use-rust-parser",
         ],
         env_inherit={"PATH", "PYENV_ROOT", "HOME"},
     )
