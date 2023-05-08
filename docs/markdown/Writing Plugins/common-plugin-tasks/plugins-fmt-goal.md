@@ -142,7 +142,7 @@ async def shfmt_fmt(request: ShfmtRequest.Batch, shfmt: Shfmt, platform: Platfor
     )
 
     result = await Get(ProcessResult, Process, process)
-    return await AbstractFmtResult.create(request, result, output_snapshot)
+    return await FmtResult.create(request, result, output_snapshot)
 ```
 
 The `FmtRequest.Batch` has `.snapshot`, which stores the list of files and the `Digest` for each source file.
