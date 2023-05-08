@@ -5,7 +5,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import ClassVar
 
-from pants.engine.target import StringField
+from pants.engine.target import Dependencies, StringField
 from pants.util.strutil import help_text
 
 
@@ -18,6 +18,10 @@ class NfpmPackageNameField(StringField):
         The package name.
         """
     )
+
+
+class NfpmDependencies(Dependencies):
+    nfpm_alias = ""  # does not map directly to a nfpm.yaml field
 
 
 class GoArch(Enum):
