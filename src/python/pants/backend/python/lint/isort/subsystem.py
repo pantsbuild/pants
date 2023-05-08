@@ -6,16 +6,15 @@ from __future__ import annotations
 import os.path
 from typing import Iterable
 
-from pants.backend.python.goals.export import ExportPythonTool, ExportPythonToolSentinel
 from pants.backend.python.subsystems.python_tool_base import (
     ExportToolOption,
     LockfileRules,
     PythonToolBase,
 )
 from pants.backend.python.target_types import ConsoleScript
+from pants.backend.python.util_rules.export import ExportRules
 from pants.core.util_rules.config_files import ConfigFilesRequest
-from pants.engine.rules import collect_rules, rule
-from pants.engine.unions import UnionRule
+from pants.engine.rules import collect_rules
 from pants.option.option_types import ArgsListOption, BoolOption, FileListOption, SkipOption
 from pants.util.strutil import softwrap
 
@@ -33,6 +32,7 @@ class Isort(PythonToolBase):
 
     default_lockfile_resource = ("pants.backend.python.lint.isort", "isort.lock")
     lockfile_rules_type = LockfileRules.SIMPLE
+    export_rules_type = ExportRules.NO_ICS
 
     skip = SkipOption("fmt", "lint")
     args = ArgsListOption(example="--case-sensitive --trailing-comma")
@@ -99,19 +99,5 @@ class Isort(PythonToolBase):
         )
 
 
-class IsortExportSentinel(ExportPythonToolSentinel):
-    pass
-
-
-@rule
-def isort_export(_: IsortExportSentinel, isort: Isort) -> ExportPythonTool:
-    if not isort.export:
-        return ExportPythonTool(resolve_name=isort.options_scope, pex_request=None)
-    return ExportPythonTool(resolve_name=isort.options_scope, pex_request=isort.to_pex_request())
-
-
 def rules():
-    return (
-        *collect_rules(),
-        UnionRule(ExportPythonToolSentinel, IsortExportSentinel),
-    )
+    return collect_rules()

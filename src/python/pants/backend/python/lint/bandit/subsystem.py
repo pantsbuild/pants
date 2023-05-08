@@ -6,7 +6,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from pants.backend.python.goals import lockfile
-from pants.backend.python.goals.export import ExportPythonTool, ExportPythonToolSentinel
 from pants.backend.python.goals.lockfile import (
     GeneratePythonLockfile,
     GeneratePythonToolLockfileSentinel,
@@ -19,6 +18,7 @@ from pants.backend.python.target_types import (
     InterpreterConstraintsField,
     PythonSourceField,
 )
+from pants.backend.python.util_rules.export import ExportRules
 from pants.backend.python.util_rules.partition import _find_all_unique_interpreter_constraints
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.util_rules.config_files import ConfigFilesRequest
@@ -61,6 +61,9 @@ class Bandit(PythonToolBase):
 
     default_lockfile_resource = ("pants.backend.python.lint.bandit", "bandit.lock")
 
+    field_set_type = BanditFieldSet
+    export_rules_type = ExportRules.WITH_ICS
+
     skip = SkipOption("lint")
     args = ArgsListOption(example="--skip B101,B308 --confidence")
     export = ExportToolOption()
@@ -102,35 +105,9 @@ async def setup_bandit_lockfile(
     return bandit.to_lockfile_request(interpreter_constraints=constraints)
 
 
-class BanditExportSentinel(ExportPythonToolSentinel):
-    pass
-
-
-@rule(
-    desc=softwrap(
-        """
-        Determine all Python interpreter versions used by Bandit in your project
-        (for `export` goal)
-        """
-    ),
-    level=LogLevel.DEBUG,
-)
-async def bandit_export(
-    _: BanditExportSentinel, bandit: Bandit, python_setup: PythonSetup
-) -> ExportPythonTool:
-    if not bandit.export:
-        return ExportPythonTool(resolve_name=bandit.options_scope, pex_request=None)
-    constraints = await _find_all_unique_interpreter_constraints(python_setup, BanditFieldSet)
-    return ExportPythonTool(
-        resolve_name=bandit.options_scope,
-        pex_request=bandit.to_pex_request(interpreter_constraints=constraints),
-    )
-
-
 def rules():
     return (
         *collect_rules(),
         *lockfile.rules(),
         UnionRule(GenerateToolLockfileSentinel, BanditLockfileSentinel),
-        UnionRule(ExportPythonToolSentinel, BanditExportSentinel),
     )

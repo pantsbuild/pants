@@ -6,7 +6,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from pants.backend.python.goals import lockfile
-from pants.backend.python.goals.export import ExportPythonTool, ExportPythonToolSentinel
 from pants.backend.python.goals.lockfile import (
     GeneratePythonLockfile,
     GeneratePythonToolLockfileSentinel,
@@ -21,6 +20,7 @@ from pants.backend.python.target_types import (
     PythonSourceField,
 )
 from pants.backend.python.util_rules import python_sources
+from pants.backend.python.util_rules.export import ExportRules
 from pants.backend.python.util_rules.partition import _find_all_unique_interpreter_constraints
 from pants.backend.python.util_rules.pex_requirements import PexRequirements
 from pants.backend.python.util_rules.python_sources import (
@@ -61,6 +61,18 @@ class Flake8FieldSet(FieldSet):
         return tgt.get(SkipFlake8Field).value
 
 
+@dataclass(frozen=True)
+class Flake8FirstPartyPlugins:
+    requirement_strings: FrozenOrderedSet[str]
+    interpreter_constraints_fields: FrozenOrderedSet[InterpreterConstraintsField]
+    sources_digest: Digest
+
+    PREFIX = "__plugins"
+
+    def __bool__(self) -> bool:
+        return self.sources_digest != EMPTY_DIGEST
+
+
 class Flake8(PythonToolBase):
     options_scope = "flake8"
     name = "Flake8"
@@ -71,6 +83,10 @@ class Flake8(PythonToolBase):
     default_requirements = [default_version]
 
     default_lockfile_resource = ("pants.backend.python.lint.flake8", "flake8.lock")
+
+    field_set_type = Flake8FieldSet
+    firstparty_plugins_type = Flake8FirstPartyPlugins
+    export_rules_type = ExportRules.WITH_FIRSTPARTY_PLUGINS
 
     skip = SkipOption("lint")
     args = ArgsListOption(example="--ignore E123,W456 --enable-extensions H111")
@@ -173,18 +189,6 @@ class Flake8(PythonToolBase):
 # --------------------------------------------------------------------------------------
 
 
-@dataclass(frozen=True)
-class Flake8FirstPartyPlugins:
-    requirement_strings: FrozenOrderedSet[str]
-    interpreter_constraints_fields: FrozenOrderedSet[InterpreterConstraintsField]
-    sources_digest: Digest
-
-    PREFIX = "__plugins"
-
-    def __bool__(self) -> bool:
-        return self.sources_digest != EMPTY_DIGEST
-
-
 @rule("Prepare [flake8].source_plugins", level=LogLevel.DEBUG)
 async def flake8_first_party_plugins(flake8: Flake8) -> Flake8FirstPartyPlugins:
     if not flake8.source_plugins:
@@ -265,51 +269,10 @@ async def setup_flake8_lockfile(
     )
 
 
-# --------------------------------------------------------------------------------------
-# Export
-# --------------------------------------------------------------------------------------
-
-
-class Flake8ExportSentinel(ExportPythonToolSentinel):
-    pass
-
-
-@rule(
-    desc=softwrap(
-        """
-        Determine all Python interpreter versions used by Flake8 in your project
-        (for `export` goal)
-        """
-    ),
-    level=LogLevel.DEBUG,
-)
-async def flake8_export(
-    _: Flake8ExportSentinel,
-    flake8: Flake8,
-    first_party_plugins: Flake8FirstPartyPlugins,
-    python_setup: PythonSetup,
-) -> ExportPythonTool:
-    if not flake8.export:
-        return ExportPythonTool(resolve_name=flake8.options_scope, pex_request=None)
-    constraints = await _find_all_unique_interpreter_constraints(
-        python_setup,
-        Flake8FieldSet,
-        extra_constraints_per_tgt=first_party_plugins.interpreter_constraints_fields,
-    )
-    return ExportPythonTool(
-        resolve_name=flake8.options_scope,
-        pex_request=flake8.to_pex_request(
-            interpreter_constraints=constraints,
-            extra_requirements=first_party_plugins.requirement_strings,
-        ),
-    )
-
-
 def rules():
     return (
         *collect_rules(),
         *lockfile.rules(),
         *python_sources.rules(),
         UnionRule(GenerateToolLockfileSentinel, Flake8LockfileSentinel),
-        UnionRule(ExportPythonToolSentinel, Flake8ExportSentinel),
     )

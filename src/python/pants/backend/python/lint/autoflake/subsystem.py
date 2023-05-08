@@ -3,15 +3,14 @@
 
 from __future__ import annotations
 
-from pants.backend.python.goals.export import ExportPythonTool, ExportPythonToolSentinel
 from pants.backend.python.subsystems.python_tool_base import (
     ExportToolOption,
     LockfileRules,
     PythonToolBase,
 )
 from pants.backend.python.target_types import ConsoleScript
-from pants.engine.rules import collect_rules, rule
-from pants.engine.unions import UnionRule
+from pants.backend.python.util_rules.export import ExportRules
+from pants.engine.rules import collect_rules
 from pants.option.option_types import ArgsListOption, SkipOption
 
 
@@ -28,6 +27,7 @@ class Autoflake(PythonToolBase):
 
     default_lockfile_resource = ("pants.backend.python.lint.autoflake", "autoflake.lock")
     lockfile_rules_type = LockfileRules.SIMPLE
+    export_rules_type = ExportRules.NO_ICS
 
     skip = SkipOption("fmt", "lint")
     args = ArgsListOption(
@@ -40,21 +40,5 @@ class Autoflake(PythonToolBase):
     export = ExportToolOption()
 
 
-class AutoflakeExportSentinel(ExportPythonToolSentinel):
-    pass
-
-
-@rule
-def autoflake_export(_: AutoflakeExportSentinel, autoflake: Autoflake) -> ExportPythonTool:
-    if not autoflake.export:
-        return ExportPythonTool(resolve_name=autoflake.options_scope, pex_request=None)
-    return ExportPythonTool(
-        resolve_name=autoflake.options_scope, pex_request=autoflake.to_pex_request()
-    )
-
-
 def rules():
-    return (
-        *collect_rules(),
-        UnionRule(ExportPythonToolSentinel, AutoflakeExportSentinel),
-    )
+    return collect_rules()

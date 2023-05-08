@@ -10,6 +10,10 @@ from typing import Any, ClassVar, Iterable, Sequence
 from pants.backend.python.goals.lockfile import GeneratePythonLockfile
 from pants.backend.python.target_types import ConsoleScript, EntryPoint, MainSpecification
 from pants.backend.python.util_rules import lockfile
+from pants.backend.python.util_rules.export_types import ExportRules
+from pants.backend.python.util_rules.export_types import (  # re-export  # noqa: F401
+    ExportToolOption as ExportToolOption,
+)
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import PexRequest
 from pants.backend.python.util_rules.pex_requirements import (
@@ -25,7 +29,7 @@ from pants.core.util_rules.lockfile_metadata import calculate_invalidation_diges
 from pants.engine.fs import Digest
 from pants.engine.internals.selectors import Get
 from pants.option.errors import OptionsError
-from pants.option.option_types import BoolOption, StrListOption, StrOption
+from pants.option.option_types import StrListOption, StrOption
 from pants.option.subsystem import Subsystem
 from pants.util.docutil import bin_name, doc_url, git_url
 from pants.util.memo import memoized_property
@@ -58,6 +62,7 @@ class PythonToolRequirementsBase(Subsystem):
 
     default_lockfile_resource: ClassVar[tuple[str, str] | None] = None
     lockfile_rules_type: LockfileRules = LockfileRules.CUSTOM
+    export_rules_type: ExportRules = ExportRules.CUSTOM
 
     install_from_resolve = StrOption(
         advanced=True,
@@ -352,9 +357,13 @@ class PythonToolRequirementsBase(Subsystem):
 
     @classmethod
     def rules(cls: Any) -> Iterable[Any]:
+        # NB: Workaround circular import
+        from pants.backend.python.util_rules import export
+
         yield from super().rules()
 
         yield from lockfile.default_rules(cls)
+        yield from export.default_export_rules(cls)
 
 
 class PythonToolBase(PythonToolRequirementsBase):
@@ -458,28 +467,4 @@ class PythonToolBase(PythonToolRequirementsBase):
             lockfile.metadata.valid_for_interpreter_constraints
             if lockfile.metadata
             else subsystem.interpreter_constraints
-        )
-
-
-class ExportToolOption(BoolOption):
-    """An `--export` option to toggle whether the `export` goal should include the tool."""
-
-    def __new__(cls):
-        return super().__new__(
-            cls,
-            default=True,
-            removal_version="2.23.0.dev0",
-            removal_hint="Use the export goal's --resolve option to select tools to export, instead "
-            "of using this option to exempt a tool from export-by-default.",
-            help=(
-                lambda subsystem_cls: softwrap(
-                    f"""
-                    If true, export a virtual environment with {subsystem_cls.name} when running
-                    `{bin_name()} export`.
-
-                    This can be useful, for example, with IDE integrations to point your editor to
-                    the tool's binary.
-                    """
-                )
-            ),
         )

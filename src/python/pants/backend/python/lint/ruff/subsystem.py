@@ -7,7 +7,6 @@ import os.path
 from dataclasses import dataclass
 from typing import Iterable
 
-from pants.backend.python.goals.export import ExportPythonTool, ExportPythonToolSentinel
 from pants.backend.python.lint.ruff.skip_field import SkipRuffField
 from pants.backend.python.subsystems.python_tool_base import (
     ExportToolOption,
@@ -21,12 +20,11 @@ from pants.backend.python.target_types import (
     PythonSourceField,
 )
 from pants.backend.python.util_rules import python_sources
+from pants.backend.python.util_rules.export import ExportRules
 from pants.core.util_rules.config_files import ConfigFilesRequest
-from pants.engine.rules import collect_rules, rule
+from pants.engine.rules import collect_rules
 from pants.engine.target import FieldSet, Target
-from pants.engine.unions import UnionRule
 from pants.option.option_types import ArgsListOption, BoolOption, FileOption, SkipOption
-from pants.util.logging import LogLevel
 from pants.util.strutil import softwrap
 
 
@@ -61,6 +59,7 @@ class Ruff(PythonToolBase):
 
     default_lockfile_resource = ("pants.backend.python.lint.ruff", "ruff.lock")
     lockfile_rules_type = LockfileRules.SIMPLE
+    export_rule_type = ExportRules.NO_ICS
 
     skip = SkipOption("fmt", "lint")
     args = ArgsListOption(example="--exclude=foo --ignore=E501")
@@ -104,36 +103,8 @@ class Ruff(PythonToolBase):
         )
 
 
-# --------------------------------------------------------------------------------------
-# Export
-# --------------------------------------------------------------------------------------
-
-
-class RuffExportSentinel(ExportPythonToolSentinel):
-    pass
-
-
-@rule(
-    desc=softwrap(
-        """
-        Determine all Python interpreter versions used by ruff in your project
-        (for `export` goal)
-        """
-    ),
-    level=LogLevel.DEBUG,
-)
-async def ruff_export(_: RuffExportSentinel, ruff: Ruff) -> ExportPythonTool:
-    if not ruff.export:
-        return ExportPythonTool(resolve_name=ruff.options_scope, pex_request=None)
-    return ExportPythonTool(
-        resolve_name=ruff.options_scope,
-        pex_request=ruff.to_pex_request(),
-    )
-
-
 def rules():
     return (
         *collect_rules(),
         *python_sources.rules(),
-        UnionRule(ExportPythonToolSentinel, RuffExportSentinel),
     )

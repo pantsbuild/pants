@@ -6,7 +6,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from pants.backend.python.goals import lockfile
-from pants.backend.python.goals.export import ExportPythonTool, ExportPythonToolSentinel
 from pants.backend.python.goals.lockfile import (
     GeneratePythonLockfile,
     GeneratePythonToolLockfileSentinel,
@@ -15,6 +14,7 @@ from pants.backend.python.lint.pydocstyle.skip_field import SkipPydocstyleField
 from pants.backend.python.subsystems.python_tool_base import ExportToolOption, PythonToolBase
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import ConsoleScript, PythonSourceField
+from pants.backend.python.util_rules.export import ExportRules
 from pants.backend.python.util_rules.partition import _find_all_unique_interpreter_constraints
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.util_rules.config_files import ConfigFilesRequest
@@ -50,6 +50,7 @@ class Pydocstyle(PythonToolBase):
     register_interpreter_constraints = True
 
     default_lockfile_resource = ("pants.backend.python.lint.pydocstyle", "pydocstyle.lock")
+    export_rules_type = ExportRules.NO_ICS
 
     skip = SkipOption("lint")
     args = ArgsListOption(example="--select=D101,D102")
@@ -122,35 +123,9 @@ async def setup_pydocstyle_lockfile(
     return pydocstyle.to_lockfile_request(constraints)
 
 
-class PydocstyleExportSentinel(ExportPythonToolSentinel):
-    pass
-
-
-@rule(
-    desc=softwrap(
-        """
-        Determine all Python interpreter versions used by Pydocstyle in your project
-        (for `export` goal)
-        """
-    ),
-    level=LogLevel.DEBUG,
-)
-async def pydocstyle_export(
-    _: PydocstyleExportSentinel,
-    pydocstyle: Pydocstyle,
-) -> ExportPythonTool:
-    if not pydocstyle.export:
-        return ExportPythonTool(resolve_name=pydocstyle.options_scope, pex_request=None)
-    return ExportPythonTool(
-        resolve_name=pydocstyle.options_scope,
-        pex_request=pydocstyle.to_pex_request(),
-    )
-
-
 def rules():
     return (
         *collect_rules(),
         *lockfile.rules(),
         UnionRule(GenerateToolLockfileSentinel, PydocstyleLockfileSentinel),
-        UnionRule(ExportPythonToolSentinel, PydocstyleExportSentinel),
     )

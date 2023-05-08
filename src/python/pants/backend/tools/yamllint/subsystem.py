@@ -3,17 +3,14 @@
 
 from __future__ import annotations
 
-from typing import Iterable
-
-from pants.backend.python.goals.export import ExportPythonTool, ExportPythonToolSentinel
 from pants.backend.python.subsystems.python_tool_base import (
     ExportToolOption,
     LockfileRules,
     PythonToolBase,
 )
 from pants.backend.python.target_types import ConsoleScript
-from pants.engine.rules import Rule, collect_rules, rule
-from pants.engine.unions import UnionRule
+from pants.backend.python.util_rules.export import ExportRules
+from pants.engine.rules import collect_rules
 from pants.option.option_types import ArgsListOption, SkipOption, StrListOption, StrOption
 from pants.util.strutil import softwrap
 
@@ -31,6 +28,7 @@ class Yamllint(PythonToolBase):
 
     default_lockfile_resource = ("pants.backend.tools.yamllint", "yamllint.lock")
     lockfile_rules_type = LockfileRules.SIMPLE
+    export_rules_type = ExportRules.NO_ICS
 
     export = ExportToolOption()
 
@@ -63,21 +61,5 @@ class Yamllint(PythonToolBase):
     skip = SkipOption("lint")
 
 
-class YamllintExportSentinel(ExportPythonToolSentinel):
-    pass
-
-
-@rule
-def yamllint_export(_: YamllintExportSentinel, yamllint: Yamllint) -> ExportPythonTool:
-    if not yamllint.export:
-        return ExportPythonTool(resolve_name=yamllint.options_scope, pex_request=None)
-    return ExportPythonTool(
-        resolve_name=yamllint.options_scope, pex_request=yamllint.to_pex_request()
-    )
-
-
-def rules() -> Iterable[Rule | UnionRule]:
-    return (
-        *collect_rules(),
-        UnionRule(ExportPythonToolSentinel, YamllintExportSentinel),
-    )
+def rules():
+    return collect_rules()

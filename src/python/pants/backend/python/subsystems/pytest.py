@@ -10,7 +10,6 @@ from typing import Iterable
 from packaging.utils import canonicalize_name as canonicalize_project_name
 
 from pants.backend.python.goals import lockfile
-from pants.backend.python.goals.export import ExportPythonTool, ExportPythonToolSentinel
 from pants.backend.python.goals.lockfile import (
     GeneratePythonLockfile,
     GeneratePythonToolLockfileSentinel,
@@ -29,6 +28,7 @@ from pants.backend.python.target_types import (
     PythonTestsXdistConcurrencyField,
     SkipPythonTestsField,
 )
+from pants.backend.python.util_rules.export import ExportRules
 from pants.backend.python.util_rules.partition import _find_all_unique_interpreter_constraints
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.goals.test import RuntimePackageDependenciesField, TestFieldSet
@@ -82,6 +82,7 @@ class PyTest(PythonToolBase):
     default_main = ConsoleScript("pytest")
 
     default_lockfile_resource = ("pants.backend.python.subsystems", "pytest.lock")
+    field_set_type = PythonTestFieldSet
 
     args = ArgsListOption(example="-k test_foo --quiet", passthrough=True)
     junit_family = StrOption(
@@ -147,6 +148,7 @@ class PyTest(PythonToolBase):
     )
 
     export = ExportToolOption()
+    export_rules_type = ExportRules.WITH_ICS
 
     skip = SkipOption("test")
 
@@ -222,35 +224,9 @@ async def setup_pytest_lockfile(
     return pytest.to_lockfile_request(constraints)
 
 
-class PytestExportSentinel(ExportPythonToolSentinel):
-    pass
-
-
-@rule(
-    desc=softwrap(
-        """
-        Determine all Python interpreter versions used by Pytest in your project
-        (for `export` goal)
-        """
-    ),
-    level=LogLevel.DEBUG,
-)
-async def pytest_export(
-    _: PytestExportSentinel, pytest: PyTest, python_setup: PythonSetup
-) -> ExportPythonTool:
-    if not pytest.export:
-        return ExportPythonTool(resolve_name=pytest.options_scope, pex_request=None)
-    constraints = await _find_all_unique_interpreter_constraints(python_setup, PythonTestFieldSet)
-    return ExportPythonTool(
-        resolve_name=pytest.options_scope,
-        pex_request=pytest.to_pex_request(interpreter_constraints=constraints),
-    )
-
-
 def rules():
     return (
         *collect_rules(),
         *lockfile.rules(),
         UnionRule(GenerateToolLockfileSentinel, PytestLockfileSentinel),
-        UnionRule(ExportPythonToolSentinel, PytestExportSentinel),
     )

@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from typing import Iterable
 
 from pants.backend.python.goals import lockfile
-from pants.backend.python.goals.export import ExportPythonTool, ExportPythonToolSentinel
+from pants.backend.python.util_rules.export import ExportRules
 from pants.backend.python.goals.lockfile import (
     GeneratePythonLockfile,
     GeneratePythonToolLockfileSentinel,
@@ -62,6 +62,18 @@ class PylintFieldSet(FieldSet):
         return tgt.get(SkipPylintField).value
 
 
+@dataclass(frozen=True)
+class PylintFirstPartyPlugins:
+    requirement_strings: FrozenOrderedSet[str]
+    interpreter_constraints_fields: FrozenOrderedSet[InterpreterConstraintsField]
+    sources_digest: Digest
+
+    PREFIX = "__plugins"
+
+    def __bool__(self) -> bool:
+        return self.sources_digest != EMPTY_DIGEST
+
+
 # --------------------------------------------------------------------------------------
 # Subsystem
 # --------------------------------------------------------------------------------------
@@ -77,6 +89,9 @@ class Pylint(PythonToolBase):
     default_requirements = [default_version]
 
     default_lockfile_resource = ("pants.backend.python.lint.pylint", "pylint.lock")
+    export_rules_type = ExportRules.WITH_FIRSTPARTY_PLUGINS
+    field_set_type: PylintFieldSet
+    firstparty_plugins_type = PylintFirstPartyPlugins
 
     skip = SkipOption("lint")
     args = ArgsListOption(example="--ignore=foo.py,bar.py --disable=C0330,W0311")
@@ -163,18 +178,6 @@ class Pylint(PythonToolBase):
 # --------------------------------------------------------------------------------------
 
 
-@dataclass(frozen=True)
-class PylintFirstPartyPlugins:
-    requirement_strings: FrozenOrderedSet[str]
-    interpreter_constraints_fields: FrozenOrderedSet[InterpreterConstraintsField]
-    sources_digest: Digest
-
-    PREFIX = "__plugins"
-
-    def __bool__(self) -> bool:
-        return self.sources_digest != EMPTY_DIGEST
-
-
 @rule("Prepare [pylint].source_plugins", level=LogLevel.DEBUG)
 async def pylint_first_party_plugins(pylint: Pylint) -> PylintFirstPartyPlugins:
     if not pylint.source_plugins:
@@ -255,50 +258,9 @@ async def setup_pylint_lockfile(
     )
 
 
-# --------------------------------------------------------------------------------------
-# Export
-# --------------------------------------------------------------------------------------
-
-
-class PylintExportSentinel(ExportPythonToolSentinel):
-    pass
-
-
-@rule(
-    desc=softwrap(
-        """
-        Determine all Python interpreter versions used by Pylint in your project
-        (for `export` goal)
-        """
-    ),
-    level=LogLevel.DEBUG,
-)
-async def pylint_export(
-    _: PylintExportSentinel,
-    pylint: Pylint,
-    first_party_plugins: PylintFirstPartyPlugins,
-    python_setup: PythonSetup,
-) -> ExportPythonTool:
-    if not pylint.export:
-        return ExportPythonTool(resolve_name=pylint.options_scope, pex_request=None)
-    constraints = await _find_all_unique_interpreter_constraints(
-        python_setup,
-        PylintFieldSet,
-        extra_constraints_per_tgt=first_party_plugins.interpreter_constraints_fields,
-    )
-    return ExportPythonTool(
-        resolve_name=pylint.options_scope,
-        pex_request=pylint.to_pex_request(
-            interpreter_constraints=constraints,
-            extra_requirements=first_party_plugins.requirement_strings,
-        ),
-    )
-
-
 def rules():
     return (
         *collect_rules(),
         *lockfile.rules(),
         UnionRule(GenerateToolLockfileSentinel, PylintLockfileSentinel),
-        UnionRule(ExportPythonToolSentinel, PylintExportSentinel),
     )
