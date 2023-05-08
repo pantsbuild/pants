@@ -7,7 +7,7 @@ import logging
 from typing import Iterable
 
 from pants.base.specs import Specs
-from pants.core.goals.fix import FixFilesRequest, FixRequest, FixResult, FixTargetsRequest
+from pants.core.goals.fix import FixFilesRequest, AbstractFixRequest, FixResult, FixTargetsRequest
 from pants.core.goals.fix import Partitions as Partitions  # re-export
 from pants.core.goals.fix import _do_fix
 from pants.core.goals.multi_tool_goal_helper import BatchSizeOption, OnlyOption
@@ -24,7 +24,7 @@ FmtResult = FixResult
 
 
 @union
-class AbstractFmtRequest(FixRequest):
+class AbstractFmtRequest(AbstractFixRequest):
     is_formatter = True
     is_fixer = False
 

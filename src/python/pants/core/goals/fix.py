@@ -14,7 +14,7 @@ from typing_extensions import Protocol
 from pants.base.specs import Specs
 from pants.core.goals.lint import (
     LintFilesRequest,
-    LintRequest,
+    AbstractLintRequest,
     LintResult,
     LintTargetsRequest,
     _get_partitions_by_request_type,
@@ -51,7 +51,7 @@ class FixResult(EngineAwareReturnType):
 
     @staticmethod
     async def create(
-        request: FixRequest.Batch,
+        request: AbstractFixRequest.Batch,
         process_result: ProcessResult | FallibleProcessResult,
         *,
         strip_chroot_path: bool = False,
@@ -116,12 +116,12 @@ Partitions = UntypedPartitions[str, PartitionMetadataT]
 
 
 @union
-class FixRequest(LintRequest):
+class AbstractFixRequest(AbstractLintRequest):
     is_fixer = True
 
     @distinct_union_type_per_subclass(in_scope_types=[EnvironmentName])
     @dataclass(frozen=True)
-    class Batch(LintRequest.Batch):
+    class Batch(AbstractLintRequest.Batch):
         snapshot: Snapshot
 
         @property
@@ -131,11 +131,11 @@ class FixRequest(LintRequest):
     @classmethod
     def _get_rules(cls) -> Iterable[UnionRule]:
         yield from super()._get_rules()
-        yield UnionRule(FixRequest, cls)
-        yield UnionRule(FixRequest.Batch, cls.Batch)
+        yield UnionRule(AbstractFixRequest, cls)
+        yield UnionRule(AbstractFixRequest.Batch, cls.Batch)
 
 
-class FixTargetsRequest(FixRequest, LintTargetsRequest):
+class FixTargetsRequest(AbstractFixRequest, LintTargetsRequest):
     @classmethod
     def _get_rules(cls) -> Iterable:
         yield from cls.partitioner_type.default_rules(cls, by_file=True)
@@ -148,7 +148,7 @@ class FixTargetsRequest(FixRequest, LintTargetsRequest):
         yield UnionRule(FixTargetsRequest.PartitionRequest, cls.PartitionRequest)
 
 
-class FixFilesRequest(FixRequest, LintFilesRequest):
+class FixFilesRequest(AbstractFixRequest, LintFilesRequest):
     @classmethod
     def _get_rules(cls) -> Iterable:
         if cls.partitioner_type is not PartitionerType.CUSTOM:
@@ -162,7 +162,7 @@ class FixFilesRequest(FixRequest, LintFilesRequest):
 
 
 class _FixBatchElement(NamedTuple):
-    request_type: type[FixRequest.Batch]
+    request_type: type[AbstractFixRequest.Batch]
     tool_name: str
     files: tuple[str, ...]
     key: Any
@@ -187,7 +187,7 @@ class FixSubsystem(GoalSubsystem):
 
     @classmethod
     def activated(cls, union_membership: UnionMembership) -> bool:
-        return FixRequest in union_membership
+        return AbstractFixRequest in union_membership
 
     only = OnlyOption("fixer", "autoflake", "pyupgrade")
     skip_formatters = BoolOption(
@@ -248,7 +248,7 @@ def _print_results(
         console.print_stderr(f"{sigil} {tool} {status}.")
 
 
-_CoreRequestType = TypeVar("_CoreRequestType", bound=FixRequest)
+_CoreRequestType = TypeVar("_CoreRequestType", bound=AbstractFixRequest)
 _TargetPartitioner = TypeVar("_TargetPartitioner", bound=FixTargetsRequest.PartitionRequest)
 _FilePartitioner = TypeVar("_FilePartitioner", bound=FixFilesRequest.PartitionRequest)
 _GoalT = TypeVar("_GoalT", bound=Goal)
@@ -294,7 +294,7 @@ async def _do_fix(
             yield tuple(batch)
 
     def _make_disjoint_batch_requests() -> Iterable[_FixBatchRequest]:
-        partition_infos: Sequence[Tuple[Type[FixRequest], Any]]
+        partition_infos: Sequence[Tuple[Type[AbstractFixRequest], Any]]
         files: Sequence[str]
 
         partition_infos_by_files = defaultdict(list)
@@ -349,7 +349,7 @@ async def fix(
         sorted(
             (
                 request_type
-                for request_type in union_membership.get(FixRequest)
+                for request_type in union_membership.get(AbstractFixRequest)
                 if not (request_type.is_formatter and fix_subsystem.skip_formatters)
             ),
             # NB: We sort the core request types so that fixers are first. This is to ensure that, between
@@ -382,7 +382,7 @@ async def fix_batch(
     for request_type, tool_name, files, key in request:
         batch = request_type(tool_name, files, key, current_snapshot)
         result = await Get(  # noqa: PNT30: this is inherently sequential
-            FixResult, FixRequest.Batch, batch
+            FixResult, AbstractFixRequest.Batch, batch
         )
         results.append(result)
 

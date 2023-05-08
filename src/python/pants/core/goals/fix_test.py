@@ -18,7 +18,7 @@ from pants.build_graph.address import Address
 from pants.core.goals.fix import (
     Fix,
     FixFilesRequest,
-    FixRequest,
+    AbstractFixRequest,
     FixResult,
     FixTargetsRequest,
     Partitions,
@@ -241,7 +241,7 @@ async def fix_with_bricky(request: BrickyBuildFileFixer.Batch) -> FixResult:
 
 def fix_rule_runner(
     target_types: List[Type[Target]],
-    request_types: List[Type[FixRequest]] = [],
+    request_types: List[Type[AbstractFixRequest]] = [],
 ) -> RuleRunner:
     return RuleRunner(
         rules=[
