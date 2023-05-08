@@ -145,7 +145,7 @@ async def shfmt_fmt(request: ShfmtRequest.Batch, shfmt: Shfmt, platform: Platfor
     return await FmtResult.create(request, result, output_snapshot)
 ```
 
-The `FmtRequest.Batch` has `.snapshot`, which stores the list of files and the `Digest` for each source file.
+The `AbstractFmtRequest.Batch` has `.snapshot`, which stores the list of files and the `Digest` for each source file.
 
 If you used `ExternalTool` in step 1, you will use `Get(DownloadedExternalTool, ExternalToolRequest)` to ensure that the tool is fetched.
 
