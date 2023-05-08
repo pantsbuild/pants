@@ -17,6 +17,7 @@ from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.base.specs import AncestorGlobSpec, RawSpecs
 from pants.build_graph.address import Address
 from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.core.goals.package import OutputPathField
 from pants.core.target_types import (
     TargetGeneratorSourcesHelperSourcesField,
     TargetGeneratorSourcesHelperTarget,
@@ -340,6 +341,7 @@ class PackageJsonTarget(TargetGenerator):
 class NodeBuildScriptEntryPointField(StringField):
     alias = "entry_point"
     required = True
+    value: str
 
 
 class NodeBuildScriptSourcesField(SourcesField):
@@ -428,6 +430,7 @@ class NodeBuildScriptTarget(Target):
         NodeBuildScriptSourcesField,
         NodeBuildScriptExtraCaches,
         NodePackageDependenciesField,
+        OutputPathField,
     )
 
     alias = "_node_build_script"
@@ -435,7 +438,7 @@ class NodeBuildScriptTarget(Target):
     help = help_text(
         """
         A package.json script that is invoked by the configured package manager
-        to produce `resource` targets.
+        to produce `resource` targets or a packaged artifact.
         """
     )
 
