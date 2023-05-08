@@ -2,14 +2,13 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
-import pytest
-from pants.engine.fs import Digest, MergeDigests, DigestContents
-from pants.engine.rules import Get
+from typing import Any
 
+import pytest
 
 from pants.backend.tools.taplo.rules import TaploFmtRequest
 from pants.backend.tools.taplo.rules import rules as taplo_rules
-from pants.core.goals.fmt import FmtResult
+from pants.core.goals.fmt import FmtResult, Partitions
 from pants.core.util_rules import config_files, external_tool
 from pants.engine.fs import PathGlobs
 from pants.engine.internals.native_engine import Snapshot
@@ -23,6 +22,7 @@ def rule_runner() -> RuleRunner:
             *taplo_rules(),
             *config_files.rules(),
             *external_tool.rules(),
+            QueryRule(Partitions, [TaploFmtRequest.PartitionRequest]),
             QueryRule(FmtResult, [TaploFmtRequest.Batch]),
         ],
     )
@@ -41,63 +41,76 @@ def run_taplo(
 ) -> FmtResult:
     rule_runner.set_options(
         ["--backend-packages=pants.backend.tools.taplo", *(extra_args or ())],
-        env_inherit={"PATH"},
     )
-    snapshot = rule_runner.request(Snapshot, [PathGlobs(["**/*.toml"])])
+    snapshot = rule_runner.request(Snapshot, [PathGlobs(["**"])])
+    partition = rule_runner.request(
+        Partitions[Any], [TaploFmtRequest.PartitionRequest(snapshot.files)]
+    )[0]
     fmt_result = rule_runner.request(
         FmtResult,
         [
-            TaploFmtRequest.Batch("", snapshot.files, partition_metadata=None, snapshot=snapshot),
+            TaploFmtRequest.Batch(
+                "", partition.elements, partition_metadata=partition.metadata, snapshot=snapshot
+            ),
         ],
     )
     return fmt_result
 
 
-def test_passing(rule_runner: RuleRunner) -> None:
+def test_no_changes_needed(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({"f.toml": GOOD_FILE, "sub/g.toml": GOOD_FILE})
     fmt_result = run_taplo(rule_runner)
-    assert fmt_result.stdout == ""
+    assert not fmt_result.stdout
+    assert "found files total=2" in fmt_result.stderr
     assert fmt_result.output == rule_runner.make_snapshot(
         {"f.toml": GOOD_FILE, "sub/g.toml": GOOD_FILE}
     )
     assert fmt_result.did_change is False
 
 
-def test_failing(rule_runner: RuleRunner) -> None:
+def test_changes_needed(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({"f.toml": BAD_FILE, "sub/g.toml": BAD_FILE})
     fmt_result = run_taplo(rule_runner)
-    assert fmt_result.stdout == ""
+    assert not fmt_result.stdout
+    assert "found files total=2" in fmt_result.stderr
     assert fmt_result.output == rule_runner.make_snapshot(
         {"f.toml": GOOD_FILE, "sub/g.toml": GOOD_FILE}
     )
     assert fmt_result.did_change is True
 
 
+def test_globs(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files({"f.toml": BAD_FILE, "g.toml": BAD_FILE})
+    fmt_result = run_taplo(rule_runner, extra_args=["--taplo-glob-pattern=['f.toml', '!g.toml']"])
+    assert not fmt_result.stdout
+    assert "found files total=1" in fmt_result.stderr
+    assert fmt_result.output == rule_runner.make_snapshot({"f.toml": GOOD_FILE})
+
+
 def test_config_files(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "a/f.toml": NEEDS_CONFIG_FILE,
-            "a/.taplo.toml": "[formatting]\ncompact_entries = true\n",
+            ".taplo.toml": "[formatting]\ncompact_entries = true\n",
             "b/f.toml": NEEDS_CONFIG_FILE,
         }
     )
     fmt_result = run_taplo(rule_runner)
-    output = Get(DigestContents, Digest, fmt_result.output.digest)
-    print(list(output[ii].content for ii in range(len(output))))
-    assert fmt_result.stdout == ""
+    assert not fmt_result.stdout
+    assert "found files total=2" in fmt_result.stderr
     assert fmt_result.output == rule_runner.make_snapshot(
         {
             "a/f.toml": FIXED_NEEDS_CONFIG_FILE,
             "b/f.toml": FIXED_NEEDS_CONFIG_FILE,
-            "a/.taplo.toml": "[formatting]\ncompact_entries=true\n",
         }
     )
-    assert fmt_result.did_change is True
+    assert fmt_result.did_change
 
 
 def test_passthrough_args(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({"f.toml": NEEDS_CONFIG_FILE})
-    fmt_result = run_taplo(rule_runner, extra_args=["--option compact_entries=true"])
-    assert fmt_result.stdout == "f.toml\n"
+    fmt_result = run_taplo(rule_runner, extra_args=["--taplo-args='--option=compact_entries=true'"])
+    assert not fmt_result.stdout
+    assert "found files total=1" in fmt_result.stderr
     assert fmt_result.output == rule_runner.make_snapshot({"f.toml": FIXED_NEEDS_CONFIG_FILE})
-    assert fmt_result.did_change is True
+    assert fmt_result.did_change

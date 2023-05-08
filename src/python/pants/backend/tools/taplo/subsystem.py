@@ -2,14 +2,10 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
-import os.path
-from typing import Sequence
-
 from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.core.util_rules.external_tool import TemplatedExternalTool
 from pants.engine.platform import Platform
 from pants.option.option_types import ArgsListOption, BoolOption, SkipOption, StrListOption
-from pants.source.filespec import FilespecMatcher
 from pants.util.strutil import softwrap
 
 
@@ -36,57 +32,48 @@ class Taplo(TemplatedExternalTool):
     }
 
     skip = SkipOption("fmt", "lint")
-    args = ArgsListOption(example="--option align_entries=false")
+    args = ArgsListOption(example="--option=align_entries=false")
     config_discovery = BoolOption(
         default=True,
         advanced=True,
         help=softwrap(
             """
-            If true, Pants will include all relevant `taplo.toml` or `.taplo.toml`
-            files during a run.
+            If true, Pants will include a `taplo.toml` or `.taplo.toml` file found in
+            the build root during a run.
             """
         ),
     )
 
-    include = StrListOption(
+    glob_pattern = StrListOption(
         help=softwrap(
             """
-            A list of glob patterns of files to include in formatting relative to the
-            build root.
+            A list of glob patterns of files to include/exclude in formatting relative
+            to the build root. Leading exclamation points exclude an item from
+            formatting.
 
             Example:
 
-                ["**/*.toml", "**/pyproject.toml"]
+                ["**/*.toml", "**/pyproject.toml", "!pyproject.toml"]
+
+            The default includes all files with ``.toml`` extension recursively and excludes
+            ``.taplo.toml`` or ``taplo.toml`` files in the build root.
+
+            It might be helpful to load this config from a JSON or YAML file. To do that, set
+            `[taplo].config = '@path/to/config.yaml'`, for example.
             """
         ),
-    )
-    exclude = StrListOption(
-        help=softwrap(
-            """
-            A list of glob patterns of files to exclude from formatting relative to the
-            build root.
-
-            Example:
-
-                ["src/*.toml", "pants/pyproject.toml"]
-            """
-        ),
+        fromfile=True,
+        advanced=True,
+        default=["**/*.toml", "!.taplo.toml", "!taplo.toml"],
     )
 
     def generate_exe(self, plat: Platform) -> str:
-        return f"./{self.generate_url(plat).rsplit('/', 1)[-1].removesuffix('.gz')}"
+        exe = super().generate_exe(plat)
+        # TODO: Replace rstrip with removesuffix when Python <3.9 support is dropped
+        return exe.rsplit("/", 1)[-1].rstrip(".gz")
 
-    def config_request(self, dirs: Sequence[str]) -> ConfigFilesRequest:
-        candidates = [os.path.join(d, ".taplo.toml") for d in ("", *dirs)]
-        candidates.extend(os.path.join(d, "taplo.toml") for d in ("", *dirs))
+    def config_request(self) -> ConfigFilesRequest:
         return ConfigFilesRequest(
             discovery=self.config_discovery,
-            check_existence=candidates,
+            check_existence=[".taplo.toml", "taplo.toml"],
         )
-
-    def filter_inputs(self, filepaths: Sequence[str]) -> dict[str, str]:
-        """Returns a mapping of path to path."""
-        matched_filepaths = FilespecMatcher(includes=self.includes, excludes=self.excludes).matches(
-            filepaths
-        )
-        return {m: m for m in matched_filepaths}
