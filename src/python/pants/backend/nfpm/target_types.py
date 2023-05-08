@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from pants.backend.nfpm.fields.all import (
     NfpmArchField,
+    NfpmDependencies,
     NfpmHomepageField,
     NfpmLicenseField,
     NfpmPackageNameField,
@@ -87,6 +88,7 @@ class NfpmApkPackage(Target):
     core_fields = (
         *COMMON_TARGET_FIELDS,  # tags, description
         OutputPathField,
+        NfpmDependencies,
         *APK_FIELDS,
     )
     help = help_text(
@@ -128,6 +130,7 @@ class NfpmArchlinuxPackage(Target):
     core_fields = (
         *COMMON_TARGET_FIELDS,
         OutputPathField,
+        NfpmDependencies,
         *ARCHLINUX_FIELDS,
     )
     help = help_text(
@@ -177,6 +180,7 @@ class NfpmDebPackage(Target):
     core_fields = (
         *COMMON_TARGET_FIELDS,
         OutputPathField,
+        NfpmDependencies,
         *DEB_FIELDS,
     )
     help = help_text(
@@ -226,6 +230,7 @@ class NfpmRpmPackage(Target):
     core_fields = (
         *COMMON_TARGET_FIELDS,
         OutputPathField,
+        NfpmDependencies,
         *RPM_FIELDS,
     )
     help = help_text(

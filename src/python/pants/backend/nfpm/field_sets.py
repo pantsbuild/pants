@@ -7,7 +7,7 @@ from abc import ABCMeta
 from dataclasses import dataclass
 from typing import Any
 
-from pants.backend.nfpm.fields.all import NfpmPackageNameField
+from pants.backend.nfpm.fields.all import NfpmDependencies, NfpmPackageNameField
 from pants.backend.nfpm.target_types import APK_FIELDS, ARCHLINUX_FIELDS, DEB_FIELDS, RPM_FIELDS
 from pants.core.goals.package import OutputPathField, PackageFieldSet
 from pants.engine.rules import collect_rules
@@ -20,6 +20,7 @@ class NfpmPackageFieldSet(PackageFieldSet, metaclass=ABCMeta):
     output_path: OutputPathField
     package_name: NfpmPackageNameField
     description: DescriptionField
+    dependencies: NfpmDependencies
 
     def nfpm_config(self, tgt: Target) -> dict[str, Any]:
         config: dict[str, Any] = {}
@@ -29,7 +30,10 @@ class NfpmPackageFieldSet(PackageFieldSet, metaclass=ABCMeta):
                 # Ignore field that is not defined in the nfpm backend.
                 continue
             # nfpm_alias is a "." concatenated series of nfpm.yaml dict keys.
-            nfpm_alias: str = getattr(field, "nfpm_alias")
+            nfpm_alias: str = getattr(field, "nfpm_alias", "")
+            if not nfpm_alias:
+                # field opted out of being included in this config (like dependencies)
+                continue
 
             value = tgt[field].value
             # NB: This assumes that nfpm fields have 'none_is_valid_value=False'.
