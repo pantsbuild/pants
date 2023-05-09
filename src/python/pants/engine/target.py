@@ -430,9 +430,6 @@ class Target:
 
         object.__setattr__(self, "address", address)
         object.__setattr__(
-            self, "plugin_fields", self._find_plugin_fields(union_membership or UnionMembership({}))
-        )
-        object.__setattr__(
             self, "residence_dir", residence_dir if residence_dir is not None else address.spec_path
         )
         object.__setattr__(self, "name_explicitly_set", name_explicitly_set)
