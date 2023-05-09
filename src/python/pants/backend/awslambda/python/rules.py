@@ -7,15 +7,17 @@ import logging
 from dataclasses import dataclass
 
 from pants.backend.awslambda.python.target_types import (
-    PythonAwsLambdaCompletePlatforms,
     PythonAwsLambdaHandlerField,
     PythonAwsLambdaIncludeRequirements,
     PythonAwsLambdaRuntime,
-    ResolvedPythonAwsHandler,
-    ResolvePythonAwsHandlerRequest,
 )
 from pants.backend.python.subsystems.lambdex import Lambdex
 from pants.backend.python.util_rules import pex_from_targets
+from pants.backend.python.util_rules.faas import (
+    PythonFaaSCompletePlatforms,
+    ResolvedPythonFaaSHandler,
+    ResolvePythonFaaSHandlerRequest,
+)
 from pants.backend.python.util_rules.pex import (
     CompletePlatforms,
     Pex,
@@ -57,14 +59,14 @@ class PythonAwsLambdaFieldSet(PackageFieldSet):
     handler: PythonAwsLambdaHandlerField
     include_requirements: PythonAwsLambdaIncludeRequirements
     runtime: PythonAwsLambdaRuntime
-    complete_platforms: PythonAwsLambdaCompletePlatforms
+    complete_platforms: PythonFaaSCompletePlatforms
     output_path: OutputPathField
     environment: EnvironmentField
 
 
 @rule
 async def digest_complete_platforms(
-    complete_platforms: PythonAwsLambdaCompletePlatforms,
+    complete_platforms: PythonFaaSCompletePlatforms,
 ) -> CompletePlatforms:
     return await Get(
         CompletePlatforms, UnparsedAddressInputs, complete_platforms.to_unparsed_address_inputs()
@@ -120,7 +122,7 @@ async def package_python_awslambda(
     )
 
     complete_platforms = await Get(
-        CompletePlatforms, PythonAwsLambdaCompletePlatforms, field_set.complete_platforms
+        CompletePlatforms, PythonFaaSCompletePlatforms, field_set.complete_platforms
     )
 
     pex_filename = f"{output_filename}.pex"
@@ -138,7 +140,7 @@ async def package_python_awslambda(
     lambdex_pex, pex_result, handler, transitive_targets = await MultiGet(
         Get(VenvPex, PexRequest, lambdex.to_pex_request()),
         Get(Pex, PexFromTargetsRequest, pex_request),
-        Get(ResolvedPythonAwsHandler, ResolvePythonAwsHandlerRequest(field_set.handler)),
+        Get(ResolvedPythonFaaSHandler, ResolvePythonFaaSHandlerRequest(field_set.handler)),
         Get(TransitiveTargets, TransitiveTargetsRequest([field_set.address])),
     )
 
