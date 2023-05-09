@@ -137,7 +137,7 @@ async def infer_js_source_dependencies(
     owning_targets = await Get(Targets, Addresses(owners))
 
     non_path_string_bases = FrozenOrderedSet(
-        non_path_string.split(os.path.sep, 1)[0]
+        non_path_string.partition(os.path.sep)[0]
         for non_path_string in import_strings - path_strings
     )
 
