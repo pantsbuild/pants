@@ -24,6 +24,7 @@ from pants.core.target_types import (
     FileSourceField,
     FileTarget,
     HTTPSource,
+    LockfilesGeneratorSourcesField,
     LockfileSourceField,
     RelocatedFiles,
     RelocateFilesViaCodegenRequest,
@@ -441,6 +442,23 @@ def test_lockfile_glob_match_error_behavior(
     assert (
         GlobMatchErrorBehavior.ignore
         == lockfile_source.path_globs(
+            UnmatchedBuildFileGlobs(error_behavior)
+        ).glob_match_error_behavior
+    )
+
+
+@pytest.mark.parametrize(
+    "error_behavior", [GlobMatchErrorBehavior.warn, GlobMatchErrorBehavior.error]
+)
+def test_lockfiles_glob_match_error_behavior(
+    error_behavior: GlobMatchErrorBehavior,
+) -> None:
+    lockfile_sources = LockfilesGeneratorSourcesField(
+        ["test.lock"], Address("", target_name="lockfiles-test")
+    )
+    assert (
+        GlobMatchErrorBehavior.ignore
+        == lockfile_sources.path_globs(
             UnmatchedBuildFileGlobs(error_behavior)
         ).glob_match_error_behavior
     )
