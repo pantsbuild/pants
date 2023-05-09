@@ -1,0 +1,24 @@
+# This file is used by GitHub to assign reviewers to PRs when PRs are opened in this repo.
+# More information: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+#
+# We use this file not to assign _ownership_ but to ensure that PR creators don't need to know who
+# "the right person" is to add to PR. Instead the "owners" here are more "who knows enough about
+# this code to review it, or add the right reviewers".
+#
+# This list isn't static either. Anyone can make a PR that edits this file to add/remove themselves
+# from any number of entries. Additionally, this list may not be exhaustive, there might be
+# files/directories that don't (yet) have owners.
+
+/.github/CODEOWNERS  @thejcannon
+
+# Root files
+/conftest.py  @thejcannon
+
+# src/python
+/src/python/pants/backend/python/  @thejcannon
+/src/python/pants/backend/experimental/python  @thejcannon
+/src/python/pants/backend/build_files  @thejcannon
+/src/python/pants/backend/tools/preamble  @thejcannon
+/src/python/pants/backend/url_handlers  @thejcannon
+/src/python/pants/core/goals/  @thejcannon
+/src/python/pants/option  @thejcannon
