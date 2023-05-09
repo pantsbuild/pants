@@ -440,7 +440,10 @@ class Target:
             self,
             "field_values",
             self._calculate_field_values(
-                unhydrated_values, address, union_membership, ignore_unrecognized_fields=ignore_unrecognized_fields
+                unhydrated_values,
+                address,
+                union_membership,
+                ignore_unrecognized_fields=ignore_unrecognized_fields,
             ),
         )
 
