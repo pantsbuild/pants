@@ -35,7 +35,6 @@ from pants.core.goals.package import (
 )
 from pants.core.target_types import FileSourceField
 from pants.core.util_rules.environments import EnvironmentField
-from pants.engine.addresses import UnparsedAddressInputs
 from pants.engine.platform import Platform
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
@@ -61,15 +60,6 @@ class PythonGoogleCloudFunctionFieldSet(PackageFieldSet):
     type: PythonGoogleCloudFunctionType
     output_path: OutputPathField
     environment: EnvironmentField
-
-
-@rule
-async def digest_complete_platforms(
-    complete_platforms: PythonFaaSCompletePlatforms,
-) -> CompletePlatforms:
-    return await Get(
-        CompletePlatforms, UnparsedAddressInputs, complete_platforms.to_unparsed_address_inputs()
-    )
 
 
 @rule(desc="Create Python Google Cloud Function", level=LogLevel.DEBUG)

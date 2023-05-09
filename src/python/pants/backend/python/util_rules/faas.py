@@ -17,7 +17,8 @@ from pants.backend.python.dependency_inference.subsystem import (
 )
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import PexCompletePlatformsField, PythonResolveField
-from pants.engine.addresses import Address
+from pants.backend.python.util_rules.pex import CompletePlatforms
+from pants.engine.addresses import Address, UnparsedAddressInputs
 from pants.engine.fs import GlobMatchErrorBehavior, PathGlobs, Paths
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
@@ -214,6 +215,15 @@ class PythonFaaSCompletePlatforms(PexCompletePlatformsField):
         N.B.: If specifying `complete_platforms` to work around packaging failures encountered when
         using the `runtime` field, ensure you delete the `runtime` field from the target.
         """
+    )
+
+
+@rule
+async def digest_complete_platforms(
+    complete_platforms: PythonFaaSCompletePlatforms,
+) -> CompletePlatforms:
+    return await Get(
+        CompletePlatforms, UnparsedAddressInputs, complete_platforms.to_unparsed_address_inputs()
     )
 
 
