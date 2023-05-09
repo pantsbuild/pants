@@ -42,6 +42,7 @@ from pants.backend.nfpm.fields.rpm import (
     NfpmRpmCompressionField,
     NfpmRpmConflictsField,
     NfpmRpmDependsField,
+    NfpmRpmGhostContents,
     NfpmRpmGroupField,
     NfpmRpmPackagerField,
     NfpmRpmProvidesField,
@@ -232,6 +233,7 @@ class NfpmRpmPackage(Target):
         OutputPathField,
         NfpmDependencies,
         *RPM_FIELDS,
+        NfpmRpmGhostContents,
     )
     help = help_text(
         f""""

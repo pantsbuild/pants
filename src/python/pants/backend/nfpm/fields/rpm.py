@@ -8,7 +8,7 @@ from typing import ClassVar, Optional
 
 from pants.backend.nfpm.fields._relationships import NfpmPackageRelationshipsField
 from pants.engine.addresses import Address
-from pants.engine.target import InvalidFieldException, StringField
+from pants.engine.target import InvalidFieldException, StringField, StringSequenceField
 from pants.util.strutil import help_text
 
 # These fields are used by the `nfpm_rpm_package` target
@@ -311,3 +311,35 @@ class NfpmRpmCompressionField(StringField):
         # Pass level as-is w/o sanitization or type checking because
         # there are too many possible levels to check it sanely here.
         return f"{computed_algorithm}:{level}"
+
+
+class NfpmRpmGhostContents(StringSequenceField):
+    nfpm_alias = ""  # does not map directly to a nfpm.yaml field
+    alias = "ghost_contents"
+    help = help_text(
+        """
+        A list of files that this package owns, but that this package does not include.
+
+        Examples of ghosted files include:
+        - A log file or a state file that does not exist until runtime.
+        - A binary that is managed by 'alternatives'.
+
+        RPM specs use the `%ghost` directive to list these ghosted files.
+
+        Each file in this list gets passed to nFPM via the 'contents' field with
+        'type=ghost'. Then nFPM translates that into the appropriate RPM header.
+        The file does not need to exist in your pants workspace as nFPM directly
+        adds it to the RPM header.
+
+        See: https://ftp.osuosl.org/pub/rpm/max-rpm/s1-rpm-inside-files-list-directives.html#S3-RPM-INSIDE-FLIST-GHOST-DIRECTIVE
+
+        N.B.: Packages distributed by Fedora must use this if they provide 'alternatives'.
+        https://docs.fedoraproject.org/en-US/packaging-guidelines/Alternatives/#_how_to_use_alternatives
+        """
+    )
+    # TODO: does this need any validation like requiring absolute paths?
+
+    @property
+    def nfpm_contents(self) -> list[dict[str, str]]:
+        contents = [{"type": "ghost", "dst": ghost} for ghost in self.value]
+        return contents
