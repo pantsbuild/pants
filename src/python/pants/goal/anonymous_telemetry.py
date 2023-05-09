@@ -7,36 +7,47 @@ import logging
 
 from pants.option.option_types import BoolOption, StrOption
 from pants.option.subsystem import Subsystem
+from pants.util.docutil import doc_url
 from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
 
+_telemetry_docs_referral = f"See {doc_url('anonymous-telemetry')} for details"
+
 
 class AnonymousTelemetry(Subsystem):
     options_scope = "anonymous-telemetry"
-    help = "<DEPRECATED>"
+    help = "Options related to sending anonymous stats to the Pants project, to aid development."
 
     enabled = BoolOption(
         default=False,
-        removal_version="2.18.0.dev0",
-        removal_hint=softwrap(
-            """
-            `anonymous-telemetry` is deprecated in 2.17 and will be removed in 2.18. We no longer
-            send any telemetry information whether this is enabled or disabled.
+        help=softwrap(
+            f"""
+            Whether to send anonymous telemetry to the Pants project.
 
-            (Additionally, we no longer warn when this option isn't provided)
+            Telemetry is sent asynchronously, with silent failure, and does not impact build times
+            or outcomes.
+
+            {_telemetry_docs_referral}.
             """
         ),
-        help="<DEPRECATED>",
         advanced=True,
     )
     repo_id = StrOption(
         default=None,
-        removal_version="2.18.0.dev0",
-        removal_hint=softwrap(
-            "`anonymous-telemetry` is deprecated in 2.17 and will be removed in 2.18."
+        help=softwrap(
+            f"""
+            An anonymized ID representing this repo.
+
+            For private repos, you likely want the ID to not be derived from, or algorithmically
+            convertible to, anything identifying the repo.
+
+            For public repos the ID may be visible in that repo's config file, so anonymity of the
+            repo is not guaranteed (although user anonymity is always guaranteed).
+
+            {_telemetry_docs_referral}.
+            """
         ),
-        help="<DEPRECATED>",
         advanced=True,
     )
 

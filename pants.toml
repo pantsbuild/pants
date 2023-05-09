@@ -82,6 +82,10 @@ cache_content_behavior = "fetch"
 # Tell `scie-pants` to use our `./pants` bootstrap script.
 delegate_bootstrap = true
 
+[anonymous-telemetry]
+enabled = true
+repo_id = "7775F8D5-FC58-4DBC-9302-D00AE4A1505F"
+
 [cli.alias]
 all-changed = "--changed-since=HEAD --changed-dependents=transitive"
 run-pyupgrade = "--backend-packages=pants.backend.experimental.python.lint.pyupgrade fmt"
