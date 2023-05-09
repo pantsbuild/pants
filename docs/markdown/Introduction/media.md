@@ -215,7 +215,7 @@ December 17, 2022
 December 1, 2022
 <https://www.bilibili.com/video/BV1L3411S76J/>
 
-> In this internal tech talk, TubiTV data engineer Darcy Shen illustrates how and why Tubi data scientists use Pants with Jupyter Notebooks, PySpark, and Pandas. This 45 minute presention delves into Pants features such as codegen, remote caching, remote execution, and multiple lockfiles.
+> In this internal tech talk, TubiTV data engineer Darcy Shen illustrates: one command line to launch JupyterLab with a proper dependency set, writing Python snippets just using a web browser, best practices for managing Python projects with Pants, and smart dependency inference of Pants.
 
 ### Pycon Japan
 
