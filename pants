@@ -48,7 +48,16 @@ function exec_pants_bare() {
   activate_pants_venv 1>&2
   bootstrap_native_code 1>&2
 
-  if [ -n "${USE_NATIVE_PANTS}" ]; then
+  if [ -n "${PANTS_DEBUG}" ]; then
+    if [[ "$*" != *"--no-pantsd"* ]]; then
+      echo "Error! Must pass '--no-pantsd' when using PANTS_DEBUG"
+      exit 1
+    fi
+    DEBUG_ARGS="-m debugpy --listen 127.0.0.1:5678 --wait-for-client"
+    echo "Will launch debugpy server at '127.0.0.1:5678' waiting for client connection."
+  fi
+
+  if [ -z "${PANTS_NO_NATIVE_CLIENT}" ]; then
     set +e
     "${NATIVE_CLIENT_BINARY}" "$@"
     result=$?
@@ -60,15 +69,6 @@ function exec_pants_bare() {
       exit ${result}
     fi
     set -e
-  fi
-
-  if [ -n "${PANTS_DEBUG}" ]; then
-    if [[ "$*" != *"--no-pantsd"* ]]; then
-      echo "Error! Must pass '--no-pantsd' when using PANTS_DEBUG"
-      exit 1
-    fi
-    DEBUG_ARGS="-m debugpy --listen 127.0.0.1:5678 --wait-for-client"
-    echo "Will launch debugpy server at '127.0.0.1:5678' waiting for client connection."
   fi
 
   # shellcheck disable=SC2086
