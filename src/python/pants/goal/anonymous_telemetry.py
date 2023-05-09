@@ -15,6 +15,14 @@ logger = logging.getLogger(__name__)
 _telemetry_docs_referral = f"See {doc_url('anonymous-telemetry')} for details"
 
 
+# This subsystem is orphaned (but not quite deprecated/removed).
+# We found that:
+#   - Most people disabled the telemetry
+#   - The telemetry we received wasn't being used for meaningful decisions
+#   - The implementation we had required humbug, which bloated Pants' environment with it and its dependencies
+#
+# The subsystem still exists, however, in hopes that a future implementation could be added seamlessly
+# which addresses the above points.
 class AnonymousTelemetry(Subsystem):
     options_scope = "anonymous-telemetry"
     help = "Options related to sending anonymous stats to the Pants project, to aid development."
