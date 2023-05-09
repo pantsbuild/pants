@@ -15,9 +15,9 @@ from pants.base.specs import Specs
 from pants.core.goals.fix import FixFilesRequest, FixTargetsRequest
 from pants.core.goals.fmt import FmtFilesRequest, FmtTargetsRequest
 from pants.core.goals.lint import (
+    AbstractLintRequest,
     Lint,
     LintFilesRequest,
-    AbstractLintRequest,
     LintResult,
     LintSubsystem,
     LintTargetsRequest,

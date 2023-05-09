@@ -13,8 +13,8 @@ from typing_extensions import Protocol
 
 from pants.base.specs import Specs
 from pants.core.goals.lint import (
-    LintFilesRequest,
     AbstractLintRequest,
+    LintFilesRequest,
     LintResult,
     LintTargetsRequest,
     _get_partitions_by_request_type,

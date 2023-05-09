@@ -16,9 +16,9 @@ import pytest
 
 from pants.build_graph.address import Address
 from pants.core.goals.fix import (
+    AbstractFixRequest,
     Fix,
     FixFilesRequest,
-    AbstractFixRequest,
     FixResult,
     FixTargetsRequest,
     Partitions,
