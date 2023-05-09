@@ -9,7 +9,7 @@ python_requirements(
         "node-semver": ["nodesemver"],
     },
     overrides={
-        "humbug": {"dependencies": ["#setuptools"]},
+        "humbug": {"dependencies": ["#setuptools", "#urllib3"]},
     },
 )
 
