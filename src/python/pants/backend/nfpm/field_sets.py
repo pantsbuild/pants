@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from pants.backend.nfpm.fields.all import NfpmDependencies, NfpmPackageNameField
+from pants.backend.nfpm.fields.rpm import NfpmRpmGhostContents
 from pants.backend.nfpm.target_types import APK_FIELDS, ARCHLINUX_FIELDS, DEB_FIELDS, RPM_FIELDS
 from pants.core.goals.package import OutputPathField, PackageFieldSet
 from pants.engine.rules import collect_rules
@@ -23,7 +24,7 @@ class NfpmPackageFieldSet(PackageFieldSet, metaclass=ABCMeta):
     dependencies: NfpmDependencies
 
     def nfpm_config(self, tgt: Target) -> dict[str, Any]:
-        config: dict[str, Any] = {}
+        config: dict[str, Any] = {"contents": []}
         for field in self.required_fields:
             # NB: This assumes that nfpm fields have a str 'nfpm_alias' attribute.
             if not hasattr(field, "nfpm_alias"):
@@ -81,6 +82,12 @@ class NfpmDebPackageFieldSet(NfpmPackageFieldSet):
 @dataclass(frozen=True)
 class NfpmRpmPackageFieldSet(NfpmPackageFieldSet):
     required_fields = RPM_FIELDS
+    ghost_contents = NfpmRpmGhostContents
+
+    def nfpm_config(self, tgt: Target) -> dict[str, Any]:
+        config = super().nfpm_config(tgt)
+        config["contents"].extend(self.ghost_contents.nfpm_contents)
+        return config
 
 
 def rules():
