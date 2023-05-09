@@ -18,7 +18,7 @@ class AnonymousTelemetry(Subsystem):
 
     enabled = BoolOption(
         default=False,
-        removal_version="2.18.0dev0",
+        removal_version="2.18.0.dev0",
         removal_hint=softwrap(
             """
             `anonymous-telemetry` is deprecated in 2.17 and will be removed in 2.18. We no longer
@@ -32,7 +32,7 @@ class AnonymousTelemetry(Subsystem):
     )
     repo_id = StrOption(
         default=None,
-        removal_version="2.18.0dev0",
+        removal_version="2.18.0.dev0",
         removal_hint=softwrap(
             "`anonymous-telemetry` is deprecated in 2.17 and will be removed in 2.18."
         ),
