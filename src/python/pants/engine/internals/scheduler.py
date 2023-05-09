@@ -35,6 +35,7 @@ from pants.engine.fs import (
 from pants.engine.goal import CurrentExecutingGoals, Goal
 from pants.engine.internals import native_engine
 from pants.engine.internals.docker import DockerResolveImageRequest, DockerResolveImageResult
+from pants.engine.internals.native_dep_inference import NativeParsedPythonDependencies
 from pants.engine.internals.native_engine import (
     PyExecutionRequest,
     PyExecutionStrategyOptions,
@@ -170,6 +171,7 @@ class Scheduler:
             engine_aware_parameter=EngineAwareParameter,
             docker_resolve_image_request=DockerResolveImageRequest,
             docker_resolve_image_result=DockerResolveImageResult,
+            parsed_python_deps_result=NativeParsedPythonDependencies,
         )
         remoting_options = PyRemotingOptions(
             execution_enable=execution_options.remote_execution,
