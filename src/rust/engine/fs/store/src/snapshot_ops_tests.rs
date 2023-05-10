@@ -1,13 +1,14 @@
 // Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 use std::fs::create_dir_all;
+use std::os::unix::fs::symlink;
 use std::path::Path;
 use std::sync::Arc;
 
 use fs::{
   DirectoryDigest, GlobExpansionConjunction, PosixFS, PreparedPathGlobs, StrictGlobMatching,
 };
-use testutil::{make_file, make_link};
+use testutil::make_file;
 
 use crate::{
   snapshot_tests::{expand_all_sorted, setup, STR, STR2},
@@ -100,10 +101,7 @@ async fn subset_symlink() {
   // Make the second snapshot with a symlink pointing to the file in the first snapshot.
   let (_store2, tempdir2, posix_fs2, digester2) = setup();
   create_dir_all(tempdir2.path().join("subdir")).unwrap();
-  make_link(
-    &tempdir2.path().join("subdir/roland2"),
-    &Path::new("./roland1"),
-  );
+  symlink("./roland1", &tempdir2.path().join("subdir/roland2")).unwrap();
   let snapshot_with_symlink =
     Snapshot::from_path_stats(digester2, expand_all_sorted(posix_fs2).await)
       .await

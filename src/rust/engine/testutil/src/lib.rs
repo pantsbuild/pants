@@ -27,7 +27,7 @@
 
 use bytes::Bytes;
 use std::io::Write;
-use std::os::unix::fs::{symlink, PermissionsExt};
+use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 
 use fs::RelativePath;
@@ -58,10 +58,6 @@ pub fn make_file(path: &Path, contents: &[u8], mode: u32) {
   let mut permissions = std::fs::metadata(path).unwrap().permissions();
   permissions.set_mode(mode);
   file.set_permissions(permissions).unwrap();
-}
-
-pub fn make_link(path: &Path, target: &Path) {
-  symlink(target, path).unwrap();
 }
 
 pub fn append_to_existing_file(path: &Path, contents: &[u8]) {
