@@ -26,11 +26,11 @@ pub struct PyProcessExecutionEnvironment {
 impl PyProcessExecutionEnvironment {
   #[new]
   fn __new__(
-    environment_name: Option<String>,
     platform: String,
-    docker_image: Option<String>,
     remote_execution: bool,
     remote_execution_extra_platform_properties: Vec<(String, String)>,
+    environment_name: Option<String>,
+    docker_image: Option<String>,
   ) -> PyResult<Self> {
     let platform = Platform::try_from(platform).map_err(PyValueError::new_err)?;
     let strategy = match (docker_image, remote_execution) {
