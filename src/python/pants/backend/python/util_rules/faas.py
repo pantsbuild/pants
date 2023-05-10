@@ -2,7 +2,10 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 """Function-as-a-service (FaaS) support like AWS Lambda and Google Cloud Functions."""
 
+from __future__ import annotations
+
 import os.path
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Optional, cast
 
@@ -216,6 +219,15 @@ class PythonFaaSCompletePlatforms(PexCompletePlatformsField):
         using the `runtime` field, ensure you delete the `runtime` field from the target.
         """
     )
+
+
+class PythonFaaSRuntimeField(StringField, ABC):
+    alias = "runtime"
+    default = None
+
+    @abstractmethod
+    def to_interpreter_version(self) -> None | tuple[int, int]:
+        """Returns the Python version implied by the runtime, as (major, minor)."""
 
 
 @rule

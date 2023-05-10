@@ -10,6 +10,7 @@ from pants.backend.python.util_rules.faas import (
     PythonFaaSCompletePlatforms,
     PythonFaaSDependencies,
     PythonFaaSHandlerField,
+    PythonFaaSRuntimeField,
 )
 from pants.backend.python.util_rules.faas import rules as faas_rules
 from pants.core.goals.package import OutputPathField
@@ -21,7 +22,6 @@ from pants.engine.target import (
     BoolField,
     InvalidFieldException,
     InvalidTargetException,
-    StringField,
     Target,
 )
 from pants.util.docutil import doc_url
@@ -61,11 +61,9 @@ class PythonAwsLambdaIncludeRequirements(BoolField):
     )
 
 
-class PythonAwsLambdaRuntime(StringField):
+class PythonAwsLambdaRuntime(PythonFaaSRuntimeField):
     PYTHON_RUNTIME_REGEX = r"python(?P<major>\d)\.(?P<minor>\d+)"
 
-    alias = "runtime"
-    default = None
     help = help_text(
         """
         The identifier of the AWS Lambda runtime to target (pythonX.Y).

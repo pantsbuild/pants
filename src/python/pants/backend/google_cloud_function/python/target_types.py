@@ -10,6 +10,7 @@ from pants.backend.python.util_rules.faas import (
     PythonFaaSCompletePlatforms,
     PythonFaaSDependencies,
     PythonFaaSHandlerField,
+    PythonFaaSRuntimeField,
 )
 from pants.backend.python.util_rules.faas import rules as faas_rules
 from pants.core.goals.package import OutputPathField
@@ -45,11 +46,9 @@ class PythonGoogleCloudFunctionRuntimes(Enum):
     PYTHON_311 = "python311"
 
 
-class PythonGoogleCloudFunctionRuntime(StringField):
+class PythonGoogleCloudFunctionRuntime(PythonFaaSRuntimeField):
     PYTHON_RUNTIME_REGEX = r"^python(?P<major>\d)(?P<minor>\d+)$"
 
-    alias = "runtime"
-    default = None
     valid_choices = PythonGoogleCloudFunctionRuntimes
     help = help_text(
         """
