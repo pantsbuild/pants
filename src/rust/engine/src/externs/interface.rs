@@ -910,7 +910,6 @@ async fn workunit_to_py_value(
     }
     externs::store_dict(py, dict_entries)
   })
-
 }
 
 async fn workunits_to_py_tuple_value(
@@ -961,7 +960,7 @@ fn session_poll_workunits(
       let workunit_store = session.workunit_store();
       let (started, completed) = workunit_store.latest_workunits(py_level.into());
 
-      Python::with_gil(|py|-> PyO3Result<_> {
+      Python::with_gil(|py| -> PyO3Result<_> {
         let started_val = core.executor.block_on(workunits_to_py_tuple_value(
           py,
           &workunit_store,

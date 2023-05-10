@@ -815,9 +815,7 @@ fn parse_python_deps(context: Context, args: Vec<Value>) -> BoxFuture<'static, N
         };
         let result = result.unwrap();
 
-        let result = {
-          let gil = Python::acquire_gil();
-          let py = gil.python();
+        let result = Python::with_gil(|py| {
           externs::unsafe_call(
             py,
             core.types.parsed_python_deps_result,
@@ -826,7 +824,7 @@ fn parse_python_deps(context: Context, args: Vec<Value>) -> BoxFuture<'static, N
               result.string_candidates.to_object(py).into(),
             ],
           )
-        };
+        });
 
         Ok(result)
       }

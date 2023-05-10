@@ -1180,9 +1180,7 @@ impl Task {
           let result = Self::gen_get(&context, workunit, &params, entry, gets).await;
           match result {
             Ok(values) => {
-              input = Some(Python::with_gil(|py| {
-                externs::store_tuple(py, values)
-              }));
+              input = Some(Python::with_gil(|py| externs::store_tuple(py, values)));
               err = None;
             }
             Err(throw @ Failure::Throw { .. }) => {
