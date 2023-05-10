@@ -294,7 +294,7 @@ def test_issue_18958(rule_runner: RuleRunner) -> None:
     assert_deps_parsed(
         rule_runner,
         content,
-        filename=f"a/b/c/d.py",
+        filename="a/b/c/d.py",
         expected_imports={
             "one.thing": ImpInfo(lineno=3, weak=True),
             "one.other_thing": ImpInfo(lineno=3, weak=True),
@@ -302,6 +302,7 @@ def test_issue_18958(rule_runner: RuleRunner) -> None:
             "a.b.c.one.other_thing": ImpInfo(lineno=5, weak=False),
         },
     )
+
 
 @pytest.mark.parametrize("min_dots", [1, 2, 3, 4])
 def test_imports_from_strings(rule_runner: RuleRunner, min_dots: int) -> None:
