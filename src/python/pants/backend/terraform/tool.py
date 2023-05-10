@@ -185,6 +185,7 @@ class TerraformProcess:
     description: str
     input_digest: Digest = EMPTY_DIGEST
     output_files: tuple[str, ...] = ()
+    output_directories: tuple[str, ...] = ()
 
 
 @rule
@@ -204,6 +205,7 @@ async def setup_terraform_process(
         input_digest=request.input_digest,
         immutable_input_digests=immutable_input_digests,
         output_files=request.output_files,
+        output_directories=request.output_directories,
         description=request.description,
         level=LogLevel.DEBUG,
     )

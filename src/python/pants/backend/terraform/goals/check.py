@@ -7,6 +7,7 @@ from pants.backend.terraform.target_types import TerraformFieldSet
 from pants.backend.terraform.tool import TerraformProcess
 from pants.core.goals.check import CheckRequest, CheckResult, CheckResults
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
+from pants.engine.internals.native_engine import Digest, MergeDigests
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import collect_rules, rule
@@ -41,12 +42,27 @@ async def terraform_check(
     )
     files_by_directory = partition_files_by_directory(source_files.files)
 
+    fetched_deps = await Get(
+        FallibleProcessResult,
+        TerraformProcess(
+            args=("init",),
+            input_digest=source_files.snapshot.digest,
+            output_files=(".terraform.lock.hcl",),
+            output_directories=(".terraform",),
+            description="Run `terraform init` to fetch dependencies",
+        ),
+    )
+
+    sources_and_deps = await Get(
+        Digest, MergeDigests([source_files.snapshot.digest, fetched_deps.output_digest])
+    )
+
     results = await MultiGet(
         Get(
             FallibleProcessResult,
             TerraformProcess(
                 args=("validate", directory),
-                input_digest=source_files.snapshot.digest,
+                input_digest=sources_and_deps,
                 output_files=tuple(files),
                 description=f"Run `terraform fmt` on {pluralize(len(files), 'file')}.",
             ),

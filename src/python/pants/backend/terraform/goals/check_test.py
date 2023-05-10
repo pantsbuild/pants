@@ -60,6 +60,16 @@ BAD_SOURCE = FileContent(
     ).encode("utf-8"),
 )
 
+# This resource uses the null_resource provider. Terraform will need to run `init` to init the provider
+SOURCE_WITH_PROVIDER = FileContent(
+    "provided.tf",
+    textwrap.dedent(
+        """
+        resource "null_resource" "dep" {}
+        """
+    ).encode("utf-8"),
+)
+
 
 def make_target(
     rule_runner: RuleRunner, source_files: list[FileContent], *, target_name="target"
@@ -133,3 +143,14 @@ def test_skip(rule_runner: RuleRunner) -> None:
     target = make_target(rule_runner, [BAD_SOURCE])
     lint_results = run_terraform_validate(rule_runner, [target], args=["--terraform-validate-skip"])
     assert not lint_results
+
+
+def test_with_dependency(rule_runner: RuleRunner) -> None:
+    """Sources with a provider need to have `terraform init` run before to initialise the provider.
+
+    Without `init`, `terraform validate` fails. It is therefore sufficient to just test that the
+    process ran successfully
+    """
+    targets = [make_target(rule_runner, [SOURCE_WITH_PROVIDER])]
+    check_results = run_terraform_validate(rule_runner, targets)
+    assert check_results[0].exit_code == 0
