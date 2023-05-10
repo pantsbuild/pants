@@ -14,11 +14,25 @@
 # Root files
 /conftest.py  @thejcannon
 
-# src/python
-/src/python/pants/backend/python/  @thejcannon
+# Docs
+/docs/markdown/Docker/  @kaos
+/docs/markdown/Using\ Pants/  @kaos
+/docs/markdown/Writing\ Plugins/  @kaos
+
+# Backends
+/src/python/pants/backend/build_files/  @thejcannon
+/src/python/pants/backend/cue/  @kaos
+/src/python/pants/backend/docker/  @kaos
 /src/python/pants/backend/experimental/python  @thejcannon
-/src/python/pants/backend/build_files  @thejcannon
-/src/python/pants/backend/tools/preamble  @thejcannon
-/src/python/pants/backend/url_handlers  @thejcannon
+/src/python/pants/backend/explorer/  @kaos
+/src/python/pants/backend/python/  @kaos @thejcannon
+/src/python/pants/backend/tools/preamble/  @thejcannon
+/src/python/pants/backend/url_handlers/  @thejcannon
+/src/python/pants/backend/visibility/  @kaos
+
+# Pants
 /src/python/pants/core/goals/  @thejcannon
-/src/python/pants/option  @thejcannon
+/src/python/pants/explorer/  @kaos
+/src/python/pants/goal/  @kaos
+/src/python/pants/help/  @kaos
+/src/python/pants/option/  @thejcannon
