@@ -554,7 +554,7 @@ pub async fn expand_all_sorted(posix_fs: Arc<PosixFS>) -> Vec<PathStat> {
   .parse()
   .unwrap();
   let mut v = posix_fs
-    .expand_globs(path_globs, SymlinkBehavior::Oblivious, None)
+    .expand_globs(path_globs, SymlinkBehavior::Aware, None)
     .await
     .unwrap();
   v.sort_by(|a, b| a.path().cmp(b.path()));
