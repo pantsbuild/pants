@@ -13,7 +13,7 @@ freezegun==1.2.1
 # anonymity promise we make here: https://www.pantsbuild.org/docs/anonymous-telemetry
 humbug==0.2.7
 
-# humbug requires requests requires urllib3, and this breaks some users, so workaround for now is to
+# `humbug` requires `requests` which requires `urllib3`. This breaks some users, so workaround for now is to
 # pin urllib3
 urllib3<2
 
