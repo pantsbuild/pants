@@ -245,14 +245,13 @@ impl Visitor for ImportCollector<'_> {
         }
       }
     }
-    let mut children_iter = children.iter();
-    self.weaken_imports = should_weaken;
-    let body = children_iter.next().unwrap();
-    self.walk(&mut body.walk());
-    self.weaken_imports = false;
 
-    for child in children_iter {
+    for child in children.iter() {
+      if child.kind_id() == KindID::BLOCK {
+        self.weaken_imports = should_weaken;
+      }
       self.walk(&mut child.walk());
+      self.weaken_imports = false;
     }
     ChildBehavior::Ignore
   }

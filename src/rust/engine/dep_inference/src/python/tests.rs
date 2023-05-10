@@ -363,6 +363,18 @@ fn weak_imports() {
     &[],
   );
 
+  assert_imports_strong_weak(
+    r"
+    try:
+      # A comment
+      import one.two.three
+      from one import four
+    except ImportError:
+      pass",
+    &[],
+    &["one.two.three", "one.four"],
+  );
+
   // Some conflict in strength
   assert_imports_strong_weak(
     r"
