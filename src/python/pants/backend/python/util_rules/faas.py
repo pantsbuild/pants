@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import logging
 import os.path
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
@@ -18,11 +19,24 @@ from pants.backend.python.dependency_inference.subsystem import (
     AmbiguityResolution,
     PythonInferSubsystem,
 )
+from pants.backend.python.subsystems.lambdex import Lambdex
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import PexCompletePlatformsField, PythonResolveField
-from pants.backend.python.util_rules.pex import CompletePlatforms
+from pants.backend.python.util_rules.pex import (
+    CompletePlatforms,
+    Pex,
+    PexPlatforms,
+    PexRequest,
+    VenvPex,
+    VenvPexProcess,
+)
+from pants.backend.python.util_rules.pex_from_targets import PexFromTargetsRequest
+from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact, OutputPathField
+from pants.core.target_types import FileSourceField
 from pants.engine.addresses import Address, UnparsedAddressInputs
 from pants.engine.fs import GlobMatchErrorBehavior, PathGlobs, Paths
+from pants.engine.platform import Platform
+from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     AsyncFieldMixin,
@@ -35,11 +49,17 @@ from pants.engine.target import (
     InvalidFieldException,
     SecondaryOwnerMixin,
     StringField,
+    TransitiveTargets,
+    TransitiveTargetsRequest,
+    targets_with_sources_types,
 )
-from pants.engine.unions import UnionRule
+from pants.engine.unions import UnionMembership, UnionRule
 from pants.source.filespec import Filespec
 from pants.source.source_root import SourceRoot, SourceRootRequest
+from pants.util.docutil import bin_name, doc_url
 from pants.util.strutil import help_text
+
+logger = logging.getLogger(__name__)
 
 
 class PythonFaaSHandlerField(StringField, AsyncFieldMixin, SecondaryOwnerMixin):
@@ -237,6 +257,140 @@ async def digest_complete_platforms(
     return await Get(
         CompletePlatforms, UnparsedAddressInputs, complete_platforms.to_unparsed_address_inputs()
     )
+
+
+@dataclass(frozen=True)
+class BuildLambdexRequest:
+    address: Address
+    target_name: str
+
+    complete_platforms: PythonFaaSCompletePlatforms
+    handler: PythonFaaSHandlerField
+    output_path: OutputPathField
+    runtime: PythonFaaSRuntimeField
+
+    include_requirements: bool
+
+    script_handler: None | str
+    script_module: None | str
+
+    handler_log_message: str
+
+
+@rule
+async def build_lambdex(
+    request: BuildLambdexRequest,
+    lambdex: Lambdex,
+    platform: Platform,
+    union_membership: UnionMembership,
+) -> BuiltPackage:
+    if platform.is_macos:
+        logger.warning(
+            f"`{request.target_name}` targets built on macOS may fail to build. If your function uses any"
+            " third-party dependencies without binary wheels (bdist) for Linux available, it will"
+            " fail to build. If this happens, you will either need to update your dependencies to"
+            " only use dependencies with pre-built wheels, or find a Linux environment to run"
+            f" {bin_name()} package. (See https://realpython.com/python-wheels/ for more about"
+            " wheels.)\n\n(If the build does not raise an exception, it's safe to use macOS.)"
+        )
+
+    output_filename = request.output_path.value_or_default(
+        # FaaS typically use the .zip suffix, so we use that instead of .pex.
+        file_ending="zip",
+    )
+
+    # We hardcode the platform value to the appropriate one for each FaaS runtime.
+    # (Running the "hello world" cloud function in the example code will report the platform, and can be
+    # used to verify correctness of these platform strings.)
+    pex_platforms = []
+    interpreter_version = request.runtime.to_interpreter_version()
+    if interpreter_version:
+        py_major, py_minor = interpreter_version
+        platform_str = f"linux_x86_64-cp-{py_major}{py_minor}-cp{py_major}{py_minor}"
+        # set pymalloc ABI flag - this was removed in python 3.8 https://bugs.python.org/issue36707
+        if py_major <= 3 and py_minor < 8:
+            platform_str += "m"
+        pex_platforms.append(platform_str)
+
+    additional_pex_args = (
+        # Ensure we can resolve manylinux wheels in addition to any AMI-specific wheels.
+        "--manylinux=manylinux2014",
+        # When we're executing Pex on Linux, allow a local interpreter to be resolved if
+        # available and matching the AMI platform.
+        "--resolve-local-platforms",
+    )
+
+    complete_platforms = await Get(
+        CompletePlatforms, PythonFaaSCompletePlatforms, request.complete_platforms
+    )
+
+    pex_request = PexFromTargetsRequest(
+        addresses=[request.address],
+        internal_only=False,
+        include_requirements=request.include_requirements,
+        output_filename=output_filename,
+        platforms=PexPlatforms(pex_platforms),
+        complete_platforms=complete_platforms,
+        additional_args=additional_pex_args,
+        additional_lockfile_args=additional_pex_args,
+    )
+    lambdex_request = lambdex.to_pex_request()
+
+    lambdex_pex, pex_result, handler, transitive_targets = await MultiGet(
+        Get(VenvPex, PexRequest, lambdex_request),
+        Get(Pex, PexFromTargetsRequest, pex_request),
+        Get(ResolvedPythonFaaSHandler, ResolvePythonFaaSHandlerRequest(request.handler)),
+        Get(TransitiveTargets, TransitiveTargetsRequest([request.address])),
+    )
+
+    # Warn if users depend on `files` targets, which won't be included in the PEX and is a common
+    # gotcha.
+    file_tgts = targets_with_sources_types(
+        [FileSourceField], transitive_targets.dependencies, union_membership
+    )
+    if file_tgts:
+        files_addresses = sorted(tgt.address.spec for tgt in file_tgts)
+        logger.warning(
+            f"The `{request.target_name}` target {request.address} transitively depends "
+            "on the below `files` targets, but Pants will not include them in the built package. "
+            "Filesystem APIs like `open()` are not able to load files within the binary "
+            "itself; instead, they read from the current working directory."
+            f"\n\nInstead, use `resources` targets. See {doc_url('resources')}."
+            f"\n\nFiles targets dependencies: {files_addresses}"
+        )
+
+    lambdex_args = ["build", "-e", handler.val, output_filename]
+    if request.script_handler:
+        lambdex_args.extend(("-H", request.script_handler))
+    if request.script_module:
+        lambdex_args.extend(("-M", request.script_module))
+
+    # NB: Lambdex modifies its input pex in-place, so the input file is also the output file.
+    result = await Get(
+        ProcessResult,
+        VenvPexProcess(
+            lambdex_pex,
+            argv=tuple(lambdex_args),
+            input_digest=pex_result.digest,
+            output_files=(output_filename,),
+            description=f"Setting up handler in {output_filename}",
+        ),
+    )
+
+    extra_log_data: list[tuple[str, str]] = []
+    if request.runtime.value:
+        extra_log_data.append(("Runtime", request.runtime.value))
+    extra_log_data.extend(("Complete platform", path) for path in complete_platforms)
+    extra_log_data.append(("Handler", request.handler_log_message))
+
+    first_column_width = 4 + max(len(header) for header, _ in extra_log_data)
+    artifact = BuiltPackageArtifact(
+        output_filename,
+        extra_log_lines=tuple(
+            f"{header.rjust(first_column_width, ' ')}: {data}" for header, data in extra_log_data
+        ),
+    )
+    return BuiltPackage(digest=result.output_digest, artifacts=(artifact,))
 
 
 def rules():
