@@ -16,8 +16,8 @@
 
 # Docs
 /docs/markdown/Docker/ @kaos
-/docs/markdown/Using Pants/ @kaos
-/docs/markdown/Writing Plugins/ @kaos
+/docs/markdown/Using\ Pants/ @kaos
+/docs/markdown/Writing\ Plugins/ @kaos
 
 # Backends
 /src/python/pants/backend/build_files  @thejcannon
