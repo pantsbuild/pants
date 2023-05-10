@@ -731,6 +731,18 @@ impl<N: Node> Entry<N> {
   ///   acquiring the graph lock here, which we currently don't do.
   ///
   pub(crate) fn clear(&mut self, graph_still_contains_edges: bool) {
+    self.reset_state(if graph_still_contains_edges {
+      ResetStateAction::DirtyPrevious
+    } else {
+      ResetStateAction::JustReset
+    })
+  }
+
+  pub fn clear_mem(&mut self) {
+    self.reset_state(ResetStateAction::ClearMemory)
+  }
+
+  fn reset_state(&mut self, action: ResetStateAction) {
     let mut state = self.state.lock();
 
     let (run_token, generation, mut previous_result) =
@@ -761,10 +773,17 @@ impl<N: Node> Entry<N> {
 
     test_trace_log!("Clearing node {:?}", self.node);
 
-    if graph_still_contains_edges {
-      if let Some(previous_result) = previous_result.as_mut() {
-        previous_result.dirty();
+    match action {
+      ResetStateAction::ClearMemory => {
+        // Don't swap the previous result back in, freeing its memory
+        return;
       }
+      ResetStateAction::DirtyPrevious => {
+        if let Some(previous_result) = previous_result.as_mut() {
+          previous_result.dirty();
+        }
+      }
+      ResetStateAction::JustReset => {}
     }
 
     // Swap in a state with a new RunToken value, which invalidates any outstanding work.
@@ -911,4 +930,10 @@ impl<N: Node> Entry<N> {
     };
     format!("{} == {}", self.node, state)
   }
+}
+
+enum ResetStateAction {
+  JustReset,
+  DirtyPrevious,
+  ClearMemory,
 }

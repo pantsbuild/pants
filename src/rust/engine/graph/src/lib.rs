@@ -36,7 +36,7 @@ use std::fs::File;
 use std::io::{self, BufWriter, Write};
 use std::path::Path;
 use std::sync::{Arc, Weak};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use fixedbitset::FixedBitSet;
 use fnv::{FnvHashMap as HashMap, FnvHashSet as HashSet};
@@ -68,6 +68,7 @@ struct InnerGraph<N: Node> {
   nodes: Nodes<N>,
   pg: PGraph<N>,
   run_id_generator: u32,
+  roots_by_age: HashMap<N, Instant>,
 }
 
 impl<N: Node> InnerGraph<N> {
@@ -93,17 +94,16 @@ impl<N: Node> InnerGraph<N> {
   }
 
   fn ensure_entry(&mut self, node: N) -> EntryId {
-    InnerGraph::ensure_entry_internal(&mut self.pg, &mut self.nodes, node)
-  }
-
-  fn ensure_entry_internal(pg: &mut PGraph<N>, nodes: &mut Nodes<N>, node: N) -> EntryId {
-    if let Some(&id) = nodes.get(&node) {
+    if let Some(&id) = self.nodes.get(&node) {
+      // Update node access time
+      *(self.roots_by_age.get_mut(&node).unwrap()) = Instant::now();
       return id;
     }
 
     // New entry.
-    let id = pg.add_node(Entry::new(node.clone()));
-    nodes.insert(node, id);
+    let id = self.pg.add_node(Entry::new(node.clone()));
+    self.roots_by_age.insert(node.clone(), Instant::now());
+    self.nodes.insert(node, id);
     id
   }
 
@@ -382,6 +382,42 @@ impl<N: Node> InnerGraph<N> {
       .filter_map(move |eid| self.entry_for_id(eid))
       .filter_map(move |entry| entry.peek(&context).map(|i| (entry.node(), i)))
   }
+
+  fn prune_unreacheable_from_relevant(&mut self) {
+    let dur = Duration::new(60, 0);
+    let now = Instant::now();
+    let relevant_root_ids: HashSet<_> = self
+      .roots_by_age
+      .iter()
+      .filter_map(|(k, v)| {
+        if now - *v < dur {
+          self.entry_id(k)
+        } else {
+          None
+        }
+      })
+      .collect();
+    let reachable_from_relevant: HashSet<_> = self
+      .walk(
+        relevant_root_ids.into_iter().cloned().collect(),
+        Direction::Incoming,
+        |_| false,
+      )
+      .collect();
+
+    let unreacheable_ids: Vec<_> = self
+      .nodes
+      .values()
+      .filter(|id| !reachable_from_relevant.contains(id))
+      .cloned()
+      .collect();
+
+    for id in unreacheable_ids.iter() {
+      if let Some(entry) = self.entry_for_id_mut(*id) {
+        entry.clear_mem();
+      }
+    }
+  }
 }
 
 ///
@@ -404,6 +440,7 @@ impl<N: Node> Graph<N> {
       nodes: HashMap::default(),
       pg: DiGraph::new(),
       run_id_generator: 0,
+      roots_by_age: HashMap::default(),
     }));
     let _join = executor.native_spawn(Self::cycle_check_task(Arc::downgrade(&inner)));
 
@@ -444,7 +481,10 @@ impl<N: Node> Graph<N> {
       sleep(Duration::from_millis(500)).await;
 
       if let Some(inner) = Weak::upgrade(&inner) {
-        inner.lock().terminate_cycles();
+        let mut lock = inner.lock();
+        lock.terminate_cycles();
+        // TODO: figure out frequency to run this at
+        lock.prune_unreacheable_from_relevant();
       } else {
         // We've been shut down.
         break;
