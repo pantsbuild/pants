@@ -281,7 +281,7 @@ def test_relative_imports(rule_runner: RuleRunner, basename: str) -> None:
     )
 
 
-def test_uhoh(rule_runner: RuleRunner) -> None:
+def test_issue_18958(rule_runner: RuleRunner) -> None:
     content = dedent(
         """\
         try:
