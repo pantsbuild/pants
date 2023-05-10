@@ -14,7 +14,6 @@ from pants.build_graph.address import (
     InvalidTargetNameError,
     UnsupportedWildcardError,
 )
-from pants.util.frozendict import FrozenDict
 
 
 def test_address_input_parse_spec() -> None:
@@ -33,7 +32,7 @@ def test_address_input_parse_spec() -> None:
             assert ai.target_component is None
         else:
             assert ai.target_component == target_component
-        assert ai.parameters == FrozenDict(parameters or {})
+        assert ai.parameters == (parameters or {})
         if generated_component is None:
             assert ai.generated_component is None
         else:
@@ -267,31 +266,6 @@ def test_address_input_from_dir() -> None:
     ).dir_to_address() == Address("a", target_name="b", generated_name="gen")
 
 
-@pytest.mark.parametrize(
-    "addr,expected",
-    [
-        (AddressInput("dir", description_of_origin="tests"), "dir"),
-        (AddressInput("dir", "tgt", description_of_origin="tests"), "dir:tgt"),
-        (AddressInput("", "tgt", description_of_origin="tests"), "//:tgt"),
-        (AddressInput("dir", generated_component="gen", description_of_origin="tests"), "dir#gen"),
-        (
-            AddressInput("dir", "tgt", generated_component="gen", description_of_origin="tests"),
-            "dir#gen:tgt",
-        ),
-        (
-            AddressInput("dir", parameters={"k1": "v", "k2": "v"}, description_of_origin="tests"),
-            "dir@k1=v,k2=v",
-        ),
-        (
-            AddressInput("dir", "tgt", parameters={"k": "v"}, description_of_origin="tests"),
-            "dir:tgt@k=v",
-        ),
-    ],
-)
-def test_address_input_spec(addr: AddressInput, expected: str) -> None:
-    assert addr.spec == expected
-
-
 def test_address_normalize_target_name() -> None:
     assert Address("a/b/c", target_name="c") == Address("a/b/c", target_name=None)
     assert Address("a/b/c", target_name="c", relative_file_path="f.txt") == Address(
@@ -459,7 +433,8 @@ def test_address_maybe_convert_to_target_generator() -> None:
     )
 
     def assert_noops(addr: Address) -> None:
-        assert addr.maybe_convert_to_target_generator() is addr
+        # TODO: See the TODO about cloning in `fn maybe_convert_to_target_generator`.
+        assert addr.maybe_convert_to_target_generator() == addr
 
     assert_noops(Address("a/b", target_name="c"))
     assert_noops(Address("a/b"))

@@ -419,7 +419,7 @@ async def find_target_adaptor(request: TargetAdaptorRequest) -> TargetAdaptor:
 
 
 def _rules_path(address: Address) -> str:
-    if address.is_file_target and os.path.sep in address._relative_file_path:  # type: ignore[operator]
+    if address.is_file_target and os.path.sep in address.relative_file_path:  # type: ignore[operator]
         # The file is in a subdirectory of spec_path
         return os.path.dirname(address.filename)
     else:

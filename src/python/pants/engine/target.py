@@ -1343,7 +1343,7 @@ def _generate_file_level_targets(
             fast_relpath(fp, template_address.spec_path) for fp in normalized_overrides
         )
         all_valid_relative_paths = sorted(
-            cast(str, tgt.address._relative_file_path or tgt.address.generated_name)
+            cast(str, tgt.address.relative_file_path or tgt.address.generated_name)
             for tgt in result
         )
         raise InvalidFieldException(
