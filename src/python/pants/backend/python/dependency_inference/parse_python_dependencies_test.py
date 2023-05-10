@@ -281,6 +281,28 @@ def test_relative_imports(rule_runner: RuleRunner, basename: str) -> None:
     )
 
 
+def test_uhoh(rule_runner: RuleRunner) -> None:
+    content = dedent(
+        """\
+        try:
+            # uh oh
+            from one import thing, other_thing
+        except ImportError:
+            from .one import thing, other_thing
+        """
+    )
+    assert_deps_parsed(
+        rule_runner,
+        content,
+        filename=f"a/b/c/d.py",
+        expected_imports={
+            "one.thing": ImpInfo(lineno=3, weak=True),
+            "one.other_thing": ImpInfo(lineno=3, weak=True),
+            "a.b.c.one.thing": ImpInfo(lineno=5, weak=False),
+            "a.b.c.one.other_thing": ImpInfo(lineno=5, weak=False),
+        },
+    )
+
 @pytest.mark.parametrize("min_dots", [1, 2, 3, 4])
 def test_imports_from_strings(rule_runner: RuleRunner, min_dots: int) -> None:
     content = dedent(
