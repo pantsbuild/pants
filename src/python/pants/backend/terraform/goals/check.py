@@ -1,7 +1,9 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-
+from pants.backend.terraform.dependency_inference import (
+    GetTerraformDependenciesRequest,
+    TerraformDependencies,
+)
 from pants.backend.terraform.partition import partition_files_by_directory
 from pants.backend.terraform.target_types import TerraformFieldSet
 from pants.backend.terraform.tool import TerraformProcess
@@ -42,19 +44,10 @@ async def terraform_check(
     )
     files_by_directory = partition_files_by_directory(source_files.files)
 
-    fetched_deps = await Get(
-        FallibleProcessResult,
-        TerraformProcess(
-            args=("init",),
-            input_digest=source_files.snapshot.digest,
-            output_files=(".terraform.lock.hcl",),
-            output_directories=(".terraform",),
-            description="Run `terraform init` to fetch dependencies",
-        ),
-    )
+    fetched_deps = await Get(TerraformDependencies, GetTerraformDependenciesRequest(source_files))
 
     sources_and_deps = await Get(
-        Digest, MergeDigests([source_files.snapshot.digest, fetched_deps.output_digest])
+        Digest, MergeDigests([source_files.snapshot.digest, fetched_deps.fetched_deps])
     )
 
     results = await MultiGet(
