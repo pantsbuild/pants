@@ -903,7 +903,7 @@ dependencies = [
  "process_execution",
  "protos",
  "pyo3",
- "pyo3-build-config 0.17.2",
+ "pyo3-build-config 0.18.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "rand",
  "regex",
  "remote",
@@ -2562,7 +2562,7 @@ dependencies = [
  "libc",
  "memoffset 0.8.0",
  "parking_lot 0.12.1",
- "pyo3-build-config 0.18.3",
+ "pyo3-build-config 0.18.3 (git+https://github.com/PyO3/pyo3.git?rev=c7d541b9ad2a9ef0255ab69541e67b22fe3fbf32)",
  "pyo3-ffi",
  "pyo3-macros",
  "unindent",
@@ -2570,9 +2570,9 @@ dependencies = [
 
 [[package]]
 name = "pyo3-build-config"
-version = "0.17.2"
+version = "0.18.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bf0708c9ed01692635cbf056e286008e5a2927ab1a5e48cdd3aeb1ba5a6fef47"
+checksum = "9cb946f5ac61bb61a5014924910d936ebd2b23b705f7a4a3c40b05c720b079a3"
 dependencies = [
  "once_cell",
  "target-lexicon",
@@ -2593,7 +2593,7 @@ version = "0.18.3"
 source = "git+https://github.com/PyO3/pyo3.git?rev=c7d541b9ad2a9ef0255ab69541e67b22fe3fbf32#c7d541b9ad2a9ef0255ab69541e67b22fe3fbf32"
 dependencies = [
  "libc",
- "pyo3-build-config 0.18.3",
+ "pyo3-build-config 0.18.3 (git+https://github.com/PyO3/pyo3.git?rev=c7d541b9ad2a9ef0255ab69541e67b22fe3fbf32)",
 ]
 
 [[package]]
