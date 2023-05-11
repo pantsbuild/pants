@@ -2,6 +2,8 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
+from pathlib import Path
+
 from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.core.util_rules.external_tool import TemplatedExternalTool
 from pants.engine.platform import Platform
@@ -55,22 +57,18 @@ class Taplo(TemplatedExternalTool):
 
                 ["**/*.toml", "**/pyproject.toml", "!pyproject.toml"]
 
-            The default includes all files with ``.toml`` extension recursively and excludes
+            The default includes all files with a ``.toml`` extension recursively and excludes
             ``.taplo.toml`` or ``taplo.toml`` files in the build root.
-
-            It might be helpful to load this config from a JSON or YAML file. To do that, set
-            `[taplo].config = '@path/to/config.yaml'`, for example.
             """
         ),
-        fromfile=True,
         advanced=True,
         default=["**/*.toml", "!.taplo.toml", "!taplo.toml"],
     )
 
     def generate_exe(self, plat: Platform) -> str:
         exe = super().generate_exe(plat)
-        # TODO: Replace rstrip with removesuffix when Python <3.9 support is dropped
-        return exe.rsplit("/", 1)[-1].rstrip(".gz")
+        exe_path = Path(exe)
+        return exe_path.stem
 
     def config_request(self) -> ConfigFilesRequest:
         return ConfigFilesRequest(
