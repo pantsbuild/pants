@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import textwrap
-from typing import Sequence
+from typing import Dict, Sequence
 
 import pytest
 
@@ -174,3 +174,42 @@ def test_in_folder(rule_runner: RuleRunner) -> None:
 
     check_results = run_terraform_validate(rule_runner, [target])
     assert check_results[0].exit_code == 0
+
+
+def test_conflicting_provider_versions(rule_runner: RuleRunner) -> None:
+    """Test that 2 separate terraform_modules can request conflicting providers."""
+    target_name = "in_folder"
+    versions = ["3.2.1", "3.0.0"]
+
+    def make_terraform_module(version: str) -> Dict[str, str]:
+        return {
+            f"folder{version}/BUILD": f"terraform_module(name='{target_name}')\n",
+            f"folder{version}/provided.tf": textwrap.dedent(
+                """
+            terraform {
+              required_providers {
+                null = {
+                  source = "hashicorp/null"
+                  version = "%s"
+                }
+              }
+            }
+            resource "null_resource" "res" {}
+            """
+                % version
+            ),
+        }
+
+    files = {}
+    for version in versions:
+        files.update(make_terraform_module(version))
+
+    rule_runner.write_files(files)
+    targets = [
+        rule_runner.get_target(Address(folder, target_name=target_name))
+        for folder in (f"folder{version}" for version in versions)
+    ]
+
+    check_results = run_terraform_validate(rule_runner, targets)
+    assert len(check_results) == len(versions)
+    assert all(check_result.exit_code == 0 for check_result in check_results)
