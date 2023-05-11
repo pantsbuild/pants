@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
-from pathlib import PureUnixPath
+from pathlib import PurePosixPath
 
 from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.core.util_rules.external_tool import TemplatedExternalTool
@@ -67,7 +67,7 @@ class Taplo(TemplatedExternalTool):
 
     def generate_exe(self, plat: Platform) -> str:
         exe = super().generate_exe(plat)
-        return PureUnixPath(exe).stem
+        return PurePosixPath(exe).stem
 
     def config_request(self) -> ConfigFilesRequest:
         return ConfigFilesRequest(
