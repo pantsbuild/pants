@@ -2,7 +2,10 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
+import shlex
 from dataclasses import dataclass
+from pathlib import Path
+from typing import Tuple
 
 from pants.core.util_rules.external_tool import (
     DownloadedExternalTool,
@@ -186,6 +189,7 @@ class TerraformProcess:
     input_digest: Digest = EMPTY_DIGEST
     output_files: tuple[str, ...] = ()
     output_directories: tuple[str, ...] = ()
+    chdir: str = "."  # directory for terraform's `-chdir` argument
 
 
 @rule
@@ -200,12 +204,15 @@ async def setup_terraform_process(
 
     immutable_input_digests = {"__terraform": downloaded_terraform.digest}
 
+    def prepend_paths(paths: Tuple[str, ...]) -> Tuple[str, ...]:
+        return tuple((Path(request.chdir) / path).as_posix() for path in paths)
+
     return Process(
-        argv=("__terraform/terraform",) + request.args,
+        argv=("__terraform/terraform", f"-chdir={shlex.quote(request.chdir)}") + request.args,
         input_digest=request.input_digest,
         immutable_input_digests=immutable_input_digests,
-        output_files=request.output_files,
-        output_directories=request.output_directories,
+        output_files=prepend_paths(request.output_files),
+        output_directories=prepend_paths(request.output_directories),
         description=request.description,
         level=LogLevel.DEBUG,
     )

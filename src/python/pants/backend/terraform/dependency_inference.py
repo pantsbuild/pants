@@ -2,9 +2,8 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
-import shlex
 from dataclasses import dataclass
-from pathlib import Path, PurePath
+from pathlib import PurePath
 from typing import Tuple
 
 from pants.backend.python.subsystems.python_tool_base import (
@@ -167,11 +166,12 @@ async def get_terraform_providers(
         Get(
             FallibleProcessResult,
             TerraformProcess(
-                args=(f"-chdir={shlex.quote(directory)}", "init"),
+                args=("init",),
                 input_digest=req.source_files.snapshot.digest,
-                output_files=((Path(directory) / ".terraform.lock.hcl").as_posix(),),
-                output_directories=((Path(directory) / ".terraform").as_posix(),),
+                output_files=(".terraform.lock.hcl",),
+                output_directories=(".terraform",),
                 description="Run `terraform init` to fetch dependencies",
+                chdir=directory,
             ),
         )
         for directory in req.directories

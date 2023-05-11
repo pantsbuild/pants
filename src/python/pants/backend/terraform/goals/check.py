@@ -1,6 +1,5 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-import shlex
 
 from pants.backend.terraform.dependency_inference import (
     GetTerraformDependenciesRequest,
@@ -61,10 +60,11 @@ async def terraform_check(
         Get(
             FallibleProcessResult,
             TerraformProcess(
-                args=(f"-chdir={shlex.quote(directory)}", "validate"),
+                args=("validate",),
                 input_digest=sources_and_deps,
                 output_files=tuple(files),
                 description=f"Run `terraform fmt` on {pluralize(len(files), 'file')}.",
+                chdir=directory,
             ),
         )
         for directory, files in files_by_directory.items()
