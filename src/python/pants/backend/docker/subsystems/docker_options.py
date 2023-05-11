@@ -66,6 +66,7 @@ class DockerOptions(Subsystem):
                         "extra_image_tags": [],
                         "skip_push": bool,
                         "repository": str,
+                        "use_local_alias": bool,
                     },
                     ...
                 }
@@ -91,6 +92,10 @@ class DockerOptions(Subsystem):
             `docker_image.repository` or the default repository. Using the placeholders
             `{target_repository}` or `{default_repository}` those overridden values may be
             incorporated into the registry specific repository value.
+
+            If `use_local_alias` is true, a built image is additionally tagged locally using the
+            registry alias as the value for repository (i.e. the additional image tag is not pushed)
+            and will be used for any `pants run` requests.
             """
         ),
         fromfile=True,

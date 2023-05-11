@@ -1185,7 +1185,7 @@ def test_write_digest_workspace(rule_runner: RuleRunner) -> None:
     assert path2.read_text() == "goodbye"
 
 
-def test_write_digest_workspace_clear_destination(rule_runner: RuleRunner) -> None:
+def test_write_digest_workspace_clear_paths(rule_runner: RuleRunner) -> None:
     workspace = Workspace(rule_runner.scheduler, _enforce_effects=False)
     digest_a = rule_runner.request(
         Digest,
@@ -1199,19 +1199,50 @@ def test_write_digest_workspace_clear_destination(rule_runner: RuleRunner) -> No
         Digest,
         [CreateDigest([FileContent("newdir/c.txt", b"hello again")])],
     )
-    path1 = Path(rule_runner.build_root, "newdir/a.txt")
-    path2 = Path(rule_runner.build_root, "newdir/b.txt")
-    path3 = Path(rule_runner.build_root, "newdir/c.txt")
+    digest_c_root = rule_runner.request(
+        Digest, [CreateDigest([FileContent("c.txt", b"hello again")])]
+    )
+    digest_d = rule_runner.request(
+        Digest, [CreateDigest([SymlinkEntry("newdir/d.txt", "newdir/a.txt")])]
+    )
+    all_paths = {name: Path(rule_runner.build_root, f"newdir/{name}.txt") for name in "abcd"}
 
-    workspace.write_digest(digest_a, clear_destination=False)
-    workspace.write_digest(digest_b, clear_destination=False)
-    assert path1.exists()
-    assert path2.exists()
+    def check(expected_names: set[str]) -> None:
+        for name, path in all_paths.items():
+            expected = name in expected_names
+            assert path.exists() == expected
 
-    workspace.write_digest(digest_c, clear_destination=True)
-    assert not path1.exists()
-    assert not path2.exists()
-    assert path3.read_text() == "hello again"
+    workspace.write_digest(digest_a, clear_paths=())
+    workspace.write_digest(digest_b, clear_paths=())
+    check({"a", "b"})
+
+    # clear a file
+    workspace.write_digest(digest_d, clear_paths=("newdir/b.txt",))
+    check({"a", "d"})
+
+    # clear a symlink (doesn't remove target file)
+    workspace.write_digest(digest_b, clear_paths=("newdir/d.txt",))
+    check({"a", "b"})
+
+    # clear a directory
+    workspace.write_digest(digest_c, clear_paths=("newdir",))
+    check({"c"})
+
+    # path prefix, and clearing the 'current' directory
+    workspace.write_digest(digest_c_root, path_prefix="newdir", clear_paths=("",))
+    check({"c"})
+
+    # clear multiple paths
+    workspace.write_digest(digest_b, clear_paths=())
+    check({"b", "c"})
+    workspace.write_digest(digest_a, clear_paths=("newdir/b.txt", "newdir/c.txt"))
+    check({"a"})
+
+    # clearing non-existent paths is fine
+    workspace.write_digest(
+        digest_b, clear_paths=("not-here", "newdir/not-here", "not-here/also-not-here")
+    )
+    check({"a", "b"})
 
 
 @dataclass(frozen=True)

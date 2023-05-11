@@ -8,11 +8,6 @@ ansicolors==1.1.8
 chevron==0.14.0
 fasteners==0.16.3
 freezegun==1.2.1
-
-# Note: we use humbug to report telemetry. When upgrading, ensure the new version maintains the
-# anonymity promise we make here: https://www.pantsbuild.org/docs/anonymous-telemetry
-humbug==0.2.7
-
 importlib_resources==5.0.*
 ijson==3.1.4
 packaging==21.3

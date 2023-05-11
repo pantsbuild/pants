@@ -32,7 +32,7 @@ fn test_find_cwd() {
 
   assert_sentinel("BUILDROOT");
   assert_sentinel("BUILD_ROOT");
-  assert_sentinel("pants");
+  assert_sentinel("pants.toml");
 }
 
 #[test]
@@ -44,7 +44,7 @@ fn test_find_subdir() {
   assert!(BuildRoot::find_from(&buildroot_path).is_err());
   assert!(BuildRoot::find_from(&subdir).is_err());
 
-  let sentinel = &buildroot.path().join("pants");
+  let sentinel = &buildroot.path().join("pants.toml");
   fs::write(sentinel, []).unwrap();
   assert_eq!(
     &buildroot_path,

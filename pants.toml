@@ -86,7 +86,6 @@ delegate_bootstrap = true
 enabled = true
 repo_id = "7775F8D5-FC58-4DBC-9302-D00AE4A1505F"
 
-
 [cli.alias]
 all-changed = "--changed-since=HEAD --changed-dependents=transitive"
 run-pyupgrade = "--backend-packages=pants.backend.experimental.python.lint.pyupgrade fmt"
@@ -160,6 +159,7 @@ python-default = [">=3.7,<3.10"]
 [python-infer]
 assets = true
 unowned_dependency_behavior = "error"
+use_rust_parser = true
 
 [docformatter]
 args = ["--wrap-summaries=100", "--wrap-descriptions=100"]
