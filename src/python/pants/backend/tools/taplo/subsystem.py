@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
-from pathlib import Path
+from pathlib import PureUnixPath
 
 from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.core.util_rules.external_tool import TemplatedExternalTool
@@ -57,8 +57,8 @@ class Taplo(TemplatedExternalTool):
 
                 ["**/*.toml", "**/pyproject.toml", "!pyproject.toml"]
 
-            The default includes all files with a ``.toml`` extension recursively and excludes
-            ``.taplo.toml`` or ``taplo.toml`` files in the build root.
+            The default includes all files with a `.toml` extension recursively and excludes
+            `.taplo.toml` or `taplo.toml` files in the build root.
             """
         ),
         advanced=True,
@@ -67,8 +67,7 @@ class Taplo(TemplatedExternalTool):
 
     def generate_exe(self, plat: Platform) -> str:
         exe = super().generate_exe(plat)
-        exe_path = Path(exe)
-        return exe_path.stem
+        return PureUnixPath(exe).stem
 
     def config_request(self) -> ConfigFilesRequest:
         return ConfigFilesRequest(
