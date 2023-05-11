@@ -365,34 +365,34 @@ def test_resolve_address() -> None:
         assert rule_runner.request(Address, [address_input]) == expected
 
     assert_is_expected(
-        AddressInput("a/b/c.txt", description_of_origin="tests"),
+        AddressInput("todo", "a/b/c.txt", description_of_origin="tests"),
         Address("a/b", target_name=None, relative_file_path="c.txt"),
     )
     assert_is_expected(
-        AddressInput("a/b", description_of_origin="tests"),
+        AddressInput("todo", "a/b", description_of_origin="tests"),
         Address("a/b", target_name=None, relative_file_path=None),
     )
 
     assert_is_expected(
-        AddressInput("a/b", target_component="c", description_of_origin="tests"),
+        AddressInput("todo", "a/b", target_component="c", description_of_origin="tests"),
         Address("a/b", target_name="c"),
     )
     assert_is_expected(
-        AddressInput("a/b/c.txt", target_component="c", description_of_origin="tests"),
+        AddressInput("todo", "a/b/c.txt", target_component="c", description_of_origin="tests"),
         Address("a/b", relative_file_path="c.txt", target_name="c"),
     )
 
     # Top-level addresses will not have a path_component, unless they are a file address.
     assert_is_expected(
-        AddressInput("f.txt", target_component="original", description_of_origin="tests"),
+        AddressInput("todo", "f.txt", target_component="original", description_of_origin="tests"),
         Address("", relative_file_path="f.txt", target_name="original"),
     )
     assert_is_expected(
-        AddressInput("", target_component="t", description_of_origin="tests"),
+        AddressInput("todo", "", target_component="t", description_of_origin="tests"),
         Address("", target_name="t"),
     )
 
-    bad_address_input = AddressInput("a/b/fake", description_of_origin="tests")
+    bad_address_input = AddressInput("todo", "a/b/fake", description_of_origin="tests")
     expected_err = "'a/b/fake' does not exist on disk"
     with engine_error(ResolveError, contains=expected_err):
         rule_runner.request(Address, [bad_address_input])

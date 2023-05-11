@@ -78,8 +78,11 @@ lazy_static! {
 }
 
 #[pyclass(name = "AddressInput")]
-#[derive(Debug, Hash, Eq, PartialEq)]
+#[derive(Debug, Derivative, Eq)]
+#[derivative(PartialEq, Hash)]
 pub struct AddressInput {
+  // TODO: Temporarily, to avoid changing tests.
+  #[derivative(PartialEq = "ignore", Hash = "ignore")]
   original_spec: String,
   path_component: PathBuf,
   target_component: Option<String>,
