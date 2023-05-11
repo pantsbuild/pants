@@ -2,8 +2,10 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
+import shlex
 from dataclasses import dataclass
-from pathlib import PurePath
+from pathlib import Path, PurePath
+from typing import Tuple
 
 from pants.backend.python.subsystems.python_tool_base import (
     LockfileRules,
@@ -18,7 +20,7 @@ from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.base.specs import DirGlobSpec, RawSpecs
 from pants.core.util_rules.source_files import SourceFiles
 from pants.engine.fs import CreateDigest, Digest, FileContent
-from pants.engine.internals.selectors import Get
+from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import FallibleProcessResult, Process, ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
@@ -149,28 +151,35 @@ async def infer_terraform_module_dependencies(
 @dataclass(frozen=True)
 class GetTerraformDependenciesRequest:
     source_files: SourceFiles
+    directories: Tuple[str, ...]
 
 
 @dataclass(frozen=True)
 class TerraformDependencies:
-    fetched_deps: Digest
+    fetched_deps: Tuple[Tuple[str, Digest], ...]
 
 
 @rule
 async def get_terraform_providers(
     req: GetTerraformDependenciesRequest,
 ) -> TerraformDependencies:
-    fetched_deps = await Get(
-        FallibleProcessResult,
-        TerraformProcess(
-            args=("init",),
-            input_digest=req.source_files.snapshot.digest,
-            output_files=(".terraform.lock.hcl",),
-            output_directories=(".terraform",),
-            description="Run `terraform init` to fetch dependencies",
-        ),
+    fetched_deps = await MultiGet(
+        Get(
+            FallibleProcessResult,
+            TerraformProcess(
+                args=(f"-chdir={shlex.quote(directory)}", "init"),
+                input_digest=req.source_files.snapshot.digest,
+                output_files=((Path(directory) / ".terraform.lock.hcl").as_posix(),),
+                output_directories=((Path(directory) / ".terraform").as_posix(),),
+                description="Run `terraform init` to fetch dependencies",
+            ),
+        )
+        for directory in req.directories
     )
-    return TerraformDependencies(fetched_deps.output_digest)
+
+    return TerraformDependencies(
+        tuple(zip(req.directories, (x.output_digest for x in fetched_deps)))
+    )
 
 
 def rules():

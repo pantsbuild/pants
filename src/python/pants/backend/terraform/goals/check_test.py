@@ -155,3 +155,22 @@ def test_with_dependency(rule_runner: RuleRunner) -> None:
     targets = [make_target(rule_runner, [SOURCE_WITH_PROVIDER])]
     check_results = run_terraform_validate(rule_runner, targets)
     assert check_results[0].exit_code == 0
+
+
+def test_in_folder(rule_runner: RuleRunner) -> None:
+    """Test that we can `check` terraform files not in the root folder."""
+    target_name = "in_folder"
+    files = {
+        "folder/BUILD": f"terraform_module(name='{target_name}')\n",
+        "folder/provided.tf": textwrap.dedent(
+            """
+            resource "null_resource" "dep" {}
+            resource "random_pet" "random" {}
+            """
+        ),
+    }
+    rule_runner.write_files(files)
+    target = rule_runner.get_target(Address("folder", target_name=target_name))
+
+    check_results = run_terraform_validate(rule_runner, [target])
+    assert check_results[0].exit_code == 0

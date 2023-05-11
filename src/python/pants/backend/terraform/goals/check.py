@@ -1,5 +1,7 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+import shlex
+
 from pants.backend.terraform.dependency_inference import (
     GetTerraformDependenciesRequest,
     TerraformDependencies,
@@ -44,17 +46,22 @@ async def terraform_check(
     )
     files_by_directory = partition_files_by_directory(source_files.files)
 
-    fetched_deps = await Get(TerraformDependencies, GetTerraformDependenciesRequest(source_files))
+    fetched_deps = await Get(
+        TerraformDependencies,
+        GetTerraformDependenciesRequest(source_files, tuple(files_by_directory.keys())),
+    )
+    # just merge them all for now. This will probably be a problem with multiple TF sources requesting different versions of the same providers
+    merged_fetched_deps = await Get(Digest, MergeDigests([x[1] for x in fetched_deps.fetched_deps]))
 
     sources_and_deps = await Get(
-        Digest, MergeDigests([source_files.snapshot.digest, fetched_deps.fetched_deps])
+        Digest, MergeDigests([source_files.snapshot.digest, merged_fetched_deps])
     )
 
     results = await MultiGet(
         Get(
             FallibleProcessResult,
             TerraformProcess(
-                args=("validate", directory),
+                args=(f"-chdir={shlex.quote(directory)}", "validate"),
                 input_digest=sources_and_deps,
                 output_files=tuple(files),
                 description=f"Run `terraform fmt` on {pluralize(len(files), 'file')}.",
