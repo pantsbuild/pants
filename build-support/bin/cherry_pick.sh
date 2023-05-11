@@ -34,6 +34,7 @@ if [[ -z $TARGET_MILESTONE ]]; then
   fi
 fi
 
+# NB: Find all milestones >= $TARGET_MILESTONE
 # shellcheck disable=SC2016
 MILESTONES=$(gh api graphql -F owner=":owner" -F name=":repo" -f query='
   query ListMilestones($name: String!, $owner: String!) {
