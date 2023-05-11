@@ -11,6 +11,7 @@ from pants.backend.python.subsystems.python_tool_base import (
 )
 from pants.backend.python.target_types import EntryPoint
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
+from pants.backend.python.util_rules.pex import rules as pex_rules
 from pants.backend.terraform.target_types import TerraformModuleSourcesField
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.base.specs import DirGlobSpec, RawSpecs
@@ -146,5 +147,6 @@ async def infer_terraform_module_dependencies(
 def rules():
     return [
         *collect_rules(),
+        *pex_rules(),
         UnionRule(InferDependenciesRequest, InferTerraformModuleDependenciesRequest),
     ]
