@@ -36,10 +36,10 @@ async def lint(..., targets: Targets, union_membership: UnionMembership) -> Lint
 ```
 
 ```python pants-plugins/bash/shellcheck.py
-from pants.core.goals.lint import AbstractLintRequest
+from pants.core.goals.lint import LintTargetsRequest
 
 
-class ShellcheckRequest(AbstractLintRequest):
+class ShellcheckRequest(LintTargetsRequest):
     ...
 
 
@@ -47,7 +47,7 @@ class ShellcheckRequest(AbstractLintRequest):
 
 
 def rules():
-    return [UnionRule(AbstractLintRequest, ShellcheckRequest)
+    return [*ShellcheckRequest.rules()]
 ```
 
 This example will find all registered linter implementations by looking up `union_membership[LintTargetsRequest]`, which returns a tuple of all `LintTargetsRequest ` types that were registered with a `UnionRule`, such as `ShellcheckRequest` and `Flake8Request`.
