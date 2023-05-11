@@ -8,7 +8,6 @@ set -e
 
 function fail {
   printf '%s\n' "$1" >&2
-  echo "Don't forget to remove the 'needs-cherrypick' label after making the PR!"
   exit "${2-1}"
 }
 
@@ -46,6 +45,10 @@ MILESTONES=$(gh api graphql -F owner=":owner" -F name=":repo" -f query='
   }' --jq .data.repository.milestones.nodes.[].title | awk "/$TARGET_MILESTONE/{p=1}p" -)
 
 COMMIT=$(gh pr view "$PR_NUM" --json mergeCommit --jq '.mergeCommit.oid')
+if [[ -z $COMMIT ]]; then
+  fail "Wasn't able to retrieve merge commit for $PR_NUM."
+fi
+
 TITLE=$(gh pr view "$PR_NUM" --json title --jq '.title')
 CATEGORY_LABEL=$(gh pr view "$PR_NUM" --json labels --jq '.labels.[] | select(.name|test("category:.")).name')
 if [[ -z $CATEGORY_LABEL ]]; then
@@ -56,24 +59,29 @@ if [[ -z $CATEGORY_LABEL ]]; then
 fi
 REVIEWERS=$(gh pr view "$PR_NUM" --json reviews --jq '.reviews.[].author.login' | sort | uniq)
 
+BODY_FILE=$(mktemp "/tmp/github.cherrypick.$PR_NUM.XXXXXX")
+gh pr view "$PR_NUM" --json body --jq '.body' > "$BODY_FILE"
+
 for MILESTONE in $MILESTONES; do
-  BODY_FILE=$(mktemp "/tmp/github.cherrypick.$PR_NUM.$MILESTONE.XXXXXX")
+  git fetch https://github.com/pantsbuild/pants "$MILESTONE" || continue
+
   PR_CREATE_CMD=(gh pr create --base "$MILESTONE" --title "$TITLE (Cherry-pick of #$PR_NUM)" --label "$CATEGORY_LABEL" --body-file "$BODY_FILE")
   while IFS= read -r REVIEWER; do PR_CREATE_CMD+=(--reviewer "$REVIEWER"); done <<< "$REVIEWERS"
   BRANCH_NAME="cherry-pick-$PR_NUM-to-$MILESTONE"
-
-  if [[ -z $COMMIT ]]; then
-    fail "Wasn't able to retrieve merge commit for $PR_NUM."
-  fi
-
-  gh pr view "$PR_NUM" --json body --jq '.body' > "$BODY_FILE"
-  git fetch https://github.com/pantsbuild/pants "$MILESTONE"
   git checkout -b "$BRANCH_NAME" FETCH_HEAD
-  git cherry-pick "$COMMIT" ||
-    fail "\nPlease fix the above conflicts, commit, and then run:\n  ${PR_CREATE_CMD[*]}"
+  if git cherry-pick "$COMMIT"; then
+    "${PR_CREATE_CMD[@]}"
+  else
+    readarray -t -d '' ESCAPED_PR_CREATE_CMD < <(printf "%q\0" "${PR_CREATE_CMD[@]}")
+    fail "
+    Cherry-picking failed, likely due to a merge-conflict.
+    Please fix the above conflicts, commit, and then run the following command.
+    (Also don't forget to remove the 'needs-cherrypick' label from the original PR).
 
-  "${PR_CREATE_CMD[@]}"
-  rm "$BODY_FILE"
+      ${ESCAPED_PR_CREATE_CMD[*]}
+    "
+  fi
 done
+rm "$BODY_FILE"
 
 gh pr edit "$PR_NUM" --remove-label "need-cherrypick"
