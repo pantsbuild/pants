@@ -1,24 +1,40 @@
-steps:
-  - uses: actions/first-interaction@v1
-    with:
-      repo-token: ${{ secrets.GITHUB_TOKEN }}
-      issue-message: |
-        Welcome to the Pantsbuild Community. This looks like your first issue here.
+name: first-interaction
 
-        If you haven't already, come say hi on Slack.
-        Use [this link](https://docs.google.com/forms/d/e/1FAIpQLSf9zgf-MXRnVDJbrVEST3urqneq7LCcy0zw8qU-GH4hPMn52A/viewform?usp=sf_link)
-        for an invitation.
+on:
+  issues:
+    types: [opened]
+  pull_request:
+    branches: [main]
+    types: [opened]
 
-        Thanks again, and we look forward to your next Issue/PR :smile:!
+jobs:
+  check_for_first_interaction:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/first-interaction@v1
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          issue-message: |
+            Welcome to the Pantsbuild Community. This looks like your first issue here.
 
-      pr-message: |
-        Welcome to the Pantsbuild Community. This looks like your first PR here.
+            If you haven't already, come say hi on Slack.
+            Use [this link](https://docs.google.com/forms/d/e/1FAIpQLSf9zgf-MXRnVDJbrVEST3urqneq7LCcy0zw8qU-GH4hPMn52A/viewform?usp=sf_link)
+            for an invitation.
 
-        We are so grateful for each an every contribution, big or small.
-        So thanks for spending your time and energy making this project better.
+            Thanks again, and we look forward to your next Issue/PR :smile:!
 
-        If you haven't already, come say hi on Slack.
-        Use [this link](https://docs.google.com/forms/d/e/1FAIpQLSf9zgf-MXRnVDJbrVEST3urqneq7LCcy0zw8qU-GH4hPMn52A/viewform?usp=sf_link)
-        for an invitation. If you have questions, or just want to surface this PR, check out the `#development` channel.
+          pr-message: |
+            Welcome to the Pantsbuild Community. This looks like your first PR here.
 
-        Thanks again, and we look forward to your next PR :smile:!
+            We are so grateful for each an every contribution, big or small.
+            So thanks for spending your time and energy making this project better.
+
+            If you haven't gotten a reply in one business week, feel free to gently comment "bump" to ping the project admins.
+
+            If you haven't already, come say hi on Slack.
+            Use [this link](https://docs.google.com/forms/d/e/1FAIpQLSf9zgf-MXRnVDJbrVEST3urqneq7LCcy0zw8qU-GH4hPMn52A/viewform?usp=sf_link)
+            for an invitation. If you have questions, or just want to surface this PR, check out the `#development` channel.
+            (If you want to check it out without logging in, check out our [Linen mirror](https://chat.pantsbuild.org/))
+
+            Thanks again, and we look forward to your next PR :smile:!
