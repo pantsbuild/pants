@@ -10,6 +10,7 @@ from pants.backend.python.util_rules.faas import (
     PythonFaaSCompletePlatforms,
     PythonFaaSDependencies,
     PythonFaaSHandlerField,
+    PythonFaaSLayoutField,
     PythonFaaSRuntimeField,
 )
 from pants.backend.python.util_rules.faas import rules as faas_rules
@@ -111,6 +112,7 @@ class PythonGoogleCloudFunction(Target):
         PythonFaaSCompletePlatforms,
         PythonGoogleCloudFunctionType,
         PythonResolveField,
+        PythonFaaSLayoutField,
         EnvironmentField,
     )
     help = help_text(

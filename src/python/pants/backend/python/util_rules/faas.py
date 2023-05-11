@@ -8,6 +8,7 @@ import logging
 import os.path
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from enum import Enum
 from typing import Optional, cast
 
 from pants.backend.python.dependency_inference.module_mapper import (
@@ -263,6 +264,34 @@ class PythonFaaSRuntimeField(StringField, ABC):
         if py_major <= 3 and py_minor < 8:
             platform_str += "m"
         return platform_str
+
+
+class PythonFaaSLayout(Enum):
+    # TODO: deprecate lambdex layout, since PEX can be used directly now
+    LAMBDEX = "lambdex"
+    ZIP = "zip"
+
+
+class PythonFaaSLayoutField(StringField):
+    alias = "layout"
+    valid_choices = PythonFaaSLayout
+    default = PythonFaaSLayout.LAMBDEX.value
+
+    help = help_text(
+        """
+        The layout used for the function artefact.
+
+        With the `lambdex` layout (default), the artefact is created as a Lambdex, which is a normal
+        PEX that's been adjusted to include a shim file for the handler. This requires dynamically
+        choosing dependencies on start-up.
+
+        With the `zip` layout, the artefact contains first and third party code at the top level,
+        similar to building with `pip install --target=...`. This layout chooses the appropriate
+        versions of dependencies at build time, and so at most one platform can be specified via
+        `runtime` or `complete_platforms`.
+
+        """
+    )
 
 
 @rule
