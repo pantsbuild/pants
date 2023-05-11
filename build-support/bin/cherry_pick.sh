@@ -34,7 +34,9 @@ if [[ -z $TARGET_MILESTONE ]]; then
   fi
 fi
 
-# NB: Find all milestones >= $TARGET_MILESTONE
+# NB: Find all milestones >= $TARGET_MILESTONE by having GH list them, then uses awk to trim the
+# results to $TARGET_MILESTONE and all milestones after it. Later we will verify these milestones
+# match a branch name.
 # shellcheck disable=SC2016
 MILESTONES=$(gh api graphql -F owner=":owner" -F name=":repo" -f query='
   query ListMilestones($name: String!, $owner: String!) {
