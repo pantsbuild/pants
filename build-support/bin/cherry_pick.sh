@@ -35,7 +35,8 @@ if [[ -z $TARGET_MILESTONE ]]; then
   fi
 fi
 
-MILESTONES=$(gh api graphql -F owner=':owner' -F name=':repo' -f query='
+# shellcheck disable=SC2016
+MILESTONES=$(gh api graphql -F owner=":owner" -F name=":repo" -f query='
   query ListMilestones($name: String!, $owner: String!) {
     repository(owner: $owner, name: $name) {
       milestones(last: 10) {
@@ -43,7 +44,6 @@ MILESTONES=$(gh api graphql -F owner=':owner' -F name=':repo' -f query='
       }
     }
   }' --jq .data.repository.milestones.nodes.[].title | awk "/$TARGET_MILESTONE/{p=1}p" -)
-
 
 COMMIT=$(gh pr view "$PR_NUM" --json mergeCommit --jq '.mergeCommit.oid')
 TITLE=$(gh pr view "$PR_NUM" --json title --jq '.title')
@@ -56,8 +56,7 @@ if [[ -z $CATEGORY_LABEL ]]; then
 fi
 REVIEWERS=$(gh pr view "$PR_NUM" --json reviews --jq '.reviews.[].author.login' | sort | uniq)
 
-for MILESTONE in $MILESTONES
-do
+for MILESTONE in $MILESTONES; do
   BODY_FILE=$(mktemp "/tmp/github.cherrypick.$PR_NUM.$MILESTONE.XXXXXX")
   PR_CREATE_CMD=(gh pr create --base "$MILESTONE" --title "$TITLE (Cherry-pick of #$PR_NUM)" --label "$CATEGORY_LABEL" --body-file "$BODY_FILE")
   while IFS= read -r REVIEWER; do PR_CREATE_CMD+=(--reviewer "$REVIEWER"); done <<< "$REVIEWERS"
