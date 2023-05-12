@@ -35,8 +35,10 @@ from pants.engine.fs import (
 from pants.engine.goal import CurrentExecutingGoals, Goal
 from pants.engine.internals import native_engine
 from pants.engine.internals.docker import DockerResolveImageRequest, DockerResolveImageResult
-from pants.engine.internals.native_dep_inference import NativeParsedPythonDependencies, \
-    NativeParsedJavascriptDependencies
+from pants.engine.internals.native_dep_inference import (
+    NativeParsedJavascriptDependencies,
+    NativeParsedPythonDependencies,
+)
 from pants.engine.internals.native_engine import (
     PyExecutionRequest,
     PyExecutionStrategyOptions,
