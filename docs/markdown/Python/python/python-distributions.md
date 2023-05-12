@@ -205,7 +205,7 @@ The generated `setup.py` will have its `install_requires` set to include the 3rd
 > 
 > ```toml
 > [setup-py-generation]
-> first_party_depenency_version_scheme = "compatible"
+> first_party_dependency_version_scheme = "compatible"
 > ```
 > 
 > See <https://www.python.org/dev/peps/pep-0440/#version-specifiers> for more information on the `~=` specifier.
