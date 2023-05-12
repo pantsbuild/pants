@@ -590,6 +590,67 @@ def test_infer_python_ignore_unowned_imports(imports_rule_runner: PythonRuleRunn
         )
 
 
+def test_infer_python_ignore_self_imports(imports_rule_runner: PythonRuleRunner, caplog) -> None:
+    """Test handling a module depending on itself with self imports set explicitly to be ignored."""
+    imports_rule_runner.write_files(
+        {
+            "src/python/cheesey.py": dedent(
+                """\
+                    from cheesey import logname
+                    from helpers import foo
+                    logname = "src.python.cheesey"
+                """
+            ),
+            "src/python/helpers.py": "foo = 'bar'",
+            "src/python/BUILD": "python_sources()",
+        }
+    )
+
+    def run_dep_inference(
+        unowned_dependency_behavior: str, ignore_self_imports: bool
+    ) -> InferredDependencies:
+        imports_rule_runner.set_options(
+            [
+                "--source-root-patterns=src/python",
+                f"--python-infer-unowned-dependency-behavior={unowned_dependency_behavior}",
+                (
+                    "--python-infer-ignore-self-imports"
+                    if ignore_self_imports
+                    else "--no-python-infer-ignore-self-imports"
+                ),
+            ],
+            env_inherit=PYTHON_BOOTSTRAP_ENV,
+        )
+        target = imports_rule_runner.get_target(
+            Address("src/python", relative_file_path="cheesey.py")
+        )
+        return imports_rule_runner.request(
+            InferredDependencies,
+            [
+                InferPythonImportDependencies(
+                    PythonImportDependenciesInferenceFieldSet.create(target)
+                )
+            ],
+        )
+
+    result = run_dep_inference("warning", ignore_self_imports=False)
+    assert (
+        FrozenOrderedSet(
+            (
+                Address("src/python", target_name="", relative_file_path="cheesey.py"),
+                Address("src/python", target_name="", relative_file_path="helpers.py"),
+            )
+        )
+        == result.include
+    )
+
+    result = run_dep_inference("warning", ignore_self_imports=True)
+    assert (
+        FrozenOrderedSet((Address("src/python", target_name="", relative_file_path="helpers.py"),))
+        == result.include
+    )
+
+
 def test_infer_python_strict(imports_rule_runner: PythonRuleRunner, caplog) -> None:
     imports_rule_runner.write_files(
         {
@@ -827,6 +888,7 @@ class TestCategoriseImportsInfo:
                 FrozenOrderedSet(),
                 FrozenOrderedSet((Address("ambiguous_disambiguatable", target_name="bad"),)),
             ),
+            ignore_self_imports=False,
         )
 
         assert len(resolve_result) == 1 and case_name in resolve_result

@@ -191,6 +191,31 @@ class PythonInferSubsystem(Subsystem):
         ),
     )
 
+    ignore_self_imports = BoolOption(
+        default=False,
+        help=softwrap(
+            """Whether self imports of a module should be ignored.
+
+            This is different from the `dependencies-closed` option which includes the input targets in the output.
+
+            A Python module may import (and therefore depend) on itself by having an import of a member from that
+            module or a string literal that would be mapped to that module name. You may want to skip reporting
+            dependencies on the module itself to avoid adding `# pants: no-infer-dep` comments.
+
+            For example, it is not uncommon to declare a logger name in a Python module in this way:
+
+                ```
+                # src/project/console.py
+                ...
+                logger_name = "src.project.console"
+                ```
+
+            which would result in having `src/project/console.py` reported as being dependent on
+            `src/project/console.py`.
+        """
+        ),
+    )
+
     use_rust_parser = BoolOption(
         default=False,
         help=softwrap(

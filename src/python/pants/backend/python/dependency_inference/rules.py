@@ -157,6 +157,7 @@ def _get_imports_info(
     owners_per_import: Iterable[PythonModuleOwners],
     parsed_imports: ParsedPythonImports,
     explicitly_provided_deps: ExplicitlyProvidedDependencies,
+    ignore_self_imports: bool,
 ) -> dict[str, ImportResolveResult]:
     def _resolve_single_import(owners, import_name) -> ImportResolveResult:
         if owners.unambiguous:
@@ -178,10 +179,15 @@ def _get_imports_info(
         else:
             return ImportResolveResult(ImportOwnerStatus.unowned)
 
-    return {
-        imp: _resolve_single_import(owners, imp)
-        for owners, (imp, inf) in zip(owners_per_import, parsed_imports.items())
-    }
+    result = {}
+    for owners, (imp, inf) in zip(owners_per_import, parsed_imports.items()):
+        resolved_single_import = _resolve_single_import(owners, imp)
+        if ignore_self_imports:
+            if not resolved_single_import.address or (resolved_single_import.address[0] != address):
+                result[imp] = resolved_single_import
+        else:
+            result[imp] = resolved_single_import
+    return result
 
 
 def _collect_imports_info(
@@ -425,6 +431,7 @@ async def resolve_parsed_dependencies(
             owners_per_import=owners_per_import,
             parsed_imports=parsed_imports,
             explicitly_provided_deps=explicitly_provided_deps,
+            ignore_self_imports=python_infer_subsystem.ignore_self_imports,
         )
     else:
         resolve_results = {}
