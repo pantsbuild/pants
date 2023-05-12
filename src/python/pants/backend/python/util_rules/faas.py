@@ -97,7 +97,8 @@ class PythonFaaSHandlerField(StringField, AsyncFieldMixin, SecondaryOwnerMixin):
 
 @dataclass(frozen=True)
 class ResolvedPythonFaaSHandler:
-    val: str
+    module: str
+    func: str
     file_name_used: bool
 
 
@@ -118,7 +119,7 @@ async def resolve_python_faas_handler(
     # If it's already a module, simply use that. Otherwise, convert the file name into a module
     # path.
     if not path.endswith(".py"):
-        return ResolvedPythonFaaSHandler(handler_val, file_name_used=False)
+        return ResolvedPythonFaaSHandler(module=path, func=func, file_name_used=False)
 
     # Use the engine to validate that the file exists and that it resolves to only one file.
     full_glob = os.path.join(address.spec_path, path)
@@ -147,7 +148,7 @@ async def resolve_python_faas_handler(
     stripped_source_path = os.path.relpath(handler_path, source_root.path)
     module_base, _ = os.path.splitext(stripped_source_path)
     normalized_path = module_base.replace(os.path.sep, ".")
-    return ResolvedPythonFaaSHandler(f"{normalized_path}:{func}", file_name_used=True)
+    return ResolvedPythonFaaSHandler(module=normalized_path, func=func, file_name_used=True)
 
 
 class PythonFaaSDependencies(Dependencies):
@@ -187,7 +188,6 @@ async def infer_faas_handler_dependency(
             ResolvePythonFaaSHandlerRequest(request.field_set.handler),
         ),
     )
-    module, _, _func = handler.val.partition(":")
 
     # Only set locality if needed, to avoid unnecessary rule graph memoization misses.
     # When set, use the source root, which is useful in practice, but incurs fewer memoization
@@ -202,7 +202,7 @@ async def infer_faas_handler_dependency(
     owners = await Get(
         PythonModuleOwners,
         PythonModuleOwnersRequest(
-            module,
+            handler.module,
             resolve=request.field_set.resolve.normalized_value(python_setup),
             locality=locality,
         ),
@@ -218,7 +218,7 @@ async def infer_faas_handler_dependency(
         context=(
             f"The target {address} has the field "
             f"`handler={repr(request.field_set.handler.value)}`, which maps "
-            f"to the Python module `{module}`"
+            f"to the Python module `{handler.module}`"
         ),
     )
     maybe_disambiguated = explicitly_provided_deps.disambiguated(
@@ -359,7 +359,7 @@ async def build_lambdex(
             f"\n\nFiles targets dependencies: {files_addresses}"
         )
 
-    lambdex_args = ["build", "-e", handler.val, output_filename]
+    lambdex_args = ["build", "-e", f"{handler.module}:{handler.func}", output_filename]
     if request.script_handler:
         lambdex_args.extend(("-H", request.script_handler))
     if request.script_module:
