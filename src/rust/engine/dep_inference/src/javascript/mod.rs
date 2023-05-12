@@ -106,37 +106,6 @@ impl ImportCollector<'_> {
     self.walk(&mut cursor);
   }
 
-  fn walk(&mut self, cursor: &mut tree_sitter::TreeCursor) {
-    loop {
-      let node = cursor.node();
-      let children_behavior = self.visit(node);
-
-      if children_behavior == ChildBehavior::Visit && cursor.goto_first_child() {
-        continue;
-      }
-      // NB: Could post_visit(node) here
-
-      if cursor.goto_next_sibling() {
-        continue;
-      }
-
-      let mut at_root = false;
-      while !at_root {
-        if cursor.goto_parent() {
-          // NB: Could post_visit(cursor.node()) here
-          if cursor.goto_next_sibling() {
-            break;
-          }
-        } else {
-          at_root = true
-        }
-      }
-      if at_root {
-        break;
-      }
-    }
-  }
-
   fn code_at(&self, range: tree_sitter::Range) -> &str {
     &self.code[range.start_byte..range.end_byte]
   }
