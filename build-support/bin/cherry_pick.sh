@@ -45,7 +45,7 @@ MILESTONES=$(gh api graphql -F owner=":owner" -F name=":repo" -f query='
         nodes {title}
       }
     }
-  }' --jq .data.repository.milestones.nodes.[].title | awk "/$TARGET_MILESTONE/{p=1}p" -)
+  }' --jq .data.repository.milestones.nodes.[].title | sort -V | awk "/$TARGET_MILESTONE/{p=1}p" -)
 
 COMMIT=$(gh pr view "$PR_NUM" --json mergeCommit --jq '.mergeCommit.oid')
 if [[ -z $COMMIT ]]; then
@@ -87,4 +87,4 @@ for MILESTONE in $MILESTONES; do
 done
 rm "$BODY_FILE"
 
-gh pr edit "$PR_NUM" --remove-label "need-cherrypick"
+gh pr edit "$PR_NUM" --remove-label "needs-cherrypick"
