@@ -84,8 +84,7 @@ async def _determine_literal_addresses_from_raw_specs(
         Get(
             Address,
             AddressInput(
-                # TODO
-                "TODO",
+                str(spec),
                 spec.path_component,
                 description_of_origin=description_of_origin,
                 target_component=spec.target_component,
