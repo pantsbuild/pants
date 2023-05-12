@@ -249,6 +249,21 @@ class PythonFaaSRuntimeField(StringField, ABC):
     def to_interpreter_version(self) -> None | tuple[int, int]:
         """Returns the Python version implied by the runtime, as (major, minor)."""
 
+    def to_platform_string(self) -> None | str:
+        # We hardcode the platform value to the appropriate one for each FaaS runtime.
+        # (Running the "hello world" cloud function in the example code will report the platform, and can be
+        # used to verify correctness of these platform strings.)
+        interpreter_version = self.to_interpreter_version()
+        if interpreter_version is None:
+            return None
+
+        py_major, py_minor = interpreter_version
+        platform_str = f"linux_x86_64-cp-{py_major}{py_minor}-cp{py_major}{py_minor}"
+        # set pymalloc ABI flag - this was removed in python 3.8 https://bugs.python.org/issue36707
+        if py_major <= 3 and py_minor < 8:
+            platform_str += "m"
+        return platform_str
+
 
 @rule
 async def digest_complete_platforms(
@@ -299,18 +314,8 @@ async def build_lambdex(
         file_ending="zip",
     )
 
-    # We hardcode the platform value to the appropriate one for each FaaS runtime.
-    # (Running the "hello world" cloud function in the example code will report the platform, and can be
-    # used to verify correctness of these platform strings.)
-    pex_platforms = []
-    interpreter_version = request.runtime.to_interpreter_version()
-    if interpreter_version:
-        py_major, py_minor = interpreter_version
-        platform_str = f"linux_x86_64-cp-{py_major}{py_minor}-cp{py_major}{py_minor}"
-        # set pymalloc ABI flag - this was removed in python 3.8 https://bugs.python.org/issue36707
-        if py_major <= 3 and py_minor < 8:
-            platform_str += "m"
-        pex_platforms.append(platform_str)
+    platform_str = request.runtime.to_platform_string()
+    pex_platforms = [platform_str] if platform_str else []
 
     additional_pex_args = (
         # Ensure we can resolve manylinux wheels in addition to any AMI-specific wheels.
