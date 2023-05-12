@@ -28,7 +28,6 @@ from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
 from pants.core.util_rules import source_files
 from pants.core.util_rules.partitions import PartitionerType
 from pants.engine.fs import (
-    EMPTY_DIGEST,
     EMPTY_SNAPSHOT,
     CreateDigest,
     Digest,
@@ -410,12 +409,8 @@ def test_no_targets() -> None:
 
 
 def test_message_lists_added_files() -> None:
-    input_snapshot = Snapshot._unsafe_create(
-        Digest("a" * 64, 1000), ["f.ext", "dir/f.ext"], ["dir"]
-    )
-    output_snapshot = Snapshot._unsafe_create(
-        Digest("b" * 64, 1000), ["f.ext", "added.ext", "dir/f.ext"], ["dir"]
-    )
+    input_snapshot = Snapshot.create_for_testing(["f.ext", "dir/f.ext"], ["dir"])
+    output_snapshot = Snapshot.create_for_testing(["f.ext", "added.ext", "dir/f.ext"], ["dir"])
     result = FixResult(
         input=input_snapshot,
         output=output_snapshot,
@@ -427,12 +422,8 @@ def test_message_lists_added_files() -> None:
 
 
 def test_message_lists_removed_files() -> None:
-    input_snapshot = Snapshot._unsafe_create(
-        Digest("a" * 64, 1000), ["f.ext", "removed.ext", "dir/f.ext"], ["dir"]
-    )
-    output_snapshot = Snapshot._unsafe_create(
-        Digest("b" * 64, 1000), ["f.ext", "dir/f.ext"], ["dir"]
-    )
+    input_snapshot = Snapshot.create_for_testing(["f.ext", "removed.ext", "dir/f.ext"], ["dir"])
+    output_snapshot = Snapshot.create_for_testing(["f.ext", "dir/f.ext"], ["dir"])
     result = FixResult(
         input=input_snapshot,
         output=output_snapshot,
@@ -444,14 +435,8 @@ def test_message_lists_removed_files() -> None:
 
 
 def test_message_lists_files() -> None:
-    # _unsafe_create() cannot be used to simulate changed files,
-    # so just make sure added and removed work together.
-    input_snapshot = Snapshot._unsafe_create(
-        Digest("a" * 64, 1000), ["f.ext", "removed.ext", "dir/f.ext"], ["dir"]
-    )
-    output_snapshot = Snapshot._unsafe_create(
-        Digest("b" * 64, 1000), ["f.ext", "added.ext", "dir/f.ext"], ["dir"]
-    )
+    input_snapshot = Snapshot.create_for_testing(["f.ext", "removed.ext", "dir/f.ext"], ["dir"])
+    output_snapshot = Snapshot.create_for_testing(["f.ext", "added.ext", "dir/f.ext"], ["dir"])
     result = FixResult(
         input=input_snapshot,
         output=output_snapshot,
@@ -530,8 +515,7 @@ def test_default_single_partition_partitioner(kitchen_field_set_type, field_sets
 
 def test_streaming_output_changed(caplog) -> None:
     caplog.set_level(logging.DEBUG)
-    changed_digest = Digest(EMPTY_DIGEST.fingerprint, 2)
-    changed_snapshot = Snapshot._unsafe_create(changed_digest, [], [])
+    changed_snapshot = Snapshot.create_for_testing(["other_file.txt"], [])
     result = FixResult(
         input=EMPTY_SNAPSHOT,
         output=changed_snapshot,
@@ -540,7 +524,7 @@ def test_streaming_output_changed(caplog) -> None:
         tool_name="fixer",
     )
     assert result.level() == LogLevel.WARN
-    assert result.message() == "fixer made changes."
+    assert result.message() == "fixer made changes.\n  other_file.txt"
     assert ["Output from fixer\nstdout\nstderr"] == [
         rec.message for rec in caplog.records if rec.levelno == logging.DEBUG
     ]

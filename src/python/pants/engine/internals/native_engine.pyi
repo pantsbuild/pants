@@ -87,9 +87,7 @@ class Snapshot:
     """
 
     @classmethod
-    def _unsafe_create(
-        cls, digest: Digest, files: Sequence[str], dirs: Sequence[str]
-    ) -> Snapshot: ...
+    def create_for_testing(cls, files: Sequence[str], dirs: Sequence[str]) -> Snapshot: ...
     @property
     def digest(self) -> Digest: ...
     @property
