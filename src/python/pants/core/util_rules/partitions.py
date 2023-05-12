@@ -17,13 +17,7 @@ from pants.engine.collection import Collection
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.rules import collect_rules, rule
-from pants.engine.target import (
-    FieldSet,
-    SourcesField,
-    SourcesPaths,
-    SourcesPathsRequest,
-    _get_field_set_fields,
-)
+from pants.engine.target import FieldSet, SourcesField, SourcesPaths, SourcesPathsRequest
 from pants.util.memo import memoized
 from pants.util.meta import runtime_ignore_subscripts
 
@@ -317,7 +311,7 @@ def _get_sources_field_name(field_set_type: type[FieldSet]) -> str:
     """
 
     sources_field_name = None
-    for fieldname, fieldtype in _get_field_set_fields(field_set_type).items():
+    for fieldname, fieldtype in field_set_type.fields.items():
         if issubclass(fieldtype, SourcesField):
             if sources_field_name is None:
                 sources_field_name = fieldname

@@ -89,7 +89,7 @@ class NodeJSProject:
 
     def extra_caches(self) -> dict[str, str]:
         if self.package_manager == "pnpm":
-            return {"pnpm_home": "{chroot}/._pnpm_home"}
+            return {"pnpm_home": "._pnpm_home"}
         return {}
 
     def get_project_digest(self) -> MergeDigests:
@@ -173,7 +173,13 @@ class ProjectPaths:
 
     def matches_glob(self, pkg_json: PackageJson) -> bool:
         path = PurePath(pkg_json.root_dir)
-        return any(path.match(glob) for glob in self.full_globs())
+
+        def safe_match(glob: str) -> bool:
+            if glob == "":
+                return pkg_json.root_dir == ""
+            return path.match(glob)
+
+        return any(safe_match(glob) for glob in self.full_globs())
 
 
 async def _get_default_resolve_name(path: str) -> str:

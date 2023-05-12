@@ -903,7 +903,16 @@ class LockfileTarget(Target):
 
 
 class LockfilesGeneratorSourcesField(MultipleSourcesField):
+    """Sources field for synthesized `_lockfiles` targets.
+
+    It is special in that it always ignores any missing files, regardless of the global
+    `--unmatched-build-file-globs` option.
+    """
+
     help = generate_multiple_sources_field_help_message("Example: `sources=['example.lock']`")
+
+    def path_globs(self, unmatched_build_file_globs: UnmatchedBuildFileGlobs) -> PathGlobs:  # type: ignore[misc]
+        return super().path_globs(UnmatchedBuildFileGlobs.ignore())
 
 
 class LockfilesGeneratorTarget(TargetFilesGenerator):

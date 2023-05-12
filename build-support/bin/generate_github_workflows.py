@@ -68,7 +68,7 @@ def hashFiles(path: str) -> str:
 
 
 NATIVE_FILES = [
-    ".pants",
+    "src/python/pants/bin/native_client",
     "src/python/pants/engine/internals/native_engine.so",
     "src/python/pants/engine/internals/native_engine.so.metadata",
 ]

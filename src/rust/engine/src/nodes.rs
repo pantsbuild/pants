@@ -640,11 +640,12 @@ impl From<Scandir> for NodeKey {
 }
 
 fn unmatched_globs_additional_context() -> Option<String> {
-  let gil = Python::acquire_gil();
-  let url = externs::doc_url(
-    gil.python(),
-    "troubleshooting#pants-cannot-find-a-file-in-your-project",
-  );
+  let url = Python::with_gil(|py| {
+    externs::doc_url(
+      py,
+      "troubleshooting#pants-cannot-find-a-file-in-your-project",
+    )
+  });
   Some(format!(
     "\n\nDo the file(s) exist? If so, check if the file(s) are in your `.gitignore` or the global \
     `pants_ignore` option, which may result in Pants not being able to see the file(s) even though \
@@ -745,13 +746,13 @@ pub struct RunId;
 
 impl RunId {
   async fn run_node(self, context: Context) -> NodeResult<Value> {
-    let gil = Python::acquire_gil();
-    let py = gil.python();
-    Ok(externs::unsafe_call(
-      py,
-      context.core.types.run_id,
-      &[externs::store_u64(py, context.session.run_id().0 as u64)],
-    ))
+    Ok(Python::with_gil(|py| {
+      externs::unsafe_call(
+        py,
+        context.core.types.run_id,
+        &[externs::store_u64(py, context.session.run_id().0 as u64)],
+      )
+    }))
   }
 }
 
@@ -1179,8 +1180,7 @@ impl Task {
           let result = Self::gen_get(&context, workunit, &params, entry, gets).await;
           match result {
             Ok(values) => {
-              let gil = Python::acquire_gil();
-              input = Some(externs::store_tuple(gil.python(), values));
+              input = Some(Python::with_gil(|py| externs::store_tuple(py, values)));
               err = None;
             }
             Err(throw @ Failure::Throw { .. }) => {
@@ -1260,9 +1260,9 @@ impl Task {
     }
 
     if self.task.engine_aware_return_type {
-      let gil = Python::acquire_gil();
-      let py = gil.python();
-      EngineAwareReturnType::update_workunit(workunit, (*result_val).as_ref(py))
+      Python::with_gil(|py| {
+        EngineAwareReturnType::update_workunit(workunit, (*result_val).as_ref(py))
+      })
     };
 
     Ok(result_val)
@@ -1552,9 +1552,7 @@ impl Node for NodeKey {
         }
       }
       (NodeKey::Task(ref t), NodeOutput::Value(ref v)) if t.task.engine_aware_return_type => {
-        let gil = Python::acquire_gil();
-        let py = gil.python();
-        EngineAwareReturnType::is_cacheable((**v).as_ref(py)).unwrap_or(true)
+        Python::with_gil(|py| EngineAwareReturnType::is_cacheable((**v).as_ref(py)).unwrap_or(true))
       }
       _ => true,
     }
@@ -1566,11 +1564,8 @@ impl Node for NodeKey {
       path[0] += " <-";
       path.push(path[0].clone());
     }
-    let gil = Python::acquire_gil();
-    let url = externs::doc_url(
-      gil.python(),
-      "targets#dependencies-and-dependency-inference",
-    );
+    let url =
+      Python::with_gil(|py| externs::doc_url(py, "targets#dependencies-and-dependency-inference"));
     throw(format!(
       "The dependency graph contained a cycle:\
       \n\n  \
@@ -1600,15 +1595,15 @@ impl Display for NodeKey {
       NodeKey::Select(s) => write!(f, "{}", s.product),
       NodeKey::Task(task) => {
         let params = {
-          let gil = Python::acquire_gil();
-          let py = gil.python();
-          task
-            .params
-            .keys()
-            .filter_map(|k| {
-              EngineAwareParameter::debug_hint(k.to_value().clone_ref(py).into_ref(py))
-            })
-            .collect::<Vec<_>>()
+          Python::with_gil(|py| {
+            task
+              .params
+              .keys()
+              .filter_map(|k| {
+                EngineAwareParameter::debug_hint(k.to_value().clone_ref(py).into_ref(py))
+              })
+              .collect::<Vec<_>>()
+          })
         };
         write!(
           f,

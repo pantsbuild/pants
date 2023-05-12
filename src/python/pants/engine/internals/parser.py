@@ -326,7 +326,11 @@ class Parser:
             return alias, Registrar(
                 parse_state,
                 alias,
-                registered_target_types.aliases_to_types[alias].class_field_types(union_membership),
+                tuple(
+                    registered_target_types.aliases_to_types[alias].class_field_types(
+                        union_membership
+                    )
+                ),
             )
 
         type_aliases = dict(map(create_registrar_for_target, registered_target_types.aliases))

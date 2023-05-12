@@ -10,7 +10,6 @@ python_sources(
 python_tests(
     name="tests",
     overrides={
-        "subsystem_test.py": {"timeout": 440},
         "rules_integration_test.py": {
             "timeout": 330,
             "tags": ["platform_specific_behavior"],
