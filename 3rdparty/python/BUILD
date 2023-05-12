@@ -8,7 +8,7 @@ python_requirements(
         "python-gnupg": ["gnupg"],
     },
     overrides={
-        "humbug": {"dependencies": ["#setuptools"]},
+        "humbug": {"dependencies": ["#setuptools", "#urllib3"]},
     },
 )
 
