@@ -2,7 +2,7 @@
 version = "0.0.1"
 edition = "2021"
 name = "protos"
-authors = [ "Pants Build <pantsbuild@gmail.com>" ]
+authors = ["Pants Build <pantsbuild@gmail.com>"]
 publish = false
 
 [dependencies]
@@ -11,7 +11,12 @@ hashing = { path = "../hashing" }
 prost = "0.9"
 prost-build = "0.9"
 prost-types = "0.9"
-tonic = { version = "0.6", features = ["transport", "codegen", "tls", "tls-roots"] }
+tonic = { version = "0.6", features = [
+  "transport",
+  "codegen",
+  "tls",
+  "tls-roots",
+] }
 
 [build-dependencies]
 prost-build = "0.9"

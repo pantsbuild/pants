@@ -2,7 +2,7 @@
 version = "0.0.1"
 edition = "2021"
 name = "client"
-authors = [ "Pants Build <pantsbuild@gmail.com>" ]
+authors = ["Pants Build <pantsbuild@gmail.com>"]
 publish = false
 
 [[bin]]
@@ -21,7 +21,13 @@ sha2 = "0.10"
 strum = "0.24"
 strum_macros = "0.24"
 sysinfo = "0.20.0"
-tokio = { version = "1.28", features = ["rt-multi-thread", "macros", "net", "io-std", "io-util"] }
+tokio = { version = "1.28", features = [
+  "rt-multi-thread",
+  "macros",
+  "net",
+  "io-std",
+  "io-util",
+] }
 uname = "0.1"
 
 [dev-dependencies]

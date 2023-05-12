@@ -34,12 +34,13 @@ backend_packages.add = [
   "pants.backend.experimental.scala.debug_goals",
   "pants.backend.experimental.visibility",
   "pants.backend.tools.preamble",
+  "pants.backend.tools.taplo",
   "pants.explorer.server",
   "internal_plugins.releases",
   "internal_plugins.test_lockfile_fixtures",
 ]
 plugins = [
-  "hdrhistogram",  # For use with `--stats-log`.
+  "hdrhistogram",                   # For use with `--stats-log`.
   "toolchain.pants.plugin==0.27.0",
 ]
 
@@ -116,9 +117,7 @@ build_file_header = """\
 # Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 """
-ignore_paths = [
-  "build-support/migration-support/BUILD",
-]
+ignore_paths = ["build-support/migration-support/BUILD"]
 ignore_adding_targets = [
   "src/python/pants:__main__",
   "src/python/pants/backend/docker/subsystems:dockerfile_wrapper_script",

@@ -13,10 +13,16 @@ org = "pantsbuild"
 # CI runs occasionally hit the 30 minute mark.
 token_expiration_threshold = 40
 ci_env_variables = [
-  "GITHUB_ACTIONS", "GITHUB_RUN_ID", "GITHUB_REF", "GITHUB_EVENT_NAME", "GITHUB_SHA", "GITHUB_REPOSITORY",
-  "GITHUB_WORKFLOW","GITHUB_JOB",  # temporary, for debugging issues w/ restricted tokens.
+  "GITHUB_ACTIONS",
+  "GITHUB_RUN_ID",
+  "GITHUB_REF",
+  "GITHUB_EVENT_NAME",
+  "GITHUB_SHA",
+  "GITHUB_REPOSITORY",
+  "GITHUB_WORKFLOW",
+  "GITHUB_JOB",        # temporary, for debugging issues w/ restricted tokens.
 ]
-restricted_token_matches =  """{
+restricted_token_matches = """{
   'GITHUB_REPOSITORY': 'pantsbuild/pants',
 }"""
 

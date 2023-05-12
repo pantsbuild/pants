@@ -2,7 +2,7 @@
 version = "0.0.1"
 edition = "2021"
 name = "remote"
-authors = [ "Pants Build <pantsbuild@gmail.com>" ]
+authors = ["Pants Build <pantsbuild@gmail.com>"]
 publish = false
 
 [dependencies]
@@ -23,7 +23,13 @@ log = "0.4"
 store = { path = "../../fs/store" }
 task_executor = { path = "../../task_executor" }
 concrete_time = { path = "../../concrete_time" }
-tokio = { version = "1.28", features = ["net", "process", "rt-multi-thread", "sync", "time"] }
+tokio = { version = "1.28", features = [
+  "net",
+  "process",
+  "rt-multi-thread",
+  "sync",
+  "time",
+] }
 tokio-rustls = "0.23"
 tokio-util = { version = "0.7", features = ["codec"] }
 workunit_store = { path = "../../workunit_store" }
@@ -32,7 +38,13 @@ once_cell = "1.15"
 prost = "0.9"
 prost-types = "0.9"
 rand = "0.8"
-tonic = { version = "0.6", features = ["transport", "codegen", "tls", "tls-roots", "prost"] }
+tonic = { version = "0.6", features = [
+  "transport",
+  "codegen",
+  "tls",
+  "tls-roots",
+  "prost",
+] }
 process_execution = { path = ".." }
 strum = "0.24"
 strum_macros = "0.24"
