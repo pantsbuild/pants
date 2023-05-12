@@ -77,7 +77,7 @@ class WorkunitLoggerCallbackFactoryRequest:
 
 class WorkunitLogger(Subsystem):
     options_scope = "workunit-logger"
-    help = "Workunit Logger subsystem. Useful for debugging."
+    help = "Workunit Logger subsystem. Useful for debugging pants itself."
 
     enabled = BoolOption("--enabled", default=False, help="Whether to enable workunit logging.")
     logdir = StrOption("--logdir", default=".pants.d", help="Where to write the log to.")
