@@ -25,6 +25,21 @@ from pants.backend.nfpm.fields.archlinux import (
     NfpmArchlinuxProvidesField,
     NfpmArchlinuxReplacesField,
 )
+from pants.backend.nfpm.fields.contents import (
+    NfpmContentDestField,
+    NfpmContentDirDestField,
+    NfpmContentDirsField,
+    NfpmContentFileGroupField,
+    NfpmContentFileModeField,
+    NfpmContentFileMtimeField,
+    NfpmContentFileOwnerField,
+    NfpmContentFilesField,
+    NfpmContentSrcField,
+    NfpmContentSymlinkDestField,
+    NfpmContentSymlinkSrcField,
+    NfpmContentSymlinksField,
+    NfpmContentTypeField,
+)
 from pants.backend.nfpm.fields.deb import (
     NfpmDebBreaksField,
     NfpmDebCompressionField,
@@ -61,7 +76,7 @@ from pants.backend.nfpm.fields.version import (
     NfpmVersionSchemaField,
 )
 from pants.core.goals.package import OutputPathField
-from pants.engine.target import COMMON_TARGET_FIELDS, Target
+from pants.engine.target import COMMON_TARGET_FIELDS, Target, TargetGenerator
 from pants.util.docutil import doc_url
 from pants.util.strutil import help_text
 
@@ -243,5 +258,126 @@ class NfpmRpmPackage(Target):
         that you can then distribute and install, e.g. via pkg.
 
         See {doc_url('nfpm-rpm-package')}.
+        """
+    )
+
+
+CONTENT_FILE_FIELDS = (
+    NfpmContentTypeField,
+    NfpmContentFileOwnerField,
+    NfpmContentFileGroupField,
+    NfpmContentFileModeField,
+    NfpmContentFileMtimeField,
+)
+
+
+class NfpmContentFile(Target):
+    alias = "nfpm_content_file"
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        NfpmDependencies,  # this would depend on the file target
+        NfpmContentSrcField,  # TODO: replace with a "source" field
+        NfpmContentDestField,
+        *CONTENT_FILE_FIELDS,
+    )
+    help = help_text(
+        f"""
+        """
+    )
+
+
+class NfpmContentFiles(TargetGenerator):
+    alias = "nfpm_content_files"
+    generated_target_cls = NfpmContentFile
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        NfpmDependencies,
+        NfpmContentFilesField,  # TODO: if given a "sources" field, what does this look like?
+    )
+    copied_fields = COMMON_TARGET_FIELDS
+    moved_fields = CONTENT_FILE_FIELDS
+    help = help_text(
+        f"""
+        """
+    )
+
+
+CONTENT_SYMLINK_FIELDS = (
+    NfpmContentFileOwnerField,
+    NfpmContentFileGroupField,
+    # NfpmContentFileModeField,  # mode does not make sense for symlink
+    NfpmContentFileMtimeField,
+)
+
+
+class NfpmContentSymlink(Target):
+    alias = "nfpm_content_symlink"
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        # Modeled w/o dependencies for now (feel free to add later).
+        NfpmContentSymlinkSrcField,  # path on package install target
+        NfpmContentSymlinkDestField,  # path on package install target
+        *CONTENT_SYMLINK_FIELDS,
+    )
+    help = help_text(
+        f"""
+        """
+    )
+
+
+class NfpmContentSymlinks(TargetGenerator):
+    alias = "nfpm_content_symlinks"
+    generated_target_cls = NfpmContentSymlink
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        # Modeled w/o dependencies for now (feel free to add later).
+        NfpmContentSymlinksField,
+    )
+    copied_fields = COMMON_TARGET_FIELDS
+    moved_fields = CONTENT_SYMLINK_FIELDS
+    help = help_text(
+        f"""
+        """
+    )
+
+
+CONTENT_DIR_FIELDS = (
+    NfpmContentFileOwnerField,
+    NfpmContentFileGroupField,
+    NfpmContentFileModeField,
+    NfpmContentFileMtimeField,
+)
+
+
+class NfpmContentDir(Target):
+    alias = "nfpm_content_dir"
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        # Modeled w/o dependencies for now (feel free to add later).
+        NfpmContentDirDestField,  # path on package install target
+        # nFPM also supports passing a real dir in "src", from which it
+        # pulls the mode and mtime. But, pants creates the sandbox for nFPM,
+        # so pants would have to explicitly set mode/mtime on sandboxed dirs.
+        # So, the pants UX simplifies and only supports BUILD-defined values.
+        *CONTENT_DIR_FIELDS,
+    )
+    help = help_text(
+        f"""
+        """
+    )
+
+
+class NfpmContentDirs(TargetGenerator):
+    alias = "nfpm_content_dirs"
+    generated_target_cls = NfpmContentDir
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        # Modeled w/o dependencies for now (feel free to add later).
+        NfpmContentDirsField,
+    )
+    copied_fields = COMMON_TARGET_FIELDS
+    moved_fields = CONTENT_DIR_FIELDS
+    help = help_text(
+        f"""
         """
     )

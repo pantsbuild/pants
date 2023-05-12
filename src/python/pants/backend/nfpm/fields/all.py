@@ -20,6 +20,7 @@ class NfpmPackageNameField(StringField):
     )
 
 
+# TODO: maybe a different dependencies field for package vs other targets
 class NfpmDependencies(Dependencies):
     nfpm_alias = ""  # does not map directly to a nfpm.yaml field
 
