@@ -780,7 +780,7 @@ fn parse_python_deps(context: Context, args: Vec<Value>) -> BoxFuture<'static, N
 
     in_workunit!(
       "parse_python_dependencies",
-      Level::Info,
+      Level::Debug,
       desc = Some(format!("Determine Python dependencies for {path:?}")),
       |_workunit| async move {
         let cache_key = CacheKey {
