@@ -978,6 +978,7 @@ impl DownloadedFile {
     CacheKey {
       key_type: CacheKeyType::Url.into(),
       digest: Some(Digest::of_bytes(&observed_url.to_bytes()).into()),
+      metadata: None,
     }
   }
 

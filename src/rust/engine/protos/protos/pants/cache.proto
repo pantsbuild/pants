@@ -15,6 +15,7 @@ message CacheKey {
   CacheKeyType key_type = 1;
 
   build.bazel.remote.execution.v2.Digest digest = 2;
+  optional string metadata = 3;  // Any other metadata to accompany the tag, e.g the JSON request of a DEP_INFERENCE_REQUEST.
 }
 
 // A URL and Digest tuple, which is itself digested and used as a CacheKey. ObservedURLs

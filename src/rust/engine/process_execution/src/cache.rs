@@ -89,6 +89,7 @@ impl crate::CommandRunner for CommandRunner {
         .into(),
       ),
       key_type: CacheKeyType::Process.into(),
+      metadata: None,
     };
 
     if self.cache_read {

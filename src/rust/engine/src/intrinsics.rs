@@ -786,6 +786,7 @@ fn parse_python_deps(context: Context, args: Vec<Value>) -> BoxFuture<'static, N
         let cache_key = CacheKey {
           key_type: CacheKeyType::DepInferenceRequest.into(),
           digest: Some(digest.into()),
+          metadata: None,
         };
         let cached_result = core.local_cache.load(&cache_key).await?;
 
