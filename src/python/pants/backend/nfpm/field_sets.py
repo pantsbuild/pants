@@ -24,7 +24,11 @@ class NfpmPackageFieldSet(PackageFieldSet, metaclass=ABCMeta):
     dependencies: NfpmDependencies
 
     def nfpm_config(self, tgt: Target) -> dict[str, Any]:
-        config: dict[str, Any] = {"contents": []}
+        config: dict[str, Any] = {
+            # pants handles any globbing before passing contents to nFPM.
+            "disable_globbing": True,
+            "contents": [],
+        }
         for field in self.required_fields:
             # NB: This assumes that nfpm fields have a str 'nfpm_alias' attribute.
             if not hasattr(field, "nfpm_alias"):
