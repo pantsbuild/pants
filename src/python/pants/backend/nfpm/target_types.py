@@ -108,7 +108,7 @@ class NfpmApkPackage(Target):
         *APK_FIELDS,
     )
     help = help_text(
-        f""""
+        f"""
         An APK system package (Alpine Package Keeper) built by nFPM.
 
         This will not install the package, only create an .apk file
@@ -150,7 +150,7 @@ class NfpmArchlinuxPackage(Target):
         *ARCHLINUX_FIELDS,
     )
     help = help_text(
-        f""""
+        f"""
         An Archlinux system package built by nFPM.
 
         This will not install the package, only create an .tar.zst file
@@ -200,7 +200,7 @@ class NfpmDebPackage(Target):
         *DEB_FIELDS,
     )
     help = help_text(
-        f""""
+        f"""
         A Debian system package built by nFPM.
 
         This will not install the package, only create a .deb file
@@ -251,7 +251,7 @@ class NfpmRpmPackage(Target):
         NfpmRpmGhostContents,
     )
     help = help_text(
-        f""""
+        f"""
         An RPM system package built by nFPM.
 
         This will not install the package, only create an .rpm file
