@@ -259,7 +259,7 @@ def generate_jvm_tool_lockfiles(tools: Sequence[JvmTool], dry_run: bool) -> None
 
 def generate(buildroot: str, tools: Sequence[Tool], args: Sequence[str], dry_run: bool) -> None:
     pants_repo_root = get_buildroot()
-    touch(os.path.join(buildroot, "BUILDROOT"))
+    touch(os.path.join(buildroot, "pants.toml"))
     backends = sorted({tool.backend for tool in tools})
     custom_cmd = "./pants run build-support/bin/generate_builtin_lockfiles.py"
     args = [
