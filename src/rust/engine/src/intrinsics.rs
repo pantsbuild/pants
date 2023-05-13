@@ -41,6 +41,7 @@ use rule_graph::DependencyKey;
 use stdio::TryCloneAsFile;
 use store::{SnapshotOps, SubsetParams};
 
+use crate::externs::dep_inference::PyNativeDependenciesRequest;
 use workunit_store::{in_workunit, Level};
 
 type IntrinsicFn =
@@ -50,7 +51,8 @@ pub struct Intrinsics {
   intrinsics: IndexMap<Intrinsic, IntrinsicFn>,
 }
 
-// NB: Keep in sync with `rules()` in `src/python/pants/engine/fs.py`.
+// NB: Keep in sync with `rules()` in `src/python/pants/engine/fs.py` and
+// `src/python/pants/engine/native_dep_inference.py`.
 impl Intrinsics {
   pub fn new(types: &Types) -> Intrinsics {
     let mut intrinsics: IndexMap<Intrinsic, IntrinsicFn> = IndexMap::new();
@@ -142,7 +144,7 @@ impl Intrinsics {
     intrinsics.insert(
       Intrinsic {
         product: types.parsed_python_deps_result,
-        inputs: vec![DependencyKey::new(types.directory_digest)],
+        inputs: vec![DependencyKey::new(types.deps_request)],
       },
       Box::new(parse_python_deps),
     );
@@ -754,10 +756,10 @@ fn parse_python_deps(context: Context, args: Vec<Value>) -> BoxFuture<'static, N
   async move {
     let core = &context.core;
     let store = core.store();
-    let directory_digest = Python::with_gil(|py| {
-      let py_digest = (*args[0]).as_ref(py);
-      lift_directory_digest(py_digest)
-    })?;
+    let PyNativeDependenciesRequest {
+      digest: directory_digest,
+      metadata,
+    } = Python::with_gil(|py| (*args[0]).as_ref(py).extract())?;
 
     let mut path = None;
     let mut digest = None;
@@ -786,7 +788,7 @@ fn parse_python_deps(context: Context, args: Vec<Value>) -> BoxFuture<'static, N
         let cache_key = CacheKey {
           key_type: CacheKeyType::DepInferenceRequest.into(),
           digest: Some(digest.into()),
-          metadata: None,
+          metadata: metadata,
         };
         let cached_result = core.local_cache.load(&cache_key).await?;
 
