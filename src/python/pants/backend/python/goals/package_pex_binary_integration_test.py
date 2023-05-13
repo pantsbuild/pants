@@ -63,7 +63,9 @@ def rule_runner() -> PythonRuleRunner:
         ],
         objects={"python_artifact": PythonArtifact},
     )
-    rule_runner.set_options([], env_inherit={"PATH", "PYENV_ROOT", "HOME"})
+    rule_runner.set_options(
+        ["--python-infer-use-rust-parser"], env_inherit={"PATH", "PYENV_ROOT", "HOME"}
+    )
     return rule_runner
 
 
@@ -180,8 +182,8 @@ def test_layout(rule_runner: PythonRuleRunner, layout: PexLayout) -> None:
                 """\
                 import os
                 import sys
-                print(f"FOO={os.environ.get('FOO')}")
-                print(f"BAR={os.environ.get('BAR')}")
+                for env in ["FOO", "--inject-arg", "quotes '"]:
+                    print(f"{env}={os.environ.get(env)}")
                 print(f"ARGV={sys.argv[1:]}")
                 """
             ),
@@ -190,8 +192,8 @@ def test_layout(rule_runner: PythonRuleRunner, layout: PexLayout) -> None:
                 python_sources(name="lib")
                 pex_binary(
                     entry_point="app.py",
-                    args=['123', 'abc'],
-                    env={{'FOO': 'xxx', 'BAR': 'yyy'}},
+                    args=['123', 'abc', '--inject-env', "quotes 'n spaces"],
+                    env={{'FOO': 'xxx', '--inject-arg': 'yyy', "quotes '": 'n spaces'}},
                     layout="{layout.value}",
                 )
                 """
@@ -215,8 +217,9 @@ def test_layout(rule_runner: PythonRuleRunner, layout: PexLayout) -> None:
     stdout = dedent(
         """\
         FOO=xxx
-        BAR=yyy
-        ARGV=['123', 'abc']
+        --inject-arg=yyy
+        quotes '=n spaces
+        ARGV=['123', 'abc', '--inject-env', "quotes 'n spaces"]
         """
     ).encode()
     assert stdout == subprocess.run([executable], check=True, stdout=subprocess.PIPE).stdout

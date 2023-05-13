@@ -83,6 +83,7 @@ target(
         "src/python/pants/backend/shell/lint/shellcheck",
         "src/python/pants/backend/shell/lint/shfmt",
         "src/python/pants/backend/tools/preamble",
+        "src/python/pants/backend/url_handlers/s3",
         "src/python/pants/core",
     ],
 )
@@ -98,5 +99,9 @@ pex_binary(
     strip_pex_env=False,
 )
 
+resources(
+    name="native_client",
+    sources=["native_client"],
+)
 
 python_tests(name="tests")

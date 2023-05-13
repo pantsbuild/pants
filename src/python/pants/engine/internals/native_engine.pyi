@@ -275,7 +275,7 @@ def write_digest(
     session: PySession,
     digest: Digest,
     path_prefix: str,
-    clear_destination: bool,
+    clear_paths: Sequence[str],
 ) -> None: ...
 def write_log(msg: str, level: int, target: str) -> None: ...
 def flush_log() -> None: ...
@@ -335,13 +335,13 @@ def scheduler_create(
     build_root: str,
     local_execution_root_dir: str,
     named_caches_dir: str,
-    ca_certs_path: str | None,
     ignore_patterns: Sequence[str],
     use_gitignore: bool,
     watch_filesystem: bool,
     remoting_options: PyRemotingOptions,
     local_store_options: PyLocalStoreOptions,
     exec_strategy_opts: PyExecutionStrategyOptions,
+    ca_certs_path: str | None,
 ) -> PyScheduler: ...
 def scheduler_execute(
     scheduler: PyScheduler, session: PySession, execution_request: PyExecutionRequest

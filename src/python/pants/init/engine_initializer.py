@@ -20,7 +20,7 @@ from pants.engine import desktop, download_file, fs, process
 from pants.engine.console import Console
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import PathGlobs, Snapshot, Workspace
-from pants.engine.goal import Goal
+from pants.engine.goal import CurrentExecutingGoals, Goal
 from pants.engine.internals import (
     build_files,
     dep_rules,
@@ -267,6 +267,10 @@ class EngineInitializer:
         @rule
         def build_root_singleton() -> BuildRoot:
             return cast(BuildRoot, BuildRoot.instance)
+
+        @rule
+        def current_executing_goals(session_values: SessionValues) -> CurrentExecutingGoals:
+            return session_values.get(CurrentExecutingGoals) or CurrentExecutingGoals()
 
         # Create a Scheduler containing graph and filesystem rules, with no installed goals.
         rules = FrozenOrderedSet(

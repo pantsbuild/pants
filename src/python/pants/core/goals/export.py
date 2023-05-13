@@ -177,13 +177,13 @@ async def export(
             for request in union_membership.get(KnownUserResolveNamesRequest)
         )
         all_valid_resolve_names = sorted(
-            [
+            {
                 *itertools.chain.from_iterable(kurn.names for kurn in all_known_user_resolve_names),
                 *(
                     sentinel.resolve_name
                     for sentinel in union_membership.get(GenerateToolLockfileSentinel)
                 ),
-            ]
+            }
         )
         raise UnrecognizedResolveNamesError(
             unexported_resolves,

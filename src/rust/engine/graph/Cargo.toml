@@ -15,9 +15,10 @@ log = "0.4"
 parking_lot = "0.12"
 petgraph = "0.6"
 task_executor = { path = "../task_executor" }
-tokio = { version = "1.21", features = ["time", "parking_lot"] }
+tokio = { version = "1.28", features = ["time", "parking_lot"] }
+workunit_store = { path = "../workunit_store" }
 
 [dev-dependencies]
 rand = "0.8"
 env_logger = "0.10.0"
-tokio = { version = "1.21", features = ["macros", "rt-multi-thread", "time"] }
+tokio = { version = "1.28", features = ["macros", "rt-multi-thread", "time"] }

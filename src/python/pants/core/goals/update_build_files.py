@@ -238,7 +238,7 @@ async def update_build_files(
     }
     build_file_to_change_descriptions: DefaultDict[str, list[str]] = defaultdict(list)
     for rewrite_request_cls in rewrite_request_classes:
-        all_rewritten_files = await MultiGet(  # noqa: PNT30: requires triage
+        all_rewritten_files = await MultiGet(  # noqa: PNT30: this is inherently sequential
             Get(
                 RewrittenBuildFile,
                 RewrittenBuildFileRequest,
@@ -382,7 +382,7 @@ async def maybe_rename_deprecated_targets(
     old_bytes = "\n".join(request.lines).encode("utf-8")
     new_content = await Get(
         FixedBUILDFile,
-        renamed_fields_rules.RenameFieldsInFileRequest(path=request.path, content=old_bytes),
+        renamed_targets_rules.RenameTargetsInFileRequest(path=request.path, content=old_bytes),
     )
 
     return RewrittenBuildFile(

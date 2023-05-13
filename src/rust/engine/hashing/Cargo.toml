@@ -14,8 +14,8 @@ generic-array = "0.14"
 hex = "0.4.3"
 serde = { version = "1.0", features = ["derive"] }
 sha2 = "0.10"
-tokio = { version = "1.21", features = ["io-util"] }
+tokio = { version = "1.28", features = ["io-util"] }
 
 [dev-dependencies]
 serde_test = "1.0"
-tempfile = "3"
+tempfile = "3.5.0"

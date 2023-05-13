@@ -4,11 +4,14 @@ from __future__ import annotations
 
 import itertools
 import json
+import logging
 import os.path
+import re
 from abc import ABC
 from dataclasses import dataclass, field
 from typing import Any, ClassVar, Iterable, Mapping, Optional, Tuple
 
+import yaml
 from typing_extensions import Literal
 
 from pants.backend.project_info import dependencies
@@ -16,6 +19,7 @@ from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.base.specs import AncestorGlobSpec, RawSpecs
 from pants.build_graph.address import Address
 from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.core.goals.package import OutputPathField
 from pants.core.target_types import (
     TargetGeneratorSourcesHelperSourcesField,
     TargetGeneratorSourcesHelperTarget,
@@ -23,7 +27,13 @@ from pants.core.target_types import (
 from pants.core.util_rules import stripped_source_files
 from pants.engine import fs
 from pants.engine.collection import Collection, DeduplicatedCollection
-from pants.engine.fs import DigestContents, FileContent, GlobExpansionConjunction, PathGlobs
+from pants.engine.fs import (
+    CreateDigest,
+    DigestContents,
+    FileContent,
+    GlobExpansionConjunction,
+    PathGlobs,
+)
 from pants.engine.internals import graph
 from pants.engine.internals.graph import (
     ResolveAllTargetGeneratorRequests,
@@ -54,6 +64,8 @@ from pants.engine.unions import UnionMembership, UnionRule
 from pants.option.global_options import UnmatchedBuildFileGlobs
 from pants.util.frozendict import FrozenDict
 from pants.util.strutil import help_text, softwrap
+
+_logger = logging.getLogger(__name__)
 
 
 class NodePackageDependenciesField(Dependencies):
@@ -333,6 +345,7 @@ class PackageJsonTarget(TargetGenerator):
 class NodeBuildScriptEntryPointField(StringField):
     alias = "entry_point"
     required = True
+    value: str
 
 
 class NodeBuildScriptSourcesField(SourcesField):
@@ -421,6 +434,7 @@ class NodeBuildScriptTarget(Target):
         NodeBuildScriptSourcesField,
         NodeBuildScriptExtraCaches,
         NodePackageDependenciesField,
+        OutputPathField,
     )
 
     alias = "_node_build_script"
@@ -428,9 +442,86 @@ class NodeBuildScriptTarget(Target):
     help = help_text(
         """
         A package.json script that is invoked by the configured package manager
-        to produce `resource` targets.
+        to produce `resource` targets or a packaged artifact.
         """
     )
+
+
+@dataclass(frozen=True)
+class PackageJsonImports:
+    """https://nodejs.org/api/packages.html#subpath-imports."""
+
+    imports: FrozenDict[re.Pattern[str], tuple[str, ...]]
+    root_dir: str
+
+    def replacements(self, import_string: str) -> tuple[str, ...]:
+        def replace_matching_pattern(
+            pattern: re.Pattern[str], subpath: str, string: str
+        ) -> str | None:
+            match = pattern.match(string)
+            if match:
+                replacement = subpath
+                for group in match.groups():
+                    replacement = replacement.replace("*", group, 1)
+                if "*" in replacement:
+                    _logger.warning(
+                        softwrap(
+                            f"""
+                            package.json#imports pattern '{pattern.pattern}' matched '{string}',
+                            but the resulting subpath '{subpath}' string replacements '*'
+                            did not match.
+
+                            Inference will not behave correctly for import '{string}'.
+                            """
+                        )
+                    )
+                    return None
+                return "".join((replacement, string[match.endpos :]))
+            return None
+
+        return tuple(
+            filter(
+                None,
+                (
+                    replace_matching_pattern(pattern, subpath, import_string)
+                    for pattern, subpaths in self.imports.items()
+                    for subpath in subpaths
+                ),
+            )
+        )
+
+    @classmethod
+    def from_package_json(cls, pkg_json: PackageJson) -> PackageJsonImports:
+        return cls(
+            imports=cls._import_from_package_json(pkg_json),
+            root_dir=pkg_json.root_dir,
+        )
+
+    @staticmethod
+    def _to_import_pattern(string: str) -> re.Pattern[str]:
+        return re.compile(r"^" + re.escape(string).replace(r"\*", "(.*)"))
+
+    @staticmethod
+    def _import_from_package_json(
+        pkg_json: PackageJson,
+    ) -> FrozenDict[re.Pattern[str], tuple[str, ...]]:
+        imports: Mapping[str, Any] | None = pkg_json.content.get("imports")
+
+        def get_subpaths(value: str | Mapping[str, Any]) -> Iterable[str]:
+            if isinstance(value, str):
+                yield value
+            elif isinstance(value, Mapping):
+                for v in value.values():
+                    yield from get_subpaths(v)
+
+        if not imports:
+            return FrozenDict()
+        return FrozenDict(
+            {
+                PackageJsonImports._to_import_pattern(key): tuple(sorted(get_subpaths(subpath)))
+                for key, subpath in imports.items()
+            }
+        )
 
 
 @dataclass(frozen=True)
@@ -509,6 +600,7 @@ class PackageJson:
     workspaces: tuple[str, ...] = ()
     module: Literal["commonjs", "module"] | None = None
     dependencies: FrozenDict[str, str] = field(default_factory=FrozenDict)
+    package_manager: str | None = None
 
     def __post_init__(self) -> None:
         if self.module not in (None, "commonjs", "module"):
@@ -609,6 +701,7 @@ async def parse_package_json(content: FileContent) -> PackageJson:
                 **parsed_package_json.get("peerDependencies", {}),
             }
         ),
+        package_manager=parsed_package_json.get("packageManager"),
     )
 
 
@@ -652,6 +745,44 @@ async def all_package_json() -> AllPackageJson:
     )
 
 
+@dataclass(frozen=True)
+class PnpmWorkspaceGlobs:
+    packages: tuple[str, ...]
+    digest: Digest
+
+
+class PnpmWorkspaces(FrozenDict[PackageJson, PnpmWorkspaceGlobs]):
+    def for_root(self, root_dir: str) -> PnpmWorkspaceGlobs | None:
+        for pkg, workspaces in self.items():
+            if pkg.root_dir == root_dir:
+                return workspaces
+        return None
+
+
+@rule
+async def pnpm_workspace_files(pkgs: AllPackageJson) -> PnpmWorkspaces:
+    snapshot = await Get(
+        Snapshot, PathGlobs(os.path.join(pkg.root_dir, "pnpm-workspace.yaml") for pkg in pkgs)
+    )
+    digest_contents = await Get(DigestContents, Digest, snapshot.digest)
+
+    async def parse_package_globs(content: FileContent) -> PnpmWorkspaceGlobs:
+        parsed = yaml.safe_load(content.content) or {"packages": ("**",)}
+        return PnpmWorkspaceGlobs(
+            tuple(parsed.get("packages", ("**",)) or ("**",)),
+            await Get(Digest, CreateDigest([content])),
+        )
+
+    globs_per_root = {
+        os.path.dirname(digest_content.path): await parse_package_globs(digest_content)
+        for digest_content in digest_contents
+    }
+
+    return PnpmWorkspaces(
+        {pkg: globs_per_root[pkg.root_dir] for pkg in pkgs if pkg.root_dir in globs_per_root}
+    )
+
+
 class AllPackageJsonNames(DeduplicatedCollection[str]):
     """Used to not invalidate all generated node package targets when any package.json contents are
     changed."""
@@ -675,6 +806,15 @@ async def script_entrypoints_for_source(
     source_field: PackageJsonSourceField,
 ) -> PackageJsonEntryPoints:
     return PackageJsonEntryPoints.from_package_json(
+        await Get(PackageJson, PackageJsonSourceField, source_field)
+    )
+
+
+@rule
+async def subpath_imports_for_source(
+    source_field: PackageJsonSourceField,
+) -> PackageJsonImports:
+    return PackageJsonImports.from_package_json(
         await Get(PackageJson, PackageJsonSourceField, source_field)
     )
 

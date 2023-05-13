@@ -26,7 +26,6 @@ from pants.engine.rules import collect_rules, rule
 from pants.engine.target import FieldSet, Target
 from pants.engine.unions import UnionRule
 from pants.option.option_types import ArgsListOption, FileOption, SkipOption
-from pants.util.docutil import git_url
 from pants.util.logging import LogLevel
 from pants.util.strutil import softwrap
 
@@ -60,10 +59,7 @@ class Bandit(PythonToolBase):
     default_main = ConsoleScript("bandit")
     default_requirements = [default_version, *default_extra_requirements]
 
-    register_lockfile = True
     default_lockfile_resource = ("pants.backend.python.lint.bandit", "bandit.lock")
-    default_lockfile_path = "src/python/pants/backend/python/lint/bandit/bandit.lock"
-    default_lockfile_url = git_url(default_lockfile_path)
 
     skip = SkipOption("lint")
     args = ArgsListOption(example="--skip B101,B308 --confidence")

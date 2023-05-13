@@ -98,12 +98,12 @@ def assert_paths(
 
 
 def test_no_from(rule_runner: RuleRunner) -> None:
-    with pytest.raises(ExecutionError, match="The option --from in scope 'paths' is required."):
+    with pytest.raises(ExecutionError, match="Must set --from"):
         assert_paths(rule_runner, path_from="", path_to="base:base")
 
 
 def test_no_to(rule_runner: RuleRunner) -> None:
-    with pytest.raises(ExecutionError, match="The option --to in scope 'paths' is required."):
+    with pytest.raises(ExecutionError, match="Must set --to"):
         assert_paths(rule_runner, path_from="intermediate:intermediate", path_to="")
 
 

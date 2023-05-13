@@ -9,10 +9,15 @@ publish = false
 # tokio_unstable is necessary for access to the `id`-related functions of tokio::task::JoinSet.
 # See https://docs.rs/tokio/1.21.1/tokio/task/struct.JoinSet.html#method.join_next_with_id.
 
+[profile.dev]
+# Increase the optimization level of the dev profile slightly, as otherwise `rule_graph`
+# solving takes prohibitively long.
+opt-level = 1
+
 [profile.release]
-# Enable debug symbols in the `release` profile: doesn't add a noticeable overhead in size/speed,
-# but enables profiling of optimized builds.
-debug = true
+# Enable only "line tables", which give line information in backtraces, but do not record information
+# about local variables.
+debug = 1
 # Optimise for the speed of our binary, rather than the speed of compilation.
 codegen-units = 1
 
@@ -74,6 +79,7 @@ default-members = [
   "cache",
   "client",
   "concrete_time",
+  "dep_inference",
   "fs",
   "fs/fs_util",
   "fs/store",
@@ -124,6 +130,7 @@ concrete_time = { path = "concrete_time" }
 crossbeam-channel = "0.5"
 # TODO: Waiting on https://github.com/Aeledfyr/deepsize/pull/{30,31,32}.
 deepsize = { git = "https://github.com/stuhood/deepsize.git", rev = "5c8bee5443fcafe4aaa9274490d354412d0955c1", features=["internment", "smallvec"] }
+dep_inference = { path = "dep_inference" }
 derivative = "2.2"
 async-oncecell = "0.2"
 docker = { path = "process_execution/docker" }
@@ -147,8 +154,11 @@ num_enum = "0.5"
 parking_lot = "0.12"
 petgraph = "0.6"
 process_execution = { path = "process_execution" }
-pyo3 = "0.16"
+# TODO: Change to ^0.18.4 once https://github.com/PyO3/pyo3/pull/3142 is released
+pyo3 =  { git = "https://github.com/PyO3/pyo3.git", rev = "c7d541b9ad2a9ef0255ab69541e67b22fe3fbf32"}
 rand = "0.8"
+# See https://github.com/PyO3/pyo3/issues/3151
+syn = "1.0.85"
 regex = "1"
 reqwest = { version = "0.11", default_features = false, features = ["stream", "rustls-tls"] }
 rule_graph = { path = "rule_graph" }
@@ -157,10 +167,10 @@ stdio = { path = "stdio" }
 store = { path = "fs/store" }
 serde_json = "1.0"
 task_executor = { path = "task_executor" }
-tempfile = "3"
+tempfile = "3.5.0"
 testutil_mock = { package = "mock", path = "testutil/mock" }
-time = "0.3"
-tokio = { version = "1.21", features = ["macros", "rt", "rt-multi-thread"] }
+time = "0.3.20"
+tokio = { version = "1.28", features = ["macros", "rt", "rt-multi-thread"] }
 tokio-retry = "0.3"
 tokio-util = { version = "0.7", features = ["io"] }
 tryfuture = { path = "tryfuture" }
@@ -177,4 +187,4 @@ fs = { path = "./fs" }
 env_logger = "0.10.0"
 
 [build-dependencies]
-pyo3-build-config = "0.17"
+pyo3-build-config = "0.18"

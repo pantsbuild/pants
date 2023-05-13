@@ -12,7 +12,6 @@ from typing import Optional, cast
 from pkg_resources import Requirement, WorkingSet
 from pkg_resources import working_set as global_working_set
 
-from pants import ox
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
 from pants.backend.python.util_rules.pex_environment import PythonExecutable
@@ -129,15 +128,13 @@ class PluginResolver:
         env: CompleteEnvironmentVars,
     ) -> WorkingSet:
         """Resolves any configured plugins and adds them to the working_set."""
-
-        with ox.traditional_import_machinery():
-            for resolved_plugin_location in self._resolve_plugins(
-                options_bootstrapper, env, self._request
-            ):
-                site.addsitedir(
-                    resolved_plugin_location
-                )  # Activate any .pth files plugin wheels may have.
-                self._working_set.add_entry(resolved_plugin_location)
+        for resolved_plugin_location in self._resolve_plugins(
+            options_bootstrapper, env, self._request
+        ):
+            site.addsitedir(
+                resolved_plugin_location
+            )  # Activate any .pth files plugin wheels may have.
+            self._working_set.add_entry(resolved_plugin_location)
         return self._working_set
 
     def _resolve_plugins(

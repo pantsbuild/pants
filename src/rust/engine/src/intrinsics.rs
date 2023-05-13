@@ -19,7 +19,10 @@ use crate::python::{throw, Key, Value};
 use crate::tasks::Intrinsic;
 use crate::types::Types;
 use crate::Failure;
+use dep_inference::python::get_dependencies;
+use protos::gen::pants::cache::{CacheKey, CacheKeyType};
 
+use bytes::Bytes;
 use futures::future::{BoxFuture, FutureExt, TryFutureExt};
 use futures::try_join;
 use indexmap::IndexMap;
@@ -28,7 +31,7 @@ use pyo3::{IntoPy, PyAny, PyRef, Python, ToPyObject};
 use tokio::process;
 
 use docker::docker::{ImagePullPolicy, ImagePullScope, DOCKER, IMAGE_PULL_CACHE};
-use fs::{DigestTrie, DirectoryDigest, RelativePath, TypedPath};
+use fs::{DigestTrie, DirectoryDigest, Entry, RelativePath, SymlinkBehavior, TypedPath};
 use hashing::{Digest, EMPTY_DIGEST};
 use process_execution::local::{
   apply_chroot, create_sandbox, prepare_workdir, setup_run_sh_script, KeepSandboxes,
@@ -136,6 +139,13 @@ impl Intrinsics {
       },
       Box::new(docker_resolve_image),
     );
+    intrinsics.insert(
+      Intrinsic {
+        product: types.parsed_python_deps_result,
+        inputs: vec![DependencyKey::new(types.directory_digest)],
+      },
+      Box::new(parse_python_deps),
+    );
     Intrinsics { intrinsics }
   }
 
@@ -187,39 +197,39 @@ fn process_request_to_process_result(
         .map_err(|e| e.enrich("Bytes from stderr"))
     )?;
 
-    let gil = Python::acquire_gil();
-    let py = gil.python();
-    Ok(externs::unsafe_call(
-      py,
-      context.core.types.process_result,
-      &[
-        externs::store_bytes(py, &stdout_bytes),
-        Snapshot::store_file_digest(py, result.stdout_digest)?,
-        externs::store_bytes(py, &stderr_bytes),
-        Snapshot::store_file_digest(py, result.stderr_digest)?,
-        externs::store_i64(py, result.exit_code.into()),
-        Snapshot::store_directory_digest(py, result.output_directory)?,
-        externs::unsafe_call(
-          py,
-          context.core.types.process_result_metadata,
-          &[
-            result
-              .metadata
-              .total_elapsed
-              .map(|d| externs::store_u64(py, Duration::from(d).as_millis() as u64))
-              .unwrap_or_else(|| Value::from(py.None())),
-            Value::from(
-              externs::process::PyProcessExecutionEnvironment {
-                environment: result.metadata.environment,
-              }
-              .into_py(py),
-            ),
-            externs::store_utf8(py, result.metadata.source.into()),
-            externs::store_u64(py, result.metadata.source_run_id.0.into()),
-          ],
-        ),
-      ],
-    ))
+    Python::with_gil(|py| -> NodeResult<Value> {
+      Ok(externs::unsafe_call(
+        py,
+        context.core.types.process_result,
+        &[
+          externs::store_bytes(py, &stdout_bytes),
+          Snapshot::store_file_digest(py, result.stdout_digest)?,
+          externs::store_bytes(py, &stderr_bytes),
+          Snapshot::store_file_digest(py, result.stderr_digest)?,
+          externs::store_i64(py, result.exit_code.into()),
+          Snapshot::store_directory_digest(py, result.output_directory)?,
+          externs::unsafe_call(
+            py,
+            context.core.types.process_result_metadata,
+            &[
+              result
+                .metadata
+                .total_elapsed
+                .map(|d| externs::store_u64(py, Duration::from(d).as_millis() as u64))
+                .unwrap_or_else(|| Value::from(py.None())),
+              Value::from(
+                externs::process::PyProcessExecutionEnvironment {
+                  environment: result.metadata.environment,
+                }
+                .into_py(py),
+              ),
+              externs::store_utf8(py, result.metadata.source.into()),
+              externs::store_u64(py, result.metadata.source_run_id.0.into()),
+            ],
+          ),
+        ],
+      ))
+    })
   }
   .boxed()
 }
@@ -236,9 +246,9 @@ fn directory_digest_to_digest_contents(
 
     let digest_contents = context.core.store().contents_for_directory(digest).await?;
 
-    let gil = Python::acquire_gil();
-    let value = Snapshot::store_digest_contents(gil.python(), &context, &digest_contents)?;
-    Ok(value)
+    Ok(Python::with_gil(|py| {
+      Snapshot::store_digest_contents(py, &context, &digest_contents)
+    })?)
   }
   .boxed()
 }
@@ -253,9 +263,9 @@ fn directory_digest_to_digest_entries(
       lift_directory_digest(py_digest)
     })?;
     let digest_entries = context.core.store().entries_for_directory(digest).await?;
-    let gil = Python::acquire_gil();
-    let value = Snapshot::store_digest_entries(gil.python(), &context, &digest_entries)?;
-    Ok(value)
+    Ok(Python::with_gil(|py| {
+      Snapshot::store_digest_entries(py, &context, &digest_entries)
+    })?)
   }
   .boxed()
 }
@@ -276,9 +286,9 @@ fn remove_prefix_request_to_digest(
       res
     })?;
     let digest = context.core.store().strip_prefix(digest, &prefix).await?;
-    let gil = Python::acquire_gil();
-    let value = Snapshot::store_directory_digest(gil.python(), digest)?;
-    Ok(value)
+    Ok(Python::with_gil(|py| {
+      Snapshot::store_directory_digest(py, digest)
+    })?)
   }
   .boxed()
 }
@@ -300,9 +310,9 @@ fn add_prefix_request_to_digest(
       res
     })?;
     let digest = context.core.store().add_prefix(digest, &prefix).await?;
-    let gil = Python::acquire_gil();
-    let value = Snapshot::store_directory_digest(gil.python(), digest)?;
-    Ok(value)
+    Ok(Python::with_gil(|py| {
+      Snapshot::store_directory_digest(py, digest)
+    })?)
   }
   .boxed()
 }
@@ -315,9 +325,9 @@ fn digest_to_snapshot(context: Context, args: Vec<Value>) -> BoxFuture<'static, 
       lift_directory_digest(py_digest)
     })?;
     let snapshot = store::Snapshot::from_digest(store, digest).await?;
-    let gil = Python::acquire_gil();
-    let value = Snapshot::store_snapshot(gil.python(), snapshot)?;
-    Ok(value)
+    Ok(Python::with_gil(|py| {
+      Snapshot::store_snapshot(py, snapshot)
+    })?)
   }
   .boxed()
 }
@@ -326,7 +336,7 @@ fn merge_digests_request_to_digest(
   context: Context,
   args: Vec<Value>,
 ) -> BoxFuture<'static, NodeResult<Value>> {
-  let core = context.core;
+  let core = &context.core;
   let store = core.store();
   async move {
     let digests = Python::with_gil(|py| {
@@ -337,9 +347,9 @@ fn merge_digests_request_to_digest(
         .map_err(|e| throw(format!("{e}")))
     })?;
     let digest = store.merge(digests).await?;
-    let gil = Python::acquire_gil();
-    let value = Snapshot::store_directory_digest(gil.python(), digest)?;
-    Ok(value)
+    Ok(Python::with_gil(|py| {
+      Snapshot::store_directory_digest(py, digest)
+    })?)
   }
   .boxed()
 }
@@ -351,9 +361,9 @@ fn download_file_to_digest(
   async move {
     let key = Key::from_value(args.pop().unwrap()).map_err(Failure::from)?;
     let snapshot = context.get(DownloadedFile(key)).await?;
-    let gil = Python::acquire_gil();
-    let value = Snapshot::store_directory_digest(gil.python(), snapshot.into())?;
-    Ok(value)
+    Ok(Python::with_gil(|py| {
+      Snapshot::store_directory_digest(py, snapshot.into())
+    })?)
   }
   .boxed()
 }
@@ -369,9 +379,9 @@ fn path_globs_to_digest(
     })
     .map_err(|e| throw(format!("Failed to parse PathGlobs: {e}")))?;
     let snapshot = context.get(Snapshot::from_path_globs(path_globs)).await?;
-    let gil = Python::acquire_gil();
-    let value = Snapshot::store_directory_digest(gil.python(), snapshot.into())?;
-    Ok(value)
+    Ok(Python::with_gil(|py| {
+      Snapshot::store_directory_digest(py, snapshot.into())
+    })?)
   }
   .boxed()
 }
@@ -388,9 +398,9 @@ fn path_globs_to_paths(
     })
     .map_err(|e| throw(format!("Failed to parse PathGlobs: {e}")))?;
     let paths = context.get(Paths::from_path_globs(path_globs)).await?;
-    let gil = Python::acquire_gil();
-    let value = Paths::store_paths(gil.python(), &core, &paths)?;
-    Ok(value)
+    Ok(Python::with_gil(|py| {
+      Paths::store_paths(py, &core, &paths)
+    })?)
   }
   .boxed()
 }
@@ -409,32 +419,32 @@ fn create_digest_to_digest(
   let mut new_file_count = 0;
 
   let items: Vec<CreateDigestItem> = {
-    let gil = Python::acquire_gil();
-    let py = gil.python();
-    let py_create_digest = (*args[0]).as_ref(py);
-    externs::collect_iterable(py_create_digest)
-      .unwrap()
-      .into_iter()
-      .map(|obj| {
-        let raw_path: String = externs::getattr(obj, "path").unwrap();
-        let path = RelativePath::new(PathBuf::from(raw_path)).unwrap();
-        if obj.hasattr("content").unwrap() {
-          let bytes = bytes::Bytes::from(externs::getattr::<Vec<u8>>(obj, "content").unwrap());
-          let is_executable: bool = externs::getattr(obj, "is_executable").unwrap();
-          new_file_count += 1;
-          CreateDigestItem::FileContent(path, bytes, is_executable)
-        } else if obj.hasattr("file_digest").unwrap() {
-          let py_file_digest: PyFileDigest = externs::getattr(obj, "file_digest").unwrap();
-          let is_executable: bool = externs::getattr(obj, "is_executable").unwrap();
-          CreateDigestItem::FileEntry(path, py_file_digest.0, is_executable)
-        } else if obj.hasattr("target").unwrap() {
-          let target: String = externs::getattr(obj, "target").unwrap();
-          CreateDigestItem::SymlinkEntry(path, PathBuf::from(target))
-        } else {
-          CreateDigestItem::Dir(path)
-        }
-      })
-      .collect()
+    Python::with_gil(|py| {
+      let py_create_digest = (*args[0]).as_ref(py);
+      externs::collect_iterable(py_create_digest)
+        .unwrap()
+        .into_iter()
+        .map(|obj| {
+          let raw_path: String = externs::getattr(obj, "path").unwrap();
+          let path = RelativePath::new(PathBuf::from(raw_path)).unwrap();
+          if obj.hasattr("content").unwrap() {
+            let bytes = bytes::Bytes::from(externs::getattr::<Vec<u8>>(obj, "content").unwrap());
+            let is_executable: bool = externs::getattr(obj, "is_executable").unwrap();
+            new_file_count += 1;
+            CreateDigestItem::FileContent(path, bytes, is_executable)
+          } else if obj.hasattr("file_digest").unwrap() {
+            let py_file_digest: PyFileDigest = externs::getattr(obj, "file_digest").unwrap();
+            let is_executable: bool = externs::getattr(obj, "is_executable").unwrap();
+            CreateDigestItem::FileEntry(path, py_file_digest.0, is_executable)
+          } else if obj.hasattr("target").unwrap() {
+            let target: String = externs::getattr(obj, "target").unwrap();
+            CreateDigestItem::SymlinkEntry(path, PathBuf::from(target))
+          } else {
+            CreateDigestItem::Dir(path)
+          }
+        })
+        .collect()
+    })
   };
 
   let mut typed_paths: Vec<TypedPath> = Vec::with_capacity(items.len());
@@ -474,9 +484,9 @@ fn create_digest_to_digest(
   let trie = DigestTrie::from_unique_paths(typed_paths, &file_digests).unwrap();
   async move {
     store.store_file_bytes_batch(items_to_store, true).await?;
-    let gil = Python::acquire_gil();
-    let value = Snapshot::store_directory_digest(gil.python(), trie.into())?;
-    Ok(value)
+    Ok(Python::with_gil(|py| {
+      Snapshot::store_directory_digest(py, trie.into())
+    })?)
   }
   .boxed()
 }
@@ -499,9 +509,9 @@ fn digest_subset_to_digest(
     })?;
     let subset_params = SubsetParams { globs: path_globs };
     let digest = store.subset(original_digest, subset_params).await?;
-    let gil = Python::acquire_gil();
-    let value = Snapshot::store_directory_digest(gil.python(), digest)?;
-    Ok(value)
+    Ok(Python::with_gil(|py| {
+      Snapshot::store_directory_digest(py, digest)
+    })?)
   }
   .boxed()
 }
@@ -558,7 +568,7 @@ fn interactive_process(
         (run_in_workspace, restartable, keep_sandboxes)
       });
 
-      let session = context.session;
+      let session = context.session.clone();
 
       let mut tempdir = create_sandbox(
         context.core.executor.clone(),
@@ -672,16 +682,16 @@ fn interactive_process(
         }
       }
 
-      let result = {
-        let gil = Python::acquire_gil();
-        let py = gil.python();
+      Ok(
+          Python::with_gil(|py| {
         externs::unsafe_call(
           py,
           interactive_process_result,
           &[externs::store_i64(py, i64::from(code))],
         )
-      };
-      Ok(result)
+
+      })
+    )
     }
   ).boxed()
 }
@@ -729,16 +739,97 @@ fn docker_resolve_image(
       .id
       .ok_or_else(|| format!("Image does not exist: `{}`", &image_name))?;
 
-    let result = {
-      let gil = Python::acquire_gil();
-      let py = gil.python();
+    Ok(Python::with_gil(|py| {
       externs::unsafe_call(
         py,
         docker_resolve_image_result,
         &[Value::from(PyString::new(py, &image_id).to_object(py))],
       )
-    };
-    Ok(result)
+    }))
+  }
+  .boxed()
+}
+
+fn parse_python_deps(context: Context, args: Vec<Value>) -> BoxFuture<'static, NodeResult<Value>> {
+  async move {
+    let core = &context.core;
+    let store = core.store();
+    let directory_digest = Python::with_gil(|py| {
+      let py_digest = (*args[0]).as_ref(py);
+      lift_directory_digest(py_digest)
+    })?;
+
+    let mut path = None;
+    let mut digest = None;
+    store
+      .load_digest_trie(directory_digest.clone())
+      .await?
+      .walk(SymlinkBehavior::Oblivious, &mut |node_path, entry| {
+        if let Entry::File(file) = entry {
+          path = Some(node_path.to_owned());
+          digest = Some(file.digest());
+        }
+      });
+    if digest.is_none() || path.is_none() {
+      Err(format!(
+        "Couldn't find a file in digest for Python inference: {directory_digest:?}"
+      ))?
+    }
+    let path = path.unwrap();
+    let digest = digest.unwrap();
+
+    in_workunit!(
+      "parse_python_dependencies",
+      Level::Debug,
+      desc = Some(format!("Determine Python dependencies for {path:?}")),
+      |_workunit| async move {
+        let cache_key = CacheKey {
+          key_type: CacheKeyType::DepInferenceRequest.into(),
+          digest: Some(digest.into()),
+        };
+        let cached_result = core.local_cache.load(&cache_key).await?;
+
+        let result = if let Some(result) =
+          cached_result.and_then(|bytes| serde_json::from_slice(&bytes).ok())
+        {
+          result
+        } else {
+          let bytes = store
+            .load_file_bytes_with(digest, |bytes| Vec::from(bytes))
+            .await?;
+
+          let contents = std::str::from_utf8(&bytes)
+            .map_err(|err| format!("Failed to convert digest bytes to utf-8: {err}"))?;
+          let result = Some(get_dependencies(contents, path)?);
+          core
+            .local_cache
+            .store(
+              &cache_key,
+              Bytes::from(
+                serde_json::to_string(&result)
+                  .map_err(|e| format!("Failed to serialize dep inference cache result: {e}"))?,
+              ),
+            )
+            .await?;
+          result
+        };
+        let result = result.unwrap();
+
+        let result = Python::with_gil(|py| {
+          externs::unsafe_call(
+            py,
+            core.types.parsed_python_deps_result,
+            &[
+              result.imports.to_object(py).into(),
+              result.string_candidates.to_object(py).into(),
+            ],
+          )
+        });
+
+        Ok(result)
+      }
+    )
+    .await
   }
   .boxed()
 }

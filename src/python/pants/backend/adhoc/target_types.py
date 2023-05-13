@@ -124,7 +124,7 @@ class AdhocToolRunnableDependenciesField(SpecialCasedDependencies):
         dependencies will be made available on the `PATH` with the name of the target.
 
         See also `{AdhocToolOutputDependenciesField.alias}` and
-        `{AdhocToolExecutionDependenciesField.alias}.
+        `{AdhocToolExecutionDependenciesField.alias}`.
         """
     )
 
@@ -149,8 +149,9 @@ class AdhocToolStdoutFilenameField(StringField):
     default = None
     help = help_text(
         lambda: f"""
-        A filename to capture the contents of `stdout` to, relative to the value of
-        `{AdhocToolWorkdirField.alias}`.
+        A filename to capture the contents of `stdout` to. Relative paths are
+        relative to the value of `{AdhocToolWorkdirField.alias}`, absolute paths
+        start at the build root.
         """
     )
 
@@ -160,8 +161,9 @@ class AdhocToolStderrFilenameField(StringField):
     default = None
     help = help_text(
         lambda: f"""
-        A filename to capture the contents of `stderr` to, relative to the value of
-        `{AdhocToolWorkdirField.alias}`
+        A filename to capture the contents of `stderr` to. Relative paths are
+        relative to the value of `{AdhocToolWorkdirField.alias}`, absolute paths
+        start at the build root.
         """
     )
 
@@ -255,8 +257,8 @@ class AdhocToolTarget(Target):
                 {AdhocToolRunnableField.alias}=":python_source",
                 {AdhocToolArgumentsField.alias}=[""],
                 {AdhocToolExecutionDependenciesField.alias}=[":scripts"],
-                {AdhocToolOutputDirectoriesField.alias}=["logs/my-script.log"],
-                {AdhocToolOutputFilesField.alias}=["results/"],
+                {AdhocToolOutputDirectoriesField.alias}=["results/"],
+                {AdhocToolOutputFilesField.alias}=["logs/my-script.log"],
             )
 
             shell_sources(name="scripts")

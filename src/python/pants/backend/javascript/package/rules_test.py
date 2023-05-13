@@ -5,7 +5,9 @@ from __future__ import annotations
 import json
 import os.path
 import tarfile
+import textwrap
 from textwrap import dedent
+from typing import cast
 
 import pytest
 
@@ -25,8 +27,13 @@ from pants.engine.target import GeneratedSources
 from pants.testutil.rule_runner import RuleRunner
 
 
+@pytest.fixture(params=["pnpm", "npm"])
+def package_manager(request) -> str:
+    return cast(str, request.param)
+
+
 @pytest.fixture
-def rule_runner() -> RuleRunner:
+def rule_runner(package_manager: str) -> RuleRunner:
     rule_runner = RuleRunner(
         rules=[
             *package_rules(),
@@ -42,7 +49,7 @@ def rule_runner() -> RuleRunner:
         ],
         objects=dict(package_json.build_file_aliases().objects),
     )
-    rule_runner.set_options([], env_inherit={"PATH"})
+    rule_runner.set_options([f"--nodejs-package-manager={package_manager}"], env_inherit={"PATH"})
     return rule_runner
 
 
@@ -127,9 +134,10 @@ def test_packages_files_as_resource(rule_runner: RuleRunner) -> None:
         assert f.read() == "blarb\n"
 
 
-def test_packages_files_as_resource_in_workspace(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files(
-        {
+@pytest.fixture
+def workspace_files(package_manager: str) -> dict[str, str]:
+    if package_manager == "npm":
+        return {
             "src/js/package-lock.json": json.dumps(
                 {
                     "name": "spam",
@@ -143,7 +151,34 @@ def test_packages_files_as_resource_in_workspace(rule_runner: RuleRunner) -> Non
                         "node_modules/ham": {"link": True, "resolved": "a"},
                     },
                 }
+            )
+        }
+    if package_manager == "pnpm":
+        return {
+            "src/js/pnpm-workspace.yaml": textwrap.dedent(
+                """\
+                packages:
+                """
             ),
+            "src/js/pnpm-lock.yaml": json.dumps(
+                {
+                    "importers": {
+                        ".": {"specifiers": {}},
+                        "a": {"specifiers": {}},
+                    },
+                    "lockfileVersion": 5.3,
+                }
+            ),
+        }
+    raise AssertionError(f"No lockfile implemented for {package_manager}.")
+
+
+def test_packages_files_as_resource_in_workspace(
+    rule_runner: RuleRunner, workspace_files: dict[str, str]
+) -> None:
+    rule_runner.write_files(
+        {
+            **workspace_files,
             "src/js/package.json": json.dumps(
                 {"name": "spam", "version": "0.0.1", "workspaces": ["a"]}
             ),

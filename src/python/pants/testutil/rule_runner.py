@@ -40,8 +40,8 @@ from pants.engine.addresses import Address
 from pants.engine.console import Console
 from pants.engine.env_vars import CompleteEnvironmentVars
 from pants.engine.environment import EnvironmentName
-from pants.engine.fs import Digest, PathGlobs, PathGlobsAndRoot, Snapshot, Workspace
-from pants.engine.goal import Goal
+from pants.engine.fs import CreateDigest, Digest, FileContent, Snapshot, Workspace
+from pants.engine.goal import CurrentExecutingGoals, Goal
 from pants.engine.internals import native_engine
 from pants.engine.internals.native_engine import ProcessExecutionEnvironment, PyExecutor
 from pants.engine.internals.scheduler import ExecutionError, Scheduler, SchedulerSession
@@ -65,13 +65,7 @@ from pants.source import source_root
 from pants.testutil.option_util import create_options_bootstrapper
 from pants.util.collections import assert_single_element
 from pants.util.contextutil import pushd, temporary_dir, temporary_file
-from pants.util.dirutil import (
-    recursive_dirname,
-    safe_file_dump,
-    safe_mkdir,
-    safe_mkdtemp,
-    safe_open,
-)
+from pants.util.dirutil import recursive_dirname, safe_mkdir, safe_mkdtemp, safe_open
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import OrderedSet
 from pants.util.strutil import softwrap
@@ -374,6 +368,7 @@ class RuleRunner:
                 {
                     OptionsBootstrapper: self.options_bootstrapper,
                     CompleteEnvironmentVars: self.environment,
+                    CurrentExecutingGoals: CurrentExecutingGoals(),
                     **self.extra_session_values,
                 }
             ),
@@ -565,13 +560,12 @@ class RuleRunner:
 
         :API: public
         """
-        with temporary_dir() as temp_dir:
-            for file_name, content in files.items():
-                mode = "wb" if isinstance(content, bytes) else "w"
-                safe_file_dump(os.path.join(temp_dir, file_name), content, mode=mode)
-            return self.scheduler.capture_snapshots(
-                (PathGlobsAndRoot(PathGlobs(("**",)), temp_dir),)
-            )[0]
+        file_contents = [
+            FileContent(path, content.encode() if isinstance(content, str) else content)
+            for path, content in files.items()
+        ]
+        digest = self.request(Digest, [CreateDigest(file_contents)])
+        return self.request(Snapshot, [digest])
 
     def make_snapshot_of_empty_files(self, files: Iterable[str]) -> Snapshot:
         """Makes a snapshot with empty content for each file.
@@ -596,7 +590,7 @@ class RuleRunner:
         ).target
 
     def write_digest(
-        self, digest: Digest, *, path_prefix: str | None = None, clear_destination: bool = False
+        self, digest: Digest, *, path_prefix: str | None = None, clear_paths: Sequence[str] = ()
     ) -> None:
         """Write a digest to disk, relative to the test's build root.
 
@@ -607,7 +601,7 @@ class RuleRunner:
             self.scheduler.py_session,
             digest,
             path_prefix or "",
-            clear_destination,
+            clear_paths,
         )
 
     def run_interactive_process(self, request: InteractiveProcess) -> InteractiveProcessResult:

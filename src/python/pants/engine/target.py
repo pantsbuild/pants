@@ -18,6 +18,7 @@ from dataclasses import dataclass
 from enum import Enum
 from pathlib import PurePath
 from typing import (
+    AbstractSet,
     Any,
     Callable,
     ClassVar,
@@ -25,6 +26,7 @@ from typing import (
     Generic,
     Iterable,
     Iterator,
+    KeysView,
     Mapping,
     Optional,
     Sequence,
@@ -62,7 +64,7 @@ from pants.util.collections import ensure_list, ensure_str_list
 from pants.util.dirutil import fast_relpath
 from pants.util.docutil import bin_name, doc_url
 from pants.util.frozendict import FrozenDict
-from pants.util.memo import memoized_method, memoized_property
+from pants.util.memo import memoized_classproperty, memoized_method, memoized_property
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import bullet_list, help_text, pluralize, softwrap
 
@@ -379,10 +381,10 @@ class Target:
 
     # These get calculated in the constructor
     address: Address
-    plugin_fields: tuple[type[Field], ...]
     field_values: FrozenDict[type[Field], Field]
     residence_dir: str
     name_explicitly_set: bool
+    description_of_origin: str
 
     @final
     def __init__(
@@ -397,6 +399,7 @@ class Target:
         name_explicitly_set: bool = True,
         residence_dir: str | None = None,
         ignore_unrecognized_fields: bool = False,
+        description_of_origin: str | None = None,
     ) -> None:
         """Create a target.
 
@@ -414,6 +417,8 @@ class Target:
             like `dir:` know whether to match the target or not.
         :param ignore_unrecognized_fields: Don't error if fields are not recognized. This is only
             intended for when Pants is bootstrapping itself.
+        :param description_of_origin: Where this target was declared, such as a path to BUILD file
+            and line number.
         """
         if self.removal_version and not address.is_generated_target:
             if not self.removal_hint:
@@ -427,34 +432,45 @@ class Target:
                 hint=f"Using the `{self.alias}` target type for {address}. {self.removal_hint}",
             )
 
-        object.__setattr__(self, "address", address)
-        object.__setattr__(
-            self, "plugin_fields", self._find_plugin_fields(union_membership or UnionMembership({}))
-        )
         object.__setattr__(
             self, "residence_dir", residence_dir if residence_dir is not None else address.spec_path
         )
-        object.__setattr__(self, "name_explicitly_set", name_explicitly_set)
+        object.__setattr__(self, "address", address)
         object.__setattr__(
-            self,
-            "field_values",
-            self._calculate_field_values(
-                unhydrated_values, address, ignore_unrecognized_fields=ignore_unrecognized_fields
-            ),
+            self, "description_of_origin", description_of_origin or self.residence_dir
         )
+        object.__setattr__(self, "name_explicitly_set", name_explicitly_set)
+        try:
+            object.__setattr__(
+                self,
+                "field_values",
+                self._calculate_field_values(
+                    unhydrated_values,
+                    address,
+                    union_membership,
+                    ignore_unrecognized_fields=ignore_unrecognized_fields,
+                ),
+            )
 
-        self.validate()
+            self.validate()
+        except Exception as e:
+            raise InvalidTargetException(
+                str(e), description_of_origin=self.description_of_origin
+            ) from e
 
     @final
     def _calculate_field_values(
         self,
         unhydrated_values: dict[str, Any],
         address: Address,
+        # See `__init__`.
+        union_membership: UnionMembership | None,
         *,
         ignore_unrecognized_fields: bool,
     ) -> FrozenDict[type[Field], Field]:
+        all_field_types = self.class_field_types(union_membership)
         field_values = {}
-        aliases_to_field_types = self._get_field_aliases_to_field_types(self.field_types)
+        aliases_to_field_types = self._get_field_aliases_to_field_types(all_field_types)
 
         for alias, value in unhydrated_values.items():
             if alias not in aliases_to_field_types:
@@ -478,7 +494,9 @@ class Target:
             field_values[field_type] = field_type(value, address)
 
         # For undefined fields, mark the raw value as missing.
-        for field_type in set(self.field_types) - set(field_values.keys()):
+        for field_type in all_field_types:
+            if field_type in field_values:
+                continue
             field_values[field_type] = field_type(NO_VALUE, address)
         return FrozenDict(
             sorted(
@@ -490,7 +508,7 @@ class Target:
     @final
     @classmethod
     def _get_field_aliases_to_field_types(
-        cls, field_types: tuple[type[Field], ...]
+        cls, field_types: Iterable[type[Field]]
     ) -> dict[str, type[Field]]:
         aliases_to_field_types = {}
         for field_type in field_types:
@@ -501,8 +519,8 @@ class Target:
 
     @final
     @property
-    def field_types(self) -> Tuple[Type[Field], ...]:
-        return (*self.core_fields, *self.plugin_fields)
+    def field_types(self) -> KeysView[Type[Field]]:
+        return self.field_values.keys()
 
     @distinct_union_type_per_subclass
     class PluginField:
@@ -513,8 +531,9 @@ class Target:
         return (
             f"{self.__class__}("
             f"address={self.address}, "
-            f"alias={repr(self.alias)}, "
-            f"residence_dir={repr(self.residence_dir)}, "
+            f"alias={self.alias!r}, "
+            f"residence_dir={self.residence_dir!r}, "
+            f"origin={self.description_of_origin}, "
             f"{fields})"
         )
 
@@ -538,6 +557,7 @@ class Target:
 
     @final
     @classmethod
+    @memoized_method
     def _find_plugin_fields(cls, union_membership: UnionMembership) -> tuple[type[Field], ...]:
         result: set[type[Field]] = set()
         classes = [cls]
@@ -577,7 +597,7 @@ class Target:
         if result is not None:
             return cast(_F, result)
         field_subclass = self._find_registered_field_subclass(
-            field, registered_fields=self.field_types
+            field, registered_fields=self.field_values.keys()
         )
         if field_subclass is not None:
             return cast(_F, self.field_values[field_subclass])
@@ -631,7 +651,7 @@ class Target:
     @final
     @classmethod
     def _has_fields(
-        cls, fields: Iterable[Type[Field]], *, registered_fields: Iterable[Type[Field]]
+        cls, fields: Iterable[Type[Field]], *, registered_fields: AbstractSet[Type[Field]]
     ) -> bool:
         unrecognized_fields = [field for field in fields if field not in registered_fields]
         if not unrecognized_fields:
@@ -662,17 +682,23 @@ class Target:
         custom subclass `CustomTags`, both `tgt.has_fields([Tags])` and
         `python_tgt.has_fields([CustomTags])` will return True.
         """
-        return self._has_fields(fields, registered_fields=self.field_types)
+        return self._has_fields(fields, registered_fields=self.field_values.keys())
 
     @final
     @classmethod
-    def class_field_types(cls, union_membership: UnionMembership) -> Tuple[Type[Field], ...]:
+    @memoized_method
+    def class_field_types(
+        cls, union_membership: UnionMembership | None
+    ) -> FrozenOrderedSet[Type[Field]]:
         """Return all registered Fields belonging to this target type.
 
         You can also use the instance property `tgt.field_types` to avoid having to pass the
         parameter UnionMembership.
         """
-        return (*cls.core_fields, *cls._find_plugin_fields(union_membership))
+        if union_membership is None:
+            return FrozenOrderedSet(cls.core_fields)
+        else:
+            return FrozenOrderedSet((*cls.core_fields, *cls._find_plugin_fields(union_membership)))
 
     @final
     @classmethod
@@ -1333,23 +1359,14 @@ def _generate_file_level_targets(
 # -----------------------------------------------------------------------------------------------
 # FieldSet
 # -----------------------------------------------------------------------------------------------
-def _get_field_set_fields(field_set: Type[FieldSet]) -> Dict[str, Type[Field]]:
-    return {
-        name: field_type
-        for name, field_type in get_type_hints(field_set).items()
-        if isinstance(field_type, type) and issubclass(field_type, Field)
-    }
-
-
 def _get_field_set_fields_from_target(
     field_set: Type[FieldSet], target: Target
 ) -> Dict[str, Field]:
-    all_expected_fields = _get_field_set_fields(field_set)
     return {
         dataclass_field_name: (
             target[field_cls] if field_cls in field_set.required_fields else target.get(field_cls)
         )
-        for dataclass_field_name, field_cls in all_expected_fields.items()
+        for dataclass_field_name, field_cls in field_set.fields.items()
     }
 
 
@@ -1434,6 +1451,17 @@ class FieldSet(EngineAwareParameter, metaclass=ABCMeta):
     @classmethod
     def create(cls: Type[_FS], tgt: Target) -> _FS:
         return cls(address=tgt.address, **_get_field_set_fields_from_target(cls, tgt))
+
+    @final
+    @memoized_classproperty
+    def fields(cls) -> FrozenDict[str, Type[Field]]:
+        return FrozenDict(
+            (
+                (name, field_type)
+                for name, field_type in get_type_hints(cls).items()
+                if isinstance(field_type, type) and issubclass(field_type, Field)
+            )
+        )
 
     def debug_hint(self) -> str:
         return self.address.spec
@@ -1564,8 +1592,22 @@ class InvalidTargetException(Exception):
 
     Suggested template:
 
-         f"The `{repr(alias)}` target {address} ..."
+         f"The `{alias!r}` target {address} ..."
     """
+
+    def __init__(self, message: Any, *, description_of_origin: str | None = None) -> None:
+        self.description_of_origin = description_of_origin
+        super().__init__(message)
+
+    def __str__(self) -> str:
+        if not self.description_of_origin:
+            return super().__str__()
+        return f"{self.description_of_origin}: {super().__str__()}"
+
+    def __repr__(self) -> str:
+        if not self.description_of_origin:
+            return super().__repr__()
+        return f"{self.description_of_origin}: {super().__repr__()}"
 
 
 class InvalidGeneratedTargetException(InvalidTargetException):
@@ -1577,8 +1619,22 @@ class InvalidFieldException(Exception):
 
     Suggested template:
 
-         f"The {repr(alias)} field in target {address} must ..., but ..."
+         f"The {alias!r} field in target {address} must ..., but ..."
     """
+
+    def __init__(self, message: Any, *, description_of_origin: str | None = None) -> None:
+        self.description_of_origin = description_of_origin
+        super().__init__(message)
+
+    def __str__(self) -> str:
+        if not self.description_of_origin:
+            return super().__str__()
+        return f"{self.description_of_origin}: {super().__str__()}"
+
+    def __repr__(self) -> str:
+        if not self.description_of_origin:
+            return super().__repr__()
+        return f"{self.description_of_origin}: {super().__repr__()}"
 
 
 class InvalidFieldTypeException(InvalidFieldException):
@@ -1586,17 +1642,29 @@ class InvalidFieldTypeException(InvalidFieldException):
     e.g. `a boolean` or `a string` or `an iterable of strings and integers`."""
 
     def __init__(
-        self, address: Address, field_alias: str, raw_value: Optional[Any], *, expected_type: str
+        self,
+        address: Address,
+        field_alias: str,
+        raw_value: Optional[Any],
+        *,
+        expected_type: str,
+        description_of_origin: str | None = None,
     ) -> None:
         super().__init__(
             f"The {repr(field_alias)} field in target {address} must be {expected_type}, but was "
-            f"`{repr(raw_value)}` with type `{type(raw_value).__name__}`."
+            f"`{repr(raw_value)}` with type `{type(raw_value).__name__}`.",
+            description_of_origin=description_of_origin,
         )
 
 
 class RequiredFieldMissingException(InvalidFieldException):
-    def __init__(self, address: Address, field_alias: str) -> None:
-        super().__init__(f"The {repr(field_alias)} field in target {address} must be defined.")
+    def __init__(
+        self, address: Address, field_alias: str, *, description_of_origin: str | None = None
+    ) -> None:
+        super().__init__(
+            f"The {repr(field_alias)} field in target {address} must be defined.",
+            description_of_origin=description_of_origin,
+        )
 
 
 class InvalidFieldChoiceException(InvalidFieldException):
@@ -1607,27 +1675,37 @@ class InvalidFieldChoiceException(InvalidFieldException):
         raw_value: Optional[Any],
         *,
         valid_choices: Iterable[Any],
+        description_of_origin: str | None = None,
     ) -> None:
         super().__init__(
             f"Values for the {repr(field_alias)} field in target {address} must be one of "
-            f"{sorted(valid_choices)}, but {repr(raw_value)} was provided."
+            f"{sorted(valid_choices)}, but {repr(raw_value)} was provided.",
+            description_of_origin=description_of_origin,
         )
 
 
-class UnrecognizedTargetTypeException(Exception):
+class UnrecognizedTargetTypeException(InvalidTargetException):
     def __init__(
         self,
         target_type: str,
         registered_target_types: RegisteredTargetTypes,
         address: Address | None = None,
+        description_of_origin: str | None = None,
     ) -> None:
         for_address = f" for address {address}" if address else ""
         super().__init__(
-            f"Target type {repr(target_type)} is not registered{for_address}.\n\nAll valid target "
-            f"types: {sorted(registered_target_types.aliases)}\n\n(If {repr(target_type)} is a "
-            "custom target type, refer to "
-            "https://groups.google.com/forum/#!topic/pants-devel/WsRFODRLVZI for instructions on "
-            "writing a light-weight Target API binding.)"
+            softwrap(
+                f"""
+                Target type {target_type!r} is not registered{for_address}.
+
+                All valid target types: {sorted(registered_target_types.aliases)}
+
+                (If {target_type!r} is a custom target type, refer to
+                {doc_url('target-api-concepts')} for getting it registered with Pants.)
+
+                """
+            ),
+            description_of_origin=description_of_origin,
         )
 
 
@@ -2844,38 +2922,37 @@ class OverridesField(AsyncFieldMixin, Field):
         cls,
         raw_value: Optional[Dict[Union[str, Tuple[str, ...]], Dict[str, Any]]],
         address: Address,
-    ) -> Optional[Dict[Tuple[str, ...], Dict[str, Any]]]:
+    ) -> Optional[FrozenDict[Tuple[str, ...], FrozenDict[str, ImmutableValue]]]:
         value_or_default = super().compute_value(raw_value, address)
         if value_or_default is None:
             return None
-        invalid_type_exception = InvalidFieldTypeException(
-            address,
-            cls.alias,
-            raw_value,
-            expected_type="dict[str | tuple[str, ...], dict[str, Any]]",
-        )
-        if not isinstance(value_or_default, collections.abc.Mapping):
-            raise invalid_type_exception
 
-        result: dict[tuple[str, ...], dict[str, Any]] = {}
+        def invalid_type_exception() -> InvalidFieldException:
+            return InvalidFieldTypeException(
+                address,
+                cls.alias,
+                raw_value,
+                expected_type="dict[str | tuple[str, ...], dict[str, Any]]",
+            )
+
+        if not isinstance(value_or_default, collections.abc.Mapping):
+            raise invalid_type_exception()
+
+        result: dict[tuple[str, ...], FrozenDict[str, ImmutableValue]] = {}
         for outer_key, nested_value in value_or_default.items():
             if isinstance(outer_key, str):
                 outer_key = (outer_key,)
             if not isinstance(outer_key, collections.abc.Sequence) or not all(
                 isinstance(elem, str) for elem in outer_key
             ):
-                raise invalid_type_exception
+                raise invalid_type_exception()
             if not isinstance(nested_value, collections.abc.Mapping):
-                raise invalid_type_exception
+                raise invalid_type_exception()
             if not all(isinstance(inner_key, str) for inner_key in nested_value):
-                raise invalid_type_exception
-            result[tuple(outer_key)] = dict(nested_value)
+                raise invalid_type_exception()
+            result[tuple(outer_key)] = FrozenDict.deep_freeze(cast(Mapping[str, Any], nested_value))
 
-        return result
-
-    def __hash__(self) -> int:
-        # The value might have unhashable elements like `list`, so we stringify it.
-        return hash((self.__class__, repr(self.value)))
+        return FrozenDict(result)
 
     @classmethod
     def to_path_globs(

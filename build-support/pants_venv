@@ -17,8 +17,9 @@ platform=$(uname -mps | sed 's/ /./g')
 venv_dir_prefix="${HOME}/.cache/pants/pants_dev_deps/${platform}"
 
 function venv_dir() {
-  py_venv_version=$(${PY} -c 'import sys; print("".join(map(str, sys.version_info[0:2])))')
-  echo "${venv_dir_prefix}.py${py_venv_version}.venv"
+  # Include the entire version string in order to differentiate e.g. PyPy from CPython.
+  py_venv_version=$(${PY} --version | shasum | awk '{print $1}')
+  echo "${venv_dir_prefix}.py.${py_venv_version}.venv"
 }
 
 function activate_venv() {

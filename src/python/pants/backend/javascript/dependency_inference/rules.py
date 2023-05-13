@@ -22,8 +22,10 @@ from pants.backend.javascript.package_json import (
     OwningNodePackage,
     OwningNodePackageRequest,
     PackageJsonEntryPoints,
+    PackageJsonImports,
     PackageJsonSourceField,
 )
+from pants.backend.javascript.subsystems.nodejs_infer import NodeJSInfer
 from pants.backend.javascript.target_types import JSDependenciesField, JSSourceField
 from pants.build_graph.address import Address
 from pants.engine.addresses import Addresses
@@ -63,7 +65,10 @@ class InferJSDependenciesRequest(InferDependenciesRequest):
 @rule
 async def infer_node_package_dependencies(
     request: InferNodePackageDependenciesRequest,
+    nodejs_infer: NodeJSInfer,
 ) -> InferredDependencies:
+    if not nodejs_infer.package_json_entry_points:
+        return InferredDependencies(())
     entry_points = await Get(
         PackageJsonEntryPoints, PackageJsonSourceField, request.field_set.source
     )
@@ -94,12 +99,34 @@ async def map_candidate_node_packages(
     )
 
 
+async def _replace_subpath_imports(
+    req: InferJSDependenciesRequest, import_strings: JSImportStrings
+) -> JSImportStrings:
+    owning_pkg = await Get(OwningNodePackage, OwningNodePackageRequest(req.field_set.address))
+    if owning_pkg.target:
+        subpath_imports = await Get(
+            PackageJsonImports, PackageJsonSourceField, owning_pkg.target[PackageJsonSourceField]
+        )
+        return JSImportStrings(
+            replace_string
+            for string in import_strings
+            for replace_string in subpath_imports.replacements(string) or (string,)
+        )
+    return import_strings
+
+
 @rule
 async def infer_js_source_dependencies(
     request: InferJSDependenciesRequest,
+    nodejs_infer: NodeJSInfer,
 ) -> InferredDependencies:
     source: JSSourceField = request.field_set.source
+    if not nodejs_infer.imports:
+        return InferredDependencies(())
+
     import_strings = await Get(JSImportStrings, ParseJsImportStrings(source))
+    import_strings = await _replace_subpath_imports(request, import_strings)
+
     path_strings = FrozenOrderedSet(
         os.path.normpath(os.path.join(os.path.dirname(source.file_path), import_string))
         for import_string in import_strings
@@ -110,8 +137,10 @@ async def infer_js_source_dependencies(
     owning_targets = await Get(Targets, Addresses(owners))
 
     non_path_string_bases = FrozenOrderedSet(
-        os.path.basename(non_path_string) for non_path_string in import_strings - path_strings
+        non_path_string.partition(os.path.sep)[0]
+        for non_path_string in import_strings - path_strings
     )
+
     candidate_pkgs = await Get(
         NodePackageCandidateMap, RequestNodePackagesCandidateMap(request.field_set.address)
     )

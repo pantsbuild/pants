@@ -33,7 +33,7 @@ jobs:
       uses: actions/cache@v3
       with:
         key: Linux-ARM64-rustup-${{ hashFiles('rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.68.2-*
+        path: '~/.rustup/toolchains/1.69.0-*
 
           ~/.rustup/update-hashes
 
@@ -54,7 +54,7 @@ jobs:
       uses: actions/cache@v3
       with:
         key: Linux-ARM64-engine-${{ steps.get-engine-hash.outputs.hash }}-v1
-        path: '.pants
+        path: 'src/python/pants/bin/native_client
 
           src/python/pants/engine/internals/native_engine.so
 
@@ -90,7 +90,7 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-ARM64
-        path: '.pants
+        path: 'src/python/pants/bin/native_client
 
           src/python/pants/engine/internals/native_engine.so
 
@@ -134,7 +134,7 @@ jobs:
       uses: actions/cache@v3
       with:
         key: Linux-x86_64-rustup-${{ hashFiles('rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.68.2-*
+        path: '~/.rustup/toolchains/1.69.0-*
 
           ~/.rustup/update-hashes
 
@@ -155,7 +155,7 @@ jobs:
       uses: actions/cache@v3
       with:
         key: Linux-x86_64-engine-${{ steps.get-engine-hash.outputs.hash }}-v1
-        path: '.pants
+        path: 'src/python/pants/bin/native_client
 
           src/python/pants/engine/internals/native_engine.so
 
@@ -191,7 +191,7 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
-        path: '.pants
+        path: 'src/python/pants/bin/native_client
 
           src/python/pants/engine/internals/native_engine.so
 
@@ -247,7 +247,7 @@ jobs:
       uses: actions/cache@v3
       with:
         key: macOS11-x86_64-rustup-${{ hashFiles('rust-toolchain') }}-v2
-        path: '~/.rustup/toolchains/1.68.2-*
+        path: '~/.rustup/toolchains/1.69.0-*
 
           ~/.rustup/update-hashes
 
@@ -268,7 +268,7 @@ jobs:
       uses: actions/cache@v3
       with:
         key: macOS11-x86_64-engine-${{ steps.get-engine-hash.outputs.hash }}-v1
-        path: '.pants
+        path: 'src/python/pants/bin/native_client
 
           src/python/pants/engine/internals/native_engine.so
 
@@ -304,7 +304,7 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: native_binaries.${{ matrix.python-version }}.macOS11-x86_64
-        path: '.pants
+        path: 'src/python/pants/bin/native_client
 
           src/python/pants/engine/internals/native_engine.so
 

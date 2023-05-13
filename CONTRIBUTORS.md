@@ -14,9 +14,11 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Andrew Hamilton
 + Andrii Porokhnavets
 + Andy Reitz
++ Anler
 + Antoine Tollenaere
 + Asher Foa
 + Aurelien Didier
++ Baptiste Gentholz
 + Bardur Arantsson
 + Bastian Wegge
 + Benjy Weinberger
@@ -149,6 +151,7 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Joshua Cannon
 + Joshua Cohen
 + Joshua Humphries
++ Jovial Joe Jayarson
 + Justin Trobec
 + KadenAgrey
 + Karin Lundberg
@@ -161,6 +164,7 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Kris Wilson
 + Kushal Dave
 + Kyle Derr
++ Kyujin Cho
 + Larry Hosken
 + Lawrence Finn
 + Le Nucksi
@@ -256,6 +260,7 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Stefan Sauer
 + Stephan Erb
 + Stu Hood
++ Subin Kim
 + Suresh Joshi
 + Tal Amuyal
 + Tansy Arron-Walker
@@ -291,6 +296,7 @@ Created by running `./pants run build-support/bin/contributors.py`.
 + Yoav Alon
 + Yuhan GUO
 + Yujie Chen
++ bianca rosa
 + billybecker
 + eugene yokota
 + hephex

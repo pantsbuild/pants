@@ -28,12 +28,12 @@ class PathsSubsystem(Outputting, GoalSubsystem):
     help = "List the paths between two addresses."
 
     from_ = StrOption(
-        required=True,
+        default=None,
         help="The path starting address",
     )
 
     to = StrOption(
-        required=True,
+        default=None,
         help="The path end address",
     )
 
@@ -81,8 +81,15 @@ def find_paths_breadth_first(
 
 @goal_rule
 async def paths(console: Console, paths_subsystem: PathsSubsystem) -> PathsGoal:
-    paths_from = paths_subsystem.from_
-    paths_to = paths_subsystem.to
+    path_from = paths_subsystem.from_
+    path_to = paths_subsystem.to
+
+    if path_from is None:
+        raise ValueError("Must set --from")
+
+    if path_to is None:
+        raise ValueError("Must set --to")
+
     specs_parser = SpecsParser()
 
     from_tgts, to_tgts = await MultiGet(
@@ -90,7 +97,7 @@ async def paths(console: Console, paths_subsystem: PathsSubsystem) -> PathsGoal:
             Targets,
             Specs,
             specs_parser.parse_specs(
-                [paths_from],
+                [path_from],
                 description_of_origin="the option `--paths-from`",
             ),
         ),
@@ -98,7 +105,7 @@ async def paths(console: Console, paths_subsystem: PathsSubsystem) -> PathsGoal:
             Targets,
             Specs,
             specs_parser.parse_specs(
-                [paths_to],
+                [path_to],
                 description_of_origin="the option `--paths-to`",
             ),
         ),
