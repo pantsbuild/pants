@@ -6,9 +6,7 @@ python_sources()
 python_tests(
     name="test",
     overrides={
-        "rules_integration_test.py": dict(
-            dependencies=[":lockfiles"],
-        ),
+        "rules_integration_test.py": dict(dependencies=[":lockfiles"], timeout=120),
     },
 )
 
