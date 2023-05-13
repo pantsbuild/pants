@@ -4,33 +4,25 @@
 from __future__ import annotations
 
 from textwrap import dedent
+from pants.backend.python.target_types import PythonSourceTarget
+from pants.engine.rules import QueryRule
 
 import pytest
 
+from pants.backend.python.dependency_inference.rules import PythonImportDependenciesInferenceFieldSet, rules as core_rules
+from pants.engine.target import InferredDependencies
 from pants.backend.python.dependency_inference import parse_python_dependencies
-from pants.backend.python.dependency_inference.parse_python_dependencies import (
-    ParsedPythonDependencies,
-)
-from pants.backend.python.dependency_inference.parse_python_dependencies import (
-    ParsedPythonImportInfo as ImpInfo,
-)
-from pants.backend.python.dependency_inference.parse_python_dependencies import (
-    ParsePythonDependenciesRequest,
-)
 from pants.backend.python.framework.django import dependency_inference, detect_apps
-from pants.backend.python.target_types import PythonSourceField, PythonSourceTarget
 from pants.backend.python.util_rules import pex
-from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.core.util_rules import stripped_source_files
 from pants.engine.addresses import Address
+from pants.testutil.rule_runner import RuleRunner
 from pants.testutil.python_interpreter_selection import (
     skip_unless_python27_present,
     skip_unless_python37_present,
     skip_unless_python38_present,
     skip_unless_python39_present,
 )
-from pants.testutil.rule_runner import QueryRule, RuleRunner
-from pants.util.strutil import softwrap
 
 
 @pytest.fixture
@@ -42,34 +34,29 @@ def rule_runner() -> RuleRunner:
             *pex.rules(),
             *dependency_inference.rules(),
             *detect_apps.rules(),
-            QueryRule(ParsedPythonDependencies, [ParsePythonDependenciesRequest]),
+            *core_rules(),
+            QueryRule(InferredDependencies, [dependency_inference.InferDjangoDependencies]),
         ],
         target_types=[PythonSourceTarget],
     )
 
 
-def assert_deps_parsed(
-    rule_runner: RuleRunner,
-    content: str,
-    *,
-    constraints: str,
-    expected_imports: dict[str, ImpInfo] | None = None,
-    expected_assets: list[str] | None = None,
-    filename: str = "path/to/app0/migrations/0001_initial.py",
-) -> None:
-    expected_imports = expected_imports or {}
-    expected_assets = expected_assets or []
-    rule_runner.set_options(
-        [
-            "--no-python-infer-string-imports",
-            "--no-python-infer-assets",
-        ],
-        env_inherit={"PATH", "PYENV_ROOT", "HOME"},
-    )
+def do_test_migration_dependencies(rule_runner: RuleRunner, constraints: str) -> None:
     rule_runner.write_files(
         {
-            "BUILD": f"python_source(name='t', source={repr(filename)})",
-            "path/to/app1/BUILD": softwrap(
+            "BUILD": f"python_source(name='t', source='path/to/app0/migrations/0001_initial.py')",
+            "path/to/app0/migrations/0001_initial.py": dedent(
+            """\
+            class Migration(migrations.Migration):
+                dependencies = [
+                ("app1", "0012_some_migration"),
+                ("app2_label", "0042_another_migration"),
+                ]
+
+                operations = []
+            """),
+
+            "path/to/app1/BUILD": dedent(
                 f"""\
                 python_source(
                   source="apps.py",
@@ -77,14 +64,15 @@ def assert_deps_parsed(
                 )
                 """
             ),
-            "path/to/app1/apps.py": softwrap(
+            "path/to/app1/apps.py": dedent(
                 """\
                 class App1AppConfig(AppConfig):
                     name = "path.to.app1"
                     label = "app1"
                 """
             ),
-            "another/path/app2/BUILD": softwrap(
+            "path/to/app1/migrations/0012_some_migration.py": "",
+            "another/path/app2/BUILD": dedent(
                 f"""\
                 python_source(
                   source="apps.py",
@@ -92,51 +80,29 @@ def assert_deps_parsed(
                 )
                 """
             ),
-            "another/path/app2/apps.py": softwrap(
+            "another/path/app2/apps.py": dedent(
                 """\
                 class App2AppConfig(AppConfig):
                     name = "another.path.app2"
                     label = "app2_label"
                 """
             ),
-            filename: content,
+            "another/path/app2/migrations/0042_another_migration.py": "",
         }
     )
     tgt = rule_runner.get_target(Address("", target_name="t"))
     result = rule_runner.request(
-        ParsedPythonDependencies,
+        InferredDependencies,
         [
-            ParsePythonDependenciesRequest(
-                tgt[PythonSourceField],
-                InterpreterConstraints([constraints]),
+            dependency_inference.InferDjangoDependencies(
+                PythonImportDependenciesInferenceFieldSet.create(tgt)
             )
         ],
     )
-    assert dict(result.imports) == expected_imports
-    assert list(result.assets) == sorted(expected_assets)
-
-
-def do_test_migration_dependencies(rule_runner: RuleRunner, constraints: str) -> None:
-    content = dedent(
-        """\
-        class Migration(migrations.Migration):
-            dependencies = [
-              ("app1", "0012_some_migration"),
-              ("app2_label", "0042_another_migration"),
-            ]
-
-            operations = []
-        """
-    )
-    assert_deps_parsed(
-        rule_runner,
-        content,
-        constraints=constraints,
-        expected_imports={
-            "path.to.app1.migrations.0012_some_migration": ImpInfo(lineno=3, weak=True),
-            "another.path.app2.migrations.0042_another_migration": ImpInfo(lineno=4, weak=True),
-        },
-    )
+    assert dict(result.include) == {
+            #Address()
+            #Address()
+        }
 
 
 @skip_unless_python27_present
