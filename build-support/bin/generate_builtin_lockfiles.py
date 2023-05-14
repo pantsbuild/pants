@@ -226,7 +226,7 @@ def generate_python_tool_lockfiles(tools: Sequence[PythonTool], dry_run: bool) -
             # Regardless of the backend the tool is defined in, we need the Python backend
             # for the Python resolves mechanism to work.
             "--backend-packages=pants.backend.python",
-            "--python-pip-version=23.0.1",
+            "--python-pip-version=latest",
             f"--python-interpreter-constraints=['{default_python_interpreter_constraints}']",
             "--python-enable-resolves",
             # Unset any existing resolve names in the Pants repo, and set to just our temporary ones.
