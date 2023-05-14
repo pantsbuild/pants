@@ -26,7 +26,7 @@ class TerraformTool(TemplatedExternalTool):
 
     # TODO: Possibly there should not be a default version, since terraform state is sensitive to
     #  the version that created it, so you have to be deliberate about the version you select.
-    default_version = "1.0.7"
+    default_version = "1.4.6"
     default_url_template = (
         "https://releases.hashicorp.com/terraform/{version}/terraform_{version}_{platform}.zip"
     )
