@@ -33,7 +33,6 @@ def rule_runner() -> RuleRunner:
             *parse_python_dependencies.rules(),
             *stripped_source_files.rules(),
             *pex.rules(),
-            *dependency_inference.rules(),
             *detect_apps.rules(),
             QueryRule(DjangoApps, [EnvironmentName]),
         ],
