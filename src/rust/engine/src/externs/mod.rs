@@ -33,6 +33,7 @@ pub mod nailgun;
 pub mod process;
 pub mod scheduler;
 mod stdio;
+mod target;
 pub mod testutil;
 pub mod workunits;
 
