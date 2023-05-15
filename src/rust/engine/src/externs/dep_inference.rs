@@ -5,6 +5,7 @@ use std::hash::{Hash, Hasher};
 
 use pyo3::basic::CompareOp;
 use pyo3::prelude::*;
+use pyo3::types::PyDict;
 use pyo3::{IntoPy, PyObject, Python};
 
 use fs::DirectoryDigest;
@@ -27,9 +28,11 @@ impl PyNativeDependenciesRequest {
   #[new]
   fn __new__(digest: PyDigest, metadata: Option<&PyAny>, py: Python) -> PyResult<Self> {
     let metadata: Option<String> = if let Some(metadata) = metadata {
+      let kwargs = PyDict::new(py);
+      kwargs.set_item("sort_keys", true)?;
       py.import("json")?
         .getattr("dumps")?
-        .call1((metadata,))?
+        .call((metadata,), Some(kwargs))?
         .extract()
     } else {
       Ok(None)
