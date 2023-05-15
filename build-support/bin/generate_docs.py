@@ -263,6 +263,7 @@ def run_pants_help_all() -> dict[str, Any]:
         "pants.backend.experimental.scala",
         "pants.backend.experimental.scala.lint.scalafmt",
         "pants.backend.experimental.terraform",
+        "pants.backend.experimental.tools.workunit_logger",
         "pants.backend.experimental.tools.yamllint",
         "pants.backend.google_cloud_function.python",
         "pants.backend.plugin_development",
@@ -281,7 +282,6 @@ def run_pants_help_all() -> dict[str, Any]:
         "pants.backend.shell.lint.shellcheck",
         "pants.backend.shell.lint.shfmt",
         "pants.backend.tools.preamble",
-        "pants.backend.tools.workunit_logger",
     ]
     argv = [
         "./pants",
