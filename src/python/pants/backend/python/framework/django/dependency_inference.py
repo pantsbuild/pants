@@ -83,7 +83,7 @@ async def django_parser_script(
     )
     # See in script for where we explicitly encoded as utf8. Even though utf8 is the
     # default for decode(), we make that explicit here for emphasis.
-    process_output = process_result.stdout or "{}"
+    process_output = process_result.stdout.decode("utf8") or "{}"
     modules = [
         "{}.migrations.{}".format(django_apps.label_to_name[label], migration)
         for label, migration in json.loads(process_output)
