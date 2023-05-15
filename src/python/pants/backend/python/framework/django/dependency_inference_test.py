@@ -4,25 +4,28 @@
 from __future__ import annotations
 
 from textwrap import dedent
-from pants.backend.python.target_types import PythonSourceTarget
-from pants.engine.rules import QueryRule
 
 import pytest
 
-from pants.backend.python.dependency_inference.rules import PythonImportDependenciesInferenceFieldSet, rules as core_rules
-from pants.engine.target import InferredDependencies
 from pants.backend.python.dependency_inference import parse_python_dependencies
+from pants.backend.python.dependency_inference.rules import (
+    PythonImportDependenciesInferenceFieldSet,
+)
+from pants.backend.python.dependency_inference.rules import rules as core_rules
 from pants.backend.python.framework.django import dependency_inference, detect_apps
+from pants.backend.python.target_types import PythonSourceTarget
 from pants.backend.python.util_rules import pex
 from pants.core.util_rules import stripped_source_files
 from pants.engine.addresses import Address
-from pants.testutil.rule_runner import RuleRunner
+from pants.engine.rules import QueryRule
+from pants.engine.target import InferredDependencies
 from pants.testutil.python_interpreter_selection import (
     skip_unless_python27_present,
     skip_unless_python37_present,
     skip_unless_python38_present,
     skip_unless_python39_present,
 )
+from pants.testutil.rule_runner import RuleRunner
 
 
 @pytest.fixture
@@ -44,9 +47,9 @@ def rule_runner() -> RuleRunner:
 def do_test_migration_dependencies(rule_runner: RuleRunner, constraints: str) -> None:
     rule_runner.write_files(
         {
-            "BUILD": f"python_source(name='t', source='path/to/app0/migrations/0001_initial.py')",
+            "BUILD": "python_source(name='t', source='path/to/app0/migrations/0001_initial.py')",
             "path/to/app0/migrations/0001_initial.py": dedent(
-            """\
+                """\
             class Migration(migrations.Migration):
                 dependencies = [
                 ("app1", "0012_some_migration"),
@@ -54,8 +57,8 @@ def do_test_migration_dependencies(rule_runner: RuleRunner, constraints: str) ->
                 ]
 
                 operations = []
-            """),
-
+            """
+            ),
             "path/to/app1/BUILD": dedent(
                 f"""\
                 python_source(
@@ -71,6 +74,7 @@ def do_test_migration_dependencies(rule_runner: RuleRunner, constraints: str) ->
                     label = "app1"
                 """
             ),
+            "path/to/app1/migrations/BUILD": "python_source(source='0012_some_migration.py')",
             "path/to/app1/migrations/0012_some_migration.py": "",
             "another/path/app2/BUILD": dedent(
                 f"""\
@@ -87,6 +91,7 @@ def do_test_migration_dependencies(rule_runner: RuleRunner, constraints: str) ->
                     label = "app2_label"
                 """
             ),
+            "another/path/app2/migrations/BUILD": "python_source(source='0042_another_migration.py')",
             "another/path/app2/migrations/0042_another_migration.py": "",
         }
     )
@@ -99,10 +104,10 @@ def do_test_migration_dependencies(rule_runner: RuleRunner, constraints: str) ->
             )
         ],
     )
-    assert dict(result.include) == {
-            #Address()
-            #Address()
-        }
+    assert set(result.include) == {
+        Address("another/path/app2/migrations", target_name="migrations"),
+        Address("path/to/app1/migrations", target_name="migrations"),
+    }
 
 
 @skip_unless_python27_present

@@ -56,7 +56,9 @@ def main(filename):
 
     visitor = DjangoDependencyVisitor()
     visitor.visit(tree)
-    print(json.dumps(sorted(visitor.info)))
+    # We have to be careful to set the encoding explicitly and write raw bytes ourselves.
+    buffer = sys.stdout if sys.version_info[0:2] == (2, 7) else sys.stdout.buffer
+    buffer.write(json.dumps(sorted(visitor.info)).encode("utf8"))
 
 if __name__ == "__main__":
     main(sys.argv[1])

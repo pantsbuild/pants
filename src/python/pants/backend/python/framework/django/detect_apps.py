@@ -6,7 +6,6 @@ import json
 from collections import defaultdict
 from dataclasses import dataclass
 
-from pants.backend.python.dependency_inference.parse_python_dependencies import get_scripts_digest
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import InterpreterConstraintsField
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
@@ -46,7 +45,9 @@ class DjangoApps:
         apps = dict(self.label_to_name, **json.loads(json_bytes.decode()))
         return DjangoApps(FrozenDict(sorted(apps.items())))
 
+
 _script_resource = "scripts/app_detector.py"
+
 
 @rule
 async def detect_django_apps(python_setup: PythonSetup) -> DjangoApps:
@@ -85,7 +86,9 @@ async def detect_django_apps(python_setup: PythonSetup) -> DjangoApps:
     if not targets:
         return django_apps
 
-    script_file_content = FileContent("script/__visitor.py", read_resource(__name__, _script_resource))
+    script_file_content = FileContent(
+        "script/__visitor.py", read_resource(__name__, _script_resource)
+    )
     script_digest = await Get(Digest, CreateDigest([script_file_content]))
     apps_sandbox_prefix = "_apps_to_detect"
 
