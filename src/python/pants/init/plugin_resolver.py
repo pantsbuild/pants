@@ -56,8 +56,9 @@ async def resolve_plugins(
     `named_caches` directory), but consequently needs to disable the process cache: see the
     ProcessCacheScope reference in the body.
     """
+    req_strings = sorted(global_options.plugins)
     requirements = PexRequirements(
-        req_strings=sorted(global_options.plugins),
+        req_strings_or_addrs=req_strings,
         constraints_strings=(str(constraint) for constraint in request.constraints),
     )
     if not requirements:
@@ -77,7 +78,7 @@ async def resolve_plugins(
             python=python,
             requirements=requirements,
             interpreter_constraints=request.interpreter_constraints or InterpreterConstraints(),
-            description=f"Resolving plugins: {', '.join(requirements.req_strings)}",
+            description=f"Resolving plugins: {', '.join(req_strings)}",
         ),
     )
 

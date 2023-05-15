@@ -279,11 +279,12 @@ def test_pex_working_directory(rule_runner: RuleRunner, pex_type: type[Pex | Ven
 
 
 def test_resolves_dependencies(rule_runner: RuleRunner) -> None:
-    requirements = PexRequirements(["six==1.12.0", "jsonschema==2.6.0", "requests==2.23.0"])
+    req_strings = ["six==1.12.0", "jsonschema==2.6.0", "requests==2.23.0"]
+    requirements = PexRequirements(req_strings)
     pex_info = create_pex_and_get_pex_info(rule_runner, requirements=requirements)
     # NB: We do not check for transitive dependencies, which PEX-INFO will include. We only check
     # that at least the dependencies we requested are included.
-    assert set(parse_requirements(requirements.req_strings)).issubset(
+    assert set(parse_requirements(req_strings)).issubset(
         set(parse_requirements(pex_info["requirements"]))
     )
 
@@ -794,7 +795,7 @@ def test_setup_pex_requirements() -> None:
     )
 
 
-def test_build_pex_description() -> None:
+def test_build_pex_description(rule_runner: RuleRunner) -> None:
     def assert_description(
         requirements: PexRequirements | EntireLockfile,
         *,
@@ -807,7 +808,16 @@ def test_build_pex_description() -> None:
             requirements=requirements,
             description=description,
         )
-        assert _build_pex_description(request, {}) == expected
+        req_strings = (
+            requirements.req_strings_or_addrs if isinstance(requirements, PexRequirements) else []
+        )
+        assert (
+            run_rule_with_mocks(
+                _build_pex_description,
+                rule_args=[request, req_strings, {}],
+            )
+            == expected
+        )
 
     repo_pex = Pex(EMPTY_DIGEST, "repo.pex", None)
 

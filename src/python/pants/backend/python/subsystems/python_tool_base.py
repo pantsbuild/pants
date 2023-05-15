@@ -91,6 +91,14 @@ class PythonToolRequirementsBase(Subsystem):
             If install_from_resolve is specified, install these requirements,
             at the versions provided by the specified resolve's lockfile.
 
+            Values can be pip-style requirements (e.g., `tool` or `tool==1.2.3` or `tool>=1.2.3`),
+            or addresses of python_requirement targets (or targets that generate or depend on
+            python_requirement targets).
+
+            The lockfile will be validated against the requirements - if a lockfile doesn't
+            provide the requirement (at a suitable version, if the requirement specifies version
+            constraints) Pants will error.
+
             If unspecified, install the entire lockfile.
             """
         ),
@@ -344,7 +352,7 @@ class PythonToolRequirementsBase(Subsystem):
         return PexRequest(
             output_filename=f"{self.options_scope.replace('-', '_')}.pex",
             internal_only=True,
-            requirements=self.pex_requirements(extra_requirements=extra_requirements),
+            requirements=requirements,
             interpreter_constraints=interpreter_constraints,
             main=main,
             sources=sources,

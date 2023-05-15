@@ -333,13 +333,8 @@ class _PexRequirementsRequest:
 async def determine_requirement_strings_in_closure(
     request: _PexRequirementsRequest, global_requirement_constraints: GlobalRequirementConstraints
 ) -> PexRequirements:
-    transitive_targets = await Get(TransitiveTargets, TransitiveTargetsRequest(request.addresses))
-    return PexRequirements.create_from_requirement_fields(
-        (
-            tgt[PythonRequirementsField]
-            for tgt in transitive_targets.closure
-            if tgt.has_field(PythonRequirementsField)
-        ),
+    return PexRequirements(
+        request.addresses,
         # This is only set if `[python].requirement_constraints` is configured, which is mutually
         # exclusive with resolves.
         constraints_strings=(str(constraint) for constraint in global_requirement_constraints),

@@ -659,7 +659,12 @@ def test_constraints_validation(tmp_path: Path, rule_runner: PythonRuleRunner) -
     )
     pex_req2_reqs = pex_req2.requirements
     assert isinstance(pex_req2_reqs, PexRequirements)
-    assert list(pex_req2_reqs.req_strings) == ["bar==5.5.5", "baz", "foo-bar>=0.1.2", url_req]
+    assert list(pex_req2_reqs.req_strings_or_addrs) == [
+        "bar==5.5.5",
+        "baz",
+        "foo-bar>=0.1.2",
+        url_req,
+    ]
     assert isinstance(pex_req2_reqs.from_superset, Pex)
     repository_pex = pex_req2_reqs.from_superset
     assert not get_all_data(rule_runner, repository_pex).info["strip_pex_env"]
@@ -720,7 +725,7 @@ def test_exclude_requirements(
     )
     pex_request = rule_runner.request(PexRequest, [request])
     assert isinstance(pex_request.requirements, PexRequirements)
-    assert len(pex_request.requirements.req_strings) == (1 if include_requirements else 0)
+    assert len(pex_request.requirements.req_strings_or_addrs) == (1 if include_requirements else 0)
 
 
 @pytest.mark.parametrize("include_sources", [False, True])
