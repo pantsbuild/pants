@@ -183,7 +183,9 @@ def _get_imports_info(
     for owners, (imp, inf) in zip(owners_per_import, parsed_imports.items()):
         resolved_single_import = _resolve_single_import(owners, imp)
         if ignore_self_imports:
-            if not resolved_single_import.address or (resolved_single_import.address[0] != address):
+            if not (
+                resolved_single_import.address and (resolved_single_import.address[0] == address)
+            ):
                 result[imp] = resolved_single_import
         else:
             result[imp] = resolved_single_import
