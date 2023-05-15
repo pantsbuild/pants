@@ -655,6 +655,9 @@ jobs:
       uses: actions/download-artifact@v3
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
+        path: src/python/pants
+    - name: Make native-client runnable
+      run: chmod +x src/python/pants/bin/native_client
     - if: github.event_name != 'pull_request'
       name: Setup toolchain auth
       run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
@@ -746,6 +749,9 @@ jobs:
       uses: actions/download-artifact@v3
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-ARM64
+        path: src/python/pants
+    - name: Make native-client runnable
+      run: chmod +x src/python/pants/bin/native_client
     - if: github.event_name != 'pull_request'
       name: Setup toolchain auth
       run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
@@ -817,6 +823,9 @@ jobs:
       uses: actions/download-artifact@v3
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
+        path: src/python/pants
+    - name: Make native-client runnable
+      run: chmod +x src/python/pants/bin/native_client
     - if: github.event_name != 'pull_request'
       name: Setup toolchain auth
       run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
@@ -888,6 +897,9 @@ jobs:
       uses: actions/download-artifact@v3
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
+        path: src/python/pants
+    - name: Make native-client runnable
+      run: chmod +x src/python/pants/bin/native_client
     - if: github.event_name != 'pull_request'
       name: Setup toolchain auth
       run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
@@ -959,6 +971,9 @@ jobs:
       uses: actions/download-artifact@v3
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
+        path: src/python/pants
+    - name: Make native-client runnable
+      run: chmod +x src/python/pants/bin/native_client
     - if: github.event_name != 'pull_request'
       name: Setup toolchain auth
       run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
@@ -1016,6 +1031,9 @@ jobs:
       uses: actions/download-artifact@v3
       with:
         name: native_binaries.${{ matrix.python-version }}.macOS11-x86_64
+        path: src/python/pants
+    - name: Make native-client runnable
+      run: chmod +x src/python/pants/bin/native_client
     - if: github.event_name != 'pull_request'
       name: Setup toolchain auth
       run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
