@@ -64,11 +64,6 @@ jobs:
           src/python/pants/engine/internals/native_engine.so
 
           src/python/pants/engine/internals/native_engine.so.metadata'
-    - if: github.event_name != 'pull_request'
-      name: Setup toolchain auth
-      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
-
-        '
     - name: Bootstrap Pants
       run: './pants --version
 
@@ -178,11 +173,6 @@ jobs:
           src/python/pants/engine/internals/native_engine.so
 
           src/python/pants/engine/internals/native_engine.so.metadata'
-    - if: github.event_name != 'pull_request'
-      name: Setup toolchain auth
-      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
-
-        '
     - name: Bootstrap Pants
       run: './pants --version
 
@@ -255,11 +245,6 @@ jobs:
     - name: Expose Pythons
       run: echo "PATH=${PATH}:/opt/python/cp37-cp37m/bin:/opt/python/cp38-cp38/bin:/opt/python/cp39-cp39/bin"
         >> $GITHUB_ENV
-    - if: github.event_name != 'pull_request'
-      name: Setup toolchain auth
-      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
-
-        '
     - env: {}
       name: Build wheels
       run: '[[ "${GITHUB_EVENT_NAME}" == "pull_request" ]] && export MODE=debug
@@ -320,11 +305,6 @@ jobs:
         cache-bin: 'false'
         shared-key: engine
         workspaces: src/rust/engine
-    - if: github.event_name != 'pull_request'
-      name: Setup toolchain auth
-      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
-
-        '
     - env:
         ARCHFLAGS: -arch x86_64
       name: Build wheels
@@ -386,11 +366,6 @@ jobs:
         cache-bin: 'false'
         shared-key: engine
         workspaces: src/rust/engine
-    - if: github.event_name != 'pull_request'
-      name: Setup toolchain auth
-      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
-
-        '
     - env:
         ARCHFLAGS: -arch arm64
       name: Build wheels
@@ -488,11 +463,6 @@ jobs:
       uses: actions/download-artifact@v3
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
-    - if: github.event_name != 'pull_request'
-      name: Setup toolchain auth
-      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
-
-        '
     - name: Lint
       run: './pants lint check ::
 
@@ -598,11 +568,6 @@ jobs:
       uses: actions/download-artifact@v3
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
-    - if: github.event_name != 'pull_request'
-      name: Setup toolchain auth
-      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
-
-        '
     - name: Run Python test shard 0/3
       run: './pants test --shard=0/3 ::
 
@@ -671,11 +636,6 @@ jobs:
       uses: actions/download-artifact@v3
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
-    - if: github.event_name != 'pull_request'
-      name: Setup toolchain auth
-      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
-
-        '
     - name: Run Python test shard 1/3
       run: './pants test --shard=1/3 ::
 
@@ -744,11 +704,6 @@ jobs:
       uses: actions/download-artifact@v3
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
-    - if: github.event_name != 'pull_request'
-      name: Setup toolchain auth
-      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
-
-        '
     - name: Run Python test shard 2/3
       run: './pants test --shard=2/3 ::
 
@@ -803,11 +758,6 @@ jobs:
       uses: actions/download-artifact@v3
       with:
         name: native_binaries.${{ matrix.python-version }}.macOS11-x86_64
-    - if: github.event_name != 'pull_request'
-      name: Setup toolchain auth
-      run: 'echo TOOLCHAIN_AUTH_TOKEN="${{ secrets.TOOLCHAIN_AUTH_TOKEN }}" >> $GITHUB_ENV
-
-        '
     - name: Run Python tests
       run: './pants --tag=+platform_specific_behavior test :: -- -m platform_specific_behavior'
     - continue-on-error: true
