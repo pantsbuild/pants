@@ -348,15 +348,21 @@ class Helper:
             },
         }
 
-    def native_binaries_download(self) -> Step:
-        return {
-            "name": "Download native binaries",
-            "uses": "actions/download-artifact@v3",
-            "with": {
-                "name": f"native_binaries.{gha_expr('matrix.python-version')}.{self.platform_name()}",
-                "path": NATIVE_FILES_COMMON_PREFIX,
+    def native_binaries_download(self) -> Sequence[Step]:
+        return [
+            {
+                "name": "Download native binaries",
+                "uses": "actions/download-artifact@v3",
+                "with": {
+                    "name": f"native_binaries.{gha_expr('matrix.python-version')}.{self.platform_name()}",
+                    "path": NATIVE_FILES_COMMON_PREFIX,
+                },
             },
-        }
+            {
+                "name": "Make native-client runnable",
+                "run": f"chmod +x {NATIVE_FILES[0]}",
+            },
+        ]
 
     def rust_caches(self) -> Sequence[Step]:
         return [
@@ -652,7 +658,7 @@ def test_jobs(
             ),
             *helper.setup_primary_python(),
             *helper.expose_all_pythons(),
-            helper.native_binaries_download(),
+            *helper.native_binaries_download(),
             setup_toolchain_auth(),
             {
                 "name": human_readable_step_name,
@@ -815,7 +821,7 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                 "steps": [
                     *checkout(),
                     *linux_x86_64_helper.setup_primary_python(),
-                    linux_x86_64_helper.native_binaries_download(),
+                    *linux_x86_64_helper.native_binaries_download(),
                     setup_toolchain_auth(),
                     {
                         "name": "Lint",
