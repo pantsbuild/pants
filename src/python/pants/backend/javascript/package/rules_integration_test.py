@@ -52,6 +52,7 @@ def rule_runner() -> RuleRunner:
     params=[
         pytest.param((Path(__file__).parent / "package-lock.json", "npm"), id="npm"),
         pytest.param((Path(__file__).parent / "pnpm-lock.yaml", "pnpm"), id="pnpm"),
+        pytest.param((Path(__file__).parent / "yarn.lock", "yarn"), id="yarn"),
     ],
     autouse=True,
 )
