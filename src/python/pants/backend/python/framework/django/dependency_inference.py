@@ -51,7 +51,6 @@ async def django_parser_script(
     # NB: This doesn't consider https://docs.djangoproject.com/en/4.2/ref/settings/#std-setting-MIGRATION_MODULES
     if not PurePath(source_field.file_path).match("migrations/*.py"):
         return InferredDependencies([])
-    # @TODO: Py 2.7 warn?
 
     stripped_sources = await Get(
         StrippedSourceFiles, SourceFilesRequest([request.field_set.source])
