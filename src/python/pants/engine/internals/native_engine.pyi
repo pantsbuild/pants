@@ -452,7 +452,7 @@ class NativeDependenciesRequest:
     """A request to parse the dependencies of a file.
 
     * The `digest` is expected to contain exactly one source file.
-    * Depending on the implementation, a json-serialized string `metadata`
+    * Depending on the implementation, a `json.dumps`-serializable structure `metadata`
       can be passed. It will be supplied to the native parser, and
       the string will be incorporated into the cache key.
 
@@ -461,7 +461,7 @@ class NativeDependenciesRequest:
         result = await Get(NativeParsedPythonDependencies, NativeDependenciesRequest(input_digest, None)
     """
 
-    def __init__(self, digest: Digest, metadata: str | None = None) -> None: ...
+    def __init__(self, digest: Digest, metadata: Any | None = None) -> None: ...
     def __eq__(self, other: NativeDependenciesRequest | Any) -> bool: ...
     def __hash__(self) -> int: ...
     def __repr__(self) -> str: ...

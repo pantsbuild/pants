@@ -25,11 +25,19 @@ pub struct PyNativeDependenciesRequest {
 #[pymethods]
 impl PyNativeDependenciesRequest {
   #[new]
-  fn __new__(digest: PyDigest, metadata: Option<String>) -> Self {
-    Self {
+  fn __new__(digest: PyDigest, metadata: Option<&PyAny>, py: Python) -> PyResult<Self> {
+    let metadata: Option<String> = if let Some(metadata) = metadata {
+      py.import("json")?
+        .getattr("dumps")?
+        .call1((metadata,))?
+        .extract()
+    } else {
+      Ok(None)
+    }?;
+    Ok(Self {
       digest: digest.0,
       metadata,
-    }
+    })
   }
 
   fn __hash__(&self) -> u64 {
