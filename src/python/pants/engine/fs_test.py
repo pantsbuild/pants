@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler
 from io import BytesIO
 from pathlib import Path
-from typing import Callable, Dict, Iterable, List, Optional, Set, Union
+from typing import Callable, Dict, Iterable, Optional, Set, Union
 
 import pytest
 
@@ -1399,49 +1399,20 @@ def test_digest_is_not_file_digest() -> None:
 
 
 def test_snapshot_properties() -> None:
-    digest = Digest("691638f4d58abaa8cfdc9af2e00682f13f07f96ad1d177f146216a7341ca4982", 154)
-    snapshot = Snapshot._unsafe_create(digest, ["f.ext", "dir/f.ext"], ["dir"])
-    assert snapshot.digest == digest
+    snapshot = Snapshot.create_for_testing(["f.ext", "dir/f.ext"], ["dir"])
+    assert snapshot.digest is not None
     assert snapshot.files == ("dir/f.ext", "f.ext")
     assert snapshot.dirs == ("dir",)
 
 
-def test_snapshot_hash() -> None:
-    def assert_hash(
-        expected: int,
-        *,
-        digest_char: str = "a",
-        files: Optional[List[str]] = None,
-        dirs: Optional[List[str]] = None,
-    ) -> None:
-        digest = Digest(digest_char * 64, 1000)
-        snapshot = Snapshot._unsafe_create(digest, files or ["f.ext", "dir/f.ext"], dirs or ["dir"])
-        assert hash(snapshot) == expected
-
-    # The digest's fingerprint is used for the hash, so all other properties are irrelevant.
-    assert_hash(-6148914691236517206)
-    assert_hash(-6148914691236517206, files=["f.ext"])
-    assert_hash(-6148914691236517206, dirs=["foo"])
-    assert_hash(-6148914691236517206, dirs=["foo"])
-    assert_hash(-4919131752989213765, digest_char="b")
-
-
-def test_snapshot_equality() -> None:
-    # Only the digest is used for equality.
-    snapshot = Snapshot._unsafe_create(Digest("a" * 64, 1000), ["f.ext", "dir/f.ext"], ["dir"])
-    assert snapshot == Snapshot._unsafe_create(
-        Digest("a" * 64, 1000), ["f.ext", "dir/f.ext"], ["dir"]
-    )
-    assert snapshot == Snapshot._unsafe_create(
-        Digest("a" * 64, 1000), ["f.ext", "dir/f.ext"], ["foo"]
-    )
-    assert snapshot == Snapshot._unsafe_create(Digest("a" * 64, 1000), ["f.ext"], ["dir"])
-    assert snapshot != Snapshot._unsafe_create(Digest("a" * 64, 0), ["f.ext", "dir/f.ext"], ["dir"])
-    assert snapshot != Snapshot._unsafe_create(
-        Digest("b" * 64, 1000), ["f.ext", "dir/f.ext"], ["dir"]
-    )
-    with pytest.raises(TypeError):
-        snapshot < snapshot  # type: ignore[operator]
+def test_snapshot_hash_and_eq() -> None:
+    one = Snapshot.create_for_testing(["f.ext"], ["dir"])
+    two = Snapshot.create_for_testing(["f.ext"], ["dir"])
+    assert hash(one) == hash(two)
+    assert one == two
+    three = Snapshot.create_for_testing(["f.ext"], [])
+    assert hash(two) != hash(three)
+    assert two != three
 
 
 @pytest.mark.parametrize(
