@@ -688,21 +688,19 @@ impl Address {
     }
   }
 
-  fn maybe_convert_to_target_generator(&self) -> Self {
-    if !self.is_generated_target() && !self.is_parametrized() {
-      // TODO: This is not great: to return either a newly allocated object or a reference to self,
-      // we'd need to use `Cow`, but `Cow` isn't supported by `ToPyObject`. `IntoPy` takes self by
-      // value, etc.
-      return self.clone();
+  fn maybe_convert_to_target_generator(self_: PyRef<Self>, py: Python) -> PyObject {
+    if !self_.is_generated_target() && !self_.is_parametrized() {
+      return self_.into_py(py);
     }
 
     Self {
-      spec_path: self.spec_path.clone(),
-      target_name: self.target_name.clone(),
+      spec_path: self_.spec_path.clone(),
+      target_name: self_.target_name.clone(),
       parameters: BTreeMap::default(),
       generated_name: None,
       relative_file_path: None,
     }
+    .into_py(py)
   }
 
   fn create_generated(&self, generated_name: String) -> PyResult<Self> {

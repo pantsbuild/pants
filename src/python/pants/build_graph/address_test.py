@@ -425,8 +425,7 @@ def test_address_maybe_convert_to_target_generator() -> None:
     )
 
     def assert_noops(addr: Address) -> None:
-        # TODO: See the TODO about cloning in `fn maybe_convert_to_target_generator`.
-        assert addr.maybe_convert_to_target_generator() == addr
+        assert addr.maybe_convert_to_target_generator() is addr
 
     assert_noops(Address("a/b", target_name="c"))
     assert_noops(Address("a/b"))
