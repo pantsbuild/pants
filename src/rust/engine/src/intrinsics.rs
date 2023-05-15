@@ -51,8 +51,6 @@ pub struct Intrinsics {
   intrinsics: IndexMap<Intrinsic, IntrinsicFn>,
 }
 
-// NB: Keep in sync with `rules()` in `src/python/pants/engine/fs.py` and
-// `src/python/pants/engine/native_dep_inference.py`.
 impl Intrinsics {
   pub fn new(types: &Types) -> Intrinsics {
     let mut intrinsics: IndexMap<Intrinsic, IntrinsicFn> = IndexMap::new();
