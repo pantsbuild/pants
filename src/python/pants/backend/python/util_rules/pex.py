@@ -467,7 +467,8 @@ class ReqStrings:
     req_strings: tuple[str, ...]
 
 
-async def _req_strings(pex_reqs: PexRequirements) -> ReqStrings:
+@rule
+async def get_req_strings(pex_reqs: PexRequirements) -> ReqStrings:
     addrs: list[Address] = []
     specs: list[str] = []
     req_strings: list[str] = []
@@ -476,12 +477,23 @@ async def _req_strings(pex_reqs: PexRequirements) -> ReqStrings:
             addrs.append(req_str_or_addr)
         else:
             assert isinstance(req_str_or_addr, str)
-            if os.path.sep in req_str_or_addr:
+            # A VCS-style requirement will have an ampersand in it, and any other
+            # string with a path.sep in it will be an address spec.
+            # TODO: Is this true?
+            if os.path.sep in req_str_or_addr and "@" not in req_str_or_addr:
                 specs.append(req_str_or_addr)
             else:
                 req_strings.append(req_str_or_addr)
     if specs:
-        addrs_from_specs = await Get(Addresses, UnparsedAddressInputs, specs)
+        addrs_from_specs = await Get(
+            Addresses,
+            UnparsedAddressInputs(
+                specs,
+                owning_address=None,
+                # TODO: Plumb the origin through in PexRequirements?
+                description_of_origin="User-specified requirements",
+            ),
+        )
         addrs.extend(addrs_from_specs)
     if addrs:
         transitive_targets = await Get(TransitiveTargets, TransitiveTargetsRequest(addrs))
@@ -552,7 +564,7 @@ async def _setup_pex_requirements(
         )
 
     assert isinstance(request.requirements, PexRequirements)
-    req_strings = (await _req_strings(request.requirements)).req_strings
+    req_strings = (await Get(ReqStrings, PexRequirements, request.requirements)).req_strings
 
     # TODO: This is not the best heuristic for available concurrency, since the
     # requirements almost certainly have transitive deps which also need building, but it
@@ -703,7 +715,7 @@ async def build_pex(
         output_directories = [request.output_filename]
 
     req_strings = (
-        (await _req_strings(request.requirements)).req_strings
+        (await Get(ReqStrings, PexRequirements, request.requirements)).req_strings
         if isinstance(request.requirements, PexRequirements)
         else []
     )
