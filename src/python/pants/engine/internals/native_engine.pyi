@@ -448,20 +448,28 @@ class PyStubCAS:
 # Dependency inference
 # ------------------------------------------------------------------------------
 
+class JavascriptInferenceMetadata:
+    def __init__(self, package_root: str, import_patterns: dict[str, list[str]]) -> None: ...
+    def __eq__(self, other: JavascriptInferenceMetadata | Any) -> bool: ...
+    def __hash__(self) -> int: ...
+    def __repr__(self) -> str: ...
+
 class NativeDependenciesRequest:
     """A request to parse the dependencies of a file.
 
     * The `digest` is expected to contain exactly one source file.
-    * Depending on the implementation, a `json.dumps`-serializable structure `metadata`
+    * Depending on the implementation, a `metadata` structure
       can be passed. It will be supplied to the native parser, and
-      the string will be incorporated into the cache key.
+      it will be incorporated into the cache key.
 
 
     Example:
         result = await Get(NativeParsedPythonDependencies, NativeDependenciesRequest(input_digest, None)
     """
 
-    def __init__(self, digest: Digest, metadata: Any | None = None) -> None: ...
+    def __init__(
+        self, digest: Digest, metadata: JavascriptInferenceMetadata | None = None
+    ) -> None: ...
     def __eq__(self, other: NativeDependenciesRequest | Any) -> bool: ...
     def __hash__(self) -> int: ...
     def __repr__(self) -> str: ...

@@ -9,55 +9,81 @@ use pyo3::types::PyDict;
 use pyo3::{IntoPy, PyObject, Python};
 
 use fs::DirectoryDigest;
+use protos::gen::pants::cache::{javascript_inference_metadata, JavascriptInferenceMetadata};
 
 use crate::externs::fs::PyDigest;
 
 pub(crate) fn register(m: &PyModule) -> PyResult<()> {
-  m.add_class::<PyNativeDependenciesRequest>()
+  m.add_class::<PyNativeDependenciesRequest>()?;
+  m.add_class::<PyJavascriptInferenceMetadata>()
+}
+
+#[pyclass(name = "JavascriptInferenceMetadata")]
+#[derive(Clone, Debug, PartialEq)]
+pub struct PyJavascriptInferenceMetadata(pub JavascriptInferenceMetadata);
+
+#[pymethods]
+impl PyJavascriptInferenceMetadata {
+  #[new]
+  fn __new__(package_root: String, patterns: &PyDict) -> PyResult<Self> {
+    use javascript_inference_metadata::ImportPattern;
+    let import_patterns: PyResult<Vec<ImportPattern>> = patterns
+      .iter()
+      .map(|(key, value)| {
+        Ok(ImportPattern {
+          pattern: key.extract()?,
+          replacements: value.extract()?,
+        })
+      })
+      .collect();
+    Ok(Self(JavascriptInferenceMetadata {
+      package_root,
+      import_patterns: import_patterns?,
+    }))
+  }
+
+  fn __hash__(&self) -> u64 {
+    let mut s = DefaultHasher::new();
+    self.0.hash(&mut s);
+    s.finish()
+  }
+}
+
+impl From<JavascriptInferenceMetadata> for PyJavascriptInferenceMetadata {
+  fn from(value: JavascriptInferenceMetadata) -> Self {
+    PyJavascriptInferenceMetadata(value)
+  }
 }
 
 #[pyclass(name = "NativeDependenciesRequest")]
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct PyNativeDependenciesRequest {
-  pub digest: DirectoryDigest,
-  pub metadata: Option<String>,
+  pub directory_digest: DirectoryDigest,
+  pub metadata: Option<JavascriptInferenceMetadata>,
 }
 
 #[pymethods]
 impl PyNativeDependenciesRequest {
   #[new]
-  fn __new__(digest: PyDigest, metadata: Option<&PyAny>, py: Python) -> PyResult<Self> {
-    let metadata: Option<String> = if let Some(metadata) = metadata {
-      let kwargs = PyDict::new(py);
-      kwargs.set_item("sort_keys", true)?;
-      py.import("json")?
-        .getattr("dumps")?
-        .call((metadata,), Some(kwargs))?
-        .extract()
-    } else {
-      Ok(None)
-    }?;
-    Ok(Self {
-      digest: digest.0,
-      metadata,
-    })
+  fn __new__(digest: PyDigest, metadata: Option<PyJavascriptInferenceMetadata>) -> Self {
+    Self {
+      directory_digest: digest.0,
+      metadata: metadata.map(|inner| inner.0),
+    }
   }
 
   fn __hash__(&self) -> u64 {
     let mut s = DefaultHasher::new();
-    self.digest.as_digest().hash.prefix_hash().hash(&mut s);
+    self.directory_digest.hash(&mut s);
     self.metadata.hash(&mut s);
     s.finish()
   }
 
   fn __repr__(&self) -> String {
     format!(
-      "NativeDependenciesRequest('{}', {})",
-      PyDigest(self.digest.clone()),
-      self
-        .metadata
-        .as_ref()
-        .map_or_else(|| "None", |string| string.as_str())
+      "NativeDependenciesRequest('{}', {:?})",
+      PyDigest(self.directory_digest.clone()),
+      self.metadata
     )
   }
 

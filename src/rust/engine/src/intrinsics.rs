@@ -20,7 +20,7 @@ use crate::tasks::Intrinsic;
 use crate::types::Types;
 use crate::Failure;
 use dep_inference::python::get_dependencies;
-use protos::gen::pants::cache::{CacheKey, CacheKeyType};
+use protos::gen::pants::cache::{CacheKey, CacheKeyType, DependencyInferenceRequest};
 
 use bytes::Bytes;
 use futures::future::{BoxFuture, FutureExt, TryFutureExt};
@@ -39,10 +39,12 @@ use process_execution::local::{
 use process_execution::{ManagedChild, Platform, ProcessExecutionStrategy};
 use rule_graph::DependencyKey;
 use stdio::TryCloneAsFile;
-use store::{SnapshotOps, SubsetParams};
+use store::{SnapshotOps, Store, SubsetParams};
 
 use crate::externs::dep_inference::PyNativeDependenciesRequest;
 use workunit_store::{in_workunit, Level};
+
+use grpc_util::prost::MessageExt;
 
 type IntrinsicFn =
   Box<dyn Fn(Context, Vec<Value>) -> BoxFuture<'static, NodeResult<Value>> + Send + Sync>;
@@ -750,12 +752,16 @@ fn docker_resolve_image(
   .boxed()
 }
 
-fn parse_python_deps(context: Context, args: Vec<Value>) -> BoxFuture<'static, NodeResult<Value>> {
-  async move {
-    let core = &context.core;
-    let store = core.store();
+struct PreparedInferenceRequest {
+  pub path: PathBuf,
+  pub digest: Digest,
+  inner: DependencyInferenceRequest,
+}
+
+impl PreparedInferenceRequest {
+  pub async fn prepare(args: Vec<Value>, store: &Store) -> NodeResult<Self> {
     let PyNativeDependenciesRequest {
-      digest: directory_digest,
+      directory_digest,
       metadata,
     } = Python::with_gil(|py| (*args[0]).as_ref(py).extract())?;
 
@@ -777,17 +783,38 @@ fn parse_python_deps(context: Context, args: Vec<Value>) -> BoxFuture<'static, N
     }
     let path = path.unwrap();
     let digest = digest.unwrap();
+    Ok(Self {
+      path,
+      digest,
+      inner: DependencyInferenceRequest {
+        input_file_digest: Some(digest.into()),
+        metadata,
+      },
+    })
+  }
 
+  fn cache_key(&self) -> CacheKey {
+    CacheKey {
+      key_type: CacheKeyType::DepInferenceRequest.into(),
+      digest: Some(Digest::of_bytes(&self.inner.to_bytes()).into()),
+    }
+  }
+}
+
+fn parse_python_deps(context: Context, args: Vec<Value>) -> BoxFuture<'static, NodeResult<Value>> {
+  async move {
+    let core = &context.core;
+    let store = core.store();
+    let prepared_inference_request = PreparedInferenceRequest::prepare(args, &store).await?;
     in_workunit!(
       "parse_python_dependencies",
       Level::Debug,
-      desc = Some(format!("Determine Python dependencies for {path:?}")),
+      desc = Some(format!(
+        "Determine Python dependencies for {:?}",
+        &prepared_inference_request.path
+      )),
       |_workunit| async move {
-        let cache_key = CacheKey {
-          key_type: CacheKeyType::DepInferenceRequest.into(),
-          digest: Some(digest.into()),
-          metadata: metadata,
-        };
+        let cache_key = prepared_inference_request.cache_key();
         let cached_result = core.local_cache.load(&cache_key).await?;
 
         let result = if let Some(result) =
@@ -795,6 +822,7 @@ fn parse_python_deps(context: Context, args: Vec<Value>) -> BoxFuture<'static, N
         {
           result
         } else {
+          let PreparedInferenceRequest { digest, path, .. } = prepared_inference_request;
           let bytes = store
             .load_file_bytes_with(digest, |bytes| Vec::from(bytes))
             .await?;
