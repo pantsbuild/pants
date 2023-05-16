@@ -126,7 +126,7 @@ async def run_golangci_lint(
             export GOROOT={goroot.path}
             sandbox_root="$(/bin/pwd)"
             export PATH="${{GOROOT}}/bin:{cgo_tool_search_paths}"
-            export GOPATH="${{sandbox_root}})/gopath"
+            export GOPATH="${{sandbox_root}}/gopath"
             export GOCACHE="${{sandbox_root}}/gocache"
             export GOLANGCI_LINT_CACHE="$GOCACHE"
             export CGO_ENABLED={1 if golang_subsystem.cgo_enabled else 0}
