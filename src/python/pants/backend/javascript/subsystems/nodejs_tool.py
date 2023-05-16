@@ -9,7 +9,7 @@ from pants.option.option_types import StrOption
 from pants.option.subsystem import Subsystem
 
 
-class NpxToolBase(Subsystem):
+class NodeJSToolBase(Subsystem):
     # Subclasses must set.
     default_version: ClassVar[str]
 

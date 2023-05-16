@@ -6,11 +6,11 @@ from __future__ import annotations
 import pytest
 
 from pants.backend.javascript.subsystems import nodejs
-from pants.backend.javascript.subsystems.npx_tool import NpxToolBase
+from pants.backend.javascript.subsystems.nodejs_tool import NodeJSToolBase
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
-class CowsayTool(NpxToolBase):
+class CowsayTool(NodeJSToolBase):
     options_scope = "cowsay"
     name = "Cowsay"
     # Intentionally older version.
