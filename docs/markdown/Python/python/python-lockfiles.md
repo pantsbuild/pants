@@ -191,7 +191,7 @@ pytest = "3rdparty/python/pytest.lock"
 
 [pytest]
 install_from_resolve = "pytest"  # Use this resolve's lockfiles.
-requirements =["3rdparty/python:pytest"]  # Use these requirements from the lockfile.
+requirements =["//3rdparty/python:pytest"]  # Use these requirements from the lockfile.
 ```
 
 Then set up the resolve's inputs:
@@ -226,7 +226,7 @@ Note that some tools, such as Flake8 and Bandit, must run on a Python interprete
 ### Invalidating tool lockfiles
 
 Pants will verify that any requirements set in the `requirements` option are provided by the lockfile specified by install_from_resolve, and will error if not. This lets you ensure that you don't inadvertently use an older version of a tool if you update its requirements but forget to regenerate the lockfile.
-The `requirements` option can either list requirement strings, such as `pytest==7.3.1`, or target addresses, such as `3rdparty/python:pytest`. The latter is particularly useful as it allows you to avoid specifying the requirements redundantly in two places. Instead, the target can serve as both an input to the lockfile generator and as the requirements to verify.
+The `requirements` option can either list requirement strings, such as `pytest==7.3.1`, or target addresses, such as `//3rdparty/python:pytest` (the `//` prefix tells Pants that these are target addresses). The latter is particularly useful as it allows you to avoid specifying the requirements redundantly in two places. Instead, the target can serve as both an input to the lockfile generator and as the requirements to verify.
 Pants will only use the given `requirements` from the lockfile. If you don't set `requirements`, Pants will use the entire lockfile, and won't validate that it provides the desired tool at the desired version.
 
 ### Sharing lockfiles between tools and code
@@ -249,11 +249,11 @@ As above, you will want to point `requirements` to the subset of targets represe
 install_from_resolve = python-default
 
 requirements = [
-  "3rdparty/python#pytest",
-  "3rdparty/python#pytest-cov",
-  "3rdparty/python#pytest-xdist",
-  "3rdparty/python#pytest-myplugin",
-  "3rdparty/python#ipdb",
+  "//3rdparty/python#pytest",
+  "//3rdparty/python#pytest-cov",
+  "//3rdparty/python#pytest-xdist",
+  "//3rdparty/python#pytest-myplugin",
+  "//3rdparty/python#ipdb",
 ]
 ```
 
