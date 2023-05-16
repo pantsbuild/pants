@@ -17,6 +17,7 @@ from pants.backend.javascript.package.rules import (
     NodePackageTarFieldSet,
 )
 from pants.backend.javascript.package.rules import rules as package_rules
+from pants.backend.javascript.package_json import NPMDistributionTarget
 from pants.backend.javascript.target_types import JSSourcesGeneratorTarget, JSSourceTarget
 from pants.build_graph.address import Address
 from pants.core.goals.package import BuiltPackage
@@ -45,6 +46,7 @@ def rule_runner(package_manager: str) -> RuleRunner:
             *package_json.target_types(),
             JSSourceTarget,
             JSSourcesGeneratorTarget,
+            NPMDistributionTarget,
             FilesGeneratorTarget,
         ],
         objects=dict(package_json.build_file_aliases().objects),
@@ -60,6 +62,8 @@ def test_creates_tar_for_package_json(rule_runner: RuleRunner, package_manager: 
                 """\
                 package_json(dependencies=[":readme"])
                 files(name="readme", sources=["*.md"])
+
+                npm_distribution(name="ham-dist")
                 """
             ),
             "src/js/package.json": json.dumps(
@@ -83,7 +87,7 @@ def test_creates_tar_for_package_json(rule_runner: RuleRunner, package_manager: 
             "src/js/lib/index.mjs": "",
         }
     )
-    tgt = rule_runner.get_target(Address("src/js", generated_name="ham"))
+    tgt = rule_runner.get_target(Address("src/js", target_name="ham-dist"))
     result = rule_runner.request(BuiltPackage, [NodePackageTarFieldSet.create(tgt)])
     rule_runner.write_digest(result.digest)
 

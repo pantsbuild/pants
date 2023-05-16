@@ -30,6 +30,7 @@ from pants.engine.process import ProcessResult
 from pants.engine.rules import Rule, collect_rules, rule
 from pants.engine.target import (
     SourcesField,
+    Target,
     TransitiveTargets,
     TransitiveTargetsRequest,
     targets_with_sources_types,
@@ -53,6 +54,10 @@ class InstalledNodePackage:
 
     def join_relative_workspace_directory(self, path: str) -> str:
         return os.path.join(self.project_env.relative_workspace_directory(), path)
+
+    @property
+    def target(self) -> Target:
+        return self.project_env.ensure_target()
 
 
 @dataclass(frozen=True)
@@ -127,7 +132,9 @@ async def add_sources_to_installed_node_package(
     req: InstalledNodePackageRequest,
 ) -> InstalledNodePackageWithSource:
     installation = await Get(InstalledNodePackage, InstalledNodePackageRequest, req)
-    transitive_tgts = await Get(TransitiveTargets, TransitiveTargetsRequest([req.address]))
+    transitive_tgts = await Get(
+        TransitiveTargets, TransitiveTargetsRequest([installation.target.address])
+    )
 
     source_files = await _get_relevant_source_files(
         (tgt[SourcesField] for tgt in transitive_tgts.dependencies if tgt.has_field(SourcesField)),
