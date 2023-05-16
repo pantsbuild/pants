@@ -62,6 +62,7 @@ async def run_golangci_lint(
     bash: BashBinary,
     platform: Platform,
     golang_subsystem: GolangSubsystem,
+    golang_env_aware: GolangSubsystem.EnvironmentAware,
 ) -> LintResult:
     transitive_targets = await Get(
         TransitiveTargets,
@@ -110,6 +111,13 @@ async def run_golangci_lint(
         Get(GoModInfo, GoModInfoRequest(address)) for address in owning_go_mod_addresses
     )
 
+    # If cgo is enabled, golangci-lint needs to be able to locate the
+    # associated tools in its environment. This is injected in $PATH in the
+    # wrapper script.
+    cgo_tool_search_paths = (
+        ":".join(golang_env_aware.cgo_tool_search_paths) if golang_subsystem.cgo_enabled else ""
+    )
+
     # golangci-lint requires a absolute path to a cache
     golangci_lint_run_script = FileContent(
         "__run_golangci_lint.sh",
@@ -117,7 +125,7 @@ async def run_golangci_lint(
             f"""\
             export GOROOT={goroot.path}
             sandbox_root="$(/bin/pwd)"
-            export PATH="${{GOROOT}}/bin:${{PATH}}"
+            export PATH="${{GOROOT}}/bin:{cgo_tool_search_paths}"
             export GOPATH="${{sandbox_root}})/gopath"
             export GOCACHE="${{sandbox_root}}/gocache"
             export GOLANGCI_LINT_CACHE="$GOCACHE"
