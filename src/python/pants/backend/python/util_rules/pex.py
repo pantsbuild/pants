@@ -477,9 +477,8 @@ async def get_req_strings(pex_reqs: PexRequirements) -> ReqStrings:
             addrs.append(req_str_or_addr)
         else:
             assert isinstance(req_str_or_addr, str)
-            # A VCS-style requirement will have an ampersand in it, and any other
+            # A local or VCS requirement will have an ampersand in it, and any other
             # string with a path.sep in it will be an address spec.
-            # TODO: Is this true?
             if os.path.sep in req_str_or_addr and "@" not in req_str_or_addr:
                 specs.append(req_str_or_addr)
             else:
