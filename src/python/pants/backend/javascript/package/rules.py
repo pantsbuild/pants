@@ -90,7 +90,9 @@ async def pack_node_package_into_tgz_for_publication(
         raise ValueError(
             f"{field_set.source.file_path}#version must be set in order to package a {NPMDistributionTarget.alias}."
         )
-    archive_file = f"{name}-{version}.tgz"
+    archive_file = installation.project_env.project.pack_archive_format.format(
+        name, version
+    )
     result = await Get(
         ProcessResult,
         NodeJsProjectEnvironmentProcess(

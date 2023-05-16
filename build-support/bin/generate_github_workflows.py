@@ -67,10 +67,14 @@ def hashFiles(path: str) -> str:
 # ----------------------------------------------------------------------
 
 
+# NB: The `upload-artifact` action strips the longest common prefix of paths in the
+# created artifact, but the `download-artifact` action needs to know what that prefix
+# was.
+NATIVE_FILES_COMMON_PREFIX = "src/python/pants"
 NATIVE_FILES = [
-    "src/python/pants/bin/native_client",
-    "src/python/pants/engine/internals/native_engine.so",
-    "src/python/pants/engine/internals/native_engine.so.metadata",
+    f"{NATIVE_FILES_COMMON_PREFIX}/bin/native_client",
+    f"{NATIVE_FILES_COMMON_PREFIX}/engine/internals/native_engine.so",
+    f"{NATIVE_FILES_COMMON_PREFIX}/engine/internals/native_engine.so.metadata",
 ]
 
 # We don't specify patch versions so that we get the latest, which comes pre-installed:
@@ -344,14 +348,21 @@ class Helper:
             },
         }
 
-    def native_binaries_download(self) -> Step:
-        return {
-            "name": "Download native binaries",
-            "uses": "actions/download-artifact@v3",
-            "with": {
-                "name": f"native_binaries.{gha_expr('matrix.python-version')}.{self.platform_name()}",
+    def native_binaries_download(self) -> Sequence[Step]:
+        return [
+            {
+                "name": "Download native binaries",
+                "uses": "actions/download-artifact@v3",
+                "with": {
+                    "name": f"native_binaries.{gha_expr('matrix.python-version')}.{self.platform_name()}",
+                    "path": NATIVE_FILES_COMMON_PREFIX,
+                },
             },
-        }
+            {
+                "name": "Make native-client runnable",
+                "run": f"chmod +x {NATIVE_FILES[0]}",
+            },
+        ]
 
     def rust_caches(self) -> Sequence[Step]:
         return [
@@ -647,7 +658,7 @@ def test_jobs(
             ),
             *helper.setup_primary_python(),
             *helper.expose_all_pythons(),
-            helper.native_binaries_download(),
+            *helper.native_binaries_download(),
             setup_toolchain_auth(),
             {
                 "name": human_readable_step_name,
@@ -810,7 +821,7 @@ def test_workflow_jobs(python_versions: list[str], *, cron: bool) -> Jobs:
                 "steps": [
                     *checkout(),
                     *linux_x86_64_helper.setup_primary_python(),
-                    linux_x86_64_helper.native_binaries_download(),
+                    *linux_x86_64_helper.native_binaries_download(),
                     setup_toolchain_auth(),
                     {
                         "name": "Lint",

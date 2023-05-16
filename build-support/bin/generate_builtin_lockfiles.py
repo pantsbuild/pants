@@ -226,7 +226,7 @@ def generate_python_tool_lockfiles(tools: Sequence[PythonTool], dry_run: bool) -
             # Regardless of the backend the tool is defined in, we need the Python backend
             # for the Python resolves mechanism to work.
             "--backend-packages=pants.backend.python",
-            "--python-pip-version=23.0.1",
+            "--python-pip-version=latest",
             f"--python-interpreter-constraints=['{default_python_interpreter_constraints}']",
             "--python-enable-resolves",
             # Unset any existing resolve names in the Pants repo, and set to just our temporary ones.
@@ -259,7 +259,7 @@ def generate_jvm_tool_lockfiles(tools: Sequence[JvmTool], dry_run: bool) -> None
 
 def generate(buildroot: str, tools: Sequence[Tool], args: Sequence[str], dry_run: bool) -> None:
     pants_repo_root = get_buildroot()
-    touch(os.path.join(buildroot, "BUILDROOT"))
+    touch(os.path.join(buildroot, "pants.toml"))
     backends = sorted({tool.backend for tool in tools})
     custom_cmd = "./pants run build-support/bin/generate_builtin_lockfiles.py"
     args = [

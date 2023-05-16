@@ -177,14 +177,8 @@ impl Snapshot {
     }
   }
 
-  /// # Safety
-  ///
-  /// This should only be used for testing, as this will always create an invalid Snapshot.
-  pub unsafe fn create_for_testing_ffi(
-    digest: Digest,
-    files: Vec<String>,
-    dirs: Vec<String>,
-  ) -> Result<Self, String> {
+  /// Creates a snapshot containing empty Files for testing purposes.
+  pub fn create_for_testing(files: Vec<String>, dirs: Vec<String>) -> Result<Self, String> {
     // NB: All files receive the EMPTY_DIGEST.
     let file_digests = files
       .iter()
@@ -216,8 +210,7 @@ impl Snapshot {
       &file_digests,
     )?;
     Ok(Self {
-      // NB: The DigestTrie's computed digest is ignored in favor of the given Digest.
-      digest,
+      digest: tree.compute_root_digest(),
       tree,
     })
   }

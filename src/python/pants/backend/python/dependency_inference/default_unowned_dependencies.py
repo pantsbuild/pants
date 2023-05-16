@@ -280,6 +280,7 @@ _STDLIB_MODULES = [
     "tkinter",
     "token",
     "tokenize",
+    "tomllib",
     "trace",
     "traceback",
     "tracemalloc",

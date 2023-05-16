@@ -30,7 +30,7 @@ from pants.engine.target import Target
 from pants.testutil.rule_runner import RuleRunner
 
 
-@pytest.fixture(params=["npm", "pnpm"])
+@pytest.fixture(params=["npm", "pnpm", "yarn"])
 def package_manager(request) -> str:
     return cast(str, request.param)
 
@@ -58,6 +58,7 @@ def rule_runner(package_manager: str) -> RuleRunner:
 _LOCKFILE_FILE_NAMES = {
     "pnpm": "pnpm-lock.yaml",
     "npm": "package-lock.json",
+    "yarn": "yarn.lock",
 }
 
 
