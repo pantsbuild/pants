@@ -286,6 +286,7 @@ class PexRequirements:
     # PEX-native lockfile, the superset to use. # NB: Use of a lockfile here asserts that the
     # lockfile is PEX-native, because legacy lockfiles do not support subset resolves.
     from_superset: Pex | Resolve | None
+    description_of_origin: str
 
     def __init__(
         self,
@@ -293,12 +294,15 @@ class PexRequirements:
         *,
         constraints_strings: Iterable[str] = (),
         from_superset: Pex | Resolve | None = None,
+        description_of_origin: str = "",
     ) -> None:
         """
         :param req_strings_or_addrs: The requirement strings to resolve, or addresses
           of targets that refer to them, or string specs of such addresses.
         :param constraints_strings: Constraints strings to apply during the resolve.
         :param from_superset: An optional superset PEX or lockfile to resolve the req strings from.
+        :param description_of_origin: A human-readable description of what these requirements
+          represent, for use in error messages.
         """
         object.__setattr__(
             self, "req_strings_or_addrs", FrozenOrderedSet(sorted(req_strings_or_addrs))
@@ -307,6 +311,7 @@ class PexRequirements:
             self, "constraints_strings", FrozenOrderedSet(sorted(constraints_strings))
         )
         object.__setattr__(self, "from_superset", from_superset)
+        object.__setattr__(self, "description_of_origin", description_of_origin)
 
     @classmethod
     def req_strings_from_requirement_fields(

@@ -222,17 +222,19 @@ class PythonToolRequirementsBase(Subsystem):
         If the tool supports lockfiles, the returned type will install from the lockfile rather than
         `all_requirements`.
         """
+        description_of_origin = f"the requirements of the `{self.options_scope}` tool"
         if self.install_from_resolve:
             use_entire_lockfile = not self.requirements
             return PexRequirements(
                 (*self.requirements, *extra_requirements),
                 from_superset=Resolve(self.install_from_resolve, use_entire_lockfile),
+                description_of_origin=description_of_origin,
             )
 
         requirements = (*self.all_requirements, *extra_requirements)
 
         if not self.uses_lockfile:
-            return PexRequirements(requirements)
+            return PexRequirements(requirements, description_of_origin=description_of_origin)
 
         hex_digest = calculate_invalidation_digest(requirements)
 

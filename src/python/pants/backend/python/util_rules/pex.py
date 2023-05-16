@@ -477,9 +477,9 @@ async def get_req_strings(pex_reqs: PexRequirements) -> ReqStrings:
             addrs.append(req_str_or_addr)
         else:
             assert isinstance(req_str_or_addr, str)
-            # A local or VCS requirement will have an ampersand in it, and any other
-            # string with a path.sep in it will be an address spec.
-            if os.path.sep in req_str_or_addr and "@" not in req_str_or_addr:
+            # Require a `//` prefix, to distinguish address specs from
+            # local or VCS requirements.
+            if req_str_or_addr.startswith(os.path.sep):
                 specs.append(req_str_or_addr)
             else:
                 req_strings.append(req_str_or_addr)
@@ -489,8 +489,7 @@ async def get_req_strings(pex_reqs: PexRequirements) -> ReqStrings:
             UnparsedAddressInputs(
                 specs,
                 owning_address=None,
-                # TODO: Plumb the origin through in PexRequirements?
-                description_of_origin="User-specified requirements",
+                description_of_origin=pex_reqs.description_of_origin,
             ),
         )
         addrs.extend(addrs_from_specs)

@@ -60,6 +60,7 @@ async def resolve_plugins(
     requirements = PexRequirements(
         req_strings_or_addrs=req_strings,
         constraints_strings=(str(constraint) for constraint in request.constraints),
+        description_of_origin="configured Pants plugins",
     )
     if not requirements:
         return ResolvedPluginDistributions()
