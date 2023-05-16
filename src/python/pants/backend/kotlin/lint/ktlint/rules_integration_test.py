@@ -80,7 +80,8 @@ open class Bar {
 """
 
 
-def run_ktlint(rule_runner: RuleRunner, targets: list[Target]) -> FmtResult:
+def run_ktlint(rule_runner: RuleRunner, targets: list[Target], extra_args: list[str] | None = None) -> FmtResult:
+    rule_runner.set_options(extra_args or (), env_inherit={"PATH"})
     field_sets = [KtlintFieldSet.create(tgt) for tgt in targets]
     input_sources = rule_runner.request(
         SourceFiles,
@@ -131,3 +132,10 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
         {"Foo.kt": GOOD_FILE, "Bar.kt": FIXED_BAD_FILE}
     )
     assert fmt_result.did_change is True
+
+def test_skip(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files({"Foo.kt": GOOD_FILE, "BUILD": "kotlin_sources(name='t')"})
+    tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="Foo.kt"))
+    fmt_result = run_ktlint(rule_runner, [tgt], extra_args=["--ktlint-skip"])
+    assert fmt_result.output == rule_runner.make_snapshot({"Foo.kt": GOOD_FILE})
+    assert fmt_result.did_change is False

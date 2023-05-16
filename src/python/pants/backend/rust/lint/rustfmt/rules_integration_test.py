@@ -156,31 +156,3 @@ def test_multiple_targets(rule_runner: RuleRunner) -> None:
         },
     )
     assert fmt_result.did_change is True
-
-
-@pytest.mark.skip(reason="This issue would have to be fixed in a future PR")
-def test_skip_using_args(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files(
-        {
-            "src/lib.rs": BAD_FILE,
-            "Cargo.toml": "",
-            "BUILD": "rust_package(name='package')",
-        }
-    )
-    tgt = rule_runner.get_target(Address("", target_name="package"))
-    fmt_result = run_rustfmt(rule_runner, [tgt], extra_args=["--rustfmt-skip"])
-    assert fmt_result.did_change is False
-
-
-@pytest.mark.skip(reason="This issue would have to be fixed in a future PR")
-def test_skip_target(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files(
-        {
-            "src/lib.rs": BAD_FILE,
-            "Cargo.toml": "",
-            "BUILD": "rust_package(name='package', skip_rustfmt=True)",
-        }
-    )
-    tgt = rule_runner.get_target(Address("", target_name="package"))
-    fmt_result = run_rustfmt(rule_runner, [tgt])
-    assert fmt_result.did_change is False
