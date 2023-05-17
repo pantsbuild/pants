@@ -23,7 +23,6 @@ jobs:
         with:
           # Always checkout the latest commit of main
           ref: "main"
-          token: ${{ secrets.WORKER_PANTS_PAT }}
 
       - name: Cherry-Pick
         run: |
