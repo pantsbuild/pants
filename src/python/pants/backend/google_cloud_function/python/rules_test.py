@@ -130,7 +130,7 @@ def complete_platform(rule_runner: PythonRuleRunner) -> bytes:
     "major_minor_interpreter",
     all_major_minor_python_versions(Lambdex.default_interpreter_constraints),
 )
-def test_create_hello_world_lambda(
+def test_create_hello_world_lambda_with_lambdex(
     rule_runner: PythonRuleRunner, major_minor_interpreter: str, complete_platform: str, caplog
 ) -> None:
     rule_runner.write_files(
@@ -243,3 +243,46 @@ def test_warn_files_targets(rule_runner: PythonRuleRunner, caplog) -> None:
     assert "assets/f.txt:files" in caplog.text
     assert "assets:relocated" in caplog.text
     assert "assets:resources" not in caplog.text
+
+
+def test_create_hello_world_gcf(rule_runner: PythonRuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/python/foo/bar/hello_world.py": dedent(
+                """
+                import mureq
+
+                def handler(event, context):
+                    print('Hello, World!')
+                """
+            ),
+            "src/python/foo/bar/BUILD": dedent(
+                """
+                python_requirement(name="mureq", requirements=["mureq==0.2"])
+                python_sources()
+
+                python_google_cloud_function(
+                    name='gcf',
+                    handler='foo.bar.hello_world:handler',
+                    runtime="python37",
+                    layout='zip',
+                    type='event',
+                )
+                """
+            ),
+        }
+    )
+
+    zip_file_relpath, content = create_python_google_cloud_function(
+        rule_runner,
+        Address("src/python/foo/bar", target_name="gcf"),
+        expected_extra_log_lines=(
+            "    Handler: foo.bar.hello_world.handler",
+        ),
+    )
+    assert "src.python.foo.bar/gcf.zip" == zip_file_relpath
+
+    zipfile = ZipFile(BytesIO(content))
+    names = set(zipfile.namelist())
+    assert "mureq/__init__.py" in names
+    assert "foo/bar/hello_world.py" in names
