@@ -9,7 +9,10 @@ import os.path
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
+from pathlib import Path
 from typing import Optional, cast
+
+from typing_extensions import Literal
 
 from pants.backend.python.dependency_inference.module_mapper import (
     PythonModuleOwners,
@@ -22,7 +25,11 @@ from pants.backend.python.dependency_inference.subsystem import (
 )
 from pants.backend.python.subsystems.lambdex import Lambdex
 from pants.backend.python.subsystems.setup import PythonSetup
-from pants.backend.python.target_types import PexCompletePlatformsField, PythonResolveField
+from pants.backend.python.target_types import (
+    PexCompletePlatformsField,
+    PexLayout,
+    PythonResolveField,
+)
 from pants.backend.python.util_rules.pex import (
     CompletePlatforms,
     Pex,
@@ -32,6 +39,9 @@ from pants.backend.python.util_rules.pex import (
     VenvPexProcess,
 )
 from pants.backend.python.util_rules.pex_from_targets import PexFromTargetsRequest
+from pants.backend.python.util_rules.pex_from_targets import rules as pex_from_targets_rules
+from pants.backend.python.util_rules.pex_venv import PexVenv, PexVenvLayout, PexVenvRequest
+from pants.backend.python.util_rules.pex_venv import rules as pex_venv_rules
 from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact, OutputPathField
 from pants.core.target_types import FileSourceField
 from pants.engine.addresses import Address, UnparsedAddressInputs
@@ -427,9 +437,87 @@ async def build_lambdex(
     return BuiltPackage(digest=result.output_digest, artifacts=(artifact,))
 
 
+@dataclass(frozen=True)
+class BuildPythonFaaSRequest:
+    address: Address
+    target_name: str
+
+    complete_platforms: PythonFaaSCompletePlatforms
+    handler: PythonFaaSHandlerField
+    output_path: OutputPathField
+    runtime: PythonFaaSRuntimeField
+    layout: Literal[PythonFaaSLayout.ZIP]
+
+    include_requirements: bool
+
+
+@rule
+async def build_python_faas(
+    request: BuildPythonFaaSRequest,
+) -> BuiltPackage:
+    platform_str = request.runtime.to_platform_string()
+    pex_platforms = PexPlatforms([platform_str] if platform_str else [])
+
+    additional_pex_args = (
+        # Ensure we can resolve manylinux wheels in addition to any AMI-specific wheels.
+        "--manylinux=manylinux2014",
+        # When we're executing Pex on Linux, allow a local interpreter to be resolved if
+        # available and matching the AMI platform.
+        "--resolve-local-platforms",
+    )
+
+    complete_platforms = await Get(
+        CompletePlatforms, PythonFaaSCompletePlatforms, request.complete_platforms
+    )
+
+    # TODO: improve diagnostics if there's more than one platform/complete_platform
+
+    repository_filename = "faas_repository.pex"
+    pex_request = PexFromTargetsRequest(
+        addresses=[request.address],
+        internal_only=False,
+        include_requirements=request.include_requirements,
+        output_filename=repository_filename,
+        platforms=pex_platforms,
+        complete_platforms=complete_platforms,
+        layout=PexLayout.PACKED,
+        additional_args=additional_pex_args,
+        additional_lockfile_args=additional_pex_args,
+    )
+
+    pex_result, handler = await MultiGet(
+        Get(Pex, PexFromTargetsRequest, pex_request),
+        Get(ResolvedPythonFaaSHandler, ResolvePythonFaaSHandlerRequest(request.handler)),
+    )
+
+    output_filename = request.output_path.value_or_default(file_ending="zip")
+
+    result = await Get(
+        PexVenv,
+        PexVenvRequest(
+            pex=pex_result,
+            layout=PexVenvLayout.FLAT_ZIPPED,
+            platforms=pex_platforms,
+            complete_platforms=complete_platforms,
+            output_path=Path(output_filename),
+            description=f"Build {request.target_name} artefact for {request.address}",
+        ),
+    )
+
+    artifact = BuiltPackageArtifact(
+        output_filename,
+        extra_log_lines=(
+            f"    Handler: {handler.module}.{handler.func}",
+        ),
+    )
+    return BuiltPackage(digest=result.digest, artifacts=(artifact,))
+
+
 def rules():
     return (
         *collect_rules(),
         *import_rules(),
+        *pex_venv_rules(),
+        *pex_from_targets_rules(),
         UnionRule(InferDependenciesRequest, InferPythonFaaSHandlerDependency),
     )
