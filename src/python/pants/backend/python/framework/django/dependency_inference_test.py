@@ -30,7 +30,7 @@ from pants.testutil.rule_runner import RuleRunner
 
 @pytest.fixture
 def rule_runner() -> RuleRunner:
-    return RuleRunner(
+    rule_runner = RuleRunner(
         rules=[
             *parse_python_dependencies.rules(),
             *stripped_source_files.rules(),
@@ -42,6 +42,8 @@ def rule_runner() -> RuleRunner:
         ],
         target_types=[PythonSourceTarget],
     )
+    rule_runner.set_options([], env_inherit={"PATH", "PYENV_ROOT", "HOME"})
+    return rule_runner
 
 
 def do_test_migration_dependencies(rule_runner: RuleRunner, constraints: str) -> None:
