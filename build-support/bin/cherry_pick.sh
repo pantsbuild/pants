@@ -61,8 +61,8 @@ if [[ -z $CATEGORY_LABEL ]]; then
   echo "Couldn't detect category label on PR. What's the label? (E.g., category:bugfix)"
   read -r CATEGORY_LABEL
 fi
-REVIEWERS=$(gh pr view "$PR_NUM" --json author --jq '.author.login')
-REVIEWERS+=" $(gh pr view "$PR_NUM" --json reviews --jq '.reviews.[].author.login' | sort | uniq)"
+
+REVIEWERS=" $(gh pr view "$PR_NUM" --json reviews --jq '.reviews.[].author.login' | sort | uniq)"
 
 BODY_FILE=$(mktemp "/tmp/github.cherrypick.$PR_NUM.XXXXXX")
 gh pr view "$PR_NUM" --json body --jq '.body' > "$BODY_FILE"
@@ -72,6 +72,8 @@ for MILESTONE in $MILESTONES; do
 
   PR_CREATE_CMD=(gh pr create --base "$MILESTONE" --title "$TITLE (Cherry-pick of #$PR_NUM)" --label "$CATEGORY_LABEL" --body-file "$BODY_FILE")
   while IFS= read -r REVIEWER; do PR_CREATE_CMD+=(--reviewer "$REVIEWER"); done <<< "$REVIEWERS"
+  # NB: Add the author in case someone else creates the PR
+  PR_CREATE_CMD+=(--reviewer "$(gh pr view "$PR_NUM" --json author --jq '.author.login')")
   BRANCH_NAME="cherry-pick-$PR_NUM-to-$MILESTONE"
   git checkout -b "$BRANCH_NAME" FETCH_HEAD
   if git cherry-pick "$COMMIT"; then
