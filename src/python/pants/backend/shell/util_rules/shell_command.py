@@ -249,7 +249,7 @@ async def _interactive_shell_command(
             bash.path,
             "-c",
             boot_script + command,
-            f"{bin_name()} run {shell_command.address.spec}",
+            f"{bin_name()} run {shell_command.address.spec} --",
         ),
         description=f"Running {description}",
         env=command_env,
