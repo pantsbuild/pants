@@ -245,7 +245,12 @@ async def _interactive_shell_command(
     boot_script = f"cd {shlex.quote(relpath)}; " if relpath != "" else ""
 
     return Process(
-        argv=(bash.path, "-c", boot_script + command, f"{bin_name()} run {shell_command.address.spec}"),
+        argv=(
+            bash.path,
+            "-c",
+            boot_script + command,
+            f"{bin_name()} run {shell_command.address.spec}",
+        ),
         description=f"Running {description}",
         env=command_env,
         input_digest=dependencies_digest,
