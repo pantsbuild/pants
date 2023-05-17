@@ -10,24 +10,6 @@ from pants.engine.target import SequenceField, StringField, StringSequenceField,
 from pants.util.strutil import help_text
 
 
-class NfpmContentSrcField(StringField):
-    nfpm_alias = "contents.[].src"
-    alias: ClassVar[str] = "src"
-    help = help_text(
-        lambda: f"""
-        """
-    )
-
-
-class NfpmContentDestField(StringField):
-    nfpm_alias = "contents.[].dest"
-    alias: ClassVar[str] = "dest"
-    help = help_text(
-        lambda: f"""
-        """
-    )
-
-
 class NfpmContentFileOwnerField(StringField):
     nfpm_alias = "contents.[].file_info.owner"
     alias: ClassVar[str] = "file_owner"
@@ -67,6 +49,38 @@ class NfpmContentFileMtimeField(StringField):
 # -----------------------------------------------------------------------------------------------
 # File-specific fields
 # -----------------------------------------------------------------------------------------------
+
+class NfpmContentSrcField(StringField):
+    nfpm_alias = "contents.[].src"
+    alias: ClassVar[str] = "src"
+    help = help_text(
+        lambda: f"""
+        A file path that should be included in the package.
+
+        When the package gets installed, the file from '{NfpmContentSrcField.alias}'
+        will be installed using the absolute path in '{NfpmContentDstField.alias}'.
+
+        This path should be relative to the sandbox. The path should point to a
+        generated file or a real file sourced from the workspace.
+        """
+    )
+
+
+class NfpmContentDstField(StringField):
+    nfpm_alias = "contents.[].dst"
+    alias: ClassVar[str] = "dst"
+    help = help_text(
+        lambda: f"""
+        The absolute install path for a packaged file.
+
+        When the package gets installed, the file from '{NfpmContentSrcField.alias}'
+        will be installed using the absolute path in '{NfpmContentDstField.alias}'.
+
+        This path is an absolute path on the file system where the package
+        will be installed.
+        """
+    )
+
 
 class NfpmContentFileType(Enum):
     # This is a subset of the nFPM content types that apply to individual files.
@@ -116,13 +130,31 @@ class NfpmContentFilesField(SequenceField[Sequence[str, str]]):
 class NfpmContentSymlinkSrcField(NfpmContentSrcField):
     help = help_text(
         lambda: f"""
+        The symlink target path (on package install).
+
+        When the package gets installed, a symlink will be installed at the
+        '{NfpmContentDstField.alias}' path. The symlink will point to the
+        '{NfpmContentSymlinkSrcField.alias}' path (the symlink target).
+
+        This path is a path on the file system where the package will be installed.
+        If this path is absolute, it is the absolute path to the symlink's target path.
+        If this path is relative, it is relative to the '{NfpmContentSymlinkDstField.alias}'
+        path, which is where the symlink will be created.
         """
     )
 
 
-class NfpmContentSymlinkDestField(NfpmContentDestField):
+class NfpmContentSymlinkDstField(NfpmContentDstField):
     help = help_text(
         lambda: f"""
+        The symlink path (on package install).
+
+        When the package gets installed, a symlink will be installed at the
+        '{NfpmContentDstField.alias}' path. The symlink will point to the
+        '{NfpmContentSymlinkSrcField.alias}' path (the symlink target).
+
+        This path is an absolute path on the file system where the package
+        will be installed.
         """
     )
 
@@ -141,9 +173,16 @@ class NfpmContentSymlinksField(SequenceField[Sequence[str, str]]):
 # -----------------------------------------------------------------------------------------------
 
 
-class NfpmContentDirDestField(NfpmContentDestField):
+class NfpmContentDirDstField(NfpmContentDstField):
     help = help_text(
         lambda: f"""
+        The absolute install path for a directory.
+
+        When the package gets installed, a directory will be created at the
+        '{NfpmContentDirDstField.alias}' path.
+
+        This path is an absolute path on the file system where the package
+        will be installed.
         """
     )
 
