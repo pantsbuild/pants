@@ -1,0 +1,33 @@
+name: Auto Cherry-Picker
+
+on:
+  pull_request:
+    types:
+      - closed
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      PR_number:
+        description: The PR number to cherry-pick
+        type: string
+        required: true
+
+jobs:
+  picker:
+    if: (github.event.pull_request.merged == true && contains(github.event.pull_request.labels.*.name, 'needs-cherrypick') ) || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v2
+        with:
+          # Always checkout the latest commit of main
+          ref: "main"
+
+      - name: Cherry-Pick
+        run: |
+          git config --local user.email "pantsbuild+github-automation@gmail.com"
+          git config --local user.name "Worker Pants (Pantsbuild GitHub Automation Bot)"
+          build-support/bin/cherry_pick.sh ${{ github.event.pull_request.number || inputs.PR_number }} origin
+        env:
+          GH_TOKEN: ${{ secrets.WORKER_PANTS_PAT }}
