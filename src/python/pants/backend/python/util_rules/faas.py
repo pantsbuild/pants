@@ -43,7 +43,6 @@ from pants.backend.python.util_rules.pex_from_targets import rules as pex_from_t
 from pants.backend.python.util_rules.pex_venv import PexVenv, PexVenvLayout, PexVenvRequest
 from pants.backend.python.util_rules.pex_venv import rules as pex_venv_rules
 from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact, OutputPathField
-from pants.core.target_types import FileSourceField
 from pants.engine.addresses import Address, UnparsedAddressInputs
 from pants.engine.fs import (
     CreateDigest,
@@ -69,12 +68,11 @@ from pants.engine.target import (
     StringField,
     TransitiveTargets,
     TransitiveTargetsRequest,
-    targets_with_sources_types,
 )
-from pants.engine.unions import UnionMembership, UnionRule
+from pants.engine.unions import UnionRule
 from pants.source.filespec import Filespec
 from pants.source.source_root import SourceRoot, SourceRootRequest
-from pants.util.docutil import bin_name, doc_url
+from pants.util.docutil import bin_name
 from pants.util.strutil import help_text
 
 logger = logging.getLogger(__name__)
@@ -344,7 +342,6 @@ async def build_lambdex(
     request: BuildLambdexRequest,
     lambdex: Lambdex,
     platform: Platform,
-    union_membership: UnionMembership,
 ) -> BuiltPackage:
     if platform.is_macos:
         logger.warning(
@@ -385,6 +382,7 @@ async def build_lambdex(
         complete_platforms=complete_platforms,
         additional_args=additional_pex_args,
         additional_lockfile_args=additional_pex_args,
+        warn_for_transitive_files_targets=True,
     )
     lambdex_request = lambdex.to_pex_request()
 
@@ -394,22 +392,6 @@ async def build_lambdex(
         Get(ResolvedPythonFaaSHandler, ResolvePythonFaaSHandlerRequest(request.handler)),
         Get(TransitiveTargets, TransitiveTargetsRequest([request.address])),
     )
-
-    # Warn if users depend on `files` targets, which won't be included in the PEX and is a common
-    # gotcha.
-    file_tgts = targets_with_sources_types(
-        [FileSourceField], transitive_targets.dependencies, union_membership
-    )
-    if file_tgts:
-        files_addresses = sorted(tgt.address.spec for tgt in file_tgts)
-        logger.warning(
-            f"The `{request.target_name}` target {request.address} transitively depends "
-            "on the below `files` targets, but Pants will not include them in the built package. "
-            "Filesystem APIs like `open()` are not able to load files within the binary "
-            "itself; instead, they read from the current working directory."
-            f"\n\nInstead, use `resources` targets. See {doc_url('resources')}."
-            f"\n\nFiles targets dependencies: {files_addresses}"
-        )
 
     lambdex_args = ["build", "-e", f"{handler.module}:{handler.func}", output_filename]
     if request.script_handler:
@@ -510,6 +492,7 @@ async def build_python_faas(
         additional_args=additional_pex_args,
         additional_lockfile_args=additional_pex_args,
         additional_sources=additional_sources,
+        warn_for_transitive_files_targets=True,
     )
 
     pex_result = await Get(Pex, PexFromTargetsRequest, pex_request)

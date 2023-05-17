@@ -236,10 +236,7 @@ def test_warn_files_targets(rule_runner: PythonRuleRunner, caplog) -> None:
     )
     assert caplog.records
     assert "src.py.project/lambda.zip" == zip_file_relpath
-    assert (
-        "The `python_google_cloud_function` target src/py/project:lambda transitively depends on"
-        in caplog.text
-    )
+    assert "The target src/py/project:lambda transitively depends on" in caplog.text
     assert "assets/f.txt:files" in caplog.text
     assert "assets:relocated" in caplog.text
     assert "assets:resources" not in caplog.text
