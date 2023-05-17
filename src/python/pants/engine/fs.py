@@ -78,7 +78,7 @@ class SymlinkEntry:
     """A symlink pointing to a target path.
 
     For the symlink target:
-        - uses a a forward slash `/` path separator.
+        - uses a forward slash `/` path separator.
         - can be relative to the parent directory of the symlink or can be an absolute path starting with `/`.
         - Allows `..` components anywhere in the path (as logical canonicalization may lead to
             different behavior in the presence of directory symlinks).
