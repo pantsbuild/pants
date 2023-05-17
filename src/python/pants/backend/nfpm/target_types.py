@@ -33,6 +33,7 @@ from pants.backend.nfpm.fields.contents import (
     NfpmContentFileModeField,
     NfpmContentFileMtimeField,
     NfpmContentFileOwnerField,
+    NfpmContentFileSourceField,
     NfpmContentFilesField,
     NfpmContentSrcField,
     NfpmContentSymlinkDstField,
@@ -275,8 +276,9 @@ class NfpmContentFile(Target):
     alias = "nfpm_content_file"
     core_fields = (
         *COMMON_TARGET_FIELDS,
+        NfpmContentFileSourceField,
         NfpmDependencies,  # this would depend on the file target
-        NfpmContentSrcField,  # TODO: replace with a "source" field
+        NfpmContentSrcField,
         NfpmContentDstField,
         *CONTENT_FILE_FIELDS,
     )
