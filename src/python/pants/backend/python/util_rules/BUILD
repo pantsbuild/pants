@@ -1,11 +1,7 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-python_sources(
-    overrides={
-        "local_dists_pep660.py": dict(dependencies=["./scripts/pep660_backend_wrapper.py"]),
-    },
-)
+python_sources()
 
 python_tests(
     name="tests",
