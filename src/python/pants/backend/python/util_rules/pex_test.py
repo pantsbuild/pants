@@ -32,6 +32,7 @@ from pants.backend.python.util_rules.pex import (
     PexProcess,
     PexRequest,
     PexResolveInfo,
+    ReqStrings,
     VenvPex,
     VenvPexProcess,
     _build_pex_description,
@@ -720,6 +721,15 @@ def test_setup_pex_requirements() -> None:
                     output_type=LoadedLockfile,
                     input_types=(LoadedLockfileRequest,),
                     mock=lambda _: create_loaded_lockfile(is_pex_lock),
+                ),
+                MockGet(
+                    output_type=ReqStrings,
+                    input_types=(PexRequirements,),
+                    mock=lambda _: ReqStrings(
+                        tuple(str(x) for x in requirements.req_strings_or_addrs)
+                        if isinstance(requirements, PexRequirements)
+                        else tuple()
+                    ),
                 ),
                 MockGet(
                     output_type=ResolvePexConfig,

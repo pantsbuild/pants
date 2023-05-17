@@ -801,7 +801,9 @@ def test_cross_platform_pex_disables_subsetting(
     result = rule_runner.request(PexRequest, [request])
 
     assert result.requirements == PexRequirements(
-        request.addresses, constraints_strings=constraints
+        request.addresses,
+        constraints_strings=constraints,
+        description_of_origin="//:lib",
     )
 
 
