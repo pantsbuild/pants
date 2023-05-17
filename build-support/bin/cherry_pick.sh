@@ -51,6 +51,7 @@ COMMIT=$(gh pr view "$PR_NUM" --json mergeCommit --jq '.mergeCommit.oid')
 if [[ -z $COMMIT ]]; then
   fail "Wasn't able to retrieve merge commit for $PR_NUM."
 fi
+git fetch https://github.com/thejcannon/pants "$COMMIT"
 
 TITLE=$(gh pr view "$PR_NUM" --json title --jq '.title')
 CATEGORY_LABEL=$(gh pr view "$PR_NUM" --json labels --jq '.labels.[] | select(.name|test("category:.")).name')
