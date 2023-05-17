@@ -26,16 +26,16 @@ from pants.backend.nfpm.fields.archlinux import (
     NfpmArchlinuxReplacesField,
 )
 from pants.backend.nfpm.fields.contents import (
-    NfpmContentDestField,
-    NfpmContentDirDestField,
+    NfpmContentDirDstField,
     NfpmContentDirsField,
+    NfpmContentDstField,
     NfpmContentFileGroupField,
     NfpmContentFileModeField,
     NfpmContentFileMtimeField,
     NfpmContentFileOwnerField,
     NfpmContentFilesField,
     NfpmContentSrcField,
-    NfpmContentSymlinkDestField,
+    NfpmContentSymlinkDstField,
     NfpmContentSymlinkSrcField,
     NfpmContentSymlinksField,
     NfpmContentTypeField,
@@ -277,7 +277,7 @@ class NfpmContentFile(Target):
         *COMMON_TARGET_FIELDS,
         NfpmDependencies,  # this would depend on the file target
         NfpmContentSrcField,  # TODO: replace with a "source" field
-        NfpmContentDestField,
+        NfpmContentDstField,
         *CONTENT_FILE_FIELDS,
     )
     help = help_text(
@@ -316,7 +316,7 @@ class NfpmContentSymlink(Target):
         *COMMON_TARGET_FIELDS,
         # Modeled w/o dependencies for now (feel free to add later).
         NfpmContentSymlinkSrcField,  # path on package install target
-        NfpmContentSymlinkDestField,  # path on package install target
+        NfpmContentSymlinkDstField,  # path on package install target
         *CONTENT_SYMLINK_FIELDS,
     )
     help = help_text(
@@ -354,7 +354,7 @@ class NfpmContentDir(Target):
     core_fields = (
         *COMMON_TARGET_FIELDS,
         # Modeled w/o dependencies for now (feel free to add later).
-        NfpmContentDirDestField,  # path on package install target
+        NfpmContentDirDstField,  # path on package install target
         # nFPM also supports passing a real dir in "src", from which it
         # pulls the mode and mtime. But, pants creates the sandbox for nFPM,
         # so pants would have to explicitly set mode/mtime on sandboxed dirs.
