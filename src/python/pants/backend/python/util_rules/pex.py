@@ -479,7 +479,7 @@ async def get_req_strings(pex_reqs: PexRequirements) -> ReqStrings:
             assert isinstance(req_str_or_addr, str)
             # Require a `//` prefix, to distinguish address specs from
             # local or VCS requirements.
-            if req_str_or_addr.startswith(os.path.sep):
+            if req_str_or_addr.startswith(os.path.sep * 2):
                 specs.append(req_str_or_addr)
             else:
                 req_strings.append(req_str_or_addr)
