@@ -12,11 +12,20 @@ from pants.engine.target import SequenceField, StringField, StringSequenceField,
 from pants.util.strutil import help_text
 
 
+# -----------------------------------------------------------------------------------------------
+# file_info fields
+# -----------------------------------------------------------------------------------------------
+
+
 class NfpmContentFileOwnerField(StringField):
     nfpm_alias = "contents.[].file_info.owner"
     alias: ClassVar[str] = "file_owner"
+    default = "root"  # Make the nFPM default visible in help.
     help = help_text(
         lambda: f"""
+        Username that owns this file or directory.
+
+        This is like the OWNER arg in chown: https://www.mankier.com/1/chown
         """
     )
 
@@ -24,17 +33,34 @@ class NfpmContentFileOwnerField(StringField):
 class NfpmContentFileGroupField(StringField):
     nfpm_alias = "contents.[].file_info.group"
     alias: ClassVar[str] = "file_group"
+    default = "root"  # Make the nFPM default visible in help.
     help = help_text(
         lambda: f"""
+        Name of the group that owns this file or directory.
+
+        This is like the GROUP arg in chown: https://www.mankier.com/1/chown
         """
     )
 
 
 class NfpmContentFileModeField(IntField):
+    # TODO: validate that this is an octal, not just an int.
+    # TODO: allow putting this as a string in BUILD files.
     nfpm_alias = "contents.[].file_info.mode"
     alias: ClassVar[str] = "file_mode"
+    # TODO: pants does not materialize mode (except the executable bit) in the sandbox
+    # TODO: use the digest's execute bit to default to either 0o644 or 0o755
+    #       and bypass any nFPM auto detection confusion.
     help = help_text(
         lambda: f"""
+        The file mode bits in octal format (starts with 0 or 0o).
+
+        If not defined, nFPM pulls the mode from the sandboxed source file.
+        However, pants only propagates the executable file mode bit into the
+        sandbox, so no other mode bits can be automatically pulled.
+        So this can be lossy if not defined.
+
+        This is like the OCTAL-MODE arg in chmod: https://www.mankier.com/1/chmod
         """
     )
 
@@ -42,8 +68,29 @@ class NfpmContentFileModeField(IntField):
 class NfpmContentFileMtimeField(StringField):
     nfpm_alias = "contents.[].file_info.mtime"
     alias: ClassVar[str] = "file_mtime"
+    # Default copied from PEX (which uses zipfile standard MS-DOS epoch).
+    # https://github.com/pantsbuild/pex/blob/v2.1.137/pex/common.py#L39-L45
+    default = "1980-01-01T00:00:00"
+    # TODO: override default with SOURCE_DATE_EPOCH env var if defined
+    # TODO: there are many things in nFPM that use time.Now(), so upstream nFPM work
+    #       is required so pants can use SOURCE_DATE_EPOCH to overwrite that.
     help = help_text(
         lambda: f"""
+        The file modification time as an RFC 3339 formatted string.
+
+        For example: 2008-01-02T15:04:05Z
+
+        The format is defined in RFC 3339: https://rfc-editor.org/rfc/rfc3339.html
+
+        Though nFPM supports pulling mtime from the src file or directory in most
+        cases, the pants nfpm backend does not support this. Reading the mtime from
+        the filesystem is problematic because Pants does not track the mtime of files
+        and does not propagate any file mtime into the sandboxes. Reasons for this
+        include: git does not track mtime, timestamps like mtime cause many issues
+        for reproducible packaging builds, and reproducible builds are required
+        for pants to provide its fine-grained caches.
+
+        See also: https://reproducible-builds.org/docs/timestamps/
         """
     )
 
