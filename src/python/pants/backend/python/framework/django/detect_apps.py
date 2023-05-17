@@ -6,14 +6,13 @@ import json
 from collections import defaultdict
 from dataclasses import dataclass
 
-from pants.backend.python.dependency_inference.parse_python_dependencies import get_scripts_digest
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import InterpreterConstraintsField
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex_environment import PythonExecutable
 from pants.base.deprecated import warn_or_error
 from pants.base.specs import FileGlobSpec, RawSpecs
-from pants.engine.fs import AddPrefix, Digest, MergeDigests
+from pants.engine.fs import AddPrefix, CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import collect_rules, rule
@@ -25,6 +24,7 @@ from pants.engine.target import (
     Targets,
 )
 from pants.util.frozendict import FrozenDict
+from pants.util.resources import read_resource
 
 
 @dataclass(frozen=True)
@@ -45,8 +45,8 @@ class DjangoApps:
         apps = dict(self.label_to_name, **json.loads(json_bytes.decode()))
         return DjangoApps(FrozenDict(sorted(apps.items())))
 
-    def to_json(self) -> bytes:
-        return json.dumps(dict(self.label_to_name), sort_keys=True).encode()
+
+_script_resource = "scripts/app_detector.py"
 
 
 @rule
@@ -86,9 +86,10 @@ async def detect_django_apps(python_setup: PythonSetup) -> DjangoApps:
     if not targets:
         return django_apps
 
-    script_digest = await get_scripts_digest(
-        "pants.backend.python.framework.django.scripts", ["app_detector.py"]
+    script_file_content = FileContent(
+        "script/__visitor.py", read_resource(__name__, _script_resource)
     )
+    script_digest = await Get(Digest, CreateDigest([script_file_content]))
     apps_sandbox_prefix = "_apps_to_detect"
 
     # Partition by ICs, so we can run the detector on the appropriate interpreter.
@@ -122,7 +123,7 @@ async def detect_django_apps(python_setup: PythonSetup) -> DjangoApps:
             Process(
                 argv=[
                     python_interpreter.path,
-                    "pants/backend/python/framework/django/scripts/app_detector.py",
+                    script_file_content.path,
                     apps_sandbox_prefix,
                 ],
                 input_digest=input_digest,

@@ -529,7 +529,7 @@ async def export_virtualenvs(
     # TODO: After the deprecation exipres, everything in this function below this comment
     #  can be deleted.
     warn_or_error(
-        "2.23.0.dev0",
+        "2.18.0.dev0",
         "exporting resolves without using the --resolve option",
         softwrap(
             f"""
