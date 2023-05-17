@@ -276,9 +276,7 @@ def test_create_hello_world_gcf(rule_runner: PythonRuleRunner) -> None:
     zip_file_relpath, content = create_python_google_cloud_function(
         rule_runner,
         Address("src/python/foo/bar", target_name="gcf"),
-        expected_extra_log_lines=(
-            "    Handler: foo.bar.hello_world.handler",
-        ),
+        expected_extra_log_lines=("    Handler: handler",),
     )
     assert "src.python.foo.bar/gcf.zip" == zip_file_relpath
 
@@ -286,3 +284,4 @@ def test_create_hello_world_gcf(rule_runner: PythonRuleRunner) -> None:
     names = set(zipfile.namelist())
     assert "mureq/__init__.py" in names
     assert "foo/bar/hello_world.py" in names
+    assert zipfile.read("main.py") == b"from foo.bar.hello_world import handler as handler"

@@ -78,6 +78,9 @@ async def package_python_awslambda(
             layout=layout,
             output_path=field_set.output_path,
             include_requirements=field_set.include_requirements.value,
+            # this isn't built or run via lambdex, but the name is arbitrary, so we stick with the
+            # 'tradition' to reduce churn.
+            reexported_handler_module="lambdex_handler",
         ),
     )
 

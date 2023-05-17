@@ -83,6 +83,14 @@ async def package_python_google_cloud_function(
             layout=layout,
             output_path=field_set.output_path,
             include_requirements=True,
+            # GCP requires "Your main file must be named main.py"
+            # https://cloud.google.com/functions/docs/writing#directory-structure-python
+            # setting a `GOOGLE_FUNCTION_SOURCE` Google Cloud build environment variable; e.g.:
+            # `gcloud functions deploy {--build-env-vars-file,--set-build-env-vars}`, but it's non-trivial
+            # to do this right or with intended effect) and the handler name you configure GCF with is just
+            # the unqualified function name, which we log here.
+            reexported_handler_module="main",
+            log_only_reexported_handler_func=True,
         ),
     )
 
