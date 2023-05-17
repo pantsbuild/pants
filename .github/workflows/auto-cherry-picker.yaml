@@ -14,34 +14,21 @@ on:
         required: true
 
 jobs:
-  inputs:
-    if: github.event.pull_request.merged == true || github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
-    outputs:
-      merge_commit: ${{ steps.step1.outputs.merge_commit }}
-    steps:
-      - id: step1
-        name: Get merge commit
-        run: |
-          COMMIT=$(gh pr view --repo "${{ github.repository }}" "${{ github.event.pull_request.number || inputs.PR_number }}" --json mergeCommit --jq '.mergeCommit.oid')
-          echo "merge_commit=$COMMIT" >> "$GITHUB_OUTPUT"
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
   picker:
     if: (github.event.pull_request.merged == true && contains(github.event.pull_request.labels.*.name, 'needs-cherrypick') ) || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
-    needs: inputs
     steps:
       - name: Check out code
         uses: actions/checkout@v2
         with:
-          ref: ${{ needs.inputs.outputs.merge_commit }}
+          # Always checkout the latest commit of main
+          ref: "main"
+          token: ${{ secrets.WORKER_PANTS_PAT }}
 
       - name: Cherry-Pick
         run: |
           git config --local user.email "pantsbuild+github-automation@gmail.com"
-          git config --local user.name "Worker Pants (Pantsbuild GitHub Automation Bot) "
-          build-support/bin/cherry_pick.sh ${{ github.event.pull_request.number || inputs.PR_number }}
+          git config --local user.name "Worker Pants (Pantsbuild GitHub Automation Bot)"
+          build-support/bin/cherry_pick.sh ${{ github.event.pull_request.number || inputs.PR_number }} origin
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.WORKER_PANTS_PAT }}
