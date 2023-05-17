@@ -183,20 +183,22 @@ It is strongly recommended that these tools be installed from a hermetic lockfil
 
 The only time you need to think about this is if you want to customize the tool requirements that Pants uses. This might be the case if you want to modify the version of a tool or add extra requirements (for example, tool plugins).
 
-If you want a tool to be installed from some resolve, instead of from the built-in lockfile, you set `install_from_resolve` on the tool's config section:
+If you want a tool to be installed from some resolve, instead of from the built-in lockfile, you set `install_from_resolve` and `requirements` on the tool's config section:
 
 ```toml pants.toml
 [python.resolves]
 pytest = "3rdparty/python/pytest.lock"
 
 [pytest]
-install_from_resolve = "pytest"
+install_from_resolve = "pytest"  # Use this resolve's lockfiles.
+requirements =["//3rdparty/python:pytest"]  # Use these requirements from the lockfile.
 ```
 
 Then set up the resolve's inputs:
 
 ```python 3rdparty/python/BUILD
 python_requirements(
+    name="pytest",
     source="pytest-requirements.txt",
     resolve="pytest",
 )
@@ -221,6 +223,12 @@ $ pants generate-lockfiles --resolve=pytest
 
 Note that some tools, such as Flake8 and Bandit, must run on a Python interpreter that is compatible with the code they operate on. In this case you must ensure that the [interpreter constraints](#interpreter-constraints) for the tool's resolve are the same as those for the code in question.
 
+### Invalidating tool lockfiles
+
+Pants will verify that any requirements set in the `requirements` option are provided by the lockfile specified by install_from_resolve, and will error if not. This lets you ensure that you don't inadvertently use an older version of a tool if you update its requirements but forget to regenerate the lockfile.
+The `requirements` option can either list requirement strings, such as `pytest==7.3.1`, or target addresses, such as `//3rdparty/python:pytest` (the `//` prefix tells Pants that these are target addresses). The latter is particularly useful as it allows you to avoid specifying the requirements redundantly in two places. Instead, the target can serve as both an input to the lockfile generator and as the requirements to verify.
+Pants will only use the given `requirements` from the lockfile. If you don't set `requirements`, Pants will use the entire lockfile, and won't validate that it provides the desired tool at the desired version.
+
 ### Sharing lockfiles between tools and code
 
 In some cases a tool also provides a runtime library. For example, `pytest` is run as a tool in a subprocess, but your tests can also `import pytest` to access testing functionality.
@@ -232,20 +240,20 @@ Rather than repeat the same requirement in two different resolves, you can point
 install_from_resolve = python-default
 ```
 
-Of course, you have to make sure that this resolve does in fact provide appropriate versions of the tool.
+Of course, you have to ensure that this resolve does in fact provide appropriate versions of the tool. 
 
-By default, Pants will use the entire lockfile when installing the tool. This may cause Pants to invalidate the tool, and therefore its outputs, due to unrelated changes in the lockfile. You can instead enumerate a subset of requirements to be installed from a larger lockfile using the `requirements` option:
+As above, you will want to point `requirements` to the subset of targets representing the tool's requirements, so that Pants can verify that the resolve provides them, and can use just the needed subset without unnecessary invalidation:
 
 ```toml pants.toml
 [pytest]
 install_from_resolve = python-default
 
 requirements = [
-  "pytest",
-  "pytest-cov",
-  "pytest-xdist",
-  "pytest-myplugin",
-  "ipdb",
+  "//3rdparty/python#pytest",
+  "//3rdparty/python#pytest-cov",
+  "//3rdparty/python#pytest-xdist",
+  "//3rdparty/python#pytest-myplugin",
+  "//3rdparty/python#ipdb",
 ]
 ```
 
