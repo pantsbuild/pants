@@ -61,7 +61,8 @@ if [[ -z $CATEGORY_LABEL ]]; then
   echo "Couldn't detect category label on PR. What's the label? (E.g., category:bugfix)"
   read -r CATEGORY_LABEL
 fi
-REVIEWERS=$(gh pr view "$PR_NUM" --json reviews --jq '.reviews.[].author.login' | sort | uniq)
+REVIEWERS=$(gh pr view "$PR_NUM" --json author --jq '.author.login')
+REVIEWERS+=$(gh pr view "$PR_NUM" --json reviews --jq '.reviews.[].author.login' | sort | uniq)
 
 BODY_FILE=$(mktemp "/tmp/github.cherrypick.$PR_NUM.XXXXXX")
 gh pr view "$PR_NUM" --json body --jq '.body' > "$BODY_FILE"
