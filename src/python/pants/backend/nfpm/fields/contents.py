@@ -6,7 +6,9 @@ from __future__ import annotations
 from enum import Enum
 from typing import ClassVar, Sequence
 
-from pants.engine.target import SequenceField, StringField, StringSequenceField, IntField, ScalarField
+from pants.backend.nfpm.fields.all import NfpmDependencies
+from pants.core.target_types import FileTarget, RelocatedFiles
+from pants.engine.target import SequenceField, StringField, StringSequenceField, IntField, ScalarField, OptionalSingleSourceField
 from pants.util.strutil import help_text
 
 
@@ -50,6 +52,27 @@ class NfpmContentFileMtimeField(StringField):
 # File-specific fields
 # -----------------------------------------------------------------------------------------------
 
+class NfpmContentFileSourceField(OptionalSingleSourceField):
+    nfpm_alias = ""
+    none_is_valid_value = True
+    # Maybe set this similar to DockerImageSourceField...
+    # default_glob_match_error_behavior =
+    help = help_text(
+        lambda: f"""
+        A file that should be copied into an nfpm package (optional).
+
+        Either specify a file with '{NfpmContentFileSourceField.alias}', or use
+        '{NfpmDependencies.alias}' to add a dependency on the target that owns
+        the file.
+
+        If both '{NfpmContentSrcField.alias}' and '{NfpmContentFileSourceField.alias}'
+        are populated, then the file in '{NfpmContentFileSourceField.alias}' will be
+        placed in the sandbox at the '{NfpmContentSrcField.alias}' path (similar to
+        how the '{RelocatedFiles.alias}' target works).
+        """
+    )
+
+
 class NfpmContentSrcField(StringField):
     nfpm_alias = "contents.[].src"
     alias: ClassVar[str] = "src"
@@ -62,6 +85,16 @@ class NfpmContentSrcField(StringField):
 
         This path should be relative to the sandbox. The path should point to a
         generated file or a real file sourced from the workspace.
+
+        The '{NfpmContentSrcField.alias}' defaults to the file referenced in the
+        '{NfpmContentFileSourceField.alias}' field, if provided. Otherwise, this
+        defaults to the path of the first '{FileTarget.alias}' target listed in the
+        '{NfpmDependencies.alias}'.
+
+        If both '{NfpmContentSrcField.alias}' and '{NfpmContentFileSourceField.alias}'
+        are populated, then the file in '{NfpmContentFileSourceField.alias}' will be
+        placed in the sandbox at the '{NfpmContentSrcField.alias}' path (similar to
+        how the '{RelocatedFiles.alias}' target works).
         """
     )
 
