@@ -19,6 +19,7 @@ from pants.backend.python.util_rules.lockfile_metadata import (
     PythonLockfileMetadata,
     PythonLockfileMetadataV2,
 )
+from pants.build_graph.address import Address
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.util_rules.lockfile_metadata import (
     InvalidLockfileError,
@@ -279,39 +280,38 @@ class EntireLockfile:
 class PexRequirements:
     """A request to resolve a series of requirements (optionally from a "superset" resolve)."""
 
-    req_strings: FrozenOrderedSet[str]
+    req_strings_or_addrs: FrozenOrderedSet[str | Address]
     constraints_strings: FrozenOrderedSet[str]
     # If these requirements should be resolved as a subset of either a repository PEX, or a
     # PEX-native lockfile, the superset to use. # NB: Use of a lockfile here asserts that the
     # lockfile is PEX-native, because legacy lockfiles do not support subset resolves.
     from_superset: Pex | Resolve | None
+    description_of_origin: str
 
     def __init__(
         self,
-        req_strings: Iterable[str] = (),
+        req_strings_or_addrs: Iterable[str | Address] = (),
         *,
         constraints_strings: Iterable[str] = (),
         from_superset: Pex | Resolve | None = None,
+        description_of_origin: str = "",
     ) -> None:
         """
-        :param req_strings: The requirement strings to resolve.
+        :param req_strings_or_addrs: The requirement strings to resolve, or addresses
+          of targets that refer to them, or string specs of such addresses.
         :param constraints_strings: Constraints strings to apply during the resolve.
         :param from_superset: An optional superset PEX or lockfile to resolve the req strings from.
+        :param description_of_origin: A human-readable description of what these requirements
+          represent, for use in error messages.
         """
-        object.__setattr__(self, "req_strings", FrozenOrderedSet(sorted(req_strings)))
+        object.__setattr__(
+            self, "req_strings_or_addrs", FrozenOrderedSet(sorted(req_strings_or_addrs))
+        )
         object.__setattr__(
             self, "constraints_strings", FrozenOrderedSet(sorted(constraints_strings))
         )
         object.__setattr__(self, "from_superset", from_superset)
-
-    @classmethod
-    def create_from_requirement_fields(
-        cls,
-        fields: Iterable[PythonRequirementsField],
-        constraints_strings: Iterable[str],
-    ) -> PexRequirements:
-        field_requirements = {str(python_req) for fld in fields for python_req in fld.value}
-        return PexRequirements(field_requirements, constraints_strings=constraints_strings)
+        object.__setattr__(self, "description_of_origin", description_of_origin)
 
     @classmethod
     def req_strings_from_requirement_fields(
@@ -319,10 +319,12 @@ class PexRequirements:
     ) -> FrozenOrderedSet[str]:
         """A convenience when you only need the raw requirement strings from fields and don't need
         to consider things like constraints or resolves."""
-        return cls.create_from_requirement_fields(fields, constraints_strings=()).req_strings
+        return FrozenOrderedSet(
+            sorted(str(python_req) for fld in fields for python_req in fld.value)
+        )
 
     def __bool__(self) -> bool:
-        return bool(self.req_strings)
+        return bool(self.req_strings_or_addrs)
 
 
 # NB: This is defined here so that our rule for ResolvePexConfigRequest -> ResolvePexConfig

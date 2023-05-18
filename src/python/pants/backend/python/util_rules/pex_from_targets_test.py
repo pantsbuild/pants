@@ -34,6 +34,7 @@ from pants.backend.python.util_rules.pex import (
     Pex,
     PexPlatforms,
     PexRequest,
+    ReqStrings,
 )
 from pants.backend.python.util_rules.pex_from_targets import (
     ChosenPythonResolve,
@@ -66,7 +67,7 @@ from pants.testutil.rule_runner import (
     run_rule_with_mocks,
 )
 from pants.util.contextutil import pushd
-from pants.util.ordered_set import OrderedSet
+from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 from pants.util.strutil import softwrap
 
 
@@ -78,6 +79,7 @@ def rule_runner() -> RuleRunner:
             *pex_from_targets.rules(),
             *target_types_rules.rules(),
             QueryRule(PexRequest, (PexFromTargetsRequest,)),
+            QueryRule(ReqStrings, (PexRequirements,)),
             QueryRule(GlobalRequirementConstraints, ()),
             QueryRule(ChosenPythonResolve, [ChosenPythonResolveRequest]),
             *setuptools.rules(),
@@ -651,10 +653,10 @@ def test_constraints_validation(tmp_path: Path, rule_runner: RuleRunner) -> None
     additional_lockfile_args = ["--no-strip-pex-env"]
 
     pex_req1 = get_pex_request(constraints1_filename, resolve_all_constraints=False)
-    assert pex_req1.requirements == PexRequirements(
-        ["foo-bar>=0.1.2", "bar==5.5.5", "baz", url_req],
-        constraints_strings=constraints1_strings,
-    )
+    assert isinstance(pex_req1.requirements, PexRequirements)
+    assert pex_req1.requirements.constraints_strings == FrozenOrderedSet(constraints1_strings)
+    req_strings_obj1 = rule_runner.request(ReqStrings, (pex_req1.requirements,))
+    assert req_strings_obj1.req_strings == ("bar==5.5.5", "baz", "foo-bar>=0.1.2", url_req)
 
     pex_req2 = get_pex_request(
         constraints1_filename,
@@ -664,7 +666,8 @@ def test_constraints_validation(tmp_path: Path, rule_runner: RuleRunner) -> None
     )
     pex_req2_reqs = pex_req2.requirements
     assert isinstance(pex_req2_reqs, PexRequirements)
-    assert list(pex_req2_reqs.req_strings) == ["bar==5.5.5", "baz", "foo-bar>=0.1.2", url_req]
+    req_strings_obj2 = rule_runner.request(ReqStrings, (pex_req2_reqs,))
+    assert req_strings_obj2.req_strings == ("bar==5.5.5", "baz", "foo-bar>=0.1.2", url_req)
     assert isinstance(pex_req2_reqs.from_superset, Pex)
     repository_pex = pex_req2_reqs.from_superset
     assert not get_all_data(rule_runner, repository_pex).info["strip_pex_env"]
@@ -725,7 +728,7 @@ def test_exclude_requirements(
     )
     pex_request = rule_runner.request(PexRequest, [request])
     assert isinstance(pex_request.requirements, PexRequirements)
-    assert len(pex_request.requirements.req_strings) == (1 if include_requirements else 0)
+    assert len(pex_request.requirements.req_strings_or_addrs) == (1 if include_requirements else 0)
 
 
 @pytest.mark.parametrize("include_sources", [False, True])
@@ -802,7 +805,11 @@ def test_cross_platform_pex_disables_subsetting(
     )
     result = rule_runner.request(PexRequest, [request])
 
-    assert result.requirements == PexRequirements(["foo"], constraints_strings=constraints)
+    assert result.requirements == PexRequirements(
+        request.addresses,
+        constraints_strings=constraints,
+        description_of_origin="//:lib",
+    )
 
 
 class ResolveMode(Enum):

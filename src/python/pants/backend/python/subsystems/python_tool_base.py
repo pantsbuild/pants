@@ -89,6 +89,14 @@ class PythonToolRequirementsBase(Subsystem):
             If install_from_resolve is specified, install these requirements,
             at the versions provided by the specified resolve's lockfile.
 
+            Values can be pip-style requirements (e.g., `tool` or `tool==1.2.3` or `tool>=1.2.3`),
+            or addresses of python_requirement targets (or targets that generate or depend on
+            python_requirement targets).
+
+            The lockfile will be validated against the requirements - if a lockfile doesn't
+            provide the requirement (at a suitable version, if the requirement specifies version
+            constraints) Pants will error.
+
             If unspecified, install the entire lockfile.
             """
         ),
@@ -204,18 +212,20 @@ class PythonToolRequirementsBase(Subsystem):
         If the tool supports lockfiles, the returned type will install from the lockfile rather than
         `all_requirements`.
         """
+        description_of_origin = f"the requirements of the `{self.options_scope}` tool"
         if self.install_from_resolve:
             use_entire_lockfile = not self.requirements
             return PexRequirements(
                 (*self.requirements, *extra_requirements),
                 from_superset=Resolve(self.install_from_resolve, use_entire_lockfile),
+                description_of_origin=description_of_origin,
             )
 
         requirements = (*self.all_requirements, *extra_requirements)
 
         # TODO: Redundant? I think no tools do not use a lockfile.
         if not self.uses_lockfile:
-            return PexRequirements(requirements)
+            return PexRequirements(requirements, description_of_origin=description_of_origin)
 
         hex_digest = calculate_invalidation_digest(requirements)
 
@@ -304,7 +314,7 @@ class PythonToolRequirementsBase(Subsystem):
         return PexRequest(
             output_filename=f"{self.options_scope.replace('-', '_')}.pex",
             internal_only=True,
-            requirements=self.pex_requirements(extra_requirements=extra_requirements),
+            requirements=requirements,
             interpreter_constraints=interpreter_constraints,
             main=main,
             sources=sources,
