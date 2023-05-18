@@ -121,7 +121,7 @@ def classify_changes() -> Jobs:
                           comparison_sha=$(git rev-parse HEAD^)
                         else
                           # pull request: just fetch what github is telling us the base is
-                          git fetch origin "$GITHUB_EVENT_PULL_REQUEST_BASE_SHA"
+                          git fetch origin --depth=1 "$GITHUB_EVENT_PULL_REQUEST_BASE_SHA"
                           comparison_sha="$GITHUB_EVENT_PULL_REQUEST_BASE_SHA"
                         fi
                         echo "comparison_sha=$comparison_sha" | tee -a $GITHUB_OUTPUT
