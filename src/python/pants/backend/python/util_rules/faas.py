@@ -296,16 +296,17 @@ class PythonFaaSLayoutField(StringField):
 
     help = help_text(
         """
-        The layout used for the function artefact.
+        The layout used for the function artifact.
 
-        With the `lambdex` layout (default), the artefact is created as a Lambdex, which is a normal
+        With the `lambdex` layout (default), the artifact is created as a Lambdex, which is a normal
         PEX that's been adjusted to include a shim file for the handler. This requires dynamically
         choosing dependencies on start-up.
 
-        With the `zip` layout, the artefact contains first and third party code at the top level,
-        similar to building with `pip install --target=...`. This layout chooses the appropriate
-        versions of dependencies at build time, and so at most one platform can be specified via
-        `runtime` or `complete_platforms`.
+        With the `zip` layout (recommended), the artifact contains first and third party code at the
+        top level, similar to building with `pip install --target=...`. This layout chooses the
+        appropriate versions of dependencies at build time, and so at most one platform can be
+        specified via `runtime` or `complete_platforms`. This matches the layout recommended by
+        cloud providers.
 
         """
     )
@@ -523,7 +524,7 @@ async def build_python_faas(
             platforms=pex_platforms,
             complete_platforms=complete_platforms,
             output_path=Path(output_filename),
-            description=f"Build {request.target_name} artefact for {request.address}",
+            description=f"Build {request.target_name} artifact for {request.address}",
         ),
     )
 
