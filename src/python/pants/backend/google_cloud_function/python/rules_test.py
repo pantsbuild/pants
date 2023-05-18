@@ -125,6 +125,9 @@ def complete_platform(rule_runner: PythonRuleRunner) -> bytes:
     ).stdout
 
 
+_first_run_of_deprecated_warning = True
+
+
 @pytest.mark.platform_specific_behavior
 @pytest.mark.parametrize(
     "major_minor_interpreter",
@@ -179,6 +182,15 @@ def test_create_hello_world_lambda_with_lambdex(
             "`python_google_cloud_function` targets built on macOS may fail to build."
             in caplog.text
         )
+
+    global _first_run_of_deprecated_warning
+    if _first_run_of_deprecated_warning:
+        _first_run_of_deprecated_warning = False
+        assert (
+            'DEPRECATED: use of `layout="lambdex"` (set by default) in target src/python/foo/bar:lambda is scheduled to be removed'
+            in caplog.text
+        )
+        assert "use_deprecated_lambdex_layout" in caplog.text
 
 
 def test_warn_files_targets(rule_runner: PythonRuleRunner, caplog) -> None:

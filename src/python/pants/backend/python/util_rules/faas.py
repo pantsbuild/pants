@@ -42,6 +42,7 @@ from pants.backend.python.util_rules.pex_from_targets import PexFromTargetsReque
 from pants.backend.python.util_rules.pex_from_targets import rules as pex_from_targets_rules
 from pants.backend.python.util_rules.pex_venv import PexVenv, PexVenvLayout, PexVenvRequest
 from pants.backend.python.util_rules.pex_venv import rules as pex_venv_rules
+from pants.base.deprecated import warn_or_error
 from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact, OutputPathField
 from pants.core.target_types import FileSourceField
 from pants.engine.addresses import Address, UnparsedAddressInputs
@@ -72,10 +73,11 @@ from pants.engine.target import (
     targets_with_sources_types,
 )
 from pants.engine.unions import UnionMembership, UnionRule
+from pants.option.global_options import GlobalOptions
 from pants.source.filespec import Filespec
 from pants.source.source_root import SourceRoot, SourceRootRequest
 from pants.util.docutil import bin_name, doc_url
-from pants.util.strutil import help_text
+from pants.util.strutil import help_text, softwrap
 
 logger = logging.getLogger(__name__)
 
@@ -284,7 +286,6 @@ class PythonFaaSRuntimeField(StringField, ABC):
 
 
 class PythonFaaSLayout(Enum):
-    # TODO: deprecate lambdex layout, since PEX can be used directly now
     LAMBDEX = "lambdex"
     ZIP = "zip"
 
@@ -292,15 +293,16 @@ class PythonFaaSLayout(Enum):
 class PythonFaaSLayoutField(StringField):
     alias = "layout"
     valid_choices = PythonFaaSLayout
-    default = PythonFaaSLayout.LAMBDEX.value
+    default = None
 
     help = help_text(
         """
         The layout used for the function artifact.
 
-        With the `lambdex` layout (default), the artifact is created as a Lambdex, which is a normal
-        PEX that's been adjusted to include a shim file for the handler. This requires dynamically
-        choosing dependencies on start-up.
+        With the `lambdex` layout (default unless `[GLOBAL].use_deprecated_lambdex_layout` is set to
+        `false`, deprecated), the artifact is created as a Lambdex, which is a normal PEX that's
+        been adjusted to include a shim file for the handler. This requires dynamically choosing
+        dependencies on start-up.
 
         With the `zip` layout (recommended), the artifact contains first and third party code at the
         top level, similar to building with `pip install --target=...`. This layout chooses the
@@ -310,6 +312,38 @@ class PythonFaaSLayoutField(StringField):
 
         """
     )
+
+    # TODO: this whole function can disappear once the LAMBDEX option is removed
+    def resolve_value(self, address: Address, global_options: GlobalOptions) -> PythonFaaSLayout:
+        if self.value is None:
+            layout = (
+                PythonFaaSLayout.LAMBDEX
+                if global_options.use_deprecated_lambdex_layout
+                else PythonFaaSLayout.ZIP
+            )
+        else:
+            layout = PythonFaaSLayout(self.value)
+
+        if layout is PythonFaaSLayout.LAMBDEX and global_options.options.is_default(
+            "use_deprecated_lambdex_layout"
+        ):
+            from_default = " (set by default)" if self.value is None else ""
+            warn_or_error(
+                Lambdex.removal_version,
+                f'use of `layout="lambdex"`{from_default} in target {address}',
+                softwrap(
+                    f"""
+                    {Lambdex.removal_hint}
+
+                    Set `use_deprecated_lambdex_layout = false` in the `[GLOBAL]` section of
+                    `pants.toml` to switch to using `layout="zip"` by default everywhere, or set it
+                    to `true` to temporarily continue with the old behaviour and silence this
+                    warning.
+                    """
+                ),
+            )
+
+        return layout
 
 
 @rule

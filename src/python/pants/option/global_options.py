@@ -1752,6 +1752,20 @@ class GlobalOptions(BootstrapOptions, Subsystem):
         default=[],
     )
 
+    use_deprecated_lambdex_layout = BoolOption(
+        default=True,
+        help=softwrap(
+            """
+            If `true`, any `python_awslambda` and `python_google_cloud_function` targets use the
+            `layout="lambdex"` by default. This is the older behaviour of these targets, and is
+            being removed.
+
+            If `false`, they will instead use the improved `layout="zip"` by default, which will
+            become the default in future.
+            """
+        ),
+    )
+
     @classmethod
     def validate_instance(cls, opts):
         """Validates an instance of global options for cases that are not prohibited via

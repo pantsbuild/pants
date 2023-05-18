@@ -24,6 +24,7 @@ from pants.core.goals.package import BuiltPackage, OutputPathField, PackageField
 from pants.core.util_rules.environments import EnvironmentField
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.unions import UnionRule
+from pants.option.global_options import GlobalOptions
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
@@ -44,9 +45,9 @@ class PythonAwsLambdaFieldSet(PackageFieldSet):
 
 @rule(desc="Create Python AWS Lambda", level=LogLevel.DEBUG)
 async def package_python_awslambda(
-    field_set: PythonAwsLambdaFieldSet,
+    field_set: PythonAwsLambdaFieldSet, global_options: GlobalOptions
 ) -> BuiltPackage:
-    layout = PythonFaaSLayout(field_set.layout.value)
+    layout = field_set.layout.resolve_value(field_set.address, global_options)
 
     if layout is PythonFaaSLayout.LAMBDEX:
         return await Get(
