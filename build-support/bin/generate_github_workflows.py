@@ -109,28 +109,37 @@ def classify_changes() -> Jobs:
                 "other": gha_expr("steps.classify.outputs.other"),
             },
             "steps": [
-                # fetch_depth must be 2.
-                *checkout(fetch_depth=2),
+                *checkout(),
                 {
-                    "id": "files",
-                    "name": "Get changed files",
-                    "uses": "tj-actions/changed-files@v32",
-                    "with": {"separator": "|"},
+                    "id": "comparison",
+                    "name": "Materialize comparison SHA",
+                    "run": dedent(
+                        """
+                        if [[ -z $GITHUB_EVENT_PULL_REQUEST_BASE_REF ]]; then
+                          # push: we need to make sure the parent commit(s) exist
+                          git fetch --deepen=1
+                          comparison_sha=$(git rev-parse HEAD^)
+                        else
+                          # pull request: just fetch what github is telling us the base is
+                          git fetch origin "$GITHUB_EVENT_PULL_REQUEST_BASE_SHA"
+                          comparison_sha="$GITHUB_EVENT_PULL_REQUEST_BASE_SHA"
+                        fi
+                        echo "comparison_sha=$comparison_sha" | tee -a $GITHUB_OUTPUT
+                        """
+                    )
                 },
                 {
                     "id": "classify",
                     "name": "Classify changed files",
                     "run": dedent(
                         f"""\
-                        affected=$(python build-support/bin/classify_changed_files.py "{gha_expr("steps.files.outputs.all_modified_files")}")
+                        affected=$(git diff --name-only  "{gha_expr("steps.comparison.outputs.comparison_sha")}" HEAD | python build-support/bin/classify_changed_files.py)
                         echo "Affected:"
                         if [[ "${{affected}}" == "docs" ]]; then
-                          echo "docs_only=true" >> $GITHUB_OUTPUT
-                          echo "docs_only"
+                          echo "docs_only=true" | tee -a $GITHUB_OUTPUT
                         fi
                         for i in ${{affected}}; do
-                          echo "${{i}}=true" >> $GITHUB_OUTPUT
-                          echo "${{i}}"
+                          echo "${{i}}=true" | tee -a $GITHUB_OUTPUT
                         done
                         """
                     ),
