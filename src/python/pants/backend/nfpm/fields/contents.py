@@ -3,14 +3,23 @@
 
 from __future__ import annotations
 
+import stat
 from enum import Enum
-from typing import ClassVar, Sequence
+from typing import ClassVar, Optional, Sequence
 
 from pants.backend.nfpm.fields.all import NfpmDependencies
 from pants.core.target_types import FileTarget, RelocatedFiles
-from pants.engine.target import SequenceField, StringField, StringSequenceField, IntField, ScalarField, OptionalSingleSourceField
+from pants.engine.addresses import Address
+from pants.engine.target import (
+    IntField,
+    InvalidFieldException,
+    OptionalSingleSourceField,
+    SequenceField,
+    StringField,
+    StringSequenceField,
+    ValidNumbers,
+)
 from pants.util.strutil import help_text
-
 
 # -----------------------------------------------------------------------------------------------
 # file_info fields
@@ -43,26 +52,123 @@ class NfpmContentFileGroupField(StringField):
     )
 
 
+# inlined private var from https://github.com/python/cpython/blob/3.9/Lib/stat.py#L128-L154
+_filemode_table = (
+    (),  # exclude irrelevant filetype bits that are in stat._filemode_table
+    ((stat.S_IRUSR, "r"),),
+    ((stat.S_IWUSR, "w"),),
+    ((stat.S_IXUSR | stat.S_ISUID, "s"), (stat.S_ISUID, "S"), (stat.S_IXUSR, "x")),
+    ((stat.S_IRGRP, "r"),),
+    ((stat.S_IWGRP, "w"),),
+    ((stat.S_IXGRP | stat.S_ISGID, "s"), (stat.S_ISGID, "S"), (stat.S_IXGRP, "x")),
+    ((stat.S_IROTH, "r"),),
+    ((stat.S_IWOTH, "w"),),
+    ((stat.S_IXOTH | stat.S_ISVTX, "t"), (stat.S_ISVTX, "T"), (stat.S_IXOTH, "x")),
+)
+_filemode_chars = set("-rwxsStT")
+
+
+def _parse_filemode(filemode: str) -> int:
+    """Parse string filemode into octal representation.
+
+    This is the opposite of stat.filemode, except that it does not support the filetype bits.
+    """
+    if len(filemode) != 9:
+        raise ValueError(f"Symbolic filemode must be exactly 9 characters, not {len(filemode)}.")
+    if not _filemode_chars.issuperset(filemode):
+        raise ValueError(
+            "Cannot parse symbolic filemode with unknown symbols: "
+            + "".join(set(filemode).difference(_filemode_chars))
+        )
+
+    mode = 0
+    # enumerate starting with index 1 to avoid irrelevant filetype bits.
+    for i, symbol in enumerate(filemode, 1):
+        for bit, char in _filemode_table[i]:
+            if symbol == char:
+                mode = mode | bit
+                break
+        else:
+            # else none of the chars matched symbol (loop didn't hit break)
+            raise ValueError(
+                f"Symbol at position {i} is unknown: '{symbol}'. Valid symbols at "
+                f"position {i}: {''.join(char for _, char in _filemode_table[i])}"
+            )
+    return mode
+
+
 class NfpmContentFileModeField(IntField):
-    # TODO: validate that this is an octal, not just an int.
-    # TODO: allow putting this as a string in BUILD files.
     nfpm_alias = "contents.[].file_info.mode"
     alias: ClassVar[str] = "file_mode"
-    # TODO: pants does not materialize mode (except the executable bit) in the sandbox
     # TODO: use the digest's execute bit to default to either 0o644 or 0o755
     #       and bypass any nFPM auto detection confusion.
     help = help_text(
         lambda: f"""
-        The file mode bits in octal format (starts with 0 or 0o).
+        A file mode as a numeric octal, an string octal, or a symbolic representation.
 
-        If not defined, nFPM pulls the mode from the sandboxed source file.
-        However, pants only propagates the executable file mode bit into the
-        sandbox, so no other mode bits can be automatically pulled.
-        So this can be lossy if not defined.
+        NB: In most cases, you should set this field and not rely on the default value.
+        Pants only tracks the executable bit for workspace files. So, this field defaults
+        to 0o755 for executable files and 0o644 for files that are not executable.
 
-        This is like the OCTAL-MODE arg in chmod: https://www.mankier.com/1/chmod
+        You may specify the file mode as: an octal, an octal string, or a symbolic string.
+        If you specify a numeric octal (not as a string), make sure to include python's
+        octal prefix: `0o` like in `0o644`. If you specify the octal as a string,
+        the `Oo` prefix is optional (like `644`). If you specify a symbolic file mode string,
+        you must provide 9 characters with "-" in place of any absent permissions
+        (like `'rw-r--r--'`).
+        
+        For example to specify world readable/executable and user writable, these
+        are equivalent:
+        
+        - `0o755`
+        - `'755'`
+        - `'rwxr-xr-x'`
+        
+        Another example for a file with read/write permissions for only the user:
+        
+        - `0o600`
+        - `'600'`
+        - `'rw-------'`
+        
+        Another example for a file with the group sticky bit set:
+        
+        - `0o2660`
+        - `'2660'`
+        - `'rw-rwS---'`
+        
+        WARNING: If you forget to include the `0o` prefix on a numeric octal, then
+        it will be interpreted as an integer which is probably not what you want.
+        For example, `755` (no quotes) will be processed as `0o1363` (symbolically
+        that would be '-wxrw--wt') which is probably not what you intended. Pants
+        cannot detect errors like this, so be careful to either use a string or
+        include the `0o` octal prefix. 
         """
     )
+
+    # The octal should be between 0o0000 and 0o7777 (inclusive)
+    valid_numbers = ValidNumbers.positive_only
+
+    @classmethod
+    def compute_value(cls, raw_value: Optional[int | str], address: Address) -> Optional[int]:
+        if isinstance(raw_value, str):
+            try:
+                octal_value = int(raw_value, 8)
+            except ValueError:
+                try:
+                    octal_value = _parse_filemode(raw_value)
+                except ValueError as e:
+                    raise InvalidFieldException(
+                        f"The {repr(cls.alias)} field in target {address} must be "
+                        "an octal (like 0o755 or 0o600), "
+                        "an octal as a string (like '755' or '600'), "
+                        "or a symbolic filemode (like 'rwxr-xr-x' or 'rw-------'). "
+                        f"It is set to {repr(raw_value)}."
+                    ) from e
+        else:
+            octal_value = raw_value
+        value = super().compute_value(octal_value, address)
+        # TODO: maybe warn if the octal value is higher than expected (value > 0o7777).
+        return value
 
 
 class NfpmContentFileMtimeField(StringField):
@@ -98,6 +204,7 @@ class NfpmContentFileMtimeField(StringField):
 # -----------------------------------------------------------------------------------------------
 # File-specific fields
 # -----------------------------------------------------------------------------------------------
+
 
 class NfpmContentFileSourceField(OptionalSingleSourceField):
     nfpm_alias = ""
