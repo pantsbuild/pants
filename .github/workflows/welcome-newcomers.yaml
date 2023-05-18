@@ -1,11 +1,11 @@
-name: first-interaction
+name: Say Hello to Firsttimers
 
 on:
   issues:
     types: [opened]
-  pull_request:
-    branches: [main]
+  pull_request_target:
     types: [opened]
+    branches: [main]
 
 jobs:
   check_for_first_interaction:
