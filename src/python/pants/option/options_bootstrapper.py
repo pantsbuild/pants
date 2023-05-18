@@ -171,7 +171,7 @@ class OptionsBootstrapper:
             val = DictValueComponent.merge([DictValueComponent.create(v) for v in alias_vals]).val
             alias = CliAlias.from_dict(val)
 
-            alias_flags_vals = post_bootstrap_config.get("cli", "alias_flag")
+            alias_flags_vals = post_bootstrap_config.get("cli", "alias_flags")
             val = DictValueComponent.merge(
                 [DictValueComponent.create(v) for v in alias_flags_vals]
             ).val

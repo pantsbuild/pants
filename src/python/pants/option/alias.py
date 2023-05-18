@@ -70,7 +70,7 @@ class CliOptions(Subsystem):
 
 
             This would allow you to run `{bin_name()} test --all-changed `, which is shorthand for
-            `{bin_name()} fmt lint check --changed-since=HEAD --changed-dependents=transitive`.
+            `{bin_name()} test --changed-since=HEAD --changed-dependents=transitive`.
 
             This is different from `[cli].alias` in that it requires each argument to start with `-`
             or `--`, thus supporting only a subset of the `[cli].alias` functionality. The upside is
