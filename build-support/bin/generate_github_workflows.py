@@ -114,7 +114,7 @@ def classify_changes() -> Jobs:
                     "id": "classify",
                     "name": "Classify changed files",
                     "run": dedent(
-                        f"""\
+                        """\
                         if [[ -z $GITHUB_EVENT_PULL_REQUEST_BASE_REF ]]; then
                           # push: compare to the immediate parent, which should already be fetched
                           # (checkout's fetch_depth defaults to 10)
@@ -128,11 +128,11 @@ def classify_changes() -> Jobs:
 
                         affected=$(git diff --name-only "$comparison_sha" HEAD | python build-support/bin/classify_changed_files.py)
                         echo "Affected:"
-                        if [[ "${{affected}}" == "docs" ]]; then
+                        if [[ "${affected}" == "docs" ]]; then
                           echo "docs_only=true" | tee -a $GITHUB_OUTPUT
                         fi
-                        for i in ${{affected}}; do
-                          echo "${{i}}=true" | tee -a $GITHUB_OUTPUT
+                        for i in ${affected}; do
+                          echo "${i}=true" | tee -a $GITHUB_OUTPUT
                         done
                         """
                     ),
