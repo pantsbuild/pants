@@ -53,6 +53,8 @@ To use an unreleased build of Pants from the [pantsbuild/pants](https://github.c
 PANTS_SHA=8553e8cbc5a1d9da3f84dcfc5e7bf3139847fb5f pants --version
 ```
 
+If a particular SHA does not have built wheels, you can either wait for [the next release from the relevant branch](doc:release-strategy), ping a maintainer [in Slack](doc:getting-help), or file a Github issue mentioning the SHA that you would like to test.
+
 Running Pants from sources
 --------------------------
 

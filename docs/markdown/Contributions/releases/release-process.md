@@ -213,15 +213,10 @@ Also, update the [Changelog](doc:changelog)'s "highlights" column with a link to
 > 
 > Ping someone in the `#maintainers-confidential` channel in Slack to be added. Alternatively, you can "Suggest edits" in the top right corner.
 
-Step 3: Wait for CI to build the wheels
+Step 3: Tag the release to build wheels
 ---------------------------------------
 
-Once you have merged the `VERSION` bump—which will be on `main` for `dev` and `a0` releases and the release branch for release candidates—CI will start building the wheels you need to finish the release.
-
-Head to <https://github.com/pantsbuild/pants/actions> and find your relevant build. You need the "Build wheels and fs_util" jobs to pass.
-
-Step 4: Run `release.sh`
-------------------------
+Once you have merged the `VERSION` bump — which will be on `main` for `dev` and `a0` releases and the release branch for release candidates — you should tag the release commit to trigger wheel building and PyPI publishing.
 
 First, ensure that you are on your release branch at your version bump commit.
 
@@ -232,12 +227,15 @@ First, ensure that you are on your release branch at your version bump commit.
 Then, run:
 
 ```bash
-./build-support/bin/release.sh publish
+./build-support/bin/release.sh tag-release
 ```
 
-This will first download the pre-built wheels built in CI and will publish them to PyPI. About 2-3 minutes in, the script will prompt you for your PGP password.
+This will tag the release with your PGP key, and push the tag to origin, which will kick off a [`Release` job](https://github.com/pantsbuild/pants/actions/workflows/release.yaml) to build the wheels and publish them to PyPI.
 
-We also release a Pants Pex via GitHub releases. Run this:
+Step 4: Release a Pants PEX
+---------------------------
+
+After the [`Release` job](https://github.com/pantsbuild/pants/actions/workflows/release.yaml) for your tag has completed, you should additionally build and publish the "universal" PEX to Github.
 
 ```bash
 PANTS_PEX_RELEASE=STABLE ./build-support/bin/release.sh build-universal-pex
