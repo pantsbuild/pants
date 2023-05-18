@@ -296,7 +296,7 @@ def test_create_hello_world_lambda(rule_runner: PythonRuleRunner) -> None:
     zip_file_relpath, content = create_python_awslambda(
         rule_runner,
         Address("src/python/foo/bar", target_name="lambda"),
-        expected_extra_log_lines=("    Handler: lambdex_handler.handler",),
+        expected_extra_log_lines=("    Handler: lambda_function.handler",),
     )
     assert "src.python.foo.bar/lambda.zip" == zip_file_relpath
 
@@ -305,13 +305,13 @@ def test_create_hello_world_lambda(rule_runner: PythonRuleRunner) -> None:
     assert "mureq/__init__.py" in names
     assert "foo/bar/hello_world.py" in names
     assert (
-        zipfile.read("lambdex_handler.py") == b"from foo.bar.hello_world import handler as handler"
+        zipfile.read("lambda_function.py") == b"from foo.bar.hello_world import handler as handler"
     )
 
     zip_file_relpath, content = create_python_awslambda(
         rule_runner,
         Address("src/python/foo/bar", target_name="slimlambda"),
-        expected_extra_log_lines=("    Handler: lambdex_handler.handler",),
+        expected_extra_log_lines=("    Handler: lambda_function.handler",),
     )
     assert "src.python.foo.bar/slimlambda.zip" == zip_file_relpath
 
@@ -320,5 +320,5 @@ def test_create_hello_world_lambda(rule_runner: PythonRuleRunner) -> None:
     assert "mureq/__init__.py" not in names
     assert "foo/bar/hello_world.py" in names
     assert (
-        zipfile.read("lambdex_handler.py") == b"from foo.bar.hello_world import handler as handler"
+        zipfile.read("lambda_function.py") == b"from foo.bar.hello_world import handler as handler"
     )
