@@ -134,7 +134,7 @@ def test_invalid_alias_name(alias: str) -> None:
 
 
 @pytest.mark.parametrize(
-    "definitions",
+    "arg, definitions",
     [
         ("goal", {"alias": "--foobar goal"}),
         ("goal", {"alias": "--foobar=test goal"}),
@@ -142,12 +142,11 @@ def test_invalid_alias_name(alias: str) -> None:
         ("goal", {"alias": "--foobar goal --baz"}),
     ],
 )
-def test_invalid_alias_value_(definitions: (str, dict[str, str])) -> None:
-    expected, definitions = definitions
+def test_invalid_alias_value_(arg: str, definitions: dict[str, str]) -> None:
     with pytest.raises(
         CliAliasInvalidError,
         match=(
-            rf"Invalid expansion in `\[cli\].alias_flags` option: {expected!r}. All expanded values must be flags."
+            rf"Invalid expansion in `\[cli\].alias_flags` option: {arg!r}. All expanded values must be flags."
         ),
     ):
         CliAliasFlag.from_dict(definitions)
