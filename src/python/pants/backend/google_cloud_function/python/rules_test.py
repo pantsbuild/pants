@@ -175,7 +175,10 @@ def test_create_hello_world_lambda(
     assert "main.py" in names
     assert "foo/bar/hello_world.py" in names
     if sys.platform == "darwin":
-        assert "Google Cloud Functions built on macOS may fail to build." in caplog.text
+        assert (
+            "`python_google_cloud_function` targets built on macOS may fail to build."
+            in caplog.text
+        )
 
 
 def test_warn_files_targets(rule_runner: PythonRuleRunner, caplog) -> None:

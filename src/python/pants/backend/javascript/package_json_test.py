@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from textwrap import dedent
 from typing import Iterable
 
@@ -15,6 +16,8 @@ from pants.backend.javascript.package_json import (
     NodeTestScript,
     NodeThirdPartyPackageTarget,
     PackageJson,
+    PackageJsonImports,
+    PackageJsonSourceField,
     PackageJsonTarget,
 )
 from pants.build_graph.address import Address
@@ -36,6 +39,7 @@ def rule_runner() -> RuleRunner:
             *package_json.rules(),
             QueryRule(AllPackageJson, ()),
             QueryRule(Owners, (OwnersRequest,)),
+            QueryRule(PackageJsonImports, (PackageJsonSourceField,)),
         ],
         target_types=[
             PackageJsonTarget,
@@ -269,3 +273,46 @@ def test_specifying_missing_custom_coverage_entry_point_script_is_an_error(
     )
     with pytest.raises(ExecutionError):
         rule_runner.get_target(Address("src/js", generated_name="ham"))
+
+
+def test_parses_subpath_imports(
+    rule_runner: RuleRunner,
+) -> None:
+    rule_runner.write_files(
+        {
+            "src/js/BUILD": dedent(
+                """\
+                package_json()
+                """
+            ),
+            "src/js/package.json": json.dumps(
+                {
+                    "name": "ham",
+                    "version": "0.0.1",
+                    "imports": {
+                        "#a": "./yep.js",
+                        "#b": "some-package",
+                        "#c": {"node": "polyfill", "default": "./polyfill.js"},
+                        "#d/module/js/*.js": "./module/*.js",
+                    },
+                }
+            ),
+        }
+    )
+
+    tgt = rule_runner.get_target(Address("src/js", generated_name="ham"))
+    imports = rule_runner.request(PackageJsonImports, (tgt[PackageJsonSourceField],))
+
+    assert imports.imports == FrozenDict(
+        {
+            re.compile(r"^\#a"): ("./yep.js",),  # noqa: W605 # Escape added by re.escape
+            re.compile(r"^\#b"): ("some-package",),  # noqa: W605 # Escape added by re.escape
+            re.compile("^\#c"): (  # noqa: W605 # Escape added by re.escape
+                "./polyfill.js",
+                "polyfill",
+            ),
+            re.compile(r"^\#d/module/js/(.*)\.js"): (  # noqa: W605 # Escape added by re.escape
+                "./module/*.js",
+            ),
+        }
+    )

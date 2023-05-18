@@ -12,7 +12,7 @@
   },
   "license": "APACHE2",
   "files": ["script.cjs"],
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Parses commonjs and esmodule import statements.",
   "keywords": [],
   "author": "",

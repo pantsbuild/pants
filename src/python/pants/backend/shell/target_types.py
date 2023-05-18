@@ -266,7 +266,15 @@ class ShellSourcesGeneratorTarget(TargetFilesGenerator):
 class ShellCommandCommandField(StringField):
     alias = "command"
     required = True
-    help = "Shell command to execute.\n\nThe command is executed as 'bash -c <command>' by default."
+    help = help_text(
+        """
+        Shell command to execute.
+
+        The command is executed as 'bash -c <command>' by default. If you want to invoke a binary
+        use `exec -a $0 <binary> <args>` as the command so that the binary gets the correct `argv[0]`
+        set.
+        """
+    )
 
 
 class ShellCommandOutputFilesField(AdhocToolOutputFilesField):

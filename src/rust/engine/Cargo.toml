@@ -79,6 +79,7 @@ default-members = [
   "cache",
   "client",
   "concrete_time",
+  "dep_inference",
   "fs",
   "fs/fs_util",
   "fs/store",
@@ -129,6 +130,7 @@ concrete_time = { path = "concrete_time" }
 crossbeam-channel = "0.5"
 # TODO: Waiting on https://github.com/Aeledfyr/deepsize/pull/{30,31,32}.
 deepsize = { git = "https://github.com/stuhood/deepsize.git", rev = "5c8bee5443fcafe4aaa9274490d354412d0955c1", features=["internment", "smallvec"] }
+dep_inference = { path = "dep_inference" }
 derivative = "2.2"
 async-oncecell = "0.2"
 docker = { path = "process_execution/docker" }
@@ -152,8 +154,11 @@ num_enum = "0.5"
 parking_lot = "0.12"
 petgraph = "0.6"
 process_execution = { path = "process_execution" }
-pyo3 = "0.16"
+# TODO: Change to ^0.18.4 once https://github.com/PyO3/pyo3/pull/3142 is released
+pyo3 =  { git = "https://github.com/PyO3/pyo3.git", rev = "c7d541b9ad2a9ef0255ab69541e67b22fe3fbf32" }
 rand = "0.8"
+# See https://github.com/PyO3/pyo3/issues/3151
+syn = "1.0.85"
 regex = "1"
 reqwest = { version = "0.11", default_features = false, features = ["stream", "rustls-tls"] }
 rule_graph = { path = "rule_graph" }
@@ -165,7 +170,7 @@ task_executor = { path = "task_executor" }
 tempfile = "3.5.0"
 testutil_mock = { package = "mock", path = "testutil/mock" }
 time = "0.3.20"
-tokio = { version = "1.21", features = ["macros", "rt", "rt-multi-thread"] }
+tokio = { version = "1.28", features = ["macros", "rt", "rt-multi-thread"] }
 tokio-retry = "0.3"
 tokio-util = { version = "0.7", features = ["io"] }
 tryfuture = { path = "tryfuture" }
@@ -182,4 +187,4 @@ fs = { path = "./fs" }
 env_logger = "0.10.0"
 
 [build-dependencies]
-pyo3-build-config = "0.17"
+pyo3-build-config = "0.18"
