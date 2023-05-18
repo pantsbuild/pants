@@ -219,15 +219,6 @@ class NodeJS(Subsystem, TemplatedExternalToolOptionsMixin):
             return tuple(sorted(set(self._corepack_env_vars)))
 
 
-class UserChosenNodeJSResolveAliases(FrozenDict[str, str]):
-    pass
-
-
-@rule(level=LogLevel.DEBUG)
-async def user_chosen_resolve_aliases(nodejs: NodeJS) -> UserChosenNodeJSResolveAliases:
-    return UserChosenNodeJSResolveAliases((value, key) for key, value in nodejs.resolves.items())
-
-
 @dataclass(frozen=True)
 class NodeJSToolProcess:
     """A request for a tool installed with NodeJS."""
