@@ -61,9 +61,11 @@ jobs:
       with:
         name: pants-log-wheels-Linux-ARM64
         path: .pants.d/pants.log
-    - name
-    - run
-    - env
+    - env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      name: Deploy wheels to S3
+      run: ./build-support/bin/deploy_to_s3.py
     timeout-minutes: 90
   build_wheels_linux_x86_64:
     container:
@@ -123,9 +125,11 @@ jobs:
       with:
         name: pants-log-wheels-Linux-x86_64
         path: .pants.d/pants.log
-    - name
-    - run
-    - env
+    - env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      name: Deploy wheels to S3
+      run: ./build-support/bin/deploy_to_s3.py
     timeout-minutes: 90
   build_wheels_macos10_15_x86_64:
     env:
@@ -186,9 +190,11 @@ jobs:
       with:
         name: pants-log-wheels-macOS10-15-x86_64
         path: .pants.d/pants.log
-    - name
-    - run
-    - env
+    - env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      name: Deploy wheels to S3
+      run: ./build-support/bin/deploy_to_s3.py
     timeout-minutes: 90
   build_wheels_macos11_arm64:
     env:
@@ -245,9 +251,11 @@ jobs:
       with:
         name: pants-log-wheels-macOS11-ARM64
         path: .pants.d/pants.log
-    - name
-    - run
-    - env
+    - env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      name: Deploy wheels to S3
+      run: ./build-support/bin/deploy_to_s3.py
     timeout-minutes: 90
   determine_ref:
     if: github.repository_owner == 'pantsbuild'
