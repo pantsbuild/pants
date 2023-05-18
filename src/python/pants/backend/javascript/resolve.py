@@ -9,6 +9,7 @@ from typing import Iterable
 from pants.backend.javascript import nodejs_project
 from pants.backend.javascript.nodejs_project import AllNodeJSProjects, NodeJSProject
 from pants.backend.javascript.package_json import (
+    FirstPartyNodePackageTargets,
     NodePackageNameField,
     OwningNodePackage,
     OwningNodePackageRequest,
@@ -89,6 +90,20 @@ async def resolve_to_projects(
         )
 
     return NodeJSProjectResolves((get_name(project), project) for project in all_projects)
+
+
+class FirstPartyNodePackageResolves(FrozenDict[str, Target]):
+    pass
+
+
+@rule
+async def resolve_to_first_party_node_package(
+    resolves: NodeJSProjectResolves, all_first_party: FirstPartyNodePackageTargets
+) -> FirstPartyNodePackageResolves:
+    by_dir = {first_party.residence_dir: first_party for first_party in all_first_party}
+    return FirstPartyNodePackageResolves(
+        (resolve, by_dir[project.root_dir]) for resolve, project in resolves.items()
+    )
 
 
 @rule(level=LogLevel.DEBUG)
