@@ -752,7 +752,7 @@ def build_wheels_job(
 
     if container:
         initial_steps = [
-            *checkout(containerized=True),
+            *checkout(containerized=True, ref=for_deploy_ref),
             install_rustup(),
             {
                 "name": "Expose Pythons",
@@ -785,6 +785,7 @@ def build_wheels_job(
             "name": f"Build wheels ({str(platform.value)})",
             "runs-on": helper.runs_on(),
             **({"container": container} if container else {}),
+            **({"needs": needs} if needs else {}),
             "timeout-minutes": 90,
             "env": {
                 **DISABLE_REMOTE_CACHE_ENV,
@@ -794,13 +795,13 @@ def build_wheels_job(
                 # than to not use debug mode.
                 **({} if for_deploy_ref else {"MODE": "debug"}),
             },
-            "steps": initial_steps
-            + [
+            "steps": [
+                *initial_steps,
                 setup_toolchain_auth(),
                 *([] if platform == Platform.LINUX_ARM64 else [install_go()]),
                 *helper.build_wheels(python_versions),
                 helper.upload_log_artifacts(name="wheels"),
-                *(deploy_to_s3("Deploy wheels to S3") if for_deploy_ref else []),
+                *([deploy_to_s3("Deploy wheels to S3")] if for_deploy_ref else []),
             ],
         },
     }
@@ -967,6 +968,7 @@ def release_jobs_and_inputs() -> tuple[Jobs, dict[str, Any]]:
     wheels_job_names = tuple(wheels_jobs.keys())
     jobs = {
         "determine_ref": {
+            "name": "Determine the ref to build",
             "runs-on": "ubuntu-latest",
             "if": IS_PANTS_OWNER,
             "steps": [

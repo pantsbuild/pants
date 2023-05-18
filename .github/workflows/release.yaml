@@ -12,6 +12,8 @@ jobs:
       PANTS_REMOTE_CACHE_WRITE: 'false'
     if: github.repository_owner == 'pantsbuild'
     name: Build wheels (Linux-ARM64)
+    needs:
+    - determine_ref
     runs-on:
     - self-hosted
     - Linux
@@ -21,6 +23,7 @@ jobs:
       uses: actions/checkout@v3
       with:
         fetch-depth: 10
+        ref: ${{ needs.determine_ref.outputs.build-ref }}
     - name: Configure Git
       run: git config --global safe.directory "$GITHUB_WORKSPACE"
     - name: Install rustup
@@ -61,9 +64,11 @@ jobs:
       with:
         name: pants-log-wheels-Linux-ARM64
         path: .pants.d/pants.log
-    - name
-    - run
-    - env
+    - env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      name: Deploy wheels to S3
+      run: ./build-support/bin/deploy_to_s3.py
     timeout-minutes: 90
   build_wheels_linux_x86_64:
     container:
@@ -73,6 +78,8 @@ jobs:
       PANTS_REMOTE_CACHE_WRITE: 'false'
     if: github.repository_owner == 'pantsbuild'
     name: Build wheels (Linux-x86_64)
+    needs:
+    - determine_ref
     runs-on:
     - ubuntu-20.04
     steps:
@@ -80,6 +87,7 @@ jobs:
       uses: actions/checkout@v3
       with:
         fetch-depth: 10
+        ref: ${{ needs.determine_ref.outputs.build-ref }}
     - name: Configure Git
       run: git config --global safe.directory "$GITHUB_WORKSPACE"
     - name: Install rustup
@@ -123,9 +131,11 @@ jobs:
       with:
         name: pants-log-wheels-Linux-x86_64
         path: .pants.d/pants.log
-    - name
-    - run
-    - env
+    - env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      name: Deploy wheels to S3
+      run: ./build-support/bin/deploy_to_s3.py
     timeout-minutes: 90
   build_wheels_macos10_15_x86_64:
     env:
@@ -133,6 +143,8 @@ jobs:
       PANTS_REMOTE_CACHE_WRITE: 'false'
     if: github.repository_owner == 'pantsbuild'
     name: Build wheels (macOS10-15-x86_64)
+    needs:
+    - determine_ref
     runs-on:
     - self-hosted
     - macOS-10.15-X64
@@ -186,9 +198,11 @@ jobs:
       with:
         name: pants-log-wheels-macOS10-15-x86_64
         path: .pants.d/pants.log
-    - name
-    - run
-    - env
+    - env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      name: Deploy wheels to S3
+      run: ./build-support/bin/deploy_to_s3.py
     timeout-minutes: 90
   build_wheels_macos11_arm64:
     env:
@@ -196,6 +210,8 @@ jobs:
       PANTS_REMOTE_CACHE_WRITE: 'false'
     if: github.repository_owner == 'pantsbuild'
     name: Build wheels (macOS11-ARM64)
+    needs:
+    - determine_ref
     runs-on:
     - self-hosted
     - macOS-11-ARM64
@@ -245,12 +261,15 @@ jobs:
       with:
         name: pants-log-wheels-macOS11-ARM64
         path: .pants.d/pants.log
-    - name
-    - run
-    - env
+    - env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      name: Deploy wheels to S3
+      run: ./build-support/bin/deploy_to_s3.py
     timeout-minutes: 90
   determine_ref:
     if: github.repository_owner == 'pantsbuild'
+    name: Determine the ref to build
     outputs:
       build-ref: ${{ steps.determine_ref.outputs.build-ref }}
       is-release: ${{ steps.determine_ref.outputs.is-release }}
